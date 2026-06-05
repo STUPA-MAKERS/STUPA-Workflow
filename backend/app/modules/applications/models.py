@@ -15,9 +15,13 @@ from decimal import Decimal
 
 from sqlalchemy import (
     CHAR,
+    Boolean,
+    CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     Text,
     UniqueConstraint,
@@ -26,7 +30,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base, TimestampMixin, UUIDPkMixin
+from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
 
 class Application(UUIDPkMixin, TimestampMixin, Base):
@@ -118,3 +122,29 @@ class StatusEvent(UUIDPkMixin, Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (Index("ix_status_event_application_id_at", "application_id", "at"),)
+
+
+class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
+    """Magic-Link für Antragsteller (security.md §1).
+
+    DB hält **nur** `sha256(token||pepper)` — der Klartext-Token existiert allein im
+    Mail-Link. Scope bindet an genau eine `application_id` + `edit|view`; Expiry +
+    `single_use` (`used_at`) erzwingen Einmal-/Ablauf-Logik (Verify → 410)."""
+
+    __tablename__ = "magic_link"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary)
+    scope: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    single_use: Mapped[bool] = mapped_column(Boolean, server_default="false")
+
+    __table_args__ = (
+        CheckConstraint("scope IN ('edit','view')", name="magic_link_scope"),
+        Index("ix_magic_link_token_hash", "token_hash"),
+    )

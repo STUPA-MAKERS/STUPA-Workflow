@@ -18,6 +18,11 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "greenlet>=3.1",
+    # Auth (T-10): OIDC-Token-Exchange (httpx), id_token-Verify (PyJWT+crypto),
+    # signierte Cookies/Tokens (itsdangerous).
+    "httpx>=0.28",
+    "pyjwt[crypto]>=2.10",
+    "itsdangerous>=2.2",
 ]
 
 [project.optional-dependencies]
@@ -85,16 +90,18 @@ exclude_lines = [
 ]
 
 # Kritische Module: 100 % Branch als eigenes Gate (testing.md §1).
-# Geprüft von scripts/coverage_critical.py gegen coverage.xml. Module entstehen in
-# Folge-Tasks (auth/voting/flow/budget/webhooks/audit) — Gate aktiviert sich, sobald
-# der jeweilige Pfad existiert; Negativ-Probe: tests/test_coverage_gate.py.
+# Geprüft von scripts/coverage_critical.py gegen coverage.xml. Pfade sind relativ
+# zum Coverage-`source` (= `app`), wie in coverage.xml gelistet (z.B.
+# `modules/auth/oidc.py`). Module entstehen in Folge-Tasks (auth/voting/flow/budget/
+# webhooks/audit) — Gate aktiviert sich, sobald der jeweilige Pfad existiert;
+# Negativ-Probe: tests/test_coverage_gate.py.
 [tool.coverage_critical]
 modules = [
-    "app/modules/auth",
-    "app/modules/voting",
-    "app/modules/flow",
-    "app/modules/budget",
-    "app/modules/webhooks",
-    "app/modules/audit",
+    "modules/auth",
+    "modules/voting",
+    "modules/flow",
+    "modules/budget",
+    "modules/webhooks",
+    "modules/audit",
 ]
 min_branch_rate = 1.0

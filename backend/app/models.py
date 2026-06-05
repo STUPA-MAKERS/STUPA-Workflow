@@ -12,10 +12,12 @@ from app.modules.admin.models import ApplicationType, Gremium, MailList
 from app.modules.applications.models import (
     Applicant,
     Application,
+    MagicLink,
     StatusEvent,
     SubmissionVersion,
 )
 from app.modules.auth.models import (
+    AuthSession,
     GroupMapping,
     Principal,
     Role,
@@ -30,6 +32,7 @@ __all__ = [
     "Applicant",
     "Application",
     "ApplicationType",
+    "AuthSession",
     "Base",
     "BudgetField",
     "BudgetPot",
@@ -38,6 +41,7 @@ __all__ = [
     "FormVersion",
     "Gremium",
     "GroupMapping",
+    "MagicLink",
     "MailList",
     "Principal",
     "Role",

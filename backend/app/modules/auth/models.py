@@ -8,11 +8,18 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Index, PrimaryKeyConstraint, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    PrimaryKeyConstraint,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base, UUIDPkMixin
+from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class Principal(UUIDPkMixin, Base):
@@ -23,8 +30,10 @@ class Principal(UUIDPkMixin, Base):
     sub: Mapped[str] = mapped_column(Text, unique=True)
     email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
     display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    oidc_groups: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    last_login: Mapped[datetime | None] = mapped_column(nullable=True)
+    oidc_groups: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    last_login: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class Role(UUIDPkMixin, Base):
@@ -65,6 +74,26 @@ class RoleAssignment(UUIDPkMixin, Base):
     delegate_voting: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     __table_args__ = (Index("ix_role_assignment_principal_id", "principal_id"),)
+
+
+class AuthSession(UUIDPkMixin, CreatedAtMixin, Base):
+    """Server-Session eines OIDC-Principals (security.md §2).
+
+    Der Browser bekommt nur ein signiertes, opakes `sid` im HttpOnly+Secure+
+    SameSite=Lax-Cookie — kein JWT im JS. id/refresh-Token bleiben serverseitig
+    (Refresh/Logout). Über Instanzen konsistent via gemeinsamer DB."""
+
+    __tablename__ = "auth_session"
+
+    sid: Mapped[str] = mapped_column(Text, unique=True)
+    principal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    id_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_auth_session_principal_id", "principal_id"),)
 
 
 class GroupMapping(UUIDPkMixin, Base):

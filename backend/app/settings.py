@@ -46,6 +46,37 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     db_migration_url: str | None = None
 
+    # — OIDC / Keycloak (security.md §2). Ohne vollständige Config ist OIDC »aus«
+    #   (Login/Callback → 503), Magic-Link bleibt unabhängig nutzbar. —
+    oidc_issuer: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_redirect_url: str | None = None
+    oidc_scopes: str = "openid email profile"
+    oidc_groups_claim: str = "groups"
+    oidc_post_logout_redirect_url: str | None = None
+
+    # — Session-/Applicant-Cookie (security.md §1/§2: HttpOnly+Secure+SameSite=Lax) —
+    session_cookie_name: str = "ap_session"
+    applicant_cookie_name: str = "ap_applicant"
+    oidc_tx_cookie_name: str = "ap_oidc_tx"
+    session_ttl_hours: int = 12
+    cookie_secure: bool = True
+
+    # — Magic-Link-Laufzeiten (security.md §1) —
+    magic_link_edit_ttl_days: int = 7
+    magic_link_action_ttl_minutes: int = 15
+
+    @property
+    def oidc_enabled(self) -> bool:
+        """OIDC nur aktiv, wenn alle Pflicht-Parameter gesetzt sind."""
+        return bool(
+            self.oidc_issuer
+            and self.oidc_client_id
+            and self.oidc_client_secret
+            and self.oidc_redirect_url
+        )
+
 
 def load_settings(**overrides: Any) -> Settings:
     """Settings laden; fehlende Pflichtfelder → `SettingsError` mit klarer Meldung."""

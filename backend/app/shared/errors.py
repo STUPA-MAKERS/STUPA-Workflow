@@ -221,3 +221,53 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, _validation_handler)  # type: ignore[arg-type]
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, _unhandled_handler)
+
+
+def _ensure_problem_components(schema: dict[str, object]) -> None:
+    """`ProblemDetail`(+`FieldError`) im components-Block registrieren (idempotent)."""
+    components = schema.setdefault("components", {})
+    assert isinstance(components, dict)
+    schemas = components.setdefault("schemas", {})
+    assert isinstance(schemas, dict)
+    if "ProblemDetail" in schemas:
+        return
+    model = ProblemDetail.model_json_schema(
+        ref_template="#/components/schemas/{model}"
+    )
+    for name, definition in model.pop("$defs", {}).items():
+        schemas.setdefault(name, definition)
+    schemas["ProblemDetail"] = model
+
+
+def use_problem_json_contract(app: FastAPI) -> None:
+    """OpenAPI an den Fehler-Contract angleichen (api.md §2).
+
+    FastAPI dokumentiert Fehler-/422-Antworten als `application/json`; die Handler
+    liefern jedoch `application/problem+json` (RFC-9457-nah). Diese Anpassung schreibt
+    **alle** 4xx/5xx-Antworten auf `application/problem+json` + `ProblemDetail` um, damit
+    der Contract (Schemathesis content/status/schema) konsistent ist."""
+    generate = app.openapi
+
+    def custom_openapi() -> dict[str, object]:
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = generate()
+        _ensure_problem_components(schema)
+        problem_content = {
+            "application/problem+json": {
+                "schema": {"$ref": "#/components/schemas/ProblemDetail"}
+            }
+        }
+        paths = schema.get("paths", {})
+        assert isinstance(paths, dict)
+        for operations in paths.values():
+            for operation in operations.values():
+                if not isinstance(operation, dict):
+                    continue
+                for code, response in operation.get("responses", {}).items():
+                    if str(code)[0] in {"4", "5"} and isinstance(response, dict):
+                        response["content"] = problem_content
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi  # type: ignore[method-assign]
