@@ -28,6 +28,12 @@ is fed first-party, app-generated documents, so it defaults to `trusted` — whi
 lets the first build pull the tectonic bundle, after which the `pytex_cache`
 volume serves it offline.
 
+> ⚠️ **The pytex port must stay private.** The `trusted` default runs builds with
+> the full tectonic/biber toolchain (shell-out, network on first build). Never
+> publish port `8099` to a host or expose it outside the `internal` network;
+> untrusted callers reaching it could abuse the trusted build path. Keep it
+> reachable only from the backend.
+
 #### Error contract
 Detail strings are scrubbed of absolute filesystem paths; no stacktrace leaks.
 
@@ -59,11 +65,13 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/ruff check . && .venv/bin/basedpyright && .venv/bin/python -m pytest
 ```
 
-Unit tests mock the render backend (no tectonic needed). The real-render
-integration tests are opt-in:
+Unit tests mock the render backend (no tectonic needed). The md→tex real-render
+integration tests run the genuine variant machinery and need no tectonic, so
+they run in CI by default. Only the md→pdf test is skipped unless `tectonic` is
+on `PATH`:
 
 ```bash
-RUN_PYTEX_INTEGRATION=1 .venv/bin/python -m pytest -m integration
+.venv/bin/python -m pytest -m integration   # md->tex run; md->pdf needs tectonic
 ```
 
 ## Example

@@ -95,6 +95,20 @@ async def render(
     ),
 ) -> Response:
     """Render the raw request body (Markdown) to a PDF or LaTeX blob."""
+    # Reject oversized uploads from the declared Content-Length *before* reading
+    # the body into memory, so a giant POST never gets buffered. A missing or
+    # malformed header falls through to the post-read guard below.
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            if int(declared) > _MAX_BODY_BYTES:
+                return JSONResponse(
+                    {"error": f"request body exceeds {_MAX_BODY_BYTES} bytes"},
+                    status_code=413,
+                )
+        except ValueError:
+            pass  # malformed header; defensive fall-through to read + length check
+
     source = await request.body()
     if not source:
         return JSONResponse(
