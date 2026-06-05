@@ -16,8 +16,9 @@ from fastapi import APIRouter, FastAPI
 from app.db import dispose_engine
 from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.modules.auth.router import router as auth_router
 from app.settings import Settings, get_settings
-from app.shared.errors import register_exception_handlers
+from app.shared.errors import register_exception_handlers, use_problem_json_contract
 
 api_router = APIRouter(prefix="/api")
 
@@ -26,6 +27,9 @@ api_router = APIRouter(prefix="/api")
 def health() -> dict[str, str]:
     """Liveness-Endpunkt (Container-Healthcheck)."""
     return {"status": "ok"}
+
+
+api_router.include_router(auth_router)
 
 
 @asynccontextmanager
@@ -51,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_exception_handlers(app)
 
     app.include_router(api_router)
+    use_problem_json_contract(app)
     return app
 
 

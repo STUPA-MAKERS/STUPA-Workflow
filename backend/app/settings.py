@@ -8,8 +8,11 @@ Layout/Namen siehe `deploy/.env.example`.
 from functools import lru_cache
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Mindestlänge für Signing-/Client-Secrets (security.md §10: keine schwachen Secrets).
+_MIN_SECRET_LEN = 16
 
 
 class SettingsError(RuntimeError):
@@ -31,10 +34,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     public_base_url: str = "http://localhost"
 
-    # — Pflicht-Secrets (kein Default) —
+    # — Pflicht-Secrets (kein Default; Mindestlänge erzwungen) —
     database_url: str
-    session_secret: str
-    magic_link_secret: str
+    session_secret: str = Field(min_length=_MIN_SECRET_LEN)
+    magic_link_secret: str = Field(min_length=_MIN_SECRET_LEN)
 
     # — Reverse-Proxy (security.md §3): eng, nie "*" —
     forwarded_allow_ips: str = "127.0.0.1"
@@ -45,6 +48,37 @@ class Settings(BaseSettings):
     # — Optionale Infra (in späteren Tasks genutzt) —
     redis_url: str = "redis://redis:6379/0"
     db_migration_url: str | None = None
+
+    # — OIDC / Keycloak (security.md §2). Ohne vollständige Config ist OIDC »aus«
+    #   (Login/Callback → 503), Magic-Link bleibt unabhängig nutzbar. —
+    oidc_issuer: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
+    oidc_redirect_url: str | None = None
+    oidc_scopes: str = "openid email profile"
+    oidc_groups_claim: str = "groups"
+    oidc_post_logout_redirect_url: str | None = None
+
+    # — Session-/Applicant-Cookie (security.md §1/§2: HttpOnly+Secure+SameSite=Lax) —
+    session_cookie_name: str = "ap_session"
+    applicant_cookie_name: str = "ap_applicant"
+    oidc_tx_cookie_name: str = "ap_oidc_tx"
+    session_ttl_hours: int = 12
+    cookie_secure: bool = True
+
+    # — Magic-Link-Laufzeiten (security.md §1) —
+    magic_link_edit_ttl_days: int = 7
+    magic_link_action_ttl_minutes: int = 15
+
+    @property
+    def oidc_enabled(self) -> bool:
+        """OIDC nur aktiv, wenn alle Pflicht-Parameter gesetzt sind."""
+        return bool(
+            self.oidc_issuer
+            and self.oidc_client_id
+            and self.oidc_client_secret
+            and self.oidc_redirect_url
+        )
 
 
 def load_settings(**overrides: Any) -> Settings:
