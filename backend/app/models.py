@@ -12,6 +12,7 @@ from app.modules.admin.models import ApplicationType, Gremium, MailList
 from app.modules.applications.models import (
     Applicant,
     Application,
+    Comment,
     MagicLink,
     StatusEvent,
     SubmissionVersion,
@@ -36,6 +37,7 @@ __all__ = [
     "Base",
     "BudgetField",
     "BudgetPot",
+    "Comment",
     "FlowVersion",
     "FormField",
     "FormVersion",

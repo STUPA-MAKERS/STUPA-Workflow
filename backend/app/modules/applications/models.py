@@ -82,7 +82,9 @@ class Applicant(UUIDPkMixin, Base):
     )
     email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    anonymized_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    anonymized_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class SubmissionVersion(UUIDPkMixin, Base):
@@ -149,4 +151,34 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
         # UNIQUE: trägt die atomare Single-Use-Einlösung (UPDATE … WHERE used_at IS
         # NULL) + verhindert Hash-Kollisions-Mehrdeutigkeit (security.md §1).
         Index("ix_magic_link_token_hash", "token_hash", unique=True),
+    )
+
+
+class Comment(UUIDPkMixin, Base):
+    """Antrags-Kommentar (data-model §1 »comment«).
+
+    `visibility='internal'` sehen nur Principals (RBAC); `'public'` auch der
+    Antragsteller (Magic-Link). `author_kind` trennt Principal- von Applicant-Autor."""
+
+    __tablename__ = "comment"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    author: Mapped[str | None] = mapped_column(Text, nullable=True)
+    author_kind: Mapped[str] = mapped_column(Text)
+    body: Mapped[str] = mapped_column(Text)
+    visibility: Mapped[str] = mapped_column(Text)
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "author_kind IN ('principal','applicant')", name="comment_author_kind"
+        ),
+        CheckConstraint(
+            "visibility IN ('internal','public')", name="comment_visibility"
+        ),
+        Index("ix_comment_application_id_at", "application_id", "at"),
     )

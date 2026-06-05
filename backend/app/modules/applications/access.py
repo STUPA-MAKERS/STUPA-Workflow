@@ -1,0 +1,96 @@
+"""Zugriffsauflösung für Antrags-Endpunkte (T-12, api.md §1/§3).
+
+Antrags-Routen sind ``A/P``: erreichbar entweder vom **Principal** (Session +
+Permission) **oder** vom **Antragsteller** (Magic-Link-Token, auf genau eine
+``application_id`` + Scope gebunden). Diese Dependencies vereinen beide Identitäten
+zu einem :class:`Access`-Objekt und erzwingen 401 (keine Identität) / 403 (Identität
+ohne ausreichendes Recht).
+
+Sichtbarkeit interner Kommentare hängt allein an :attr:`Access.can_see_internal`
+(nur Principal) — der Antragsteller sieht ausschließlich ``public`` (api.md §3).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import Depends
+
+from app.deps import get_current_applicant, get_current_principal
+from app.modules.auth.principal import Applicant, ApplicantScope, Principal
+from app.shared.errors import ForbiddenError, UnauthorizedError
+
+READ_PERMISSION = "application.read"
+MANAGE_PERMISSION = "application.manage"
+
+
+@dataclass(slots=True)
+class Access:
+    """Aufgelöster Zugriff auf genau einen Antrag (Principal **oder** Applicant)."""
+
+    application_id: UUID
+    principal: Principal | None
+    applicant: Applicant | None
+
+    @property
+    def can_see_internal(self) -> bool:
+        """Nur Principals sehen interne Kommentare/PII; Antragsteller nie."""
+        return self.principal is not None
+
+    @property
+    def author_kind(self) -> str:
+        return "principal" if self.principal is not None else "applicant"
+
+    @property
+    def actor(self) -> str:
+        """Audit-Akteur: Principal-``sub`` bzw. ``'applicant'``."""
+        return self.principal.sub if self.principal is not None else "applicant"
+
+
+def _resolve(
+    application_id: UUID,
+    principal: Principal | None,
+    applicant: Applicant | None,
+    *,
+    perm: str,
+    scope: ApplicantScope,
+) -> Access:
+    """Principal-Permission **oder** Applicant-Scope gegen den Antrag prüfen."""
+    if principal is not None:
+        if principal.has(perm):
+            return Access(application_id, principal, None)
+        raise ForbiddenError(f"Missing permission: {perm}")
+    if applicant is not None:
+        if str(applicant.application_id) == str(application_id) and applicant.allows(
+            scope
+        ):
+            return Access(application_id, None, applicant)
+        raise ForbiddenError("Magic-link does not grant access to this application.")
+    raise UnauthorizedError("Authentication required.")
+
+
+async def require_app_read(
+    application_id: UUID,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> Access:
+    """Lesezugriff: Principal mit ``application.read`` oder ``view``-Antragsteller."""
+    return _resolve(
+        application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
+    )
+
+
+async def require_app_edit(
+    application_id: UUID,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> Access:
+    """Schreibzugriff: Principal mit ``application.manage`` oder ``edit``-Antragsteller.
+
+    Der Edit-Lock (``state.editAllowed``) wird **zusätzlich** im Service geprüft (409),
+    unabhängig von der Identität."""
+    return _resolve(
+        application_id, principal, applicant, perm=MANAGE_PERMISSION, scope="edit"
+    )
