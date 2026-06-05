@@ -133,7 +133,11 @@ jobs:
             curl -sf http://127.0.0.1:8000/api/health && break || sleep 1
           done
       - name: Schemathesis
-        run: schemathesis run http://127.0.0.1:8000/openapi.json --checks all
+        # Volle Contract-Checks. `unsupported_method` ausgenommen: erzwingt RFC-9110
+        # `Allow`-Header am 405 — gehört in den Error-Contract-Handler (T-02), nicht T-04.
+        run: >
+          schemathesis run http://127.0.0.1:8000/openapi.json
+          --checks all --exclude-checks unsupported_method
 
   # ---- 6 FE-Unit/Komponente (Jest + ATL) ----------------------------------- #
   fe-unit:
