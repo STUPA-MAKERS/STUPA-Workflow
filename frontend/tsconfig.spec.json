@@ -1,0 +1,12 @@
+/* TypeScript config for the Jest unit-test run. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "types": ["jest", "node"]
+  },
+  "include": ["src/**/*.spec.ts", "src/**/*.d.ts", "setup-jest.ts"]
+}

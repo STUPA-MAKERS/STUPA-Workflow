@@ -1,0 +1,193 @@
+// =============================================================================
+// CD-Tokens — Antragsplattform Design-System (T-03, requirements N1/N1a)
+// -----------------------------------------------------------------------------
+// HSRT/STUPA Corporate Design. Primärfarbe: British Racing Green.
+// Zwei Ebenen:
+//   1. PRIMITIVE  — rohe Palette (theme-unabhängig), Namen `--c-*`.
+//   2. SEMANTIC   — rollenbasierte Tokens (`--color-bg`, `--color-primary`, …),
+//      pro Theme (Light/Dark) neu gemappt. NUR Semantic-Tokens in Komponenten
+//      nutzen — nie Primitive direkt.
+// Theme-Schalter: `data-theme="light|dark"` auf <html> (ThemeService).
+// =============================================================================
+
+:root {
+  // --- 1. PRIMITIVE: British Racing Green Scale ------------------------------
+  --c-brg-50: #e9f1ec;
+  --c-brg-100: #c8dccf;
+  --c-brg-200: #a0c1ac;
+  --c-brg-300: #72a384;
+  --c-brg-400: #4a8763;
+  --c-brg-500: #2c6e48;
+  --c-brg-600: #155a34;
+  --c-brg-700: #004225; // British Racing Green — Markenkern
+  --c-brg-800: #00351e;
+  --c-brg-900: #002615;
+
+  // --- PRIMITIVE: Neutralskala (warm-neutral) -------------------------------
+  --c-neutral-0: #ffffff;
+  --c-neutral-50: #f7f8f7;
+  --c-neutral-100: #eef0ee;
+  --c-neutral-200: #e0e3e0;
+  --c-neutral-300: #c7ccc8;
+  --c-neutral-400: #9aa19c;
+  --c-neutral-500: #6e756f;
+  --c-neutral-600: #515751;
+  --c-neutral-700: #3a3f3b;
+  --c-neutral-800: #232724;
+  --c-neutral-850: #1b1f1c;
+  --c-neutral-900: #141815;
+  --c-neutral-950: #0c0f0d;
+
+  // --- PRIMITIVE: Akzent (warm-bronze, sparsam) -----------------------------
+  --c-accent-400: #c8a25a;
+  --c-accent-500: #b08530;
+  --c-accent-600: #8c6820;
+
+  // --- PRIMITIVE: Status -----------------------------------------------------
+  --c-success-500: #2c7a4b;
+  --c-success-600: #1f5d38;
+  --c-warning-500: #b5821a;
+  --c-warning-600: #8f6510;
+  --c-danger-500: #b3261e;
+  --c-danger-600: #8c1c16;
+  --c-info-500: #1f6f8b;
+  --c-info-600: #185468;
+
+  // --- TYPOGRAPHIE -----------------------------------------------------------
+  --font-sans: 'Archivo', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --fs-xs: 0.75rem; // 12
+  --fs-sm: 0.875rem; // 14
+  --fs-md: 1rem; // 16 (Basis)
+  --fs-lg: 1.125rem; // 18
+  --fs-xl: 1.375rem; // 22
+  --fs-2xl: 1.75rem; // 28
+  --fs-3xl: 2.25rem; // 36
+  --lh-tight: 1.2;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.7;
+  --tracking-tight: -0.01em;
+
+  // --- SPACING (4px-Raster, viel Weißraum N1) --------------------------------
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
+  --space-10: 4rem;
+  --space-12: 6rem;
+
+  // --- RADIUS / BORDER / SHADOW ---------------------------------------------
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 18px;
+  --radius-pill: 999px;
+  --border-width: 1px;
+
+  // --- LAYOUT ----------------------------------------------------------------
+  --layout-max-width: 1180px;
+  --layout-header-height: 64px;
+  --layout-gutter: var(--space-5);
+
+  // --- MOTION ----------------------------------------------------------------
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  // --- Z-INDEX ---------------------------------------------------------------
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-dialog: 1300;
+  --z-toast: 1400;
+}
+
+// =============================================================================
+// 2. SEMANTIC TOKENS — LIGHT (Default)
+// =============================================================================
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-bg: var(--c-neutral-50);
+  --color-bg-elevated: var(--c-neutral-0);
+  --color-surface: var(--c-neutral-0);
+  --color-surface-sunken: var(--c-neutral-100);
+  --color-border: var(--c-neutral-200);
+  --color-border-strong: var(--c-neutral-300);
+
+  --color-text: var(--c-neutral-900);
+  --color-text-muted: var(--c-neutral-500);
+  --color-text-inverse: var(--c-neutral-0);
+
+  --color-primary: var(--c-brg-700);
+  --color-primary-hover: var(--c-brg-800);
+  --color-primary-active: var(--c-brg-900);
+  --color-primary-subtle: var(--c-brg-50);
+  --color-on-primary: var(--c-neutral-0);
+  --color-focus-ring: var(--c-brg-500);
+
+  --color-accent: var(--c-accent-600);
+
+  --color-success: var(--c-success-600);
+  --color-success-subtle: #e3f1e8;
+  --color-warning: var(--c-warning-600);
+  --color-warning-subtle: #f7eed8;
+  --color-danger: var(--c-danger-600);
+  --color-danger-subtle: #f7e1df;
+  --color-info: var(--c-info-600);
+  --color-info-subtle: #dfeef3;
+
+  --shadow-sm: 0 1px 2px rgba(0, 38, 21, 0.06), 0 1px 3px rgba(0, 38, 21, 0.08);
+  --shadow-md: 0 2px 6px rgba(0, 38, 21, 0.08), 0 6px 16px rgba(0, 38, 21, 0.08);
+  --shadow-lg: 0 8px 28px rgba(0, 38, 21, 0.14);
+}
+
+// =============================================================================
+// SEMANTIC TOKENS — DARK
+// =============================================================================
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-bg: var(--c-neutral-950);
+  --color-bg-elevated: var(--c-neutral-900);
+  --color-surface: var(--c-neutral-850);
+  --color-surface-sunken: var(--c-neutral-900);
+  --color-border: #2c322d;
+  --color-border-strong: #3c443e;
+
+  --color-text: var(--c-neutral-50);
+  --color-text-muted: var(--c-neutral-400);
+  --color-text-inverse: var(--c-neutral-950);
+
+  --color-primary: var(--c-brg-300);
+  --color-primary-hover: var(--c-brg-200);
+  --color-primary-active: var(--c-brg-100);
+  --color-primary-subtle: #10271b;
+  --color-on-primary: var(--c-neutral-950);
+  --color-focus-ring: var(--c-brg-300);
+
+  --color-accent: var(--c-accent-400);
+
+  --color-success: #5cba80;
+  --color-success-subtle: #122a1c;
+  --color-warning: #d6a548;
+  --color-warning-subtle: #2c2412;
+  --color-danger: #e0685f;
+  --color-danger-subtle: #2c1614;
+  --color-info: #5aa6c0;
+  --color-info-subtle: #122730;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 32px rgba(0, 0, 0, 0.6);
+}
