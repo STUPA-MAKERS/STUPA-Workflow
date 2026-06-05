@@ -1,0 +1,223 @@
+"""Einheitlicher Fehler-Contract (api.md §2, RFC-9457-nah).
+
+Problem-JSON:
+    {"type","title","status","code","detail","errors":[{"field","msg"}],"traceId"}
+
+`AppError` + Subklassen tragen Status/Code/Title. `register_exception_handlers`
+mappt AppError, FastAPI-Validierung, Starlette-HTTP (z.B. unbekannte Route) und
+unbehandelte Exceptions auf das Problem-JSON. Nach außen **keine** Stacktraces/Pfade.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Sequence
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import JSONResponse
+
+logger = logging.getLogger("app.error")
+
+PROBLEM_CONTENT_TYPE = "application/problem+json"
+
+# Status → stabiler Fehlercode (api.md §2).
+STATUS_CODE_MAP: dict[int, str] = {
+    400: "bad_request",
+    401: "unauthorized",
+    403: "forbidden",
+    404: "not_found",
+    409: "conflict",
+    410: "gone",
+    413: "payload_too_large",
+    422: "validation_error",
+    429: "rate_limited",
+    500: "internal_error",
+}
+
+# Status → menschenlesbarer Titel (Default, falls AppError keinen setzt).
+STATUS_TITLE_MAP: dict[int, str] = {
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    409: "Conflict",
+    410: "Gone",
+    413: "Payload Too Large",
+    422: "Unprocessable Entity",
+    429: "Too Many Requests",
+    500: "Internal Server Error",
+}
+
+
+class FieldError(BaseModel):
+    field: str
+    msg: str
+
+
+class ProblemDetail(BaseModel):
+    type: str
+    title: str
+    status: int
+    code: str
+    detail: str | None = None
+    errors: list[FieldError] | None = None
+    traceId: str | None = None
+
+
+def code_for(status: int) -> str:
+    return STATUS_CODE_MAP.get(status, "error")
+
+
+def title_for(status: int) -> str:
+    return STATUS_TITLE_MAP.get(status, "Error")
+
+
+class AppError(Exception):
+    """Domänen-/HTTP-Fehler mit Mapping auf das Problem-JSON."""
+
+    status: int = 500
+
+    def __init__(
+        self,
+        detail: str | None = None,
+        *,
+        code: str | None = None,
+        title: str | None = None,
+        errors: Sequence[FieldError | dict[str, str]] | None = None,
+    ) -> None:
+        self.status = type(self).status
+        self.code = code or code_for(self.status)
+        self.title = title or title_for(self.status)
+        self.detail = detail
+        self.errors: list[FieldError] | None = (
+            [e if isinstance(e, FieldError) else FieldError(**e) for e in errors]
+            if errors is not None
+            else None
+        )
+        super().__init__(self.detail or self.title)
+
+    def to_problem(self, trace_id: str | None) -> ProblemDetail:
+        return ProblemDetail(
+            type=f"app://error/{self.code}",
+            title=self.title,
+            status=self.status,
+            code=self.code,
+            detail=self.detail,
+            errors=self.errors,
+            traceId=trace_id,
+        )
+
+
+class BadRequestError(AppError):
+    status = 400
+
+
+class UnauthorizedError(AppError):
+    status = 401
+
+
+class ForbiddenError(AppError):
+    status = 403
+
+
+class NotFoundError(AppError):
+    status = 404
+
+
+class ConflictError(AppError):
+    status = 409
+
+
+class GoneError(AppError):
+    status = 410
+
+
+class PayloadTooLargeError(AppError):
+    status = 413
+
+
+class ValidationProblem(AppError):
+    """422 — Validierung gegen Form/Config (api.md). Name vermeidet Pydantic-Kollision."""
+
+    status = 422
+
+
+class RateLimitedError(AppError):
+    status = 429
+
+
+def _trace_id(request: Request) -> str | None:
+    return getattr(request.state, "trace_id", None)
+
+
+def _problem_response(problem: ProblemDetail) -> JSONResponse:
+    return JSONResponse(
+        status_code=problem.status,
+        content=problem.model_dump(exclude_none=True),
+        media_type=PROBLEM_CONTENT_TYPE,
+        headers={"X-Trace-Id": problem.traceId} if problem.traceId else None,
+    )
+
+
+async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    return _problem_response(exc.to_problem(_trace_id(request)))
+
+
+async def _validation_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    errors = [
+        FieldError(field=".".join(str(p) for p in e["loc"]), msg=e["msg"])
+        for e in exc.errors()
+    ]
+    problem = ProblemDetail(
+        type="app://error/validation_error",
+        title=title_for(422),
+        status=422,
+        code="validation_error",
+        detail="Request validation failed.",
+        errors=errors,
+        traceId=_trace_id(request),
+    )
+    return _problem_response(problem)
+
+
+async def _http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    status = exc.status_code
+    detail = exc.detail if isinstance(exc.detail, str) else None
+    problem = ProblemDetail(
+        type=f"app://error/{code_for(status)}",
+        title=title_for(status),
+        status=status,
+        code=code_for(status),
+        detail=detail,
+        traceId=_trace_id(request),
+    )
+    return _problem_response(problem)
+
+
+async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
+    # Intern volle Info loggen, nach außen nichts leaken (keine Pfade/Stacktraces).
+    logger.exception("Unhandled exception", exc_info=exc)
+    problem = ProblemDetail(
+        type="app://error/internal_error",
+        title=title_for(500),
+        status=500,
+        code="internal_error",
+        detail="An internal error occurred.",
+        traceId=_trace_id(request),
+    )
+    return _problem_response(problem)
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """Alle Handler an die App binden (Reihenfolge: spezifisch → generisch)."""
+    app.add_exception_handler(AppError, _app_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(RequestValidationError, _validation_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(StarletteHTTPException, _http_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(Exception, _unhandled_handler)
