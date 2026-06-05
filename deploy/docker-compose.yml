@@ -13,7 +13,11 @@ x-restart: &restart
 services:
   web:
     # SPA-Static + Routing /api -> api. Einziger NPM-Upstream.
-    image: nginx:1.27-alpine
+    # Multi-Stage-Image baut das Angular-FE (frontend/) und liefert es per nginx
+    # aus. Context = Repo-Root, damit frontend/ + deploy/web/nginx.conf greifbar.
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
     <<: *restart
     depends_on:
       api:
@@ -22,8 +26,9 @@ services:
       # Nur lokal gebunden; externer NPM proxyt hierher (oder via `proxy`-Netz).
       - "127.0.0.1:8080:80"
     volumes:
+      # nginx.conf ist ins Image gebacken; Mount erlaubt prod-Edits (real_ip-CIDR)
+      # ohne Rebuild. SPA-HTML kommt aus dem Image (kein html-Mount mehr).
       - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./web/html:/usr/share/nginx/html:ro
     networks:
       - internal
       - proxy

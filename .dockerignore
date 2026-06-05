@@ -1,0 +1,8 @@
+# Greift nur für Builds mit Repo-Root als Context (aktuell: deploy/web).
+# backend/ und pytex/ bauen aus eigenem Context mit eigener .dockerignore.
+**/node_modules
+**/dist
+frontend/.angular
+**/coverage
+.git
+**/__pycache__
