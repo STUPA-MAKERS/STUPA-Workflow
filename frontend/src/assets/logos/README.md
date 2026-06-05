@@ -1,14 +1,20 @@
-# Logo-Set (Platzhalter)
+# Logo-Set
 
-**Achtung:** Dies sind eigenständige Platzhalter im CD-Stil (British Racing Green,
-`currentColor` → theme-adaptiv). Die **verbindlichen HSRT/STUPA-Assets liegen in
-Nextcloud** (requirements N1) und ersetzen diese Dateien 1:1, sobald verfügbar.
+Offizielle **STUPA**-Assets aus dem Corporate Design (Nextcloud
+`Corporate Design/Icons-und-Logos/`, requirements N1). 1:1 als Ersatz der
+früheren CD-Stil-Platzhalter eingesetzt.
 
-| Datei | Verwendung |
-|---|---|
-| `stupa-mark.svg` | quadratische Marke (Favicon, App-Icon) |
-| `stupa-wordmark.svg` | Header-Logo (Wort + Marke), `currentColor` |
-| `hsrt-wordmark.svg` | Footer-Co-Branding, `currentColor` |
+| Datei | Verwendung | Quelle (Nextcloud CD) |
+|---|---|---|
+| `stupa-mark.svg` | quadratische Marke (Favicon, App-Icon) | `Icon/STUPA/STUPA-Logo_icon-only.svg` |
+| `stupa-wordmark.svg` | Header- **und** Footer-Logo (Wort + Marke) | `Logo/STUPA/STUPA-Logo_gray-text.svg` |
 
-`currentColor` + `var(--color-bg)` machen die SVGs **theme-abhängig** (Light/Dark)
-ohne separate Dateien (Q16): die Komponente setzt `color` aus dem Theme-Token.
+`favicon.ico` (`frontend/public/`) ist aus `stupa-mark.svg` gerendert
+(16/32/48/64 px, ImageMagick).
+
+**Theme/Hell-Dunkel:** Die Marke ist mehrfarbig (CD-Signalfarben) und liest auf
+hellem wie dunklem Header. Für die Wortmarke wird die neutrale CD-Variante
+`gray-text` (#706f6f) verwendet — kontraststabil in Light- **und** Dark-Theme,
+da das Logo per `<img src>` eingebunden ist und so kein `currentColor`/Theme-Token
+erbt. Eine echte Light/Dark-Umschaltung (black-text/white-text) würde
+`shell.component` (Markup/SCSS) berühren → bewusst vermieden (Konflikt mit T-30/T-36).
