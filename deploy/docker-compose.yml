@@ -1,0 +1,195 @@
+# Antragsplattform — docker-compose Skelett (T-01)
+# Eine VM, plain HTTP intern hinter externem Nginx Proxy Manager (TLS-Edge).
+# Kein TLS/Cert/Keycloak im Stack. Einziger Host-Port: `web` (127.0.0.1:8080).
+# Alle anderen Services nur intern -> kein Internet-Ingress. Egress erlaubt
+# (worker: SMTP/WebDAV/Webhooks, pytex: tectonic-Bundle, api: OIDC).
+# Referenz: sds/deployment.md §1-§5, sds/overview.md §2.
+
+name: antragsplattform
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  web:
+    # SPA-Static + Routing /api -> api. Einziger NPM-Upstream.
+    image: nginx:1.27-alpine
+    <<: *restart
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      # Nur lokal gebunden; externer NPM proxyt hierher (oder via `proxy`-Netz).
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web/html:/usr/share/nginx/html:ro
+    networks:
+      - internal
+      - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    # FastAPI (uvicorn --proxy-headers). Kein Host-Port.
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    <<: *restart
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    # arq Worker + Cron (deadlines, retries, rollups). Kein Host-Port.
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    <<: *restart
+    command: ["arq", "worker.main.WorkerSettings"]
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "arq --check worker.main.WorkerSettings || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  postgres:
+    image: postgres:16-alpine
+    <<: *restart
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    <<: *restart
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  minio:
+    image: minio/minio:latest
+    <<: *restart
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  clamav:
+    image: clamav/clamav:latest
+    <<: *restart
+    volumes:
+      - clamav_data:/var/lib/clamav
+    networks:
+      - internal
+    healthcheck:
+      # clamd lädt Signaturen beim Start (mehrere Minuten) -> langes start_period.
+      test: ["CMD-SHELL", "clamdcheck.sh || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 300s
+
+  pytex:
+    # FastAPI-Wrapper um pytex_api.render_blob (md->pdf). Skelett: /health + /render-Stub.
+    # Reales pytex v1.0.0 + tectonic-Cache: T-21.
+    build:
+      context: ../pytex
+      dockerfile: Dockerfile
+    <<: *restart
+    env_file: .env
+    volumes:
+      - pytex_cache:/cache
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8099/health')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  altcha:
+    # Captcha-Verifier. PLATZHALTER — reale Wiring/Config im Captcha-Task.
+    # Bild ggf. anpassen sobald ALTCHA-Server-Image fixiert ist.
+    image: ghcr.io/altcha-org/altcha-server:latest
+    <<: *restart
+    environment:
+      ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY}
+    networks:
+      - internal
+
+volumes:
+  pg_data:
+  minio_data:
+  redis_data:
+  clamav_data:
+  pytex_cache:
+  backups:
+
+networks:
+  internal:
+    # Keine publizierten Host-Ports an diesen Services => kein Internet-Ingress.
+    # Egress (Internet/Intranet) bleibt erlaubt für worker/pytex/api.
+    driver: bridge
+  proxy:
+    # In prod: externes NPM-Netz. Dann hier `external: true` setzen und das
+    # vom Nginx Proxy Manager verwaltete Netz referenzieren.
+    driver: bridge
