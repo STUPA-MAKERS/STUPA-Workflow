@@ -89,7 +89,8 @@ def get_magic_link_sender() -> MagicLinkSender:
     "/applications",
     response_model=ApplicationCreated,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(404, 422),
+    # 400 = malformed JSON body (Parse-Fehler), 422 = Form-/Schema-Validierung.
+    responses=_errors(400, 404, 422),
 )
 async def create_application(
     payload: ApplicationCreate,
@@ -149,7 +150,7 @@ async def get_application(
 @router.patch(
     "/applications/{application_id}",
     response_model=ApplicationOut,
-    responses=_errors(401, 403, 404, 409, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def patch_application(
     payload: ApplicationPatch,
@@ -193,7 +194,7 @@ async def get_versions(
     "/applications/{application_id}/comments",
     response_model=CommentOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 422),
 )
 async def add_comment(
     payload: CommentCreate,

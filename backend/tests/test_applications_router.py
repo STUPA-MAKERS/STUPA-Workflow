@@ -353,7 +353,9 @@ def test_list_comments_principal_all(
 def test_openapi_declares_error_responses(client: TestClient) -> None:
     spec = client.get("/openapi.json").json()
     post = spec["paths"]["/api/applications"]["post"]
-    assert {"404", "422"} <= set(post["responses"])
+    assert {"400", "404", "422"} <= set(post["responses"])
     patch = spec["paths"]["/api/applications/{application_id}"]["patch"]
-    assert {"401", "403", "404", "409", "422"} <= set(patch["responses"])
+    assert {"400", "401", "403", "404", "409", "422"} <= set(patch["responses"])
     assert "application/problem+json" in patch["responses"]["409"]["content"]
+    comments = spec["paths"]["/api/applications/{application_id}/comments"]["post"]
+    assert {"400", "401", "403", "404", "422"} <= set(comments["responses"])
