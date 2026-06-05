@@ -61,6 +61,21 @@ def test_validate_definition_promoted_numeric_ok() -> None:
     )
 
 
+def test_validate_definition_rejects_bad_pattern() -> None:
+    # S1: defektes Regex-Pattern würde sonst erst zur Antwort-Laufzeit als 500 knallen.
+    with pytest.raises(FormDefinitionError, match="invalid validation pattern"):
+        validate_definition([_field("t", "text", validation={"pattern": "["})])
+
+
+def test_validate_definition_rejects_bad_jsonlogic() -> None:
+    # FormFieldDef validiert JsonLogic beim Bau; hier nach dem Bau verbogen, um den
+    # defensiven Speicher-Gate-Zweig in validate_definition zu prüfen.
+    f = _field("t", "text")
+    f.visible_if = {"system": ["rm", "-rf"]}
+    with pytest.raises(FormDefinitionError, match="invalid expression"):
+        validate_definition([f])
+
+
 # --------------------------------------------------------------------------- #
 # effective_form
 # --------------------------------------------------------------------------- #
@@ -112,6 +127,9 @@ def test_collects_all_errors() -> None:
 def test_text_valid_and_constraints() -> None:
     f = _field("t", "text", validation={"minLen": 2, "maxLen": 4, "pattern": "[a-z]+"})
     assert validate_answers([f], {"t": "abc"}) == {"t": "abc"}
+    # nur Längen-Constraints (kein pattern) → durchläuft ohne Fehler
+    len_only = _field("t", "text", validation={"minLen": 2, "maxLen": 4})
+    assert validate_answers([len_only], {"t": "abc"}) == {"t": "abc"}
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"t": "a"})  # too short
     with pytest.raises(AnswerValidationError):
@@ -120,6 +138,15 @@ def test_text_valid_and_constraints() -> None:
         validate_answers([f], {"t": "AB"})  # pattern (also too short, both error)
     with pytest.raises(AnswerValidationError):
         validate_answers([_field("t", "text")], {"t": 123})  # not a string
+
+
+def test_text_runtime_bad_pattern_is_422_not_500() -> None:
+    # Defense-in-depth: ein (über validate_definition normalerweise abgewiesenes)
+    # defektes Pattern darf zur Laufzeit kein 500 erzeugen.
+    f = _field("t", "text", validation={"pattern": "["})
+    with pytest.raises(AnswerValidationError) as ei:
+        validate_answers([f], {"t": "x"})
+    assert ei.value.errors[0].msg == "field has an invalid validation pattern"
 
 
 def test_number_valid_and_range() -> None:
@@ -140,6 +167,21 @@ def test_currency_valid() -> None:
     assert validate_answers([f], {"c": "250.00"}) == {"c": "250.00"}
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"c": -5})
+
+
+@pytest.mark.parametrize("ftype", ["number", "currency"])
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), "NaN", "Infinity"])
+def test_number_currency_non_finite_is_422_not_500(ftype: str, bad: object) -> None:
+    # B1: Decimal("NaN") konstruiert ohne Fehler, würde aber bei min/max-Vergleich
+    # decimal.InvalidOperation werfen → 500. Muss als 422-Feldfehler enden.
+    plain = _field("n", ftype)
+    with pytest.raises(AnswerValidationError) as ei:
+        validate_answers([plain], {"n": bad})
+    assert ei.value.errors[0].msg == "must be a finite number"
+    # auch mit Range-Constraints (der eigentliche Krach-Pfad)
+    ranged = _field("n", ftype, validation={"min": 0, "max": 10})
+    with pytest.raises(AnswerValidationError):
+        validate_answers([ranged], {"n": bad})
 
 
 def test_date_valid_invalid() -> None:
@@ -307,3 +349,10 @@ def test_extract_promoted_non_numeric_passthrough() -> None:
 def test_extract_promoted_unparseable_numeric_skipped() -> None:
     fields = [_field("amount", "number", isPromoted=True, promoteTarget="amount")]
     assert extract_promoted(fields, {"amount": "not-a-number"}) == {}
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), "NaN", "Infinity"])
+def test_extract_promoted_non_finite_skipped(bad: object) -> None:
+    # B1: niemals Decimal('NaN')/Decimal('Infinity') als amount weiterreichen.
+    fields = [_field("amount", "currency", isPromoted=True, promoteTarget="amount")]
+    assert extract_promoted(fields, {"amount": bad}) == {}

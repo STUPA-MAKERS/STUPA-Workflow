@@ -101,10 +101,26 @@ class FormsService:
         ).all()
         return [_row_to_field_def(r) for r in rows]
 
-    async def _pot_fields(self, budget_pot_id: UUID) -> list[FormFieldDef]:
+    async def _pot_fields(
+        self, app_type: ApplicationType, budget_pot_id: UUID
+    ) -> list[FormFieldDef]:
+        """Topf-Extra-Felder laden — nur für einen Topf, der zum Typ-Gremium gehört.
+
+        Verhindert Cross-Gremium-Leak (N1): ein fremder/typ-fremder Topf darf nicht
+        an die öffentliche effektive Form gehängt werden. Nicht-passende Töpfe →
+        404 (keine Existenz preisgeben).
+        """
         pot = await self.session.get(BudgetPot, budget_pot_id)
         if pot is None:
             raise NotFoundError(f"budget pot {budget_pot_id} not found")
+        if not app_type.has_budget:
+            raise NotFoundError(
+                f"application type {app_type.id} does not support budget pots"
+            )
+        if app_type.gremium_id is None or pot.gremium_id != app_type.gremium_id:
+            raise NotFoundError(
+                f"budget pot {budget_pot_id} is not available for this application type"
+            )
         rows = (
             await self.session.scalars(
                 select(BudgetField)
@@ -123,7 +139,9 @@ class FormsService:
             raise NotFoundError(f"application type {type_id} has no active form version")
 
         type_fields = await self._fields_of_version(app_type.active_form_version_id)
-        pot_fields = await self._pot_fields(budget_pot_id) if budget_pot_id else None
+        pot_fields = (
+            await self._pot_fields(app_type, budget_pot_id) if budget_pot_id else None
+        )
         sections = effective_form(type_fields, pot_fields)
 
         return EffectiveFormOut(

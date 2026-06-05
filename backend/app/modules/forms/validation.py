@@ -31,7 +31,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.shared.config_schemas import FormFieldDef
-from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic
+from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlogic
 
 # Feldtypen, deren Wert numerisch ist (für promoted-Extraktion + min/max).
 _NUMERIC_TYPES = frozenset({"number", "currency"})
@@ -73,7 +73,9 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
     """Form-Definition strukturell prüfen. Wirft ``FormDefinitionError``.
 
     Regeln: keine doppelten Feld-Keys; promoted-Felder müssen numerisch sein
-    (``number``/``currency``), da das Ziel (z. B. ``amount``) ``numeric`` ist.
+    (``number``/``currency``), da das Ziel (z. B. ``amount``) ``numeric`` ist;
+    ``visibleIf``/``compute`` nur mit Whitelist-Operatoren (T-05); ein gesetztes
+    ``pattern`` muss eine kompilierbare Regex sein (sonst 500 zur Antwort-Laufzeit).
     """
     keys = [f.key for f in fields]
     duplicates = sorted({k for k in keys if keys.count(k) > 1})
@@ -85,6 +87,21 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
             raise FormDefinitionError(
                 f"promoted field {f.key!r} must be numeric (number/currency), got {f.type!r}"
             )
+        for expr in (f.visible_if, f.compute):
+            if expr is not None:
+                try:
+                    validate_jsonlogic(expr)
+                except JsonLogicError as exc:
+                    raise FormDefinitionError(
+                        f"field {f.key!r} has an invalid expression: {exc}"
+                    ) from exc
+        if f.validation is not None and f.validation.pattern is not None:
+            try:
+                re.compile(f.validation.pattern)
+            except re.error as exc:
+                raise FormDefinitionError(
+                    f"field {f.key!r} has an invalid validation pattern: {exc}"
+                ) from exc
 
 
 # --------------------------------------------------------------------------- #
@@ -214,8 +231,16 @@ def _validate_text(field: FormFieldDef, value: Any, errors: list[FieldError]) ->
         _err(errors, field.key, f"shorter than minimum length {v.min_len}")
     if v.max_len is not None and len(value) > v.max_len:
         _err(errors, field.key, f"longer than maximum length {v.max_len}")
-    if v.pattern is not None and re.fullmatch(v.pattern, value) is None:
-        _err(errors, field.key, "does not match required pattern")
+    if v.pattern is not None:
+        try:
+            matched = re.fullmatch(v.pattern, value) is not None
+        except re.error:
+            # Defekt gespeichertes Pattern: defense-in-depth (validate_definition
+            # lehnt das schon beim Anlegen ab) — niemals 500 zur Laufzeit.
+            _err(errors, field.key, "field has an invalid validation pattern")
+            return
+        if not matched:
+            _err(errors, field.key, "does not match required pattern")
 
 
 def _validate_number(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
@@ -226,6 +251,11 @@ def _validate_number(field: FormFieldDef, value: Any, errors: list[FieldError]) 
         num = Decimal(str(value))
     except (InvalidOperation, ValueError):
         _err(errors, field.key, "must be a number")
+        return
+    if not num.is_finite():
+        # NaN/Infinity (z. B. JSON "NaN"/Infinity): Vergleich mit min/max würde
+        # decimal.InvalidOperation werfen → 422 statt 500.
+        _err(errors, field.key, "must be a finite number")
         return
     v = field.validation
     if v is None:
@@ -312,9 +342,13 @@ def extract_promoted(
             continue
         if f.type in _NUMERIC_TYPES:
             try:
-                out[f.promote_target] = Decimal(str(value))
+                num = Decimal(str(value))
             except (InvalidOperation, ValueError):
                 continue
+            # NaN/Infinity nie als amount weiterreichen (kracht sonst in T-12/T-17).
+            if not num.is_finite():
+                continue
+            out[f.promote_target] = num
         else:
             out[f.promote_target] = value
     return out

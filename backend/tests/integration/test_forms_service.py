@@ -39,11 +39,18 @@ async def session(
     await eng.dispose()
 
 
-async def _make_type(session: AsyncSession) -> ApplicationType:
+async def _make_type(
+    session: AsyncSession, *, has_budget: bool = False
+) -> ApplicationType:
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
-    app_type = ApplicationType(gremium_id=gremium.id, key=f"t-{uuid.uuid4()}", name_i18n={})
+    app_type = ApplicationType(
+        gremium_id=gremium.id,
+        key=f"t-{uuid.uuid4()}",
+        name_i18n={},
+        has_budget=has_budget,
+    )
     session.add(app_type)
     await session.commit()
     return app_type
@@ -178,14 +185,8 @@ async def test_effective_form_main_only(session: AsyncSession) -> None:
     assert amount.is_promoted is True and amount.promote_target == "amount"
 
 
-async def test_effective_form_with_budget_pot(session: AsyncSession) -> None:
-    app_type = await _make_type(session)
-    svc = FormsService(session)
-    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
-
-    refreshed = await session.get(ApplicationType, app_type.id)
-    assert refreshed is not None
-    pot = BudgetPot(gremium_id=refreshed.gremium_id, name="Topf")
+async def _add_pot(session: AsyncSession, gremium_id: uuid.UUID) -> BudgetPot:
+    pot = BudgetPot(gremium_id=gremium_id, name="Topf")
     session.add(pot)
     await session.flush()
     session.add(
@@ -196,11 +197,44 @@ async def test_effective_form_with_budget_pot(session: AsyncSession) -> None:
         )
     )
     await session.commit()
+    return pot
+
+
+async def test_effective_form_with_budget_pot(session: AsyncSession) -> None:
+    app_type = await _make_type(session, has_budget=True)
+    svc = FormsService(session)
+    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
+
+    assert app_type.gremium_id is not None
+    pot = await _add_pot(session, app_type.gremium_id)
 
     eff = await svc.get_effective_form(app_type.id, pot.id)
     assert [s.key for s in eff.sections] == ["main", "budget"]
     assert eff.sections[1].fields[0].key == "cost_center"
     assert eff.budget_pot_id == pot.id
+
+
+async def test_effective_form_pot_without_has_budget_404(session: AsyncSession) -> None:
+    # N1: Typ ohne has_budget darf keinen Topf an die Form hängen.
+    app_type = await _make_type(session, has_budget=False)
+    svc = FormsService(session)
+    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
+    assert app_type.gremium_id is not None
+    pot = await _add_pot(session, app_type.gremium_id)
+    with pytest.raises(NotFoundError, match="does not support budget pots"):
+        await svc.get_effective_form(app_type.id, pot.id)
+
+
+async def test_effective_form_cross_gremium_pot_404(session: AsyncSession) -> None:
+    # N1: ein Topf aus einem fremden Gremium darf nicht durchsickern.
+    app_type = await _make_type(session, has_budget=True)
+    other = await _make_type(session, has_budget=True)
+    svc = FormsService(session)
+    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
+    assert other.gremium_id is not None
+    foreign_pot = await _add_pot(session, other.gremium_id)
+    with pytest.raises(NotFoundError, match="not available for this application type"):
+        await svc.get_effective_form(app_type.id, foreign_pot.id)
 
 
 async def test_effective_form_no_active_version_404(session: AsyncSession) -> None:
