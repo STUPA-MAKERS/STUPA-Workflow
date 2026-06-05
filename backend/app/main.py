@@ -17,6 +17,7 @@ from app.db import dispose_engine
 from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.modules.auth.router import router as auth_router
+from app.modules.forms.router import router as forms_router
 from app.settings import Settings, get_settings
 from app.shared.errors import register_exception_handlers, use_problem_json_contract
 
@@ -29,7 +30,10 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# Fachmodul-Router (einmalig auf Modulebene gemountet → keine Doppel-Registrierung
+# bei mehrfachem `create_app()` in Tests).
 api_router.include_router(auth_router)
+api_router.include_router(forms_router)
 
 
 @asynccontextmanager
