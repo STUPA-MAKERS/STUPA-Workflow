@@ -23,7 +23,15 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
     "pytest-cov>=6.0",
+    "coverage[toml]>=7.6",
     "httpx>=0.28",
+    # Test-Infra (testing.md §5): testcontainers (PG/Redis/MinIO), HTTP-Mock,
+    # Zeit-Freeze, Pydantic/SQLAlchemy-Factories, Contract (Schemathesis).
+    "testcontainers[postgres,redis]>=4.9",
+    "respx>=0.22",
+    "freezegun>=1.5",
+    "polyfactory>=2.18",
+    "schemathesis>=3.39",
     "ruff>=0.9",
     "basedpyright>=1.28",
 ]
@@ -46,3 +54,40 @@ reportMissingTypeStubs = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# Default-Lauf = schnelle Unit-Suite (kein Docker). Integration/E2E opt-in via -m.
+addopts = "-m 'not integration and not e2e'"
+markers = [
+    "integration: braucht testcontainers (PG/Redis/MinIO) — Docker erforderlich",
+    "e2e: End-to-End gegen ephemeren Compose-Stack",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["app", "worker"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+# Gesamt-Gate (testing.md §1): Backend ≥ 85 % (Lines+Branches).
+fail_under = 85
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+# Kritische Module: 100 % Branch als eigenes Gate (testing.md §1).
+# Geprüft von scripts/coverage_critical.py gegen coverage.xml. Module entstehen in
+# Folge-Tasks (auth/voting/flow/budget/webhooks/audit) — Gate aktiviert sich, sobald
+# der jeweilige Pfad existiert; Negativ-Probe: tests/test_coverage_gate.py.
+[tool.coverage_critical]
+modules = [
+    "app/modules/auth",
+    "app/modules/voting",
+    "app/modules/flow",
+    "app/modules/budget",
+    "app/modules/webhooks",
+    "app/modules/audit",
+]
+min_branch_rate = 1.0

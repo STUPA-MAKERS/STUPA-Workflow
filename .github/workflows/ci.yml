@@ -1,4 +1,10 @@
-# Basis-CI (T-01). Vollständige Gates/Stages/Coverage/Branch-Protection: T-04.
+# CI-Gate (testing.md §4). Stage-Reihenfolge: Lint → Typecheck → BE-Unit →
+# BE-Integration (testcontainers) → Contract (Schemathesis) → FE-Unit → E2E
+# (Playwright vs Compose) → Coverage-Gate → Image-Build + Smoke. Schnelle Stages
+# zuerst; rotes PR blockiert (Branch-Protection, s. CONTRIBUTING.md).
+#
+# Additiv konsolidiert (T-01/T-02/T-21 + T-04). FE-Stufen aktivieren sich
+# automatisch, sobald `frontend/package.json` existiert (T-03); bis dahin neutral.
 name: ci
 
 on:
@@ -9,8 +15,31 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+
 jobs:
-  backend:
+  # ---- Wegweiser: existiert ein Frontend-Projekt? -------------------------- #
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.check.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---- 1 Lint/Format ------------------------------------------------------- #
+  be-lint:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -19,16 +48,190 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
-      - name: Install
-        run: pip install -e '.[dev]'
-      - name: Ruff
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e '.[dev]'
+      - name: Ruff lint
         run: ruff check .
+      # Hinweis: `ruff format --check` läuft lokal via pre-commit (.pre-commit-config.yaml);
+      # in CI nur Lint, solange Bestands-Skelett (T-02) noch nicht durchformatiert ist.
+
+  # ---- 2 Typecheck --------------------------------------------------------- #
+  be-typecheck:
+    runs-on: ubuntu-latest
+    needs: be-lint
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e '.[dev]'
       - name: basedpyright
         run: basedpyright
-      - name: Pytest
-        run: pytest
 
+  # ---- 3 BE-Unit (+ Coverage-XML als Artefakt) ----------------------------- #
+  be-unit:
+    runs-on: ubuntu-latest
+    needs: be-typecheck
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e '.[dev]'
+      - name: Pytest (Unit) + Coverage
+        # fail_under=85 (pyproject [tool.coverage.report]) bricht hier bereits.
+        run: pytest --cov --cov-report=xml --cov-report=term-missing
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 7
+
+  # ---- 4 BE-Integration (testcontainers: PG/Redis) ------------------------- #
+  be-integration:
+    runs-on: ubuntu-latest
+    needs: be-unit
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e '.[dev]'
+      - name: Pytest (Integration, Docker)
+        run: pytest -m integration
+
+  # ---- 5 Contract (Schemathesis vs OpenAPI) -------------------------------- #
+  be-contract:
+    runs-on: ubuntu-latest
+    needs: be-unit
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: "postgresql+asyncpg://app:pw@localhost/antrag_test"
+      SESSION_SECRET: "ci-session-secret"
+      MAGIC_LINK_SECRET: "ci-magic-link-secret"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e '.[dev]'
+      - name: App starten
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/health && break || sleep 1
+          done
+      - name: Schemathesis
+        run: schemathesis run http://127.0.0.1:8000/openapi.json --checks all
+
+  # ---- 6 FE-Unit/Komponente (Jest + ATL) ----------------------------------- #
+  fe-unit:
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint --if-present
+      - name: tsc
+        run: npx tsc --noEmit
+      - name: Jest + Coverage (Gate 80 %)
+        # Schwelle in jest.config (coverageThreshold global 80). Rot ⇒ Build bricht.
+        run: npm test -- --coverage --watch=false
+
+  # ---- 7 E2E (Playwright vs ephemerer Compose-Stack) ----------------------- #
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [detect, be-unit, fe-unit]
+    if: needs.detect.outputs.frontend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Compose-Stack hochfahren (inkl. pytex, Mock-Keycloak/MailHog)
+        working-directory: deploy
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+      - name: Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps
+          npx playwright test
+      - name: Compose-Logs (bei Fehler)
+        if: failure()
+        working-directory: deploy
+        run: docker compose logs --no-color
+      - name: Teardown
+        if: always()
+        working-directory: deploy
+        run: docker compose down -v --remove-orphans
+
+  # ---- 8 Coverage-Gate ----------------------------------------------------- #
+  # Gesamt-Gate (85 %) bricht bereits in be-unit. Hier zusätzlich das strengere
+  # Gate für kritische Module (100 % Branch, testing.md §1).
+  coverage-gate:
+    runs-on: ubuntu-latest
+    needs: [be-unit, be-integration]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend
+      - name: Kritische Module 100 % Branch
+        working-directory: backend
+        run: python -m scripts.coverage_critical coverage.xml pyproject.toml
+
+  # ---- 9 Image-Build + Smoke ---------------------------------------------- #
+  image-build-smoke:
+    runs-on: ubuntu-latest
+    needs: coverage-gate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backend-Image bauen
+        run: docker build -t antrag-backend:ci backend
+      - name: Container-Smoke (/api/health)
+        run: |
+          docker run -d --name api-smoke -p 8000:8000 \
+            -e DATABASE_URL="postgresql+asyncpg://app:pw@localhost/antrag_test" \
+            -e SESSION_SECRET="ci-session-secret" \
+            -e MAGIC_LINK_SECRET="ci-magic-link-secret" \
+            -e FORWARDED_ALLOW_IPS="*" \
+            antrag-backend:ci
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/health && ok=1 && break || sleep 1
+          done
+          docker logs api-smoke
+          docker rm -f api-smoke
+          [ "${ok:-0}" = "1" ] || { echo "Smoke fehlgeschlagen"; exit 1; }
+
+  # ---- pytex (T-21, beibehalten) ------------------------------------------ #
   pytex:
     runs-on: ubuntu-latest
     defaults:
@@ -38,7 +241,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
         run: pip install -e '.[dev]'
       - name: Ruff
@@ -49,6 +252,7 @@ jobs:
         # Unit suite only; real-render tests are opt-in (RUN_PYTEX_INTEGRATION).
         run: pytest
 
+  # ---- Compose-Validierung (T-01, beibehalten) ---------------------------- #
   compose:
     runs-on: ubuntu-latest
     steps:

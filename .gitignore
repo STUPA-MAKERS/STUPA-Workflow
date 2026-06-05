@@ -12,6 +12,7 @@ venv/
 .ruff_cache/
 .coverage
 .coverage.*
+coverage.xml
 htmlcov/
 *.egg-info/
 dist/
