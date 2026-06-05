@@ -10,6 +10,8 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://app:pw@localhost/ant
 os.environ.setdefault("SESSION_SECRET", "test-session-secret")
 os.environ.setdefault("MAGIC_LINK_SECRET", "test-magic-link-secret")
 
+from collections.abc import Iterator
+
 import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
@@ -71,3 +73,42 @@ def error_client() -> TestClient:
     router.add_api_route("/raise/unhandled", boom, methods=["GET"])
     app.include_router(router)
     return TestClient(app, raise_server_exceptions=False)
+
+
+# --------------------------------------------------------------------------- #
+# Integration-Fixtures (testing.md §5): echte Backing-Services via testcontainers.
+# Nur für `-m integration` (Docker nötig). Fehlt Docker, wird der Test geskippt
+# statt zu erroren — die Unit-Suite (Default-addopts) berührt diese Fixtures nie.
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture(scope="session")
+def postgres_url() -> Iterator[str]:
+    """Ephemerer Postgres; liefert async-DSN (`postgresql+asyncpg://…`)."""
+    try:
+        from testcontainers.postgres import PostgresContainer
+    except ImportError:  # pragma: no cover
+        pytest.skip("testcontainers nicht installiert")
+
+    try:
+        with PostgresContainer("postgres:16-alpine", driver="asyncpg") as pg:
+            yield pg.get_connection_url()
+    except Exception as exc:  # pragma: no cover — Docker fehlt/Runner ohne Daemon
+        pytest.skip(f"Postgres-Container nicht startbar: {exc}")
+
+
+@pytest.fixture(scope="session")
+def redis_url() -> Iterator[str]:
+    """Ephemerer Redis; liefert `redis://host:port/0`."""
+    try:
+        from testcontainers.redis import RedisContainer
+    except ImportError:  # pragma: no cover
+        pytest.skip("testcontainers nicht installiert")
+
+    try:
+        with RedisContainer("redis:7-alpine") as redis:
+            host = redis.get_container_host_ip()
+            port = redis.get_exposed_port(6379)
+            yield f"redis://{host}:{port}/0"
+    except Exception as exc:  # pragma: no cover — Docker fehlt/Runner ohne Daemon
+        pytest.skip(f"Redis-Container nicht startbar: {exc}")
