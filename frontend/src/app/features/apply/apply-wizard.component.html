@@ -1,0 +1,123 @@
+<section class="wizard">
+  <header class="wizard__head">
+    <h1 class="wizard__title">Antrag stellen</h1>
+    <app-stepper [steps]="steps()" [activeIndex]="activeIndex()" ariaLabel="Antrags-Fortschritt" />
+  </header>
+
+  <app-card>
+    @switch (currentStep()) {
+      @case ('type') {
+        <h2 class="wizard__step-title">Antragsart wählen</h2>
+        <p class="wizard__lead">Wofür möchtest du einen Antrag stellen?</p>
+        <div class="type-list" role="radiogroup" aria-label="Antragsart">
+          @for (t of types(); track t.id) {
+            <button
+              type="button"
+              class="type-option"
+              role="radio"
+              [attr.aria-checked]="typeId() === t.id"
+              [class.is-selected]="typeId() === t.id"
+              (click)="selectType(t.id)"
+            >
+              <span class="type-option__name">{{ t.name }}</span>
+            </button>
+          } @empty {
+            <p class="wizard__muted">Zurzeit sind keine Antragsarten verfügbar.</p>
+          }
+        </div>
+        @if (loadingForm()) {
+          <p class="wizard__muted" role="status">Formular wird geladen …</p>
+        }
+      }
+
+      @case ('contact') {
+        <h2 class="wizard__step-title">Kontakt</h2>
+        <p class="wizard__lead">
+          An diese E-Mail senden wir den Bearbeitungs-Link für deinen Antrag.
+        </p>
+        <form class="contact" [formGroup]="contactForm">
+          <app-input
+            label="E-Mail"
+            type="email"
+            [required]="true"
+            [formControl]="contactForm.controls.email"
+            [error]="
+              contactForm.controls.email.touched && contactForm.controls.email.invalid
+                ? 'Bitte eine gültige E-Mail-Adresse eingeben.'
+                : ''
+            "
+          />
+          <app-input
+            label="Name (optional)"
+            [formControl]="contactForm.controls.name"
+            hint="Wird Gremien angezeigt; nicht öffentlich."
+          />
+        </form>
+      }
+
+      @case ('section') {
+        @if (currentSection(); as section) {
+          <h2 class="wizard__step-title">{{ section.label }}</h2>
+          <formly-form [form]="section.form" [fields]="section.fields" [model]="model" />
+        }
+      }
+
+      @case ('review') {
+        <h2 class="wizard__step-title">Prüfen & Absenden</h2>
+        <dl class="summary">
+          <div class="summary__row">
+            <dt>E-Mail</dt>
+            <dd>{{ contactForm.controls.email.value }}</dd>
+          </div>
+          @for (row of summary(); track row.label) {
+            <div class="summary__row">
+              <dt>{{ row.label }}</dt>
+              <dd>{{ row.value }}</dd>
+            </div>
+          }
+        </dl>
+        <div class="review__altcha">
+          <app-altcha (solved)="onAltchaSolved($event)" />
+        </div>
+      }
+    }
+
+    <div card-footer class="wizard__nav">
+      <div class="wizard__nav-left">
+        @if (activeIndex() > 0) {
+          <app-button variant="secondary" (click)="prev()">Zurück</app-button>
+        }
+        @if (effForm()) {
+          <app-button variant="ghost" size="sm" (click)="discardDraft()">
+            Entwurf verwerfen
+          </app-button>
+        }
+      </div>
+      <div class="wizard__nav-right">
+        @if (currentStep() === 'review') {
+          <app-button
+            type="button"
+            [disabled]="!canSubmit()"
+            [loading]="submitting()"
+            (click)="submit()"
+          >
+            Antrag absenden
+          </app-button>
+        } @else {
+          <app-button
+            [disabled]="(currentStep() === 'type' && !effForm()) || loadingForm()"
+            (click)="next()"
+          >
+            Weiter
+          </app-button>
+        }
+      </div>
+    </div>
+  </app-card>
+
+  @if (effForm()) {
+    <p class="wizard__autosave" role="status">
+      Dein Zwischenstand wird auf diesem Gerät automatisch gespeichert.
+    </p>
+  }
+</section>

@@ -1,0 +1,146 @@
+.wizard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.wizard__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.wizard__title {
+  margin: 0;
+}
+
+.wizard__step-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-xl);
+}
+
+.wizard__lead {
+  margin: 0 0 var(--space-5);
+  color: var(--color-text-muted);
+}
+
+.wizard__muted {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.type-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.type-option {
+  display: flex;
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+  text-align: left;
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-text);
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+
+.type-option:hover {
+  border-color: var(--color-text-muted);
+}
+
+.type-option.is-selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.type-option__name {
+  font-weight: var(--fw-medium);
+}
+
+.contact {
+  display: grid;
+  gap: var(--space-5);
+}
+
+:host ::ng-deep formly-form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+:host ::ng-deep formly-field {
+  display: block;
+}
+
+.summary {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-6);
+}
+
+.summary__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 14rem) 1fr;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.summary__row dt {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.summary__row dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.review__altcha {
+  margin-top: var(--space-4);
+}
+
+.wizard__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.wizard__nav-left,
+.wizard__nav-right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wizard__autosave {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+@media (max-width: 40rem) {
+  .summary__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+
+  .wizard__nav {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .wizard__nav-left,
+  .wizard__nav-right {
+    justify-content: space-between;
+  }
+}

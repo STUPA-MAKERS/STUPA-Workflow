@@ -58,4 +58,37 @@ describe('ApiClient', () => {
     api.timeline('app-9').subscribe();
     http.expectOne('/api/applications/app-9/timeline').flush([]);
   });
+
+  it('POSTs the magic-link token to verify', () => {
+    api.verifyMagicLink('tok-1').subscribe();
+    const req = http.expectOne('/api/auth/magic-link/verify');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ token: 'tok-1' });
+    req.flush({ application_id: 'a', scope: 'edit' });
+  });
+
+  it('GETs the effective form with an optional pot param', () => {
+    api.effectiveForm('type-1', 'pot-9').subscribe();
+    const req = http.expectOne((r) => r.url === '/api/application-types/type-1/form');
+    expect(req.request.params.get('pot')).toBe('pot-9');
+    req.flush({ applicationTypeId: 'type-1', formVersionId: 'v1', sections: [] });
+  });
+
+  it('PATCHes application data', () => {
+    api.updateApplication('app-2', { title: 'Neu' }).subscribe();
+    const req = http.expectOne('/api/applications/app-2');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ data: { title: 'Neu' } });
+    req.flush({});
+  });
+
+  it('GETs and POSTs comments', () => {
+    api.comments('app-3').subscribe();
+    http.expectOne('/api/applications/app-3/comments').flush([]);
+    api.addComment('app-3', 'Hallo').subscribe();
+    const req = http.expectOne('/api/applications/app-3/comments');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ body: 'Hallo' });
+    req.flush({});
+  });
 });

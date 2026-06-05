@@ -35,4 +35,59 @@ describe('mockApiInterceptor', () => {
     http.expectOne('/api/application-types').flush([]);
     http.verify();
   });
+
+  it('serves the effective form (with sections) for the apply wizard', (done) => {
+    const { api, http } = setup(true);
+    api.effectiveForm('11111111-1111-1111-1111-111111111111').subscribe((form) => {
+      expect(form.sections.length).toBeGreaterThan(0);
+      expect(form.budgetPotId).toBeTruthy();
+      done();
+    });
+    http.expectNone((r) => r.url.includes('/form'));
+  });
+
+  it('creates an application echoing the submitted data', (done) => {
+    const { api } = setup(true);
+    api
+      .createApplication({
+        type_id: '11111111-1111-1111-1111-111111111111',
+        data: { title: 'X' },
+        applicant_email: 'a@b.de',
+        lang: 'de',
+        altcha: 'sol',
+      })
+      .subscribe((app) => {
+        expect(app.id).toBeTruthy();
+        expect(app.data).toEqual({ title: 'X' });
+        done();
+      });
+  });
+
+  it('verifies a magic-link token and returns an applicant scope', (done) => {
+    const { api } = setup(true);
+    api.verifyMagicLink('tok').subscribe((res) => {
+      expect(res.scope).toBe('edit');
+      expect(res.application_id).toBeTruthy();
+      done();
+    });
+  });
+
+  it('serves a single application, its timeline and comments, and accepts a PATCH', (done) => {
+    const { api } = setup(true);
+    api.getApplication('33333333-3333-3333-3333-333333333333').subscribe((app) => {
+      expect(app.state.editAllowed).toBe(true);
+      api.timeline(app.id).subscribe((t) => {
+        expect(t.length).toBeGreaterThan(0);
+        api.comments(app.id).subscribe((c) => {
+          expect(c.length).toBeGreaterThan(0);
+          api.addComment(app.id, 'Neu').subscribe(() => {
+            api.updateApplication(app.id, { title: 'Y' }).subscribe((updated) => {
+              expect(updated.data).toEqual({ title: 'Y' });
+              done();
+            });
+          });
+        });
+      });
+    });
+  });
 });
