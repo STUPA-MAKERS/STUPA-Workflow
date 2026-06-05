@@ -23,9 +23,18 @@ class MagicLinkVerifyRequest(BaseModel):
 
 
 class MagicLinkVerifyOut(BaseModel):
+    """Applicant-Session wird **ausschließlich** über das HttpOnly-Cookie geführt
+    (nicht im Body) — kein Token im JS greifbar (XSS-Schutz, security.md §1)."""
+
     application_id: UUID
     scope: Literal["edit", "view"]
-    token: str  # Applicant-Session-Token (Bearer/`?t=`), zusätzlich als Cookie gesetzt
+
+
+class LogoutOut(BaseModel):
+    """RP-Initiated Logout: `logout_url` (falls OIDC) zum Beenden der Keycloak-SSO-
+    Session; das FE leitet den Browser dorthin weiter. `null` bei reinem Local-Logout."""
+
+    logout_url: str | None = None
 
 
 class MeOut(BaseModel):

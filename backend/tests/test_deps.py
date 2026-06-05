@@ -21,14 +21,14 @@ from app.settings import Settings, load_settings
 from app.shared.errors import ForbiddenError, UnauthorizedError
 from tests.auth_fakes import fake_session, result
 
-SECRET = "deps-secret"
+SECRET = "deps-secret-0123456"
 
 
 def _settings() -> Settings:
     return load_settings(
         database_url="postgresql+asyncpg://x/y",
         session_secret=SECRET,
-        magic_link_secret="m",
+        magic_link_secret="magic-link-secret-0",
     )
 
 
@@ -105,12 +105,11 @@ async def test_get_current_applicant_bearer() -> None:
     assert applicant.scope == "edit"
 
 
-async def test_get_current_applicant_query_param() -> None:
+async def test_get_current_applicant_query_param_not_accepted() -> None:
+    # `?t=` wird bewusst NICHT mehr akzeptiert (Query-Token-Leak, security.md §1).
     token = sessions.issue_applicant_token(SECRET, "a2", "view")
     req = _request(query=f"t={token}")
-    applicant = await get_current_applicant(req, _settings())
-    assert applicant is not None
-    assert applicant.scope == "view"
+    assert await get_current_applicant(req, _settings()) is None
 
 
 async def test_get_current_applicant_cookie() -> None:

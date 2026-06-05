@@ -146,5 +146,7 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         CheckConstraint("scope IN ('edit','view')", name="magic_link_scope"),
-        Index("ix_magic_link_token_hash", "token_hash"),
+        # UNIQUE: trägt die atomare Single-Use-Einlösung (UPDATE … WHERE used_at IS
+        # NULL) + verhindert Hash-Kollisions-Mehrdeutigkeit (security.md §1).
+        Index("ix_magic_link_token_hash", "token_hash", unique=True),
     )

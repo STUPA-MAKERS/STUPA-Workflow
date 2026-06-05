@@ -21,8 +21,8 @@ NOW = datetime(2026, 6, 5, 12, 0, tzinfo=UTC)
 def _settings() -> Settings:
     return load_settings(
         database_url="postgresql+asyncpg://x/y",
-        session_secret="sess-secret",
-        magic_link_secret="ml-pepper",
+        session_secret="sess-secret-0123456",
+        magic_link_secret="ml-pepper-0123456",
         public_base_url="https://antrag.example",
     )
 
@@ -57,7 +57,7 @@ async def test_request_magic_link_edit_scope_no_state() -> None:
     )
     assert len(db.added) == 1
     link = sent[0][1]
-    assert "/antrag/aid-1?t=" in link
+    assert "/antrag/aid-1#t=" in link  # Token im Fragment, nicht im Query
     assert db.added[0].scope == "edit"
     assert db.added[0].single_use is False
 
@@ -136,8 +136,9 @@ async def test_verify_magic_link_expired(monkeypatch: pytest.MonkeyPatch) -> Non
 async def test_verify_magic_link_already_used(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _settings()
     monkeypatch.setattr(service, "_now", lambda: NOW)
-    row = _link("tok", settings, single_use=True, used_at=NOW)
-    db = fake_session(result(row))
+    row = _link("tok", settings, single_use=True)
+    # Atomare Einlösung: UPDATE trifft 0 Zeilen (schon verbraucht) → 410.
+    db = fake_session(result(row), result())
     with pytest.raises(GoneError):
         await service.verify_magic_link(db, settings, token="tok")
 
@@ -146,11 +147,11 @@ async def test_verify_magic_link_single_use_ok(monkeypatch: pytest.MonkeyPatch) 
     settings = _settings()
     monkeypatch.setattr(service, "_now", lambda: NOW)
     row = _link("tok", settings, scope="view", single_use=True)
-    db = fake_session(result(row))
+    # UPDATE gewinnt (returning id) → diese Verify löst den Token ein.
+    db = fake_session(result(row), result("claimed-id"))
     app_id, scope, token = await service.verify_magic_link(db, settings, token="tok")
     assert app_id == "aid-1"
     assert scope == "view"
-    assert row.used_at == NOW  # single_use markiert
     assert token  # signierter Applicant-Token
 
 
@@ -158,10 +159,9 @@ async def test_verify_magic_link_edit_not_marked_used(monkeypatch: pytest.Monkey
     settings = _settings()
     monkeypatch.setattr(service, "_now", lambda: NOW)
     row = _link("tok", settings, scope="edit", single_use=False)
-    db = fake_session(result(row))
+    db = fake_session(result(row))  # kein UPDATE bei non-single-use
     _, scope, _ = await service.verify_magic_link(db, settings, token="tok")
     assert scope == "edit"
-    assert row.used_at is None
 
 
 # --------------------------------------------------------------------------- #

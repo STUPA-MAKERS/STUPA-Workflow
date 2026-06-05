@@ -11,6 +11,7 @@ from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
 from app.modules.auth import router as router_mod
+from app.modules.auth.models import AuthSession
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oidc import OidcError
 from app.settings import Settings, get_settings, load_settings
@@ -18,15 +19,17 @@ from app.shared.errors import GoneError
 from tests.auth_fakes import fake_session
 
 DISABLED = load_settings(
-    database_url="postgresql+asyncpg://x/y", session_secret="s", magic_link_secret="m"
+    database_url="postgresql+asyncpg://x/y",
+    session_secret="session-secret-0123",
+    magic_link_secret="magic-link-secret-0",
 )
 ENABLED = load_settings(
     database_url="postgresql+asyncpg://x/y",
-    session_secret="s",
-    magic_link_secret="m",
+    session_secret="session-secret-0123",
+    magic_link_secret="magic-link-secret-0",
     oidc_issuer="https://kc.example/realms/app",
     oidc_client_id="antrag",
-    oidc_client_secret="secret",
+    oidc_client_secret="client-secret-01234",
     oidc_redirect_url="https://antrag.example/api/auth/callback",
     cookie_secure=False,
 )
@@ -123,19 +126,39 @@ def test_callback_success_sets_session(
 # --------------------------------------------------------------------------- #
 # logout
 # --------------------------------------------------------------------------- #
-def test_logout_without_cookie_is_204(enabled_client: TestClient) -> None:
-    assert enabled_client.post("/api/auth/logout").status_code == 204
+def test_logout_without_cookie_local_only(enabled_client: TestClient) -> None:
+    resp = enabled_client.post("/api/auth/logout")
+    assert resp.status_code == 200
+    assert resp.json() == {"logout_url": None}
 
 
-def test_logout_with_cookie_clears_session(
+def test_logout_with_cookie_returns_rp_logout_url(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def _del(*a: object, **k: object) -> None:
-        return None
+    async def _del(*a: object, **k: object) -> AuthSession:
+        return AuthSession(sid="s", principal_id="p", id_token="idt")
 
     monkeypatch.setattr(router_mod.sessions, "delete_principal_session", _del)
     enabled_client.cookies.set(ENABLED.session_cookie_name, "x")
-    assert enabled_client.post("/api/auth/logout").status_code == 204
+    resp = enabled_client.post("/api/auth/logout")
+    assert resp.status_code == 200
+    url = resp.json()["logout_url"]
+    assert url is not None
+    assert "/protocol/openid-connect/logout" in url
+    assert "id_token_hint=idt" in url
+
+
+def test_logout_disabled_oidc_no_url(
+    disabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _del(*a: object, **k: object) -> AuthSession:
+        return AuthSession(sid="s", principal_id="p", id_token="idt")
+
+    monkeypatch.setattr(router_mod.sessions, "delete_principal_session", _del)
+    disabled_client.cookies.set(DISABLED.session_cookie_name, "x")
+    resp = disabled_client.post("/api/auth/logout")
+    assert resp.status_code == 200
+    assert resp.json() == {"logout_url": None}
 
 
 # --------------------------------------------------------------------------- #
@@ -170,18 +193,47 @@ def test_me_returns_principal() -> None:
 def test_magic_link_always_202(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def _noop(*a: object, **k: object) -> None:
-        return None
+    scheduled: list[tuple[object, ...]] = []
 
-    monkeypatch.setattr(router_mod.service, "request_magic_link", _noop)
+    async def _capture(settings: object, email: str, application_id: object) -> None:
+        scheduled.append((email, application_id))
+
+    # Hintergrund-Task abfangen (kein realer DB-Zugriff im Test).
+    monkeypatch.setattr(router_mod, "_deliver_magic_link", _capture)
     resp = enabled_client.post("/api/auth/magic-link", json={"email": "x@y.de"})
     assert resp.status_code == 202
     assert resp.json() == {"status": "accepted"}
+    # Arbeit wurde als Background-Task geplant (konstante Antwortzeit).
+    assert scheduled == [("x@y.de", None)]
 
 
 def test_magic_link_invalid_email_422(enabled_client: TestClient) -> None:
     resp = enabled_client.post("/api/auth/magic-link", json={"email": "not-an-email"})
     assert resp.status_code == 422
+
+
+async def test_deliver_magic_link_opens_session_and_commits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = fake_session()
+
+    class _ACM:
+        async def __aenter__(self) -> object:
+            return db
+
+        async def __aexit__(self, *exc: object) -> bool:
+            return False
+
+    called: list[str] = []
+
+    async def _req(session: object, settings: object, *, email: str, **k: object) -> None:
+        called.append(email)
+
+    monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
+    monkeypatch.setattr(router_mod.service, "request_magic_link", _req)
+    await router_mod._deliver_magic_link(ENABLED, "x@y.de", None)
+    assert called == ["x@y.de"]
+    assert db.committed == 1
 
 
 def test_magic_link_verify_ok(

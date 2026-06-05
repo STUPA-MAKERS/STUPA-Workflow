@@ -43,13 +43,14 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 def _bearer_token(request: Request, settings: Settings) -> str | None:
-    """Applicant-Token aus `Authorization: Bearer`, `?t=` oder Cookie (in der Reihenfolge)."""
+    """Applicant-Token aus `Authorization: Bearer` oder HttpOnly-Cookie.
+
+    **Kein `?t=`-Query** mehr: Token im Query leckt über Referer/History/Logs
+    (security.md §1). Der Magic-Link transportiert seinen Token im URL-Fragment; das
+    FE tauscht ihn per POST gegen das Cookie."""
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         return auth[7:]
-    query_token = request.query_params.get("t")
-    if query_token:
-        return query_token
     return request.cookies.get(settings.applicant_cookie_name)
 
 

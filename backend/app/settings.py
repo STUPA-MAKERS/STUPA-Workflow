@@ -8,8 +8,11 @@ Layout/Namen siehe `deploy/.env.example`.
 from functools import lru_cache
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Mindestlänge für Signing-/Client-Secrets (security.md §10: keine schwachen Secrets).
+_MIN_SECRET_LEN = 16
 
 
 class SettingsError(RuntimeError):
@@ -31,10 +34,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     public_base_url: str = "http://localhost"
 
-    # — Pflicht-Secrets (kein Default) —
+    # — Pflicht-Secrets (kein Default; Mindestlänge erzwungen) —
     database_url: str
-    session_secret: str
-    magic_link_secret: str
+    session_secret: str = Field(min_length=_MIN_SECRET_LEN)
+    magic_link_secret: str = Field(min_length=_MIN_SECRET_LEN)
 
     # — Reverse-Proxy (security.md §3): eng, nie "*" —
     forwarded_allow_ips: str = "127.0.0.1"
@@ -50,7 +53,7 @@ class Settings(BaseSettings):
     #   (Login/Callback → 503), Magic-Link bleibt unabhängig nutzbar. —
     oidc_issuer: str | None = None
     oidc_client_id: str | None = None
-    oidc_client_secret: str | None = None
+    oidc_client_secret: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
     oidc_redirect_url: str | None = None
     oidc_scopes: str = "openid email profile"
     oidc_groups_claim: str = "groups"

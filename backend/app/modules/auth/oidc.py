@@ -12,6 +12,7 @@ import base64
 import hashlib
 import json
 import secrets
+import time
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
@@ -96,23 +97,57 @@ async def exchange_code(settings: Settings, *, code: str, verifier: str) -> dict
     return payload
 
 
+# JWKS-Cache je issuer: (Ablauf-Monotonzeit, keys). TTL begrenzt IdP-Last +
+# DoS-Amplifikation; bei unbekannter `kid` wird einmalig erzwungen neu geladen
+# (Key-Rotation), danach Fehler (security.md §2/§11).
+_JWKS_TTL_SECONDS = 300.0
+_jwks_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+
+def _monotonic() -> float:
+    return time.monotonic()
+
+
+async def _fetch_jwks(issuer: str) -> list[dict[str, Any]]:
+    try:
+        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+            resp = await client.get(_endpoint(issuer, "certs"))
+            resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise OidcError(f"jwks unreachable: {exc}") from exc
+    keys = resp.json().get("keys", [])
+    _jwks_cache[issuer] = (_monotonic() + _JWKS_TTL_SECONDS, keys)
+    return keys
+
+
+async def _get_jwks(issuer: str, *, force: bool) -> list[dict[str, Any]]:
+    cached = _jwks_cache.get(issuer)
+    if not force and cached is not None and cached[0] > _monotonic():
+        return cached[1]
+    return await _fetch_jwks(issuer)
+
+
+def _find_key(keys: list[dict[str, Any]], kid: object) -> dict[str, Any] | None:
+    return next((k for k in keys if k.get("kid") == kid), None)
+
+
 async def _signing_key(settings: Settings, id_token: str) -> Any:
-    """JWKS holen, passenden Schlüssel (`kid`) als Key-Objekt für PyJWT liefern."""
+    """Passenden JWKS-Schlüssel (`kid`) als Key-Objekt für PyJWT — mit TTL-Cache."""
     try:
         header = jwt.get_unverified_header(id_token)
     except jwt.PyJWTError as exc:
         raise OidcError(f"malformed id_token: {exc}") from exc
     kid = header.get("kid")
-    try:
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
-            resp = await client.get(_endpoint(settings.oidc_issuer or "", "certs"))
-            resp.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise OidcError(f"jwks unreachable: {exc}") from exc
-    for key in resp.json().get("keys", []):
-        if key.get("kid") == kid:
-            return RSAAlgorithm.from_jwk(json.dumps(key))
-    raise OidcError("no matching jwks key")
+    issuer = settings.oidc_issuer or ""
+    keys = await _get_jwks(issuer, force=False)
+    jwk = _find_key(keys, kid)
+    if jwk is None:
+        # Cache evtl. veraltet (Rotation) → einmalig erzwungen neu laden.
+        keys = await _get_jwks(issuer, force=True)
+        jwk = _find_key(keys, kid)
+    if jwk is None:
+        raise OidcError("no matching jwks key")
+    return RSAAlgorithm.from_jwk(json.dumps(jwk))
 
 
 async def verify_id_token(settings: Settings, *, id_token: str, nonce: str) -> OidcClaims:

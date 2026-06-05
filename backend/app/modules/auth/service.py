@@ -11,7 +11,7 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Applicant as ApplicantRow
@@ -100,7 +100,10 @@ async def request_magic_link(
         )
     )
     await db.flush()
-    link = f"{settings.public_base_url.rstrip('/')}/antrag/{app.id}?t={token}"
+    # Token im URL-Fragment (#), nicht im Query (?): Fragmente landen nicht in
+    # Referer-Headern, Server-/Proxy-Logs oder der Browser-History-Query (security.md §1).
+    # Das FE liest das Fragment und sendet den Token per POST an /auth/magic-link/verify.
+    link = f"{settings.public_base_url.rstrip('/')}/antrag/{app.id}#t={token}"
     deliver(email, link)
 
 
@@ -121,11 +124,20 @@ async def verify_magic_link(
     now = _now()
     if row.expires_at <= now:
         raise GoneError("Magic-Link expired.")
-    if row.single_use and row.used_at is not None:
-        raise GoneError("Magic-Link already used.")
     if row.single_use:
-        row.used_at = now
-        await db.flush()
+        # Atomare Einlösung: nur eine nebenläufige Verify gewinnt (Replay-Schutz).
+        # `WHERE used_at IS NULL` serialisiert auf DB-Ebene → 0 Zeilen = schon
+        # verbraucht → 410 (security.md §1).
+        claimed = (
+            await db.execute(
+                update(MagicLink)
+                .where(MagicLink.id == row.id, MagicLink.used_at.is_(None))
+                .values(used_at=now)
+                .returning(MagicLink.id)
+            )
+        ).scalar_one_or_none()
+        if claimed is None:
+            raise GoneError("Magic-Link already used.")
     scope: ApplicantScope = "edit" if row.scope == "edit" else "view"
     app_id = str(row.application_id)
     session_token = sessions.issue_applicant_token(settings.session_secret, app_id, scope)

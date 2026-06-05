@@ -1,26 +1,30 @@
 """Auth-Endpunkte (api.md §3 »auth«).
 
 OIDC-Login/Callback (Keycloak, Auth Code + PKCE), Server-Session-Cookie,
-Magic-Link issue/verify, `/auth/me`, Logout. Token landen nie im JS — nur
-HttpOnly+Secure+SameSite=Lax-Cookies bzw. der signierte Applicant-Token im Body.
+Magic-Link issue/verify, `/auth/me`, Logout. Token landen **nie** im JS oder Body —
+ausschließlich HttpOnly+Secure+SameSite=Lax-Cookies.
 """
 
 from __future__ import annotations
 
 from typing import Annotated, Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 
+from app.db import get_sessionmaker
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.auth import oidc, service, sessions
 from app.modules.auth.oidc import OidcError
 from app.modules.auth.schemas import (
+    LogoutOut,
     MagicLinkRequest,
     MagicLinkVerifyOut,
     MagicLinkVerifyRequest,
     MeOut,
 )
+from app.settings import Settings
 from app.shared.errors import BadRequestError, NotFoundError, ProblemDetail
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -109,21 +113,27 @@ async def callback(
     return response
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(request: Request, db: DbSession, settings: SettingsDep) -> Response:
-    """Server-Session beenden + Cookie löschen (idempotent)."""
+@router.post("/logout")
+async def logout(
+    request: Request, db: DbSession, settings: SettingsDep, response: Response
+) -> LogoutOut:
+    """Server-Session beenden + Cookie löschen (idempotent). Liefert für OIDC die
+    RP-Initiated-Logout-URL (Keycloak `end_session`, id_token_hint), damit das FE auch
+    die IdP-SSO-Session beendet (security.md §2) — sonst überlebt der SSO-Login."""
+    logout_url: str | None = None
     cookie = request.cookies.get(settings.session_cookie_name)
     if cookie:
-        await sessions.delete_principal_session(
+        ended = await sessions.delete_principal_session(
             db,
             secret=settings.session_secret,
             cookie_value=cookie,
             max_age=settings.session_ttl_hours * 3600,
         )
         await db.commit()
-    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+        if settings.oidc_enabled and ended is not None:
+            logout_url = oidc.end_session_url(settings, id_token=ended.id_token)
     response.delete_cookie(settings.session_cookie_name, path="/")
-    return response
+    return LogoutOut(logout_url=logout_url)
 
 
 @router.get("/me", responses=_errors(401, 403))
@@ -139,20 +149,34 @@ def me(principal: Annotated[Principal, Depends(require_principal())]) -> MeOut:
     )
 
 
+async def _deliver_magic_link(
+    settings: Settings, email: str, application_id: UUID | None
+) -> None:
+    """Magic-Link-Erstellung/-Versand in eigener Session (Background-Task).
+
+    Läuft **nach** der 202-Antwort → die Antwortzeit ist für Treffer und Nicht-Treffer
+    identisch (keine Timing-Enumeration, security.md §1 / §11)."""
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as db:
+        await service.request_magic_link(
+            db, settings, email=email, application_id=application_id
+        )
+        await db.commit()
+
+
 @router.post(
     "/magic-link",
     status_code=status.HTTP_202_ACCEPTED,
     responses=_errors(400),
 )
 async def request_magic_link(
-    body: MagicLinkRequest, db: DbSession, settings: SettingsDep
+    body: MagicLinkRequest, settings: SettingsDep, background: BackgroundTasks
 ) -> dict[str, str]:
-    """Magic-Link anfordern. Anti-Enumeration: **immer** 202 + konstanter Body,
-    kein Treffer-Leak (ob Mail/Antrag existiert)."""
-    await service.request_magic_link(
-        db, settings, email=str(body.email), application_id=body.application_id
+    """Magic-Link anfordern. Anti-Enumeration: **immer** 202 + konstanter Body, kein
+    Treffer-Leak. Die DB-Arbeit läuft im Hintergrund → konstante Antwortzeit."""
+    background.add_task(
+        _deliver_magic_link, settings, str(body.email), body.application_id
     )
-    await db.commit()
     return {"status": "accepted"}
 
 
@@ -166,7 +190,10 @@ async def verify_magic_link(
     settings: SettingsDep,
     response: Response,
 ) -> MagicLinkVerifyOut:
-    """Token→Applicant-Session (Scope = genau eine App). Abgelaufen/verbraucht → 410."""
+    """Token→Applicant-Session (Scope = genau eine App). Abgelaufen/verbraucht → 410.
+
+    Die Session wird **nur** als HttpOnly-Cookie gesetzt, nie im Body zurückgegeben
+    (kein im JS greifbarer Token, security.md §1)."""
     app_id, scope, token = await service.verify_magic_link(
         db, settings, token=body.token
     )
@@ -177,4 +204,4 @@ async def verify_magic_link(
         max_age=settings.session_ttl_hours * 3600,
         **_cookie_kwargs(settings),  # type: ignore[arg-type]
     )
-    return MagicLinkVerifyOut(application_id=app_id, scope=scope, token=token)  # type: ignore[arg-type]
+    return MagicLinkVerifyOut(application_id=UUID(app_id), scope=scope)
