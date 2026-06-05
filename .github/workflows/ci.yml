@@ -162,10 +162,17 @@ jobs:
       - name: Jest + Coverage (Gate 80 %)
         # Schwelle in jest.config (coverageThreshold global 80). Rot ⇒ Build bricht.
         run: npm test -- --coverage --watch=false
+      - name: Build
+        run: npm run build
 
   # ---- 7 E2E (Playwright vs ephemerer Compose-Stack) ----------------------- #
+  # TODO(T-04): non-blocking bis T-10 Auth + Captcha-Task + echte Playwright-Specs
+  # landen. Dann `continue-on-error` entfernen, damit e2e wieder blockiert.
+  # Aktuell existieren keine Specs und kein echter Keycloak/MailHog ⇒ Job
+  # informativ, darf den Merge nicht gaten.
   e2e:
     runs-on: ubuntu-latest
+    continue-on-error: true
     needs: [detect, be-unit, fe-unit]
     if: needs.detect.outputs.frontend == 'true'
     steps:

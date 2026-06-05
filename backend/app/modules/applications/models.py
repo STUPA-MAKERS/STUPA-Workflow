@@ -1,0 +1,120 @@
+"""Anträge: application, applicant, submission_version, status_event (data-model §1).
+
+Nur Tabellen (T-06). CRUD/Diff/Timeline: T-12.
+
+PII liegt in `applicant` (R14.3, ausgelagert); `application.data` möglichst ohne PII.
+Anonymisierung (nicht Hard-Delete) ist der Default-Löschweg → `applicant`-FK CASCADE
+greift nur bei tatsächlichem Antrags-Delete.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from decimal import Decimal
+
+from sqlalchemy import (
+    CHAR,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    Text,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.dialects.postgresql import CITEXT, JSONB
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db import Base, TimestampMixin, UUIDPkMixin
+
+
+class Application(UUIDPkMixin, TimestampMixin, Base):
+    """Antrag. `data` = aktuelle Feldwerte (JSONB, GIN-indiziert); promoted
+    `amount`/`currency` werden vom Service aus `data` synchronisiert (data-model §2)."""
+
+    __tablename__ = "application"
+
+    type_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("application_type.id"))
+    form_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("form_version.id"))
+    flow_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("flow_version.id"))
+    current_state_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("state.id"), nullable=True
+    )
+    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id"), nullable=True
+    )
+    budget_pot_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget_pot.id"), nullable=True
+    )
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    currency: Mapped[str | None] = mapped_column(CHAR(3), nullable=True)
+    data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    lang: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index(
+            "ix_application_data",
+            "data",
+            postgresql_using="gin",
+            postgresql_ops={"data": "jsonb_path_ops"},
+        ),
+        Index("ix_application_current_state_id", "current_state_id"),
+        Index("ix_application_gremium_id", "gremium_id"),
+        Index("ix_application_budget_pot_id", "budget_pot_id"),
+        Index("ix_application_type_id", "type_id"),
+        Index("ix_application_created_at", "created_at"),
+    )
+
+
+class Applicant(UUIDPkMixin, Base):
+    """Ausgelagerte PII (1:1 zum Antrag). Anonymisieren = email/name → NULL +
+    `anonymized_at` setzen (Antrag bleibt)."""
+
+    __tablename__ = "applicant"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE"), unique=True
+    )
+    email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    anonymized_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+
+class SubmissionVersion(UUIDPkMixin, Base):
+    """Versionierter Snapshot der Antwortdaten + Diff."""
+
+    __tablename__ = "submission_version"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    changed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    at: Mapped[datetime] = mapped_column(server_default=func.now())
+    diff: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    __table_args__ = (UniqueConstraint("application_id", "version"),)
+
+
+class StatusEvent(UUIDPkMixin, Base):
+    """Status-Timeline-Eintrag (Übergang)."""
+
+    __tablename__ = "status_event"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    from_state_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("state.id"), nullable=True
+    )
+    to_state_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("state.id"))
+    transition_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("transition.id"), nullable=True
+    )
+    actor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    at: Mapped[datetime] = mapped_column(server_default=func.now())
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_status_event_application_id_at", "application_id", "at"),)

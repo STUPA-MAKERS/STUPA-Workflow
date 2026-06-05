@@ -167,14 +167,28 @@ services:
       start_period: 20s
 
   altcha:
-    # Captcha-Verifier. PLATZHALTER — reale Wiring/Config im Captcha-Task.
-    # Bild ggf. anpassen sobald ALTCHA-Server-Image fixiert ist.
-    image: ghcr.io/altcha-org/altcha-server:latest
+    # Captcha-Verifier: ALTCHA Sentinel (offizielles self-hosted Image).
+    # Lauscht intern auf :8080, persistiert nach /data. KEIN Host-Port —
+    # erreichbar nur über das interne Netz (altcha:8080), kein Internet-Ingress.
+    # Erstes Login root/root (DEFAULT_ROOT_PASSWORD), sofort ändern. Fehlende
+    # Secrets (JWT_SECRET, CODE_CHALLENGE_SECRET) generiert Sentinel selbst nach
+    # /data/.env. Reale Captcha-Wiring zur Anwendung folgt im Captcha-Task.
+    image: ghcr.io/altcha-org/sentinel:1.31.1
     <<: *restart
     environment:
-      ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY}
+      DEFAULT_ROOT_PASSWORD: ${ALTCHA_ROOT_PASSWORD}
+      ALTCHA_HMAC_SECRET: ${ALTCHA_HMAC_SECRET}
+    volumes:
+      - altcha_data:/data
     networks:
       - internal
+    security_opt:
+      - no-new-privileges:true
+
+  # TODO(T-04/e2e): Für aktivierbare e2e (T-10 Auth + Captcha + Playwright-Specs)
+  # hier dev-Profile-Services ergänzen — MailHog (SMTP-Sink) und Dev-Keycloak-Mock —
+  # unter `profiles: [dev]`, damit der Prod-Stack unberührt bleibt. Bewusst noch
+  # nicht angelegt (kein Consumer), siehe e2e-Job in .github/workflows/ci.yml.
 
 volumes:
   pg_data:
@@ -183,6 +197,7 @@ volumes:
   clamav_data:
   pytex_cache:
   backups:
+  altcha_data:
 
 networks:
   internal:
