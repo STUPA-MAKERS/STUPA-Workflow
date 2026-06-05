@@ -99,6 +99,10 @@ async def callback(
         )
     except OidcError as exc:
         raise BadRequestError("OIDC login failed.") from exc
+    # Principal + auth_session persistieren (get_session committet nie selbst); ohne
+    # Commit rollt der Request-Close beide Zeilen zurück → /auth/me 401 (konsistent
+    # mit verify_magic_link/logout).
+    await db.commit()
 
     response = RedirectResponse(
         settings.public_base_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT
