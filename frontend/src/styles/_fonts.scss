@@ -1,0 +1,35 @@
+// Self-hosted web font — Archivo (free Grotesk, DIN-ähnlich, OFL).
+// Q15b: Web-Ersatzfont. DIN bleibt PDF-only (siehe pytex/T-20).
+// Austauschbar über das Token --font-sans in tokens.scss.
+
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/assets/fonts/archivo-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/assets/fonts/archivo-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/assets/fonts/archivo-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/assets/fonts/archivo-latin-700-normal.woff2') format('woff2');
+}

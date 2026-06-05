@@ -1,0 +1,59 @@
+<a class="skip-link" href="#main">{{ 'app.skipToContent' | t }}</a>
+
+<header class="header">
+  <div class="container header__inner">
+    <a class="header__brand" routerLink="/" [attr.aria-label]="'app.title' | t">
+      <img class="header__logo" src="assets/logos/stupa-wordmark.svg" alt="" aria-hidden="true" />
+    </a>
+
+    <nav class="header__nav" [attr.aria-label]="'nav.applications' | t">
+      @for (item of nav; track item.path) {
+        <a
+          class="header__link"
+          [routerLink]="item.path"
+          routerLinkActive="is-active"
+          [routerLinkActiveOptions]="{ exact: false }"
+        >
+          {{ item.labelKey | t }}
+        </a>
+      }
+    </nav>
+
+    <div class="header__actions">
+      <label class="lang" [attr.aria-label]="'lang.switch' | t">
+        <select class="lang__select" [value]="i18n.locale()" (change)="setLocale($any($event.target).value)">
+          @for (loc of i18n.locales; track loc) {
+            <option [value]="loc">{{ loc | uppercase }}</option>
+          }
+        </select>
+      </label>
+
+      <button
+        type="button"
+        class="theme-toggle"
+        [attr.aria-label]="'theme.toggle' | t"
+        [attr.aria-pressed]="theme.resolved() === 'dark'"
+        (click)="toggleTheme()"
+      >
+        {{ theme.resolved() === 'dark' ? '☾' : '☀' }}
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="main container" tabindex="-1">
+  <router-outlet />
+</main>
+
+<footer class="footer">
+  <div class="container footer__inner">
+    <img class="footer__logo" src="assets/logos/hsrt-wordmark.svg" alt="" aria-hidden="true" />
+    <span class="footer__text">{{ 'footer.coBranding' | t }}</span>
+    <nav class="footer__links" aria-label="Footer">
+      <a href="#">{{ 'footer.imprint' | t }}</a>
+      <a href="#">{{ 'footer.privacy' | t }}</a>
+    </nav>
+  </div>
+</footer>
+
+<app-toast />
