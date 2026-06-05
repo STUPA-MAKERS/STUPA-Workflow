@@ -188,6 +188,16 @@ def test_create_application_rejects_bad_email_422(client: TestClient) -> None:
     assert r.status_code == 422
 
 
+def test_create_application_oversize_payload_413(
+    client: TestClient, fake_service: _FakeService
+) -> None:
+    body = _create_body() | {"data": {"blob": "x" * 200_000}}
+    r = client.post("/api/applications", json=body)
+    assert r.status_code == 413
+    assert r.headers["content-type"] == "application/problem+json"
+    assert fake_service.created is None  # nie an den Service durchgereicht
+
+
 # --------------------------------------------------------------------------- #
 # GET /applications/{id} (A/P)
 # --------------------------------------------------------------------------- #
@@ -353,7 +363,7 @@ def test_list_comments_principal_all(
 def test_openapi_declares_error_responses(client: TestClient) -> None:
     spec = client.get("/openapi.json").json()
     post = spec["paths"]["/api/applications"]["post"]
-    assert {"400", "404", "422"} <= set(post["responses"])
+    assert {"400", "404", "413", "422"} <= set(post["responses"])
     patch = spec["paths"]["/api/applications/{application_id}"]["patch"]
     assert {"400", "401", "403", "404", "409", "422"} <= set(patch["responses"])
     assert "application/problem+json" in patch["responses"]["409"]["content"]

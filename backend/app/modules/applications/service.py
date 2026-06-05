@@ -94,6 +94,25 @@ def _state_out(state: State | None) -> StateOut | None:
     )
 
 
+def _whitelist(fields: list[FormFieldDef], data: dict[str, Any]) -> dict[str, Any]:
+    """``data`` strikt auf die bekannten Feld-Keys der effektiven Form reduzieren.
+
+    Unbekannte Keys werden **verworfen** (nicht persistiert): der öffentliche POST darf
+    sonst beliebige, GIN-indizierte Junk-Blobs ablegen (DoS-/Amplification-Fläche)."""
+    known = {f.key for f in fields}
+    return {k: v for k, v in data.items() if k in known}
+
+
+def _scrub_diff(diff: dict[str, Any], pii_keys: set[str]) -> dict[str, Any]:
+    """PII-Feld-Keys aus einem gespeicherten ``DataDiff`` entfernen (added/removed/changed).
+
+    Diff-Werte enthalten alte/neue Klartext-Feldwerte → beim Anonymisieren mit-leeren."""
+    return {
+        bucket: {k: v for k, v in (entries or {}).items() if k not in pii_keys}
+        for bucket, entries in diff.items()
+    }
+
+
 def _amount_currency(
     fields: list[FormFieldDef], data: dict[str, Any]
 ) -> tuple[Decimal | None, str | None]:
@@ -220,7 +239,9 @@ class ApplicationsService:
             ) from exc
 
         initial = await self._initial_state(app_type.active_flow_version_id)
-        amount, currency = _amount_currency(fields, payload.data)
+        # Nur bekannte Feld-Keys persistieren (unbekannte verwerfen, HIGH #1).
+        clean = _whitelist(fields, payload.data)
+        amount, currency = _amount_currency(fields, clean)
 
         app = Application(
             type_id=payload.type_id,
@@ -231,7 +252,7 @@ class ApplicationsService:
             budget_pot_id=payload.budget_pot_id,
             amount=amount,
             currency=currency,
-            data=payload.data,
+            data=clean,
             lang=payload.lang,
         )
         self.session.add(app)
@@ -248,7 +269,7 @@ class ApplicationsService:
             SubmissionVersion(
                 application_id=app.id,
                 version=1,
-                data=payload.data,
+                data=clean,
                 changed_by="applicant",
                 diff=None,
             )
@@ -294,28 +315,33 @@ class ApplicationsService:
 
         # Validierung VOR dem Schreibzugriff (422 statt 500), gegen die gepinnte Form.
         fields = await self._pinned_fields(app)
-        context = {"has_budget": app.budget_pot_id is not None}
+        # `has_budget`-Kontext aus dem Typ (wie bei create) — NICHT aus budget_pot_id:
+        # sonst flippt `visibleIf: has_budget` bei einem has_budget-Typ ohne Topf und
+        # ein Pflichtfeld ließe sich beim Edit straflos entfernen (MED).
+        app_type = await self.session.get(ApplicationType, app.type_id)
+        clean = _whitelist(fields, data)
+        context = {"has_budget": app_type.has_budget if app_type is not None else False}
         try:
-            validate_answers(fields, data, context)
+            validate_answers(fields, clean, context)
         except AnswerValidationError as exc:
             raise ValidationProblem(
                 "Invalid application data.",
                 errors=[{"field": e.field, "msg": e.msg} for e in exc.errors],
             ) from exc
 
-        diff: DataDiff = compute_diff(app.data, data)
+        diff: DataDiff = compute_diff(app.data, clean)
         next_version = await self._current_version(application_id) + 1
         self.session.add(
             SubmissionVersion(
                 application_id=app.id,
                 version=next_version,
-                data=data,
+                data=clean,
                 changed_by=changed_by,
                 diff=None if is_empty_diff(diff) else dict(diff),
             )
         )
-        app.data = data
-        app.amount, app.currency = _amount_currency(fields, data)
+        app.data = clean
+        app.amount, app.currency = _amount_currency(fields, clean)
         await self.session.commit()
         # `updated_at` (server-seitiges onupdate) ist nach dem UPDATE expired →
         # vor dem Serialisieren explizit nachladen (sonst Lazy-IO außerhalb await).
@@ -491,8 +517,21 @@ class ApplicationsService:
         fields = await self._pinned_fields(app)
         pii_keys = {f.key for f in fields if f.is_pii}
         if pii_keys:
-            cleaned = {k: v for k, v in app.data.items() if k not in pii_keys}
-            app.data = cleaned
+            app.data = {k: v for k, v in app.data.items() if k not in pii_keys}
+            # PII steckt auch in jeder gespeicherten Version + deren Diff (DSGVO Art. 17):
+            # alle submission_version-Zeilen mit-scrubben, sonst leakt versions()/Timeline
+            # den alten Klartext-Snapshot (HIGH #2).
+            versions = (
+                await self.session.scalars(
+                    select(SubmissionVersion).where(
+                        SubmissionVersion.application_id == application_id
+                    )
+                )
+            ).all()
+            for v in versions:
+                v.data = {k: val for k, val in v.data.items() if k not in pii_keys}
+                if v.diff is not None:
+                    v.diff = _scrub_diff(v.diff, pii_keys)
         await self.session.commit()
         # onupdate-Spalten nach dem UPDATE expired → nachladen (vermeidet Lazy-IO).
         await self.session.refresh(app)

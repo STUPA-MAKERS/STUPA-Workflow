@@ -18,7 +18,9 @@ import pytest
 from app.modules.applications.service import (
     ApplicationsService,
     _amount_currency,
+    _scrub_diff,
     _state_out,
+    _whitelist,
 )
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ConflictError, NotFoundError
@@ -93,6 +95,29 @@ def test_amount_currency_extracts_promoted() -> None:
 def test_amount_currency_none_when_absent() -> None:
     fields = [FormFieldDef(key="title", type="text", label={"de": "Titel"})]
     assert _amount_currency(fields, {"title": "x"}) == (None, None)
+
+
+def test_whitelist_drops_unknown_keys() -> None:
+    fields = [
+        FormFieldDef(key="title", type="text", label={"de": "Titel"}),
+        FormFieldDef(key="amount", type="currency", label={"de": "Betrag"}),
+    ]
+    clean = _whitelist(fields, {"title": "x", "amount": "1", "junk": "y" * 100, "evil": 1})
+    assert clean == {"title": "x", "amount": "1"}
+
+
+def test_scrub_diff_removes_pii_keys() -> None:
+    diff = {
+        "added": {"note": "secret", "title": "x"},
+        "removed": {"note": "old"},
+        "changed": {"note": {"old": "a", "new": "b"}, "title": {"old": "x", "new": "y"}},
+    }
+    scrubbed = _scrub_diff(diff, {"note"})
+    assert scrubbed == {
+        "added": {"title": "x"},
+        "removed": {},
+        "changed": {"title": {"old": "x", "new": "y"}},
+    }
 
 
 def test_state_out_none() -> None:

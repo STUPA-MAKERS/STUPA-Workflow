@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     magic_link_edit_ttl_days: int = 7
     magic_link_action_ttl_minutes: int = 15
 
+    # — Antrags-Payload-Obergrenze (öffentlicher POST /applications, anti-DoS) —
+    #   Gilt für die serialisierten Feldwerte (`data`) und als Content-Length-Schranke;
+    #   darüber → 413. 64 KiB reicht für alle realen Formulare.
+    max_application_payload_bytes: int = 65536
+
     @property
     def oidc_enabled(self) -> bool:
         """OIDC nur aktiv, wenn alle Pflicht-Parameter gesetzt sind."""

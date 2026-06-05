@@ -20,11 +20,12 @@ Fehler werden als ``ProblemDetail`` deklariert (T-10-Hook → problem+json).
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
 
 from app.db import get_sessionmaker
 from app.deps import DbSession, SettingsDep, require_principal
@@ -43,7 +44,7 @@ from app.modules.applications.schemas import (
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth import service as auth_service
 from app.settings import Settings
-from app.shared.errors import ForbiddenError, ProblemDetail
+from app.shared.errors import ForbiddenError, PayloadTooLargeError, ProblemDetail
 from app.shared.paging import Page, PageParams
 
 router = APIRouter(tags=["applications"])
@@ -85,12 +86,25 @@ def get_magic_link_sender() -> MagicLinkSender:
     return _deliver_magic_link
 
 
+async def enforce_payload_limit(request: Request, settings: SettingsDep) -> None:
+    """Content-Length des öffentlichen POST früh gegen die Obergrenze prüfen → 413.
+
+    Frühe, billige Schranke gegen Junk-Blob-Bodies (anti-DoS, HIGH #1); die maßgebliche
+    Prüfung auf die serialisierten Feldwerte erfolgt zusätzlich nach dem Parsen."""
+    raw = request.headers.get("content-length")
+    if raw is not None and raw.isdigit() and int(raw) > settings.max_application_payload_bytes:
+        raise PayloadTooLargeError(
+            f"Request body exceeds {settings.max_application_payload_bytes} bytes."
+        )
+
+
 @router.post(
     "/applications",
     response_model=ApplicationCreated,
     status_code=status.HTTP_201_CREATED,
-    # 400 = malformed JSON body (Parse-Fehler), 422 = Form-/Schema-Validierung.
-    responses=_errors(400, 404, 422),
+    dependencies=[Depends(enforce_payload_limit)],
+    # 400 = malformed JSON body, 413 = Body zu groß, 422 = Form-/Schema-Validierung.
+    responses=_errors(400, 404, 413, 422),
 )
 async def create_application(
     payload: ApplicationCreate,
@@ -100,6 +114,11 @@ async def create_application(
     send_magic_link: Annotated[MagicLinkSender, Depends(get_magic_link_sender)],
 ) -> ApplicationCreated:
     """Antrag anlegen (öffentlich). PII getrennt, v1-Version, Magic-Link-Mail enqueued."""
+    # Maßgebliche Schranke: serialisierte Feldwerte (unabhängig von Content-Length).
+    if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
+        raise PayloadTooLargeError(
+            f"Application data exceeds {settings.max_application_payload_bytes} bytes."
+        )
     app, email = await service.create(payload)
     background.add_task(send_magic_link, settings, email, app.id)
     return ApplicationCreated(applicationId=app.id)
@@ -199,6 +218,9 @@ async def get_versions(
 async def add_comment(
     payload: CommentCreate,
     service: ServiceDep,
+    # Bewusst ``require_app_read`` (view-Scope genügt): Kommentieren ist Kommunikation,
+    # keine Antrags-Datenmutation — ein Antragsteller darf auch im gesperrten (view-only)
+    # Status noch öffentlich nachfragen. Entspricht api.md (POST comments = A(public)/P).
     access: Annotated[Access, Depends(require_app_read)],
 ) -> CommentOut:
     """Kommentar anlegen. Antragsteller dürfen nur ``public`` schreiben (sonst 403)."""

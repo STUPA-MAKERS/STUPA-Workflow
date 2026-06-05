@@ -58,20 +58,28 @@ def _fields() -> list[FormFieldDef]:
     ]
 
 
-async def _seed_type(session: AsyncSession) -> tuple[ApplicationType, State, State]:
+async def _seed_type(
+    session: AsyncSession,
+    *,
+    has_budget: bool = False,
+    fields: list[FormFieldDef] | None = None,
+) -> tuple[ApplicationType, State, State]:
     """Typ mit aktiver Form-Version + Flow (Initial-State + gesperrter State)."""
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
     app_type = ApplicationType(
-        gremium_id=gremium.id, key=f"t-{uuid.uuid4()}", name_i18n={}
+        gremium_id=gremium.id,
+        key=f"t-{uuid.uuid4()}",
+        name_i18n={},
+        has_budget=has_budget,
     )
     session.add(app_type)
     await session.commit()
 
     forms = FormsService(session)
     await forms.create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=True)
+        app_type.id, FormVersionCreate(fields=fields or _fields(), activate=True)
     )
 
     flow = FlowVersion(
@@ -282,3 +290,97 @@ async def test_anonymize_clears_pii_keeps_application(session: AsyncSession) -> 
     assert out.applicant.email is None
     assert out.applicant.name is None
     assert out.applicant.anonymized is True
+
+
+# --------------------------------------------------------------------------- #
+# HIGH #1 — unbekannte Keys werden verworfen (nicht persistiert)
+# --------------------------------------------------------------------------- #
+async def test_create_drops_unknown_keys(session: AsyncSession) -> None:
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    payload = ApplicationCreate.model_validate(
+        {
+            "typeId": str(app_type.id),
+            "data": {"title": "T", "cost": "1.00", "note": "g", "junk": "x" * 50},
+            "applicantEmail": "x@example.org",
+        }
+    )
+    app, _ = await svc.create(payload)
+    out = await svc.get(app.id, include_pii=False)
+    assert "junk" not in out.data
+    # auch nicht in v1
+    v1 = (await svc.versions(app.id))[0]
+    assert "junk" not in v1.data
+
+
+async def test_patch_drops_unknown_keys(session: AsyncSession) -> None:
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id))
+    out = await svc.patch(
+        app.id,
+        {"title": "Neu", "cost": "2.00", "note": "g", "evil": {"a": 1}},
+        changed_by="applicant",
+    )
+    assert "evil" not in out.data
+    v2 = (await svc.versions(app.id))[1]
+    assert "evil" not in v2.data
+    assert "evil" not in (v2.diff or {}).get("added", {})
+
+
+# --------------------------------------------------------------------------- #
+# HIGH #2 — anonymize scrubbt auch Versionshistorie + Diff
+# --------------------------------------------------------------------------- #
+async def test_anonymize_scrubs_version_history(session: AsyncSession) -> None:
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id))  # note="geheim" in v1
+    await svc.patch(
+        app.id, {"title": "T", "cost": "100.00", "note": "geheim2"}, changed_by="applicant"
+    )
+
+    await svc.anonymize(app.id)
+
+    versions = await svc.versions(app.id)
+    assert len(versions) == 2
+    for v in versions:
+        assert "note" not in v.data  # PII aus jedem Snapshot
+        if v.diff is not None:
+            for bucket in ("added", "removed", "changed"):
+                assert "note" not in v.diff.get(bucket, {})
+
+
+# --------------------------------------------------------------------------- #
+# MED — has_budget-Kontext: patch nutzt Typ (nicht budget_pot_id)
+# --------------------------------------------------------------------------- #
+async def test_patch_has_budget_context_from_type(session: AsyncSession) -> None:
+    # has_budget-Typ OHNE Topf: ein bei has_budget=true sichtbares Pflichtfeld muss auch
+    # beim Edit Pflicht bleiben (sonst straflos entfernbar).
+    cond_fields = [
+        FormFieldDef(key="title", type="text", label={"de": "Titel"}, required=True),
+        FormFieldDef.model_validate(
+            {
+                "key": "reason",
+                "type": "text",
+                "label": {"de": "Begründung"},
+                "required": True,
+                "visibleIf": {"==": [{"var": "has_budget"}, True]},
+            }
+        ),
+    ]
+    app_type, _, _ = await _seed_type(session, has_budget=True, fields=cond_fields)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(
+        ApplicationCreate.model_validate(
+            {
+                "typeId": str(app_type.id),
+                "data": {"title": "T", "reason": "weil"},
+                "applicantEmail": "x@example.org",
+            }
+        )
+    )
+    # `reason` weglassen → muss 422 sein (Feld sichtbar+Pflicht via Typ-has_budget).
+    with pytest.raises(ValidationProblem) as ei:
+        await svc.patch(app.id, {"title": "T2"}, changed_by="applicant")
+    assert ei.value.errors is not None
+    assert any(e.field == "reason" for e in ei.value.errors)
