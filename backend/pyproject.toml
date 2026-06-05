@@ -4,18 +4,25 @@ build-backend = "hatchling.build"
 
 [project]
 name = "antragsplattform-backend"
-version = "0.0.1"
-description = "Antragsplattform backend (FastAPI + arq) — Skelett (T-01)"
+version = "0.0.2"
+description = "Antragsplattform backend (FastAPI + arq) — Skelett (T-02)"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
     "arq>=0.26",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "pydantic[email]>=2.10",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
     "httpx>=0.28",
     "ruff>=0.9",
     "basedpyright>=1.28",
@@ -38,3 +45,4 @@ reportMissingTypeStubs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"

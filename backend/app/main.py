@@ -1,14 +1,58 @@
-"""FastAPI app factory — Skelett (T-01).
+"""FastAPI App-Factory (T-02).
 
-Nur /health. Router-Mount, Middleware, Error-Contract, Settings: T-02.
+`create_app()` baut die App: Settings laden, Logging, Middleware (Trace-Id +
+Security-Header, CORS aus), Fehler-Contract-Handler, API-Router-Mount unter `/api`.
+Fachmodul-Router werden ab T-10 hier eingehängt. uvicorn-Entrypoint nutzt
+`--proxy-headers` (Dockerfile/compose, security.md §3).
 """
 
-from fastapi import FastAPI
+from __future__ import annotations
 
-app = FastAPI(title="Antragsplattform API", version="0.0.1")
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import APIRouter, FastAPI
+
+from app.db import dispose_engine
+from app.logging_config import configure_logging
+from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.settings import Settings, get_settings
+from app.shared.errors import register_exception_handlers
+
+api_router = APIRouter(prefix="/api")
 
 
-@app.get("/health")
+@api_router.get("/health", tags=["meta"])
 def health() -> dict[str, str]:
-    """Liveness-Endpunkt für Container-Healthcheck."""
+    """Liveness-Endpunkt (Container-Healthcheck)."""
     return {"status": "ok"}
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    yield
+    await dispose_engine()
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
+    configure_logging(settings.log_level)
+
+    app = FastAPI(
+        title=settings.app_name,
+        version=settings.app_version,
+        lifespan=lifespan,
+    )
+
+    # Middleware (CORS bewusst nicht registriert → Cross-Origin aus).
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestContextMiddleware)
+
+    register_exception_handlers(app)
+
+    app.include_router(api_router)
+    return app
+
+
+# Modul-Level-App für uvicorn (`app.main:app`).
+app = create_app()
