@@ -154,11 +154,17 @@ jobs:
             curl -sf http://127.0.0.1:8000/api/health && break || sleep 1
           done
       - name: Schemathesis
-        # Volle Contract-Checks. `unsupported_method` ausgenommen: erzwingt RFC-9110
-        # `Allow`-Header am 405 — gehört in den Error-Contract-Handler (T-02), nicht T-04.
+        # Volle Contract-Checks mit zwei bewussten Ausnahmen:
+        # - `unsupported_method`: erzwingt RFC-9110 `Allow`-Header am 405 — gehört in
+        #   den Error-Contract-Handler (T-02), nicht hierher.
+        # - `positive_data_acceptance`: erwartet 2xx für schema-valide Eingaben. Für
+        #   Auth-Endpunkte (T-10) ist schema-valide ≠ semantisch gültig: ein wohl-
+        #   geformter, aber nicht existierender Magic-Link-Token liefert korrekt 410,
+        #   ein zufälliger OIDC-`code`/`state` 400/404. Diese 4xx sind erwünscht.
         run: >
           schemathesis run http://127.0.0.1:8000/openapi.json
-          --checks all --exclude-checks unsupported_method
+          --checks all
+          --exclude-checks unsupported_method,positive_data_acceptance
 
   # ---- 6 FE-Unit/Komponente (Jest + ATL) ----------------------------------- #
   fe-unit:
