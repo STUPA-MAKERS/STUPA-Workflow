@@ -142,6 +142,7 @@ def me(principal: Annotated[Principal, Depends(require_principal())]) -> MeOut:
 @router.post(
     "/magic-link",
     status_code=status.HTTP_202_ACCEPTED,
+    responses=_errors(400),
 )
 async def request_magic_link(
     body: MagicLinkRequest, db: DbSession, settings: SettingsDep
@@ -157,7 +158,7 @@ async def request_magic_link(
 
 @router.post(
     "/magic-link/verify",
-    responses=_errors(410),
+    responses=_errors(400, 410),
 )
 async def verify_magic_link(
     body: MagicLinkVerifyRequest,
