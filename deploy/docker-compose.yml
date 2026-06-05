@@ -51,7 +51,7 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -148,8 +148,8 @@ services:
       start_period: 300s
 
   pytex:
-    # FastAPI-Wrapper um pytex_api.render_blob (md->pdf). Skelett: /health + /render-Stub.
-    # Reales pytex v1.0.0 + tectonic-Cache: T-21.
+    # FastAPI-Wrapper um pytex_api.render_blob (md->pdf, Variante via Frontmatter).
+    # pytex v1.0.0; tectonic-Bundle lazy in pytex_cache (XDG_CACHE_HOME=/cache).
     build:
       context: ../pytex
       dockerfile: Dockerfile

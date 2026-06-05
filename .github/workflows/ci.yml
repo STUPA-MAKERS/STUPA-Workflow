@@ -29,6 +29,26 @@ jobs:
       - name: Pytest
         run: pytest
 
+  pytex:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pytex
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Ruff
+        run: ruff check .
+      - name: basedpyright
+        run: basedpyright
+      - name: Pytest
+        # Unit suite only; real-render tests are opt-in (RUN_PYTEX_INTEGRATION).
+        run: pytest
+
   compose:
     runs-on: ubuntu-latest
     steps:
