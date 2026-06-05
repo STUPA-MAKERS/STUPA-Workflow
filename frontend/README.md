@@ -24,7 +24,7 @@ und Formly-Setup. Feature-Module folgen in T-30…T-36.
 src/
   styles/            Design-System (Tokens, Fonts, Base) — siehe DESIGN_SYSTEM.md
   assets/fonts/      Archivo (OFL, self-hosted woff2) — Web-Ersatz für DIN
-  assets/logos/      STUPA/HSRT-Platzhalter (currentColor, theme-adaptiv)
+  assets/logos/      Offizielle STUPA-CD-Logos (Marke + Wortmarke)
   app/
     core/            App-weite Singletons (kein UI)
       api/           Typisierter API-Client + DTOs + Mock-Interceptor
@@ -43,7 +43,7 @@ src/
 
 ## Design-System
 
-CD-Tokens als CSS-Custom-Properties aus der HSRT-Palette (`britishracinggreen`
+CD-Tokens als CSS-Custom-Properties aus der STUPA-Palette (`britishracinggreen`
 primär), zweistufig (Primitive → Semantic). **Light + Dark** über
 `data-theme` auf `<html>`; `ThemeService` folgt dem OS und erlaubt einen
 persistierten Toggle. Vollständige Token-Referenz: **[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)**.
@@ -51,8 +51,9 @@ persistierten Toggle. Vollständige Token-Referenz: **[DESIGN_SYSTEM.md](./DESIG
 - **Web-Font:** Archivo (freie Grotesk, DIN-ähnlich, OFL), self-hosted unter
   `assets/fonts`. Austauschbar über das Token `--font-sans`. **DIN bleibt
   PDF-only** (requirements N1, Q15b) — kein DIN-Web-Font.
-- **Logos:** Platzhalter im CD-Stil; die verbindlichen HSRT/STUPA-Assets aus
-  Nextcloud ersetzen sie 1:1 (siehe `assets/logos/README.md`).
+- **Logos:** Offizielle STUPA-CD-Assets aus Nextcloud (Marke + Wortmarke);
+  STUPA-only, kein Hochschul-Logo. Wortmarke fixes `#706f6f` (gray-text), kein
+  `currentColor` (Einbindung per `<img src>`). Details: `assets/logos/README.md`.
 
 ## i18n
 

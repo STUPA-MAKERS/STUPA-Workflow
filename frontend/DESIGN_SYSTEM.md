@@ -1,7 +1,7 @@
 # Design-System — CD-Tokens
 
 Corporate Design der Antragsplattform (requirements **N1/N1a**). Quelle:
-HSRT/STUPA-CD, Primärfarbe **British Racing Green**. Definiert in
+STUPA-CD, Primärfarbe **British Racing Green**. Definiert in
 [`src/styles/tokens.scss`](./src/styles/tokens.scss) als CSS-Custom-Properties.
 
 ## Zwei Ebenen
@@ -66,4 +66,4 @@ Jede Komponente hat einen Jest + Angular-Testing-Library-Test.
 
 - Neue Farbe → erst Primitive ergänzen, dann Semantic-Token je Theme mappen.
 - Font tauschen → nur `--font-sans` (und `@font-face` in `_fonts.scss`).
-- HSRT/STUPA-Originalassets → Dateien in `assets/logos` ersetzen (gleiche Namen).
+- STUPA-Originalassets → Dateien in `assets/logos` ersetzen (gleiche Namen).
