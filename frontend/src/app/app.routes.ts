@@ -21,7 +21,23 @@ export const routes: Routes = [
         path: 'apply',
         data: { title: 'Antrag stellen' },
         loadComponent: () =>
-          import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
+          import('./features/apply/apply-wizard.component').then((m) => m.ApplyWizardComponent),
+      },
+      {
+        path: 'apply/confirmation',
+        data: { title: 'Antrag eingegangen' },
+        loadComponent: () =>
+          import('./features/apply/apply-confirmation.component').then(
+            (m) => m.ApplyConfirmationComponent,
+          ),
+      },
+      {
+        path: 'status',
+        data: { title: 'Antragsstatus' },
+        loadComponent: () =>
+          import('./features/apply/status-timeline.component').then(
+            (m) => m.StatusTimelineComponent,
+          ),
       },
       {
         path: 'dashboard',

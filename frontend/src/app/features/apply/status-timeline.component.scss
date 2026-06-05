@@ -1,0 +1,200 @@
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.status--narrow {
+  max-width: 36rem;
+}
+
+.status__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.status__title {
+  margin: 0;
+}
+
+.status__id {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+}
+
+.status__badges {
+  display: inline-flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.status__text,
+.status__hint {
+  color: var(--color-text-muted);
+}
+
+.status__hint {
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-sm);
+}
+
+.status__muted {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.status__link {
+  color: var(--color-primary);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+
+.status__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-5);
+}
+
+:host ::ng-deep formly-form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+// --- timeline ---------------------------------------------------------------
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-4);
+}
+
+.timeline__dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-top: 0.35rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+}
+
+.timeline__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.timeline__label {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+}
+
+.timeline__time {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.timeline__note {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+// --- readonly data ----------------------------------------------------------
+.readonly {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.readonly__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 14rem) 1fr;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.readonly__row dt {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.readonly__row dd {
+  margin: 0;
+}
+
+// --- comments ---------------------------------------------------------------
+.comments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  list-style: none;
+}
+
+.comments__item {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+
+.comments__meta {
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.comments__body {
+  margin: 0;
+  white-space: pre-line;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.comment-form__label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.comment-form__input {
+  padding: var(--space-3) var(--space-4);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  resize: vertical;
+}
+
+.comment-form__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 40rem) {
+  .readonly__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}

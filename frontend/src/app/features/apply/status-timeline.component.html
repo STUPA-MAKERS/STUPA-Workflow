@@ -1,0 +1,138 @@
+@switch (phase()) {
+  @case ('loading') {
+    <p class="status__muted" role="status">Antrag wird geladen …</p>
+  }
+
+  @case ('expired') {
+    <section class="status status--narrow">
+      <app-card heading="Link abgelaufen">
+        <app-badge variant="warning">Abgelaufen</app-badge>
+        <p class="status__text">
+          Dieser Bearbeitungs-Link ist nicht mehr gültig oder wurde bereits verwendet. Fordere bei
+          Bedarf über deinen Antrag einen neuen Link an.
+        </p>
+        <a card-footer routerLink="/" class="status__link">Zur Startseite</a>
+      </app-card>
+    </section>
+  }
+
+  @case ('error') {
+    <section class="status status--narrow">
+      <app-card heading="Antrag nicht gefunden">
+        <p class="status__text">
+          Der Antrag konnte nicht geladen werden. Bitte öffne den Link aus deiner Bestätigungs-Mail
+          erneut.
+        </p>
+        <a card-footer routerLink="/" class="status__link">Zur Startseite</a>
+      </app-card>
+    </section>
+  }
+
+  @case ('ready') {
+    @if (application(); as app) {
+      <section class="status">
+        <header class="status__head">
+          <div>
+            <h1 class="status__title">Antragsstatus</h1>
+            <p class="status__id">Vorgang {{ app.id }}</p>
+          </div>
+          <div class="status__badges">
+            <app-badge variant="primary">{{ app.state.label }}</app-badge>
+            @if (!canEdit()) {
+              <app-badge variant="neutral">Gesperrt</app-badge>
+            }
+          </div>
+        </header>
+
+        <app-card heading="Verlauf">
+          @if (timeline().length) {
+            <ol class="timeline">
+              @for (entry of timeline(); track entry.at) {
+                <li class="timeline__item">
+                  <span class="timeline__dot" aria-hidden="true"></span>
+                  <div class="timeline__body">
+                    <p class="timeline__label">{{ entry.label }}</p>
+                    <time class="timeline__time" [attr.datetime]="entry.at">
+                      {{ entry.at | date: 'medium' }}
+                    </time>
+                    @if (entry.note) {
+                      <p class="timeline__note">{{ entry.note }}</p>
+                    }
+                  </div>
+                </li>
+              }
+            </ol>
+          } @else {
+            <p class="status__muted">Noch keine Ereignisse.</p>
+          }
+        </app-card>
+
+        <app-card heading="Antragsdaten">
+          @if (canEdit()) {
+            <p class="status__hint">Du kannst deinen Antrag im aktuellen Status bearbeiten.</p>
+            <form>
+              <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
+              <div card-footer class="status__actions">
+                <app-button [loading]="saving()" [disabled]="saving()" (click)="save()">
+                  Änderungen speichern
+                </app-button>
+              </div>
+            </form>
+          } @else {
+            <p class="status__hint">
+              In diesem Status ist keine Bearbeitung mehr möglich. Deine Angaben:
+            </p>
+            <dl class="readonly">
+              @for (row of readonlyRows(); track row.label) {
+                <div class="readonly__row">
+                  <dt>{{ row.label }}</dt>
+                  <dd>{{ row.value }}</dd>
+                </div>
+              } @empty {
+                <p class="status__muted">Keine Angaben vorhanden.</p>
+              }
+            </dl>
+          }
+        </app-card>
+
+        <app-card heading="Kommentare">
+          @if (comments().length) {
+            <ul class="comments">
+              @for (c of comments(); track c.id) {
+                <li class="comments__item">
+                  <p class="comments__meta">
+                    {{ c.author_name || 'Gremium' }} · {{ c.created_at | date: 'short' }}
+                  </p>
+                  <p class="comments__body">{{ c.body }}</p>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="status__muted">Noch keine öffentlichen Kommentare.</p>
+          }
+
+          <div class="comment-form">
+            <label class="comment-form__label" for="comment-body">Öffentlicher Kommentar</label>
+            <textarea
+              id="comment-body"
+              class="comment-form__input"
+              rows="3"
+              [formControl]="commentBody"
+              placeholder="Frage oder Ergänzung an das Gremium …"
+            ></textarea>
+            <div class="comment-form__actions">
+              <app-button
+                size="sm"
+                [loading]="postingComment()"
+                [disabled]="commentBody.invalid || postingComment()"
+                (click)="addComment()"
+              >
+                Kommentar senden
+              </app-button>
+            </div>
+          </div>
+        </app-card>
+      </section>
+    }
+  }
+}
