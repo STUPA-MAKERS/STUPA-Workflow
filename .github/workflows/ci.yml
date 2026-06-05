@@ -11,6 +11,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Opt-in trigger for the e2e job (see its `if:` gate): run manually via
+  # Actions → Run workflow. Without this trigger the workflow_dispatch opt-in
+  # documented on the e2e job would be unreachable.
+  workflow_dispatch:
 
 permissions:
   contents: read
