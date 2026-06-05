@@ -7,8 +7,7 @@ früheren CD-Stil-Platzhalter eingesetzt.
 | Datei | Verwendung | Quelle (Nextcloud CD) |
 |---|---|---|
 | `stupa-mark.svg` | quadratische Marke (Favicon, App-Icon) | `Icon/STUPA/STUPA-Logo_icon-only.svg` |
-| `stupa-wordmark.svg` | Header-Logo (Wort + Marke) | `Logo/STUPA/STUPA-Logo_gray-text.svg` |
-| `hsrt-wordmark.svg` | Footer-Co-Branding | **Platzhalter** — kein HSRT-Asset im CD (STUPA-only) |
+| `stupa-wordmark.svg` | Header- **und** Footer-Logo (Wort + Marke) | `Logo/STUPA/STUPA-Logo_gray-text.svg` |
 
 `favicon.ico` (`frontend/public/`) ist aus `stupa-mark.svg` gerendert
 (16/32/48/64 px, ImageMagick).
