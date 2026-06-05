@@ -7,7 +7,7 @@
     </a>
 
     <nav class="header__nav" [attr.aria-label]="'nav.applications' | t">
-      @for (item of nav; track item.path) {
+      @for (item of visibleNav(); track item.path) {
         <a
           class="header__link"
           [routerLink]="item.path"
@@ -37,6 +37,19 @@
       >
         {{ theme.resolved() === 'dark' ? '☾' : '☀' }}
       </button>
+
+      @if (auth.isAuthenticated()) {
+        <div class="account">
+          <span class="account__name" [title]="'auth.signedInAs' | t">{{ auth.displayName() }}</span>
+          <button type="button" class="account__btn" (click)="logout()">
+            {{ 'action.logout' | t }}
+          </button>
+        </div>
+      } @else {
+        <button type="button" class="account__btn account__btn--primary" (click)="login()">
+          {{ 'action.login' | t }}
+        </button>
+      }
     </div>
   </div>
 </header>

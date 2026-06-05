@@ -20,14 +20,23 @@ export interface ProblemDetail {
   traceId?: string;
 }
 
-/** Principal (OIDC) inkl. Rollen/Permissions/Gruppen — GET /api/auth/me. */
+/**
+ * Principal (OIDC) inkl. Rollen/Permissions/Gruppen — GET /api/auth/me.
+ * Feldnamen spiegeln das Backend-`MeOut` (auth/schemas.py) 1:1; das OpenAPI
+ * bleibt Single Source of Truth — hier nicht einseitig umbenennen.
+ */
 export interface Principal {
-  id: Uuid;
-  displayName: string;
-  email: string;
+  sub: Uuid;
+  email?: string | null;
+  display_name?: string | null;
   roles: string[];
   permissions: string[];
-  groups: Uuid[];
+  groups: string[];
+}
+
+/** Antwort von POST /api/auth/logout — RP-Initiated-Logout-URL (OIDC) oder null. */
+export interface LogoutOut {
+  logout_url: string | null;
 }
 
 export interface StateOut {
