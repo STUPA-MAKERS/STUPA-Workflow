@@ -16,4 +16,5 @@ RUN pip install .
 EXPOSE 8000
 
 # Default: API. Worker überschreibt command in compose.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-*}\""]
+# forwarded-allow-ips eng (security.md §3): nie "*"; Default loopback, real per FORWARDED_ALLOW_IPS (NPM-Netz).
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-127.0.0.1}\""]

@@ -1,13 +1,9 @@
-"""TDD-Smoke (T-01): /health liefert 200 + {"status": "ok"}."""
+"""TDD: /api/health 200 (api.md Basis-Pfad /api)."""
 
 from fastapi.testclient import TestClient
 
-from app.main import app
 
-client = TestClient(app)
-
-
-def test_health_ok() -> None:
-    resp = client.get("/health")
+def test_health_ok(client: TestClient) -> None:
+    resp = client.get("/api/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
