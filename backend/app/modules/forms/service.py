@@ -27,9 +27,13 @@ from app.modules.forms.schemas import (
     FormVersionCreate,
     FormVersionOut,
 )
-from app.modules.forms.validation import effective_form, validate_definition
+from app.modules.forms.validation import (
+    FormDefinitionError,
+    effective_form,
+    validate_definition,
+)
 from app.shared.config_schemas import FormFieldDef
-from app.shared.errors import NotFoundError
+from app.shared.errors import NotFoundError, ValidationProblem
 
 
 def _row_to_field_def(row: FormField) -> FormFieldDef:
@@ -158,8 +162,14 @@ class FormsService:
         self, type_id: UUID, payload: FormVersionCreate
     ) -> FormVersionOut:
         """Neue Form-Version anlegen (Definition validiert; optional aktivieren)."""
+        # Eingabe vor DB-Zugriff prüfen: defekte Definition → 422 (statt 500), api.md §2.
+        try:
+            validate_definition(payload.fields)
+        except FormDefinitionError as exc:
+            raise ValidationProblem(
+                "Invalid form definition.", errors=[{"field": "fields", "msg": str(exc)}]
+            ) from exc
         await self._get_type(type_id)
-        validate_definition(payload.fields)
 
         next_version = await self._next_version(type_id)
 

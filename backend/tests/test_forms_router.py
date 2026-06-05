@@ -182,3 +182,16 @@ def test_create_form_version_rejects_empty_fields(
         json={"fields": [], "activate": True},
     )
     assert r.status_code == 422
+
+
+# --------------------------------------------------------------------------- #
+# OpenAPI-Contract: Fehler-Status deklariert (für Schemathesis-Conformance)
+# --------------------------------------------------------------------------- #
+def test_openapi_declares_error_responses(app_client: TestClient) -> None:
+    spec = app_client.get("/openapi.json").json()
+    get_form = spec["paths"]["/api/application-types/{type_id}/form"]["get"]
+    assert "404" in get_form["responses"]
+    post = spec["paths"]["/api/admin/application-types/{type_id}/form-versions"]["post"]
+    assert {"400", "401", "403", "404", "422"} <= set(post["responses"])
+    # T-10s Hook schreibt 4xx auf problem+json um
+    assert "application/problem+json" in get_form["responses"]["404"]["content"]
