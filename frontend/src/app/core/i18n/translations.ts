@@ -40,7 +40,6 @@ export const de = {
   'home.cta': 'Jetzt Antrag stellen',
 
   'auth.signedInAs': 'Angemeldet als',
-  'auth.account': 'Konto',
   'rbac.forbidden': 'Keine Berechtigung für diesen Bereich.',
 
   'dashboard.greeting': 'Willkommen, {name}',
@@ -97,7 +96,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'home.cta': 'Submit an application',
 
   'auth.signedInAs': 'Signed in as',
-  'auth.account': 'Account',
   'rbac.forbidden': 'You do not have access to this area.',
 
   'dashboard.greeting': 'Welcome, {name}',

@@ -113,12 +113,4 @@ describe('AuthService', () => {
     expect(auth.isAuthenticated()).toBe(false);
     expect(assign).toHaveBeenCalledWith('/api/auth/login');
   });
-
-  it('persists the applicant token to sessionStorage', () => {
-    auth.setApplicantToken('tok-123');
-    expect(auth.applicantToken()).toBe('tok-123');
-    expect(sessionStorage.getItem('ap.applicantToken')).toBe('tok-123');
-    auth.setApplicantToken(null);
-    expect(sessionStorage.getItem('ap.applicantToken')).toBeNull();
-  });
 });

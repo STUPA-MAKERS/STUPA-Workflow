@@ -4,25 +4,24 @@ import { catchError, map } from 'rxjs/operators';
 import { ApiClient } from '../api/api-client.service';
 import type { Principal } from '../api/models';
 
-const APPLICANT_TOKEN_KEY = 'ap.applicantToken';
-
 /**
  * Auth-State. Principal aus GET /api/auth/me (Session-Cookie, OIDC). RBAC ist
  * **nie** FE-autoritativ (security.md §2): `can()`/Nav-Gating sind reine UX —
  * der Server prüft jede Route per `require_principal`. `ensureLoaded()` lädt den
  * Principal genau einmal (memoisiert), damit Route-Guards synchron entscheiden.
- * Applicant-Magic-Link-Token wird kurzlebig gehalten (Bearer via Interceptor).
+ *
+ * Beide Sessions (OIDC-principal, Magic-Link-applicant) laufen ausschließlich
+ * über HttpOnly-Cookies (security.md §1) — kein Token im JS-Storage, daher kein
+ * XSS-Exfiltrationspfad. Der auth-Interceptor sendet sie via `withCredentials`.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly api = inject(ApiClient);
 
   private readonly _principal = signal<Principal | null>(null);
-  private readonly _applicantToken = signal<string | null>(this.readToken());
   private principal$?: Observable<Principal | null>;
 
   readonly principal = this._principal.asReadonly();
-  readonly applicantToken = this._applicantToken.asReadonly();
   readonly isAuthenticated = computed(() => this._principal() !== null);
 
   /** Anzeigename (Fallback: Mail → "—"). */
@@ -60,16 +59,6 @@ export class AuthService {
     return permissions.length === 0 || permissions.some((p) => this.can(p));
   }
 
-  setApplicantToken(token: string | null): void {
-    this._applicantToken.set(token);
-    try {
-      if (token) sessionStorage.setItem(APPLICANT_TOKEN_KEY, token);
-      else sessionStorage.removeItem(APPLICANT_TOKEN_KEY);
-    } catch {
-      /* ignore */
-    }
-  }
-
   /** Startet den OIDC-Login (Full-Redirect zu Keycloak via Backend). */
   login(): void {
     window.location.assign('/api/auth/login');
@@ -99,13 +88,5 @@ export class AuthService {
     this._principal.set(null);
     this.principal$ = undefined;
     this.login();
-  }
-
-  private readToken(): string | null {
-    try {
-      return sessionStorage.getItem(APPLICANT_TOKEN_KEY);
-    } catch {
-      return null;
-    }
   }
 }

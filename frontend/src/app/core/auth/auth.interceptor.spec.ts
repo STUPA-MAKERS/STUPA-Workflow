@@ -29,19 +29,11 @@ describe('authInterceptor', () => {
 
   afterEach(() => http.verify());
 
-  it('adds withCredentials and no bearer for anonymous /api requests', () => {
+  it('adds withCredentials and sends no bearer for same-origin /api requests', () => {
     httpClient.get('/api/applications').subscribe();
     const req = http.expectOne('/api/applications');
     expect(req.request.withCredentials).toBe(true);
     expect(req.request.headers.has('Authorization')).toBe(false);
-    req.flush({});
-  });
-
-  it('attaches the applicant magic-link token as a bearer', () => {
-    auth.setApplicantToken('magic-xyz');
-    httpClient.get('/api/applications/1').subscribe();
-    const req = http.expectOne('/api/applications/1');
-    expect(req.request.headers.get('Authorization')).toBe('Bearer magic-xyz');
     req.flush({});
   });
 
@@ -50,6 +42,35 @@ describe('authInterceptor', () => {
     const req = http.expectOne('/assets/logos/stupa-mark.svg');
     expect(req.request.withCredentials).toBe(false);
     req.flush('');
+  });
+
+  describe('same-origin enforcement', () => {
+    it('does not attach credentials to a cross-origin url containing /api/', () => {
+      const evil = 'https://evil.example.com/api/applications';
+      httpClient.get(evil).subscribe();
+      const req = http.expectOne(evil);
+      expect(req.request.withCredentials).toBe(false);
+      req.flush({});
+    });
+
+    it('does not send the CSRF header to a cross-origin /api/ post', () => {
+      document.cookie = 'XSRF-TOKEN=csrf-abc; path=/';
+      const evil = 'https://evil.example.com/api/applications';
+      httpClient.post(evil, {}).subscribe();
+      const req = http.expectOne(evil);
+      expect(req.request.withCredentials).toBe(false);
+      expect(req.request.headers.has('X-XSRF-TOKEN')).toBe(false);
+      req.flush({});
+      document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    });
+
+    it('attaches credentials to an absolute same-origin /api url', () => {
+      const sameOrigin = `${window.location.origin}/api/applications`;
+      httpClient.get(sameOrigin).subscribe();
+      const req = http.expectOne(sameOrigin);
+      expect(req.request.withCredentials).toBe(true);
+      req.flush({});
+    });
   });
 
   describe('CSRF double-submit', () => {
@@ -95,6 +116,13 @@ describe('authInterceptor', () => {
       const spy = jest.spyOn(auth, 'handleUnauthorized').mockImplementation(() => undefined);
       httpClient.get('/api/auth/me').subscribe({ error: () => undefined });
       http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('ignores a 401 from logout (avoids a redirect race)', () => {
+      const spy = jest.spyOn(auth, 'handleUnauthorized').mockImplementation(() => undefined);
+      httpClient.post('/api/auth/logout', {}).subscribe({ error: () => undefined });
+      http.expectOne('/api/auth/logout').flush(null, { status: 401, statusText: 'Unauthorized' });
       expect(spy).not.toHaveBeenCalled();
     });
   });
