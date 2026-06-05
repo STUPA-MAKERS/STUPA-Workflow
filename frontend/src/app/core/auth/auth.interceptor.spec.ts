@@ -51,4 +51,51 @@ describe('authInterceptor', () => {
     expect(req.request.withCredentials).toBe(false);
     req.flush('');
   });
+
+  describe('CSRF double-submit', () => {
+    afterEach(() => {
+      document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    });
+
+    it('mirrors the XSRF-TOKEN cookie into the header for unsafe methods', () => {
+      document.cookie = 'XSRF-TOKEN=csrf-abc; path=/';
+      httpClient.post('/api/applications', {}).subscribe();
+      const req = http.expectOne('/api/applications');
+      expect(req.request.headers.get('X-XSRF-TOKEN')).toBe('csrf-abc');
+      req.flush({});
+    });
+
+    it('does not send a CSRF header for safe GET requests', () => {
+      document.cookie = 'XSRF-TOKEN=csrf-abc; path=/';
+      httpClient.get('/api/applications').subscribe();
+      const req = http.expectOne('/api/applications');
+      expect(req.request.headers.has('X-XSRF-TOKEN')).toBe(false);
+      req.flush({});
+    });
+
+    it('omits the header when no cookie is present', () => {
+      httpClient.post('/api/applications', {}).subscribe();
+      const req = http.expectOne('/api/applications');
+      expect(req.request.headers.has('X-XSRF-TOKEN')).toBe(false);
+      req.flush({});
+    });
+  });
+
+  describe('401 handling', () => {
+    it('triggers re-login on a 401 from a protected endpoint', () => {
+      const spy = jest.spyOn(auth, 'handleUnauthorized').mockImplementation(() => undefined);
+      httpClient.get('/api/applications').subscribe({ error: () => undefined });
+      http
+        .expectOne('/api/applications')
+        .flush(null, { status: 401, statusText: 'Unauthorized' });
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it('ignores a 401 from the anonymous /auth/me probe', () => {
+      const spy = jest.spyOn(auth, 'handleUnauthorized').mockImplementation(() => undefined);
+      httpClient.get('/api/auth/me').subscribe({ error: () => undefined });
+      http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+      expect(spy).not.toHaveBeenCalled();
+    });
+  });
 });

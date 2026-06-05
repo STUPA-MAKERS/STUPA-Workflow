@@ -1,9 +1,12 @@
 import type { Routes } from '@angular/router';
+import { authGuard } from '@core/auth/auth.guard';
 import { ShellComponent } from './layout/shell.component';
 
 /**
- * Routing-Gerüst (T-03). Feature-Routen laden vorerst einen Platzhalter; die
- * echten Feature-Module folgen in T-30…T-36 (loadChildren je Feature).
+ * Routing-Gerüst (T-03). OIDC-Bereiche sind per `authGuard` geschützt; einzelne
+ * Bereiche fordern zusätzlich eine RBAC-Permission (`data.permission`, T-36).
+ * Feature-Inhalte folgen je Strang (T-30…T-35); offene Bereiche zeigen vorerst
+ * den Platzhalter, sind aber bereits korrekt gated.
  */
 export const routes: Routes = [
   {
@@ -23,36 +26,42 @@ export const routes: Routes = [
       {
         path: 'dashboard',
         data: { title: 'Dashboard' },
+        canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
+          import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
         path: 'applications',
-        data: { title: 'Anträge' },
+        data: { title: 'Anträge', permission: 'application.read' },
+        canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
       },
       {
         path: 'voting',
-        data: { title: 'Abstimmungen' },
+        data: { title: 'Abstimmungen', permission: ['vote.cast', 'vote.manage'] },
+        canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
       },
       {
         path: 'meetings',
-        data: { title: 'Sitzungen' },
+        data: { title: 'Sitzungen', permission: ['meeting.manage', 'protocol.write'] },
+        canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
       },
       {
         path: 'budget',
-        data: { title: 'Budget' },
+        data: { title: 'Budget', permission: ['budget.view', 'budget.manage'] },
+        canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
       },
       {
         path: 'admin',
-        data: { title: 'Verwaltung' },
+        data: { title: 'Verwaltung', permission: 'admin.config' },
+        canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
       },

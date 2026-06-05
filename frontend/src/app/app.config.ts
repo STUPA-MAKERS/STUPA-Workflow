@@ -30,7 +30,7 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(() => {
       inject(ThemeService).init();
       inject(I18nService); // initialisiert document.lang über Konstruktor-Default
-      inject(AuthService).loadPrincipal();
+      inject(AuthService).ensureLoaded().subscribe();
     }),
   ],
 };

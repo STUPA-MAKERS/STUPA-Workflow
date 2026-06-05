@@ -7,6 +7,7 @@ import type {
   ApplicationListQuery,
   ApplicationOut,
   ApplicationType,
+  LogoutOut,
   Page,
   Principal,
   TimelineEntry,
@@ -29,6 +30,10 @@ export class ApiClient {
   // --- auth ----------------------------------------------------------------
   me(): Observable<Principal> {
     return this.http.get<Principal>(`${this.base}/auth/me`);
+  }
+
+  logout(): Observable<LogoutOut> {
+    return this.http.post<LogoutOut>(`${this.base}/auth/logout`, {});
   }
 
   // --- application-types (public) ------------------------------------------
