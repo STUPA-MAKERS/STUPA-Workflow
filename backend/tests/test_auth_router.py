@@ -176,6 +176,7 @@ def test_magic_link_always_202(
     monkeypatch.setattr(router_mod.service, "request_magic_link", _noop)
     resp = enabled_client.post("/api/auth/magic-link", json={"email": "x@y.de"})
     assert resp.status_code == 202
+    assert resp.json() == {"status": "accepted"}
 
 
 def test_magic_link_invalid_email_422(enabled_client: TestClient) -> None:

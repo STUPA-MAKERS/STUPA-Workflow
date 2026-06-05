@@ -145,13 +145,14 @@ def me(principal: Annotated[Principal, Depends(require_principal())]) -> MeOut:
 )
 async def request_magic_link(
     body: MagicLinkRequest, db: DbSession, settings: SettingsDep
-) -> Response:
-    """Magic-Link anfordern. Anti-Enumeration: **immer** 202, kein Treffer-Leak."""
+) -> dict[str, str]:
+    """Magic-Link anfordern. Anti-Enumeration: **immer** 202 + konstanter Body,
+    kein Treffer-Leak (ob Mail/Antrag existiert)."""
     await service.request_magic_link(
         db, settings, email=str(body.email), application_id=body.application_id
     )
     await db.commit()
-    return Response(status_code=status.HTTP_202_ACCEPTED)
+    return {"status": "accepted"}
 
 
 @router.post(
