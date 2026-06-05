@@ -16,6 +16,8 @@ dependencies = [
     "pydantic[email]>=2.10",
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg>=0.30",
+    "alembic>=1.14",
+    "greenlet>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +28,8 @@ dev = [
     "httpx>=0.28",
     "ruff>=0.9",
     "basedpyright>=1.28",
+    "testcontainers[postgres]>=4.8",
+    "psycopg[binary]>=3.2",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -42,6 +46,9 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false
+# Alembic-Migrationen: dynamische op/context-API → vom Strict-Typecheck ausgenommen
+# (Modelle/Logik bleiben geprüft). env.py wird separat typisiert gehalten.
+exclude = ["migrations/versions", ".venv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
