@@ -148,5 +148,5 @@ def test_openapi_declares_flow_error_responses(client: TestClient) -> None:
     get = spec["paths"]["/api/applications/{application_id}/transitions"]["get"]
     assert {"401", "403", "404"} <= set(get["responses"])
     post = spec["paths"]["/api/applications/{application_id}/transition"]["post"]
-    assert {"401", "403", "404", "409", "422"} <= set(post["responses"])
+    assert {"400", "401", "403", "404", "409", "422"} <= set(post["responses"])
     assert "application/problem+json" in post["responses"]["409"]["content"]

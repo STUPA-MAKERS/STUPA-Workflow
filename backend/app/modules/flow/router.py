@@ -67,7 +67,8 @@ async def list_transitions(
 @router.post(
     "/applications/{application_id}/transition",
     response_model=TransitionResult,
-    responses=_errors(401, 403, 404, 409, 422),
+    # 400 = malformed JSON body (FastAPI-Parser, vor der Validierung) — wie T-12.
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def fire_transition(
     application_id: UUID,
