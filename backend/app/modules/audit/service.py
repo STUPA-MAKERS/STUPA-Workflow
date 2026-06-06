@@ -96,18 +96,20 @@ class AuditService:
         return entry
 
     async def verify_chain(self) -> ChainVerification:
-        """Kette ab Genesis nachrechnen; erster Bruch wird gemeldet (fail-closed)."""
-        rows = (
-            (await self.session.execute(select(AuditEntry).order_by(AuditEntry.id.asc())))
-            .scalars()
-            .all()
-        )
+        """Kette ab Genesis nachrechnen; erster Bruch wird gemeldet (fail-closed).
+
+        Streamt zeilenweise (server-side cursor) statt die gesamte Kette in den Speicher
+        zu laden — auch sehr lange Audit-Logs bleiben verifizierbar."""
         prev_hash: bytes | None = None
-        for index, entry in enumerate(rows):
+        checked = 0
+        stream = await self.session.stream_scalars(
+            select(AuditEntry).order_by(AuditEntry.id.asc())
+        )
+        async for entry in stream:
             if entry.prev_hash != prev_hash:
                 return ChainVerification(
                     valid=False,
-                    checked=index,
+                    checked=checked,
                     broken_at=entry.id,
                     reason="prev_hash_mismatch",
                 )
@@ -122,12 +124,13 @@ class AuditService:
             if compute_hash(entry.prev_hash, canonical) != entry.hash:
                 return ChainVerification(
                     valid=False,
-                    checked=index,
+                    checked=checked,
                     broken_at=entry.id,
                     reason="hash_mismatch",
                 )
             prev_hash = entry.hash
-        return ChainVerification(valid=True, checked=len(rows))
+            checked += 1
+        return ChainVerification(valid=True, checked=checked)
 
     async def query(
         self,

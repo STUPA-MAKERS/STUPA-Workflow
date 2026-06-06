@@ -9,6 +9,7 @@ Beweist gegen ein echtes Schema (security.md §4):
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 
 import pytest
@@ -99,3 +100,46 @@ async def test_delete_is_rejected(session: AsyncSession, engine: Engine) -> None
     with pytest.raises(DBAPIError, match="append-only"):
         async with session.begin():
             await session.execute(text("DELETE FROM audit_entry"))
+
+
+async def test_truncate_is_rejected(session: AsyncSession, engine: Engine) -> None:
+    """TRUNCATE umginge die Row-Trigger → Statement-Trigger lehnt ab (Tamper-Evidence)."""
+    await AuditService(session).record(actor="a", action=AuditAction.LOGIN)
+    await session.commit()
+
+    with pytest.raises(DBAPIError, match="append-only"):
+        async with session.begin():
+            await session.execute(text("TRUNCATE audit_entry"))
+
+
+async def test_concurrent_records_keep_chain_intact(
+    migrated: tuple[str, str], engine: Engine
+) -> None:
+    """Zwei gleichzeitige ``record()`` (eigene Sessions) → lückenlose Kette.
+
+    Der Transaktions-Advisory-Lock serialisiert die Appends; kein verschränktes
+    ``prev_hash`` (eine der beiden Transaktionen wartet bis zum Commit der anderen)."""
+    eng = create_async_engine(migrated[1])
+    maker = async_sessionmaker(eng, expire_on_commit=False)
+
+    async def _one(actor: str) -> None:
+        async with maker() as s:
+            await AuditService(s).record(actor=actor, action=AuditAction.LOGIN)
+            await s.commit()
+
+    try:
+        await asyncio.gather(_one("u-1"), _one("u-2"))
+
+        async with maker() as s:
+            entries = (
+                (await s.execute(select(AuditEntry).order_by(AuditEntry.id)))
+                .scalars()
+                .all()
+            )
+            assert len(entries) == 2
+            assert entries[0].prev_hash is None
+            assert entries[1].prev_hash == entries[0].hash  # echte Verkettung
+            assert entries[0].hash != entries[1].hash
+            assert (await AuditService(s).verify_chain()).valid is True
+    finally:
+        await eng.dispose()

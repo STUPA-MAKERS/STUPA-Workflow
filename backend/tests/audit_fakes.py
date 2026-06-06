@@ -27,6 +27,21 @@ class FakeResult:
         return list(self._items)
 
 
+class FakeAsyncScalars:
+    """Async-iterierbarer ``stream_scalars``-Ersatz."""
+
+    def __init__(self, items: Iterable[Any]) -> None:
+        self._items = list(items)
+
+    def __aiter__(self) -> FakeAsyncScalars:
+        return self
+
+    async def __anext__(self) -> Any:
+        if not self._items:
+            raise StopAsyncIteration
+        return self._items.pop(0)
+
+
 class FakeSession:
     def __init__(self, results: Iterable[FakeResult] = ()) -> None:
         self._results = list(results)
@@ -37,6 +52,10 @@ class FakeSession:
         if not self._results:
             return FakeResult()
         return self._results.pop(0)
+
+    async def stream_scalars(self, _stmt: Any) -> FakeAsyncScalars:
+        items = self._results.pop(0).all() if self._results else []
+        return FakeAsyncScalars(items)
 
     def add(self, obj: Any) -> None:
         self.added.append(obj)

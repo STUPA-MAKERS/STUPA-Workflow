@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -26,12 +26,15 @@ def canonical_payload(
 
     ``sort_keys`` + kompakte Separatoren garantieren reproduzierbare Bytes unabhängig
     von der Einfüge-Reihenfolge der Keys (auch im verschachtelten ``data``-JSONB).
-    ``at`` wird als ISO-8601-String fixiert; nicht JSON-native Werte in ``data`` lösen
-    bewusst ``TypeError`` aus (fail-closed statt stillem ``str()``)."""
+    ``at`` wird **nach UTC normalisiert** und als ISO-8601-String fixiert — der Hash
+    bleibt so unabhängig von der Server-Zeitzone reproduzierbar (naive Werte werden als
+    UTC interpretiert). Nicht JSON-native Werte in ``data`` lösen bewusst ``TypeError``
+    aus (fail-closed statt stillem ``str()``)."""
+    at_utc = (at if at.tzinfo is not None else at.replace(tzinfo=UTC)).astimezone(UTC)
     payload = {
         "action": action,
         "actor": actor,
-        "at": at.isoformat(),
+        "at": at_utc.isoformat(),
         "data": data,
         "target_id": target_id,
         "target_type": target_type,

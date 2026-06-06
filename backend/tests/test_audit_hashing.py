@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -44,6 +44,23 @@ def test_canonical_compact_and_sorted() -> None:
 
 def test_canonical_at_is_iso() -> None:
     assert _AT.isoformat() in _payload({}).decode("utf-8")
+
+
+def _payload_at(at: datetime) -> bytes:
+    return canonical_payload(
+        actor="a", action="login", target_type=None, target_id=None, at=at, data={}
+    )
+
+
+def test_canonical_normalizes_non_utc_timezone() -> None:
+    # Gleicher Zeitpunkt in +02:00 → identische Bytes wie in UTC (TZ-Determinismus).
+    berlin = _payload_at(_AT.astimezone(timezone(timedelta(hours=2))))
+    assert berlin == _payload_at(_AT)
+
+
+def test_canonical_treats_naive_as_utc() -> None:
+    naive = _AT.replace(tzinfo=None)
+    assert _payload_at(naive) == _payload_at(_AT)
 
 
 def test_canonical_rejects_non_json(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -8,7 +8,10 @@ Create Date: 2026-06-06 00:00:05
 ``Base.metadata.create_all`` in 0002 (Single-Source-Pattern, s. ``app.models``).
 Diese Revision ergänzt, was ``create_all`` nicht abbildet (security.md §4):
 
-* **Append-only-Trigger**: ``BEFORE UPDATE OR DELETE`` ⇒ ``RAISE EXCEPTION``. Greift
+* **Append-only-Trigger**: ``BEFORE UPDATE OR DELETE`` (row) **und** ``BEFORE TRUNCATE``
+  (statement) ⇒ ``RAISE EXCEPTION``. Der TRUNCATE-Trigger ist entscheidend: ein
+  ``TRUNCATE`` umginge sonst die Row-Trigger und würde die gesamte Kette löschen
+  (``verify_chain`` meldete danach fälschlich ``valid`` auf leerer Kette). Greift
   rollenunabhängig (auch für den Owner) → fail-closed, portabel, testbar. Primäre
   Durchsetzung der Unveränderlichkeit der Hash-Kette.
 * **Least-Privilege-Grant**: existiert die Rolle ``audit_writer`` (deployment.md,
@@ -68,11 +71,16 @@ def upgrade() -> None:
         "CREATE TRIGGER trg_audit_entry_no_delete BEFORE DELETE ON audit_entry "
         "FOR EACH ROW EXECUTE FUNCTION audit_entry_append_only();"
     )
+    op.execute(
+        "CREATE TRIGGER trg_audit_entry_no_truncate BEFORE TRUNCATE ON audit_entry "
+        "FOR EACH STATEMENT EXECUTE FUNCTION audit_entry_append_only();"
+    )
     op.execute(_GRANT)
 
 
 def downgrade() -> None:
     op.execute(_REVOKE)
+    op.execute("DROP TRIGGER IF EXISTS trg_audit_entry_no_truncate ON audit_entry;")
     op.execute("DROP TRIGGER IF EXISTS trg_audit_entry_no_delete ON audit_entry;")
     op.execute("DROP TRIGGER IF EXISTS trg_audit_entry_no_update ON audit_entry;")
     op.execute("DROP FUNCTION IF EXISTS audit_entry_append_only();")
