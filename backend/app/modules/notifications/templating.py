@@ -45,6 +45,13 @@ def _resolve(value: I18nMap | None, lang: str, default_lang: str) -> tuple[str |
     return value[used], used
 
 
+def _sanitize_subject(value: str) -> str:
+    """Header-Injection abwehren: CR/LF (und weitere Zeilenumbrüche) aus dem Subject
+    entfernen, sonst könnte Kontext-Input zusätzliche Mail-Header schmuggeln
+    (security.md). `splitlines()` deckt \\r \\n \\r\\n \\v \\f u. a. ab."""
+    return " ".join(value.splitlines()).strip()
+
+
 def _render_str(template_str: str, context: dict[str, object], *, html: bool) -> str:
     env = _env_html if html else _env
     try:
@@ -69,7 +76,7 @@ def render_mail(
         raise TemplateRenderError("template missing subject or body")
     html_tpl, _ = _resolve(body_html_i18n, lang, default_lang)
 
-    subject = _render_str(subject_tpl, context, html=False).strip()
+    subject = _sanitize_subject(_render_str(subject_tpl, context, html=False))
     text = _render_str(body_tpl, context, html=False)
     html = _render_str(html_tpl, context, html=True) if html_tpl else None
     return RenderedMail(subject=subject, text=text, html=html, lang=used)

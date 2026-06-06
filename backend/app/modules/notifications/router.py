@@ -68,7 +68,8 @@ async def list_notification_rules(service: ServiceDep) -> list[NotificationRuleO
     response_model=NotificationRuleOut,
     status_code=201,
     dependencies=[_MANAGE],
-    responses=_errors(401, 403, 422),
+    # 400 = malformed JSON body (Parse-Fehler), 422 = Schema-Validierung.
+    responses=_errors(400, 401, 403, 422),
 )
 async def create_notification_rule(
     payload: NotificationRuleCreate, service: ServiceDep
@@ -80,7 +81,7 @@ async def create_notification_rule(
     "/notification-rules/{rule_id}",
     response_model=NotificationRuleOut,
     dependencies=[_MANAGE],
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 422),
 )
 async def update_notification_rule(
     rule_id: UUID, payload: NotificationRuleUpdate, service: ServiceDep
@@ -106,7 +107,7 @@ async def list_mail_templates(service: ServiceDep) -> list[MailTemplateOut]:
     response_model=MailTemplateOut,
     status_code=201,
     dependencies=[_MANAGE],
-    responses=_errors(401, 403, 409, 422),
+    responses=_errors(400, 401, 403, 409, 422),
 )
 async def create_mail_template(
     payload: MailTemplateCreate, service: ServiceDep
@@ -118,7 +119,7 @@ async def create_mail_template(
     "/mail-templates/{template_id}",
     response_model=MailTemplateOut,
     dependencies=[_MANAGE],
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 422),
 )
 async def update_mail_template(
     template_id: UUID, payload: MailTemplateUpdate, service: ServiceDep
@@ -130,7 +131,7 @@ async def update_mail_template(
     "/mail-templates/{template_id}/preview",
     response_model=MailPreviewOut,
     dependencies=[_MANAGE],
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 422),
 )
 async def preview_mail_template(
     template_id: UUID, payload: MailPreviewRequest, service: ServiceDep

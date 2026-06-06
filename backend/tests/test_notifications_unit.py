@@ -155,6 +155,16 @@ def test_render_mail_unknown_placeholder_raises() -> None:
         )
 
 
+def test_render_mail_subject_strips_crlf_header_injection() -> None:
+    out = render_mail(
+        subject_i18n={"de": "Betreff {{ x }}"},
+        body_i18n={"de": "b"},
+        context={"x": "ok\r\nBcc: evil@x.de"},
+    )
+    assert "\n" not in out.subject and "\r" not in out.subject
+    assert "Bcc:" in out.subject  # Inhalt bleibt, nur Umbruch entfernt
+
+
 def test_render_html_autoescape() -> None:
     out = render_mail(
         subject_i18n={"de": "s"},

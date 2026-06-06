@@ -137,6 +137,23 @@ def test_create_rule(app: FastAPI, client: TestClient) -> None:
     assert r.json()["event"] == "status_changed"
 
 
+def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
+    """Body-tragende Mutationen müssen 400 (malformed JSON/Parse) deklarieren —
+    sonst schemathesis-Failure »undocumented status code« (be-contract)."""
+    spec = app.openapi()
+    cases = [
+        ("/api/admin/notification-rules", "post"),
+        ("/api/admin/notification-rules/{rule_id}", "patch"),
+        ("/api/admin/mail-templates", "post"),
+        ("/api/admin/mail-templates/{template_id}", "patch"),
+        ("/api/admin/mail-templates/{template_id}/preview", "post"),
+    ]
+    for path, method in cases:
+        responses = spec["paths"][path][method]["responses"]
+        assert "400" in responses, f"{method.upper()} {path} missing 400"
+        assert list(responses["400"]["content"]) == ["application/problem+json"]
+
+
 def test_create_rule_unknown_event_422(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     r = client.post(
