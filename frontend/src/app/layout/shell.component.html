@@ -6,7 +6,7 @@
       <img class="header__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     </a>
 
-    <nav class="header__nav" [attr.aria-label]="'nav.applications' | t">
+    <nav class="header__nav" [attr.aria-label]="'nav.main' | t">
       @for (item of visibleNav(); track item.path) {
         <a
           class="header__link"
@@ -67,7 +67,7 @@
   <div class="container footer__inner">
     <img class="footer__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     <span class="footer__text">{{ 'footer.coBranding' | t }}</span>
-    <nav class="footer__links" aria-label="Footer">
+    <nav class="footer__links" [attr.aria-label]="'nav.footer' | t">
       <a href="#">{{ 'footer.imprint' | t }}</a>
       <a href="#">{{ 'footer.privacy' | t }}</a>
     </nav>

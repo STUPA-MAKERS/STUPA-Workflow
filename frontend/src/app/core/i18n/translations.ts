@@ -11,6 +11,8 @@ export const de = {
   'app.title': 'StuPa Antragsplattform',
   'app.skipToContent': 'Zum Inhalt springen',
 
+  'nav.main': 'Hauptnavigation',
+  'nav.footer': 'Fußzeile',
   'nav.dashboard': 'Dashboard',
   'nav.applications': 'Anträge',
   'nav.voting': 'Abstimmungen',
@@ -152,6 +154,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'app.title': 'StuPa Application Platform',
   'app.skipToContent': 'Skip to content',
 
+  'nav.main': 'Main navigation',
+  'nav.footer': 'Footer',
   'nav.dashboard': 'Dashboard',
   'nav.applications': 'Applications',
   'nav.voting': 'Votes',
