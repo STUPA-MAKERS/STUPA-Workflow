@@ -168,6 +168,33 @@ export interface TransitionOutWire {
   label: I18nMap;
 }
 
+/** Eine Feld-Änderung im Versions-Diff (`FieldChange`, applications/diff.py). */
+export interface FieldChangeWire {
+  old: unknown;
+  new: unknown;
+}
+
+/**
+ * Struktur-Diff zweier `data`-Snapshots (`DataDiff`, applications/diff.py):
+ * `added`/`removed` sind Feldwert-Maps, `changed` mappt Schlüssel → `{old,new}`.
+ * Verschachtelte Felder werden **wertweise als Ganzes** verglichen (kein
+ * rekursives Zell-Diff) — robust gegen heterogene Tabellen/Objekte (T-12).
+ */
+export interface DataDiffWire {
+  added: Record<string, unknown>;
+  removed: Record<string, unknown>;
+  changed: Record<string, FieldChangeWire>;
+}
+
+/** `VersionOut` (applications/schemas.py) — eine Submission-Version + Diff. */
+export interface VersionOutWire {
+  version: number;
+  data: Record<string, unknown>;
+  diff?: DataDiffWire | null;
+  changedBy?: string | null;
+  at: IsoDateTime;
+}
+
 // --- Request-Bodies (camelCase-Wire-Form) ---------------------------------- //
 
 /** Body für `POST /applications` (`ApplicationCreate`, by_alias). */
@@ -290,6 +317,33 @@ export interface Transition {
   fromStateId: Uuid;
   toStateId: Uuid;
   label: string;
+}
+
+/** Eine geänderte Feldzelle (FE-View) — `key` aus der Diff-Map herausgezogen. */
+export interface FieldChange {
+  key: string;
+  old: unknown;
+  new: unknown;
+}
+
+/**
+ * Versions-Diff (FE-View) — die Backend-Maps (`added`/`removed`/`changed`)
+ * sind hier in iterierbare, schlüsseltragende Listen aufgelöst, damit Templates
+ * direkt mit `@for` darüber rendern können.
+ */
+export interface DataDiff {
+  added: { key: string; value: unknown }[];
+  removed: { key: string; value: unknown }[];
+  changed: FieldChange[];
+}
+
+/** Eine Submission-Version (FE-View) für die Historie/Diff-Ansicht. */
+export interface ApplicationVersion {
+  version: number;
+  data: Record<string, unknown>;
+  diff: DataDiff | null;
+  changedBy: string | null;
+  at: IsoDateTime;
 }
 
 /** FE-Eingabe für einen neuen Antrag → via Mapper zu `ApplicationCreateBody`. */

@@ -165,6 +165,36 @@ describe('ApiClient', () => {
     http.expectOne('/api/applications/app-9/timeline').flush(events);
   });
 
+  it('maps the version history with its diff into iterable lists', (done) => {
+    api.versions('app-7').subscribe((versions) => {
+      expect(versions).toHaveLength(2);
+      expect(versions[0].diff).toBeNull(); // erste Version: kein Diff
+      expect(versions[1].changedBy).toBe('Mia');
+      expect(versions[1].diff?.added).toEqual([{ key: 'note', value: 'neu' }]);
+      expect(versions[1].diff?.changed).toEqual([
+        { key: 'title', old: 'Alt', new: 'Neu' },
+      ]);
+      expect(versions[1].diff?.removed).toEqual([]);
+      done();
+    });
+    const req = http.expectOne('/api/applications/app-7/versions');
+    expect(req.request.method).toBe('GET');
+    req.flush([
+      { version: 1, data: { title: 'Alt' }, diff: null, changedBy: null, at: '2026-06-01T10:00:00Z' },
+      {
+        version: 2,
+        data: { title: 'Neu', note: 'neu' },
+        diff: {
+          added: { note: 'neu' },
+          removed: {},
+          changed: { title: { old: 'Alt', new: 'Neu' } },
+        },
+        changedBy: 'Mia',
+        at: '2026-06-02T10:00:00Z',
+      },
+    ]);
+  });
+
   it('POSTs the magic-link token to verify (snake_case response)', () => {
     api.verifyMagicLink('tok-1').subscribe();
     const req = http.expectOne('/api/auth/magic-link/verify');
