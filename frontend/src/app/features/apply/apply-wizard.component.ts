@@ -10,10 +10,10 @@ import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type {
-  ApplicationCreate,
   ApplicationType,
   EffectiveForm,
   FormFieldDef,
+  NewApplication,
   ProblemDetail,
   Uuid,
 } from '@core/api/models';
@@ -198,22 +198,24 @@ export class ApplyWizardComponent {
     const altcha = this.altchaSolution();
     if (!typeId || !altcha) return;
 
-    const payload: ApplicationCreate = {
-      type_id: typeId,
-      budget_pot_id: this.effForm()?.budgetPotId ?? null,
+    const payload: NewApplication = {
+      typeId,
+      budgetPotId: this.effForm()?.budgetPotId ?? null,
       data: { ...this.model },
-      applicant_email: this.contactForm.controls.email.value,
-      applicant_name: this.contactForm.controls.name.value || null,
+      applicantEmail: this.contactForm.controls.email.value,
+      applicantName: this.contactForm.controls.name.value || null,
       lang: this.i18n.locale(),
       altcha,
     };
 
     this.submitting.set(true);
     this.api.createApplication(payload).subscribe({
-      next: (app) => {
+      next: (created) => {
         this.clearDraft();
         this.submitting.set(false);
-        void this.router.navigate(['/apply/confirmation'], { queryParams: { id: app.id } });
+        void this.router.navigate(['/apply/confirmation'], {
+          queryParams: { id: created.applicationId },
+        });
       },
       error: (err: { error?: ProblemDetail }) => {
         this.submitting.set(false);
