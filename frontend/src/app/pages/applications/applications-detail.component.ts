@@ -6,6 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
@@ -504,13 +505,35 @@ export class ApplicationsDetailComponent {
   );
 
   constructor() {
-    this.id = this.route.snapshot.paramMap.get('id') ?? '';
-    if (!this.id) {
+    // `paramMap` (nicht `snapshot`): bei Detail→Detail-Navigation reused Angular
+    // die Komponente, der Konstruktor läuft dann **nicht** erneut — ein Snapshot
+    // bliebe auf der alten `id` stehen. Das Abo lädt bei jedem `id`-Wechsel neu.
+    this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
+      this.loadApplication(pm.get('id') ?? '');
+    });
+  }
+
+  private loadApplication(id: Uuid): void {
+    this.id = id;
+    // Zustand für die (ggf. neue) id zurücksetzen, damit nichts Altes durchblitzt.
+    this.app.set(null);
+    this.versions.set([]);
+    this.comments.set([]);
+    this.transitions.set([]);
+    this.pending.set(null);
+    this.note.set('');
+    this.newComment.set('');
+    this.visibility.set('public');
+    this.notFound.set(false);
+    this.error.set(false);
+
+    if (!id) {
       this.notFound.set(true);
       this.loading.set(false);
       return;
     }
-    this.api.getApplication(this.id).subscribe({
+    this.loading.set(true);
+    this.api.getApplication(id).subscribe({
       next: (app) => {
         this.app.set(app);
         this.loading.set(false);

@@ -6,6 +6,7 @@ import {
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -74,7 +75,10 @@ function fakeAuth(permissions: string[]): Partial<AuthService> {
   return { can: (p: string) => permissions.includes(p) };
 }
 
-async function setup(permissions: string[] = ['application.read', 'application.manage']) {
+async function setup(
+  permissions: string[] = ['application.read', 'application.manage'],
+  paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
+) {
   const view = await render(ApplicationsDetailComponent, {
     providers: [
       provideRouter([]),
@@ -82,25 +86,25 @@ async function setup(permissions: string[] = ['application.read', 'application.m
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(permissions) },
-      {
-        provide: ActivatedRoute,
-        useValue: { snapshot: { paramMap: convertToParamMap({ id: 'app-1' }) } },
-      },
+      { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   const toast = view.fixture.debugElement.injector.get(ToastService);
-  return { ...view, http, toast };
+  return { ...view, http, toast, paramMap$ };
 }
 
-const url = (suffix: string) => (r: { url: string }) => r.url === `/api/applications/app-1${suffix}`;
+const url =
+  (suffix: string, id = 'app-1') =>
+  (r: { url: string }) =>
+    r.url === `/api/applications/${id}${suffix}`;
 
 /** Flush the detail GET and the three (or two) aux loads it triggers. */
-function flushAll(http: HttpTestingController, manage = true) {
-  http.expectOne(url('')).flush(appWire());
-  http.expectOne(url('/versions')).flush(VERSIONS);
-  http.expectOne(url('/comments')).flush(COMMENTS);
-  if (manage) http.expectOne(url('/transitions')).flush(TRANSITIONS);
+function flushAll(http: HttpTestingController, manage = true, id = 'app-1') {
+  http.expectOne(url('', id)).flush({ ...appWire(), id });
+  http.expectOne(url('/versions', id)).flush(VERSIONS);
+  http.expectOne(url('/comments', id)).flush(COMMENTS);
+  if (manage) http.expectOne(url('/transitions', id)).flush(TRANSITIONS);
 }
 
 describe('ApplicationsDetailComponent', () => {
@@ -242,6 +246,28 @@ describe('ApplicationsDetailComponent', () => {
       .flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
 
     expect(error).toHaveBeenCalledWith('Kommentar konnte nicht gespeichert werden.');
+    http.verify();
+  });
+
+  it('reloads when the route id changes on a reused component (paramMap, not snapshot)', async () => {
+    const paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' }));
+    const { http, detectChanges } = await setup(
+      ['application.read', 'application.manage'],
+      paramMap$,
+    );
+    flushAll(http, true, 'app-1');
+    detectChanges();
+
+    // simulate Detail→Detail navigation: same component instance, new param
+    paramMap$.next(convertToParamMap({ id: 'app-2' }));
+    // a fresh detail GET for app-2 must fire (snapshot would have stayed on app-1)
+    http.expectOne(url('', 'app-2')).flush({ ...appWire(), id: 'app-2' });
+    http.expectOne(url('/versions', 'app-2')).flush(VERSIONS);
+    http.expectOne(url('/comments', 'app-2')).flush(COMMENTS);
+    http.expectOne(url('/transitions', 'app-2')).flush(TRANSITIONS);
+    detectChanges();
+
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     http.verify();
   });
 
