@@ -69,7 +69,36 @@ export const routes: Routes = [
         data: { title: 'nav.voting', permission: ['vote.cast', 'vote.manage'] },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
+          import('./features/voting/live-vote.component').then((m) => m.LiveVoteComponent),
+      },
+      {
+        // Beamer-/Projektor-Ansicht (read-only). Vor `vote/:id` deklariert.
+        path: 'voting/beamer',
+        data: { title: 'voting.beamer.heading', permission: 'meeting.manage' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
+      },
+      {
+        path: 'voting/beamer/:id',
+        data: { title: 'voting.beamer.heading', permission: 'meeting.manage' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
+      },
+      {
+        path: 'voting/meeting/:id',
+        data: { title: 'voting.live.heading', permission: ['vote.cast', 'vote.manage'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/voting/live-vote.component').then((m) => m.LiveVoteComponent),
+      },
+      {
+        path: 'voting/vote/:id',
+        data: { title: 'voting.cast.heading', permission: ['vote.cast', 'vote.manage'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/voting/vote-cast.component').then((m) => m.VoteCastComponent),
       },
       {
         path: 'meetings',

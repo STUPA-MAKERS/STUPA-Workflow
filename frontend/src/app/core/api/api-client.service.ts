@@ -49,6 +49,8 @@ import type {
   TransitionResult,
   Uuid,
   VersionOutWire,
+  Vote,
+  BallotResult,
 } from './models';
 
 /**
@@ -224,5 +226,25 @@ export class ApiClient {
     return this.http
       .get<SignedUrlOutWire>(`${this.base}/attachments/${attachmentId}`)
       .pipe(map(mapSignedUrl));
+  }
+
+  // --- voting (api.md »voting«) --------------------------------------------
+  /**
+   * GET /votes/{id} — Vote-State + Tally. `VoteOut` ist ein `_CamelModel`
+   * (camelCase) und braucht keine Mapper-Schicht; bei `secret` liefert der
+   * Server in `tally` nur `counts`.
+   */
+  getVote(id: Uuid): Observable<Vote> {
+    return this.http.get<Vote>(`${this.base}/votes/${id}`);
+  }
+
+  /**
+   * POST /votes/{id}/ballot — Stimme abgeben (`choice` ∈ config.options).
+   * Idempotent: erneuter Cast mit gleicher Wahl bleibt `cast`; ein Wechsel
+   * liefert `changed` (nur wenn `config.allowChange`). 409 = Doppel/geschlossen,
+   * 403 = nicht stimmberechtigt — Components werten den Status aus.
+   */
+  castBallot(id: Uuid, choice: string): Observable<BallotResult> {
+    return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, { choice });
   }
 }

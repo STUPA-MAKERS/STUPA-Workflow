@@ -1,0 +1,82 @@
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bars__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.bars__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.bars__label {
+  font-weight: var(--fw-semibold);
+}
+
+.bars__count {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-bold);
+  color: var(--color-text);
+}
+
+.bars__track {
+  height: 0.85rem;
+  background: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.bars__fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: inherit;
+  transition: width var(--motion-base) var(--ease-standard);
+}
+
+.bars__row--leading .bars__fill {
+  background: var(--color-success);
+}
+
+.bars__row--leading .bars__label::after {
+  content: '★';
+  margin-left: var(--space-2);
+  color: var(--color-success);
+}
+
+// --- Beamer: großschriftig, hochkontrast ------------------------------------
+.bars--beamer {
+  gap: var(--space-6);
+}
+
+.bars--beamer .bars__label,
+.bars--beamer .bars__count {
+  font-size: var(--fs-3xl);
+}
+
+.bars--beamer .bars__count {
+  font-weight: var(--fw-bold);
+}
+
+.bars--beamer .bars__track {
+  height: 2.5rem;
+  border-width: 2px;
+  border-color: var(--color-border-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bars__fill {
+    transition: none;
+  }
+}

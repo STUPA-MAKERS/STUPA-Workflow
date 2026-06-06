@@ -295,4 +295,38 @@ describe('ApiClient', () => {
     expect(req.request.body).toEqual({ body: 'Hallo', visibility: 'public' });
     req.flush(wire, { status: 201, statusText: 'Created' });
   });
+
+  it('GETs a vote state + tally from /votes/{id}', (done) => {
+    api.getVote('v1').subscribe((vote) => {
+      expect(vote.status).toBe('open');
+      expect(vote.config.options).toEqual(['yes', 'no', 'abstain']);
+      expect(vote.tally.counts['yes']).toBe(5);
+      done();
+    });
+    const req = http.expectOne('/api/votes/v1');
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      id: 'v1',
+      applicationId: 'app-1',
+      eligibleGroup: 'stupa',
+      config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds', allowChange: true },
+      status: 'open',
+      opensAt: null,
+      closesAt: null,
+      result: null,
+      secret: false,
+      tally: { counts: { yes: 5, no: 2, abstain: 1 }, eligible: 12, quorumMet: true, leading: 'yes' },
+    });
+  });
+
+  it('POSTs a ballot choice to /votes/{id}/ballot', (done) => {
+    api.castBallot('v1', 'yes').subscribe((res) => {
+      expect(res.status).toBe('cast');
+      done();
+    });
+    const req = http.expectOne('/api/votes/v1/ballot');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ choice: 'yes' });
+    req.flush({ status: 'cast' });
+  });
 });

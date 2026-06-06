@@ -480,3 +480,65 @@ export interface MagicLinkVerifyResult {
   application_id: Uuid;
   scope: 'edit' | 'view';
 }
+
+// --- Voting (api.md »voting«, §4; config_schemas.VoteConfig — T-15) -----------
+
+export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
+export type VoteStatus = 'draft' | 'open' | 'closed';
+export type VoteResult = 'passed' | 'rejected' | 'tie';
+
+/** Beschlussfähigkeits-Schwelle (config_schemas.Quorum). */
+export interface Quorum {
+  type: 'count' | 'percent';
+  value: number;
+}
+
+/**
+ * Abstimmungs-Konfiguration (`VoteConfig`, config_schemas.py). Felder kommen
+ * camelCase über das Backend-`_CamelModel`; Defaults spiegeln die Pydantic-
+ * Defaults (`abstainCountsQuorum`/`allowChange` true, `secret` false).
+ */
+export interface VoteConfig {
+  options: string[];
+  majorityRule: MajorityRule;
+  quorum?: Quorum | null;
+  abstainCountsQuorum?: boolean;
+  secret?: boolean;
+  allowChange?: boolean;
+  tieBreak?: VoteResult;
+}
+
+/**
+ * Aggregiertes Zwischen-/Endergebnis (`TallyOut`). Bei `secret` enthält der
+ * Server nur `counts` — **nie** einzelne Stimmende (api.md §4).
+ */
+export interface Tally {
+  counts: Record<string, number>;
+  eligible: number;
+  quorumMet: boolean;
+  leading: string | null;
+  result?: VoteResult | null;
+}
+
+/**
+ * Vote-State + Tally — GET /api/votes/{id} (`VoteOut`). Reines `_CamelModel`,
+ * daher 1:1 als View-Modell verwendbar (kein i18n-Label, Optionen sind
+ * Roh-Keys, die das FE über `vote.option.*` übersetzt).
+ */
+export interface Vote {
+  id: Uuid;
+  applicationId: Uuid;
+  eligibleGroup: string;
+  config: VoteConfig;
+  status: VoteStatus;
+  opensAt: IsoDateTime | null;
+  closesAt: IsoDateTime | null;
+  result: VoteResult | null;
+  secret: boolean;
+  tally: Tally;
+}
+
+/** Antwort auf eine angenommene Stimme — POST /api/votes/{id}/ballot. */
+export interface BallotResult {
+  status: 'cast' | 'changed';
+}

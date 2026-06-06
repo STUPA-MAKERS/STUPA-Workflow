@@ -1,0 +1,20 @@
+<ul class="bars" [class.bars--beamer]="variant() === 'beamer'">
+  @for (row of rows(); track row.option) {
+    <li class="bars__row" [class.bars__row--leading]="row.leading">
+      <div class="bars__head">
+        <span class="bars__label">{{ row.label }}</span>
+        <span class="bars__count">{{ row.count }}</span>
+      </div>
+      <div
+        class="bars__track"
+        role="progressbar"
+        [attr.aria-valuenow]="row.count"
+        [attr.aria-valuemin]="0"
+        [attr.aria-valuemax]="eligible() || null"
+        [attr.aria-label]="row.label + ': ' + row.count"
+      >
+        <div class="bars__fill" [style.width.%]="row.pct"></div>
+      </div>
+    </li>
+  }
+</ul>

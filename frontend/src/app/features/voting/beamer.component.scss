@@ -1,0 +1,86 @@
+// Beamer/Projektor: maximaler Kontrast über die Semantic-Tokens (Text 900 auf
+// Bg 50 in Light, Text 50 auf Bg 950 in Dark) + große Typo für Fernlesbarkeit.
+:host {
+  display: block;
+  min-height: calc(100vh - var(--layout-header-height));
+}
+
+.beamer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.beamer__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  border-bottom: 3px solid var(--color-border-strong);
+  padding-bottom: var(--space-4);
+}
+
+.beamer__title {
+  margin: 0;
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.beamer__phase {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+}
+
+.beamer__phase--done {
+  color: var(--color-accent);
+}
+
+.beamer__stats {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-semibold);
+}
+
+.beamer__count {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.beamer__quorum {
+  margin: 0;
+}
+
+.beamer__quorum--met {
+  color: var(--color-success);
+}
+
+.beamer__quorum--missed {
+  color: var(--color-danger);
+}
+
+.beamer__result {
+  margin: 0 0 0 auto;
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-bold);
+  color: var(--color-danger);
+}
+
+.beamer__result--passed {
+  color: var(--color-success);
+}
+
+.beamer__waiting {
+  margin: 0;
+  padding: var(--space-12) var(--space-4);
+  text-align: center;
+  font-size: var(--fs-2xl);
+  color: var(--color-text-muted);
+}

@@ -1,0 +1,106 @@
+@switch (phase()) {
+  @case ('loading') {
+    <p class="vote__muted" role="status">{{ 'voting.cast.loading' | t }}</p>
+  }
+
+  @case ('error') {
+    <section class="vote vote--narrow">
+      <app-card [heading]="'voting.cast.error.heading' | t">
+        <p class="vote__muted">{{ 'voting.cast.error.body' | t }}</p>
+        <a card-footer routerLink="/voting" class="vote__link">{{ 'voting.live.heading' | t }}</a>
+      </app-card>
+    </section>
+  }
+
+  @case ('ready') {
+    @if (notEligible() && !vote()) {
+      <section class="vote vote--narrow">
+        <p class="vote__notice" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
+        <a routerLink="/voting" class="vote__link">{{ 'voting.live.heading' | t }}</a>
+      </section>
+    }
+    @if (vote(); as v) {
+      <section class="vote">
+        <header class="vote__head">
+          <div>
+            <h1 class="vote__title">{{ 'voting.cast.heading' | t }}</h1>
+            <p class="vote__meta">
+              {{ majorityKey() | t }}
+              @if (v.config.quorum) {
+                · {{ 'vote.tally.quorum' | t }} {{ v.config.quorum.value
+                }}{{ v.config.quorum.type === 'percent' ? '%' : '' }}
+              }
+            </p>
+          </div>
+          <div class="vote__badges">
+            @if (isOpen()) {
+              <app-badge variant="success">{{ 'vote.option.yes' | t }}</app-badge>
+            }
+            @if (isClosed()) {
+              <app-badge variant="neutral">{{ 'voting.cast.closedHint' | t }}</app-badge>
+              <app-badge [variant]="v.result === 'passed' ? 'success' : 'danger'">
+                {{ resultKey() | t }}
+              </app-badge>
+            }
+            @if (secret()) {
+              <app-badge variant="info">{{ 'vote.tally.secret' | t }}</app-badge>
+            }
+          </div>
+        </header>
+
+        @if (notEligible()) {
+          <p class="vote__notice" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
+        } @else if (isClosed()) {
+          <p class="vote__muted">{{ 'voting.cast.closedHint' | t }}</p>
+        } @else {
+          <p class="vote__muted">{{ 'voting.cast.openHint' | t }}</p>
+        }
+
+        @if (isOpen() && !notEligible()) {
+          <div class="vote__options" role="group" [attr.aria-label]="'voting.cast.heading' | t">
+            @for (option of options(); track option) {
+              <app-button
+                class="vote__option"
+                size="lg"
+                [variant]="myChoice() === option ? 'primary' : 'secondary'"
+                [disabled]="submitting() || (locked() && myChoice() !== option)"
+                (click)="cast(option)"
+              >
+                {{ optionLabel(option) }}
+              </app-button>
+            }
+          </div>
+
+          @if (myChoice(); as choice) {
+            <p class="vote__choice" role="status">
+              {{ 'voting.cast.yourChoice' | t: { choice: optionLabel(choice) } }}
+              @if (!allowChange()) {
+                — {{ 'voting.cast.locked' | t }}
+              }
+            </p>
+          }
+        }
+
+        @if (showBars()) {
+          <app-card [heading]="'voting.beamer.heading' | t">
+            <app-vote-bars
+              [options]="options()"
+              [counts]="v.tally.counts"
+              [eligible]="v.tally.eligible"
+              [leading]="v.tally.leading"
+            />
+            <p class="vote__tallyMeta">
+              {{ 'voting.beamer.votesOf' | t: { cast: castCount(), eligible: v.tally.eligible } }}
+              · {{ 'vote.tally.quorum' | t }}:
+              {{ (v.tally.quorumMet ? 'vote.tally.quorumMet' : 'vote.tally.quorumMissed') | t }}
+            </p>
+          </app-card>
+        } @else if (secret()) {
+          <p class="vote__muted">{{ 'vote.tally.secretHint' | t }}</p>
+        }
+
+        <a routerLink="/voting/beamer" class="vote__link">{{ 'voting.cast.toBeamer' | t }}</a>
+      </section>
+    }
+  }
+}
