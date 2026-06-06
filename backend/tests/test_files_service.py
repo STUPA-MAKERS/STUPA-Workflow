@@ -17,6 +17,7 @@ from app.modules.files.mime import MimeRejected
 from app.modules.files.models import Attachment
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.service import SCAN_RESULT_CLEAN, FilesService
+from app.modules.flow.models import State
 from app.settings import load_settings
 from app.shared.errors import (
     ConflictError,
@@ -71,6 +72,47 @@ async def test_upload_clean_path_stores_and_enqueues() -> None:
     assert len(storage.put_calls) == 1
     assert len(queue.enqueued) == 1
     assert session.committed == 1
+
+
+async def test_upload_locked_state_409() -> None:
+    session = FakeSession()
+    state = State()
+    state.id = uuid.uuid4()
+    state.edit_allowed = False
+    app = Application()
+    app.id = uuid.uuid4()
+    app.current_state_id = state.id
+    session.add(state)
+    session.add(app)
+    with pytest.raises(ConflictError):
+        await _service(session, storage=FakeStorage()).upload(
+            app.id, filename="doc.pdf", data=PDF, by="p"
+        )
+
+
+async def test_upload_state_row_missing_proceeds() -> None:
+    # current_state_id gesetzt, aber kein State-Datensatz → kein Lock, Upload geht durch.
+    session = FakeSession()
+    app = Application()
+    app.id = uuid.uuid4()
+    app.current_state_id = uuid.uuid4()
+    session.add(app)
+    out = await _service(session, storage=FakeStorage()).upload(
+        app.id, filename="doc.pdf", data=PDF, by="p"
+    )
+    assert out.scanned is False
+
+
+async def test_upload_sanitizes_filename_and_key() -> None:
+    session = FakeSession()
+    app_id = _app(session)
+    storage = FakeStorage()
+    out = await _service(session, storage=storage).upload(
+        app_id, filename="../../etc/passwd.pdf", data=PDF, by="p"
+    )
+    assert out.filename == "passwd.pdf"
+    assert ".." not in storage.put_calls[0]
+    assert storage.put_calls[0].endswith("/passwd.pdf")
 
 
 async def test_upload_too_large_413() -> None:

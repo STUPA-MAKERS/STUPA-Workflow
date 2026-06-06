@@ -87,6 +87,26 @@ def file_extension(filename: str | None) -> str:
     return os.path.splitext(filename)[1].lower()
 
 
+# Erlaubte Zeichen im gespeicherten Dateinamen (alles andere → ``_``).
+_FILENAME_SAFE = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._- "
+)
+_FILENAME_MAX = 200
+
+
+def sanitize_filename(filename: str | None) -> str:
+    """Dateinamen härten: Pfadanteile entfernen, Control-/Sonderzeichen ersetzen.
+
+    Schützt sowohl den ``storage_key`` (kein ``../``-Traversal, keine NUL/Slashes) als
+    auch den gespeicherten Anzeigenamen. Fällt auf ``upload`` zurück, wenn nach der
+    Bereinigung nichts Brauchbares übrig bleibt; begrenzt die Länge."""
+    raw = (filename or "").replace("\\", "/")
+    base = os.path.basename(raw).strip()  # Pfadanteile (inkl. ``../``) verwerfen
+    cleaned = "".join(c if c in _FILENAME_SAFE else "_" for c in base).strip(" .")
+    cleaned = cleaned[:_FILENAME_MAX]
+    return cleaned or "upload"
+
+
 def validate_upload(filename: str | None, data: bytes) -> str:
     """Bytes prüfen → gesniffter MIME-Typ, oder :class:`MimeRejected`.
 

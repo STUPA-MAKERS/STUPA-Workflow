@@ -158,10 +158,11 @@ def test_get_url_ok(app: FastAPI, client: TestClient) -> None:
     assert r.json()["expiresIn"] == 300
 
 
-def test_get_url_forbidden_without_read(app: FastAPI, client: TestClient) -> None:
+def test_get_url_cross_tenant_is_404_not_403(app: FastAPI, client: TestClient) -> None:
+    # Auth, aber kein Lesezugriff auf den Antrag → 404 (kein Existenz-Orakel), nicht 403.
     _as(app)  # keine Permissions
     r = client.get(f"/api/attachments/{ATT_ID}")
-    assert r.status_code == 403
+    assert r.status_code == 404
 
 
 # --------------------------------------------------------------------------- wiring
@@ -194,5 +195,5 @@ def test_endpoints_declare_problem_responses(app: FastAPI) -> None:
         assert code in upload, f"upload missing {code}"
         assert list(upload[code]["content"]) == ["application/problem+json"]
     get = spec["paths"]["/api/attachments/{attachment_id}"]["get"]["responses"]
-    for code in ("401", "403", "404", "409", "410"):
+    for code in ("401", "404", "409", "410"):
         assert code in get, f"get missing {code}"

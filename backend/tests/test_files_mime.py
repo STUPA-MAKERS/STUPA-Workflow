@@ -14,6 +14,7 @@ from app.modules.files import mime as mime_mod
 from app.modules.files.mime import (
     MimeRejected,
     file_extension,
+    sanitize_filename,
     sniff_mime,
     validate_upload,
 )
@@ -34,6 +35,28 @@ def test_file_extension() -> None:
     assert file_extension("noext") == ""
     assert file_extension(None) == ""
     assert file_extension("archive.tar.gz") == ".gz"
+
+
+def test_sanitize_strips_path_components() -> None:
+    assert sanitize_filename("../../etc/passwd") == "passwd"
+    assert sanitize_filename(r"C:\Windows\evil.exe") == "evil.exe"
+    assert sanitize_filename("/abs/path/report.pdf") == "report.pdf"
+
+
+def test_sanitize_replaces_control_and_special_chars() -> None:
+    assert sanitize_filename("a\x00b\nc;d.pdf") == "a_b_c_d.pdf"
+    assert "/" not in sanitize_filename("a/b/c")
+
+
+def test_sanitize_fallback_on_empty() -> None:
+    assert sanitize_filename(None) == "upload"
+    assert sanitize_filename("") == "upload"
+    assert sanitize_filename("   ") == "upload"
+    assert sanitize_filename("...") == "upload"
+
+
+def test_sanitize_length_capped() -> None:
+    assert len(sanitize_filename("x" * 500)) <= 200
 
 
 def test_sniff_empty_is_x_empty() -> None:

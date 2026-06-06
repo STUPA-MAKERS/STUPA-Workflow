@@ -23,12 +23,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.files.mime import MimeRejected, file_extension, validate_upload
+from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
 from app.modules.files.models import MAX_ATTACHMENT_BYTES, Attachment
 from app.modules.files.queue import ScanQueue
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
 from app.modules.files.storage import ObjectStorage, StorageError
+from app.modules.flow.models import State
 from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,
@@ -92,6 +93,15 @@ class FilesService:
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
 
+        # Edit-Lock wie T-12-PATCH: in einem gesperrten State (``edit_allowed=false``,
+        # z. B. eingereicht/entschieden) sind keine neuen Anhänge erlaubt → 409.
+        if app.current_state_id is not None:
+            state = await self.session.get(State, app.current_state_id)
+            if state is not None and not state.edit_allowed:
+                raise ConflictError(
+                    "Application is locked for editing in its current state."
+                )
+
         try:
             mime = validate_upload(filename, data)
         except MimeRejected as exc:
@@ -100,7 +110,7 @@ class FilesService:
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
 
-        safe_name = filename or f"upload{file_extension(filename)}"
+        safe_name = sanitize_filename(filename)
         storage_key = f"{application_id}/{uuid.uuid4().hex}/{safe_name}"
         try:
             await self.storage.put(storage_key, data, mime)

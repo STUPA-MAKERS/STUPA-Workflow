@@ -28,7 +28,13 @@ from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
 from app.modules.files.service import FilesService
 from app.shared.antiabuse import rate_limit_attachments
-from app.shared.errors import PayloadTooLargeError, ProblemDetail, UnauthorizedError
+from app.shared.errors import (
+    ForbiddenError,
+    NotFoundError,
+    PayloadTooLargeError,
+    ProblemDetail,
+    UnauthorizedError,
+)
 
 router = APIRouter(tags=["files"])
 
@@ -104,7 +110,7 @@ async def upload_attachment(
 @router.get(
     "/attachments/{attachment_id}",
     response_model=SignedUrlOut,
-    responses=_errors(401, 403, 404, 409, 410, 503),
+    responses=_errors(401, 404, 409, 410, 503),
 )
 async def get_attachment_url(
     attachment_id: UUID,
@@ -118,12 +124,17 @@ async def get_attachment_url(
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
     attachment = await service.get_attachment(attachment_id)
-    # A/P-Zugriff gegen den Antrag des Anhangs prüfen (401/403) — view-Scope genügt.
-    resolve_access(
-        attachment.application_id,
-        principal,
-        applicant,
-        perm=READ_PERMISSION,
-        scope="view",
-    )
+    # A/P-Zugriff gegen den Antrag des Anhangs prüfen. Cross-Tenant (auth, aber fremder
+    # Antrag) → bewusst 404 statt 403: ein authentifizierter Fremder soll die Existenz
+    # eines Anhangs nicht unterscheiden können (kein Existenz-Orakel). view-Scope genügt.
+    try:
+        resolve_access(
+            attachment.application_id,
+            principal,
+            applicant,
+            perm=READ_PERMISSION,
+            scope="view",
+        )
+    except ForbiddenError as exc:
+        raise NotFoundError(f"attachment {attachment_id} not found") from exc
     return await service.signed_url(attachment_id)
