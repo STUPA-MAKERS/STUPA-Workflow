@@ -22,6 +22,8 @@ from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application, StatusEvent
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import AuditService
 from app.modules.auth.principal import Principal
 from app.modules.flow import context as flow_context
 from app.modules.flow.dispatch import (
@@ -183,6 +185,24 @@ class FlowService:
         self.session.add(event)
         await self.session.flush()
         status_event_id = event.id
+
+        # Audit-Trail (T-23, security.md §4): Statuswechsel append-only protokollieren,
+        # **in derselben Transaktion** wie der State-Wechsel (atomar). Nur id-Referenzen
+        # — keine PII/Notiz-Rohwerte (note kann Freitext sein → nur Vorhandensein).
+        await AuditService(self.session).record(
+            actor=principal.sub,
+            action=AuditAction.STATUS_CHANGE,
+            target_type="application",
+            target_id=str(app.id),
+            data={
+                "fromStateId": str(from_state_id),
+                "toStateId": str(to_state_id),
+                "transitionId": str(transition.id),
+                "statusEventId": str(status_event_id),
+                "manual": manual,
+                "hasNote": note is not None,
+            },
+        )
         await self.session.commit()
 
         # --- Nach Commit: Worker-Actions dispatchen (idempotent, retrybar). --------

@@ -82,6 +82,13 @@ _DATA_TABLES = (
 
 def _truncate(eng: Engine) -> None:
     with eng.begin() as conn:
+        # `audit_entry` ist per Trigger append-only (auch gegen TRUNCATE, T-23). Für die
+        # Test-Isolation wird der Schutz nur in dieser Wartungs-Transaktion umgangen
+        # (`session_replication_role = replica` deaktiviert User-Trigger) — der Trigger
+        # selbst bleibt bestehen; ein eigener Test beweist die Ablehnung im Normalbetrieb.
+        conn.execute(text("SET LOCAL session_replication_role = replica"))
+        conn.execute(text("TRUNCATE audit_entry RESTART IDENTITY"))
+        conn.execute(text("SET LOCAL session_replication_role = origin"))
         conn.execute(
             text("TRUNCATE " + ", ".join(_DATA_TABLES) + " RESTART IDENTITY CASCADE")
         )
