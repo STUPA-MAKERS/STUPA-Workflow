@@ -16,8 +16,10 @@ import type {
   CommentOutWire,
   EffectiveForm,
   MagicLinkVerifyResult,
+  MeetingOutWire,
   Page,
   Principal,
+  ProtocolOutWire,
   SignedUrlOutWire,
   StateOutWire,
   TimelineEventOutWire,
@@ -41,9 +43,17 @@ const MOCK_PRINCIPAL: Principal = {
   email: 'demo@stupa.example',
   roles: ['member'],
   // application.manage (T-31) für RBAC-Aktionen auf der Detail-Seite;
-  // vote.manage/meeting.manage (T-32) für Beamer-/Manage-Ansichten — alle im
-  // Mock gesetzt, damit der FE-Dev/Harness-Betrieb die gegateten Ansichten zeigt.
-  permissions: ['application.read', 'application.manage', 'vote.cast', 'vote.manage', 'meeting.manage'],
+  // vote.manage/meeting.manage (T-32) für Beamer-/Manage-Ansichten;
+  // protocol.write (T-33) für den Protokoll-Editor — alle im Mock gesetzt, damit
+  // der FE-Dev/Harness-Betrieb die gegateten Ansichten zeigt.
+  permissions: [
+    'application.read',
+    'application.manage',
+    'vote.cast',
+    'vote.manage',
+    'meeting.manage',
+    'protocol.write',
+  ],
   groups: [],
 };
 
@@ -309,6 +319,64 @@ const MOCK_TRANSITIONS: TransitionOutWire[] = [
 
 const LOGOUT_OUT = { logout_url: null };
 
+// --- meetings + Protokoll (T-33) — mutabler In-Memory-State ----------------- //
+const MOCK_MEETING_ID = 'd0000000-0000-0000-0000-000000000001';
+const MOCK_PROTOCOL_ID = 'e0000000-0000-0000-0000-000000000099';
+
+let MOCK_MEETING: MeetingOutWire = {
+  id: MOCK_MEETING_ID,
+  title: 'StuPa-Sitzung 12.06.',
+  status: 'live',
+  activeApplicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  gremiumId: null,
+  protocolId: MOCK_PROTOCOL_ID,
+  votes: [
+    {
+      id: 'a0000000-0000-0000-0000-0000000000a1',
+      applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      title: 'Förderung Ersti-Wochenende',
+      status: 'open',
+      result: null,
+      counts: { ja: 12, nein: 3, enthaltung: 1 },
+      leading: 'ja',
+      closesAt: null,
+    },
+    {
+      id: 'a0000000-0000-0000-0000-0000000000a2',
+      applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      title: 'Anschaffung Beamer',
+      status: 'pending',
+      result: null,
+      counts: null,
+      leading: null,
+      closesAt: null,
+    },
+  ],
+  createdAt: '2026-06-12T17:00:00Z',
+};
+
+let MOCK_PROTOCOL: ProtocolOutWire = {
+  id: MOCK_PROTOCOL_ID,
+  meetingId: MOCK_MEETING_ID,
+  markdown:
+    '# Protokoll der StuPa-Sitzung\n\n## TOP 1 — Begrüßung\n\nDie Sitzungsleitung eröffnet die Sitzung.\n\n- Anwesend: 16 Mitglieder\n- Beschlussfähig: **ja**\n',
+  status: 'draft',
+  pdfUrl: null,
+  sentAt: null,
+};
+
+/** Vote-Status im Mock-Meeting setzen (gibt beim Schließen ein Ergebnis aus). */
+function setVoteStatus(voteId: string, status: 'open' | 'closed'): void {
+  MOCK_MEETING = {
+    ...MOCK_MEETING,
+    votes: MOCK_MEETING.votes.map((v) =>
+      v.id === voteId
+        ? { ...v, status, result: status === 'closed' ? (v.leading ?? 'accepted') : v.result }
+        : v,
+    ),
+  };
+}
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -338,6 +406,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
+    if (/\/meetings\/[^/]+$/.test(p)) return ok(MOCK_MEETING);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
   }
 
@@ -394,11 +463,55 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const res: BallotResult = { status: 'cast' };
       return ok(res, 201);
     }
+    // --- meetings + Protokoll (T-33) ---
+    if (p.endsWith('/finalize')) {
+      MOCK_PROTOCOL = {
+        ...MOCK_PROTOCOL,
+        status: 'final',
+        pdfUrl: 'https://nextcloud.example/s/protokoll-12-06.pdf',
+        sentAt: '2026-06-12T19:30:00Z',
+      };
+      return ok(MOCK_PROTOCOL);
+    }
+    if (/\/protocols\/[^/]+\/votes$/.test(p)) return ok(MOCK_PROTOCOL);
+    if (/\/votes\/[^/]+\/open$/.test(p)) {
+      setVoteStatus(p.split('/').slice(-2)[0], 'open');
+      return ok(null, 204);
+    }
+    if (/\/votes\/[^/]+\/close$/.test(p)) {
+      setVoteStatus(p.split('/').slice(-2)[0], 'closed');
+      return ok(null, 204);
+    }
+    if (/\/meetings\/[^/]+\/protocol$/.test(p)) return ok(MOCK_PROTOCOL);
+    if (p.endsWith('/meetings')) {
+      const title = (req.body as { title?: string } | null)?.title?.trim();
+      MOCK_MEETING = { ...MOCK_MEETING, title: title || MOCK_MEETING.title, status: 'live' };
+      return ok(MOCK_MEETING, 201);
+    }
   }
 
   if (req.method === 'PATCH' && /\/applications\/[^/]+$/.test(p)) {
     const data = (req.body as { data?: Record<string, unknown> } | null)?.data ?? {};
     return ok(mockApplication(data));
+  }
+
+  if (req.method === 'PATCH' && /\/meetings\/[^/]+$/.test(p)) {
+    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string } | null) ?? {};
+    MOCK_MEETING = {
+      ...MOCK_MEETING,
+      status: body.status ?? MOCK_MEETING.status,
+      activeApplicationId:
+        body.activeApplicationId !== undefined
+          ? body.activeApplicationId
+          : MOCK_MEETING.activeApplicationId,
+    };
+    return ok(MOCK_MEETING);
+  }
+
+  if (req.method === 'PATCH' && /\/protocols\/[^/]+$/.test(p)) {
+    const markdown = (req.body as { markdown?: string } | null)?.markdown ?? MOCK_PROTOCOL.markdown;
+    MOCK_PROTOCOL = { ...MOCK_PROTOCOL, markdown };
+    return ok(MOCK_PROTOCOL);
   }
 
   return next(req);

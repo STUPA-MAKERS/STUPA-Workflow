@@ -5,6 +5,8 @@ import {
   mapApplicationType,
   mapAttachment,
   mapComment,
+  mapMeeting,
+  mapProtocol,
   mapSignedUrl,
   mapState,
   mapTimelineEvent,
@@ -18,7 +20,9 @@ import type {
   ApplicationTypeListItemWire,
   AttachmentOutWire,
   CommentOutWire,
+  MeetingOutWire,
   NewApplication,
+  ProtocolOutWire,
   StateOutWire,
   TimelineEventOutWire,
   TransitionOutWire,
@@ -374,5 +378,72 @@ describe('mapSignedUrl', () => {
       url: 'https://minio/x?sig=1',
       expiresIn: 60,
     });
+  });
+});
+
+describe('mapMeeting', () => {
+  it('maps the session state and normalises optional fields', () => {
+    const wire: MeetingOutWire = {
+      id: 'm-1',
+      title: 'Sitzung',
+      status: 'live',
+      activeApplicationId: 'app-1',
+      votes: [
+        {
+          id: 'v-1',
+          applicationId: 'app-1',
+          title: 'Antrag A',
+          status: 'open',
+          counts: { ja: 5 },
+          leading: 'ja',
+        },
+      ],
+      createdAt: '2026-06-12T17:00:00Z',
+    };
+    const m = mapMeeting(wire);
+    expect(m.activeApplicationId).toBe('app-1');
+    expect(m.gremiumId).toBeNull();
+    expect(m.protocolId).toBeNull();
+    expect(m.votes).toHaveLength(1);
+    expect(m.votes[0].result).toBeNull();
+    expect(m.votes[0].closesAt).toBeNull();
+  });
+
+  it('defaults a missing vote list to an empty array', () => {
+    const wire = {
+      id: 'm-2',
+      title: 'Leer',
+      status: 'draft',
+      createdAt: '2026-06-12T17:00:00Z',
+    } as unknown as MeetingOutWire;
+    expect(mapMeeting(wire).votes).toEqual([]);
+  });
+});
+
+describe('mapProtocol', () => {
+  it('derives isFinal from the status', () => {
+    const wire: ProtocolOutWire = {
+      id: 'p-1',
+      meetingId: 'm-1',
+      markdown: '# Titel',
+      status: 'final',
+      pdfUrl: 'https://example/p.pdf',
+      sentAt: '2026-06-12T19:00:00Z',
+    };
+    const p = mapProtocol(wire);
+    expect(p.isFinal).toBe(true);
+    expect(p.pdfUrl).toBe('https://example/p.pdf');
+  });
+
+  it('treats a draft as not final and normalises missing fields', () => {
+    const p = mapProtocol({
+      id: 'p-2',
+      meetingId: 'm-1',
+      markdown: '',
+      status: 'draft',
+    } as ProtocolOutWire);
+    expect(p.isFinal).toBe(false);
+    expect(p.pdfUrl).toBeNull();
+    expect(p.sentAt).toBeNull();
   });
 });

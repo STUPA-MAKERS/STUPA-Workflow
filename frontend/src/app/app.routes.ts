@@ -105,7 +105,14 @@ export const routes: Routes = [
         data: { title: 'nav.meetings', permission: ['meeting.manage', 'protocol.write'] },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
+          import('./features/meetings/meetings.component').then((m) => m.MeetingsComponent),
+      },
+      {
+        path: 'meetings/:id',
+        data: { title: 'nav.meetings', permission: ['meeting.manage', 'protocol.write'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/meetings/meetings.component').then((m) => m.MeetingsComponent),
       },
       {
         path: 'budget',
