@@ -103,13 +103,13 @@ async def update_pot(
 @router.post(
     "/applications/{application_id}/assign",
     response_model=AssignOut,
-    dependencies=[Depends(require_principal("application.manage"))],
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def assign_application(
     application_id: UUID,
     payload: AssignRequest,
     service: ServiceDep,
+    # Einmalige RBAC-Prüfung (der Principal wird zugleich als ``actor`` gebraucht).
     principal: Annotated[Principal, Depends(require_principal("application.manage"))],
 ) -> AssignOut:
     """Antrag einem Gremium/Topf zuordnen (manuell; ``budgetPotId=null`` löst)."""

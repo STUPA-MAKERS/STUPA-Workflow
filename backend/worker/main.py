@@ -10,11 +10,17 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from functools import lru_cache
 from typing import Any
 
 from arq import cron
 from arq.connections import RedisSettings
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.modules.budget.stats import BudgetStatsService
 
@@ -24,14 +30,20 @@ async def ping(ctx: dict[str, object]) -> str:
     return "pong"
 
 
-def _budget_sessionmaker() -> async_sessionmaker[AsyncSession]:  # pragma: no cover
-    """AUTOCOMMIT-Sessionmaker (Prod/Worker) — ``REFRESH … CONCURRENTLY`` darf nicht in
-    einer Transaktion laufen. In Tests via ``ctx['budget_sessionmaker']`` injiziert."""
-    engine = create_async_engine(
+@lru_cache(maxsize=1)
+def _budget_engine() -> AsyncEngine:  # pragma: no cover
+    """Einmalige AUTOCOMMIT-Engine (Worker-Lebensdauer) — ``REFRESH … CONCURRENTLY``
+    darf nicht in einer Transaktion laufen. Gecacht → kein Pool-Leak je Refresh."""
+    return create_async_engine(
         os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:pw@db/antrag"),
         isolation_level="AUTOCOMMIT",
     )
-    return async_sessionmaker(engine, expire_on_commit=False)
+
+
+def _budget_sessionmaker() -> async_sessionmaker[AsyncSession]:  # pragma: no cover
+    """Sessionmaker auf der wiederverwendeten Engine. In Tests via
+    ``ctx['budget_sessionmaker']`` injiziert."""
+    return async_sessionmaker(_budget_engine(), expire_on_commit=False)
 
 
 async def refresh_budget_stats(ctx: dict[str, Any]) -> str:
@@ -42,9 +54,17 @@ async def refresh_budget_stats(ctx: dict[str, Any]) -> str:
     return "ok"
 
 
+async def _shutdown(ctx: dict[str, Any]) -> None:  # pragma: no cover
+    """Gecachte Budget-Engine beim Worker-Stop sauber schließen (Pool freigeben)."""
+    if _budget_engine.cache_info().currsize:
+        await _budget_engine().dispose()
+        _budget_engine.cache_clear()
+
+
 class WorkerSettings:
     functions = [ping, refresh_budget_stats]
     cron_jobs = [cron(refresh_budget_stats, hour=3, minute=0)]
+    on_shutdown = _shutdown
     redis_settings = RedisSettings.from_dsn(
         os.environ.get("REDIS_URL", "redis://redis:6379/0")
     )

@@ -244,6 +244,23 @@ async def test_assign_type_missing() -> None:
         await BudgetService(db).assign(_AID, AssignRequest(budgetPotId=_PID), actor="admin")
 
 
+async def test_assign_amount_none() -> None:
+    db = fake_session(
+        result(_app(amount=None)), result(), result(_type()), result(_pot())
+    )
+    out = await BudgetService(db).assign(_AID, AssignRequest(budgetPotId=_PID), actor="admin")
+    assert out.amount is None
+    assert out.stage == "requested"
+
+
+async def test_assign_amount_non_finite_rejected() -> None:
+    db = fake_session(
+        result(_app(amount=Decimal("NaN"))), result(), result(_type()), result(_pot())
+    )
+    with pytest.raises(ValidationProblem):
+        await BudgetService(db).assign(_AID, AssignRequest(budgetPotId=_PID), actor="admin")
+
+
 # ------------------------------------------------------------------- set_stage
 async def test_reserve_within_budget() -> None:
     entry = _entry(stage="requested")
@@ -276,6 +293,13 @@ async def test_set_stage_no_entry() -> None:
     db = fake_session(result())
     with pytest.raises(NotFoundError):
         await BudgetService(db).set_stage(_AID, "reserved", actor="admin")
+
+
+async def test_set_stage_non_finite_amount_rejected() -> None:
+    entry = _entry(stage="requested")
+    db = fake_session(result(entry), result(_app(amount=Decimal("Infinity"))))
+    with pytest.raises(ValidationProblem):
+        await BudgetService(db).reserve(_AID, actor="admin")
 
 
 async def test_set_stage_cannot_advance_backwards() -> None:

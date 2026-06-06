@@ -9,6 +9,7 @@ effektiven Form **nur** bei Topf-Zuordnung, sowie Rollup-Statistik inkl.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from decimal import Decimal
@@ -202,6 +203,48 @@ async def test_unassign_removes_entry(session: AsyncSession) -> None:
         )
     ).scalar_one_or_none()
     assert remaining is None
+
+
+async def test_concurrent_reserve_rejects_overbooking(
+    session: AsyncSession, migrated: tuple[str, str]
+) -> None:
+    """Über-Allokations-Race: zwei gleichzeitige ``reserve`` auf denselben Topf, je 60
+    bei Total 100. Der ``SELECT … FOR UPDATE``-Backstop serialisiert → genau einer
+    passt, der andere wird mit 409 abgelehnt (DB-Garantie, nicht nur Snapshot-Lesart)."""
+    app_type, gremium, _ = await _seed_type(session)
+    svc = BudgetService(session)
+    pot = await svc.create_pot(
+        BudgetPotCreate(gremiumId=gremium.id, name="Topf", total=Decimal("100.00"))
+    )
+    app1 = await _make_application(session, app_type, "60.00")
+    app2 = await _make_application(session, app_type, "60.00")
+    await svc.assign(app1, AssignRequest(budgetPotId=pot.id), actor="admin")
+    await svc.assign(app2, AssignRequest(budgetPotId=pot.id), actor="admin")
+
+    # Zwei unabhängige Verbindungen → echte Nebenläufigkeit.
+    eng_a = create_async_engine(migrated[1])
+    eng_b = create_async_engine(migrated[1])
+    maker_a = async_sessionmaker(eng_a, expire_on_commit=False)
+    maker_b = async_sessionmaker(eng_b, expire_on_commit=False)
+    try:
+        async with maker_a() as sa, maker_b() as sb:
+            results = await asyncio.gather(
+                BudgetService(sa).reserve(app1, actor="a"),
+                BudgetService(sb).reserve(app2, actor="b"),
+                return_exceptions=True,
+            )
+        oks = [r for r in results if not isinstance(r, Exception)]
+        errs = [r for r in results if isinstance(r, ConflictError)]
+        assert len(oks) == 1, f"genau eine Reservierung erwartet, war {results}"
+        assert len(errs) == 1
+    finally:
+        await eng_a.dispose()
+        await eng_b.dispose()
+
+    # Nur 60 gebunden, Topf nicht überbucht.
+    detail = await svc.get_pot(pot.id)
+    assert detail.usage.reserved == Decimal("60.00")
+    assert detail.usage.available == Decimal("40.00")
 
 
 async def test_set_stage_without_assignment_404(session: AsyncSession) -> None:

@@ -42,6 +42,18 @@ from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 StatsRefreshHook = Callable[[], Awaitable[None]]
 
 
+def _checked_amount(amount: Decimal | None) -> Decimal | None:
+    """Promoted ``amount`` defensiv prüfen: ``None`` ok (budgetlos), sonst muss er
+    endlich sein. NaN/Infinity (fehlerhafte Promotion aus T-12) würde sonst still gegen
+    ``budget_pot.total`` gerechnet und den Überbuchungsschutz aushebeln → 422."""
+    if amount is not None and not amount.is_finite():
+        raise ValidationProblem(
+            "Promoted amount is not finite.",
+            errors=[{"field": "amount", "msg": "must be a finite number"}],
+        )
+    return amount
+
+
 class BudgetService:
     """DB-gestützte Budget-Operationen (an eine ``AsyncSession`` gebunden)."""
 
@@ -52,10 +64,18 @@ class BudgetService:
         self._stats_refresh = stats_refresh
 
     # ------------------------------------------------------------ low-level gets
-    async def _get_pot(self, pot_id: UUID) -> BudgetPot:
-        pot = (
-            await self.session.execute(select(BudgetPot).where(BudgetPot.id == pot_id))
-        ).scalar_one_or_none()
+    async def _get_pot(self, pot_id: UUID, *, for_update: bool = False) -> BudgetPot:
+        """Topf laden; ``for_update`` sperrt die Zeile (``SELECT … FOR UPDATE``).
+
+        Die Sperre serialisiert nebenläufige Reservierungen auf denselben Topf, sodass
+        der Überbuchungs-Check (``would_overbook``) den Verbrauch des jeweils anderen
+        sieht statt einer veralteten Summe (READ COMMITTED) — DB-Backstop gegen die
+        Über-Allokations-Race.
+        """
+        stmt = select(BudgetPot).where(BudgetPot.id == pot_id)
+        if for_update:
+            stmt = stmt.with_for_update()
+        pot = (await self.session.execute(stmt)).scalar_one_or_none()
         if pot is None:
             raise NotFoundError(f"budget pot {pot_id} not found")
         return pot
@@ -266,7 +286,7 @@ class BudgetService:
             self.session.add(entry)
         entry.budget_pot_id = pot.id
         entry.stage = "requested"
-        entry.amount = app.amount
+        entry.amount = _checked_amount(app.amount)
         entry.currency = currency
         entry.actor = actor
         entry.note = payload.note
@@ -300,10 +320,12 @@ class BudgetService:
                 f"cannot advance budget stage from {entry.stage!r} to {target!r}"
             )
         app = await self._get_application(application_id)
-        entry.amount = app.amount
+        entry.amount = _checked_amount(app.amount)
         # Jede Vorwärts-Stufe (reserved/approved/paid) bindet Budget → Überbuchung
         # prüfen (``requested`` ist nie ein Vorwärtsziel, daher kein Sonderzweig).
-        pot = await self._get_pot(entry.budget_pot_id)
+        # FOR UPDATE: Topf-Zeile sperren, damit der Verbrauch konsistent gelesen wird
+        # (serialisiert nebenläufige Reservierungen, kein Über-Allokations-Race).
+        pot = await self._get_pot(entry.budget_pot_id, for_update=True)
         committed_others = await self._committed_excluding(
             entry.budget_pot_id, application_id
         )

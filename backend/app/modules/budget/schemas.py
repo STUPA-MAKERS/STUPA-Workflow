@@ -30,7 +30,7 @@ class BudgetPotCreate(_CamelModel):
 
     gremium_id: UUID = Field(alias="gremiumId")
     name: str = Field(min_length=1)
-    total: Decimal | None = Field(default=None, ge=0)
+    total: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
     currency: str = Field(default="EUR", min_length=3, max_length=3)
     period: str | None = None
     active: bool = True
@@ -41,7 +41,7 @@ class BudgetPotUpdate(_CamelModel):
     """Topf teil-aktualisieren. ``fields`` (falls gesetzt) **ersetzt** die Extra-Felder."""
 
     name: str | None = Field(default=None, min_length=1)
-    total: Decimal | None = Field(default=None, ge=0)
+    total: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     period: str | None = None
     active: bool | None = None
