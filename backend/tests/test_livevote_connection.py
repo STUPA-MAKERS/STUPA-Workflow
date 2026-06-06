@@ -48,11 +48,19 @@ def _conn(*, beamer: bool) -> LiveVoteConnection:
     )
 
 
+# Whitelisted Aggregat-Events + zwei NICHT-whitelisted, identitätstragende Events,
+# wie sie z. B. ein Audit-/Cast-Kanal führen könnte — die dürfen den Beamer nie sehen.
+_IDENTITY_EVENTS = [
+    {"type": "ballot_cast", "voter": "alice", "choice": "yes"},
+    {"type": "internal_secret", "voters": ["alice", "bob"]},
+]
 _STREAM = [
     {"type": "meeting_state", "status": "live"},
     {"type": "vote_opened", "voteId": "v"},
-    {"type": "internal_secret", "voter": "alice"},
+    _IDENTITY_EVENTS[0],
     {"type": "vote_tally", "counts": {"yes": 1}},
+    _IDENTITY_EVENTS[1],
+    {"type": "vote_closed", "result": "passed", "counts": {"yes": 1}},
 ]
 
 
@@ -60,10 +68,14 @@ _STREAM = [
 async def test_beamer_pump_drops_non_whitelisted_events() -> None:
     conn = _conn(beamer=True)
     await conn._pump(_Sub(_STREAM))
-    types_sent = [m["type"] for m in conn.ws.sent]  # type: ignore[attr-defined]
-    assert types_sent == ["meeting_state", "vote_opened", "vote_tally"]
-    # Niemals interne/identitätsbehaftete Events auf den Beamer (requirements N1a).
-    assert all("voter" not in m for m in conn.ws.sent)  # type: ignore[attr-defined]
+    sent = conn.ws.sent  # type: ignore[attr-defined]
+    types_sent = [m["type"] for m in sent]
+    # Nur die vier Aggregat-Event-Typen erreichen den Beamer (api.md §4).
+    assert types_sent == ["meeting_state", "vote_opened", "vote_tally", "vote_closed"]
+    # N1a-Stimmgeheimnis: kein identitätstragendes Event wird durchgereicht …
+    assert all(ev not in sent for ev in _IDENTITY_EVENTS)
+    # … und keine voter/voters-Felder leaken über den Beamer-Feed.
+    assert all("voter" not in m and "voters" not in m for m in sent)
 
 
 @pytest.mark.asyncio

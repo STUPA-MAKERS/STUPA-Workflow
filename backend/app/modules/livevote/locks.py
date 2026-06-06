@@ -13,6 +13,7 @@ damit konkurrierende Requests nicht beide bis zum (dann scheiternden) Insert lau
 from __future__ import annotations
 
 import asyncio
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Protocol
@@ -42,20 +43,32 @@ class InMemoryLocker:
             lock.release()
 
 
-class RedisLocker:
-    """``SET NX PX``-Lock über ``redis.asyncio`` (Fan-out-sicher)."""
+# Token-sicheres Release: nur löschen, wenn der Lock noch **uns** gehört. Sonst würde
+# ein nach TTL-Ablauf erneut vergebener Lock eines anderen Halters fälschlich gelöscht.
+# Atomar in Lua (CAS), damit zwischen GET und DEL kein fremder Acquire schlüpfen kann.
+_RELEASE_LUA = (
+    "if redis.call('get', KEYS[1]) == ARGV[1] "
+    "then return redis.call('del', KEYS[1]) else return 0 end"
+)
 
-    def __init__(self, client: object, token: str = "locked") -> None:
+
+class RedisLocker:
+    """``SET NX PX``-Lock über ``redis.asyncio`` (Fan-out-sicher).
+
+    Pro Acquire ein **zufälliger** Token; Release per Lua-CAS löscht nur den eigenen
+    Lock (verhindert das Freigeben eines bereits abgelaufen-und-neuvergebenen Locks)."""
+
+    def __init__(self, client: object) -> None:
         self._client = client
-        self._token = token
 
     @asynccontextmanager
     async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncIterator[bool]:
-        got = await self._client.set(key, self._token, nx=True, px=ttl_ms)  # type: ignore[attr-defined]
+        token = secrets.token_hex(16)
+        got = await self._client.set(key, token, nx=True, px=ttl_ms)  # type: ignore[attr-defined]
         acquired = bool(got)
         try:
             yield acquired
         finally:
             if acquired:
-                # Best-effort-Release; ablaufende TTL deckt den Crash-Fall ab.
-                await self._client.delete(key)  # type: ignore[attr-defined]
+                # CAS-Release; ablaufende TTL deckt den Crash-Fall ab.
+                await self._client.eval(_RELEASE_LUA, 1, key, token)  # type: ignore[attr-defined]

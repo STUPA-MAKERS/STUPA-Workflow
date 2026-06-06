@@ -258,6 +258,19 @@ def test_unknown_message_type_reports_error() -> None:
         assert ws.receive_json() == {"type": "error", "code": "unknown_type"}
 
 
+def test_malformed_json_frame_does_not_crash_connection() -> None:
+    meeting = _meeting()
+    app, _, _ = _build(meeting=meeting, principal=_voter())
+    client = TestClient(app)
+    with client.websocket_connect(_url(meeting)) as ws:
+        assert ws.receive_json()["type"] == "meeting_state"
+        ws.send_text("not-json{")  # kaputter Frame → error statt Crash
+        assert ws.receive_json() == {"type": "error", "code": "invalid_message"}
+        # Verbindung lebt weiter: gültige Folge-Nachricht wird normal bedient.
+        ws.send_json({"type": "subscribe"})
+        assert ws.receive_json()["type"] == "meeting_state"
+
+
 # --------------------------------------------------------------------------- #
 # Beamer (read-only, P(meeting.manage))
 # --------------------------------------------------------------------------- #

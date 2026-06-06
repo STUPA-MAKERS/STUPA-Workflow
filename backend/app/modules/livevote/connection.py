@@ -18,6 +18,7 @@ Trennt Auth/RBAC (Handshake), den Empfang von Client-Nachrichten (``cast``/
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -191,7 +192,12 @@ class LiveVoteConnection:
 
     async def _receive(self) -> None:
         while True:
-            raw = await self.ws.receive_json()
+            try:
+                raw = await self.ws.receive_json()
+            except json.JSONDecodeError:
+                # Nicht-JSON-Frame: Verbindung bleibt offen, Client bekommt error.
+                await self._send_error("invalid_message")
+                continue
             if isinstance(raw, dict):
                 await self._handle_message(raw)
             else:
