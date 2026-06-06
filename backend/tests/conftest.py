@@ -9,6 +9,10 @@ import os
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://app:pw@localhost/antrag_test")
 os.environ.setdefault("SESSION_SECRET", "test-session-secret")
 os.environ.setdefault("MAGIC_LINK_SECRET", "test-magic-link-secret")
+# Anti-Abuse standardmäßig aus für die Unit-Suite: Rate-Limiting würde sonst pro POST
+# einen (scheiternden) Redis-Connect versuchen; Altcha bleibt ohne Secret ohnehin aus.
+# Die Härtungs-Tests aktivieren beides gezielt via eigener Settings/Overrides.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 from collections.abc import Iterator
 

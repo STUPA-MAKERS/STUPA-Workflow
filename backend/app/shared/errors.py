@@ -87,6 +87,7 @@ class AppError(Exception):
         code: str | None = None,
         title: str | None = None,
         errors: Sequence[FieldError | dict[str, str]] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.status = type(self).status
         self.code = code or code_for(self.status)
@@ -97,6 +98,8 @@ class AppError(Exception):
             if errors is not None
             else None
         )
+        # Zusätzliche Antwort-Header (z.B. `Retry-After` bei 429).
+        self.headers: dict[str, str] | None = headers
         super().__init__(self.detail or self.title)
 
     def to_problem(self, trace_id: str | None) -> ProblemDetail:
@@ -148,22 +151,42 @@ class ValidationProblem(AppError):
 class RateLimitedError(AppError):
     status = 429
 
+    def __init__(
+        self,
+        detail: str | None = None,
+        *,
+        retry_after: int | None = None,
+        code: str | None = None,
+        title: str | None = None,
+    ) -> None:
+        headers = (
+            {"Retry-After": str(max(0, retry_after))} if retry_after is not None else None
+        )
+        super().__init__(detail, code=code, title=title, headers=headers)
+
 
 def _trace_id(request: Request) -> str | None:
     return getattr(request.state, "trace_id", None)
 
 
-def _problem_response(problem: ProblemDetail) -> JSONResponse:
+def _problem_response(
+    problem: ProblemDetail, extra_headers: dict[str, str] | None = None
+) -> JSONResponse:
+    headers: dict[str, str] = {}
+    if problem.traceId:
+        headers["X-Trace-Id"] = problem.traceId
+    if extra_headers:
+        headers.update(extra_headers)
     return JSONResponse(
         status_code=problem.status,
         content=problem.model_dump(exclude_none=True),
         media_type=PROBLEM_CONTENT_TYPE,
-        headers={"X-Trace-Id": problem.traceId} if problem.traceId else None,
+        headers=headers or None,
     )
 
 
 async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
-    return _problem_response(exc.to_problem(_trace_id(request)))
+    return _problem_response(exc.to_problem(_trace_id(request)), exc.headers)
 
 
 async def _validation_handler(

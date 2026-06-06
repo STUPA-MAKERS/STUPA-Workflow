@@ -25,6 +25,12 @@ from app.modules.auth.schemas import (
     MeOut,
 )
 from app.settings import Settings
+from app.shared.antiabuse import (
+    enforce_auth_payload_limit,
+    rate_limit_magic_link,
+    rate_limit_magic_link_verify,
+    verify_altcha,
+)
 from app.shared.errors import BadRequestError, NotFoundError, ProblemDetail
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -171,7 +177,13 @@ async def _deliver_magic_link(
 @router.post(
     "/magic-link",
     status_code=status.HTTP_202_ACCEPTED,
-    responses=_errors(400),
+    dependencies=[
+        Depends(enforce_auth_payload_limit),
+        Depends(rate_limit_magic_link),
+        Depends(verify_altcha),
+    ],
+    # 400 = Altcha ungültig/fehlend, 413 = Body zu groß, 429 = Rate-Limit (api.md §7).
+    responses=_errors(400, 413, 429),
 )
 async def request_magic_link(
     body: MagicLinkRequest, settings: SettingsDep, background: BackgroundTasks
@@ -186,7 +198,11 @@ async def request_magic_link(
 
 @router.post(
     "/magic-link/verify",
-    responses=_errors(400, 410),
+    dependencies=[
+        Depends(enforce_auth_payload_limit),
+        Depends(rate_limit_magic_link_verify),
+    ],
+    responses=_errors(400, 410, 413, 429),
 )
 async def verify_magic_link(
     body: MagicLinkVerifyRequest,

@@ -75,6 +75,29 @@ class Settings(BaseSettings):
     #   darüber → 413. 64 KiB reicht für alle realen Formulare.
     max_application_payload_bytes: int = 65536
 
+    # — Body-Cap der Auth-POSTs (magic-link / verify, anti-DoS, Issue #24). Auth-Bodies
+    #   sind winzig (Mail/Token) → enge Schranke; darüber → 413. —
+    max_auth_payload_bytes: int = 8192
+
+    # — Altcha (Proof-of-Work, security.md §7, Issue #23). Ohne Secret ist die
+    #   Verifikation **aus** (Dev/Test); das Feld wird dann nur durchgereicht. Das
+    #   Secret wird mit dem Altcha-Sentinel geteilt (deploy/.env: ALTCHA_HMAC_SECRET). —
+    altcha_hmac_secret: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
+    altcha_max_number: int = 100_000
+    altcha_challenge_ttl_seconds: int = 300
+
+    # — Rate-Limiting (sliding window, security.md §8 / api.md §7, Issue #24). —
+    rate_limit_enabled: bool = True
+    rl_magic_link_ip_per_hour: int = 5
+    rl_magic_link_mail_per_hour: int = 3
+    rl_magic_link_verify_ip_per_hour: int = 20
+    rl_applications_ip_per_hour: int = 10
+
+    @property
+    def altcha_enabled(self) -> bool:
+        """Altcha-Verifikation nur aktiv, wenn ein HMAC-Secret gesetzt ist."""
+        return bool(self.altcha_hmac_secret)
+
     @property
     def oidc_enabled(self) -> bool:
         """OIDC nur aktiv, wenn alle Pflicht-Parameter gesetzt sind."""

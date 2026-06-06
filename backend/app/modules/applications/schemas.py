@@ -29,7 +29,7 @@ class _CamelModel(BaseModel):
 # --------------------------------------------------------------------------- #
 class ApplicationCreate(_CamelModel):
     """Antrag anlegen (öffentlich, api.md §5). ``data`` wird gegen die effektive
-    Form validiert; ``altcha`` ist im Contract reserviert (Verifikation: Captcha-Task)."""
+    Form validiert; ``altcha`` wird serverseitig verifiziert (security.md §7, Issue #23)."""
 
     type_id: UUID = Field(alias="typeId")
     budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")

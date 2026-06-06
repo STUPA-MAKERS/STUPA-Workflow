@@ -25,7 +25,7 @@ from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 
 from app.db import get_sessionmaker
 from app.deps import DbSession, SettingsDep, require_principal
@@ -44,6 +44,11 @@ from app.modules.applications.schemas import (
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth import service as auth_service
 from app.settings import Settings
+from app.shared.antiabuse import (
+    enforce_application_payload_limit,
+    rate_limit_applications,
+    verify_altcha,
+)
 from app.shared.errors import ForbiddenError, PayloadTooLargeError, ProblemDetail
 from app.shared.paging import Page, PageParams
 
@@ -86,25 +91,21 @@ def get_magic_link_sender() -> MagicLinkSender:
     return _deliver_magic_link
 
 
-async def enforce_payload_limit(request: Request, settings: SettingsDep) -> None:
-    """Content-Length des öffentlichen POST früh gegen die Obergrenze prüfen → 413.
-
-    Frühe, billige Schranke gegen Junk-Blob-Bodies (anti-DoS, HIGH #1); die maßgebliche
-    Prüfung auf die serialisierten Feldwerte erfolgt zusätzlich nach dem Parsen."""
-    raw = request.headers.get("content-length")
-    if raw is not None and raw.isdigit() and int(raw) > settings.max_application_payload_bytes:
-        raise PayloadTooLargeError(
-            f"Request body exceeds {settings.max_application_payload_bytes} bytes."
-        )
-
-
 @router.post(
     "/applications",
     response_model=ApplicationCreated,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(enforce_payload_limit)],
-    # 400 = malformed JSON body, 413 = Body zu groß, 422 = Form-/Schema-Validierung.
-    responses=_errors(400, 404, 413, 422),
+    dependencies=[
+        # Body-Cap (413): Content-Length-Schranke + gekapptes Lesen (auch chunked,
+        # Review #3). Die maßgebliche Prüfung der serialisierten Feldwerte erfolgt
+        # zusätzlich nach dem Parsen.
+        Depends(enforce_application_payload_limit),
+        Depends(rate_limit_applications),
+        Depends(verify_altcha),
+    ],
+    # 400 = malformed JSON / Altcha ungültig, 413 = Body zu groß, 422 = Form-/Schema-
+    # Validierung, 429 = Rate-Limit (api.md §7).
+    responses=_errors(400, 404, 413, 422, 429),
 )
 async def create_application(
     payload: ApplicationCreate,
