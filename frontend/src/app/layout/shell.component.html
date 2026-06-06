@@ -20,10 +20,15 @@
     </nav>
 
     <div class="header__actions">
-      <label class="lang" [attr.aria-label]="'lang.switch' | t">
-        <select class="lang__select" [value]="i18n.locale()" (change)="setLocale($any($event.target).value)">
+      <label class="lang">
+        <select
+          class="lang__select"
+          [attr.aria-label]="'lang.switch' | t"
+          [value]="i18n.locale()"
+          (change)="setLocale($any($event.target).value)"
+        >
           @for (loc of i18n.locales; track loc) {
-            <option [value]="loc">{{ loc | uppercase }}</option>
+            <option [value]="loc" [selected]="loc === i18n.locale()">{{ loc | uppercase }}</option>
           }
         </select>
       </label>

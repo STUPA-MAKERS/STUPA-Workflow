@@ -86,11 +86,39 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
-  it('switches locale through the language selector', async () => {
+  it('switches locale through the language selector and reflects it in the control', async () => {
     const { fixture, http } = await setup();
     const i18n = fixture.debugElement.injector.get(I18nService);
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'en');
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    expect(select.value).toBe('de');
+    await userEvent.selectOptions(select, 'en');
     expect(i18n.locale()).toBe('en');
+    expect(select.value).toBe('en');
+    http.verify();
+  });
+
+  it('shows the persisted locale as the selected option on load', async () => {
+    localStorage.setItem('ap.locale', 'en');
+    const { http } = await setup();
+    expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('en');
+    localStorage.clear();
+    http.verify();
+  });
+
+  it('exposes accessible header controls (labelled select, aria-pressed toggle)', async () => {
+    const { fixture, http } = await setup();
+    const theme = fixture.debugElement.injector.get(ThemeService);
+    theme.setPreference('light');
+    fixture.detectChanges();
+
+    // Language dropdown has an accessible name from the wrapping label.
+    expect(screen.getByRole('combobox', { name: /Sprache|language/i })).toBeInTheDocument();
+
+    // Theme toggle mirrors the resolved theme via aria-pressed.
+    const toggle = screen.getByRole('button', { name: /Erscheinungsbild|appearance/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
     http.verify();
   });
 
