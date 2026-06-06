@@ -12,8 +12,8 @@
 
 Auf einem **frischen** Schema entstehen die Tabellen über ``Base.metadata.create_all``
 in Migration 0002 (Single-Source via ``app.models``); für bereits ältere Schemata legt
-Migration 0005 sie **idempotent** (``checkfirst``) nach. ``eligible_count`` ist ein
-Snapshot der Stimmberechtigten, den der Service beim Öffnen setzt.
+Migration 0007 sie **idempotent** (``checkfirst``) nach. ``eligible_count`` ist die
+maßgebliche Stimmberechtigten-Zahl (Roster), die beim Anlegen gesetzt wird.
 """
 
 from __future__ import annotations

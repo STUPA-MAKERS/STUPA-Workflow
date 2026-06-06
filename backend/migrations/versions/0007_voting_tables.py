@@ -1,8 +1,8 @@
 """voting: vote/ballot/voted_marker/secret_ballot (T-15)
 
-Revision ID: 0005_voting_tables
-Revises: 0004_budget_entry_and_views
-Create Date: 2026-06-06 00:00:05
+Revision ID: 0007_voting_tables
+Revises: 0006_audit_append_only
+Create Date: 2026-06-06 00:00:07
 
 Wie alle Modul-Tabellen entstehen die Voting-Tabellen auf einem **frischen** Schema
 bereits über ``Base.metadata.create_all`` in 0002 (Single-Source via ``app.models``).
@@ -23,8 +23,8 @@ import app.models  # noqa: F401  — befüllt Base.metadata
 from app.db import Base
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 
-revision: str = "0005_voting_tables"
-down_revision: str | None = "0004_budget_entry_and_views"
+revision: str = "0007_voting_tables"
+down_revision: str | None = "0006_audit_append_only"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
