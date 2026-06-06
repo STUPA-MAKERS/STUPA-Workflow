@@ -19,6 +19,7 @@ from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
 from app.modules.applications.router import router as applications_router
+from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
 from app.modules.budget.router import router as budget_router
 from app.modules.flow.dispatch import ActionDispatcher
@@ -50,6 +51,7 @@ api_router.include_router(flow_router)
 api_router.include_router(budget_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(notifications_router)
+api_router.include_router(audit_router)
 
 
 @asynccontextmanager

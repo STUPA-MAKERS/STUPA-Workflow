@@ -69,6 +69,7 @@ def engine(migrated: tuple[str, str]) -> Iterator[Engine]:
 
 
 _DATA_TABLES = (
+    "audit_entry",
     "applicant",
     "application",
     "state",
