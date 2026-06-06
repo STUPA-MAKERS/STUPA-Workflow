@@ -8,7 +8,9 @@ import {
   mapApplicationCreated,
   mapApplicationListItem,
   mapApplicationType,
+  mapAttachment,
   mapComment,
+  mapSignedUrl,
   mapTimelineEvent,
   mapTransition,
   mapVersion,
@@ -26,6 +28,8 @@ import type {
   ApplicationType,
   ApplicationTypeListItemWire,
   ApplicationVersion,
+  Attachment,
+  AttachmentOutWire,
   CommentCreateBody,
   CommentOutWire,
   CommentVisibility,
@@ -35,6 +39,8 @@ import type {
   NewApplication,
   Page,
   Principal,
+  SignedUrl,
+  SignedUrlOutWire,
   TimelineEntry,
   TimelineEventOutWire,
   Transition,
@@ -187,5 +193,36 @@ export class ApiClient {
 
   fireTransition(id: Uuid, req: TransitionRequestBody): Observable<TransitionResult> {
     return this.http.post<TransitionResult>(`${this.base}/applications/${id}/transition`, req);
+  }
+
+  // --- files / attachments (T-13) ------------------------------------------
+  /**
+   * POST /applications/{id}/attachments — Multipart-Upload (≤10 MB, A(edit)/P).
+   * Der Server scannt asynchron (ClamAV); die Antwort trägt `scanned=false` bis
+   * der Worker durch ist. Fehler: 413 (zu groß), 415 (Typ), 429 (Rate-Limit),
+   * 503 (Storage aus).
+   */
+  uploadAttachment(
+    id: Uuid,
+    file: File,
+    opts: { fieldKey?: string | null; isComparisonOffer?: boolean } = {},
+  ): Observable<Attachment> {
+    const form = new FormData();
+    form.append('file', file);
+    if (opts.fieldKey) form.append('field_key', opts.fieldKey);
+    if (opts.isComparisonOffer) form.append('is_comparison_offer', 'true');
+    return this.http
+      .post<AttachmentOutWire>(`${this.base}/applications/${id}/attachments`, form)
+      .pipe(map(mapAttachment));
+  }
+
+  /**
+   * GET /attachments/{id} — kurzlebige signierte MinIO-URL. 409 = noch nicht
+   * sauber gescannt / Quarantäne, 410 = abgelaufen/verbraucht (api.md §files).
+   */
+  attachmentUrl(attachmentId: Uuid): Observable<SignedUrl> {
+    return this.http
+      .get<SignedUrlOutWire>(`${this.base}/attachments/${attachmentId}`)
+      .pipe(map(mapSignedUrl));
   }
 }

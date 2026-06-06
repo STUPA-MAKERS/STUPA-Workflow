@@ -195,6 +195,28 @@ export interface VersionOutWire {
   at: IsoDateTime;
 }
 
+/**
+ * `AttachmentOut` (files/schemas.py, T-13) — Anhang-Metadaten. **Reines
+ * `BaseModel`** (kein `_CamelModel`) → `is_comparison_offer` bleibt snake_case.
+ * `scanned` = ClamAV-Lauf **abgeschlossen** (nicht „sauber"!): das Scan-Ergebnis
+ * (`scan_result`) wird bewusst nicht exponiert (security.md §6), Befund ⇒ Objekt
+ * gelöscht. Sauber-vs-Befund klärt sich erst beim Download (200 vs. 409).
+ */
+export interface AttachmentOutWire {
+  id: Uuid;
+  filename: string;
+  mime: string;
+  size: number;
+  scanned: boolean;
+  is_comparison_offer: boolean;
+}
+
+/** `SignedUrlOut` (files/schemas.py) — kurzlebige MinIO-URL + Restlaufzeit (s). */
+export interface SignedUrlOutWire {
+  url: string;
+  expiresIn: number;
+}
+
 // --- Request-Bodies (camelCase-Wire-Form) ---------------------------------- //
 
 /** Body für `POST /applications` (`ApplicationCreate`, by_alias). */
@@ -344,6 +366,32 @@ export interface ApplicationVersion {
   diff: DataDiff | null;
   changedBy: string | null;
   at: IsoDateTime;
+}
+
+/**
+ * Scan-Zustand eines Anhangs (FE-View). Aus dem Contract ableitbar:
+ * - `scanning`    — `scanned=false`: ClamAV läuft noch, kein Download (→ 409).
+ * - `clean`       — `scanned=true`: Scan fertig; Download grundsätzlich möglich.
+ * - `quarantined` — clientseitig gesetzt, wenn der Download mit **409** abgewiesen
+ *   wird (Befund/Quarantäne) — die Metadaten allein verraten das nicht.
+ */
+export type ScanState = 'scanning' | 'clean' | 'quarantined';
+
+/** Anhang (FE-View) — `isComparisonOffer` camelCase, `scanState` abgeleitet. */
+export interface Attachment {
+  id: Uuid;
+  filename: string;
+  mime: string;
+  size: number;
+  scanned: boolean;
+  isComparisonOffer: boolean;
+  scanState: ScanState;
+}
+
+/** Signierte Download-URL (FE-View). */
+export interface SignedUrl {
+  url: string;
+  expiresIn: number;
 }
 
 /** FE-Eingabe für einen neuen Antrag → via Mapper zu `ApplicationCreateBody`. */

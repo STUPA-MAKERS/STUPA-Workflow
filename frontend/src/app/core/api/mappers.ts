@@ -25,11 +25,15 @@ import type {
   ApplicationType,
   ApplicationTypeListItemWire,
   ApplicationVersion,
+  Attachment,
+  AttachmentOutWire,
   CommentOutWire,
   ApplicationComment,
   DataDiff,
   DataDiffWire,
   NewApplication,
+  SignedUrl,
+  SignedUrlOutWire,
   StateOutWire,
   TimelineEntry,
   TimelineEventOutWire,
@@ -161,6 +165,23 @@ function mapDiff(wire: DataDiffWire | null | undefined): DataDiff | null {
       new: change.new,
     })),
   };
+}
+
+export function mapAttachment(wire: AttachmentOutWire): Attachment {
+  return {
+    id: wire.id,
+    filename: wire.filename,
+    mime: wire.mime,
+    size: wire.size,
+    scanned: wire.scanned,
+    isComparisonOffer: wire.is_comparison_offer,
+    // `scanned=true` heißt nur „Scan fertig"; sauber-vs-Befund klärt der Download.
+    scanState: wire.scanned ? 'clean' : 'scanning',
+  };
+}
+
+export function mapSignedUrl(wire: SignedUrlOutWire): SignedUrl {
+  return { url: wire.url, expiresIn: wire.expiresIn };
 }
 
 export function mapVersion(wire: VersionOutWire): ApplicationVersion {

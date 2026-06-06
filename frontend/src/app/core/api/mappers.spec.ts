@@ -3,7 +3,9 @@ import {
   mapApplicationCreated,
   mapApplicationListItem,
   mapApplicationType,
+  mapAttachment,
   mapComment,
+  mapSignedUrl,
   mapState,
   mapTimelineEvent,
   mapTransition,
@@ -14,6 +16,7 @@ import type {
   ApplicationOutWire,
   ApplicationListItemWire,
   ApplicationTypeListItemWire,
+  AttachmentOutWire,
   CommentOutWire,
   NewApplication,
   StateOutWire,
@@ -337,5 +340,39 @@ describe('mapVersion', () => {
     expect(v.diff?.added).toEqual([{ key: 'a', value: 1 }]);
     expect(v.diff?.removed).toEqual([]);
     expect(v.diff?.changed).toEqual([]);
+  });
+});
+
+describe('mapAttachment', () => {
+  const base: AttachmentOutWire = {
+    id: 'att-1',
+    filename: 'plan.pdf',
+    mime: 'application/pdf',
+    size: 2048,
+    scanned: false,
+    is_comparison_offer: false,
+  };
+
+  it('maps snake_case is_comparison_offer to camelCase', () => {
+    const a = mapAttachment({ ...base, is_comparison_offer: true });
+    expect(a.isComparisonOffer).toBe(true);
+    expect(a.filename).toBe('plan.pdf');
+  });
+
+  it('derives scanState=scanning while the scan is pending', () => {
+    expect(mapAttachment(base).scanState).toBe('scanning');
+  });
+
+  it('derives scanState=clean once scanned=true', () => {
+    expect(mapAttachment({ ...base, scanned: true }).scanState).toBe('clean');
+  });
+});
+
+describe('mapSignedUrl', () => {
+  it('passes the url and expiry through', () => {
+    expect(mapSignedUrl({ url: 'https://minio/x?sig=1', expiresIn: 60 })).toEqual({
+      url: 'https://minio/x?sig=1',
+      expiresIn: 60,
+    });
   });
 });
