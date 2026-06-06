@@ -7,6 +7,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# System-Lib für MIME-Sniffing (python-magic → libmagic, T-13). apt-Listen danach
+# entfernen (kleines Image).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Deps zuerst (Layer-Cache).
 COPY pyproject.toml ./
 COPY app ./app

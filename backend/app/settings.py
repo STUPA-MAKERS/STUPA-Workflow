@@ -92,6 +92,37 @@ class Settings(BaseSettings):
         """Echter Versand nur bei gesetztem `smtp_host`; sonst Worker-No-op (DEV/Test)."""
         return bool(self.smtp_host)
 
+    # — Object-Storage / MinIO (T-13, security.md §6). Ohne `minio_endpoint` ist der
+    #   Upload »aus« (POST /attachments → 503); DEV/Contract-CI laufen ohne Bucket. Die
+    #   Keys sind Secrets und werden **nie** geloggt. —
+    minio_endpoint: str | None = None
+    minio_access_key: str | None = None
+    minio_secret_key: str | None = None
+    minio_bucket: str = "attachments"
+    minio_secure: bool = False  # TLS zur MinIO-API (intern i. d. R. plain HTTP)
+    # Upload-Schranke (data-model: CHECK(size <= 10485760)) + Lebensdauer signierter URLs.
+    attachment_max_bytes: int = 10 * 1024 * 1024
+    attachment_url_ttl_seconds: int = 300
+
+    # — ClamAV (T-13, security.md §6). Ohne `clamav_host` ist der Scan »aus«: Uploads
+    #   bleiben `scanned=false` (Quarantäne, kein Download) — fail-closed (DEV/Test). —
+    clamav_host: str | None = None
+    clamav_port: int = 3310
+    clamav_timeout_seconds: int = 60
+    # Scan-Retry im Worker (arq): max. Versuche + Backoff-Basis (Sekunden).
+    scan_max_tries: int = 5
+    scan_retry_backoff_seconds: int = 30
+
+    @property
+    def storage_enabled(self) -> bool:
+        """Object-Storage nur aktiv, wenn ein MinIO-Endpunkt gesetzt ist."""
+        return bool(self.minio_endpoint)
+
+    @property
+    def clamav_enabled(self) -> bool:
+        """ClamAV-Scan nur aktiv, wenn ein clamd-Host gesetzt ist."""
+        return bool(self.clamav_host)
+
     # — Antrags-Payload-Obergrenze (öffentlicher POST /applications, anti-DoS) —
     #   Gilt für die serialisierten Feldwerte (`data`) und als Content-Length-Schranke;
     #   darüber → 413. 64 KiB reicht für alle realen Formulare.
@@ -114,6 +145,7 @@ class Settings(BaseSettings):
     rl_magic_link_mail_per_hour: int = 3
     rl_magic_link_verify_ip_per_hour: int = 20
     rl_applications_ip_per_hour: int = 10
+    rl_attachments_per_hour: int = 30  # POST /attachments: 30/Std/applicant (api.md §7)
 
     @property
     def altcha_enabled(self) -> bool:

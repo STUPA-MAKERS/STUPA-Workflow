@@ -23,3 +23,4 @@ class AuditAction(StrEnum):
     PII_DELETION = "pii_deletion"
     ANONYMIZATION = "anonymization"
     WEBHOOK_CONFIG = "webhook_config"
+    ATTACHMENT_QUARANTINE = "attachment_quarantine"

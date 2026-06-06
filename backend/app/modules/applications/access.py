@@ -49,7 +49,7 @@ class Access:
         return self.principal.sub if self.principal is not None else "applicant"
 
 
-def _resolve(
+def resolve_access(
     application_id: UUID,
     principal: Principal | None,
     applicant: Applicant | None,
@@ -57,7 +57,10 @@ def _resolve(
     perm: str,
     scope: ApplicantScope,
 ) -> Access:
-    """Principal-Permission **oder** Applicant-Scope gegen den Antrag prüfen."""
+    """Principal-Permission **oder** Applicant-Scope gegen den Antrag prüfen.
+
+    Öffentlich, damit angrenzende Module (z. B. files/T-13, deren Pfad nur die
+    ``attachment_id`` trägt) denselben A/P-Zugriffspfad nutzen, statt ihn zu duplizieren."""
     if principal is not None:
         if principal.has(perm):
             return Access(application_id, principal, None)
@@ -77,7 +80,7 @@ async def require_app_read(
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Access:
     """Lesezugriff: Principal mit ``application.read`` oder ``view``-Antragsteller."""
-    return _resolve(
+    return resolve_access(
         application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
     )
 
@@ -91,6 +94,6 @@ async def require_app_edit(
 
     Der Edit-Lock (``state.editAllowed``) wird **zusätzlich** im Service geprüft (409),
     unabhängig von der Identität."""
-    return _resolve(
+    return resolve_access(
         application_id, principal, applicant, perm=MANAGE_PERMISSION, scope="edit"
     )

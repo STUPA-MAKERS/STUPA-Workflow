@@ -27,6 +27,7 @@ from app.modules.auth.models import (
     RolePermission,
 )
 from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
+from app.modules.files.models import Attachment
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.notifications.models import MailTemplate, NotificationRule
@@ -36,6 +37,7 @@ __all__ = [
     "Applicant",
     "Application",
     "ApplicationType",
+    "Attachment",
     "AuditEntry",
     "AuthSession",
     "Ballot",

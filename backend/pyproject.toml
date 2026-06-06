@@ -27,6 +27,14 @@ dependencies = [
     # async SMTP-Versand im arq-Worker (kein Blockieren der API).
     "jinja2>=3.1",
     "aiosmtplib>=3.0",
+    # Files/Uploads (T-13): MIME-Sniffing (libmagic), MinIO/S3-Client + signierte URLs,
+    # ClamAV-Scan via clamd. Alle drei werden lazy importiert (nur auf dem Upload-/
+    # Worker-Pfad) — der Contract-CI (nur Postgres) lädt sie nie.
+    "python-magic>=0.4",
+    "minio>=7.2",
+    "clamd>=1.0",
+    # Multipart-Parsing für den Datei-Upload (FastAPI UploadFile/Form).
+    "python-multipart>=0.0.18",
 ]
 
 [project.optional-dependencies]
