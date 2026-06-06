@@ -1,16 +1,20 @@
 # Frontend — Antragsplattform SPA
 
-Angular 20 (TS strict, standalone) SPA-Skelett + **Design-System** (T-03).
-Routing-Gerüst, CD-Tokens (Light/Dark), self-hosted Web-Font, STUPA-Logo-Set,
-`core/` (API-Client, WS-Service, Auth-Interceptor, i18n DE/EN), `shared/` UI-Kit
-und Formly-Setup. Feature-Module folgen in T-30…T-36.
+Angular 20 (TS strict, standalone). Design-System (CD-Tokens, Dark-Mode, Web-Font,
+STUPA-Logos), `core/` (typisierter API-Client, Auth-Interceptor, i18n DE/EN, Theme,
+WS-Service), `shared/` UI-Kit + Formly-Bindung.
+
+Gebaut sind der öffentliche **Apply-Wizard** (mehrstufig, Altcha, Draft-Persistenz),
+die **Status-Timeline**, die **Confirmation**-Seite und das **Dashboard**
+(rollenabhängige Kacheln). Die Screens für Applications, Voting, Meetings, Budget und
+Admin sind aktuell gegatete Platzhalter (Roadmap T-31 ff.).
 
 ## Befehle
 
 | Befehl | Zweck |
 |---|---|
 | `npm start` | Dev-Server (`http://localhost:4200`) |
-| `npm run build` | Produktions-Build → `dist/antragsplattform` |
+| `npm run build` | Produktions-Build → `dist/antragsplattform/browser` |
 | `npm test` | Jest (jsdom + Angular Testing Library) |
 | `npm run test:cov` | Jest mit Coverage-Gate (FE ≥80 %) |
 | `npm run lint` | ESLint (flat config, `@angular-eslint`) |
@@ -36,7 +40,8 @@ src/
       ui/            UI-Kit: Button/Input/Card/Table/Stepper/Dialog/Toast/Badge
       formly/        Formly-Bindung an das UI-Kit (Feldtyp `input`)
     layout/          ShellComponent (Header/Nav/Theme/Sprache/Footer/Toasts)
-    pages/           Home, Platzhalter (Feature-Routen), 404
+    pages/           Home, Dashboard, Platzhalter (gegatete Feature-Routen), 404
+    features/apply/  Apply-Wizard, Confirmation, Status-Timeline, Altcha
     app.config.ts    Composition Root (Provider, Interceptor-Kette, Init)
     app.routes.ts    Routing-Gerüst (Feature-Routen lazy → Platzhalter)
 ```
@@ -64,11 +69,9 @@ Header. Konfigurierbare DB-Texte (`*_i18n`) sind **nicht** Teil dieses Service.
 ## API-Client & Mock
 
 `core/api/ApiClient` ist gegen die OpenAPI-Contracts (`sds/api.md`) typisiert.
-Im Skelett-Betrieb liefert `mockApiInterceptor` In-Memory-Antworten
-(`USE_MOCK_API`, Default `true`), damit die SPA ohne Backend läuft. Für echte
-Aufrufe `USE_MOCK_API` auf `false` setzen — `web`-nginx routet `/api` → `api`.
+`mockApiInterceptor` liefert In-Memory-Antworten (`USE_MOCK_API`, Default `true`),
+damit die SPA ohne Backend läuft. Für echte Aufrufe `USE_MOCK_API` auf `false`
+setzen — `web`-nginx routet `/api` → `api`.
 
-## Scope-Grenze (T-03)
-
-Kein Feature-Code (Wizard, Voting, Admin …) — nur Gerüst, Design-System und
-Infrastruktur. Backend (`backend/`) und `pytex/` bleiben unberührt (T-02/T-21).
+> Der WS-Service (`core/ws`) ist für Live-Vote vorbereitet; der zugehörige
+> Server-Endpoint im Backend ist noch nicht gebaut (Roadmap).
