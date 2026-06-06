@@ -17,6 +17,12 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
+from app.deps import (
+    Applicant,
+    Principal,
+    get_current_applicant,
+    get_current_principal,
+)
 from app.settings import Settings, get_settings
 from app.shared.altcha import (
     AltchaError,
@@ -195,6 +201,33 @@ async def rate_limit_applications(
         limit=settings.rl_applications_ip_per_hour,
         window=_HOUR,
         detail="Too many application submissions from this IP. Try again later.",
+    )
+
+
+async def rate_limit_attachments(
+    request: Request,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> None:
+    """`POST /attachments`: 30/Std/applicant (api.md §7).
+
+    Schlüssel folgt der Identität: Principal-``sub`` bzw. (Antragsteller) die gebundene
+    ``application_id``; ohne Identität IP-Fallback. Die Auth-Dependency (401/403) läuft
+    separat — dieser Check drosselt nur die Frequenz."""
+    if principal is not None:
+        key = f"attachments:principal:{principal.sub}"
+    elif applicant is not None:
+        key = f"attachments:applicant:{applicant.application_id}"
+    else:
+        key = f"attachments:ip:{client_ip(request)}"
+    await _enforce(
+        limiter,
+        key,
+        limit=settings.rl_attachments_per_hour,
+        window=_HOUR,
+        detail="Too many uploads. Try again later.",
     )
 
 

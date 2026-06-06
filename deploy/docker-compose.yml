@@ -100,6 +100,10 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      # ClamAV lädt Signaturen minutenlang → nur „gestartet" abwarten; der Scan-Task
+      # retryt, bis clamd bereit ist (kein Worker-Block beim Boot).
+      clamav:
+        condition: service_started
     networks:
       - internal
     healthcheck:

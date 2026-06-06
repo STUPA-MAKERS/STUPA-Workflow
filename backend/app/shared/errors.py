@@ -32,9 +32,11 @@ STATUS_CODE_MAP: dict[int, str] = {
     409: "conflict",
     410: "gone",
     413: "payload_too_large",
+    415: "unsupported_media_type",
     422: "validation_error",
     429: "rate_limited",
     500: "internal_error",
+    503: "service_unavailable",
 }
 
 # Status → menschenlesbarer Titel (Default, falls AppError keinen setzt).
@@ -46,9 +48,11 @@ STATUS_TITLE_MAP: dict[int, str] = {
     409: "Conflict",
     410: "Gone",
     413: "Payload Too Large",
+    415: "Unsupported Media Type",
     422: "Unprocessable Entity",
     429: "Too Many Requests",
     500: "Internal Server Error",
+    503: "Service Unavailable",
 }
 
 
@@ -142,6 +146,12 @@ class PayloadTooLargeError(AppError):
     status = 413
 
 
+class UnsupportedMediaTypeError(AppError):
+    """415 — Datei-Typ nicht erlaubt bzw. MIME-Sniff ≠ Endung (security.md §6)."""
+
+    status = 415
+
+
 class ValidationProblem(AppError):
     """422 — Validierung gegen Form/Config (api.md). Name vermeidet Pydantic-Kollision."""
 
@@ -163,6 +173,12 @@ class RateLimitedError(AppError):
             {"Retry-After": str(max(0, retry_after))} if retry_after is not None else None
         )
         super().__init__(detail, code=code, title=title, headers=headers)
+
+
+class ServiceUnavailableError(AppError):
+    """503 — abhängiger Dienst nicht erreichbar (z. B. Object-Storage beim Upload)."""
+
+    status = 503
 
 
 def _trace_id(request: Request) -> str | None:

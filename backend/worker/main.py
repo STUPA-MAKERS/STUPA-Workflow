@@ -25,11 +25,19 @@ from sqlalchemy.ext.asyncio import (
 from app.modules.budget.stats import BudgetStatsService
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
+from worker.scan import on_startup as scan_on_startup
+from worker.scan import scan_attachment
 
 
 async def ping(ctx: dict[str, object]) -> str:
     """Platzhalter-Task."""
     return "pong"
+
+
+async def _on_startup(ctx: dict[str, Any]) -> None:
+    """Worker-Init: Mail- (T-18) **und** Scan-Abhängigkeiten (T-13) in ``ctx`` legen."""
+    await mail_on_startup(ctx)
+    await scan_on_startup(ctx)
 
 
 @lru_cache(maxsize=1)
@@ -64,9 +72,9 @@ async def _shutdown(ctx: dict[str, Any]) -> None:  # pragma: no cover
 
 
 class WorkerSettings:
-    functions = [ping, refresh_budget_stats, send_mail]
+    functions = [ping, refresh_budget_stats, send_mail, scan_attachment]
     cron_jobs = [cron(refresh_budget_stats, hour=3, minute=0)]
-    on_startup = mail_on_startup
+    on_startup = _on_startup
     on_shutdown = _shutdown
     redis_settings = RedisSettings.from_dsn(
         os.environ.get("REDIS_URL", "redis://redis:6379/0")

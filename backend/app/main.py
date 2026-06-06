@@ -22,6 +22,8 @@ from app.modules.applications.router import router as applications_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
 from app.modules.budget.router import router as budget_router
+from app.modules.files.router import router as files_router
+from app.modules.files.storage import build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
@@ -53,13 +55,17 @@ api_router.include_router(voting_router)
 api_router.include_router(budget_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(notifications_router)
+api_router.include_router(files_router)
 api_router.include_router(audit_router)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # arq-Pool best-effort öffnen (Mail-Versand via Worker). Fehlt Redis → None.
-    app.state.arq_pool = await create_mail_pool(get_settings().redis_url)
+    settings = get_settings()
+    # arq-Pool best-effort öffnen (Mail-Versand + Scan-Jobs via Worker). Fehlt Redis → None.
+    app.state.arq_pool = await create_mail_pool(settings.redis_url)
+    # Object-Storage best-effort bauen (Upload, T-13). Ohne MinIO → None → Upload 503.
+    app.state.object_storage = build_object_storage(settings)
     try:
         yield
     finally:
