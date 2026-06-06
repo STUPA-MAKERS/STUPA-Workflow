@@ -111,6 +111,9 @@ async function setup(api: Partial<ApiClient>, params: Record<string, string>) {
 }
 
 describe('StatusTimelineComponent', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => localStorage.clear());
+
   it('verifies the magic-link token and shows status, timeline and comments', async () => {
     await setup(fakeApi(), { t: 'tok', app: 'app-1' });
     expect(await screen.findByText('Bitte ergänzen.')).toBeInTheDocument();
@@ -163,5 +166,20 @@ describe('StatusTimelineComponent', () => {
   it('shows an error notice when no link is provided', async () => {
     await setup(fakeApi(), {});
     expect(await screen.findByText(/Antrag nicht gefunden/)).toBeInTheDocument();
+  });
+
+  it('renders the status page in English when the locale is EN', async () => {
+    localStorage.setItem('ap.locale', 'en');
+    await setup(fakeApi(), { t: 'tok', app: 'app-1' });
+    expect(await screen.findByRole('heading', { name: 'Application status' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Save changes/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Public comment/)).toBeInTheDocument();
+    expect(screen.queryByText('Antragsstatus')).not.toBeInTheDocument();
+  });
+
+  it('localizes the expired notice in English', async () => {
+    localStorage.setItem('ap.locale', 'en');
+    await setup(fakeApi({ verify: () => throwError(() => ({ status: 410 })) }), { t: 'old' });
+    expect(await screen.findByText(/Link expired/)).toBeInTheDocument();
   });
 });

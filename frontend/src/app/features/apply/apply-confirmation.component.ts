@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 
@@ -13,25 +14,19 @@ import { CardComponent } from '@shared/ui/card/card.component';
   selector: 'app-apply-confirmation',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, BadgeComponent, CardComponent],
+  imports: [RouterLink, BadgeComponent, CardComponent, TranslatePipe],
   template: `
     <section class="done">
-      <app-card heading="Antrag eingegangen">
-        <app-badge variant="success">Eingereicht</app-badge>
-        <p class="done__text">
-          Vielen Dank! Dein Antrag wurde aufgenommen. Wir haben dir eine E-Mail mit einem
-          persönlichen Link gesendet — darüber kannst du den <strong>Status verfolgen</strong> und
-          deinen Antrag bei Bedarf <strong>bearbeiten</strong>, ohne dich anzumelden.
-        </p>
+      <app-card [heading]="'apply.confirm.heading' | t">
+        <app-badge variant="success">{{ 'apply.confirm.badge' | t }}</app-badge>
+        <p class="done__text">{{ 'apply.confirm.body' | t }}</p>
         @if (applicationId()) {
           <p class="done__ref">
-            Vorgangsnummer: <code>{{ applicationId() }}</code>
+            {{ 'apply.confirm.ref' | t }} <code>{{ applicationId() }}</code>
           </p>
         }
-        <p class="done__hint">
-          Keine Mail erhalten? Prüfe den Spam-Ordner. Der Link ist zeitlich begrenzt gültig.
-        </p>
-        <a card-footer routerLink="/" class="done__home">Zur Startseite</a>
+        <p class="done__hint">{{ 'apply.confirm.hint' | t }}</p>
+        <a card-footer routerLink="/" class="done__home">{{ 'apply.confirm.home' | t }}</a>
       </app-card>
     </section>
   `,

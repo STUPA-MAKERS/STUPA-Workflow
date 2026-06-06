@@ -82,7 +82,13 @@ async function setup(create?: jest.Mock) {
 }
 
 describe('ApplyWizardComponent', () => {
-  beforeEach(() => sessionStorage.clear());
+  beforeEach(() => {
+    sessionStorage.clear();
+    // Locale auf DE pinnen — die deutschen Assertions unten sollen unabhängig
+    // von der jsdom-Navigator-Sprache (en-US) gelten.
+    localStorage.setItem('ap.locale', 'de');
+  });
+  afterEach(() => localStorage.clear());
 
   it('renders the title and a single step before a type is chosen', async () => {
     await setup();

@@ -7,6 +7,7 @@ import { forkJoin } from 'rxjs';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
   Application,
   ApplicationComment,
@@ -49,6 +50,7 @@ interface ReadonlyRow {
     BadgeComponent,
     CardComponent,
     ButtonComponent,
+    TranslatePipe,
   ],
   templateUrl: './status-timeline.component.html',
   styleUrl: './status-timeline.component.scss',
@@ -198,7 +200,8 @@ export class StatusTimelineComponent {
   private formatValue(field: FormFieldDef, value: unknown, lang: string): string {
     if (value === null || value === undefined || value === '') return '';
     if (Array.isArray(value)) return value.map((v) => this.optionLabel(field, v, lang)).join(', ');
-    if (typeof value === 'boolean') return value ? 'Ja' : 'Nein';
+    if (typeof value === 'boolean')
+      return this.i18n.translate(value ? 'common.yes' : 'common.no');
     return this.optionLabel(field, value, lang);
   }
 
@@ -220,16 +223,16 @@ export class StatusTimelineComponent {
       next: (updated) => {
         this.application.set(updated);
         this.saving.set(false);
-        this.toast.success('Änderungen gespeichert.');
+        this.toast.success(this.i18n.translate('status.toast.saved'));
         this.api.timeline(app.id).subscribe((t) => this.timeline.set(t));
       },
       error: (err: { status?: number; error?: ProblemDetail }) => {
         this.saving.set(false);
         if (err.status === 409) {
-          this.toast.error('Antrag ist gesperrt und kann nicht mehr bearbeitet werden.');
+          this.toast.error(this.i18n.translate('status.toast.locked'));
           this.api.getApplication(app.id).subscribe((a) => this.application.set(a));
         } else {
-          this.toast.error(err.error?.detail ?? 'Speichern fehlgeschlagen.');
+          this.toast.error(err.error?.detail ?? this.i18n.translate('status.toast.saveFailed'));
         }
       },
     });
@@ -249,7 +252,7 @@ export class StatusTimelineComponent {
       },
       error: () => {
         this.postingComment.set(false);
-        this.toast.error('Kommentar konnte nicht gespeichert werden.');
+        this.toast.error(this.i18n.translate('status.toast.commentFailed'));
       },
     });
   }

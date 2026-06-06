@@ -1,15 +1,19 @@
 <section class="wizard">
   <header class="wizard__head">
-    <h1 class="wizard__title">Antrag stellen</h1>
-    <app-stepper [steps]="steps()" [activeIndex]="activeIndex()" ariaLabel="Antrags-Fortschritt" />
+    <h1 class="wizard__title">{{ 'apply.title' | t }}</h1>
+    <app-stepper
+      [steps]="steps()"
+      [activeIndex]="activeIndex()"
+      [ariaLabel]="'apply.progress' | t"
+    />
   </header>
 
   <app-card>
     @switch (currentStep()) {
       @case ('type') {
-        <h2 class="wizard__step-title">Antragsart wählen</h2>
-        <p class="wizard__lead">Wofür möchtest du einen Antrag stellen?</p>
-        <div class="type-list" role="radiogroup" aria-label="Antragsart">
+        <h2 class="wizard__step-title">{{ 'apply.type.title' | t }}</h2>
+        <p class="wizard__lead">{{ 'apply.type.lead' | t }}</p>
+        <div class="type-list" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
           @for (t of types(); track t.id) {
             <button
               type="button"
@@ -22,35 +26,33 @@
               <span class="type-option__name">{{ t.name }}</span>
             </button>
           } @empty {
-            <p class="wizard__muted">Zurzeit sind keine Antragsarten verfügbar.</p>
+            <p class="wizard__muted">{{ 'apply.type.empty' | t }}</p>
           }
         </div>
         @if (loadingForm()) {
-          <p class="wizard__muted" role="status">Formular wird geladen …</p>
+          <p class="wizard__muted" role="status">{{ 'apply.form.loading' | t }}</p>
         }
       }
 
       @case ('contact') {
-        <h2 class="wizard__step-title">Kontakt</h2>
-        <p class="wizard__lead">
-          An diese E-Mail senden wir den Bearbeitungs-Link für deinen Antrag.
-        </p>
+        <h2 class="wizard__step-title">{{ 'apply.contact.title' | t }}</h2>
+        <p class="wizard__lead">{{ 'apply.contact.lead' | t }}</p>
         <form class="contact" [formGroup]="contactForm">
           <app-input
-            label="E-Mail"
+            [label]="'apply.contact.email' | t"
             type="email"
             [required]="true"
             [formControl]="contactForm.controls.email"
             [error]="
               contactForm.controls.email.touched && contactForm.controls.email.invalid
-                ? 'Bitte eine gültige E-Mail-Adresse eingeben.'
+                ? ('apply.contact.emailInvalid' | t)
                 : ''
             "
           />
           <app-input
-            label="Name (optional)"
+            [label]="'apply.contact.name' | t"
             [formControl]="contactForm.controls.name"
-            hint="Wird Gremien angezeigt; nicht öffentlich."
+            [hint]="'apply.contact.nameHint' | t"
           />
         </form>
       }
@@ -63,10 +65,10 @@
       }
 
       @case ('review') {
-        <h2 class="wizard__step-title">Prüfen & Absenden</h2>
+        <h2 class="wizard__step-title">{{ 'apply.review.title' | t }}</h2>
         <dl class="summary">
           <div class="summary__row">
-            <dt>E-Mail</dt>
+            <dt>{{ 'apply.review.email' | t }}</dt>
             <dd>{{ contactForm.controls.email.value }}</dd>
           </div>
           @for (row of summary(); track row.label) {
@@ -85,11 +87,11 @@
     <div card-footer class="wizard__nav">
       <div class="wizard__nav-left">
         @if (activeIndex() > 0) {
-          <app-button variant="secondary" (click)="prev()">Zurück</app-button>
+          <app-button variant="secondary" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
         }
         @if (effForm()) {
           <app-button variant="ghost" size="sm" (click)="discardDraft()">
-            Entwurf verwerfen
+            {{ 'apply.nav.discard' | t }}
           </app-button>
         }
       </div>
@@ -101,14 +103,14 @@
             [loading]="submitting()"
             (click)="submit()"
           >
-            Antrag absenden
+            {{ 'apply.nav.submit' | t }}
           </app-button>
         } @else {
           <app-button
             [disabled]="(currentStep() === 'type' && !effForm()) || loadingForm()"
             (click)="next()"
           >
-            Weiter
+            {{ 'apply.nav.next' | t }}
           </app-button>
         }
       </div>
@@ -116,8 +118,6 @@
   </app-card>
 
   @if (effForm()) {
-    <p class="wizard__autosave" role="status">
-      Dein Zwischenstand wird auf diesem Gerät automatisch gespeichert.
-    </p>
+    <p class="wizard__autosave" role="status">{{ 'apply.autosave' | t }}</p>
   }
 </section>

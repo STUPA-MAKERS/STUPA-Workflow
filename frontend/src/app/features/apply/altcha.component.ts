@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, output, signal } from '@angular/core';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 type AltchaState = 'idle' | 'verifying' | 'solved';
 
@@ -13,6 +14,7 @@ type AltchaState = 'idle' | 'verifying' | 'solved';
   selector: 'app-altcha',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="altcha" [attr.data-state]="state()">
       <button
@@ -34,22 +36,22 @@ type AltchaState = 'idle' | 'verifying' | 'solved';
         <span class="altcha__label">
           @switch (state()) {
             @case ('idle') {
-              Ich bin kein Roboter
+              {{ 'altcha.idle' | t }}
             }
             @case ('verifying') {
-              Wird überprüft …
+              {{ 'altcha.verifying' | t }}
             }
             @case ('solved') {
-              Bestätigt
+              {{ 'altcha.solved' | t }}
             }
           }
         </span>
       </button>
       <p class="altcha__note" role="status">
         @if (state() === 'solved') {
-          Verifizierung abgeschlossen.
+          {{ 'altcha.noteSolved' | t }}
         } @else {
-          Spam-Schutz (Altcha) — keine Tracking-Cookies.
+          {{ 'altcha.note' | t }}
         }
       </p>
     </div>
