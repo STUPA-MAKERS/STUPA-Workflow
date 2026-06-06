@@ -13,8 +13,8 @@ class MagicLinkRequest(BaseModel):
 
     email: EmailStr
     application_id: UUID | None = None
-    # Altcha-Solution (PoW). Verifikation kommt mit dem Captcha-Task — Feld hier
-    # bereits im Contract, damit das FE stabil bleibt.
+    # Altcha-Solution (PoW). Serverseitig verifiziert via `require_altcha` (security.md §7,
+    # Issue #23); ohne konfiguriertes Secret (Dev/Test) wird das Feld nur durchgereicht.
     altcha: str | None = None
 
 

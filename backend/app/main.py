@@ -16,6 +16,7 @@ from fastapi import APIRouter, FastAPI
 from app.db import dispose_engine
 from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
 from app.modules.applications.router import router as applications_router
 from app.modules.auth.router import router as auth_router
@@ -42,12 +43,17 @@ api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(flow_router)
 api_router.include_router(budget_router)
+api_router.include_router(antiabuse_router)
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
     await dispose_engine()
+    state = getattr(app, "state", None)
+    redis_client = getattr(state, "_antiabuse_redis", None) if state is not None else None
+    if redis_client is not None:
+        await redis_client.aclose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
