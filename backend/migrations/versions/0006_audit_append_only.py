@@ -1,8 +1,8 @@
 """audit: append-only-Enforcement (Trigger) + Least-Privilege-Grant (T-23)
 
-Revision ID: 0005_audit_append_only
-Revises: 0004_budget_entry_and_views
-Create Date: 2026-06-06 00:00:05
+Revision ID: 0006_audit_append_only
+Revises: 0005_seed_mail_templates
+Create Date: 2026-06-06 00:00:06
 
 ``audit_entry`` selbst entsteht – wie alle Modul-Tabellen – über
 ``Base.metadata.create_all`` in 0002 (Single-Source-Pattern, s. ``app.models``).
@@ -25,8 +25,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0005_audit_append_only"
-down_revision: str | None = "0004_budget_entry_and_views"
+revision: str = "0006_audit_append_only"
+down_revision: str | None = "0005_seed_mail_templates"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
