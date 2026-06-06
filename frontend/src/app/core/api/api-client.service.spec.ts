@@ -6,6 +6,39 @@ import {
 } from '@angular/common/http/testing';
 import { ApiClient } from './api-client.service';
 import { USE_MOCK_API } from './api.config';
+import type {
+  ApplicationOutWire,
+  ApplicationTypeListItemWire,
+  CommentOutWire,
+  Page,
+  StateOutWire,
+  TimelineEventOutWire,
+} from './models';
+
+const STATE: StateOutWire = {
+  id: 's1',
+  key: 'submitted',
+  label: { de: 'Eingereicht', en: 'Submitted' },
+  category: 'open',
+  editAllowed: true,
+};
+
+function appWire(): ApplicationOutWire {
+  return {
+    id: 'app-1',
+    typeId: 't1',
+    state: STATE,
+    gremiumId: null,
+    budgetPotId: 'p1',
+    amount: '10.00',
+    currency: 'EUR',
+    data: { title: 'X' },
+    version: 1,
+    lang: 'de',
+    createdAt: '2026-06-05T10:00:00Z',
+    updatedAt: '2026-06-05T10:00:00Z',
+  };
+}
 
 describe('ApiClient', () => {
   let api: ApiClient;
@@ -29,37 +62,110 @@ describe('ApiClient', () => {
     api.me().subscribe();
     const req = http.expectOne('/api/auth/me');
     expect(req.request.method).toBe('GET');
-    req.flush({ id: 'x', displayName: 'A', email: 'a@b', roles: [], permissions: [], groups: [] });
+    req.flush({ sub: 'x', display_name: 'A', email: 'a@b', roles: [], permissions: [], groups: [] });
   });
 
-  it('GETs application types', () => {
-    api.applicationTypes().subscribe();
-    http.expectOne('/api/application-types').flush([]);
+  it('unwraps the application-types Page into a mapped array', (done) => {
+    const page: Page<ApplicationTypeListItemWire> = {
+      items: [
+        { id: 't1', name: 'Finanzantrag', hasBudget: true, active: true, activeFormVersionId: 'v1' },
+      ],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    };
+    api.applicationTypes().subscribe((types) => {
+      expect(types).toEqual([
+        {
+          id: 't1',
+          name: 'Finanzantrag',
+          active: true,
+          hasBudget: true,
+          activeFormVersionId: 'v1',
+          key: null,
+          gremiumId: null,
+        },
+      ]);
+      done();
+    });
+    http.expectOne('/api/application-types').flush(page);
   });
 
-  it('serialises list query params', () => {
-    api.listApplications({ state: 'draft', q: 'foo', limit: 10 }).subscribe();
+  it('serialises list query params and maps the page items', (done) => {
+    api.listApplications({ state: 'draft', q: 'foo', limit: 10 }).subscribe((page) => {
+      expect(page.total).toBe(1);
+      expect(page.items[0].typeId).toBe('t1');
+      expect(page.items[0].state?.label).toBe('Eingereicht');
+      done();
+    });
     const req = http.expectOne((r) => r.url === '/api/applications');
     expect(req.request.params.get('state')).toBe('draft');
     expect(req.request.params.get('q')).toBe('foo');
     expect(req.request.params.get('limit')).toBe('10');
-    req.flush({ items: [], total: 0, limit: 10, offset: 0 });
+    req.flush({ items: [appWire()], total: 1, limit: 10, offset: 0 });
   });
 
-  it('POSTs a transition payload', () => {
-    api.fireTransition('app-1', { transition_id: 't-1', note: 'ok' }).subscribe();
+  it('maps a single application from the wire DTO', (done) => {
+    api.getApplication('app-1').subscribe((app) => {
+      expect(app.typeId).toBe('t1');
+      expect(app.budgetPotId).toBe('p1');
+      expect(app.state?.editAllowed).toBe(true);
+      expect(app.createdAt).toBe('2026-06-05T10:00:00Z');
+      done();
+    });
+    http.expectOne('/api/applications/app-1').flush(appWire());
+  });
+
+  it('POSTs a camelCase create body and unwraps applicationId', (done) => {
+    api
+      .createApplication({
+        typeId: 't1',
+        budgetPotId: 'p1',
+        data: { title: 'X' },
+        applicantEmail: 'a@b.de',
+        applicantName: 'Max',
+        lang: 'de',
+        altcha: 'sol',
+      })
+      .subscribe((created) => {
+        expect(created).toEqual({ applicationId: 'app-9' });
+        done();
+      });
+    const req = http.expectOne('/api/applications');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      typeId: 't1',
+      budgetPotId: 'p1',
+      data: { title: 'X' },
+      applicantEmail: 'a@b.de',
+      applicantName: 'Max',
+      lang: 'de',
+      altcha: 'sol',
+    });
+    req.flush({ applicationId: 'app-9' }, { status: 201, statusText: 'Created' });
+  });
+
+  it('POSTs a transition with the camelCase transitionId', () => {
+    api.fireTransition('app-1', { transitionId: 't-1', note: 'ok' }).subscribe();
     const req = http.expectOne('/api/applications/app-1/transition');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ transition_id: 't-1', note: 'ok' });
-    req.flush({});
+    expect(req.request.body).toEqual({ transitionId: 't-1', note: 'ok' });
+    req.flush({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] });
   });
 
-  it('builds nested resource URLs', () => {
-    api.timeline('app-9').subscribe();
-    http.expectOne('/api/applications/app-9/timeline').flush([]);
+  it('maps the timeline events into view entries', (done) => {
+    const events: TimelineEventOutWire[] = [
+      { fromStateId: null, toStateId: 's1', toState: STATE, actor: null, at: '2026-06-05T10:00:00Z', note: null },
+    ];
+    api.timeline('app-9').subscribe((entries) => {
+      expect(entries[0].label).toBe('Eingereicht');
+      expect(entries[0].toStateId).toBe('s1');
+      done();
+    });
+    http.expectOne('/api/applications/app-9/timeline').flush(events);
   });
 
-  it('POSTs the magic-link token to verify', () => {
+  it('POSTs the magic-link token to verify (snake_case response)', () => {
     api.verifyMagicLink('tok-1').subscribe();
     const req = http.expectOne('/api/auth/magic-link/verify');
     expect(req.request.method).toBe('POST');
@@ -67,28 +173,47 @@ describe('ApiClient', () => {
     req.flush({ application_id: 'a', scope: 'edit' });
   });
 
-  it('GETs the effective form with an optional pot param', () => {
+  it('GETs the effective form with the budgetPotId param (not ?pot)', () => {
     api.effectiveForm('type-1', 'pot-9').subscribe();
     const req = http.expectOne((r) => r.url === '/api/application-types/type-1/form');
-    expect(req.request.params.get('pot')).toBe('pot-9');
+    expect(req.request.params.get('budgetPotId')).toBe('pot-9');
+    expect(req.request.params.get('pot')).toBeNull();
     req.flush({ applicationTypeId: 'type-1', formVersionId: 'v1', sections: [] });
   });
 
-  it('PATCHes application data', () => {
-    api.updateApplication('app-2', { title: 'Neu' }).subscribe();
-    const req = http.expectOne('/api/applications/app-2');
+  it('PATCHes application data and maps the result', (done) => {
+    api.updateApplication('app-1', { title: 'Neu' }).subscribe((app) => {
+      expect(app.data).toEqual({ title: 'X' });
+      done();
+    });
+    const req = http.expectOne('/api/applications/app-1');
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ data: { title: 'Neu' } });
-    req.flush({});
+    req.flush(appWire());
   });
 
-  it('GETs and POSTs comments', () => {
-    api.comments('app-3').subscribe();
-    http.expectOne('/api/applications/app-3/comments').flush([]);
-    api.addComment('app-3', 'Hallo').subscribe();
+  it('GETs and POSTs comments with mapped view models', (done) => {
+    const wire: CommentOutWire = {
+      id: 'c1',
+      author: 'Referat',
+      authorKind: 'principal',
+      body: 'Hi',
+      visibility: 'public',
+      at: '2026-06-05T13:00:00Z',
+    };
+    api.comments('app-3').subscribe((comments) => {
+      expect(comments[0].isPublic).toBe(true);
+      expect(comments[0].author).toBe('Referat');
+    });
+    http.expectOne('/api/applications/app-3/comments').flush([wire]);
+
+    api.addComment('app-3', 'Hallo').subscribe((c) => {
+      expect(c.isPublic).toBe(true);
+      done();
+    });
     const req = http.expectOne('/api/applications/app-3/comments');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ body: 'Hallo' });
-    req.flush({});
+    expect(req.request.body).toEqual({ body: 'Hallo', visibility: 'public' });
+    req.flush(wire, { status: 201, statusText: 'Created' });
   });
 });

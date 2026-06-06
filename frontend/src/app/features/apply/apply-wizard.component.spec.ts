@@ -8,7 +8,17 @@ import type { ApplicationType, EffectiveForm } from '@core/api/models';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { ApplyWizardComponent } from './apply-wizard.component';
 
-const TYPES: ApplicationType[] = [{ id: 't1', name: 'Finanzantrag', active: true }];
+const TYPES: ApplicationType[] = [
+  {
+    id: 't1',
+    name: 'Finanzantrag',
+    active: true,
+    hasBudget: true,
+    activeFormVersionId: 'v1',
+    key: null,
+    gremiumId: null,
+  },
+];
 
 const EFF: EffectiveForm = {
   applicationTypeId: 't1',
@@ -52,7 +62,7 @@ const EFF: EffectiveForm = {
   ],
 };
 
-function fakeApi(create = jest.fn(() => of({ id: 'app-1' }))): Partial<ApiClient> {
+function fakeApi(create = jest.fn(() => of({ applicationId: 'app-1' }))): Partial<ApiClient> {
   return {
     applicationTypes: () => of(TYPES),
     effectiveForm: () => of(EFF),
@@ -103,7 +113,7 @@ describe('ApplyWizardComponent', () => {
   });
 
   it('walks through the wizard and submits with the collected data + altcha', async () => {
-    const create = jest.fn(() => of({ id: 'app-1' }));
+    const create = jest.fn(() => of({ applicationId: 'app-1' }));
     const { fixture } = await setup(create);
     const comp = fixture.componentInstance;
     const router = TestBed.inject(Router);
@@ -129,8 +139,14 @@ describe('ApplyWizardComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: /Antrag absenden/ }));
 
     expect(create).toHaveBeenCalledTimes(1);
-    const payload = create.mock.calls[0][0] as { data: Record<string, unknown>; applicant_email: string; altcha: string };
-    expect(payload.applicant_email).toBe('antrag@stupa.de');
+    const payload = create.mock.calls[0][0] as {
+      typeId: string;
+      data: Record<string, unknown>;
+      applicantEmail: string;
+      altcha: string;
+    };
+    expect(payload.typeId).toBe('t1');
+    expect(payload.applicantEmail).toBe('antrag@stupa.de');
     expect(payload.data['title']).toBe('Sommerfest');
     expect(payload.altcha).toBe('sol');
     expect(navSpy).toHaveBeenCalledWith(['/apply/confirmation'], { queryParams: { id: 'app-1' } });

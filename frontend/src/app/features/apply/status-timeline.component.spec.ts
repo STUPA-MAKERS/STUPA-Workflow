@@ -3,21 +3,36 @@ import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
-import type { ApplicationOut, EffectiveForm } from '@core/api/models';
+import type {
+  Application,
+  ApplicationComment,
+  EffectiveForm,
+  TimelineEntry,
+} from '@core/api/models';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { StatusTimelineComponent } from './status-timeline.component';
 
-function app(editAllowed: boolean, data: Record<string, unknown> = { title: 'Sommerfest' }): ApplicationOut {
+function app(editAllowed: boolean, data: Record<string, unknown> = { title: 'Sommerfest' }): Application {
   return {
     id: 'app-1',
-    type_id: 't1',
-    state: { key: 'submitted', label: editAllowed ? 'Eingereicht' : 'Beschlossen', editAllowed },
-    gremium_id: null,
-    budget_pot_id: null,
+    typeId: 't1',
+    state: {
+      id: 's1',
+      key: 'submitted',
+      label: editAllowed ? 'Eingereicht' : 'Beschlossen',
+      category: 'open',
+      editAllowed,
+    },
+    gremiumId: null,
+    budgetPotId: null,
     amount: null,
+    currency: null,
     data,
     version: 1,
-    created_at: '2026-06-05T10:00:00Z',
+    lang: 'de',
+    createdAt: '2026-06-05T10:00:00Z',
+    updatedAt: '2026-06-05T10:00:00Z',
+    applicant: null,
   };
 }
 
@@ -49,14 +64,25 @@ const EFF: EffectiveForm = {
   ],
 };
 
-const TIMELINE = [{ state: 'submitted', label: 'Eingereicht', at: '2026-06-05T10:00:00Z' }];
-const COMMENTS = [
-  { id: 'c1', body: 'Bitte ergänzen.', author_name: 'Referat', created_at: '2026-06-05T13:00:00Z', is_public: true },
+const TIMELINE: TimelineEntry[] = [
+  { toStateId: 's1', toState: null, label: 'Eingereicht', actor: null, at: '2026-06-05T10:00:00Z', note: null },
+];
+
+const COMMENTS: ApplicationComment[] = [
+  {
+    id: 'c1',
+    author: 'Referat',
+    authorKind: 'principal',
+    body: 'Bitte ergänzen.',
+    visibility: 'public',
+    isPublic: true,
+    at: '2026-06-05T13:00:00Z',
+  },
 ];
 
 interface ApiOverrides {
   verify?: Partial<ApiClient>['verifyMagicLink'];
-  application?: ApplicationOut;
+  application?: Application;
   update?: jest.Mock;
   addComment?: jest.Mock;
 }
@@ -88,6 +114,8 @@ describe('StatusTimelineComponent', () => {
   it('verifies the magic-link token and shows status, timeline and comments', async () => {
     await setup(fakeApi(), { t: 'tok', app: 'app-1' });
     expect(await screen.findByText('Bitte ergänzen.')).toBeInTheDocument();
+    // Author from the mapped comment (author, not author_name).
+    expect(screen.getByText(/Referat/)).toBeInTheDocument();
     // Status-Badge + Timeline tragen beide das Label.
     expect(screen.getAllByText('Eingereicht').length).toBeGreaterThan(1);
     // editierbar → Bearbeitungs-Formular sichtbar

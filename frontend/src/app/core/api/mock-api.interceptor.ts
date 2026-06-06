@@ -8,23 +8,26 @@ import { type Observable, of } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
 import type {
-  ApplicationComment,
-  ApplicationOut,
-  ApplicationType,
+  ApplicationCreatedWire,
+  ApplicationOutWire,
+  ApplicationTypeListItemWire,
+  CommentOutWire,
   EffectiveForm,
   MagicLinkVerifyResult,
   Page,
   Principal,
-  TimelineEntry,
-  Transition,
+  StateOutWire,
+  TimelineEventOutWire,
+  TransitionOutWire,
 } from './models';
 
 /**
  * In-Memory-Mock-Backend für den Skelett-/FE-Betrieb (Mock erlaubt, T-03/T-30).
  * Aktiv nur wenn `USE_MOCK_API` true ist; greift ausschließlich für `/api/*`.
- * Deckt den öffentlichen Apply-Flow (T-30) gegen den OpenAPI-Contract ab:
- * effektive Form, Antrag anlegen, Magic-Link-Verify (Cookie-Modell, kein Token),
- * Timeline, Kommentare, PATCH. Echte Persistenz kommt in den Backend-Tasks (T-12ff).
+ *
+ * Die Antworten sind in der **Backend-Wire-Form** (`*Wire`, camelCase via T-12
+ * `_CamelModel`) — der `ApiClient` mappt sie wie beim echten Backend. So bleibt
+ * der Mock contract-treu und die Mapper-Schicht wird mitgetestet (Issue #17).
  */
 const MOCK_PRINCIPAL: Principal = {
   sub: '00000000-0000-0000-0000-000000000001',
@@ -35,15 +38,32 @@ const MOCK_PRINCIPAL: Principal = {
   groups: [],
 };
 
-const MOCK_TYPES: ApplicationType[] = [
-  { id: '11111111-1111-1111-1111-111111111111', name: 'Finanzantrag', active: true },
-  { id: '22222222-2222-2222-2222-222222222222', name: 'Sonstiger Antrag', active: true },
-];
+const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
+  items: [
+    {
+      id: '11111111-1111-1111-1111-111111111111',
+      name: 'Finanzantrag',
+      hasBudget: true,
+      active: true,
+      activeFormVersionId: '44444444-4444-4444-4444-444444444444',
+    },
+    {
+      id: '22222222-2222-2222-2222-222222222222',
+      name: 'Sonstiger Antrag',
+      hasBudget: false,
+      active: true,
+      activeFormVersionId: '44444444-4444-4444-4444-444444444445',
+    },
+  ],
+  total: 2,
+  limit: 20,
+  offset: 0,
+};
 
 const MOCK_APP_ID = '33333333-3333-3333-3333-333333333333';
 
 const MOCK_EFFECTIVE_FORM: EffectiveForm = {
-  applicationTypeId: MOCK_TYPES[0].id,
+  applicationTypeId: MOCK_TYPES.items[0].id,
   formVersionId: '44444444-4444-4444-4444-444444444444',
   budgetPotId: '55555555-5555-5555-5555-555555555555',
   sections: [
@@ -112,43 +132,74 @@ const MOCK_EFFECTIVE_FORM: EffectiveForm = {
   ],
 };
 
-function mockApplication(data: Record<string, unknown> = {}): ApplicationOut {
+const SUBMITTED_STATE: StateOutWire = {
+  id: '66666666-6666-6666-6666-666666666661',
+  key: 'submitted',
+  label: { de: 'Eingereicht', en: 'Submitted' },
+  category: 'open',
+  editAllowed: true,
+};
+
+const REVIEW_STATE: StateOutWire = {
+  id: '66666666-6666-6666-6666-666666666662',
+  key: 'review',
+  label: { de: 'In Prüfung', en: 'In review' },
+  category: 'open',
+  editAllowed: false,
+};
+
+function mockApplication(data: Record<string, unknown> = {}): ApplicationOutWire {
   return {
     id: MOCK_APP_ID,
-    type_id: MOCK_TYPES[0].id,
-    state: { key: 'submitted', label: 'Eingereicht', editAllowed: true },
-    gremium_id: null,
-    budget_pot_id: MOCK_EFFECTIVE_FORM.budgetPotId ?? null,
+    typeId: MOCK_TYPES.items[0].id,
+    state: SUBMITTED_STATE,
+    gremiumId: null,
+    budgetPotId: MOCK_EFFECTIVE_FORM.budgetPotId ?? null,
     amount: null,
+    currency: 'EUR',
     data,
     version: 1,
-    created_at: '2026-06-05T10:00:00Z',
+    lang: 'de',
+    createdAt: '2026-06-05T10:00:00Z',
+    updatedAt: '2026-06-05T10:00:00Z',
   };
 }
 
-const MOCK_APPLICATIONS: Page<ApplicationOut> = {
+const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
   items: [
     {
       id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      type_id: '11111111-1111-1111-1111-111111111111',
-      state: { key: 'submitted', label: 'Eingereicht', editAllowed: false },
-      gremium_id: null,
-      budget_pot_id: null,
+      typeId: '11111111-1111-1111-1111-111111111111',
+      state: { ...SUBMITTED_STATE, editAllowed: false },
+      gremiumId: null,
+      budgetPotId: null,
       amount: '250.00',
+      currency: 'EUR',
       data: { title: 'Förderung Ersti-Wochenende' },
       version: 1,
-      created_at: '2026-05-30T09:00:00Z',
+      lang: 'de',
+      createdAt: '2026-05-30T09:00:00Z',
+      updatedAt: '2026-05-30T09:00:00Z',
     },
     {
       id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-      type_id: '22222222-2222-2222-2222-222222222222',
-      state: { key: 'draft', label: 'Entwurf', editAllowed: true },
-      gremium_id: null,
-      budget_pot_id: null,
+      typeId: '22222222-2222-2222-2222-222222222222',
+      state: {
+        id: '66666666-6666-6666-6666-666666666663',
+        key: 'draft',
+        label: { de: 'Entwurf', en: 'Draft' },
+        category: 'open',
+        editAllowed: true,
+      },
+      gremiumId: null,
+      budgetPotId: null,
       amount: null,
+      currency: 'EUR',
       data: { title: 'Anschaffung Beamer' },
       version: 1,
-      created_at: '2026-06-02T14:30:00Z',
+      lang: 'de',
+      createdAt: '2026-06-02T14:30:00Z',
+      updatedAt: '2026-06-02T14:30:00Z',
     },
   ],
   total: 2,
@@ -156,22 +207,37 @@ const MOCK_APPLICATIONS: Page<ApplicationOut> = {
   offset: 0,
 };
 
-const MOCK_TIMELINE: TimelineEntry[] = [
-  { state: 'submitted', label: 'Eingereicht', at: '2026-06-05T10:00:00Z' },
-  { state: 'review', label: 'In Prüfung', at: '2026-06-05T12:30:00Z', note: 'Eingang bestätigt.' },
-];
-
-const MOCK_COMMENTS: ApplicationComment[] = [
+const MOCK_TIMELINE: TimelineEventOutWire[] = [
   {
-    id: 'c0000000-0000-0000-0000-000000000001',
-    body: 'Bitte ergänze die Kostenaufstellung.',
-    author_name: 'Finanzreferat',
-    created_at: '2026-06-05T13:00:00Z',
-    is_public: true,
+    fromStateId: null,
+    toStateId: SUBMITTED_STATE.id,
+    toState: SUBMITTED_STATE,
+    actor: null,
+    at: '2026-06-05T10:00:00Z',
+    note: null,
+  },
+  {
+    fromStateId: SUBMITTED_STATE.id,
+    toStateId: REVIEW_STATE.id,
+    toState: REVIEW_STATE,
+    actor: 'Finanzreferat',
+    at: '2026-06-05T12:30:00Z',
+    note: 'Eingang bestätigt.',
   },
 ];
 
-const EMPTY_TRANSITIONS: Transition[] = [];
+const MOCK_COMMENTS: CommentOutWire[] = [
+  {
+    id: 'c0000000-0000-0000-0000-000000000001',
+    author: 'Finanzreferat',
+    authorKind: 'principal',
+    body: 'Bitte ergänze die Kostenaufstellung.',
+    visibility: 'public',
+    at: '2026-06-05T13:00:00Z',
+  },
+];
+
+const EMPTY_TRANSITIONS: TransitionOutWire[] = [];
 const LOGOUT_OUT = { logout_url: null };
 
 function path(url: string): string {
@@ -207,19 +273,21 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (p.endsWith('/comments')) {
       const body = (req.body as { body?: string } | null)?.body ?? '';
-      const created: ApplicationComment = {
+      const visibility = (req.body as { visibility?: 'internal' | 'public' } | null)?.visibility;
+      const created: CommentOutWire = {
         id: `c0000000-0000-0000-0000-0000000000${MOCK_COMMENTS.length + 1}`,
+        author: null,
+        authorKind: 'applicant',
         body,
-        author_name: null,
-        created_at: '2026-06-05T14:00:00Z',
-        is_public: true,
+        visibility: visibility ?? 'public',
+        at: '2026-06-05T14:00:00Z',
       };
       MOCK_COMMENTS.push(created);
       return ok(created, 201);
     }
     if (p.endsWith('/applications')) {
-      const data = (req.body as { data?: Record<string, unknown> } | null)?.data ?? {};
-      return ok(mockApplication(data), 201);
+      const created: ApplicationCreatedWire = { applicationId: MOCK_APP_ID };
+      return ok(created, 201);
     }
   }
 

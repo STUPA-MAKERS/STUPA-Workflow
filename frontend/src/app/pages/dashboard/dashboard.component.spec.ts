@@ -8,7 +8,7 @@ import { render, screen } from '@testing-library/angular';
 import { DashboardComponent } from './dashboard.component';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
-import type { ApplicationOut, Page, Principal } from '@core/api/models';
+import type { ApplicationListItem, Page, Principal } from '@core/api/models';
 
 const MEMBER: Principal = {
   sub: '1',
@@ -19,7 +19,7 @@ const MEMBER: Principal = {
   groups: [],
 };
 
-const PAGE: Page<ApplicationOut> = { items: [], total: 2, limit: 20, offset: 0 };
+const PAGE: Page<ApplicationListItem> = { items: [], total: 2, limit: 20, offset: 0 };
 
 async function setup(principal: Principal) {
   const view = await render(DashboardComponent, {

@@ -37,7 +37,7 @@
             <p class="status__id">Vorgang {{ app.id }}</p>
           </div>
           <div class="status__badges">
-            <app-badge variant="primary">{{ app.state.label }}</app-badge>
+            <app-badge variant="primary">{{ app.state?.label }}</app-badge>
             @if (!canEdit()) {
               <app-badge variant="neutral">Gesperrt</app-badge>
             }
@@ -101,7 +101,7 @@
               @for (c of comments(); track c.id) {
                 <li class="comments__item">
                   <p class="comments__meta">
-                    {{ c.author_name || 'Gremium' }} · {{ c.created_at | date: 'short' }}
+                    {{ c.author || 'Gremium' }} · {{ c.at | date: 'short' }}
                   </p>
                   <p class="comments__body">{{ c.body }}</p>
                 </li>

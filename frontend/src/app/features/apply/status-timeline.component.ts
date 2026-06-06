@@ -8,8 +8,8 @@ import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type {
+  Application,
   ApplicationComment,
-  ApplicationOut,
   EffectiveForm,
   FormFieldDef,
   ProblemDetail,
@@ -60,7 +60,7 @@ export class StatusTimelineComponent {
   private readonly route = inject(ActivatedRoute);
 
   readonly phase = signal<Phase>('loading');
-  readonly application = signal<ApplicationOut | null>(null);
+  readonly application = signal<Application | null>(null);
   readonly timeline = signal<TimelineEntry[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
   readonly readonlyRows = signal<ReadonlyRow[]>([]);
@@ -79,7 +79,7 @@ export class StatusTimelineComponent {
   readonly postingComment = signal(false);
 
   readonly canEdit = computed(
-    () => this.editScope() && Boolean(this.application()?.state.editAllowed),
+    () => this.editScope() && Boolean(this.application()?.state?.editAllowed),
   );
 
   constructor() {
@@ -155,8 +155,8 @@ export class StatusTimelineComponent {
     });
   }
 
-  private loadForm(application: ApplicationOut): void {
-    this.api.effectiveForm(application.type_id, application.budget_pot_id).subscribe({
+  private loadForm(application: Application): void {
+    this.api.effectiveForm(application.typeId, application.budgetPotId).subscribe({
       next: (eff) => {
         this.buildView(eff, application);
         this.phase.set('ready');
@@ -166,7 +166,7 @@ export class StatusTimelineComponent {
     });
   }
 
-  private buildView(eff: EffectiveForm, application: ApplicationOut): void {
+  private buildView(eff: EffectiveForm, application: Application): void {
     const lang = this.i18n.locale();
     const allFields = eff.sections.flatMap((s) => s.fields);
 

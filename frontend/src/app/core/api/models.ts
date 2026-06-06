@@ -3,6 +3,16 @@
  * Single Source of Truth bleibt das Backend-OpenAPI; diese Typen sind die
  * FE-seitige Spiegelung für den typisierten API-Client. Bei Contract-Änderung
  * → abstimmen (tasks.md §Konventionen), nicht einseitig brechen.
+ *
+ * Aufbau (T-40, Issue #17):
+ *  - **`*Wire`-Typen** spiegeln das Backend-JSON **1:1** (T-12 `_CamelModel`:
+ *    camelCase-Aliase via `by_alias`). Sie werden **nicht** direkt in Components
+ *    konsumiert, sondern in der `ApiClient`-Schicht über `mappers.ts` in die
+ *    FE-View-Modelle übersetzt.
+ *  - **View-Modelle** (`Application`, `ApplicationComment`, …) sind die
+ *    aufbereiteten, FE-freundlichen Shapes (i18n-Label bereits aufgelöst,
+ *    Bool-Komfortfelder). Sie sind das, was Components/Templates sehen.
+ *  - **`*Body`-Typen** sind Request-Bodies in der camelCase-Wire-Form.
  */
 
 export type Uuid = string;
@@ -25,8 +35,8 @@ export interface ProblemDetail {
 
 /**
  * Principal (OIDC) inkl. Rollen/Permissions/Gruppen — GET /api/auth/me.
- * Feldnamen spiegeln das Backend-`MeOut` (auth/schemas.py) 1:1; das OpenAPI
- * bleibt Single Source of Truth — hier nicht einseitig umbenennen.
+ * Feldnamen spiegeln das Backend-`MeOut` (auth/schemas.py) 1:1. `MeOut` ist ein
+ * **reines** `BaseModel` (kein `_CamelModel`) → `display_name` bleibt snake_case.
  */
 export interface Principal {
   sub: Uuid;
@@ -40,86 +50,6 @@ export interface Principal {
 /** Antwort von POST /api/auth/logout — RP-Initiated-Logout-URL (OIDC) oder null. */
 export interface LogoutOut {
   logout_url: string | null;
-}
-
-export interface StateOut {
-  key: string;
-  label: string;
-  editAllowed: boolean;
-}
-
-export interface ApplicationType {
-  id: Uuid;
-  name: string;
-  active: boolean;
-}
-
-export interface ApplicationCreate {
-  type_id: Uuid;
-  budget_pot_id?: Uuid | null;
-  data: Record<string, unknown>;
-  applicant_email: string;
-  applicant_name?: string | null;
-  lang: Lang;
-  altcha: string;
-}
-
-export interface ApplicationOut {
-  id: Uuid;
-  type_id: Uuid;
-  state: StateOut;
-  gremium_id: Uuid | null;
-  budget_pot_id: Uuid | null;
-  amount: string | null;
-  data: Record<string, unknown>;
-  version: number;
-  created_at: IsoDateTime;
-}
-
-export interface TimelineEntry {
-  state: string;
-  label: string;
-  at: IsoDateTime;
-  note?: string;
-}
-
-export interface Transition {
-  id: Uuid;
-  label: string;
-  toState: string;
-}
-
-export interface TransitionRequest {
-  transition_id: Uuid;
-  note?: string | null;
-}
-
-export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
-
-export interface VoteConfig {
-  options: string[];
-  majority_rule: MajorityRule;
-  abstain_counts_quorum: boolean;
-  secret: boolean;
-  allow_change: boolean;
-  tie_break: 'passed' | 'rejected' | 'tie';
-}
-
-export interface TallyOut {
-  counts: Record<string, number>;
-  eligible: number;
-  quorum_met: boolean;
-  leading: string | null;
-  result: string | null;
-}
-
-export interface AttachmentOut {
-  id: Uuid;
-  filename: string;
-  mime: string;
-  size: number;
-  scanned: boolean;
-  is_comparison_offer: boolean;
 }
 
 /** Einheitliche Listen-Hülle (Offset-Paging, overview §5 / api.md). */
@@ -138,6 +68,239 @@ export interface ApplicationListQuery {
   q?: string;
   limit?: number;
   offset?: number;
+}
+
+// =========================================================================== //
+// Wire-DTOs — exakte Spiegelung des Backend-JSON (T-12 `_CamelModel`).         //
+// =========================================================================== //
+
+/** `StateOut` (applications/schemas.py) — `label` ist eine **i18n-Map**. */
+export interface StateOutWire {
+  id: Uuid;
+  key: string;
+  label: I18nMap;
+  category: string;
+  editAllowed: boolean;
+}
+
+/** `ApplicantOut` — PII, nur für Berechtigte gefüllt. */
+export interface ApplicantOutWire {
+  email?: string | null;
+  name?: string | null;
+  anonymized: boolean;
+}
+
+/** `ApplicationOut` — Antrag-Detail. */
+export interface ApplicationOutWire {
+  id: Uuid;
+  typeId: Uuid;
+  state?: StateOutWire | null;
+  gremiumId?: Uuid | null;
+  budgetPotId?: Uuid | null;
+  amount?: string | null;
+  currency?: string | null;
+  data: Record<string, unknown>;
+  version: number;
+  lang?: string | null;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+  applicant?: ApplicantOutWire | null;
+}
+
+/** `ApplicationListItem` — Listen-Eintrag (kein `data`/`applicant`). */
+export interface ApplicationListItemWire {
+  id: Uuid;
+  typeId: Uuid;
+  state?: StateOutWire | null;
+  gremiumId?: Uuid | null;
+  budgetPotId?: Uuid | null;
+  amount?: string | null;
+  currency?: string | null;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+}
+
+/** `ApplicationCreated` — 201-Antwort auf `POST /applications` (nur die ID). */
+export interface ApplicationCreatedWire {
+  applicationId: Uuid;
+}
+
+/** `TimelineEventOut` — Status-Übergang in der Timeline. */
+export interface TimelineEventOutWire {
+  fromStateId?: Uuid | null;
+  toStateId: Uuid;
+  toState?: StateOutWire | null;
+  actor?: string | null;
+  at: IsoDateTime;
+  note?: string | null;
+}
+
+export type CommentVisibility = 'internal' | 'public';
+export type CommentAuthorKind = 'principal' | 'applicant';
+
+/** `CommentOut` — echte Backend-Feldnamen: `author`/`authorKind`/`visibility`/`at`. */
+export interface CommentOutWire {
+  id: Uuid;
+  author?: string | null;
+  authorKind: CommentAuthorKind;
+  body: string;
+  visibility: CommentVisibility;
+  at: IsoDateTime;
+}
+
+/** `ApplicationTypeListItem` (application_types/schemas.py). */
+export interface ApplicationTypeListItemWire {
+  id: Uuid;
+  name: string;
+  hasBudget: boolean;
+  active: boolean;
+  activeFormVersionId?: Uuid | null;
+  /** Admin-Zusatzfelder (nur bei Berechtigung gefüllt). */
+  key?: string | null;
+  gremiumId?: Uuid | null;
+}
+
+/** `TransitionOut` (flow/schemas.py) — `label` ist eine i18n-Map. */
+export interface TransitionOutWire {
+  id: Uuid;
+  fromStateId: Uuid;
+  toStateId: Uuid;
+  label: I18nMap;
+}
+
+// --- Request-Bodies (camelCase-Wire-Form) ---------------------------------- //
+
+/** Body für `POST /applications` (`ApplicationCreate`, by_alias). */
+export interface ApplicationCreateBody {
+  typeId: Uuid;
+  budgetPotId?: Uuid | null;
+  data: Record<string, unknown>;
+  applicantEmail: string;
+  applicantName?: string | null;
+  lang: Lang;
+  altcha?: string | null;
+}
+
+/** Body für `POST /applications/{id}/comments` (`CommentCreate`). */
+export interface CommentCreateBody {
+  body: string;
+  visibility: CommentVisibility;
+}
+
+/** Body für `POST /applications/{id}/transition` (`TransitionRequest`). */
+export interface TransitionRequestBody {
+  transitionId: Uuid;
+  note?: string | null;
+}
+
+/** `TransitionResult` — 200-Antwort eines erfolgreichen Übergangs. */
+export interface TransitionResult {
+  newStateId: Uuid;
+  statusEventId: Uuid;
+  dispatchedActions: string[];
+}
+
+// =========================================================================== //
+// View-Modelle — FE-freundlich, i18n bereits aufgelöst (Output von mappers.ts). //
+// =========================================================================== //
+
+/** Status eines Antrags mit **aufgelöstem** Label (für die aktuelle `lang`). */
+export interface ApplicationState {
+  id: Uuid;
+  key: string;
+  label: string;
+  category: string;
+  editAllowed: boolean;
+}
+
+export interface Applicant {
+  email: string | null;
+  name: string | null;
+  anonymized: boolean;
+}
+
+export interface Application {
+  id: Uuid;
+  typeId: Uuid;
+  state: ApplicationState | null;
+  gremiumId: Uuid | null;
+  budgetPotId: Uuid | null;
+  amount: string | null;
+  currency: string | null;
+  data: Record<string, unknown>;
+  version: number;
+  lang: string | null;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+  applicant: Applicant | null;
+}
+
+export interface ApplicationListItem {
+  id: Uuid;
+  typeId: Uuid;
+  state: ApplicationState | null;
+  gremiumId: Uuid | null;
+  budgetPotId: Uuid | null;
+  amount: string | null;
+  currency: string | null;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+}
+
+/** Ergebnis von `POST /applications` (FE-View). */
+export interface ApplicationCreated {
+  applicationId: Uuid;
+}
+
+/** Timeline-Eintrag (FE-View) — `label` aus `toState` aufgelöst. */
+export interface TimelineEntry {
+  toStateId: Uuid;
+  toState: ApplicationState | null;
+  label: string;
+  actor: string | null;
+  at: IsoDateTime;
+  note: string | null;
+}
+
+/** Kommentar (FE-View) — `isPublic` aus `visibility` abgeleitet. */
+export interface ApplicationComment {
+  id: Uuid;
+  author: string | null;
+  authorKind: CommentAuthorKind;
+  body: string;
+  visibility: CommentVisibility;
+  isPublic: boolean;
+  at: IsoDateTime;
+}
+
+/** Antragstyp (FE-View) für die Wizard-Auswahl. */
+export interface ApplicationType {
+  id: Uuid;
+  name: string;
+  active: boolean;
+  hasBudget: boolean;
+  activeFormVersionId: Uuid | null;
+  key: string | null;
+  gremiumId: Uuid | null;
+}
+
+/** Verfügbarer Übergang (FE-View) — `label` aufgelöst. */
+export interface Transition {
+  id: Uuid;
+  fromStateId: Uuid;
+  toStateId: Uuid;
+  label: string;
+}
+
+/** FE-Eingabe für einen neuen Antrag → via Mapper zu `ApplicationCreateBody`. */
+export interface NewApplication {
+  typeId: Uuid;
+  budgetPotId?: Uuid | null;
+  data: Record<string, unknown>;
+  applicantEmail: string;
+  applicantName?: string | null;
+  lang: Lang;
+  altcha: string;
 }
 
 // --- Form-Definition (config_schemas §5.1) — Spiegel von FormFieldDef ---------
@@ -202,27 +365,16 @@ export interface EffectiveForm {
   sections: FormSection[];
 }
 
-// --- Magic-Link + Kommentare (api.md §1/§3) -----------------------------------
+// --- Magic-Link (api.md §1) ---------------------------------------------------
 
 /**
  * Antwort von POST /api/auth/magic-link/verify (`MagicLinkVerifyOut`,
- * auth/schemas.py — T-10). Die Applicant-Session läuft **ausschließlich** über
- * eine HttpOnly-Cookie (security.md §1) — **kein** Session-Token im Body/JS.
+ * auth/schemas.py — T-10). Reines `BaseModel` (kein `_CamelModel`) → Feldnamen
+ * bleiben snake_case (`application_id`). Die Applicant-Session läuft
+ * **ausschließlich** über ein HttpOnly-Cookie (security.md §1) — **kein**
+ * Session-Token im Body/JS.
  */
 export interface MagicLinkVerifyResult {
   application_id: Uuid;
   scope: 'edit' | 'view';
-}
-
-/**
- * Öffentlicher Kommentar (api.md §3 applications/comments). snake_case wie die
- * übrigen Application-DTOs; das Backend-Schema kommt mit T-12 (PR #13) — vor
- * T-40 gegen das dann exportierte OpenAPI abgleichen.
- */
-export interface ApplicationComment {
-  id: Uuid;
-  body: string;
-  author_name?: string | null;
-  created_at: IsoDateTime;
-  is_public: boolean;
 }
