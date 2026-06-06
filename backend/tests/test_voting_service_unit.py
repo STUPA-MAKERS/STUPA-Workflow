@@ -49,6 +49,7 @@ def _vote(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "id": uuid4(),
         "application_id": uuid4(),
+        "meeting_id": None,
         "eligible_group": "stupa",
         "config": _config(),
         "eligible_count": 10,

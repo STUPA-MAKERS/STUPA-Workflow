@@ -45,9 +45,12 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     application_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE")
     )
-    # `meeting` entsteht erst in T-16 (Live-Vote); Spalte ist forward-kompatibel
-    # nullable **ohne** FK, bis das Ziel existiert — dann ergänzt T-16 die Constraint.
-    meeting_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    # `meeting` existiert ab T-16 (Live-Vote); die FK wird hier nun gesetzt (frische
+    # Schemata via create_all, ältere via Migration 0008). SET NULL: gelöschte Sitzung
+    # entkoppelt den (Async-)Vote, statt ihn zu kaskadieren.
+    meeting_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
+    )
     eligible_group: Mapped[str] = mapped_column(Text)
     config: Mapped[dict] = mapped_column(JSONB)
     # Maßgebliche Zahl der Stimmberechtigten (Roster der Gruppe/des Gremiums) — Nenner

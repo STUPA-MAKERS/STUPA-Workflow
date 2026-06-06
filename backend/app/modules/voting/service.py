@@ -108,6 +108,7 @@ class VotingService:
         return VoteOut(
             id=vote.id,
             applicationId=vote.application_id,
+            meetingId=vote.meeting_id,
             eligibleGroup=vote.eligible_group,
             config=config,
             status=vote.status,  # type: ignore[arg-type]
@@ -304,6 +305,7 @@ class VotingService:
         )
         return VoteClosed(
             id=vote.id,
+            meetingId=vote.meeting_id,
             result=outcome.result,
             tally=tally_out,
             firedTransitionId=branch.id if branch is not None else None,

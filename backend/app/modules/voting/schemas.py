@@ -65,6 +65,8 @@ class VoteOut(_CamelModel):
 
     id: UUID
     application_id: UUID = Field(alias="applicationId")
+    # Sitzung, an die der Vote hängt (Live-Vote, T-16); None bei reinem Async-Vote.
+    meeting_id: UUID | None = Field(default=None, alias="meetingId")
     eligible_group: str = Field(alias="eligibleGroup")
     config: VoteConfig
     status: Literal["draft", "open", "closed"]
@@ -85,6 +87,7 @@ class VoteClosed(_CamelModel):
     """Ergebnis des Schließens (``POST /votes/{id}/close``)."""
 
     id: UUID
+    meeting_id: UUID | None = Field(default=None, alias="meetingId")
     result: Literal["passed", "rejected", "tie"]
     tally: TallyOut
     fired_transition_id: UUID | None = Field(
