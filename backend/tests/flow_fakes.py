@@ -24,6 +24,9 @@ class FakeResult:
     def scalar_one_or_none(self) -> Any:
         return self._items[0] if self._items else None
 
+    def scalar_one(self) -> Any:
+        return self._items[0]
+
     def scalars(self) -> FakeResult:
         return self
 

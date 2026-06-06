@@ -30,6 +30,7 @@ from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.notifications.models import MailTemplate, NotificationRule
+from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 
 __all__ = [
     "Applicant",
@@ -37,6 +38,7 @@ __all__ = [
     "ApplicationType",
     "AuditEntry",
     "AuthSession",
+    "Ballot",
     "Base",
     "BudgetEntry",
     "BudgetField",
@@ -55,8 +57,11 @@ __all__ = [
     "Role",
     "RoleAssignment",
     "RolePermission",
+    "SecretBallot",
     "State",
     "StatusEvent",
     "SubmissionVersion",
     "Transition",
+    "Vote",
+    "VotedMarker",
 ]

@@ -29,6 +29,7 @@ from app.modules.forms.router import router as forms_router
 from app.modules.notifications.action_dispatcher import build_notify_dispatcher
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
 from app.modules.notifications.router import router as notifications_router
+from app.modules.voting.router import router as voting_router
 from app.settings import Settings, get_settings
 from app.shared.errors import register_exception_handlers, use_problem_json_contract
 
@@ -48,6 +49,7 @@ api_router.include_router(forms_router)
 api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(flow_router)
+api_router.include_router(voting_router)
 api_router.include_router(budget_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(notifications_router)
