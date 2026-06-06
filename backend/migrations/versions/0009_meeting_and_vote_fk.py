@@ -1,8 +1,8 @@
 """livevote: meeting-Tabelle + vote.meeting_id-FK (T-16)
 
-Revision ID: 0008_meeting_and_vote_fk
-Revises: 0007_voting_tables
-Create Date: 2026-06-06 00:00:08
+Revision ID: 0009_meeting_and_vote_fk
+Revises: 0008_attachment_table
+Create Date: 2026-06-06 00:00:09
 
 Wie alle Modul-Tabellen entsteht ``meeting`` auf einem **frischen** Schema bereits
 über ``Base.metadata.create_all`` in 0002 (Single-Source via ``app.models``) — inkl.
@@ -24,8 +24,8 @@ import app.models  # noqa: F401  — befüllt Base.metadata
 from app.db import Base
 from app.modules.livevote.models import Meeting
 
-revision: str = "0008_meeting_and_vote_fk"
-down_revision: str | None = "0007_voting_tables"
+revision: str = "0009_meeting_and_vote_fk"
+down_revision: str | None = "0008_attachment_table"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
