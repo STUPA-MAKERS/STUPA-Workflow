@@ -39,6 +39,25 @@ services:
       retries: 5
       start_period: 10s
 
+  migrate:
+    # One-Shot-Migrator (Issue #38): fährt VOR api/worker `alembic upgrade head`
+    # gegen die DB — race-frei (wartet auf postgres healthy) und idempotent
+    # (alembic überspringt bereits angewandte Revisions). Kein restart-Loop:
+    # läuft einmal bis exit 0, api/worker hängen via `service_completed_successfully`
+    # daran. Migrations-URL: env.py nimmt DB_MIGRATION_URL→DATABASE_URL (s. .env);
+    # Default-Stack migriert als app-User. Nutzt dasselbe Backend-Image wie api.
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
   api:
     # FastAPI (uvicorn --proxy-headers). Kein Host-Port.
     build:
@@ -47,6 +66,8 @@ services:
     <<: *restart
     env_file: .env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -71,6 +92,8 @@ services:
     command: ["arq", "worker.main.WorkerSettings"]
     env_file: .env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       postgres:

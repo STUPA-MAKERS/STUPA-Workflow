@@ -11,6 +11,11 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY app ./app
 COPY worker ./worker
+# Alembic-Config + Migrationen ins Image (Issue #38): ohne sie kann der Container
+# kein `alembic upgrade head` ausführen → frische DB bliebe leer. env.py importiert
+# app.models/app.settings (via pip install . verfügbar), prepend_sys_path=. ⇒ /app.
+COPY alembic.ini ./
+COPY migrations ./migrations
 RUN pip install .
 
 EXPOSE 8000
