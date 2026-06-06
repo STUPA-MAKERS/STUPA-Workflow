@@ -18,14 +18,14 @@ import { CardComponent } from '@shared/ui/card/card.component';
     </section>
 
     <div class="grid">
-      <app-card heading="Anträge">
-        <p>{{ 'home.subtitle' | t }}</p>
+      <app-card [heading]="'home.cards.applications.title' | t">
+        <p>{{ 'home.cards.applications.body' | t }}</p>
       </app-card>
-      <app-card heading="Live-Vote">
-        <p>{{ 'nav.voting' | t }}</p>
+      <app-card [heading]="'home.cards.voting.title' | t">
+        <p>{{ 'home.cards.voting.body' | t }}</p>
       </app-card>
-      <app-card heading="Budget">
-        <p>{{ 'nav.budget' | t }}</p>
+      <app-card [heading]="'home.cards.budget.title' | t">
+        <p>{{ 'home.cards.budget.body' | t }}</p>
       </app-card>
     </div>
   `,

@@ -3,10 +3,10 @@
 <header class="header">
   <div class="container header__inner">
     <a class="header__brand" routerLink="/" [attr.aria-label]="'app.title' | t">
-      <img class="header__logo" src="assets/logos/stupa-wordmark.svg" alt="" aria-hidden="true" />
+      <img class="header__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     </a>
 
-    <nav class="header__nav" [attr.aria-label]="'nav.applications' | t">
+    <nav class="header__nav" [attr.aria-label]="'nav.main' | t">
       @for (item of visibleNav(); track item.path) {
         <a
           class="header__link"
@@ -20,10 +20,15 @@
     </nav>
 
     <div class="header__actions">
-      <label class="lang" [attr.aria-label]="'lang.switch' | t">
-        <select class="lang__select" [value]="i18n.locale()" (change)="setLocale($any($event.target).value)">
+      <label class="lang">
+        <select
+          class="lang__select"
+          [attr.aria-label]="'lang.switch' | t"
+          [value]="i18n.locale()"
+          (change)="setLocale($any($event.target).value)"
+        >
           @for (loc of i18n.locales; track loc) {
-            <option [value]="loc">{{ loc | uppercase }}</option>
+            <option [value]="loc" [selected]="loc === i18n.locale()">{{ loc | uppercase }}</option>
           }
         </select>
       </label>
@@ -60,9 +65,9 @@
 
 <footer class="footer">
   <div class="container footer__inner">
-    <img class="footer__logo" src="assets/logos/stupa-wordmark.svg" alt="" aria-hidden="true" />
+    <img class="footer__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     <span class="footer__text">{{ 'footer.coBranding' | t }}</span>
-    <nav class="footer__links" aria-label="Footer">
+    <nav class="footer__links" [attr.aria-label]="'nav.footer' | t">
       <a href="#">{{ 'footer.imprint' | t }}</a>
       <a href="#">{{ 'footer.privacy' | t }}</a>
     </nav>

@@ -99,6 +99,10 @@
   --layout-header-height: 64px;
   --layout-gutter: var(--space-5);
 
+  // Einheitliche Höhe interaktiver Steuerelemente (Buttons, Select, Toggle),
+  // damit Header-Controls auf einer Linie sitzen.
+  --control-height: 2.25rem; // 36px
+
   // --- MOTION ----------------------------------------------------------------
   --motion-fast: 120ms;
   --motion-base: 200ms;

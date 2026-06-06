@@ -52,4 +52,11 @@ describe('I18nService', () => {
     i18n.setLocale('fr' as never);
     expect(i18n.locale()).toBe('de');
   });
+
+  it('syncs <html lang> with the resolved locale on construction', () => {
+    document.documentElement.lang = '';
+    localStorage.setItem('ap.locale', 'en');
+    service();
+    expect(document.documentElement.lang).toBe('en');
+  });
 });

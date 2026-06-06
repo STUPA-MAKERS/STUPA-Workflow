@@ -25,6 +25,14 @@ export class I18nService {
   /** Aktive Übersetzungstabelle (für Template-Bindings via `t`-Pipe). */
   readonly dictionary = computed(() => CATALOG[this._locale()]);
 
+  constructor() {
+    // `<html lang>` ab dem ersten Paint mit der aufgelösten Locale synchronisieren
+    // (a11y/SEO) — nicht erst beim ersten manuellen Sprachwechsel.
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = this._locale();
+    }
+  }
+
   setLocale(locale: Locale): void {
     if (!SUPPORTED_LOCALES.includes(locale)) return;
     this._locale.set(locale);

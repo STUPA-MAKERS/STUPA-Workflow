@@ -19,13 +19,13 @@ export const routes: Routes = [
       },
       {
         path: 'apply',
-        data: { title: 'Antrag stellen' },
+        data: { title: 'apply.title' },
         loadComponent: () =>
           import('./features/apply/apply-wizard.component').then((m) => m.ApplyWizardComponent),
       },
       {
         path: 'apply/confirmation',
-        data: { title: 'Antrag eingegangen' },
+        data: { title: 'apply.confirm.heading' },
         loadComponent: () =>
           import('./features/apply/apply-confirmation.component').then(
             (m) => m.ApplyConfirmationComponent,
@@ -33,7 +33,7 @@ export const routes: Routes = [
       },
       {
         path: 'status',
-        data: { title: 'Antragsstatus' },
+        data: { title: 'status.heading' },
         loadComponent: () =>
           import('./features/apply/status-timeline.component').then(
             (m) => m.StatusTimelineComponent,
@@ -41,42 +41,42 @@ export const routes: Routes = [
       },
       {
         path: 'dashboard',
-        data: { title: 'Dashboard' },
+        data: { title: 'nav.dashboard' },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
         path: 'applications',
-        data: { title: 'Anträge', permission: 'application.read' },
+        data: { title: 'nav.applications', permission: 'application.read' },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
       },
       {
         path: 'voting',
-        data: { title: 'Abstimmungen', permission: ['vote.cast', 'vote.manage'] },
+        data: { title: 'nav.voting', permission: ['vote.cast', 'vote.manage'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
       },
       {
         path: 'meetings',
-        data: { title: 'Sitzungen', permission: ['meeting.manage', 'protocol.write'] },
+        data: { title: 'nav.meetings', permission: ['meeting.manage', 'protocol.write'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
       },
       {
         path: 'budget',
-        data: { title: 'Budget', permission: ['budget.view', 'budget.manage'] },
+        data: { title: 'nav.budget', permission: ['budget.view', 'budget.manage'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
       },
       {
         path: 'admin',
-        data: { title: 'Verwaltung', permission: 'admin.config' },
+        data: { title: 'nav.admin', permission: 'admin.config' },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),

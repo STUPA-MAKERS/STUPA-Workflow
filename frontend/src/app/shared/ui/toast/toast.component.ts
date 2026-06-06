@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ToastService } from './toast.service';
 
 /** Toast-Container — einmal im Shell-Layout platziert. ARIA-Live-Region. */
@@ -6,6 +7,7 @@ import { ToastService } from './toast.service';
   selector: 'app-toast',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="toasts" aria-live="polite" aria-atomic="false">
       @for (toast of toastService.toasts(); track toast.id) {
@@ -14,7 +16,7 @@ import { ToastService } from './toast.service';
           <button
             type="button"
             class="toast__close"
-            aria-label="Schließen"
+            [attr.aria-label]="'action.close' | t"
             (click)="toastService.dismiss(toast.id)"
           >
             ✕

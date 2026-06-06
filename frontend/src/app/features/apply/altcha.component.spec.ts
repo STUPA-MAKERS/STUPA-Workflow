@@ -2,6 +2,15 @@ import { render, screen } from '@testing-library/angular';
 import { AltchaComponent } from './altcha.component';
 
 describe('AltchaComponent', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => localStorage.clear());
+
+  it('renders the idle label in English when the locale is EN', async () => {
+    localStorage.setItem('ap.locale', 'en');
+    await render(AltchaComponent, { on: { solved: jest.fn() } });
+    expect(screen.getByRole('button', { name: /not a robot/i })).toBeInTheDocument();
+  });
+
   it('emits a solution once the challenge is solved', async () => {
     jest.useFakeTimers();
     const solved = jest.fn();

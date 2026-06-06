@@ -9,6 +9,7 @@ import { Router } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
   ApplicationType,
   EffectiveForm,
@@ -61,6 +62,7 @@ const DRAFT_PREFIX = 'ap.draft.';
     InputComponent,
     StepperComponent,
     AltchaComponent,
+    TranslatePipe,
   ],
   templateUrl: './apply-wizard.component.html',
   styleUrl: './apply-wizard.component.scss',
@@ -92,12 +94,15 @@ export class ApplyWizardComponent {
   });
 
   readonly steps = computed<Step[]>(() => {
-    if (!this.effForm()) return [{ label: 'Antragsart' }];
+    const t = (k: Parameters<I18nService['translate']>[0]) => this.i18n.translate(k);
+    // i18n.locale() lesen, damit das Signal bei Sprachwechsel neu berechnet.
+    this.i18n.locale();
+    if (!this.effForm()) return [{ label: t('apply.steps.type') }];
     return [
-      { label: 'Antragsart' },
-      { label: 'Kontakt' },
+      { label: t('apply.steps.type') },
+      { label: t('apply.steps.contact') },
       ...this.sections().map((s) => ({ label: s.label })),
-      { label: 'Prüfen' },
+      { label: t('apply.steps.review') },
     ];
   });
 
@@ -118,7 +123,7 @@ export class ApplyWizardComponent {
   constructor() {
     this.api.applicationTypes().subscribe({
       next: (t) => this.types.set(t.filter((x) => x.active)),
-      error: () => this.toast.error('Antragsarten konnten nicht geladen werden.'),
+      error: () => this.toast.error(this.i18n.translate('apply.error.typesLoad')),
     });
   }
 
@@ -139,7 +144,7 @@ export class ApplyWizardComponent {
       },
       error: () => {
         this.loadingForm.set(false);
-        this.toast.error('Formular konnte nicht geladen werden.');
+        this.toast.error(this.i18n.translate('apply.error.formLoad'));
       },
     });
   }
@@ -219,7 +224,7 @@ export class ApplyWizardComponent {
       },
       error: (err: { error?: ProblemDetail }) => {
         this.submitting.set(false);
-        this.toast.error(err.error?.detail ?? 'Antrag konnte nicht gesendet werden.');
+        this.toast.error(err.error?.detail ?? this.i18n.translate('apply.error.submit'));
       },
     });
   }
@@ -313,7 +318,8 @@ export class ApplyWizardComponent {
   private formatValue(field: FormFieldDef, value: unknown): string {
     if (value === null || value === undefined || value === '') return '';
     if (Array.isArray(value)) return value.map((v) => this.optionLabel(field, v)).join(', ');
-    if (typeof value === 'boolean') return value ? 'Ja' : 'Nein';
+    if (typeof value === 'boolean')
+      return this.i18n.translate(value ? 'common.yes' : 'common.no');
     return this.optionLabel(field, value);
   }
 

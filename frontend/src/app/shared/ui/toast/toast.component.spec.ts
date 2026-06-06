@@ -4,6 +4,9 @@ import { ToastComponent } from './toast.component';
 import { ToastService } from './toast.service';
 
 describe('ToastComponent + ToastService', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => localStorage.clear());
+
   it('renders toasts pushed through the service', async () => {
     const { fixture } = await render(ToastComponent);
     const svc = fixture.debugElement.injector.get(ToastService);
@@ -22,5 +25,14 @@ describe('ToastComponent + ToastService', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
     fixture.detectChanges();
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('localizes the dismiss control label (EN)', async () => {
+    localStorage.setItem('ap.locale', 'en');
+    const { fixture } = await render(ToastComponent);
+    const svc = fixture.debugElement.injector.get(ToastService);
+    svc.show('x', 'info', 0);
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });
 });

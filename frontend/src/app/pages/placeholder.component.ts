@@ -2,25 +2,25 @@ import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core
 import { ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 
 /**
  * Generischer Platzhalter für noch nicht implementierte Feature-Routen
- * (T-30…T-36). Liest den Titel aus `route.data.title`.
+ * (T-30…T-36). Liest den Titel-Key aus `route.data.title` (i18n-Key; unbekannte
+ * Werte fallen über die Pipe auf sich selbst zurück).
  */
 @Component({
   selector: 'app-placeholder',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CardComponent, BadgeComponent],
+  imports: [CardComponent, BadgeComponent, TranslatePipe],
   template: `
-    <app-card [heading]="title()">
-      <app-badge variant="info">In Arbeit</app-badge>
-      <p class="ph__text">
-        Dieser Bereich wird in einem späteren Task umgesetzt. Das Skelett (Routing,
-        Design-System, API-Client) steht bereit.
-      </p>
+    <app-card [heading]="title() | t">
+      <app-badge variant="info">{{ 'placeholder.badge' | t }}</app-badge>
+      <p class="ph__text">{{ 'placeholder.body' | t }}</p>
     </app-card>
   `,
   styles: [
@@ -35,9 +35,12 @@ import { CardComponent } from '@shared/ui/card/card.component';
 })
 export class PlaceholderComponent {
   private readonly route = inject(ActivatedRoute);
-  readonly fallback = input('Bereich');
+  /** i18n-Key des Fallback-Titels (überschreibbar). */
+  readonly fallback = input<TranslationKey>('placeholder.fallback');
   readonly title = toSignal(
-    this.route.data.pipe(map((d) => (d['title'] as string | undefined) ?? this.fallback())),
+    this.route.data.pipe(
+      map((d) => ((d['title'] as TranslationKey | undefined) ?? this.fallback())),
+    ),
     { initialValue: this.fallback() },
   );
 }
