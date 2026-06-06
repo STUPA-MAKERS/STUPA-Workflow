@@ -23,12 +23,11 @@ from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, literal_column, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application
-from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService
@@ -76,20 +75,6 @@ class VotingService:
     @staticmethod
     def _config(vote: Vote) -> VoteConfig:
         return VoteConfig.model_validate(vote.config)
-
-    async def _count_eligible(self, eligible_group: str) -> int:
-        """Stimmberechtigte = Principals, deren OIDC-Gruppen den Key enthalten.
-
-        Dokumentierte Scope-Grenze (SDS-A3): gezählt werden OIDC-Gruppen-Mitglieder
-        (``principal.oidc_groups``); Gremium-Rollen-Feinsteuerung ist Folge-Arbeit."""
-        count = (
-            await self.session.execute(
-                select(func.count())
-                .select_from(PrincipalRow)
-                .where(PrincipalRow.oidc_groups.contains([eligible_group]))
-            )
-        ).scalar_one()
-        return int(count)
 
     async def _aggregate(self, vote: Vote, config: VoteConfig) -> dict[str, int]:
         """Stimmen je Option zählen — offen aus ``ballot``, geheim aus ``secret_ballot``."""
@@ -141,6 +126,7 @@ class VotingService:
             application_id=application_id,
             eligible_group=payload.eligible_group,
             config=payload.config.model_dump(by_alias=True),
+            eligible_count=payload.eligible_count,
             opens_state_id=payload.opens_state_id,
             closes_at=payload.closes_at,
             result_branch_transition_id=payload.result_branch_transition_id,
@@ -151,24 +137,29 @@ class VotingService:
         await self.session.commit()
         config = payload.config
         empty = {opt: 0 for opt in config.options}
-        return self._to_out(vote, config, self._tally_out(config, empty, 0))
+        return self._to_out(vote, config, self._tally_out(config, empty, vote.eligible_count or 0))
 
     # ----------------------------------------------------------------- open
     async def open(self, vote_id: UUID, *, now: datetime) -> VoteOut:
-        """``draft`` → ``open``: Stimmberechtigte zählen + ``opens_at`` setzen."""
+        """``draft`` → ``open``: Zeitfenster öffnen.
+
+        Der Quorum-Nenner (``eligible_count``) stammt aus dem maßgeblichen Roster und
+        wird beim Anlegen gesetzt — **nicht** aus eingeloggten Usern abgeleitet (das
+        wäre fail-open). Fehlt er, bleibt ein Prozent-Quorum fail-closed unerfüllt."""
         vote = await self._get_vote(vote_id)
         if vote.status != "draft":
             raise ConflictError(
                 f"vote is {vote.status}, cannot open.", code="conflict"
             )
         config = self._config(vote)
-        vote.eligible_count = await self._count_eligible(vote.eligible_group)
         vote.opens_at = now
         vote.status = "open"
         await self.session.flush()
         await self.session.commit()
         empty = {opt: 0 for opt in config.options}
-        return self._to_out(vote, config, self._tally_out(config, empty, vote.eligible_count))
+        return self._to_out(
+            vote, config, self._tally_out(config, empty, vote.eligible_count or 0)
+        )
 
     # ----------------------------------------------------------------- cast
     async def cast(
@@ -203,6 +194,9 @@ class VotingService:
     ) -> BallotAccepted:
         values = {"vote_id": vote_id, "voter_sub": voter_sub, "choice": choice}
         if allow_change:
+            # ``xmax = 0`` unterscheidet INSERT (Erst-Stimme → "cast") von dem durch
+            # ON CONFLICT ausgelösten UPDATE (Änderung → "changed"): bei einem frisch
+            # eingefügten Tupel ist die löschende Transaktions-ID 0.
             stmt = (
                 pg_insert(Ballot)
                 .values(**values)
@@ -210,11 +204,12 @@ class VotingService:
                     constraint="uq_ballot_vote_voter",
                     set_={"choice": choice, "at": func.now()},
                 )
-                .returning(Ballot.id)
+                .returning(literal_column("(xmax = 0)").label("inserted"))
             )
-            await self.session.execute(stmt)
+            row = (await self.session.execute(stmt)).first()
             await self.session.commit()
-            return BallotAccepted(status="changed")
+            inserted = bool(row.inserted) if row is not None else False
+            return BallotAccepted(status="cast" if inserted else "changed")
 
         stmt = (
             pg_insert(Ballot)
@@ -255,14 +250,20 @@ class VotingService:
         vote = await self._get_vote(vote_id)
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
-        tally_out = self._tally_out(config, counts, vote.eligible_count)
+        tally_out = self._tally_out(config, counts, vote.eligible_count or 0)
         if vote.status == "closed" and vote.result is not None:
             tally_out = tally_out.model_copy(update={"result": vote.result})
         return self._to_out(vote, config, tally_out)
 
     # ----------------------------------------------------------------- close
     async def close(self, vote_id: UUID, principal: Principal) -> VoteClosed:
-        """``open`` → ``closed``: auszählen → Ergebnis → ``flow.fire(result_branch)``."""
+        """``open`` → ``closed``: auszählen → Ergebnis → ``flow.fire(result_branch)``.
+
+        **Atomar**: Vote-Schließung (``status=closed`` + ``result``) und der
+        ``voteResult``-Übergang werden in **einer** Transaktion committet (``fire``
+        committet die vorgemerkten Vote-Änderungen mit). Schlägt ``fire`` fehl
+        (Guard/Race), rollt die Session-Dependency alles zurück → der Vote bleibt
+        **offen und wiederholbar** statt »zu, aber Branch nie gefeuert« (stuck)."""
         vote = await self._get_vote(vote_id)
         if vote.status != "open":
             raise ConflictError(
@@ -270,49 +271,41 @@ class VotingService:
             )
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
-        outcome = tally_mod.result(config, counts, vote.eligible_count)
+        eligible = vote.eligible_count or 0
+        outcome = tally_mod.result(config, counts, eligible)
 
+        flow = FlowService(self.session, self.dispatcher)
+        available = await flow.available_transitions(
+            vote.application_id, principal, vote_result=outcome.result
+        )
+        branch = available[0] if available else None
+
+        # Vote-Zustand vormerken — NICHT separat committen: `fire` schreibt ihn
+        # atomar mit Transition + status_event; ohne Branch committen wir hier.
         vote.status = "closed"
         vote.result = outcome.result
-        await self.session.flush()
-        await self.session.commit()
+        vote.result_branch_transition_id = branch.id if branch is not None else None
+
+        new_state_id: UUID | None = None
+        if branch is not None:
+            fired = await flow.fire(
+                vote.application_id, branch.id, principal, vote_result=outcome.result
+            )
+            new_state_id = fired.new_state_id
+        else:
+            await self.session.commit()
 
         tally_out = TallyOut(
             counts=counts,
-            eligible=vote.eligible_count,
+            eligible=eligible,
             quorumMet=outcome.quorum_met,
             leading=outcome.leading,
             result=outcome.result,
-        )
-        fired_id, new_state_id = await self._fire_branch(
-            vote, outcome.result, principal
         )
         return VoteClosed(
             id=vote.id,
             result=outcome.result,
             tally=tally_out,
-            firedTransitionId=fired_id,
+            firedTransitionId=branch.id if branch is not None else None,
             newStateId=new_state_id,
         )
-
-    async def _fire_branch(
-        self, vote: Vote, vote_result: str, principal: Principal
-    ) -> tuple[UUID | None, UUID | None]:
-        """Den zum Ergebnis passenden ``voteResult``-Übergang feuern (flows §3/§4).
-
-        Wählt unter den verfügbaren Übergängen (Guards mit ``vote_result`` erfüllt) den
-        ersten und feuert ihn. Gibt es keinen, bleibt es beim Schließen ohne Branch."""
-        flow = FlowService(self.session, self.dispatcher)
-        available = await flow.available_transitions(
-            vote.application_id, principal, vote_result=vote_result
-        )
-        if not available:
-            return None, None
-        transition_id = available[0].id
-        result = await flow.fire(
-            vote.application_id,
-            transition_id,
-            principal,
-            vote_result=vote_result,
-        )
-        return transition_id, result.new_state_id

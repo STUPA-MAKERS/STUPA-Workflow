@@ -50,8 +50,9 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     meeting_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     eligible_group: Mapped[str] = mapped_column(Text)
     config: Mapped[dict] = mapped_column(JSONB)
-    # Snapshot der Stimmberechtigten zum Öffnungszeitpunkt (Basis für Prozent-Quorum).
-    eligible_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    # Maßgebliche Zahl der Stimmberechtigten (Roster der Gruppe/des Gremiums) — Nenner
+    # des Prozent-Quorums. NULL = unbekannt → Prozent-Quorum fail-closed (nie erfüllt).
+    eligible_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     opens_state_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("state.id", ondelete="SET NULL"), nullable=True
     )
@@ -115,7 +116,12 @@ class VotedMarker(UUIDPkMixin, Base):
 
 
 class SecretBallot(UUIDPkMixin, Base):
-    """Geheim-Pfad: nur ``choice`` (keine Identität) — nicht auf den Wähler rückführbar."""
+    """Geheim-Pfad: nur ``choice`` (keine Identität) — nicht auf den Wähler rückführbar.
+
+    **Bewusst zeitstempel-frei.** Ein präziser ``at`` wäre ein Korrelationskanal:
+    gegen eine externe sub+Zeit-Quelle (Audit/Proxy-Log) ließe sich ``choice↔voter``
+    rekonstruieren. Die Reihenfolge der anonymen Stimmen ist nicht beobachtbar
+    (nur die ``vote_id``-Zugehörigkeit zählt fürs Aggregat)."""
 
     __tablename__ = "secret_ballot"
 
@@ -123,8 +129,5 @@ class SecretBallot(UUIDPkMixin, Base):
         ForeignKey("vote.id", ondelete="CASCADE")
     )
     choice: Mapped[str] = mapped_column(Text)
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
 
     __table_args__ = (Index("ix_secret_ballot_vote_id", "vote_id"),)

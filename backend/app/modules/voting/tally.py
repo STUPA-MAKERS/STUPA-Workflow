@@ -17,13 +17,18 @@ Enthaltung:
 * Weitere Optionen (n-Options) zählen als abgegebene Stimme (Quorum/Beteiligung),
   fließen aber nicht in die Ja/Nein-Mehrheit ein.
 
-**Mehrheitsregeln** (``yes``/``no`` = Ja/Nein-Stimmen, ``cast`` = alle abgegebenen):
+**Mehrheitsregeln** (``yes``/``no`` = Ja/Nein-Stimmen, ``cast`` = alle abgegebenen,
+``decisive = yes + no``):
 
 * ``simple``     — Ja > Nein. Patt bei Ja == Nein.
 * ``absolute``   — absolute Mehrheit aller abgegebenen Stimmen: ``2·yes > cast``.
   Patt bei ``2·yes == cast`` (keine Seite erreicht die absolute Mehrheit).
-* ``two_thirds`` — Zwei-Drittel der Ja/Nein-Stimmen: ``3·yes > 2·(yes+no)``.
-  Patt bei exakt zwei Dritteln (``3·yes == 2·(yes+no)``).
+* ``two_thirds`` — **Zweidrittelmehrheit im Sinne des Vereins-/Satzungsrechts:
+  ``≥ ⅔``** (R5.1). Angenommen, wenn Ja **mindestens** zwei Drittel erreicht
+  (``3·yes ≥ 2·decisive``) — exakt ⅔ (z.B. 2:1) zählt also als angenommen.
+  Symmetrisch abgelehnt, wenn Nein die Zweidrittel erreicht (``3·no ≥ 2·decisive``).
+  Erreicht **keine** Seite die Zweidrittel (Sperrminorität, z.B. 3:2), ist das
+  Ergebnis ein **Patt** → ``tieBreak`` (Default ``rejected``).
 
 Ein **Patt** wird über ``tieBreak`` (``passed | rejected | tie``) aufgelöst; der
 Roh-Patt bleibt als ``tie`` erhalten, wenn ``tieBreak == "tie"``. **Verfehltes
@@ -93,12 +98,18 @@ def _quorum_met(quorum: Quorum | None, participation: int, eligible: int) -> boo
 
 def _majority(rule: str, yes: int, no: int, cast: int) -> VoteResult:
     """Mehrheitsregel auf Ja/Nein anwenden → ``passed | rejected | tie`` (Roh-Patt)."""
-    if rule == "absolute":
-        threshold = 2 * yes - cast
-    elif rule == "two_thirds":
-        threshold = 3 * yes - 2 * (yes + no)
-    else:  # "simple"
-        threshold = yes - no
+    if rule == "two_thirds":
+        # ≥ ⅔ (Satzungs-/Vereinsrecht, R5.1): exakt zwei Drittel zählt als
+        # angenommen. Symmetrisch: erreicht keine Seite ⅔ → Patt (Sperrminorität).
+        decisive = yes + no
+        if decisive == 0:
+            return "tie"
+        if 3 * yes >= 2 * decisive:
+            return "passed"
+        if 3 * no >= 2 * decisive:
+            return "rejected"
+        return "tie"
+    threshold = 2 * yes - cast if rule == "absolute" else yes - no
     if threshold > 0:
         return "passed"
     if threshold < 0:

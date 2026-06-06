@@ -7,6 +7,7 @@ dem Eligible-Snapshot und ``close`` → ``result`` → ``flow.fire(result_branch
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
@@ -19,10 +20,10 @@ from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
-from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import FlowVersion, State, Transition
+from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
@@ -126,9 +127,12 @@ def _config(**over: object) -> dict:
     return VoteConfig.model_validate(base).model_dump(by_alias=True)
 
 
-async def _make_vote(session: AsyncSession, app: Application, **cfg: object) -> Vote:
+async def _make_vote(
+    session: AsyncSession, app: Application, *, eligible_count: int | None = None,
+    **cfg: object,
+) -> Vote:
     vote = Vote(application_id=app.id, eligible_group="grp", config=_config(**cfg),
-                status="draft")
+                eligible_count=eligible_count, status="draft")
     session.add(vote)
     await session.commit()
     return vote
@@ -210,20 +214,35 @@ async def test_secret_vote_unlinks_choice_from_voter(session: AsyncSession) -> N
     assert ballots == 0                          # keine identifizierende Stimme
 
 
-# --------------------------------------------------------------------------- #
-# Prozent-Quorum aus Eligible-Snapshot
-# --------------------------------------------------------------------------- #
-async def test_open_snapshots_eligible_from_oidc_groups(session: AsyncSession) -> None:
-    app, _ = await _seed(session)
-    for i in range(4):
-        session.add(PrincipalRow(sub=f"m{i}-{uuid.uuid4()}", oidc_groups=["grp"]))
-    session.add(PrincipalRow(sub=f"out-{uuid.uuid4()}", oidc_groups=["other"]))
-    await session.commit()
+def test_secret_ballot_has_no_timestamp_column() -> None:
+    """Kein ``at`` an der Geheim-Stimme → kein sub+Zeit-Korrelationskanal."""
+    assert "at" not in SecretBallot.__table__.columns
+    assert set(SecretBallot.__table__.columns.keys()) == {"id", "vote_id", "choice"}
 
-    vote = await _make_vote(session, app, quorum={"type": "percent", "value": 50})
+
+# --------------------------------------------------------------------------- #
+# Prozent-Quorum: Nenner = maßgeblicher Roster, NICHT eingeloggte/abstimmende User
+# --------------------------------------------------------------------------- #
+async def test_percent_quorum_denominator_is_roster_not_voters(
+    session: AsyncSession,
+) -> None:
+    app, _ = await _seed(session)
+    # Roster: 20 Stimmberechtigte (z.B. Gremiumsgröße) — unabhängig davon, wer
+    # eingeloggt ist oder abstimmt. Es existiert KEINE entsprechende principal-Zeile.
+    vote = await _make_vote(
+        session, app, eligible_count=20, quorum={"type": "percent", "value": 50}
+    )
     svc = VotingService(session)
-    out = await svc.open(vote.id, now=NOW)
-    assert out.tally.eligible == 4  # nur grp-Mitglieder
+    await svc.open(vote.id, now=NOW)
+    # 5 Stimmen → 5/20 = 25% < 50%: Quorum verfehlt (fail-closed). Mit dem alten
+    # Fail-open-Nenner (nur Abstimmende) wären es 5/5 = 100% gewesen.
+    for i in range(5):
+        await svc.cast(vote.id, _voter(f"v{i}"), "yes", now=NOW)
+    closer = Principal(sub="mgr", permissions={"vote.manage"})
+    out = await svc.close(vote.id, closer)
+    assert out.tally.eligible == 20
+    assert out.tally.quorum_met is False
+    assert out.result == "rejected"
 
 
 # --------------------------------------------------------------------------- #
@@ -264,6 +283,86 @@ async def test_close_branches_to_flow(
     await session.refresh(vote_row)
     assert vote_row.status == "closed"
     assert vote_row.result == result
+
+
+async def test_close_atomic_rolls_back_on_fire_failure(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Schlägt ``fire`` beim Schließen fehl, bleibt der Vote (nach Rollback der
+    Session-Dependency) **offen** — kein »zu, aber Branch nie gefeuert« (stuck)."""
+    app, states = await _seed(session)
+    vote = await _make_vote(session, app)
+    # IDs vor dem Rollback festhalten (Rollback expired die ORM-Objekte → späterer
+    # Attribut-Zugriff würde sonst synchrones Lazy-IO auslösen).
+    app_id, vote_id = app.id, vote.id
+    voting_state_id, approved_state_id = states["voting"].id, states["approved"].id
+    svc = VotingService(session)
+    await svc.open(vote_id, now=NOW)
+    await svc.cast(vote_id, _voter("v1"), "yes", now=NOW)
+
+    async def _boom(*_a: object, **_k: object) -> object:
+        raise ConflictError("forced", code="guard_failed")
+
+    monkeypatch.setattr(FlowService, "fire", _boom)
+    closer = Principal(sub="mgr", permissions={"vote.manage"})
+    with pytest.raises(ConflictError):
+        await svc.close(vote_id, closer)
+    await session.rollback()  # emuliert get_session bei einer Exception
+
+    vote_row = await session.get(Vote, vote_id)
+    assert vote_row is not None
+    await session.refresh(vote_row)
+    assert vote_row.status == "open"   # nicht geschlossen
+    assert vote_row.result is None
+
+    refreshed = await session.get(Application, app_id)
+    assert refreshed is not None
+    await session.refresh(refreshed)
+    assert refreshed.current_state_id == voting_state_id  # State unverändert
+
+    # Re-Close funktioniert (fire nicht mehr gepatcht) → wiederholbar.
+    monkeypatch.undo()
+    out = await svc.close(vote_id, closer)
+    assert out.result == "passed"
+    assert out.new_state_id == approved_state_id
+
+
+# --------------------------------------------------------------------------- #
+# Echter nebenläufiger Cast — genau eine Stimme gewinnt (UNIQUE-Race)
+# --------------------------------------------------------------------------- #
+async def test_concurrent_cast_same_voter_exactly_one_wins(
+    migrated: tuple[str, str], session: AsyncSession
+) -> None:
+    """Zwei parallele ``cast`` desselben Wählers über **separate** Sessions →
+    genau eine Stimme persistiert, die andere 409 (DB-UNIQUE, nicht App-Logik)."""
+    app, _ = await _seed(session)
+    vote = await _make_vote(session, app, allowChange=False)
+    await VotingService(session).open(vote.id, now=NOW)
+
+    eng = create_async_engine(migrated[1])
+    maker = async_sessionmaker(eng, expire_on_commit=False)
+    try:
+        async def _cast(choice: str) -> object:
+            async with maker() as s:
+                try:
+                    return await VotingService(s).cast(
+                        vote.id, _voter("v1"), choice, now=NOW
+                    )
+                except ConflictError as exc:
+                    return exc
+
+        first, second = await asyncio.gather(_cast("yes"), _cast("no"))
+    finally:
+        await eng.dispose()
+
+    conflicts = [r for r in (first, second) if isinstance(r, ConflictError)]
+    accepted = [r for r in (first, second) if not isinstance(r, ConflictError)]
+    assert len(conflicts) == 1
+    assert len(accepted) == 1
+    count = (await session.execute(
+        select(func.count()).select_from(Ballot).where(Ballot.vote_id == vote.id)
+    )).scalar_one()
+    assert count == 1
 
 
 async def test_close_then_get_reports_result(session: AsyncSession) -> None:

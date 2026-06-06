@@ -83,10 +83,12 @@ def test_leading_none_on_top_tie() -> None:
         ("absolute", {YES: 3, NO: 1, ABSTAIN: 0}, "passed"),  # 6>4
         ("absolute", {YES: 3, NO: 1, ABSTAIN: 2}, "tie"),     # 6==6
         ("absolute", {YES: 3, NO: 1, ABSTAIN: 3}, "rejected"),  # 6<7
-        # two_thirds: 3·yes vs 2·(yes+no)
-        ("two_thirds", {YES: 3, NO: 1}, "passed"),   # 9>8
-        ("two_thirds", {YES: 2, NO: 1}, "tie"),      # 6==6 (genau ⅔)
-        ("two_thirds", {YES: 1, NO: 1}, "rejected"),  # 3<4
+        # two_thirds (≥⅔, R5.1): exakt ⅔ angenommen, Sperrminorität → Patt
+        ("two_thirds", {YES: 3, NO: 1}, "passed"),   # 9≥8
+        ("two_thirds", {YES: 2, NO: 1}, "passed"),   # 6≥6 (genau ⅔ → angenommen)
+        ("two_thirds", {YES: 1, NO: 2}, "rejected"),  # Nein erreicht ⅔
+        ("two_thirds", {YES: 3, NO: 2}, "tie"),      # keine Seite ⅔ (60%)
+        ("two_thirds", {YES: 0, NO: 0}, "tie"),      # keine Ja/Nein-Stimme
     ],
 )
 def test_majority_rules(rule: str, counts: dict[str, int], expected: str) -> None:

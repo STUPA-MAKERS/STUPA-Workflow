@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.shared.config_schemas import VoteConfig
 
@@ -22,11 +22,26 @@ class VoteCreate(_CamelModel):
 
     config: VoteConfig
     eligible_group: str = Field(alias="eligibleGroup", min_length=1)
+    # Maßgebliche Zahl der Stimmberechtigten (Beschlussfähigkeits-Basis aus dem
+    # Roster der Gruppe/des Gremiums) — **Nenner** des Prozent-Quorums. NICHT aus
+    # eingeloggten Usern abgeleitet (das wäre fail-open). Pflicht für Prozent-Quorum;
+    # fehlt sie dort, ist das Quorum fail-closed nie erfüllt.
+    eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
     opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     result_branch_transition_id: UUID | None = Field(
         default=None, alias="resultBranchTransitionId"
     )
+
+    @model_validator(mode="after")
+    def _percent_quorum_needs_eligible(self) -> VoteCreate:
+        """Prozent-Quorum braucht eine maßgebliche Stimmberechtigten-Zahl (fail-closed)."""
+        quorum = self.config.quorum
+        if quorum is not None and quorum.type == "percent" and self.eligible_count is None:
+            raise ValueError(
+                "eligibleCount is required when a percent quorum is configured"
+            )
+        return self
 
 
 class BallotIn(_CamelModel):

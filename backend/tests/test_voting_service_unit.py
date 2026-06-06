@@ -83,6 +83,28 @@ async def test_create_ok() -> None:
     assert db.committed == 1
 
 
+def test_votecreate_percent_quorum_requires_eligible_count() -> None:
+    """Prozent-Quorum ohne maßgebliche Stimmberechtigten-Zahl → 422 (fail-closed)."""
+    with pytest.raises(ValueError, match="eligibleCount"):
+        VoteCreate.model_validate(
+            {
+                "config": _config(quorum={"type": "percent", "value": 50}),
+                "eligibleGroup": "stupa",
+            }
+        )
+
+
+def test_votecreate_percent_quorum_with_eligible_count_ok() -> None:
+    payload = VoteCreate.model_validate(
+        {
+            "config": _config(quorum={"type": "percent", "value": 50}),
+            "eligibleGroup": "stupa",
+            "eligibleCount": 12,
+        }
+    )
+    assert payload.eligible_count == 12
+
+
 async def test_create_unknown_application_404() -> None:
     db = fake_session(result())
     payload = VoteCreate.model_validate(
@@ -97,14 +119,15 @@ async def test_create_unknown_application_404() -> None:
 # --------------------------------------------------------------------------- #
 # open
 # --------------------------------------------------------------------------- #
-async def test_open_counts_eligible_and_sets_window() -> None:
-    vote = _vote(status="draft", eligible_count=0)
-    db = fake_session(result(vote), result(7))  # _get_vote, _count_eligible
+async def test_open_sets_window_keeps_roster_eligible() -> None:
+    # eligible_count stammt aus dem Roster (beim Anlegen gesetzt), NICHT aus
+    # eingeloggten Usern → open zählt nichts nach.
+    vote = _vote(status="draft", eligible_count=20)
+    db = fake_session(result(vote))  # nur _get_vote, kein Count-Query
     out = await VotingService(db).open(vote.id, now=NOW)
     assert out.status == "open"
     assert out.opens_at == NOW
-    assert vote.eligible_count == 7
-    assert out.tally.eligible == 7
+    assert out.tally.eligible == 20
 
 
 async def test_open_non_draft_409() -> None:
@@ -171,12 +194,30 @@ async def test_cast_open_double_no_change_409() -> None:
     assert db.committed == 0
 
 
-async def test_cast_open_change_updates() -> None:
+async def test_cast_open_allowchange_first_vote_is_cast() -> None:
+    # allowChange + Erst-Stimme (INSERT, xmax=0) → "cast", nicht "changed".
     vote = _vote(config=_config(allowChange=True))
-    db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
+    db = fake_session(result(vote), result(SimpleNamespace(inserted=True)))
+    out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
+    assert out.status == "cast"
+    assert db.committed == 1
+
+
+async def test_cast_open_change_updates() -> None:
+    # allowChange + bestehende Stimme (UPDATE via ON CONFLICT) → "changed".
+    vote = _vote(config=_config(allowChange=True))
+    db = fake_session(result(vote), result(SimpleNamespace(inserted=False)))
     out = await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
     assert out.status == "changed"
     assert db.committed == 1
+
+
+async def test_cast_open_allowchange_empty_returning_is_changed() -> None:
+    # Defensiv: leeres RETURNING (kein row) → kein Insert erkannt → "changed".
+    vote = _vote(config=_config(allowChange=True))
+    db = fake_session(result(vote), result())
+    out = await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
+    assert out.status == "changed"
 
 
 # --------------------------------------------------------------------------- #
@@ -235,6 +276,7 @@ class _FakeFlow:
     available: ClassVar[list[TransitionOut]] = []
     calls: ClassVar[list[str | None]] = []
     new_state: ClassVar[Any] = uuid4()
+    fire_raises: ClassVar[Exception | None] = None
 
     def __init__(self, session: object, dispatcher: object) -> None:
         self.fired: dict[str, object] | None = None
@@ -245,6 +287,8 @@ class _FakeFlow:
         return self._available
 
     async def fire(self, application_id, transition_id, principal, *, vote_result=None):  # noqa: ANN001
+        if _FakeFlow.fire_raises is not None:
+            raise _FakeFlow.fire_raises
         self.fired = {"transition_id": transition_id, "vote_result": vote_result}
         return TransitionResult(
             newStateId=_FakeFlow.new_state, statusEventId=uuid4(), dispatchedActions=[]
@@ -256,6 +300,7 @@ def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     _FakeFlow.available = []
     _FakeFlow.calls = []
     _FakeFlow.new_state = uuid4()
+    _FakeFlow.fire_raises = None
     monkeypatch.setattr(voting_service, "FlowService", _FakeFlow)
     return _FakeFlow
 
@@ -285,6 +330,26 @@ async def test_close_no_matching_branch_just_closes(
     assert out.result == "rejected"
     assert out.fired_transition_id is None
     assert out.new_state_id is None
+    assert db.committed == 1  # ohne Branch committet close den Schluss selbst
+
+
+async def test_close_atomic_fire_failure_does_not_commit(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """`fire`-Fehler beim Schließen ⇒ KEIN Commit → Vote bleibt offen/wiederholbar
+    (kein »zu, aber Branch nie gefeuert«). Der Vote-Close ist mit `fire` atomar."""
+    transition = TransitionOut(
+        id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={}
+    )
+    _patch_flow.available = [transition]
+    _patch_flow.fire_raises = ConflictError("guard", code="guard_failed")
+    vote = _vote()
+    db = fake_session(result(vote), result("yes", "yes"))
+    with pytest.raises(ConflictError):
+        await VotingService(db).close(vote.id, _voter())
+    # close hat selbst NICHT committet — die Vote-Änderung hängt nur ungespeichert
+    # in der Session; get_session rollt bei der Exception zurück.
+    assert db.committed == 0
 
 
 async def test_close_non_open_409() -> None:
