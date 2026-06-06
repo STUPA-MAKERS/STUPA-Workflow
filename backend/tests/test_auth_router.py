@@ -195,7 +195,9 @@ def test_magic_link_always_202(
 ) -> None:
     scheduled: list[tuple[object, ...]] = []
 
-    async def _capture(settings: object, email: str, application_id: object) -> None:
+    async def _capture(
+        settings: object, email: str, application_id: object, pool: object
+    ) -> None:
         scheduled.append((email, application_id))
 
     # Hintergrund-Task abfangen (kein realer DB-Zugriff im Test).
@@ -231,7 +233,7 @@ async def test_deliver_magic_link_opens_session_and_commits(
 
     monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
     monkeypatch.setattr(router_mod.service, "request_magic_link", _req)
-    await router_mod._deliver_magic_link(ENABLED, "x@y.de", None)
+    await router_mod._deliver_magic_link(ENABLED, "x@y.de", None, None)
     assert called == ["x@y.de"]
     assert db.committed == 1
 

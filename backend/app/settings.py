@@ -70,6 +70,28 @@ class Settings(BaseSettings):
     magic_link_edit_ttl_days: int = 7
     magic_link_action_ttl_minutes: int = 15
 
+    # — Mail/SMTP (T-18). Ohne `smtp_host` ist der Versand »aus« (Worker loggt +
+    #   verwirft statt zu senden) — DEV/Tests laufen ohne echten MTA. Das Passwort
+    #   ist ein Secret und wird **nie** geloggt. —
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_starttls: bool = True
+    smtp_ssl: bool = False
+    smtp_timeout_seconds: int = 30
+    mail_from: str = "noreply@antragsplattform.local"
+    mail_from_name: str = "Antragsplattform"
+    mail_default_lang: str = "de"
+    # Versand-Retry im Worker (arq): max. Versuche + Backoff-Basis (Sekunden).
+    mail_max_tries: int = 5
+    mail_retry_backoff_seconds: int = 30
+
+    @property
+    def smtp_enabled(self) -> bool:
+        """Echter Versand nur bei gesetztem `smtp_host`; sonst Worker-No-op (DEV/Test)."""
+        return bool(self.smtp_host)
+
     # — Antrags-Payload-Obergrenze (öffentlicher POST /applications, anti-DoS) —
     #   Gilt für die serialisierten Feldwerte (`data`) und als Content-Length-Schranke;
     #   darüber → 413. 64 KiB reicht für alle realen Formulare.

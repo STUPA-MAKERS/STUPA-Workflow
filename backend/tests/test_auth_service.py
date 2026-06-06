@@ -93,6 +93,19 @@ async def test_request_magic_link_edit_scope_when_open_state() -> None:
     assert db.added[0].scope == "edit"
 
 
+async def test_request_magic_link_awaits_async_deliver() -> None:
+    """Async-Deliver (T-18: Mail-Enqueue) wird awaited (isawaitable-Zweig)."""
+    settings = _settings()
+    db = fake_session(result(_app()))
+    sent: list[tuple[str, str]] = []
+
+    async def deliver(email: str, link: str) -> None:
+        sent.append((email, link))
+
+    await service.request_magic_link(db, settings, email="x@y.de", deliver=deliver)
+    assert len(sent) == 1 and "/antrag/aid-1#t=" in sent[0][1]
+
+
 # --------------------------------------------------------------------------- #
 # verify_magic_link
 # --------------------------------------------------------------------------- #

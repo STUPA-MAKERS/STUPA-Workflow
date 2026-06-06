@@ -28,6 +28,7 @@ from app.modules.auth.models import (
 from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
+from app.modules.notifications.models import MailTemplate, NotificationRule
 
 __all__ = [
     "Applicant",
@@ -46,6 +47,8 @@ __all__ = [
     "GroupMapping",
     "MagicLink",
     "MailList",
+    "MailTemplate",
+    "NotificationRule",
     "Principal",
     "Role",
     "RoleAssignment",

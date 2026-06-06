@@ -7,8 +7,9 @@ Reine HTTP-Verdrahtung liegt im Router; hier nur Domänenlogik + I/O.
 
 from __future__ import annotations
 
+import inspect
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
@@ -25,7 +26,9 @@ from app.shared.errors import GoneError
 
 logger = logging.getLogger("app.auth")
 
-Deliver = Callable[[str, str], None]
+# Versand-Callback `(email, link)`. Sync **oder** async: T-18 liefert einen
+# async-Deliver (Mail-Render + arq-Enqueue); Bestands-Tests nutzen sync-Lambdas.
+Deliver = Callable[[str, str], None | Awaitable[None]]
 
 
 def _now() -> datetime:
@@ -104,7 +107,9 @@ async def request_magic_link(
     # Referer-Headern, Server-/Proxy-Logs oder der Browser-History-Query (security.md §1).
     # Das FE liest das Fragment und sendet den Token per POST an /auth/magic-link/verify.
     link = f"{settings.public_base_url.rstrip('/')}/antrag/{app.id}#t={token}"
-    deliver(email, link)
+    result = deliver(email, link)
+    if inspect.isawaitable(result):
+        await result
 
 
 async def verify_magic_link(

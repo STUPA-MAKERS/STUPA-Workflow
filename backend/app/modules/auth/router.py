@@ -24,6 +24,8 @@ from app.modules.auth.schemas import (
     MagicLinkVerifyRequest,
     MeOut,
 )
+from app.modules.notifications.provider import mail_queue_from_pool
+from app.modules.notifications.service import NotificationService
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_auth_payload_limit,
@@ -160,16 +162,24 @@ def me(principal: Annotated[Principal, Depends(require_principal())]) -> MeOut:
 
 
 async def _deliver_magic_link(
-    settings: Settings, email: str, application_id: UUID | None
+    settings: Settings, email: str, application_id: UUID | None, pool: object
 ) -> None:
     """Magic-Link-Erstellung/-Versand in eigener Session (Background-Task).
 
     Läuft **nach** der 202-Antwort → die Antwortzeit ist für Treffer und Nicht-Treffer
-    identisch (keine Timing-Enumeration, security.md §1 / §11)."""
+    identisch (keine Timing-Enumeration, security.md §1 / §11). Der Versand geht über
+    die Mail-Queue (Worker, T-18); fehlt der arq-Pool, wird geloggt + verworfen."""
+    queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
+
+        async def deliver(recipient: str, link: str) -> None:
+            await NotificationService(
+                db, queue=queue, settings=settings
+            ).send_magic_link(email=recipient, link=link)
+
         await service.request_magic_link(
-            db, settings, email=email, application_id=application_id
+            db, settings, email=email, application_id=application_id, deliver=deliver
         )
         await db.commit()
 
@@ -186,12 +196,16 @@ async def _deliver_magic_link(
     responses=_errors(400, 413, 429),
 )
 async def request_magic_link(
-    body: MagicLinkRequest, settings: SettingsDep, background: BackgroundTasks
+    body: MagicLinkRequest,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
 ) -> dict[str, str]:
     """Magic-Link anfordern. Anti-Enumeration: **immer** 202 + konstanter Body, kein
     Treffer-Leak. Die DB-Arbeit läuft im Hintergrund → konstante Antwortzeit."""
+    pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(
-        _deliver_magic_link, settings, str(body.email), body.application_id
+        _deliver_magic_link, settings, str(body.email), body.application_id, pool
     )
     return {"status": "accepted"}
 
