@@ -34,11 +34,18 @@ async def test_get_session_rolls_back_on_error() -> None:
         await gen.athrow(RuntimeError("boom"))
 
 
-async def test_lifespan_disposes_engine() -> None:
+async def test_lifespan_disposes_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
     from app.db import get_engine
     from app.main import lifespan
 
+    # Mail-Pool im Lifespan stubben (kein Redis im Unit-Test).
+    async def _no_pool(_redis_url: str) -> None:
+        return None
+
+    monkeypatch.setattr("app.main.create_mail_pool", _no_pool)
     get_engine()  # Engine erzeugen, damit dispose-Pfad greift.
-    app = object()  # lifespan nutzt das Arg nicht.
+    app = SimpleNamespace(state=SimpleNamespace())  # lifespan setzt state.arq_pool
     async with lifespan(app):  # type: ignore[arg-type]
         pass

@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 
 from app.db import dispose_engine
 from app.logging_config import configure_logging
@@ -21,8 +21,13 @@ from app.modules.application_types.router import router as application_types_rou
 from app.modules.applications.router import router as applications_router
 from app.modules.auth.router import router as auth_router
 from app.modules.budget.router import router as budget_router
+from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import router as forms_router
+from app.modules.notifications.action_dispatcher import build_notify_dispatcher
+from app.modules.notifications.provider import close_mail_pool, create_mail_pool
+from app.modules.notifications.router import router as notifications_router
 from app.settings import Settings, get_settings
 from app.shared.errors import register_exception_handlers, use_problem_json_contract
 
@@ -44,16 +49,33 @@ api_router.include_router(applications_router)
 api_router.include_router(flow_router)
 api_router.include_router(budget_router)
 api_router.include_router(antiabuse_router)
+api_router.include_router(notifications_router)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    yield
-    await dispose_engine()
-    state = getattr(app, "state", None)
-    redis_client = getattr(state, "_antiabuse_redis", None) if state is not None else None
-    if redis_client is not None:
-        await redis_client.aclose()
+    # arq-Pool best-effort öffnen (Mail-Versand via Worker). Fehlt Redis → None.
+    app.state.arq_pool = await create_mail_pool(get_settings().redis_url)
+    try:
+        yield
+    finally:
+        await dispose_engine()
+        await close_mail_pool(getattr(app.state, "arq_pool", None))
+        state = getattr(app, "state", None)
+        redis_client = (
+            getattr(state, "_antiabuse_redis", None) if state is not None else None
+        )
+        if redis_client is not None:
+            await redis_client.aclose()
+
+
+def _notify_action_dispatcher(request: Request) -> ActionDispatcher:
+    """Flow-Action-Dispatcher mit Mail-`notify`-Handler (überschreibt den No-op).
+
+    Liest den arq-Pool aus dem App-State (Lifespan); ohne Pool werden notify-Mails
+    geloggt + verworfen (kein API-Block)."""
+    pool = getattr(request.app.state, "arq_pool", None)
+    return build_notify_dispatcher(pool)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -71,6 +93,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestContextMiddleware)
 
     register_exception_handlers(app)
+
+    # Flow-`notify`-Actions echt versenden (statt No-op-Log): Dispatcher überschreiben.
+    app.dependency_overrides[get_action_dispatcher] = _notify_action_dispatcher
 
     app.include_router(api_router)
     use_problem_json_contract(app)

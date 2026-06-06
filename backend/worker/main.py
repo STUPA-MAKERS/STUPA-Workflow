@@ -23,6 +23,8 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.modules.budget.stats import BudgetStatsService
+from worker.mail import on_startup as mail_on_startup
+from worker.mail import send_mail
 
 
 async def ping(ctx: dict[str, object]) -> str:
@@ -62,8 +64,9 @@ async def _shutdown(ctx: dict[str, Any]) -> None:  # pragma: no cover
 
 
 class WorkerSettings:
-    functions = [ping, refresh_budget_stats]
+    functions = [ping, refresh_budget_stats, send_mail]
     cron_jobs = [cron(refresh_budget_stats, hour=3, minute=0)]
+    on_startup = mail_on_startup
     on_shutdown = _shutdown
     redis_settings = RedisSettings.from_dsn(
         os.environ.get("REDIS_URL", "redis://redis:6379/0")
