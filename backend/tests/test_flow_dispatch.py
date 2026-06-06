@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import logging
 from uuid import uuid4
 
+import pytest
+
+from app.modules.flow import dispatch as dispatch_mod
 from app.modules.flow.dispatch import (
     ActionDispatcher,
     DispatchedAction,
@@ -50,9 +52,25 @@ def test_build_only_inline_action_yields_nothing() -> None:
     assert dispatched == []
 
 
-async def test_null_dispatcher_logs_each_action(caplog) -> None:  # noqa: ANN001
+class _SpyLogger:
+    """Stand-in für den Modul-Logger — deterministisch, immun gegen globale
+    Logging-Config (``disable_existing_loggers``/Propagation würden caplog & direkt
+    angehängte Handler leeren)."""
+
+    def __init__(self) -> None:
+        self.messages: list[str] = []
+
+    def info(self, msg: str, *args: object) -> None:
+        self.messages.append(msg % args if args else msg)
+
+
+async def test_null_dispatcher_logs_each_action(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     dispatcher = NullActionDispatcher()
     assert isinstance(dispatcher, ActionDispatcher)  # runtime_checkable Protocol
+    spy = _SpyLogger()
+    monkeypatch.setattr(dispatch_mod, "logger", spy)
     action = DispatchedAction(
         type="notify",
         application_id=uuid4(),
@@ -60,13 +78,13 @@ async def test_null_dispatcher_logs_each_action(caplog) -> None:  # noqa: ANN001
         status_event_id=uuid4(),
         idempotency_key="k",
     )
-    with caplog.at_level(logging.INFO, logger="app.flow.dispatch"):
-        await dispatcher.dispatch([action])
-    assert "flow action dispatched" in caplog.text
-    assert "type=notify" in caplog.text
+    await dispatcher.dispatch([action])
+    assert any("flow action dispatched" in m for m in spy.messages)
+    assert any("type=notify" in m for m in spy.messages)
 
 
-async def test_null_dispatcher_empty_is_noop(caplog) -> None:  # noqa: ANN001
-    with caplog.at_level(logging.INFO, logger="app.flow.dispatch"):
-        await NullActionDispatcher().dispatch([])
-    assert caplog.text == ""
+async def test_null_dispatcher_empty_is_noop(monkeypatch: pytest.MonkeyPatch) -> None:
+    spy = _SpyLogger()
+    monkeypatch.setattr(dispatch_mod, "logger", spy)
+    await NullActionDispatcher().dispatch([])
+    assert spy.messages == []

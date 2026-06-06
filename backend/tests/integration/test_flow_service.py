@@ -9,6 +9,7 @@ und optimistisches Locking (konkurrierende Transition → 409).
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator, Sequence
 
@@ -23,6 +24,7 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import FlowVersion, State, Transition
+from app.modules.flow.schemas import TransitionResult
 from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
@@ -238,13 +240,26 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
     await flow.fire(app.id, t_review.id, _manager())
     await apps.patch(app.id, {"title": "Aktualisiert"}, changed_by="mgr-1")  # ok
 
-    # Manuell in den gesperrten `voting`-State setzen (Guard dort wäre treasurer/vote);
-    # danach muss T-12 patch mit 409 sperren (edit_allowed=False).
+    # Position auf `voting` (kein Manager-Pfad dorthin), dann **per fire** in den
+    # gesperrten `approved`-State (edit_allowed=False) übergehen — der Lock entsteht
+    # also end-to-end aus dem Übergang, nicht aus manuellem State-Setzen.
     app_row = await session.get(Application, app.id)
     assert app_row is not None
     app_row.current_state_id = states["voting"].id
     await session.commit()
 
+    t_approved = (
+        await session.execute(
+            select(Transition).where(
+                Transition.from_state_id == states["voting"].id,
+                Transition.to_state_id == states["approved"].id,
+            )
+        )
+    ).scalar_one()
+    res = await flow.fire(app.id, t_approved.id, _manager(), vote_result="passed")
+    assert res.new_state_id == states["approved"].id
+
+    # Folge des Übergangs: T-12 patch sperrt jetzt mit 409.
     with pytest.raises(ConflictError):
         await apps.patch(app.id, {"title": "Verboten"}, changed_by="mgr-1")
 
@@ -330,3 +345,51 @@ async def test_fire_wrong_from_state_conflict(session: AsyncSession) -> None:
     with pytest.raises(ConflictError) as exc:
         await flow.fire(app.id, t_review.id, _manager())
     assert exc.value.code == "conflict"
+
+
+async def test_fire_concurrent_race_exactly_one_wins(
+    migrated: tuple[str, str], session: AsyncSession
+) -> None:
+    """Echter UPDATE-Race: zwei nebenläufige ``fire`` auf denselben from-State über
+    **separate** Sessions/Verbindungen → genau einer gewinnt, der andere 409.
+
+    Trifft den realen ``rowcount==0``-Pfad (nicht nur Fake/sequenziell): die zweite
+    Transaktion blockiert am Row-Lock, sieht nach dem Commit der ersten ``current !=
+    from`` und liefert rowcount 0."""
+    app_type, states = await _seed(session)
+    app = await _make_application(session, app_type)
+    transition = (
+        await session.execute(
+            select(Transition).where(
+                Transition.from_state_id == states["draft"].id,
+                Transition.to_state_id == states["review"].id,
+            )
+        )
+    ).scalar_one()
+
+    eng = create_async_engine(migrated[1])
+    maker = async_sessionmaker(eng, expire_on_commit=False)
+    try:
+
+        async def _fire() -> TransitionResult | ConflictError:
+            async with maker() as s:
+                try:
+                    return await FlowService(s).fire(app.id, transition.id, _manager())
+                except ConflictError as exc:
+                    return exc
+
+        first, second = await asyncio.gather(_fire(), _fire())
+    finally:
+        await eng.dispose()
+
+    winner = second if isinstance(first, ConflictError) else first
+    loser = first if isinstance(first, ConflictError) else second
+    assert isinstance(winner, TransitionResult)
+    assert isinstance(loser, ConflictError)
+    assert loser.code == "conflict"
+    assert winner.new_state_id == states["review"].id
+
+    refreshed = await session.get(Application, app.id)
+    assert refreshed is not None
+    await session.refresh(refreshed)
+    assert refreshed.current_state_id == states["review"].id
