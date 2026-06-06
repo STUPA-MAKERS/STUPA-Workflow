@@ -11,6 +11,7 @@ import {
   mapComment,
   mapTimelineEvent,
   mapTransition,
+  mapVersion,
   toApplicationCreateBody,
 } from './mappers';
 import type {
@@ -24,6 +25,7 @@ import type {
   ApplicationOutWire,
   ApplicationType,
   ApplicationTypeListItemWire,
+  ApplicationVersion,
   CommentCreateBody,
   CommentOutWire,
   CommentVisibility,
@@ -40,6 +42,7 @@ import type {
   TransitionRequestBody,
   TransitionResult,
   Uuid,
+  VersionOutWire,
 } from './models';
 
 /**
@@ -143,6 +146,16 @@ export class ApiClient {
     return this.http
       .get<TimelineEventOutWire[]>(`${this.base}/applications/${id}/timeline`)
       .pipe(map((events) => events.map((e) => mapTimelineEvent(e, lang))));
+  }
+
+  /**
+   * GET /applications/{id}/versions — Versionshistorie + Diff (Principal-only).
+   * Der Diff ist sprach-neutral (rohe Feldwerte) → kein `lang`-Mapping nötig.
+   */
+  versions(id: Uuid): Observable<ApplicationVersion[]> {
+    return this.http
+      .get<VersionOutWire[]>(`${this.base}/applications/${id}/versions`)
+      .pipe(map((items) => items.map(mapVersion)));
   }
 
   // --- comments (applicant: nur public) ------------------------------------

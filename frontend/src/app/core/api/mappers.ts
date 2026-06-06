@@ -24,14 +24,18 @@ import type {
   ApplicationState,
   ApplicationType,
   ApplicationTypeListItemWire,
+  ApplicationVersion,
   CommentOutWire,
   ApplicationComment,
+  DataDiff,
+  DataDiffWire,
   NewApplication,
   StateOutWire,
   TimelineEntry,
   TimelineEventOutWire,
   Transition,
   TransitionOutWire,
+  VersionOutWire,
 } from './models';
 
 export function mapState(
@@ -138,6 +142,34 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
     fromStateId: wire.fromStateId,
     toStateId: wire.toStateId,
     label: resolveI18n(wire.label, lang),
+  };
+}
+
+/**
+ * Backend-Diff-Maps in iterierbare, schlüsseltragende Listen auflösen. `null`
+ * (kein Diff, z. B. erste Version) wird durchgereicht; fehlende Teil-Maps werden
+ * defensiv auf `{}` normalisiert.
+ */
+function mapDiff(wire: DataDiffWire | null | undefined): DataDiff | null {
+  if (!wire) return null;
+  return {
+    added: Object.entries(wire.added ?? {}).map(([key, value]) => ({ key, value })),
+    removed: Object.entries(wire.removed ?? {}).map(([key, value]) => ({ key, value })),
+    changed: Object.entries(wire.changed ?? {}).map(([key, change]) => ({
+      key,
+      old: change.old,
+      new: change.new,
+    })),
+  };
+}
+
+export function mapVersion(wire: VersionOutWire): ApplicationVersion {
+  return {
+    version: wire.version,
+    data: wire.data ?? {},
+    diff: mapDiff(wire.diff),
+    changedBy: wire.changedBy ?? null,
+    at: wire.at,
   };
 }
 

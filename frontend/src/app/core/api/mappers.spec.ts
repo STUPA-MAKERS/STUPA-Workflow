@@ -7,6 +7,7 @@ import {
   mapState,
   mapTimelineEvent,
   mapTransition,
+  mapVersion,
   toApplicationCreateBody,
 } from './mappers';
 import type {
@@ -18,6 +19,7 @@ import type {
   StateOutWire,
   TimelineEventOutWire,
   TransitionOutWire,
+  VersionOutWire,
 } from './models';
 
 const STATE: StateOutWire = {
@@ -288,5 +290,52 @@ describe('toApplicationCreateBody', () => {
     const body = toApplicationCreateBody(input);
     expect(body.budgetPotId).toBeNull();
     expect(body.applicantName).toBeNull();
+  });
+});
+
+describe('mapVersion', () => {
+  it('passes a null diff through (e.g. the first version)', () => {
+    const wire: VersionOutWire = {
+      version: 1,
+      data: { title: 'Alt' },
+      diff: null,
+      changedBy: null,
+      at: '2026-06-01T10:00:00Z',
+    };
+    const v = mapVersion(wire);
+    expect(v.diff).toBeNull();
+    expect(v.changedBy).toBeNull();
+    expect(v.data).toEqual({ title: 'Alt' });
+  });
+
+  it('flattens the diff maps into keyed lists', () => {
+    const wire: VersionOutWire = {
+      version: 2,
+      data: { title: 'Neu', note: 'x' },
+      diff: {
+        added: { note: 'x' },
+        removed: { obsolete: 'y' },
+        changed: { title: { old: 'Alt', new: 'Neu' } },
+      },
+      changedBy: 'Mia',
+      at: '2026-06-02T10:00:00Z',
+    };
+    const v = mapVersion(wire);
+    expect(v.diff?.added).toEqual([{ key: 'note', value: 'x' }]);
+    expect(v.diff?.removed).toEqual([{ key: 'obsolete', value: 'y' }]);
+    expect(v.diff?.changed).toEqual([{ key: 'title', old: 'Alt', new: 'Neu' }]);
+  });
+
+  it('tolerates missing diff sub-maps', () => {
+    const wire = {
+      version: 3,
+      data: {},
+      diff: { added: { a: 1 } },
+      at: '2026-06-03T10:00:00Z',
+    } as unknown as VersionOutWire;
+    const v = mapVersion(wire);
+    expect(v.diff?.added).toEqual([{ key: 'a', value: 1 }]);
+    expect(v.diff?.removed).toEqual([]);
+    expect(v.diff?.changed).toEqual([]);
   });
 });

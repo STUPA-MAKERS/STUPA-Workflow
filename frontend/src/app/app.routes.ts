@@ -51,7 +51,18 @@ export const routes: Routes = [
         data: { title: 'nav.applications', permission: 'application.read' },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
+          import('./pages/applications/applications-list.component').then(
+            (m) => m.ApplicationsListComponent,
+          ),
+      },
+      {
+        path: 'applications/:id',
+        data: { title: 'nav.applications', permission: 'application.read' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/applications/applications-detail.component').then(
+            (m) => m.ApplicationsDetailComponent,
+          ),
       },
       {
         path: 'voting',

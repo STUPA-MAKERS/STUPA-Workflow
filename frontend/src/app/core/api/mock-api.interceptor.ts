@@ -19,6 +19,8 @@ import type {
   StateOutWire,
   TimelineEventOutWire,
   TransitionOutWire,
+  TransitionResult,
+  VersionOutWire,
 } from './models';
 
 /**
@@ -34,7 +36,9 @@ const MOCK_PRINCIPAL: Principal = {
   display_name: 'Demo Mitglied',
   email: 'demo@stupa.example',
   roles: ['member'],
-  permissions: ['application.read', 'vote.cast'],
+  // `application.manage` ist gesetzt, damit der Mock-Betrieb (FE-Dev/Harness)
+  // die RBAC-gegateten Statuswechsel-Aktionen auf der Detail-Seite zeigt (T-31).
+  permissions: ['application.read', 'application.manage', 'vote.cast'],
   groups: [],
 };
 
@@ -237,7 +241,45 @@ const MOCK_COMMENTS: CommentOutWire[] = [
   },
 ];
 
-const EMPTY_TRANSITIONS: TransitionOutWire[] = [];
+const MOCK_VERSIONS: VersionOutWire[] = [
+  {
+    version: 1,
+    data: { title: 'Förderung Ersti-Wochenende', amount: '200.00' },
+    diff: null,
+    changedBy: 'Antragsteller:in',
+    at: '2026-06-05T10:00:00Z',
+  },
+  {
+    version: 2,
+    data: { title: 'Förderung Ersti-Wochenende 2026', amount: '250.00', note: 'Nachgereicht' },
+    diff: {
+      added: { note: 'Nachgereicht' },
+      removed: {},
+      changed: {
+        title: { old: 'Förderung Ersti-Wochenende', new: 'Förderung Ersti-Wochenende 2026' },
+        amount: { old: '200.00', new: '250.00' },
+      },
+    },
+    changedBy: 'Antragsteller:in',
+    at: '2026-06-05T11:15:00Z',
+  },
+];
+
+const MOCK_TRANSITIONS: TransitionOutWire[] = [
+  {
+    id: '77777777-7777-7777-7777-777777777771',
+    fromStateId: SUBMITTED_STATE.id,
+    toStateId: REVIEW_STATE.id,
+    label: { de: 'In Prüfung nehmen', en: 'Move to review' },
+  },
+  {
+    id: '77777777-7777-7777-7777-777777777772',
+    fromStateId: SUBMITTED_STATE.id,
+    toStateId: '66666666-6666-6666-6666-666666666664',
+    label: { de: 'Ablehnen', en: 'Reject' },
+  },
+];
+
 const LOGOUT_OUT = { logout_url: null };
 
 function path(url: string): string {
@@ -257,8 +299,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
     if (p.endsWith('/timeline')) return ok(MOCK_TIMELINE);
+    if (p.endsWith('/versions')) return ok([...MOCK_VERSIONS]);
     if (p.endsWith('/comments')) return ok([...MOCK_COMMENTS]);
-    if (p.endsWith('/transitions')) return ok(EMPTY_TRANSITIONS);
+    if (p.endsWith('/transitions')) return ok([...MOCK_TRANSITIONS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
   }
@@ -284,6 +327,17 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       MOCK_COMMENTS.push(created);
       return ok(created, 201);
+    }
+    if (p.endsWith('/transition')) {
+      const transitionId =
+        (req.body as { transitionId?: string } | null)?.transitionId ?? MOCK_TRANSITIONS[0].id;
+      const target = MOCK_TRANSITIONS.find((t) => t.id === transitionId) ?? MOCK_TRANSITIONS[0];
+      const result: TransitionResult = {
+        newStateId: target.toStateId,
+        statusEventId: 'e0000000-0000-0000-0000-000000000001',
+        dispatchedActions: [],
+      };
+      return ok(result);
     }
     if (p.endsWith('/applications')) {
       const created: ApplicationCreatedWire = { applicationId: MOCK_APP_ID };
