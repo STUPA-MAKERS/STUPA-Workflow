@@ -36,6 +36,12 @@ export class ShellComponent {
   readonly i18n = inject(I18nService);
   readonly auth = inject(AuthService);
 
+  /**
+   * Theme-abhängige Wortmarke: schwarze Schrift auf hell, weiße auf dunkel
+   * (offizielle CD-Varianten). Die mehrfarbige Marke bleibt in beiden Modi lesbar.
+   */
+  readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
+
   private readonly nav: NavItem[] = [
     { path: '/dashboard', labelKey: 'nav.dashboard', permissions: [] },
     { path: '/applications', labelKey: 'nav.applications', permissions: ['application.read'] },

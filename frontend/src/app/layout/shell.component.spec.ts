@@ -93,4 +93,18 @@ describe('ShellComponent', () => {
     expect(i18n.locale()).toBe('en');
     http.verify();
   });
+
+  it('uses a theme-dependent wordmark and swaps it when the theme changes', async () => {
+    const { fixture, container, http } = await setup();
+    const theme = fixture.debugElement.injector.get(ThemeService);
+    theme.setPreference('light');
+    fixture.detectChanges();
+    const logo = () => container.querySelector('.header__logo') as HTMLImageElement;
+    expect(logo().getAttribute('src')).toBe('assets/logos/stupa-wordmark-light.svg');
+
+    theme.setPreference('dark');
+    fixture.detectChanges();
+    expect(logo().getAttribute('src')).toBe('assets/logos/stupa-wordmark-dark.svg');
+    http.verify();
+  });
 });

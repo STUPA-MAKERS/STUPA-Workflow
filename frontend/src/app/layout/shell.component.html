@@ -3,7 +3,7 @@
 <header class="header">
   <div class="container header__inner">
     <a class="header__brand" routerLink="/" [attr.aria-label]="'app.title' | t">
-      <img class="header__logo" src="assets/logos/stupa-wordmark.svg" alt="" aria-hidden="true" />
+      <img class="header__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     </a>
 
     <nav class="header__nav" [attr.aria-label]="'nav.applications' | t">
@@ -60,7 +60,7 @@
 
 <footer class="footer">
   <div class="container footer__inner">
-    <img class="footer__logo" src="assets/logos/stupa-wordmark.svg" alt="" aria-hidden="true" />
+    <img class="footer__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     <span class="footer__text">{{ 'footer.coBranding' | t }}</span>
     <nav class="footer__links" aria-label="Footer">
       <a href="#">{{ 'footer.imprint' | t }}</a>
