@@ -25,7 +25,7 @@ from app.modules.auth.models import (
     RoleAssignment,
     RolePermission,
 )
-from app.modules.budget.models import BudgetField, BudgetPot
+from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
 
@@ -35,6 +35,7 @@ __all__ = [
     "ApplicationType",
     "AuthSession",
     "Base",
+    "BudgetEntry",
     "BudgetField",
     "BudgetPot",
     "Comment",

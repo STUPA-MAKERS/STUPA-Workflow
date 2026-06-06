@@ -19,6 +19,7 @@ from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.modules.application_types.router import router as application_types_router
 from app.modules.applications.router import router as applications_router
 from app.modules.auth.router import router as auth_router
+from app.modules.budget.router import router as budget_router
 from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import router as forms_router
 from app.settings import Settings, get_settings
@@ -40,6 +41,7 @@ api_router.include_router(forms_router)
 api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(flow_router)
+api_router.include_router(budget_router)
 
 
 @asynccontextmanager
