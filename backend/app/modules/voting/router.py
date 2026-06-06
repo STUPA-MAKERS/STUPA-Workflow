@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
+from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
@@ -57,6 +58,7 @@ def get_voting_service(
 
 
 ServiceDep = Annotated[VotingService, Depends(get_voting_service)]
+PublisherDep = Annotated[MeetingPublisher, Depends(get_meeting_publisher)]
 ManagerDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
 VoterDep = Annotated[Principal, Depends(require_principal(CAST_PERMISSION))]
 ReaderDep = Annotated[Principal, Depends(require_principal())]
@@ -85,10 +87,16 @@ async def create_vote(
 async def open_vote(
     vote_id: UUID,
     service: ServiceDep,
+    publisher: PublisherDep,
     _principal: ManagerDep,
 ) -> VoteOut:
-    """Abstimmung öffnen (``draft`` → ``open``) → 409, wenn nicht ``draft``."""
-    return await service.open(vote_id, now=datetime.now(UTC))
+    """Abstimmung öffnen (``draft`` → ``open``) → 409, wenn nicht ``draft``.
+
+    Hängt der Vote an einer Sitzung, broadcastet der Publisher ``vote_opened`` auf
+    den Live-Vote-Kanal (T-16); andernfalls no-op."""
+    vote = await service.open(vote_id, now=datetime.now(UTC))
+    await publisher.vote_opened(vote)
+    return vote
 
 
 @router.post(
@@ -99,10 +107,16 @@ async def open_vote(
 async def close_vote(
     vote_id: UUID,
     service: ServiceDep,
+    publisher: PublisherDep,
     principal: ManagerDep,
 ) -> VoteClosed:
-    """Abstimmung schließen → auszählen → Ergebnis → ``flow.fire(result_branch)``."""
-    return await service.close(vote_id, principal)
+    """Abstimmung schließen → auszählen → Ergebnis → ``flow.fire(result_branch)``.
+
+    Live-Vote (T-16): broadcastet ``vote_closed`` auf den Sitzungs-Kanal (no-op ohne
+    Sitzung)."""
+    closed = await service.close(vote_id, principal)
+    await publisher.vote_closed(closed)
+    return closed
 
 
 @router.post(

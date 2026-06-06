@@ -28,6 +28,10 @@ from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import router as forms_router
+from app.modules.livevote.broker import RedisBroker
+from app.modules.livevote.locks import RedisLocker
+from app.modules.livevote.router import router as livevote_router
+from app.modules.livevote.service import BrokerPublisher
 from app.modules.notifications.action_dispatcher import build_notify_dispatcher
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
 from app.modules.notifications.router import router as notifications_router
@@ -52,6 +56,7 @@ api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
+api_router.include_router(livevote_router)
 api_router.include_router(budget_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(notifications_router)
@@ -66,6 +71,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.arq_pool = await create_mail_pool(settings.redis_url)
     # Object-Storage best-effort bauen (Upload, T-13). Ohne MinIO → None → Upload 503.
     app.state.object_storage = build_object_storage(settings)
+    # Live-Vote (T-16): Redis-PubSub-Broker + Cast-Lock + Event-Publisher. Der Client
+    # ist lazy (verbindet erst beim ersten PUBLISH/SUBSCRIBE), daher hier billig.
+    import redis.asyncio as aioredis
+
+    livevote_redis = aioredis.from_url(settings.redis_url)
+    app.state._livevote_redis = livevote_redis
+    app.state.broker = RedisBroker(livevote_redis)
+    app.state.locker = RedisLocker(livevote_redis)
+    app.state.meeting_publisher = BrokerPublisher(app.state.broker)
     try:
         yield
     finally:
@@ -77,6 +91,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         if redis_client is not None:
             await redis_client.aclose()
+        await livevote_redis.aclose()
 
 
 def _notify_action_dispatcher(request: Request) -> ActionDispatcher:

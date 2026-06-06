@@ -35,6 +35,9 @@ dependencies = [
     "clamd>=1.0",
     # Multipart-Parsing für den Datei-Upload (FastAPI UploadFile/Form).
     "python-multipart>=0.0.18",
+    # Live-Vote (T-16): Redis-PubSub-Fan-out + Cast-Lock (redis.asyncio) — bislang
+    # transitiv über arq, jetzt direkt genutzt (Broker/Locker), daher explizit.
+    "redis>=5.0",
 ]
 
 [project.optional-dependencies]

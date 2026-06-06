@@ -30,6 +30,7 @@ from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
 from app.modules.files.models import Attachment
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
+from app.modules.livevote.models import Meeting
 from app.modules.notifications.models import MailTemplate, NotificationRule
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 
@@ -54,6 +55,7 @@ __all__ = [
     "MagicLink",
     "MailList",
     "MailTemplate",
+    "Meeting",
     "NotificationRule",
     "Principal",
     "Role",
