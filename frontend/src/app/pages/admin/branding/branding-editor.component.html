@@ -1,0 +1,147 @@
+@if (draft(); as d) {
+  <section class="br">
+    <header class="br__head">
+      <h1>{{ 'admin.brand.title' | t }}</h1>
+      <div class="br__ver">
+        <span class="br__badge">{{ 'admin.brand.version' | t: { n: version() } }}</span>
+        @if (hasDraftChanges()) {
+          <span class="br__badge br__badge--draft">{{ 'admin.brand.draftDirty' | t }}</span>
+        }
+      </div>
+    </header>
+
+    @if (linkErrors().length > 0) {
+      <p class="br__alert" role="alert">
+        {{ 'admin.brand.badUrl' | t }} ({{ linkErrors().join(', ') }})
+      </p>
+    }
+
+    <div class="br__cols">
+      <div class="br__editor">
+        <!-- Logos -->
+        <fieldset class="br__group">
+          <legend>{{ 'admin.brand.logos' | t }}</legend>
+          <p class="br__hint">{{ 'admin.brand.logoHint' | t: { mb: maxMb } }}</p>
+          @for (slot of logoSlots; track slot) {
+            <div class="br__logo">
+              <span class="br__logo-name">{{ slotLabel(slot) }}</span>
+              @if (d.logos[slot]; as asset) {
+                <img class="br__logo-prev" [src]="asset.url" [alt]="slotLabel(slot)" />
+                <span class="br__logo-meta">{{ asset.filename }}</span>
+                <button type="button" class="br__del" (click)="removeLogo(slot)">{{ 'admin.common.remove' | t }}</button>
+              } @else {
+                <span class="br__logo-empty">{{ 'admin.brand.dropHere' | t }}</span>
+              }
+              <input
+                #logo
+                type="file"
+                [accept]="accept"
+                [attr.aria-label]="slotLabel(slot)"
+                (change)="onLogoSelected(slot, logo)"
+              />
+            </div>
+          }
+        </fieldset>
+
+        <!-- Footer columns -->
+        <fieldset class="br__group">
+          <legend>{{ 'admin.brand.footer' | t }}</legend>
+          @for (col of d.footerColumns; track $index; let ci = $index) {
+            <div class="br__col">
+              <div class="br__col-head">
+                <input
+                  class="br__col-title"
+                  [attr.aria-label]="'admin.common.labelDe' | t"
+                  [(ngModel)]="col.label['de']"
+                  (ngModelChange)="reemit()"
+                  placeholder="DE"
+                />
+                <input
+                  [attr.aria-label]="'admin.common.labelEn' | t"
+                  [(ngModel)]="col.label['en']"
+                  (ngModelChange)="reemit()"
+                  placeholder="EN"
+                />
+                <button type="button" [attr.aria-label]="'admin.common.moveUp' | t" (click)="moveColumn(ci, -1)">↑</button>
+                <button type="button" [attr.aria-label]="'admin.common.moveDown' | t" (click)="moveColumn(ci, 1)">↓</button>
+                <button type="button" class="br__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeColumn(ci)">✕</button>
+              </div>
+              @for (link of col.links; track $index; let li = $index) {
+                <div class="br__link">
+                  <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />
+                  <input [attr.aria-label]="'admin.brand.url' | t" [(ngModel)]="link.url" (ngModelChange)="reemit()" placeholder="https://" />
+                  <button type="button" class="br__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeLink(col, li)">✕</button>
+                </div>
+              }
+              <button type="button" class="br__addlink" (click)="addLink(col)">+ {{ 'admin.brand.addLink' | t }}</button>
+            </div>
+          }
+          <app-button variant="ghost" size="sm" (click)="addColumn()">{{ 'admin.brand.addColumn' | t }}</app-button>
+        </fieldset>
+
+        <!-- Copyright + legal -->
+        <fieldset class="br__group">
+          <legend>{{ 'admin.brand.copyright' | t }}</legend>
+          <input [attr.aria-label]="'admin.brand.copyright' | t" [(ngModel)]="d.copyright['de']" (ngModelChange)="reemit()" placeholder="DE" />
+          <h3 class="br__sub">{{ 'admin.brand.legal' | t }}</h3>
+          @for (link of d.legalLinks; track $index; let li = $index) {
+            <div class="br__link">
+              <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />
+              <input [attr.aria-label]="'admin.brand.url' | t" [(ngModel)]="link.url" (ngModelChange)="reemit()" placeholder="https://" />
+              <button type="button" class="br__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeLegalLink(li)">✕</button>
+            </div>
+          }
+          <button type="button" class="br__addlink" (click)="addLegalLink()">+ {{ 'admin.brand.addLink' | t }}</button>
+        </fieldset>
+
+        <!-- Freetexts -->
+        <fieldset class="br__group">
+          <legend>{{ 'admin.brand.texts' | t }}</legend>
+          <label class="br__lbl">{{ 'admin.brand.text.loginHint' | t }}
+            <textarea rows="2" [(ngModel)]="d.freetexts.loginHint['de']" (ngModelChange)="reemit()"></textarea></label>
+          <label class="br__lbl">{{ 'admin.brand.text.welcome' | t }}
+            <textarea rows="2" [(ngModel)]="d.freetexts.welcome['de']" (ngModelChange)="reemit()"></textarea></label>
+          <label class="br__lbl">{{ 'admin.brand.text.support' | t }}
+            <textarea rows="2" [(ngModel)]="d.freetexts.support['de']" (ngModelChange)="reemit()"></textarea></label>
+          <label class="br__lbl">{{ 'admin.brand.text.emailFooter' | t }}
+            <textarea rows="2" [(ngModel)]="d.freetexts.emailFooter['de']" (ngModelChange)="reemit()"></textarea></label>
+        </fieldset>
+      </div>
+
+      <!-- Live preview -->
+      <aside class="br__preview" aria-label="{{ 'admin.common.preview' | t }}">
+        <h2 class="br__preview-h">{{ 'admin.common.preview' | t }}</h2>
+
+        <div class="br__pv-header" data-testid="preview-header">
+          @if (d.logos.imagemark; as im) {
+            <img class="br__pv-logo" [src]="im.url" alt="" aria-hidden="true" />
+          }
+          @if (d.logos.wordmark; as wm) {
+            <img class="br__pv-word" [src]="wm.url" alt="" aria-hidden="true" />
+          } @else {
+            <strong>{{ text(d.copyright) }}</strong>
+          }
+        </div>
+
+        <p class="br__pv-welcome" data-testid="preview-welcome">{{ text(d.freetexts.welcome) }}</p>
+
+        <footer class="br__pv-footer" data-testid="preview-footer">
+          @for (col of d.footerColumns; track $index) {
+            <div class="br__pv-col">
+              <strong>{{ text(col.label) }}</strong>
+              @for (link of col.links; track $index) {
+                <a [href]="link.url">{{ text(link.label) }}</a>
+              }
+            </div>
+          }
+          <p class="br__pv-copy">{{ text(d.copyright) }}</p>
+        </footer>
+      </aside>
+    </div>
+
+    <footer class="br__foot">
+      <app-button variant="secondary" [disabled]="linkErrors().length > 0" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
+      <app-button [disabled]="!hasDraftChanges() || linkErrors().length > 0" (click)="activate()">{{ 'admin.brand.activate' | t }}</app-button>
+    </footer>
+  </section>
+}

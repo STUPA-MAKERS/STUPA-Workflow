@@ -1,0 +1,172 @@
+<section class="fe">
+  <header class="fe__head">
+    <h1>{{ 'admin.flow.title' | t }}</h1>
+    <div class="fe__modes" role="tablist" [attr.aria-label]="'admin.flow.title' | t">
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="mode() === 'simple'"
+        [class.fe__mode--on]="mode() === 'simple'"
+        (click)="setMode('simple')"
+      >{{ 'admin.flow.modeSimple' | t }}</button>
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="mode() === 'expert'"
+        [class.fe__mode--on]="mode() === 'expert'"
+        (click)="setMode('expert')"
+      >{{ 'admin.flow.modeExpert' | t }}</button>
+    </div>
+  </header>
+
+  @if (mode() === 'simple') {
+    <div class="fe__preset">
+      <label class="fe__lbl">
+        {{ 'admin.flow.preset' | t }}
+        <select [ngModel]="selectedPreset()" (ngModelChange)="selectedPreset.set($event)">
+          @for (p of presets; track p.key) {
+            <option [value]="p.key">{{ p.labelKey | t }}</option>
+          }
+        </select>
+      </label>
+      <app-button variant="secondary" size="sm" (click)="applyPreset()">{{ 'admin.flow.presetApply' | t }}</app-button>
+    </div>
+  }
+
+  @if (validation().errors.length > 0) {
+    <ul class="fe__alert" role="alert">
+      @for (err of validation().errors; track err) {
+        <li>{{ err }}</li>
+      }
+    </ul>
+  }
+
+  <!-- States -->
+  <section class="fe__block">
+    <div class="fe__block-head">
+      <h2>{{ 'admin.flow.states' | t }}</h2>
+      <app-button variant="ghost" size="sm" (click)="addState()">{{ 'admin.flow.addState' | t }}</app-button>
+    </div>
+    @if (graph().states.length === 0) {
+      <p class="fe__empty">{{ 'admin.flow.noStates' | t }}</p>
+    }
+    @for (state of graph().states; track $index; let si = $index) {
+      <div class="fe__row">
+        <label class="fe__lbl">{{ 'admin.common.key' | t }}
+          <input [(ngModel)]="state.key" (ngModelChange)="touch()" autocomplete="off" /></label>
+        <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
+          <input [(ngModel)]="state.label['de']" (ngModelChange)="touch()" /></label>
+        <label class="fe__lbl">{{ 'admin.flow.category' | t }}
+          <select [ngModel]="state.category ?? ''" (ngModelChange)="setStateCategory(si, $event)">
+            <option value="">—</option>
+            @for (c of categories; track c) {
+              <option [value]="c">{{ catLabel(c) }}</option>
+            }
+          </select>
+        </label>
+        <label class="fe__chk">
+          <input type="radio" name="flow-initial" [checked]="state.isInitial" (change)="setInitial(state.key)" />
+          {{ 'admin.flow.initial' | t }}
+        </label>
+        <label class="fe__chk">
+          <input type="checkbox" [(ngModel)]="state.editAllowed" (ngModelChange)="touch()" />
+          {{ 'admin.flow.editAllowed' | t }}
+        </label>
+        <button type="button" class="fe__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeState(si)">✕</button>
+      </div>
+    }
+  </section>
+
+  <!-- Transitions -->
+  <section class="fe__block">
+    <div class="fe__block-head">
+      <h2>{{ 'admin.flow.transitions' | t }}</h2>
+      <app-button variant="ghost" size="sm" (click)="addTransition()">{{ 'admin.flow.addTransition' | t }}</app-button>
+    </div>
+    @if (graph().transitions.length === 0) {
+      <p class="fe__empty">{{ 'admin.flow.noTransitions' | t }}</p>
+    }
+    @for (tr of graph().transitions; track $index; let ti = $index) {
+      <div class="fe__trow">
+        <div class="fe__row">
+          <label class="fe__lbl">{{ 'admin.flow.from' | t }}
+            <select [(ngModel)]="tr.from" (ngModelChange)="touch()">
+              @for (s of graph().states; track s.key) {
+                <option [value]="s.key">{{ s.key }}</option>
+              }
+            </select></label>
+          <label class="fe__lbl">{{ 'admin.flow.to' | t }}
+            <select [(ngModel)]="tr.to" (ngModelChange)="touch()">
+              @for (s of graph().states; track s.key) {
+                <option [value]="s.key">{{ s.key }}</option>
+              }
+            </select></label>
+          <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
+            <input [ngModel]="tr.label?.['de'] ?? ''" (ngModelChange)="setTransitionLabel(ti, $event)" /></label>
+          <button type="button" class="fe__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeTransition(ti)">✕</button>
+        </div>
+
+        @if (mode() === 'expert') {
+          <div class="fe__expert">
+            <label class="fe__lbl">{{ 'admin.flow.guard' | t }}
+              <select #gop [ngModel]="guardOp(tr)" (ngModelChange)="setGuard(ti, $event, gval.value)">
+                <option value="">—</option>
+                @for (op of guardOps; track op) {
+                  <option [value]="op">{{ op }}</option>
+                }
+              </select></label>
+            <label class="fe__lbl">{{ 'admin.flow.guardValue' | t }}
+              <input #gval [value]="guardValue(tr)" (input)="setGuard(ti, gop.value, gval.value)" /></label>
+
+            <div class="fe__actions">
+              <span class="fe__actions-label">{{ 'admin.flow.actions' | t }}:</span>
+              @for (act of tr.actions ?? []; track $index; let ai = $index) {
+                <span class="fe__chip">
+                  {{ act.type }}
+                  <button type="button" [attr.aria-label]="'admin.common.remove' | t" (click)="removeAction(ti, ai)">✕</button>
+                </span>
+              }
+              <select #asel (change)="addAction(ti, asel.value); asel.value = ''">
+                <option value="">{{ 'admin.flow.addAction' | t }}</option>
+                @for (at of actionTypes; track at) {
+                  <option [value]="at">{{ at }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- Diagram -->
+  <section class="fe__block">
+    <div class="fe__block-head">
+      <h2>{{ 'admin.flow.diagram' | t }}</h2>
+      <app-button variant="ghost" size="sm" (click)="relayout()">{{ 'admin.flow.relayout' | t }}</app-button>
+    </div>
+    <svg class="fe__svg" [attr.viewBox]="viewBox()" role="img" [attr.aria-label]="'admin.flow.diagram' | t">
+      @for (e of edges(); track $index) {
+        <line [attr.x1]="e.x1" [attr.y1]="e.y1" [attr.x2]="e.x2" [attr.y2]="e.y2" class="fe__edge" />
+      }
+      @for (n of nodes(); track n.key) {
+        <g [attr.transform]="'translate(' + n.x + ',' + n.y + ')'">
+          <rect width="120" height="40" rx="8" class="fe__node" [class.fe__node--initial]="n.isInitial" />
+          <text x="60" y="24" text-anchor="middle" class="fe__node-text">{{ n.label }}</text>
+        </g>
+      }
+    </svg>
+  </section>
+
+  <details class="fe__json">
+    <summary>{{ 'admin.common.json' | t }}</summary>
+    <pre data-testid="flow-json">{{ json() }}</pre>
+  </details>
+
+  <footer class="fe__foot">
+    <span class="fe__status" [class.fe__status--ok]="validation().valid">
+      {{ (validation().valid ? 'admin.common.valid' : 'admin.common.errors') | t }}
+    </span>
+    <app-button [disabled]="!validation().valid" (click)="save()">{{ 'admin.flow.save' | t }}</app-button>
+  </footer>
+</section>

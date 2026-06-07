@@ -126,7 +126,50 @@ export const routes: Routes = [
         data: { title: 'nav.admin', permission: 'admin.config' },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
+          import('./pages/admin/admin-home.component').then((m) => m.AdminHomeComponent),
+      },
+      {
+        path: 'admin/forms',
+        data: { title: 'admin.form.title', permission: 'form.configure' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/form-builder/form-builder.component').then(
+            (m) => m.FormBuilderComponent,
+          ),
+      },
+      {
+        path: 'admin/flow',
+        data: { title: 'admin.flow.title', permission: 'flow.configure' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/flow-editor/flow-editor.component').then(
+            (m) => m.FlowEditorComponent,
+          ),
+      },
+      {
+        path: 'admin/branding',
+        data: { title: 'admin.brand.title', permission: 'admin.config' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/branding/branding-editor.component').then(
+            (m) => m.BrandingEditorComponent,
+          ),
+      },
+      {
+        path: 'admin/webhooks',
+        data: { title: 'admin.webhook.title', permission: 'webhook.manage' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/config/webhooks.component').then((m) => m.WebhooksComponent),
+      },
+      {
+        path: 'admin/notifications',
+        data: { title: 'admin.notif.title', permission: 'notification.manage' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/config/notification-rules.component').then(
+            (m) => m.NotificationRulesComponent,
+          ),
       },
       {
         path: '**',

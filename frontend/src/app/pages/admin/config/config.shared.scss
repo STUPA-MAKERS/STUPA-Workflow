@@ -1,0 +1,91 @@
+.cfg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cfg__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.cfg__empty {
+  color: var(--color-text-muted);
+}
+
+.cfg__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.cfg__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.cfg__lbl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.cfg__lbl--wide {
+  grid-column: span 2;
+}
+
+.cfg__chk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
+
+.cfg__events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  border: var(--border-width) dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.cfg__events legend {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+}
+
+.cfg__errors {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+}
+
+.cfg__row-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+input,
+select,
+textarea {
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+}

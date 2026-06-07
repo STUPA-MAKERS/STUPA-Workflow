@@ -44,8 +44,10 @@ const MOCK_PRINCIPAL: Principal = {
   roles: ['member'],
   // application.manage (T-31) für RBAC-Aktionen auf der Detail-Seite;
   // vote.manage/meeting.manage (T-32) für Beamer-/Manage-Ansichten;
-  // protocol.write (T-33) für den Protokoll-Editor — alle im Mock gesetzt, damit
-  // der FE-Dev/Harness-Betrieb die gegateten Ansichten zeigt.
+  // protocol.write (T-33) für den Protokoll-Editor;
+  // admin.config/form.configure/flow.configure/webhook.manage/notification.manage
+  // (T-34) für die Verwaltungs-UIs — alle im Mock gesetzt, damit der FE-Dev/
+  // Harness-/Demo-Betrieb die gegateten Ansichten zeigt.
   permissions: [
     'application.read',
     'application.manage',
@@ -53,6 +55,11 @@ const MOCK_PRINCIPAL: Principal = {
     'vote.manage',
     'meeting.manage',
     'protocol.write',
+    'admin.config',
+    'form.configure',
+    'flow.configure',
+    'webhook.manage',
+    'notification.manage',
   ],
   groups: [],
 };
