@@ -26,6 +26,7 @@ docker compose up -d --build
 | `clamav` | Virenscan (langer erster Start: Signaturen) | — |
 | `pytex` | interner Markdown→PDF-Renderer | — |
 | `altcha` | ALTCHA Sentinel (Captcha-Verifier) | — |
+| `backup` | tägliches verschlüsseltes Backup (pg_dump + MinIO-Spiegel, age); Profil `prod`/`backup` | — |
 
 `web` wird über das `..`-Repo-Root in zwei Stufen gebaut (`web/Dockerfile`): Stage 1
 baut mit Node das Angular-Frontend, Stage 2 serviert es per nginx. `web/nginx.conf` ist
@@ -57,6 +58,22 @@ Alle Secrets in `.env` (Vorlage: `.env.example`). Pflichtwerte für den API-Star
 sich, sobald ihre Werte gesetzt sind — fehlen sie, bleiben die jeweiligen Funktionen
 sauber abgeschaltet (kein Crash). Vollständige Referenz im
 [Configuration-Wiki](https://github.com/frederikbeimgraben/antragsplattform/wiki/Configuration).
+
+## Profile
+
+- **prod** — hinter NPM, externe Keycloak/SMTP/Nextcloud, ClamAV aktiv, **kein**
+  Host-Port außer `web`. Aktiviert zusätzlich den `backup`-Service:
+  ```bash
+  docker compose --profile prod up -d --build
+  ```
+  Für das echte NPM-Netz im compose `proxy:` auf `external: true` umstellen.
+- Default (ohne Profil) = Smoke-/Dev-Stack ohne `backup`.
+
+## Backup & Restore
+
+Tägliches verschlüsseltes Backup (PostgreSQL + MinIO, age) und die getestete
+Restore-Prozedur: siehe [`backup/README.md`](backup/README.md). Restore-Test:
+`../scripts/restore-smoke.sh`.
 
 ## Smoke-Test
 

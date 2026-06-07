@@ -313,3 +313,21 @@ jobs:
         run: |
           cp .env.example .env
           docker compose config -q
+
+  # ---- Restore-Smoke (T-42) ----------------------------------------------- #
+  # Beweist die Backup->Restore-Runde gegen einen Wegwerf-Stack (DB + MinIO).
+  # Opt-in wie e2e: baut das backup-Image + lädt mc -> zu schwer/langsam für jeden
+  # PR. Standardlauf erscheint sauber als *skipped* (neutral), blockiert nicht:
+  #   - manuell:   Actions → Run workflow (workflow_dispatch)
+  #   - pro PR:    Label `run-restore-smoke` setzen
+  #   - dauerhaft: Repo-Variable RUN_RESTORE_SMOKE=true
+  restore-smoke:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || contains(github.event.pull_request.labels.*.name, 'run-restore-smoke')
+      || vars.RUN_RESTORE_SMOKE == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore-Smoke (backup -> wipe -> restore -> verify)
+        run: scripts/restore-smoke.sh

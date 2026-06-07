@@ -217,6 +217,36 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  backup:
+    # Tägliches verschlüsseltes Backup (T-42, deployment.md §4): pg_dump (custom) +
+    # mc mirror (MinIO) -> ein age-verschlüsseltes Artefakt im backups-Volume, mit
+    # Retention. Eigener Job statt Cron im worker -> entkoppelt vom App-Lifecycle.
+    # Nur im prod-Profil aktiv (im Default-Stack aus, damit der Smoke schlank bleibt).
+    # Profil `backup` erlaubt das Ziehen/Restoren ohne den Rest des prod-Profils.
+    # Manuell: docker compose --profile backup run --rm backup backup.sh
+    build:
+      context: ./backup
+    profiles: ["prod", "backup"]
+    <<: *restart
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      # Restore braucht den privaten age-Key (off-host). Default-Pfad existiert im
+      # Normalbetrieb NICHT -> Backup (encrypt-only) läuft trotzdem. Nur zum Restore
+      # eine Key-Datei nach ./backup/secrets/age.key legen (gitignored).
+      - backups:/backups
+      # :z relabelt für SELinux-Hosts (Fedora/rootless podman); auf Nicht-SELinux
+      # (CI/ubuntu) ein No-op. Ohne -> "Permission denied" beim Lesen des age-Keys.
+      - ./backup/secrets:/secrets:ro,z
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
   # TODO(T-04/e2e): Für aktivierbare e2e (T-10 Auth + Captcha + Playwright-Specs)
   # hier dev-Profile-Services ergänzen — MailHog (SMTP-Sink) und Dev-Keycloak-Mock —
   # unter `profiles: [dev]`, damit der Prod-Stack unberührt bleibt. Bewusst noch
