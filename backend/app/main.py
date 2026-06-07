@@ -39,6 +39,7 @@ from app.modules.notifications.provider import close_mail_pool, create_mail_pool
 from app.modules.notifications.router import router as notifications_router
 from app.modules.pdf.action_dispatcher import ChainActionDispatcher, build_pdf_dispatcher
 from app.modules.pdf.router import router as pdf_router
+from app.modules.protocol.router import router as protocol_router
 from app.modules.voting.router import router as voting_router
 from app.modules.webhooks.action_dispatcher import build_webhook_dispatcher
 from app.settings import Settings, get_settings
@@ -62,6 +63,7 @@ api_router.include_router(applications_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
 api_router.include_router(livevote_router)
+api_router.include_router(protocol_router)
 api_router.include_router(budget_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(notifications_router)
