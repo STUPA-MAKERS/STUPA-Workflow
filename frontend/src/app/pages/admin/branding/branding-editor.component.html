@@ -10,6 +10,8 @@
       </div>
     </header>
 
+    <p class="br__desc">{{ 'admin.brand.desc' | t }}</p>
+
     @if (linkErrors().length > 0) {
       <p class="br__alert" role="alert">
         {{ 'admin.brand.badUrl' | t }} ({{ linkErrors().join(', ') }})
@@ -124,6 +126,9 @@
         </div>
 
         <p class="br__pv-welcome" data-testid="preview-welcome">{{ text(d.freetexts.welcome) }}</p>
+        @if (text(d.freetexts.support)) {
+          <p class="br__pv-support" data-testid="preview-support">{{ text(d.freetexts.support) }}</p>
+        }
 
         <footer class="br__pv-footer" data-testid="preview-footer">
           @for (col of d.footerColumns; track $index) {
@@ -135,6 +140,13 @@
             </div>
           }
           <p class="br__pv-copy">{{ text(d.copyright) }}</p>
+          @if (d.legalLinks.length) {
+            <nav class="br__pv-legal" data-testid="preview-legal" [attr.aria-label]="'admin.brand.legal' | t">
+              @for (link of d.legalLinks; track $index) {
+                <a [href]="link.url">{{ text(link.label) }}</a>
+              }
+            </nav>
+          }
         </footer>
       </aside>
     </div>

@@ -25,6 +25,8 @@ import { EVENT_NAMES, type EventName, type WebhookConfig } from '../admin.models
         <app-button variant="secondary" size="sm" (click)="add()">{{ 'admin.webhook.add' | t }}</app-button>
       </header>
 
+      <p class="cfg__desc">{{ 'admin.webhook.desc' | t }}</p>
+
       @if (hooks().length === 0) {
         <p class="cfg__empty">{{ 'admin.webhook.none' | t }}</p>
       }

@@ -25,6 +25,8 @@ import { type NotificationRule } from '../admin.models';
         <app-button variant="secondary" size="sm" (click)="add()">{{ 'admin.notif.add' | t }}</app-button>
       </header>
 
+      <p class="cfg__desc">{{ 'admin.notif.desc' | t }}</p>
+
       @if (rules().length === 0) {
         <p class="cfg__empty">{{ 'admin.notif.none' | t }}</p>
       }

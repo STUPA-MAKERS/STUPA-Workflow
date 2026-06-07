@@ -54,8 +54,11 @@ let nextId = 0;
         color: var(--color-danger);
       }
       .field__control {
-        padding: var(--space-3) var(--space-4);
+        height: var(--control-height);
+        box-sizing: border-box;
+        padding: 0 var(--space-4);
         font-size: var(--fs-md);
+        line-height: var(--lh-normal);
         color: var(--color-text);
         background: var(--color-surface);
         border: var(--border-width) solid var(--color-border-strong);

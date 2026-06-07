@@ -4,6 +4,8 @@
     <app-button variant="secondary" size="sm" (click)="addField()">{{ 'admin.form.addField' | t }}</app-button>
   </header>
 
+  <p class="fb__desc">{{ 'admin.form.desc' | t }}</p>
+
   @if (duplicates().length > 0) {
     <p class="fb__alert" role="alert">
       {{ 'admin.form.dupKeys' | t: { keys: duplicates().join(', ') } }}

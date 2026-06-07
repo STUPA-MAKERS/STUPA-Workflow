@@ -28,6 +28,14 @@ describe('BrandingEditorComponent (#21)', () => {
     expect(screen.getByTestId('preview-welcome')).toHaveTextContent(/Willkommen/);
   });
 
+  it('renders support text and legal links in the preview from the form state (#review2 §4)', async () => {
+    await setup();
+    expect(screen.getByTestId('preview-support')).toHaveTextContent(/support@/);
+    const legal = screen.getByTestId('preview-legal');
+    expect(legal).toHaveTextContent('Impressum');
+    expect(legal).toHaveTextContent('Datenschutz');
+  });
+
   it('live-updates the preview as free text changes', async () => {
     await setup();
     const welcome = screen.getByRole('textbox', { name: 'Willkommenstext' });

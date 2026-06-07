@@ -68,7 +68,10 @@ export const MOCK_BRANDING: Branding = {
     },
   ],
   copyright: { de: '© Studierendenschaft', en: '© Student body' },
-  legalLinks: [{ label: { de: 'Datenschutz', en: 'Privacy' }, url: 'https://example.org/privacy' }],
+  legalLinks: [
+    { label: { de: 'Impressum', en: 'Imprint' }, url: 'https://example.org/impressum' },
+    { label: { de: 'Datenschutz', en: 'Privacy' }, url: 'https://example.org/privacy' },
+  ],
   freetexts: {
     loginHint: { de: 'Mit Hochschul-Account anmelden.', en: 'Sign in with your university account.' },
     welcome: { de: 'Willkommen auf der Antragsplattform.', en: 'Welcome to the application platform.' },

@@ -1,0 +1,117 @@
+<header class="dash__head">
+  <h1 class="dash__title">{{ 'dashboard.greeting' | t: { name: auth.displayName() } }}</h1>
+  <p class="dash__subtitle">{{ 'dashboard.subtitle' | t }}</p>
+  @if (auth.roles().length) {
+    <div class="dash__roles">
+      @for (role of auth.roles(); track role) {
+        <app-badge variant="primary">{{ role | capitalize }}</app-badge>
+      }
+    </div>
+  }
+</header>
+
+<!-- Primäre CTA: neuen Antrag stellen (führt in den Apply-Wizard). -->
+<a class="dash__cta" routerLink="/apply">
+  <div class="dash__cta-text">
+    <h2 class="dash__cta-title">{{ 'dashboard.apply.title' | t }}</h2>
+    <p class="dash__cta-body">{{ 'dashboard.apply.body' | t }}</p>
+  </div>
+  <span class="dash__cta-action">{{ 'dashboard.apply.cta' | t }} →</span>
+</a>
+
+@if (canReadApplications()) {
+  <div class="dash__panels">
+    <!-- Offene Aufgaben: Anträge, die auf den Nutzer warten. -->
+    <section class="dash__panel" aria-labelledby="dash-tasks-h">
+      <div class="dash__panel-head">
+        <div>
+          <h2 id="dash-tasks-h" class="dash__panel-title">{{ 'dashboard.tasks.title' | t }}</h2>
+          <p class="dash__panel-sub">{{ 'dashboard.tasks.subtitle' | t }}</p>
+        </div>
+        @if (!loading() && !error() && openTasks().length) {
+          <app-badge variant="warning">{{ openTasks().length }}</app-badge>
+        }
+      </div>
+
+      @if (loading()) {
+        <p class="dash__state" aria-live="polite">{{ 'dashboard.loading' | t }}</p>
+      } @else if (error()) {
+        <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
+      } @else if (taskRows().length === 0) {
+        <p class="dash__state">{{ 'dashboard.tasks.empty' | t }}</p>
+      } @else {
+        <ul class="dash__list">
+          @for (item of taskRows(); track item.id) {
+            <li class="dash__row">
+              <a class="dash__row-link" [routerLink]="['/applications', item.id]">{{ name(item) }}</a>
+              <span class="dash__row-meta">
+                @if (item.state) {
+                  <app-badge [variant]="stateVariant(item.state.category)">{{ item.state.label }}</app-badge>
+                }
+                <span class="dash__row-cta">{{ 'dashboard.open' | t }} →</span>
+              </span>
+            </li>
+          }
+        </ul>
+        <a class="dash__more" routerLink="/applications">{{ 'dashboard.viewAll' | t }} →</a>
+      }
+    </section>
+
+    <!-- Meine Anträge: eigene/lesbare Anträge mit Status + Deep-Link. -->
+    <section class="dash__panel" aria-labelledby="dash-apps-h">
+      <div class="dash__panel-head">
+        <div>
+          <h2 id="dash-apps-h" class="dash__panel-title">{{ 'dashboard.applications.title' | t }}</h2>
+          <p class="dash__panel-sub">{{ 'dashboard.applications.subtitle' | t }}</p>
+        </div>
+        @if (!loading() && !error() && total()) {
+          <app-badge variant="primary">{{ total() }}</app-badge>
+        }
+      </div>
+
+      @if (loading()) {
+        <p class="dash__state" aria-live="polite">{{ 'dashboard.loading' | t }}</p>
+      } @else if (error()) {
+        <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
+      } @else if (applicationRows().length === 0) {
+        <div class="dash__empty">
+          <p class="dash__state">{{ 'dashboard.applications.empty' | t }}</p>
+          <a class="dash__empty-cta" routerLink="/apply">{{ 'dashboard.applications.emptyCta' | t }} →</a>
+        </div>
+      } @else {
+        <ul class="dash__list">
+          @for (item of applicationRows(); track item.id) {
+            <li class="dash__row">
+              <a class="dash__row-link" [routerLink]="['/applications', item.id]">{{ name(item) }}</a>
+              <span class="dash__row-meta">
+                @if (item.state) {
+                  <app-badge [variant]="stateVariant(item.state.category)">{{ item.state.label }}</app-badge>
+                }
+                @if (created(item); as c) {
+                  <time class="dash__row-date" [attr.datetime]="c">{{ c | date: 'mediumDate' }}</time>
+                }
+              </span>
+            </li>
+          }
+        </ul>
+        <a class="dash__more" routerLink="/applications">{{ 'dashboard.viewAll' | t }} →</a>
+      }
+    </section>
+  </div>
+}
+
+<!-- Schnellzugriffe: distinkte Ziele (kein Antrags-Inhalt), RBAC-gegated. -->
+@if (visibleQuickLinks().length) {
+  <section class="dash__quick" aria-labelledby="dash-quick-h">
+    <h2 id="dash-quick-h" class="dash__quick-h">{{ 'dashboard.quickLinks' | t }}</h2>
+    <div class="dash__grid">
+      @for (link of visibleQuickLinks(); track link.route) {
+        <a class="dash__tile" [routerLink]="link.route">
+          <app-card [heading]="link.titleKey | t" [interactive]="true">
+            <span card-footer class="dash__link">{{ 'dashboard.viewAll' | t }} →</span>
+          </app-card>
+        </a>
+      }
+    </div>
+  </section>
+}

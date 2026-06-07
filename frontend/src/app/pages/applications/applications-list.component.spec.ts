@@ -74,11 +74,26 @@ describe('ApplicationsListComponent', () => {
     detectChanges();
 
     expect(screen.getByRole('heading', { name: 'Anträge', level: 1 })).toBeInTheDocument();
-    expect(screen.getByText('Eingereicht')).toBeInTheDocument();
+    // state appears both as the row badge and as a real status filter option (#review2 §2)
+    const badge = screen.getAllByText('Eingereicht').find((el) => el.tagName !== 'OPTION');
+    expect(badge).toBeTruthy();
     expect(screen.getByText(/250/)).toBeInTheDocument();
     // row links to the detail route (the type name also appears in the filter <option>)
     const link = screen.getByRole('link', { name: /Finanzantrag/ });
     expect(link).toHaveAttribute('href', '/applications/app-1');
+    http.verify();
+  });
+
+  it('offers the real loaded states as status filter options with the state UUID as value (#review2 §2)', async () => {
+    const { http, detectChanges } = await setup();
+    flushTypes(http);
+    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+    detectChanges();
+
+    // The status filter is a dropdown (not free text); option label = state name,
+    // option value = the backend state UUID (sent filter value unchanged).
+    const option = screen.getByRole('option', { name: 'Eingereicht' }) as HTMLOptionElement;
+    expect(option.value).toBe('s1');
     http.verify();
   });
 

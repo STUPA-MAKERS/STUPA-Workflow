@@ -77,9 +77,11 @@ export interface SelectOption {
         appearance: none;
         -webkit-appearance: none;
         width: 100%;
-        padding: var(--space-3) var(--space-7) var(--space-3) var(--space-4);
-        font: inherit;
+        height: var(--control-height);
+        box-sizing: border-box;
+        padding: 0 var(--space-7) 0 var(--space-4);
         font-size: var(--fs-md);
+        line-height: var(--lh-normal);
         color: var(--color-text);
         background-color: var(--color-surface);
         background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path d="M2 4.5l4 4 4-4" fill="none" stroke="%236e756f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>');

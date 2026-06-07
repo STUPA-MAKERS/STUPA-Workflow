@@ -20,6 +20,12 @@
   font-size: var(--fs-sm);
 }
 
+.fb__desc {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+
 .fb__empty {
   color: var(--color-text-muted);
 }
@@ -111,15 +117,23 @@
 input,
 select,
 textarea {
-  padding: var(--space-2) var(--space-3);
   font: inherit;
   color: var(--color-text);
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+}
+
+// Einheitliche Control-Höhe: native Felder bündig mit app-select (#85-Regression).
+input,
+select {
+  height: var(--control-height);
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
 }
 
 textarea {
+  padding: var(--space-2) var(--space-3);
   font-family: var(--font-mono, monospace);
   resize: vertical;
 }

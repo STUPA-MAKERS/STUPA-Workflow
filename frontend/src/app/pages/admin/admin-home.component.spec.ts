@@ -1,5 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -52,5 +52,26 @@ describe('AdminHomeComponent', () => {
     // Status-Badge + Version sichtbar.
     expect(screen.getAllByText('Aktiv').length).toBeGreaterThan(0);
     expect(screen.getByText('v3')).toBeInTheDocument();
+  });
+
+  it('shows an error state when the active-forms request fails (#review2 §5)', async () => {
+    // Real mode → the overview comes from the API; a failure must surface an error state.
+    const view = await render(AdminHomeComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+      ],
+    });
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    http
+      .expectOne((r) => r.url.endsWith('/admin/application-types'))
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    http.expectOne((r) => r.url.endsWith('/admin/gremien')).flush([]);
+    view.fixture.detectChanges();
+
+    expect(screen.getByRole('alert')).toHaveTextContent('konnten nicht geladen werden');
+    http.verify();
   });
 });

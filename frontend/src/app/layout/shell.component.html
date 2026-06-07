@@ -71,16 +71,13 @@
   <div class="container footer__inner">
     <img class="footer__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     <span class="footer__text">{{ footerCopyright() || ('footer.coBranding' | t) }}</span>
-    <nav class="footer__links" [attr.aria-label]="'nav.footer' | t">
-      @if (footerLinks().length > 0) {
+    @if (footerLinks().length > 0) {
+      <nav class="footer__links" [attr.aria-label]="'nav.footer' | t">
         @for (link of footerLinks(); track link.url) {
           <a [href]="link.url">{{ link.label }}</a>
         }
-      } @else {
-        <a href="#">{{ 'footer.imprint' | t }}</a>
-        <a href="#">{{ 'footer.privacy' | t }}</a>
-      }
-    </nav>
+      </nav>
+    }
   </div>
 </footer>
 
