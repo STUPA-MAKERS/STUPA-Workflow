@@ -279,6 +279,42 @@ def test_applications_router_rejects_missing_altcha() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Strukturprüfung des altcha-Felds greift VOR der Logik und UNABHÄNGIG vom Schalter
+# (Contract `negative_data_rejection`: malformtes Payload muss 4xx liefern) — Issue #23
+# --------------------------------------------------------------------------- #
+# Exakte CI-Reproduktion: Steuerzeichen-String, der die `null`-Variante des
+# `anyOf[string,null]`-Schemas „negiert", aber als String galt → früher 202.
+_MALFORMED_ALTCHA = "ZÈ♯æL¾&"
+
+
+def test_magic_link_malformed_altcha_422_even_when_disabled() -> None:
+    # Kein Altcha-Secret → Verifikation AUS (CI-Parität). Trotzdem muss ein strukturell
+    # ungültiges Payload mit 422 (problem+json) abgelehnt werden, nicht 202.
+    app = create_app(_settings())
+    resp = TestClient(app).post(
+        "/api/auth/magic-link", json={"email": "a@b.de", "altcha": _MALFORMED_ALTCHA}
+    )
+    assert resp.status_code == 422
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    assert resp.json()["errors"][0]["field"] == "body.altcha"
+
+
+def test_applications_malformed_altcha_422_even_when_disabled() -> None:
+    app = create_app(_settings())
+    resp = TestClient(app).post(
+        "/api/applications",
+        json={
+            "typeId": "11111111-1111-1111-1111-111111111111",
+            "data": {},
+            "applicantEmail": "a@b.de",
+            "altcha": _MALFORMED_ALTCHA,
+        },
+    )
+    assert resp.status_code == 422
+    assert resp.json()["errors"][0]["field"] == "body.altcha"
+
+
+# --------------------------------------------------------------------------- #
 # Lifespan schließt den Redis-Client
 # --------------------------------------------------------------------------- #
 async def test_lifespan_closes_redis_client() -> None:

@@ -22,8 +22,10 @@ import logging
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Annotated, Protocol, runtime_checkable
 from urllib.parse import parse_qs, urlparse
+
+from pydantic import AfterValidator
 
 ALGORITHM = "SHA-256"
 
@@ -104,11 +106,27 @@ def _parse_expires(salt: str) -> int | None:
     return int(raw)
 
 
-def verify_solution(payload_b64: str, secret: str, *, now: int) -> str:
-    """Lösung prüfen (Algorithmus, Hash, HMAC, Ablauf). Liefert den Replay-Schlüssel.
+@dataclass(frozen=True)
+class Solution:
+    """Strukturell geparste (noch **nicht** kryptografisch verifizierte) PoW-Lösung."""
 
-    Wirft `AltchaError` bei jeder Ungültigkeit. Konstante-Zeit-Vergleich für Hash/HMAC.
-    """
+    algorithm: str
+    challenge: str
+    number: int
+    salt: str
+    signature: str
+
+
+def parse_solution(payload_b64: str) -> Solution:
+    """Lösungs-Payload **strukturell** parsen (Base64→JSON→Pflichtfelder/Typen).
+
+    Reine Form-Validierung ohne Secret/Krypto: prüft, dass `payload_b64` dekodierbares
+    Base64-JSON mit den erwarteten Feldern und Typen ist. Wirft `AltchaError` bei jeder
+    strukturellen Ungültigkeit (kaputtes Base64, kein JSON-Objekt, fehlende/falsch
+    getypte Felder). Dient sowohl der vollen Verifikation (`verify_solution`) als auch
+    der frühen Request-Validierung (`MagicLinkRequest`/`ApplicationCreate`), damit
+    malformte Eingaben **unabhängig** vom Altcha-Schalter mit 4xx abgelehnt werden
+    (Contract `negative_data_rejection`, Issue #23)."""
     try:
         raw = base64.b64decode(payload_b64, validate=True)
         data = json.loads(raw)
@@ -129,6 +147,42 @@ def verify_solution(payload_b64: str, secret: str, *, now: int) -> str:
     # bool ist int-Subklasse → explizit ausschließen; negative Zahlen unzulässig.
     if isinstance(number, bool) or not isinstance(number, int) or number < 0:
         raise AltchaError("malformed altcha payload")
+    return Solution(
+        algorithm=algorithm, challenge=challenge, number=number, salt=salt, signature=signature
+    )
+
+
+def validate_solution_format(value: str) -> str:
+    """Pydantic-`AfterValidator`: strukturell ungültiges Altcha → `ValueError` (→ 422).
+
+    Greift im Request-Schema **vor** jeder Endpoint-Logik (Mail-Existenzprüfung,
+    DB-Zugriff) und **unabhängig** davon, ob die Altcha-Verifikation aktiv ist. So wird
+    ein malformtes Payload (Steuerzeichen, kein Base64-JSON, fehlende Felder) konsistent
+    mit problem+json-422 abgelehnt, ohne den Enumeration-Schutz (konstante Antwort für
+    existierende/nicht-existierende Mail) zu berühren — die Ablehnung hängt allein an der
+    Payload-Form. `AltchaError` wird zu `ValueError` umgehängt, weil Pydantic nur
+    `ValueError`/`AssertionError` zu Validierungsfehlern (422) macht (sonst 500)."""
+    try:
+        parse_solution(value)
+    except AltchaError as exc:
+        raise ValueError(f"malformed altcha solution: {exc}") from exc
+    return value
+
+
+AltchaSolutionStr = Annotated[str, AfterValidator(validate_solution_format)]
+"""Request-Feldtyp für ein Altcha-Solution-Feld: erzwingt strukturelle Form (422)."""
+
+
+def verify_solution(payload_b64: str, secret: str, *, now: int) -> str:
+    """Lösung prüfen (Algorithmus, Hash, HMAC, Ablauf). Liefert den Replay-Schlüssel.
+
+    Wirft `AltchaError` bei jeder Ungültigkeit. Konstante-Zeit-Vergleich für Hash/HMAC.
+    """
+    parsed = parse_solution(payload_b64)
+    challenge = parsed.challenge
+    number = parsed.number
+    salt = parsed.salt
+    signature = parsed.signature
 
     expires = _parse_expires(salt)
     if expires is not None and now > expires:

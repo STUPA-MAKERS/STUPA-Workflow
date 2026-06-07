@@ -15,6 +15,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.modules.applications.diff import DataDiff
+from app.shared.altcha import AltchaSolutionStr
 from app.shared.i18n import I18nMap
 
 
@@ -37,7 +38,9 @@ class ApplicationCreate(_CamelModel):
     applicant_email: EmailStr = Field(alias="applicantEmail")
     applicant_name: str | None = Field(default=None, alias="applicantName")
     lang: Literal["de", "en"] = "de"
-    altcha: str | None = None
+    # Strukturell schon im Schema validiert (malformt → 422); kryptografische Prüfung via
+    # `require_altcha` (security.md §7, Issue #23). Vgl. `MagicLinkRequest.altcha`.
+    altcha: AltchaSolutionStr | None = None
 
 
 class ApplicationCreated(_CamelModel):

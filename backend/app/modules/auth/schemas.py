@@ -7,15 +7,19 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
+from app.shared.altcha import AltchaSolutionStr
+
 
 class MagicLinkRequest(BaseModel):
     """`POST /auth/magic-link` — Anti-Enumeration: Antwort immer 202."""
 
     email: EmailStr
     application_id: UUID | None = None
-    # Altcha-Solution (PoW). Serverseitig verifiziert via `require_altcha` (security.md §7,
-    # Issue #23); ohne konfiguriertes Secret (Dev/Test) wird das Feld nur durchgereicht.
-    altcha: str | None = None
+    # Altcha-Solution (PoW). Strukturell schon im Schema validiert (malformt → 422,
+    # `AltchaSolutionStr`); die kryptografische Verifikation läuft zusätzlich via
+    # `require_altcha` (security.md §7, Issue #23). Ohne Secret (Dev/Test) bleibt nur die
+    # Strukturprüfung — ein malformtes Payload wird trotzdem abgelehnt.
+    altcha: AltchaSolutionStr | None = None
 
 
 class MagicLinkVerifyRequest(BaseModel):

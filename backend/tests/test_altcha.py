@@ -15,7 +15,9 @@ from app.shared.altcha import (
     RedisReplayGuard,
     create_challenge,
     encode_solution,
+    parse_solution,
     solve_challenge,
+    validate_solution_format,
     verify_solution,
 )
 
@@ -116,6 +118,46 @@ def test_missing_string_field_rejected() -> None:
     enc = base64.b64encode(json.dumps(payload).encode()).decode()
     with pytest.raises(AltchaError):
         verify_solution(enc, SECRET, now=0)
+
+
+# --------------------------------------------------------------------------- #
+# parse_solution / validate_solution_format (Strukturprüfung ohne Secret) — Issue #23
+# --------------------------------------------------------------------------- #
+def test_parse_solution_returns_fields() -> None:
+    challenge = create_challenge(SECRET, number=7, salt="abcd", max_number=10)
+    parsed = parse_solution(encode_solution(challenge, 7))
+    assert parsed.number == 7
+    assert parsed.algorithm == "SHA-256"
+    assert parsed.challenge == challenge.challenge
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "ZÈ♯",  # Steuerzeichen (exakt CI-Reproduktion)
+        "garbage!!",  # kein gültiges Base64
+        "",  # leer
+        base64.b64encode(b"abc").decode(),  # gültiges Base64, aber kein JSON
+        base64.b64encode(json.dumps([1, 2]).encode()).decode(),  # JSON, aber kein Objekt
+        base64.b64encode(json.dumps({"algorithm": "SHA-256"}).encode()).decode(),  # Felder fehlen
+    ],
+)
+def test_parse_solution_rejects_malformed(bad: str) -> None:
+    with pytest.raises(AltchaError):
+        parse_solution(bad)
+
+
+def test_validate_solution_format_passes_well_formed() -> None:
+    challenge = create_challenge(SECRET, number=3, salt="s", max_number=10)
+    enc = encode_solution(challenge, 3)
+    # Strukturell ok → unverändert zurück (Krypto wird hier NICHT geprüft).
+    assert validate_solution_format(enc) == enc
+
+
+def test_validate_solution_format_raises_valueerror_for_pydantic() -> None:
+    # Pydantic macht nur aus ValueError/AssertionError ein 422 (sonst 500) → kein AltchaError.
+    with pytest.raises(ValueError):
+        validate_solution_format("ZÈ")
 
 
 # --------------------------------------------------------------------------- #

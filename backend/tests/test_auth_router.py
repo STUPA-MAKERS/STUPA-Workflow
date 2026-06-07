@@ -214,6 +214,33 @@ def test_magic_link_invalid_email_422(enabled_client: TestClient) -> None:
     assert resp.status_code == 422
 
 
+def test_magic_link_malformed_altcha_422(enabled_client: TestClient) -> None:
+    # Strukturell ungültiges altcha (Steuerzeichen) → 422 VOR der Logik, auch bei
+    # ausgeschalteter Verifikation (Contract `negative_data_rejection`, Issue #23).
+    resp = enabled_client.post(
+        "/api/auth/magic-link", json={"email": "x@y.de", "altcha": "ZÈ♯æL¾&"}
+    )
+    assert resp.status_code == 422
+    assert resp.json()["errors"][0]["field"] == "body.altcha"
+
+
+def test_magic_link_well_formed_altcha_202(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Strukturell gültige Lösung (Krypto irrelevant, Verifikation aus) → Happy-Path 202.
+    from app.shared.altcha import create_challenge, solve_challenge
+
+    async def _noop(settings: object, email: str, application_id: object, pool: object) -> None:
+        return None
+
+    monkeypatch.setattr(router_mod, "_deliver_magic_link", _noop)
+    solution = solve_challenge(create_challenge("altcha-test-secret-0123", max_number=50))
+    resp = enabled_client.post(
+        "/api/auth/magic-link", json={"email": "x@y.de", "altcha": solution}
+    )
+    assert resp.status_code == 202
+
+
 async def test_deliver_magic_link_opens_session_and_commits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
