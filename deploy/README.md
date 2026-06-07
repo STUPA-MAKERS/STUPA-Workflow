@@ -135,3 +135,22 @@ Restore-Prozedur: siehe [`backup/README.md`](backup/README.md). Restore-Test:
 ../scripts/smoke.sh        # up + warten bis healthy
 ../scripts/smoke.sh down   # Stack inkl. Volumes abräumen
 ```
+
+### Real-Stack-Smoke (Kernflüsse via HTTP/WS)
+
+Fährt den vollen Stack hoch (Mock AUS, Bootstrap-Admin gesetzt) und prüft die
+Kernflüsse rein über HTTP/WS — API up, `/api/health`, öffentlicher Branding-Read,
+Auth-Pfad erreichbar (307), `/auth/me` 401, WS-Handshake erreichbar. Eigener
+`COMPOSE_PROJECT_NAME` (berührt keinen anderen Stack); sichert/stellt ein
+vorhandenes `deploy/.env` wieder her; räumt restlos ab.
+
+```bash
+../scripts/smoke-real-stack.sh        # up -> Kernflüsse prüfen -> teardown
+```
+
+Host-Port ist fix `127.0.0.1:8080` (compose-Mapping). `SMOKE_TIMEOUT` (Default
+600s) steuert die Wartezeit (ClamAV lädt lange).
+
+CI: Job `real-stack-smoke` (opt-in wie e2e). Default-PR bleibt grün (skipped).
+Triggern: `workflow_dispatch`, PR-Label `run-real-stack-smoke`, oder Repo-Variable
+`RUN_REAL_STACK_SMOKE=true`. Kein FE-Selenium — das macht die Visual-Harness.
