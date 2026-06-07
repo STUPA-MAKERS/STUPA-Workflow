@@ -143,6 +143,22 @@ async def test_verify_id_token_happy() -> None:
     assert claims.sub == "user-1"
     assert claims.email == "e@x.de"
     assert claims.groups == ["stupa", "asta"]
+    assert claims.email_verified is False  # Claim fehlt → defensiv unverifiziert
+
+
+async def test_verify_id_token_email_verified_claim() -> None:
+    """`email_verified` zählt nur bei striktem ``True`` (#70-E-Mail-Bootstrap)."""
+    with respx.mock:
+        respx.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))
+        verified = await oidc.verify_id_token(
+            _settings(), id_token=_id_token(nonce="nc", email_verified=True), nonce="nc"
+        )
+        # truthy-aber-nicht-True (z. B. String "true") zählt NICHT
+        unverified = await oidc.verify_id_token(
+            _settings(), id_token=_id_token(nonce="nc", email_verified="true"), nonce="nc"
+        )
+    assert verified.email_verified is True
+    assert unverified.email_verified is False
 
 
 async def test_verify_id_token_groups_non_list_falls_back() -> None:

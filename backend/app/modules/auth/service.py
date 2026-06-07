@@ -179,8 +179,11 @@ async def oidc_callback(
     )
     row = await upsert_principal(db, claims)
     # Bootstrap-Admins (#70): erstmaliger/idempotenter admin-Grant beim Login, sonst
-    # sperrt sich eine frische OIDC-Installation selbst aus. Committet der Aufrufer.
-    await ensure_admin_for_principal(db, settings, row)
+    # sperrt sich eine frische OIDC-Installation selbst aus. Der E-Mail-Bootstrap zählt
+    # nur bei verifizierter Mail (claims.email_verified). Committet der Aufrufer.
+    await ensure_admin_for_principal(
+        db, settings, row, email_verified=claims.email_verified
+    )
     cookie = await sessions.create_principal_session(
         db,
         secret=settings.session_secret,

@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import Principal as PrincipalRow
@@ -31,10 +31,19 @@ logger = logging.getLogger("app.auth.bootstrap")
 _ADMIN_ROLE_KEY = "admin"
 
 
-def _is_bootstrap_principal(row: PrincipalRow, settings: Settings) -> bool:
-    """``True``, wenn der Principal per ``sub`` oder E-Mail in den Bootstrap-Listen steht."""
+def _is_bootstrap_principal(
+    row: PrincipalRow, settings: Settings, *, email_verified: bool
+) -> bool:
+    """``True``, wenn der Principal per ``sub`` oder **verifizierter** E-Mail matcht.
+
+    Der ``sub`` ist die fälschungssichere IdP-Identität und zählt immer. Die E-Mail
+    zählt **nur bei ``email_verified``** — sonst könnte ein IdP mit Self-Registration
+    ohne Mail-Verifikation einen Token mit beliebiger ``email`` ausstellen (#70).
+    """
     if row.sub in settings.bootstrap_admin_subject_set:
         return True
+    if not email_verified:
+        return False
     email = row.email
     return email is not None and email.lower() in settings.bootstrap_admin_email_set
 
@@ -69,15 +78,16 @@ def _new_assignment(principal_id: object, role_id: object) -> RoleAssignment:
 
 
 async def ensure_admin_for_principal(
-    db: AsyncSession, settings: Settings, row: PrincipalRow
+    db: AsyncSession, settings: Settings, row: PrincipalRow, *, email_verified: bool
 ) -> bool:
     """Login-Pfad: diesem Principal idempotent die ``admin``-Rolle geben.
 
-    Greift nur, wenn der Principal in den Bootstrap-Listen steht und die Rolle noch
-    nicht (global) hält. Gibt ``True`` bei Neu-Zuweisung. **Committet nicht** — der
-    Aufrufer (OIDC-Callback) steuert die Transaktion.
+    Greift nur, wenn der Principal (per ``sub`` oder **verifizierter** E-Mail) in den
+    Bootstrap-Listen steht und die Rolle noch nicht (global) hält. ``email_verified``
+    stammt aus dem frischen id_token-Claim. Gibt ``True`` bei Neu-Zuweisung.
+    **Committet nicht** — der Aufrufer (OIDC-Callback) steuert die Transaktion.
     """
-    if not _is_bootstrap_principal(row, settings):
+    if not _is_bootstrap_principal(row, settings, email_verified=email_verified):
         return False
     role_id = await _admin_role_id(db)
     if role_id is None:
@@ -92,27 +102,23 @@ async def ensure_admin_for_principal(
 
 
 async def ensure_bootstrap_admins(db: AsyncSession, settings: Settings) -> int:
-    """Startup-Sweep: allen bereits existierenden, gematchten Principals die Rolle geben.
+    """Startup-Sweep: bereits existierenden Principals **per ``sub``** die Rolle geben.
 
-    Subjects/E-Mails ohne Principal-Zeile werden beim ersten Login versorgt
-    (``ensure_admin_for_principal``). Gibt die Anzahl **neuer** Zuweisungen.
-    **Committet nicht** — der Aufrufer steuert die Transaktion.
+    Bewusst **nur ``sub``** (fälschungssichere IdP-Identität): die gespeicherte
+    ``principal.email`` trägt kein ``email_verified``-Flag, also lässt sich beim
+    Start nicht prüfen, ob sie verifiziert war (#70). Der E-Mail-Bootstrap greift
+    deshalb ausschließlich am Login (``ensure_admin_for_principal`` mit dem frischen,
+    verifizierten Claim). Gibt die Anzahl **neuer** Zuweisungen. **Committet nicht.**
     """
     subjects = settings.bootstrap_admin_subject_set
-    emails = settings.bootstrap_admin_email_set
-    if not subjects and not emails:
+    if not subjects:
         return 0
     role_id = await _admin_role_id(db)
     if role_id is None:
         logger.warning("bootstrap admin sweep: role %r missing", _ADMIN_ROLE_KEY)
         return 0
     res = await db.execute(
-        select(PrincipalRow).where(
-            or_(
-                PrincipalRow.sub.in_(subjects),
-                func.lower(PrincipalRow.email).in_(emails),
-            )
-        )
+        select(PrincipalRow).where(PrincipalRow.sub.in_(subjects))
     )
     granted = 0
     for row in res.scalars().all():
