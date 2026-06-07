@@ -353,3 +353,23 @@ jobs:
       - uses: actions/checkout@v4
       - name: Restore-Smoke (backup -> wipe -> restore -> verify)
         run: scripts/restore-smoke.sh
+
+  # ---- Real-Stack-Smoke (Prozess-Fix) ------------------------------------- #
+  # Fährt den VOLLEN Compose-Stack hoch (Mock AUS, Bootstrap-Admin gesetzt) und
+  # prüft die Kernflüsse rein über HTTP/WS (API up, /api/health, public/auth-Pfade,
+  # WS-Handshake). Gedacht, um eine Welle bewusst gegen den echten Stack zu testen.
+  # Opt-in wie e2e/restore-smoke: voller Build + ClamAV-Load -> zu schwer für jeden
+  # PR. Standardlauf erscheint sauber als *skipped* (neutral), blockiert nicht:
+  #   - manuell:   Actions → Run workflow (workflow_dispatch)
+  #   - pro PR:    Label `run-real-stack-smoke` setzen
+  #   - dauerhaft: Repo-Variable RUN_REAL_STACK_SMOKE=true
+  real-stack-smoke:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || contains(github.event.pull_request.labels.*.name, 'run-real-stack-smoke')
+      || vars.RUN_REAL_STACK_SMOKE == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real-Stack-Smoke (compose up -> HTTP/WS-Kernflüsse)
+        run: scripts/smoke-real-stack.sh
