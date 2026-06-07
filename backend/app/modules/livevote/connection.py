@@ -132,17 +132,11 @@ class LiveVoteConnection:
                 applicationId=vote_out.application_id,
                 options=vote_out.config.options,
                 closesAt=vote_out.closes_at,
+                secret=vote_out.secret,
             ).dump()
         )
-        await self._send(
-            VoteTallyEvent(
-                voteId=vote_out.id,
-                counts=vote_out.tally.counts,
-                eligible=vote_out.tally.eligible,
-                quorumMet=vote_out.tally.quorum_met,
-                leading=vote_out.tally.leading,
-            ).dump()
-        )
+        # ``from_vote`` setzt die »Counts erst bei Close«-Regel für geheime Votes durch.
+        await self._send(VoteTallyEvent.from_vote(vote_out).dump())
 
     # ------------------------------------------------------------------ cast
     async def _handle_cast(self, raw: dict[str, object]) -> None:

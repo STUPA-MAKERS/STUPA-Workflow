@@ -59,19 +59,16 @@ class BrokerPublisher:
             applicationId=vote.application_id,
             options=vote.config.options,
             closesAt=vote.closes_at,
+            secret=vote.secret,
         )
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
     async def vote_tally(self, vote: VoteOut) -> None:
         if vote.meeting_id is None:
             return
-        event = VoteTallyEvent(
-            voteId=vote.id,
-            counts=vote.tally.counts,
-            eligible=vote.tally.eligible,
-            quorumMet=vote.tally.quorum_met,
-            leading=vote.tally.leading,
-        )
+        # ``from_vote`` unterdrückt Choice-Counts solange der Vote geheim **und** offen
+        # ist (kein Zwischenstand-Leak am Beamer/Voter); nur die Teilnahme reist mit.
+        event = VoteTallyEvent.from_vote(vote)
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
     async def vote_closed(self, vote: VoteClosed) -> None:
