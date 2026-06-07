@@ -1,0 +1,127 @@
+<section class="fb">
+  <header class="fb__head">
+    <h1>{{ 'admin.form.title' | t }}</h1>
+    <app-button variant="secondary" size="sm" (click)="addField()">{{ 'admin.form.addField' | t }}</app-button>
+  </header>
+
+  @if (duplicates().length > 0) {
+    <p class="fb__alert" role="alert">
+      {{ 'admin.form.dupKeys' | t: { keys: duplicates().join(', ') } }}
+    </p>
+  }
+
+  @if (fields().length === 0) {
+    <p class="fb__empty">{{ 'admin.form.noFields' | t }}</p>
+  }
+
+  <ol class="fb__list">
+    @for (field of fields(); track $index; let fi = $index) {
+      <li class="fb__field">
+        <div class="fb__field-head">
+          <strong>{{ 'admin.form.field' | t }} {{ fi + 1 }}</strong>
+          <div class="fb__field-tools">
+            <button type="button" [attr.aria-label]="'admin.common.moveUp' | t" (click)="move(fi, -1)">↑</button>
+            <button type="button" [attr.aria-label]="'admin.common.moveDown' | t" (click)="move(fi, 1)">↓</button>
+            <button type="button" class="fb__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeField(fi)">✕</button>
+          </div>
+        </div>
+
+        <div class="fb__grid">
+          <label class="fb__lbl">
+            {{ 'admin.common.key' | t }}
+            <input [(ngModel)]="field.key" (ngModelChange)="touch()" autocomplete="off" />
+          </label>
+          <label class="fb__lbl">
+            {{ 'admin.common.type' | t }}
+            <select [ngModel]="field.type" (ngModelChange)="onTypeChange(fi, $event)">
+              @for (t of fieldTypes; track t) {
+                <option [value]="t">{{ t }}</option>
+              }
+            </select>
+          </label>
+          <label class="fb__lbl">
+            {{ 'admin.common.labelDe' | t }}
+            <input [(ngModel)]="field.label['de']" (ngModelChange)="touch()" />
+          </label>
+          <label class="fb__lbl">
+            {{ 'admin.common.labelEn' | t }}
+            <input [(ngModel)]="field.label['en']" (ngModelChange)="touch()" />
+          </label>
+        </div>
+
+        <div class="fb__toggles">
+          <label><input type="checkbox" [(ngModel)]="field.required" (ngModelChange)="touch()" /> {{ 'admin.common.required' | t }}</label>
+          <label><input type="checkbox" [(ngModel)]="field.isPII" (ngModelChange)="touch()" /> {{ 'admin.form.isPII' | t }}</label>
+          <label><input type="checkbox" [(ngModel)]="field.isPromoted" (ngModelChange)="touch()" /> {{ 'admin.form.isPromoted' | t }}</label>
+          @if (field.isPromoted) {
+            <label class="fb__lbl fb__lbl--inline">
+              {{ 'admin.form.promoteTarget' | t }}
+              <input [(ngModel)]="field.promoteTarget" (ngModelChange)="touch()" />
+            </label>
+          }
+        </div>
+
+        @if (isChoice(field.type)) {
+          <fieldset class="fb__sub">
+            <legend>{{ 'admin.form.options' | t }}</legend>
+            @for (opt of field.options ?? []; track $index; let oi = $index) {
+              <div class="fb__opt">
+                <input [attr.aria-label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" placeholder="value" />
+                <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="opt.label['de']" (ngModelChange)="touch()" placeholder="DE" />
+                <input [attr.aria-label]="'admin.common.labelEn' | t" [(ngModel)]="opt.label['en']" (ngModelChange)="touch()" placeholder="EN" />
+                <button type="button" class="fb__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeOption(fi, oi)">✕</button>
+              </div>
+            }
+            <app-button variant="ghost" size="sm" (click)="addOption(fi)">{{ 'admin.form.addOption' | t }}</app-button>
+          </fieldset>
+        }
+
+        <details class="fb__sub">
+          <summary>{{ 'admin.form.validation' | t }} · {{ 'admin.form.visibleIf' | t }}</summary>
+          <div class="fb__grid">
+            <label class="fb__lbl">{{ 'admin.form.min' | t }}
+              <input type="number" [ngModel]="field.validation?.min" (ngModelChange)="setVal(fi, 'min', $event)" /></label>
+            <label class="fb__lbl">{{ 'admin.form.max' | t }}
+              <input type="number" [ngModel]="field.validation?.max" (ngModelChange)="setVal(fi, 'max', $event)" /></label>
+            <label class="fb__lbl">{{ 'admin.form.minLen' | t }}
+              <input type="number" [ngModel]="field.validation?.minLen" (ngModelChange)="setVal(fi, 'minLen', $event)" /></label>
+            <label class="fb__lbl">{{ 'admin.form.maxLen' | t }}
+              <input type="number" [ngModel]="field.validation?.maxLen" (ngModelChange)="setVal(fi, 'maxLen', $event)" /></label>
+            <label class="fb__lbl fb__lbl--wide">{{ 'admin.form.pattern' | t }}
+              <input [ngModel]="field.validation?.pattern" (ngModelChange)="setVal(fi, 'pattern', $event)" /></label>
+          </div>
+          <label class="fb__lbl fb__lbl--wide">
+            {{ 'admin.form.visibleIf' | t }}
+            <textarea rows="2" [ngModel]="logicRaw(fi, 'visibleIf', field.visibleIf)" (ngModelChange)="onLogicInput(fi, 'visibleIf', $event)" placeholder='{"==":[{"var":"x"},1]}'></textarea>
+          </label>
+          @if (field.type === 'computed') {
+            <label class="fb__lbl fb__lbl--wide">
+              {{ 'admin.form.compute' | t }}
+              <textarea rows="2" [ngModel]="logicRaw(fi, 'compute', field.compute)" (ngModelChange)="onLogicInput(fi, 'compute', $event)" placeholder='{"+":[{"var":"a"},{"var":"b"}]}'></textarea>
+            </label>
+          }
+        </details>
+
+        @if (fieldErrors()[fi].length > 0) {
+          <ul class="fb__errors" role="alert">
+            @for (err of fieldErrors()[fi]; track err) {
+              <li>{{ err }}</li>
+            }
+          </ul>
+        }
+      </li>
+    }
+  </ol>
+
+  <details class="fb__json">
+    <summary>{{ 'admin.common.json' | t }}</summary>
+    <pre data-testid="form-json">{{ json() }}</pre>
+  </details>
+
+  <footer class="fb__foot">
+    <span class="fb__status" [class.fb__status--ok]="formValid()">
+      {{ (formValid() ? 'admin.common.valid' : 'admin.common.errors') | t }}
+    </span>
+    <app-button [disabled]="!formValid()" (click)="save()">{{ 'admin.form.save' | t }}</app-button>
+  </footer>
+</section>

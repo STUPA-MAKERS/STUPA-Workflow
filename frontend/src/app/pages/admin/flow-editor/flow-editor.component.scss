@@ -1,0 +1,216 @@
+.fe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.fe__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.fe__modes {
+  display: inline-flex;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.fe__modes button {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+}
+
+.fe__mode--on {
+  background: var(--color-primary) !important;
+  color: var(--color-on-primary) !important;
+}
+
+.fe__preset {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.fe__alert {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+}
+
+.fe__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.fe__block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fe__block-head h2 {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+
+.fe__empty {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.fe__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.fe__trow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) dashed var(--color-border);
+}
+
+.fe__lbl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.fe__chk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
+
+.fe__expert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--color-primary-subtle);
+}
+
+.fe__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.fe__actions-label {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.fe__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+}
+
+.fe__chip button,
+.fe__del {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fe__del {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-danger);
+  padding: var(--space-1) var(--space-2);
+}
+
+input,
+select {
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.fe__svg {
+  width: 100%;
+  max-height: 22rem;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+
+.fe__edge {
+  stroke: var(--color-text-muted);
+  stroke-width: 2;
+}
+
+.fe__node {
+  fill: var(--color-bg-elevated);
+  stroke: var(--color-border-strong);
+  stroke-width: 1.5;
+}
+
+.fe__node--initial {
+  stroke: var(--color-primary);
+  stroke-width: 2.5;
+}
+
+.fe__node-text {
+  fill: var(--color-text);
+  font-size: 13px;
+}
+
+.fe__json pre {
+  max-height: 18rem;
+  overflow: auto;
+  padding: var(--space-3);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-xs);
+}
+
+.fe__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+}
+
+.fe__status {
+  font-size: var(--fs-sm);
+  color: var(--color-danger);
+}
+
+.fe__status--ok {
+  color: var(--color-success);
+}
