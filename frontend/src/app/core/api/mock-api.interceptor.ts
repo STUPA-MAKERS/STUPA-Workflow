@@ -58,6 +58,7 @@ const MOCK_PRINCIPAL: Principal = {
     'meeting.manage',
     'protocol.write',
     'admin.config',
+    'admin.roles',
     'form.configure',
     'flow.configure',
     'webhook.manage',

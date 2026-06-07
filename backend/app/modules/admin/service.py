@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import ApplicationType, Gremium, Webhook
@@ -33,6 +33,7 @@ from app.modules.admin.schemas import (
     GroupMappingCreate,
     GroupMappingOut,
     GroupMappingUpdate,
+    PrincipalOut,
     RoleAssignmentCreate,
     RoleAssignmentOut,
     RoleAssignmentUpdate,
@@ -54,10 +55,18 @@ from app.shared.config_schemas import (
     validate_flow_graph,
 )
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.permissions import PERMISSION_CATALOGUE
 
 
 def _parse_dt(value: str | None) -> datetime | None:
-    """ISO-8601 → naives UTC-``datetime`` (``role_assignment.valid_*`` ist tz-naiv)."""
+    """ISO-8601 → **tz-aware UTC** ``datetime``.
+
+    ``role_assignment.valid_from``/``valid_until`` sind seit Migration 0015
+    ``timestamptz`` — wir speichern konsequent aware-UTC (statt naiv), damit das
+    Gültigkeitsfenster (Vertretung/Delegation) ohne den defensiven ``_as_aware``-
+    Fallback im RBAC-Resolver korrekt vergleicht. Naive Eingaben werden als UTC
+    interpretiert, aware Eingaben nach UTC normalisiert.
+    """
     if value is None:
         return None
     try:
@@ -66,9 +75,9 @@ def _parse_dt(value: str | None) -> datetime | None:
         raise ValidationProblem(
             "Invalid datetime.", errors=[{"field": "validFrom/validUntil", "msg": str(exc)}]
         ) from exc
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
-    return parsed
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -393,6 +402,54 @@ class ConfigService:
         await self.session.commit()
         return _assignment_out(row)
 
+    async def delete_role_assignment(self, assignment_id: UUID, actor: str) -> None:
+        """Rolle entziehen (#72): die Zuweisung löschen + auditieren."""
+        row = await self.session.get(RoleAssignmentRow, assignment_id)
+        if row is None:
+            raise NotFoundError(f"role assignment {assignment_id} not found")
+        await self.session.delete(row)
+        await self._audit(actor, AuditAction.ROLE_CHANGE, "role_assignment", assignment_id)
+        await self.session.commit()
+
+    # ----------------------------------------------------- principals/perms #
+    async def search_principals(
+        self, query: str | None, limit: int = 50
+    ) -> list[PrincipalOut]:
+        """Principals (Benutzer) per OIDC-`sub`/Name/E-Mail suchen (#72).
+
+        Ohne `query` werden die ersten `limit` Principals geliefert; mit `query` ein
+        case-insensitives Teilstring-Match (CITEXT-E-Mail ist ohnehin ci). Inkl. der
+        Rollenzuweisungen je Principal (ein Folge-Query, kein N+1)."""
+        stmt = select(Principal)
+        if query:
+            like = f"%{query}%"
+            stmt = stmt.where(
+                or_(
+                    Principal.sub.ilike(like),
+                    Principal.email.ilike(like),
+                    Principal.display_name.ilike(like),
+                )
+            )
+        stmt = stmt.order_by(Principal.display_name, Principal.sub).limit(limit)
+        rows = (await self.session.scalars(stmt)).all()
+        ids = [r.id for r in rows]
+        by_principal: dict[UUID, list[RoleAssignmentRow]] = {}
+        if ids:
+            assignments = (
+                await self.session.scalars(
+                    select(RoleAssignmentRow).where(
+                        RoleAssignmentRow.principal_id.in_(ids)
+                    )
+                )
+            ).all()
+            for a in assignments:
+                by_principal.setdefault(a.principal_id, []).append(a)
+        return [_principal_out(r, by_principal.get(r.id, [])) for r in rows]
+
+    def list_permissions(self) -> list[str]:
+        """Katalog wählbarer Permission-Keys fürs Rollen-/Rechte-UI (api.md §1)."""
+        return list(PERMISSION_CATALOGUE)
+
     # ------------------------------------------------------ group-mappings #
     async def list_group_mappings(self) -> list[GroupMappingOut]:
         rows = (await self.session.scalars(select(GroupMapping))).all()
@@ -530,6 +587,19 @@ def _assignment_out(row: RoleAssignmentRow) -> RoleAssignmentOut:
         valid_from=_iso(row.valid_from),
         valid_until=_iso(row.valid_until),
         delegate_voting=row.delegate_voting,
+    )
+
+
+def _principal_out(
+    row: Principal, assignments: list[RoleAssignmentRow]
+) -> PrincipalOut:
+    return PrincipalOut(
+        id=row.id,
+        sub=row.sub,
+        email=row.email,
+        display_name=row.display_name,
+        last_login=_iso(row.last_login),
+        assignments=[_assignment_out(a) for a in assignments],
     )
 
 

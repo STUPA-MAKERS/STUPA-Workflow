@@ -20,12 +20,15 @@ import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
 import {
+  type AdminPrincipal,
   type Branding,
   type FlowGraph,
   type FormOverviewItem,
   type Gremium,
   type NotificationRule,
   type Role,
+  type RoleAssignment,
+  type RoleAssignmentInput,
   type SiteConfig,
   type WebhookConfig,
 } from './admin.models';
@@ -34,6 +37,9 @@ import {
   MOCK_FORMS,
   MOCK_GREMIEN,
   MOCK_NOTIFICATION_RULES,
+  MOCK_PERMISSIONS,
+  MOCK_PRINCIPALS,
+  MOCK_ROLES,
   MOCK_WEBHOOKS,
 } from './admin.mock';
 
@@ -51,6 +57,8 @@ export class AdminApiService {
     gremien: structuredCopy(MOCK_GREMIEN),
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     rules: structuredCopy(MOCK_NOTIFICATION_RULES),
+    roles: structuredCopy(MOCK_ROLES),
+    principals: structuredCopy(MOCK_PRINCIPALS),
     site: <SiteConfig>{
       version: 1,
       active: structuredCopy(MOCK_BRANDING),
@@ -72,7 +80,7 @@ export class AdminApiService {
   }
 
   listRoles(): Observable<Role[]> {
-    if (this.mock) return of([]);
+    if (this.mock) return of(structuredCopy(this.store.roles));
     return this.http.get<Role[]>(`${this.base}/admin/roles`);
   }
 
@@ -80,6 +88,69 @@ export class AdminApiService {
   listForms(): Observable<FormOverviewItem[]> {
     if (this.mock) return of(structuredCopy(MOCK_FORMS));
     return this.http.get<FormOverviewItem[]>(`${this.base}/admin/application-types`);
+  }
+
+  /** Rechte einer Rolle ändern (#72) — PATCH /admin/roles/{id} (`permissions`). */
+  saveRolePermissions(roleId: Uuid, permissions: string[]): Observable<Role> {
+    if (this.mock) {
+      const idx = this.store.roles.findIndex((r) => r.id === roleId);
+      if (idx >= 0) this.store.roles[idx] = { ...this.store.roles[idx], permissions: [...permissions] };
+      return of(structuredCopy(this.store.roles[idx]));
+    }
+    return this.http.patch<Role>(`${this.base}/admin/roles/${roleId}`, { permissions });
+  }
+
+  /** Katalog wählbarer Permission-Keys (GET /admin/permissions). */
+  listPermissions(): Observable<string[]> {
+    if (this.mock) return of([...MOCK_PERMISSIONS]);
+    return this.http.get<string[]>(`${this.base}/admin/permissions`);
+  }
+
+  // --- Benutzer & Rollen (#72) --------------------------------------------
+  /** Benutzer (OIDC-Principals) auflisten/suchen — GET /admin/principals?q=. */
+  listPrincipals(query?: string): Observable<AdminPrincipal[]> {
+    if (this.mock) {
+      const q = (query ?? '').trim().toLowerCase();
+      const hit = (p: AdminPrincipal) =>
+        !q ||
+        p.sub.toLowerCase().includes(q) ||
+        (p.email ?? '').toLowerCase().includes(q) ||
+        (p.displayName ?? '').toLowerCase().includes(q);
+      return of(structuredCopy(this.store.principals.filter(hit)));
+    }
+    const url = query ? `${this.base}/admin/principals?q=${encodeURIComponent(query)}` : `${this.base}/admin/principals`;
+    return this.http.get<AdminPrincipal[]>(url);
+  }
+
+  /** Rolle zuweisen (#72) — POST /admin/role-assignments. */
+  assignRole(input: RoleAssignmentInput): Observable<RoleAssignment> {
+    if (this.mock) {
+      const assignment: RoleAssignment = {
+        id: `assign-${Math.abs(hashString(input.principalId + input.roleId + (input.validFrom ?? '')))}`,
+        principalId: input.principalId,
+        roleId: input.roleId,
+        gremiumId: input.gremiumId ?? null,
+        grantedBy: 'mock-admin',
+        validFrom: input.validFrom ?? null,
+        validUntil: input.validUntil ?? null,
+        delegateVoting: input.delegateVoting ?? false,
+      };
+      const p = this.store.principals.find((x) => x.id === input.principalId);
+      if (p) p.assignments = [...p.assignments, assignment];
+      return of(structuredCopy(assignment));
+    }
+    return this.http.post<RoleAssignment>(`${this.base}/admin/role-assignments`, input);
+  }
+
+  /** Rolle entziehen (#72) — DELETE /admin/role-assignments/{id}. */
+  revokeRole(assignmentId: Uuid): Observable<void> {
+    if (this.mock) {
+      for (const p of this.store.principals) {
+        p.assignments = p.assignments.filter((a) => a.id !== assignmentId);
+      }
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/role-assignments/${assignmentId}`);
   }
 
   // --- Form-/Flow-Versionen ------------------------------------------------
@@ -170,6 +241,13 @@ export class AdminApiService {
 /** Deep-Copy ohne `structuredClone`-Verfügbarkeitsannahme (jsdom-sicher). */
 function structuredCopy<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/** Stabiler String-Hash (deterministische Mock-IDs, kein `Math.random`/`Date`). */
+function hashString(value: string): number {
+  let h = 0;
+  for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0;
+  return h;
 }
 
 /** Minimaler Schema-Stub für den Mock-Modus (echte Schemas kommen vom Backend). */

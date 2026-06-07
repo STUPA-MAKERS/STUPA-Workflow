@@ -59,12 +59,14 @@ def test_create_flow_version_unknown_guard_operator_is_422() -> None:
         asyncio.run(_svc().create_flow_version(uuid4(), FlowVersionCreate(graph=graph), "admin"))
 
 
-def test_parse_dt_normalizes_aware_to_naive_utc_and_none() -> None:
+def test_parse_dt_normalizes_to_aware_utc_and_none() -> None:
     assert _parse_dt(None) is None
-    # tz-aware Eingabe → naives UTC (Spalte ist TIMESTAMP WITHOUT TIME ZONE)
-    assert _parse_dt("2026-06-07T12:00:00+02:00") == datetime(2026, 6, 7, 10, 0)
-    # naive Eingabe bleibt naiv
-    assert _parse_dt("2026-06-07T10:00:00") == datetime(2026, 6, 7, 10, 0)
+    # tz-aware Eingabe → aware UTC (Spalte ist timestamptz seit Migration 0015)
+    assert _parse_dt("2026-06-07T12:00:00+02:00") == datetime(2026, 6, 7, 10, 0, tzinfo=UTC)
+    # naive Eingabe wird als UTC interpretiert (aware)
+    assert _parse_dt("2026-06-07T10:00:00") == datetime(2026, 6, 7, 10, 0, tzinfo=UTC)
+    # _iso emittiert den UTC-Offset
+    assert _iso(_parse_dt("2026-06-07T10:00:00")) == "2026-06-07T10:00:00+00:00"
 
 
 def test_parse_dt_invalid_raises_422() -> None:

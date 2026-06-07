@@ -118,6 +118,38 @@ export interface Role {
   permissions: string[];
 }
 
+/** Rollenzuweisung (admin-API `/role-assignments`) — Vertretung/Delegation. */
+export interface RoleAssignment {
+  id: Uuid;
+  principalId: Uuid;
+  roleId: Uuid;
+  gremiumId?: Uuid | null;
+  grantedBy?: string | null;
+  validFrom?: string | null;
+  validUntil?: string | null;
+  delegateVoting: boolean;
+}
+
+/** Eingabe für eine neue Zuweisung (#72) — optionales tz-aware Gültigkeitsfenster. */
+export interface RoleAssignmentInput {
+  principalId: Uuid;
+  roleId: Uuid;
+  gremiumId?: Uuid | null;
+  validFrom?: string | null;
+  validUntil?: string | null;
+  delegateVoting?: boolean;
+}
+
+/** OIDC-Principal (Benutzer) inkl. seiner Rollenzuweisungen (admin-API `/principals`). */
+export interface AdminPrincipal {
+  id: Uuid;
+  sub: string;
+  email?: string | null;
+  displayName?: string | null;
+  lastLogin?: string | null;
+  assignments: RoleAssignment[];
+}
+
 export interface ApplicationTypeAdmin {
   id: Uuid;
   key: string;

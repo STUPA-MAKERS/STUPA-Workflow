@@ -23,6 +23,7 @@ from app.modules.admin.schemas import (
     FlowVersionOut,
     GremiumOut,
     GroupMappingOut,
+    PrincipalOut,
     PublicSiteConfigOut,
     RoleAssignmentOut,
     RoleOut,
@@ -124,6 +125,28 @@ class _FakeConfig:
             id=assignment_id, principal_id=uuid4(), role_id=uuid4(), gremium_id=None,
             granted_by=actor, valid_from=None, valid_until=None, delegate_voting=True,
         )
+
+    async def delete_role_assignment(self, assignment_id, actor):  # noqa: ANN001
+        if str(assignment_id).startswith("00000000"):
+            raise NotFoundError("nope")
+
+    async def search_principals(self, query, limit=50):  # noqa: ANN001
+        return [
+            PrincipalOut(
+                id=uuid4(), sub="kc|max", email="max@x.de", display_name="Max",
+                last_login="2026-06-07T09:00:00+00:00",
+                assignments=[
+                    RoleAssignmentOut(
+                        id=uuid4(), principal_id=uuid4(), role_id=uuid4(),
+                        gremium_id=None, granted_by="admin",
+                        valid_from=None, valid_until=None, delegate_voting=False,
+                    )
+                ] if query != "none" else [],
+            )
+        ]
+
+    def list_permissions(self):
+        return ["flow.configure", "admin.roles"]
 
     async def list_group_mappings(self):
         return []
@@ -349,6 +372,50 @@ def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) ->
     )
     assert gmu.status_code == 200
     assert client.get("/api/admin/group-mappings").status_code == 200
+
+
+# ------------------------------------------------------------- principals/#72
+def test_list_principals_camelcase(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    r = client.get("/api/admin/principals?q=max")
+    assert r.status_code == 200
+    body = r.json()[0]
+    assert body["sub"] == "kc|max"
+    assert body["displayName"] == "Max"
+    assert body["lastLogin"] == "2026-06-07T09:00:00+00:00"
+    assert len(body["assignments"]) == 1
+
+
+def test_list_principals_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
+    _as(app, {"admin.config"})  # config darf das nicht
+    assert client.get("/api/admin/principals").status_code == 403
+
+
+def test_list_permissions_catalogue(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    r = client.get("/api/admin/permissions")
+    assert r.status_code == 200
+    assert "flow.configure" in r.json()
+
+
+def test_permissions_need_admin_roles(app: FastAPI, client: TestClient) -> None:
+    _as(app, {"admin.config"})
+    assert client.get("/api/admin/permissions").status_code == 403
+
+
+def test_revoke_role_assignment_204_and_404(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    ok = client.delete(f"/api/admin/role-assignments/{uuid4()}")
+    assert ok.status_code == 204
+    missing = client.delete(
+        "/api/admin/role-assignments/00000000-0000-0000-0000-000000000000"
+    )
+    assert missing.status_code == 404
+
+
+def test_revoke_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
+    _as(app, {"admin.config"})
+    assert client.delete(f"/api/admin/role-assignments/{uuid4()}").status_code == 403
 
 
 # --------------------------------------------------------------------------- webhooks

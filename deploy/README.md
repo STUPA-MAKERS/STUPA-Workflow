@@ -86,6 +86,28 @@ sich, sobald ihre Werte gesetzt sind — fehlen sie, bleiben die jeweiligen Funk
 sauber abgeschaltet (kein Crash). Vollständige Referenz im
 [Configuration-Wiki](https://github.com/frederikbeimgraben/antragsplattform/wiki/Configuration).
 
+### Bootstrap initialer Admins (#70) — Pflichtschritt bei echter OIDC-Auth
+
+Unter echter OIDC-Auth (ohne Mock) hat ein frisches Schema **keinen** Admin: niemand
+besitzt `admin.*`, also kann auch niemand über die Rollen-/Rechte-UI (`/admin/users`)
+Rollen vergeben. Damit sich die Plattform nicht selbst aussperrt, weist der
+Bootstrap-Mechanismus den/die ersten Admin(s) per OIDC-Subject **oder** E-Mail
+idempotent die `admin`-Rolle zu — **beim Login** (OIDC-Callback) und **beim Startup**:
+
+```dotenv
+# kommagetrennt; mind. einen der beiden setzen
+BOOTSTRAP_ADMIN_SUBJECTS=f47ac10b-58cc-4372-a567-0e02b2c3d479,kc|alice
+BOOTSTRAP_ADMIN_EMAILS=admin@hochschule.example,vorstand@stupa.example
+```
+
+- **Subject** = der OIDC-`sub`-Claim aus Keycloak (stabil, fälschungssicher) — bevorzugt.
+- **E-Mail** = der `email`-Claim (case-insensitiv) — bequem, aber nur so vertrauenswürdig
+  wie die E-Mail-Verifizierung im IdP.
+- Die Zuweisung ist global (kein Gremium-Scope), unbefristet, `granted_by=bootstrap` und
+  **idempotent**: bereits vergebene Rollen werden nicht doppelt zugewiesen.
+- Nach dem ersten erfolgreichen Admin-Login kann der Eintrag bleiben (no-op) oder über
+  die normale RBAC-UI durch weitere Admins ersetzt werden.
+
 ## Profile
 
 - **prod** — hinter NPM, externe Keycloak/SMTP/Nextcloud, ClamAV aktiv, **kein**
