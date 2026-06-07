@@ -7,7 +7,8 @@ import { FormBuilderComponent } from './form-builder.component';
 
 async function setup() {
   const createFormVersion = jest.fn(() => of({ id: 'fv1' }));
-  const api = { createFormVersion };
+  const listApplicationTypes = jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }]));
+  const api = { createFormVersion, listApplicationTypes };
   const view = await render(FormBuilderComponent, {
     providers: [{ provide: AdminApiService, useValue: api }],
   });

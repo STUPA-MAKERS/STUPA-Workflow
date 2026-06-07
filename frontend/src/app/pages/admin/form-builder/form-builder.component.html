@@ -6,6 +6,20 @@
 
   <p class="fb__desc">{{ 'admin.form.desc' | t }}</p>
 
+  <!-- Antragstyp-Auswahl (#69): Form-Version wird gegen eine echte Typ-UUID gespeichert. -->
+  <app-select
+    class="fb__type"
+    [label]="'admin.form.applicationType' | t"
+    [placeholder]="'admin.form.applicationTypePlaceholder' | t"
+    [options]="typeOptions()"
+    [required]="true"
+    [ngModel]="selectedTypeId()"
+    (ngModelChange)="selectedTypeId.set($event)"
+  />
+  @if (!typeOptions().length) {
+    <p class="fb__alert" role="alert">{{ 'admin.form.noTypes' | t }}</p>
+  }
+
   @if (duplicates().length > 0) {
     <p class="fb__alert" role="alert">
       {{ 'admin.form.dupKeys' | t: { keys: duplicates().join(', ') } }}
@@ -123,6 +137,6 @@
     <span class="fb__status" [class.fb__status--ok]="formValid()">
       {{ (formValid() ? 'admin.common.valid' : 'admin.common.errors') | t }}
     </span>
-    <app-button [disabled]="!formValid()" (click)="save()">{{ 'admin.form.save' | t }}</app-button>
+    <app-button [disabled]="!formValid() || !selectedTypeId()" (click)="save()">{{ 'admin.form.save' | t }}</app-button>
   </footer>
 </section>

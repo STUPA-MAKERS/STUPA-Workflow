@@ -712,6 +712,25 @@ export interface BudgetPotOutWire {
   active: boolean;
 }
 
+/** Body für `POST /budget-pots` (`BudgetPotCreate`) — flaches Konfigurieren (#76). */
+export interface BudgetPotCreateBody {
+  gremiumId: Uuid;
+  name: string;
+  total?: MoneyString | null;
+  currency?: string;
+  period?: string | null;
+  active?: boolean;
+}
+
+/** Body für `PATCH /budget-pots/{id}` (`BudgetPotUpdate`) — Teil-Update. */
+export interface BudgetPotUpdateBody {
+  name?: string;
+  total?: MoneyString | null;
+  currency?: string;
+  period?: string | null;
+  active?: boolean;
+}
+
 /** Filter für GET /budget/stats (api.md: `pot`/`gremium`/`period`). */
 export interface BudgetStatsQuery {
   pot?: Uuid;

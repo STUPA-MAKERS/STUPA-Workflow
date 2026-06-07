@@ -22,7 +22,9 @@ import type { ServerMessage } from '@core/ws/ws-messages';
 import { BadgeComponent, type BadgeVariant } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
+import { SelectComponent, type SelectOption } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
+import { AdminOptionsService } from '../../pages/admin/admin-options.service';
 import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings.util';
 
 /**
@@ -42,7 +44,14 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
   selector: 'app-meetings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, BadgeComponent, ButtonComponent, CardComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    BadgeComponent,
+    ButtonComponent,
+    CardComponent,
+    SelectComponent,
+  ],
   template: `
     <header class="mtg__head">
       <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
@@ -247,10 +256,23 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
               (ngModelChange)="newTitle.set($event)"
               name="title"
             />
+            <!-- Gremium ist Pflicht (BE MeetingCreate.gremiumId, #68): echte Liste. -->
+            <app-select
+              name="gremium"
+              [label]="'meetings.create.gremium' | t"
+              [placeholder]="'meetings.create.gremiumPlaceholder' | t"
+              [options]="gremiumOptions()"
+              [required]="true"
+              [ngModel]="newGremiumId()"
+              (ngModelChange)="newGremiumId.set($event)"
+            />
+            @if (!gremiumOptions().length) {
+              <p class="mtg__muted mtg__hint">{{ 'meetings.create.noGremien' | t }}</p>
+            }
             <app-button
               type="submit"
               size="sm"
-              [disabled]="!newTitle().trim()"
+              [disabled]="!newTitle().trim() || !newGremiumId()"
               [loading]="creating()"
             >
               {{ 'meetings.create.submit' | t }}
@@ -476,6 +498,7 @@ export class MeetingsComponent implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly useMock = inject(USE_MOCK_API);
+  private readonly options = inject(AdminOptionsService);
 
   readonly loading = signal(false);
   readonly error = signal(false);
@@ -491,6 +514,10 @@ export class MeetingsComponent implements OnDestroy {
   readonly finalizing = signal(false);
   readonly creating = signal(false);
   readonly newTitle = signal('');
+  /** Pflicht-Gremium für die neue Sitzung (#68); leer ⇒ Submit gesperrt. */
+  readonly newGremiumId = signal('');
+  /** Gremien als Dropdown-Optionen (echte Liste, `/gremien`). */
+  readonly gremiumOptions = signal<SelectOption[]>([]);
 
   readonly canManage = computed(() => this.auth.can('meeting.manage'));
   readonly canWrite = computed(() => this.auth.can('protocol.write'));
@@ -503,6 +530,16 @@ export class MeetingsComponent implements OnDestroy {
       const id = pm.get('id');
       if (id) this.loadMeeting(id);
     });
+    // Gremien-Liste für das Anlege-Dropdown (#68) — nur wer Sitzungen verwaltet.
+    if (this.canManage()) {
+      this.options
+        .gremiumOptions()
+        .pipe(takeUntilDestroyed())
+        .subscribe({
+          next: (opts) => this.gremiumOptions.set(opts),
+          error: () => this.gremiumOptions.set([]),
+        });
+    }
   }
 
   ngOnDestroy(): void {
@@ -534,12 +571,14 @@ export class MeetingsComponent implements OnDestroy {
   create(event: Event): void {
     event.preventDefault();
     const title = this.newTitle().trim();
-    if (!title || this.creating()) return;
+    const gremiumId = this.newGremiumId();
+    if (!title || !gremiumId || this.creating()) return;
     this.creating.set(true);
-    this.api.createMeeting({ title }).subscribe({
+    this.api.createMeeting({ title, gremiumId }).subscribe({
       next: (m) => {
         this.creating.set(false);
         this.newTitle.set('');
+        this.newGremiumId.set('');
         this.adoptMeeting(m);
         this.toast.success(this.i18n.translate('meetings.toast.created'));
       },

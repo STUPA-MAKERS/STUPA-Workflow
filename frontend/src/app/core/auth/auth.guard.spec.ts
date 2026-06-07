@@ -96,12 +96,12 @@ describe('authGuard', () => {
     expect(run({ permission: ['admin.config', 'application.read'] }, MEMBER)).toBe(true);
   });
 
-  it('redirects to the dashboard and toasts when the permission is missing', () => {
+  it('redirects to the forbidden page and toasts when the permission is missing', () => {
     const toast = TestBed.inject(ToastService);
     const toastSpy = jest.spyOn(toast, 'error');
     const result = run({ permission: 'admin.config' }, MEMBER);
     expect(result).toBeInstanceOf(UrlTree);
-    expect((result as UrlTree).toString()).toBe('/dashboard');
+    expect((result as UrlTree).toString()).toBe('/forbidden');
     expect(toastSpy).toHaveBeenCalled();
   });
 });

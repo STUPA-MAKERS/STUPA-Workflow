@@ -1,0 +1,10 @@
+{
+  "$comment": "Dev-Proxy für `ng serve` (#87/#2): leitet /api inkl. WebSocket an das lokale Backend. Ohne diesen Proxy treffen REST/WS auf den Dev-Server (:4200) → 404/Connection refused. Im echten Stack (compose) übernimmt das web-nginx (deploy/web/nginx.conf) dieselbe Aufgabe. Backend-Ziel via API_PROXY_TARGET überschreibbar.",
+  "/api": {
+    "target": "http://localhost:8000",
+    "secure": false,
+    "ws": true,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}

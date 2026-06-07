@@ -9,9 +9,11 @@ import { AuthService } from './auth.service';
  * Schützt OIDC-Routen (overview §4). Ablauf:
  * 1. Principal sicher geladen (`ensureLoaded`, einmalig) → synchrone Entscheidung.
  * 2. Keine Session → OIDC-Login (Full-Redirect); Navigation abgebrochen.
- * 3. `route.data.permission` gesetzt, aber fehlt → Hinweis + zurück zum Dashboard.
+ * 3. `route.data.permission` gesetzt, aber fehlt → 403-Seite (`/forbidden`, #71).
  *
- * RBAC ist hier reine UX; der Server bleibt autoritativ (security.md §2).
+ * RBAC ist hier reine UX; der Server bleibt autoritativ (security.md §2). Die
+ * Entscheidung fällt **nach** dem Laden des echten Principals — kein blindes
+ * Wegwerfen vor Perm-Auswertung.
  */
 export const authGuard: CanActivateFn = (route) => {
   const auth = inject(AuthService);
@@ -29,7 +31,7 @@ export const authGuard: CanActivateFn = (route) => {
       const required = permission === undefined ? [] : ([] as string[]).concat(permission);
       if (required.length > 0 && !auth.canAny(...required)) {
         toast.error(i18n.translate('rbac.forbidden'));
-        return router.createUrlTree(['/dashboard']);
+        return router.createUrlTree(['/forbidden']);
       }
       return true;
     }),

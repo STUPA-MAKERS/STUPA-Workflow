@@ -79,6 +79,7 @@ export class ShellComponent {
     { path: '/voting', labelKey: 'nav.voting', permissions: ['vote.cast', 'vote.manage'] },
     { path: '/meetings', labelKey: 'nav.meetings', permissions: ['meeting.manage', 'protocol.write'] },
     { path: '/budget', labelKey: 'nav.budget', permissions: ['budget.view', 'budget.manage'] },
+    { path: '/budget/pots', labelKey: 'nav.budgetPots', permissions: ['budget.manage'] },
     { path: '/admin', labelKey: 'nav.admin', permissions: ['admin.config'] },
   ];
 

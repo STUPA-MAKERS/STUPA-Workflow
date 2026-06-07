@@ -21,8 +21,10 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  BudgetPotCreateBody,
   BudgetPotInfo,
   BudgetPotOutWire,
+  BudgetPotUpdateBody,
   BudgetStats,
   BudgetStatsOutWire,
   BudgetStatsQuery,
@@ -359,5 +361,19 @@ export class ApiClient {
     return this.http
       .get<BudgetPotOutWire[]>(`${this.base}/budget-pots`, { params })
       .pipe(map((pots) => pots.map(mapBudgetPotInfo)));
+  }
+
+  /** POST /budget-pots — neuen Topf anlegen (P(budget.manage), #76). */
+  createBudgetPot(body: BudgetPotCreateBody): Observable<BudgetPotInfo> {
+    return this.http
+      .post<BudgetPotOutWire>(`${this.base}/budget-pots`, body)
+      .pipe(map(mapBudgetPotInfo));
+  }
+
+  /** PATCH /budget-pots/{id} — Topf-Stammdaten ändern (P(budget.manage), #76). */
+  updateBudgetPot(id: Uuid, body: BudgetPotUpdateBody): Observable<BudgetPotInfo> {
+    return this.http
+      .patch<BudgetPotOutWire>(`${this.base}/budget-pots/${id}`, body)
+      .pipe(map(mapBudgetPotInfo));
   }
 }

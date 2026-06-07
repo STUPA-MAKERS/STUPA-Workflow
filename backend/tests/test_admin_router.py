@@ -296,6 +296,19 @@ def test_update_gremium_404(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 404
 
 
+def test_gremien_authed_list_without_admin_perm(app: FastAPI, client: TestClient) -> None:
+    """#68: `GET /api/gremien` ist für jeden eingeloggten Principal lesbar
+    (Dropdown-Quelle) — auch ohne ``admin.config``."""
+    _as(app, set())  # eingeloggt, aber keinerlei Permission
+    r = client.get("/api/gremien")
+    assert r.status_code == 200
+    assert r.json()[0]["cdVariant"] == "stupa"
+
+
+def test_gremien_authed_requires_auth_401(client: TestClient) -> None:
+    assert client.get("/api/gremien").status_code == 401
+
+
 # --------------------------------------------------------------------------- types
 def test_application_types_crud(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)

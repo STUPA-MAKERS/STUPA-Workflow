@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -6,6 +7,7 @@ import type { FieldType, FormFieldDef } from '@core/api/models';
 import { ButtonComponent, CheckboxComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
+import { AdminOptionsService } from '../admin-options.service';
 import {
   FIELD_TYPES,
   blankField,
@@ -35,8 +37,27 @@ import {
 })
 export class FormBuilderComponent {
   private readonly api = inject(AdminApiService);
+  private readonly options = inject(AdminOptionsService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
+
+  /** Antragstypen als Auswahl (#69) — ersetzt das hartkodierte `'mock-type'`. */
+  protected readonly typeOptions = signal<SelectOption[]>([]);
+  protected readonly selectedTypeId = signal('');
+
+  constructor() {
+    this.options
+      .applicationTypeOptions()
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: (opts) => {
+          this.typeOptions.set(opts);
+          // Vorauswahl: erster Typ, damit Speichern ohne Extra-Klick valide ist.
+          if (opts.length && !this.selectedTypeId()) this.selectedTypeId.set(opts[0].value);
+        },
+        error: () => this.typeOptions.set([]),
+      });
+  }
 
   protected readonly fieldTypes = FIELD_TYPES;
   /** Feldtypen als Dropdown-Optionen (#77) — Wert == Typ-Schlüssel. */
@@ -166,13 +187,14 @@ export class FormBuilderComponent {
 
   // --- save ----------------------------------------------------------------
   protected save(): void {
-    if (!this.formValid()) {
+    const typeId = this.selectedTypeId();
+    if (!this.formValid() || !typeId) {
       this.toast.error(this.i18n.translate('admin.common.invalid'));
       return;
     }
     const normalized = this.fields().map(normalizeFormField);
-    // TODO(T-24): echter applicationTypeId aus Routen-/Auswahl-Kontext; im Mock fix.
-    this.api.createFormVersion('mock-type', normalized).subscribe({
+    // Echte applicationType-UUID aus der Auswahl (#69) statt hartkodiertem 'mock-type'.
+    this.api.createFormVersion(typeId, normalized).subscribe({
       next: () => this.toast.success(this.i18n.translate('admin.common.saved')),
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });
