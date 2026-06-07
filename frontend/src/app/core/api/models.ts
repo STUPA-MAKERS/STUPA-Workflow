@@ -652,3 +652,113 @@ export interface Protocol {
   pdfUrl: string | null;
   sentAt: IsoDateTime | null;
 }
+
+// =========================================================================== //
+// Budget — Töpfe + Auslastungs-/Statusstatistik (T-17/T-35).                    //
+// api.md »budget«: GET /budget/stats (P budget.view), GET /budget-pots          //
+// (P budget.manage). Geld kommt als `Decimal` → JSON-String (numeric(12,2));    //
+// das FE rechnet/formatiert über `Number(...)` und behält den Roh-String.       //
+// =========================================================================== //
+
+/** Lebenszyklus-Stufe eines Budget-Eintrags (SDS-A1). */
+export type BudgetStage = 'requested' | 'reserved' | 'approved' | 'paid';
+
+/** Reihenfolge der Stufen für Anzeige/Aggregation (kumulativ aufsteigend). */
+export const BUDGET_STAGES: readonly BudgetStage[] = [
+  'requested',
+  'reserved',
+  'approved',
+  'paid',
+] as const;
+
+/** Geldbetrag in Wire-Form: `Decimal` serialisiert FastAPI als String. */
+export type MoneyString = string;
+
+/** `PotUsageOut` — Auslastung eines Topfs (Summen je Stufe + freier Rest). */
+export interface PotUsageOutWire {
+  budgetPotId: Uuid;
+  period: string | null;
+  total: MoneyString | null;
+  currency: string;
+  requested: MoneyString;
+  reserved: MoneyString;
+  approved: MoneyString;
+  paid: MoneyString;
+  committed: MoneyString;
+  available: MoneyString | null;
+}
+
+/** `StatusBucketOut` — eine Zelle der Statusverteilung (Gremium × State). */
+export interface StatusBucketOutWire {
+  gremiumId: Uuid | null;
+  stateId: Uuid | null;
+  count: number;
+}
+
+/** `BudgetStatsOut` — Rollup (GET /budget/stats): Auslastung + Statusverteilung. */
+export interface BudgetStatsOutWire {
+  pots: PotUsageOutWire[];
+  statusDistribution: StatusBucketOutWire[];
+}
+
+/** `BudgetPotOut` — Topf-Stammdaten (GET /budget-pots; nur P budget.manage). */
+export interface BudgetPotOutWire {
+  id: Uuid;
+  gremiumId: Uuid;
+  name: string;
+  total: MoneyString | null;
+  currency: string;
+  period: string | null;
+  active: boolean;
+}
+
+/** Filter für GET /budget/stats (api.md: `pot`/`gremium`/`period`). */
+export interface BudgetStatsQuery {
+  pot?: Uuid;
+  gremium?: Uuid;
+  period?: string;
+}
+
+// --- View-Modelle ---------------------------------------------------------- //
+
+/** Auslastung eines Topfs (FE-View) — Beträge als `number` für Anzeige/Charts. */
+export interface PotUsage {
+  budgetPotId: Uuid;
+  /** Aufgelöster Anzeigename (best-effort aus /budget-pots), sonst gekürzte ID. */
+  name: string;
+  period: string | null;
+  total: number | null;
+  currency: string;
+  requested: number;
+  reserved: number;
+  approved: number;
+  paid: number;
+  /** Gebundene Mittel (reserved+approved+paid, vom Backend berechnet). */
+  committed: number;
+  /** Freier Rest (`total - committed`); `null` wenn der Topf kein Limit hat. */
+  available: number | null;
+}
+
+/** Eine Zelle der Statusverteilung (FE-View). */
+export interface StatusBucket {
+  gremiumId: Uuid | null;
+  stateId: Uuid | null;
+  count: number;
+}
+
+/** Budget-Statistik (FE-View). */
+export interface BudgetStats {
+  pots: PotUsage[];
+  statusDistribution: StatusBucket[];
+}
+
+/** Budget-Topf-Stammdaten (FE-View). */
+export interface BudgetPotInfo {
+  id: Uuid;
+  gremiumId: Uuid;
+  name: string;
+  total: number | null;
+  currency: string;
+  period: string | null;
+  active: boolean;
+}
