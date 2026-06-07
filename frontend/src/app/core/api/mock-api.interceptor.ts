@@ -12,6 +12,7 @@ import type {
   ApplicationOutWire,
   ApplicationTypeListItemWire,
   AttachmentOutWire,
+  BallotResult,
   CommentOutWire,
   EffectiveForm,
   MagicLinkVerifyResult,
@@ -23,6 +24,7 @@ import type {
   TransitionOutWire,
   TransitionResult,
   VersionOutWire,
+  Vote,
 } from './models';
 
 /**
@@ -38,10 +40,33 @@ const MOCK_PRINCIPAL: Principal = {
   display_name: 'Demo Mitglied',
   email: 'demo@stupa.example',
   roles: ['member'],
-  // `application.manage` ist gesetzt, damit der Mock-Betrieb (FE-Dev/Harness)
-  // die RBAC-gegateten Statuswechsel-Aktionen auf der Detail-Seite zeigt (T-31).
-  permissions: ['application.read', 'application.manage', 'vote.cast'],
+  // application.manage (T-31) für RBAC-Aktionen auf der Detail-Seite;
+  // vote.manage/meeting.manage (T-32) für Beamer-/Manage-Ansichten — alle im
+  // Mock gesetzt, damit der FE-Dev/Harness-Betrieb die gegateten Ansichten zeigt.
+  permissions: ['application.read', 'application.manage', 'vote.cast', 'vote.manage', 'meeting.manage'],
   groups: [],
+};
+
+/** Laufende Demo-Abstimmung (api.md »voting«, GET /votes/{id}). */
+const MOCK_VOTE: Vote = {
+  id: 'vote-demo',
+  applicationId: 'app-demo',
+  eligibleGroup: 'stupa',
+  config: {
+    options: ['yes', 'no', 'abstain'],
+    majorityRule: 'two_thirds',
+    quorum: { type: 'percent', value: 50 },
+    abstainCountsQuorum: true,
+    secret: false,
+    allowChange: true,
+    tieBreak: 'rejected',
+  },
+  status: 'open',
+  opensAt: '2026-06-06T09:00:00Z',
+  closesAt: null,
+  result: null,
+  secret: false,
+  tally: { counts: { yes: 5, no: 2, abstain: 1 }, eligible: 12, quorumMet: true, leading: 'yes' },
 };
 
 const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
@@ -312,6 +337,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok(signed);
     }
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
+    if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
   }
 
@@ -363,6 +389,10 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/applications')) {
       const created: ApplicationCreatedWire = { applicationId: MOCK_APP_ID };
       return ok(created, 201);
+    }
+    if (/\/votes\/[^/]+\/ballot$/.test(p)) {
+      const res: BallotResult = { status: 'cast' };
+      return ok(res, 201);
     }
   }
 
