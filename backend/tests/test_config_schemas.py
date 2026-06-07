@@ -333,7 +333,7 @@ def test_export_json_schemas_keys_and_deterministic() -> None:
     schemas = export_json_schemas()
     assert set(schemas) == {
         "FormFieldDef", "FlowGraph", "VoteConfig", "NotificationRule",
-        "WebhookConfig", "ComparisonOffers", "BudgetField",
+        "WebhookConfig", "ComparisonOffers", "BudgetField", "Branding",
     }
     # deterministisch: zweiter Aufruf identisch
     assert export_json_schemas() == schemas
