@@ -145,9 +145,11 @@ Auth-Pfad erreichbar (307), `/auth/me` 401, WS-Handshake erreichbar. Eigener
 vorhandenes `deploy/.env` wieder her; räumt restlos ab.
 
 ```bash
-../scripts/smoke-real-stack.sh                 # up -> Kernflüsse prüfen -> teardown
-SMOKE_WEB_PORT=8090 ../scripts/smoke-real-stack.sh   # anderer Host-Port
+../scripts/smoke-real-stack.sh        # up -> Kernflüsse prüfen -> teardown
 ```
+
+Host-Port ist fix `127.0.0.1:8080` (compose-Mapping). `SMOKE_TIMEOUT` (Default
+600s) steuert die Wartezeit (ClamAV lädt lange).
 
 CI: Job `real-stack-smoke` (opt-in wie e2e). Default-PR bleibt grün (skipped).
 Triggern: `workflow_dispatch`, PR-Label `run-real-stack-smoke`, oder Repo-Variable

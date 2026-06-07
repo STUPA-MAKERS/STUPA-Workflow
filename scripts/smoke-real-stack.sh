@@ -13,15 +13,15 @@
 # stellt es am Ende wieder her. Räumt restlos ab (down -v). Idempotent.
 #
 # Usage: scripts/smoke-real-stack.sh
-#   SMOKE_WEB_PORT (Default 8080) · SMOKE_TIMEOUT (Default 600s; ClamAV lädt lange)
+#   SMOKE_TIMEOUT (Default 600s; ClamAV lädt lange). Host-Port fix 8080 (compose).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY="${ROOT}/deploy"
 ENV_FILE="${DEPLOY}/.env"
 ENV_BACKUP=""
-PORT="${SMOKE_WEB_PORT:-8080}"
-WEB="http://127.0.0.1:${PORT}"
+# Host-Port ist im compose hart auf 127.0.0.1:8080:80 gemappt -> kein Override.
+WEB="http://127.0.0.1:8080"
 TIMEOUT="${SMOKE_TIMEOUT:-600}"
 
 export COMPOSE_PROJECT_NAME="antrag-real-smoke"
@@ -117,7 +117,11 @@ echo "==> HTTP-Kernflüsse (${WEB})"
 check "web /healthz"          "/healthz"        200        # nginx-Liveness
 check "api /api/health"       "/api/health"     200        # FastAPI up
 check "public site-config"    "/api/site-config" 200       # auth-freier Branding-Read
-check "auth login erreichbar" "/api/auth/login" 307        # Redirect zur OIDC-Issuer
+# 307 = Redirect zur OIDC-Issuer (OIDC vollständig konfiguriert). 404 = OIDC aus,
+# weil .env.example OIDC_CLIENT_SECRET leer shippt (oidc_enabled braucht alle 4
+# Felder) -> login() 404. Smoke läuft bewusst ohne echten IdP -> beide ok; geprüft
+# wird nur, dass die Route existiert/antwortet (kein 5xx/000).
+check "auth login erreichbar" "/api/auth/login" 307 404
 check "auth me (unauth)"      "/api/auth/me"    401        # RBAC greift, problem+json
 check "unbekannt -> 404"      "/api/__nope__"   404        # Error-Handler erreichbar
 
