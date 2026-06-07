@@ -10,6 +10,12 @@
       </div>
     </header>
 
+    @if (linkErrors().length > 0) {
+      <p class="br__alert" role="alert">
+        {{ 'admin.brand.badUrl' | t }} ({{ linkErrors().join(', ') }})
+      </p>
+    }
+
     <div class="br__cols">
       <div class="br__editor">
         <!-- Logos -->
@@ -108,10 +114,10 @@
 
         <div class="br__pv-header" data-testid="preview-header">
           @if (d.logos.imagemark; as im) {
-            <img class="br__pv-logo" [src]="im.url" alt="" />
+            <img class="br__pv-logo" [src]="im.url" alt="" aria-hidden="true" />
           }
           @if (d.logos.wordmark; as wm) {
-            <img class="br__pv-word" [src]="wm.url" alt="" />
+            <img class="br__pv-word" [src]="wm.url" alt="" aria-hidden="true" />
           } @else {
             <strong>{{ text(d.copyright) }}</strong>
           }
@@ -134,8 +140,8 @@
     </div>
 
     <footer class="br__foot">
-      <app-button variant="secondary" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
-      <app-button [disabled]="!hasDraftChanges()" (click)="activate()">{{ 'admin.brand.activate' | t }}</app-button>
+      <app-button variant="secondary" [disabled]="linkErrors().length > 0" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
+      <app-button [disabled]="!hasDraftChanges() || linkErrors().length > 0" (click)="activate()">{{ 'admin.brand.activate' | t }}</app-button>
     </footer>
   </section>
 }

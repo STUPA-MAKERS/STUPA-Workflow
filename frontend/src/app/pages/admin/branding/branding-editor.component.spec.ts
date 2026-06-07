@@ -71,6 +71,30 @@ describe('BrandingEditorComponent (#21)', () => {
     expect(toast.error).toHaveBeenCalledWith('Dateityp nicht erlaubt.');
   });
 
+  it('rejects an SVG logo upload (img-only contract, no inline-SVG XSS)', async () => {
+    const { toast } = await setup();
+    const input = screen.getByLabelText('Bildmarke') as HTMLInputElement;
+    const svg = new File(['<svg onload="alert(1)"/>'], 'logo.svg', { type: 'image/svg+xml' });
+    await userEvent.upload(input, svg, { applyAccept: false });
+    expect(toast.error).toHaveBeenCalledWith('Dateityp nicht erlaubt.');
+  });
+
+  it('blocks saving when a footer link uses a disallowed scheme', async () => {
+    const { fixture, toast } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addColumn();
+    const col = c.draft().footerColumns[c.draft().footerColumns.length - 1];
+    c.addLink(col);
+    col.links[0].url = 'javascript:alert(1)';
+    c.reemit();
+    expect(c.linkErrors()).toContain('javascript:alert(1)');
+    c.saveDraft();
+    expect(toast.error).toHaveBeenCalledWith(
+      'Unzulässige Link-URL — nur http(s):// oder mailto: erlaubt.',
+    );
+  });
+
   it('exercises footer/legal/logo mutators', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,9 +111,9 @@ describe('BrandingEditorComponent (#21)', () => {
     c.moveColumn(cols.length - 1, 1); // out of bounds → no-op
     c.removeColumn(0);
 
-    c.addLegalLink();
+    c.addLegalLink(); // appends an empty-url legal link
     expect(c.draft().legalLinks.length).toBeGreaterThan(0);
-    c.removeLegalLink(0);
+    c.removeLegalLink(c.draft().legalLinks.length - 1); // drop the empty one, keep valid seed
 
     c.removeLogo('wordmark'); // absent slot → safe delete branch
     c.reemit();

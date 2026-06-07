@@ -14,6 +14,7 @@ import {
   LOGO_MAX_SIZE_MB,
   type LogoSlot,
 } from '../admin.models';
+import { brandingLinkErrors } from '../branding.util';
 
 /**
  * Branding-/Site-Config-Editor (#21, T-34). Macht Logos, Fußzeile und Freitexte
@@ -48,6 +49,9 @@ export class BrandingEditorComponent {
 
   /** Aktiv-genutzte Sprache für die Vorschau. */
   protected readonly lang = computed(() => this.i18n.locale());
+
+  /** Unzulässige Link-URLs (Schema ≠ http(s)/mailto) — blockiert Speichern. */
+  protected readonly linkErrors = computed(() => brandingLinkErrors(this.draft()));
 
   constructor() {
     this.api.getSiteConfig().subscribe((cfg) => {
@@ -166,6 +170,10 @@ export class BrandingEditorComponent {
   protected saveDraft(): void {
     const d = this.draft();
     if (!d) return;
+    if (this.linkErrors().length > 0) {
+      this.toast.error(this.i18n.translate('admin.brand.badUrl'));
+      return;
+    }
     this.api.saveBrandingDraft(d).subscribe({
       next: (cfg) => {
         this.hasDraftChanges.set(cfg.hasDraftChanges);

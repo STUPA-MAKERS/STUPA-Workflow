@@ -230,10 +230,18 @@ export interface SiteConfig {
   hasDraftChanges: boolean;
 }
 
-/** Akzeptierte Logo-MIME-Typen + Max-Größe (UI-Hinweis + Client-Guard). */
+/**
+ * Akzeptierte Logo-MIME-Typen + Max-Größe (UI-Hinweis + Client-Guard).
+ *
+ * **Sicherheit — img-only-Kontrakt:** Branding-Logos werden als `branding`-JSON
+ * site-weit persistiert und ausschließlich über `<img src>` gerendert (nie inline
+ * ins DOM injiziert). `image/svg+xml` ist **bewusst ausgeschlossen** — ein SVG
+ * kann `<script>`/`on*`-Handler tragen und wäre für einen künftigen Inline-SVG-
+ * Consumer ein gespeicherter XSS-Vektor. Nur Raster-Formate (PNG/JPEG/WebP/ICO).
+ * Wer Logos konsumiert, MUSS bei `<img src>` bleiben.
+ */
 export const LOGO_ACCEPT_MIME: readonly string[] = [
   'image/png',
-  'image/svg+xml',
   'image/jpeg',
   'image/webp',
   'image/x-icon',

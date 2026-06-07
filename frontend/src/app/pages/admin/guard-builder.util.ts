@@ -72,6 +72,13 @@ export function validateGuard(guard: Guard | null | undefined): void {
     if (op === 'voteResult' && !VOTE_RESULTS.includes(String(value))) {
       throw new GuardError(`invalid voteResult value: ${JSON.stringify(value)}`);
     }
+    // roleIs/permissionIs brauchen einen nicht-leeren String — sonst lehnt der
+    // Server beim Speichern ab und das UI hätte "gültig" gelogen.
+    if (op === 'roleIs' || op === 'permissionIs') {
+      if (typeof value !== 'string' || value.trim() === '') {
+        throw new GuardError(`${op} requires a non-empty value`);
+      }
+    }
     return;
   }
 

@@ -33,6 +33,16 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     expect(() => validateGuard({ voteResult: 'maybe' })).toThrow(/invalid voteResult/);
   });
 
+  it('rejects empty roleIs/permissionIs operands (server would reject too)', () => {
+    expect(() => validateGuard({ roleIs: '' })).toThrow(/roleIs/);
+    expect(() => validateGuard({ roleIs: null })).toThrow(/roleIs/);
+    expect(() => validateGuard({ permissionIs: '   ' })).toThrow(/permissionIs/);
+    expect(() => validateGuard({ permissionIs: undefined })).toThrow(/permissionIs/);
+    // non-empty stays valid
+    expect(() => validateGuard({ roleIs: 'stupa' })).not.toThrow();
+    expect(isGuardValid({ roleIs: '' })).toBe(false);
+  });
+
   it("requires 'not' to have exactly one child", () => {
     expect(() => validateGuard({ not: [{ manual: true }, { roleIs: 'x' }] })).toThrow(
       /'not' requires exactly one/,

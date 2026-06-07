@@ -442,7 +442,7 @@ export const de = {
   'admin.brand.logo.wordmark': 'Wortmarke',
   'admin.brand.logo.imagemark': 'Bildmarke',
   'admin.brand.logo.favicon': 'Favicon',
-  'admin.brand.logoHint': 'PNG/SVG/JPEG/WEBP, max. {mb} MB.',
+  'admin.brand.logoHint': 'PNG/JPEG/WEBP/ICO, max. {mb} MB.',
   'admin.brand.dropHere': 'Datei hierher ziehen oder auswählen',
   'admin.brand.replace': 'Ersetzen',
   'admin.brand.tooLarge': 'Datei zu groß (max. {mb} MB).',
@@ -461,6 +461,7 @@ export const de = {
   'admin.brand.saveDraft': 'Entwurf speichern',
   'admin.brand.activate': 'Entwurf aktivieren',
   'admin.brand.activated': 'Branding aktiviert (Version {n}).',
+  'admin.brand.badUrl': 'Unzulässige Link-URL — nur http(s):// oder mailto: erlaubt.',
   'admin.brand.previewHeader': 'Kopf-Vorschau',
   'admin.brand.previewFooter': 'Fuß-Vorschau',
 
@@ -920,7 +921,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.logo.wordmark': 'Wordmark',
   'admin.brand.logo.imagemark': 'Image mark',
   'admin.brand.logo.favicon': 'Favicon',
-  'admin.brand.logoHint': 'PNG/SVG/JPEG/WEBP, max. {mb} MB.',
+  'admin.brand.logoHint': 'PNG/JPEG/WEBP/ICO, max. {mb} MB.',
   'admin.brand.dropHere': 'Drag a file here or choose one',
   'admin.brand.replace': 'Replace',
   'admin.brand.tooLarge': 'File too large (max. {mb} MB).',
@@ -939,6 +940,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.saveDraft': 'Save draft',
   'admin.brand.activate': 'Activate draft',
   'admin.brand.activated': 'Branding activated (version {n}).',
+  'admin.brand.badUrl': 'Disallowed link URL — only http(s):// or mailto: are allowed.',
   'admin.brand.previewHeader': 'Header preview',
   'admin.brand.previewFooter': 'Footer preview',
 
