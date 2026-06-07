@@ -11,13 +11,18 @@ from __future__ import annotations
 import types
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
+from app.db import get_session
 from app.main import create_app
+from app.modules.auth import sessions
+from app.modules.auth.models import AuthSession, RoleAssignment
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.locks import InMemoryLocker
@@ -30,6 +35,7 @@ from app.modules.livevote.router import (
 )
 from app.modules.livevote.schemas import MeetingOut, MeetingStatus
 from app.modules.voting.schemas import TallyOut, VoteOut
+from app.settings import get_settings
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError
 
@@ -295,3 +301,107 @@ def test_beamer_receives_state_but_cannot_cast() -> None:
         ws.send_json({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
         assert ws.receive_json() == {"type": "error", "code": "read_only"}
     assert voting.casts == []
+
+
+# --------------------------------------------------------------------------- #
+# Realer Handshake-Auth-Pfad (Cookie → Session → RBAC-Principal)
+#
+# Anders als oben wird ``get_ws_principal`` **nicht** überschrieben: der echte
+# ``resolve_ws_principal`` läuft (Cookie entsiegeln → ``auth_session`` → ``principal``
+# → RBAC). Nur ``get_session`` liefert einen gequeueten Fake (kein Postgres). Deckt
+# die Lücke, die den Meeting-WS-403 maskiert hat: ein eingeloggter, berechtigter
+# Nutzer mit zeit-validiertem RoleAssignment.
+# --------------------------------------------------------------------------- #
+from tests.auth_fakes import fake_session, result  # noqa: E402
+
+_SID = "ws-handshake-sid"
+
+
+def _signed_cookie() -> tuple[str, str]:
+    settings = get_settings()
+    return settings.session_cookie_name, sessions._sign_sid(settings.session_secret, _SID)
+
+
+def _auth_db(*, naive: bool):
+    """Fake-Session für den realen Handshake: AuthSession → Principal → RBAC."""
+    pid = uuid4()
+    now = datetime.now(UTC)
+    vf, vu = now - timedelta(days=1), now + timedelta(days=1)
+    if naive:  # so, wie eine ``timestamp``-Spalte (ohne tz) aus der DB käme
+        vf, vu = vf.replace(tzinfo=None), vu.replace(tzinfo=None)
+    auth_session = AuthSession(
+        sid=_SID, principal_id=pid, expires_at=now + timedelta(hours=1),
+        refresh_token=None, id_token=None,
+    )
+    principal_row = PrincipalRow(
+        sub="member", email=None, display_name="M", oidc_groups=[]
+    )
+    principal_row.id = pid  # type: ignore[assignment]
+    assignment = RoleAssignment(
+        principal_id=pid, role_id=uuid4(), gremium_id=_GREMIUM,
+        valid_from=vf, valid_until=vu,
+    )
+
+    def factory():
+        return fake_session(
+            result(auth_session),     # load_principal_session → AuthSession
+            result(principal_row),    # PrincipalRow
+            result(assignment),       # RoleAssignment (im Sitzungs-Gremium)
+            result(),                 # GroupMapping (keine)
+            result("vote.cast"),      # RolePermission
+            result("member"),         # Role.key
+        )
+
+    async def _override():
+        yield factory()
+
+    return _override
+
+
+def _build_real_handshake(*, naive: bool):
+    meeting = _meeting()
+    app = create_app()
+    app.dependency_overrides[get_session] = _auth_db(naive=naive)
+    app.dependency_overrides[get_meeting_service_ws] = (
+        lambda: _FakeMeetingService(meeting, None)
+    )
+    app.dependency_overrides[get_voting_service_ws] = (
+        lambda: _FakeVotingService(_vote_out(meeting.id))
+    )
+    app.dependency_overrides[get_broker_ws] = lambda: InMemoryBroker()
+    app.dependency_overrides[get_locker_ws] = lambda: InMemoryLocker()
+    return app, meeting
+
+
+def test_handshake_with_valid_cookie_opens_socket() -> None:
+    app, meeting = _build_real_handshake(naive=False)
+    client = TestClient(app)
+    name, value = _signed_cookie()
+    client.cookies.set(name, value)
+    with client.websocket_connect(_url(meeting)) as ws:
+        state = ws.receive_json()
+    assert state["type"] == "meeting_state"
+    assert state["status"] == "live"
+
+
+def test_handshake_with_naive_assignment_does_not_403() -> None:
+    """Regression Meeting-WS-403: naive ``valid_from``/``valid_until`` aus der DB.
+
+    Vor dem Fix warf ``rbac._assignment_valid`` in ``resolve_ws_principal``
+    ``TypeError`` → die ``get_ws_principal``-Dependency scheiterte → Handshake
+    abgelehnt. Jetzt löst der Principal sauber auf und der Socket öffnet.
+    """
+    app, meeting = _build_real_handshake(naive=True)
+    client = TestClient(app)
+    name, value = _signed_cookie()
+    client.cookies.set(name, value)
+    with client.websocket_connect(_url(meeting)) as ws:
+        assert ws.receive_json()["type"] == "meeting_state"
+
+
+def test_handshake_without_cookie_is_rejected() -> None:
+    """Ohne Cookie kein Principal → Close vor Accept (Handshake scheitert)."""
+    app, meeting = _build_real_handshake(naive=False)
+    client = TestClient(app)
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect(_url(meeting)):
+        pass

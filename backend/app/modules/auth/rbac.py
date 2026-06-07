@@ -8,7 +8,7 @@ Gruppen-Key in `Principal.groups` (`require_group` greift darauf).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,10 +18,29 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 
 
+def _as_aware(dt: datetime | None) -> datetime | None:
+    """Naive Werte als UTC interpretieren (defensiv: Alt-Daten/timestamp ohne tz).
+
+    Der Rest des Codes rechnet mit aware-UTC (``datetime.now(UTC)``). Eine naive
+    ``valid_from``/``valid_until`` aus der DB würde sonst beim Vergleich mit dem
+    aware ``now`` ``TypeError: can't compare offset-naive and offset-aware
+    datetimes`` werfen und so die komplette Principal-Auflösung (REST **und**
+    WS-Handshake) lahmlegen.
+    """
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
+
+
 def _assignment_valid(
     valid_from: datetime | None, valid_until: datetime | None, now: datetime
 ) -> bool:
-    """Gültigkeitsfenster (Vertretung/Delegation) prüfen."""
+    """Gültigkeitsfenster (Vertretung/Delegation) prüfen.
+
+    ``now`` ist immer aware-UTC (Aufrufer); nur die DB-Spalten können naiv sein.
+    """
+    valid_from = _as_aware(valid_from)
+    valid_until = _as_aware(valid_until)
     after_start = valid_from is None or valid_from <= now
     before_end = valid_until is None or valid_until >= now
     return after_start and before_end
