@@ -1,8 +1,8 @@
 """role_assignment.delegated_by + Index (T-45 Vertretung/Delegation)
 
-Revision ID: 0016_role_assignment_deleg
-Revises: 0015_role_assignment_tz
-Create Date: 2026-06-07 00:00:16
+Revision ID: 0017_role_assignment_deleg
+Revises: 0016_seed_flow_configure
+Create Date: 2026-06-07 00:00:17
 
 Selbst-Delegation/Vertretung (R1.5): ein Mitglied gibt eines seiner eigenen Rechte
 zeitlich begrenzt an ein anderes ab. ``delegated_by`` trägt die ``sub`` des
@@ -14,9 +14,9 @@ Idempotent: auf einem **frischen** Schema hat ``Base.metadata.create_all`` (0002
 Spalte + Index bereits angelegt (Single-Source via ``app.models``); diese Revision
 prüft per Inspector und legt nur Fehlendes nach (für vor-T-45 migrierte Schemata).
 
-Lineare Kette: ``down_revision`` = ``0015_role_assignment_tz`` → ``alembic heads`` =
-EIN Head. (Koordination mit paralleler Rollen-Admin-Welle: kollidiert eine zweite
-0016, wird beim Merge auf den dann aktuellen Head rebased.)
+Lineare Kette: ``down_revision`` = ``0016_seed_flow_configure`` (T-24-Rollen-Admin-
+Welle, PR #98) → ``alembic heads`` = EIN Head. (Auf 0017 umnummeriert nach dem Merge
+von #98, das die 0016 belegte — Rebase gem. Review.)
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0016_role_assignment_deleg"
-down_revision: str | None = "0015_role_assignment_tz"
+revision: str = "0017_role_assignment_deleg"
+down_revision: str | None = "0016_seed_flow_configure"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
