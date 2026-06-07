@@ -97,7 +97,11 @@ class WebhookDelivery(UUIDPkMixin, Base):
     """Auslieferungs-Versuch eines Webhooks (Worker-Pickup, data-model §1).
 
     Von T-24 mit angelegt, damit das Schema vollständig ist; der Delivery-Worker
-    (T-19/T-41) ist der Schreiber. Index ``(status, next_at)`` = Worker-Pickup.
+    (T-19) ist der Schreiber. Index ``(status, next_at)`` = Worker-Pickup.
+
+    ``idempotency_key`` (T-19, Migration 0012) entkoppelt Event-Instanz von Versand:
+    ein Flow-Retry desselben Status-Events legt **keine** zweite Delivery an
+    (unique ``(webhook_id, idempotency_key)``; ``NULL`` = keine Dedup, z. B. manuell).
     """
 
     __tablename__ = "webhook_delivery"
@@ -109,6 +113,7 @@ class WebhookDelivery(UUIDPkMixin, Base):
     payload: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     status: Mapped[str] = mapped_column(Text, server_default="pending")
     attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_at: Mapped[object | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -123,6 +128,11 @@ class WebhookDelivery(UUIDPkMixin, Base):
             name="webhook_delivery_status",
         ),
         Index("ix_webhook_delivery_status_next_at", "status", "next_at"),
+        UniqueConstraint(
+            "webhook_id",
+            "idempotency_key",
+            name="uq_webhook_delivery_idempotency",
+        ),
     )
 
 
