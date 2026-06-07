@@ -29,6 +29,8 @@ from worker.pdf import on_startup as pdf_on_startup
 from worker.pdf import render_pdf
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
+from worker.webhook import deliver_webhook
+from worker.webhook import on_startup as webhook_on_startup
 
 
 async def ping(ctx: dict[str, object]) -> str:
@@ -37,10 +39,11 @@ async def ping(ctx: dict[str, object]) -> str:
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
-    """Worker-Init: Mail- (T-18), Scan- (T-13) **und** PDF-Render-Deps (T-20) in ``ctx``."""
+    """Worker-Init: Mail- (T-18), Scan- (T-13), PDF-Render- (T-20) **und** Webhook-Deps (T-19)."""
     await mail_on_startup(ctx)
     await scan_on_startup(ctx)
     await pdf_on_startup(ctx)
+    await webhook_on_startup(ctx)
 
 
 @lru_cache(maxsize=1)
@@ -75,7 +78,14 @@ async def _shutdown(ctx: dict[str, Any]) -> None:  # pragma: no cover
 
 
 class WorkerSettings:
-    functions = [ping, refresh_budget_stats, send_mail, scan_attachment, render_pdf]
+    functions = [
+        ping,
+        refresh_budget_stats,
+        send_mail,
+        scan_attachment,
+        render_pdf,
+        deliver_webhook,
+    ]
     cron_jobs = [cron(refresh_budget_stats, hour=3, minute=0)]
     on_startup = _on_startup
     on_shutdown = _shutdown

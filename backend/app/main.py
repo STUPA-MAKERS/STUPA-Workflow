@@ -40,6 +40,7 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.pdf.action_dispatcher import ChainActionDispatcher, build_pdf_dispatcher
 from app.modules.pdf.router import router as pdf_router
 from app.modules.voting.router import router as voting_router
+from app.modules.webhooks.action_dispatcher import build_webhook_dispatcher
 from app.settings import Settings, get_settings
 from app.shared.errors import register_exception_handlers, use_problem_json_contract
 
@@ -101,14 +102,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await livevote_redis.aclose()
 
 
-def _notify_action_dispatcher(request: Request) -> ActionDispatcher:
-    """Flow-Action-Dispatcher: `notify` (T-18) **und** `exportPdf` (T-20) verkettet.
+def _flow_action_dispatcher(request: Request) -> ActionDispatcher:
+    """Flow-Action-Dispatcher: `notify` (T-18), `exportPdf` (T-20) **und** `webhook` (T-19).
 
-    Liest den arq-Pool aus dem App-State (Lifespan); ohne Pool werden notify-Mails bzw.
-    Render-Jobs geloggt + verworfen/pending gehalten (kein API-Block)."""
+    Liest den arq-Pool aus dem App-State (Lifespan); ohne Pool werden notify-Mails,
+    Render-Jobs bzw. Webhook-Deliveries geloggt + verworfen/pending gehalten (kein
+    API-Block)."""
     pool = getattr(request.app.state, "arq_pool", None)
     return ChainActionDispatcher(
-        [build_notify_dispatcher(pool), build_pdf_dispatcher(pool)]
+        [
+            build_notify_dispatcher(pool),
+            build_pdf_dispatcher(pool),
+            build_webhook_dispatcher(pool),
+        ]
     )
 
 
@@ -128,8 +134,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
 
-    # Flow-`notify`-Actions echt versenden (statt No-op-Log): Dispatcher überschreiben.
-    app.dependency_overrides[get_action_dispatcher] = _notify_action_dispatcher
+    # Flow-Actions echt ausführen (statt No-op-Log): notify (T-18) + webhook (T-19).
+    app.dependency_overrides[get_action_dispatcher] = _flow_action_dispatcher
 
     app.include_router(api_router)
     use_problem_json_contract(app)

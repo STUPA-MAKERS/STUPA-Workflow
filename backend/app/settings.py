@@ -113,6 +113,16 @@ class Settings(BaseSettings):
     scan_max_tries: int = 5
     scan_retry_backoff_seconds: int = 30
 
+    # — Webhook-Dispatch (T-19, security.md §5). Versand läuft im arq-Worker; die API
+    #   legt nur ``webhook_delivery``-Zeilen + Jobs an. SSRF-Guard ist **immer** aktiv
+    #   (private/loopback/link-local/metadata blockiert); die optionale Host-Allowlist
+    #   schränkt zusätzlich auf erlaubte Ziel-Hosts ein (leer = jeder *öffentliche*
+    #   Host). Das pro-Webhook-``secret`` wird **nie** geloggt. —
+    webhook_timeout_seconds: float = 10.0
+    webhook_max_tries: int = 5
+    webhook_retry_backoff_seconds: int = 30
+    webhook_host_allowlist: list[str] = []
+
     @property
     def storage_enabled(self) -> bool:
         """Object-Storage nur aktiv, wenn ein MinIO-Endpunkt gesetzt ist."""
