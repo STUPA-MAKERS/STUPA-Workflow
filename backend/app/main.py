@@ -37,6 +37,8 @@ from app.modules.livevote.service import BrokerPublisher
 from app.modules.notifications.action_dispatcher import build_notify_dispatcher
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
 from app.modules.notifications.router import router as notifications_router
+from app.modules.pdf.action_dispatcher import ChainActionDispatcher, build_pdf_dispatcher
+from app.modules.pdf.router import router as pdf_router
 from app.modules.voting.router import router as voting_router
 from app.settings import Settings, get_settings
 from app.shared.errors import register_exception_handlers, use_problem_json_contract
@@ -63,6 +65,7 @@ api_router.include_router(budget_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(notifications_router)
 api_router.include_router(files_router)
+api_router.include_router(pdf_router)
 api_router.include_router(audit_router)
 api_router.include_router(admin_router)
 api_router.include_router(site_config_public_router)
@@ -99,12 +102,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def _notify_action_dispatcher(request: Request) -> ActionDispatcher:
-    """Flow-Action-Dispatcher mit Mail-`notify`-Handler (überschreibt den No-op).
+    """Flow-Action-Dispatcher: `notify` (T-18) **und** `exportPdf` (T-20) verkettet.
 
-    Liest den arq-Pool aus dem App-State (Lifespan); ohne Pool werden notify-Mails
-    geloggt + verworfen (kein API-Block)."""
+    Liest den arq-Pool aus dem App-State (Lifespan); ohne Pool werden notify-Mails bzw.
+    Render-Jobs geloggt + verworfen/pending gehalten (kein API-Block)."""
     pool = getattr(request.app.state, "arq_pool", None)
-    return build_notify_dispatcher(pool)
+    return ChainActionDispatcher(
+        [build_notify_dispatcher(pool), build_pdf_dispatcher(pool)]
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
