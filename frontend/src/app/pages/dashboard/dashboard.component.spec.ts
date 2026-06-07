@@ -44,7 +44,8 @@ describe('DashboardComponent', () => {
   it('greets the signed-in member by name and shows their roles', async () => {
     const { http } = await setup(MEMBER);
     expect(screen.getByText('Willkommen, Mia Member')).toBeInTheDocument();
-    expect(screen.getByText('member')).toBeInTheDocument();
+    // Rollen-Tag wird kapitalisiert angezeigt (#73), Wert bleibt `member`.
+    expect(screen.getByText('Member')).toBeInTheDocument();
     http.verify();
   });
 

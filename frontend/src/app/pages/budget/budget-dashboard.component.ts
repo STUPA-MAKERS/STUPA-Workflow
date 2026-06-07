@@ -15,6 +15,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { BudgetPotInfo, BudgetStats } from '@core/api/models';
 import { ButtonComponent } from '@shared/ui/button/button.component';
+import { SelectComponent, type SelectOption } from '@shared/ui';
+import { AdminOptionsService } from '../admin/admin-options.service';
 import { type BudgetKpis, formatMoney, kpiTotals } from './budget.util';
 import { PotUsageComponent } from './pot-usage.component';
 import { StatusDistributionComponent } from './status-distribution.component';
@@ -37,6 +39,7 @@ import { StatusDistributionComponent } from './status-distribution.component';
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    SelectComponent,
     PotUsageComponent,
     StatusDistributionComponent,
   ],
@@ -76,13 +79,12 @@ import { StatusDistributionComponent } from './status-distribution.component';
       </div>
 
       <div class="field">
-        <label class="field__label" for="budget-gremium">{{ 'budget.filter.gremium' | t }}</label>
-        <input
+        <app-select
           id="budget-gremium"
-          class="field__control"
-          type="text"
           name="gremium"
-          [placeholder]="'budget.filter.gremium.placeholder' | t"
+          [label]="'budget.filter.gremium' | t"
+          [placeholder]="'budget.filter.all' | t"
+          [options]="gremiumOptions()"
           [ngModel]="gremium()"
           (ngModelChange)="gremium.set($event)"
         />
@@ -290,11 +292,14 @@ export class BudgetDashboardComponent {
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly options = inject(AdminOptionsService);
 
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly stats = signal<BudgetStats | null>(null);
   readonly pots = signal<BudgetPotInfo[]>([]);
+  /** Gremien als Dropdown-Optionen (#77) statt Freitext-ID. */
+  readonly gremiumOptions = signal<SelectOption[]>([]);
 
   /** Sichtbare Filter-Controls (gespiegelt aus den Query-Params). */
   readonly pot = signal('');
@@ -311,6 +316,10 @@ export class BudgetDashboardComponent {
   });
 
   constructor() {
+    this.options
+      .gremiumOptions()
+      .pipe(takeUntilDestroyed())
+      .subscribe((opts) => this.gremiumOptions.set(opts));
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.pot.set(pm.get('pot') ?? '');
       this.gremium.set(pm.get('gremium') ?? '');

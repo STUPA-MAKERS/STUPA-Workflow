@@ -7,7 +7,13 @@ import { NotificationRulesComponent } from './notification-rules.component';
 
 async function setup(seed: NotificationRule[] = []) {
   const saveNotificationRule = jest.fn((r: NotificationRule) => of({ ...r, id: r.id || 'nr-new' }));
-  const api = { listNotificationRules: jest.fn(() => of(seed)), saveNotificationRule };
+  const api = {
+    listNotificationRules: jest.fn(() => of(seed)),
+    saveNotificationRule,
+    // Vom Options-Provider (#77) für die Empfänger-Dropdowns benötigt.
+    listGremien: jest.fn(() => of([{ id: 'g-stupa', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' }])),
+    listRoles: jest.fn(() => of([])),
+  };
   const view = await render(NotificationRulesComponent, {
     providers: [{ provide: AdminApiService, useValue: api }],
   });
@@ -52,7 +58,8 @@ describe('NotificationRulesComponent', () => {
     expect(c.rules()[0].recipients[1].ref).toBeUndefined();
     c.removeRcpt(0, 1);
     expect(c.rules()[0].recipients).toHaveLength(1);
-    expect(c.rcptLabel('role')).toBe('Rolle');
+    // Empfänger-Typen kommen als lokalisierte Dropdown-Optionen (#77).
+    expect(c.kindOptions.find((o: { value: string }) => o.value === 'role').label).toBe('Rolle');
     c.remove(0);
     expect(c.rules()).toHaveLength(0);
   });

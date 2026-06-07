@@ -2,17 +2,11 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, CheckboxComponent } from '@shared/ui';
+import { ButtonComponent, CheckboxComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
-import {
-  EVENT_NAMES,
-  type NotificationRule,
-  type RecipientKind,
-} from '../admin.models';
-
-const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group'];
+import { AdminOptionsService } from '../admin-options.service';
+import { type NotificationRule } from '../admin.models';
 
 /**
  * Notification-Regel-UI (T-34, api.md `/admin/notification-rules`). CRUD über die
@@ -23,7 +17,7 @@ const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group']
   selector: 'app-notification-rules',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, SelectComponent],
   template: `
     <section class="cfg">
       <header class="cfg__head">
@@ -38,12 +32,13 @@ const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group']
       @for (rule of rules(); track $index; let i = $index) {
         <article class="cfg__card">
           <div class="cfg__grid">
-            <label class="cfg__lbl">{{ 'admin.notif.event' | t }}
-              <select [(ngModel)]="rule.event" (ngModelChange)="touch()">
-                @for (ev of allEvents; track ev) {
-                  <option [value]="ev">{{ ev }}</option>
-                }
-              </select></label>
+            <app-select
+              class="cfg__lbl"
+              [label]="'admin.notif.event' | t"
+              [options]="eventOptions"
+              [(ngModel)]="rule.event"
+              (ngModelChange)="touch()"
+            />
             <label class="cfg__lbl">{{ 'admin.notif.template' | t }}
               <input [(ngModel)]="rule.templateKey" (ngModelChange)="touch()" /></label>
             <app-checkbox [(ngModel)]="rule.enabled" (ngModelChange)="touch()">
@@ -55,17 +50,27 @@ const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group']
             <legend>{{ 'admin.notif.recipients' | t }}</legend>
             @for (rcpt of rule.recipients; track $index; let ri = $index) {
               <div class="cfg__rcpt">
-                <select [(ngModel)]="rcpt.kind" (ngModelChange)="onKind(i, ri)">
-                  @for (k of kinds; track k) {
-                    <option [value]="k">{{ rcptLabel(k) }}</option>
-                  }
-                </select>
-                @if (rcpt.kind !== 'applicant') {
-                  <input
-                    [attr.aria-label]="'admin.common.key' | t"
+                <app-select
+                  [ariaLabel]="'admin.notif.recipients' | t"
+                  [options]="kindOptions"
+                  [(ngModel)]="rcpt.kind"
+                  (ngModelChange)="onKind(i, ri)"
+                />
+                @if (rcpt.kind === 'role') {
+                  <app-select
+                    [ariaLabel]="'admin.notif.refRole' | t"
+                    [placeholder]="'admin.notif.refRole' | t"
+                    [options]="roleOptions()"
                     [(ngModel)]="rcpt.ref"
                     (ngModelChange)="touch()"
-                    placeholder="ref"
+                  />
+                } @else if (rcpt.kind === 'group') {
+                  <app-select
+                    [ariaLabel]="'admin.notif.refGroup' | t"
+                    [placeholder]="'admin.notif.refGroup' | t"
+                    [options]="gremiumOptions()"
+                    [(ngModel)]="rcpt.ref"
+                    (ngModelChange)="touch()"
                   />
                 }
                 <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeRcpt(i, ri)">✕</app-button>
@@ -96,14 +101,13 @@ export class NotificationRulesComponent {
   private readonly api = inject(AdminApiService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
+  private readonly options = inject(AdminOptionsService);
 
-  protected readonly allEvents = EVENT_NAMES;
-  protected readonly kinds = RECIPIENT_KINDS;
+  protected readonly eventOptions = this.options.eventOptions();
+  protected readonly kindOptions = this.options.recipientKindOptions();
+  protected readonly roleOptions = signal<SelectOption[]>([]);
+  protected readonly gremiumOptions = signal<SelectOption[]>([]);
   protected readonly rules = signal<NotificationRule[]>([]);
-
-  protected rcptLabel(kind: RecipientKind): string {
-    return this.i18n.translate(`admin.notif.rcpt.${kind}` as TranslationKey);
-  }
 
   protected readonly errors = computed(() =>
     this.rules().map((r) => {
@@ -121,6 +125,8 @@ export class NotificationRulesComponent {
 
   constructor() {
     this.api.listNotificationRules().subscribe((r) => this.rules.set(r));
+    this.options.roleOptions().subscribe((o) => this.roleOptions.set(o));
+    this.options.gremiumOptions().subscribe((o) => this.gremiumOptions.set(o));
   }
 
   protected add(): void {

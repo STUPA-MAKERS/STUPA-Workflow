@@ -105,14 +105,33 @@
   outline-offset: 2px;
 }
 
-.lang {
+/* Präferenzen-Gruppe (Sprache + Erscheinungsbild), rechts neben „Abmelden" (#81). */
+.prefs {
   display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: var(--space-2);
+  padding-inline-start: var(--space-3);
+  border-inline-start: var(--border-width) solid var(--color-border);
+}
+
+.lang {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.lang__icon {
+  position: absolute;
+  left: var(--space-3);
+  display: inline-flex;
+  color: var(--color-text-muted);
+  pointer-events: none;
 }
 .lang__select {
   appearance: none;
   -webkit-appearance: none;
-  // Platz für das eingebettete Chevron rechts.
-  padding-inline: var(--space-3) var(--space-7);
+  // Platz für das Sprach-Icon links und das eingebettete Chevron rechts.
+  padding-inline: var(--space-7) var(--space-7);
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path d="M2 4.5l4 4 4-4" fill="none" stroke="%236e756f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>');
   background-repeat: no-repeat;
   background-position: right var(--space-3) center;
@@ -122,8 +141,7 @@
 .theme-toggle {
   width: var(--control-height);
   justify-content: center;
-  font-size: var(--fs-lg);
-  line-height: 1;
+  line-height: 0;
 }
 /* Aktiver/aktueller Modus klar markiert (a11y: aria-pressed gespiegelt). */
 .theme-toggle[aria-pressed='true'] {

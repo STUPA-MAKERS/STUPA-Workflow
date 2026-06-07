@@ -66,6 +66,6 @@ describe('PotUsageComponent', () => {
 
   it('shows an empty hint when no pots are present', async () => {
     await render(PotUsageComponent, { inputs: { pots: [] } });
-    expect(screen.getByText('Keine Töpfe für die aktuelle Auswahl.')).toBeInTheDocument();
+    expect(screen.getByText('Keine Budgets für die aktuelle Auswahl.')).toBeInTheDocument();
   });
 });

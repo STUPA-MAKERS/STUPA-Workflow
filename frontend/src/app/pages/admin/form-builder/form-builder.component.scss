@@ -59,6 +59,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: var(--space-3);
+  align-items: end;
 }
 
 .fb__lbl {
@@ -144,6 +145,8 @@ textarea {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--color-border);
 }
 
 .fb__status {

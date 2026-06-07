@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { FieldType, FormFieldDef } from '@core/api/models';
-import { ButtonComponent, CheckboxComponent } from '@shared/ui';
+import { ButtonComponent, CheckboxComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import {
@@ -29,7 +29,7 @@ import {
   selector: 'app-form-builder',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, SelectComponent],
   templateUrl: './form-builder.component.html',
   styleUrl: './form-builder.component.scss',
 })
@@ -39,6 +39,8 @@ export class FormBuilderComponent {
   private readonly i18n = inject(I18nService);
 
   protected readonly fieldTypes = FIELD_TYPES;
+  /** Feldtypen als Dropdown-Optionen (#77) — Wert == Typ-Schlüssel. */
+  protected readonly fieldTypeOptions: SelectOption[] = FIELD_TYPES.map((t) => ({ value: t, label: t }));
   protected readonly fields = signal<FormFieldDef[]>([]);
   /** Roh-Editierstrings für JsonLogic-Felder (Index → {visibleIf, compute}). */
   protected readonly rawLogic = signal<Record<number, { visibleIf?: string; compute?: string }>>({});

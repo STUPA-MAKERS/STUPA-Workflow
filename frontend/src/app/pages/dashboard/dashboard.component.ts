@@ -8,6 +8,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { CardComponent } from '@shared/ui/card/card.component';
+import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 
 interface Section {
   /** Sichtbarkeit: mindestens eine Permission (leer = jede Session). */
@@ -28,7 +29,7 @@ interface Section {
   selector: 'app-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, CardComponent, BadgeComponent],
+  imports: [RouterLink, TranslatePipe, CardComponent, BadgeComponent, CapitalizePipe],
   template: `
     <header class="dash__head">
       <h1 class="dash__title">{{ 'dashboard.greeting' | t: { name: auth.displayName() } }}</h1>
@@ -36,7 +37,7 @@ interface Section {
       @if (auth.roles().length) {
         <div class="dash__roles">
           @for (role of auth.roles(); track role) {
-            <app-badge variant="primary">{{ role }}</app-badge>
+            <app-badge variant="primary">{{ role | capitalize }}</app-badge>
           }
         </div>
       }
