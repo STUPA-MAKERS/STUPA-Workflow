@@ -1,4 +1,10 @@
-import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applications.util';
+import {
+  applicationTitle,
+  formatBytes,
+  formatFieldValue,
+  scanBadgeVariant,
+  stateBadgeVariant,
+} from './applications.util';
 
 describe('stateBadgeVariant', () => {
   it('maps the backend state categories', () => {
@@ -47,5 +53,28 @@ describe('formatFieldValue', () => {
   it('JSON-stringifies objects and arrays', () => {
     expect(formatFieldValue({ a: 1 })).toBe('{"a":1}');
     expect(formatFieldValue([1, 2])).toBe('[1,2]');
+  });
+});
+
+describe('scanBadgeVariant', () => {
+  it('maps each scan state to a badge variant', () => {
+    expect(scanBadgeVariant('scanning')).toBe('warning');
+    expect(scanBadgeVariant('clean')).toBe('success');
+    expect(scanBadgeVariant('quarantined')).toBe('danger');
+  });
+});
+
+describe('formatBytes', () => {
+  it('formats bytes/KB/MB with a binary base', () => {
+    expect(formatBytes(0)).toBe('0 B');
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(1024)).toBe('1.0 KB');
+    expect(formatBytes(1536)).toBe('1.5 KB');
+    expect(formatBytes(1048576)).toBe('1.0 MB');
+  });
+
+  it('returns a dash for invalid sizes', () => {
+    expect(formatBytes(-1)).toBe('—');
+    expect(formatBytes(NaN)).toBe('—');
   });
 });

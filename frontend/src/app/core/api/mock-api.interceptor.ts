@@ -11,11 +11,13 @@ import type {
   ApplicationCreatedWire,
   ApplicationOutWire,
   ApplicationTypeListItemWire,
+  AttachmentOutWire,
   CommentOutWire,
   EffectiveForm,
   MagicLinkVerifyResult,
   Page,
   Principal,
+  SignedUrlOutWire,
   StateOutWire,
   TimelineEventOutWire,
   TransitionOutWire,
@@ -302,6 +304,13 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/versions')) return ok([...MOCK_VERSIONS]);
     if (p.endsWith('/comments')) return ok([...MOCK_COMMENTS]);
     if (p.endsWith('/transitions')) return ok([...MOCK_TRANSITIONS]);
+    if (/\/attachments\/[^/]+$/.test(p)) {
+      const signed: SignedUrlOutWire = {
+        url: 'https://minio.example/mock-attachment?sig=demo',
+        expiresIn: 120,
+      };
+      return ok(signed);
+    }
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
   }
@@ -326,6 +335,18 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         at: '2026-06-05T14:00:00Z',
       };
       MOCK_COMMENTS.push(created);
+      return ok(created, 201);
+    }
+    if (p.endsWith('/attachments')) {
+      // Multipart-Upload: der echte Server scannt async → `scanned=false`.
+      const created: AttachmentOutWire = {
+        id: 'att00000-0000-0000-0000-000000000001',
+        filename: 'mock-upload.pdf',
+        mime: 'application/pdf',
+        size: 12345,
+        scanned: false,
+        is_comparison_offer: false,
+      };
       return ok(created, 201);
     }
     if (p.endsWith('/transition')) {

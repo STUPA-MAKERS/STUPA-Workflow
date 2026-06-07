@@ -26,6 +26,7 @@ import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
+import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applications.util';
 
 /**
@@ -52,6 +53,7 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
     ButtonComponent,
     CardComponent,
     DialogComponent,
+    AttachmentsPanelComponent,
   ],
   template: `
     <a class="det__back" routerLink="/applications">← {{ 'applications.detail.back' | t }}</a>
@@ -249,10 +251,8 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
         </form>
       </app-card>
 
-      <!-- Anhänge — Platzhalter bis T-13 (files) -->
-      <app-card [heading]="'applications.attachments.title' | t">
-        <p class="det__muted det__todo">{{ 'applications.attachments.todo' | t }}</p>
-      </app-card>
+      <!-- Anhänge (T-13-Contract): Upload + signierte Download-URLs + Scan-Status -->
+      <app-attachments-panel [applicationId]="application.id" [canUpload]="canManage()" />
     }
 
     <app-dialog
@@ -361,9 +361,6 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
       }
       .det__muted {
         color: var(--color-text-muted);
-      }
-      .det__todo {
-        font-style: italic;
       }
       .det__actions {
         display: flex;

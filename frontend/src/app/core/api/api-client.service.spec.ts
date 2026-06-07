@@ -195,6 +195,55 @@ describe('ApiClient', () => {
     ]);
   });
 
+  it('uploads an attachment as multipart FormData and maps the result', (done) => {
+    const file = new File(['hello'], 'plan.pdf', { type: 'application/pdf' });
+    api.uploadAttachment('app-1', file, { isComparisonOffer: true }).subscribe((att) => {
+      expect(att.isComparisonOffer).toBe(true);
+      expect(att.scanState).toBe('scanning');
+      done();
+    });
+    const req = http.expectOne('/api/applications/app-1/attachments');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body instanceof FormData).toBe(true);
+    const form = req.request.body as FormData;
+    expect((form.get('file') as File).name).toBe('plan.pdf');
+    expect(form.get('is_comparison_offer')).toBe('true');
+    req.flush(
+      {
+        id: 'att-1',
+        filename: 'plan.pdf',
+        mime: 'application/pdf',
+        size: 5,
+        scanned: false,
+        is_comparison_offer: true,
+      },
+      { status: 201, statusText: 'Created' },
+    );
+  });
+
+  it('GETs a signed download URL for an attachment', (done) => {
+    api.attachmentUrl('att-9').subscribe((signed) => {
+      expect(signed.url).toContain('minio');
+      expect(signed.expiresIn).toBe(120);
+      done();
+    });
+    const req = http.expectOne('/api/attachments/att-9');
+    expect(req.request.method).toBe('GET');
+    req.flush({ url: 'https://minio/att-9?sig=abc', expiresIn: 120 });
+  });
+
+  it('propagates a 409 when the attachment is not yet clean', (done) => {
+    api.attachmentUrl('att-q').subscribe({
+      error: (err: { status: number }) => {
+        expect(err.status).toBe(409);
+        done();
+      },
+    });
+    http
+      .expectOne('/api/attachments/att-q')
+      .flush({ title: 'Conflict', status: 409 }, { status: 409, statusText: 'Conflict' });
+  });
+
   it('POSTs the magic-link token to verify (snake_case response)', () => {
     api.verifyMagicLink('tok-1').subscribe();
     const req = http.expectOne('/api/auth/magic-link/verify');
