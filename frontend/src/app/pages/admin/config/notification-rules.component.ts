@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent } from '@shared/ui';
+import { ButtonComponent, CheckboxComponent } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import {
@@ -23,7 +23,7 @@ const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group']
   selector: 'app-notification-rules',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent],
   template: `
     <section class="cfg">
       <header class="cfg__head">
@@ -46,10 +46,9 @@ const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group']
               </select></label>
             <label class="cfg__lbl">{{ 'admin.notif.template' | t }}
               <input [(ngModel)]="rule.templateKey" (ngModelChange)="touch()" /></label>
-            <label class="cfg__chk">
-              <input type="checkbox" [(ngModel)]="rule.enabled" (ngModelChange)="touch()" />
+            <app-checkbox [(ngModel)]="rule.enabled" (ngModelChange)="touch()">
               {{ 'admin.notif.enabled' | t }}
-            </label>
+            </app-checkbox>
           </div>
 
           <fieldset class="cfg__events">
@@ -69,10 +68,10 @@ const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group']
                     placeholder="ref"
                   />
                 }
-                <button type="button" class="cfg__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeRcpt(i, ri)">✕</button>
+                <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeRcpt(i, ri)">✕</app-button>
               </div>
             }
-            <button type="button" class="cfg__addlink" (click)="addRcpt(i)">+ {{ 'admin.common.add' | t }}</button>
+            <app-button variant="ghost" size="sm" (click)="addRcpt(i)">+ {{ 'admin.common.add' | t }}</app-button>
           </fieldset>
 
           @if (errors()[i].length > 0) {

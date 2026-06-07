@@ -28,7 +28,7 @@
               @if (d.logos[slot]; as asset) {
                 <img class="br__logo-prev" [src]="asset.url" [alt]="slotLabel(slot)" />
                 <span class="br__logo-meta">{{ asset.filename }}</span>
-                <button type="button" class="br__del" (click)="removeLogo(slot)">{{ 'admin.common.remove' | t }}</button>
+                <app-button variant="ghost" size="sm" (click)="removeLogo(slot)">{{ 'admin.common.remove' | t }}</app-button>
               } @else {
                 <span class="br__logo-empty">{{ 'admin.brand.dropHere' | t }}</span>
               }
@@ -62,18 +62,18 @@
                   (ngModelChange)="reemit()"
                   placeholder="EN"
                 />
-                <button type="button" [attr.aria-label]="'admin.common.moveUp' | t" (click)="moveColumn(ci, -1)">↑</button>
-                <button type="button" [attr.aria-label]="'admin.common.moveDown' | t" (click)="moveColumn(ci, 1)">↓</button>
-                <button type="button" class="br__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeColumn(ci)">✕</button>
+                <app-button variant="secondary" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveUp' | t" (click)="moveColumn(ci, -1)">↑</app-button>
+                <app-button variant="secondary" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveDown' | t" (click)="moveColumn(ci, 1)">↓</app-button>
+                <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeColumn(ci)">✕</app-button>
               </div>
               @for (link of col.links; track $index; let li = $index) {
                 <div class="br__link">
                   <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />
                   <input [attr.aria-label]="'admin.brand.url' | t" [(ngModel)]="link.url" (ngModelChange)="reemit()" placeholder="https://" />
-                  <button type="button" class="br__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeLink(col, li)">✕</button>
+                  <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeLink(col, li)">✕</app-button>
                 </div>
               }
-              <button type="button" class="br__addlink" (click)="addLink(col)">+ {{ 'admin.brand.addLink' | t }}</button>
+              <app-button class="br__addlink" variant="ghost" size="sm" (click)="addLink(col)">+ {{ 'admin.brand.addLink' | t }}</app-button>
             </div>
           }
           <app-button variant="ghost" size="sm" (click)="addColumn()">{{ 'admin.brand.addColumn' | t }}</app-button>
@@ -88,10 +88,10 @@
             <div class="br__link">
               <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />
               <input [attr.aria-label]="'admin.brand.url' | t" [(ngModel)]="link.url" (ngModelChange)="reemit()" placeholder="https://" />
-              <button type="button" class="br__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeLegalLink(li)">✕</button>
+              <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeLegalLink(li)">✕</app-button>
             </div>
           }
-          <button type="button" class="br__addlink" (click)="addLegalLink()">+ {{ 'admin.brand.addLink' | t }}</button>
+          <app-button class="br__addlink" variant="ghost" size="sm" (click)="addLegalLink()">+ {{ 'admin.brand.addLink' | t }}</app-button>
         </fieldset>
 
         <!-- Freetexts -->

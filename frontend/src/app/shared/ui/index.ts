@@ -2,6 +2,7 @@
 export { ButtonComponent } from './button/button.component';
 export type { ButtonVariant, ButtonSize } from './button/button.component';
 export { InputComponent } from './input/input.component';
+export { CheckboxComponent } from './checkbox/checkbox.component';
 export { CardComponent } from './card/card.component';
 export { BadgeComponent } from './badge/badge.component';
 export type { BadgeVariant } from './badge/badge.component';
