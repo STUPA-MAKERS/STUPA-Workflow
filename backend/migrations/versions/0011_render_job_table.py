@@ -1,8 +1,8 @@
 """pdf: render_job (T-20)
 
-Revision ID: 0010_render_job_table
-Revises: 0009_meeting_and_vote_fk
-Create Date: 2026-06-07 00:00:10
+Revision ID: 0011_render_job_table
+Revises: 0010_admin_config_tables
+Create Date: 2026-06-07 00:00:11
 
 Wie alle Modul-Tabellen entsteht ``render_job`` auf einem **frischen** Schema bereits
 über ``Base.metadata.create_all`` in 0002 (Single-Source via ``app.models``). Für bereits
@@ -23,8 +23,8 @@ import app.models  # noqa: F401  — befüllt Base.metadata
 from app.db import Base
 from app.modules.pdf.models import RenderJob
 
-revision: str = "0010_render_job_table"
-down_revision: str | None = "0009_meeting_and_vote_fk"
+revision: str = "0011_render_job_table"
+down_revision: str | None = "0010_admin_config_tables"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
