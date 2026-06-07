@@ -123,6 +123,11 @@ class Settings(BaseSettings):
     webhook_retry_backoff_seconds: int = 30
     webhook_host_allowlist: list[str] = []
 
+    # --- Deadlines/Cron (T-44, flows §9.4) ---------------------------------- #
+    #   Vorlauf für die `deadline_approaching`-Erinnerung: gesendet, sobald
+    #   `due_at - lead <= now < due_at` (Default 24 h).
+    deadline_reminder_lead_minutes: int = 1440
+
     @property
     def storage_enabled(self) -> bool:
         """Object-Storage nur aktiv, wenn ein MinIO-Endpunkt gesetzt ist."""

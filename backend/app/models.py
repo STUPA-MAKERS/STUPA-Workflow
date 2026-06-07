@@ -34,6 +34,7 @@ from app.modules.auth.models import (
     RolePermission,
 )
 from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
+from app.modules.deadlines.models import Deadline
 from app.modules.files.models import Attachment
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
@@ -56,6 +57,7 @@ __all__ = [
     "BudgetField",
     "BudgetPot",
     "Comment",
+    "Deadline",
     "FlowVersion",
     "FormField",
     "FormVersion",
