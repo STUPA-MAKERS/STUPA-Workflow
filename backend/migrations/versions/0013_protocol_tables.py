@@ -1,8 +1,14 @@
 """protocol: protocol(+vote_ref) + protocol.write-grant (T-22)
 
-Revision ID: 0012_protocol_tables
+Revision ID: 0013_protocol_tables
 Revises: 0011_render_job_table
-Create Date: 2026-06-07 00:00:12
+Create Date: 2026-06-07 00:00:13
+
+**Nummerierung (Strang E/parallel):** T-19 belegt 0012 (parallel, noch nicht auf main).
+T-22 nimmt daher **0013**. ``down_revision`` zeigt auf den **aktuellen main-Head** —
+zum Zeitpunkt der Erstellung ``0011_render_job_table`` (T-20). Sobald T-19 (0012) auf
+main ist, wird vor dem Merge auf ``origin/main`` rebased und ``down_revision`` auf
+``0012`` gesetzt, damit ``alembic heads`` EIN Head bleibt (keine Verzweigung an 0011).
 
 Auf einem **frischen** Schema entstehen ``protocol`` und ``protocol_vote_ref`` bereits
 über ``Base.metadata.create_all`` in 0002 (Single-Source via ``app.models``). Für vor
@@ -27,7 +33,7 @@ import app.models  # noqa: F401 — befüllt Base.metadata
 from app.db import Base
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
 
-revision: str = "0012_protocol_tables"
+revision: str = "0013_protocol_tables"
 down_revision: str | None = "0011_render_job_table"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
