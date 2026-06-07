@@ -23,6 +23,15 @@ logger = logging.getLogger("app.error")
 
 PROBLEM_CONTENT_TYPE = "application/problem+json"
 
+# FastAPI wirft GENAU diese `HTTPException(400)`, wenn das Parsen des Request-Bodys
+# fehlschlägt, das kein JSON-Decode-Fehler ist — v.a. kaputtes `multipart/form-data`
+# (fastapi/routing.py). Ungültiges JSON läuft dagegen über `RequestValidationError`
+# → 422. Damit ein unparsebarer Body **app-weit** denselben dokumentierten
+# problem+json-Status liefert (statt endpunktweise undokumentierter 400er — Contract
+# `negative_data_rejection`/undocumented-status, Issue #23/T-13), heben wir diesen Fall
+# auf 422 (validation_error) — denselben Status wie jede andere Body-Validierung.
+_BODY_PARSE_ERROR_DETAIL = "There was an error parsing the body"
+
 # Status → stabiler Fehlercode (api.md §2).
 STATUS_CODE_MAP: dict[int, str] = {
     400: "bad_request",
@@ -205,6 +214,22 @@ async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     return _problem_response(exc.to_problem(_trace_id(request)), exc.headers)
 
 
+def _validation_problem(
+    request: Request, *, detail: str, errors: list[FieldError]
+) -> JSONResponse:
+    """Einheitliches 422-problem+json für jede Body-/Parameter-Validierung."""
+    problem = ProblemDetail(
+        type="app://error/validation_error",
+        title=title_for(422),
+        status=422,
+        code="validation_error",
+        detail=detail,
+        errors=errors,
+        traceId=_trace_id(request),
+    )
+    return _problem_response(problem)
+
+
 async def _validation_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
@@ -212,21 +237,20 @@ async def _validation_handler(
         FieldError(field=".".join(str(p) for p in e["loc"]), msg=e["msg"])
         for e in exc.errors()
     ]
-    problem = ProblemDetail(
-        type="app://error/validation_error",
-        title=title_for(422),
-        status=422,
-        code="validation_error",
-        detail="Request validation failed.",
-        errors=errors,
-        traceId=_trace_id(request),
-    )
-    return _problem_response(problem)
+    return _validation_problem(request, detail="Request validation failed.", errors=errors)
 
 
 async def _http_exception_handler(
     request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
+    # Body-Parse-Fehler (kaputtes multipart o.Ä.) vereinheitlichen auf 422 — nicht der
+    # endpunktspezifische, undokumentierte 400 von FastAPI (s. `_BODY_PARSE_ERROR_DETAIL`).
+    if exc.status_code == 400 and exc.detail == _BODY_PARSE_ERROR_DETAIL:
+        return _validation_problem(
+            request,
+            detail="Request body could not be parsed.",
+            errors=[FieldError(field="body", msg="Request body could not be parsed.")],
+        )
     status = exc.status_code
     detail = exc.detail if isinstance(exc.detail, str) else None
     problem = ProblemDetail(
@@ -303,7 +327,18 @@ def use_problem_json_contract(app: FastAPI) -> None:
             for operation in operations.values():
                 if not isinstance(operation, dict):
                     continue
-                for code, response in operation.get("responses", {}).items():
+                responses = operation.setdefault("responses", {})
+                # Jeder Body-annehmende Endpunkt kann bei unparsebarem/ungültigem Body
+                # ein 422 liefern (RequestValidationError bzw. vereinheitlichter
+                # Body-Parse-Fehler, s. `_http_exception_handler`). FastAPI dokumentiert
+                # 422 nur, wenn validierbare Felder existieren — multipart/File-Endpunkte
+                # bekommen es z.B. nicht zuverlässig. Darum hier global ergänzen, damit der
+                # Contract nicht endpunktweise an einem undokumentierten Status scheitert.
+                if "requestBody" in operation and isinstance(responses, dict):
+                    responses.setdefault(
+                        "422", {"description": "Validation Error"}
+                    )
+                for code, response in responses.items():
                     if str(code)[0] in {"4", "5"} and isinstance(response, dict):
                         response["content"] = problem_content
         app.openapi_schema = schema
