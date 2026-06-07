@@ -180,12 +180,28 @@ async def test_cast_blocked_when_voting_right_delegated_403() -> None:
 
 async def test_cast_blocked_when_only_nonvoting_delegation_403() -> None:
     # T-45 #3: Empfänger einer NICHT-stimmberechtigenden Delegation (delegated_by !=
-    # eigene sub, delegate_voting=False) darf trotz Gruppen-Mitgliedschaft nicht stimmen.
+    # eigene sub, delegate_voting=False) OHNE eigenes Recht (independence-probe leer)
+    # darf trotz Gruppen-Mitgliedschaft nicht stimmen.
     vote = _vote()
-    db = fake_session(result(vote), result(("other", False)))
+    db = fake_session(result(vote), result(("other", False)), result())
     with pytest.raises(ForbiddenError, match="delegated"):
         await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert db.committed == 0
+
+
+async def test_cast_nonvoting_delegation_but_own_right_allowed() -> None:
+    # T-45 re-review #1: Empfänger hat eigenes direktes Stimmrecht (eligible_group in
+    # OIDC-Gruppen) + zusätzliche Nicht-Stimm-Delegation → darf normal stimmen (1 Stimme).
+    vote = _vote()  # eligible_group="stupa"
+    db = fake_session(
+        result(vote),
+        result(("other", False)),  # nonvoting delegation in scope
+        result((uuid4(), ["stupa"])),  # independence: own OIDC membership in scope
+        result(SimpleNamespace(inserted=True)),  # ballot insert
+    )
+    out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
+    assert out.status == "cast"
+    assert db.committed == 1
 
 
 async def test_cast_exercising_delegated_vote_is_audited() -> None:

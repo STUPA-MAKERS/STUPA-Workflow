@@ -30,13 +30,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.auth.models import GroupMapping, Role, RoleAssignment
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.auth.models import Role, RoleAssignment
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import _assignment_valid
 from app.modules.delegations.schemas import DelegationCreate, DelegationOut
@@ -76,22 +76,84 @@ def _scope_clause(scope: str | None):  # noqa: ANN202 — SQLAlchemy-ColumnEleme
     return or_(base, RoleAssignment.gremium_id == gid)
 
 
+def _window_active(now: datetime):  # noqa: ANN202 — SQLAlchemy-ColumnElement
+    """SQL: Assignment-Fenster zum Zeitpunkt ``now`` aktiv."""
+    return and_(
+        or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
+        or_(RoleAssignment.valid_until.is_(None), RoleAssignment.valid_until >= now),
+    )
+
+
+async def _independently_eligible(
+    session: AsyncSession, sub: str, scope: str | None, now: datetime
+) -> bool:
+    """Ist ``sub`` **unabhängig von Delegationen** in der ``eligible_group``?
+
+    Quellen (wie der Resolver, aber ohne ``delegated_by``-Zeilen): OIDC-Gruppe direkt,
+    ein **direkt** gehaltenes Assignment im Gremium ``scope``, oder ein group-mapping
+    (eigene OIDC-Gruppe → Gremium ``scope``). Trennt einen legitimen Eigen-Wähler von
+    einem reinen Delegations-Empfänger (security-review #95, false-positive-Fix).
+    """
+    row = (
+        await session.execute(
+            select(PrincipalRow.id, PrincipalRow.oidc_groups).where(PrincipalRow.sub == sub)
+        )
+    ).first()
+    if row is None:
+        return False
+    pid, raw_groups = row
+    oidc = {str(g) for g in (raw_groups or [])}
+    if scope is not None and scope in oidc:
+        return True
+    if scope is None:
+        return False
+    try:
+        gid = UUID(scope)
+    except ValueError:
+        return False
+    direct = (
+        await session.execute(
+            select(RoleAssignment.id)
+            .where(
+                RoleAssignment.principal_id == pid,
+                RoleAssignment.delegated_by.is_(None),
+                RoleAssignment.gremium_id == gid,
+                _window_active(now),
+            )
+            .limit(1)
+        )
+    ).first()
+    if direct is not None:
+        return True
+    if not oidc:
+        return False
+    mapped = (
+        await session.execute(
+            select(GroupMapping.id)
+            .where(GroupMapping.gremium_id == gid, GroupMapping.oidc_group.in_(oidc))
+            .limit(1)
+        )
+    ).first()
+    return mapped is not None
+
+
 async def voting_delegation_check(
     session: AsyncSession, sub: str, scope: str | None, now: datetime
 ) -> tuple[bool, bool]:
     """Zwei-seitiges Stimmrecht-Verdikt für ``sub`` im ``scope`` → ``(blocked, exercised)``.
 
-    Eine **einzige** Query (Sub-Select für die principal-id des Empfängers), damit der
-    Voting-cast-Pfad genau einen DB-Zugriff behält. ``blocked`` hat Vorrang
-    (fail-closed). Klassifikation der aktiven, scope-passenden Delegations-Zeilen:
+    Erste Query (Sub-Select für die principal-id) klassifiziert die aktiven, scope-
+    passenden Delegations-Zeilen; ``blocked`` hat Vorrang (fail-closed):
 
     * ``delegated_by == sub`` & ``delegate_voting`` → der Aufrufer hat sein Stimmrecht
       abgegeben → **blocked** (kein Doppel: nur der Empfänger stimmt).
-    * Empfänger-Zeile (``delegated_by != sub``) & **nicht** ``delegate_voting`` → der
-      Aufrufer käme nur über eine *nicht*-stimmberechtigende Delegation in die Gruppe
-      → **blocked** (eine nicht-Stimm-Delegation verleiht kein Stimmrecht).
     * Empfänger-Zeile & ``delegate_voting`` → der Aufrufer **übt** ein delegiertes
-      Stimmrecht aus → ``exercised`` (für das Nutzungs-Audit).
+      Stimmrecht aus → ``exercised`` (Nutzungs-Audit).
+    * Empfänger-Zeile & **nicht** ``delegate_voting`` → nur dann **blocked**, wenn der
+      Aufrufer **nicht eigenständig** stimmberechtigt ist (sonst stimmt er auf sein
+      eigenes direktes Recht; die nicht-Stimm-Delegation verleiht kein Stimmrecht).
+      Diese Eigenständigkeits-Probe läuft nur in diesem schmalen Fall — der Normal-
+      Wähler-Pfad bleibt bei genau einer Query.
     """
     pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
     rows = (
@@ -102,24 +164,31 @@ async def voting_delegation_check(
                     RoleAssignment.delegated_by == sub,
                     RoleAssignment.principal_id == pid_subq,
                 ),
-                or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
-                or_(RoleAssignment.valid_until.is_(None), RoleAssignment.valid_until >= now),
+                _window_active(now),
                 _scope_clause(scope),
             )
         )
     ).all()
 
-    blocked = False
-    exercised = False
+    gave_voting_away = False
+    recipient_voting = False
+    recipient_nonvoting = False
     for delegated_by, delegate_voting in rows:
         if delegated_by == sub:
             if delegate_voting:
-                blocked = True
+                gave_voting_away = True
         elif delegate_voting:
-            exercised = True
+            recipient_voting = True
         else:
-            blocked = True
-    return blocked, exercised
+            recipient_nonvoting = True
+
+    if gave_voting_away:
+        return True, False
+    if recipient_voting:
+        return False, True
+    if recipient_nonvoting and not await _independently_eligible(session, sub, scope, now):
+        return True, False
+    return False, False
 
 
 class DelegationService:

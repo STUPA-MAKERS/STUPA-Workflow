@@ -84,27 +84,74 @@ def test_to_utc_normalizes() -> None:
     assert _to_utc(aware) == aware
 
 
-async def test_voting_delegation_check_classifies_both_sides() -> None:
-    # delegator gave voting away → blocked
+async def test_voting_delegation_check_delegator_gave_voting_blocked() -> None:
     db = fake_session(result(("me", True)))
     assert await voting_delegation_check(db, "me", None, NOW) == (True, False)
-    # recipient via NON-voting delegation → blocked
-    db = fake_session(result(("other", False)))
-    assert await voting_delegation_check(db, "me", None, NOW) == (True, False)
-    # recipient via voting delegation → exercised
+
+
+async def test_voting_delegation_check_recipient_voting_exercised() -> None:
     db = fake_session(result(("other", True)))
     assert await voting_delegation_check(db, "me", None, NOW) == (False, True)
-    # nothing → normal
+
+
+async def test_voting_delegation_check_none_is_normal() -> None:
     db = fake_session(result())
     assert await voting_delegation_check(db, "me", None, NOW) == (False, False)
 
 
-async def test_voting_delegation_check_scope_branches() -> None:
-    # _scope_clause: None, gültige UUID, Nicht-UUID — alle Branches.
-    db = fake_session(result(), result(), result())
-    assert await voting_delegation_check(db, "me", None, NOW) == (False, False)
-    assert await voting_delegation_check(db, "me", str(uuid4()), NOW) == (False, False)
-    assert await voting_delegation_check(db, "me", "not-a-uuid", NOW) == (False, False)
+async def test_voting_delegation_check_nonvoting_recipient_without_own_right_blocked() -> None:
+    # recipient-nonvoting + KEIN eigenes Recht (independence-probe: principal None) → blocked
+    db = fake_session(result(("other", False)), result())
+    assert await voting_delegation_check(db, "me", None, NOW) == (True, False)
+
+
+async def test_voting_delegation_check_nonvoting_recipient_with_own_right_allowed() -> None:
+    # #1 re-review: eigenes direktes Recht via OIDC-Gruppe → NICHT blocken (1 Stimme).
+    db = fake_session(
+        result(("other", False)),  # nonvoting delegation present
+        result((uuid4(), ["stupa"])),  # principal id + oidc_groups containing scope
+    )
+    assert await voting_delegation_check(db, "me", "stupa", NOW) == (False, False)
+
+
+async def test_independently_eligible_via_direct_assignment() -> None:
+    gid = str(uuid4())
+    db = fake_session(
+        result(("other", False)),  # nonvoting delegation
+        result((uuid4(), [])),  # no oidc match
+        result(SimpleNamespace(id=uuid4())),  # direct active assignment in gremium
+    )
+    assert await voting_delegation_check(db, "me", gid, NOW) == (False, False)
+
+
+async def test_independently_eligible_via_group_mapping() -> None:
+    gid = str(uuid4())
+    db = fake_session(
+        result(("other", False)),  # nonvoting delegation
+        result((uuid4(), ["g1"])),  # oidc group g1 (no direct scope match)
+        result(),  # no direct assignment
+        result(SimpleNamespace(id=uuid4())),  # group_mapping g1 → gremium
+    )
+    assert await voting_delegation_check(db, "me", gid, NOW) == (False, False)
+
+
+async def test_independently_eligible_uuid_scope_no_source_blocked() -> None:
+    gid = str(uuid4())
+    db = fake_session(
+        result(("other", False)),  # nonvoting delegation
+        result((uuid4(), [])),  # no oidc
+        result(),  # no direct assignment
+        # oidc empty → group_mapping query skipped
+    )
+    assert await voting_delegation_check(db, "me", gid, NOW) == (True, False)
+
+
+async def test_independently_eligible_nonuuid_scope_blocked() -> None:
+    db = fake_session(
+        result(("other", False)),  # nonvoting delegation
+        result((uuid4(), [])),  # no oidc match, scope not a uuid
+    )
+    assert await voting_delegation_check(db, "me", "not-a-uuid", NOW) == (True, False)
 
 
 # --------------------------------------------------------------------------- #
