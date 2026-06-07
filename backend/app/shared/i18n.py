@@ -6,7 +6,17 @@ sonst erster vorhandener Wert.
 
 from __future__ import annotations
 
+from typing import Literal
+
 I18nMap = dict[str, str]
+
+# Unterstützte UI-Sprachen (T-25). Als Query-/Body-Feldtyp verwendet, damit
+# ungültige Werte (z.B. ``lang=null``) sauber als 422 problem+json abgelehnt
+# werden statt still durchzulaufen — schließt den be-contract-Coverage-Flake
+# (schemathesis injiziert ungültige Enum-Werte, erwartet 4xx; vgl. PR #63).
+Lang = Literal["de", "en"]
+
+DEFAULT_LANG: Lang = "de"
 
 
 def resolve_i18n(

@@ -173,6 +173,31 @@ def test_list_rejects_unknown_query_param_422(app_client: TestClient) -> None:
     assert r.status_code == 422
 
 
+@pytest.mark.parametrize("lang", ["null", "xx", "EN", "de-DE", ""])
+def test_list_rejects_invalid_lang_422(app_client: TestClient, lang: str) -> None:
+    # `lang`-Enum: ungültige Werte (inkl. `lang=null`) → 422 statt still 200.
+    # Schließt den be-contract-Coverage-Flake (schemathesis injiziert Müll, erwartet 4xx; PR #63).
+    r = app_client.get(f"/api/application-types?lang={lang}")
+    assert r.status_code == 422
+    assert r.headers["content-type"].startswith("application/problem+json")
+
+
+@pytest.mark.parametrize("lang", ["de", "en"])
+def test_list_accepts_valid_lang_200(
+    app_client: TestClient, fake_service: _FakeService, lang: str
+) -> None:
+    r = app_client.get(f"/api/application-types?lang={lang}")
+    assert r.status_code == 200
+    assert fake_service.calls[0]["lang"] == lang
+
+
+def test_list_default_lang_is_de(app_client: TestClient, fake_service: _FakeService) -> None:
+    # Default ohne Param → 200/de.
+    r = app_client.get("/api/application-types")
+    assert r.status_code == 200
+    assert fake_service.calls[0]["lang"] == "de"
+
+
 # --------------------------------------------------------------------------- #
 # OpenAPI-Contract
 # --------------------------------------------------------------------------- #
@@ -184,3 +209,12 @@ def test_openapi_declares_error_responses(app_client: TestClient) -> None:
     assert "application/problem+json" in get_list["responses"]["422"]["content"]
     # Erfolg bleibt application/json.
     assert "application/json" in get_list["responses"]["200"]["content"]
+
+
+def test_openapi_lang_param_is_enum(app_client: TestClient) -> None:
+    # `lang` als Enum dokumentiert (de|en) statt freier String.
+    spec = app_client.get("/openapi.json").json()
+    params = spec["paths"]["/api/application-types"]["get"]["parameters"]
+    lang_param = next(p for p in params if p["name"] == "lang")
+    assert lang_param["schema"]["enum"] == ["de", "en"]
+    assert lang_param["schema"]["default"] == "de"
