@@ -25,6 +25,8 @@ from sqlalchemy.ext.asyncio import (
 from app.modules.budget.stats import BudgetStatsService
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
+from worker.pdf import on_startup as pdf_on_startup
+from worker.pdf import render_pdf
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
 
@@ -35,9 +37,10 @@ async def ping(ctx: dict[str, object]) -> str:
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
-    """Worker-Init: Mail- (T-18) **und** Scan-Abhängigkeiten (T-13) in ``ctx`` legen."""
+    """Worker-Init: Mail- (T-18), Scan- (T-13) **und** PDF-Render-Deps (T-20) in ``ctx``."""
     await mail_on_startup(ctx)
     await scan_on_startup(ctx)
+    await pdf_on_startup(ctx)
 
 
 @lru_cache(maxsize=1)
@@ -72,7 +75,7 @@ async def _shutdown(ctx: dict[str, Any]) -> None:  # pragma: no cover
 
 
 class WorkerSettings:
-    functions = [ping, refresh_budget_stats, send_mail, scan_attachment]
+    functions = [ping, refresh_budget_stats, send_mail, scan_attachment, render_pdf]
     cron_jobs = [cron(refresh_budget_stats, hour=3, minute=0)]
     on_startup = _on_startup
     on_shutdown = _shutdown

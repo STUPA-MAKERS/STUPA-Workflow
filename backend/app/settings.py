@@ -123,6 +123,37 @@ class Settings(BaseSettings):
         """ClamAV-Scan nur aktiv, wenn ein clamd-Host gesetzt ist."""
         return bool(self.clamav_host)
 
+    # — pytex-Render-Container (T-20/T-21, deployment §3). `api`→`pytex` nur `/render`.
+    #   `PYTEX_URL` zeigt auf den internen Container; `trusted` schaltet das
+    #   tectonic-Bundle frei (App-generierte, erst­partei­liche Dokumente). Der Render
+    #   kann dauern (Erst-Build lädt das Bundle) → großzügiger Timeout. —
+    pytex_url: str = "http://pytex:8099"
+    pytex_trust: str = "trusted"
+    pytex_timeout_seconds: int = 120
+    # PDF-Render-Retry im Worker (arq): max. Versuche + Backoff-Basis (Sekunden).
+    pdf_max_tries: int = 4
+    pdf_retry_backoff_seconds: int = 30
+    # Lebensdauer der signierten Ergebnis-URL (GET /jobs/{id}).
+    pdf_url_ttl_seconds: int = 300
+
+    # — Nextcloud-WebDAV-Export (T-20, deployment §3). Optional: ohne vollständige
+    #   Config bleibt der Export »aus« (PDF liegt dann nur in MinIO, kein Crash). Das
+    #   App-Passwort ist ein Secret und wird **nie** geloggt. —
+    nextcloud_webdav_url: str | None = None
+    nextcloud_user: str | None = None
+    nextcloud_app_password: str | None = None
+    nextcloud_base_path: str = "Antraege/"
+    nextcloud_timeout_seconds: int = 60
+
+    @property
+    def nextcloud_enabled(self) -> bool:
+        """WebDAV-Export nur aktiv, wenn URL + Credentials vollständig gesetzt sind."""
+        return bool(
+            self.nextcloud_webdav_url
+            and self.nextcloud_user
+            and self.nextcloud_app_password
+        )
+
     # — Antrags-Payload-Obergrenze (öffentlicher POST /applications, anti-DoS) —
     #   Gilt für die serialisierten Feldwerte (`data`) und als Content-Length-Schranke;
     #   darüber → 413. 64 KiB reicht für alle realen Formulare.
