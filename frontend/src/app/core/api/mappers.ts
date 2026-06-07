@@ -31,7 +31,13 @@ import type {
   ApplicationComment,
   DataDiff,
   DataDiffWire,
+  Meeting,
+  MeetingOutWire,
+  MeetingVote,
+  MeetingVoteOutWire,
   NewApplication,
+  Protocol,
+  ProtocolOutWire,
   SignedUrl,
   SignedUrlOutWire,
   StateOutWire,
@@ -191,6 +197,46 @@ export function mapVersion(wire: VersionOutWire): ApplicationVersion {
     diff: mapDiff(wire.diff),
     changedBy: wire.changedBy ?? null,
     at: wire.at,
+  };
+}
+
+// --- Meetings + Protokoll (T-33) ------------------------------------------- //
+
+export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
+  return {
+    id: wire.id,
+    applicationId: wire.applicationId,
+    title: wire.title ?? null,
+    status: wire.status,
+    result: wire.result ?? null,
+    counts: wire.counts ?? null,
+    leading: wire.leading ?? null,
+    closesAt: wire.closesAt ?? null,
+  };
+}
+
+export function mapMeeting(wire: MeetingOutWire): Meeting {
+  return {
+    id: wire.id,
+    title: wire.title,
+    status: wire.status,
+    activeApplicationId: wire.activeApplicationId ?? null,
+    gremiumId: wire.gremiumId ?? null,
+    votes: (wire.votes ?? []).map(mapMeetingVote),
+    protocolId: wire.protocolId ?? null,
+    createdAt: wire.createdAt,
+  };
+}
+
+export function mapProtocol(wire: ProtocolOutWire): Protocol {
+  return {
+    id: wire.id,
+    meetingId: wire.meetingId,
+    markdown: wire.markdown ?? '',
+    status: wire.status,
+    isFinal: wire.status === 'final',
+    pdfUrl: wire.pdfUrl ?? null,
+    sentAt: wire.sentAt ?? null,
   };
 }
 

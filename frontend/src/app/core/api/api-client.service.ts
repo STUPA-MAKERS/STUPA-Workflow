@@ -10,6 +10,8 @@ import {
   mapApplicationType,
   mapAttachment,
   mapComment,
+  mapMeeting,
+  mapProtocol,
   mapSignedUrl,
   mapTimelineEvent,
   mapTransition,
@@ -36,9 +38,16 @@ import type {
   EffectiveForm,
   LogoutOut,
   MagicLinkVerifyResult,
+  Meeting,
+  MeetingCreateBody,
+  MeetingOutWire,
+  MeetingPatchBody,
   NewApplication,
   Page,
   Principal,
+  Protocol,
+  ProtocolOutWire,
+  ProtocolVotesBody,
   SignedUrl,
   SignedUrlOutWire,
   TimelineEntry,
@@ -246,5 +255,65 @@ export class ApiClient {
    */
   castBallot(id: Uuid, choice: string): Observable<BallotResult> {
     return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, { choice });
+  }
+
+  // --- meetings (Sitzungssteuerung, T-33) ----------------------------------
+  /** POST /meetings — Sitzung anlegen (P(meeting.manage)). */
+  createMeeting(body: MeetingCreateBody): Observable<Meeting> {
+    return this.http
+      .post<MeetingOutWire>(`${this.base}/meetings`, body)
+      .pipe(map(mapMeeting));
+  }
+
+  /** GET /meetings/{id} — Sitzungs-State + Votes. */
+  getMeeting(id: Uuid): Observable<Meeting> {
+    return this.http.get<MeetingOutWire>(`${this.base}/meetings/${id}`).pipe(map(mapMeeting));
+  }
+
+  /** PATCH /meetings/{id} — Status und/oder aktiven Antrag setzen. */
+  patchMeeting(id: Uuid, body: MeetingPatchBody): Observable<Meeting> {
+    return this.http
+      .patch<MeetingOutWire>(`${this.base}/meetings/${id}`, body)
+      .pipe(map(mapMeeting));
+  }
+
+  /** POST /votes/{id}/open — Vote öffnen (auch live; P(vote.manage)). */
+  openVote(voteId: Uuid): Observable<void> {
+    return this.http.post<void>(`${this.base}/votes/${voteId}/open`, {});
+  }
+
+  /** POST /votes/{id}/close — Vote schließen → Ergebnis → Flow-Branch. */
+  closeVote(voteId: Uuid): Observable<void> {
+    return this.http.post<void>(`${this.base}/votes/${voteId}/close`, {});
+  }
+
+  // --- protocol (Protokoll-Editor, T-33) -----------------------------------
+  /** POST /meetings/{id}/protocol — Protokoll anlegen **oder** laden (idempotent). */
+  loadProtocol(meetingId: Uuid): Observable<Protocol> {
+    return this.http
+      .post<ProtocolOutWire>(`${this.base}/meetings/${meetingId}/protocol`, {})
+      .pipe(map(mapProtocol));
+  }
+
+  /** PATCH /protocols/{id} — Markdown aktualisieren. */
+  updateProtocol(protocolId: Uuid, markdown: string): Observable<Protocol> {
+    return this.http
+      .patch<ProtocolOutWire>(`${this.base}/protocols/${protocolId}`, { markdown })
+      .pipe(map(mapProtocol));
+  }
+
+  /** POST /protocols/{id}/votes — Abstimmungs-Snippets serverseitig einbetten. */
+  embedVotes(protocolId: Uuid, voteIds: Uuid[]): Observable<Protocol> {
+    const body: ProtocolVotesBody = { voteIds };
+    return this.http
+      .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/votes`, body)
+      .pipe(map(mapProtocol));
+  }
+
+  /** POST /protocols/{id}/finalize — →PDF (pytex) → MAIL_LIST + Nextcloud. */
+  finalizeProtocol(protocolId: Uuid): Observable<Protocol> {
+    return this.http
+      .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/finalize`, {})
+      .pipe(map(mapProtocol));
   }
 }

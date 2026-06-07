@@ -542,3 +542,113 @@ export interface Vote {
 export interface BallotResult {
   status: 'cast' | 'changed';
 }
+
+// =========================================================================== //
+// Meetings + Protokoll (T-33) — api.md livevote/meetings + protocol.            //
+// Wire-Form camelCase (T-12 `_CamelModel`); Backend-Modul folgt mit T-16/T-22,  //
+// FE arbeitet bis dahin gegen den Mock (network-plan §4).                       //
+// =========================================================================== //
+
+/** Sitzungs-Status (api.md §4 `meeting_state.status`). */
+export type MeetingStatus = 'draft' | 'live' | 'closed';
+/** Status eines Votes innerhalb einer Sitzung. */
+export type MeetingVoteStatus = 'pending' | 'open' | 'closed';
+
+/** `MeetingVoteOut` — Vote-Zusammenfassung im Sitzungs-State (GET /meetings/{id}). */
+export interface MeetingVoteOutWire {
+  id: Uuid;
+  applicationId: Uuid;
+  /** Antrags-Titel (vom Backend mitgeliefert; sonst aus dem Antrag aufzulösen). */
+  title?: string | null;
+  status: MeetingVoteStatus;
+  /** Endergebnis (z. B. `accepted`/`rejected`), erst nach `closed`. */
+  result?: string | null;
+  counts?: Record<string, number> | null;
+  leading?: string | null;
+  closesAt?: IsoDateTime | null;
+}
+
+/** `MeetingOut` — Sitzungs-State + Votes (GET /meetings/{id}). */
+export interface MeetingOutWire {
+  id: Uuid;
+  title: string;
+  status: MeetingStatus;
+  activeApplicationId?: Uuid | null;
+  gremiumId?: Uuid | null;
+  votes: MeetingVoteOutWire[];
+  /** Verknüpftes Protokoll (falls bereits angelegt). */
+  protocolId?: Uuid | null;
+  createdAt: IsoDateTime;
+}
+
+/** `ProtocolOut` — Sitzungsprotokoll (POST /meetings/{id}/protocol, PATCH /protocols/{id}). */
+export interface ProtocolOutWire {
+  id: Uuid;
+  meetingId: Uuid;
+  markdown: string;
+  status: 'draft' | 'final';
+  /** Ergebnis-Link nach `finalize` (PDF in MinIO/Nextcloud). */
+  pdfUrl?: string | null;
+  sentAt?: IsoDateTime | null;
+}
+
+// --- Request-Bodies (camelCase-Wire-Form) ---------------------------------- //
+
+/** Body für `POST /meetings` (`MeetingCreate`). */
+export interface MeetingCreateBody {
+  title: string;
+  gremiumId?: Uuid | null;
+}
+
+/** Body für `PATCH /meetings/{id}` — Status und/oder aktiven Antrag setzen. */
+export interface MeetingPatchBody {
+  status?: MeetingStatus;
+  activeApplicationId?: Uuid | null;
+}
+
+/** Body für `PATCH /protocols/{id}` — Markdown aktualisieren. */
+export interface ProtocolPatchBody {
+  markdown: string;
+}
+
+/** Body für `POST /protocols/{id}/votes` — Abstimmungen einbetten. */
+export interface ProtocolVotesBody {
+  voteIds: Uuid[];
+}
+
+// --- View-Modelle ---------------------------------------------------------- //
+
+/** Vote-Zusammenfassung (FE-View) — `null`-Defaults normalisiert. */
+export interface MeetingVote {
+  id: Uuid;
+  applicationId: Uuid;
+  title: string | null;
+  status: MeetingVoteStatus;
+  result: string | null;
+  counts: Record<string, number> | null;
+  leading: string | null;
+  closesAt: IsoDateTime | null;
+}
+
+/** Sitzung (FE-View). */
+export interface Meeting {
+  id: Uuid;
+  title: string;
+  status: MeetingStatus;
+  activeApplicationId: Uuid | null;
+  gremiumId: Uuid | null;
+  votes: MeetingVote[];
+  protocolId: Uuid | null;
+  createdAt: IsoDateTime;
+}
+
+/** Protokoll (FE-View) — `isFinal` aus `status` abgeleitet. */
+export interface Protocol {
+  id: Uuid;
+  meetingId: Uuid;
+  markdown: string;
+  status: 'draft' | 'final';
+  isFinal: boolean;
+  pdfUrl: string | null;
+  sentAt: IsoDateTime | null;
+}
