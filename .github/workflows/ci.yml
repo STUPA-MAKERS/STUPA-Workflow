@@ -161,10 +161,17 @@ jobs:
         #   Auth-Endpunkte (T-10) ist schema-valide ≠ semantisch gültig: ein wohl-
         #   geformter, aber nicht existierender Magic-Link-Token liefert korrekt 410,
         #   ein zufälliger OIDC-`code`/`state` 400/404. Diese 4xx sind erwünscht.
+        #
+        # `--seed` fix + schemathesis/hypothesis gepinnt (pyproject): macht den Lauf
+        # deterministisch (sonst zieht jeder Lauf andere Zufallsfälle → flaky, mal grün
+        # mal rot am selben Commit). Der Lauf ist aus dem RICHTIGEN Grund grün — kaputte/
+        # malformte Bodies liefern app-weit einen dokumentierten 422 (s.
+        # app/shared/errors.py), nicht durch Seed-Maskierung.
         run: >
           schemathesis run http://127.0.0.1:8000/openapi.json
           --checks all
           --exclude-checks unsupported_method,positive_data_acceptance
+          --seed 1337
 
   # ---- 6 FE-Unit/Komponente (Jest + ATL) ----------------------------------- #
   fe-unit:

@@ -6,9 +6,12 @@ Keine Stacktraces/Pfade nach außen.
 """
 
 import pytest
+from fastapi import FastAPI, UploadFile
 from fastapi.testclient import TestClient
 
-from app.shared.errors import STATUS_CODE_MAP, ProblemDetail
+from app.main import create_app
+from app.middleware import RequestContextMiddleware
+from app.shared.errors import STATUS_CODE_MAP, ProblemDetail, register_exception_handlers
 
 # (Pfad-Suffix, erwarteter Status, erwarteter Code)
 CASES = [
@@ -65,6 +68,74 @@ def test_unknown_route_yields_problem_json(client: TestClient) -> None:
     assert resp.status_code == 404
     assert resp.headers["content-type"].startswith("application/problem+json")
     _assert_problem_shape(resp.json(), 404, "not_found")
+
+
+# --------------------------------------------------------------------------- #
+# Unparsebarer Request-Body → app-weit EIN dokumentierter 422 (nicht der
+# endpunktspezifische, undokumentierte FastAPI-400 bei kaputtem multipart). T-13/PR.
+# --------------------------------------------------------------------------- #
+_MALFORMED_MULTIPART = b"--ff\r\nFalse--ff--\r\n"
+_MULTIPART_HEADERS = {"content-type": "multipart/form-data; boundary=xxx"}
+
+
+def _upload_app() -> TestClient:
+    app = FastAPI()
+    app.add_middleware(RequestContextMiddleware)
+    register_exception_handlers(app)
+
+    @app.post("/upload")
+    async def upload(file: UploadFile) -> dict[str, str]:  # pragma: no cover - Parse failt davor
+        return {"name": file.filename or ""}
+
+    return TestClient(app)
+
+
+def test_malformed_multipart_body_is_422_problem_json() -> None:
+    resp = _upload_app().post(
+        "/upload", content=_MALFORMED_MULTIPART, headers=_MULTIPART_HEADERS
+    )
+    assert resp.status_code == 422
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    body = resp.json()
+    _assert_problem_shape(body, 422, "validation_error")
+    assert body["errors"][0]["field"] == "body"
+
+
+def test_malformed_json_body_is_422() -> None:
+    # JSON-Decode-Fehler laufen schon über RequestValidationError → 422; hier nur
+    # festhalten, dass beide Body-Parse-Pfade DENSELBEN Status liefern.
+    resp = create_app_client().post(
+        "/api/auth/magic-link", content=b"not json{", headers={"content-type": "application/json"}
+    )
+    assert resp.status_code == 422
+
+
+def create_app_client() -> TestClient:
+    return TestClient(create_app())
+
+
+def test_attachments_route_documents_422_problem_json() -> None:
+    schema = create_app().openapi()
+    op = schema["paths"]["/api/applications/{application_id}/attachments"]["post"]
+    assert "422" in op["responses"]
+    assert (
+        op["responses"]["422"]["content"]["application/problem+json"]["schema"]["$ref"]
+        == "#/components/schemas/ProblemDetail"
+    )
+
+
+def test_all_body_endpoints_document_422() -> None:
+    # Globale Garantie: jeder Body-annehmende Endpunkt dokumentiert 422 (sonst wäre ein
+    # unparsebarer Body endpunktweise ein undokumentierter Status → be-contract rot).
+    schema = create_app().openapi()
+    missing: list[str] = []
+    for path, ops in schema["paths"].items():
+        for method, op in ops.items():
+            if not isinstance(op, dict) or "requestBody" not in op:
+                continue
+            if "422" not in op.get("responses", {}):
+                missing.append(f"{method.upper()} {path}")
+    assert not missing, f"Body-Endpunkte ohne dokumentierten 422: {missing}"
 
 
 def test_status_code_map_complete() -> None:
