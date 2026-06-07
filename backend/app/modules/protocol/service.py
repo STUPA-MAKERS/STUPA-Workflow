@@ -29,6 +29,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium, MailList
@@ -113,15 +114,37 @@ class ProtocolService:
         )
 
     # ------------------------------------------------------------- get/create
-    async def get_or_create(
-        self, meeting_id: UUID, *, author: str | None = None
-    ) -> ProtocolOut:
-        """Protokoll der Sitzung anlegen **oder** laden (idempotent). 404 ohne Sitzung."""
-        existing = (
+    async def _by_meeting(self, meeting_id: UUID) -> Protocol | None:
+        return (
             await self.session.execute(
                 select(Protocol).where(Protocol.meeting_id == meeting_id)
             )
         ).scalar_one_or_none()
+
+    @staticmethod
+    def _insert_values(
+        meeting: Meeting, gremium: Gremium | None, author: str | None
+    ) -> dict[str, object]:
+        """Spalten-Werte einer frischen ``protocol``-Zeile (``cd_variant`` vom Gremium)."""
+        return {
+            "meeting_id": meeting.id,
+            "gremium_id": meeting.gremium_id,
+            "markdown": "",
+            "status": "draft",
+            "author": author,
+            "cd_variant": gremium.cd_variant if gremium is not None else None,
+        }
+
+    async def get_or_create(
+        self, meeting_id: UUID, *, author: str | None = None
+    ) -> ProtocolOut:
+        """Protokoll der Sitzung anlegen **oder** laden (idempotent). 404 ohne Sitzung.
+
+        Race-sicher: bei parallelem POST verhindert ``INSERT … ON CONFLICT
+        (meeting_id) DO NOTHING`` die UNIQUE-Verletzung (kein ``IntegrityError`` → kein
+        500); das anschließende Re-Select liefert in **beiden** Fällen (selbst angelegt
+        **oder** vom Parallel-Request gewonnen) dieselbe Zeile zurück (idempotent)."""
+        existing = await self._by_meeting(meeting_id)
         if existing is not None:
             return self._to_out(existing)
 
@@ -129,17 +152,16 @@ class ProtocolService:
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
         gremium = await self.session.get(Gremium, meeting.gremium_id)
-        protocol = Protocol(
-            meeting_id=meeting_id,
-            gremium_id=meeting.gremium_id,
-            markdown="",
-            status="draft",
-            author=author,
-            cd_variant=gremium.cd_variant if gremium is not None else None,
+        await self.session.execute(
+            pg_insert(Protocol)
+            .values(**self._insert_values(meeting, gremium, author))
+            .on_conflict_do_nothing(constraint="uq_protocol_meeting")
         )
-        self.session.add(protocol)
-        await self.session.flush()
         await self.session.commit()
+
+        protocol = await self._by_meeting(meeting_id)
+        if protocol is None:  # nur falls die Zeile zwischen Insert+Select verschwand
+            raise NotFoundError(f"protocol for meeting {meeting_id} not found")
         return self._to_out(protocol)
 
     # --------------------------------------------------------------- markdown
@@ -175,7 +197,21 @@ class ProtocolService:
         for vote_id in vote_ids:
             if vote_id in already:
                 continue  # schon eingebettet → kein Doppel-Snippet
-            await self._get_vote(vote_id)  # 404, falls die Abstimmung fehlt
+            await self._get_vote(vote_id)  # 404 + verhindert FK-IntegrityError beim Insert
+            already.add(vote_id)
+            # Race-sicher: ON CONFLICT (protocol_id, vote_id) DO NOTHING. Schreibt ein
+            # Parallel-Request den Ref zuerst, liefert RETURNING nichts → kein Doppel-
+            # Snippet (idempotent, kein IntegrityError/500).
+            inserted = (
+                await self.session.execute(
+                    pg_insert(ProtocolVoteRef)
+                    .values(protocol_id=protocol_id, vote_id=vote_id)
+                    .on_conflict_do_nothing(constraint="uq_protocol_vote_ref")
+                    .returning(ProtocolVoteRef.id)
+                )
+            ).first()
+            if inserted is None:
+                continue  # nebenläufig bereits eingebettet
             view = await voting.get(vote_id)
             snippets.append(
                 build_vote_snippet(
@@ -184,10 +220,6 @@ class ProtocolService:
                     view.tally.counts,
                 )
             )
-            self.session.add(
-                ProtocolVoteRef(protocol_id=protocol_id, vote_id=vote_id)
-            )
-            already.add(vote_id)
 
         if snippets:
             body = protocol.markdown.rstrip("\n")

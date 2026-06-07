@@ -9,7 +9,7 @@
 
 Wie alle Modul-Tabellen entstehen sie auf einem **frischen** Schema über
 ``Base.metadata.create_all`` in Migration 0002 (Single-Source via ``app.models``);
-für ältere Schemata legt Migration 0012 sie idempotent (``checkfirst``) nach.
+für ältere Schemata legt Migration 0013 sie idempotent (``checkfirst``) nach.
 """
 
 from __future__ import annotations

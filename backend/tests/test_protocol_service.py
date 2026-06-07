@@ -13,8 +13,10 @@ from uuid import uuid4
 
 import pytest
 
+from app.modules.admin.models import Gremium
+from app.modules.livevote.models import Meeting
 from app.modules.pdf.pytex_client import PytexError
-from app.modules.protocol.models import Protocol, ProtocolVoteRef
+from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService, protocol_storage_key
 from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError, ServiceUnavailableError
@@ -52,6 +54,18 @@ def _gremium(cd_variant: str = "stupa") -> SimpleNamespace:
     return SimpleNamespace(id=GID, slug="stupa", cd_variant=cd_variant)
 
 
+def _real_meeting() -> Meeting:
+    meeting = Meeting(gremium_id=GID, title="StuPa-Sitzung", date=date(2026, 6, 12))
+    meeting.id = MID
+    return meeting
+
+
+def _real_gremium(cd_variant: str = "stupa") -> Gremium:
+    gremium = Gremium(name="StuPa", slug="stupa", cd_variant=cd_variant)
+    gremium.id = GID
+    return gremium
+
+
 def _vote(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "id": VID,
@@ -82,15 +96,34 @@ def _service(session: Any, **infra: Any) -> ProtocolService:
 
 
 # --------------------------------------------------------------- get_or_create
-async def test_get_or_create_new_inherits_cd_variant() -> None:
+def test_insert_values_inherits_cd_variant_and_gremium() -> None:
+    meeting = _real_meeting()
+    values = ProtocolService._insert_values(meeting, _real_gremium("asta"), "p1")
+    assert values == {
+        "meeting_id": MID,
+        "gremium_id": GID,
+        "markdown": "",
+        "status": "draft",
+        "author": "p1",
+        "cd_variant": "asta",
+    }
+
+
+def test_insert_values_without_gremium_has_null_variant() -> None:
+    values = ProtocolService._insert_values(_real_meeting(), None, None)
+    assert values["cd_variant"] is None and values["gremium_id"] == GID
+
+
+async def test_get_or_create_new_reselects_after_insert() -> None:
+    created = _protocol(markdown="", status="draft")
     session = FakeSession(
-        store={MID: _meeting(), GID: _gremium("asta")}, results=[result()]
+        store={MID: _real_meeting(), GID: _real_gremium("asta")},
+        # execute-Reihenfolge: _by_meeting(leer) → pg_insert(ignoriert) → _by_meeting(neu)
+        results=[result(), result(), result(created)],
     )
     out = await _service(session).get_or_create(MID, author="p1")
-    assert out.markdown == ""
     assert out.status == "draft"
-    added = [o for o in session.added if isinstance(o, Protocol)]
-    assert added and added[0].cd_variant == "asta" and added[0].author == "p1"
+    assert out.markdown == ""
     assert session.committed == 1
 
 
@@ -99,11 +132,32 @@ async def test_get_or_create_returns_existing_idempotent() -> None:
     session = FakeSession(results=[result(existing)])
     out = await _service(session).get_or_create(MID)
     assert out.markdown == "# schon da"
-    assert session.added == []  # nichts neu angelegt
+    assert session.committed == 0  # reiner Read, kein Insert/Commit
+
+
+async def test_get_or_create_concurrent_insert_reselects_winner() -> None:
+    """Parallel-POST: eigenes ON-CONFLICT-Insert no-opt, Re-Select liefert Gewinner-Zeile."""
+    winner = _protocol(markdown="# vom Parallel-Request")
+    session = FakeSession(
+        store={MID: _real_meeting(), GID: _real_gremium()},
+        results=[result(), result(), result(winner)],
+    )
+    out = await _service(session).get_or_create(MID)
+    assert out.markdown == "# vom Parallel-Request"
 
 
 async def test_get_or_create_unknown_meeting_404() -> None:
     session = FakeSession(store={}, results=[result()])
+    with pytest.raises(NotFoundError):
+        await _service(session).get_or_create(MID)
+
+
+async def test_get_or_create_vanished_after_insert_404() -> None:
+    """Defensiv: Zeile zwischen Insert und Re-Select verschwunden → 404 statt None-Deref."""
+    session = FakeSession(
+        store={MID: _real_meeting(), GID: _real_gremium()},
+        results=[result(), result(), result()],  # kein bestehendes, Insert, Re-Select leer
+    )
     with pytest.raises(NotFoundError):
         await _service(session).get_or_create(MID)
 
@@ -136,6 +190,7 @@ async def test_embed_votes_appends_snippet_and_ref() -> None:
         results=[
             result(proto),  # _get
             result(),  # bestehende Refs (keine)
+            result(uuid4()),  # pg_insert ProtocolVoteRef → RETURNING id (eingefügt)
             result(_vote()),  # VotingService._get_vote
             result("yes", "yes", "no"),  # VotingService._aggregate
         ],
@@ -144,19 +199,31 @@ async def test_embed_votes_appends_snippet_and_ref() -> None:
     assert "### Abstimmung" in out.markdown
     assert "**Ergebnis:** passed" in out.markdown
     assert "yes: 2, no: 1" in out.markdown
-    refs = [o for o in session.added if isinstance(o, ProtocolVoteRef)]
-    assert len(refs) == 1 and refs[0].vote_id == VID
     assert session.committed == 1
 
 
 async def test_embed_votes_idempotent_skips_referenced() -> None:
     proto = _protocol(markdown="# TOP 1")
     session = FakeSession(
-        results=[result(proto), result(VID)]  # VID bereits referenziert
+        results=[result(proto), result(VID)]  # VID bereits referenziert (pre-query)
     )
     out = await _service(session).embed_votes(PID, [VID])
     assert out.markdown == "# TOP 1"  # unverändert
-    assert [o for o in session.added if isinstance(o, ProtocolVoteRef)] == []
+
+
+async def test_embed_votes_concurrent_ref_skips_snippet() -> None:
+    """Parallel-Insert gewinnt: ON CONFLICT liefert kein RETURNING → kein Doppel-Snippet."""
+    proto = _protocol(markdown="# TOP 1")
+    session = FakeSession(
+        store={VID: _vote()},
+        results=[
+            result(proto),  # _get
+            result(),  # bestehende Refs (keine, pre-query)
+            result(),  # pg_insert → RETURNING leer (Konflikt: nebenläufig eingefügt)
+        ],
+    )
+    out = await _service(session).embed_votes(PID, [VID])
+    assert out.markdown == "# TOP 1"  # unverändert
 
 
 async def test_embed_votes_unknown_vote_404() -> None:
