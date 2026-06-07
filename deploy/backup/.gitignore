@@ -1,0 +1,4 @@
+# Privater age-Restore-Key + Backup-Artefakte nie committen.
+secrets/*
+!secrets/.gitkeep
+*.tar.age
