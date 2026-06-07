@@ -30,6 +30,7 @@
   --c-neutral-200: #e0e3e0;
   --c-neutral-300: #c7ccc8;
   --c-neutral-400: #9aa19c;
+  --c-neutral-450: #696f6a; // muted-Text auf hellem bg — WCAG AA (≥4.5, T-43)
   --c-neutral-500: #6e756f;
   --c-neutral-600: #515751;
   --c-neutral-700: #3a3f3b;
@@ -127,10 +128,13 @@
   --color-surface: var(--c-neutral-0);
   --color-surface-sunken: var(--c-neutral-100);
   --color-border: var(--c-neutral-200);
-  --color-border-strong: var(--c-neutral-300);
+  // Control-Rahmen (Inputs/Select/Button) — ≥3:1 ggü. Surface/bg für
+  // WCAG 1.4.11 Non-Text-Contrast (T-43). Bewusst dunkler als der dekorative
+  // --color-border (Divider/Karten), der unter 1.4.11 fällt.
+  --color-border-strong: #828a84;
 
   --color-text: var(--c-neutral-900);
-  --color-text-muted: var(--c-neutral-500);
+  --color-text-muted: var(--c-neutral-450);
   --color-text-inverse: var(--c-neutral-0);
 
   --color-primary: var(--c-brg-700);
@@ -167,7 +171,8 @@
   --color-surface: var(--c-neutral-850);
   --color-surface-sunken: var(--c-neutral-900);
   --color-border: #2c322d;
-  --color-border-strong: #3c443e;
+  // Control-Rahmen (Inputs/Select/Button) — ≥3:1 ggü. Surface/bg, WCAG 1.4.11 (T-43).
+  --color-border-strong: #646f68;
 
   --color-text: var(--c-neutral-50);
   --color-text-muted: var(--c-neutral-400);
