@@ -24,10 +24,17 @@ from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.modules.admin.models import Webhook, WebhookDelivery
 from app.modules.webhooks.signing import build_headers, canonical_body
-from app.modules.webhooks.ssrf import Resolver, SsrfError, assert_allowed_url, default_resolver
+from app.modules.webhooks.ssrf import (
+    Resolver,
+    SsrfError,
+    assert_allowed_url,
+    default_resolver,
+    pin_url,
+)
 
 if TYPE_CHECKING:
     import httpx
@@ -95,12 +102,23 @@ class WebhookService:
                 attempts=0,
                 idempotency_key=key,
             )
-            self.session.add(delivery)
+            # Savepoint je Delivery: bei nebenläufigem Insert verletzt das
+            # unique(webhook_id, idempotency_key) — dann ist die Delivery bereits von
+            # einem anderen Lauf angelegt (= schon enqueued), also überspringen statt
+            # den ganzen Batch zu verlieren.
+            try:
+                async with self.session.begin_nested():
+                    self.session.add(delivery)
+                    await self.session.flush()
+            except IntegrityError:
+                logger.info(
+                    "webhook delivery race-deduped (event=%s hook=%s)", event, hook.id
+                )
+                continue
             created.append(delivery)
 
         if not created:
             return 0
-        await self.session.flush()
         await self.session.commit()
 
         if self.queue is None:
@@ -153,7 +171,7 @@ class WebhookService:
             )
 
         try:
-            assert_allowed_url(
+            ips = assert_allowed_url(
                 hook.url,
                 allowlist=self.settings.webhook_host_allowlist,
                 resolver=resolver,
@@ -165,12 +183,18 @@ class WebhookService:
             )
             return await self._finish(delivery, "dead", moment, response_code=None)
 
+        # DNS-Rebinding-Pinning: an die **validierte** IP connecten (kein erneutes
+        # Auflösen durch den Client), Host/TLS-SNI bleibt der Original-Host.
+        ip_url, host_header = pin_url(hook.url, ips[0])
         body = canonical_body(delivery.payload)
         headers = build_headers(
             hook.secret, body, event=delivery.event, timestamp=int(moment.timestamp())
         )
+        headers["Host"] = host_header
+        request = http_client.build_request("POST", ip_url, content=body, headers=headers)
+        request.extensions["sni_hostname"] = host_header.rsplit(":", 1)[0]
         try:
-            response = await http_client.post(hook.url, content=body, headers=headers)
+            response = await http_client.send(request)
         except httpx.HTTPError as exc:
             logger.warning(
                 "webhook delivery %s transport error: %s",
@@ -182,6 +206,18 @@ class WebhookService:
         if 200 <= response.status_code < 300:
             return await self._finish(
                 delivery, "ok", moment, response_code=response.status_code
+            )
+        if 400 <= response.status_code < 500:
+            # 4xx ist ein Client-/Config-Fehler — Wiederholung ändert nichts →
+            # sofort Dead-Letter, kein Retry (Spec).
+            logger.warning(
+                "webhook delivery %s dead — non-retryable %s",
+                delivery_id,
+                response.status_code,
+            )
+            return await self._finish(
+                delivery, "dead", moment, response_code=response.status_code,
+                attempts=delivery.attempts + 1,
             )
         return await self._fail(delivery, moment, response_code=response.status_code)
 

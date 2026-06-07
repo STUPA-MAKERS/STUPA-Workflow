@@ -50,8 +50,12 @@ def _delivery(
     return d
 
 
+_IP = "93.184.216.34"
+_IP_URL = f"https://{_IP}/h"  # Ziel nach Pinning (Host bleibt hook.test)
+
+
 def _public_resolver(_host: str) -> list[str]:
-    return ["93.184.216.34"]
+    return [_IP]
 
 
 # ----------------------------------------------------------------- dispatch #
@@ -102,6 +106,24 @@ async def test_dispatch_without_queue_stays_pending() -> None:
     assert session.committed == 1
 
 
+async def test_dispatch_race_integrity_error_is_deduped() -> None:
+    # Nebenläufiger Insert verletzt unique(webhook_id, idempotency_key): die
+    # Delivery existiert bereits (= enqueued) → überspringen, nicht zählen/enqueuen.
+    from sqlalchemy.exc import IntegrityError
+
+    h1 = _hook()
+    base = "app:evt:0:webhook"
+    err = IntegrityError("INSERT", {}, Exception("duplicate key"))
+    session = FakeSession(scalars=[[h1], []], flush_errors=[err])
+    queue = FakeWebhookQueue()
+    n = await _svc(session, queue).dispatch_event(
+        "status_changed", idempotency_base=base
+    )
+    assert n == 0
+    assert queue.enqueued == []
+    assert session.added == []  # Savepoint-Rollback hat die Delivery verworfen
+
+
 # ------------------------------------------------------------------ deliver #
 async def test_deliver_gone() -> None:
     async with httpx.AsyncClient() as client:
@@ -135,9 +157,9 @@ async def test_deliver_ssrf_block_is_permanent_dead() -> None:
 
 
 @respx.mock
-async def test_deliver_ok_on_2xx() -> None:
+async def test_deliver_ok_pins_ip_and_signs() -> None:
     hook = _hook(url="https://hook.test/h")
-    route = respx.post("https://hook.test/h").mock(return_value=httpx.Response(204))
+    route = respx.post(_IP_URL).mock(return_value=httpx.Response(204))
     session = FakeSession()
     delivery = _delivery(hook.id)
     session.store.update({delivery.id: delivery, hook.id: hook})
@@ -149,14 +171,61 @@ async def test_deliver_ok_on_2xx() -> None:
     assert delivery.status == "ok"
     assert delivery.response_code == 204
     sent = route.calls.last.request
+    # Pinning: verbunden zur validierten IP, Host bleibt der Original-Host.
+    assert sent.url.host == _IP
+    assert sent.headers["Host"] == "hook.test"
     assert sent.headers["X-Signature"].startswith("sha256=")
     assert "X-Timestamp" in sent.headers
 
 
 @respx.mock
-async def test_deliver_non_2xx_retries_with_backoff() -> None:
+async def test_deliver_pins_validated_ip_no_rebind() -> None:
+    # DNS-Rebinding: erste Auflösung public, zweite intern. Da wir an die validierte
+    # IP pinnen (kein erneutes Auflösen), erreicht die interne Adresse den Client nie.
+    calls: list[str] = []
+
+    def _rebinding(host: str) -> list[str]:
+        calls.append(host)
+        return [_IP] if len(calls) == 1 else ["10.0.0.5"]
+
     hook = _hook(url="https://hook.test/h")
-    respx.post("https://hook.test/h").mock(return_value=httpx.Response(500))
+    route = respx.post(_IP_URL).mock(return_value=httpx.Response(200))
+    # Die interne IP darf NIE angefragt werden:
+    internal = respx.post("https://10.0.0.5/h").mock(return_value=httpx.Response(200))
+    session = FakeSession()
+    delivery = _delivery(hook.id)
+    session.store.update({delivery.id: delivery, hook.id: hook})
+    async with httpx.AsyncClient() as client:
+        outcome = await _svc(session).deliver(
+            delivery.id, http_client=client, resolver=_rebinding
+        )
+    assert outcome.kind == "ok"
+    assert calls == ["hook.test"]  # genau einmal aufgelöst (kein Re-Resolve)
+    assert route.called
+    assert not internal.called
+
+
+@respx.mock
+async def test_deliver_4xx_is_dead_no_retry() -> None:
+    hook = _hook(url="https://hook.test/h")
+    respx.post(_IP_URL).mock(return_value=httpx.Response(404))
+    session = FakeSession()
+    delivery = _delivery(hook.id, attempts=0)
+    session.store.update({delivery.id: delivery, hook.id: hook})
+    async with httpx.AsyncClient() as client:
+        outcome = await _svc(session).deliver(
+            delivery.id, http_client=client, resolver=_public_resolver
+        )
+    assert outcome.kind == "dead"
+    assert delivery.status == "dead"
+    assert delivery.response_code == 404
+    assert delivery.next_at is None
+
+
+@respx.mock
+async def test_deliver_5xx_retries_with_backoff() -> None:
+    hook = _hook(url="https://hook.test/h")
+    respx.post(_IP_URL).mock(return_value=httpx.Response(500))
     session = FakeSession()
     delivery = _delivery(hook.id, attempts=0)
     session.store.update({delivery.id: delivery, hook.id: hook})
@@ -174,7 +243,7 @@ async def test_deliver_non_2xx_retries_with_backoff() -> None:
 @respx.mock
 async def test_deliver_dead_after_max_tries() -> None:
     hook = _hook(url="https://hook.test/h")
-    respx.post("https://hook.test/h").mock(return_value=httpx.Response(503))
+    respx.post(_IP_URL).mock(return_value=httpx.Response(503))
     session = FakeSession()
     delivery = _delivery(hook.id, attempts=SETTINGS.webhook_max_tries - 1)
     session.store.update({delivery.id: delivery, hook.id: hook})
@@ -190,7 +259,7 @@ async def test_deliver_dead_after_max_tries() -> None:
 @respx.mock
 async def test_deliver_transport_error_retries() -> None:
     hook = _hook(url="https://hook.test/h")
-    respx.post("https://hook.test/h").mock(side_effect=httpx.ConnectError("down"))
+    respx.post(_IP_URL).mock(side_effect=httpx.ConnectError("down"))
     session = FakeSession()
     delivery = _delivery(hook.id, attempts=0)
     session.store.update({delivery.id: delivery, hook.id: hook})

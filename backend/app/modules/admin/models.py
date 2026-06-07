@@ -99,7 +99,7 @@ class WebhookDelivery(UUIDPkMixin, Base):
     Von T-24 mit angelegt, damit das Schema vollständig ist; der Delivery-Worker
     (T-19) ist der Schreiber. Index ``(status, next_at)`` = Worker-Pickup.
 
-    ``idempotency_key`` (T-19, Migration 0011) entkoppelt Event-Instanz von Versand:
+    ``idempotency_key`` (T-19, Migration 0012) entkoppelt Event-Instanz von Versand:
     ein Flow-Retry desselben Status-Events legt **keine** zweite Delivery an
     (unique ``(webhook_id, idempotency_key)``; ``NULL`` = keine Dedup, z. B. manuell).
     """

@@ -18,7 +18,7 @@ from __future__ import annotations
 import ipaddress
 import socket
 from collections.abc import Callable, Iterable
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 # Host → Liste aufgelöster IP-Strings. Injizierbar (Tests/DNS-Rebinding-Schutz).
 Resolver = Callable[[str], list[str]]
@@ -88,3 +88,22 @@ def assert_allowed_url(
         if _is_blocked(ip):
             raise SsrfError(f"blocked non-global target: {ip}")
     return [str(ip) for ip in ips]
+
+
+def pin_url(url: str, ip: str) -> tuple[str, str]:
+    """URL auf die **validierte** Ziel-IP umschreiben (DNS-Rebinding-Pinning).
+
+    Gibt ``(ip_url, host_header)`` zurück: ``ip_url`` ersetzt den Host durch die IP
+    (so verbindet der Client genau zur geprüften Adresse statt erneut aufzulösen),
+    ``host_header`` trägt den ursprünglichen ``Host`` für Routing/TLS-SNI. Der TOCTOU
+    zwischen Auflösung und Connect entfällt damit.
+    """
+    parsed = urlsplit(url)
+    port = parsed.port
+    host_header = parsed.hostname or ""
+    if port is not None:
+        host_header = f"{host_header}:{port}"
+    ip_host = f"[{ip}]" if ":" in ip else ip
+    netloc = f"{ip_host}:{port}" if port is not None else ip_host
+    ip_url = urlunsplit((parsed.scheme, netloc, parsed.path or "/", parsed.query, ""))
+    return ip_url, host_header

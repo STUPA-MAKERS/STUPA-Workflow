@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.modules.webhooks.ssrf import SsrfError, assert_allowed_url
+from app.modules.webhooks.ssrf import SsrfError, assert_allowed_url, pin_url
 
 
 def _resolver(*addrs: str):
@@ -92,3 +92,27 @@ def test_ipv6_public_ok() -> None:
     assert assert_allowed_url("https://[2606:4700:4700::1111]/h") == [
         "2606:4700:4700::1111"
     ]
+
+
+# --------------------------------------------------------------- pin_url #
+def test_pin_url_ipv4() -> None:
+    ip_url, host = pin_url("https://hook.example/path?q=1", "93.184.216.34")
+    assert ip_url == "https://93.184.216.34/path?q=1"
+    assert host == "hook.example"
+
+
+def test_pin_url_with_port() -> None:
+    ip_url, host = pin_url("http://hook.example:8443/h", "203.0.113.9")
+    assert ip_url == "http://203.0.113.9:8443/h"
+    assert host == "hook.example:8443"
+
+
+def test_pin_url_ipv6_target_is_bracketed() -> None:
+    ip_url, host = pin_url("https://hook.example/h", "2606:4700:4700::1111")
+    assert ip_url == "https://[2606:4700:4700::1111]/h"
+    assert host == "hook.example"
+
+
+def test_pin_url_empty_path_becomes_root() -> None:
+    ip_url, _ = pin_url("https://hook.example", "93.184.216.34")
+    assert ip_url == "https://93.184.216.34/"
