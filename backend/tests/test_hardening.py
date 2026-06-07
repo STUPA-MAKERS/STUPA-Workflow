@@ -110,6 +110,22 @@ def test_csrf_disabled_skips_enforcement() -> None:
     assert client.post("/w").status_code == 200
 
 
+def test_csrf_defaults_match_angular_fe_flow() -> None:
+    """Regression: BE-Defaults = Angular-Default-Namen, sonst 403 auf jedem SPA-Write.
+
+    Der FE-Interceptor (frontend/.../auth.interceptor.ts) liest Cookie `XSRF-TOKEN` und
+    sendet Header `X-XSRF-TOKEN`. Hier den ECHTEN Flow nachstellen: Cookie gesetzt +
+    Header gespiegelt → 2xx; ohne Header → 403."""
+    s = _settings()
+    assert s.csrf_cookie_name == "XSRF-TOKEN"
+    assert s.csrf_header_name == "X-XSRF-TOKEN"
+    client = _csrf_app(s)
+    client.cookies.set(s.session_cookie_name, "sess")
+    client.cookies.set("XSRF-TOKEN", "fe-token")
+    assert client.post("/w", headers={"X-XSRF-TOKEN": "fe-token"}).status_code == 200
+    assert client.post("/w").status_code == 403  # FE würde ohne Token nie schreiben
+
+
 # --------------------------------------------------------------------------- #
 # Default-Rate-Limit auf schreibenden Endpunkten (api.md §7)
 # --------------------------------------------------------------------------- #

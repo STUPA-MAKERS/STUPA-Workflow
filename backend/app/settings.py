@@ -44,10 +44,12 @@ class Settings(BaseSettings):
     forwarded_allow_ips: str = "127.0.0.1"
 
     # — CSRF (Double-Submit, security.md §10). Schützt cookie-authentifizierte
-    #   schreibende Requests; Bearer-Token-Requests sind ausgenommen. —
+    #   schreibende Requests; Bearer-Token-Requests sind ausgenommen. Namen folgen dem
+    #   Angular-Default (HttpClient liest `XSRF-TOKEN`, sendet `X-XSRF-TOKEN`), damit der
+    #   FE-Interceptor (frontend/.../auth.interceptor.ts) ohne Änderung greift. —
     csrf_enabled: bool = True
-    csrf_cookie_name: str = "ap_csrf"
-    csrf_header_name: str = "X-CSRF-Token"
+    csrf_cookie_name: str = "XSRF-TOKEN"
+    csrf_header_name: str = "X-XSRF-TOKEN"
 
     # — CORS aus per Default (overview/security: kein Cross-Origin) —
     cors_allow_origins: list[str] = []

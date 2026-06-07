@@ -44,19 +44,32 @@ das neue Image und `migrate` spielt offene Revisionen ein, bevor die App hochfä
 Optional läuft `migrate` unter einem eigenen DB-User (`DB_MIGRATION_URL`), getrennt vom
 Laufzeit-User der App.
 
-### Least-Privilege-DB-Rollen (security.md §4/§10)
+### Least-Privilege-DB-Rollen (security.md §4/§10) — MANUELLER Prod-Schritt
+
+> ⚠️ **Nicht automatisch.** Compose fährt nur `alembic upgrade head` (DDL/DML); es
+> legt **keine** Rollen an und entzieht **keine** Grants. Ohne diesen Schritt läuft die
+> Plattform funktional, aber **ohne** Rollentrennung — der Runtime-User könnte dann das
+> Audit-Log per UPDATE/DELETE manipulieren (der Append-only-Trigger aus Migration 0006
+> blockt das zwar rollenunabhängig, aber die Least-Privilege-Schicht fehlt). In Prod
+> daher Pflicht.
 
 `db/roles.sql` provisioniert die getrennten Service-User (`app` Runtime, `migrator`
 DDL, optional `audit_writer`) und entzieht dem Runtime-User UPDATE/DELETE/TRUNCATE auf
-`audit_entry` (Hash-Kette unveränderlich). Einmalig als Superuser ausführen — Schritte
-1–4 **vor**, Schritt 5 **nach** `alembic upgrade head`:
+`audit_entry`. **Einmalig als DB-Superuser** ausführen — Schritte 1–4 **vor**, Schritt 5
+**nach** `alembic upgrade head` (idempotent, mehrfach gefahrlos):
 
-```
-psql -U postgres -d antrag -f db/roles.sql   # idempotent; danach Passwörter via ALTER ROLE
+```bash
+# 1) Rollen anlegen (vor den Migrationen)
+psql -U postgres -d antrag -f db/roles.sql
+# 2) Passwörter aus dem Secret-Store setzen
+psql -U postgres -d antrag -c "ALTER ROLE app PASSWORD '…'; ALTER ROLE migrator PASSWORD '…';"
+# 3) Migrationen unter migrator (DB_MIGRATION_URL) laufen lassen — via compose-migrate
+#    oder manuell: alembic upgrade head
+# 4) Audit-Grant-Entzug erneut anwenden (Schritt 5 in roles.sql, jetzt existiert audit_entry)
+psql -U postgres -d antrag -f db/roles.sql
 ```
 
-Der Append-only-Trigger (Migration 0006) erzwingt die Unveränderlichkeit zusätzlich
-rollenunabhängig; `roles.sql` ist die Least-Privilege-Schicht darüber.
+Danach in `.env`: `DATABASE_URL` → User `app`, `DB_MIGRATION_URL` → User `migrator`.
 
 ## Netze
 
