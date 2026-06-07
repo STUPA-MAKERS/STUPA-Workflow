@@ -282,6 +282,92 @@ async def test_remind_lock_miss(patched: None) -> None:
 # --------------------------------------------------------------------------- #
 # End-to-end orchestration + queue/startup
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# Per-unit failure isolation (eine kaputte Einheit bricht den Zyklus nicht ab)
+# --------------------------------------------------------------------------- #
+def _deadline(**over: Any) -> SimpleNamespace:
+    base: dict[str, Any] = {
+        "id": uuid4(), "kind": "flow", "application_id": uuid4(), "type_id": uuid4(),
+        "action_on_pass": {"transitionId": str(uuid4())},
+        "due_at": NOW + timedelta(hours=1), "reminded_at": None,
+    }
+    base.update(over)
+    return SimpleNamespace(**base)
+
+
+@freeze_time(FROZEN)
+async def test_reminder_failure_does_not_abort_cycle(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = {"n": 0}
+
+    class _RaiseOnce(_NotifyFake):
+        async def dispatch_event(self, event: str, **kw: Any) -> int:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("broken template")
+            return await super().dispatch_event(event, **kw)
+
+    monkeypatch.setattr(wd, "NotificationService", _RaiseOnce)
+    bad, good = _deadline(), _deadline()
+    sessions = [
+        FakeSession([[bad.id, good.id]]),  # scan
+        FakeSession([[bad]]),              # lock bad → dispatch raises
+        FakeSession([[good]]),             # lock good → ok
+    ]
+    # Die kaputte Frist wird geloggt+übersprungen, die gute trotzdem verarbeitet.
+    assert await wd._process_reminders(_ctx(sessions), SETTINGS, NOW) == 1
+    assert _NotifyFake.events == ["deadline_approaching"]
+
+
+@freeze_time(FROZEN)
+async def test_action_failure_does_not_abort_cycle(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = {"n": 0}
+
+    class _RaiseOnce(_FlowFake):
+        async def fire(self, *a: Any, **k: Any) -> Any:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("boom")
+            return await super().fire(*a, **k)
+
+    monkeypatch.setattr(wd, "FlowService", _RaiseOnce)
+    bad, good = _deadline(), _deadline()
+    sessions = [
+        FakeSession([[bad.id, good.id]]),
+        FakeSession([[bad]]),
+        FakeSession([[good]]),
+    ]
+    assert await wd._process_actions(_ctx(sessions), SETTINGS, NOW) == 1
+    assert len(_FlowFake.calls) == 1  # nur die gute Frist gefeuert
+
+
+@freeze_time(FROZEN)
+async def test_vote_failure_does_not_abort_cycle(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = {"n": 0}
+
+    class _RaiseOnce(_VotingFake):
+        async def close(self, *a: Any, **k: Any) -> Any:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("boom")
+            return await super().close(*a, **k)
+
+    monkeypatch.setattr(wd, "VotingService", _RaiseOnce)
+    bad, good = SimpleNamespace(id=uuid4()), SimpleNamespace(id=uuid4())
+    sessions = [
+        FakeSession([[bad.id, good.id]]),
+        FakeSession([[bad]]),
+        FakeSession([[good]]),
+    ]
+    assert await wd._process_votes(_ctx(sessions), NOW) == 1
+    assert _VotingFake.calls == [good.id]
+
+
 @freeze_time(FROZEN)
 async def test_process_deadlines_orchestrates_all(patched: None) -> None:
     tid = uuid4()

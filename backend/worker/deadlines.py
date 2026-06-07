@@ -107,8 +107,11 @@ async def _process_reminders(
         ids = await DeadlineService(session).due_reminder_ids(now, lead)
     sent = 0
     for deadline_id in ids:
-        if await _remind_one(ctx, settings, deadline_id, now, lead):
-            sent += 1
+        try:
+            if await _remind_one(ctx, settings, deadline_id, now, lead):
+                sent += 1
+        except Exception:  # noqa: BLE001 — kaputte Einzel-Frist darf den Zyklus nicht abbrechen
+            logger.exception("deadline reminder failed (deadline=%s)", deadline_id)
     return sent
 
 
@@ -161,8 +164,11 @@ async def _process_actions(
         ids = await DeadlineService(session).due_action_deadline_ids(now)
     fired = 0
     for deadline_id in ids:
-        if await _fire_one(ctx, deadline_id, now):
-            fired += 1
+        try:
+            if await _fire_one(ctx, deadline_id, now):
+                fired += 1
+        except Exception:  # noqa: BLE001 — kaputte Einzel-Frist darf den Zyklus nicht abbrechen
+            logger.exception("deadline action failed (deadline=%s)", deadline_id)
     return fired
 
 
@@ -215,8 +221,11 @@ async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
         ids = await DeadlineService(session).due_open_vote_ids(now)
     closed = 0
     for vote_id in ids:
-        if await _close_one(ctx, vote_id, now):
-            closed += 1
+        try:
+            if await _close_one(ctx, vote_id, now):
+                closed += 1
+        except Exception:  # noqa: BLE001 — kaputter Einzel-Vote darf den Zyklus nicht abbrechen
+            logger.exception("vote auto-close failed (vote=%s)", vote_id)
     return closed
 
 

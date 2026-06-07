@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.modules.deadlines.service import DeadlineService, chunked, transition_ref
+from app.modules.deadlines.service import DeadlineService, transition_ref
 from tests.flow_fakes import fake_session, result
 
 NOW = datetime(2026, 6, 7, 12, 0, tzinfo=UTC)
@@ -35,12 +35,6 @@ def test_transition_ref_camel_and_snake() -> None:
 )
 def test_transition_ref_invalid_is_none(value: Any) -> None:
     assert transition_ref(value) is None
-
-
-def test_chunked_splits_into_batches() -> None:
-    ids = [uuid4() for _ in range(5)]
-    assert chunked(ids, 2) == [ids[0:2], ids[2:4], ids[4:5]]
-    assert chunked([], 3) == []
 
 
 # --------------------------------------------------------------------------- #

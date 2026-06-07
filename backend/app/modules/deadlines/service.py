@@ -13,7 +13,6 @@ Wiederholung über Worker-Neustarts hinweg.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -170,8 +169,3 @@ def transition_ref(action_on_pass: dict | None) -> UUID | None:
         return UUID(str(raw))
     except (ValueError, TypeError):
         return None
-
-
-def chunked(items: Sequence[UUID], size: int) -> list[list[UUID]]:
-    """``items`` in Blöcke der Länge ``size`` teilen (Batch-Begrenzung pro Cron-Lauf)."""
-    return [list(items[i : i + size]) for i in range(0, len(items), size)]
