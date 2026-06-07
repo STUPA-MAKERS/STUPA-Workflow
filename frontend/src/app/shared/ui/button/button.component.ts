@@ -13,7 +13,8 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
       [type]="type"
       [disabled]="disabled || loading"
       [attr.aria-busy]="loading ? 'true' : null"
-      [class]="'btn btn--' + variant + ' btn--' + size"
+      [attr.aria-label]="ariaLabel || null"
+      [class]="'btn btn--' + variant + ' btn--' + size + (iconOnly ? ' btn--icon' : '')"
     >
       @if (loading) {
         <span class="btn__spinner" aria-hidden="true"></span>
@@ -58,12 +59,24 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
         padding: var(--space-4) var(--space-6);
         font-size: var(--fs-lg);
       }
+      /* Quadratischer Icon-Button: gleiche H/B, zentriertes Glyph. */
+      .btn--icon {
+        aspect-ratio: 1;
+        padding: var(--space-2);
+        line-height: 1;
+      }
+      .btn--icon.btn--sm {
+        padding: var(--space-1) var(--space-2);
+      }
       .btn--primary {
         background: var(--color-primary);
         color: var(--color-on-primary);
       }
       .btn--primary:hover:not(:disabled) {
         background: var(--color-primary-hover);
+      }
+      .btn--primary:active:not(:disabled) {
+        background: var(--color-primary-active);
       }
       .btn--secondary {
         background: var(--color-surface);
@@ -72,6 +85,10 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
       }
       .btn--secondary:hover:not(:disabled) {
         background: var(--color-surface-sunken);
+        border-color: var(--color-text-muted);
+      }
+      .btn--secondary:active:not(:disabled) {
+        background: var(--color-border);
       }
       .btn--ghost {
         background: transparent;
@@ -80,9 +97,19 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
       .btn--ghost:hover:not(:disabled) {
         background: var(--color-primary-subtle);
       }
+      .btn--ghost:active:not(:disabled) {
+        background: var(--color-primary-subtle);
+        color: var(--color-primary-active);
+      }
       .btn--danger {
         background: var(--color-danger);
         color: var(--color-text-inverse);
+      }
+      .btn--danger:hover:not(:disabled) {
+        filter: brightness(1.08);
+      }
+      .btn--danger:active:not(:disabled) {
+        filter: brightness(0.94);
       }
       .btn__spinner {
         width: 1em;
@@ -106,4 +133,8 @@ export class ButtonComponent {
   @Input() type: 'button' | 'submit' | 'reset' = 'button';
   @Input() disabled = false;
   @Input() loading = false;
+  /** Quadratischer Icon-Button (gleiche Höhe/Breite) für einzelne Glyphs (✕ ↑ ↓). */
+  @Input() iconOnly = false;
+  /** Barrierefreier Name — Pflicht für Icon-Buttons ohne sichtbaren Text. */
+  @Input() ariaLabel = '';
 }

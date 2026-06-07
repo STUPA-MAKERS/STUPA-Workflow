@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent } from '@shared/ui';
+import { ButtonComponent, CheckboxComponent } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import { EVENT_NAMES, type EventName, type WebhookConfig } from '../admin.models';
@@ -17,7 +17,7 @@ import { EVENT_NAMES, type EventName, type WebhookConfig } from '../admin.models
   selector: 'app-webhooks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent],
   template: `
     <section class="cfg">
       <header class="cfg__head">
@@ -36,23 +36,20 @@ import { EVENT_NAMES, type EventName, type WebhookConfig } from '../admin.models
               <input [(ngModel)]="hook.name" (ngModelChange)="touch()" /></label>
             <label class="cfg__lbl cfg__lbl--wide">{{ 'admin.webhook.url' | t }}
               <input [(ngModel)]="hook.url" (ngModelChange)="touch()" placeholder="https://" /></label>
-            <label class="cfg__chk">
-              <input type="checkbox" [(ngModel)]="hook.active" (ngModelChange)="touch()" />
+            <app-checkbox [(ngModel)]="hook.active" (ngModelChange)="touch()">
               {{ 'admin.webhook.active' | t }}
-            </label>
+            </app-checkbox>
           </div>
 
           <fieldset class="cfg__events">
             <legend>{{ 'admin.webhook.events' | t }}</legend>
             @for (ev of allEvents; track ev) {
-              <label class="cfg__chk">
-                <input
-                  type="checkbox"
-                  [checked]="hook.events.includes(ev)"
-                  (change)="toggleEvent(i, ev)"
-                />
+              <app-checkbox
+                [ngModel]="hook.events.includes(ev)"
+                (ngModelChange)="toggleEvent(i, ev)"
+              >
                 {{ ev }}
-              </label>
+              </app-checkbox>
             }
           </fieldset>
 

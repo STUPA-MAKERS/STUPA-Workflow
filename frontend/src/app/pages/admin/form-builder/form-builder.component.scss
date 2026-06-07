@@ -49,19 +49,10 @@
   justify-content: space-between;
 }
 
-.fb__field-tools button,
-.fb__del {
-  background: transparent;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: var(--space-1) var(--space-2);
-  margin-left: var(--space-1);
-}
-
-.fb__del {
-  color: var(--color-danger);
+.fb__field-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .fb__grid {
@@ -91,14 +82,9 @@
 .fb__toggles {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-4);
   font-size: var(--fs-sm);
-}
-
-.fb__toggles label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 .fb__sub {

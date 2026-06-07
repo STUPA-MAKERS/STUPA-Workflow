@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { FieldType, FormFieldDef } from '@core/api/models';
-import { ButtonComponent } from '@shared/ui';
+import { ButtonComponent, CheckboxComponent } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import {
@@ -29,7 +29,7 @@ import {
   selector: 'app-form-builder',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent],
   templateUrl: './form-builder.component.html',
   styleUrl: './form-builder.component.scss',
 })

@@ -18,6 +18,20 @@ describe('ButtonComponent', () => {
     expect(screen.getByRole('button')).toHaveClass('btn--danger', 'btn--lg');
   });
 
+  it('adds the icon modifier when iconOnly is set', async () => {
+    await render(`<app-button [iconOnly]="true" variant="secondary" size="sm">✕</app-button>`, {
+      imports: [ButtonComponent],
+    });
+    expect(screen.getByRole('button')).toHaveClass('btn--icon', 'btn--secondary', 'btn--sm');
+  });
+
+  it('exposes an accessible name via ariaLabel for icon buttons', async () => {
+    await render(`<app-button [iconOnly]="true" ariaLabel="Entfernen">✕</app-button>`, {
+      imports: [ButtonComponent],
+    });
+    expect(screen.getByRole('button', { name: 'Entfernen' })).toBeInTheDocument();
+  });
+
   it('disables and marks aria-busy while loading', async () => {
     await render(`<app-button [loading]="true">X</app-button>`, { imports: [ButtonComponent] });
     const btn = screen.getByRole('button');

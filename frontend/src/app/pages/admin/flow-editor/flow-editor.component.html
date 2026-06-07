@@ -68,11 +68,10 @@
           <input type="radio" name="flow-initial" [checked]="state.isInitial" (change)="setInitial(state.key)" />
           {{ 'admin.flow.initial' | t }}
         </label>
-        <label class="fe__chk">
-          <input type="checkbox" [(ngModel)]="state.editAllowed" (ngModelChange)="touch()" />
+        <app-checkbox [(ngModel)]="state.editAllowed" (ngModelChange)="touch()">
           {{ 'admin.flow.editAllowed' | t }}
-        </label>
-        <button type="button" class="fe__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeState(si)">✕</button>
+        </app-checkbox>
+        <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeState(si)">✕</app-button>
       </div>
     }
   </section>
@@ -103,7 +102,7 @@
             </select></label>
           <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
             <input [ngModel]="tr.label?.['de'] ?? ''" (ngModelChange)="setTransitionLabel(ti, $event)" /></label>
-          <button type="button" class="fe__del" [attr.aria-label]="'admin.common.remove' | t" (click)="removeTransition(ti)">✕</button>
+          <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeTransition(ti)">✕</app-button>
         </div>
 
         @if (mode() === 'expert') {
