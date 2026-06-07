@@ -10,15 +10,26 @@ ausgehenden Nachrichten genutzt.
 **Beamer/Geheimhaltung (requirements N1a):** ``vote_tally``/``vote_closed`` tragen
 ausschließlich Aggregate (``counts``/``quorumMet``/``leading``/``result``) — **nie**
 Wähler-Identitäten.
+
+**Geheime Abstimmung (``secret=true``), Regel »Counts erst bei Close« (api.md §4):**
+Solange ein geheimer Vote **offen** ist, darf der Live-Feed (Beamer **und** Voter)
+keinen Zwischenstand je Option preisgeben. ``vote_tally`` trägt dann nur die
+**Teilnahme** (``cast`` von ``eligible``) — ``counts`` ist leer ``{}`` und ``leading``
+``null``. Erst ``vote_closed`` liefert die vollen Aggregate. Das spiegelt die
+REST-Regel ``showBars = !secret || isClosed``. ``secret`` reist in ``vote_opened`` und
+``vote_tally`` mit, damit das FE (T-32) die Balken von Anfang an korrekt ausblendet.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from app.modules.voting.schemas import VoteOut
 
 
 class _CamelModel(BaseModel):
@@ -50,17 +61,49 @@ class VoteOpenedEvent(_CamelModel):
     application_id: UUID = Field(alias="applicationId")
     options: list[str]
     closes_at: datetime | None = Field(default=None, alias="closesAt")
+    # Geheime Abstimmung → FE blendet Live-Balken aus (showBars = !secret || isClosed).
+    secret: bool = False
 
 
 class VoteTallyEvent(_CamelModel):
-    """Live-Zwischenstand — **nur Aggregate, keine Namen** (requirements N1a)."""
+    """Live-Zwischenstand — **nur Aggregate, keine Namen** (requirements N1a).
+
+    Bei einem **offenen geheimen** Vote bleibt ``counts`` leer und ``leading`` ``null``
+    (kein Zwischenstand); nur die Teilnahme (``cast`` von ``eligible``) ist sichtbar.
+    Über :meth:`from_vote` konstruieren, damit diese Regel an **einer** Stelle gilt.
+    """
 
     type: Literal["vote_tally"] = "vote_tally"
     vote_id: UUID = Field(alias="voteId")
+    # Stimmen je Option — leer ``{}`` solange der Vote geheim **und** offen ist.
     counts: dict[str, int]
+    # Abgegebene Stimmen (Teilnahme). Auch bei geheimem offenen Vote sichtbar ("N von M").
+    cast: int = 0
     eligible: int
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
+    # Geheime Abstimmung → FE blendet Live-Balken aus (showBars = !secret || isClosed).
+    secret: bool = False
+
+    @classmethod
+    def from_vote(cls, vote: VoteOut) -> VoteTallyEvent:
+        """Tally-Event aus einem Vote bauen + »Counts erst bei Close«-Regel anwenden.
+
+        Geheim **und** offen ⇒ keine Choice-Counts und kein ``leading`` (sonst leakt der
+        Zwischenstand am Beamer/Mobile); nur die Teilnahme (``cast``) reist mit. Sichtbar
+        (nicht geheim) oder bereits geschlossen ⇒ volle Aggregate.
+        """
+        hide = vote.secret and vote.status == "open"
+        counts = vote.tally.counts
+        return cls(
+            voteId=vote.id,
+            counts={} if hide else counts,
+            cast=sum(counts.values()),
+            eligible=vote.tally.eligible,
+            quorumMet=vote.tally.quorum_met,
+            leading=None if hide else vote.tally.leading,
+            secret=vote.secret,
+        )
 
 
 class VoteClosedEvent(_CamelModel):

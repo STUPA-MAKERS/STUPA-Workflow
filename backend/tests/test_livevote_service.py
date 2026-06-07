@@ -20,8 +20,6 @@ from app.modules.voting.schemas import TallyOut, VoteClosed, VoteOut
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import NotFoundError
 
-_CONFIG = VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "simple"})
-
 
 class _CaptureBroker:
     def __init__(self) -> None:
@@ -34,15 +32,18 @@ class _CaptureBroker:
         raise NotImplementedError
 
 
-def _vote_out(*, meeting_id, status: str = "open") -> VoteOut:
+def _vote_out(*, meeting_id, status: str = "open", secret: bool = False) -> VoteOut:
+    config = VoteConfig.model_validate(
+        {"options": ["yes", "no"], "majorityRule": "simple", "secret": secret}
+    )
     return VoteOut(
         id=uuid4(),
         applicationId=uuid4(),
         meetingId=meeting_id,
         eligibleGroup="stupa",
-        config=_CONFIG,
+        config=config,
         status=status,  # type: ignore[arg-type]
-        secret=False,
+        secret=secret,
         tally=TallyOut(counts={"yes": 3, "no": 1}, eligible=10, quorumMet=True, leading="yes"),
     )
 
@@ -103,6 +104,38 @@ async def test_publisher_vote_tally_and_closed() -> None:
     assert closed_msg["type"] == "vote_closed"
     assert closed_msg["result"] == "rejected"
     assert closed_msg["voteId"] == str(vid)
+
+
+@pytest.mark.asyncio
+async def test_publisher_open_secret_vote_broadcasts_no_choice_counts() -> None:
+    # Sicherheits-Regression (fix/secret-live-tally): der WS-/Beamer-Fan-out eines
+    # OFFENEN geheimen Votes darf nur die Teilnahme tragen, keine Choice-Counts/leading.
+    broker = _CaptureBroker()
+    mid = uuid4()
+    await BrokerPublisher(broker).vote_tally(_vote_out(meeting_id=mid, secret=True))
+    [(channel, msg)] = broker.messages
+    assert channel == f"meeting:{mid}"
+    assert msg["type"] == "vote_tally"
+    assert msg["secret"] is True
+    assert msg["counts"] == {}            # kein Zwischenstand am Beamer/Mobile
+    assert msg["leading"] is None
+    assert msg["cast"] == 4               # nur Teilnahme: 3 + 1 von 10
+    assert msg["eligible"] == 10
+    assert {3, 1}.isdisjoint(v for v in msg.values() if type(v) is int)
+
+
+@pytest.mark.asyncio
+async def test_publisher_closed_secret_vote_reveals_full_aggregates() -> None:
+    # Nach Close erscheinen die vollen Aggregate (über vote_closed; vote_tally bei
+    # status=closed gäbe sie ebenfalls frei — Regel »Counts erst bei Close«).
+    broker = _CaptureBroker()
+    mid = uuid4()
+    await BrokerPublisher(broker).vote_tally(
+        _vote_out(meeting_id=mid, status="closed", secret=True)
+    )
+    [(_, msg)] = broker.messages
+    assert msg["counts"] == {"yes": 3, "no": 1}
+    assert msg["leading"] == "yes"
 
 
 @pytest.mark.asyncio
