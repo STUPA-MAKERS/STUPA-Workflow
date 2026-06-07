@@ -21,13 +21,15 @@ CRON_SPEC="${BACKUP_CRON:-17 2 * * *}"   # Default: täglich 02:17
 : "${BACKUP_AGE_RECIPIENT:?BACKUP_AGE_RECIPIENT (age-Public-Key) nicht gesetzt}"
 
 # Env in eine Datei sichern, die der cron-Job einliest (crond-Jobs erben die
-# Service-Umgebung nicht).
+# Service-Umgebung nicht). `export -p` schreibt bash-Syntax (`declare -x …`) —
+# busybox-crond führt Jobs aber via ash aus, das `declare` NICHT kennt. Daher den
+# Job explizit unter bash starten, das die Datei sauber sourcen kann.
 export -p > /etc/backup.env
 
 crontab_file="/etc/crontabs/root"
 mkdir -p "$(dirname "${crontab_file}")"
 cat > "${crontab_file}" <<EOF
-${CRON_SPEC} . /etc/backup.env; ${HERE}/backup.sh >> /proc/1/fd/1 2>&1
+${CRON_SPEC} bash -c '. /etc/backup.env; ${HERE}/backup.sh' >> /proc/1/fd/1 2>&1
 EOF
 
 echo "[backup] cron: '${CRON_SPEC}' — warte auf Lauf. Manuell: docker compose run --rm backup backup.sh"

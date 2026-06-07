@@ -106,8 +106,27 @@ fail=0
 [[ "${got_db}" == "${MARKER}" ]]  || { echo "FEHLER: DB-Zeile nicht wiederhergestellt ('${got_db}')"; fail=1; }
 [[ "${got_obj}" == "${MARKER}" ]] || { echo "FEHLER: MinIO-Objekt nicht wiederhergestellt ('${got_obj}')"; fail=1; }
 
+# --- Daemon-/Cron-Pfad: deckt genau den Lauf ab, den der One-Shot oben UMGEHT. ---
+# Der nächtliche Lauf geht über crond (ash) + /etc/backup.env. Schreibt der
+# entrypoint die env in bash-Syntax (`declare -x`), kann ash sie nicht sourcen und
+# backup.sh startet ohne POSTGRES_*/MINIO_* -> kein Backup. Wir setzen die Cron auf
+# jede Minute, starten den Service als Daemon und warten auf ein NEUES Artefakt.
+echo "==> Daemon-/Cron-Pfad (crond + env-Datei)"
+before="$("${DC[@]}" run --rm --no-deps --entrypoint bash backup \
+  -c 'ls /backups/antrag-*.tar.age 2>/dev/null | wc -l' | tr -d '[:space:]')"
+echo "BACKUP_CRON=* * * * *" >> .env          # env_file: letzter Key gewinnt
+"${DC[@]}" up -d backup
+got_daemon=0
+for _ in $(seq 1 30); do                       # max ~150s (Cron feuert minütlich)
+  now="$("${DC[@]}" exec -T backup sh -c 'ls /backups/antrag-*.tar.age 2>/dev/null | wc -l' | tr -d '[:space:]')"
+  if [[ "${now:-0}" -gt "${before:-0}" ]]; then got_daemon=1; break; fi
+  sleep 5
+done
+"${DC[@]}" stop backup >/dev/null 2>&1 || true
+[[ "${got_daemon}" -eq 1 ]] || { echo "FEHLER: crond erzeugte kein Backup (env-Datei nicht ash-/bash-sourcebar?)"; fail=1; }
+
 if [[ "${fail}" -eq 0 ]]; then
-  echo "==> RESTORE-SMOKE OK — DB + MinIO erfolgreich aus Backup wiederhergestellt."
+  echo "==> RESTORE-SMOKE OK — DB + MinIO wiederhergestellt; crond-Pfad erzeugt Backup."
 else
   echo "==> RESTORE-SMOKE FEHLGESCHLAGEN."
   exit 1
