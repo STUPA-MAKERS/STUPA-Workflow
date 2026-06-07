@@ -1,0 +1,452 @@
+"""Router-Tests Admin/Config (T-24): Endpunkt-Verdrahtung + RBAC, Service gefaked.
+
+Beweist: korrekte Permission-Gates je Bereich (admin.config / admin.roles /
+webhook.manage), camelCase-Serialisierung der DTOs, die FE-Site-Config-Form
+(``{version, active, draft, hasDraftChanges}``), der auth-freie Public-Read und dass
+alle body-tragenden Mutationen ``400`` (problem+json) deklarieren (be-contract).
+"""
+
+from __future__ import annotations
+
+from uuid import uuid4
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from app.deps import Principal, get_current_principal
+from app.main import create_app
+from app.modules.admin.branding import Branding
+from app.modules.admin.router import get_config_service, get_site_config_service
+from app.modules.admin.schemas import (
+    ApplicationTypeOut,
+    FlowVersionOut,
+    GremiumOut,
+    GroupMappingOut,
+    PublicSiteConfigOut,
+    RoleAssignmentOut,
+    RoleOut,
+    SiteConfigOut,
+    WebhookOut,
+)
+from app.shared.errors import ConflictError, NotFoundError
+
+_ALL_PERMS = {"admin.config", "admin.roles", "webhook.manage"}
+
+
+class _FakeConfig:
+    async def list_gremien(self):
+        return [
+            GremiumOut(
+                id=uuid4(), name="StuPa", slug="stupa",
+                cd_variant="stupa", default_lang="de",
+            )
+        ]
+
+    async def create_gremium(self, payload, actor):  # noqa: ANN001
+        return GremiumOut(
+            id=uuid4(), name=payload.name, slug=payload.slug,
+            cd_variant=payload.cd_variant, default_lang=payload.default_lang,
+        )
+
+    async def update_gremium(self, gremium_id, payload, actor):  # noqa: ANN001
+        if str(gremium_id).startswith("00000000"):
+            raise NotFoundError("nope")
+        return GremiumOut(
+            id=gremium_id, name=payload.name or "X", slug="stupa",
+            cd_variant="stupa", default_lang="de",
+        )
+
+    async def list_application_types(self):
+        return [
+            ApplicationTypeOut(
+                id=uuid4(), gremium_id=None, key="grant", name_i18n={"de": "Antrag"},
+                has_budget=False, comparison_offers=None,
+                active_form_version_id=None, active_flow_version_id=None,
+            )
+        ]
+
+    async def create_application_type(self, payload, actor):  # noqa: ANN001
+        return ApplicationTypeOut(
+            id=uuid4(), gremium_id=payload.gremium_id, key=payload.key,
+            name_i18n=payload.name_i18n, has_budget=payload.has_budget,
+            comparison_offers=None, active_form_version_id=None,
+            active_flow_version_id=None,
+        )
+
+    async def update_application_type(self, type_id, payload, actor):  # noqa: ANN001
+        return ApplicationTypeOut(
+            id=type_id, gremium_id=None, key="grant", name_i18n={"de": "x"},
+            has_budget=True, comparison_offers=None,
+            active_form_version_id=None, active_flow_version_id=None,
+        )
+
+    async def create_flow_version(self, type_id, payload, actor):  # noqa: ANN001
+        if str(type_id).startswith("00000000"):
+            raise NotFoundError("nope")
+        return FlowVersionOut(
+            id=uuid4(), application_type_id=type_id, version=1, active=payload.activate
+        )
+
+    async def list_roles(self):
+        return [
+            RoleOut(
+                id=uuid4(), key="admin", label={"de": "Admin"},
+                permissions=["admin.config"],
+            )
+        ]
+
+    async def create_role(self, payload, actor):  # noqa: ANN001
+        return RoleOut(
+            id=uuid4(), key=payload.key, label=payload.label,
+            permissions=payload.permissions,
+        )
+
+    async def update_role(self, role_id, payload, actor):  # noqa: ANN001
+        return RoleOut(
+            id=role_id, key="admin", label={"de": "A"},
+            permissions=payload.permissions or [],
+        )
+
+    async def list_role_assignments(self):
+        return []
+
+    async def create_role_assignment(self, payload, actor):  # noqa: ANN001
+        return RoleAssignmentOut(
+            id=uuid4(), principal_id=payload.principal_id, role_id=payload.role_id,
+            gremium_id=payload.gremium_id, granted_by=actor,
+            valid_from=payload.valid_from, valid_until=payload.valid_until,
+            delegate_voting=payload.delegate_voting,
+        )
+
+    async def update_role_assignment(self, assignment_id, payload, actor):  # noqa: ANN001
+        return RoleAssignmentOut(
+            id=assignment_id, principal_id=uuid4(), role_id=uuid4(), gremium_id=None,
+            granted_by=actor, valid_from=None, valid_until=None, delegate_voting=True,
+        )
+
+    async def list_group_mappings(self):
+        return []
+
+    async def create_group_mapping(self, payload, actor):  # noqa: ANN001
+        return GroupMappingOut(
+            id=uuid4(), oidc_group=payload.oidc_group, role_id=payload.role_id,
+            gremium_id=payload.gremium_id,
+        )
+
+    async def update_group_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+        return GroupMappingOut(
+            id=mapping_id, oidc_group="g", role_id=uuid4(), gremium_id=None
+        )
+
+    async def list_webhooks(self):
+        return [
+            WebhookOut(
+                id=uuid4(), name="n8n", url="https://h/x",
+                events=["status_changed"], active=True,
+            )
+        ]
+
+    async def create_webhook(self, payload, actor):  # noqa: ANN001
+        if payload.name == "dup":
+            raise ConflictError("exists")
+        return WebhookOut(
+            id=uuid4(), name=payload.name, url=payload.url,
+            events=payload.events, active=payload.active,
+        )
+
+    async def update_webhook(self, webhook_id, payload, actor):  # noqa: ANN001
+        if str(webhook_id).startswith("00000000"):
+            raise NotFoundError("nope")
+        return WebhookOut(
+            id=webhook_id, name="n8n", url="https://h/x",
+            events=["status_changed"], active=False,
+        )
+
+
+class _FakeSite:
+    def __init__(self) -> None:
+        self._active = Branding()
+        self._draft = Branding()
+        self._has = False
+        self._version = 1
+
+    async def get(self):
+        return SiteConfigOut(
+            version=self._version, active=self._active,
+            draft=self._draft, has_draft_changes=self._has,
+        )
+
+    async def put_draft(self, branding, actor):  # noqa: ANN001
+        self._draft = branding
+        self._has = True
+        return await self.get()
+
+    async def activate(self, actor):  # noqa: ANN001
+        if not self._has:
+            raise ConflictError("no draft")
+        self._active = self._draft
+        self._version += 1
+        self._has = False
+        return await self.get()
+
+    async def public(self):
+        return PublicSiteConfigOut(version=self._version, branding=self._active)
+
+
+@pytest.fixture
+def app() -> FastAPI:
+    application = create_app()
+    config, site = _FakeConfig(), _FakeSite()  # je App eine Instanz → Zustand bleibt
+    application.dependency_overrides[get_config_service] = lambda: config
+    application.dependency_overrides[get_site_config_service] = lambda: site
+    return application
+
+
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    return TestClient(app)
+
+
+def _as(app: FastAPI, perms: set[str]) -> None:
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="admin", permissions=perms
+    )
+
+
+def _as_admin(app: FastAPI) -> None:
+    _as(app, set(_ALL_PERMS))
+
+
+# --------------------------------------------------------------------------- auth
+def test_requires_auth_401(client: TestClient) -> None:
+    assert client.get("/api/admin/gremien").status_code == 401
+
+
+def test_forbidden_without_permission(app: FastAPI, client: TestClient) -> None:
+    _as(app, set())
+    r = client.get("/api/admin/gremien")
+    assert r.status_code == 403
+    assert r.json()["code"] == "forbidden"
+
+
+def test_roles_write_needs_admin_roles_not_just_config(
+    app: FastAPI, client: TestClient
+) -> None:
+    _as(app, {"admin.config"})  # darf Config lesen, aber keine Rollen schreiben
+    assert client.get("/api/admin/roles").status_code == 200
+    r = client.post(
+        "/api/admin/roles", json={"key": "x", "label": {}, "permissions": []}
+    )
+    assert r.status_code == 403
+
+
+def test_webhooks_need_webhook_manage(app: FastAPI, client: TestClient) -> None:
+    _as(app, {"admin.config", "admin.roles"})
+    assert client.get("/api/admin/webhooks").status_code == 403
+
+
+# --------------------------------------------------------------------------- schemas
+def test_config_schemas_includes_branding(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    r = client.get("/api/admin/config-schemas")
+    assert r.status_code == 200
+    body = r.json()
+    assert "Branding" in body and "FlowGraph" in body
+
+
+# --------------------------------------------------------------------------- gremien
+def test_list_create_update_gremium(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    assert client.get("/api/admin/gremien").json()[0]["cdVariant"] == "stupa"
+    r = client.post("/api/admin/gremien", json={"name": "AStA", "slug": "asta"})
+    assert r.status_code == 201 and r.json()["defaultLang"] == "de"
+    patched = client.patch(f"/api/admin/gremien/{uuid4()}", json={"name": "Neu"})
+    assert patched.status_code == 200
+
+
+def test_update_gremium_404(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    r = client.patch(
+        "/api/admin/gremien/00000000-0000-0000-0000-000000000000", json={"name": "x"}
+    )
+    assert r.status_code == 404
+
+
+# --------------------------------------------------------------------------- types
+def test_application_types_crud(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    assert client.get("/api/admin/application-types").json()[0]["key"] == "grant"
+    r = client.post(
+        "/api/admin/application-types",
+        json={"key": "grant", "nameI18n": {"de": "Antrag"}},
+    )
+    assert r.status_code == 201 and r.json()["hasBudget"] is False
+    patched = client.patch(
+        f"/api/admin/application-types/{uuid4()}", json={"hasBudget": True}
+    )
+    assert patched.status_code == 200
+
+
+# --------------------------------------------------------------------------- flow
+def test_create_flow_version_ok(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    graph = {
+        "states": [{"key": "draft", "label": {"de": "Entwurf"}, "isInitial": True}],
+        "transitions": [],
+    }
+    r = client.post(
+        f"/api/admin/application-types/{uuid4()}/flow-versions", json={"graph": graph}
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["active"] is True and body["version"] == 1
+
+
+def test_create_flow_version_type_404(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    graph = {
+        "states": [{"key": "s", "label": {"de": "S"}, "isInitial": True}],
+        "transitions": [],
+    }
+    r = client.post(
+        "/api/admin/application-types/00000000-0000-0000-0000-000000000000/flow-versions",
+        json={"graph": graph},
+    )
+    assert r.status_code == 404
+
+
+# --------------------------------------------------------------------------- rbac
+def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    assert client.get("/api/admin/roles").json()[0]["permissions"] == ["admin.config"]
+    created = client.post(
+        "/api/admin/roles",
+        json={"key": "r", "label": {"de": "R"}, "permissions": ["vote.cast"]},
+    )
+    assert created.status_code == 201
+    patched = client.patch(
+        f"/api/admin/roles/{uuid4()}", json={"permissions": ["audit.read"]}
+    )
+    assert patched.status_code == 200
+    pid, rid = str(uuid4()), str(uuid4())
+    r = client.post(
+        "/api/admin/role-assignments",
+        json={"principalId": pid, "roleId": rid, "delegateVoting": True},
+    )
+    assert r.status_code == 201 and r.json()["delegateVoting"] is True
+    upd = client.patch(
+        f"/api/admin/role-assignments/{uuid4()}", json={"delegateVoting": True}
+    )
+    assert upd.status_code == 200
+    assert client.get("/api/admin/role-assignments").status_code == 200
+    gm = client.post(
+        "/api/admin/group-mappings", json={"oidcGroup": "fsr", "roleId": rid}
+    )
+    assert gm.status_code == 201 and gm.json()["oidcGroup"] == "fsr"
+    gmu = client.patch(
+        f"/api/admin/group-mappings/{uuid4()}", json={"oidcGroup": "x"}
+    )
+    assert gmu.status_code == 200
+    assert client.get("/api/admin/group-mappings").status_code == 200
+
+
+# --------------------------------------------------------------------------- webhooks
+def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    assert client.get("/api/admin/webhooks").json()[0]["name"] == "n8n"
+    ok = client.post(
+        "/api/admin/webhooks",
+        json={"name": "h", "url": "https://h/x", "events": ["status_changed"]},
+    )
+    assert ok.status_code == 201
+    # non-http url → 422 (Schema)
+    bad = client.post(
+        "/api/admin/webhooks",
+        json={"name": "h", "url": "ftp://h/x", "events": ["status_changed"]},
+    )
+    assert bad.status_code == 422
+    # FE schickt volles Objekt inkl. leerem id beim POST → wird ignoriert
+    withid = client.post(
+        "/api/admin/webhooks",
+        json={
+            "id": "", "name": "h", "url": "https://h/y",
+            "events": ["vote_closed"], "active": True,
+        },
+    )
+    assert withid.status_code == 201
+    patched = client.patch(f"/api/admin/webhooks/{uuid4()}", json={"active": False})
+    assert patched.status_code == 200
+
+
+# --------------------------------------------------------------------------- site-config
+def test_site_config_draft_activate_cycle(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    r = client.get("/api/admin/site-config")
+    assert r.status_code == 200
+    empty = Branding().model_dump(by_alias=True)
+    assert r.json() == {
+        "version": 1, "active": empty, "draft": empty, "hasDraftChanges": False
+    }
+    put = client.put("/api/admin/site-config/draft", json={"copyright": {"de": "© 2026"}})
+    assert put.status_code == 200 and put.json()["hasDraftChanges"] is True
+    act = client.post("/api/admin/site-config/activate")
+    assert act.status_code == 200
+    body = act.json()
+    assert body["version"] == 2 and body["hasDraftChanges"] is False
+    assert body["active"]["copyright"] == {"de": "© 2026"}
+
+
+def test_site_config_draft_rejects_inline_svg_422(
+    app: FastAPI, client: TestClient
+) -> None:
+    _as_admin(app)
+    draft = {
+        "logos": {
+            "favicon": {
+                "url": "data:image/svg+xml;base64,PHN2Zz4=",
+                "filename": "f.svg", "mime": "image/png", "size": 10,
+            }
+        }
+    }
+    r = client.put("/api/admin/site-config/draft", json=draft)
+    assert r.status_code == 422
+
+
+def test_activate_without_draft_409(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    r = client.post("/api/admin/site-config/activate")
+    assert r.status_code == 409
+
+
+def test_public_site_config_no_auth_and_cache_header(client: TestClient) -> None:
+    r = client.get("/api/site-config")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "public, max-age=300"
+    assert "branding" in r.json()
+
+
+# --------------------------------------------------------------------------- contract
+def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
+    spec = app.openapi()
+    cases = [
+        ("/api/admin/gremien", "post"),
+        ("/api/admin/gremien/{gremium_id}", "patch"),
+        ("/api/admin/application-types", "post"),
+        ("/api/admin/application-types/{type_id}", "patch"),
+        ("/api/admin/application-types/{type_id}/flow-versions", "post"),
+        ("/api/admin/roles", "post"),
+        ("/api/admin/roles/{role_id}", "patch"),
+        ("/api/admin/role-assignments", "post"),
+        ("/api/admin/role-assignments/{assignment_id}", "patch"),
+        ("/api/admin/group-mappings", "post"),
+        ("/api/admin/group-mappings/{mapping_id}", "patch"),
+        ("/api/admin/webhooks", "post"),
+        ("/api/admin/webhooks/{webhook_id}", "patch"),
+        ("/api/admin/site-config/draft", "put"),
+        ("/api/admin/site-config/activate", "post"),
+    ]
+    for path, method in cases:
+        responses = spec["paths"][path][method]["responses"]
+        assert "400" in responses, f"{method.upper()} {path} missing 400"
+        assert list(responses["400"]["content"]) == ["application/problem+json"]

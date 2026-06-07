@@ -289,19 +289,26 @@ class BudgetField(_CamelModel):
 # --------------------------------------------------------------------------- #
 # JSON-Schema-Export (für FE-Editoren / Client-Validierung, api.md /config-schemas)
 # --------------------------------------------------------------------------- #
-_EXPORTED: dict[str, type[BaseModel]] = {
-    "FormFieldDef": FormFieldDef,
-    "FlowGraph": FlowGraph,
-    "VoteConfig": VoteConfig,
-    "NotificationRule": NotificationRule,
-    "WebhookConfig": WebhookConfig,
-    "ComparisonOffers": ComparisonOffers,
-    "BudgetField": BudgetField,
-}
+def _exported_models() -> dict[str, type[BaseModel]]:
+    """Exportierte Config-Modelle. ``Branding`` (T-24/#21) wird lazy importiert, um
+    den Import-Zyklus shared ↔ admin zu vermeiden."""
+    from app.modules.admin.branding import Branding
+
+    return {
+        "FormFieldDef": FormFieldDef,
+        "FlowGraph": FlowGraph,
+        "VoteConfig": VoteConfig,
+        "NotificationRule": NotificationRule,
+        "WebhookConfig": WebhookConfig,
+        "ComparisonOffers": ComparisonOffers,
+        "BudgetField": BudgetField,
+        "Branding": Branding,
+    }
 
 
 def export_json_schemas() -> dict[str, dict[str, Any]]:
     """Deterministischer JSON-Schema-Export aller Config-Modelle (by_alias)."""
     return {
-        name: model.model_json_schema(by_alias=True) for name, model in _EXPORTED.items()
+        name: model.model_json_schema(by_alias=True)
+        for name, model in _exported_models().items()
     }

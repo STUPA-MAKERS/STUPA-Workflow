@@ -8,7 +8,14 @@ T-06 deckt den DB-Kern ab (data-model §1–4). Spätere Tasks ergänzen ihre Mo
 from __future__ import annotations
 
 from app.db import Base
-from app.modules.admin.models import ApplicationType, Gremium, MailList
+from app.modules.admin.models import (
+    ApplicationType,
+    Gremium,
+    MailList,
+    SiteConfigVersion,
+    Webhook,
+    WebhookDelivery,
+)
 from app.modules.applications.models import (
     Applicant,
     Application,
@@ -62,10 +69,13 @@ __all__ = [
     "RoleAssignment",
     "RolePermission",
     "SecretBallot",
+    "SiteConfigVersion",
     "State",
     "StatusEvent",
     "SubmissionVersion",
     "Transition",
     "Vote",
     "VotedMarker",
+    "Webhook",
+    "WebhookDelivery",
 ]

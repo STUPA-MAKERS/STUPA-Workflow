@@ -16,6 +16,8 @@ from fastapi import APIRouter, FastAPI, Request
 from app.db import dispose_engine
 from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.modules.admin.router import public_router as site_config_public_router
+from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
 from app.modules.applications.router import router as applications_router
@@ -62,6 +64,8 @@ api_router.include_router(antiabuse_router)
 api_router.include_router(notifications_router)
 api_router.include_router(files_router)
 api_router.include_router(audit_router)
+api_router.include_router(admin_router)
+api_router.include_router(site_config_public_router)
 
 
 @asynccontextmanager
