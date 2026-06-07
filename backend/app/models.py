@@ -40,6 +40,7 @@ from app.modules.forms.models import FormField, FormVersion
 from app.modules.livevote.models import Meeting
 from app.modules.notifications.models import MailTemplate, NotificationRule
 from app.modules.pdf.models import RenderJob
+from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 
 __all__ = [
@@ -66,6 +67,8 @@ __all__ = [
     "Meeting",
     "NotificationRule",
     "Principal",
+    "Protocol",
+    "ProtocolVoteRef",
     "RenderJob",
     "Role",
     "RoleAssignment",
