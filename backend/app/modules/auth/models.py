@@ -69,8 +69,12 @@ class RoleAssignment(UUIDPkMixin, Base):
         ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
     )
     granted_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    valid_from: Mapped[datetime | None] = mapped_column(nullable=True)
-    valid_until: Mapped[datetime | None] = mapped_column(nullable=True)
+    valid_from: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    valid_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     delegate_voting: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     __table_args__ = (Index("ix_role_assignment_principal_id", "principal_id"),)

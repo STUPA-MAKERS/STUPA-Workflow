@@ -19,6 +19,40 @@ def test_assignment_valid_window() -> None:
     assert rbac._assignment_valid(None, NOW - timedelta(days=1), NOW) is False  # abgelaufen
 
 
+def test_assignment_valid_naive_db_values_do_not_crash() -> None:
+    """Regression: naive ``valid_from``/``valid_until`` (timestamp ohne tz) aus der DB.
+
+    Vor dem Fix warf der Vergleich mit dem aware ``now``
+    ``TypeError: can't compare offset-naive and offset-aware datetimes`` und legte
+    damit die komplette Principal-Auflösung lahm (REST 500, WS-Handshake-403).
+    """
+    naive_from = (NOW - timedelta(days=1)).replace(tzinfo=None)
+    naive_until = (NOW + timedelta(days=1)).replace(tzinfo=None)
+    assert rbac._assignment_valid(naive_from, naive_until, NOW) is True
+    assert rbac._assignment_valid(None, naive_from, NOW) is False  # naiv, abgelaufen
+    assert rbac._assignment_valid(naive_until, None, NOW) is False  # naiv, noch nicht
+
+
+async def test_resolve_principal_with_naive_validity_window() -> None:
+    """Voller Resolver-Pfad mit naivem Gültigkeitsfenster crasht nicht (WS/REST-Auth)."""
+    row = PrincipalRow(sub="u4", email=None, display_name=None, oidc_groups=None)
+    naive_valid = RoleAssignment(
+        role_id="r1",
+        gremium_id="gid1",
+        valid_from=(NOW - timedelta(days=1)).replace(tzinfo=None),
+        valid_until=(NOW + timedelta(days=1)).replace(tzinfo=None),
+    )
+    db = fake_session(
+        result(naive_valid),
+        result(),  # keine GroupMappings
+        result("vote.cast"),
+        result("member"),
+    )
+    p = await rbac.resolve_principal(db, row, NOW)
+    assert p.permissions == {"vote.cast"}
+    assert p.groups == {"gid1"}
+
+
 async def test_resolve_principal_no_roles() -> None:
     row = PrincipalRow(sub="u1", email="e@x.de", display_name="N", oidc_groups=None)
     db = fake_session(result())  # keine Assignments
