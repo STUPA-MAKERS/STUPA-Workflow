@@ -8,7 +8,7 @@ export const DEFAULT_LOCALE: Locale = 'de';
 export type TranslationKey = keyof typeof de;
 
 export const de = {
-  'app.title': 'StuPa Antragsplattform',
+  'app.title': 'STUPA Antragsplattform',
   'app.skipToContent': 'Zum Inhalt springen',
 
   'nav.main': 'Hauptnavigation',
@@ -278,7 +278,7 @@ export const de = {
   'meetings.create.title': 'Sitzung anlegen',
   'meetings.create.lead': 'Lege eine neue Sitzung an, um Anträge und Abstimmungen zu steuern.',
   'meetings.create.name': 'Titel',
-  'meetings.create.placeholder': 'z. B. StuPa-Sitzung 12.06.',
+  'meetings.create.placeholder': 'z. B. STUPA-Sitzung 12.06.',
   'meetings.create.submit': 'Sitzung anlegen',
   'meetings.toast.created': 'Sitzung angelegt.',
   'meetings.toast.createFailed': 'Sitzung konnte nicht angelegt werden.',
@@ -294,8 +294,6 @@ export const de = {
   'notFound.back': 'Zur Startseite',
 
   'footer.coBranding': 'Eine Plattform des Studierendenparlaments',
-  'footer.imprint': 'Impressum',
-  'footer.privacy': 'Datenschutz',
 
   // --- Voting / Live-Vote (T-32) ---------------------------------------------
   'vote.option.yes': 'Ja',
@@ -384,6 +382,8 @@ export const de = {
   'admin.common.errors': 'Fehler',
 
   'admin.form.title': 'Formular-Builder',
+  'admin.form.desc':
+    'Stelle die Felder eines Antragsformulars zusammen. Reihenfolge per Pfeile, Pflichtfelder und Validierung je Feld. Speichern legt eine neue Form-Version an.',
   'admin.form.addField': 'Feld hinzufügen',
   'admin.form.noFields': 'Noch keine Felder. Füge ein erstes Feld hinzu.',
   'admin.form.field': 'Feld',
@@ -406,6 +406,8 @@ export const de = {
   'admin.form.save': 'Als Form-Version speichern',
 
   'admin.flow.title': 'Flow-Editor',
+  'admin.flow.desc':
+    'Definiere Status und Übergänge eines Antragstyps. „Einfach" startet von einer Vorlage, „Experte" gibt volle Kontrolle über Bedingungen und Aktionen.',
   'admin.flow.modeSimple': 'Einfach',
   'admin.flow.modeExpert': 'Experte',
   'admin.flow.preset': 'Vorlage',
@@ -436,6 +438,8 @@ export const de = {
   'admin.flow.preset.vote': 'Mit Abstimmung: Entwurf → Prüfung → Abstimmung → Entschieden',
 
   'admin.brand.title': 'Branding & Texte',
+  'admin.brand.desc':
+    'Pflege Logos, Fußzeile, rechtliche Links und Freitexte. Die Vorschau rechts zeigt deine Eingaben sofort; „Entwurf aktivieren" macht sie live.',
   'admin.brand.version': 'Version {n}',
   'admin.brand.draftDirty': 'Nicht aktivierter Entwurf',
   'admin.brand.logos': 'Logos',
@@ -466,6 +470,8 @@ export const de = {
   'admin.brand.previewFooter': 'Fuß-Vorschau',
 
   'admin.webhook.title': 'Webhooks',
+  'admin.webhook.desc':
+    'Sende Ereignisse an externe Systeme (z. B. Chat-Bridges). Pro Hook eine Ziel-URL und die Ereignisse, die ihn auslösen.',
   'admin.webhook.name': 'Name',
   'admin.webhook.url': 'Ziel-URL',
   'admin.webhook.events': 'Ereignisse',
@@ -476,6 +482,8 @@ export const de = {
   'admin.webhook.noEvents': 'Mindestens ein Ereignis auswählen.',
 
   'admin.notif.title': 'Benachrichtigungsregeln',
+  'admin.notif.desc':
+    'Lege fest, wer bei welchem Ereignis benachrichtigt wird. Empfänger sind Antragsteller:in, eine Rolle oder ein Gremium.',
   'admin.notif.event': 'Ereignis',
   'admin.notif.template': 'Vorlagen-Schlüssel',
   'admin.notif.recipients': 'Empfänger',
@@ -499,6 +507,8 @@ export const de = {
   'admin.forms.status.draft': 'Entwurf',
   'admin.forms.status.inactive': 'Inaktiv',
   'admin.forms.overviewEmpty': 'Noch keine Formulare angelegt.',
+  'admin.forms.overviewLoading': 'Formulare werden geladen …',
+  'admin.forms.overviewError': 'Formulare konnten nicht geladen werden.',
   'admin.forms.edit': 'Bearbeiten',
   'admin.forms.manage': 'Formulare verwalten',
 
@@ -559,7 +569,7 @@ export const de = {
 } as const;
 
 export const en: Partial<Record<TranslationKey, string>> = {
-  'app.title': 'StuPa Application Platform',
+  'app.title': 'STUPA Application Platform',
   'app.skipToContent': 'Skip to content',
 
   'nav.main': 'Main navigation',
@@ -829,7 +839,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.create.title': 'Create meeting',
   'meetings.create.lead': 'Create a new meeting to steer applications and votes.',
   'meetings.create.name': 'Title',
-  'meetings.create.placeholder': 'e.g. StuPa session June 12',
+  'meetings.create.placeholder': 'e.g. STUPA session June 12',
   'meetings.create.submit': 'Create meeting',
   'meetings.toast.created': 'Meeting created.',
   'meetings.toast.createFailed': 'The meeting could not be created.',
@@ -845,8 +855,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'notFound.back': 'Back to start',
 
   'footer.coBranding': 'A platform of the Student Parliament',
-  'footer.imprint': 'Imprint',
-  'footer.privacy': 'Privacy',
 
   // --- Voting / Live-Vote (T-32) ---------------------------------------------
   'vote.option.yes': 'Yes',
@@ -934,6 +942,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.common.errors': 'Errors',
 
   'admin.form.title': 'Form builder',
+  'admin.form.desc':
+    'Compose the fields of an application form. Reorder with the arrows, set required fields and validation per field. Saving creates a new form version.',
   'admin.form.addField': 'Add field',
   'admin.form.noFields': 'No fields yet. Add your first field.',
   'admin.form.field': 'Field',
@@ -956,6 +966,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.save': 'Save as form version',
 
   'admin.flow.title': 'Flow editor',
+  'admin.flow.desc':
+    'Define the states and transitions of an application type. “Simple” starts from a template, “Expert” gives full control over guards and actions.',
   'admin.flow.modeSimple': 'Simple',
   'admin.flow.modeExpert': 'Expert',
   'admin.flow.preset': 'Template',
@@ -986,6 +998,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.preset.vote': 'With vote: Draft → Review → Vote → Decided',
 
   'admin.brand.title': 'Branding & texts',
+  'admin.brand.desc':
+    'Manage logos, footer, legal links and free texts. The preview on the right reflects your input instantly; “Activate draft” makes it live.',
   'admin.brand.version': 'Version {n}',
   'admin.brand.draftDirty': 'Unactivated draft',
   'admin.brand.logos': 'Logos',
@@ -1016,6 +1030,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.previewFooter': 'Footer preview',
 
   'admin.webhook.title': 'Webhooks',
+  'admin.webhook.desc':
+    'Send events to external systems (e.g. chat bridges). One target URL per hook plus the events that should trigger it.',
   'admin.webhook.name': 'Name',
   'admin.webhook.url': 'Target URL',
   'admin.webhook.events': 'Events',
@@ -1026,6 +1042,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.webhook.noEvents': 'Select at least one event.',
 
   'admin.notif.title': 'Notification rules',
+  'admin.notif.desc':
+    'Decide who gets notified for which event. Recipients are the applicant, a role or a body.',
   'admin.notif.event': 'Event',
   'admin.notif.template': 'Template key',
   'admin.notif.recipients': 'Recipients',
@@ -1049,6 +1067,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.status.draft': 'Draft',
   'admin.forms.status.inactive': 'Inactive',
   'admin.forms.overviewEmpty': 'No forms created yet.',
+  'admin.forms.overviewLoading': 'Loading forms …',
+  'admin.forms.overviewError': 'Forms could not be loaded.',
   'admin.forms.edit': 'Edit',
   'admin.forms.manage': 'Manage forms',
 

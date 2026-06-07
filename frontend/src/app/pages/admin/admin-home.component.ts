@@ -62,7 +62,11 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
           <a class="admin-home__forms-cta" routerLink="forms">{{ 'admin.forms.manage' | t }} →</a>
         </div>
 
-        @if (forms().length === 0) {
+        @if (loading()) {
+          <p class="admin-home__empty" aria-live="polite">{{ 'admin.forms.overviewLoading' | t }}</p>
+        } @else if (error()) {
+          <p class="admin-home__empty admin-home__error" role="alert">{{ 'admin.forms.overviewError' | t }}</p>
+        } @else if (forms().length === 0) {
           <p class="admin-home__empty">{{ 'admin.forms.overviewEmpty' | t }}</p>
         } @else {
           <table class="admin-home__table">
@@ -148,6 +152,9 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
       .admin-home__empty {
         color: var(--color-text-muted);
       }
+      .admin-home__error {
+        color: var(--color-danger);
+      }
       .admin-home__table {
         width: 100%;
         border-collapse: collapse;
@@ -203,6 +210,8 @@ export class AdminHomeComponent {
   private readonly i18n = inject(I18nService);
 
   protected readonly forms = signal<FormOverviewItem[]>([]);
+  protected readonly loading = signal(true);
+  protected readonly error = signal(false);
   private readonly gremien = signal<Gremium[]>([]);
   private readonly gremiumMap = computed(
     () => new Map(this.gremien().map((g) => [g.id, g.name])),
@@ -217,8 +226,20 @@ export class AdminHomeComponent {
   ];
 
   constructor() {
-    this.api.listForms().subscribe((f) => this.forms.set(f));
-    this.api.listGremien().subscribe((g) => this.gremien.set(g));
+    this.api.listForms().subscribe({
+      next: (f) => {
+        this.forms.set(f);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.error.set(true);
+        this.loading.set(false);
+      },
+    });
+    this.api.listGremien().subscribe({
+      next: (g) => this.gremien.set(g),
+      error: () => this.gremien.set([]),
+    });
   }
 
   protected name(form: FormOverviewItem): string {

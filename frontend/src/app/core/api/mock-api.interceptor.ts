@@ -416,7 +416,7 @@ const MOCK_PROTOCOL_ID = 'e0000000-0000-0000-0000-000000000099';
 
 let MOCK_MEETING: MeetingOutWire = {
   id: MOCK_MEETING_ID,
-  title: 'StuPa-Sitzung 12.06.',
+  title: 'STUPA-Sitzung 12.06.',
   status: 'live',
   activeApplicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   gremiumId: null,
@@ -450,7 +450,7 @@ let MOCK_PROTOCOL: ProtocolOutWire = {
   id: MOCK_PROTOCOL_ID,
   meetingId: MOCK_MEETING_ID,
   markdown:
-    '# Protokoll der StuPa-Sitzung\n\n## TOP 1 — Begrüßung\n\nDie Sitzungsleitung eröffnet die Sitzung.\n\n- Anwesend: 16 Mitglieder\n- Beschlussfähig: **ja**\n',
+    '# Protokoll der STUPA-Sitzung\n\n## TOP 1 — Begrüßung\n\nDie Sitzungsleitung eröffnet die Sitzung.\n\n- Anwesend: 16 Mitglieder\n- Beschlussfähig: **ja**\n',
   status: 'draft',
   pdfUrl: null,
   sentAt: null,

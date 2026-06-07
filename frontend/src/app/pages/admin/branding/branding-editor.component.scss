@@ -68,6 +68,12 @@
   color: var(--color-text-muted);
 }
 
+.br__desc {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+
 .br__logo {
   display: flex;
   align-items: center;
@@ -135,15 +141,22 @@
 
 input,
 textarea {
-  padding: var(--space-2) var(--space-3);
   font: inherit;
   color: var(--color-text);
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+}
+
+// Einheitliche Control-Höhe: Text-Inputs bündig mit app-select/app-input (#85-Regression).
+input {
+  height: var(--control-height);
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
 }
 
 textarea {
+  padding: var(--space-2) var(--space-3);
   resize: vertical;
 }
 
@@ -189,6 +202,23 @@ textarea {
 
 .br__pv-welcome {
   font-size: var(--fs-md);
+}
+
+.br__pv-support {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.br__pv-legal {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--fs-xs);
+}
+
+.br__pv-legal a {
+  color: var(--color-primary);
 }
 
 .br__pv-footer {

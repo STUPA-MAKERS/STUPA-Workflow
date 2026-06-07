@@ -21,6 +21,7 @@ import type {
 } from '@core/api/models';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
+import { SelectComponent, type SelectOption } from '@shared/ui';
 import { stateBadgeVariant } from './applications.util';
 
 /**
@@ -35,7 +36,7 @@ import { stateBadgeVariant } from './applications.util';
   selector: 'app-applications-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, FormsModule, DatePipe, TranslatePipe, BadgeComponent, ButtonComponent],
+  imports: [RouterLink, FormsModule, DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, SelectComponent],
   template: `
     <header class="apps__head">
       <h1 class="apps__title">{{ 'applications.list.title' | t }}</h1>
@@ -73,14 +74,14 @@ import { stateBadgeVariant } from './applications.util';
       </div>
 
       <div class="field">
-        <label class="field__label" [for]="'apps-state'">{{ 'applications.list.filter.state' | t }}</label>
-        <input
+        <app-select
           id="apps-state"
-          class="field__control"
-          type="text"
+          name="state"
+          [label]="'applications.list.filter.state' | t"
+          [placeholder]="'applications.list.filter.all' | t"
+          [options]="stateOptions()"
           [ngModel]="state()"
           (ngModelChange)="state.set($event)"
-          name="state"
         />
       </div>
 
@@ -310,6 +311,17 @@ export class ApplicationsListComponent {
   readonly typeId = signal('');
   readonly state = signal('');
 
+  /**
+   * Status-Dropdown-Optionen aus den **realen** Status der geladenen Anträge
+   * akkumuliert (Wert = State-UUID, Label = aufgelöster State-Name). Der gesendete
+   * `state`-Filterwert bleibt die UUID (Contract: `current_state_id`). Einmal
+   * gesehene Status bleiben erhalten, damit der Filter nicht auf einen Wert kollabiert.
+   */
+  private readonly seenStates = signal<Map<string, string>>(new Map());
+  readonly stateOptions = computed<SelectOption[]>(() =>
+    [...this.seenStates()].map(([value, label]) => ({ value, label })),
+  );
+
   readonly items = computed(() => this.result()?.items ?? []);
   readonly total = computed(() => this.result()?.total ?? 0);
   private readonly offset = computed(() => this.result()?.offset ?? 0);
@@ -340,6 +352,19 @@ export class ApplicationsListComponent {
 
   typeName(typeId: Uuid): string {
     return this.typesById().get(typeId) ?? typeId;
+  }
+
+  /** Reale Status der geladenen Anträge in die Dropdown-Optionen übernehmen. */
+  private collectStates(items: ApplicationListItem[]): void {
+    const next = new Map(this.seenStates());
+    let changed = false;
+    for (const item of items) {
+      if (item.state && !next.has(item.state.id)) {
+        next.set(item.state.id, item.state.label);
+        changed = true;
+      }
+    }
+    if (changed) this.seenStates.set(next);
   }
 
   amount(item: ApplicationListItem): string {
@@ -406,6 +431,7 @@ export class ApplicationsListComponent {
     this.api.listApplications(query).subscribe({
       next: (page) => {
         this.result.set(page);
+        this.collectStates(page.items);
         this.loading.set(false);
       },
       error: () => {
