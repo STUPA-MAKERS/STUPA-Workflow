@@ -169,13 +169,39 @@ async def test_cast_not_in_group_403() -> None:
 
 
 async def test_cast_blocked_when_voting_right_delegated_403() -> None:
-    # T-45: Delegierender hat sein Stimmrecht abgegeben → eigene Stimme verboten
-    # (Doppel-Stimmrecht-Sperre). _get_vote ok, Delegations-Lookup liefert eine Zeile.
+    # T-45: Delegierender (delegated_by == eigene sub, delegate_voting=True) hat sein
+    # Stimmrecht abgegeben → eigene Stimme verboten (Doppel-Stimmrecht-Sperre).
     vote = _vote()
-    db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
+    db = fake_session(result(vote), result(("v1", True)))
     with pytest.raises(ForbiddenError, match="delegated"):
         await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert db.committed == 0
+
+
+async def test_cast_blocked_when_only_nonvoting_delegation_403() -> None:
+    # T-45 #3: Empfänger einer NICHT-stimmberechtigenden Delegation (delegated_by !=
+    # eigene sub, delegate_voting=False) darf trotz Gruppen-Mitgliedschaft nicht stimmen.
+    vote = _vote()
+    db = fake_session(result(vote), result(("other", False)))
+    with pytest.raises(ForbiddenError, match="delegated"):
+        await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
+    assert db.committed == 0
+
+
+async def test_cast_exercising_delegated_vote_is_audited() -> None:
+    # T-45 #5: Empfänger übt ein delegiertes Stimmrecht aus → DELEGATION_USE-Audit.
+    vote = _vote()
+    db = fake_session(
+        result(vote),
+        result(("other", True)),  # Empfänger-Stimm-Delegation → exercised
+        result(),  # audit advisory lock
+        result(),  # audit prev-hash
+        result(SimpleNamespace(inserted=True)),  # ballot insert (allowChange → xmax)
+    )
+    out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
+    assert out.status == "cast"
+    assert db.committed == 1
+    assert any(type(a).__name__ == "AuditEntry" for a in db.added)
 
 
 async def test_cast_unknown_option_422() -> None:

@@ -20,6 +20,7 @@ class AuditAction(StrEnum):
     ROLE_CHANGE = "role_change"
     DELEGATION_GRANT = "delegation_grant"
     DELEGATION_REVOKE = "delegation_revoke"
+    DELEGATION_USE = "delegation_use"
     EXPORT = "export"
     PII_ACCESS = "pii_access"
     PII_DELETION = "pii_deletion"

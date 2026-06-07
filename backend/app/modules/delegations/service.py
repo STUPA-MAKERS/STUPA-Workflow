@@ -1,4 +1,4 @@
-"""Delegation-Service (T-45, R1.5).
+"""Delegation-Service (T-45, R1.5) — Sicherheitskern.
 
 Anlegen/Auflisten/Widerrufen zeitbegrenzter Selbst-Delegationen. Eine Delegation ist
 ein ``role_assignment`` mit gesetztem ``delegated_by`` (= ``sub`` des Delegierenden);
@@ -6,14 +6,23 @@ der RBAC-Resolver (T-10) zählt sie im Gültigkeitsfenster automatisch mit, ein 
 (Hard-Delete der Zeile) wirkt daher **sofort**. Jede Delegation/jeder Widerruf wird
 auditiert (T-23).
 
-**RBAC serverseitig autoritativ.** Delegieren darf nur, wer die Rolle **selbst hält**
-(``role.key`` in den aufgelösten Rollen des Aufrufers) — sonst 403. Stimmrecht-
-Delegation (``delegateVoting``) ist nur bei aktivierter Settings-Option zulässig
-(satzungsrechtlicher Vorbehalt Q5), sonst 422.
+**Invariante: »nie mehr delegieren als man selbst direkt hält«** (serverseitig
+erzwungen, security-review #95):
 
-**Doppelte Stimmrechte.** :func:`has_active_voting_delegation` meldet dem Voting-
-Modul (T-15), ob ein Aufrufer sein Stimmrecht (für den Scope der Abstimmung) bereits
-abgegeben hat — der Delegierende darf dann nicht zusätzlich selbst abstimmen.
+* **Keine Re-Delegation/Ketten:** delegierbar ist nur eine **direkt** gehaltene Rolle
+  (``role_assignment`` mit ``delegated_by IS NULL``) — nicht eine selbst nur per
+  Delegation erhaltene. Damit gibt es keine A→B→C-Kette (sonst 403).
+* **Zeitliche Klammer:** ``valid_until`` der Delegation wird auf das Ende der eigenen
+  zugrundeliegenden Berechtigung geklammert (``min``); ist die eigene unbefristet,
+  gilt der Wunsch. Eine Delegation kann nie länger laufen als das eigene Recht.
+* **Gremium-Scope:** der angefragte ``gremium_id``-Scope muss durch ein direkt
+  gehaltenes Assignment gedeckt sein (global deckt alles), sonst 403.
+
+**Stimmrecht (exklusiv, Transfer ≠ Duplikat).** :func:`voting_delegation_check`
+liefert dem Voting-Modul (T-15) ein zwei-seitiges Verdikt: wer sein Stimmrecht
+abgegeben hat **und** wer nur über eine *nicht*-stimmberechtigende Delegation in die
+``eligible_group`` käme, darf nicht abstimmen (fail-closed); wer eine Stimm-Delegation
+ausübt, wird auditiert (``DELEGATION_USE``).
 """
 
 from __future__ import annotations
@@ -67,26 +76,50 @@ def _scope_clause(scope: str | None):  # noqa: ANN202 — SQLAlchemy-ColumnEleme
     return or_(base, RoleAssignment.gremium_id == gid)
 
 
-async def has_active_voting_delegation(
-    session: AsyncSession, delegator_sub: str, scope: str | None, now: datetime
-) -> bool:
-    """Hat ``delegator_sub`` sein Stimmrecht (für ``scope``) aktiv delegiert?
+async def voting_delegation_check(
+    session: AsyncSession, sub: str, scope: str | None, now: datetime
+) -> tuple[bool, bool]:
+    """Zwei-seitiges Stimmrecht-Verdikt für ``sub`` im ``scope`` → ``(blocked, exercised)``.
 
-    Genutzt vom Voting-Modul zur Doppel-Stimmrechts-Sperre: wer sein Stimmrecht
-    abgegeben hat, darf nicht zusätzlich selbst abstimmen.
+    Eine **einzige** Query (Sub-Select für die principal-id des Empfängers), damit der
+    Voting-cast-Pfad genau einen DB-Zugriff behält. ``blocked`` hat Vorrang
+    (fail-closed). Klassifikation der aktiven, scope-passenden Delegations-Zeilen:
+
+    * ``delegated_by == sub`` & ``delegate_voting`` → der Aufrufer hat sein Stimmrecht
+      abgegeben → **blocked** (kein Doppel: nur der Empfänger stimmt).
+    * Empfänger-Zeile (``delegated_by != sub``) & **nicht** ``delegate_voting`` → der
+      Aufrufer käme nur über eine *nicht*-stimmberechtigende Delegation in die Gruppe
+      → **blocked** (eine nicht-Stimm-Delegation verleiht kein Stimmrecht).
+    * Empfänger-Zeile & ``delegate_voting`` → der Aufrufer **übt** ein delegiertes
+      Stimmrecht aus → ``exercised`` (für das Nutzungs-Audit).
     """
-    stmt = (
-        select(RoleAssignment.id)
-        .where(
-            RoleAssignment.delegated_by == delegator_sub,
-            RoleAssignment.delegate_voting.is_(True),
-            or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
-            or_(RoleAssignment.valid_until.is_(None), RoleAssignment.valid_until >= now),
-            _scope_clause(scope),
+    pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
+    rows = (
+        await session.execute(
+            select(RoleAssignment.delegated_by, RoleAssignment.delegate_voting).where(
+                RoleAssignment.delegated_by.is_not(None),
+                or_(
+                    RoleAssignment.delegated_by == sub,
+                    RoleAssignment.principal_id == pid_subq,
+                ),
+                or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
+                or_(RoleAssignment.valid_until.is_(None), RoleAssignment.valid_until >= now),
+                _scope_clause(scope),
+            )
         )
-        .limit(1)
-    )
-    return (await session.execute(stmt)).scalars().first() is not None
+    ).all()
+
+    blocked = False
+    exercised = False
+    for delegated_by, delegate_voting in rows:
+        if delegated_by == sub:
+            if delegate_voting:
+                blocked = True
+        elif delegate_voting:
+            exercised = True
+        else:
+            blocked = True
+    return blocked, exercised
 
 
 class DelegationService:
@@ -96,10 +129,37 @@ class DelegationService:
         self.session = session
         self.settings = settings
 
+    async def _direct_holdings(
+        self, principal_id: UUID, role_id: UUID, now: datetime
+    ) -> list[tuple[UUID | None, datetime | None]]:
+        """Aktive, **direkt** (nicht delegiert) gehaltene Assignments der Rolle.
+
+        Liefert ``(gremium_id, valid_until)`` je aktiver Zeile mit ``delegated_by IS
+        NULL`` — Basis für »nie mehr als man hält« (Scope + Zeitklammer).
+        """
+        rows = (
+            await self.session.execute(
+                select(
+                    RoleAssignment.gremium_id,
+                    RoleAssignment.valid_from,
+                    RoleAssignment.valid_until,
+                ).where(
+                    RoleAssignment.principal_id == principal_id,
+                    RoleAssignment.role_id == role_id,
+                    RoleAssignment.delegated_by.is_(None),
+                )
+            )
+        ).all()
+        return [
+            (gremium_id, valid_until)
+            for gremium_id, valid_from, valid_until in rows
+            if _assignment_valid(valid_from, valid_until, now)
+        ]
+
     # ------------------------------------------------------------------ create
     async def create(self, payload: DelegationCreate, actor: Principal) -> DelegationOut:
-        """Delegation anlegen. 422 (Config/Fenster/Selbst), 403 (Rolle nicht gehalten),
-        404 (Empfänger/Rolle unbekannt)."""
+        """Delegation anlegen. 422 (Config/Fenster/Selbst), 403 (Recht/Scope nicht
+        direkt gehalten), 404 (Empfänger/Rolle unbekannt)."""
         now = datetime.now(UTC)
         if payload.delegate_voting and not self.settings.delegation_voting_enabled:
             raise ValidationProblem(
@@ -116,11 +176,6 @@ class DelegationService:
                 "validUntil must be after validFrom.",
                 errors=[{"field": "validUntil", "msg": "must be after start of window"}],
             )
-        if valid_until <= now:
-            raise ValidationProblem(
-                "Delegation window already elapsed.",
-                errors=[{"field": "validUntil", "msg": "must lie in the future"}],
-            )
 
         delegate = (
             await self.session.execute(
@@ -136,14 +191,49 @@ class DelegationService:
             )
 
         role = (
-            await self.session.execute(
-                select(Role).where(Role.id == payload.role_id)
-            )
+            await self.session.execute(select(Role).where(Role.id == payload.role_id))
         ).scalar_one_or_none()
         if role is None:
             raise NotFoundError(f"role {payload.role_id} not found")
-        if role.key not in actor.roles:
-            raise ForbiddenError("Cannot delegate a role you do not hold.")
+
+        # »Nie mehr als man hält«: nur direkt (nicht-delegiert) gehaltene Rechte sind
+        # delegierbar → keine Re-Delegation/Ketten.
+        me = (
+            await self.session.execute(
+                select(PrincipalRow).where(PrincipalRow.sub == actor.sub)
+            )
+        ).scalar_one_or_none()
+        if me is None:
+            raise ForbiddenError("Delegator principal not found.")
+        holdings = await self._direct_holdings(me.id, payload.role_id, now)
+        if not holdings:
+            raise ForbiddenError(
+                "You may only delegate a role you hold directly (not via delegation)."
+            )
+
+        # Scope-Deckung: globale Holdings (gremium_id is None) decken jeden Scope;
+        # gremien-scoped Holdings nur den eigenen Scope.
+        covering = [
+            (gremium_id, until)
+            for gremium_id, until in holdings
+            if gremium_id is None or gremium_id == payload.gremium_id
+        ]
+        if not covering:
+            raise ForbiddenError("Requested gremium scope exceeds your own holdings.")
+
+        # Zeitklammer: nie länger als das eigene (deckende) Recht. None = unbefristet.
+        if any(until is None for _, until in covering):
+            allowed_until: datetime | None = None
+        else:
+            allowed_until = max(until for _, until in covering if until is not None)
+        effective_until = (
+            valid_until if allowed_until is None else min(valid_until, allowed_until)
+        )
+        if effective_until <= now:
+            raise ValidationProblem(
+                "Delegation window already elapsed.",
+                errors=[{"field": "validUntil", "msg": "must lie in the future"}],
+            )
 
         row = RoleAssignment(
             principal_id=payload.principal_id,
@@ -152,7 +242,7 @@ class DelegationService:
             granted_by=actor.sub,
             delegated_by=actor.sub,
             valid_from=valid_from,
-            valid_until=valid_until,
+            valid_until=effective_until,
             delegate_voting=payload.delegate_voting,
         )
         self.session.add(row)
@@ -169,7 +259,8 @@ class DelegationService:
                 "gremiumId": str(payload.gremium_id) if payload.gremium_id else None,
                 "delegateVoting": payload.delegate_voting,
                 "validFrom": start.isoformat(),
-                "validUntil": valid_until.isoformat(),
+                "validUntil": effective_until.isoformat(),
+                "clamped": allowed_until is not None and effective_until < valid_until,
             },
         )
         await self.session.commit()
