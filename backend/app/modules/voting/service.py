@@ -28,7 +28,10 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
+from app.modules.delegations.service import voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService
 from app.modules.voting import tally as tally_mod
@@ -185,6 +188,26 @@ class VotingService:
             raise ValidationProblem(
                 "Unknown vote option.",
                 errors=[{"field": "choice", "msg": "not in vote options"}],
+            )
+        # Stimmrecht ist exklusiv (T-45, security-review #95): Transfer, kein Duplikat.
+        # `blocked` = der Aufrufer hat sein Stimmrecht abgegeben ODER käme nur über eine
+        # nicht-stimmberechtigende Delegation in die Gruppe → keine Stimme.
+        # `exercised` = der Aufrufer übt ein delegiertes Stimmrecht aus → Nutzungs-Audit.
+        blocked, exercised = await voting_delegation_check(
+            self.session, principal.sub, vote.eligible_group, now
+        )
+        if blocked:
+            raise ForbiddenError("Voting right has been delegated to another member.")
+        if exercised:
+            # Audit der Delegations-NUTZUNG; bei späterem 409 (Doppel) rollt die
+            # Session-Dependency die Transaktion inkl. dieses Eintrags zurück.
+            await audit_record(
+                self.session,
+                actor=principal.sub,
+                action=AuditAction.DELEGATION_USE,
+                target_type="vote",
+                target_id=str(vote.id),
+                data={"eligibleGroup": vote.eligible_group},
             )
         if config.secret:
             return await self._cast_secret(vote.id, principal.sub, choice)

@@ -69,6 +69,12 @@ class RoleAssignment(UUIDPkMixin, Base):
         ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
     )
     granted_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # `delegated_by` markiert eine **Selbst-Delegation/Vertretung** (T-45, R1.5): die
+    # `sub` des Mitglieds, das eines seiner eigenen Rechte zeitlich begrenzt abgibt.
+    # Bei reinen Admin-Zuweisungen (T-24) ist es `NULL`. Anker für »eigene Delegationen
+    # auflisten/widerrufen« und für die Doppel-Stimmrechts-Sperre (Delegierender darf
+    # nach Abgabe des Stimmrechts nicht selbst abstimmen).
+    delegated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     valid_from: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -77,7 +83,11 @@ class RoleAssignment(UUIDPkMixin, Base):
     )
     delegate_voting: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
-    __table_args__ = (Index("ix_role_assignment_principal_id", "principal_id"),)
+    __table_args__ = (
+        Index("ix_role_assignment_principal_id", "principal_id"),
+        # Lookup »aktive ausgehende (Stimm-)Delegationen eines Mitglieds« (cast-Sperre).
+        Index("ix_role_assignment_delegated_by", "delegated_by"),
+    )
 
 
 class AuthSession(UUIDPkMixin, CreatedAtMixin, Base):

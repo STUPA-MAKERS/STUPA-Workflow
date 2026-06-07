@@ -43,6 +43,7 @@ class FakeSession:
     def __init__(self, results: Iterable[FakeResult] = ()) -> None:
         self._results = list(results)
         self.added: list[Any] = []
+        self.deleted: list[Any] = []
         self.flushed = 0
         self.committed = 0
         self.rolled_back = 0
@@ -54,6 +55,9 @@ class FakeSession:
 
     def add(self, obj: Any) -> None:
         self.added.append(obj)
+
+    async def delete(self, obj: Any) -> None:
+        self.deleted.append(obj)
 
     async def flush(self) -> None:
         self.flushed += 1
