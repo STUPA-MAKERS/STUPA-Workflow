@@ -12,6 +12,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.shared.i18n import DEFAULT_LANG, Lang
 from app.shared.paging import PageParams
 
 
@@ -37,7 +38,8 @@ class ApplicationTypeListQuery(PageParams):
 
     # int4-Max: rein zur Overflow-Abwehr, keine fachliche Seiten-Obergrenze.
     offset: int = Field(default=0, ge=0, le=2_147_483_647)
-    lang: str = "de"
+    # `Lang`-Enum: ungültige Werte (z.B. `lang=null`) → 422 statt still ignoriert.
+    lang: Lang = DEFAULT_LANG
 
 
 class ApplicationTypeListItem(_CamelModel):
