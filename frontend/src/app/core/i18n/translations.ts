@@ -488,9 +488,6 @@ export const de = {
   'admin.notif.refRole': 'Rolle wählen',
   'admin.notif.refGroup': 'Gremium wählen',
 
-  'admin.common.choose': 'Bitte wählen …',
-  'admin.common.value': 'Wert',
-
   // Überblick aktiver Formulare (#75)
   'admin.forms.overviewTitle': 'Aktive Formulare',
   'admin.forms.overviewSubtitle': 'Veröffentlichte Antragsformulare mit Status und Version.',
@@ -519,7 +516,6 @@ export const de = {
   'budget.filter.gremium': 'Gremium',
   'budget.filter.period': 'Zeitraum',
   'budget.filter.all': 'Alle',
-  'budget.filter.gremium.placeholder': 'Gremium-ID',
   'budget.filter.period.placeholder': 'z. B. 2026 oder 2026-SS',
   'budget.filter.apply': 'Anwenden',
   'budget.filter.reset': 'Zurücksetzen',
@@ -1042,9 +1038,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.notif.refRole': 'Choose role',
   'admin.notif.refGroup': 'Choose body',
 
-  'admin.common.choose': 'Please choose …',
-  'admin.common.value': 'Value',
-
   // Active forms overview (#75)
   'admin.forms.overviewTitle': 'Active forms',
   'admin.forms.overviewSubtitle': 'Published application forms with status and version.',
@@ -1073,7 +1066,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.filter.gremium': 'Body',
   'budget.filter.period': 'Period',
   'budget.filter.all': 'All',
-  'budget.filter.gremium.placeholder': 'Body ID',
   'budget.filter.period.placeholder': 'e.g. 2026 or 2026-SS',
   'budget.filter.apply': 'Apply',
   'budget.filter.reset': 'Reset',
