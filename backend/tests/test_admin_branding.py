@@ -7,12 +7,20 @@ autoritativ (das FE-Client-Gate ist nur UX).
 
 from __future__ import annotations
 
+import base64
+
 import pytest
 from pydantic import ValidationError
 
-from app.modules.admin.branding import MAX_LOGO_BYTES, Branding, BrandingAsset
+from app.modules.admin.branding import (
+    MAX_FREETEXT_CHARS,
+    MAX_LOGO_BYTES,
+    Branding,
+    BrandingAsset,
+)
 
 
+# `iVBORw0KGgo=` ist exakt die 8-Byte-PNG-Signatur → echter Magic-Byte-Check besteht.
 def _png(url: str = "data:image/png;base64,iVBORw0KGgo=") -> dict:
     return {"url": url, "filename": "logo.png", "mime": "image/png", "size": 1024}
 
@@ -54,10 +62,11 @@ def test_http_and_absolute_logo_urls_allowed() -> None:
 
 
 def test_favicon_ico_allowed() -> None:
+    # 4-Byte-ICO-Header 00 00 01 00 → base64 "AAABAA=="
     BrandingAsset(
-        url="data:image/x-icon;base64,AAAB",
+        url="data:image/x-icon;base64,AAABAA==",
         filename="favicon.ico",
-        mime="image/x-icon",
+        mime="image/vnd.microsoft.icon",  # Alias von image/x-icon → akzeptiert
         size=10,
     )
 
@@ -142,3 +151,63 @@ def test_branding_forbids_extra_keys() -> None:
 def test_unknown_logo_slot_rejected() -> None:
     with pytest.raises(ValidationError):
         Branding.model_validate({"logos": {"banner": _png()}})
+
+
+# --------------------------------------------------------------- echte Bytes härten
+def test_data_url_real_bytes_exceed_cap_rejected() -> None:
+    """Client-`size` ist nicht vertrauenswürdig → echte Byte-Größe entscheidet."""
+    big = b"\x89PNG\r\n\x1a\n" + b"\x00" * (MAX_LOGO_BYTES + 1)
+    url = "data:image/png;base64," + base64.b64encode(big).decode()
+    with pytest.raises(ValidationError):
+        BrandingAsset(url=url, filename="l.png", mime="image/png", size=0)
+
+
+def test_png_declared_but_svg_bytes_rejected() -> None:
+    """Als image/png getarntes SVG (base64) → Magic-Byte-Sniff lehnt ab."""
+    svg = base64.b64encode(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>").decode()
+    with pytest.raises(ValidationError):
+        BrandingAsset(
+            url=f"data:image/png;base64,{svg}", filename="l.png", mime="image/png", size=10
+        )
+
+
+def test_png_declared_but_jpeg_bytes_rejected() -> None:
+    jpeg = base64.b64encode(b"\xff\xd8\xff\xe0\x00\x10").decode()
+    with pytest.raises(ValidationError):
+        BrandingAsset(
+            url=f"data:image/png;base64,{jpeg}", filename="l.png", mime="image/png", size=10
+        )
+
+
+def test_non_base64_data_url_rejected() -> None:
+    with pytest.raises(ValidationError):
+        BrandingAsset(
+            url="data:image/png,rawbytes", filename="l.png", mime="image/png", size=10
+        )
+
+
+def test_invalid_base64_payload_rejected() -> None:
+    with pytest.raises(ValidationError):
+        BrandingAsset(
+            url="data:image/png;base64,@@not-base64@@",
+            filename="l.png", mime="image/png", size=10,
+        )
+
+
+def test_overlong_freetext_rejected() -> None:
+    with pytest.raises(ValidationError):
+        Branding.model_validate(
+            {"freetexts": {"welcome": {"de": "x" * (MAX_FREETEXT_CHARS + 1)}}}
+        )
+
+
+def test_overlong_footer_label_rejected() -> None:
+    with pytest.raises(ValidationError):
+        Branding.model_validate(
+            {"footerColumns": [{"label": {"de": "y" * 600}, "links": []}]}
+        )
+
+
+def test_overlong_copyright_rejected() -> None:
+    with pytest.raises(ValidationError):
+        Branding.model_validate({"copyright": {"de": "z" * 600}})

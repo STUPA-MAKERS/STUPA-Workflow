@@ -213,7 +213,7 @@ async def test_application_type_crud_and_conflict(session: AsyncSession) -> None
             ApplicationTypeCreate.model_validate({"key": key, "nameI18n": {"de": "X"}}), _ACTOR
         )
     updated = await svc.update_application_type(
-        created.id, ApplicationTypeUpdate(has_budget=False), _ACTOR
+        created.id, ApplicationTypeUpdate(hasBudget=False), _ACTOR
     )
     assert updated.has_budget is False
 

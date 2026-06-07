@@ -75,4 +75,5 @@ def test_parse_dt_invalid_raises_422() -> None:
 
 def test_iso_helper() -> None:
     assert _iso(None) is None
-    assert _iso(datetime(2026, 1, 2, tzinfo=UTC)).startswith("2026-01-02T")
+    iso = _iso(datetime(2026, 1, 2, tzinfo=UTC))
+    assert iso is not None and iso.startswith("2026-01-02T")
