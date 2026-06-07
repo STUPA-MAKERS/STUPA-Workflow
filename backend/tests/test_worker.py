@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from tests.auth_fakes import FakeSession
-from worker.main import WorkerSettings, ping, refresh_budget_stats
+from worker.main import WorkerSettings, ping, process_deadlines, refresh_budget_stats
 
 
 @pytest.mark.asyncio
@@ -18,9 +18,10 @@ async def test_ping_returns_pong() -> None:
 def test_worker_settings_registers_tasks() -> None:
     assert ping in WorkerSettings.functions
     assert refresh_budget_stats in WorkerSettings.functions
+    assert process_deadlines in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    # Nächtlicher Cron registriert.
-    assert len(WorkerSettings.cron_jobs) == 1
+    # Nächtlicher Budget-Rollup + minütlicher Deadline-Scan (T-44).
+    assert len(WorkerSettings.cron_jobs) == 2
 
 
 class _SessionCM:

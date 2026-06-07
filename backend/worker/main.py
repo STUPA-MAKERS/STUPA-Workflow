@@ -23,6 +23,8 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.modules.budget.stats import BudgetStatsService
+from worker.deadlines import on_startup as deadlines_on_startup
+from worker.deadlines import process_deadlines
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
 from worker.pdf import on_startup as pdf_on_startup
@@ -44,6 +46,7 @@ async def _on_startup(ctx: dict[str, Any]) -> None:
     await scan_on_startup(ctx)
     await pdf_on_startup(ctx)
     await webhook_on_startup(ctx)
+    await deadlines_on_startup(ctx)
 
 
 @lru_cache(maxsize=1)
@@ -85,8 +88,13 @@ class WorkerSettings:
         scan_attachment,
         render_pdf,
         deliver_webhook,
+        process_deadlines,
     ]
-    cron_jobs = [cron(refresh_budget_stats, hour=3, minute=0)]
+    cron_jobs = [
+        cron(refresh_budget_stats, hour=3, minute=0),
+        # Fristen/Votes minütlich scannen (flows §9.4, T-44) — idempotent + SKIP LOCKED.
+        cron(process_deadlines, second=0),
+    ]
     on_startup = _on_startup
     on_shutdown = _shutdown
     redis_settings = RedisSettings.from_dsn(
