@@ -131,6 +131,13 @@ export const routes: Routes = [
           import('./pages/admin/admin-home.component').then((m) => m.AdminHomeComponent),
       },
       {
+        path: 'admin/users',
+        data: { title: 'admin.users.title', permission: 'admin.roles' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/users/users.component').then((m) => m.UsersComponent),
+      },
+      {
         path: 'admin/forms',
         data: { title: 'admin.form.title', permission: 'form.configure' },
         canActivate: [authGuard],

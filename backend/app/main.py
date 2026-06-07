@@ -8,12 +8,13 @@ Fachmodul-Router werden ab T-10 hier eingehängt. uvicorn-Entrypoint nutzt
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, Request
 
-from app.db import dispose_engine
+from app.db import dispose_engine, get_sessionmaker
 from app.logging_config import configure_logging
 from app.middleware import (
     CsrfMiddleware,
@@ -79,6 +80,27 @@ api_router.include_router(admin_router)
 api_router.include_router(site_config_public_router)
 
 
+async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: no cover
+    """Beim Start gematchten Bestands-Principals die admin-Rolle geben (#70).
+
+    Best-effort: ohne Bootstrap-Config (Normalfall) kein DB-Zugriff; Fehler (DB nicht
+    erreichbar/migriert) werden geloggt, nicht propagiert — der App-Start bleibt robust.
+    Die Branch-Logik steckt in ``ensure_bootstrap_admins`` (unit-getestet)."""
+    if not (settings.bootstrap_admin_subject_set or settings.bootstrap_admin_email_set):
+        return
+    from app.modules.auth.bootstrap import ensure_bootstrap_admins
+
+    try:
+        sessionmaker = get_sessionmaker()
+        async with sessionmaker() as db:
+            await ensure_bootstrap_admins(db, settings)
+            await db.commit()
+    except Exception:  # noqa: BLE001 — Start darf an Bootstrap nie scheitern
+        logging.getLogger("app.auth.bootstrap").warning(
+            "bootstrap admin startup sweep skipped (db unavailable?)", exc_info=True
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -95,6 +117,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.broker = RedisBroker(livevote_redis)
     app.state.locker = RedisLocker(livevote_redis)
     app.state.meeting_publisher = BrokerPublisher(app.state.broker)
+    await _bootstrap_admins_on_startup(settings)
     try:
         yield
     finally:

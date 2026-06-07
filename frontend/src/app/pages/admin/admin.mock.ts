@@ -5,6 +5,7 @@
  * `AdminApiService`.
  */
 import type {
+  AdminPrincipal,
   Branding,
   FormOverviewItem,
   Gremium,
@@ -12,6 +13,78 @@ import type {
   Role,
   WebhookConfig,
 } from './admin.models';
+
+/** Permission-Katalog (Spiegel von `app.shared.permissions.PERMISSION_CATALOGUE`). */
+export const MOCK_PERMISSIONS: string[] = [
+  'application.read',
+  'application.create',
+  'application.update',
+  'application.transition',
+  'application.manage',
+  'form.configure',
+  'flow.configure',
+  'vote.manage',
+  'vote.cast',
+  'meeting.manage',
+  'protocol.manage',
+  'protocol.write',
+  'budget.manage',
+  'budget.view',
+  'notification.manage',
+  'webhook.manage',
+  'audit.read',
+  'admin.config',
+  'admin.roles',
+];
+
+export const MOCK_PRINCIPALS: AdminPrincipal[] = [
+  {
+    id: 'p-1',
+    sub: 'kc|alex.admin',
+    email: 'alex@stupa.example',
+    displayName: 'Alex Admin',
+    lastLogin: '2026-06-06T18:20:00+00:00',
+    assignments: [
+      {
+        id: 'a-1',
+        principalId: 'p-1',
+        roleId: 'r-admin',
+        gremiumId: null,
+        grantedBy: 'bootstrap',
+        validFrom: null,
+        validUntil: null,
+        delegateVoting: false,
+      },
+    ],
+  },
+  {
+    id: 'p-2',
+    sub: 'kc|robin.member',
+    email: 'robin@stupa.example',
+    displayName: 'Robin Mitglied',
+    lastLogin: '2026-06-05T09:00:00+00:00',
+    assignments: [
+      {
+        id: 'a-2',
+        principalId: 'p-2',
+        roleId: 'r-member',
+        gremiumId: null,
+        grantedBy: 'kc|alex.admin',
+        validFrom: null,
+        validUntil: null,
+        delegateVoting: false,
+      },
+    ],
+  },
+  {
+    id: 'p-3',
+    sub: 'kc|sam.neu',
+    email: 'sam@stupa.example',
+    displayName: 'Sam Neu',
+    lastLogin: null,
+    assignments: [],
+  },
+];
 
 export const MOCK_GREMIEN: Gremium[] = [
   { id: 'g-stupa', name: 'Studierendenparlament', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' },
@@ -25,10 +98,10 @@ export const MOCK_GREMIEN: Gremium[] = [
  * Rollenliste ersetzen — der Options-Provider bevorzugt API-Daten automatisch.
  */
 export const MOCK_ROLES: Role[] = [
-  { id: 'r-member', key: 'member', label: { de: 'Mitglied', en: 'Member' }, permissions: [] },
-  { id: 'r-referent', key: 'referent', label: { de: 'Referent:in', en: 'Officer' }, permissions: [] },
-  { id: 'r-vorstand', key: 'vorstand', label: { de: 'Vorstand', en: 'Board' }, permissions: [] },
-  { id: 'r-admin', key: 'admin', label: { de: 'Administration', en: 'Administration' }, permissions: [] },
+  { id: 'r-member', key: 'member', label: { de: 'Mitglied', en: 'Member' }, permissions: ['application.read', 'vote.cast'] },
+  { id: 'r-referent', key: 'referent', label: { de: 'Referent:in', en: 'Officer' }, permissions: ['application.read', 'application.update', 'application.transition', 'vote.manage'] },
+  { id: 'r-vorstand', key: 'vorstand', label: { de: 'Vorstand', en: 'Board' }, permissions: ['application.read', 'budget.view', 'meeting.manage'] },
+  { id: 'r-admin', key: 'admin', label: { de: 'Administration', en: 'Administration' }, permissions: [...MOCK_PERMISSIONS] },
 ];
 
 /** Seed für den Formular-Überblick (#75), bis `/admin/application-types` real ist. */

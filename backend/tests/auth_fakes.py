@@ -30,10 +30,17 @@ class FakeResult:
 
 
 class FakeSession:
-    """`AsyncSession`-Stub: `execute` liefert die Ergebnisse in Reihenfolge."""
+    """`AsyncSession`-Stub: `execute`/`scalars` liefern die Ergebnisse in Reihenfolge.
 
-    def __init__(self, results: Iterable[FakeResult] = ()) -> None:
+    `get` zieht aus einer eigenen Queue (`gets`), da `AsyncSession.get` nicht über
+    `execute` läuft. Reicht für die DB-nahen Service-/RBAC-Branches ohne Docker.
+    """
+
+    def __init__(
+        self, results: Iterable[FakeResult] = (), gets: Iterable[Any] = ()
+    ) -> None:
         self._results = list(results)
+        self._gets = list(gets)
         self.added: list[Any] = []
         self.deleted: list[Any] = []
         self.flushed = 0
@@ -43,6 +50,17 @@ class FakeSession:
         if not self._results:
             return FakeResult()
         return self._results.pop(0)
+
+    async def scalars(self, _stmt: Any) -> FakeResult:
+        if not self._results:
+            return FakeResult()
+        return self._results.pop(0)
+
+    async def scalar(self, _stmt: Any) -> Any:
+        return (await self.execute(_stmt)).scalar_one_or_none()
+
+    async def get(self, _model: Any, _ident: Any) -> Any:
+        return self._gets.pop(0) if self._gets else None
 
     def add(self, obj: Any) -> None:
         self.added.append(obj)
@@ -61,6 +79,6 @@ def result(*items: Any) -> FakeResult:
     return FakeResult(items)
 
 
-def fake_session(*results: FakeResult) -> Any:
+def fake_session(*results: FakeResult, gets: Iterable[Any] = ()) -> Any:
     """`AsyncSession`-kompatibler Fake (Rückgabe `Any` → ohne Cast einsetzbar)."""
-    return FakeSession(list(results))
+    return FakeSession(list(results), gets=gets)

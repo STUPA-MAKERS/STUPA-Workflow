@@ -218,6 +218,7 @@ export class AdminHomeComponent {
   );
 
   protected readonly tiles: AdminTile[] = [
+    { link: 'users', title: 'admin.home.users', desc: 'admin.home.usersDesc' },
     { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc' },
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc' },
     { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc' },

@@ -153,6 +153,17 @@ class RoleAssignmentUpdate(_CamelModel):
     delegate_voting: bool | None = Field(default=None, alias="delegateVoting")
 
 
+class PrincipalOut(_CamelModel):
+    """OIDC-Principal + dessen Rollenzuweisungen (Rollen-/Rechte-UI, #72)."""
+
+    id: UUID
+    sub: str
+    email: str | None
+    display_name: str | None = Field(serialization_alias="displayName")
+    last_login: str | None = Field(serialization_alias="lastLogin")
+    assignments: list[RoleAssignmentOut]
+
+
 class GroupMappingOut(_CamelModel):
     id: UUID
     oidc_group: str = Field(serialization_alias="oidcGroup")

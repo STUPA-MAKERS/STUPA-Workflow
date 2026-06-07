@@ -68,6 +68,26 @@ class Settings(BaseSettings):
     oidc_groups_claim: str = "groups"
     oidc_post_logout_redirect_url: str | None = None
 
+    # — Bootstrap-Admins (#70). Kommagetrennt: OIDC-`sub` und/oder E-Mail. Beim
+    #   OIDC-Login (Callback) **und** beim Startup wird den gematchten Principals
+    #   idempotent die `admin`-Rolle zugewiesen. Verhindert die Selbstaussperrung
+    #   einer frischen, echten OIDC-Installation (ohne Mock hätte niemand `admin.*`
+    #   und könnte daher auch keine Rollen vergeben). Leer = aus. —
+    bootstrap_admin_subjects: str = ""
+    bootstrap_admin_emails: str = ""
+
+    @property
+    def bootstrap_admin_subject_set(self) -> set[str]:
+        """OIDC-`sub`s aus `BOOTSTRAP_ADMIN_SUBJECTS` (kommagetrennt, getrimmt)."""
+        return {s.strip() for s in self.bootstrap_admin_subjects.split(",") if s.strip()}
+
+    @property
+    def bootstrap_admin_email_set(self) -> set[str]:
+        """E-Mails aus `BOOTSTRAP_ADMIN_EMAILS` (kommagetrennt, getrimmt, lowercase)."""
+        return {
+            e.strip().lower() for e in self.bootstrap_admin_emails.split(",") if e.strip()
+        }
+
     # — Session-/Applicant-Cookie (security.md §1/§2: HttpOnly+Secure+SameSite=Lax) —
     session_cookie_name: str = "ap_session"
     applicant_cookie_name: str = "ap_applicant"

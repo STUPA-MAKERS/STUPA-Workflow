@@ -37,6 +37,11 @@ class OidcClaims:
     email: str | None
     name: str | None
     groups: list[str] = field(default_factory=list)
+    # `email_verified` (OIDC-Standard-Claim). Nur ein **verifizierter** Claim darf für
+    # den E-Mail-Bootstrap (#70) zählen — sonst könnte auf einem IdP mit
+    # Self-Registration ohne Mail-Verifikation ein beliebiger Account einen Token mit
+    # `email` = Bootstrap-Admin-Adresse minten und so beim ersten Login Admin werden.
+    email_verified: bool = False
 
 
 def generate_pkce() -> tuple[str, str]:
@@ -174,6 +179,7 @@ async def verify_id_token(settings: Settings, *, id_token: str, nonce: str) -> O
         email=claims.get("email"),
         name=claims.get("name") or claims.get("preferred_username"),
         groups=[str(g) for g in groups],
+        email_verified=claims.get("email_verified") is True,
     )
 
 

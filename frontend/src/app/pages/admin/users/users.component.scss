@@ -1,0 +1,120 @@
+.users {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.users__sub {
+  color: var(--color-text-muted);
+}
+
+.users__search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.users__search-lbl {
+  flex-basis: 100%;
+  font-weight: var(--fw-semibold);
+}
+
+.users__search input {
+  flex: 1 1 18rem;
+}
+
+.users__empty {
+  color: var(--color-text-muted);
+}
+
+.users__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.users__id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+}
+
+.users__name {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-md);
+}
+
+.users__meta {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.users__sub-id {
+  font-family: var(--font-mono, monospace);
+}
+
+.users__roles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.users__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.users__until {
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.users__assign,
+.users__permgrid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.users__permgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  align-items: center;
+}
+
+.users__lbl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+}
+
+.users__row-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

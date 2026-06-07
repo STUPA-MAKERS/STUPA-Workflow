@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Applicant as ApplicantRow
 from app.modules.applications.models import Application, MagicLink
 from app.modules.auth import oidc, sessions, tokens
+from app.modules.auth.bootstrap import ensure_admin_for_principal
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import ApplicantScope
 from app.modules.flow.models import State
@@ -177,6 +178,12 @@ async def oidc_callback(
         settings, id_token=token_set["id_token"], nonce=nonce
     )
     row = await upsert_principal(db, claims)
+    # Bootstrap-Admins (#70): erstmaliger/idempotenter admin-Grant beim Login, sonst
+    # sperrt sich eine frische OIDC-Installation selbst aus. Der E-Mail-Bootstrap zählt
+    # nur bei verifizierter Mail (claims.email_verified). Committet der Aufrufer.
+    await ensure_admin_for_principal(
+        db, settings, row, email_verified=claims.email_verified
+    )
     cookie = await sessions.create_principal_session(
         db,
         secret=settings.session_secret,

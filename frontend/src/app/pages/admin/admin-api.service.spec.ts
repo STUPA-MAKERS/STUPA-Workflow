@@ -40,7 +40,7 @@ describe('AdminApiService — mock mode', () => {
     expect((await firstValueFrom(s.createFormVersion('t', []))).id).toBeTruthy();
     expect((await firstValueFrom(s.createFlowVersion('t', { states: [], transitions: [] }))).id).toBeTruthy();
     expect((await firstValueFrom(s.listGremien())).length).toBeGreaterThan(0);
-    expect(await firstValueFrom(s.listRoles())).toEqual([]);
+    expect((await firstValueFrom(s.listRoles())).length).toBeGreaterThan(0);
 
     const rules = await firstValueFrom(s.listNotificationRules());
     const created = await firstValueFrom(
@@ -54,6 +54,34 @@ describe('AdminApiService — mock mode', () => {
     const hooks = await firstValueFrom(s.listWebhooks());
     const wh = await firstValueFrom(s.saveWebhook({ ...hooks[0], name: 'renamed' }));
     expect(wh.name).toBe('renamed');
+  });
+
+  it('manages principals, role assignments and permissions in mock mode (#72)', async () => {
+    const s = svc();
+    const all = await firstValueFrom(s.listPrincipals());
+    expect(all.length).toBeGreaterThan(0);
+    // search filters by name/email/sub
+    const hit = await firstValueFrom(s.listPrincipals('robin'));
+    expect(hit.every((p) => /robin/i.test(p.sub + p.email + p.displayName))).toBe(true);
+
+    const perms = await firstValueFrom(s.listPermissions());
+    expect(perms).toContain('flow.configure');
+
+    const target = all.find((p) => p.assignments.length === 0)!;
+    const assignment = await firstValueFrom(
+      s.assignRole({ principalId: target.id, roleId: 'r-member', validFrom: '2026-07-01T00:00:00Z', delegateVoting: true }),
+    );
+    expect(assignment.id).toBeTruthy();
+    const afterAssign = await firstValueFrom(s.listPrincipals());
+    expect(afterAssign.find((p) => p.id === target.id)!.assignments).toHaveLength(1);
+
+    await firstValueFrom(s.revokeRole(assignment.id));
+    const afterRevoke = await firstValueFrom(s.listPrincipals());
+    expect(afterRevoke.find((p) => p.id === target.id)!.assignments).toHaveLength(0);
+
+    const role = (await firstValueFrom(s.listRoles())).find((r) => r.key === 'member')!;
+    const saved = await firstValueFrom(s.saveRolePermissions(role.id, [...role.permissions, 'flow.configure']));
+    expect(saved.permissions).toContain('flow.configure');
   });
 
   it('saves a branding draft and activates a new version', (done) => {
@@ -135,5 +163,24 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/site-config/draft').request.method).toBe('PUT');
     s.activateBranding().subscribe();
     expect(http.expectOne('/api/admin/site-config/activate').request.method).toBe('POST');
+  });
+
+  it('wires principal/role-assignment/permission endpoints (#72)', () => {
+    s.listPrincipals().subscribe();
+    expect(http.expectOne('/api/admin/principals').request.method).toBe('GET');
+    s.listPrincipals('a x').subscribe();
+    http.expectOne('/api/admin/principals?q=a%20x').flush([]);
+
+    s.listPermissions().subscribe();
+    http.expectOne('/api/admin/permissions').flush([]);
+
+    s.assignRole({ principalId: 'p1', roleId: 'r1' }).subscribe();
+    expect(http.expectOne('/api/admin/role-assignments').request.method).toBe('POST');
+
+    s.revokeRole('a-9').subscribe();
+    expect(http.expectOne('/api/admin/role-assignments/a-9').request.method).toBe('DELETE');
+
+    s.saveRolePermissions('r-9', ['flow.configure']).subscribe();
+    expect(http.expectOne('/api/admin/roles/r-9').request.method).toBe('PATCH');
   });
 });

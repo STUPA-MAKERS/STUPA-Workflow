@@ -20,7 +20,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from app.deps import DbSession, Principal, require_principal
 from app.modules.admin.branding import Branding
@@ -36,6 +36,7 @@ from app.modules.admin.schemas import (
     GroupMappingCreate,
     GroupMappingOut,
     GroupMappingUpdate,
+    PrincipalOut,
     PublicSiteConfigOut,
     RoleAssignmentCreate,
     RoleAssignmentOut,
@@ -199,6 +200,30 @@ async def create_flow_version(
 # Rollen / RBAC + Vertretung
 # =========================================================================== #
 @router.get(
+    "/principals",
+    response_model=list[PrincipalOut],
+    dependencies=[_ROLES],
+    responses=_errors(401, 403),
+)
+async def list_principals(
+    service: ServiceDep, q: Annotated[str | None, Query()] = None
+) -> list[PrincipalOut]:
+    """Benutzer (OIDC-Principals) auflisten/suchen (per `sub`/Name/E-Mail) — #72."""
+    return await service.search_principals(q)
+
+
+@router.get(
+    "/permissions",
+    response_model=list[str],
+    dependencies=[_ROLES],
+    responses=_errors(401, 403),
+)
+async def list_permissions(service: ServiceDep) -> list[str]:
+    """Katalog wählbarer Permission-Keys fürs Rollen-/Rechte-UI (api.md §1)."""
+    return service.list_permissions()
+
+
+@router.get(
     "/roles",
     response_model=list[RoleOut],
     dependencies=[_CONFIG],
@@ -265,6 +290,19 @@ async def update_role_assignment(
     principal: RolesAdmin,
 ) -> RoleAssignmentOut:
     return await service.update_role_assignment(assignment_id, payload, principal.sub)
+
+
+@router.delete(
+    "/role-assignments/{assignment_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_role_assignment(
+    assignment_id: UUID, service: ServiceDep, principal: RolesAdmin
+) -> Response:
+    """Rolle entziehen (#72): Zuweisung löschen (idempotent → 204; unbekannt → 404)."""
+    await service.delete_role_assignment(assignment_id, principal.sub)
+    return Response(status_code=204)
 
 
 @router.get(
