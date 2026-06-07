@@ -24,6 +24,16 @@ export class WsService {
     const ws = new WebSocket(this.url(`/api/ws/meetings/${meetingId}${suffix}`));
     const subject = new Subject<ServerMessage>();
 
+    // Outbound-Puffer: Frames, die vor dem Handshake (`CONNECTING`) gesendet
+    // werden — z. B. das initiale `subscribe` der LiveVoteSession — würden sonst
+    // verworfen. Sie werden zwischengespeichert und bei `open` der Reihe nach
+    // geflusht.
+    const outbox: string[] = [];
+    const flush = (): void => {
+      while (outbox.length > 0) ws.send(outbox.shift() as string);
+    };
+
+    ws.addEventListener('open', flush);
     ws.addEventListener('message', (ev: MessageEvent<string>) => {
       try {
         subject.next(JSON.parse(ev.data) as ServerMessage);
@@ -37,7 +47,13 @@ export class WsService {
     return {
       messages$: subject.asObservable(),
       send: (msg: ClientMessage) => {
-        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+        const data = JSON.stringify(msg);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+          outbox.push(data); // bis `open` puffern, dann flushen
+        }
+        // CLOSING/CLOSED → verwerfen (Reconnect öffnet einen neuen Kanal)
       },
       close: () => ws.close(),
     };
