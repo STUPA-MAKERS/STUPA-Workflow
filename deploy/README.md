@@ -44,6 +44,20 @@ das neue Image und `migrate` spielt offene Revisionen ein, bevor die App hochfä
 Optional läuft `migrate` unter einem eigenen DB-User (`DB_MIGRATION_URL`), getrennt vom
 Laufzeit-User der App.
 
+### Least-Privilege-DB-Rollen (security.md §4/§10)
+
+`db/roles.sql` provisioniert die getrennten Service-User (`app` Runtime, `migrator`
+DDL, optional `audit_writer`) und entzieht dem Runtime-User UPDATE/DELETE/TRUNCATE auf
+`audit_entry` (Hash-Kette unveränderlich). Einmalig als Superuser ausführen — Schritte
+1–4 **vor**, Schritt 5 **nach** `alembic upgrade head`:
+
+```
+psql -U postgres -d antrag -f db/roles.sql   # idempotent; danach Passwörter via ALTER ROLE
+```
+
+Der Append-only-Trigger (Migration 0006) erzwingt die Unveränderlichkeit zusätzlich
+rollenunabhängig; `roles.sql` ist die Least-Privilege-Schicht darüber.
+
 ## Netze
 
 - `internal` — bridge, keine publizierten Ports → kein Ingress. Egress bleibt offen
