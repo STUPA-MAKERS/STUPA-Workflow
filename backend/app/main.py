@@ -15,7 +15,12 @@ from fastapi import APIRouter, FastAPI, Request
 
 from app.db import dispose_engine
 from app.logging_config import configure_logging
-from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.middleware import (
+    CsrfMiddleware,
+    DefaultWriteRateLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.modules.admin.router import public_router as site_config_public_router
 from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
@@ -130,9 +135,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Middleware (CORS bewusst nicht registriert → Cross-Origin aus).
-    app.add_middleware(SecurityHeadersMiddleware)
+    # Middleware (CORS bewusst nicht registriert → Cross-Origin aus). Reihenfolge:
+    # zuletzt hinzugefügt = äußerste Schicht. SecurityHeaders außen (Header auch auf
+    # CSRF/429-Antworten), dann Trace-Id (vor CSRF/Rate-Limit gesetzt), dann CSRF, dann
+    # das Default-Write-Rate-Limit innen. Alle sind BaseHTTPMiddleware → WS-Scopes
+    # laufen unberührt durch (Live-Vote nutzt eigene Cast-Limits).
+    app.add_middleware(DefaultWriteRateLimitMiddleware, settings=settings)
+    app.add_middleware(CsrfMiddleware, settings=settings)
     app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
 
     register_exception_handlers(app)
 

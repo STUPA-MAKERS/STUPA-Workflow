@@ -8,7 +8,7 @@ Layout/Namen siehe `deploy/.env.example`.
 from functools import lru_cache
 from typing import Any
 
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Mindestlänge für Signing-/Client-Secrets (security.md §10: keine schwachen Secrets).
@@ -39,8 +39,17 @@ class Settings(BaseSettings):
     session_secret: str = Field(min_length=_MIN_SECRET_LEN)
     magic_link_secret: str = Field(min_length=_MIN_SECRET_LEN)
 
-    # — Reverse-Proxy (security.md §3): eng, nie "*" —
+    # — Reverse-Proxy (security.md §3): eng, nie "*". In `production` ist "*" verboten
+    #   (X-Forwarded-* dürfte sonst von jeder Quelle gespooft werden) → SettingsError. —
     forwarded_allow_ips: str = "127.0.0.1"
+
+    # — CSRF (Double-Submit, security.md §10). Schützt cookie-authentifizierte
+    #   schreibende Requests; Bearer-Token-Requests sind ausgenommen. Namen folgen dem
+    #   Angular-Default (HttpClient liest `XSRF-TOKEN`, sendet `X-XSRF-TOKEN`), damit der
+    #   FE-Interceptor (frontend/.../auth.interceptor.ts) ohne Änderung greift. —
+    csrf_enabled: bool = True
+    csrf_cookie_name: str = "XSRF-TOKEN"
+    csrf_header_name: str = "X-XSRF-TOKEN"
 
     # — CORS aus per Default (overview/security: kein Cross-Origin) —
     cors_allow_origins: list[str] = []
@@ -192,6 +201,22 @@ class Settings(BaseSettings):
     rl_magic_link_verify_ip_per_hour: int = 20
     rl_applications_ip_per_hour: int = 10
     rl_attachments_per_hour: int = 30  # POST /attachments: 30/Std/applicant (api.md §7)
+    # Default-Limit auf allen *schreibenden* Endpunkten (api.md §7): IP-Schlüssel,
+    # großzügig → fängt Endpunkte ohne eigenes (strengeres) Limit ab, Defense-in-Depth.
+    rl_default_write_per_hour: int = 100
+
+    @model_validator(mode="after")
+    def _no_wildcard_proxy_in_prod(self) -> "Settings":
+        """`production` darf `FORWARDED_ALLOW_IPS` nicht auf "*" setzen (security.md §3).
+
+        "*" würde uvicorn jede X-Forwarded-*-Quelle vertrauen lassen → IP-Spoofing
+        (Rate-Limit-Bypass, falsche Audit-IP). Außerhalb von `production` (Dev/CI/
+        Container-Smoke) bleibt "*" erlaubt."""
+        if self.environment == "production" and "*" in self.forwarded_allow_ips:
+            raise ValueError(
+                'FORWARDED_ALLOW_IPS must not be "*" in production (security.md §3).'
+            )
+        return self
 
     @property
     def altcha_enabled(self) -> bool:

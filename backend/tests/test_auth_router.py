@@ -56,6 +56,15 @@ def enabled_client() -> Iterator[TestClient]:
     yield from _client(ENABLED)
 
 
+def _csrf(client: TestClient, settings: Settings) -> dict[str, str]:
+    """CSRF-Cookie setzen + passenden Header liefern (Double-Submit, security.md §10).
+
+    Nötig, sobald der Request ein Auth-Cookie trägt (z. B. Logout mit Session-Cookie)."""
+    token = "csrf-test-token"
+    client.cookies.set(settings.csrf_cookie_name, token)
+    return {settings.csrf_header_name: token}
+
+
 # --------------------------------------------------------------------------- #
 # login
 # --------------------------------------------------------------------------- #
@@ -140,7 +149,7 @@ def test_logout_with_cookie_returns_rp_logout_url(
 
     monkeypatch.setattr(router_mod.sessions, "delete_principal_session", _del)
     enabled_client.cookies.set(ENABLED.session_cookie_name, "x")
-    resp = enabled_client.post("/api/auth/logout")
+    resp = enabled_client.post("/api/auth/logout", headers=_csrf(enabled_client, ENABLED))
     assert resp.status_code == 200
     url = resp.json()["logout_url"]
     assert url is not None
@@ -156,7 +165,9 @@ def test_logout_disabled_oidc_no_url(
 
     monkeypatch.setattr(router_mod.sessions, "delete_principal_session", _del)
     disabled_client.cookies.set(DISABLED.session_cookie_name, "x")
-    resp = disabled_client.post("/api/auth/logout")
+    resp = disabled_client.post(
+        "/api/auth/logout", headers=_csrf(disabled_client, DISABLED)
+    )
     assert resp.status_code == 200
     assert resp.json() == {"logout_url": None}
 

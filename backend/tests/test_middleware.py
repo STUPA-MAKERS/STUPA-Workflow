@@ -10,6 +10,9 @@ def test_security_headers_present(client: TestClient) -> None:
     assert h["referrer-policy"] == "no-referrer"
     assert h["x-frame-options"] == "DENY"
     assert "permissions-policy" in h
+    # Strikte CSP für die JSON-API (security.md §10): kein aktiver Inhalt, kein Framing.
+    assert "default-src 'none'" in h["content-security-policy"]
+    assert "frame-ancestors 'none'" in h["content-security-policy"]
 
 
 def test_trace_id_header_and_unique(client: TestClient) -> None:
