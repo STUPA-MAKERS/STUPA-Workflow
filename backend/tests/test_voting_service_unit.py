@@ -168,6 +168,16 @@ async def test_cast_not_in_group_403() -> None:
         await VotingService(db).cast(vote.id, _voter(group="other"), "yes", now=NOW)
 
 
+async def test_cast_blocked_when_voting_right_delegated_403() -> None:
+    # T-45: Delegierender hat sein Stimmrecht abgegeben → eigene Stimme verboten
+    # (Doppel-Stimmrecht-Sperre). _get_vote ok, Delegations-Lookup liefert eine Zeile.
+    vote = _vote()
+    db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
+    with pytest.raises(ForbiddenError, match="delegated"):
+        await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
+    assert db.committed == 0
+
+
 async def test_cast_unknown_option_422() -> None:
     vote = _vote()
     db = fake_session(result(vote))
@@ -180,7 +190,7 @@ async def test_cast_unknown_option_422() -> None:
 # --------------------------------------------------------------------------- #
 async def test_cast_open_first_vote() -> None:
     vote = _vote(config=_config(allowChange=False))
-    db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
+    db = fake_session(result(vote), result(), result(SimpleNamespace(id=uuid4())))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
     assert db.committed == 1
@@ -188,7 +198,7 @@ async def test_cast_open_first_vote() -> None:
 
 async def test_cast_open_double_no_change_409() -> None:
     vote = _vote(config=_config(allowChange=False))
-    db = fake_session(result(vote), result())  # leeres RETURNING → Konflikt
+    db = fake_session(result(vote), result(), result())  # leeres RETURNING → Konflikt
     with pytest.raises(ConflictError, match="Already voted"):
         await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     # ON CONFLICT DO NOTHING schrieb nichts → kein Commit (get_session rollt zurück).
@@ -198,7 +208,7 @@ async def test_cast_open_double_no_change_409() -> None:
 async def test_cast_open_allowchange_first_vote_is_cast() -> None:
     # allowChange + Erst-Stimme (INSERT, xmax=0) → "cast", nicht "changed".
     vote = _vote(config=_config(allowChange=True))
-    db = fake_session(result(vote), result(SimpleNamespace(inserted=True)))
+    db = fake_session(result(vote), result(), result(SimpleNamespace(inserted=True)))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
     assert db.committed == 1
@@ -207,7 +217,7 @@ async def test_cast_open_allowchange_first_vote_is_cast() -> None:
 async def test_cast_open_change_updates() -> None:
     # allowChange + bestehende Stimme (UPDATE via ON CONFLICT) → "changed".
     vote = _vote(config=_config(allowChange=True))
-    db = fake_session(result(vote), result(SimpleNamespace(inserted=False)))
+    db = fake_session(result(vote), result(), result(SimpleNamespace(inserted=False)))
     out = await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
     assert out.status == "changed"
     assert db.committed == 1
@@ -216,7 +226,7 @@ async def test_cast_open_change_updates() -> None:
 async def test_cast_open_allowchange_empty_returning_is_changed() -> None:
     # Defensiv: leeres RETURNING (kein row) → kein Insert erkannt → "changed".
     vote = _vote(config=_config(allowChange=True))
-    db = fake_session(result(vote), result())
+    db = fake_session(result(vote), result(), result())
     out = await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
     assert out.status == "changed"
 
@@ -226,7 +236,7 @@ async def test_cast_open_allowchange_empty_returning_is_changed() -> None:
 # --------------------------------------------------------------------------- #
 async def test_cast_secret_first_vote_writes_anonymous() -> None:
     vote = _vote(config=_config(secret=True))
-    db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
+    db = fake_session(result(vote), result(), result(SimpleNamespace(id=uuid4())))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
     # secret_ballot ohne Identität hinzugefügt, kein Ballot.
@@ -237,7 +247,7 @@ async def test_cast_secret_first_vote_writes_anonymous() -> None:
 
 async def test_cast_secret_double_409() -> None:
     vote = _vote(config=_config(secret=True))
-    db = fake_session(result(vote), result())  # marker existiert → Konflikt
+    db = fake_session(result(vote), result(), result())  # marker existiert → Konflikt
     with pytest.raises(ConflictError, match="Already voted"):
         await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert db.committed == 0

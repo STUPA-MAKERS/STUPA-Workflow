@@ -152,6 +152,13 @@ class Settings(BaseSettings):
     webhook_retry_backoff_seconds: int = 30
     webhook_host_allowlist: list[str] = []
 
+    # --- Delegation/Vertretung (T-45, R1.5) --------------------------------- #
+    #   Stimmrecht-Delegation steht unter satzungsrechtlichem Vorbehalt (open-questions
+    #   Q5). Standardmäßig **aus**: eine Delegation darf Rollen/Rechte übertragen, aber
+    #   `delegateVoting=true` wird erst akzeptiert (sonst 422), wenn der Betreiber die
+    #   Stimmrecht-Delegation bewusst freischaltet. Reine Rechte-Delegation bleibt frei.
+    delegation_voting_enabled: bool = False
+
     # --- Deadlines/Cron (T-44, flows §9.4) ---------------------------------- #
     #   Vorlauf für die `deadline_approaching`-Erinnerung: gesendet, sobald
     #   `due_at - lead <= now < due_at` (Default 24 h).

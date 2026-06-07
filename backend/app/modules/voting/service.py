@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application
 from app.modules.auth.principal import Principal
+from app.modules.delegations.service import has_active_voting_delegation
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService
 from app.modules.voting import tally as tally_mod
@@ -186,6 +187,13 @@ class VotingService:
                 "Unknown vote option.",
                 errors=[{"field": "choice", "msg": "not in vote options"}],
             )
+        # Doppel-Stimmrecht (T-45): wer sein Stimmrecht für diese Abstimmung delegiert
+        # hat, darf nicht zusätzlich selbst abstimmen — sonst zählte die Stimme doppelt
+        # (Delegierender **und** Vertreter).
+        if await has_active_voting_delegation(
+            self.session, principal.sub, vote.eligible_group, now
+        ):
+            raise ForbiddenError("Voting right has been delegated to another member.")
         if config.secret:
             return await self._cast_secret(vote.id, principal.sub, choice)
         return await self._cast_open(vote.id, principal.sub, choice, config.allow_change)

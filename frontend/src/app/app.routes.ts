@@ -181,6 +181,15 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/delegations',
+        data: { title: 'admin.deleg.title', permission: 'admin.roles' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/delegations/delegations.component').then(
+            (m) => m.DelegationsComponent,
+          ),
+      },
+      {
         path: '**',
         loadComponent: () =>
           import('./pages/not-found.component').then((m) => m.NotFoundComponent),

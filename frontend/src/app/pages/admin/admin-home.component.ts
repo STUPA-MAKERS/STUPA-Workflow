@@ -224,6 +224,7 @@ export class AdminHomeComponent {
     { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc' },
     { link: 'webhooks', title: 'admin.home.webhooks', desc: 'admin.home.webhooksDesc' },
     { link: 'notifications', title: 'admin.home.notifications', desc: 'admin.home.notificationsDesc' },
+    { link: 'delegations', title: 'admin.home.delegations', desc: 'admin.home.delegationsDesc' },
   ];
 
   constructor() {

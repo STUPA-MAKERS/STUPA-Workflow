@@ -370,6 +370,8 @@ export const de = {
   'admin.home.webhooksDesc': 'Ausgehende Ereignis-Hooks verwalten.',
   'admin.home.notifications': 'Benachrichtigungen',
   'admin.home.notificationsDesc': 'Benachrichtigungsregeln pflegen.',
+  'admin.home.delegations': 'Vertretung / Delegation',
+  'admin.home.delegationsDesc': 'Rechte und Stimmrechte zeitlich begrenzt delegieren.',
   'admin.home.mockNotice':
     'Admin-API (T-24) noch nicht verfügbar – Daten kommen aus einem lokalen Mock.',
 
@@ -490,6 +492,33 @@ export const de = {
   'admin.webhook.none': 'Keine Webhooks konfiguriert.',
   'admin.webhook.badUrl': 'Bitte eine gültige http(s)-URL angeben.',
   'admin.webhook.noEvents': 'Mindestens ein Ereignis auswählen.',
+
+  'admin.deleg.title': 'Vertretung / Delegation',
+  'admin.deleg.subtitle':
+    'Ein eigenes Recht (Rolle, optional Stimmrecht) zeitlich begrenzt an ein anderes Mitglied übertragen. Widerruf wirkt sofort.',
+  'admin.deleg.create': 'Delegation anlegen',
+  'admin.deleg.listTitle': 'Bestehende Delegationen',
+  'admin.deleg.principal': 'Empfänger (Principal-ID)',
+  'admin.deleg.role': 'Rolle (Rollen-ID)',
+  'admin.deleg.gremium': 'Gremium (optional)',
+  'admin.deleg.validFrom': 'Gültig ab (optional)',
+  'admin.deleg.validUntil': 'Gültig bis',
+  'admin.deleg.voting': 'Stimmrecht mit delegieren',
+  'admin.deleg.votingHint':
+    'Nur wirksam, wenn die Stimmrecht-Delegation serverseitig freigeschaltet ist (satzungsrechtlicher Vorbehalt).',
+  'admin.deleg.submit': 'Delegieren',
+  'admin.deleg.none': 'Keine Delegationen vorhanden.',
+  'admin.deleg.active': 'Aktiv',
+  'admin.deleg.expired': 'Abgelaufen',
+  'admin.deleg.revoke': 'Widerrufen',
+  'admin.deleg.created': 'Delegation angelegt.',
+  'admin.deleg.revoked': 'Delegation widerrufen.',
+  'admin.deleg.createFailed': 'Delegation fehlgeschlagen.',
+  'admin.deleg.revokeFailed': 'Widerruf fehlgeschlagen.',
+  'admin.deleg.errRequired': 'Empfänger, Rolle und »Gültig bis« sind erforderlich.',
+  'admin.deleg.errFuture': '»Gültig bis« muss in der Zukunft liegen.',
+  'admin.deleg.yes': 'Ja',
+  'admin.deleg.no': 'Nein',
 
   'admin.notif.title': 'Benachrichtigungsregeln',
   'admin.notif.desc':
@@ -970,6 +999,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.home.webhooksDesc': 'Manage outgoing event hooks.',
   'admin.home.notifications': 'Notifications',
   'admin.home.notificationsDesc': 'Manage notification rules.',
+  'admin.home.delegations': 'Proxy / Delegation',
+  'admin.home.delegationsDesc': 'Delegate rights and voting rights for a limited time.',
   'admin.home.mockNotice': 'Admin API (T-24) not available yet – data comes from a local mock.',
 
   'admin.common.add': 'Add',
@@ -1089,6 +1120,33 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.webhook.none': 'No webhooks configured.',
   'admin.webhook.badUrl': 'Please provide a valid http(s) URL.',
   'admin.webhook.noEvents': 'Select at least one event.',
+
+  'admin.deleg.title': 'Proxy / Delegation',
+  'admin.deleg.subtitle':
+    'Delegate one of your own rights (a role, optionally voting) to another member for a limited time. Revocation takes effect immediately.',
+  'admin.deleg.create': 'Create delegation',
+  'admin.deleg.listTitle': 'Existing delegations',
+  'admin.deleg.principal': 'Recipient (principal ID)',
+  'admin.deleg.role': 'Role (role ID)',
+  'admin.deleg.gremium': 'Body (optional)',
+  'admin.deleg.validFrom': 'Valid from (optional)',
+  'admin.deleg.validUntil': 'Valid until',
+  'admin.deleg.voting': 'Also delegate voting right',
+  'admin.deleg.votingHint':
+    'Only effective when voting-right delegation is enabled on the server (subject to bylaws).',
+  'admin.deleg.submit': 'Delegate',
+  'admin.deleg.none': 'No delegations yet.',
+  'admin.deleg.active': 'Active',
+  'admin.deleg.expired': 'Expired',
+  'admin.deleg.revoke': 'Revoke',
+  'admin.deleg.created': 'Delegation created.',
+  'admin.deleg.revoked': 'Delegation revoked.',
+  'admin.deleg.createFailed': 'Delegation failed.',
+  'admin.deleg.revokeFailed': 'Revocation failed.',
+  'admin.deleg.errRequired': 'Recipient, role and “valid until” are required.',
+  'admin.deleg.errFuture': '“Valid until” must be in the future.',
+  'admin.deleg.yes': 'Yes',
+  'admin.deleg.no': 'No',
 
   'admin.notif.title': 'Notification rules',
   'admin.notif.desc':
