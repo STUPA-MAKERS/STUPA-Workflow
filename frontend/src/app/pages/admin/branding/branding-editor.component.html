@@ -85,7 +85,7 @@
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.copyright' | t }}</legend>
           <input [attr.aria-label]="'admin.brand.copyright' | t" [(ngModel)]="d.copyright['de']" (ngModelChange)="reemit()" placeholder="DE" />
-          <h3 class="br__sub">{{ 'admin.brand.legal' | t }}</h3>
+          <h2 class="br__sub">{{ 'admin.brand.legal' | t }}</h2>
           @for (link of d.legalLinks; track $index; let li = $index) {
             <div class="br__link">
               <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />

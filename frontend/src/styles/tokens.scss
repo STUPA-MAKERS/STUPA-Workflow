@@ -30,7 +30,7 @@
   --c-neutral-200: #e0e3e0;
   --c-neutral-300: #c7ccc8;
   --c-neutral-400: #9aa19c;
-  --c-neutral-450: #696f6a; // muted-Text auf hellem bg — WCAG AA (≥4.5, T-43)
+  --c-neutral-450: #666c67; // muted-Text — WCAG AA ≥4.5 auf bg/surface/sunken (T-43)
   --c-neutral-500: #6e756f;
   --c-neutral-600: #515751;
   --c-neutral-700: #3a3f3b;
@@ -48,7 +48,7 @@
   --c-success-500: #2c7a4b;
   --c-success-600: #1f5d38;
   --c-warning-500: #b5821a;
-  --c-warning-600: #8f6510;
+  --c-warning-600: #876010; // ≥4.5:1 + Puffer auf warning-subtle (Badge), T-43
   --c-danger-500: #b3261e;
   --c-danger-600: #8c1c16;
   --c-info-500: #1f6f8b;

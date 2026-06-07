@@ -105,6 +105,14 @@ function textPairs(t: Record<string, string>): Pair[] {
     p('warning / surface', '--color-warning', '--color-surface'),
     p('danger / surface', '--color-danger', '--color-surface'),
     p('info / surface', '--color-info', '--color-surface'),
+    // Badge-Chips: Status-/muted-Text auf *-subtle bzw. surface-sunken
+    // (app-badge nutzt diese Paare — eigene Hintergründe, nicht surface).
+    p('badge neutral: muted / surface-sunken', '--color-text-muted', '--color-surface-sunken'),
+    p('badge primary / primary-subtle', '--color-primary', '--color-primary-subtle'),
+    p('badge success / success-subtle', '--color-success', '--color-success-subtle'),
+    p('badge warning / warning-subtle', '--color-warning', '--color-warning-subtle'),
+    p('badge danger / danger-subtle', '--color-danger', '--color-danger-subtle'),
+    p('badge info / info-subtle', '--color-info', '--color-info-subtle'),
     // Non-Text (1.4.11): Fokus-Ring + Control-Rahmen
     p('focus-ring / bg', '--color-focus-ring', '--color-bg', AA_NONTEXT),
     p('focus-ring / surface', '--color-focus-ring', '--color-surface', AA_NONTEXT),

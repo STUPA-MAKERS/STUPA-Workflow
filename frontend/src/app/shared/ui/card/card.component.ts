@@ -9,7 +9,17 @@ import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
     <section class="card" [class.card--interactive]="interactive">
       <header class="card__header">
         @if (heading) {
-          <h3 class="card__title">{{ heading }}</h3>
+          @switch (headingLevel) {
+            @case (2) {
+              <h2 class="card__title">{{ heading }}</h2>
+            }
+            @case (4) {
+              <h4 class="card__title">{{ heading }}</h4>
+            }
+            @default {
+              <h3 class="card__title">{{ heading }}</h3>
+            }
+          }
         }
         <ng-content select="[card-header]" />
       </header>
@@ -60,4 +70,6 @@ import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 export class CardComponent {
   @Input() heading = '';
   @Input() interactive = false;
+  /** Überschriften-Ebene des `heading` (a11y/heading-order). Default `<h3>`. */
+  @Input() headingLevel: 2 | 3 | 4 = 3;
 }

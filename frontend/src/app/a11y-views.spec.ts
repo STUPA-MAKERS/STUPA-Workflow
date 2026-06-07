@@ -22,6 +22,11 @@ import { NotFoundComponent } from './pages/not-found.component';
 import { ApplyWizardComponent } from './features/apply/apply-wizard.component';
 import { LiveVoteComponent } from './features/voting/live-vote.component';
 import { BeamerComponent } from './features/voting/beamer.component';
+import { AdminHomeComponent } from './pages/admin/admin-home.component';
+import { UsersComponent } from './pages/admin/users/users.component';
+import { FlowEditorComponent } from './pages/admin/flow-editor/flow-editor.component';
+import { BrandingEditorComponent } from './pages/admin/branding/branding-editor.component';
+import { AdminApiService } from './pages/admin/admin-api.service';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ApiClient } from '@core/api/api-client.service';
@@ -225,6 +230,96 @@ describe('Kern-Views a11y (axe)', () => {
       source.channels[0].subject.next(OPEN_VOTE);
       view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+  });
+
+  describe('Admin-Views (T-43 AC: Admin/Flow-Editor)', () => {
+    // Reads liefern aus admin.mock (USE_MOCK_API) bzw. werden gefaket — die
+    // Views sollen ihre volle Struktur (Headings/Tabellen/Forms) rendern.
+    const adminHttp = [provideHttpClient(), provideHttpClientTesting()];
+
+    @Component({
+      standalone: true,
+      imports: [AdminHomeComponent],
+      template: `<main><app-admin-home /></main>`,
+    })
+    class AdminHomeHost {}
+
+    @Component({
+      standalone: true,
+      imports: [UsersComponent],
+      template: `<main><app-admin-users /></main>`,
+    })
+    class UsersHost {}
+
+    @Component({
+      standalone: true,
+      imports: [FlowEditorComponent],
+      template: `<main><app-flow-editor /></main>`,
+    })
+    class FlowEditorHost {}
+
+    @Component({
+      standalone: true,
+      imports: [BrandingEditorComponent],
+      template: `<main><app-branding-editor /></main>`,
+    })
+    class BrandingHost {}
+
+    /** Fake-AdminApiService: Reads mit minimalen Daten, Mutationen als No-op. */
+    function fakeAdminApi(): Partial<AdminApiService> {
+      const role = {
+        id: 'r-admin',
+        key: 'admin',
+        label: { de: 'administrator', en: 'administrator' },
+        permissions: ['admin.roles'],
+      };
+      const principal = {
+        id: 'p-1',
+        sub: 'kc|alex',
+        email: 'alex@x.de',
+        displayName: 'Alex Admin',
+        lastLogin: null,
+        assignments: [],
+      };
+      return {
+        listRoles: jest.fn(() => of([role])),
+        listPermissions: jest.fn(() => of(['admin.roles', 'application.read'])),
+        listPrincipals: jest.fn(() => of([principal])),
+        assignRole: jest.fn(() => of({ id: 'a-new' })),
+        revokeRole: jest.fn(() => of(void 0)),
+        saveRolePermissions: jest.fn(() => of(role)),
+        createFlowVersion: jest.fn(() => of({ id: 'fv1' })),
+        listApplicationTypes: jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }])),
+      } as unknown as Partial<AdminApiService>;
+    }
+
+    it('/admin home has no violations', async () => {
+      const { container } = await render(AdminHomeHost, {
+        providers: [provideRouter([]), ...adminHttp, { provide: USE_MOCK_API, useValue: true }],
+      });
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+
+    it('/admin/users has no violations', async () => {
+      const { container } = await render(UsersHost, {
+        providers: [provideRouter([]), { provide: AdminApiService, useValue: fakeAdminApi() }],
+      });
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+
+    it('flow-editor has no violations', async () => {
+      const { container } = await render(FlowEditorHost, {
+        providers: [provideRouter([]), { provide: AdminApiService, useValue: fakeAdminApi() }],
+      });
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+
+    it('branding-editor has no violations', async () => {
+      const { container } = await render(BrandingHost, {
+        providers: [provideRouter([]), ...adminHttp, { provide: USE_MOCK_API, useValue: true }],
+      });
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
   });
 });
