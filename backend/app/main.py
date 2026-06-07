@@ -22,6 +22,7 @@ from app.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.modules.admin.router import authed_router as gremien_authed_router
 from app.modules.admin.router import public_router as site_config_public_router
 from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
@@ -79,6 +80,7 @@ api_router.include_router(pdf_router)
 api_router.include_router(audit_router)
 api_router.include_router(admin_router)
 api_router.include_router(delegations_router)
+api_router.include_router(gremien_authed_router)
 api_router.include_router(site_config_public_router)
 
 

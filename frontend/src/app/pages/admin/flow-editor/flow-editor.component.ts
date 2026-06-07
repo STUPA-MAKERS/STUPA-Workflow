@@ -1,11 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, CheckboxComponent } from '@shared/ui';
+import { ButtonComponent, CheckboxComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
+import { AdminOptionsService } from '../admin-options.service';
 import {
   ACTION_TYPES,
   type ActionType,
@@ -44,14 +46,32 @@ type Mode = 'simple' | 'expert';
   selector: 'app-flow-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, SelectComponent],
   templateUrl: './flow-editor.component.html',
   styleUrl: './flow-editor.component.scss',
 })
 export class FlowEditorComponent {
   private readonly api = inject(AdminApiService);
+  private readonly options = inject(AdminOptionsService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
+
+  /** Antragstypen als Auswahl (#69) — ersetzt das hartkodierte `'mock-type'`. */
+  protected readonly typeOptions = signal<SelectOption[]>([]);
+  protected readonly selectedTypeId = signal('');
+
+  constructor() {
+    this.options
+      .applicationTypeOptions()
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: (opts) => {
+          this.typeOptions.set(opts);
+          if (opts.length && !this.selectedTypeId()) this.selectedTypeId.set(opts[0].value);
+        },
+        error: () => this.typeOptions.set([]),
+      });
+  }
 
   protected readonly categories = STATE_CATEGORIES;
   protected readonly guardOps = GUARD_LEAF_OPERATORS;
@@ -227,13 +247,14 @@ export class FlowEditorComponent {
 
   // --- save ----------------------------------------------------------------
   protected save(): void {
-    if (!this.validation().valid) {
+    const typeId = this.selectedTypeId();
+    if (!this.validation().valid || !typeId) {
       this.toast.error(this.i18n.translate('admin.common.invalid'));
       return;
     }
     const graph = normalizeFlowGraph(autoLayout(this.graph()));
-    // TODO(T-24): echter applicationTypeId aus Routen-/Auswahl-Kontext.
-    this.api.createFlowVersion('mock-type', graph).subscribe({
+    // Echte applicationType-UUID aus der Auswahl (#69) statt hartkodiertem 'mock-type'.
+    this.api.createFlowVersion(typeId, graph).subscribe({
       next: () => this.toast.success(this.i18n.translate('admin.common.saved')),
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });

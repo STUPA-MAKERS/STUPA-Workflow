@@ -10,8 +10,8 @@ async function setup(seed: NotificationRule[] = []) {
   const api = {
     listNotificationRules: jest.fn(() => of(seed)),
     saveNotificationRule,
-    // Vom Options-Provider (#77) für die Empfänger-Dropdowns benötigt.
-    listGremien: jest.fn(() => of([{ id: 'g-stupa', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' }])),
+    // Vom Options-Provider (#77/#68) für die Empfänger-Dropdowns benötigt.
+    listGremienOptions: jest.fn(() => of([{ id: 'g-stupa', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' }])),
     listRoles: jest.fn(() => of([])),
   };
   const view = await render(NotificationRulesComponent, {

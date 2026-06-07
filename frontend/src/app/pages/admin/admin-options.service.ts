@@ -22,19 +22,35 @@ const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group']
  * Admin-API/Config-Daten; wo die (im Mock) leer sind, greift eine saubere
  * Fallback-Liste. Labels folgen der aktiven Locale.
  *
- * TODO(T-24-Verdrahtung): `/admin/gremien` + `/admin/roles` liefern real; der
- * Provider übernimmt sie automatisch, sobald `USE_MOCK_API=false`.
+ * Quellen sind mit »Mock aus« (#67) real verdrahtet: Gremien über `/gremien`
+ * (#68, authentifiziert), Antragstypen über `/application-types` (#69), Rollen
+ * über `/admin/roles`.
  */
 @Injectable({ providedIn: 'root' })
 export class AdminOptionsService {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
 
-  /** Gremien als Optionen (id → Anzeigename), aus `/admin/gremien`. */
+  /**
+   * Gremien als Optionen (id → Anzeigename), aus `/gremien` (#68 —
+   * authentifiziert, kein Admin-Recht). So nutzbar in »Sitzung anlegen« und
+   * Budget, wo der Akteur nicht zwingend `admin.config` hat.
+   */
   gremiumOptions(): Observable<SelectOption[]> {
     return this.api
-      .listGremien()
+      .listGremienOptions()
       .pipe(map((list) => list.map((g) => ({ value: g.id, label: g.name }))));
+  }
+
+  /**
+   * Antragstypen als Optionen (id → Name) für Form-/Flow-Builder (#69), aus dem
+   * öffentlichen `/application-types`. Ersetzt das hartkodierte `'mock-type'`:
+   * der Builder speichert gegen eine **echte** Typ-UUID.
+   */
+  applicationTypeOptions(): Observable<SelectOption[]> {
+    return this.api
+      .listApplicationTypes()
+      .pipe(map((list) => list.map((t) => ({ value: t.id, label: t.name }))));
   }
 
   /** Rollen als Optionen (key → lokalisiertes Label); Fallback-Liste wenn leer. */

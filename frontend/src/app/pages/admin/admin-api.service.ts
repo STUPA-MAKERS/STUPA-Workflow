@@ -15,7 +15,7 @@
  */
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { type Observable, of } from 'rxjs';
+import { type Observable, map, of } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
@@ -45,6 +45,12 @@ import {
 
 /** JSON-Schema-Export des Backends (`export_json_schemas`, config_schemas). */
 export type ConfigSchemas = Record<string, Record<string, unknown>>;
+
+/** Antragstyp als Auswahl-Quelle (id + Anzeigename), #69. */
+export interface ApplicationTypeOption {
+  id: Uuid;
+  name: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
@@ -79,9 +85,32 @@ export class AdminApiService {
     return this.http.get<Gremium[]>(`${this.base}/admin/gremien`);
   }
 
+  /**
+   * Gremien-Stammdaten als Dropdown-Quelle (#68) — GET `/gremien` (kein
+   * Admin-Recht; jeder eingeloggte Principal). Anders als {@link listGremien}
+   * (`/admin/gremien`, P `admin.config`) für »Sitzung anlegen«/Budget nutzbar,
+   * wo der Akteur nur `meeting.manage`/`budget.*` hat.
+   */
+  listGremienOptions(): Observable<Gremium[]> {
+    if (this.mock) return of(structuredCopy(this.store.gremien));
+    return this.http.get<Gremium[]>(`${this.base}/gremien`);
+  }
+
   listRoles(): Observable<Role[]> {
     if (this.mock) return of(structuredCopy(this.store.roles));
     return this.http.get<Role[]>(`${this.base}/admin/roles`);
+  }
+
+  /**
+   * Antragstypen (id + Name) als Auswahl-Quelle für die Form-/Flow-Builder (#69).
+   * Nutzt das öffentliche `/application-types` (Page); ein `form.configure`-
+   * Principal erhält dort auch inaktive Typen. Im Mock eine kleine Stub-Liste.
+   */
+  listApplicationTypes(): Observable<ApplicationTypeOption[]> {
+    if (this.mock) return of(structuredCopy(MOCK_APP_TYPE_OPTIONS));
+    return this.http
+      .get<{ items: ApplicationTypeOption[] }>(`${this.base}/application-types`)
+      .pipe(map((page) => page.items.map((t) => ({ id: t.id, name: t.name }))));
   }
 
   /** Überblick aktiver Formulare (#75): Name/Gremium/Status/Version. */
@@ -249,6 +278,12 @@ function hashString(value: string): number {
   for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0;
   return h;
 }
+
+/** Antragstyp-Stubs für den Mock-Modus (#69) — echte Typen kommen vom Backend. */
+const MOCK_APP_TYPE_OPTIONS: ApplicationTypeOption[] = [
+  { id: '11111111-1111-1111-1111-111111111111', name: 'Finanzantrag' },
+  { id: '22222222-2222-2222-2222-222222222222', name: 'Sonstiger Antrag' },
+];
 
 /** Minimaler Schema-Stub für den Mock-Modus (echte Schemas kommen vom Backend). */
 const MOCK_CONFIG_SCHEMAS: ConfigSchemas = {

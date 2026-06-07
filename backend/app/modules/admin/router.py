@@ -56,6 +56,10 @@ from app.shared.errors import ProblemDetail
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 public_router = APIRouter(tags=["admin"])
+# Authentifiziert (irgendein Principal), aber **ohne** Admin-Recht: Stammdaten-
+# Reads, die mehrere Rollen als Dropdown-Quelle brauchen (#68 Sitzung anlegen,
+# Budget-Topf, Antragstyp). Eigener Router, da ohne `/admin`-Prefix gemountet.
+authed_router = APIRouter(tags=["gremien"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
@@ -136,6 +140,24 @@ async def update_gremium(
     principal: ConfigAdmin,
 ) -> GremiumOut:
     return await service.update_gremium(gremium_id, payload, principal.sub)
+
+
+# =========================================================================== #
+# Gremien (authentifiziert, ohne Admin-Recht) — Dropdown-Quelle (#68)
+# =========================================================================== #
+@authed_router.get(
+    "/gremien",
+    response_model=list[GremiumOut],
+    responses=_errors(401),
+)
+async def list_gremien_authed(
+    service: ServiceDep,
+    _principal: Annotated[Principal, Depends(require_principal())],
+) -> list[GremiumOut]:
+    """Gremien als Stammdaten für jeden eingeloggten Principal (#68): Quelle der
+    Gremium-Auswahl in »Sitzung anlegen«, Budget-Topf und Antragstyp. Reine
+    Lese-Stammdaten (id/Name/Variante) — Anlegen/Ändern bleibt ``admin.config``."""
+    return await service.list_gremien()
 
 
 # =========================================================================== #

@@ -124,6 +124,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'budget/pots',
+        data: { title: 'budget.pots.title', permission: 'budget.manage' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/budget/budget-pots.component').then((m) => m.BudgetPotsComponent),
+      },
+      {
         path: 'admin',
         data: { title: 'nav.admin', permission: 'admin.config' },
         canActivate: [authGuard],
@@ -188,6 +195,12 @@ export const routes: Routes = [
           import('./pages/admin/delegations/delegations.component').then(
             (m) => m.DelegationsComponent,
           ),
+      },
+      {
+        path: 'forbidden',
+        data: { title: 'forbidden.heading' },
+        loadComponent: () =>
+          import('./pages/forbidden.component').then((m) => m.ForbiddenComponent),
       },
       {
         path: '**',

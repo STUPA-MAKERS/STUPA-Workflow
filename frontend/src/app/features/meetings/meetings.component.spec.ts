@@ -80,7 +80,9 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
   };
 }
 
-async function setup(opts: { perms?: string[]; id?: string | null } = {}) {
+async function setup(
+  opts: { perms?: string[]; id?: string | null; gremien?: { id: string; name: string }[] } = {},
+) {
   const perms = opts.perms ?? ['meeting.manage', 'protocol.write'];
   const id = opts.id === undefined ? 'm-1' : opts.id;
   const ws = new FakeWs();
@@ -98,6 +100,8 @@ async function setup(opts: { perms?: string[]; id?: string | null } = {}) {
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
+  // Gremien-Dropdown (#68) lädt beim Start `/gremien` (nur mit meeting.manage).
+  http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush(opts.gremien ?? []));
   return { ...view, http, ws };
 }
 
@@ -219,13 +223,18 @@ describe('MeetingsComponent', () => {
   });
 
   it('lets a manager create a meeting when none is loaded', async () => {
-    const { http } = await setup({ id: null });
+    const { http } = await setup({
+      id: null,
+      gremien: [{ id: 'g-1', name: 'StuPa' }],
+    });
     const input = await screen.findByLabelText('Titel');
     await userEvent.type(input, 'Neue Sitzung');
+    // Pflicht-Gremium wählen (#68) — sonst bleibt »Sitzung anlegen« gesperrt.
+    await userEvent.selectOptions(screen.getByLabelText(/Gremium/), 'g-1');
     await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
     const req = http.expectOne('/api/meetings');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ title: 'Neue Sitzung' });
+    expect(req.request.body).toEqual({ title: 'Neue Sitzung', gremiumId: 'g-1' });
     req.flush({ ...MEETING, title: 'Neue Sitzung', protocolId: null });
     expect(await screen.findByText('Sitzungssteuerung')).toBeInTheDocument();
   });

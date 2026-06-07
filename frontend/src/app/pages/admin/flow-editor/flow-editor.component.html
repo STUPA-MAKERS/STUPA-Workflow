@@ -21,6 +21,20 @@
 
   <p class="fe__desc">{{ 'admin.flow.desc' | t }}</p>
 
+  <!-- Antragstyp-Auswahl (#69): Flow-Version wird gegen eine echte Typ-UUID gespeichert. -->
+  <app-select
+    class="fe__type"
+    [label]="'admin.flow.applicationType' | t"
+    [placeholder]="'admin.flow.applicationTypePlaceholder' | t"
+    [options]="typeOptions()"
+    [required]="true"
+    [ngModel]="selectedTypeId()"
+    (ngModelChange)="selectedTypeId.set($event)"
+  />
+  @if (!typeOptions().length) {
+    <p class="fe__desc" role="alert">{{ 'admin.flow.noTypes' | t }}</p>
+  }
+
   @if (mode() === 'simple') {
     <div class="fe__preset">
       <label class="fe__lbl">
@@ -168,6 +182,6 @@
     <span class="fe__status" [class.fe__status--ok]="validation().valid">
       {{ (validation().valid ? 'admin.common.valid' : 'admin.common.errors') | t }}
     </span>
-    <app-button [disabled]="!validation().valid" (click)="save()">{{ 'admin.flow.save' | t }}</app-button>
+    <app-button [disabled]="!validation().valid || !selectedTypeId()" (click)="save()">{{ 'admin.flow.save' | t }}</app-button>
   </footer>
 </section>

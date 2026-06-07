@@ -7,7 +7,8 @@ import { FlowEditorComponent } from './flow-editor.component';
 
 async function setup() {
   const createFlowVersion = jest.fn(() => of({ id: 'fv1' }));
-  const api = { createFlowVersion };
+  const listApplicationTypes = jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }]));
+  const api = { createFlowVersion, listApplicationTypes };
   const view = await render(FlowEditorComponent, {
     providers: [{ provide: AdminApiService, useValue: api }],
   });

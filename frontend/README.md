@@ -69,9 +69,12 @@ Header. Konfigurierbare DB-Texte (`*_i18n`) sind **nicht** Teil dieses Service.
 ## API-Client & Mock
 
 `core/api/ApiClient` ist gegen die OpenAPI-Contracts (`sds/api.md`) typisiert.
-`mockApiInterceptor` liefert In-Memory-Antworten (`USE_MOCK_API`, Default `true`),
-damit die SPA ohne Backend läuft. Für echte Aufrufe `USE_MOCK_API` auf `false`
-setzen — `web`-nginx routet `/api` → `api`.
+`mockApiInterceptor` liefert In-Memory-Antworten. Default ist **`USE_MOCK_API=false`**
+(#67): die SPA spricht das **echte** Backend (`/api`) an — `web`-nginx routet `/api`
+→ `api`; im Dev leitet `proxy.conf.json` (`ng serve`) `/api` inkl. WebSocket weiter.
+Der Mock ist nur noch ein **explizites** Opt-in für Dev/Tests: `?mock=1`,
+`localStorage['useMockApi']='1'` oder `window.__USE_MOCK_API__=true` vor dem Bootstrap.
 
-> Der WS-Service (`core/ws`) ist für Live-Vote vorbereitet; der zugehörige
-> Server-Endpoint im Backend ist noch nicht gebaut (Roadmap).
+> Der WS-Service (`core/ws`) verbindet `ws(s)://…/api/ws/meetings/{id}` (Live-Vote);
+> der Server-Endpoint existiert (T-16) und wird hinter nginx/`proxy.conf.json`
+> durchgereicht.
