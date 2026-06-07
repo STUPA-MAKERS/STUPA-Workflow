@@ -9,6 +9,8 @@ import {
   mapApplicationListItem,
   mapApplicationType,
   mapAttachment,
+  mapBudgetPotInfo,
+  mapBudgetStats,
   mapComment,
   mapMeeting,
   mapProtocol,
@@ -19,6 +21,11 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  BudgetPotInfo,
+  BudgetPotOutWire,
+  BudgetStats,
+  BudgetStatsOutWire,
+  BudgetStatsQuery,
   Application,
   ApplicationComment,
   ApplicationCreated,
@@ -315,5 +322,42 @@ export class ApiClient {
     return this.http
       .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/finalize`, {})
       .pipe(map(mapProtocol));
+  }
+
+  // --- budget (api.md »budget«, T-17/T-35) ---------------------------------
+  /**
+   * GET /budget/stats — Rollup-Statistik (P(budget.view)). Filter `pot`/`gremium`/
+   * `period` werden 1:1 als Query-Param durchgereicht (Backend-Aliase). `names`
+   * (id → Topf-Name aus {@link listBudgetPots}) reicht der Aufrufer optional durch,
+   * damit Töpfe im Diagramm statt mit roher UUID benannt erscheinen.
+   */
+  budgetStats(
+    query: BudgetStatsQuery = {},
+    names?: ReadonlyMap<Uuid, string>,
+  ): Observable<BudgetStats> {
+    let params = new HttpParams();
+    if (query.pot) params = params.set('pot', query.pot);
+    if (query.gremium) params = params.set('gremium', query.gremium);
+    if (query.period) params = params.set('period', query.period);
+    return this.http
+      .get<BudgetStatsOutWire>(`${this.base}/budget/stats`, { params })
+      .pipe(map((wire) => mapBudgetStats(wire, names)));
+  }
+
+  /**
+   * GET /budget-pots — Topf-Stammdaten (P(budget.manage)). Dient dem Dashboard
+   * **nur** zur Namens-/Stammdaten-Anreicherung; ohne `budget.manage` antwortet
+   * der Server 403 → der Aufrufer fängt das ab und zeigt gekürzte IDs.
+   */
+  budgetPots(
+    opts: { gremium?: Uuid; period?: string; active?: boolean } = {},
+  ): Observable<BudgetPotInfo[]> {
+    let params = new HttpParams();
+    if (opts.gremium) params = params.set('gremium', opts.gremium);
+    if (opts.period) params = params.set('period', opts.period);
+    if (opts.active !== undefined) params = params.set('active', String(opts.active));
+    return this.http
+      .get<BudgetPotOutWire[]>(`${this.base}/budget-pots`, { params })
+      .pipe(map((pots) => pots.map(mapBudgetPotInfo)));
   }
 }

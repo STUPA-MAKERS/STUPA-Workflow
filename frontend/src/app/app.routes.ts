@@ -119,7 +119,9 @@ export const routes: Routes = [
         data: { title: 'nav.budget', permission: ['budget.view', 'budget.manage'] },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/placeholder.component').then((m) => m.PlaceholderComponent),
+          import('./pages/budget/budget-dashboard.component').then(
+            (m) => m.BudgetDashboardComponent,
+          ),
       },
       {
         path: 'admin',

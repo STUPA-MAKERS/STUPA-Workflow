@@ -4,6 +4,8 @@ import {
   mapApplicationListItem,
   mapApplicationType,
   mapAttachment,
+  mapBudgetPotInfo,
+  mapBudgetStats,
   mapComment,
   mapMeeting,
   mapProtocol,
@@ -19,6 +21,8 @@ import type {
   ApplicationListItemWire,
   ApplicationTypeListItemWire,
   AttachmentOutWire,
+  BudgetPotOutWire,
+  BudgetStatsOutWire,
   CommentOutWire,
   MeetingOutWire,
   NewApplication,
@@ -445,5 +449,75 @@ describe('mapProtocol', () => {
     expect(p.isFinal).toBe(false);
     expect(p.pdfUrl).toBeNull();
     expect(p.sentAt).toBeNull();
+  });
+});
+
+describe('mapBudgetPotInfo', () => {
+  const wire: BudgetPotOutWire = {
+    id: 'pot-1',
+    gremiumId: 'g1',
+    name: 'Veranstaltungen',
+    total: '10000.00',
+    currency: 'EUR',
+    period: '2026',
+    active: true,
+  };
+
+  it('parses the Decimal-string total into a number', () => {
+    const pot = mapBudgetPotInfo(wire);
+    expect(pot.total).toBe(10000);
+    expect(pot.name).toBe('Veranstaltungen');
+  });
+
+  it('keeps an unlimited pot total as null', () => {
+    expect(mapBudgetPotInfo({ ...wire, total: null }).total).toBeNull();
+  });
+});
+
+describe('mapBudgetStats', () => {
+  const wire: BudgetStatsOutWire = {
+    pots: [
+      {
+        budgetPotId: 'pot-1',
+        period: '2026',
+        total: '10000.00',
+        currency: 'EUR',
+        requested: '4200.00',
+        reserved: '1500.00',
+        approved: '3000.00',
+        paid: '2000.00',
+        committed: '6500.00',
+        available: '3500.00',
+      },
+    ],
+    statusDistribution: [{ gremiumId: 'g1', stateId: 's1', count: 5 }],
+  };
+
+  it('converts money strings to numbers across all stages', () => {
+    const stats = mapBudgetStats(wire);
+    expect(stats.pots[0].committed).toBe(6500);
+    expect(stats.pots[0].available).toBe(3500);
+    expect(stats.statusDistribution[0].count).toBe(5);
+  });
+
+  it('resolves the pot name from the supplied map', () => {
+    const stats = mapBudgetStats(wire, new Map([['pot-1', 'Veranstaltungen']]));
+    expect(stats.pots[0].name).toBe('Veranstaltungen');
+  });
+
+  it('falls back to a shortened id when no name is known', () => {
+    const stats = mapBudgetStats({
+      ...wire,
+      pots: [{ ...wire.pots[0], budgetPotId: 'abcdefgh-ijkl' }],
+    });
+    expect(stats.pots[0].name).toBe('abcdefgh…');
+  });
+
+  it('defaults a missing/blank money field to zero (no NaN leak)', () => {
+    const stats = mapBudgetStats({
+      ...wire,
+      pots: [{ ...wire.pots[0], requested: '' }],
+    });
+    expect(stats.pots[0].requested).toBe(0);
   });
 });
