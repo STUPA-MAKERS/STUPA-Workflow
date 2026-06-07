@@ -80,7 +80,7 @@ async def create_or_load_protocol(
 @router.patch(
     "/protocols/{protocol_id}",
     response_model=ProtocolOut,
-    responses=_errors(401, 403, 404, 409, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def update_protocol(
     protocol_id: UUID,
@@ -95,7 +95,7 @@ async def update_protocol(
 @router.post(
     "/protocols/{protocol_id}/votes",
     response_model=ProtocolOut,
-    responses=_errors(401, 403, 404, 409, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def embed_votes(
     protocol_id: UUID,
