@@ -56,7 +56,7 @@ const EFF: EffectiveForm = {
     },
     {
       key: 'budget',
-      label: { de: 'Topf' },
+      label: { de: 'Budget' },
       fields: [{ key: 'cofunding', type: 'currency', label: { de: 'Eigenanteil' } }],
     },
   ],

@@ -245,7 +245,7 @@ const MOCK_EFFECTIVE_FORM: EffectiveForm = {
     },
     {
       key: 'budget',
-      label: { de: 'Topf-spezifische Felder', en: 'Budget-specific fields' },
+      label: { de: 'Budget-spezifische Felder', en: 'Budget-specific fields' },
       fields: [
         {
           key: 'cofunding',

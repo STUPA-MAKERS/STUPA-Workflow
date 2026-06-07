@@ -52,6 +52,8 @@ async function setup() {
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
+  // Gremien-Dropdown (#77) lädt beim Start `/admin/gremien` — neutral flushen.
+  http.match((r) => r.url.endsWith('/admin/gremien')).forEach((req) => req.flush([]));
   return { ...view, http };
 }
 

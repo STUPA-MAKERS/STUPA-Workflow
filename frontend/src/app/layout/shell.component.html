@@ -20,29 +20,6 @@
     </nav>
 
     <div class="header__actions">
-      <label class="lang">
-        <select
-          class="lang__select"
-          [attr.aria-label]="'lang.switch' | t"
-          [value]="i18n.locale()"
-          (change)="setLocale($any($event.target).value)"
-        >
-          @for (loc of i18n.locales; track loc) {
-            <option [value]="loc" [selected]="loc === i18n.locale()">{{ loc | uppercase }}</option>
-          }
-        </select>
-      </label>
-
-      <button
-        type="button"
-        class="theme-toggle"
-        [attr.aria-label]="'theme.toggle' | t"
-        [attr.aria-pressed]="theme.resolved() === 'dark'"
-        (click)="toggleTheme()"
-      >
-        {{ theme.resolved() === 'dark' ? '☾' : '☀' }}
-      </button>
-
       @if (auth.isAuthenticated()) {
         <div class="account">
           <span class="account__name" [title]="'auth.signedInAs' | t">{{ auth.displayName() }}</span>
@@ -55,6 +32,33 @@
           {{ 'action.login' | t }}
         </button>
       }
+
+      <!-- Sprache + Erscheinungsbild: rechts neben „Abmelden" (#81). -->
+      <div class="prefs">
+        <label class="lang">
+          <span class="lang__icon" aria-hidden="true"><app-icon name="language" [size]="16" /></span>
+          <select
+            class="lang__select"
+            [attr.aria-label]="'lang.switch' | t"
+            [value]="i18n.locale()"
+            (change)="setLocale($any($event.target).value)"
+          >
+            @for (loc of i18n.locales; track loc) {
+              <option [value]="loc" [selected]="loc === i18n.locale()">{{ loc | uppercase }}</option>
+            }
+          </select>
+        </label>
+
+        <button
+          type="button"
+          class="theme-toggle"
+          [attr.aria-label]="'theme.toggle' | t"
+          [attr.aria-pressed]="theme.resolved() === 'dark'"
+          (click)="toggleTheme()"
+        >
+          <app-icon [name]="theme.resolved() === 'dark' ? 'moon' : 'sun'" [size]="18" />
+        </button>
+      </div>
     </div>
   </div>
 </header>
@@ -66,10 +70,16 @@
 <footer class="footer">
   <div class="container footer__inner">
     <img class="footer__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
-    <span class="footer__text">{{ 'footer.coBranding' | t }}</span>
+    <span class="footer__text">{{ footerCopyright() || ('footer.coBranding' | t) }}</span>
     <nav class="footer__links" [attr.aria-label]="'nav.footer' | t">
-      <a href="#">{{ 'footer.imprint' | t }}</a>
-      <a href="#">{{ 'footer.privacy' | t }}</a>
+      @if (footerLinks().length > 0) {
+        @for (link of footerLinks(); track link.url) {
+          <a [href]="link.url">{{ link.label }}</a>
+        }
+      } @else {
+        <a href="#">{{ 'footer.imprint' | t }}</a>
+        <a href="#">{{ 'footer.privacy' | t }}</a>
+      }
     </nav>
   </div>
 </footer>

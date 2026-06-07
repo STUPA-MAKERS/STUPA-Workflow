@@ -22,13 +22,20 @@ import type { FormFieldDef } from '@core/api/models';
 import {
   type Branding,
   type FlowGraph,
+  type FormOverviewItem,
   type Gremium,
   type NotificationRule,
   type Role,
   type SiteConfig,
   type WebhookConfig,
 } from './admin.models';
-import { MOCK_BRANDING, MOCK_GREMIEN, MOCK_NOTIFICATION_RULES, MOCK_WEBHOOKS } from './admin.mock';
+import {
+  MOCK_BRANDING,
+  MOCK_FORMS,
+  MOCK_GREMIEN,
+  MOCK_NOTIFICATION_RULES,
+  MOCK_WEBHOOKS,
+} from './admin.mock';
 
 /** JSON-Schema-Export des Backends (`export_json_schemas`, config_schemas). */
 export type ConfigSchemas = Record<string, Record<string, unknown>>;
@@ -67,6 +74,12 @@ export class AdminApiService {
   listRoles(): Observable<Role[]> {
     if (this.mock) return of([]);
     return this.http.get<Role[]>(`${this.base}/admin/roles`);
+  }
+
+  /** Überblick aktiver Formulare (#75): Name/Gremium/Status/Version. */
+  listForms(): Observable<FormOverviewItem[]> {
+    if (this.mock) return of(structuredCopy(MOCK_FORMS));
+    return this.http.get<FormOverviewItem[]>(`${this.base}/admin/application-types`);
   }
 
   // --- Form-/Flow-Versionen ------------------------------------------------

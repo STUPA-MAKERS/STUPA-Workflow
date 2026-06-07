@@ -126,6 +126,22 @@ export interface ApplicationTypeAdmin {
   active: boolean;
 }
 
+export type FormStatus = 'active' | 'draft' | 'inactive';
+
+/**
+ * Überblicks-Zeile aktiver Formulare (#75): Anzeigename, zuständiges Gremium,
+ * Status und aktive Form-Version. Aggregiert aus Application-Type + Form-Version;
+ * im Mock geseedet. TODO(T-24): aus `/admin/application-types` (+ Versionen)
+ * ableiten, sobald der Endpunkt steht.
+ */
+export interface FormOverviewItem {
+  id: Uuid;
+  name: I18nMap;
+  gremiumId?: Uuid | null;
+  status: FormStatus;
+  version: number;
+}
+
 // --- Notification-/Webhook-Config (config_schemas §5.4/§5.5) ----------------
 
 export type EventName =

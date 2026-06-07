@@ -31,14 +31,13 @@
             {{ 'admin.common.key' | t }}
             <input [(ngModel)]="field.key" (ngModelChange)="touch()" autocomplete="off" />
           </label>
-          <label class="fb__lbl">
-            {{ 'admin.common.type' | t }}
-            <select [ngModel]="field.type" (ngModelChange)="onTypeChange(fi, $event)">
-              @for (t of fieldTypes; track t) {
-                <option [value]="t">{{ t }}</option>
-              }
-            </select>
-          </label>
+          <app-select
+            class="fb__lbl"
+            [label]="'admin.common.type' | t"
+            [options]="fieldTypeOptions"
+            [ngModel]="field.type"
+            (ngModelChange)="onTypeChange(fi, $event)"
+          />
           <label class="fb__lbl">
             {{ 'admin.common.labelDe' | t }}
             <input [(ngModel)]="field.label['de']" (ngModelChange)="touch()" />

@@ -33,6 +33,18 @@ async function setup() {
   });
   const auth = view.fixture.debugElement.injector.get(AuthService);
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
+  // Shell lädt beim Start die aktive Site-Config für die Fußzeile (#82). Im
+  // Real-Modus (USE_MOCK_API=false) geht der Request raus — hier neutral flushen.
+  http
+    .match((r) => r.url.endsWith('/admin/site-config'))
+    .forEach((req) =>
+      req.flush({
+        version: 1,
+        active: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
+        draft: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
+        hasDraftChanges: false,
+      }),
+    );
   return { ...view, auth, http };
 }
 
@@ -119,6 +131,35 @@ describe('ShellComponent', () => {
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    http.verify();
+  });
+
+  it('renders maintained legal links and copyright in the footer (#82)', async () => {
+    const view = await render(ShellComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+      ],
+    });
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    http.expectOne((r) => r.url.endsWith('/admin/site-config')).flush({
+      version: 2,
+      active: {
+        logos: {},
+        footerColumns: [],
+        copyright: { de: '© Verfasste Studierendenschaft' },
+        legalLinks: [{ label: { de: 'Impressum' }, url: 'https://example.org/impressum' }],
+        freetexts: {},
+      },
+      draft: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
+      hasDraftChanges: false,
+    });
+    view.fixture.detectChanges();
+    const link = screen.getByRole('link', { name: 'Impressum' });
+    expect(link).toHaveAttribute('href', 'https://example.org/impressum');
+    expect(screen.getByText('© Verfasste Studierendenschaft')).toBeInTheDocument();
     http.verify();
   });
 

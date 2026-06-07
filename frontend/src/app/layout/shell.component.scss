@@ -30,7 +30,7 @@
 .header__inner {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--space-4);
   height: var(--layout-header-height);
 }
 .header__brand {
@@ -45,10 +45,15 @@
 .header__nav {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  margin-inline-start: var(--space-4);
-  flex: 1;
+  gap: var(--space-1);
+  margin-inline-start: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
   overflow-x: auto;
+  scrollbar-width: none;
+}
+.header__nav::-webkit-scrollbar {
+  display: none;
 }
 .header__link {
   padding: var(--space-2) var(--space-3);
@@ -70,8 +75,8 @@
 .header__actions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  flex-shrink: 0;
+  gap: var(--space-2);
+  flex: none;
 }
 
 /* Gemeinsame Basis aller Header-Steuerelemente: gleiche Höhe, Radius, Fokus. */
@@ -105,25 +110,41 @@
   outline-offset: 2px;
 }
 
-.lang {
+/* Präferenzen-Gruppe (Sprache + Erscheinungsbild), rechts neben „Abmelden" (#81). */
+.prefs {
   display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.lang {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.lang__icon {
+  position: absolute;
+  left: var(--space-2);
+  display: inline-flex;
+  color: var(--color-text-muted);
+  pointer-events: none;
 }
 .lang__select {
   appearance: none;
   -webkit-appearance: none;
-  // Platz für das eingebettete Chevron rechts.
-  padding-inline: var(--space-3) var(--space-7);
+  // Kompakt: Globus-Icon links, eingebettetes Chevron rechts, schmales Kürzel (DE/EN).
+  padding-inline: calc(var(--space-2) + 1.1rem) var(--space-5);
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path d="M2 4.5l4 4 4-4" fill="none" stroke="%236e756f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>');
   background-repeat: no-repeat;
-  background-position: right var(--space-3) center;
-  background-size: 0.7rem;
+  background-position: right var(--space-2) center;
+  background-size: 0.65rem;
 }
 
 .theme-toggle {
   width: var(--control-height);
   justify-content: center;
-  font-size: var(--fs-lg);
-  line-height: 1;
+  line-height: 0;
 }
 /* Aktiver/aktueller Modus klar markiert (a11y: aria-pressed gespiegelt). */
 .theme-toggle[aria-pressed='true'] {
@@ -135,13 +156,13 @@
 .account {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 .account__name {
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   color: var(--color-text);
-  max-width: 12rem;
+  max-width: 9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
