@@ -82,17 +82,11 @@
   color: var(--color-text);
 }
 
-/* --- Zwei Spalten -------------------------------------------------------- */
+/* --- Gestapelt: Anträge UNTER der Tree-Tabelle, nicht daneben (#49). ------ */
 .bd__cols {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-5);
-}
-
-@media (min-width: 62rem) {
-  .bd__cols {
-    grid-template-columns: 3fr 2fr;
-  }
 }
 
 .bd__panel {
