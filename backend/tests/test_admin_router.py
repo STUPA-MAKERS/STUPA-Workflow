@@ -40,7 +40,7 @@ class _FakeConfig:
         return [
             GremiumOut(
                 id=uuid4(), name="StuPa", slug="stupa",
-                cd_variant="stupa", default_lang="de",
+                cd_variant="stupa", default_lang="de", allow_vote_delegation=False,
             )
         ]
 
@@ -48,6 +48,7 @@ class _FakeConfig:
         return GremiumOut(
             id=uuid4(), name=payload.name, slug=payload.slug,
             cd_variant=payload.cd_variant, default_lang=payload.default_lang,
+            allow_vote_delegation=payload.allow_vote_delegation,
         )
 
     async def update_gremium(self, gremium_id, payload, actor):  # noqa: ANN001
@@ -55,7 +56,7 @@ class _FakeConfig:
             raise NotFoundError("nope")
         return GremiumOut(
             id=gremium_id, name=payload.name or "X", slug="stupa",
-            cd_variant="stupa", default_lang="de",
+            cd_variant="stupa", default_lang="de", allow_vote_delegation=False,
         )
 
     async def list_application_types(self):

@@ -389,9 +389,10 @@ async def test_process_deadlines_orchestrates_all(patched: None) -> None:
         FakeSession([[deadline]]),     # action lock
         FakeSession([[vote.id]]),      # vote scan
         FakeSession([[vote]]),         # vote lock
+        FakeSession([[]]),             # auto-transition scan (#8/#28) → keine Apps
     ]
     out = await wd.process_deadlines(_ctx(sessions))
-    assert out == "reminders=1 actions=1 votes=1"
+    assert out == "reminders=1 actions=1 votes=1 auto=0"
 
 
 @freeze_time(FROZEN)

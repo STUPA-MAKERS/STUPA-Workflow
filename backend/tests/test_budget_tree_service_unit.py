@@ -69,10 +69,12 @@ async def test_create_node_invalid_key() -> None:
         await svc.create_node(BudgetNodeCreate(key="VS-800", name="x"))
 
 
-async def test_create_top_level_requires_gremium() -> None:
-    svc = BudgetTreeService(fake_session())
-    with pytest.raises(ValidationProblem):
-        await svc.create_node(BudgetNodeCreate(key="VS", name="x"))
+async def test_create_top_level_without_gremium_ok() -> None:
+    # #22: Budgets sind nicht an ein Gremium gebunden — Top-Level ohne gremiumId ok.
+    sess = fake_session(result())  # nur Sibling-Check (kein Gremium-Lookup)
+    svc = BudgetTreeService(sess)
+    out = await svc.create_node(BudgetNodeCreate(key="VS", name="VS-Mittel"))
+    assert out.path_key == "VS" and out.gremium_id is None
 
 
 async def test_create_top_level_gremium_not_found() -> None:

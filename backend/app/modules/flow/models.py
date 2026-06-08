@@ -28,8 +28,12 @@ class FlowVersion(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "flow_version"
 
-    application_type_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("application_type.id", ondelete="CASCADE")
+    # Global-Flow-Redesign (#28): ein **globaler** Flow für ALLE Antragstypen.
+    # ``application_type_id`` ist daher nullable — ``NULL`` = globaler Flow. Welcher
+    # Pfad/welches Gremium wann greift, regeln Decision-/Vote-/Approval-States, nicht
+    # die Typ-Bindung. (Pre-Alpha: harter Cutover, Alt-Flows werden gedroppt.)
+    application_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application_type.id", ondelete="CASCADE"), nullable=True
     )
     version: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default="false")
@@ -37,11 +41,19 @@ class FlowVersion(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         UniqueConstraint("application_type_id", "version"),
+        # Genau ein aktiver globaler Flow (``application_type_id IS NULL``).
+        Index(
+            "uq_flow_version_one_active_global",
+            "active",
+            unique=True,
+            postgresql_where=text("active AND application_type_id IS NULL"),
+        ),
+        # Übergangsweise: max. ein aktiver per-Typ-Flow (Alt-Pfad bis Cutover).
         Index(
             "uq_flow_version_one_active_per_type",
             "application_type_id",
             unique=True,
-            postgresql_where=text("active"),
+            postgresql_where=text("active AND application_type_id IS NOT NULL"),
         ),
     )
 
@@ -60,11 +72,24 @@ class State(UUIDPkMixin, Base):
     category: Mapped[str] = mapped_column(Text)
     edit_allowed: Mapped[bool] = mapped_column(Boolean, server_default="true")
     is_initial: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    # Global-Flow-Redesign (#28): State-Art + Konfiguration.
+    #  * ``normal``   — gewöhnlicher Status (Übergänge wie bisher).
+    #  * ``vote``     — ein Gremium stimmt ab; ``config={gremiumId,...}``; 2 Ausgänge
+    #                   (branch ``pass``/``fail``).
+    #  * ``approval`` — Rolle X in Gremium Y nimmt an/ab; ``config={roleKey,gremiumId}``;
+    #                   2 Ausgänge (branch ``accept``/``reject``).
+    #  * ``decision`` — Auto-Routing nach Betrag/Typ/Antragsteller-Rolle;
+    #                   ``config={rules:[{when,to}],else}``.
+    kind: Mapped[str] = mapped_column(Text, server_default="normal")
+    config: Mapped[dict] = mapped_column(JSONB, server_default="{}")
 
     __table_args__ = (
         UniqueConstraint("flow_version_id", "key"),
         CheckConstraint(
             "category IN ('open','running','closed')", name="state_category"
+        ),
+        CheckConstraint(
+            "kind IN ('normal','vote','approval','decision')", name="state_kind"
         ),
         Index(
             "uq_state_one_initial_per_flow",
@@ -94,6 +119,9 @@ class Transition(UUIDPkMixin, Base):
     # Automatischer Übergang (#8): feuert ohne Nutzer-Aktion, sobald der Guard
     # erfüllt ist (vom Worker zyklisch ausgewertet, ``manual=False``).
     automatic: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    # Ergebnis-Zweig (#28): für die 2 Ausgänge von vote/approval-States —
+    # ``pass``/``fail`` bzw. ``accept``/``reject`` (sonst ``NULL``).
+    branch: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (Index("ix_transition_flow_version_id_from_state_id",
                             "flow_version_id", "from_state_id"),)

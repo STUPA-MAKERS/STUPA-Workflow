@@ -245,6 +245,8 @@ class ConfigService:
                 category=state.category or "open",
                 edit_allowed=state.edit_allowed,
                 is_initial=state.is_initial,
+                kind=state.kind,
+                config=state.config,
             )
             self.session.add(row)
             await self.session.flush()
@@ -261,6 +263,7 @@ class ConfigService:
                     actions=trans.actions,
                     order=trans.order if trans.order is not None else order,
                     automatic=trans.automatic,
+                    branch=trans.branch,
                 )
             )
 

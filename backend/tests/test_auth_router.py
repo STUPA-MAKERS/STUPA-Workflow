@@ -181,7 +181,12 @@ def test_me_unauthenticated_401(enabled_client: TestClient) -> None:
 
 def test_me_returns_principal() -> None:
     app = create_app(ENABLED)
+
+    async def _fake_db() -> AsyncIterator[object]:
+        yield fake_session()
+
     app.dependency_overrides[get_settings] = lambda: ENABLED
+    app.dependency_overrides[get_session] = _fake_db
     app.dependency_overrides[get_current_principal] = lambda: Principal(
         sub="u1", email="e@x.de", roles=["member"], permissions={"application.read"},
         groups={"stupa"},
@@ -195,6 +200,7 @@ def test_me_returns_principal() -> None:
         "roles": ["member"],
         "permissions": ["application.read"],
         "groups": ["stupa"],
+        "gremien": [],
     }
 
 

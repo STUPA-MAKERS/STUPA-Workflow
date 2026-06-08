@@ -128,6 +128,10 @@ class FormFieldDef(_CamelModel):
 # --------------------------------------------------------------------------- #
 # 5.2 Flow-Graph
 # --------------------------------------------------------------------------- #
+StateKind = Literal["normal", "vote", "approval", "decision"]
+TransitionBranch = Literal["pass", "fail", "accept", "reject"]
+
+
 class StateDef(_CamelModel):
     key: str = Field(pattern=KEY_PATTERN)
     label: I18nMap
@@ -135,6 +139,9 @@ class StateDef(_CamelModel):
     color: str | None = None
     edit_allowed: bool = Field(default=True, alias="editAllowed")
     is_initial: bool = Field(default=False, alias="isInitial")
+    # Global-Flow-Redesign (#28): State-Art + Konfiguration (vote/approval/decision).
+    kind: StateKind = "normal"
+    config: dict[str, Any] = Field(default_factory=dict)
 
 
 class TransitionDef(_CamelModel):
@@ -146,6 +153,8 @@ class TransitionDef(_CamelModel):
     order: int | None = None
     # Automatischer Übergang (#8): vom Worker gefeuert, sobald der Guard erfüllt ist.
     automatic: bool = False
+    # Ergebnis-Zweig (#28) für vote/approval-States: pass/fail bzw. accept/reject.
+    branch: TransitionBranch | None = None
 
 
 class FlowGraph(_CamelModel):
@@ -189,7 +198,57 @@ def validate_flow_graph(graph: FlowGraph) -> None:
         except GuardError as exc:
             raise FlowValidationError(str(exc)) from exc
 
+    _validate_state_kinds(graph, key_set)
     _assert_all_reachable(initials[0], key_set, graph.transitions)
+
+
+def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
+    """vote/approval/decision-States strukturell prüfen (#28).
+
+    * ``vote``     — ``config.gremiumId`` Pflicht; genau 2 Ausgänge ``pass``/``fail``.
+    * ``approval`` — ``config.roleKey`` + ``config.gremiumId``; 2 Ausgänge ``accept``/``reject``.
+    * ``decision`` — ``config.rules`` (Liste ``{when,to}``) + ``config.else``; Ziele gültig.
+    """
+    outgoing: dict[str, list[TransitionDef]] = {k: [] for k in key_set}
+    for t in graph.transitions:
+        if t.from_ in outgoing:
+            outgoing[t.from_].append(t)
+
+    for s in graph.states:
+        branches = sorted(t.branch for t in outgoing[s.key] if t.branch)
+        if s.kind == "vote":
+            if not isinstance(s.config.get("gremiumId"), str):
+                raise FlowValidationError(f"vote state {s.key!r} requires config.gremiumId")
+            if branches != ["fail", "pass"]:
+                raise FlowValidationError(
+                    f"vote state {s.key!r} needs exactly two outgoing transitions "
+                    "with branch 'pass' and 'fail'"
+                )
+        elif s.kind == "approval":
+            if not isinstance(s.config.get("roleKey"), str) or not isinstance(
+                s.config.get("gremiumId"), str
+            ):
+                raise FlowValidationError(
+                    f"approval state {s.key!r} requires config.roleKey and config.gremiumId"
+                )
+            if branches != ["accept", "reject"]:
+                raise FlowValidationError(
+                    f"approval state {s.key!r} needs exactly two outgoing transitions "
+                    "with branch 'accept' and 'reject'"
+                )
+        elif s.kind == "decision":
+            rules = s.config.get("rules")
+            fallback = s.config.get("else")
+            if not isinstance(rules, list) or not isinstance(fallback, str):
+                raise FlowValidationError(
+                    f"decision state {s.key!r} requires config.rules (list) and config.else"
+                )
+            for rule in [*rules, {"to": fallback}]:
+                target = rule.get("to") if isinstance(rule, dict) else None
+                if not isinstance(target, str) or target not in key_set:
+                    raise FlowValidationError(
+                        f"decision state {s.key!r} routes to unknown state {target!r}"
+                    )
 
 
 def _assert_all_reachable(

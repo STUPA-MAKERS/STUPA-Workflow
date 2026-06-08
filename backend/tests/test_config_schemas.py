@@ -133,6 +133,59 @@ def test_flow_graph_from_alias_parsed() -> None:
     assert graph.transitions[0].from_ == "draft"
 
 
+# --- #28: vote/approval/decision state validation -------------------------- #
+def _vote_graph_dict() -> dict:
+    return {
+        "states": [
+            {"key": "draft", "label": {"de": "Entwurf"}, "category": "open", "isInitial": True},
+            {"key": "voting", "label": {"de": "Abstimmung"}, "category": "running",
+             "kind": "vote", "config": {"gremiumId": "g-1"}},
+            {"key": "passed", "label": {"de": "Angenommen"}, "category": "closed"},
+            {"key": "failed", "label": {"de": "Abgelehnt"}, "category": "closed"},
+        ],
+        "transitions": [
+            {"from": "draft", "to": "voting"},
+            {"from": "voting", "to": "passed", "branch": "pass"},
+            {"from": "voting", "to": "failed", "branch": "fail"},
+        ],
+    }
+
+
+def test_vote_state_valid_passes() -> None:
+    validate_flow_graph(FlowGraph.model_validate(_vote_graph_dict()))  # no raise
+
+
+def test_vote_state_requires_gremium() -> None:
+    g = _vote_graph_dict()
+    g["states"][1]["config"] = {}
+    with pytest.raises(FlowValidationError):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_vote_state_requires_two_branches() -> None:
+    g = _vote_graph_dict()
+    g["transitions"] = [t for t in g["transitions"] if t.get("branch") != "fail"]
+    g["states"] = [s for s in g["states"] if s["key"] != "failed"]
+    with pytest.raises(FlowValidationError):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_decision_state_unknown_target_rejected() -> None:
+    g = _vote_graph_dict()
+    g["states"][1] = {
+        "key": "voting", "label": {"de": "Weiche"}, "category": "running",
+        "kind": "decision",
+        "config": {"rules": [{"when": {"amountGte": 100}, "to": "nope"}], "else": "passed"},
+    }
+    g["transitions"] = [
+        {"from": "draft", "to": "voting"},
+        {"from": "voting", "to": "passed"},
+        {"from": "voting", "to": "failed"},
+    ]
+    with pytest.raises(FlowValidationError):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
 def test_flow_no_initial() -> None:
     g = _valid_graph_dict()
     g["states"][0]["isInitial"] = False
