@@ -75,7 +75,6 @@ describe('UsersComponent (#70/#72/#73)', () => {
       gremiumId: null,
       validFrom: '2026-07-01T00:00:00Z',
       validUntil: '2026-12-31T00:00:00Z',
-      delegateVoting: false,
     });
   });
 
@@ -95,15 +94,9 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(api.revokeRole).toHaveBeenCalledWith('a-1');
   });
 
-  it('toggles and saves role permissions', async () => {
-    const { api, fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const inst = fixture.componentInstance as any;
-    inst.togglePerm(ROLES[1], 'flow.configure', true);
-    const role = inst.roles().find((r: Role) => r.id === 'r-member');
-    expect(role.permissions).toContain('flow.configure');
-    inst.togglePerm(role, 'application.read', false);
-    inst.saveRole(inst.roles().find((r: Role) => r.id === 'r-member'));
-    expect(api.saveRolePermissions).toHaveBeenCalledWith('r-member', ['flow.configure']);
+  it('renders the principals as a table', async () => {
+    await setup();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'OIDC-Subject' })).toBeInTheDocument();
   });
 });

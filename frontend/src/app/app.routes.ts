@@ -154,6 +154,14 @@ export const routes: Routes = [
           import('./pages/admin/users/users.component').then((m) => m.UsersComponent),
       },
       {
+        // Rollen-Rechte aus dem Benutzer-Screen herausgelöst (#12).
+        path: 'admin/roles',
+        data: { title: 'admin.roles.title', permission: 'admin.roles' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/roles/roles.component').then((m) => m.AdminRolesComponent),
+      },
+      {
         path: 'admin/forms',
         data: { title: 'admin.form.title', permission: 'form.configure' },
         canActivate: [authGuard],
