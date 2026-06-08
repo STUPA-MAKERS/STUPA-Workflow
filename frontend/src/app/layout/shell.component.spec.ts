@@ -84,7 +84,9 @@ describe('ShellComponent', () => {
     fixture.detectChanges();
 
     const spy = jest.spyOn(auth, 'logout').mockImplementation(() => undefined);
-    await userEvent.click(screen.getByRole('button', { name: /Abmelden|Sign out/ }));
+    // Logout liegt jetzt im Konto-Popout (#51): erst den Namen anklicken.
+    await userEvent.click(screen.getByRole('button', { name: /Mia Member/ }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /Abmelden|Sign out/ }));
     expect(spy).toHaveBeenCalled();
     http.verify();
   });

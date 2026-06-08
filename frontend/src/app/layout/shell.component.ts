@@ -114,7 +114,19 @@ export class ShellComponent {
     this.auth.login();
   }
 
+  /** Konto-Popout (#51): Aktionen wie Abmelden liegen nur hier, nicht direkt im Header. */
+  readonly accountMenuOpen = signal(false);
+
+  toggleAccountMenu(): void {
+    this.accountMenuOpen.update((v) => !v);
+  }
+
+  closeAccountMenu(): void {
+    this.accountMenuOpen.set(false);
+  }
+
   logout(): void {
+    this.closeAccountMenu();
     this.auth.logout();
   }
 }

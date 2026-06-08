@@ -22,10 +22,26 @@
     <div class="header__actions">
       @if (auth.isAuthenticated()) {
         <div class="account">
-          <span class="account__name" [title]="'auth.signedInAs' | t">{{ auth.displayName() }}</span>
-          <button type="button" class="account__btn" (click)="logout()">
-            {{ 'action.logout' | t }}
+          <button
+            type="button"
+            class="account__name-btn"
+            [attr.aria-expanded]="accountMenuOpen()"
+            aria-haspopup="menu"
+            [title]="'auth.signedInAs' | t"
+            (click)="toggleAccountMenu()"
+          >
+            <span class="account__name">{{ auth.displayName() }}</span>
+            <app-icon name="chevron-down" [size]="14" />
           </button>
+          @if (accountMenuOpen()) {
+            <button type="button" class="account__backdrop" aria-hidden="true" tabindex="-1" (click)="closeAccountMenu()"></button>
+            <div class="account__menu" role="menu">
+              <button type="button" class="account__menu-item" role="menuitem" (click)="logout()">
+                <app-icon name="power" [size]="16" />
+                {{ 'action.logout' | t }}
+              </button>
+            </div>
+          }
         </div>
       } @else {
         <button type="button" class="account__btn account__btn--primary" (click)="login()">
