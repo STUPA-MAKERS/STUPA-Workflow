@@ -15,9 +15,6 @@ import re
 from collections.abc import Iterable, Sequence
 from datetime import date
 from decimal import Decimal
-from typing import TypeVar
-
-_T = TypeVar("_T")
 
 # Pfad-Segment: alphanumerisch (z.B. ``VS``/``800``/``04``). Trenner ``-`` ist reserviert
 # für die Pfad-Komposition und daher im Segment verboten.
@@ -132,7 +129,7 @@ def node_available(
     return as_amount(allocated) - committed
 
 
-def pick_fiscal_year(active_ids: Sequence[_T]) -> _T | None:
+def pick_fiscal_year[T](active_ids: Sequence[T]) -> T | None:
     """HHJ bei Budget-Zuordnung ableiten (R7.1e): genau **ein** aktives HHJ → dieses;
     sonst ``None`` (mehrdeutig/keins → Service lässt ``fiscal_year_id`` offen)."""
     return active_ids[0] if len(active_ids) == 1 else None
