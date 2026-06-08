@@ -1,10 +1,13 @@
 <header class="dash__head">
   <h1 class="dash__title">{{ 'dashboard.greeting' | t: { name: auth.displayName() } }}</h1>
   <p class="dash__subtitle">{{ 'dashboard.subtitle' | t }}</p>
-  @if (auth.roles().length) {
+  @if (roles().length || gremien().length) {
     <div class="dash__roles">
-      @for (role of auth.roles(); track role) {
+      @for (role of roles(); track role) {
         <app-badge variant="primary">{{ role | capitalize }}</app-badge>
+      }
+      @for (g of gremien(); track g.id) {
+        <app-badge variant="neutral">{{ g.name }}</app-badge>
       }
     </div>
   }

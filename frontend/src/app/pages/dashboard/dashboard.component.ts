@@ -103,4 +103,9 @@ export class DashboardComponent {
 
   /** Antrags-Panels nur, wenn der Nutzer Anträge lesen darf. */
   readonly canReadApplications = computed(() => this.auth.canAny('application.read'));
+
+  /** Globale Rollen des Nutzers (Badges, #54). */
+  readonly roles = computed(() => this.auth.roles());
+  /** Gremien-Zugehörigkeiten des Nutzers (Badges, #54). */
+  readonly gremien = computed(() => this.auth.gremien());
 }
