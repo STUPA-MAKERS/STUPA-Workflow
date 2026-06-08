@@ -1,6 +1,5 @@
 import { of } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
-import userEvent from '@testing-library/user-event';
 import type { FlowGraph } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { FlowEditorComponent } from './flow-editor.component';
@@ -15,6 +14,17 @@ async function setup() {
   return { ...view, createFlowVersion };
 }
 
+/** Baut über die Komponenten-API einen gültigen Graphen (a initial → b). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildValid(c: any): void {
+  c.addState();
+  c.addState();
+  c.setStateKey('state', 'a');
+  c.setStateKey('state2', 'b');
+  c.setInitial('a');
+  c.graph.update((g: FlowGraph) => ({ ...g, transitions: [{ from: 'a', to: 'b', actions: [] }] }));
+}
+
 describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
@@ -24,40 +34,36 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(screen.getByRole('button', { name: 'Als Flow-Version speichern' })).toBeDisabled();
   });
 
-  it('applies a preset to a valid graph and saves it', async () => {
-    const { createFlowVersion } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Vorlage übernehmen' }));
-
-    const save = screen.getByRole('button', { name: 'Als Flow-Version speichern' });
-    expect(save).toBeEnabled();
-    await userEvent.click(save);
-
+  it('builds a valid graph and saves it as a flow version', async () => {
+    const { fixture, createFlowVersion } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    c.save();
     expect(createFlowVersion).toHaveBeenCalledTimes(1);
     const graph = createFlowVersion.mock.calls[0][1] as FlowGraph;
-    expect(graph.states.map((s) => s.key)).toEqual(['draft', 'submitted', 'decided']);
+    expect(graph.states.map((s) => s.key)).toEqual(['a', 'b']);
     expect(graph.states.filter((s) => s.isInitial)).toHaveLength(1);
-    expect(graph.layout?.positions).toBeDefined(); // layout persisted
+    expect(graph.layout?.positions).toBeDefined();
   });
 
   it('renders one canvas node per state', async () => {
-    const { container } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Vorlage übernehmen' }));
-    // 3 states → 3 node-text labels in the SVG canvas
-    expect(container.querySelectorAll('.fe__node-text')).toHaveLength(3);
+    const { container, fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buildValid(fixture.componentInstance as any);
+    fixture.detectChanges();
+    expect(container.querySelectorAll('.fe__node-text')).toHaveLength(2);
   });
 
   it('exposes the guard control only for an automatic transition', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    await userEvent.click(screen.getByRole('button', { name: 'Vorlage übernehmen' }));
-
-    c.selectEdge(0); // erste Transition auswählen
+    buildValid(c);
+    c.selectEdge(0);
     fixture.detectChanges();
-    // Manueller Übergang → kein Guard-Control.
     expect(screen.queryByRole('combobox', { name: 'Bedingung (Guard)' })).not.toBeInTheDocument();
-
-    c.setTransitionAutomatic(0, true); // Guard erscheint erst für automatische Übergänge (FE3)
+    c.setTransitionAutomatic(0, true);
     fixture.detectChanges();
     expect(screen.getByRole('combobox', { name: 'Bedingung (Guard)' })).toBeInTheDocument();
   });
@@ -66,46 +72,39 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const { fixture, createFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-
-    c.addState();
-    c.addState();
-    expect(c.graph().states).toHaveLength(2);
-    c.setStateKey('state', 'a');
-    c.setStateKey('state2', 'b');
+    buildValid(c);
     c.setInitial('b');
-    c.setInitial('a'); // a is initial; toggling exercises the reset branch
+    c.setInitial('a');
     expect(c.graph().states.filter((s: { isInitial?: boolean }) => s.isInitial)).toHaveLength(1);
     c.setStateCategory('a', 'open');
-    c.setStateCategory('a', ''); // clear → null branch
+    c.setStateCategory('a', '');
     c.setStateLabel('a', 'de', 'Entwurf');
     c.setStateLabel('a', 'en', 'Draft');
     c.setStateEditAllowed('a', false);
 
-    // Übergang a→b anlegen (entspricht dem Aufziehen im Canvas).
-    c.graph.update((g: FlowGraph) => ({ ...g, transitions: [{ from: 'a', to: 'b', actions: [] }] }));
     c.selectEdge(0);
     c.setGuard(0, 'roleIs', 'x');
     expect(c.guardOp(c.graph().transitions[0])).toBe('roleIs');
     expect(c.guardValue(c.graph().transitions[0])).toBe('x');
-    c.setGuard(0, 'manual', 'true'); // boolean coercion branch
-    c.setGuard(0, '', ''); // remove guard branch
+    c.setGuard(0, 'manual', 'true');
+    c.setGuard(0, '', '');
     expect(c.graph().transitions[0].guard).toBeUndefined();
 
-    c.setTransitionAutomatic(0, true); // #8
+    c.setTransitionAutomatic(0, true);
     expect(c.graph().transitions[0].automatic).toBe(true);
 
     c.addAction(0, 'notify');
-    c.addAction(0, ''); // no-op branch
+    c.addAction(0, '');
     expect(c.graph().transitions[0].actions).toHaveLength(1);
     c.removeAction(0, 0);
     c.setTransitionLabel(0, 'de', 'go');
     c.setTransitionEndpoint(0, 'to', 'b');
 
     c.relayout();
-    c.save(); // graph valid (a initial, b reachable) → success
+    c.save();
     expect(createFlowVersion).toHaveBeenCalled();
     const graph = createFlowVersion.mock.calls[0][1] as FlowGraph;
-    expect(graph.transitions[0].automatic).toBe(true); // automatisch serialisiert
+    expect(graph.transitions[0].automatic).toBe(true);
 
     c.selectEdge(0);
     c.removeSelectedTransition();
@@ -119,7 +118,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const { fixture, createFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.save(); // empty graph → invalid → error path, no API call
+    c.save();
     expect(createFlowVersion).not.toHaveBeenCalled();
   });
 });

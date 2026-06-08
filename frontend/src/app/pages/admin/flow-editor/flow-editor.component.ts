@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, CheckboxComponent, DialogComponent, SelectComponent, type SelectOption } from '@shared/ui';
+import { ButtonComponent, CheckboxComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import { AdminOptionsService } from '../admin-options.service';
@@ -36,15 +36,6 @@ import {
   serializeFlowGraph,
   validateFlowGraph,
 } from '../flow-graph.util';
-import { FLOW_PRESETS, type FlowPreset } from './flow-presets';
-
-/** Benutzer-Vorlage (im localStorage gesichert, #20). */
-interface CustomTemplate {
-  key: string;
-  name: string;
-  graph: FlowGraph;
-}
-const TEMPLATE_STORE = 'ap.flowTemplates';
 
 /** Aktuelle Auswahl im Canvas: ein State (per key) oder eine Transition (per Index). */
 type Selection =
@@ -71,7 +62,7 @@ const MARGIN = 40;
   selector: 'app-flow-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, SelectComponent, DialogComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, SelectComponent],
   templateUrl: './flow-editor.component.html',
   styleUrl: './flow-editor.component.scss',
 })
@@ -90,25 +81,8 @@ export class FlowEditorComponent {
   protected readonly categories = STATE_CATEGORIES;
   protected readonly guardOps = GUARD_LEAF_OPERATORS;
   protected readonly actionTypes = ACTION_TYPES;
-  protected readonly presets = FLOW_PRESETS;
 
   protected readonly graph = signal<FlowGraph>(autoLayout(blankGraph()));
-  protected readonly selectedPreset = signal<string>(FLOW_PRESETS[0].key);
-
-  /** Gespeicherte Benutzer-Vorlagen (#20) — im localStorage. */
-  protected readonly customTemplates = signal<CustomTemplate[]>(loadTemplates());
-  protected readonly saveOpen = signal(false);
-  protected readonly templateName = signal('');
-
-  /** Vorlagen-Dropdown: eingebaute Presets + eigene Vorlagen. */
-  protected readonly presetOptions = computed(() => [
-    ...this.presets.map((p) => ({ key: p.key, label: this.i18n.translate(p.labelKey) })),
-    ...this.customTemplates().map((t) => ({ key: t.key, label: `★ ${t.name}` })),
-  ]);
-
-  protected selectedIsCustom(): boolean {
-    return this.customTemplates().some((t) => t.key === this.selectedPreset());
-  }
 
   /** Aktuell ausgewählter Knoten/Kante für das Inspektor-Panel. */
   protected readonly selection = signal<Selection>(null);
@@ -273,47 +247,6 @@ export class FlowEditorComponent {
   /** Annotation/Hinweis für das Guard-Wertfeld je Operator (FE1). */
   protected guardValueHint(op: string): string {
     return this.i18n.translate(`admin.flow.guardHint.${op}` as TranslationKey);
-  }
-
-  // --- presets / templates -------------------------------------------------
-  protected applyPreset(): void {
-    const key = this.selectedPreset();
-    const graph =
-      this.presets.find((p) => p.key === key)?.graph ??
-      this.customTemplates().find((t) => t.key === key)?.graph;
-    if (!graph) return;
-    this.selection.set(null);
-    this.graph.set(autoLayout(JSON.parse(JSON.stringify(graph)) as FlowGraph));
-  }
-
-  protected openSaveTemplate(): void {
-    this.templateName.set('');
-    this.saveOpen.set(true);
-  }
-
-  /** Aktuellen Graphen als wiederverwendbare Vorlage speichern (#20). */
-  protected saveTemplate(): void {
-    const name = this.templateName().trim();
-    if (!name) return;
-    const tpl: CustomTemplate = {
-      key: `custom-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-      name,
-      graph: normalizeFlowGraph(this.graph()),
-    };
-    const next = [...this.customTemplates().filter((t) => t.key !== tpl.key), tpl];
-    this.customTemplates.set(next);
-    saveTemplates(next);
-    this.selectedPreset.set(tpl.key);
-    this.saveOpen.set(false);
-    this.toast.success(this.i18n.translate('admin.flow.templateSaved'));
-  }
-
-  protected deleteTemplate(): void {
-    const key = this.selectedPreset();
-    const next = this.customTemplates().filter((t) => t.key !== key);
-    this.customTemplates.set(next);
-    saveTemplates(next);
-    this.selectedPreset.set(this.presets[0].key);
   }
 
   // --- states --------------------------------------------------------------
@@ -608,25 +541,6 @@ function blankGraph(): FlowGraph {
   return { states: [], transitions: [] };
 }
 
-/** Benutzer-Vorlagen aus dem localStorage laden (defensiv, #20). */
-function loadTemplates(): CustomTemplate[] {
-  try {
-    const raw = localStorage.getItem(TEMPLATE_STORE);
-    const parsed = raw ? (JSON.parse(raw) as CustomTemplate[]) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTemplates(templates: CustomTemplate[]): void {
-  try {
-    localStorage.setItem(TEMPLATE_STORE, JSON.stringify(templates));
-  } catch {
-    /* localStorage nicht verfügbar → Vorlage bleibt nur in dieser Session. */
-  }
-}
-
 /** Eindeutigen State-Key erzeugen (`state`, `state2`, …). */
 function uniqueKey(base: string, states: StateDef[]): string {
   const used = new Set(states.map((s) => s.key));
@@ -635,5 +549,3 @@ function uniqueKey(base: string, states: StateDef[]): string {
   while (used.has(`${base}${i}`)) i++;
   return `${base}${i}`;
 }
-
-export type { FlowPreset };

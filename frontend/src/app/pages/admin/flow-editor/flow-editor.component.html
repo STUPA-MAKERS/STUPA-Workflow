@@ -20,37 +20,6 @@
     <p class="fe__desc" role="alert">{{ 'admin.flow.noTypes' | t }}</p>
   }
 
-  <div class="fe__preset">
-    <label class="fe__lbl">
-      {{ 'admin.flow.preset' | t }}
-      <select [ngModel]="selectedPreset()" (ngModelChange)="selectedPreset.set($event)">
-        @for (opt of presetOptions(); track opt.key) {
-          <option [value]="opt.key">{{ opt.label }}</option>
-        }
-      </select>
-    </label>
-    <app-button variant="secondary" size="sm" (click)="applyPreset()">{{ 'admin.flow.presetApply' | t }}</app-button>
-    <app-button variant="ghost" size="sm" (click)="openSaveTemplate()">{{ 'admin.flow.saveTemplate' | t }}</app-button>
-    @if (selectedIsCustom()) {
-      <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.deleteTemplate' | t" (click)="deleteTemplate()">✕</app-button>
-    }
-  </div>
-
-  <!-- Aktuellen Graphen als Vorlage speichern (#20) -->
-  <app-dialog
-    [open]="saveOpen()"
-    [title]="'admin.flow.saveTemplate' | t"
-    [closeLabel]="'admin.flow.cancel' | t"
-    (closed)="saveOpen.set(false)"
-  >
-    <label class="fe__lbl">{{ 'admin.flow.templateName' | t }}
-      <input [ngModel]="templateName()" (ngModelChange)="templateName.set($event)" name="tplName" /></label>
-    <div dialog-footer class="fe__dialog-foot">
-      <app-button variant="ghost" (click)="saveOpen.set(false)">{{ 'admin.flow.cancel' | t }}</app-button>
-      <app-button [disabled]="!templateName().trim()" (click)="saveTemplate()">{{ 'action.save' | t }}</app-button>
-    </div>
-  </app-dialog>
-
   <div class="fe__toolbar">
     <app-button variant="ghost" size="sm" (click)="addState()">+ {{ 'admin.flow.addState' | t }}</app-button>
     <app-button variant="ghost" size="sm" (click)="relayout()">{{ 'admin.flow.relayout' | t }}</app-button>
