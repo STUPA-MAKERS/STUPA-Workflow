@@ -58,6 +58,7 @@ describe('mapState', () => {
       label: 'Eingereicht',
       category: 'open',
       editAllowed: true,
+      kind: 'normal',
     });
   });
 
@@ -89,7 +90,7 @@ describe('mapApplication', () => {
     expect(view).toEqual({
       id: 'a1',
       typeId: 't1',
-      state: { id: 's1', key: 'submitted', label: 'Eingereicht', category: 'open', editAllowed: true },
+      state: { id: 's1', key: 'submitted', label: 'Eingereicht', category: 'open', editAllowed: true, kind: 'normal' },
       gremiumId: 'g1',
       budgetPotId: 'p1',
       amount: '250.00',
@@ -156,7 +157,7 @@ describe('mapTimelineEvent', () => {
     const view = mapTimelineEvent(wire, 'en');
     expect(view).toEqual({
       toStateId: 's1',
-      toState: { id: 's1', key: 'submitted', label: 'Submitted', category: 'open', editAllowed: true },
+      toState: { id: 's1', key: 'submitted', label: 'Submitted', category: 'open', editAllowed: true, kind: 'normal' },
       label: 'Submitted',
       actor: 'Referat',
       at: '2026-06-05T10:00:00Z',

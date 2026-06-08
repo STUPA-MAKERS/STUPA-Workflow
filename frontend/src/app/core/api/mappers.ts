@@ -68,6 +68,7 @@ export function mapState(
     label: resolveI18n(wire.label, lang),
     category: wire.category,
     editAllowed: wire.editAllowed,
+    kind: wire.kind ?? 'normal',
   };
 }
 

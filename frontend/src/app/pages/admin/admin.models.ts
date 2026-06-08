@@ -19,6 +19,30 @@ import type { FormFieldDef, I18nMap, Uuid } from '@core/api/models';
 
 export type StateCategory = 'open' | 'running' | 'closed';
 
+/** State-Art im globalen Flow (#28). */
+export type StateKind = 'normal' | 'vote' | 'approval' | 'decision';
+
+/** Eine Regel eines `decision`-States: Bedingung → Ziel-State-Key. */
+export interface DecisionRule {
+  when?: {
+    field: 'amount' | 'typeKey' | 'applicantRole';
+    op: string;
+    value: unknown;
+  } | null;
+  to: string;
+}
+
+/** Config eines States je nach `kind` (#28). Leeres Objekt für `normal`. */
+export interface StateConfig {
+  /** vote/approval: Gremium, das abstimmt/entscheidet. */
+  gremiumId?: string;
+  /** approval: Schlüssel der entscheidenden (Gremium-)Rolle. */
+  roleKey?: string;
+  /** decision: Regeln (erste passende gewinnt) + Fallback-Ziel. */
+  rules?: DecisionRule[];
+  else?: string;
+}
+
 export interface StateDef {
   key: string;
   label: I18nMap;
@@ -26,7 +50,14 @@ export interface StateDef {
   color?: string | null;
   editAllowed?: boolean;
   isInitial?: boolean;
+  /** State-Art (#28); fehlt ⇒ `normal`. */
+  kind?: StateKind | null;
+  /** Kind-spezifische Konfiguration (#28). */
+  config?: StateConfig | null;
 }
+
+/** Ergebnis-Zweig eines vote/approval-States (#28). */
+export type TransitionBranch = 'pass' | 'fail' | 'accept' | 'reject';
 
 export interface TransitionDef {
   from: string;
@@ -37,6 +68,8 @@ export interface TransitionDef {
   order?: number | null;
   /** Automatischer Übergang (#8): feuert ohne Nutzer-Aktion, sobald der Guard erfüllt ist. */
   automatic?: boolean;
+  /** Ergebnis-Zweig für vote/approval-States (#28): pass/fail bzw. accept/reject. */
+  branch?: TransitionBranch | null;
 }
 
 /** Optionales Editor-Layout (Knoten-Positionen) — persistiert im Graphen. */

@@ -123,6 +123,21 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
         }
       </app-card>
 
+      <!-- Approval-State (#28): Annehmen/Ablehnen (Server prüft Rolle im Gremium) -->
+      @if (application.state?.kind === 'approval') {
+        <app-card [heading]="'applications.approval.title' | t">
+          <p class="det__muted">{{ 'applications.approval.lead' | t }}</p>
+          <div class="det__actions">
+            <app-button variant="primary" size="sm" [loading]="approving()" (click)="submitApproval('accept')">
+              {{ 'applications.approval.accept' | t }}
+            </app-button>
+            <app-button variant="danger" size="sm" [loading]="approving()" (click)="submitApproval('reject')">
+              {{ 'applications.approval.reject' | t }}
+            </app-button>
+          </div>
+        </app-card>
+      }
+
       <!-- Statuswechsel-Aktionen (RBAC: application.manage) -->
       @if (canManage()) {
         <app-card [heading]="'applications.actions.title' | t">
@@ -490,6 +505,7 @@ export class ApplicationsDetailComponent {
   readonly pending = signal<Transition | null>(null);
   readonly note = signal('');
   readonly firing = signal(false);
+  readonly approving = signal(false);
 
   readonly canManage = computed(() => this.auth.can('application.manage'));
   readonly stateVariant = stateBadgeVariant;
@@ -622,6 +638,30 @@ export class ApplicationsDetailComponent {
         // erlaubten Übergänge ist veraltet; Detail + Aktionen neu laden.
         const key =
           err.status === 409 ? 'applications.actions.conflict' : 'applications.actions.error';
+        this.toast.error(this.i18n.translate(key));
+        this.refresh();
+      },
+    });
+  }
+
+  /** Approval-State entscheiden (#28): Annehmen/Ablehnen → POST /approval. */
+  submitApproval(decision: 'accept' | 'reject'): void {
+    if (this.approving()) return;
+    this.approving.set(true);
+    this.api.submitApproval(this.id, decision).subscribe({
+      next: () => {
+        this.approving.set(false);
+        this.toast.success(this.i18n.translate('applications.actions.success'));
+        this.refresh();
+      },
+      error: (err: { status?: number }) => {
+        this.approving.set(false);
+        const key =
+          err.status === 403
+            ? 'applications.approval.forbidden'
+            : err.status === 409
+              ? 'applications.actions.conflict'
+              : 'applications.actions.error';
         this.toast.error(this.i18n.translate(key));
         this.refresh();
       },

@@ -90,6 +90,8 @@ export interface StateOutWire {
   label: I18nMap;
   category: string;
   editAllowed: boolean;
+  /** State-Art (#28): normal|vote|approval|decision. */
+  kind?: string;
 }
 
 /** `ApplicantOut` — PII, nur für Berechtigte gefüllt. */
@@ -269,6 +271,8 @@ export interface ApplicationState {
   label: string;
   category: string;
   editAllowed: boolean;
+  /** State-Art (#28): normal|vote|approval|decision. */
+  kind: string;
 }
 
 export interface Applicant {
