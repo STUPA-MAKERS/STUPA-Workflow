@@ -13,14 +13,15 @@
  * `/api/admin/site-config` ist eine T-34-Festlegung. TODO(T-24/#21): mit Backend
  * abstimmen.
  */
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map, of } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
-import type { I18nMap, Uuid } from '@core/api/models';
+import type { I18nMap, Page, Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
 import {
   type AdminPrincipal,
+  type AuditEntry,
   type Branding,
   type FlowGraph,
   type FormOverviewItem,
@@ -300,6 +301,19 @@ export class AdminApiService {
     return hook.id
       ? this.http.patch<WebhookConfig>(`${this.base}/admin/webhooks/${hook.id}`, hook)
       : this.http.post<WebhookConfig>(`${this.base}/admin/webhooks`, hook);
+  }
+
+  // --- Audit-Log (#45, P(audit.read)) --------------------------------------
+  listAuditLog(
+    opts: { limit?: number; offset?: number; action?: string; actor?: string } = {},
+  ): Observable<Page<AuditEntry>> {
+    const limit = opts.limit ?? 50;
+    const offset = opts.offset ?? 0;
+    if (this.mock) return of({ items: [], total: 0, limit, offset });
+    let params = new HttpParams().set('limit', String(limit)).set('offset', String(offset));
+    if (opts.action) params = params.set('action', opts.action);
+    if (opts.actor) params = params.set('actor', opts.actor);
+    return this.http.get<Page<AuditEntry>>(`${this.base}/admin/audit`, { params });
   }
 
   // --- Notification-Regeln -------------------------------------------------

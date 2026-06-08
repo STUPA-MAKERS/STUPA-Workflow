@@ -621,6 +621,16 @@ export const de = {
   'admin.webhook.badUrl': 'Bitte eine gültige http(s)-URL angeben.',
   'admin.webhook.noEvents': 'Mindestens ein Ereignis auswählen.',
 
+  'admin.audit.title': 'Audit-Log',
+  'admin.audit.desc': 'Revisionssicheres, fortlaufendes Protokoll aller sicherheitsrelevanten Aktionen.',
+  'admin.audit.empty': 'Keine Audit-Einträge.',
+  'admin.audit.error': 'Audit-Log konnte nicht geladen werden.',
+  'admin.audit.loadMore': 'Mehr laden',
+  'admin.audit.col.at': 'Zeitpunkt',
+  'admin.audit.col.action': 'Aktion',
+  'admin.audit.col.actor': 'Akteur',
+  'admin.audit.col.target': 'Ziel',
+
   'admin.deleg.title': 'Vertretung / Delegation',
   'admin.deleg.subtitle':
     'Ein eigenes Recht (Rolle, optional Stimmrecht) zeitlich begrenzt an ein anderes Mitglied übertragen. Widerruf wirkt sofort.',
@@ -1503,6 +1513,16 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.webhook.none': 'No webhooks configured.',
   'admin.webhook.badUrl': 'Please provide a valid http(s) URL.',
   'admin.webhook.noEvents': 'Select at least one event.',
+
+  'admin.audit.title': 'Audit log',
+  'admin.audit.desc': 'Tamper-evident, append-only record of all security-relevant actions.',
+  'admin.audit.empty': 'No audit entries.',
+  'admin.audit.error': 'Could not load the audit log.',
+  'admin.audit.loadMore': 'Load more',
+  'admin.audit.col.at': 'Timestamp',
+  'admin.audit.col.action': 'Action',
+  'admin.audit.col.actor': 'Actor',
+  'admin.audit.col.target': 'Target',
 
   'admin.deleg.title': 'Proxy / Delegation',
   'admin.deleg.subtitle':

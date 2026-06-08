@@ -222,6 +222,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/audit',
+        data: { title: 'admin.audit.title', permission: 'audit.read' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/audit/audit-log.component').then((m) => m.AuditLogComponent),
+      },
+      {
         path: 'admin/delegations',
         data: { title: 'admin.deleg.title', permission: 'admin.roles' },
         canActivate: [authGuard],

@@ -270,6 +270,19 @@ export interface WebhookConfig {
   active: boolean;
 }
 
+/** Append-only Audit-Eintrag (T-23, `GET /admin/audit`). */
+export interface AuditEntry {
+  id: number;
+  at: string;
+  actor: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  data: Record<string, unknown>;
+  hash: string;
+  prevHash: string | null;
+}
+
 // --- Branding / Site-Config (#21 — T-34-Contract, nicht SDS) ----------------
 
 export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon';
