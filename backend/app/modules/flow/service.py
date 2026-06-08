@@ -15,6 +15,7 @@ prüft das und liefert 409 (``setEditLock`` wird daher inline behandelt, nicht d
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -25,6 +26,8 @@ from app.modules.admin.models import ApplicationType
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
+from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.models import Role, RoleAssignment
 from app.modules.auth.principal import Principal
 from app.modules.flow import context as flow_context
 from app.modules.flow.dispatch import (
@@ -35,7 +38,7 @@ from app.modules.flow.dispatch import (
 from app.modules.flow.models import State, Transition
 from app.modules.flow.routing import DecisionFacts, evaluate_decision
 from app.modules.flow.schemas import TransitionOut, TransitionResult
-from app.shared.errors import ConflictError, NotFoundError
+from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 from app.shared.guards import eval_guard
 
 
@@ -263,6 +266,70 @@ class FlowService:
             )
         return await self.fire(
             application_id, t.id, principal, note=note or branch, manual=False
+        )
+
+    # --------------------------------------------------------- approval states
+    async def _has_gremium_role(
+        self, sub: str, role_key: str, gremium_id: UUID
+    ) -> bool:
+        """``True`` wenn ``sub`` aktuell die Rolle ``role_key`` im Gremium hält (#28).
+
+        Wertet das tz-aware Gültigkeitsfenster der Rollenzuweisung aus (gleiche
+        Logik wie ``_gremien_for``)."""
+        now = datetime.now(UTC)
+        row = (
+            await self.session.execute(
+                select(RoleAssignment.id)
+                .join(Role, Role.id == RoleAssignment.role_id)
+                .join(PrincipalRow, PrincipalRow.id == RoleAssignment.principal_id)
+                .where(
+                    PrincipalRow.sub == sub,
+                    Role.key == role_key,
+                    RoleAssignment.gremium_id == gremium_id,
+                    (RoleAssignment.valid_from.is_(None))
+                    | (RoleAssignment.valid_from <= now),
+                    (RoleAssignment.valid_until.is_(None))
+                    | (RoleAssignment.valid_until > now),
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+    async def submit_approval(
+        self, application_id: UUID, decision: str, principal: Principal
+    ) -> TransitionResult:
+        """Approval-State entscheiden: ``accept``/``reject`` feuert den Branch (#28).
+
+        Der aktuelle State muss ``kind == 'approval'`` sein; nur ein Principal mit der
+        konfigurierten Rolle (``config.roleKey``) im Gremium (``config.gremiumId``) —
+        oder ein Admin (#15) — darf entscheiden (403 sonst)."""
+        if decision not in ("accept", "reject"):
+            raise ConflictError(f"invalid approval decision {decision!r}", code="conflict")
+        app = await self._load_app(application_id)
+        if app.current_state_id is None:
+            raise ConflictError("application has no current state", code="conflict")
+        state = await self._load_state(app.current_state_id)
+        if state is None or state.kind != "approval":
+            raise ConflictError(
+                "current state is not an approval state", code="conflict"
+            )
+        cfg = state.config if isinstance(state.config, dict) else {}
+        role_key = cfg.get("roleKey")
+        gremium_id = cfg.get("gremiumId")
+        if not isinstance(role_key, str) or not isinstance(gremium_id, str):
+            raise ConflictError(
+                f"approval state {state.key!r} is misconfigured", code="conflict"
+            )
+        authorized = "admin" in principal.roles or await self._has_gremium_role(
+            principal.sub, role_key, UUID(gremium_id)
+        )
+        if not authorized:
+            raise ForbiddenError(
+                f"requires role {role_key!r} in the configured gremium"
+            )
+        return await self.fire_branch(
+            application_id, decision, principal, note=f"approval:{decision}"
         )
 
     # ------------------------------------------------------------------- fire

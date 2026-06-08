@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -29,6 +30,12 @@ class TransitionRequest(_CamelModel):
 
     transition_id: UUID = Field(alias="transitionId")
     note: str | None = None
+
+
+class ApprovalRequest(_CamelModel):
+    """``POST /applications/{id}/approval`` — Approval-State entscheiden (#28)."""
+
+    decision: Literal["accept", "reject"]
 
 
 class TransitionResult(_CamelModel):

@@ -17,7 +17,7 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.models import State, Transition
 from app.modules.flow.schemas import TransitionResult
 from app.modules.flow.service import FlowService
-from app.shared.errors import ConflictError, NotFoundError
+from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 from tests.auth_fakes import fake_session, result
 
 
@@ -178,3 +178,74 @@ async def test_fire_branch_unknown_branch_raises() -> None:
     _stub_fire(svc, [])
     with pytest.raises(NotFoundError):
         await svc.fire_branch(app.id, "fail", _principal())
+
+
+def _member() -> Principal:
+    return Principal(sub="member-sub", roles=["referent"], permissions={"flow.fire"})
+
+
+def _approval_state() -> State:
+    return _state(
+        "approval",
+        kind="approval",
+        config={"roleKey": "referent", "gremiumId": str(uuid4())},
+    )
+
+
+async def test_submit_approval_admin_fires_accept() -> None:
+    appr = _approval_state()
+    accepted, rejected = _state("accepted"), _state("rejected")
+    t_acc = _transition(appr, accepted, branch="accept")
+    t_rej = _transition(appr, rejected, branch="reject")
+    app = _app(appr)
+    # admin path: _load_app, _load_state, then fire_branch(_load_app, _outgoing)
+    db = fake_session(result(app), result(appr), result(app), result(t_acc, t_rej))
+    svc = FlowService(db)
+    calls: list = []
+    _stub_fire(svc, calls)
+    await svc.submit_approval(app.id, "accept", _principal())  # admin
+    assert calls == [t_acc.id]
+
+
+async def test_submit_approval_gremium_role_fires_reject() -> None:
+    appr = _approval_state()
+    accepted, rejected = _state("accepted"), _state("rejected")
+    t_acc = _transition(appr, accepted, branch="accept")
+    t_rej = _transition(appr, rejected, branch="reject")
+    app = _app(appr)
+    # non-admin: _load_app, _load_state, _has_gremium_role(assignment id), then fire_branch
+    db = fake_session(
+        result(app), result(appr), result(uuid4()), result(app), result(t_acc, t_rej)
+    )
+    svc = FlowService(db)
+    calls: list = []
+    _stub_fire(svc, calls)
+    await svc.submit_approval(app.id, "reject", _member())
+    assert calls == [t_rej.id]
+
+
+async def test_submit_approval_unauthorized_raises_forbidden() -> None:
+    appr = _approval_state()
+    app = _app(appr)
+    # non-admin, no matching role assignment → None → Forbidden
+    db = fake_session(result(app), result(appr), result())
+    svc = FlowService(db)
+    _stub_fire(svc, [])
+    with pytest.raises(ForbiddenError):
+        await svc.submit_approval(app.id, "accept", _member())
+
+
+async def test_submit_approval_non_approval_state_conflict() -> None:
+    normal = _state("open")
+    app = _app(normal)
+    db = fake_session(result(app), result(normal))
+    svc = FlowService(db)
+    _stub_fire(svc, [])
+    with pytest.raises(ConflictError):
+        await svc.submit_approval(app.id, "accept", _principal())
+
+
+async def test_submit_approval_invalid_decision_conflict() -> None:
+    svc = FlowService(fake_session())
+    with pytest.raises(ConflictError):
+        await svc.submit_approval(uuid4(), "maybe", _principal())

@@ -19,7 +19,12 @@ from fastapi import APIRouter, Depends
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
-from app.modules.flow.schemas import TransitionOut, TransitionRequest, TransitionResult
+from app.modules.flow.schemas import (
+    ApprovalRequest,
+    TransitionOut,
+    TransitionRequest,
+    TransitionResult,
+)
 from app.modules.flow.service import FlowService
 from app.shared.errors import ProblemDetail
 
@@ -83,3 +88,20 @@ async def fire_transition(
         principal,
         note=payload.note,
     )
+
+
+@router.post(
+    "/applications/{application_id}/approval",
+    response_model=TransitionResult,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def submit_approval(
+    application_id: UUID,
+    payload: ApprovalRequest,
+    service: ServiceDep,
+    principal: PrincipalDep,
+) -> TransitionResult:
+    """Approval-State entscheiden (#28): ``accept``/``reject`` feuert den Branch.
+
+    403, wenn der Principal die konfigurierte Rolle im Gremium nicht hält."""
+    return await service.submit_approval(application_id, payload.decision, principal)
