@@ -39,20 +39,35 @@ describe('WebhooksComponent', () => {
     expect(saveWebhook.mock.calls[0][0].events).toEqual(['application_created']);
   });
 
-  it('toggles events off and removes a webhook', async () => {
+  it('edits an existing webhook via the dialog', async () => {
     const seed = [
       { id: 'wh-1', name: 'A', url: 'https://a', events: ['vote_opened' as const], active: true },
     ];
-    const { fixture } = await setup(seed);
+    const { fixture, saveWebhook } = await setup(seed);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.toggleEvent(0, 'vote_opened'); // remove existing event
-    expect(c.hooks()[0].events).toEqual([]);
-    c.toggleEvent(0, 'vote_closed'); // add new
+    c.openEdit(0);
+    expect(c.draft().url).toBe('https://a');
+    c.toggleEvent('vote_opened'); // remove existing event from the draft
+    expect(c.draft().events).toEqual([]);
+    c.toggleEvent('vote_closed'); // add a new one
+    expect(c.draft().events).toEqual(['vote_closed']);
+    // Bearbeiten lässt das Original unberührt, bis gespeichert wird.
+    expect(c.hooks()[0].events).toEqual(['vote_opened']);
+    c.save();
+    expect(saveWebhook).toHaveBeenCalledTimes(1);
     expect(c.hooks()[0].events).toEqual(['vote_closed']);
-    expect(c.tr('admin.webhook.badUrl')).toContain('URL');
-    c.save(0); // valid row (https + 1 event) → saveWebhook path
-    c.remove(0);
-    expect(c.hooks()).toHaveLength(0);
+    expect(c.draft()).toBeNull(); // Dialog nach dem Speichern zu
+  });
+
+  it('cancelling the dialog discards the draft', async () => {
+    const { fixture, saveWebhook } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openAdd();
+    c.patch('url', 'https://x');
+    c.close();
+    expect(c.draft()).toBeNull();
+    expect(saveWebhook).not.toHaveBeenCalled();
   });
 });

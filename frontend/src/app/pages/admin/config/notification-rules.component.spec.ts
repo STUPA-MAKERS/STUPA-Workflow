@@ -46,21 +46,36 @@ describe('NotificationRulesComponent', () => {
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
 
-  it('exercises recipient mutators and labels', async () => {
+  it('exercises recipient mutators on the draft and labels', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.add();
-    c.addRcpt(0); // adds a role recipient (ref empty)
-    expect(c.rules()[0].recipients).toHaveLength(2);
-    c.rules()[0].recipients[1].kind = 'applicant';
-    c.onKind(0, 1); // applicant → ref stripped
-    expect(c.rules()[0].recipients[1].ref).toBeUndefined();
-    c.removeRcpt(0, 1);
-    expect(c.rules()[0].recipients).toHaveLength(1);
+    c.openAdd();
+    c.addRcpt(); // adds a role recipient (ref empty)
+    expect(c.draft().recipients).toHaveLength(2);
+    c.setKind(1, 'applicant'); // applicant → ref stripped
+    expect(c.draft().recipients[1].ref).toBeUndefined();
+    c.removeRcpt(1);
+    expect(c.draft().recipients).toHaveLength(1);
     // Empfänger-Typen kommen als lokalisierte Dropdown-Optionen (#77).
     expect(c.kindOptions.find((o: { value: string }) => o.value === 'role').label).toBe('Rolle');
-    c.remove(0);
-    expect(c.rules()).toHaveLength(0);
+    c.close();
+    expect(c.draft()).toBeNull();
+  });
+
+  it('edits an existing rule without mutating it until save', async () => {
+    const seed: NotificationRule[] = [
+      { id: 'nr-1', event: 'status_changed', recipients: [{ kind: 'applicant' }], templateKey: 'old', enabled: true },
+    ];
+    const { fixture, saveNotificationRule } = await setup(seed);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openEdit(0);
+    c.patch('templateKey', 'new');
+    expect(c.rules()[0].templateKey).toBe('old'); // original untouched
+    c.save();
+    expect(saveNotificationRule).toHaveBeenCalledTimes(1);
+    expect(c.rules()[0].templateKey).toBe('new');
+    expect(c.draft()).toBeNull();
   });
 });

@@ -450,6 +450,8 @@ export const de = {
 
   'admin.common.add': 'Hinzufügen',
   'admin.common.remove': 'Entfernen',
+  'admin.common.edit': 'Bearbeiten',
+  'admin.common.actions': 'Aktionen',
   'admin.common.moveUp': 'Nach oben',
   'admin.common.moveDown': 'Nach unten',
   'admin.common.key': 'Schlüssel',
@@ -1331,6 +1333,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'admin.common.add': 'Add',
   'admin.common.remove': 'Remove',
+  'admin.common.edit': 'Edit',
+  'admin.common.actions': 'Actions',
   'admin.common.moveUp': 'Move up',
   'admin.common.moveDown': 'Move down',
   'admin.common.key': 'Key',

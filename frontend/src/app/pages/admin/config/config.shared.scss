@@ -85,6 +85,49 @@
   gap: var(--space-3);
 }
 
+/* Dialog-Formular (#39): Anlegen/Bearbeiten als Dialog statt Inline-Karte. */
+.cfg__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cfg__dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field__label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.field__control {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Boolean-Spalte: farbiges ✓/✗ (konsistent mit Gremien). */
+.cfg__yes,
+.cfg__no {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+.cfg__yes {
+  color: var(--color-success);
+}
+.cfg__no {
+  color: var(--color-danger);
+}
+
 input,
 select,
 textarea {

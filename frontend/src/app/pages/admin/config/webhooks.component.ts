@@ -3,73 +3,114 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, CheckboxComponent } from '@shared/ui';
-import { ToastService } from '@shared/ui';
+import {
+  BadgeComponent,
+  ButtonComponent,
+  CellDirective,
+  CheckboxComponent,
+  type ColumnDef,
+  DataTableComponent,
+  DialogComponent,
+  IconComponent,
+  ToastService,
+} from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import { EVENT_NAMES, type EventName, type WebhookConfig } from '../admin.models';
 
+function emptyHook(): WebhookConfig {
+  return { id: '', name: '', url: '', events: [], active: true };
+}
+
 /**
- * Webhook-Config-UI (T-34, api.md `/admin/webhooks`). CRUD über die admin-API
- * (im Mock-Modus In-Memory). Client-Validierung: gültige http(s)-URL + mind. ein
- * Ereignis aus der Whitelist (`EventName`).
+ * Webhook-Config-UI (T-34, api.md `/admin/webhooks`). Header mit Anlegen-Button,
+ * Liste als geteilte {@link DataTableComponent}, Anlegen/Bearbeiten über einen
+ * **Dialog** (#19/#39). Client-Validierung: gültige http(s)-URL + mind. ein Ereignis.
  */
 @Component({
   selector: 'app-webhooks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    CheckboxComponent,
+    BadgeComponent,
+    DataTableComponent,
+    CellDirective,
+    DialogComponent,
+    IconComponent,
+  ],
   template: `
     <section class="cfg">
       <header class="cfg__head">
-        <h1>{{ 'admin.webhook.title' | t }}</h1>
-        <app-button variant="secondary" size="sm" (click)="add()">{{ 'admin.webhook.add' | t }}</app-button>
+        <div>
+          <h1>{{ 'admin.webhook.title' | t }}</h1>
+          <p class="cfg__desc">{{ 'admin.webhook.desc' | t }}</p>
+        </div>
+        <app-button size="sm" (click)="openAdd()">{{ 'admin.webhook.add' | t }}</app-button>
       </header>
 
-      <p class="cfg__desc">{{ 'admin.webhook.desc' | t }}</p>
+      <app-data-table [columns]="columns()" [rows]="hooks()" [emptyText]="'admin.webhook.none' | t">
+        <ng-template appCell="active" let-h>
+          @if ($any(h).active) {
+            <span class="cfg__yes" aria-label="✓">✓</span>
+          } @else {
+            <span class="cfg__no" aria-label="✗">✗</span>
+          }
+        </ng-template>
+        <ng-template appCell="events" let-h>
+          <app-badge variant="neutral">{{ $any(h).events.length }}</app-badge>
+        </ng-template>
+        <ng-template appCell="actions" let-h let-i="index">
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.edit' | t" (click)="openEdit(i)">
+            <app-icon name="edit" />
+          </app-button>
+        </ng-template>
+      </app-data-table>
+    </section>
 
-      @if (hooks().length === 0) {
-        <p class="cfg__empty">{{ 'admin.webhook.none' | t }}</p>
-      }
-
-      @for (hook of hooks(); track $index; let i = $index) {
-        <article class="cfg__card">
-          <div class="cfg__grid">
-            <label class="cfg__lbl">{{ 'admin.webhook.name' | t }}
-              <input [(ngModel)]="hook.name" (ngModelChange)="touch()" /></label>
-            <label class="cfg__lbl cfg__lbl--wide">{{ 'admin.webhook.url' | t }}
-              <input [(ngModel)]="hook.url" (ngModelChange)="touch()" placeholder="https://" /></label>
-            <app-checkbox [(ngModel)]="hook.active" (ngModelChange)="touch()">
-              {{ 'admin.webhook.active' | t }}
-            </app-checkbox>
-          </div>
-
+    <app-dialog
+      [open]="draft() !== null"
+      [title]="(editingIndex() === null ? 'admin.webhook.add' : 'admin.common.edit') | t"
+      [closeLabel]="'action.cancel' | t"
+      (closed)="close()"
+    >
+      @if (draft(); as d) {
+        <form class="cfg__form" (submit)="$event.preventDefault(); save()">
+          <label class="field">
+            <span class="field__label">{{ 'admin.webhook.name' | t }}</span>
+            <input class="field__control" [ngModel]="d.name" (ngModelChange)="patch('name', $event)" name="name" />
+          </label>
+          <label class="field">
+            <span class="field__label">{{ 'admin.webhook.url' | t }}</span>
+            <input class="field__control" [ngModel]="d.url" (ngModelChange)="patch('url', $event)" name="url" placeholder="https://" />
+          </label>
+          <app-checkbox [ngModel]="d.active" (ngModelChange)="patch('active', $event)" name="active">
+            {{ 'admin.webhook.active' | t }}
+          </app-checkbox>
           <fieldset class="cfg__events">
             <legend>{{ 'admin.webhook.events' | t }}</legend>
             @for (ev of allEvents; track ev) {
-              <app-checkbox
-                [ngModel]="hook.events.includes(ev)"
-                (ngModelChange)="toggleEvent(i, ev)"
-              >
+              <app-checkbox [ngModel]="d.events.includes(ev)" (ngModelChange)="toggleEvent(ev)" [name]="'ev-' + ev">
                 {{ ev }}
               </app-checkbox>
             }
           </fieldset>
-
-          @if (errors()[i].length > 0) {
+          @if (errors().length > 0) {
             <ul class="cfg__errors" role="alert">
-              @for (e of errors()[i]; track e) {
+              @for (e of errors(); track e) {
                 <li>{{ tr(e) }}</li>
               }
             </ul>
           }
-
-          <div class="cfg__row-foot">
-            <app-button variant="ghost" size="sm" (click)="remove(i)">{{ 'admin.common.remove' | t }}</app-button>
-            <app-button size="sm" [disabled]="errors()[i].length > 0" (click)="save(i)">{{ 'action.save' | t }}</app-button>
-          </div>
-        </article>
+        </form>
       }
-    </section>
+      <div dialog-footer class="cfg__dialog-foot">
+        <app-button variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+        <app-button [disabled]="errors().length > 0" (click)="save()">{{ 'action.save' | t }}</app-button>
+      </div>
+    </app-dialog>
   `,
   styleUrl: './config.shared.scss',
 })
@@ -80,58 +121,74 @@ export class WebhooksComponent {
 
   protected readonly allEvents = EVENT_NAMES;
   protected readonly hooks = signal<WebhookConfig[]>([]);
+  protected readonly draft = signal<WebhookConfig | null>(null);
+  protected readonly editingIndex = signal<number | null>(null);
 
-  /** i18n-Key (Validierungsmeldung) übersetzen — Keys sind statisch gepflegt. */
-  protected tr(key: string): string {
-    return this.i18n.translate(key as TranslationKey);
-  }
+  protected readonly columns = computed<ColumnDef[]>(() => [
+    { key: 'name', label: this.i18n.translate('admin.webhook.name') },
+    { key: 'url', label: this.i18n.translate('admin.webhook.url') },
+    { key: 'events', label: this.i18n.translate('admin.webhook.events'), align: 'start', width: '7rem' },
+    { key: 'active', label: this.i18n.translate('admin.webhook.active'), align: 'start', width: '6rem' },
+    { key: 'actions', label: this.i18n.translate('admin.common.actions'), align: 'end', width: '6rem' },
+  ]);
 
-  protected readonly errors = computed(() =>
-    this.hooks().map((h) => {
-      const errs: string[] = [];
-      if (!/^https?:\/\/.+/i.test(h.url)) errs.push('admin.webhook.badUrl');
-      if (h.events.length === 0) errs.push('admin.webhook.noEvents');
-      return errs;
-    }),
-  );
+  protected readonly errors = computed(() => {
+    const d = this.draft();
+    if (!d) return [] as string[];
+    const errs: string[] = [];
+    if (!/^https?:\/\/.+/i.test(d.url)) errs.push('admin.webhook.badUrl');
+    if (d.events.length === 0) errs.push('admin.webhook.noEvents');
+    return errs;
+  });
 
   constructor() {
     this.api.listWebhooks().subscribe((h) => this.hooks.set(h));
   }
 
-  protected add(): void {
-    this.hooks.update((list) => [
-      ...list,
-      { id: '', name: '', url: '', events: [], active: true },
-    ]);
+  protected tr(key: string): string {
+    return this.i18n.translate(key as TranslationKey);
   }
 
-  protected remove(i: number): void {
-    this.hooks.update((list) => list.filter((_, idx) => idx !== i));
+  protected openAdd(): void {
+    this.editingIndex.set(null);
+    this.draft.set(emptyHook());
   }
 
-  protected toggleEvent(i: number, ev: EventName): void {
-    this.hooks.update((list) =>
-      list.map((h, idx) => {
-        if (idx !== i) return h;
-        const events = h.events.includes(ev)
-          ? h.events.filter((e) => e !== ev)
-          : [...h.events, ev];
-        return { ...h, events };
-      }),
-    );
+  protected openEdit(i: number): void {
+    this.editingIndex.set(i);
+    this.draft.set({ ...this.hooks()[i], events: [...this.hooks()[i].events] });
   }
 
-  protected touch(): void {
-    this.hooks.update((list) => [...list]);
+  protected close(): void {
+    this.draft.set(null);
+    this.editingIndex.set(null);
   }
 
-  protected save(i: number): void {
-    if (this.errors()[i].length > 0) return;
-    this.api.saveWebhook(this.hooks()[i]).subscribe({
+  protected patch<K extends keyof WebhookConfig>(key: K, value: WebhookConfig[K]): void {
+    this.draft.update((d) => (d ? { ...d, [key]: value } : d));
+  }
+
+  protected toggleEvent(ev: EventName): void {
+    this.draft.update((d) => {
+      if (!d) return d;
+      const events = d.events.includes(ev)
+        ? d.events.filter((e) => e !== ev)
+        : [...d.events, ev];
+      return { ...d, events };
+    });
+  }
+
+  protected save(): void {
+    const d = this.draft();
+    if (!d || this.errors().length > 0) return;
+    const idx = this.editingIndex();
+    this.api.saveWebhook(d).subscribe({
       next: (saved) => {
-        this.hooks.update((list) => list.map((h, idx) => (idx === i ? saved : h)));
+        this.hooks.update((list) =>
+          idx === null ? [...list, saved] : list.map((h, i) => (i === idx ? saved : h)),
+        );
         this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.close();
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });
