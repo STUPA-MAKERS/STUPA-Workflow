@@ -52,21 +52,18 @@ import { StatusDistributionComponent } from './status-distribution.component';
     <form class="budget__filters" (submit)="applyFilters($event)" role="search">
       <p class="budget__filtersLegend">{{ 'budget.filter.heading' | t }}</p>
       <div class="field">
-        <label class="field__label" for="budget-pot">{{ 'budget.filter.pot' | t }}</label>
         @if (pots().length) {
-          <select
+          <app-select
             id="budget-pot"
-            class="field__control"
             name="pot"
+            [label]="'budget.filter.pot' | t"
+            [placeholder]="'budget.filter.all' | t"
+            [options]="potOptions()"
             [ngModel]="pot()"
             (ngModelChange)="pot.set($event)"
-          >
-            <option value="">{{ 'budget.filter.all' | t }}</option>
-            @for (p of pots(); track p.id) {
-              <option [value]="p.id">{{ p.name }}</option>
-            }
-          </select>
+          />
         } @else {
+          <label class="field__label" for="budget-pot">{{ 'budget.filter.pot' | t }}</label>
           <input
             id="budget-pot"
             class="field__control"
@@ -240,9 +237,21 @@ import { StatusDistributionComponent } from './status-distribution.component';
       }
       .budget__kpis {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+        /* Feste, gleich breite Spalten statt content-getriebener auto-fit-Tracks
+           (#106): 2 → 3 → 6 Spalten, immer volle Reihen, alle KPIs gleich breit. */
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: var(--space-4);
         margin-bottom: var(--space-5);
+      }
+      @media (min-width: 40rem) {
+        .budget__kpis {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      @media (min-width: 64rem) {
+        .budget__kpis {
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
       }
       .kpi {
         display: flex;
@@ -300,6 +309,10 @@ export class BudgetDashboardComponent {
   readonly pots = signal<BudgetPotInfo[]>([]);
   /** Gremien als Dropdown-Optionen (#77) statt Freitext-ID. */
   readonly gremiumOptions = signal<SelectOption[]>([]);
+  /** Töpfe als Dropdown-Optionen (#106 — custom app-select statt nativem select). */
+  readonly potOptions = computed<SelectOption[]>(() =>
+    this.pots().map((p) => ({ value: p.id, label: p.name })),
+  );
 
   /** Sichtbare Filter-Controls (gespiegelt aus den Query-Params). */
   readonly pot = signal('');

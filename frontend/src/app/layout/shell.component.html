@@ -12,7 +12,7 @@
           class="header__link"
           [routerLink]="item.path"
           routerLinkActive="is-active"
-          [routerLinkActiveOptions]="{ exact: false }"
+          [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
         >
           {{ item.labelKey | t }}
         </a>

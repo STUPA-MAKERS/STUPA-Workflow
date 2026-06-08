@@ -56,7 +56,10 @@
   display: none;
 }
 .header__link {
-  padding: var(--space-2) var(--space-3);
+  /* Kompakteres horizontales Padding (#106): schafft Platz, damit die volle Nav
+     (… Verwaltung) bei 1440px in eine Zeile passt und das aktive Item nicht am
+     Container-Rand abgeschnitten wird. */
+  padding: var(--space-2);
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   color: var(--color-text-muted);
