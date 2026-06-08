@@ -303,6 +303,7 @@ export const de = {
   'meetings.create.noGremien': 'Kein Gremium verfügbar — bitte zuerst in der Verwaltung anlegen.',
   'meetings.create.submit': 'Sitzung anlegen',
   'meetings.create.date': 'Geplantes Datum',
+  'meetings.create.time': 'Uhrzeit',
   'meetings.plan.title': 'Sitzung terminieren',
   'meetings.plan.lead':
     'Lege für diese geplante Sitzung ein Datum fest. Anträge werden über die Abstimmungen zugewiesen.',
@@ -1170,6 +1171,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.create.noGremien': 'No committee available — please create one in administration first.',
   'meetings.create.submit': 'Create meeting',
   'meetings.create.date': 'Planned date',
+  'meetings.create.time': 'Time',
   'meetings.plan.title': 'Schedule meeting',
   'meetings.plan.lead':
     'Set a date for this planned meeting. Applications are assigned via the votes.',

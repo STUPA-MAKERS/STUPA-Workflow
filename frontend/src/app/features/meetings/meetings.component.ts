@@ -62,7 +62,7 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
         <div class="mtg__meta">
           <span class="mtg__name">{{ m.title }}</span>
           @if (m.date) {
-            <span class="mtg__muted">{{ m.date | date: 'mediumDate' }}</span>
+            <span class="mtg__muted">{{ m.date | date: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}</span>
           }
           <app-badge [variant]="statusVariant(m.status)">
             {{ statusKey(m.status) | t }}
@@ -88,6 +88,15 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
               [ngModel]="planDate()"
               (ngModelChange)="planDate.set($event)"
               name="planDate"
+            />
+            <label class="mtg__paneLabel" for="mtg-plan-time">{{ 'meetings.create.time' | t }}</label>
+            <input
+              id="mtg-plan-time"
+              class="mtg__input"
+              type="time"
+              [ngModel]="planTime()"
+              (ngModelChange)="planTime.set($event)"
+              name="planTime"
             />
             <app-button
               size="sm"
@@ -282,7 +291,7 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
                 <li class="mtg__listItem">
                   <span class="mtg__listTitle">{{ mtg.title }}</span>
                   @if (mtg.date) {
-                    <span class="mtg__muted">{{ mtg.date | date: 'mediumDate' }}</span>
+                    <span class="mtg__muted">{{ mtg.date | date: 'mediumDate' }}{{ mtg.startTime ? ', ' + mtg.startTime : '' }}</span>
                   }
                   <app-badge [variant]="statusVariant(mtg.status)">
                     {{ statusKey(mtg.status) | t }}
@@ -331,6 +340,15 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
               [ngModel]="newDate()"
               (ngModelChange)="newDate.set($event)"
               name="date"
+            />
+            <label class="mtg__paneLabel" for="mtg-new-time">{{ 'meetings.create.time' | t }}</label>
+            <input
+              id="mtg-new-time"
+              class="mtg__input"
+              type="time"
+              [ngModel]="newTime()"
+              (ngModelChange)="newTime.set($event)"
+              name="time"
             />
             <app-button
               type="submit"
@@ -610,8 +628,11 @@ export class MeetingsComponent implements OnDestroy {
   readonly newTitle = signal('');
   /** Optionales geplantes Datum für die neue Sitzung (#7), `YYYY-MM-DD`. */
   readonly newDate = signal('');
-  /** Datums-Editor einer bereits angelegten, geplanten Sitzung (#7). */
+  /** Optionale geplante Uhrzeit (#34), `HH:mm`. */
+  readonly newTime = signal('');
+  /** Datums-/Zeit-Editor einer bereits angelegten, geplanten Sitzung (#7/#34). */
   readonly planDate = signal('');
+  readonly planTime = signal('');
   readonly savingDate = signal(false);
   /** Pflicht-Gremium für die neue Sitzung (#68); leer ⇒ Submit gesperrt. */
   readonly newGremiumId = signal('');
@@ -670,6 +691,7 @@ export class MeetingsComponent implements OnDestroy {
   private adoptMeeting(m: Meeting): void {
     this.meeting.set(m);
     this.planDate.set(m.date ?? '');
+    this.planTime.set(m.startTime ?? '');
     this.connectLive(m.id);
     if (m.protocolId && this.canWrite()) this.loadProtocol();
   }
@@ -697,12 +719,14 @@ export class MeetingsComponent implements OnDestroy {
     if (!title || !gremiumId || this.creating()) return;
     this.creating.set(true);
     const date = this.newDate().trim() || null;
-    this.api.createMeeting({ title, gremiumId, date }).subscribe({
+    const startTime = this.newTime().trim() || null;
+    this.api.createMeeting({ title, gremiumId, date, startTime }).subscribe({
       next: (m) => {
         this.creating.set(false);
         this.newTitle.set('');
         this.newGremiumId.set('');
         this.newDate.set('');
+        this.newTime.set('');
         this.toast.success(this.i18n.translate('meetings.toast.created'));
         // Auf die Detail-Route navigieren, damit die Sitzung wiederauffindbar ist (#104).
         void this.router.navigate(['/meetings', m.id]);
@@ -735,7 +759,7 @@ export class MeetingsComponent implements OnDestroy {
     const date = this.planDate().trim();
     if (!m || !date || this.savingDate()) return;
     this.savingDate.set(true);
-    this.api.patchMeeting(m.id, { date }).subscribe({
+    this.api.patchMeeting(m.id, { date, startTime: this.planTime().trim() || null }).subscribe({
       next: (updated) => {
         this.savingDate.set(false);
         this.meeting.set(updated);

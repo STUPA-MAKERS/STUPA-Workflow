@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date as _date
 from datetime import datetime as _datetime
+from datetime import time as _time
 from typing import Literal
 from uuid import UUID
 
@@ -24,6 +25,7 @@ class MeetingCreate(_CamelModel):
     gremium_id: UUID = Field(alias="gremiumId")
     title: str = Field(min_length=1)
     date: _date | None = None
+    start_time: _time | None = Field(default=None, alias="startTime")
 
 
 class MeetingPatch(_CamelModel):
@@ -35,6 +37,7 @@ class MeetingPatch(_CamelModel):
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
     status: MeetingStatus | None = None
     date: _date | None = None
+    start_time: _time | None = Field(default=None, alias="startTime")
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
@@ -43,9 +46,10 @@ class MeetingPatch(_CamelModel):
             self.status is None
             and self.active_application_id is None
             and "date" not in self.model_fields_set
+            and "start_time" not in self.model_fields_set
         ):
             raise ValueError(
-                "at least one of 'status', 'activeApplicationId' or 'date' required"
+                "at least one of 'status', 'activeApplicationId', 'date' or 'startTime' required"
             )
         return self
 
@@ -57,6 +61,7 @@ class MeetingOut(_CamelModel):
     gremium_id: UUID = Field(alias="gremiumId")
     title: str
     date: _date | None = None
+    start_time: _time | None = Field(default=None, alias="startTime")
     status: MeetingStatus
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
     protocol_id: UUID | None = Field(default=None, alias="protocolId")

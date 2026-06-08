@@ -97,6 +97,7 @@ class MeetingService:
             gremiumId=meeting.gremium_id,
             title=meeting.title,
             date=meeting.date,
+            startTime=meeting.start_time,
             status=meeting.status,  # type: ignore[arg-type]
             activeApplicationId=meeting.active_application_id,
             protocolId=protocol_id,
@@ -153,6 +154,7 @@ class MeetingService:
             gremium_id=payload.gremium_id,
             title=payload.title,
             date=payload.date,
+            start_time=payload.start_time,
             status="planned",
             created_by=principal.sub,
         )
@@ -170,6 +172,8 @@ class MeetingService:
             meeting.active_application_id = payload.active_application_id
         if "date" in payload.model_fields_set:
             meeting.date = payload.date
+        if "start_time" in payload.model_fields_set:
+            meeting.start_time = payload.start_time
         await self.session.flush()
         await self.session.commit()
         out = self._to_out(meeting)

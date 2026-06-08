@@ -245,7 +245,7 @@ describe('MeetingsComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
     const req = http.expectOne('/api/meetings');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ title: 'Neue Sitzung', gremiumId: 'g-1', date: null });
+    expect(req.request.body).toEqual({ title: 'Neue Sitzung', gremiumId: 'g-1', date: null, startTime: null });
     req.flush({ ...MEETING, title: 'Neue Sitzung', protocolId: null });
     // Wiederauffindbarkeit: nach dem Anlegen auf `/meetings/{id}` navigieren.
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);

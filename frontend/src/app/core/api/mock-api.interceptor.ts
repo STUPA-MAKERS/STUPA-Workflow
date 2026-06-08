@@ -583,13 +583,14 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (/\/meetings\/[^/]+\/protocol$/.test(p)) return ok(MOCK_PROTOCOL);
     if (p.endsWith('/meetings')) {
-      const body = (req.body as { title?: string; date?: string | null } | null) ?? {};
+      const body = (req.body as { title?: string; date?: string | null; startTime?: string | null } | null) ?? {};
       const title = body.title?.trim();
       // BE legt neue Sitzungen mit Status `planned` an (#104 — keine Drift mehr).
       MOCK_MEETING = {
         ...MOCK_MEETING,
         title: title || MOCK_MEETING.title,
         date: body.date ?? null,
+        startTime: body.startTime ?? null,
         status: 'planned',
       };
       return ok(MOCK_MEETING, 201);
@@ -602,7 +603,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PATCH' && /\/meetings\/[^/]+$/.test(p)) {
-    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; date?: string | null } | null) ?? {};
+    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; date?: string | null; startTime?: string | null } | null) ?? {};
     MOCK_MEETING = {
       ...MOCK_MEETING,
       status: body.status ?? MOCK_MEETING.status,
@@ -611,6 +612,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
           ? body.activeApplicationId
           : MOCK_MEETING.activeApplicationId,
       date: body.date !== undefined ? body.date : MOCK_MEETING.date,
+      startTime: body.startTime !== undefined ? body.startTime : MOCK_MEETING.startTime,
     };
     return ok(MOCK_MEETING);
   }

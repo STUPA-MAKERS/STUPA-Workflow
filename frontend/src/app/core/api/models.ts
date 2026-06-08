@@ -582,6 +582,7 @@ export interface MeetingOutWire {
   id: Uuid;
   title: string;
   date?: string | null;
+  startTime?: string | null;
   status: MeetingStatus;
   activeApplicationId?: Uuid | null;
   gremiumId?: Uuid | null;
@@ -610,6 +611,8 @@ export interface MeetingCreateBody {
   gremiumId?: Uuid | null;
   /** Geplantes Sitzungsdatum (`YYYY-MM-DD`), optional. */
   date?: string | null;
+  /** Geplante Uhrzeit (`HH:mm`), optional (#34). */
+  startTime?: string | null;
 }
 
 /** Body für `PATCH /meetings/{id}` — Status, aktiven Antrag und/oder Datum setzen. */
@@ -618,6 +621,8 @@ export interface MeetingPatchBody {
   activeApplicationId?: Uuid | null;
   /** Geplantes Sitzungsdatum (`YYYY-MM-DD`); für Vorab-Terminierung geplanter Sitzungen. */
   date?: string | null;
+  /** Geplante Uhrzeit (`HH:mm`) (#34). */
+  startTime?: string | null;
 }
 
 /** Body für `PATCH /protocols/{id}` — Markdown aktualisieren. */
@@ -650,6 +655,8 @@ export interface Meeting {
   title: string;
   /** Geplantes Sitzungsdatum (`YYYY-MM-DD`) oder `null`. */
   date: string | null;
+  /** Geplante Uhrzeit (`HH:mm`) oder `null` (#34). */
+  startTime: string | null;
   status: MeetingStatus;
   activeApplicationId: Uuid | null;
   gremiumId: Uuid | null;

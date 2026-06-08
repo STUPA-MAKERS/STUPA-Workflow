@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import date as _date
+from datetime import time as _time
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Text
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
@@ -31,6 +32,8 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     )
     title: Mapped[str] = mapped_column(Text)
     date: Mapped[_date | None] = mapped_column(Date, nullable=True)
+    # Geplante Uhrzeit (#34) — optional, ergänzt das Datum.
+    start_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
     active_application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
