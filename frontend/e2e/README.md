@@ -7,72 +7,65 @@ gegen die Mock-API (seit #101 AUS). Magic-Link-Mails landen im `mailpit`-SMTP-Si
 ## Ausführen
 
 ```bash
-# Gating-Subset (Standard; entspricht dem CI-Gate)
 scripts/e2e.sh
-
-# Full-Tier (zusätzlich opt-in/flakeanfällige Szenarien)
-scripts/e2e.sh --full
 ```
 
-`scripts/e2e.sh` fährt den Stack mit eigenem `COMPOSE_PROJECT_NAME=antrag-e2e` hoch
-(berührt andere Stacks nicht), schreibt ein Wegwerf-`deploy/.env` (Mock AUS, mailpit-
-SMTP, Altcha + Rate-Limit AUS für Determinismus), seedet deterministische Fixtures,
-läuft Playwright und räumt restlos ab (`down -v`). Voraussetzung: in `frontend/`
-einmalig `npm ci && npx playwright install --with-deps chromium`.
+Fährt den Stack mit eigenem `COMPOSE_PROJECT_NAME=antrag-e2e` hoch (berührt andere
+Stacks nicht), schreibt ein Wegwerf-`deploy/.env` (Mock AUS, mailpit-SMTP, Altcha +
+Rate-Limit AUS für Determinismus), seedet deterministische Fixtures, läuft Playwright
+und räumt restlos ab (`down -v`). Voraussetzung: in `frontend/` einmalig
+`npm ci && npx playwright install --with-deps chromium`.
 
-## Tiers
+## Abgedeckt — gating (scharf, jeder PR, CI-Job `e2e`)
 
-| Tier | Tag | Wann | Inhalt |
-|------|-----|------|--------|
-| **gating** (sharp, CI-Gate) | alles außer `@full` | jeder PR | deterministische Kern-Journeys, kein Keycloak/pytex/ClamAV auf dem Gate-Pfad |
-| **full** (opt-in) | `@full` | `scripts/e2e.sh --full`, CI-Job `e2e-full` (Label `run-e2e-full` / `workflow_dispatch` / `RUN_E2E_FULL`) | Live-Vote-WS (2 Contexts + Beamer), Protokoll→PDF |
-
-Begründung der Trennung (Frederiks Regel „lieber stabil als flaky"): WS-Live-Vote-
-Timing und der pytex-tectonic-Bundle-Download (Minuten, netzabhängig) sind im CI-
-Runner nicht zuverlässig deterministisch. Statt ein flakiges Gate zu erzwingen läuft
-ein zuverlässiges Subset scharf; der Rest ist als `@full`/`fixme` dokumentiert
-(testing.md §6: kein stiller skip — jeder mit begründetem Grund).
-
-## Abgedeckt (gating, scharf)
+Deterministisch, kein Keycloak/pytex/ClamAV auf dem Gate-Pfad:
 
 - **01 apply** — öffentlicher Apply-Wizard → Bestätigung (Szenario 1, Teil).
-- **02 magic-link-flow** — Antrag anlegen → Magic-Link (mailpit) → bearbeiten →
-  Admin schaltet via Flow-Transition nach `pruefung` → read-only/gesperrt
+- **02 magic-link-flow** — Antrag anlegen → Magic-Link (echtes SMTP via mailpit) →
+  bearbeiten → Admin schaltet via Flow-Transition nach `pruefung` → read-only/gesperrt
   (Szenarien 1 + 2 + read-only).
 - **03 rbac** — Unauth sieht geschützte Routen nicht (Szenario 7).
-- **04 admin-form** — Form-Builder: Feld hinzufügen → neue Form-Version (Szenario 6).
+- **04 admin-form** — Form-Builder: Feld hinzufügen → Form-Version **persistiert**
+  (Erfolgs-Toast nur auf 2xx vom Server) (Szenario 6).
 - **05 budget-pots** — Budget-Töpfe-Sicht + Topf anlegen.
 
-## Bewusst NICHT im Gate (opt-in/dokumentiert)
+**T-40 deckt damit 4/7 SDS-Szenarien real grün ab** (1 apply+magic-link, 2 flow,
+6 admin-config, 7 RBAC) **plus** Budget-Töpfe + read-only.
 
-- **Live-Vote (WS, 2 Contexts + Beamer)** und **async Voting** — `e2e/full/live-vote.spec.ts`
-  (`@full`, `fixme`): WS-Timing nicht gate-stabil; braucht Live-Vote-Seed-Fixture.
-- **Protokoll → PDF → Versand** — `e2e/full/protocol-pdf.spec.ts` (`@full`, `fixme`):
-  pytex-Render lädt tectonic-Bundle (langsam/netzabhängig).
-- **OIDC-Login via Keycloak** — der Gate-Stack läuft bewusst ohne Mock-Keycloak; der
-  Admin wird über eine geseedete Server-Session authentifiziert (siehe unten). Echte
-  OIDC-E2E gehören in den full-Tier mit Keycloak-Test-Realm (noch nicht im Compose).
-- **Anhang-Download nach ClamAV-Freigabe** — ClamAV-Start (~300s) ist nicht gate-
-  tauglich; der Upload-Pfad (Annahme/Quarantäne) ist davon unabhängig.
+## Bewusst (noch) NICHT abgedeckt — als Follow-up-Issues, keine hohlen Stubs
+
+Frederiks Regel „lieber stabil als flaky": voll-grün für alle 7 Szenarien gegen den
+realen Stack ist im CI nicht zuverlässig deterministisch (WS-Timing, pytex-tectonic,
+Keycloak, ClamAV). Diese Szenarien sind als klar benannte Issues ausgelagert statt
+als leere `test.fixme()`-Stubs Abdeckung vorzutäuschen:
+
+| Szenario (SDS) | Issue |
+|----------------|-------|
+| 3 async Voting | #107 |
+| 4 Live-Vote (WS, 2 Contexts + Beamer) | #108 |
+| 5 Protokoll → PDF → Versand (pytex) | #109 |
+| OIDC-Login via Keycloak-Test-Realm | #110 |
 
 ## Architektur-Notizen
 
 - **Seed** (`deploy/e2e/seed.py`, One-Shot-Service `seed`): legt für den von `0018`
   geseedeten Default-Antragstyp `foerderantrag` eine **aktive Form- + Flow-Version**
-  an (ohne sie schlägt `POST /applications` fehl). Mintet zusätzlich eine **Admin-
-  Server-Session** mit der App-eigenen `create_principal_session` (kennt
-  `SESSION_SECRET`) → `ap_session`-Cookie. Kein Prod-Backdoor: nur der Test-Seed nutzt
-  die normale Signier-Funktion (analog Djangos `force_login`). `global-setup.ts` baut
-  daraus den Admin-`storageState`.
+  an (ohne sie schlägt `POST /applications` fehl). Mintet eine **Admin-Server-Session**
+  mit der App-eigenen `create_principal_session` (kennt `SESSION_SECRET`) →
+  `ap_session`-Cookie. Kein Prod-Backdoor: nur der Test-Seed nutzt die normale
+  Signier-Funktion (analog Djangos `force_login`). `global-setup.ts` baut daraus den
+  Admin-`storageState`.
 - **CSRF**: nur bei vorhandenem Auth-Cookie erzwungen (middleware.py). Unauth-Setup-
   POSTs (apply/magic-link) sind CSRF-frei; authentifizierte Writes laufen über die
   echte Angular-UI, deren Interceptor das Double-Submit-Token spiegelt.
+- **OIDC + Altcha AUS**: die optionalen Secrets dürfen NICHT als leerer String
+  gesetzt sein (`min_length=16` in `app.settings` → sonst bricht `get_settings()` →
+  migrate exit 1). `scripts/e2e.sh` strippt die leeren Zeilen aus dem e2e-`.env`.
 
-## Gefundener Defekt (nicht Teil von T-40)
+## Gefundener Defekt (separater Bugfix-Task, nicht Teil von T-40)
 
 Die BE-Mail verlinkt `/antrag/<id>#t=<token>` (Fragment, security.md §1 — Token nie
 an den Server), das FE konsumiert den Token jedoch auf `/status?t=…&app=…` und hat
-**keine** `/antrag/:id`-Route. Magic-Link-Landing ist dadurch End-to-End kaputt. Der
-gating-Test deckt die Magic-Link-*Fähigkeit* über den vom FE unterstützten `/status`-
-Pfad ab (Token aus mailpit gezogen). Die Route-/Fragment-Diskrepanz ist als separater
-Bugfix-Task ausgelagert.
+**keine** `/antrag/:id`-Route → Magic-Link-Landing ist End-to-End kaputt. Der
+gating-Test deckt die Magic-Link-*Fähigkeit* über den FE-unterstützten `/status`-Pfad
+ab (Token aus mailpit gezogen).

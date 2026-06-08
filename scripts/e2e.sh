@@ -5,12 +5,11 @@
 # laufen. Räumt restlos ab (``down -v``). Idempotent; eigener Projektname → berührt
 # andere Stacks NICHT.
 #
-# Tiers:
-#   (default)  gating  — stabiler, deterministischer Subset (CI-Gate, jeder PR).
-#   --full / E2E_FULL=1 full — zusätzlich die opt-in/flakeanfälligen Szenarien
-#                              (Live-Vote-WS, Protokoll→PDF). Nicht gate-bindend.
+# Deckt das deterministische, gate-bindende Subset ab (CI-Job `e2e`). Die noch
+# offenen, flakeanfälligen/langsamen Szenarien (async Voting, Live-Vote-WS,
+# Protokoll→PDF, OIDC) sind als Follow-up-Issues ausgelagert — siehe e2e/README.md.
 #
-# Usage: scripts/e2e.sh [--full]
+# Usage: scripts/e2e.sh
 #   E2E_TIMEOUT (Default 900s; Image-Build + ClamAV-Start). Host-Ports fix:
 #   web 127.0.0.1:8080 (compose), mailpit-API 127.0.0.1:8025 (overlay).
 set -euo pipefail
@@ -22,11 +21,6 @@ ENV_FILE="${DEPLOY}/.env"
 ENV_BACKUP=""
 ARTIFACTS="${DEPLOY}/e2e/.artifacts"
 TIMEOUT="${E2E_TIMEOUT:-900}"
-
-TIER="gating"
-if [[ "${1:-}" == "--full" || "${E2E_FULL:-0}" == "1" ]]; then
-  TIER="full"
-fi
 
 export COMPOSE_PROJECT_NAME="antrag-e2e"
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.e2e.yml)
@@ -84,7 +78,7 @@ rm -rf "${ARTIFACTS}"; mkdir -p "${ARTIFACTS}"
 echo "==> docker compose config (Validierung)"
 "${COMPOSE[@]}" config -q
 
-echo "==> docker compose up -d --build (Tier: ${TIER})"
+echo "==> docker compose up -d --build"
 if ! "${COMPOSE[@]}" up -d --build; then
   echo "FEHLER: compose up — Logs (migrate/api/web):"
   "${COMPOSE[@]}" logs --no-color --tail=120 migrate api web || true
@@ -121,19 +115,14 @@ if [[ ! -s "${ARTIFACTS}/e2e.json" ]]; then
 fi
 
 # --- Playwright ------------------------------------------------------------ #
-echo "==> Playwright (Tier: ${TIER})"
+echo "==> Playwright"
 cd "${FRONTEND}"
 export E2E_BASE_URL="http://127.0.0.1:8080"
 export E2E_MAILPIT_URL="http://127.0.0.1:8025"
 export E2E_ARTIFACTS_FILE="${ARTIFACTS}/e2e.json"
 
-pw_args=()
-if [[ "${TIER}" == "gating" ]]; then
-  pw_args+=(--grep-invert @full)
-fi
-
 set +e
-npx playwright test "${pw_args[@]}"
+npx playwright test
 rc=$?
 set -e
 

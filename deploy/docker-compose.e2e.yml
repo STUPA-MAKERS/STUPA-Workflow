@@ -16,6 +16,25 @@
 # laufen im opt-in „full"-Tier (siehe scripts/e2e.sh, .github/workflows/ci.yml).
 
 services:
+  web:
+    # Overlay-Override (Basis unberührt): zwei e2e-spezifische Anpassungen am web/nginx.
+    #  1. `:ro,z` statt `:ro` — SELinux-Relabel (Fedora/rootless podman lokal); ohne
+    #     `z` scheitert nginx mit „Permission denied" am gemounteten conf. Auf Nicht-
+    #     SELinux-Hosts (CI/ubuntu-docker) ist `z` ein No-op (wie beim backup-Service).
+    #  2. Healthcheck über `127.0.0.1` statt `localhost`: der nginx-Entrypoint kann die
+    #     IPv6-Listen-Direktive nicht ergänzen (conf read-only gemountet) → nginx
+    #     lauscht nur IPv4. `localhost` löst im Container teils auf `::1` auf →
+    #     busybox-`wget` schlägt fehl → web bleibt „unhealthy" (Stack-Timeout, kein
+    #     Playwright-Lauf). `127.0.0.1` erzwingt IPv4. Engeres Intervall fürs Gate.
+    volumes:
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro,z
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 5s
+
   mailpit:
     image: axllent/mailpit:v1.21
     restart: unless-stopped
@@ -50,7 +69,8 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./e2e/seed.py:/seed/seed.py:ro
-      - ./e2e/.artifacts:/artifacts
+      # `:z`/`,z` — SELinux-Relabel (Fedora/podman lokal); No-op auf CI/ubuntu-docker.
+      - ./e2e/seed.py:/seed/seed.py:ro,z
+      - ./e2e/.artifacts:/artifacts:z
     networks:
       - internal

@@ -6,8 +6,9 @@ import { defineConfig, devices } from '@playwright/test';
  * hochgefahren (eigener COMPOSE_PROJECT_NAME, `down -v`); diese Config startet
  * KEINEN Webserver, sondern fährt gegen den laufenden `web`-Container.
  *
- * Tiers via Tag: Specs mit `@full` (Live-Vote-WS, Protokoll→PDF) laufen nur opt-in
- * (`scripts/e2e.sh --full`); das CI-Gate läuft den Rest (`--grep-invert @full`).
+ * Deckt das deterministische, gate-bindende Subset ab; die offenen Szenarien
+ * (async Voting, Live-Vote-WS, Protokoll→PDF, OIDC) sind als Follow-up-Issues
+ * ausgelagert (siehe e2e/README.md).
  *
  * Determinismus (testing.md §3, „keine Flakes"): `workers: 1` + `fullyParallel:
  * false` — die Szenarien teilen einen geseedeten Antragstyp und eine Admin-Session;

@@ -222,12 +222,13 @@ jobs:
         run: npm run build
 
   # ---- 7 E2E (Playwright vs echtem Compose-Stack) — SCHARF (T-40) ----------- #
-  # Gating-Subset: deterministische Kern-Journeys gegen den ECHTEN Stack (Mock seit
-  # #101 AUS) + mailpit-SMTP-Sink + Seed-Service. KEIN Keycloak/pytex/ClamAV auf dem
-  # Gate-Pfad → stabil & schnell genug fürs PR-Gate (Frederik: lieber stabil als
-  # flaky). scripts/e2e.sh fährt hoch, seedet, läuft `--grep-invert @full`, räumt ab
-  # (down -v). Die flakeanfälligen/langsamen Szenarien (Live-Vote-WS, Protokoll→PDF,
-  # OIDC) laufen im opt-in Job `e2e-full`. Begründung im PR-DoD.
+  # Deterministische Kern-Journeys gegen den ECHTEN Stack (Mock seit #101 AUS) +
+  # mailpit-SMTP-Sink + Seed-Service. KEIN Keycloak/pytex/ClamAV auf dem Gate-Pfad →
+  # stabil & schnell genug fürs PR-Gate (Frederik: lieber stabil als flaky).
+  # scripts/e2e.sh fährt hoch, seedet, läuft Playwright, räumt ab (down -v). Die noch
+  # offenen, flakeanfälligen/langsamen Szenarien (async Voting, Live-Vote-WS,
+  # Protokoll→PDF, OIDC) sind als Follow-up-Issues ausgelagert (siehe e2e/README.md),
+  # NICHT als hohle Stubs. Der Report wird immer hochgeladen (Beweis: >0 Tests).
   e2e:
     runs-on: ubuntu-latest
     needs: [detect, be-unit, fe-unit]
@@ -244,51 +245,15 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
-      - name: E2E (gating subset vs echtem Stack)
+      - name: E2E (vs echtem Stack)
         run: scripts/e2e.sh
-      - name: Playwright-Report (bei Fehler)
-        if: failure()
+      - name: Playwright-Report (immer — Beweis >0 Tests)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: frontend/playwright-report
-          retention-days: 7
-
-  # ---- 7b E2E-Full (opt-in, NICHT gate-bindend) ---------------------------- #
-  # Die schweren/flakeanfälligen Szenarien (Live-Vote-WS, Protokoll→PDF via pytex-
-  # tectonic). Standardlauf erscheint sauber als *skipped* (neutral), blockiert
-  # nicht. Aktivieren wie restore-smoke/real-stack-smoke:
-  #   - manuell:   Actions → Run workflow (workflow_dispatch)
-  #   - pro PR:    Label `run-e2e-full` setzen
-  #   - dauerhaft: Repo-Variable RUN_E2E_FULL=true
-  e2e-full:
-    runs-on: ubuntu-latest
-    needs: [detect, be-unit, fe-unit]
-    if: >-
-      needs.detect.outputs.frontend == 'true'
-      && ( github.event_name == 'workflow_dispatch'
-           || contains(github.event.pull_request.labels.*.name, 'run-e2e-full')
-           || vars.RUN_E2E_FULL == 'true' )
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: FE-Deps + Playwright-Browser
-        working-directory: frontend
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-      - name: E2E (full tier vs echtem Stack)
-        run: scripts/e2e.sh --full
-      - name: Playwright-Report (bei Fehler)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-full
-          path: frontend/playwright-report
+          if-no-files-found: warn
           retention-days: 7
 
   # ---- 8 Coverage-Gate ----------------------------------------------------- #
