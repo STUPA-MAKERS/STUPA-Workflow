@@ -18,9 +18,11 @@ import type {
   ApplicationComment,
   ApplicationVersion,
   CommentVisibility,
+  FormFieldDef,
   Transition,
   Uuid,
 } from '@core/api/models';
+import { resolveI18n } from '@shared/forms/i18n-text';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
@@ -110,7 +112,7 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
           <dl class="det__data">
             @for (entry of dataEntries(application); track entry.key) {
               <div class="det__dataRow">
-                <dt>{{ entry.key }}</dt>
+                <dt>{{ entry.label }}</dt>
                 <dd>{{ entry.value }}</dd>
               </div>
             }
@@ -142,7 +144,7 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
             <div class="det__actions">
               @for (transition of transitions(); track transition.id) {
                 <app-button variant="secondary" size="sm" (click)="openConfirm(transition)">
-                  {{ transition.label }}
+                  {{ transitionLabel(transition) }}
                 </app-button>
               }
             </div>
@@ -485,6 +487,8 @@ export class ApplicationsDetailComponent {
   readonly versions = signal<ApplicationVersion[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
   readonly transitions = signal<Transition[]>([]);
+  /** Feld-Definitionen der effektiven Form — für Labels/typisierte Werte (sonst leer). */
+  readonly formFields = signal<FormFieldDef[]>([]);
 
   readonly newComment = signal('');
   readonly visibility = signal<CommentVisibility>('public');
@@ -521,6 +525,7 @@ export class ApplicationsDetailComponent {
     this.versions.set([]);
     this.comments.set([]);
     this.transitions.set([]);
+    this.formFields.set([]);
     this.pending.set(null);
     this.note.set('');
     this.newComment.set('');
@@ -539,6 +544,11 @@ export class ApplicationsDetailComponent {
         this.app.set(app);
         this.loading.set(false);
         this.loadAux();
+        // Effektive Form für Feld-Labels/typisierte Werte (still degradieren → rohe Keys).
+        this.api.effectiveForm?.(app.typeId).subscribe({
+          next: (eff) => this.formFields.set(eff.sections.flatMap((s) => s.fields)),
+          error: () => this.formFields.set([]),
+        });
       },
       error: (err: { status?: number }) => {
         this.loading.set(false);
@@ -560,8 +570,78 @@ export class ApplicationsDetailComponent {
     }
   }
 
-  dataEntries(app: Application): { key: string; value: string }[] {
-    return Object.entries(app.data).map(([key, value]) => ({ key, value: formatFieldValue(value) }));
+  /** Antragsdaten als Label/Wert-Zeilen: Feld-Definition → Label + typisierter Wert;
+   *  unbekannte Keys roh; `title` (im Kopf gezeigt) + reine Anzeigefelder weglassen. */
+  dataEntries(app: Application): { key: string; label: string; value: string }[] {
+    const lang = this.i18n.locale();
+    const byKey = new Map(this.formFields().map((f) => [f.key, f]));
+    const rows: { key: string; label: string; value: string }[] = [];
+    const seen = new Set<string>();
+
+    const pushField = (f: FormFieldDef): void => {
+      if (f.type === 'markdown' || f.type === 'computed') return;
+      if (f.key === 'title') return;
+      if (!(f.key in app.data)) return;
+      seen.add(f.key);
+      rows.push({ key: f.key, label: resolveI18n(f.label, lang), value: this.formatByField(f, app.data[f.key]) });
+    };
+
+    for (const f of this.formFields()) pushField(f);
+    // Daten ohne passende Feld-Definition trotzdem zeigen (roh) — außer `title`.
+    for (const [key, value] of Object.entries(app.data)) {
+      if (seen.has(key) || key === 'title' || byKey.has(key)) continue;
+      rows.push({ key, label: key, value: formatFieldValue(value) });
+    }
+    return rows;
+  }
+
+  /** Einen Wert anhand seines Feldtyps anzeigefreundlich formatieren. */
+  private formatByField(field: FormFieldDef, value: unknown): string {
+    if (value === null || value === undefined || value === '') return '—';
+    const lang = this.i18n.locale();
+    if (field.type === 'positions') return this.formatPositions(value);
+    if (field.type === 'checkbox' && typeof value === 'boolean') {
+      return this.i18n.translate(value ? 'common.yes' : 'common.no');
+    }
+    if (field.type === 'select') {
+      const opt = field.options?.find((o) => o.value === value);
+      return opt ? resolveI18n(opt.label, lang) : formatFieldValue(value);
+    }
+    if (field.type === 'multiselect' && Array.isArray(value)) {
+      return value
+        .map((v) => {
+          const opt = field.options?.find((o) => o.value === v);
+          return opt ? resolveI18n(opt.label, lang) : String(v);
+        })
+        .join(', ');
+    }
+    if (field.type === 'currency') {
+      const n = Number(value);
+      if (Number.isFinite(n)) {
+        return new Intl.NumberFormat(lang, { style: 'currency', currency: 'EUR' }).format(n);
+      }
+    }
+    return formatFieldValue(value);
+  }
+
+  /** Kostenpositionen kompakt: Anzahl Positionen + Σ der bevorzugten Werte. */
+  private formatPositions(value: unknown): string {
+    if (!Array.isArray(value)) return '—';
+    let total = 0;
+    for (const p of value as { offers?: { value?: number | null; preferred?: boolean }[] }[]) {
+      const pref = (p.offers ?? []).find((o) => o.preferred);
+      total += pref?.value ?? 0;
+    }
+    const sum = new Intl.NumberFormat(this.i18n.locale(), {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(total);
+    return `${value.length} × ${this.i18n.translate('applications.detail.positionsTotal')}: ${sum}`;
+  }
+
+  /** Übergangs-Label mit Fallback (leeres i18n-Label → generisch „Weiter“). */
+  transitionLabel(transition: Transition): string {
+    return transition.label?.trim() || this.i18n.translate('applications.actions.advance');
   }
 
   amount(app: Application): string {

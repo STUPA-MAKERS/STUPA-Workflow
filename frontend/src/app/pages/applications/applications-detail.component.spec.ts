@@ -99,12 +99,27 @@ const url =
   (r: { url: string }) =>
     r.url === `/api/applications/${id}${suffix}`;
 
-/** Flush the detail GET and the three (or two) aux loads it triggers. */
-function flushAll(http: HttpTestingController, manage = true, id = 'app-1') {
+/** Flush the detail GET and the aux loads it triggers (versions/comments/transitions
+ *  + the effective form used for data-field labels). */
+function flushForm(http: HttpTestingController) {
+  http
+    .expectOne((r) => r.url === '/api/application-types/t1/form')
+    .flush({
+      applicationTypeId: 't1',
+      formVersionId: 'fv1',
+      sections: [
+        { key: 'main', label: { de: 'Antrag' }, fields: [{ key: 'amount', type: 'currency', label: { de: 'Betrag' } }] },
+      ],
+    });
+}
+
+// `form` nur beim initialen Laden (loadApplication); ein refresh() lädt die Form nicht neu.
+function flushAll(http: HttpTestingController, manage = true, id = 'app-1', form = true) {
   http.expectOne(url('', id)).flush({ ...appWire(), id });
   http.expectOne(url('/versions', id)).flush(VERSIONS);
   http.expectOne(url('/comments', id)).flush(COMMENTS);
   if (manage) http.expectOne(url('/transitions', id)).flush(TRANSITIONS);
+  if (form) flushForm(http);
 }
 
 describe('ApplicationsDetailComponent', () => {
@@ -148,6 +163,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.queryByRole('heading', { name: 'Statuswechsel' })).not.toBeInTheDocument();
     // internal-visibility select is manager-only
     expect(screen.queryByText('Sichtbarkeit')).not.toBeInTheDocument();
+    flushForm(http);
     http.verify();
   });
 
@@ -167,8 +183,8 @@ describe('ApplicationsDetailComponent', () => {
     post.flush({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] });
 
     expect(success).toHaveBeenCalled();
-    // refresh re-loads detail + aux
-    flushAll(http);
+    // refresh re-loads detail + aux (not the static form)
+    flushAll(http, true, 'app-1', false);
     http.verify();
   });
 
@@ -188,7 +204,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(error).toHaveBeenCalledWith(
       'Statuswechsel nicht möglich (Status hat sich geändert oder Bedingung nicht erfüllt).',
     );
-    flushAll(http); // refresh after the failed attempt
+    flushAll(http, true, 'app-1', false); // refresh after the failed attempt (no form reload)
     http.verify();
   });
 
@@ -230,6 +246,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/transitions')).flush(TRANSITIONS);
     detectChanges();
     expect(screen.getByText('Keine Feldänderungen.')).toBeInTheDocument();
+    flushForm(http);
     http.verify();
   });
 
@@ -265,9 +282,35 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions', 'app-2')).flush(VERSIONS);
     http.expectOne(url('/comments', 'app-2')).flush(COMMENTS);
     http.expectOne(url('/transitions', 'app-2')).flush(TRANSITIONS);
+    flushForm(http); // loadApplication for app-2 also fetches the effective form
     detectChanges();
 
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    http.verify();
+  });
+
+  it('renders data with form-field labels and a fallback for an unlabelled transition', async () => {
+    const { http, detectChanges } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    // Transition without a usable label → must fall back to a generic action label.
+    http.expectOne(url('/transitions')).flush([
+      { id: 'tr1', fromStateId: 's1', toStateId: 's2', label: {} },
+    ]);
+    http.expectOne((r) => r.url === '/api/application-types/t1/form').flush({
+      applicationTypeId: 't1',
+      formVersionId: 'fv1',
+      sections: [
+        { key: 'main', label: { de: 'Antrag' }, fields: [{ key: 'amount', type: 'currency', label: { de: 'Beantragte Summe' } }] },
+      ],
+    });
+    detectChanges();
+
+    // data row uses the field label, not the raw key, and formats the currency value.
+    expect(screen.getByText('Beantragte Summe')).toBeInTheDocument();
+    // the empty-labelled transition renders the generic fallback, not a blank button.
+    expect(screen.getByRole('button', { name: 'Weiter' })).toBeInTheDocument();
     http.verify();
   });
 
