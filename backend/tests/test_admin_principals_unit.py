@@ -12,8 +12,8 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.modules.admin.service import ConfigService, _principal_out
-from app.modules.auth.models import Principal, RoleAssignment
-from app.shared.errors import NotFoundError
+from app.modules.auth.models import Principal, Role, RoleAssignment
+from app.shared.errors import ConflictError, NotFoundError
 from app.shared.permissions import PERMISSION_CATALOGUE
 from tests.auth_fakes import fake_session, result
 
@@ -88,3 +88,33 @@ async def test_delete_role_assignment_ok() -> None:
     await ConfigService(db).delete_role_assignment(row.id, "admin")
     assert db.deleted == [row]
     assert db.committed == 1
+
+
+def _admin_role() -> Role:
+    r = Role(key="admin", name_i18n={"de": "Administrator"})
+    r.id = uuid4()
+    return r
+
+
+async def test_delete_role_assignment_blocks_self_admin_removal() -> None:
+    """#40: ein Admin darf sich die eigene Admin-Rolle nicht entziehen."""
+    pid = uuid4()
+    row = _assignment(pid)
+    # gets: assignment → admin role → own principal (sub == actor)
+    db = fake_session(gets=[row, _admin_role(), _principal(pid, "me-sub")])
+    with pytest.raises(ConflictError):
+        await ConfigService(db).delete_role_assignment(row.id, "me-sub")
+    assert db.deleted == []
+
+
+async def test_delete_role_assignment_allows_admin_of_other_principal() -> None:
+    """Fremden Admin entziehen bleibt erlaubt (nur Selbst-Aussperrung blockt)."""
+    pid = uuid4()
+    row = _assignment(pid)
+    db = fake_session(
+        result(),
+        result(),
+        gets=[row, _admin_role(), _principal(pid, "someone-else")],
+    )
+    await ConfigService(db).delete_role_assignment(row.id, "me-sub")
+    assert db.deleted == [row]

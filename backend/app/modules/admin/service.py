@@ -411,6 +411,10 @@ class ConfigService:
         if payload.role_id is not None:
             if await self.session.get(Role, payload.role_id) is None:
                 raise NotFoundError(f"role {payload.role_id} not found")
+            # Selbst-Aussperrung verhindern (#40): den eigenen Admin nicht auf eine
+            # andere Rolle umschreiben.
+            if payload.role_id != row.role_id:
+                await self._guard_self_admin_removal(row, actor)
             row.role_id = payload.role_id
         if payload.gremium_id is not None:
             row.gremium_id = payload.gremium_id
@@ -429,9 +433,25 @@ class ConfigService:
         row = await self.session.get(RoleAssignmentRow, assignment_id)
         if row is None:
             raise NotFoundError(f"role assignment {assignment_id} not found")
+        # Selbst-Aussperrung verhindern (#40): den eigenen Admin nicht entziehen.
+        await self._guard_self_admin_removal(row, actor)
         await self.session.delete(row)
         await self._audit(actor, AuditAction.ROLE_CHANGE, "role_assignment", assignment_id)
         await self.session.commit()
+
+    async def _guard_self_admin_removal(
+        self, row: RoleAssignmentRow, actor: str
+    ) -> None:
+        """Verhindert, dass ein Admin sich selbst die Admin-Rolle entzieht (#40).
+
+        ``actor`` ist der OIDC-``sub``; eine Admin-Zuweisung des eigenen Principals
+        darf nicht gelöscht/umgeschrieben werden (Selbst-Aussperrung)."""
+        role = await self.session.get(Role, row.role_id)
+        if role is None or role.key != "admin":
+            return
+        principal = await self.session.get(Principal, row.principal_id)
+        if principal is not None and principal.sub == actor:
+            raise ConflictError("admins cannot remove their own admin role")
 
     # ----------------------------------------------------- principals/perms #
     async def search_principals(
