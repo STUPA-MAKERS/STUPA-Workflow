@@ -22,17 +22,19 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.deps import DbSession, require_principal
+from app.deps import DbSession, Principal, require_principal
 from app.modules.budget.tree_schemas import (
-    BudgetApplicationOut,
     AllocationOut,
     AllocationSet,
     AssignBudgetOut,
     AssignBudgetRequest,
+    BudgetApplicationOut,
     BudgetNodeCreate,
     BudgetNodeOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
+    ExpenseCreate,
+    ExpenseOut,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
@@ -123,6 +125,49 @@ async def list_budget_applications(
 ) -> list[BudgetApplicationOut]:
     """Anträge dieser Kostenstelle + Unterbaum (#17), optional HHJ-gefiltert."""
     return await service.list_applications(budget_id, fiscal_year_id)
+
+
+# -------------------------------------------------------------------- expenses
+@router.get(
+    "/budgets/{budget_id}/expenses",
+    response_model=list[ExpenseOut],
+    dependencies=[Depends(require_principal("budget.view"))],
+    responses=_errors(401, 403, 404),
+)
+async def list_budget_expenses(
+    budget_id: UUID,
+    service: ServiceDep,
+    fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
+) -> list[ExpenseOut]:
+    """Eigenständige Ausgaben dieser Kostenstelle + Unterbaum (#25), optional HHJ."""
+    return await service.list_expenses(budget_id, fiscal_year_id)
+
+
+@router.post(
+    "/budgets/{budget_id}/expenses",
+    response_model=ExpenseOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def create_budget_expense(
+    budget_id: UUID,
+    payload: ExpenseCreate,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.manage"))],
+) -> ExpenseOut:
+    """Ausgabe ohne Antrag gegen Kostenstelle + HHJ buchen (#25)."""
+    return await service.create_expense(budget_id, payload, actor=principal.sub)
+
+
+@router.delete(
+    "/budget-expenses/{expense_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_principal("budget.manage"))],
+    responses=_errors(401, 403, 404),
+)
+async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
+    """Gebuchte Ausgabe löschen (#25)."""
+    await service.delete_expense(expense_id)
 
 
 # ---------------------------------------------------------------- fiscal years

@@ -7,7 +7,7 @@ liegen in der Integration. Deckt jede Route + den Service-Factory-Hook.
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import UTC, date
 from decimal import Decimal
 from typing import Any
 
@@ -23,6 +23,7 @@ from app.modules.budget.tree_schemas import (
     AssignBudgetOut,
     BudgetNodeOut,
     BudgetTreeNodeOut,
+    ExpenseOut,
     FiscalYearOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
@@ -31,7 +32,18 @@ _BID = uuid.uuid4()
 _GID = uuid.uuid4()
 _FYID = uuid.uuid4()
 _AID = uuid.uuid4()
+_EID = uuid.uuid4()
 _PERMS = ("budget.manage", "budget.view", "application.manage")
+
+
+def _expense_out() -> ExpenseOut:
+    from datetime import datetime
+
+    return ExpenseOut(
+        id=_EID, budgetId=_BID, pathKey="VS", fiscalYearId=_FYID,
+        amount=Decimal("42.00"), currency="EUR", description="Rechnung",
+        actor="admin", createdAt=datetime(2026, 6, 9, tzinfo=UTC),
+    )
 
 
 def _node_out() -> BudgetNodeOut:
@@ -94,6 +106,21 @@ class _FakeService:
     async def move_fiscal_year(self, application_id: uuid.UUID, payload: object) -> AssignBudgetOut:
         self.calls["move"] = application_id
         return AssignBudgetOut(applicationId=application_id, budgetId=_BID, fiscalYearId=_FYID)
+
+    async def create_expense(
+        self, budget_id: uuid.UUID, payload: object, *, actor: str
+    ) -> ExpenseOut:
+        self.calls["create_expense"] = (budget_id, actor)
+        return _expense_out()
+
+    async def list_expenses(
+        self, budget_id: uuid.UUID, fiscal_year_id: Any = None
+    ) -> list[ExpenseOut]:
+        self.calls["list_expenses"] = (budget_id, fiscal_year_id)
+        return [_expense_out()]
+
+    async def delete_expense(self, expense_id: uuid.UUID) -> None:
+        self.calls["delete_expense"] = expense_id
 
 
 def _fy_out() -> FiscalYearOut:
@@ -192,6 +219,42 @@ def test_move_fiscal_year(client: TestClient, fake: _FakeService) -> None:
     )
     assert resp.status_code == 200
     assert fake.calls["move"] == _AID
+
+
+def test_create_expense(client: TestClient, fake: _FakeService) -> None:
+    resp = client.post(
+        f"/api/budgets/{_BID}/expenses",
+        json={"amount": "42.00", "description": "Rechnung", "fiscalYearId": str(_FYID)},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["amount"] == "42.00"
+    assert fake.calls["create_expense"] == (_BID, "admin")
+
+
+def test_list_expenses(client: TestClient, fake: _FakeService) -> None:
+    resp = client.get(f"/api/budgets/{_BID}/expenses", params={"fiscalYear": str(_FYID)})
+    assert resp.status_code == 200
+    assert resp.json()[0]["description"] == "Rechnung"
+    assert fake.calls["list_expenses"] == (_BID, _FYID)
+
+
+def test_delete_expense(client: TestClient, fake: _FakeService) -> None:
+    resp = client.delete(f"/api/budget-expenses/{_EID}")
+    assert resp.status_code == 204
+    assert fake.calls["delete_expense"] == _EID
+
+
+def test_create_expense_forbidden_for_viewer(fake: _FakeService) -> None:
+    app = create_app()
+    app.dependency_overrides[get_budget_tree_service] = lambda: fake
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="v", permissions={"budget.view"}
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
+    resp = TestClient(app).post(
+        f"/api/budgets/{_BID}/expenses", json={"amount": "1.00", "description": "x"}
+    )
+    assert resp.status_code == 403
 
 
 def test_forbidden_without_permission(fake: _FakeService) -> None:

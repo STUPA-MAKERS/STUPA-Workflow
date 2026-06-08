@@ -19,18 +19,25 @@ from app.modules.applications.models import Application
 from app.modules.budget import tree_rules
 from app.modules.budget.models import BudgetEntry
 from app.modules.budget.rules import COMMITTED_STAGES
-from app.modules.budget.tree_models import Budget, BudgetAllocation, FiscalYear
+from app.modules.budget.tree_models import (
+    Budget,
+    BudgetAllocation,
+    BudgetExpense,
+    FiscalYear,
+)
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import (
     AllocationOut,
     AllocationSet,
     AssignBudgetOut,
     AssignBudgetRequest,
+    BudgetApplicationOut,
     BudgetNodeCreate,
     BudgetNodeOut,
-    BudgetApplicationOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
+    ExpenseCreate,
+    ExpenseOut,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
@@ -472,6 +479,106 @@ class BudgetTreeService:
             applicationId=app.id, budgetId=app.budget_id, fiscalYearId=fy.id
         )
 
+    # --------------------------------------------------------------- expenses
+    async def _resolve_expense_fiscal_year(
+        self, node: Budget, fiscal_year_id: UUID | None
+    ) -> UUID:
+        """HHJ einer Ausgabe bestimmen: explizit (muss zum Top-Budget gehören) oder
+        — falls offen — das **eine** aktive HHJ des Top-Budgets (sonst 422)."""
+        top = await self._top_level(node)
+        if fiscal_year_id is not None:
+            fy = await self._get_fiscal_year(fiscal_year_id)
+            if fy.budget_id != top.id:
+                raise ValidationProblem(
+                    "Fiscal year does not belong to this budget's top-level.",
+                    errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
+                )
+            return fy.id
+        active_ids = [f.id for f in await self._fiscal_years_of(top.id) if f.active]
+        picked = tree_rules.pick_fiscal_year(active_ids)
+        if picked is None:
+            raise ValidationProblem(
+                "No single active fiscal year — specify fiscalYearId.",
+                errors=[{"field": "fiscalYearId", "msg": "ambiguous or missing"}],
+            )
+        return picked
+
+    async def create_expense(
+        self, budget_id: UUID, payload: ExpenseCreate, *, actor: str
+    ) -> ExpenseOut:
+        """Eigenständige Ausgabe gegen eine Kostenstelle buchen (#25, ohne Antrag)."""
+        node = await self._get_node(budget_id)
+        fy_id = await self._resolve_expense_fiscal_year(node, payload.fiscal_year_id)
+        expense = BudgetExpense(
+            id=uuid.uuid4(),
+            budget_id=node.id,
+            fiscal_year_id=fy_id,
+            amount=payload.amount,
+            currency=node.currency,
+            description=payload.description,
+            actor=actor,
+        )
+        self.session.add(expense)
+        await self.session.commit()
+        return ExpenseOut(
+            id=expense.id,
+            budgetId=node.id,
+            pathKey=node.path_key,
+            fiscalYearId=fy_id,
+            amount=expense.amount,
+            currency=expense.currency,
+            description=expense.description,
+            actor=expense.actor,
+            createdAt=expense.created_at,
+        )
+
+    async def list_expenses(
+        self, budget_id: UUID, fiscal_year_id: UUID | None = None
+    ) -> list[ExpenseOut]:
+        """Ausgaben dieser Kostenstelle **und ihres Unterbaums** (#25, optional HHJ)."""
+        node = await self._get_node(budget_id)
+        subtree = select(Budget.id).where(
+            or_(
+                Budget.path_key == node.path_key,
+                Budget.path_key.like(node.path_key + _SEP + "%"),
+            )
+        )
+        stmt = (
+            select(BudgetExpense, Budget.path_key)
+            .join(Budget, Budget.id == BudgetExpense.budget_id)
+            .where(BudgetExpense.budget_id.in_(subtree))
+            .order_by(BudgetExpense.created_at.desc())
+        )
+        if fiscal_year_id is not None:
+            stmt = stmt.where(BudgetExpense.fiscal_year_id == fiscal_year_id)
+        rows = (await self.session.execute(stmt)).all()
+        return [
+            ExpenseOut(
+                id=e.id,
+                budgetId=e.budget_id,
+                pathKey=path_key,
+                fiscalYearId=e.fiscal_year_id,
+                amount=e.amount,
+                currency=e.currency,
+                description=e.description,
+                actor=e.actor,
+                createdAt=e.created_at,
+            )
+            for (e, path_key) in rows
+        ]
+
+    async def delete_expense(self, expense_id: UUID) -> None:
+        """Ausgabe löschen (#25)."""
+        expense = (
+            await self.session.execute(
+                select(BudgetExpense).where(BudgetExpense.id == expense_id)
+            )
+        ).scalar_one_or_none()
+        if expense is None:
+            raise NotFoundError(f"budget expense {expense_id} not found")
+        await self.session.delete(expense)
+        await self.session.commit()
+
     # --------------------------------------------------------------- tree view
     async def get_tree(
         self, *, gremium_id: UUID | None = None
@@ -507,12 +614,25 @@ class BudgetTreeService:
             )
         ).all()
 
+        # Eigenständige Ausgaben (#25) zählen ebenfalls als gebundener Verbrauch und
+        # fließen über das path_key-Präfix in denselben Roll-up wie genehmigte Anträge.
+        expense_rows = (
+            await self.session.execute(
+                select(
+                    Budget.path_key,
+                    BudgetExpense.fiscal_year_id,
+                    BudgetExpense.amount,
+                ).join(Budget, Budget.id == BudgetExpense.budget_id)
+            )
+        ).all()
+
         node_tuples = [
             (n.id, n.parent_id, n.gremium_id, n.key, n.path_key, n.name, n.currency, n.active)
             for n in nodes
         ]
         alloc_tuples = [(a.budget_id, a.fiscal_year_id, a.allocated) for a in allocs]
         committed_rows = [(fy, path, amount) for path, fy, amount in rows]
+        committed_rows += [(fy, path, amount) for path, fy, amount in expense_rows]
         forest = tree_rules.build_forest(
             node_tuples, alloc_tuples, committed_rows, gremium_id=gremium_id
         )

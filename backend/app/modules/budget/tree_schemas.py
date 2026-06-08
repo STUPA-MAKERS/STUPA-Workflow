@@ -158,6 +158,33 @@ class BudgetApplicationOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
 
 
+# ------------------------------------------------------------------- expense
+class ExpenseCreate(_CamelModel):
+    """Eigenständige Ausgabe buchen (#25) — ohne Antrag, gegen Kostenstelle + HHJ.
+
+    ``fiscalYearId`` ist optional: fehlt es, wird das **eine** aktive HHJ des
+    Top-Budgets gewählt (mehrdeutig/keins → 422).
+    """
+
+    amount: Decimal = Field(gt=0, allow_inf_nan=False)
+    description: str = Field(min_length=1)
+    fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
+
+
+class ExpenseOut(_CamelModel):
+    """Gebuchte Ausgabe (Stammdaten)."""
+
+    id: UUID
+    budget_id: UUID = Field(alias="budgetId")
+    path_key: str | None = Field(default=None, alias="pathKey")
+    fiscal_year_id: UUID = Field(alias="fiscalYearId")
+    amount: Decimal
+    currency: str
+    description: str
+    actor: str | None = None
+    created_at: datetime = Field(alias="createdAt")
+
+
 BudgetTreeNodeOut.model_rebuild()
 
 __all__ = [
@@ -171,6 +198,8 @@ __all__ = [
     "BudgetNodeOut",
     "BudgetNodeUpdate",
     "BudgetTreeNodeOut",
+    "ExpenseCreate",
+    "ExpenseOut",
     "FiscalYearCreate",
     "FiscalYearOut",
     "FiscalYearUpdate",

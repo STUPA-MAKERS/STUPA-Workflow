@@ -117,4 +117,34 @@ class BudgetAllocation(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
-__all__ = ["Budget", "BudgetAllocation", "FiscalYear"]
+class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
+    """Eigenständige Ausgabe gegen eine Kostenstelle + HHJ (#25), **ohne** Antrag.
+
+    Direkte Buchung (z. B. Barauslage, Rechnung) auf einen Budget-Knoten. Zählt —
+    wie genehmigte Anträge — als **gebundener Verbrauch** und fließt im Roll-up
+    (``tree_rules.rollup_committed``) über das ``path_key``-Präfix zu allen Vorfahren
+    rauf. ``fiscal_year_id`` muss zum Top-Level des Knotens gehören (Service-Check).
+    """
+
+    __tablename__ = "budget_expense"
+
+    budget_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("budget.id", ondelete="CASCADE")
+    )
+    fiscal_year_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("fiscal_year.id", ondelete="CASCADE")
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
+    description: Mapped[str] = mapped_column(Text)
+    actor: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="budget_expense_amount_positive"),
+        CheckConstraint("currency = 'EUR'", name="budget_expense_currency_eur"),
+        Index("ix_budget_expense_budget_id", "budget_id"),
+        Index("ix_budget_expense_fiscal_year_id", "fiscal_year_id"),
+    )
+
+
+__all__ = ["Budget", "BudgetAllocation", "BudgetExpense", "FiscalYear"]

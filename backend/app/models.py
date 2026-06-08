@@ -34,7 +34,12 @@ from app.modules.auth.models import (
     RolePermission,
 )
 from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
-from app.modules.budget.tree_models import Budget, BudgetAllocation, FiscalYear
+from app.modules.budget.tree_models import (
+    Budget,
+    BudgetAllocation,
+    BudgetExpense,
+    FiscalYear,
+)
 from app.modules.deadlines.models import Deadline
 from app.modules.files.models import Attachment
 from app.modules.flow.models import FlowVersion, State, Transition
@@ -57,6 +62,7 @@ __all__ = [
     "Budget",
     "BudgetAllocation",
     "BudgetEntry",
+    "BudgetExpense",
     "BudgetField",
     "BudgetPot",
     "FiscalYear",

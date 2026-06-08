@@ -437,3 +437,58 @@ async def test_get_tree_assembles() -> None:
     assert view.allocated == Decimal("1000")
     assert view.committed == Decimal("250")
     assert view.available == Decimal("750")
+
+
+# ------------------------------------------------------------------- expenses
+async def test_get_tree_rolls_up_standalone_expenses() -> None:
+    """Eigenständige Ausgaben (#25) zählen wie Anträge als gebundener Verbrauch."""
+    g = uuid.uuid4()
+    fy_id = uuid.uuid4()
+    top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=g, key="VS")
+    alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
+    sess = fake_session(
+        result(top),                            # nodes
+        result(alloc),                          # allocations
+        result(),                               # committed application rows (none)
+        result(("VS", fy_id, Decimal("60"))),   # standalone expense rows (#25)
+    )
+    svc = BudgetTreeService(sess)
+    view = (await svc.get_tree())[0].by_fiscal_year[0]
+    assert view.committed == Decimal("60")
+    assert view.available == Decimal("940")
+
+
+async def test_resolve_expense_fiscal_year_explicit_ok() -> None:
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id)
+    sess = fake_session(result(top), result(fy))  # _top_level, _get_fiscal_year
+    svc = BudgetTreeService(sess)
+    assert await svc._resolve_expense_fiscal_year(node, fy.id) == fy.id
+
+
+async def test_resolve_expense_fiscal_year_wrong_top() -> None:
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
+    fy = _fy(id=uuid.uuid4(), budget_id=uuid.uuid4())  # gehört zu anderem Top-Budget
+    sess = fake_session(result(top), result(fy))
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ValidationProblem):
+        await svc._resolve_expense_fiscal_year(node, fy.id)
+
+
+async def test_resolve_expense_fiscal_year_ambiguous() -> None:
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
+    fy1 = _fy(id=uuid.uuid4(), budget_id=top.id)
+    fy2 = _fy(id=uuid.uuid4(), budget_id=top.id)
+    sess = fake_session(result(top), result(fy1, fy2))  # _top_level, _fiscal_years_of
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ValidationProblem):
+        await svc._resolve_expense_fiscal_year(node, None)
+
+
+async def test_delete_expense_not_found() -> None:
+    svc = BudgetTreeService(fake_session(result()))
+    with pytest.raises(NotFoundError):
+        await svc.delete_expense(uuid.uuid4())
