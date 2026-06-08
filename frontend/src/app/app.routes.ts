@@ -187,6 +187,16 @@ export const routes: Routes = [
           import('./pages/admin/gremien/gremien.component').then((m) => m.AdminGremienComponent),
       },
       {
+        // Mitglieder-Unterseite je Gremium (#18).
+        path: 'admin/gremien/:id',
+        data: { title: 'admin.gremien.membersOf', permission: 'admin.config' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/gremien/gremium-members.component').then(
+            (m) => m.GremiumMembersComponent,
+          ),
+      },
+      {
         path: 'admin/branding',
         data: { title: 'admin.brand.title', permission: 'admin.config' },
         canActivate: [authGuard],

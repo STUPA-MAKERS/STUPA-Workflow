@@ -110,7 +110,7 @@ export class AdminApiService {
   /** POST /admin/gremien — Gremium anlegen (P `admin.config`), #105. */
   createGremium(body: GremiumCreateBody): Observable<Gremium> {
     if (this.mock) {
-      const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, ...body };
+      const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, allowVoteDelegation: false, ...body };
       this.store.gremien.push(created);
       return of(structuredCopy(created));
     }

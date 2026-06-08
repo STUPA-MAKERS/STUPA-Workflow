@@ -1,125 +1,67 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
-import { ButtonComponent } from '@shared/ui/button/button.component';
-import { CardComponent } from '@shared/ui/card/card.component';
-import { BadgeComponent, SelectComponent, type SelectOption } from '@shared/ui';
+import {
+  BadgeComponent,
+  ButtonComponent,
+  CheckboxComponent,
+  DialogComponent,
+  SelectComponent,
+  type SelectOption,
+} from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminApiService } from '../admin-api.service';
-import type {
-  AdminPrincipal,
-  Gremium,
-  GremiumCreateBody,
-  GremiumUpdateBody,
-  Role,
+import {
+  CD_VARIANTS,
+  type Gremium,
+  type GremiumCreateBody,
+  type GremiumUpdateBody,
+  slugify,
 } from '../admin.models';
 
-/** Eine Mitgliedschaft (Rollenzuweisung) innerhalb eines Gremiums (#11). */
-interface GremiumMember {
-  assignmentId: string;
-  principalId: string;
-  name: string;
-  email: string | null;
-  roleLabel: string;
-}
-
-/** Editier-Formularzustand eines Gremiums (flach). */
+/** Editier-Formularzustand eines Gremiums (Slug wird automatisch erzeugt). */
 interface GremiumForm {
   name: string;
-  slug: string;
   cdVariant: string;
   defaultLang: string;
+  allowVoteDelegation: boolean;
 }
 
 function emptyForm(): GremiumForm {
-  return { name: '', slug: '', cdVariant: 'stupa', defaultLang: 'de' };
+  return { name: '', cdVariant: 'stupa', defaultLang: 'de', allowVoteDelegation: false };
 }
 
 /**
- * Gremien-Verwaltung (#105). Schließt die Lücke: das Backend bietet volle
- * Gremien-CRUD (`GET/POST/PATCH /admin/gremien`, P `admin.config`), aber im
- * Frontend fehlte der Ort zum Anlegen/Bearbeiten — obwohl Gremien überall als
- * Pflicht-Fremdschlüssel referenziert sind (Sitzung, Budget-Topf, Antragstyp).
- * Folgt dem Budget-Töpfe-Muster (`/budget/pots`): Anlege-Formular + Liste +
- * „Bearbeiten", durchgängig custom-Controls.
+ * Gremien-Verwaltung (#18). Tabelle aller Gremien; Anlegen/Bearbeiten über einen
+ * **Dialog** (nicht inline). CD-Variante als Dropdown, der Slug wird automatisch
+ * aus dem Namen erzeugt, Stimm-Delegation ist eine Gremium-Einstellung (#14).
+ * »Mitglieder« führt auf die **Unterseite** je Gremium (`/admin/gremien/:id`).
  */
 @Component({
   selector: 'app-admin-gremien',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, SelectComponent, BadgeComponent],
+  imports: [
+    FormsModule,
+    RouterLink,
+    TranslatePipe,
+    ButtonComponent,
+    BadgeComponent,
+    CheckboxComponent,
+    SelectComponent,
+    DialogComponent,
+  ],
   template: `
     <header class="grem__head">
-      <h1 class="grem__title">{{ 'admin.gremien.title' | t }}</h1>
-      <p class="grem__subtitle">{{ 'admin.gremien.subtitle' | t }}</p>
+      <div>
+        <h1 class="grem__title">{{ 'admin.gremien.title' | t }}</h1>
+        <p class="grem__subtitle">{{ 'admin.gremien.subtitle' | t }}</p>
+      </div>
+      <app-button (click)="openCreate()">{{ 'admin.gremien.addGremium' | t }}</app-button>
     </header>
-
-    <app-card [heading]="(editingId() ? 'admin.gremien.edit' : 'admin.gremien.create') | t">
-      <form class="grem__form" (submit)="submit($event)">
-        <div class="grem__grid">
-          <div class="field">
-            <label class="field__label" for="grem-name">{{ 'admin.gremien.name' | t }}</label>
-            <input
-              id="grem-name"
-              class="field__control"
-              name="name"
-              [ngModel]="form().name"
-              (ngModelChange)="patch('name', $event)"
-              required
-            />
-          </div>
-          <div class="field">
-            <label class="field__label" for="grem-slug">{{ 'admin.gremien.slug' | t }}</label>
-            <input
-              id="grem-slug"
-              class="field__control"
-              name="slug"
-              [placeholder]="'admin.gremien.slugPlaceholder' | t"
-              [ngModel]="form().slug"
-              (ngModelChange)="patch('slug', $event)"
-              required
-            />
-          </div>
-          <div class="field">
-            <label class="field__label" for="grem-cd">{{ 'admin.gremien.cdVariant' | t }}</label>
-            <input
-              id="grem-cd"
-              class="field__control"
-              name="cdVariant"
-              [placeholder]="'admin.gremien.cdVariantPlaceholder' | t"
-              [ngModel]="form().cdVariant"
-              (ngModelChange)="patch('cdVariant', $event)"
-            />
-          </div>
-          <app-select
-            name="defaultLang"
-            [label]="'admin.gremien.defaultLang' | t"
-            [options]="langOptions()"
-            [ngModel]="form().defaultLang"
-            (ngModelChange)="patch('defaultLang', $event)"
-          />
-        </div>
-
-        <div class="grem__actions">
-          <app-button type="submit" size="sm" [disabled]="!canSubmit()" [loading]="saving()">
-            {{ (editingId() ? 'admin.gremien.save' : 'admin.gremien.add') | t }}
-          </app-button>
-          @if (editingId()) {
-            <app-button type="button" variant="ghost" size="sm" (click)="cancelEdit()">
-              {{ 'admin.gremien.cancel' | t }}
-            </app-button>
-          }
-        </div>
-      </form>
-    </app-card>
 
     <section class="grem__list" [attr.aria-label]="'admin.gremien.title' | t">
       @if (loading()) {
@@ -136,23 +78,25 @@ function emptyForm(): GremiumForm {
               <th>{{ 'admin.gremien.slug' | t }}</th>
               <th>{{ 'admin.gremien.cdVariant' | t }}</th>
               <th>{{ 'admin.gremien.defaultLang' | t }}</th>
+              <th>{{ 'admin.gremien.delegation' | t }}</th>
               <th class="grem__th-actions">{{ 'admin.gremien.actions' | t }}</th>
             </tr>
           </thead>
           <tbody>
             @for (g of gremien(); track g.id) {
-              <tr [class.grem__row--editing]="editingId() === g.id">
+              <tr>
                 <td>{{ g.name }}</td>
-                <td>{{ g.slug }}</td>
+                <td class="grem__mono">{{ g.slug }}</td>
                 <td>{{ g.cdVariant }}</td>
                 <td>{{ g.defaultLang }}</td>
+                <td>
+                  @if (g.allowVoteDelegation) {
+                    <app-badge variant="primary">{{ 'admin.gremien.delegationOn' | t }}</app-badge>
+                  } @else { — }
+                </td>
                 <td class="grem__th-actions">
-                  <app-button variant="ghost" size="sm" (click)="openMembers(g)">
-                    {{ 'admin.gremien.members' | t }}
-                  </app-button>
-                  <app-button variant="secondary" size="sm" (click)="startEdit(g)">
-                    {{ 'admin.gremien.editAction' | t }}
-                  </app-button>
+                  <a class="grem__link" [routerLink]="['/admin/gremien', g.id]">{{ 'admin.gremien.members' | t }}</a>
+                  <app-button variant="secondary" size="sm" (click)="openEdit(g)">{{ 'admin.gremien.editAction' | t }}</app-button>
                 </td>
               </tr>
             }
@@ -161,78 +105,47 @@ function emptyForm(): GremiumForm {
       }
     </section>
 
-    <!-- Mitglieder eines Gremiums verwalten (#11) -->
-    @if (selectedGremium(); as g) {
-      <app-card [heading]="('admin.gremien.membersOf' | t) + ': ' + g.name">
-        <div class="grem__members-head">
-          <p class="grem__subtitle">{{ 'admin.gremien.membersHint' | t }}</p>
-          <app-button variant="ghost" size="sm" (click)="closeMembers()">{{ 'admin.gremien.membersClose' | t }}</app-button>
+    <!-- Anlegen/Bearbeiten als Dialog (#18/#19). -->
+    <app-dialog
+      [open]="dialogOpen()"
+      [title]="(editingId() ? 'admin.gremien.edit' : 'admin.gremien.create') | t"
+      [closeLabel]="'admin.gremien.cancel' | t"
+      (closed)="closeDialog()"
+    >
+      <form id="grem-form" class="grem__form" (submit)="submit($event)">
+        <div class="field">
+          <label class="field__label" for="grem-name">{{ 'admin.gremien.name' | t }}</label>
+          <input id="grem-name" class="field__control" name="name" [ngModel]="form().name" (ngModelChange)="patch('name', $event)" required />
+          <p class="field__hint">{{ 'admin.gremien.slug' | t }}: <span class="grem__mono">{{ slugPreview() }}</span></p>
         </div>
-
-        <!-- Mitglied hinzufügen -->
-        <form class="grem__add-member" (submit)="addMember($event)">
-          <div class="field">
-            <label class="field__label" for="member-search">{{ 'admin.gremien.memberSearch' | t }}</label>
-            <input
-              id="member-search"
-              class="field__control"
-              name="memberSearch"
-              [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
-              [ngModel]="memberQuery()"
-              (ngModelChange)="onMemberSearch($event)"
-            />
-          </div>
-          <app-select
-            name="memberPrincipal"
-            [label]="'admin.gremien.memberPrincipal' | t"
-            [placeholder]="'admin.gremien.memberPrincipalPlaceholder' | t"
-            [options]="candidateOptions()"
-            [ngModel]="addPrincipalId()"
-            (ngModelChange)="addPrincipalId.set($event)"
-          />
-          <app-select
-            name="memberRole"
-            [label]="'admin.gremien.memberRole' | t"
-            [placeholder]="'admin.gremien.memberRolePlaceholder' | t"
-            [options]="roleOptions()"
-            [ngModel]="addRoleId()"
-            (ngModelChange)="addRoleId.set($event)"
-          />
-          <app-button type="submit" size="sm" [disabled]="!addPrincipalId() || !addRoleId()">
-            {{ 'admin.gremien.memberAdd' | t }}
-          </app-button>
-        </form>
-
-        @if (members().length === 0) {
-          <p class="grem__status">{{ 'admin.gremien.membersEmpty' | t }}</p>
-        } @else {
-          <table class="grem__table">
-            <thead>
-              <tr>
-                <th>{{ 'admin.users.col.name' | t }}</th>
-                <th>{{ 'admin.users.col.email' | t }}</th>
-                <th>{{ 'admin.gremien.memberRole' | t }}</th>
-                <th class="grem__th-actions">{{ 'admin.users.col.actions' | t }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (m of members(); track m.assignmentId) {
-                <tr>
-                  <td>{{ m.name }}</td>
-                  <td>{{ m.email || '—' }}</td>
-                  <td><app-badge variant="primary">{{ m.roleLabel }}</app-badge></td>
-                  <td class="grem__th-actions">
-                    <app-button variant="danger" size="sm" (click)="removeMember(m.assignmentId)">
-                      {{ 'admin.gremien.memberRemove' | t }}
-                    </app-button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        }
-      </app-card>
-    }
+        <app-select
+          [label]="'admin.gremien.cdVariant' | t"
+          [options]="cdOptions"
+          [ngModel]="form().cdVariant"
+          (ngModelChange)="patch('cdVariant', $event)"
+          name="cdVariant"
+        />
+        <app-select
+          [label]="'admin.gremien.defaultLang' | t"
+          [options]="langOptions()"
+          [ngModel]="form().defaultLang"
+          (ngModelChange)="patch('defaultLang', $event)"
+          name="defaultLang"
+        />
+        <app-checkbox
+          [ngModel]="form().allowVoteDelegation"
+          (ngModelChange)="patch('allowVoteDelegation', $event)"
+          [hint]="'admin.gremien.delegationHint' | t"
+          name="delegation"
+        >{{ 'admin.gremien.delegation' | t }}</app-checkbox>
+      </form>
+      <div dialog-footer class="grem__dialog-foot">
+        <app-button variant="ghost" (click)="closeDialog()">{{ 'admin.gremien.cancel' | t }}</app-button>
+        <app-button [disabled]="!form().name.trim()" [loading]="saving()" (click)="submit($event)">
+          {{ (editingId() ? 'admin.gremien.save' : 'admin.gremien.add') | t }}
+        </app-button>
+      </div>
+    </app-dialog>
   `,
   styles: [
     `
@@ -241,45 +154,19 @@ function emptyForm(): GremiumForm {
         flex-direction: column;
         gap: var(--space-5);
       }
+      .grem__head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: var(--space-4);
+        flex-wrap: wrap;
+      }
       .grem__title {
         margin: 0;
       }
       .grem__subtitle {
         color: var(--color-text-muted);
         margin: var(--space-1) 0 0;
-      }
-      .grem__grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-        gap: var(--space-4);
-      }
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-      }
-      .field__label {
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-medium);
-        color: var(--color-text);
-      }
-      .field__control {
-        height: var(--control-height);
-        padding: 0 var(--space-3);
-        background: var(--color-surface);
-        color: var(--color-text);
-        border: var(--border-width) solid var(--color-border-strong);
-        border-radius: var(--radius-md);
-        font-size: var(--fs-md);
-      }
-      .field__control:focus-visible {
-        outline: 2px solid var(--color-primary);
-        outline-offset: 1px;
-      }
-      .grem__actions {
-        display: flex;
-        gap: var(--space-2);
-        margin-top: var(--space-4);
       }
       .grem__status {
         color: var(--color-text-muted);
@@ -291,39 +178,75 @@ function emptyForm(): GremiumForm {
       .grem__table {
         width: 100%;
         border-collapse: collapse;
-        font-size: var(--fs-md);
+        font-size: var(--fs-sm);
+        background: var(--color-surface);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
       }
-      .grem__table th,
-      .grem__table td {
-        text-align: left;
-        padding: var(--space-3);
+      .grem__table th {
+        text-align: start;
+        padding: var(--space-3) var(--space-4);
+        font-size: var(--fs-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-text-muted);
+        background: var(--color-surface-sunken);
         border-bottom: var(--border-width) solid var(--color-border);
+      }
+      .grem__table td {
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-width) solid var(--color-border);
+        vertical-align: middle;
+      }
+      .grem__mono {
+        font-family: var(--font-mono, monospace);
+        font-size: var(--fs-xs);
       }
       .grem__th-actions {
-        text-align: right;
+        text-align: end;
+        white-space: nowrap;
       }
-      .grem__row--editing {
-        background: var(--color-primary-subtle);
+      .grem__link {
+        color: var(--color-primary);
+        text-decoration: none;
+        margin-right: var(--space-3);
+        font-weight: var(--fw-medium);
       }
-      .grem__members-head {
+      .grem__link:hover {
+        text-decoration: underline;
+      }
+      .grem__form {
         display: flex;
-        justify-content: space-between;
-        align-items: start;
-        gap: var(--space-3);
-        flex-wrap: wrap;
-        margin-bottom: var(--space-4);
+        flex-direction: column;
+        gap: var(--space-4);
       }
-      .grem__add-member {
+      .field {
         display: flex;
-        flex-wrap: wrap;
-        align-items: end;
-        gap: var(--space-3);
-        margin-bottom: var(--space-4);
-        padding-bottom: var(--space-4);
-        border-bottom: var(--border-width) solid var(--color-border);
+        flex-direction: column;
+        gap: var(--space-2);
       }
-      .grem__add-member .field {
-        flex: 1 1 12rem;
+      .field__label {
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-medium);
+      }
+      .field__control {
+        height: var(--control-height);
+        padding: 0 var(--space-3);
+        background: var(--color-surface);
+        color: var(--color-text);
+        border: var(--border-width) solid var(--color-border-strong);
+        border-radius: var(--radius-md);
+        font-size: var(--fs-md);
+      }
+      .field__hint {
+        font-size: var(--fs-xs);
+        color: var(--color-text-muted);
+        margin: 0;
+      }
+      .grem__dialog-foot {
+        display: flex;
+        gap: var(--space-3);
       }
     `,
   ],
@@ -337,117 +260,18 @@ export class AdminGremienComponent {
   readonly loading = signal(true);
   readonly loadError = signal(false);
   readonly saving = signal(false);
+  readonly dialogOpen = signal(false);
   readonly editingId = signal<Uuid | null>(null);
   readonly form = signal<GremiumForm>(emptyForm());
 
+  readonly cdOptions: SelectOption[] = CD_VARIANTS.map((v) => ({ value: v, label: v }));
   readonly langOptions = computed<SelectOption[]>(() => [
     { value: 'de', label: this.i18n.translate('admin.gremien.langDe') },
     { value: 'en', label: this.i18n.translate('admin.gremien.langEn') },
   ]);
 
-  readonly canSubmit = computed(() => {
-    const f = this.form();
-    return f.name.trim().length > 0 && f.slug.trim().length > 0 && !this.saving();
-  });
-
-  // --- Mitglieder-Verwaltung (#11) -----------------------------------------
-  private readonly principals = signal<AdminPrincipal[]>([]);
-  private readonly memberRoles = signal<Role[]>([]);
-  readonly selectedGremium = signal<Gremium | null>(null);
-  readonly memberQuery = signal('');
-  readonly candidates = signal<AdminPrincipal[]>([]);
-  readonly addPrincipalId = signal('');
-  readonly addRoleId = signal('');
-
-  readonly roleOptions = computed<SelectOption[]>(() =>
-    this.memberRoles().map((r) => ({ value: r.id, label: this.roleName(r) })),
-  );
-  readonly candidateOptions = computed<SelectOption[]>(() =>
-    this.candidates().map((p) => ({ value: p.id, label: p.displayName || p.email || p.sub })),
-  );
-
-  readonly members = computed<GremiumMember[]>(() => {
-    const g = this.selectedGremium();
-    if (!g) return [];
-    const rolesById = new Map(this.memberRoles().map((r) => [r.id, r]));
-    const out: GremiumMember[] = [];
-    for (const p of this.principals()) {
-      for (const a of p.assignments) {
-        if (a.gremiumId === g.id) {
-          const role = rolesById.get(a.roleId);
-          out.push({
-            assignmentId: a.id,
-            principalId: p.id,
-            name: p.displayName || p.email || p.sub,
-            email: p.email ?? null,
-            roleLabel: role ? this.roleName(role) : a.roleId,
-          });
-        }
-      }
-    }
-    return out;
-  });
-
-  private roleName(role: Role): string {
-    return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
-  }
-
-  openMembers(g: Gremium): void {
-    this.selectedGremium.set(g);
-    this.addPrincipalId.set('');
-    this.addRoleId.set('');
-    this.memberQuery.set('');
-    this.api.listRoles().subscribe((r) => this.memberRoles.set(r));
-    this.api.listPrincipals('').subscribe((p) => {
-      this.principals.set(p);
-      this.candidates.set(p);
-    });
-  }
-
-  closeMembers(): void {
-    this.selectedGremium.set(null);
-  }
-
-  onMemberSearch(q: string): void {
-    this.memberQuery.set(q);
-    this.api.listPrincipals(q).subscribe({
-      next: (p) => this.candidates.set(p),
-      error: () => this.candidates.set([]),
-    });
-  }
-
-  addMember(event: Event): void {
-    event.preventDefault();
-    const g = this.selectedGremium();
-    const principalId = this.addPrincipalId();
-    const roleId = this.addRoleId();
-    if (!g || !principalId || !roleId) return;
-    this.api
-      .assignRole({ principalId, roleId, gremiumId: g.id, validFrom: null, validUntil: null })
-      .subscribe({
-        next: () => {
-          this.toast.success(this.i18n.translate('admin.gremien.memberAdded'));
-          this.addPrincipalId.set('');
-          this.addRoleId.set('');
-          this.refreshPrincipals();
-        },
-        error: () => this.toast.error(this.i18n.translate('admin.gremien.memberFailed')),
-      });
-  }
-
-  removeMember(assignmentId: string): void {
-    this.api.revokeRole(assignmentId).subscribe({
-      next: () => {
-        this.toast.success(this.i18n.translate('admin.gremien.memberRemoved'));
-        this.refreshPrincipals();
-      },
-      error: () => this.toast.error(this.i18n.translate('admin.gremien.memberFailed')),
-    });
-  }
-
-  private refreshPrincipals(): void {
-    this.api.listPrincipals('').subscribe((p) => this.principals.set(p));
-  }
+  /** Vorschau des automatisch erzeugten Slugs. */
+  readonly slugPreview = computed(() => slugify(this.form().name) || '—');
 
   constructor() {
     this.reload();
@@ -457,35 +281,39 @@ export class AdminGremienComponent {
     this.form.update((f) => ({ ...f, [key]: value }));
   }
 
-  startEdit(g: Gremium): void {
+  openCreate(): void {
+    this.editingId.set(null);
+    this.form.set(emptyForm());
+    this.dialogOpen.set(true);
+  }
+
+  openEdit(g: Gremium): void {
     this.editingId.set(g.id);
     this.form.set({
       name: g.name,
-      slug: g.slug,
       cdVariant: g.cdVariant,
       defaultLang: g.defaultLang,
+      allowVoteDelegation: g.allowVoteDelegation,
     });
+    this.dialogOpen.set(true);
   }
 
-  cancelEdit(): void {
-    this.editingId.set(null);
-    this.form.set(emptyForm());
+  closeDialog(): void {
+    this.dialogOpen.set(false);
   }
 
   submit(event: Event): void {
     event.preventDefault();
-    if (!this.canSubmit()) return;
     const f = this.form();
-    const cdVariant = f.cdVariant.trim() || 'stupa';
+    if (!f.name.trim() || this.saving()) return;
     this.saving.set(true);
-
     const id = this.editingId();
     if (id) {
       const body: GremiumUpdateBody = {
         name: f.name.trim(),
-        slug: f.slug.trim(),
-        cdVariant,
+        cdVariant: f.cdVariant,
         defaultLang: f.defaultLang,
+        allowVoteDelegation: f.allowVoteDelegation,
       };
       this.api.updateGremium(id, body).subscribe({
         next: () => this.onSaved('admin.gremien.toast.updated'),
@@ -494,9 +322,10 @@ export class AdminGremienComponent {
     } else {
       const body: GremiumCreateBody = {
         name: f.name.trim(),
-        slug: f.slug.trim(),
-        cdVariant,
+        slug: slugify(f.name) || f.name.trim().toLowerCase(),
+        cdVariant: f.cdVariant,
         defaultLang: f.defaultLang,
+        allowVoteDelegation: f.allowVoteDelegation,
       };
       this.api.createGremium(body).subscribe({
         next: () => this.onSaved('admin.gremien.toast.created'),
@@ -507,8 +336,8 @@ export class AdminGremienComponent {
 
   private onSaved(key: 'admin.gremien.toast.created' | 'admin.gremien.toast.updated'): void {
     this.saving.set(false);
+    this.dialogOpen.set(false);
     this.toast.success(this.i18n.translate(key));
-    this.cancelEdit();
     this.reload();
   }
 

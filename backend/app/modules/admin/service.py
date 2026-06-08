@@ -105,6 +105,7 @@ class ConfigService:
             slug=payload.slug,
             cd_variant=payload.cd_variant,
             default_lang=payload.default_lang,
+            allow_vote_delegation=payload.allow_vote_delegation,
         )
         self.session.add(row)
         await self.session.flush()
@@ -128,6 +129,8 @@ class ConfigService:
             row.cd_variant = payload.cd_variant
         if payload.default_lang is not None:
             row.default_lang = payload.default_lang
+        if payload.allow_vote_delegation is not None:
+            row.allow_vote_delegation = payload.allow_vote_delegation
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id)
         await self.session.commit()
         return _gremium_out(row)
@@ -562,6 +565,7 @@ def _gremium_out(row: Gremium) -> GremiumOut:
         slug=row.slug,
         cd_variant=row.cd_variant,
         default_lang=row.default_lang,
+        allow_vote_delegation=row.allow_vote_delegation,
     )
 
 

@@ -87,8 +87,8 @@ export const MOCK_PRINCIPALS: AdminPrincipal[] = [
 ];
 
 export const MOCK_GREMIEN: Gremium[] = [
-  { id: 'g-stupa', name: 'Studierendenparlament', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' },
-  { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariant: 'asta', defaultLang: 'de' },
+  { id: 'g-stupa', name: 'Studierendenparlament', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de', allowVoteDelegation: true },
+  { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariant: 'asta', defaultLang: 'de', allowVoteDelegation: false },
 ];
 
 /**

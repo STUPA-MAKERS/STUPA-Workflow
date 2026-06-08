@@ -38,6 +38,8 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     # pytex CD-Variante: stupa/asta/echo/makers/report
     cd_variant: Mapped[str] = mapped_column(Text, server_default="stupa")
     default_lang: Mapped[str] = mapped_column(Text, server_default="de")
+    # Stimm-Delegation in diesem Gremium erlaubt (#14, pro Gremium statt pro Zuweisung).
+    allow_vote_delegation: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
 
 class MailList(UUIDPkMixin, Base):

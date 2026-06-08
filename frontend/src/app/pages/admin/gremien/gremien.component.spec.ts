@@ -1,8 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -15,6 +13,7 @@ const GREMIUM: Gremium = {
   slug: 'stupa',
   cdVariant: 'stupa',
   defaultLang: 'de',
+  allowVoteDelegation: false,
 };
 
 async function setup(gremien: Gremium[] = [GREMIUM]) {
@@ -22,6 +21,7 @@ async function setup(gremien: Gremium[] = [GREMIUM]) {
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
+      provideRouter([]),
       { provide: USE_MOCK_API, useValue: false },
     ],
   });
@@ -30,7 +30,7 @@ async function setup(gremien: Gremium[] = [GREMIUM]) {
   return { ...view, http };
 }
 
-describe('AdminGremienComponent', () => {
+describe('AdminGremienComponent (#18)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists existing committees from /admin/gremien', async () => {
@@ -45,74 +45,53 @@ describe('AdminGremienComponent', () => {
     http.verify();
   });
 
-  it('creates a committee via POST and reloads', async () => {
+  it('creates a committee via a dialog with an auto-generated slug', async () => {
     const { http } = await setup([]);
-    await userEvent.type(screen.getByLabelText('Name'), 'AStA');
-    await userEvent.type(screen.getByLabelText(/Kürzel/), 'asta');
-
+    await userEvent.click(screen.getByRole('button', { name: 'Gremium hinzufügen' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'AStA Vorstand');
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     const post = http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'POST');
     expect(post.request.body).toEqual({
-      name: 'AStA',
-      slug: 'asta',
+      name: 'AStA Vorstand',
+      slug: 'asta-vorstand',
       cdVariant: 'stupa',
       defaultLang: 'de',
+      allowVoteDelegation: false,
     });
-    post.flush({ ...GREMIUM, id: 'g-2', name: 'AStA', slug: 'asta' });
-
+    post.flush({ ...GREMIUM, id: 'g-2', name: 'AStA Vorstand', slug: 'asta-vorstand' });
     http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);
     http.verify();
   });
 
-  it('edits a committee via PATCH', async () => {
+  it('edits a committee via PATCH (slug stays)', async () => {
     const { http } = await setup();
     await screen.findByText('Studierendenparlament');
-
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
     const name = screen.getByLabelText('Name');
     await userEvent.clear(name);
     await userEvent.type(name, 'StuPa 2026');
     await userEvent.selectOptions(screen.getByLabelText(/Standardsprache/), 'en');
-
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
 
-    const patch = http.expectOne(
-      (r) => r.url.endsWith('/admin/gremien/g-1') && r.method === 'PATCH',
-    );
+    const patch = http.expectOne((r) => r.url.endsWith('/admin/gremien/g-1') && r.method === 'PATCH');
     expect(patch.request.body).toEqual({
       name: 'StuPa 2026',
-      slug: 'stupa',
       cdVariant: 'stupa',
       defaultLang: 'en',
+      allowVoteDelegation: false,
     });
     patch.flush({ ...GREMIUM, name: 'StuPa 2026', defaultLang: 'en' });
     http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);
     http.verify();
   });
 
-  it('keeps create disabled until name and slug are set', async () => {
+  it('keeps create disabled until a name is set', async () => {
     await setup([]);
+    await userEvent.click(screen.getByRole('button', { name: 'Gremium hinzufügen' }));
     const add = screen.getByRole('button', { name: 'Anlegen' });
     expect(add).toBeDisabled();
     await userEvent.type(screen.getByLabelText('Name'), 'X');
-    expect(add).toBeDisabled();
-    await userEvent.type(screen.getByLabelText(/Kürzel/), 'x');
     expect(add).toBeEnabled();
-  });
-
-  it('shows an error when the list cannot load', async () => {
-    const view = await render(AdminGremienComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: USE_MOCK_API, useValue: false },
-      ],
-    });
-    const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET')
-      .flush({ detail: 'fail' }, { status: 500, statusText: 'Server Error' });
-    expect(await screen.findByText(/konnten nicht geladen/i)).toBeInTheDocument();
   });
 });

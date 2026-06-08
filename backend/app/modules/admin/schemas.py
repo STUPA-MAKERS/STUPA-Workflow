@@ -34,6 +34,7 @@ class GremiumOut(_CamelModel):
     slug: str
     cd_variant: str = Field(serialization_alias="cdVariant")
     default_lang: str = Field(serialization_alias="defaultLang")
+    allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
 
 
 class GremiumCreate(_CamelModel):
@@ -41,6 +42,7 @@ class GremiumCreate(_CamelModel):
     slug: str = Field(min_length=1)
     cd_variant: str = Field(default="stupa", alias="cdVariant")
     default_lang: str = Field(default="de", alias="defaultLang")
+    allow_vote_delegation: bool = Field(default=False, alias="allowVoteDelegation")
 
 
 class GremiumUpdate(_CamelModel):
@@ -48,6 +50,7 @@ class GremiumUpdate(_CamelModel):
     slug: str | None = None
     cd_variant: str | None = Field(default=None, alias="cdVariant")
     default_lang: str | None = Field(default=None, alias="defaultLang")
+    allow_vote_delegation: bool | None = Field(default=None, alias="allowVoteDelegation")
 
 
 # --------------------------------------------------------------------------- #

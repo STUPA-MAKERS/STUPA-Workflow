@@ -111,6 +111,7 @@ export interface Gremium {
   slug: string;
   cdVariant: string;
   defaultLang: string;
+  allowVoteDelegation: boolean;
 }
 
 /** Body für `POST /admin/gremien` (`GremiumCreate`). */
@@ -119,6 +120,7 @@ export interface GremiumCreateBody {
   slug: string;
   cdVariant: string;
   defaultLang: string;
+  allowVoteDelegation?: boolean;
 }
 
 /** Body für `PATCH /admin/gremien/{id}` (`GremiumUpdate`) — alle Felder optional. */
@@ -127,6 +129,24 @@ export interface GremiumUpdateBody {
   slug?: string;
   cdVariant?: string;
   defaultLang?: string;
+  allowVoteDelegation?: boolean;
+}
+
+/** CD-Varianten (pytex) als Dropdown statt Freitext (#18). */
+export const CD_VARIANTS: readonly string[] = ['stupa', 'asta', 'echo', 'makers', 'report'];
+
+/** Name → URL-Slug (#18, automatische Generierung). */
+export function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 export interface Role {
