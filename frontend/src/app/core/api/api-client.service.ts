@@ -142,6 +142,14 @@ export class ApiClient {
       );
   }
 
+  /** GET /applications/tasks — offene Entscheidungen für die eigene Rolle (#64). */
+  listTasks(): Observable<ApplicationListItem[]> {
+    const lang = this.i18n.locale();
+    return this.http
+      .get<ApplicationListItemWire[]>(`${this.base}/applications/tasks`)
+      .pipe(map((items) => items.map((item) => mapApplicationListItem(item, lang))));
+  }
+
   getApplication(id: Uuid): Observable<Application> {
     const lang = this.i18n.locale();
     return this.http

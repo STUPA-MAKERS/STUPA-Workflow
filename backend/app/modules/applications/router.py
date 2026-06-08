@@ -28,7 +28,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 
 from app.db import get_sessionmaker
-from app.deps import DbSession, SettingsDep, require_principal
+from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.applications.access import Access, require_app_edit, require_app_read
 from app.modules.applications.schemas import (
     ApplicationCreate,
@@ -123,6 +123,20 @@ async def create_application(
     app, email = await service.create(payload)
     background.add_task(send_magic_link, settings, email, app.id)
     return ApplicationCreated(applicationId=app.id)
+
+
+@router.get(
+    "/applications/tasks",
+    response_model=list[ApplicationListItem],
+    responses=_errors(401, 403),
+)
+async def list_tasks(
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("application.read"))],
+) -> list[ApplicationListItem]:
+    """Offene Entscheidungen für die eigene Rolle (#64): Anträge in vote/approval-
+    States, in denen der Principal handeln darf."""
+    return await service.list_tasks(principal)
 
 
 @router.get(

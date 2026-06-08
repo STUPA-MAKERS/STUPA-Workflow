@@ -22,12 +22,11 @@ from uuid import UUID
 from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import ApplicationType
+from app.modules.admin.models import ApplicationType, GremiumMembership, GremiumRole
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.auth.models import Role, RoleAssignment
 from app.modules.auth.principal import Principal
 from app.modules.flow import context as flow_context
 from app.modules.flow.dispatch import (
@@ -272,24 +271,23 @@ class FlowService:
     async def _has_gremium_role(
         self, sub: str, role_key: str, gremium_id: UUID
     ) -> bool:
-        """``True`` wenn ``sub`` aktuell die Rolle ``role_key`` im Gremium hält (#28).
-
-        Wertet das tz-aware Gültigkeitsfenster der Rollenzuweisung aus (gleiche
-        Logik wie ``_gremien_for``)."""
+        """``True`` wenn ``sub`` aktuell die Gremium-Rolle ``role_key`` im Gremium hält
+        (#28/#62). Wertet das tz-aware Amtszeit-Fenster der Mitgliedschaft aus —
+        gegen die **gremium-eigenen** Rollen (``gremium_membership``/``gremium_role``)."""
         now = datetime.now(UTC)
         row = (
             await self.session.execute(
-                select(RoleAssignment.id)
-                .join(Role, Role.id == RoleAssignment.role_id)
-                .join(PrincipalRow, PrincipalRow.id == RoleAssignment.principal_id)
+                select(GremiumMembership.id)
+                .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+                .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
                 .where(
                     PrincipalRow.sub == sub,
-                    Role.key == role_key,
-                    RoleAssignment.gremium_id == gremium_id,
-                    (RoleAssignment.valid_from.is_(None))
-                    | (RoleAssignment.valid_from <= now),
-                    (RoleAssignment.valid_until.is_(None))
-                    | (RoleAssignment.valid_until > now),
+                    GremiumRole.key == role_key,
+                    GremiumMembership.gremium_id == gremium_id,
+                    (GremiumMembership.valid_from.is_(None))
+                    | (GremiumMembership.valid_from <= now),
+                    (GremiumMembership.valid_until.is_(None))
+                    | (GremiumMembership.valid_until > now),
                 )
                 .limit(1)
             )

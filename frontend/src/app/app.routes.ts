@@ -64,6 +64,12 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'tasks',
+        data: { title: 'nav.tasks', permission: 'application.read' },
+        canActivate: [authGuard],
+        loadComponent: () => import('./pages/tasks/tasks.component').then((m) => m.TasksComponent),
+      },
+      {
         path: 'applications/:id',
         data: { title: 'nav.applications', permission: 'application.read' },
         canActivate: [authGuard],

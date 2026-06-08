@@ -27,7 +27,7 @@ from uuid import UUID
 from sqlalchemy import Text, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import ApplicationType
+from app.modules.admin.models import ApplicationType, GremiumMembership
 from app.modules.applications.diff import DataDiff, compute_diff, is_empty_diff
 from app.modules.applications.models import (
     Applicant,
@@ -471,6 +471,83 @@ class ApplicationsService:
                 )
             )
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def _in_gremium(self, sub: str, gremium_id: UUID) -> bool:
+        """``True`` wenn ``sub`` aktuell (gültige Amtszeit) Mitglied im Gremium ist (#64)."""
+        from app.modules.auth.models import Principal as PrincipalRow
+
+        now = datetime.now(UTC)
+        row = await self.session.scalar(
+            select(GremiumMembership.id)
+            .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
+            .where(
+                PrincipalRow.sub == sub,
+                GremiumMembership.gremium_id == gremium_id,
+                (GremiumMembership.valid_from.is_(None)) | (GremiumMembership.valid_from <= now),
+                (GremiumMembership.valid_until.is_(None)) | (GremiumMembership.valid_until > now),
+            )
+            .limit(1)
+        )
+        return row is not None
+
+    async def list_tasks(self, principal: Any) -> list[ApplicationListItem]:
+        """Offene Entscheidungen für die eigene Rolle (#64): Anträge in vote/approval-
+        States, in denen der Principal handeln darf (Gremium-Rolle/-Mitgliedschaft oder
+        globale Rolle; Admin sieht alle)."""
+        from app.modules.flow.service import FlowService
+
+        states = (
+            await self.session.scalars(
+                select(State).where(State.kind.in_(["vote", "approval"]))
+            )
+        ).all()
+        by_id = {s.id: s for s in states}
+        if not by_id:
+            return []
+        apps = (
+            await self.session.scalars(
+                select(Application)
+                .where(Application.current_state_id.in_(list(by_id.keys())))
+                .order_by(Application.created_at.desc())
+            )
+        ).all()
+        flow = FlowService(self.session)
+        is_admin = "admin" in principal.roles
+        items: list[ApplicationListItem] = []
+        for app in apps:
+            s = by_id.get(app.current_state_id)
+            if s is None:
+                continue
+            cfg = s.config if isinstance(s.config, dict) else {}
+            ok = is_admin
+            if not ok and s.kind == "approval":
+                role_key = cfg.get("roleKey")
+                gid = cfg.get("gremiumId")
+                if isinstance(role_key, str):
+                    if isinstance(gid, str) and gid:
+                        ok = await flow._has_gremium_role(principal.sub, role_key, UUID(gid))
+                    else:
+                        ok = role_key in principal.roles
+            elif not ok and s.kind == "vote":
+                gid = cfg.get("gremiumId")
+                ok = isinstance(gid, str) and bool(gid) and await self._in_gremium(
+                    principal.sub, UUID(gid)
+                )
+            if ok:
+                items.append(
+                    ApplicationListItem(
+                        id=app.id,
+                        typeId=app.type_id,
+                        state=_state_out(s),
+                        gremiumId=app.gremium_id,
+                        budgetPotId=app.budget_pot_id,
+                        amount=app.amount,
+                        currency=app.currency,
+                        createdAt=app.created_at,
+                        updatedAt=app.updated_at,
+                    )
+                )
+        return items
 
     # --------------------------------------------------------------- comments
     async def add_comment(

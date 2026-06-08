@@ -131,9 +131,11 @@ def test_state_out_maps_fields() -> None:
         label_i18n={"de": "Entwurf"},
         category="open",
         edit_allowed=True,
+        kind="normal",
     )
     out = _state_out(state)  # type: ignore[arg-type]
     assert out is not None
     assert out.key == "draft"
     assert out.edit_allowed is True
+    assert out.kind == "normal"
     assert out.label == {"de": "Entwurf"}
