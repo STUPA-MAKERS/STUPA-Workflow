@@ -22,6 +22,25 @@
 
 .users__search input {
   flex: 1 1 18rem;
+  height: var(--control-height);
+  box-sizing: border-box;
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-size: var(--fs-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.users__search input:hover {
+  border-color: var(--color-text-muted);
+}
+
+.users__search input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 
 .users__empty {
@@ -93,6 +112,16 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
   align-items: center;
+}
+
+/* Checkbox + „Zuweisen“ vertikal an der Control-Höhe der Felder ausrichten (#Image1). */
+.users__assign app-checkbox {
+  min-height: var(--control-height);
+  justify-content: center;
+}
+
+.users__assign app-button {
+  align-self: end;
 }
 
 .users__lbl {

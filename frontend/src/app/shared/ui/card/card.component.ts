@@ -29,7 +29,12 @@ import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
   `,
   styles: [
     `
+      :host {
+        display: flex;
+        flex-direction: column;
+      }
       .card {
+        flex: 1 1 auto;
         display: flex;
         flex-direction: column;
         background: var(--color-surface);

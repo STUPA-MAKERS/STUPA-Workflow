@@ -65,7 +65,9 @@ let nextId = 0;
       .dp__control {
         /* Native Kalender-/Spinner-UI folgt dem Theme (hell/dunkel). */
         color-scheme: light dark;
-        padding: var(--space-3) var(--space-4);
+        height: var(--control-height);
+        box-sizing: border-box;
+        padding: 0 var(--space-4);
         font: inherit;
         font-size: var(--fs-md);
         color: var(--color-text);

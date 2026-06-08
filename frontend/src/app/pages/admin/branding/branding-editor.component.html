@@ -120,14 +120,22 @@
           }
           @if (d.logos.wordmark; as wm) {
             <img class="br__pv-word" [src]="wm.url" alt="" aria-hidden="true" />
-          } @else {
+          } @else if (text(d.copyright)) {
             <strong>{{ text(d.copyright) }}</strong>
+          } @else {
+            <strong class="br__pv-ph">{{ 'admin.brand.logo.wordmark' | t }}</strong>
           }
         </div>
 
-        <p class="br__pv-welcome" data-testid="preview-welcome">{{ text(d.freetexts.welcome) }}</p>
-        @if (text(d.freetexts.support)) {
-          <p class="br__pv-support" data-testid="preview-support">{{ text(d.freetexts.support) }}</p>
+        @if (text(d.freetexts.welcome); as w) {
+          <p class="br__pv-welcome" data-testid="preview-welcome">{{ w }}</p>
+        } @else {
+          <p class="br__pv-welcome br__pv-ph" data-testid="preview-welcome">{{ 'admin.brand.text.welcome' | t }}</p>
+        }
+        @if (text(d.freetexts.support); as s) {
+          <p class="br__pv-support" data-testid="preview-support">{{ s }}</p>
+        } @else {
+          <p class="br__pv-support br__pv-ph" data-testid="preview-support">{{ 'admin.brand.text.support' | t }}</p>
         }
 
         <footer class="br__pv-footer" data-testid="preview-footer">

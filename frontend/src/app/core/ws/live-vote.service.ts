@@ -29,6 +29,9 @@ export class LiveVoteSession {
   private channel: MeetingChannel | null = null;
   private closedByUser = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Fehlversuche in Folge ohne Server-Antwort. Begrenzt den Reconnect-Sturm. */
+  private attempts = 0;
+  private static readonly MAX_ATTEMPTS = 5;
 
   constructor(
     private readonly source: LiveVoteSource,
@@ -42,7 +45,13 @@ export class LiveVoteSession {
   private connect(): void {
     this.channel = this.source.connectMeeting(this.meetingId, this.beamer);
     this.channel.messages$.subscribe({
-      next: (m) => this.handle(m),
+      // Eine empfangene Nachricht beweist, dass der Server wirklich antwortet →
+      // Fehlversuch-Zähler zurücksetzen (sonst zählt ein später Abbruch fälschlich
+      // zum Reconnect-Limit eines toten Sockets).
+      next: (m) => {
+        this.attempts = 0;
+        this.handle(m);
+      },
       complete: () => this.onClosed(),
       error: () => this.onClosed(),
     });
@@ -99,8 +108,17 @@ export class LiveVoteSession {
       this.connection.set('closed');
       return;
     }
+    this.attempts += 1;
+    // Endgültig aufgeben statt endlos „Connection refused“ zu spammen, wenn der
+    // Server nicht erreichbar ist (kein Backend/kein Meeting). UI zeigt 'closed'.
+    if (this.attempts >= LiveVoteSession.MAX_ATTEMPTS) {
+      this.errorCode.set('connection_failed');
+      this.connection.set('closed');
+      return;
+    }
     this.connection.set('reconnecting');
-    this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectMs);
+    const delay = Math.min(this.reconnectMs * this.attempts, 15000);
+    this.reconnectTimer = setTimeout(() => this.connect(), delay);
   }
 
   /** Verbindung endgültig schließen (Component-Destroy) — kein Reconnect mehr. */
