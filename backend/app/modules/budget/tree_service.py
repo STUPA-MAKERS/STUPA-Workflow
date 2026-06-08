@@ -11,7 +11,7 @@ import uuid
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
@@ -28,6 +28,7 @@ from app.modules.budget.tree_schemas import (
     AssignBudgetRequest,
     BudgetNodeCreate,
     BudgetNodeOut,
+    BudgetApplicationOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
     FiscalYearCreate,
@@ -230,6 +231,47 @@ class BudgetTreeService:
     async def list_fiscal_years(self, budget_id: UUID) -> list[FiscalYearOut]:
         await self._require_top_level(budget_id)
         return [_fy_out(f) for f in await self._fiscal_years_of(budget_id)]
+
+    async def list_applications(
+        self, budget_id: UUID, fiscal_year_id: UUID | None = None
+    ) -> list[BudgetApplicationOut]:
+        """Anträge dieser Kostenstelle **und ihres Unterbaums** (#17, Budget-Statistik).
+
+        Unterbaum über das ``path_key``-Präfix (Knoten selbst ``==`` oder Nachfahre
+        ``LIKE path||'-%'``). ``stage`` kommt aus dem ``budget_entry`` (1:1 je Antrag),
+        optional auf ein Haushaltsjahr gefiltert. Neueste zuerst.
+        """
+        node = await self._get_node(budget_id)
+        subtree = select(Budget.id).where(
+            or_(
+                Budget.path_key == node.path_key,
+                Budget.path_key.like(node.path_key + _SEP + "%"),
+            )
+        )
+        stmt = (
+            select(Application, Budget.path_key, BudgetEntry.stage)
+            .join(Budget, Budget.id == Application.budget_id)
+            .outerjoin(BudgetEntry, BudgetEntry.application_id == Application.id)
+            .where(Application.budget_id.in_(subtree))
+            .order_by(Application.created_at.desc())
+        )
+        if fiscal_year_id is not None:
+            stmt = stmt.where(Application.fiscal_year_id == fiscal_year_id)
+        rows = (await self.session.execute(stmt)).all()
+        return [
+            BudgetApplicationOut(
+                applicationId=app.id,
+                budgetId=app.budget_id,
+                pathKey=path_key,
+                fiscalYearId=app.fiscal_year_id,
+                amount=app.amount,
+                currency=app.currency,
+                stage=stage,
+                stateId=app.current_state_id,
+                createdAt=app.created_at,
+            )
+            for (app, path_key, stage) in rows
+        ]
 
     async def create_fiscal_year(
         self, budget_id: UUID, payload: FiscalYearCreate

@@ -1,35 +1,43 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
-import { of } from 'rxjs';
-import { catchError, switchMap } from 'rxjs/operators';
-import { ApiClient } from '@core/api/api-client.service';
+import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { BudgetPotInfo, BudgetStats } from '@core/api/models';
-import { ButtonComponent } from '@shared/ui/button/button.component';
-import { SelectComponent, type SelectOption } from '@shared/ui';
-import { AdminOptionsService } from '../admin/admin-options.service';
-import { type BudgetKpis, formatMoney, kpiTotals } from './budget.util';
-import { PotUsageComponent } from './pot-usage.component';
-import { StatusDistributionComponent } from './status-distribution.component';
+import type { TranslationKey } from '@core/i18n/translations';
+import type { Uuid } from '@core/api/models';
+import {
+  BadgeComponent,
+  ButtonComponent,
+  DialogComponent,
+  SelectComponent,
+  type SelectOption,
+} from '@shared/ui';
+import {
+  BudgetTreeApi,
+  type BudgetApplication,
+  type BudgetTreeNode,
+  type FiscalYear,
+} from './budget-tree.api';
+
+/** Eine Baumzeile im linken Auslastungs-Teil. */
+interface UsageRow {
+  node: BudgetTreeNode;
+  depth: number;
+  allocated: number;
+  committed: number;
+  available: number;
+  /** committed/allocated in Prozent (null wenn keine Zuteilung). */
+  percent: number | null;
+}
 
 /**
- * Budget-Statistik-Dashboard (T-35, api.md »budget«, Rolle `budget.view`).
+ * Budget-Statistik (#17) als **Drilldown** über den Kostenstellen-Baum.
  *
- * Datenquelle ist **real** `GET /budget/stats` (kein toter Mock): Kennzahlen,
- * Auslastung je Topf und Statusverteilung. Filter (`pot`/`gremium`/`period`)
- * leben in den Query-Params → die gefilterte Sicht ist verlinkbar und Browser-
- * Back funktioniert. `GET /budget-pots` (P(budget.manage)) wird **best-effort**
- * dazugeladen, um Töpfe mit Namen statt roher UUID zu zeigen und die Topf-Auswahl
- * zu füllen; fehlt die Berechtigung (403), greift der gekürzte-ID-Fallback.
+ * Oben Filter Budget → Kostenstelle (Tree-Dropdown) → Haushaltsjahr + Breadcrumbs.
+ * Links: Baum-Tabelle der gewählten Kostenstelle + Unterbaum mit Verbrauchs-Balken
+ * (gebunden vs. zugeteilt = Roll-Down/Roll-Up). Rechts: konkrete Anträge der
+ * aktuellen Kostenstelle **und ihres Unterbaums** (klickbar → Antrag-Popover). Ein
+ * Klick auf eine Kostenstelle links geht tiefer (aktualisiert das Dropdown).
  */
 @Component({
   selector: 'app-budget-dashboard',
@@ -37,376 +45,202 @@ import { StatusDistributionComponent } from './status-distribution.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    RouterLink,
     TranslatePipe,
-    ButtonComponent,
     SelectComponent,
-    PotUsageComponent,
-    StatusDistributionComponent,
+    BadgeComponent,
+    ButtonComponent,
+    DialogComponent,
   ],
-  template: `
-    <header class="budget__head">
-      <h1 class="budget__title">{{ 'budget.title' | t }}</h1>
-      <p class="budget__subtitle">{{ 'budget.subtitle' | t }}</p>
-    </header>
-
-    <form class="budget__filters" (submit)="applyFilters($event)" role="search">
-      <p class="budget__filtersLegend">{{ 'budget.filter.heading' | t }}</p>
-      <div class="field">
-        <app-select
-          name="pot"
-          [label]="'budget.filter.pot' | t"
-          [placeholder]="'budget.filter.all' | t"
-          [options]="potOptions()"
-          [ngModel]="pot()"
-          (ngModelChange)="pot.set($event)"
-        />
-      </div>
-
-      <div class="field">
-        <app-select
-          name="gremium"
-          [label]="'budget.filter.gremium' | t"
-          [placeholder]="'budget.filter.all' | t"
-          [options]="gremiumOptions()"
-          [ngModel]="gremium()"
-          (ngModelChange)="gremium.set($event)"
-        />
-      </div>
-
-      <div class="field">
-        <app-select
-          name="period"
-          [label]="'budget.filter.period' | t"
-          [placeholder]="'budget.filter.all' | t"
-          [options]="periodOptions()"
-          [ngModel]="period()"
-          (ngModelChange)="period.set($event)"
-        />
-      </div>
-
-      <div class="budget__filterActions">
-        <app-button type="submit" size="sm">{{ 'budget.filter.apply' | t }}</app-button>
-        <app-button type="button" variant="ghost" size="sm" (click)="reset()">
-          {{ 'budget.filter.reset' | t }}
-        </app-button>
-      </div>
-    </form>
-
-    @if (loading()) {
-      <p class="budget__status" aria-live="polite">{{ 'budget.loading' | t }}</p>
-    } @else if (error()) {
-      <p class="budget__status budget__status--error" role="alert">{{ 'budget.error' | t }}</p>
-    } @else if (isEmpty()) {
-      <section class="budget__empty">
-        <h2 class="budget__emptyTitle">{{ 'budget.empty.title' | t }}</h2>
-        <p>{{ 'budget.empty.body' | t }}</p>
-      </section>
-    } @else {
-      <section class="budget__kpis" [attr.aria-label]="'budget.title' | t">
-        <div class="kpi">
-          <span class="kpi__label">{{ 'budget.kpi.pots' | t }}</span>
-          <span class="kpi__value">{{ kpis().potCount }}</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi__label">{{ 'budget.kpi.total' | t }}</span>
-          <span class="kpi__value">{{ money(kpis().total) }}</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi__label">{{ 'budget.kpi.requested' | t }}</span>
-          <span class="kpi__value">{{ money(kpis().requested) }}</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi__label">{{ 'budget.kpi.committed' | t }}</span>
-          <span class="kpi__value">{{ money(kpis().committed) }}</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi__label">{{ 'budget.kpi.available' | t }}</span>
-          <span class="kpi__value">{{ money(kpis().available) }}</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi__label">{{ 'budget.kpi.applications' | t }}</span>
-          <span class="kpi__value">{{ kpis().applicationCount }}</span>
-        </div>
-      </section>
-
-      @if (kpis().mixedCurrency) {
-        <p class="budget__note" role="note">{{ 'budget.mixedCurrency' | t }}</p>
-      }
-
-      <div class="budget__panels">
-        <app-pot-usage class="budget__panel" [pots]="stats()!.pots" />
-        <app-status-distribution class="budget__panel" [buckets]="stats()!.statusDistribution" />
-      </div>
-    }
-  `,
-  styles: [
-    `
-      .budget__head {
-        margin-bottom: var(--space-5);
-      }
-      .budget__title {
-        margin: 0;
-      }
-      .budget__subtitle {
-        color: var(--color-text-muted);
-        margin: var(--space-1) 0 0;
-      }
-      .budget__filters {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: var(--space-4);
-        margin-bottom: var(--space-5);
-        padding: var(--space-4);
-        background: var(--color-surface);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
-      }
-      .budget__filtersLegend {
-        flex-basis: 100%;
-        margin: 0;
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-semibold);
-        color: var(--color-text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-1);
-        min-width: 12rem;
-        flex: 1 1 12rem;
-      }
-      .field__label {
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-medium);
-        color: var(--color-text-muted);
-      }
-      .field__control {
-        height: var(--control-height);
-        padding: 0 var(--space-3);
-        background: var(--color-bg);
-        color: var(--color-text);
-        border: var(--border-width) solid var(--color-border-strong);
-        border-radius: var(--radius-md);
-        font-size: var(--fs-md);
-      }
-      .field__control:focus-visible {
-        outline: 2px solid var(--color-primary);
-        outline-offset: 1px;
-      }
-      .budget__filterActions {
-        display: flex;
-        gap: var(--space-2);
-      }
-      .budget__status {
-        color: var(--color-text-muted);
-        padding: var(--space-5) 0;
-      }
-      .budget__status--error {
-        color: var(--color-danger);
-      }
-      .budget__empty {
-        padding: var(--space-6);
-        background: var(--color-surface);
-        border: var(--border-width) dashed var(--color-border-strong);
-        border-radius: var(--radius-md);
-        text-align: center;
-        color: var(--color-text-muted);
-      }
-      .budget__emptyTitle {
-        margin: 0 0 var(--space-2);
-        color: var(--color-text);
-      }
-      .budget__kpis {
-        display: grid;
-        /* Feste, gleich breite Spalten statt content-getriebener auto-fit-Tracks
-           (#106): 2 → 3 → 6 Spalten, immer volle Reihen, alle KPIs gleich breit. */
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--space-4);
-        margin-bottom: var(--space-5);
-      }
-      @media (min-width: 40rem) {
-        .budget__kpis {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-      }
-      @media (min-width: 64rem) {
-        .budget__kpis {
-          grid-template-columns: repeat(6, minmax(0, 1fr));
-        }
-      }
-      .kpi {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-1);
-        padding: var(--space-4);
-        background: var(--color-surface);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
-      }
-      .kpi__label {
-        font-size: var(--fs-sm);
-        color: var(--color-text-muted);
-      }
-      .kpi__value {
-        font-size: var(--fs-xl);
-        font-weight: var(--fw-bold);
-        font-variant-numeric: tabular-nums;
-      }
-      .budget__note {
-        margin: 0 0 var(--space-5);
-        color: var(--color-text-muted);
-        font-size: var(--fs-sm);
-      }
-      .budget__panels {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: var(--space-6);
-      }
-      .budget__panel {
-        display: block;
-        padding: var(--space-5);
-        background: var(--color-surface);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
-      }
-      @media (min-width: 60rem) {
-        .budget__panels {
-          grid-template-columns: 3fr 2fr;
-        }
-      }
-    `,
-  ],
+  templateUrl: './budget-dashboard.component.html',
+  styleUrl: './budget-dashboard.component.scss',
 })
 export class BudgetDashboardComponent {
-  private readonly api = inject(ApiClient);
+  private readonly api = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
-  private readonly options = inject(AdminOptionsService);
 
   readonly loading = signal(true);
   readonly error = signal(false);
-  readonly stats = signal<BudgetStats | null>(null);
-  readonly pots = signal<BudgetPotInfo[]>([]);
-  /** Gremien als Dropdown-Optionen (#77) statt Freitext-ID. */
-  readonly gremiumOptions = signal<SelectOption[]>([]);
-  /** Töpfe als Dropdown-Optionen (#106 — custom app-select statt nativem select). */
-  readonly potOptions = computed<SelectOption[]>(() =>
-    this.pots().map((p) => ({ value: p.id, label: p.name })),
-  );
+  readonly tree = signal<BudgetTreeNode[]>([]);
+  readonly fiscalYears = signal<FiscalYear[]>([]);
+  readonly applications = signal<BudgetApplication[]>([]);
 
-  /**
-   * Haushaltsperioden als Dropdown statt Freitext (#6, Image 7): Kalenderjahre +
-   * akademische Spannen ums laufende Jahr. Ein per Query-Param vorbelegter Wert,
-   * der nicht in der Liste steht, wird ergänzt, damit die Auswahl ihn anzeigt.
-   */
-  readonly periodOptions = computed<SelectOption[]>(() => {
-    const opts = buildPeriodOptions();
-    const current = this.period();
-    if (current && !opts.some((o) => o.value === current)) {
-      opts.unshift({ value: current, label: current });
-    }
-    return opts;
+  readonly selectedBudgetId = signal('');
+  readonly selectedKsId = signal('');
+  readonly selectedFyId = signal('');
+  readonly dialogApp = signal<BudgetApplication | null>(null);
+
+  /** Schneller Knoten-Lookup (id → Knoten) über den ganzen Baum. */
+  private readonly nodeById = computed(() => {
+    const map = new Map<string, BudgetTreeNode>();
+    const walk = (nodes: BudgetTreeNode[]): void => {
+      for (const n of nodes) {
+        map.set(n.id, n);
+        walk(n.children);
+      }
+    };
+    walk(this.tree());
+    return map;
   });
 
-  /** Sichtbare Filter-Controls (gespiegelt aus den Query-Params). */
-  readonly pot = signal('');
-  readonly gremium = signal('');
-  readonly period = signal('');
-
-  readonly kpis = computed<BudgetKpis>(() =>
-    kpiTotals(this.stats() ?? { pots: [], statusDistribution: [] }),
+  readonly budgetOptions = computed<SelectOption[]>(() =>
+    this.tree().map((n) => ({ value: n.id, label: `${n.key} – ${n.name}` })),
   );
 
-  readonly isEmpty = computed(() => {
-    const s = this.stats();
-    return !!s && s.pots.length === 0 && s.statusDistribution.length === 0;
+  private readonly selectedTop = computed(() => this.nodeById().get(this.selectedBudgetId()) ?? null);
+
+  /** Kostenstellen-Optionen (Tree-Dropdown) des gewählten Budgets, eingerückt. */
+  readonly ksOptions = computed<SelectOption[]>(() => {
+    const top = this.selectedTop();
+    if (!top) return [];
+    const out: SelectOption[] = [];
+    const walk = (node: BudgetTreeNode, depth: number): void => {
+      const indent = '  '.repeat(depth);
+      out.push({ value: node.id, label: `${indent}${node.pathKey} – ${node.name}` });
+      for (const c of node.children) walk(c, depth + 1);
+    };
+    walk(top, 0);
+    return out;
+  });
+
+  readonly fyOptions = computed<SelectOption[]>(() =>
+    this.fiscalYears().map((fy) => ({ value: fy.id, label: fy.label })),
+  );
+
+  private readonly selectedKs = computed(() => this.nodeById().get(this.selectedKsId()) ?? null);
+
+  /** Breadcrumbs vom Top-Budget bis zur aktuellen Kostenstelle. */
+  readonly breadcrumbs = computed<BudgetTreeNode[]>(() => {
+    const map = this.nodeById();
+    let node = this.selectedKs();
+    const chain: BudgetTreeNode[] = [];
+    while (node) {
+      chain.unshift(node);
+      node = node.parentId ? (map.get(node.parentId) ?? null) : null;
+    }
+    return chain;
+  });
+
+  /** Linker Teil: gewählte Kostenstelle + Unterbaum als flache Zeilen mit Balken. */
+  readonly usageRows = computed<UsageRow[]>(() => {
+    const ks = this.selectedKs();
+    if (!ks) return [];
+    const fy = this.selectedFyId();
+    const out: UsageRow[] = [];
+    const walk = (node: BudgetTreeNode, depth: number): void => {
+      const a = node.byFiscalYear.find((x) => x.fiscalYearId === fy);
+      const allocated = a ? Number(a.allocated) : 0;
+      const committed = a ? Number(a.committed) : 0;
+      const available = a ? Number(a.available) : 0;
+      out.push({
+        node,
+        depth,
+        allocated,
+        committed,
+        available,
+        percent: a && allocated > 0 ? Math.round((committed / allocated) * 100) : null,
+      });
+      for (const c of node.children) walk(c, depth + 1);
+    };
+    walk(ks, 0);
+    return out;
   });
 
   constructor() {
-    this.options
-      .gremiumOptions()
-      .pipe(takeUntilDestroyed())
-      .subscribe((opts) => this.gremiumOptions.set(opts));
-    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
-      this.pot.set(pm.get('pot') ?? '');
-      this.gremium.set(pm.get('gremium') ?? '');
-      this.period.set(pm.get('period') ?? '');
-      this.load(pm);
-    });
+    this.load();
   }
 
-  money(value: number | null): string {
-    return formatMoney(value, this.kpis().currency, this.i18n.locale());
+  // --- Anzeige-Helfer -------------------------------------------------------
+  money(value: string | number | null | undefined, currency = 'EUR'): string {
+    const n = value == null || value === '' ? 0 : Number(value);
+    return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
   }
 
-  applyFilters(event: Event): void {
-    event.preventDefault();
-    this.navigate({
-      pot: this.pot() || null,
-      gremium: this.gremium() || null,
-      period: this.period() || null,
-    });
+  /** Balkenbreite (committed/allocated, gekappt auf 100 %). */
+  barPct(row: UsageRow): number {
+    if (!row.allocated) return 0;
+    return Math.min(100, Math.round((row.committed / row.allocated) * 100));
   }
 
-  reset(): void {
-    this.pot.set('');
-    this.gremium.set('');
-    this.period.set('');
-    this.navigate({ pot: null, gremium: null, period: null });
+  shortId(id: Uuid): string {
+    return id.slice(0, 8);
   }
 
-  private navigate(queryParams: Record<string, string | null>): void {
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams,
-      queryParamsHandling: 'merge',
-    });
+  /** Übersetzte Budget-Stufe (dynamischer Key → typsicher gekapselt). */
+  stageLabel(stage: string | null): string {
+    if (!stage) return '—';
+    return this.i18n.translate(`budget.stage.${stage}` as TranslationKey);
   }
 
-  private load(pm: ParamMap): void {
-    const gremium = pm.get('gremium') || undefined;
-    const period = pm.get('period') || undefined;
-    const pot = pm.get('pot') || undefined;
-
+  // --- Laden ----------------------------------------------------------------
+  private load(): void {
     this.loading.set(true);
     this.error.set(false);
-
-    // Töpfe best-effort (nur P(budget.manage)) → Namensauflösung + Filter-Optionen.
-    this.api
-      .budgetPots({ gremium, period })
-      .pipe(
-        catchError(() => of([] as BudgetPotInfo[])),
-        switchMap((pots) => {
-          this.pots.set(pots);
-          const names = new Map(pots.map((p) => [p.id, p.name]));
-          return this.api.budgetStats({ pot, gremium, period }, names);
-        }),
-      )
-      .subscribe({
-        next: (stats) => {
-          this.stats.set(stats);
-          this.loading.set(false);
-        },
-        error: () => {
-          this.error.set(true);
-          this.loading.set(false);
-        },
-      });
+    this.api.tree().subscribe({
+      next: (tree) => {
+        this.tree.set(tree);
+        const tops = tree.filter((n) => n.parentId === null);
+        if (tops.length) this.selectBudget(tops[0].id);
+        this.loading.set(false);
+        if (!tops.length) this.applications.set([]);
+      },
+      error: () => {
+        this.error.set(true);
+        this.loading.set(false);
+      },
+    });
   }
-}
 
-/** Haushaltsperioden-Optionen: Kalenderjahre + akademische Spannen ums laufende Jahr. */
-function buildPeriodOptions(): SelectOption[] {
-  const now = new Date().getFullYear();
-  const opts: SelectOption[] = [];
-  for (let y = now + 1; y >= now - 3; y--) {
-    opts.push({ value: String(y), label: String(y) });
-    opts.push({ value: `${y}-SS`, label: `${y}-SS` });
-    opts.push({ value: `${y}-WS`, label: `${y}-WS` });
+  selectBudget(id: string): void {
+    this.selectedBudgetId.set(id);
+    this.selectedKsId.set(id); // Drilldown startet an der Wurzel
+    this.api.listFiscalYears(id as Uuid).subscribe({
+      next: (fys) => {
+        this.fiscalYears.set(fys);
+        this.selectedFyId.set(fys[0]?.id ?? '');
+        this.reloadApplications();
+      },
+      error: () => {
+        this.fiscalYears.set([]);
+        this.selectedFyId.set('');
+        this.reloadApplications();
+      },
+    });
   }
-  return opts;
+
+  selectKs(id: string): void {
+    this.selectedKsId.set(id);
+    this.reloadApplications();
+  }
+
+  selectFy(id: string): void {
+    this.selectedFyId.set(id);
+    this.reloadApplications();
+  }
+
+  /** Klick auf eine Kostenstelle links → tiefer ins Detail. */
+  drillInto(node: BudgetTreeNode): void {
+    this.selectKs(node.id);
+  }
+
+  private reloadApplications(): void {
+    const ks = this.selectedKsId();
+    if (!ks) {
+      this.applications.set([]);
+      return;
+    }
+    this.api.applications(ks as Uuid, this.selectedFyId() || undefined).subscribe({
+      next: (apps) => this.applications.set(apps),
+      error: () => this.applications.set([]),
+    });
+  }
+
+  // --- Popover --------------------------------------------------------------
+  openApp(app: BudgetApplication): void {
+    this.dialogApp.set(app);
+  }
+
+  closeDialog(): void {
+    this.dialogApp.set(null);
+  }
 }

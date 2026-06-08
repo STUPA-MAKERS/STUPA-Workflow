@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.deps import DbSession, require_principal
 from app.modules.budget.tree_schemas import (
+    BudgetApplicationOut,
     AllocationOut,
     AllocationSet,
     AssignBudgetOut,
@@ -107,6 +108,21 @@ async def update_budget_node(
 async def delete_budget_node(budget_id: UUID, service: ServiceDep) -> None:
     """Kostenstelle löschen (nur ohne Kinder/Zuteilungen → 409 sonst)."""
     await service.delete_node(budget_id)
+
+
+@router.get(
+    "/budgets/{budget_id}/applications",
+    response_model=list[BudgetApplicationOut],
+    dependencies=[Depends(require_principal("budget.view"))],
+    responses=_errors(401, 403, 404),
+)
+async def list_budget_applications(
+    budget_id: UUID,
+    service: ServiceDep,
+    fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
+) -> list[BudgetApplicationOut]:
+    """Anträge dieser Kostenstelle + Unterbaum (#17), optional HHJ-gefiltert."""
+    return await service.list_applications(budget_id, fiscal_year_id)
 
 
 # ---------------------------------------------------------------- fiscal years

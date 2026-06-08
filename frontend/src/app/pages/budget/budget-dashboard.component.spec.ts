@@ -1,132 +1,103 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
-import userEvent from '@testing-library/user-event';
-import { USE_MOCK_API } from '@core/api/api.config';
-import type { BudgetPotOutWire, BudgetStatsOutWire } from '@core/api/models';
 import { BudgetDashboardComponent } from './budget-dashboard.component';
+import type { BudgetApplication, BudgetTreeNode, FiscalYear } from './budget-tree.api';
 
-const POTS: BudgetPotOutWire[] = [
+const FY: FiscalYear = {
+  id: 'fy-1',
+  budgetId: 'b-vs',
+  label: '2026',
+  startDate: '2026-01-01',
+  endDate: '2026-12-31',
+  active: true,
+};
+
+const TREE: BudgetTreeNode[] = [
   {
-    id: 'pot-events',
-    gremiumId: 'g1',
-    name: 'Veranstaltungen',
-    total: '10000.00',
+    id: 'b-vs',
+    parentId: null,
+    gremiumId: 'g-1',
+    key: 'VS',
+    pathKey: 'VS',
+    name: 'VS-Mittel',
     currency: 'EUR',
-    period: '2026',
     active: true,
+    byFiscalYear: [{ fiscalYearId: 'fy-1', allocated: '1000', committed: '400', available: '600' }],
+    children: [
+      {
+        id: 'b-800',
+        parentId: 'b-vs',
+        gremiumId: 'g-1',
+        key: '800',
+        pathKey: 'VS-800',
+        name: 'Dezentrale Einrichtungen',
+        currency: 'EUR',
+        active: true,
+        byFiscalYear: [{ fiscalYearId: 'fy-1', allocated: '400', committed: '100', available: '300' }],
+        children: [],
+      },
+    ],
   },
 ];
 
-const STATS: BudgetStatsOutWire = {
-  pots: [
-    {
-      budgetPotId: 'pot-events',
-      period: '2026',
-      total: '10000.00',
-      currency: 'EUR',
-      requested: '4200.00',
-      reserved: '1500.00',
-      approved: '3000.00',
-      paid: '2000.00',
-      committed: '6500.00',
-      available: '3500.00',
-    },
-  ],
-  statusDistribution: [{ gremiumId: 'g1', stateId: 's1', count: 5 }],
-};
-
-const EMPTY_STATS: BudgetStatsOutWire = { pots: [], statusDistribution: [] };
+const APPS: BudgetApplication[] = [
+  {
+    applicationId: 'aaaaaaaa-1111-2222-3333-444444444444',
+    budgetId: 'b-800',
+    pathKey: 'VS-800',
+    fiscalYearId: 'fy-1',
+    amount: '120.00',
+    currency: 'EUR',
+    stage: 'approved',
+    stateId: 's-1',
+    createdAt: '2026-05-01T10:00:00Z',
+  },
+];
 
 async function setup() {
   const view = await render(BudgetDashboardComponent, {
-    providers: [
-      provideRouter([]),
-      provideHttpClient(),
-      provideHttpClientTesting(),
-      { provide: USE_MOCK_API, useValue: false },
-    ],
+    providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
   });
-  const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // Gremien-Dropdown (#77) lädt beim Start `/gremien` (#68) — neutral flushen.
-  http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush([]));
+  const http = TestBed.inject(HttpTestingController);
+  http.expectOne((r) => r.url.endsWith('/budgets')).flush(TREE);
+  http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
+  http.expectOne((r) => r.url.includes('/budgets/b-vs/applications')).flush(APPS);
+  view.fixture.detectChanges();
   return { ...view, http };
 }
 
-/** Töpfe (best-effort) dann Stats beantworten — Reihenfolge des `switchMap`. */
-function answer(http: HttpTestingController, pots: BudgetPotOutWire[], stats: BudgetStatsOutWire) {
-  http.expectOne((r) => r.url.endsWith('/budget-pots')).flush(pots);
-  http.expectOne((r) => r.url.endsWith('/budget/stats')).flush(stats);
-}
+describe('BudgetDashboardComponent (#17)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-describe('BudgetDashboardComponent', () => {
-  it('loads real /budget/stats and renders KPI cards', async () => {
-    const { http, fixture } = await setup();
-    answer(http, POTS, STATS);
-    fixture.detectChanges();
-
-    // KPI-Labels gerendert; committed-Betrag erscheint (Karte + Topf-Zahlen + Tabelle).
-    expect(screen.getByText('Anträge')).toBeInTheDocument(); // nur als KPI-Label
-    expect(screen.getAllByText('Gebunden').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('6.500,00 €').length).toBeGreaterThan(0);
-    http.verify();
+  it('shows the cost-centre subtree with bars and the applications panel', async () => {
+    await setup();
+    expect(screen.getAllByText('VS').length).toBeGreaterThan(0);
+    expect(screen.getByText('VS-Mittel')).toBeInTheDocument();
+    // Pfad VS-800 erscheint im Baum (links) und in der Anträge-Tabelle (rechts).
+    expect(screen.getAllByText('VS-800').length).toBeGreaterThan(1);
   });
 
-  it('enriches pot names from /budget-pots', async () => {
-    const { http, fixture } = await setup();
-    answer(http, POTS, STATS);
-    fixture.detectChanges();
-    expect(screen.getAllByText('Veranstaltungen').length).toBeGreaterThan(0);
-    http.verify();
+  it('drills into a cost centre on click and reloads its applications', async () => {
+    const { fixture, http } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.drillInto(TREE[0].children[0]);
+    expect(c.selectedKsId()).toBe('b-800');
+    http.expectOne((r) => r.url.includes('/budgets/b-800/applications')).flush(APPS);
+    // Breadcrumbs gehen jetzt VS › 800.
+    expect(c.breadcrumbs().map((n: { key: string }) => n.key)).toEqual(['VS', '800']);
   });
 
-  it('falls back to a shortened id when /budget-pots is forbidden (403)', async () => {
-    const { http, fixture } = await setup();
-    http
-      .expectOne((r) => r.url.endsWith('/budget-pots'))
-      .flush({ title: 'forbidden' }, { status: 403, statusText: 'Forbidden' });
-    http.expectOne((r) => r.url.endsWith('/budget/stats')).flush(STATS);
+  it('opens an application in a popover dialog', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openApp(APPS[0]);
     fixture.detectChanges();
-    expect(screen.getAllByText('pot-even…').length).toBeGreaterThan(0);
-    http.verify();
-  });
-
-  it('shows the empty state when there are no pots and no applications', async () => {
-    const { http, fixture } = await setup();
-    answer(http, [], EMPTY_STATS);
-    fixture.detectChanges();
-    expect(screen.getByText('Noch keine Budgetdaten')).toBeInTheDocument();
-    http.verify();
-  });
-
-  it('applies the period filter to the stats request', async () => {
-    const { http, fixture } = await setup();
-    answer(http, POTS, STATS);
-    fixture.detectChanges();
-
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Zeitraum' }), '2026');
-    await userEvent.click(screen.getByRole('button', { name: 'Anwenden' }));
-
-    // Navigation aktualisiert die Query-Params → erneuter Lade-Zyklus.
-    http.expectOne((r) => r.url.endsWith('/budget-pots')).flush(POTS);
-    const statsReq = http.expectOne((r) => r.url.endsWith('/budget/stats'));
-    expect(statsReq.request.params.get('period')).toBe('2026');
-    statsReq.flush(STATS);
-    http.verify();
-  });
-
-  it('shows an error when the stats request fails', async () => {
-    const { http, fixture } = await setup();
-    http.expectOne((r) => r.url.endsWith('/budget-pots')).flush([]);
-    http
-      .expectOne((r) => r.url.endsWith('/budget/stats'))
-      .flush({ title: 'boom' }, { status: 500, statusText: 'Server Error' });
-    fixture.detectChanges();
-    expect(screen.getByRole('alert')).toHaveTextContent('konnte nicht geladen werden');
-    http.verify();
+    expect(c.dialogApp()).toEqual(APPS[0]);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

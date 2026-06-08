@@ -1,0 +1,250 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.bd__title {
+  margin: 0;
+}
+
+.bd__subtitle {
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+}
+
+.bd__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.bd__filter {
+  flex: 1 1 14rem;
+}
+
+/* --- Breadcrumbs --------------------------------------------------------- */
+.bd__crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bd__crumb {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.bd__crumb:hover:not(:disabled) {
+  background: var(--color-surface-sunken);
+}
+
+.bd__crumb--current {
+  color: var(--color-text);
+  cursor: default;
+}
+
+.bd__crumb-sep {
+  color: var(--color-text-muted);
+}
+
+.bd__status {
+  color: var(--color-text-muted);
+  padding: var(--space-4) 0;
+}
+
+.bd__status--error {
+  color: var(--color-danger);
+}
+
+.bd__empty {
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: var(--border-width) dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.bd__emptyTitle {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text);
+}
+
+/* --- Zwei Spalten -------------------------------------------------------- */
+.bd__cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+
+@media (min-width: 62rem) {
+  .bd__cols {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
+.bd__panel {
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+
+.bd__panel-h {
+  font-size: var(--fs-lg);
+  margin: 0 0 var(--space-4);
+}
+
+.bd__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.bd__table th {
+  text-align: start;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.bd__table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  vertical-align: middle;
+}
+
+.bd__num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bd__neg {
+  color: var(--color-danger);
+}
+
+.bd__mono {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
+}
+
+.bd__row--current > td {
+  background: var(--color-primary-subtle);
+}
+
+.bd__ks {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+}
+
+.bd__ks:hover .bd__name {
+  text-decoration: underline;
+}
+
+.bd__path {
+  font-family: var(--font-mono, monospace);
+  font-weight: var(--fw-semibold);
+}
+
+.bd__name {
+  color: var(--color-text-muted);
+}
+
+.bd__bar-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 8rem;
+}
+
+.bd__track {
+  flex: 1;
+  height: 0.7rem;
+  background: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.bd__seg {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+}
+
+.bd__seg--over {
+  background: var(--color-danger);
+}
+
+.bd__pct {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.bd__app-row {
+  cursor: pointer;
+}
+
+.bd__app-row:hover td,
+.bd__app-row:focus-visible td {
+  background: var(--color-surface-sunken);
+}
+
+.bd__dl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.bd__dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.bd__dl dt {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.bd__dl dd {
+  margin: 0;
+  font-weight: var(--fw-medium);
+}
+
+.bd__open {
+  color: var(--color-primary);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+}
+
+.bd__open:hover {
+  text-decoration: underline;
+}

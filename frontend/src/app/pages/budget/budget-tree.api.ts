@@ -60,6 +60,19 @@ export interface FiscalYearCreate {
   endDate: string;
 }
 
+/** Ein Antrag innerhalb einer Kostenstelle (+ Unterbaum) — Budget-Statistik (#17). */
+export interface BudgetApplication {
+  applicationId: Uuid;
+  budgetId: Uuid | null;
+  pathKey: string | null;
+  fiscalYearId: Uuid | null;
+  amount: string | null;
+  currency: string | null;
+  stage: string | null;
+  stateId: Uuid | null;
+  createdAt: string;
+}
+
 /**
  * Client für den Kostenstellen-Baum (#9, api.md »budget«, P(`budget.view`/`manage`)).
  * Spricht die **bereits vorhandenen** Tree-Endpunkte (`/api/budgets`, fiscal-years,
@@ -97,5 +110,13 @@ export class BudgetTreeApi {
 
   setAllocation(id: Uuid, fiscalYearId: Uuid, allocated: string): Observable<unknown> {
     return this.http.put(`${this.base}/budgets/${id}/allocations/${fiscalYearId}`, { allocated });
+  }
+
+  /** Anträge einer Kostenstelle + Unterbaum (#17), optional HHJ-gefiltert. */
+  applications(budgetId: Uuid, fiscalYearId?: string): Observable<BudgetApplication[]> {
+    const params = fiscalYearId ? { fiscalYear: fiscalYearId } : undefined;
+    return this.http.get<BudgetApplication[]>(`${this.base}/budgets/${budgetId}/applications`, {
+      params,
+    });
   }
 }

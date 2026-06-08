@@ -1,0 +1,146 @@
+<header class="bd__head">
+  <h1 class="bd__title">{{ 'budget.title' | t }}</h1>
+  <p class="bd__subtitle">{{ 'budget.subtitle' | t }}</p>
+</header>
+
+<!-- Filter: Budget → Kostenstelle → Haushaltsjahr -->
+<div class="bd__filters">
+  <app-select
+    class="bd__filter"
+    [label]="'budget.filter.budget' | t"
+    [placeholder]="'budget.filter.budgetPlaceholder' | t"
+    [options]="budgetOptions()"
+    [ngModel]="selectedBudgetId()"
+    (ngModelChange)="selectBudget($event)"
+  />
+  <app-select
+    class="bd__filter"
+    [label]="'budget.filter.ks' | t"
+    [options]="ksOptions()"
+    [ngModel]="selectedKsId()"
+    (ngModelChange)="selectKs($event)"
+  />
+  <app-select
+    class="bd__filter"
+    [label]="'budget.filter.fiscalYear' | t"
+    [placeholder]="'budget.filter.noFiscalYear' | t"
+    [options]="fyOptions()"
+    [ngModel]="selectedFyId()"
+    (ngModelChange)="selectFy($event)"
+  />
+</div>
+
+<!-- Breadcrumbs -->
+@if (breadcrumbs().length) {
+  <nav class="bd__crumbs" [attr.aria-label]="'budget.breadcrumbs' | t">
+    @for (node of breadcrumbs(); track node.id; let last = $last) {
+      <button type="button" class="bd__crumb" [class.bd__crumb--current]="last" [disabled]="last" (click)="selectKs(node.id)">
+        {{ node.key }}
+      </button>
+      @if (!last) {
+        <span class="bd__crumb-sep" aria-hidden="true">›</span>
+      }
+    }
+  </nav>
+}
+
+@if (loading()) {
+  <p class="bd__status" aria-live="polite">{{ 'budget.loading' | t }}</p>
+} @else if (error()) {
+  <p class="bd__status bd__status--error" role="alert">{{ 'budget.error' | t }}</p>
+} @else if (!tree().length) {
+  <section class="bd__empty">
+    <h2 class="bd__emptyTitle">{{ 'budget.empty.title' | t }}</h2>
+    <p>{{ 'budget.empty.body' | t }}</p>
+  </section>
+} @else {
+  <div class="bd__cols">
+    <!-- Links: Auslastungs-Baum -->
+    <section class="bd__panel" aria-labelledby="bd-usage-h">
+      <h2 id="bd-usage-h" class="bd__panel-h">{{ 'budget.usage.heading' | t }}</h2>
+      <table class="bd__table">
+        <thead>
+          <tr>
+            <th>{{ 'budget.tree.col.node' | t }}</th>
+            <th>{{ 'budget.usage.bar' | t }}</th>
+            <th class="bd__num">{{ 'budget.tree.col.committed' | t }}</th>
+            <th class="bd__num">{{ 'budget.tree.col.available' | t }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of usageRows(); track row.node.id) {
+            <tr [class.bd__row--current]="row.node.id === selectedKsId()">
+              <td>
+                <button type="button" class="bd__ks" [style.paddingLeft.rem]="row.depth * 1.25" (click)="drillInto(row.node)">
+                  <span class="bd__path">{{ row.node.pathKey }}</span>
+                  <span class="bd__name">{{ row.node.name }}</span>
+                </button>
+              </td>
+              <td class="bd__bar-cell">
+                <div class="bd__track" role="img" [attr.aria-label]="(row.percent ?? 0) + '%'">
+                  <span class="bd__seg" [class.bd__seg--over]="row.committed > row.allocated && row.allocated > 0" [style.width.%]="barPct(row)"></span>
+                </div>
+                <span class="bd__pct">{{ row.percent === null ? '—' : row.percent + '%' }}</span>
+              </td>
+              <td class="bd__num">{{ money(row.committed, row.node.currency) }}</td>
+              <td class="bd__num" [class.bd__neg]="row.available < 0">{{ money(row.available, row.node.currency) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Rechts: Anträge in der aktuellen Kostenstelle + Unterbaum -->
+    <section class="bd__panel" aria-labelledby="bd-apps-h">
+      <h2 id="bd-apps-h" class="bd__panel-h">{{ 'budget.apps.heading' | t }}</h2>
+      @if (applications().length === 0) {
+        <p class="bd__status">{{ 'budget.apps.empty' | t }}</p>
+      } @else {
+        <table class="bd__table">
+          <thead>
+            <tr>
+              <th>{{ 'budget.apps.col.id' | t }}</th>
+              <th>{{ 'budget.apps.col.ks' | t }}</th>
+              <th>{{ 'budget.apps.col.stage' | t }}</th>
+              <th class="bd__num">{{ 'budget.apps.col.amount' | t }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (app of applications(); track app.applicationId) {
+              <tr class="bd__app-row" (click)="openApp(app)" tabindex="0" (keydown.enter)="openApp(app)">
+                <td class="bd__mono">{{ shortId(app.applicationId) }}…</td>
+                <td class="bd__mono">{{ app.pathKey }}</td>
+                <td>
+                  @if (app.stage) {
+                    <app-badge variant="neutral">{{ stageLabel(app.stage) }}</app-badge>
+                  } @else { — }
+                </td>
+                <td class="bd__num">{{ app.amount ? money(app.amount, app.currency ?? 'EUR') : '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+  </div>
+}
+
+<!-- Antrag-Popover -->
+<app-dialog
+  [open]="!!dialogApp()"
+  [title]="'budget.apps.dialogTitle' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="closeDialog()"
+>
+  @if (dialogApp(); as app) {
+    <dl class="bd__dl">
+      <div><dt>{{ 'budget.apps.col.id' | t }}</dt><dd class="bd__mono">{{ app.applicationId }}</dd></div>
+      <div><dt>{{ 'budget.apps.col.ks' | t }}</dt><dd class="bd__mono">{{ app.pathKey }}</dd></div>
+      <div><dt>{{ 'budget.apps.col.stage' | t }}</dt><dd>{{ stageLabel(app.stage) }}</dd></div>
+      <div><dt>{{ 'budget.apps.col.amount' | t }}</dt><dd>{{ app.amount ? money(app.amount, app.currency ?? 'EUR') : '—' }}</dd></div>
+    </dl>
+  }
+  <a dialog-footer class="bd__open" [routerLink]="['/applications', dialogApp()?.applicationId]" (click)="closeDialog()">
+    {{ 'budget.apps.openFull' | t }} →
+  </a>
+</app-dialog>

@@ -7,7 +7,7 @@ nicht akzeptiert, nur in Out-DTOs.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -143,9 +143,25 @@ class AssignBudgetOut(_CamelModel):
     fiscal_year_id: UUID | None = Field(alias="fiscalYearId")
 
 
+class BudgetApplicationOut(_CamelModel):
+    """Antrag in einer Kostenstelle (+ Unterbaum) — für die Budget-Statistik-Drilldown-
+    Liste (#17). Geld als ``Decimal``; ``stage`` aus dem ``budget_entry`` (oder None)."""
+
+    application_id: UUID = Field(alias="applicationId")
+    budget_id: UUID | None = Field(default=None, alias="budgetId")
+    path_key: str | None = Field(default=None, alias="pathKey")
+    fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
+    amount: Decimal | None = None
+    currency: str | None = None
+    stage: str | None = None
+    state_id: UUID | None = Field(default=None, alias="stateId")
+    created_at: datetime = Field(alias="createdAt")
+
+
 BudgetTreeNodeOut.model_rebuild()
 
 __all__ = [
+    "BudgetApplicationOut",
     "AllocationOut",
     "AllocationSet",
     "AllocationView",
