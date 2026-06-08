@@ -47,7 +47,7 @@ from app.modules.applications.schemas import (
     VersionOut,
 )
 from app.modules.budget.models import BudgetField
-from app.modules.flow.models import State
+from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.service import FormsService
 from app.modules.forms.validation import (
     AnswerValidationError,
@@ -217,10 +217,10 @@ class ApplicationsService:
         app_type = await self.session.get(ApplicationType, payload.type_id)
         if app_type is None:
             raise NotFoundError(f"application type {payload.type_id} not found")
-        if app_type.active_flow_version_id is None:
-            raise NotFoundError(
-                f"application type {payload.type_id} has no active flow version"
-            )
+        # Global-Flow-Redesign (#28): bevorzugt den aktiven GLOBALEN Flow
+        # (application_type_id IS NULL). Existiert keiner, fällt der per-Typ-Flow
+        # als Übergangslösung ein (Cutover). Fehlt beides → 404.
+        flow_version_id = await self._resolve_flow_version_id(app_type)
 
         # Effektive Form (Typ + ggf. Topf-Felder); validiert Topf-Scoping (404).
         forms = FormsService(self.session)
@@ -238,7 +238,7 @@ class ApplicationsService:
                 errors=[{"field": e.field, "msg": e.msg} for e in exc.errors],
             ) from exc
 
-        initial = await self._initial_state(app_type.active_flow_version_id)
+        initial = await self._initial_state(flow_version_id)
         # Nur bekannte Feld-Keys persistieren (unbekannte verwerfen, HIGH #1).
         clean = _whitelist(fields, payload.data)
         amount, currency = _amount_currency(fields, clean)
@@ -246,7 +246,7 @@ class ApplicationsService:
         app = Application(
             type_id=payload.type_id,
             form_version_id=effective.form_version_id,
-            flow_version_id=app_type.active_flow_version_id,
+            flow_version_id=flow_version_id,
             current_state_id=initial.id,
             gremium_id=app_type.gremium_id,
             budget_pot_id=payload.budget_pot_id,
@@ -284,6 +284,28 @@ class ApplicationsService:
         )
         await self.session.commit()
         return app, str(payload.applicant_email)
+
+    async def _resolve_flow_version_id(self, app_type: ApplicationType) -> UUID:
+        """Aktiven Flow für einen neuen Antrag bestimmen (#28).
+
+        Bevorzugt den **globalen** Flow (``application_type_id IS NULL`` & ``active``);
+        sonst der per-Typ-Flow (``active_flow_version_id``, Übergangslösung). Fehlt
+        beides → 404."""
+        global_flow_id = (
+            await self.session.execute(
+                select(FlowVersion.id).where(
+                    FlowVersion.application_type_id.is_(None),
+                    FlowVersion.active.is_(True),
+                )
+            )
+        ).scalar_one_or_none()
+        if global_flow_id is not None:
+            return global_flow_id
+        if app_type.active_flow_version_id is not None:
+            return app_type.active_flow_version_id
+        raise NotFoundError(
+            f"no active flow (global or per-type) for application type {app_type.id}"
+        )
 
     async def _initial_state(self, flow_version_id: UUID) -> State:
         state = (
