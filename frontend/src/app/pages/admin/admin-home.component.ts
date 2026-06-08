@@ -82,7 +82,7 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
             <ng-template appCell="gremium" let-f>{{ gremiumName($any(f).gremiumId) }}</ng-template>
             <ng-template appCell="status" let-f><app-badge [variant]="statusVariant($any(f).status)">{{ statusLabel($any(f).status) }}</app-badge></ng-template>
             <ng-template appCell="version" let-f>{{ $any(f).version ? 'v' + $any(f).version : '—' }}</ng-template>
-            <ng-template appCell="edit" let-f><a class="admin-home__edit" routerLink="forms" [attr.aria-label]="'admin.forms.edit' | t" [attr.title]="'admin.forms.edit' | t"><app-icon name="edit" /></a></ng-template>
+            <ng-template appCell="edit" let-f><a class="admin-home__edit" [routerLink]="['/admin/forms', $any(f).id]" [attr.aria-label]="'admin.forms.edit' | t" [attr.title]="'admin.forms.edit' | t"><app-icon name="edit" /></a></ng-template>
           </app-data-table>
         }
       </section>

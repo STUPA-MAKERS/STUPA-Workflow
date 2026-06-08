@@ -32,6 +32,8 @@ class FormVersionCreate(_CamelModel):
 
     fields: list[FormFieldDef] = Field(min_length=1)
     activate: bool = True
+    # NC-Forms-Beschreibung (mehrsprachiges Markdown), optional (#13).
+    description: I18nMap | None = None
 
 
 class FormVersionOut(_CamelModel):
@@ -41,6 +43,23 @@ class FormVersionOut(_CamelModel):
     application_type_id: UUID = Field(alias="applicationTypeId")
     version: int
     active: bool
+    fields: list[FormFieldDef]
+    description: I18nMap | None = None
+
+
+class FormDraftOut(_CamelModel):
+    """Aktuelle (zuletzt angelegte) Form-Version eines Typs zum Bearbeiten (#13).
+
+    Liefert die rohe Feld-Liste + Beschreibung (ohne Topf-Merge/Sektionen) für den
+    NC-Forms-Editor. ``formVersionId``/``version`` sind ``null``, wenn der Typ noch
+    keine Form-Version hat (frisch angelegt) → Editor startet leer.
+    """
+
+    application_type_id: UUID = Field(alias="applicationTypeId")
+    form_version_id: UUID | None = Field(default=None, alias="formVersionId")
+    version: int | None = None
+    active: bool = False
+    description: I18nMap | None = None
     fields: list[FormFieldDef]
 
 

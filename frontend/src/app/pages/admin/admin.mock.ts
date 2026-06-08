@@ -6,7 +6,9 @@
  */
 import type {
   AdminPrincipal,
+  ApplicationTypeFull,
   Branding,
+  FormDraft,
   FormOverviewItem,
   Gremium,
   NotificationRule,
@@ -111,6 +113,43 @@ export const MOCK_FORMS: FormOverviewItem[] = [
   { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: 'g-stupa', status: 'draft', version: 1 },
   { id: 'f-altfall', name: { de: 'Härtefallantrag', en: 'Hardship application' }, gremiumId: 'g-asta', status: 'inactive', version: 5 },
 ];
+
+/** Antragstypen/Formulare für den NC-Forms-Builder (#13) — Mock bis Backend real. */
+export const MOCK_APP_TYPES: ApplicationTypeFull[] = [
+  { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: 'g-stupa', hasBudget: true, activeFormVersionId: 'fv-foerderung-3' },
+  { id: 'f-veranstaltung', name: { de: 'Veranstaltungsantrag', en: 'Event application' }, gremiumId: 'g-asta', hasBudget: false, activeFormVersionId: 'fv-veranstaltung-2' },
+  { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: 'g-stupa', hasBudget: true, activeFormVersionId: null },
+];
+
+/** Form-Drafts je Typ (#13) — rohe Felder + Beschreibung des NC-Editors. */
+export const MOCK_FORM_DRAFTS: Record<string, FormDraft> = {
+  'f-foerderung': {
+    applicationTypeId: 'f-foerderung',
+    formVersionId: 'fv-foerderung-3',
+    version: 3,
+    active: true,
+    description: {
+      de: 'Bitte beschreibe dein Förderprojekt möglichst genau.\n\nAnträge werden im StuPa beraten.',
+      en: 'Please describe your funding project as precisely as possible.',
+    },
+    fields: [
+      { key: 'title', type: 'text', label: { de: 'Projekttitel', en: 'Project title' }, required: true },
+      { key: 'amount', type: 'currency', label: { de: 'Beantragte Summe', en: 'Requested amount' }, required: true },
+      { key: 'description', type: 'textarea', label: { de: 'Beschreibung', en: 'Description' }, help: { de: 'Worum geht es?', en: 'What is it about?' } },
+    ],
+  },
+  'f-veranstaltung': {
+    applicationTypeId: 'f-veranstaltung',
+    formVersionId: 'fv-veranstaltung-2',
+    version: 2,
+    active: true,
+    description: { de: '', en: '' },
+    fields: [
+      { key: 'event_name', type: 'text', label: { de: 'Name der Veranstaltung', en: 'Event name' }, required: true },
+      { key: 'date', type: 'date', label: { de: 'Datum', en: 'Date' }, required: true },
+    ],
+  },
+};
 
 export const MOCK_WEBHOOKS: WebhookConfig[] = [
   {

@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Query
 from app.deps import DbSession, require_principal
 from app.modules.forms.schemas import (
     EffectiveFormOut,
+    FormDraftOut,
     FormVersionCreate,
     FormVersionOut,
 )
@@ -56,6 +57,20 @@ async def get_effective_form(
 ) -> EffectiveFormOut:
     """Effektive Form-Definition für die Antragstellung (öffentlich)."""
     return await service.get_effective_form(type_id, budget_pot_id)
+
+
+@router.get(
+    "/admin/application-types/{type_id}/form-versions/latest",
+    response_model=FormDraftOut,
+    dependencies=[Depends(require_principal("form.configure"))],
+    responses=_errors(401, 403, 404),
+)
+async def get_form_draft(
+    type_id: UUID,
+    service: ServiceDep,
+) -> FormDraftOut:
+    """Zuletzt angelegte Form-Version eines Typs zum Bearbeiten laden (#13)."""
+    return await service.get_form_draft(type_id)
 
 
 @router.post(

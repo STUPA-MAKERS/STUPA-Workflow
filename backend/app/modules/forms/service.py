@@ -23,6 +23,7 @@ from app.modules.forms.models import FormField, FormVersion
 from app.modules.forms.schemas import (
     SECTION_LABELS,
     EffectiveFormOut,
+    FormDraftOut,
     FormSectionOut,
     FormVersionCreate,
     FormVersionOut,
@@ -177,6 +178,7 @@ class FormsService:
             application_type_id=type_id,
             version=next_version,
             active=payload.activate,
+            description_i18n=payload.description,
         )
         if payload.activate:
             await self.session.execute(
@@ -206,6 +208,33 @@ class FormsService:
             version=next_version,
             active=payload.activate,
             fields=list(payload.fields),
+            description=payload.description,
+        )
+
+    async def get_form_draft(self, type_id: UUID) -> FormDraftOut:
+        """Zuletzt angelegte Form-Version eines Typs zum Bearbeiten (#13).
+
+        Rohe Feld-Liste + Beschreibung — ohne Topf-Merge/Sektionen (das ist der
+        öffentliche ``get_effective_form``-Pfad). Hat der Typ noch keine Version,
+        kommt eine leere Definition (Editor startet leer).
+        """
+        await self._get_type(type_id)
+        version = await self.session.scalar(
+            select(FormVersion)
+            .where(FormVersion.application_type_id == type_id)
+            .order_by(FormVersion.version.desc())
+            .limit(1)
+        )
+        if version is None:
+            return FormDraftOut(applicationTypeId=type_id, fields=[])
+        fields = await self._fields_of_version(version.id)
+        return FormDraftOut(
+            applicationTypeId=type_id,
+            formVersionId=version.id,
+            version=version.version,
+            active=version.active,
+            description=version.description_i18n,
+            fields=fields,
         )
 
     async def _next_version(self, type_id: UUID) -> int:

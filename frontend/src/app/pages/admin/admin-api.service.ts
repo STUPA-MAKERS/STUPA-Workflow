@@ -21,9 +21,13 @@ import type { I18nMap, Page, Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
 import {
   type AdminPrincipal,
+  type ApplicationTypeCreateBody,
+  type ApplicationTypeFull,
+  type ApplicationTypeUpdateBody,
   type AuditEntry,
   type Branding,
   type FlowGraph,
+  type FormDraft,
   type FormOverviewItem,
   type FormStatus,
   type Gremium,
@@ -39,7 +43,9 @@ import {
   type WebhookConfig,
 } from './admin.models';
 import {
+  MOCK_APP_TYPES,
   MOCK_BRANDING,
+  MOCK_FORM_DRAFTS,
   MOCK_FORMS,
   MOCK_GREMIEN,
   MOCK_NOTIFICATION_RULES,
@@ -63,6 +69,7 @@ interface ApplicationTypeOutWire {
   id: Uuid;
   nameI18n?: Record<string, string> | null;
   gremiumId?: Uuid | null;
+  hasBudget?: boolean;
   activeFormVersionId?: Uuid | null;
 }
 
@@ -75,6 +82,8 @@ export class AdminApiService {
   // In-Memory-Store (nur Mock-Modus). Pro Service-Instanz, reicht für UI/Tests.
   private readonly store = {
     gremien: structuredCopy(MOCK_GREMIEN),
+    appTypes: structuredCopy(MOCK_APP_TYPES),
+    formDrafts: structuredCopy(MOCK_FORM_DRAFTS) as Record<string, FormDraft>,
     gremiumRoles: [] as GremiumRole[],
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     rules: structuredCopy(MOCK_NOTIFICATION_RULES),
@@ -274,13 +283,112 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/role-assignments/${assignmentId}`);
   }
 
+  // --- Antragstypen / Formulare (#13 — NC-Forms) ---------------------------
+  /** Antragstypen als Editier-Sicht (id + i18n-Name + Gremium + Budget-Flag). */
+  listApplicationTypesFull(): Observable<ApplicationTypeFull[]> {
+    if (this.mock) return of(structuredCopy(this.store.appTypes));
+    return this.http
+      .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`)
+      .pipe(
+        map((list) =>
+          list.map((t) => ({
+            id: t.id,
+            name: (t.nameI18n ?? {}) as I18nMap,
+            gremiumId: t.gremiumId ?? null,
+            hasBudget: t.hasBudget ?? false,
+            activeFormVersionId: t.activeFormVersionId ?? null,
+          })),
+        ),
+      );
+  }
+
+  /** Neuen Antragstyp/Formular anlegen — POST /admin/application-types (#13). */
+  createApplicationType(body: ApplicationTypeCreateBody): Observable<ApplicationTypeFull> {
+    if (this.mock) {
+      const created: ApplicationTypeFull = {
+        id: `f-${body.key || this.store.appTypes.length + 1}`,
+        name: { ...body.name },
+        gremiumId: body.gremiumId ?? null,
+        hasBudget: body.hasBudget ?? false,
+        activeFormVersionId: null,
+      };
+      this.store.appTypes = [...this.store.appTypes, created];
+      return of(structuredCopy(created));
+    }
+    return this.http
+      .post<ApplicationTypeOutWire>(`${this.base}/admin/application-types`, {
+        key: body.key,
+        nameI18n: body.name,
+        gremiumId: body.gremiumId ?? null,
+        hasBudget: body.hasBudget ?? false,
+      })
+      .pipe(
+        map((t) => ({
+          id: t.id,
+          name: (t.nameI18n ?? {}) as I18nMap,
+          gremiumId: t.gremiumId ?? null,
+          hasBudget: t.hasBudget ?? false,
+          activeFormVersionId: t.activeFormVersionId ?? null,
+        })),
+      );
+  }
+
+  /** Antragstyp-Stammdaten ändern (Titel/Gremium/Budget) — PATCH (#13). */
+  updateApplicationType(id: Uuid, body: ApplicationTypeUpdateBody): Observable<void> {
+    if (this.mock) {
+      const row = this.store.appTypes.find((t) => t.id === id);
+      if (row) {
+        if (body.name) row.name = { ...body.name };
+        if (body.gremiumId !== undefined) row.gremiumId = body.gremiumId;
+        if (body.hasBudget !== undefined) row.hasBudget = body.hasBudget;
+      }
+      return of(void 0);
+    }
+    const payload: Record<string, unknown> = {};
+    if (body.name) payload['nameI18n'] = body.name;
+    if (body.gremiumId !== undefined) payload['gremiumId'] = body.gremiumId;
+    if (body.hasBudget !== undefined) payload['hasBudget'] = body.hasBudget;
+    return this.http
+      .patch<unknown>(`${this.base}/admin/application-types/${id}`, payload)
+      .pipe(map(() => void 0));
+  }
+
+  /** Aktuelle Form-Version eines Typs zum Bearbeiten laden (#13). */
+  getFormDraft(typeId: Uuid): Observable<FormDraft> {
+    if (this.mock) {
+      const draft = this.store.formDrafts[typeId];
+      return of(draft ? structuredCopy(draft) : { applicationTypeId: typeId, fields: [] });
+    }
+    return this.http.get<FormDraft>(
+      `${this.base}/admin/application-types/${typeId}/form-versions/latest`,
+    );
+  }
+
   // --- Form-/Flow-Versionen ------------------------------------------------
   /** POST neue Form-Version (Definition serverseitig gegen JSON-Schema validiert). */
-  createFormVersion(typeId: Uuid, fields: FormFieldDef[]): Observable<{ id: Uuid }> {
-    if (this.mock) return of({ id: `formver-${fields.length}` });
+  createFormVersion(
+    typeId: Uuid,
+    fields: FormFieldDef[],
+    description?: I18nMap | null,
+  ): Observable<{ id: Uuid }> {
+    if (this.mock) {
+      const id = `formver-${fields.length}`;
+      // Draft + Typ im Store nachführen, damit Reload den gespeicherten Stand zeigt.
+      this.store.formDrafts[typeId] = {
+        applicationTypeId: typeId,
+        formVersionId: id,
+        version: (this.store.formDrafts[typeId]?.version ?? 0) + 1,
+        active: true,
+        description: description ?? null,
+        fields: structuredCopy(fields),
+      };
+      const t = this.store.appTypes.find((x) => x.id === typeId);
+      if (t) t.activeFormVersionId = id;
+      return of({ id });
+    }
     return this.http.post<{ id: Uuid }>(
       `${this.base}/admin/application-types/${typeId}/form-versions`,
-      { fields },
+      { fields, description: description ?? null },
     );
   }
 

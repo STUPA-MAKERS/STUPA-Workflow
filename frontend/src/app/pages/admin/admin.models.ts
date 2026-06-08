@@ -231,6 +231,46 @@ export interface ApplicationTypeAdmin {
   active: boolean;
 }
 
+/**
+ * Antragstyp (Formular) als Editier-Sicht des NC-Forms-Builders (#13). Spiegelt
+ * `ApplicationTypeOut` der Admin-API; `name` ist die i18n-Map (Titel des Formulars).
+ */
+export interface ApplicationTypeFull {
+  id: Uuid;
+  name: I18nMap;
+  gremiumId?: Uuid | null;
+  hasBudget: boolean;
+  activeFormVersionId?: Uuid | null;
+}
+
+/** Body für `POST /admin/application-types` — Antragstyp/Formular anlegen (#13). */
+export interface ApplicationTypeCreateBody {
+  key: string;
+  name: I18nMap;
+  gremiumId?: Uuid | null;
+  hasBudget?: boolean;
+}
+
+/** Body für `PATCH /admin/application-types/{id}` — Titel/Gremium/Budget (#13). */
+export interface ApplicationTypeUpdateBody {
+  name?: I18nMap;
+  gremiumId?: Uuid | null;
+  hasBudget?: boolean;
+}
+
+/**
+ * Aktuelle Form-Version eines Typs zum Bearbeiten (#13) — rohe Felder +
+ * Beschreibung (NC-Forms-Editor). Beim frisch angelegten Typ ist `fields` leer.
+ */
+export interface FormDraft {
+  applicationTypeId: Uuid;
+  formVersionId?: Uuid | null;
+  version?: number | null;
+  active?: boolean;
+  description?: I18nMap | null;
+  fields: FormFieldDef[];
+}
+
 export type FormStatus = 'active' | 'draft' | 'inactive';
 
 /**

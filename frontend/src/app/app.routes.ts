@@ -169,12 +169,17 @@ export const routes: Routes = [
       },
       {
         path: 'admin/forms',
-        data: { title: 'admin.form.title', permission: 'form.configure' },
+        data: { title: 'admin.forms.listTitle', permission: 'form.configure' },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/admin/form-builder/form-builder.component').then(
-            (m) => m.FormBuilderComponent,
-          ),
+          import('./pages/admin/forms/forms-list.component').then((m) => m.FormsListComponent),
+      },
+      {
+        path: 'admin/forms/:id',
+        data: { title: 'admin.forms.listTitle', permission: 'form.configure' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
       },
       {
         path: 'admin/flow',
@@ -194,7 +199,7 @@ export const routes: Routes = [
       },
       {
         // Mitglieder-Unterseite je Gremium (#18).
-        path: 'admin/gremien/:id',
+        path: 'admin/gremien/:id/members',
         data: { title: 'admin.gremien.membersOf', permission: 'admin.config' },
         canActivate: [authGuard],
         loadComponent: () =>

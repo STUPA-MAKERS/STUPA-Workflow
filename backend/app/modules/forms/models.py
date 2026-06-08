@@ -33,6 +33,8 @@ class FormVersion(UUIDPkMixin, CreatedAtMixin, Base):
     version: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    # NC-Forms-Beschreibung (mehrsprachiges Markdown); optional (#13).
+    description_i18n: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("application_type_id", "version"),
