@@ -11,6 +11,7 @@ import {
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
+  IconComponent,
   RowDetailDirective,
   SelectComponent,
   type SelectOption,
@@ -37,7 +38,7 @@ interface Row {
   selector: 'app-budget-tree',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, SelectComponent, BadgeComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, SelectComponent, BadgeComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent],
   templateUrl: './budget-tree.component.html',
   styleUrl: './budget-tree.component.scss',
 })

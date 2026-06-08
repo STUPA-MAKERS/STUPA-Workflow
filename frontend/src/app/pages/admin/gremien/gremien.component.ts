@@ -12,6 +12,7 @@ import {
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
+  IconComponent,
   SelectComponent,
   type SelectOption,
 } from '@shared/ui';
@@ -58,6 +59,7 @@ function emptyForm(): GremiumForm {
     DialogComponent,
     DataTableComponent,
     CellDirective,
+    IconComponent,
   ],
   template: `
     <header class="grem__head">
@@ -85,8 +87,8 @@ function emptyForm(): GremiumForm {
           </ng-template>
           <ng-template appCell="actions" let-g>
             <span class="grem__th-actions">
-              <a class="grem__link" [routerLink]="['/admin/gremien', $any(g).id]">{{ 'admin.gremien.members' | t }}</a>
-              <app-button variant="secondary" size="sm" (click)="openEdit($any(g))">{{ 'admin.gremien.editAction' | t }}</app-button>
+              <a class="grem__icon-link" [routerLink]="['/admin/gremien', $any(g).id]" [attr.aria-label]="'admin.gremien.members' | t" [attr.title]="'admin.gremien.members' | t"><app-icon name="members" /></a>
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.editAction' | t" (click)="openEdit($any(g))"><app-icon name="edit" /></app-button>
             </span>
           </ng-template>
         </app-data-table>
@@ -195,14 +197,24 @@ function emptyForm(): GremiumForm {
         text-align: end;
         white-space: nowrap;
       }
-      .grem__link {
-        color: var(--color-primary);
-        text-decoration: none;
-        margin-right: var(--space-3);
-        font-weight: var(--fw-medium);
+      .grem__th-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        justify-content: flex-end;
       }
-      .grem__link:hover {
-        text-decoration: underline;
+      .grem__icon-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: var(--radius-md);
+        color: var(--color-text-muted);
+      }
+      .grem__icon-link:hover {
+        color: var(--color-primary);
+        background: var(--color-surface-sunken);
       }
       .grem__form {
         display: flex;

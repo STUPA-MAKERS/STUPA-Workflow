@@ -177,6 +177,12 @@
 
 .bd__name {
   color: var(--color-text-muted);
+  display: inline-block;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 /* Auslastungs-Spalte: feste Breite → Balken zeilenübergreifend bündig (Image 14). */
@@ -192,7 +198,7 @@
 }
 
 .bd__track {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   height: 0.7rem;
   background: var(--color-surface-sunken);
@@ -212,6 +218,9 @@
 }
 
 .bd__pct {
+  flex: none;
+  width: 2.75rem;
+  text-align: end;
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-xs);
   color: var(--color-text-muted);

@@ -84,9 +84,9 @@
     </ng-template>
     <ng-template appCell="actions" let-row>
       <span class="bt__col-actions">
-        <app-button variant="secondary" size="sm" [disabled]="!selectedFyId()" (click)="openLimit($any(row).node)">{{ 'budget.tree.setLimit' | t }}</app-button>
-        <app-button variant="ghost" size="sm" (click)="startAddChild($any(row).node)">{{ 'budget.tree.addChild' | t }}</app-button>
-        <app-button variant="danger" size="sm" (click)="deleteNode($any(row).node)">{{ 'budget.tree.delete' | t }}</app-button>
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!selectedFyId()" [ariaLabel]="'budget.tree.setLimit' | t" (click)="openLimit($any(row).node)"><app-icon name="edit" /></app-button>
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.addChild' | t" (click)="startAddChild($any(row).node)"><app-icon name="add" /></app-button>
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.delete' | t" (click)="deleteNode($any(row).node)"><app-icon name="delete" /></app-button>
       </span>
     </ng-template>
 

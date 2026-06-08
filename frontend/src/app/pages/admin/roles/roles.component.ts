@@ -10,6 +10,7 @@ import {
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
+  IconComponent,
   RowDetailDirective,
   ToastService,
 } from '@shared/ui';
@@ -43,6 +44,7 @@ interface RoleDraft {
     DataTableComponent,
     CellDirective,
     RowDetailDirective,
+    IconComponent,
   ],
   providers: [CapitalizePipe],
   template: `
@@ -60,7 +62,7 @@ interface RoleDraft {
         <ng-template appCell="key" let-r><span class="roles__key">{{ $any(r).key }}</span></ng-template>
         <ng-template appCell="perms" let-r>{{ $any(r).permissions.length }} / {{ permissions().length }}</ng-template>
         <ng-template appCell="actions" let-r>
-          <app-button variant="secondary" size="sm" (click)="toggle($any(r).id)">{{ 'admin.roles.editPerms' | t }}</app-button>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.roles.editPerms' | t" (click)="toggle($any(r).id)"><app-icon name="chevron-down" /></app-button>
         </ng-template>
 
         <ng-template appRowDetail let-r>

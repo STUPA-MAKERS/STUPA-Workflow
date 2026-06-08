@@ -113,6 +113,12 @@
 
 .bt__name {
   color: var(--color-text);
+  display: inline-block;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .bt__row--inactive {

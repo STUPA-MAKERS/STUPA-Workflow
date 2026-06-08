@@ -12,6 +12,7 @@ import {
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
+  IconComponent,
   SelectComponent,
   type SelectOption,
 } from '@shared/ui';
@@ -45,6 +46,7 @@ interface Member {
     DialogComponent,
     DataTableComponent,
     CellDirective,
+    IconComponent,
   ],
   template: `
     <a class="gm__back" routerLink="/admin/gremien">← {{ 'admin.gremien.title' | t }}</a>
@@ -64,8 +66,8 @@ interface Member {
         <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
         <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
         <ng-template appCell="actions" let-m>
-          <app-button variant="danger" size="sm" (click)="removeMember($any(m).assignmentId)">
-            {{ 'admin.gremien.memberRemove' | t }}
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberRemove' | t" (click)="removeMember($any(m).assignmentId)">
+            <app-icon name="delete" />
           </app-button>
         </ng-template>
       </app-data-table>

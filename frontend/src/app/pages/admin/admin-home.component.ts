@@ -12,6 +12,7 @@ import {
   CellDirective,
   type ColumnDef,
   DataTableComponent,
+  IconComponent,
 } from '@shared/ui';
 import { AdminApiService } from './admin-api.service';
 import type { FormOverviewItem, FormStatus, Gremium } from './admin.models';
@@ -38,7 +39,7 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
   selector: 'app-admin-home',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, CardComponent, BadgeComponent, DataTableComponent, CellDirective],
+  imports: [RouterLink, TranslatePipe, CardComponent, BadgeComponent, DataTableComponent, CellDirective, IconComponent],
   template: `
     <section class="admin-home">
       <header class="admin-home__head">
@@ -81,7 +82,7 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
             <ng-template appCell="gremium" let-f>{{ gremiumName($any(f).gremiumId) }}</ng-template>
             <ng-template appCell="status" let-f><app-badge [variant]="statusVariant($any(f).status)">{{ statusLabel($any(f).status) }}</app-badge></ng-template>
             <ng-template appCell="version" let-f>{{ $any(f).version ? 'v' + $any(f).version : '—' }}</ng-template>
-            <ng-template appCell="edit" let-f><a routerLink="forms">{{ 'admin.forms.edit' | t }}</a></ng-template>
+            <ng-template appCell="edit" let-f><a class="admin-home__edit" routerLink="forms" [attr.aria-label]="'admin.forms.edit' | t" [attr.title]="'admin.forms.edit' | t"><app-icon name="edit" /></a></ng-template>
           </app-data-table>
         }
       </section>
@@ -185,6 +186,13 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
       }
       .admin-home__row-cta a:hover {
         text-decoration: underline;
+      }
+      .admin-home__edit {
+        display: inline-flex;
+        color: var(--color-text-muted);
+      }
+      .admin-home__edit:hover {
+        color: var(--color-primary);
       }
       .visually-hidden {
         position: absolute;

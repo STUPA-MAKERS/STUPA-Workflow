@@ -50,8 +50,8 @@
         <span class="users__muted">{{ $any(p).lastLogin ? ($any(p).lastLogin | slice: 0 : 10) : ('admin.users.never' | t) }}</span>
       </ng-template>
       <ng-template appCell="actions" let-p>
-        <app-button variant="secondary" size="sm" [attr.aria-expanded]="isExpanded($any(p).id)" (click)="toggleAssign($any(p).id)">
-          {{ 'admin.users.addRole' | t }}
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.users.addRole' | t" [attr.aria-expanded]="isExpanded($any(p).id)" (click)="toggleAssign($any(p).id)">
+          <app-icon name="add" />
         </app-button>
       </ng-template>
 
