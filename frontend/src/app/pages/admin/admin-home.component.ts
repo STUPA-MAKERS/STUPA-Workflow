@@ -85,7 +85,7 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
                   <td class="admin-home__name">{{ name(form) }}</td>
                   <td>{{ gremiumName(form.gremiumId) }}</td>
                   <td><app-badge [variant]="statusVariant(form.status)">{{ statusLabel(form.status) }}</app-badge></td>
-                  <td class="admin-home__num">v{{ form.version }}</td>
+                  <td class="admin-home__num">{{ form.version ? 'v' + form.version : '—' }}</td>
                   <td class="admin-home__row-cta"><a routerLink="forms">{{ 'admin.forms.edit' | t }}</a></td>
                 </tr>
               }
@@ -119,6 +119,7 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
         gap: var(--space-5);
       }
       .admin-home__tile {
+        display: grid;
         text-decoration: none;
         color: inherit;
       }

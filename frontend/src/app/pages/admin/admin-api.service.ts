@@ -24,6 +24,7 @@ import {
   type Branding,
   type FlowGraph,
   type FormOverviewItem,
+  type FormStatus,
   type Gremium,
   type GremiumCreateBody,
   type GremiumUpdateBody,
@@ -52,6 +53,14 @@ export type ConfigSchemas = Record<string, Record<string, unknown>>;
 export interface ApplicationTypeOption {
   id: Uuid;
   name: string;
+}
+
+/** Roh-Form von `GET /admin/application-types` (`ApplicationTypeOut`). */
+interface ApplicationTypeOutWire {
+  id: Uuid;
+  nameI18n?: Record<string, string> | null;
+  gremiumId?: Uuid | null;
+  activeFormVersionId?: Uuid | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -138,7 +147,22 @@ export class AdminApiService {
   /** Überblick aktiver Formulare (#75): Name/Gremium/Status/Version. */
   listForms(): Observable<FormOverviewItem[]> {
     if (this.mock) return of(structuredCopy(MOCK_FORMS));
-    return this.http.get<FormOverviewItem[]>(`${this.base}/admin/application-types`);
+    // `/admin/application-types` liefert `ApplicationTypeOut` (nameI18n,
+    // activeFormVersionId …), nicht die FE-View → mappen statt roh casten,
+    // sonst zeigt die Tabelle leeren Namen + `status.undefined` (Image 11).
+    return this.http
+      .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`)
+      .pipe(
+        map((list) =>
+          list.map((t) => ({
+            id: t.id,
+            name: t.nameI18n ?? {},
+            gremiumId: t.gremiumId ?? null,
+            status: (t.activeFormVersionId ? 'active' : 'draft') as FormStatus,
+            version: 0,
+          })),
+        ),
+      );
   }
 
   /** Rechte einer Rolle ändern (#72) — PATCH /admin/roles/{id} (`permissions`). */
