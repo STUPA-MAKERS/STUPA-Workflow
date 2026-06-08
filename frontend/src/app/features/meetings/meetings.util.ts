@@ -56,19 +56,49 @@ export function insertAt(text: string, snippet: string, caret: number | null): s
   return text.slice(0, caret) + snippet + text.slice(caret);
 }
 
+/** Nur Links mit sicherem Schema (kein `javascript:`-Vektor) durchlassen. */
+function safeUrl(url: string): boolean {
+  return /^(https?:\/\/|mailto:|\/)/i.test(url);
+}
+
 function inline(text: string): string {
-  // Reihenfolge: Code zuerst (schützt Inhalt), dann fett vor kursiv.
+  // Reihenfolge: Code zuerst (schützt Inhalt), dann Links, fett vor kursiv.
   return escapeHtml(text)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (match, label: string, url: string) =>
+      safeUrl(url)
+        ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`
+        : match,
+    )
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*]+)\*/g, '<em>$1</em>');
 }
 
-/** Minimaler Markdown→HTML-Renderer für die Vorschau (siehe Datei-Header). */
+/** Zellen einer Pipe-Tabellen-Zeile (`| a | b |`) trimmen. */
+function tableCells(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((c) => c.trim());
+}
+
+/** Trenn-Zeile einer Pipe-Tabelle? (`| --- | :--: |`). */
+function isTableSeparator(line: string): boolean {
+  return /^\|?[\s:|-]+\|?$/.test(line.trim()) && line.includes('-') && line.includes('|');
+}
+
+/**
+ * Minimaler, abhängigkeitsfreier Markdown→HTML-Renderer für die Vorschau
+ * (siehe Datei-Header). Unterstützt Überschriften, Fett/Kursiv/Code, **Links**,
+ * geordnete + ungeordnete Listen, Zitate, **Pipe-Tabellen**, Trennlinien und
+ * Absätze — genug für Sitzungsprotokolle (inkl. der `voteSnippet`-Ergebnistabellen).
+ */
 export function renderMarkdown(markdown: string): string {
   const lines = (markdown ?? '').replace(/\r\n/g, '\n').split('\n');
   const html: string[] = [];
-  let listOpen = false;
+  let list: 'ul' | 'ol' | null = null;
   let paragraph: string[] = [];
 
   const flushParagraph = (): void => {
@@ -78,30 +108,62 @@ export function renderMarkdown(markdown: string): string {
     }
   };
   const closeList = (): void => {
-    if (listOpen) {
-      html.push('</ul>');
-      listOpen = false;
+    if (list) {
+      html.push(`</${list}>`);
+      list = null;
+    }
+  };
+  const openList = (kind: 'ul' | 'ol'): void => {
+    if (list !== kind) {
+      closeList();
+      html.push(`<${kind}>`);
+      list = kind;
     }
   };
 
-  for (const raw of lines) {
-    const line = raw.trimEnd();
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trimEnd();
     const heading = /^(#{1,3})\s+(.*)$/.exec(line);
-    const listItem = /^[-*]\s+(.*)$/.exec(line);
+    const ordered = /^\d+\.\s+(.*)$/.exec(line);
+    const unordered = /^[-*]\s+(.*)$/.exec(line);
     const quote = /^>\s?(.*)$/.exec(line);
+    const isHr = /^([-*_])\1{2,}$/.test(line.trim());
+    const isTableHead =
+      line.trim().startsWith('|') && i + 1 < lines.length && isTableSeparator(lines[i + 1]);
 
     if (heading) {
       flushParagraph();
       closeList();
       const level = heading[1].length;
       html.push(`<h${level}>${inline(heading[2])}</h${level}>`);
-    } else if (listItem) {
+    } else if (isHr) {
       flushParagraph();
-      if (!listOpen) {
-        html.push('<ul>');
-        listOpen = true;
+      closeList();
+      html.push('<hr>');
+    } else if (isTableHead) {
+      flushParagraph();
+      closeList();
+      const head = tableCells(line);
+      i += 2; // Kopf + Trenn-Zeile überspringen
+      const body: string[][] = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        body.push(tableCells(lines[i]));
+        i++;
       }
-      html.push(`<li>${inline(listItem[1])}</li>`);
+      i--; // die for-Schleife inkrementiert gleich wieder
+      const thead = `<thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead>`;
+      const rows = body
+        .map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`)
+        .join('');
+      html.push(`<table>${thead}<tbody>${rows}</tbody></table>`);
+    } else if (ordered) {
+      flushParagraph();
+      openList('ol');
+      html.push(`<li>${inline(ordered[1])}</li>`);
+    } else if (unordered) {
+      flushParagraph();
+      openList('ul');
+      html.push(`<li>${inline(unordered[1])}</li>`);
     } else if (quote) {
       flushParagraph();
       closeList();

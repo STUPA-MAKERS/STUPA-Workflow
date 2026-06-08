@@ -98,4 +98,31 @@ describe('renderMarkdown', () => {
   it('returns an empty string for empty input', () => {
     expect(renderMarkdown('')).toBe('');
   });
+
+  it('renders ordered lists separately from unordered ones', () => {
+    const out = renderMarkdown('1. eins\n2. zwei');
+    expect(out).toContain('<ol>');
+    expect((out.match(/<li>/g) ?? []).length).toBe(2);
+  });
+
+  it('renders a pipe table (as emitted by voteSnippet)', () => {
+    const out = renderMarkdown('| Option | Stimmen |\n| --- | --- |\n| yes | 12 |');
+    expect(out).toContain('<table>');
+    expect(out).toContain('<th>Option</th>');
+    expect(out).toContain('<td>yes</td>');
+    expect(out).toContain('<td>12</td>');
+  });
+
+  it('renders safe links and drops dangerous schemes', () => {
+    expect(renderMarkdown('[ok](https://x.test)')).toContain(
+      '<a href="https://x.test" target="_blank" rel="noopener noreferrer">ok</a>',
+    );
+    const bad = renderMarkdown('[x](javascript:alert(1))');
+    expect(bad).not.toContain('<a ');
+    expect(bad).not.toContain('href');
+  });
+
+  it('renders a horizontal rule', () => {
+    expect(renderMarkdown('---')).toContain('<hr>');
+  });
 });

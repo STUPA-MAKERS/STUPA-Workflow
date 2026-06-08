@@ -44,6 +44,9 @@ import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
 import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings.util';
 
+/** Wartezeit nach der letzten Eingabe, bevor das Protokoll automatisch gespeichert wird (#56). */
+const AUTOSAVE_DELAY_MS = 1000;
+
 /**
  * Sitzungssteuerung + Protokoll-Editor (T-33, flows §5/§7).
  *
@@ -277,24 +280,27 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
 
             <div class="mtg__protoActions">
               @if (!proto.isFinal) {
-                <app-button
-                  size="sm"
-                  [disabled]="!dirty()"
-                  [loading]="saving()"
-                  (click)="save()"
-                >
-                  {{ 'action.save' | t }}
-                </app-button>
+                <!-- Auto-Speichern (#56): kein manueller Save-Button, Status-Anzeige. -->
+                <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+                  @switch (saveState()) {
+                    @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+                    @case ('saved') { ✓ {{ 'meetings.protocol.saved' | t }} }
+                    @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+                    @default {
+                      @if (dirty()) { {{ 'meetings.protocol.unsaved' | t }} }
+                    }
+                  }
+                </span>
                 <app-button
                   variant="primary"
                   size="sm"
-                  [disabled]="dirty()"
+                  [disabled]="dirty() || saveState() === 'saving'"
                   [loading]="finalizing()"
                   (click)="finalize()"
                 >
                   {{ 'meetings.protocol.finalize' | t }}
                 </app-button>
-                @if (dirty()) {
+                @if (dirty() || saveState() === 'saving') {
                   <span class="mtg__muted mtg__hint">{{ 'meetings.protocol.saveFirst' | t }}</span>
                 }
               } @else {
@@ -653,11 +659,53 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
         border-radius: var(--radius-sm);
         font-size: 0.9em;
       }
+      .mtg__preview a {
+        color: var(--color-primary);
+        text-decoration: underline;
+      }
+      .mtg__preview ul,
+      .mtg__preview ol {
+        margin: var(--space-2) 0;
+        padding-left: var(--space-5);
+      }
+      .mtg__preview hr {
+        border: 0;
+        border-top: var(--border-width) solid var(--color-border);
+        margin: var(--space-3) 0;
+      }
+      .mtg__preview table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: var(--space-2) 0;
+        font-size: var(--fs-sm);
+      }
+      .mtg__preview th,
+      .mtg__preview td {
+        border: var(--border-width) solid var(--color-border);
+        padding: var(--space-1) var(--space-2);
+        text-align: start;
+      }
+      .mtg__preview thead th {
+        background: var(--color-surface);
+        font-weight: var(--fw-semibold);
+      }
       .mtg__protoActions {
         display: flex;
+        align-items: center;
         gap: var(--space-3);
         margin-top: var(--space-4);
         flex-wrap: wrap;
+      }
+      .mtg__saveState {
+        font-size: var(--fs-sm);
+        color: var(--color-text-muted);
+        min-width: 8rem;
+      }
+      .mtg__saveState[data-state='saved'] {
+        color: var(--color-success);
+      }
+      .mtg__saveState[data-state='error'] {
+        color: var(--color-danger);
       }
       .mtg__att {
         list-style: none;
@@ -760,6 +808,9 @@ export class MeetingsComponent implements OnDestroy {
 
   readonly loadingProtocol = signal(false);
   readonly saving = signal(false);
+  /** Auto-Speichern-Status des Protokolls (#56). */
+  readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
   readonly finalizing = signal(false);
   readonly creating = signal(false);
   readonly newTitle = signal('');
@@ -821,6 +872,7 @@ export class MeetingsComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.channel?.close();
+    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
   }
 
   // --- laden / anlegen -----------------------------------------------------
@@ -970,6 +1022,7 @@ export class MeetingsComponent implements OnDestroy {
   onMarkdownChange(value: string): void {
     this.markdown.set(value);
     this.dirty.set(true);
+    this.scheduleAutosave();
   }
 
   onCaret(event: Event): void {
@@ -989,23 +1042,39 @@ export class MeetingsComponent implements OnDestroy {
     const next = insertAt(this.markdown(), snippet, this.caret);
     this.markdown.set(next);
     this.dirty.set(true);
+    this.scheduleAutosave();
   }
 
-  save(): void {
+  /** Debounced Auto-Speichern (#56): nach kurzer Tipp-Pause an den Server. */
+  private scheduleAutosave(): void {
+    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
+    this.saveState.set('idle');
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.autosave();
+    }, AUTOSAVE_DELAY_MS);
+  }
+
+  private autosave(): void {
     const proto = this.protocol();
-    if (!proto || this.saving()) return;
+    if (!proto || proto.isFinal || !this.dirty() || this.saving()) return;
+    const pending = this.markdown();
     this.saving.set(true);
-    this.api.updateProtocol(proto.id, this.markdown()).subscribe({
+    this.saveState.set('saving');
+    this.api.updateProtocol(proto.id, pending).subscribe({
       next: (updated) => {
         this.saving.set(false);
         this.protocol.set(updated);
-        this.markdown.set(updated.markdown);
-        this.dirty.set(false);
-        this.toast.success(this.i18n.translate('meetings.toast.saved'));
+        // Nur als gespeichert markieren, wenn der Editor seither nicht weiter
+        // verändert wurde (sonst läuft bereits der nächste Autosave-Timer).
+        if (this.markdown() === pending) {
+          this.dirty.set(false);
+          this.saveState.set('saved');
+        }
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.saveFailed'));
+        this.saveState.set('error');
       },
     });
   }

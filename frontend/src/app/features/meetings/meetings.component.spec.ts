@@ -4,7 +4,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject } from 'rxjs';
 import { of } from 'rxjs';
@@ -182,14 +182,16 @@ describe('MeetingsComponent', () => {
     expect(preview?.querySelector('h2')?.textContent).toBe('Hallo');
   });
 
-  it('saves the protocol and then finalizes it', async () => {
+  it('auto-saves the protocol and then finalizes it', async () => {
     const { http } = await setup();
     flushLoad(http);
     const textarea = (await screen.findByLabelText('Markdown')) as HTMLTextAreaElement;
     await userEvent.type(textarea, ' geändert');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    const saveReq = http.expectOne('/api/protocols/p-1');
+    // Auto-Speichern (#56): debounced PATCH ohne manuellen Save-Button.
+    const saveReq = await waitFor(() => http.expectOne('/api/protocols/p-1'), {
+      timeout: 2500,
+    });
     expect(saveReq.request.method).toBe('PATCH');
     saveReq.flush({ ...PROTOCOL, markdown: '# Protokoll geändert' });
 
