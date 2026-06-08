@@ -111,6 +111,9 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
     if (s.color) out.color = s.color;
     if (s.editAllowed === false) out.editAllowed = false;
     if (s.isInitial) out.isInitial = true;
+    // State-Art + Config (#28) — `normal` ist der Default und wird weggelassen.
+    if (s.kind && s.kind !== 'normal') out.kind = s.kind;
+    if (s.config && Object.keys(s.config).length > 0) out.config = s.config;
     return out;
   });
   const transitions: TransitionDef[] = (graph.transitions ?? []).map((t) => {
@@ -120,6 +123,7 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
     if (t.actions && t.actions.length > 0) out.actions = t.actions;
     if (t.order != null) out.order = t.order;
     if (t.automatic) out.automatic = true;
+    if (t.branch) out.branch = t.branch; // Ergebnis-Zweig (#28)
     return out;
   });
   const out: FlowGraph = { states, transitions };

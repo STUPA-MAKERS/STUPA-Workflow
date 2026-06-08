@@ -382,3 +382,40 @@ select {
 .fe__status--ok {
   color: var(--color-success);
 }
+
+/* State-Art-Config + Decision-Regeln (#28) */
+.fe__hint {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+.fe__lbl-text {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+.fe__rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.fe__rule {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+.fe__rule select,
+.fe__rule input {
+  height: var(--control-height);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 0 var(--space-2);
+}
+.fe__rule-val {
+  width: 5rem;
+}
+.fe__rule-arrow {
+  color: var(--color-text-muted);
+}

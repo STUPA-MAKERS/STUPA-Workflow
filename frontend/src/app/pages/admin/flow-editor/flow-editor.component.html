@@ -135,6 +135,67 @@
         <app-checkbox [ngModel]="s.editAllowed !== false" (ngModelChange)="setStateEditAllowed(s.key, $event)">
           {{ 'admin.flow.editAllowed' | t }}
         </app-checkbox>
+
+        <!-- State-Art + kind-spezifische Config (#28) -->
+        <label class="fe__lbl">{{ 'admin.flow.kindLabel' | t }}
+          <select [ngModel]="s.kind ?? 'normal'" (ngModelChange)="setStateKind(s.key, $event)">
+            @for (k of stateKinds; track k) {
+              <option [value]="k">{{ kindLabel(k) }}</option>
+            }
+          </select>
+        </label>
+
+        @if (s.kind === 'vote' || s.kind === 'approval') {
+          <app-select
+            [label]="'admin.flow.cfgGremium' | t"
+            [placeholder]="'admin.flow.cfgGremiumPh' | t"
+            [options]="gremiumOptions()"
+            [ngModel]="s.config?.gremiumId ?? ''"
+            (ngModelChange)="setStateGremium(s.key, $event)"
+          />
+        }
+        @if (s.kind === 'approval') {
+          <app-select
+            [label]="'admin.flow.cfgRole' | t"
+            [placeholder]="'admin.flow.cfgRolePh' | t"
+            [options]="gremiumRoleOptions()"
+            [ngModel]="s.config?.roleKey ?? ''"
+            (ngModelChange)="setStateRoleKey(s.key, $event)"
+          />
+        }
+        @if (s.kind === 'vote' || s.kind === 'approval') {
+          <p class="fe__hint">{{ 'admin.flow.branchHint' | t }}</p>
+        }
+        @if (s.kind === 'decision') {
+          <div class="fe__rules">
+            <span class="fe__lbl-text">{{ 'admin.flow.cfgRules' | t }}</span>
+            @for (rule of s.config?.rules ?? []; track $index; let i = $index) {
+              <div class="fe__rule">
+                <select [ngModel]="rule.when?.field ?? 'amount'" (ngModelChange)="setDecisionRule(s.key, i, { whenField: $event })">
+                  @for (f of decisionFields; track f) { <option [value]="f">{{ f }}</option> }
+                </select>
+                <select [ngModel]="rule.when?.op ?? '>='" (ngModelChange)="setDecisionRule(s.key, i, { whenOp: $event })">
+                  @for (o of decisionOps; track o) { <option [value]="o">{{ o }}</option> }
+                </select>
+                <input class="fe__rule-val" [ngModel]="$any(rule.when?.value) ?? ''" (ngModelChange)="setDecisionRule(s.key, i, { whenValue: $event })" [attr.placeholder]="'admin.flow.cfgValue' | t" />
+                <span class="fe__rule-arrow">→</span>
+                <select [ngModel]="rule.to" (ngModelChange)="setDecisionRule(s.key, i, { to: $event })">
+                  <option value="">—</option>
+                  @for (opt of stateOptions(); track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
+                </select>
+                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeDecisionRule(s.key, i)">✕</app-button>
+              </div>
+            }
+            <app-button variant="ghost" size="sm" (click)="addDecisionRule(s.key)">+ {{ 'admin.flow.addRule' | t }}</app-button>
+            <label class="fe__lbl">{{ 'admin.flow.cfgElse' | t }}
+              <select [ngModel]="s.config?.else ?? ''" (ngModelChange)="setDecisionElse(s.key, $event)">
+                <option value="">—</option>
+                @for (opt of stateOptions(); track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
+              </select>
+            </label>
+          </div>
+        }
+
         <app-button variant="danger" size="sm" (click)="removeSelectedState()">{{ 'admin.flow.removeState' | t }}</app-button>
       } @else if (selectedTransition(); as sel) {
         <h2 class="fe__panel-h">{{ 'admin.flow.transitionInspector' | t }}</h2>
@@ -159,6 +220,16 @@
             {{ 'admin.flow.automatic' | t }}
           </app-checkbox>
         </div>
+
+        <!-- Ergebnis-Zweig für vote/approval-States (#28): pass/fail bzw. accept/reject. -->
+        <label class="fe__lbl">{{ 'admin.flow.branch' | t }}
+          <select [ngModel]="sel.t.branch ?? ''" (ngModelChange)="setTransitionBranch(sel.index, $event)">
+            <option value="">{{ 'admin.flow.branchNone' | t }}</option>
+            @for (b of branches; track b) {
+              <option [value]="b">{{ b }}</option>
+            }
+          </select>
+        </label>
 
         <!-- Guard nur bei automatischen Übergängen (FE3): er entscheidet das Auto-Feuern. -->
         @if (sel.t.automatic) {

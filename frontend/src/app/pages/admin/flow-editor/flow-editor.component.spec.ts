@@ -7,7 +7,10 @@ import { FlowEditorComponent } from './flow-editor.component';
 async function setup() {
   const createFlowVersion = jest.fn(() => of({ id: 'fv1' }));
   const listApplicationTypes = jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }]));
-  const api = { createFlowVersion, listApplicationTypes };
+  // vote/approval-State-Config (#28): Gremien + Gremium-Rollen-Quellen.
+  const listGremienOptions = jest.fn(() => of([{ id: 'g1', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' }]));
+  const listGremiumRoles = jest.fn(() => of([{ id: 'gr1', key: 'vorsitz', name: { de: 'Vorsitz' } }]));
+  const api = { createFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles };
   const view = await render(FlowEditorComponent, {
     providers: [{ provide: AdminApiService, useValue: api }],
   });

@@ -19,11 +19,15 @@ import { AdminOptionsService } from '../admin-options.service';
 import {
   ACTION_TYPES,
   type ActionType,
+  type DecisionRule,
   type FlowGraph,
   GUARD_LEAF_OPERATORS,
   type GuardLeafOperator,
   type StateCategory,
+  type StateConfig,
   type StateDef,
+  type StateKind,
+  type TransitionBranch,
   type TransitionDef,
   VOTE_RESULTS,
 } from '../admin.models';
@@ -82,6 +86,15 @@ export class FlowEditorComponent {
   protected readonly guardOps = GUARD_LEAF_OPERATORS;
   protected readonly actionTypes = ACTION_TYPES;
 
+  /** State-Arten (#28) + Branch-/Decision-Auswahllisten. */
+  protected readonly stateKinds: StateKind[] = ['normal', 'vote', 'approval', 'decision'];
+  protected readonly branches: TransitionBranch[] = ['pass', 'fail', 'accept', 'reject'];
+  protected readonly decisionFields = ['amount', 'typeKey', 'applicantRole'];
+  protected readonly decisionOps = ['==', '!=', '>', '>=', '<', '<=', 'in', 'has'];
+  /** Gremien + Gremium-Rollen für vote/approval-Config (#28/#42). */
+  protected readonly gremiumOptions = signal<SelectOption[]>([]);
+  protected readonly gremiumRoleOptions = signal<SelectOption[]>([]);
+
   protected readonly graph = signal<FlowGraph>(autoLayout(blankGraph()));
 
   /** Aktuell ausgewählter Knoten/Kante für das Inspektor-Panel. */
@@ -107,6 +120,21 @@ export class FlowEditorComponent {
           if (opts.length && !this.selectedTypeId()) this.selectedTypeId.set(opts[0].value);
         },
         error: () => this.typeOptions.set([]),
+      });
+    // Gremien + Gremium-Rollen für vote/approval-State-Config (#28/#42).
+    this.options
+      .gremiumOptions()
+      .pipe(takeUntilDestroyed())
+      .subscribe({ next: (o) => this.gremiumOptions.set(o), error: () => undefined });
+    this.api
+      .listGremiumRoles()
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: (roles) =>
+          this.gremiumRoleOptions.set(
+            roles.map((r) => ({ value: r.key, label: `${r.name['de'] ?? r.key} (${r.key})` })),
+          ),
+        error: () => undefined,
       });
   }
 
@@ -195,6 +223,10 @@ export class FlowEditorComponent {
 
   protected catLabel(c: StateCategory): string {
     return this.i18n.translate(`admin.flow.cat.${c}` as TranslationKey);
+  }
+
+  protected kindLabel(k: string): string {
+    return this.i18n.translate(`admin.flow.kind.${k}` as TranslationKey);
   }
 
   /** Von/Nach-Optionen als „Klarname (key)" (FE5). */
@@ -327,6 +359,89 @@ export class FlowEditorComponent {
     this.graph.update((g) => ({
       ...g,
       states: g.states.map((s) => (s.key === key ? { ...s, editAllowed: on } : s)),
+    }));
+  }
+
+  // --- state kind + config (#28) -------------------------------------------
+  private patchState(key: string, patch: Partial<StateDef>): void {
+    this.graph.update((g) => ({
+      ...g,
+      states: g.states.map((s) => (s.key === key ? { ...s, ...patch } : s)),
+    }));
+  }
+
+  protected setStateKind(key: string, kind: string): void {
+    const k = (kind || 'normal') as StateKind;
+    // Beim Wechsel der Art die Config auf einen sinnvollen Default zurücksetzen.
+    const config: StateConfig =
+      k === 'decision' ? { rules: [], else: '' } : k === 'normal' ? {} : {};
+    this.patchState(key, { kind: k === 'normal' ? null : k, config });
+  }
+
+  private patchConfig(key: string, patch: Partial<StateConfig>): void {
+    this.graph.update((g) => ({
+      ...g,
+      states: g.states.map((s) =>
+        s.key === key ? { ...s, config: { ...(s.config ?? {}), ...patch } } : s,
+      ),
+    }));
+  }
+
+  protected setStateGremium(key: string, gremiumId: string): void {
+    this.patchConfig(key, { gremiumId: gremiumId || undefined });
+  }
+
+  protected setStateRoleKey(key: string, roleKey: string): void {
+    this.patchConfig(key, { roleKey: roleKey || undefined });
+  }
+
+  protected setDecisionElse(key: string, value: string): void {
+    this.patchConfig(key, { else: value });
+  }
+
+  protected addDecisionRule(key: string): void {
+    const rules = [...(this.stateByKey(key)?.config?.rules ?? [])];
+    rules.push({ when: { field: 'amount', op: '>=', value: 0 }, to: '' });
+    this.patchConfig(key, { rules });
+  }
+
+  protected removeDecisionRule(key: string, index: number): void {
+    const rules = (this.stateByKey(key)?.config?.rules ?? []).filter((_, i) => i !== index);
+    this.patchConfig(key, { rules });
+  }
+
+  protected setDecisionRule(
+    key: string,
+    index: number,
+    patch: Partial<DecisionRule> | { whenField?: string; whenOp?: string; whenValue?: string },
+  ): void {
+    const rules = (this.stateByKey(key)?.config?.rules ?? []).map((r, i) => {
+      if (i !== index) return r;
+      const next: DecisionRule = { ...r };
+      if ('to' in patch && patch.to !== undefined) next.to = patch.to;
+      const when: NonNullable<DecisionRule['when']> = {
+        ...(r.when ?? { field: 'amount', op: '>=', value: 0 }),
+      };
+      const p = patch as { whenField?: string; whenOp?: string; whenValue?: string };
+      if (p.whenField !== undefined) when.field = p.whenField as 'amount' | 'typeKey' | 'applicantRole';
+      if (p.whenOp !== undefined) when.op = p.whenOp;
+      if (p.whenValue !== undefined) when.value = when.field === 'amount' ? Number(p.whenValue) : p.whenValue;
+      next.when = when;
+      return next;
+    });
+    this.patchConfig(key, { rules });
+  }
+
+  private stateByKey(key: string): StateDef | undefined {
+    return this.graph().states.find((s) => s.key === key);
+  }
+
+  protected setTransitionBranch(index: number, branch: string): void {
+    this.graph.update((g) => ({
+      ...g,
+      transitions: (g.transitions ?? []).map((t, idx) =>
+        idx === index ? { ...t, branch: (branch || null) as TransitionBranch | null } : t,
+      ),
     }));
   }
 
