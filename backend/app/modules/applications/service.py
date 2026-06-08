@@ -210,11 +210,17 @@ class ApplicationsService:
         )
 
     # ------------------------------------------------------------------ create
-    async def create(self, payload: ApplicationCreate) -> tuple[Application, str]:
+    async def create(
+        self, payload: ApplicationCreate, *, actor: str = "applicant"
+    ) -> tuple[Application, str]:
         """Antrag anlegen. Rückgabe = (Antrag, applicant_email) für den Mail-Versand.
 
         Reihenfolge (flows §1): effektive Form laden → ``validate_answers`` (422 vor
-        DB) → Antrag + PII + v1 + Initial-State + ``status_event``."""
+        DB) → Antrag + PII + v1 + Initial-State + ``status_event``.
+
+        ``actor`` ist der Audit-Akteur: ``"applicant"`` bei öffentlicher Einreichung,
+        bei manueller Anlage durch eine:n Verwalter:in der Principal-``sub`` (#24).
+        """
         app_type = await self.session.get(ApplicationType, payload.type_id)
         if app_type is None:
             raise NotFoundError(f"application type {payload.type_id} not found")
@@ -271,7 +277,7 @@ class ApplicationsService:
                 application_id=app.id,
                 version=1,
                 data=clean,
-                changed_by="applicant",
+                changed_by=actor,
                 diff=None,
             )
         )
@@ -280,7 +286,7 @@ class ApplicationsService:
                 application_id=app.id,
                 from_state_id=None,
                 to_state_id=initial.id,
-                actor="applicant",
+                actor=actor,
             )
         )
         await self.session.commit()

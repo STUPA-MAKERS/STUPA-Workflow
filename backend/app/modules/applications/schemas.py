@@ -29,13 +29,20 @@ class _CamelModel(BaseModel):
 # Create
 # --------------------------------------------------------------------------- #
 class ApplicationCreate(_CamelModel):
-    """Antrag anlegen (öffentlich, api.md §5). ``data`` wird gegen die effektive
-    Form validiert; ``altcha`` wird serverseitig verifiziert (security.md §7, Issue #23)."""
+    """Antrag anlegen (api.md §5). ``data`` wird gegen die effektive Form validiert.
+
+    Anonyme Einreichung: ``altcha`` wird serverseitig verifiziert (security.md §7,
+    Issue #23) und ``applicantEmail`` ist Pflicht. Eingeloggte Nutzer:innen (#24)
+    brauchen **kein** Altcha; ``applicantEmail``/``applicantName`` werden — falls leer
+    — aus dem Account abgeleitet. Der Router erzwingt die anonymen Pflichtfelder.
+    """
 
     type_id: UUID = Field(alias="typeId")
     budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")
     data: dict[str, Any]
-    applicant_email: EmailStr = Field(alias="applicantEmail")
+    # Optional auf Schema-Ebene: für eingeloggte Nutzer:innen aus dem Account ableitbar
+    # (#24). Für anonyme Einreichung erzwingt der Router die Pflicht (422).
+    applicant_email: EmailStr | None = Field(default=None, alias="applicantEmail")
     applicant_name: str | None = Field(default=None, alias="applicantName")
     lang: Lang = DEFAULT_LANG
     # Strukturell schon im Schema validiert (malformt → 422); kryptografische Prüfung via

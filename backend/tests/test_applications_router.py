@@ -66,11 +66,13 @@ def _out(app_id: UUID, *, with_pii: bool) -> ApplicationOut:
 class _FakeService:
     def __init__(self) -> None:
         self.created: object | None = None
+        self.created_actor: str | None = None
         self.last_include_pii: bool | None = None
         self.comment_args: dict[str, object] | None = None
 
-    async def create(self, payload):  # noqa: ANN001
+    async def create(self, payload, *, actor="applicant"):  # noqa: ANN001
         self.created = payload
+        self.created_actor = actor
         return _FakeApp(uuid4()), str(payload.applicant_email)
 
     async def get(self, application_id, *, include_pii):  # noqa: ANN001
@@ -186,6 +188,43 @@ def test_create_application_rejects_bad_email_422(client: TestClient) -> None:
     body = _create_body() | {"applicantEmail": "not-an-email"}
     r = client.post("/api/applications", json=body)
     assert r.status_code == 422
+
+
+def _login(app: FastAPI, **kw: object) -> None:
+    """Eingeloggten Principal setzen (für die Altcha-Befreiung/Identitäts-Ableitung, #24)."""
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub=str(kw.get("sub", "u-1")),
+        email=kw.get("email"),  # type: ignore[arg-type]
+        display_name=kw.get("display_name"),  # type: ignore[arg-type]
+        permissions=set(),
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
+
+
+def test_create_application_logged_in_skips_altcha_and_derives_identity(
+    app: FastAPI, client: TestClient, fake_service: _FakeService, sent: list[tuple[str, UUID]]
+) -> None:
+    _login(app, sub="u-7", email="user@example.org", display_name="Userin")
+    # Kein applicantEmail, kein Altcha — als eingeloggte:r Nutzer:in erlaubt (#24).
+    body = {"typeId": str(uuid4()), "data": {"title": "Mein Antrag"}, "lang": "de"}
+    r = client.post("/api/applications", json=body)
+    assert r.status_code == 201
+    assert fake_service.created.applicant_email == "user@example.org"  # type: ignore[union-attr]
+    assert fake_service.created.applicant_name == "Userin"  # type: ignore[union-attr]
+    assert fake_service.created_actor == "u-7"
+    assert sent and sent[0][0] == "user@example.org"
+
+
+def test_create_application_logged_in_explicit_email_on_behalf(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _login(app, sub="verwalter", email="staff@example.org", display_name="Staff")
+    body = _create_body() | {"applicantEmail": "applicant@example.org"}
+    r = client.post("/api/applications", json=body)
+    assert r.status_code == 201
+    # Explizite Angabe gewinnt über die Account-Ableitung (Anlage im Namen).
+    assert fake_service.created.applicant_email == "applicant@example.org"  # type: ignore[union-attr]
+    assert fake_service.created_actor == "verwalter"
 
 
 def test_create_application_oversize_payload_413(

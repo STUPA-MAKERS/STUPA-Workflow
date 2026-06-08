@@ -255,5 +255,32 @@ def require_altcha(field: str = "altcha") -> Callable[..., Awaitable[None]]:
 verify_altcha = require_altcha()
 
 
+def require_altcha_unless_authenticated(
+    field: str = "altcha",
+) -> Callable[..., Awaitable[None]]:
+    """Wie :func:`require_altcha`, **überspringt** Altcha aber für eingeloggte Nutzer:innen.
+
+    Begründung (#24): eine gültige Principal-Session ist bereits ein Vertrauensanker —
+    Altcha (Bot-/Spam-Abwehr) ist nur für die anonyme öffentliche Einreichung nötig.
+    Anonyme Requests durchlaufen die normale Altcha-Prüfung (400 bei fehlend/ungültig).
+    """
+
+    inner = require_altcha(field)
+
+    async def dependency(
+        request: Request,
+        verifier: AltchaDep,
+        principal: Annotated[Principal | None, Depends(get_current_principal)],
+    ) -> None:
+        if principal is not None:
+            return
+        await inner(request=request, verifier=verifier)
+
+    return dependency
+
+
+verify_altcha_unless_authenticated = require_altcha_unless_authenticated()
+
+
 def now_unix() -> int:
     return int(time.time())

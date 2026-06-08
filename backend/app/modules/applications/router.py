@@ -28,7 +28,13 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 
 from app.db import get_sessionmaker
-from app.deps import DbSession, Principal, SettingsDep, require_principal
+from app.deps import (
+    DbSession,
+    Principal,
+    SettingsDep,
+    get_current_principal,
+    require_principal,
+)
 from app.modules.applications.access import Access, require_app_edit, require_app_read
 from app.modules.applications.schemas import (
     ApplicationCreate,
@@ -47,9 +53,14 @@ from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_application_payload_limit,
     rate_limit_applications,
-    verify_altcha,
+    verify_altcha_unless_authenticated,
 )
-from app.shared.errors import ForbiddenError, PayloadTooLargeError, ProblemDetail
+from app.shared.errors import (
+    ForbiddenError,
+    PayloadTooLargeError,
+    ProblemDetail,
+    ValidationProblem,
+)
 from app.shared.paging import Page, PageParams
 
 router = APIRouter(tags=["applications"])
@@ -101,7 +112,8 @@ def get_magic_link_sender() -> MagicLinkSender:
         # zusätzlich nach dem Parsen.
         Depends(enforce_application_payload_limit),
         Depends(rate_limit_applications),
-        Depends(verify_altcha),
+        # Altcha nur für anonyme Einreichung; eingeloggte Nutzer:innen sind befreit (#24).
+        Depends(verify_altcha_unless_authenticated),
     ],
     # 400 = malformed JSON / Altcha ungültig, 413 = Body zu groß, 422 = Form-/Schema-
     # Validierung, 429 = Rate-Limit (api.md §7).
@@ -112,15 +124,39 @@ async def create_application(
     service: ServiceDep,
     settings: SettingsDep,
     background: BackgroundTasks,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
     send_magic_link: Annotated[MagicLinkSender, Depends(get_magic_link_sender)],
 ) -> ApplicationCreated:
-    """Antrag anlegen (öffentlich). PII getrennt, v1-Version, Magic-Link-Mail enqueued."""
+    """Antrag anlegen. PII getrennt, v1-Version, Magic-Link-Mail enqueued.
+
+    Eingeloggte Nutzer:innen (#24) brauchen **kein** Altcha; fehlende
+    ``applicantEmail``/``applicantName`` werden aus dem Account abgeleitet und der
+    Audit-Akteur ist ihr Principal-``sub``. Anonyme Einreichung wie bisher (Altcha +
+    Pflicht-``applicantEmail``)."""
     # Maßgebliche Schranke: serialisierte Feldwerte (unabhängig von Content-Length).
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
         raise PayloadTooLargeError(
             f"Application data exceeds {settings.max_application_payload_bytes} bytes."
         )
-    app, email = await service.create(payload)
+    # Identität ableiten: explizite Angabe gewinnt, sonst der eingeloggte Account.
+    email = (
+        str(payload.applicant_email)
+        if payload.applicant_email
+        else (principal.email if principal else None)
+    )
+    if not email:
+        raise ValidationProblem(
+            "Applicant email required.",
+            errors=[
+                {"field": "applicantEmail", "msg": "required for anonymous submissions"}
+            ],
+        )
+    payload.applicant_email = email
+    if not payload.applicant_name and principal:
+        payload.applicant_name = principal.display_name
+    actor = principal.sub if principal else "applicant"
+
+    app, email = await service.create(payload, actor=actor)
     background.add_task(send_magic_link, settings, email, app.id)
     return ApplicationCreated(applicationId=app.id)
 
