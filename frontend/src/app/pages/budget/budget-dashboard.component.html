@@ -57,7 +57,7 @@
   <div class="bd__cols">
     <!-- Links: Auslastungs-Baum (ohne Box/Heading — der Budget-Name steht oben) -->
     <section class="bd__usage" [attr.aria-label]="'budget.usage.heading' | t">
-      <app-data-table [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId" [boxed]="false">
+      <app-data-table [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
         <ng-template appCell="node" let-row>
           <button type="button" class="bd__ks" [style.paddingLeft.rem]="$any(row).depth * 1.25" (click)="drillInto($any(row).node)">
             <span class="bd__path">{{ $any(row).node.pathKey }}</span>
