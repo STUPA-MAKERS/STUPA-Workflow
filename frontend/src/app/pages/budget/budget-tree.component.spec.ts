@@ -77,12 +77,13 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.rows()[1].depth).toBe(1);
   });
 
-  it('saves an allocation via PUT for the selected fiscal year', async () => {
+  it('sets a limit (allocation) via PUT for the selected fiscal year', async () => {
     const { fixture, http } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.patchAlloc('b-800', '500');
-    c.saveAlloc(TREE[0].children[0]);
+    c.openLimit(TREE[0].children[0]);
+    c.limitValue.set('500');
+    c.saveLimit();
     const put = http.expectOne((r) => r.url.endsWith('/budgets/b-800/allocations/fy-1'));
     expect(put.request.method).toBe('PUT');
     expect(put.request.body).toEqual({ allocated: '500' });

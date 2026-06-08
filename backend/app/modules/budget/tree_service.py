@@ -124,18 +124,17 @@ class BudgetTreeService:
             )
 
         if payload.parent_id is None:
-            if payload.gremium_id is None:
-                raise ValidationProblem(
-                    "Top-level budget requires a gremium.",
-                    errors=[{"field": "gremiumId", "msg": "required for top-level"}],
-                )
-            gremium = (
-                await self.session.execute(
-                    select(Gremium).where(Gremium.id == payload.gremium_id)
-                )
-            ).scalar_one_or_none()
-            if gremium is None:
-                raise NotFoundError(f"gremium {payload.gremium_id} not found")
+            # Budgets sind NICHT fest an ein Gremium gebunden (#17-Korrektur). Ein
+            # optionales ``gremiumId`` wird nur — falls gesetzt — validiert; sonst NULL.
+            # Wer wann mitstimmt, regelt der Flow (z. B. Betragsschwelle), nicht das Budget.
+            if payload.gremium_id is not None:
+                gremium = (
+                    await self.session.execute(
+                        select(Gremium).where(Gremium.id == payload.gremium_id)
+                    )
+                ).scalar_one_or_none()
+                if gremium is None:
+                    raise NotFoundError(f"gremium {payload.gremium_id} not found")
             parent_path = None
             gremium_id = payload.gremium_id
         else:
