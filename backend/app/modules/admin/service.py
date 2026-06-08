@@ -468,6 +468,25 @@ class ConfigService:
                 by_principal.setdefault(a.principal_id, []).append(a)
         return [_principal_out(r, by_principal.get(r.id, [])) for r in rows]
 
+    async def set_principal_active(
+        self, principal_id: UUID, active: bool, actor: str
+    ) -> PrincipalOut:
+        """Benutzer aktivieren/deaktivieren (#30). 404 bei unbekannter id."""
+        principal = await self.session.get(Principal, principal_id)
+        if principal is None:
+            raise NotFoundError(f"principal {principal_id} not found")
+        principal.active = active
+        await self._audit(actor, AuditAction.ROLE_CHANGE, "principal", principal.id)
+        await self.session.commit()
+        assignments = (
+            await self.session.scalars(
+                select(RoleAssignmentRow).where(
+                    RoleAssignmentRow.principal_id == principal_id
+                )
+            )
+        ).all()
+        return _principal_out(principal, list(assignments))
+
     def list_permissions(self) -> list[str]:
         """Katalog wählbarer Permission-Keys fürs Rollen-/Rechte-UI (api.md §1)."""
         return list(PERMISSION_CATALOGUE)
@@ -622,6 +641,7 @@ def _principal_out(
         email=row.email,
         display_name=row.display_name,
         last_login=_iso(row.last_login),
+        active=True if row.active is None else row.active,
         assignments=[_assignment_out(a) for a in assignments],
     )
 

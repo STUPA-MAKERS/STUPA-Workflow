@@ -22,7 +22,12 @@
     <p class="users__empty">{{ 'admin.users.noResults' | t }}</p>
   } @else {
     <app-data-table [columns]="columns()" [rows]="principals()" [rowKey]="rowId" [isExpanded]="rowExpanded">
-      <ng-template appCell="name" let-p><span class="users__name">{{ userLabel($any(p)) }}</span></ng-template>
+      <ng-template appCell="name" let-p>
+        <span class="users__name">{{ userLabel($any(p)) }}</span>
+        @if ($any(p).active === false) {
+          <app-badge variant="neutral">{{ 'admin.users.inactive' | t }}</app-badge>
+        }
+      </ng-template>
       <ng-template appCell="email" let-p><span class="users__muted">{{ $any(p).email || '—' }}</span></ng-template>
       <ng-template appCell="subject" let-p><span class="users__muted users__mono">{{ $any(p).sub }}</span></ng-template>
       <ng-template appCell="roles" let-p>
@@ -50,9 +55,14 @@
         <span class="users__muted">{{ $any(p).lastLogin ? ($any(p).lastLogin | slice: 0 : 10) : ('admin.users.never' | t) }}</span>
       </ng-template>
       <ng-template appCell="actions" let-p>
-        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.users.addRole' | t" [attr.aria-expanded]="isExpanded($any(p).id)" (click)="toggleAssign($any(p).id)">
-          <app-icon name="add" />
-        </app-button>
+        <span class="users__row-actions">
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.users.addRole' | t" [attr.aria-expanded]="isExpanded($any(p).id)" (click)="toggleAssign($any(p).id)">
+            <app-icon name="add" />
+          </app-button>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="($any(p).active === false ? 'admin.users.activate' : 'admin.users.deactivate') | t" (click)="setActive($any(p), $any(p).active === false)">
+            <app-icon name="power" />
+          </app-button>
+        </span>
       </ng-template>
 
       <ng-template appRowDetail let-p>

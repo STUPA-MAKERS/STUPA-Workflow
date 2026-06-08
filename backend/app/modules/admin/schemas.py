@@ -164,7 +164,14 @@ class PrincipalOut(_CamelModel):
     email: str | None
     display_name: str | None = Field(serialization_alias="displayName")
     last_login: str | None = Field(serialization_alias="lastLogin")
+    active: bool = True
     assignments: list[RoleAssignmentOut]
+
+
+class PrincipalUpdate(_CamelModel):
+    """``PATCH /admin/principals/{id}`` — aktivieren/deaktivieren (#30)."""
+
+    active: bool
 
 
 class GroupMappingOut(_CamelModel):

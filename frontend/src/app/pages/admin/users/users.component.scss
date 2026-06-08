@@ -83,6 +83,12 @@
   font-weight: var(--fw-medium);
 }
 
+.users__row-actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+
 .users__muted {
   color: var(--color-text-muted);
 }

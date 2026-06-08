@@ -37,6 +37,7 @@ from app.modules.admin.schemas import (
     GroupMappingOut,
     GroupMappingUpdate,
     PrincipalOut,
+    PrincipalUpdate,
     PublicSiteConfigOut,
     RoleAssignmentCreate,
     RoleAssignmentOut,
@@ -232,6 +233,18 @@ async def list_principals(
 ) -> list[PrincipalOut]:
     """Benutzer (OIDC-Principals) auflisten/suchen (per `sub`/Name/E-Mail) — #72."""
     return await service.search_principals(q)
+
+
+@router.patch(
+    "/principals/{principal_id}",
+    response_model=PrincipalOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def patch_principal(
+    principal_id: UUID, payload: PrincipalUpdate, service: ServiceDep, principal: RolesAdmin
+) -> PrincipalOut:
+    """Benutzer aktivieren/deaktivieren (#30)."""
+    return await service.set_principal_active(principal_id, payload.active, principal.sub)
 
 
 @router.get(

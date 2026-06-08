@@ -190,6 +190,16 @@ export class AdminApiService {
     return this.http.post<Role>(`${this.base}/admin/roles`, body);
   }
 
+  /** Benutzer aktivieren/deaktivieren (#30) — PATCH /admin/principals/{id}. */
+  setPrincipalActive(principalId: Uuid, active: boolean): Observable<AdminPrincipal> {
+    if (this.mock) {
+      const p = this.store.principals.find((x) => x.id === principalId);
+      if (p) p.active = active;
+      return of(structuredCopy(p ?? this.store.principals[0]));
+    }
+    return this.http.patch<AdminPrincipal>(`${this.base}/admin/principals/${principalId}`, { active });
+  }
+
   /** Rolle löschen (#38) — DELETE /admin/roles/{id} (admin/member serverseitig geschützt). */
   deleteRole(roleId: Uuid): Observable<void> {
     if (this.mock) {

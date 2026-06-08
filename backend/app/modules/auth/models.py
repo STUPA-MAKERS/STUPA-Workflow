@@ -34,6 +34,8 @@ class Principal(UUIDPkMixin, Base):
     last_login: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Aktiv/deaktiviert (#30) — deaktivierte Principals dürfen sich nicht anmelden.
+    active: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
 
 class Role(UUIDPkMixin, Base):

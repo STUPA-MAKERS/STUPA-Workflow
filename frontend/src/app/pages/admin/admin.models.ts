@@ -185,6 +185,8 @@ export interface AdminPrincipal {
   email?: string | null;
   displayName?: string | null;
   lastLogin?: string | null;
+  /** Aktiv/deaktiviert (#30). */
+  active?: boolean;
   assignments: RoleAssignment[];
 }
 

@@ -9,7 +9,8 @@ export type IconName =
   | 'add'
   | 'remove'
   | 'members'
-  | 'chevron-down';
+  | 'chevron-down'
+  | 'power';
 
 /**
  * Inline-SVG-Icon-Set (#80). Saubere, konsistente `currentColor`-Icons (folgen
@@ -70,6 +71,9 @@ export type IconName =
         }
         @case ('chevron-down') {
           <path d="M6 9l6 6 6-6" />
+        }
+        @case ('power') {
+          <path d="M18.4 6.6a9 9 0 1 1-12.8 0M12 2v8" />
         }
       }
     </svg>
