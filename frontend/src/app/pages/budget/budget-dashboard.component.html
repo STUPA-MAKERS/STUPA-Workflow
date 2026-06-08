@@ -15,13 +15,6 @@
   />
   <app-select
     class="bd__filter"
-    [label]="'budget.filter.ks' | t"
-    [options]="ksOptions()"
-    [ngModel]="selectedKsId()"
-    (ngModelChange)="selectKs($event)"
-  />
-  <app-select
-    class="bd__filter"
     [label]="'budget.filter.fiscalYear' | t"
     [placeholder]="'budget.filter.noFiscalYear' | t"
     [options]="fyOptions()"
