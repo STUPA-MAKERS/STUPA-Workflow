@@ -21,7 +21,10 @@ class Principal:
     groups: set[str] = field(default_factory=set)
 
     def has(self, perm: str) -> bool:
-        return perm in self.permissions
+        # Admin hat IMMER alle Rechte (#15) — unabhängig von den explizit
+        # zugewiesenen Permissions. Einziger RBAC-Chokepoint (require_principal &
+        # alle `.has()`-Aufrufe).
+        return "admin" in self.roles or perm in self.permissions
 
     def in_group(self, group: str) -> bool:
         return group in self.groups
