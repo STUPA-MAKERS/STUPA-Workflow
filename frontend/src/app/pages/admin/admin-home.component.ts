@@ -109,6 +109,8 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
       .admin-home__grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+        /* alle Kacheln gleich hoch — auch über Zeilen hinweg (#43). */
+        grid-auto-rows: 1fr;
         gap: var(--space-5);
       }
       .admin-home__tile {
