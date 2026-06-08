@@ -104,9 +104,9 @@
 
             <div class="fe__row">
               <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
-                <input [ngModel]="field.label['de']" (ngModelChange)="touch()" [attr.placeholder]="'admin.forms.questionPlaceholder' | t" /></label>
+                <input [(ngModel)]="field.label['de']" (ngModelChange)="touch()" [attr.placeholder]="'admin.forms.questionPlaceholder' | t" /></label>
               <label class="fe__lbl">{{ 'admin.common.labelEn' | t }}
-                <input [ngModel]="field.label['en']" (ngModelChange)="touch()" /></label>
+                <input [(ngModel)]="field.label['en']" (ngModelChange)="touch()" /></label>
             </div>
             <div class="fe__row">
               <label class="fe__lbl">{{ 'admin.forms.helpDe' | t }}

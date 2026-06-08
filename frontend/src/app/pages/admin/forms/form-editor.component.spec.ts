@@ -69,6 +69,16 @@ describe('FormEditorComponent', () => {
     expect(description).toEqual({ de: 'Hallo', en: '' });
   });
 
+  it('writes the question label back into the model (regression: label stayed empty)', async () => {
+    const { fixture } = await setup(draft([{ key: 'sum', type: 'text', label: { de: '', en: '' } }]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.fieldErrors()[0]).toContain('label (de) is required');
+    await userEvent.type(screen.getByLabelText('Bezeichnung (DE)'), 'Summe');
+    expect(c.fields()[0].label.de).toBe('Summe');
+    expect(c.fieldErrors()[0]).not.toContain('label (de) is required');
+  });
+
   it('switches to preview mode', async () => {
     await setup(draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' }, required: true }]));
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
