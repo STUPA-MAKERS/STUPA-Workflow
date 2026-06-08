@@ -52,32 +52,18 @@ import { StatusDistributionComponent } from './status-distribution.component';
     <form class="budget__filters" (submit)="applyFilters($event)" role="search">
       <p class="budget__filtersLegend">{{ 'budget.filter.heading' | t }}</p>
       <div class="field">
-        @if (pots().length) {
-          <app-select
-            id="budget-pot"
-            name="pot"
-            [label]="'budget.filter.pot' | t"
-            [placeholder]="'budget.filter.all' | t"
-            [options]="potOptions()"
-            [ngModel]="pot()"
-            (ngModelChange)="pot.set($event)"
-          />
-        } @else {
-          <label class="field__label" for="budget-pot">{{ 'budget.filter.pot' | t }}</label>
-          <input
-            id="budget-pot"
-            class="field__control"
-            type="text"
-            name="pot"
-            [ngModel]="pot()"
-            (ngModelChange)="pot.set($event)"
-          />
-        }
+        <app-select
+          name="pot"
+          [label]="'budget.filter.pot' | t"
+          [placeholder]="'budget.filter.all' | t"
+          [options]="potOptions()"
+          [ngModel]="pot()"
+          (ngModelChange)="pot.set($event)"
+        />
       </div>
 
       <div class="field">
         <app-select
-          id="budget-gremium"
           name="gremium"
           [label]="'budget.filter.gremium' | t"
           [placeholder]="'budget.filter.all' | t"
@@ -88,13 +74,11 @@ import { StatusDistributionComponent } from './status-distribution.component';
       </div>
 
       <div class="field">
-        <label class="field__label" for="budget-period">{{ 'budget.filter.period' | t }}</label>
-        <input
-          id="budget-period"
-          class="field__control"
-          type="text"
+        <app-select
           name="period"
-          [placeholder]="'budget.filter.period.placeholder' | t"
+          [label]="'budget.filter.period' | t"
+          [placeholder]="'budget.filter.all' | t"
+          [options]="periodOptions()"
           [ngModel]="period()"
           (ngModelChange)="period.set($event)"
         />
@@ -314,6 +298,20 @@ export class BudgetDashboardComponent {
     this.pots().map((p) => ({ value: p.id, label: p.name })),
   );
 
+  /**
+   * Haushaltsperioden als Dropdown statt Freitext (#6, Image 7): Kalenderjahre +
+   * akademische Spannen ums laufende Jahr. Ein per Query-Param vorbelegter Wert,
+   * der nicht in der Liste steht, wird ergänzt, damit die Auswahl ihn anzeigt.
+   */
+  readonly periodOptions = computed<SelectOption[]>(() => {
+    const opts = buildPeriodOptions();
+    const current = this.period();
+    if (current && !opts.some((o) => o.value === current)) {
+      opts.unshift({ value: current, label: current });
+    }
+    return opts;
+  });
+
   /** Sichtbare Filter-Controls (gespiegelt aus den Query-Params). */
   readonly pot = signal('');
   readonly gremium = signal('');
@@ -399,4 +397,16 @@ export class BudgetDashboardComponent {
         },
       });
   }
+}
+
+/** Haushaltsperioden-Optionen: Kalenderjahre + akademische Spannen ums laufende Jahr. */
+function buildPeriodOptions(): SelectOption[] {
+  const now = new Date().getFullYear();
+  const opts: SelectOption[] = [];
+  for (let y = now + 1; y >= now - 3; y--) {
+    opts.push({ value: String(y), label: String(y) });
+    opts.push({ value: `${y}-SS`, label: `${y}-SS` });
+    opts.push({ value: `${y}-WS`, label: `${y}-WS` });
+  }
+  return opts;
 }

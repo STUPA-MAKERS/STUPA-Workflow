@@ -108,7 +108,7 @@ describe('BudgetDashboardComponent', () => {
     answer(http, POTS, STATS);
     fixture.detectChanges();
 
-    await userEvent.type(screen.getByLabelText('Zeitraum'), '2026');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Zeitraum' }), '2026');
     await userEvent.click(screen.getByRole('button', { name: 'Anwenden' }));
 
     // Navigation aktualisiert die Query-Params → erneuter Lade-Zyklus.
