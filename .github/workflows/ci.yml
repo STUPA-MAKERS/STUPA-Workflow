@@ -221,46 +221,75 @@ jobs:
       - name: Build
         run: npm run build
 
-  # ---- 7 E2E (Playwright vs ephemerer Compose-Stack) ----------------------- #
-  # TODO(T-04): standardmäßig wieder aktivieren (gaten), sobald T-10 Auth +
-  # Captcha-Task + echte Playwright-Specs landen. Bis dahin opt-in, damit der Job
-  # bei normalem push/PR sauber als *skipped* (neutral) erscheint statt rot:
-  #   - manuell:   Actions → Run workflow (workflow_dispatch)
-  #   - pro PR:    Label `run-e2e` setzen
-  #   - dauerhaft: Repo-Variable RUN_E2E=true (Settings → Variables)
-  # Grund: noch keine Specs und kein echter Keycloak/MailHog ⇒ Job nicht gate-fähig.
+  # ---- 7 E2E (Playwright vs echtem Compose-Stack) — SCHARF (T-40) ----------- #
+  # Gating-Subset: deterministische Kern-Journeys gegen den ECHTEN Stack (Mock seit
+  # #101 AUS) + mailpit-SMTP-Sink + Seed-Service. KEIN Keycloak/pytex/ClamAV auf dem
+  # Gate-Pfad → stabil & schnell genug fürs PR-Gate (Frederik: lieber stabil als
+  # flaky). scripts/e2e.sh fährt hoch, seedet, läuft `--grep-invert @full`, räumt ab
+  # (down -v). Die flakeanfälligen/langsamen Szenarien (Live-Vote-WS, Protokoll→PDF,
+  # OIDC) laufen im opt-in Job `e2e-full`. Begründung im PR-DoD.
   e2e:
     runs-on: ubuntu-latest
     needs: [detect, be-unit, fe-unit]
-    if: >-
-      needs.detect.outputs.frontend == 'true'
-      && ( github.event_name == 'workflow_dispatch'
-           || contains(github.event.pull_request.labels.*.name, 'run-e2e')
-           || vars.RUN_E2E == 'true' )
+    if: needs.detect.outputs.frontend == 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Compose-Stack hochfahren (inkl. pytex, Mock-Keycloak/MailHog)
-        working-directory: deploy
-        run: |
-          cp .env.example .env
-          docker compose up -d --build
-      - name: Playwright
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: FE-Deps + Playwright-Browser
         working-directory: frontend
         run: |
           npm ci
-          npx playwright install --with-deps
-          npx playwright test
-      - name: Compose-Logs (bei Fehler)
+          npx playwright install --with-deps chromium
+      - name: E2E (gating subset vs echtem Stack)
+        run: scripts/e2e.sh
+      - name: Playwright-Report (bei Fehler)
         if: failure()
-        working-directory: deploy
-        run: docker compose logs --no-color
-      - name: Teardown
-        if: always()
-        working-directory: deploy
-        run: docker compose down -v --remove-orphans
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 7
+
+  # ---- 7b E2E-Full (opt-in, NICHT gate-bindend) ---------------------------- #
+  # Die schweren/flakeanfälligen Szenarien (Live-Vote-WS, Protokoll→PDF via pytex-
+  # tectonic). Standardlauf erscheint sauber als *skipped* (neutral), blockiert
+  # nicht. Aktivieren wie restore-smoke/real-stack-smoke:
+  #   - manuell:   Actions → Run workflow (workflow_dispatch)
+  #   - pro PR:    Label `run-e2e-full` setzen
+  #   - dauerhaft: Repo-Variable RUN_E2E_FULL=true
+  e2e-full:
+    runs-on: ubuntu-latest
+    needs: [detect, be-unit, fe-unit]
+    if: >-
+      needs.detect.outputs.frontend == 'true'
+      && ( github.event_name == 'workflow_dispatch'
+           || contains(github.event.pull_request.labels.*.name, 'run-e2e-full')
+           || vars.RUN_E2E_FULL == 'true' )
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: FE-Deps + Playwright-Browser
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: E2E (full tier vs echtem Stack)
+        run: scripts/e2e.sh --full
+      - name: Playwright-Report (bei Fehler)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-full
+          path: frontend/playwright-report
+          retention-days: 7
 
   # ---- 8 Coverage-Gate ----------------------------------------------------- #
   # Gesamt-Gate (85 %) bricht bereits in be-unit. Hier zusätzlich das strengere

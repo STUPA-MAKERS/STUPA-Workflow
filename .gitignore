@@ -1,7 +1,16 @@
 # Secrets
 deploy/.env
+deploy/.env.e2e-bak
+deploy/.env.smoke-bak
 .env
 *.env.local
+
+# E2E (T-40) — Laufzeit-Artefakte
+deploy/e2e/.artifacts/
+frontend/e2e/.auth/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.last-run.json
 
 # Python
 __pycache__/

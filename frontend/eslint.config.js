@@ -7,7 +7,19 @@ const templateParser = require('@angular-eslint/template-parser');
 
 module.exports = tseslint.config(
   {
-    ignores: ['dist/**', 'out-tsc/**', 'coverage/**', 'node_modules/**', '.angular/**'],
+    // E2E (Playwright) wird separat per `npm run e2e:tsc` geprüft — eigener
+    // tsconfig (e2e/tsconfig.json), nicht Teil des Angular-Lint-Projekts.
+    ignores: [
+      'dist/**',
+      'out-tsc/**',
+      'coverage/**',
+      'node_modules/**',
+      '.angular/**',
+      'e2e/**',
+      'playwright.config.ts',
+      'playwright-report/**',
+      'test-results/**',
+    ],
   },
   {
     files: ['**/*.ts'],
