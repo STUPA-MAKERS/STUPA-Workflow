@@ -6,3 +6,7 @@ __pycache__/
 venv/
 tests/
 *.egg-info/
+# Secrets nie in den Build-Context ziehen (#20, defense-in-depth).
+**/.env
+**/.env.*
+!**/.env.example
