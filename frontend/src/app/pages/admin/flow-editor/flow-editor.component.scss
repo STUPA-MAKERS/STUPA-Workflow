@@ -170,6 +170,12 @@ select {
   gap: var(--space-2);
   flex-wrap: wrap;
 }
+.fe__toolbar-zoom {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  margin-left: auto;
+}
 
 .fe__work {
   display: grid;
@@ -186,7 +192,7 @@ select {
 
 .fe__canvas-wrap {
   height: 30rem;
-  overflow: auto;
+  overflow: hidden;
   background: var(--color-surface-sunken);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
@@ -196,9 +202,15 @@ select {
 
 .fe__canvas {
   display: block;
-  /* 1:1 (px == user-units): kein Umskalieren beim Ziehen, exaktes Drag-Mapping. */
+  width: 100%;
+  height: 100%;
+  /* Zoom (Rad) + Pan (Ziehen auf leerer Fläche); ``touch-action: none`` für Stift/Touch. */
   touch-action: none;
   user-select: none;
+  cursor: grab;
+}
+.fe__canvas:active {
+  cursor: grabbing;
 }
 
 .fe__node-g {

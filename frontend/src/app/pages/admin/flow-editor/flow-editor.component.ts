@@ -112,6 +112,15 @@ export class FlowEditorComponent {
   /** Branch (pass/fail/accept/reject), wenn von einem Branch-Punkt gezogen wird. */
   private connectBranch: string | null = null;
 
+  /**
+   * Sichtfenster (Zoom/Pan) in Welt-Koordinaten. ``null`` = ganzer Inhalt (Fit).
+   * Gesteuert via Mausrad (Zoom am Cursor) + Ziehen auf leerer Fläche (Pan);
+   * ``toSvg`` rechnet über ``getScreenCTM`` automatisch korrekt (Drag bleibt exakt).
+   */
+  protected readonly view = signal<{ x: number; y: number; w: number; h: number } | null>(null);
+  /** Welt-Punkt unter dem Cursor beim Pan-Start (bleibt fix »unter dem Finger«). */
+  private panGrab: { x: number; y: number } | null = null;
+
   constructor() {
     // Globaler Flow (#28): den aktiven globalen Flow laden, falls vorhanden, sonst
     // mit leerem Graphen starten.
@@ -258,7 +267,10 @@ export class FlowEditorComponent {
     const ys = Object.values(this.positions()).map((p) => p.y);
     return Math.max((ys.length ? Math.max(...ys) : 0) + NODE_H + MARGIN, 320);
   });
-  protected readonly viewBox = computed(() => `0 0 ${this.canvasW()} ${this.canvasH()}`);
+  protected readonly viewBox = computed(() => {
+    const v = this.view();
+    return v ? `${v.x} ${v.y} ${v.w} ${v.h}` : `0 0 ${this.canvasW()} ${this.canvasH()}`;
+  });
 
   /** Aktuell ausgewählter State (oder undefined). */
   protected readonly selectedState = computed<StateDef | undefined>(() => {
@@ -656,10 +668,21 @@ export class FlowEditorComponent {
       const from = this.positions()[this.connectFrom];
       const p = this.toSvg(event);
       this.tempEdge.set({ x1: from.x + NODE_W, y1: from.y + NODE_H / 2, x2: p.x, y2: p.y });
+      return;
+    }
+    if (this.panGrab) {
+      // Welt-Punkt unter dem Cursor wieder auf ``panGrab`` schieben.
+      const now = this.toSvg(event);
+      const v = this.ensureView();
+      this.view.set({ ...v, x: v.x + (this.panGrab.x - now.x), y: v.y + (this.panGrab.y - now.y) });
     }
   }
 
   protected onCanvasPointerUp(event: PointerEvent): void {
+    if (this.panGrab) {
+      this.panGrab = null;
+      return;
+    }
     if (this.drag) {
       // Klick ohne Bewegung = Auswahl; Bewegung = nur Position übernommen.
       if (!this.drag.moved) this.selection.set({ kind: 'state', key: this.drag.key });
@@ -694,8 +717,67 @@ export class FlowEditorComponent {
     if (!this.drag && !this.connectFrom) this.selection.set(null);
   }
 
-  /** Client-Koordinaten → SVG-User-Space (für Drag/Connect-Mathematik). */
-  private toSvg(event: PointerEvent): { x: number; y: number } {
+  // --- Zoom & Pan ----------------------------------------------------------
+  /** Aktuelles Sichtfenster (initialisiert es beim ersten Zoom/Pan auf »ganzer Inhalt«). */
+  private ensureView(): { x: number; y: number; w: number; h: number } {
+    const v = this.view();
+    if (v) return v;
+    const init = { x: 0, y: 0, w: this.canvasW(), h: this.canvasH() };
+    this.view.set(init);
+    return init;
+  }
+
+  /** Mausrad: Zoom um den Cursor (Welt-Punkt unter dem Cursor bleibt fix). */
+  protected onWheel(event: WheelEvent): void {
+    event.preventDefault();
+    const v = this.ensureView();
+    const c = this.toSvg(event);
+    const factor = event.deltaY > 0 ? 1.12 : 1 / 1.12; // runter = rauszoomen
+    this.applyZoom(v, factor, c);
+  }
+
+  protected zoomIn(): void {
+    const v = this.ensureView();
+    this.applyZoom(v, 1 / 1.2, { x: v.x + v.w / 2, y: v.y + v.h / 2 });
+  }
+
+  protected zoomOut(): void {
+    const v = this.ensureView();
+    this.applyZoom(v, 1.2, { x: v.x + v.w / 2, y: v.y + v.h / 2 });
+  }
+
+  /** Zoom/Fit zurücksetzen (ganzer Inhalt). */
+  protected resetView(): void {
+    this.view.set(null);
+  }
+
+  private applyZoom(
+    v: { x: number; y: number; w: number; h: number },
+    factor: number,
+    center: { x: number; y: number },
+  ): void {
+    // Zoom relativ zur Inhalts-Breite begrenzen (0.2×…6×).
+    const base = this.canvasW();
+    const minW = base / 6;
+    const maxW = base * 5;
+    const w = Math.min(maxW, Math.max(minW, v.w * factor));
+    const ratio = w / v.w;
+    const h = v.h * ratio;
+    // Welt-Punkt ``center`` bleibt an derselben Bildschirmstelle.
+    const x = center.x - (center.x - v.x) * ratio;
+    const y = center.y - (center.y - v.y) * ratio;
+    this.view.set({ x, y, w, h });
+  }
+
+  /** Pointerdown auf leerer Fläche: Auswahl leeren + Pan starten. */
+  protected onCanvasPointerDown(event: PointerEvent): void {
+    this.clearSelection();
+    this.panGrab = this.toSvg(event);
+    (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+  }
+
+  /** Client-Koordinaten → SVG-User-Space (für Drag/Connect/Zoom-Mathematik). */
+  private toSvg(event: MouseEvent): { x: number; y: number } {
     const svg = this.canvas()?.nativeElement;
     if (!svg) return { x: event.clientX, y: event.clientY };
     const ctm = svg.getScreenCTM();

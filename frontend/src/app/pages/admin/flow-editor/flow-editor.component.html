@@ -8,6 +8,11 @@
   <div class="fe__toolbar">
     <app-button variant="ghost" size="sm" (click)="addState()">+ {{ 'admin.flow.addState' | t }}</app-button>
     <app-button variant="ghost" size="sm" (click)="relayout()">{{ 'admin.flow.relayout' | t }}</app-button>
+    <span class="fe__toolbar-zoom" role="group" [attr.aria-label]="'admin.flow.zoom' | t">
+      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomOut' | t" (click)="zoomOut()">−</app-button>
+      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomIn' | t" (click)="zoomIn()">+</app-button>
+      <app-button variant="ghost" size="sm" (click)="resetView()">{{ 'admin.flow.zoomReset' | t }}</app-button>
+    </span>
   </div>
 
   @if (validation().errors.length > 0) {
@@ -27,13 +32,15 @@
       #canvas
       class="fe__canvas"
       [attr.viewBox]="viewBox()"
-      [attr.width]="canvasW()"
-      [attr.height]="canvasH()"
+      width="100%"
+      height="100%"
+      preserveAspectRatio="xMidYMid meet"
       role="application"
       [attr.aria-label]="'admin.flow.diagram' | t"
+      (wheel)="onWheel($event)"
       (pointermove)="onCanvasPointerMove($event)"
       (pointerup)="onCanvasPointerUp($event)"
-      (pointerdown)="clearSelection()"
+      (pointerdown)="onCanvasPointerDown($event)"
     >
       <defs>
         <marker id="fe-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">

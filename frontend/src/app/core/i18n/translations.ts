@@ -606,6 +606,10 @@ export const de = {
   'admin.flow.addAction': 'Aktion hinzufügen',
   'admin.flow.diagram': 'Diagramm',
   'admin.flow.relayout': 'Neu anordnen',
+  'admin.flow.zoom': 'Zoom',
+  'admin.flow.zoomIn': 'Vergrößern',
+  'admin.flow.zoomOut': 'Verkleinern',
+  'admin.flow.zoomReset': 'Ansicht zurücksetzen',
   'admin.flow.canvasHint':
     'Knoten ziehen zum Verschieben, am blauen Punkt ziehen für einen neuen Übergang. Klick öffnet die Detail-Bearbeitung rechts.',
   'admin.flow.connectHint': 'Ziehen, um einen Übergang zu erstellen',
@@ -1631,6 +1635,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.addAction': 'Add action',
   'admin.flow.diagram': 'Diagram',
   'admin.flow.relayout': 'Re-layout',
+  'admin.flow.zoom': 'Zoom',
+  'admin.flow.zoomIn': 'Zoom in',
+  'admin.flow.zoomOut': 'Zoom out',
+  'admin.flow.zoomReset': 'Reset view',
   'admin.flow.canvasHint':
     'Drag nodes to move them, drag the blue dot to draw a transition. Click to edit details on the right.',
   'admin.flow.connectHint': 'Drag to create a transition',
