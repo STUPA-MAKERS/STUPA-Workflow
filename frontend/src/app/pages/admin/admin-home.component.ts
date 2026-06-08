@@ -220,12 +220,12 @@ export class AdminHomeComponent {
   protected readonly tiles: AdminTile[] = [
     { link: 'users', title: 'admin.home.users', desc: 'admin.home.usersDesc' },
     { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc' },
+    { link: 'budget-pots', title: 'admin.home.budgetPots', desc: 'admin.home.budgetPotsDesc' },
     { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc' },
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc' },
     { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc' },
     { link: 'webhooks', title: 'admin.home.webhooks', desc: 'admin.home.webhooksDesc' },
     { link: 'notifications', title: 'admin.home.notifications', desc: 'admin.home.notificationsDesc' },
-    { link: 'delegations', title: 'admin.home.delegations', desc: 'admin.home.delegationsDesc' },
   ];
 
   constructor() {

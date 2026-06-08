@@ -30,6 +30,8 @@ export class AuthService {
     return p?.display_name || p?.email || '—';
   });
   readonly roles = computed(() => this._principal()?.roles ?? []);
+  /** Gremien des angemeldeten Principals (#5) — für die »Meine Gremien«-Ansicht. */
+  readonly gremien = computed(() => this._principal()?.gremien ?? []);
 
   /**
    * Lädt den Principal genau einmal und cached das Ergebnis (`shareReplay`).

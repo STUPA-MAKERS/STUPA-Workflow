@@ -47,6 +47,14 @@ export const routes: Routes = [
           import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
+        // »Meine Gremien« (#5): nutzerseitige Mitglieder-Sicht, jede Session.
+        path: 'my/gremien',
+        data: { title: 'nav.myGremien' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/gremien/my-gremien.component').then((m) => m.MyGremienComponent),
+      },
+      {
         path: 'applications',
         data: { title: 'nav.applications', permission: 'application.read' },
         canActivate: [authGuard],
@@ -124,7 +132,8 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'budget/pots',
+        // Budget-Töpfe in die Verwaltung verlegt (#6) — kein eigener Top-Level-Tab mehr.
+        path: 'admin/budget-pots',
         data: { title: 'budget.pots.title', permission: 'budget.manage' },
         canActivate: [authGuard],
         loadComponent: () =>

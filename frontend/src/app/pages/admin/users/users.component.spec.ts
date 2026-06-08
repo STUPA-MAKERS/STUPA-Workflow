@@ -29,6 +29,7 @@ function makeApi(over: Partial<Record<keyof AdminApiService, unknown>> = {}) {
     listRoles: jest.fn(() => of(ROLES)),
     listPermissions: jest.fn(() => of(['admin.roles', 'application.read', 'flow.configure'])),
     listPrincipals: jest.fn(() => of(PRINCIPALS)),
+    listGremienOptions: jest.fn(() => of([{ id: 'g-1', name: 'StuPa' }])),
     assignRole: jest.fn(() => of({ id: 'a-new' })),
     revokeRole: jest.fn(() => of(void 0)),
     saveRolePermissions: jest.fn((id: string, perms: string[]) => of({ ...ROLES[0], id, permissions: perms })),
@@ -71,6 +72,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(api.assignRole).toHaveBeenCalledWith({
       principalId: 'p-3',
       roleId: 'r-member',
+      gremiumId: null,
       validFrom: '2026-07-01T00:00:00Z',
       validUntil: '2026-12-31T00:00:00Z',
       delegateVoting: false,

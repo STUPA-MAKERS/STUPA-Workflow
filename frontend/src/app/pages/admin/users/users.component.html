@@ -70,6 +70,15 @@
           (ngModelChange)="patchDraft(p.id, { roleId: $event })"
           [name]="'role-' + p.id"
         />
+        <app-select
+          class="users__lbl"
+          [label]="'admin.users.gremium' | t"
+          [placeholder]="'admin.users.gremiumAll' | t"
+          [options]="gremiumOptions()"
+          [ngModel]="draftFor(p.id).gremiumId"
+          (ngModelChange)="patchDraft(p.id, { gremiumId: $event })"
+          [name]="'grem-' + p.id"
+        />
         <app-datepicker
           class="users__lbl"
           [label]="'admin.users.validFrom' | t"

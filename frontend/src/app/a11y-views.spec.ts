@@ -286,6 +286,7 @@ describe('Kern-Views a11y (axe)', () => {
         listRoles: jest.fn(() => of([role])),
         listPermissions: jest.fn(() => of(['admin.roles', 'application.read'])),
         listPrincipals: jest.fn(() => of([principal])),
+        listGremienOptions: jest.fn(() => of([{ id: 'g-1', name: 'StuPa' }])),
         assignRole: jest.fn(() => of({ id: 'a-new' })),
         revokeRole: jest.fn(() => of(void 0)),
         saveRolePermissions: jest.fn(() => of(role)),

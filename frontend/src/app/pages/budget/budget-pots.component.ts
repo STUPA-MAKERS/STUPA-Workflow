@@ -36,6 +36,17 @@ function emptyForm(): PotForm {
   return { gremiumId: '', name: '', total: '', currency: 'EUR', period: '', active: true };
 }
 
+/** Haushaltsperioden-Optionen: Kalenderjahre + akademische Spannen rund ums laufende Jahr. */
+function buildPeriodOptions(): SelectOption[] {
+  const now = new Date().getFullYear();
+  const opts: SelectOption[] = [];
+  for (let y = now + 1; y >= now - 3; y--) {
+    opts.push({ value: String(y), label: String(y) });
+    opts.push({ value: `${y}/${(y + 1) % 100}`, label: `${y}/${(y + 1) % 100}` });
+  }
+  return opts;
+}
+
 /**
  * Budget-Topf-Verwaltung (#76, T-17). **Flaches** Konfigurieren der Töpfe gegen
  * die echte Budget-API (`POST/GET/PATCH /budget-pots`, P(`budget.manage`)) —
@@ -90,28 +101,21 @@ function emptyForm(): PotForm {
               (ngModelChange)="patch('total', $event)"
             />
           </div>
-          <div class="field">
-            <label class="field__label" for="pot-currency">{{ 'budget.pots.currency' | t }}</label>
-            <input
-              id="pot-currency"
-              class="field__control"
-              name="currency"
-              maxlength="3"
-              [ngModel]="form().currency"
-              (ngModelChange)="patch('currency', $event)"
-            />
-          </div>
-          <div class="field">
-            <label class="field__label" for="pot-period">{{ 'budget.pots.period' | t }}</label>
-            <input
-              id="pot-period"
-              class="field__control"
-              name="period"
-              [placeholder]="'budget.pots.periodPlaceholder' | t"
-              [ngModel]="form().period"
-              (ngModelChange)="patch('period', $event)"
-            />
-          </div>
+          <app-select
+            name="currency"
+            [label]="'budget.pots.currency' | t"
+            [options]="currencyOptions"
+            [ngModel]="form().currency"
+            (ngModelChange)="patch('currency', $event)"
+          />
+          <app-select
+            name="period"
+            [label]="'budget.pots.period' | t"
+            [placeholder]="'budget.pots.periodPlaceholder' | t"
+            [options]="periodOptions"
+            [ngModel]="form().period"
+            (ngModelChange)="patch('period', $event)"
+          />
           <div class="field">
             <app-select
               name="active"
@@ -270,6 +274,15 @@ export class BudgetPotsComponent {
     { value: 'true', label: this.i18n.translate('budget.pots.yes') },
     { value: 'false', label: this.i18n.translate('budget.pots.no') },
   ]);
+
+  /** Währungen als Dropdown statt Freitext (#6). */
+  readonly currencyOptions: SelectOption[] = ['EUR', 'CHF', 'USD', 'GBP'].map((c) => ({
+    value: c,
+    label: c,
+  }));
+
+  /** Haushaltsperioden als Dropdown (#6): laufendes Jahr ± Umgebung. */
+  readonly periodOptions: SelectOption[] = buildPeriodOptions();
 
   readonly canSubmit = computed(() => {
     const f = this.form();

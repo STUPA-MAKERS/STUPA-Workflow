@@ -81,6 +81,7 @@ export class ShellComponent {
 
   private readonly nav: NavItem[] = [
     { path: '/dashboard', labelKey: 'nav.dashboard', permissions: [] },
+    { path: '/my/gremien', labelKey: 'nav.myGremien', permissions: [] },
     { path: '/applications', labelKey: 'nav.applications', permissions: ['application.read'] },
     { path: '/voting', labelKey: 'nav.voting', permissions: ['vote.cast', 'vote.manage'] },
     { path: '/meetings', labelKey: 'nav.meetings', permissions: ['meeting.manage', 'protocol.write'] },
@@ -88,9 +89,7 @@ export class ShellComponent {
       path: '/budget',
       labelKey: 'nav.budget',
       permissions: ['budget.view', 'budget.manage'],
-      exact: true,
     },
-    { path: '/budget/pots', labelKey: 'nav.budgetPots', permissions: ['budget.manage'] },
     { path: '/admin', labelKey: 'nav.admin', permissions: ['admin.config'] },
   ];
 

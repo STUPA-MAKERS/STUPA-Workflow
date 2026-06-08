@@ -41,6 +41,14 @@ class LogoutOut(BaseModel):
     logout_url: str | None = None
 
 
+class GremiumRef(BaseModel):
+    """Schlankes Gremium-Referenzobjekt für die »Meine Gremien«-Ansicht (#5)."""
+
+    id: UUID
+    name: str
+    slug: str
+
+
 class MeOut(BaseModel):
     sub: str
     email: str | None = None
@@ -48,3 +56,6 @@ class MeOut(BaseModel):
     roles: list[str]
     permissions: list[str]
     groups: list[str]
+    # Gremien, in denen der Principal über eine (gültige) Rollenzuweisung Mitglied
+    # ist — Basis der nutzerseitigen »Meine Gremien«-Ansicht (#5).
+    gremien: list[GremiumRef] = []

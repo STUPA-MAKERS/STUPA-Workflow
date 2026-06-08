@@ -7,6 +7,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -22,7 +23,7 @@ import type { ServerMessage } from '@core/ws/ws-messages';
 import { BadgeComponent, type BadgeVariant } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
-import { SelectComponent, type SelectOption } from '@shared/ui';
+import { DatepickerComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
 import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings.util';
@@ -51,6 +52,8 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
     ButtonComponent,
     CardComponent,
     SelectComponent,
+    DatepickerComponent,
+    DatePipe,
   ],
   template: `
     <header class="mtg__head">
@@ -58,6 +61,9 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
       @if (meeting(); as m) {
         <div class="mtg__meta">
           <span class="mtg__name">{{ m.title }}</span>
+          @if (m.date) {
+            <span class="mtg__muted">{{ m.date | date: 'mediumDate' }}</span>
+          }
           <app-badge [variant]="statusVariant(m.status)">
             {{ statusKey(m.status) | t }}
           </app-badge>
@@ -72,6 +78,29 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
     } @else if (error()) {
       <p class="mtg__status mtg__status--error" role="alert">{{ 'meetings.error' | t }}</p>
     } @else if (meeting(); as m) {
+      <!-- Vorab-Terminierung geplanter Sitzungen (#7) -->
+      @if (canManage() && m.status === 'planned') {
+        <app-card [heading]="'meetings.plan.title' | t">
+          <p class="mtg__lead">{{ 'meetings.plan.lead' | t }}</p>
+          <div class="mtg__planRow">
+            <app-datepicker
+              [label]="'meetings.plan.date' | t"
+              [ngModel]="planDate()"
+              (ngModelChange)="planDate.set($event)"
+              name="planDate"
+            />
+            <app-button
+              size="sm"
+              [loading]="savingDate()"
+              [disabled]="!planDate()"
+              (click)="savePlannedDate()"
+            >
+              {{ 'meetings.plan.save' | t }}
+            </app-button>
+          </div>
+        </app-card>
+      }
+
       <!-- Sitzungssteuerung -->
       @if (canManage()) {
         <app-card [heading]="'meetings.control.title' | t">
@@ -252,6 +281,9 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
               @for (mtg of meetings(); track mtg.id) {
                 <li class="mtg__listItem">
                   <span class="mtg__listTitle">{{ mtg.title }}</span>
+                  @if (mtg.date) {
+                    <span class="mtg__muted">{{ mtg.date | date: 'mediumDate' }}</span>
+                  }
                   <app-badge [variant]="statusVariant(mtg.status)">
                     {{ statusKey(mtg.status) | t }}
                   </app-badge>
@@ -294,6 +326,12 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
             @if (!gremiumOptions().length) {
               <p class="mtg__muted mtg__hint">{{ 'meetings.create.noGremien' | t }}</p>
             }
+            <app-datepicker
+              [label]="'meetings.create.date' | t"
+              [ngModel]="newDate()"
+              (ngModelChange)="newDate.set($event)"
+              name="date"
+            />
             <app-button
               type="submit"
               size="sm"
@@ -511,6 +549,12 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
         gap: var(--space-3);
         max-width: 28rem;
       }
+      .mtg__planRow {
+        display: flex;
+        align-items: end;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+      }
       .mtg__list {
         list-style: none;
         margin: 0;
@@ -564,6 +608,11 @@ export class MeetingsComponent implements OnDestroy {
   readonly finalizing = signal(false);
   readonly creating = signal(false);
   readonly newTitle = signal('');
+  /** Optionales geplantes Datum für die neue Sitzung (#7), `YYYY-MM-DD`. */
+  readonly newDate = signal('');
+  /** Datums-Editor einer bereits angelegten, geplanten Sitzung (#7). */
+  readonly planDate = signal('');
+  readonly savingDate = signal(false);
   /** Pflicht-Gremium für die neue Sitzung (#68); leer ⇒ Submit gesperrt. */
   readonly newGremiumId = signal('');
   /** Gremien als Dropdown-Optionen (echte Liste, `/gremien`). */
@@ -620,6 +669,7 @@ export class MeetingsComponent implements OnDestroy {
 
   private adoptMeeting(m: Meeting): void {
     this.meeting.set(m);
+    this.planDate.set(m.date ?? '');
     this.connectLive(m.id);
     if (m.protocolId && this.canWrite()) this.loadProtocol();
   }
@@ -646,11 +696,13 @@ export class MeetingsComponent implements OnDestroy {
     const gremiumId = this.newGremiumId();
     if (!title || !gremiumId || this.creating()) return;
     this.creating.set(true);
-    this.api.createMeeting({ title, gremiumId }).subscribe({
+    const date = this.newDate().trim() || null;
+    this.api.createMeeting({ title, gremiumId, date }).subscribe({
       next: (m) => {
         this.creating.set(false);
         this.newTitle.set('');
         this.newGremiumId.set('');
+        this.newDate.set('');
         this.toast.success(this.i18n.translate('meetings.toast.created'));
         // Auf die Detail-Route navigieren, damit die Sitzung wiederauffindbar ist (#104).
         void this.router.navigate(['/meetings', m.id]);
@@ -674,6 +726,25 @@ export class MeetingsComponent implements OnDestroy {
     this.api.patchMeeting(m.id, { status }).subscribe({
       next: (updated) => this.meeting.set(updated),
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+    });
+  }
+
+  /** Geplantes Datum einer (geplanten) Sitzung vorab setzen (#7, PATCH date). */
+  savePlannedDate(): void {
+    const m = this.meeting();
+    const date = this.planDate().trim();
+    if (!m || !date || this.savingDate()) return;
+    this.savingDate.set(true);
+    this.api.patchMeeting(m.id, { date }).subscribe({
+      next: (updated) => {
+        this.savingDate.set(false);
+        this.meeting.set(updated);
+        this.toast.success(this.i18n.translate('meetings.toast.dateSaved'));
+      },
+      error: () => {
+        this.savingDate.set(false);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
     });
   }
 

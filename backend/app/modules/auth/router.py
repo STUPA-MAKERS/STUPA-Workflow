@@ -7,17 +7,23 @@ ausschließlich HttpOnly+Secure+SameSite=Lax-Cookies.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 
 from app.db import get_sessionmaker
 from app.deps import DbSession, Principal, SettingsDep, require_principal
+from app.modules.admin.models import Gremium
 from app.modules.auth import oidc, service, sessions
+from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.models import RoleAssignment
 from app.modules.auth.oidc import OidcError
 from app.modules.auth.schemas import (
+    GremiumRef,
     LogoutOut,
     MagicLinkRequest,
     MagicLinkVerifyOut,
@@ -149,8 +155,11 @@ async def logout(
 
 
 @router.get("/me", responses=_errors(401, 403))
-def me(principal: Annotated[Principal, Depends(require_principal())]) -> MeOut:
-    """Principal + aufgelöste Rollen/Permissions/Gruppen."""
+async def me(
+    principal: Annotated[Principal, Depends(require_principal())],
+    db: DbSession,
+) -> MeOut:
+    """Principal + aufgelöste Rollen/Permissions/Gruppen + eigene Gremien (#5)."""
     return MeOut(
         sub=principal.sub,
         email=principal.email,
@@ -158,7 +167,32 @@ def me(principal: Annotated[Principal, Depends(require_principal())]) -> MeOut:
         roles=sorted(principal.roles),
         permissions=sorted(principal.permissions),
         groups=sorted(principal.groups),
+        gremien=await _gremien_for(db, principal.sub),
     )
+
+
+async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
+    """Gremien, in denen ``sub`` per **gültiger** Rollenzuweisung Mitglied ist (#5).
+
+    Filtert das tz-aware Gültigkeitsfenster (``valid_from``/``valid_until``) und
+    dedupliziert, sodass jedes Gremium genau einmal erscheint. Magic-Link-
+    Applicants (kein Principal-Row) bekommen eine leere Liste.
+    """
+    now = datetime.now(UTC)
+    stmt = (
+        select(Gremium.id, Gremium.name, Gremium.slug)
+        .join(RoleAssignment, RoleAssignment.gremium_id == Gremium.id)
+        .join(PrincipalRow, PrincipalRow.id == RoleAssignment.principal_id)
+        .where(
+            PrincipalRow.sub == sub,
+            (RoleAssignment.valid_from.is_(None)) | (RoleAssignment.valid_from <= now),
+            (RoleAssignment.valid_until.is_(None)) | (RoleAssignment.valid_until > now),
+        )
+        .distinct()
+        .order_by(Gremium.name)
+    )
+    rows = (await db.execute(stmt)).all()
+    return [GremiumRef(id=r.id, name=r.name, slug=r.slug) for r in rows]
 
 
 async def _deliver_magic_link(

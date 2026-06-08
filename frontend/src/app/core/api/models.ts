@@ -38,6 +38,13 @@ export interface ProblemDetail {
  * Feldnamen spiegeln das Backend-`MeOut` (auth/schemas.py) 1:1. `MeOut` ist ein
  * **reines** `BaseModel` (kein `_CamelModel`) → `display_name` bleibt snake_case.
  */
+/** Schlanke Gremium-Referenz (Mitgliedschaft eines Principals, #5). */
+export interface GremiumRef {
+  id: Uuid;
+  name: string;
+  slug: string;
+}
+
 export interface Principal {
   sub: Uuid;
   email?: string | null;
@@ -45,6 +52,8 @@ export interface Principal {
   roles: string[];
   permissions: string[];
   groups: string[];
+  /** Gremien, in denen der Principal Mitglied ist (#5) — Basis für »Meine Gremien«. */
+  gremien?: GremiumRef[];
 }
 
 /** Antwort von POST /api/auth/logout — RP-Initiated-Logout-URL (OIDC) oder null. */
@@ -572,6 +581,7 @@ export interface MeetingVoteOutWire {
 export interface MeetingOutWire {
   id: Uuid;
   title: string;
+  date?: string | null;
   status: MeetingStatus;
   activeApplicationId?: Uuid | null;
   gremiumId?: Uuid | null;
@@ -598,12 +608,16 @@ export interface ProtocolOutWire {
 export interface MeetingCreateBody {
   title: string;
   gremiumId?: Uuid | null;
+  /** Geplantes Sitzungsdatum (`YYYY-MM-DD`), optional. */
+  date?: string | null;
 }
 
-/** Body für `PATCH /meetings/{id}` — Status und/oder aktiven Antrag setzen. */
+/** Body für `PATCH /meetings/{id}` — Status, aktiven Antrag und/oder Datum setzen. */
 export interface MeetingPatchBody {
   status?: MeetingStatus;
   activeApplicationId?: Uuid | null;
+  /** Geplantes Sitzungsdatum (`YYYY-MM-DD`); für Vorab-Terminierung geplanter Sitzungen. */
+  date?: string | null;
 }
 
 /** Body für `PATCH /protocols/{id}` — Markdown aktualisieren. */
@@ -634,6 +648,8 @@ export interface MeetingVote {
 export interface Meeting {
   id: Uuid;
   title: string;
+  /** Geplantes Sitzungsdatum (`YYYY-MM-DD`) oder `null`. */
+  date: string | null;
   status: MeetingStatus;
   activeApplicationId: Uuid | null;
   gremiumId: Uuid | null;

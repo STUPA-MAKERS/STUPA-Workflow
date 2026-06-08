@@ -13,11 +13,13 @@ import {
   ToastService,
 } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
+import { AdminOptionsService } from '../admin-options.service';
 import type { AdminPrincipal, Role, RoleAssignment } from '../admin.models';
 
 /** Lokaler Formularzustand fürs Zuweisen einer Rolle je Benutzer. */
 interface AssignDraft {
   roleId: string;
+  gremiumId: string;
   validFrom: string;
   validUntil: string;
   delegateVoting: boolean;
@@ -52,6 +54,7 @@ interface AssignDraft {
 })
 export class UsersComponent {
   private readonly api = inject(AdminApiService);
+  private readonly options = inject(AdminOptionsService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
   private readonly capitalize = inject(CapitalizePipe);
@@ -61,6 +64,8 @@ export class UsersComponent {
   protected readonly roles = signal<Role[]>([]);
   protected readonly permissions = signal<string[]>([]);
   protected readonly drafts = signal<Record<string, AssignDraft>>({});
+  /** Gremien als Dropdown — eine Rollenzuweisung ist gremium-scoped (#5). */
+  protected readonly gremiumOptions = signal<SelectOption[]>([]);
 
   /** Rollen-Lookup (id → Role) für Tag-Beschriftung + Validierung. */
   protected readonly rolesById = computed(
@@ -78,6 +83,10 @@ export class UsersComponent {
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));
     this.api.listPermissions().subscribe((p) => this.permissions.set(p));
+    this.options.gremiumOptions().subscribe({
+      next: (opts) => this.gremiumOptions.set(opts),
+      error: () => this.gremiumOptions.set([]),
+    });
     this.search();
   }
 
@@ -104,6 +113,7 @@ export class UsersComponent {
     return (
       this.drafts()[principalId] ?? {
         roleId: '',
+        gremiumId: '',
         validFrom: '',
         validUntil: '',
         delegateVoting: false,
@@ -125,6 +135,7 @@ export class UsersComponent {
       .assignRole({
         principalId: principal.id,
         roleId: draft.roleId,
+        gremiumId: draft.gremiumId || null,
         validFrom: isoOrNull(draft.validFrom),
         validUntil: isoOrNull(draft.validUntil),
         delegateVoting: draft.delegateVoting,
@@ -132,7 +143,7 @@ export class UsersComponent {
       .subscribe({
         next: () => {
           this.toast.success(this.i18n.translate('admin.users.assigned'));
-          this.drafts.update((d) => ({ ...d, [principal.id]: { roleId: '', validFrom: '', validUntil: '', delegateVoting: false } }));
+          this.drafts.update((d) => ({ ...d, [principal.id]: { roleId: '', gremiumId: '', validFrom: '', validUntil: '', delegateVoting: false } }));
           this.search();
         },
         error: () => this.toast.error(this.i18n.translate('admin.users.assignFailed')),

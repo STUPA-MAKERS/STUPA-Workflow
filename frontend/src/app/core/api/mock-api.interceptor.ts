@@ -68,6 +68,10 @@ const MOCK_PRINCIPAL: Principal = {
     'budget.manage',
   ],
   groups: [],
+  gremien: [
+    { id: 'g0000000-0000-0000-0000-000000000001', name: 'Studierendenparlament', slug: 'stupa' },
+    { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss', slug: 'haushalt' },
+  ],
 };
 
 // --- Budget (T-17/T-35) — Töpfe + Rollup-Statistik -------------------------- //
@@ -579,9 +583,15 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (/\/meetings\/[^/]+\/protocol$/.test(p)) return ok(MOCK_PROTOCOL);
     if (p.endsWith('/meetings')) {
-      const title = (req.body as { title?: string } | null)?.title?.trim();
+      const body = (req.body as { title?: string; date?: string | null } | null) ?? {};
+      const title = body.title?.trim();
       // BE legt neue Sitzungen mit Status `planned` an (#104 — keine Drift mehr).
-      MOCK_MEETING = { ...MOCK_MEETING, title: title || MOCK_MEETING.title, status: 'planned' };
+      MOCK_MEETING = {
+        ...MOCK_MEETING,
+        title: title || MOCK_MEETING.title,
+        date: body.date ?? null,
+        status: 'planned',
+      };
       return ok(MOCK_MEETING, 201);
     }
   }
@@ -592,7 +602,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PATCH' && /\/meetings\/[^/]+$/.test(p)) {
-    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string } | null) ?? {};
+    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; date?: string | null } | null) ?? {};
     MOCK_MEETING = {
       ...MOCK_MEETING,
       status: body.status ?? MOCK_MEETING.status,
@@ -600,6 +610,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         body.activeApplicationId !== undefined
           ? body.activeApplicationId
           : MOCK_MEETING.activeApplicationId,
+      date: body.date !== undefined ? body.date : MOCK_MEETING.date,
     };
     return ok(MOCK_MEETING);
   }

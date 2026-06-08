@@ -168,6 +168,8 @@ class MeetingService:
             meeting.status = payload.status
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id
+        if "date" in payload.model_fields_set:
+            meeting.date = payload.date
         await self.session.flush()
         await self.session.commit()
         out = self._to_out(meeting)

@@ -34,11 +34,19 @@ class MeetingPatch(_CamelModel):
 
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
     status: MeetingStatus | None = None
+    date: _date | None = None
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
-        if self.status is None and self.active_application_id is None:
-            raise ValueError("at least one of 'status' or 'activeApplicationId' required")
+        # ``date`` zählt mit: geplante Sitzungen lassen sich so vorab terminieren.
+        if (
+            self.status is None
+            and self.active_application_id is None
+            and "date" not in self.model_fields_set
+        ):
+            raise ValueError(
+                "at least one of 'status', 'activeApplicationId' or 'date' required"
+            )
         return self
 
 
