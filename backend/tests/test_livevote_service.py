@@ -211,7 +211,7 @@ async def test_service_create_sets_planned_and_commits() -> None:
 async def test_service_get_not_found() -> None:
     svc = MeetingService(_FakeSession(existing=None))  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
-        await svc.get(uuid4())
+        await svc.get(uuid4(), _principal())
 
 
 @pytest.mark.asyncio
@@ -227,7 +227,9 @@ async def test_service_patch_applies_and_broadcasts_meeting_state() -> None:
     svc = MeetingService(session, BrokerPublisher(broker))  # type: ignore[arg-type]
 
     aid = uuid4()
-    out = await svc.patch(meeting.id, MeetingPatch(status="live", activeApplicationId=aid))
+    out = await svc.patch(
+        meeting.id, MeetingPatch(status="live", activeApplicationId=aid), _principal()
+    )
     assert out.status == "live"
     assert out.active_application_id == aid
     assert session.commits == 1
@@ -245,7 +247,7 @@ async def test_service_patch_without_publisher_is_silent() -> None:
     meeting.active_application_id = None
     meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
-    out = await svc.patch(meeting.id, MeetingPatch(status="closed"))
+    out = await svc.patch(meeting.id, MeetingPatch(status="closed"), _principal())
     assert out.status == "closed"
 
 
@@ -295,7 +297,7 @@ async def test_service_list_maps_protocol_and_keeps_order() -> None:
     m1, m2 = _meeting_row(), _meeting_row()
     pid = uuid4()
     session = _ListSession([m1, m2], [(m1.id, pid)])  # nur m1 hat ein Protokoll
-    out = await MeetingService(session).list()  # type: ignore[arg-type]
+    out = await MeetingService(session).list(_principal())  # type: ignore[arg-type]
     assert [o.id for o in out] == [m1.id, m2.id]
     assert out[0].protocol_id == pid
     assert out[1].protocol_id is None
@@ -304,20 +306,21 @@ async def test_service_list_maps_protocol_and_keeps_order() -> None:
 @pytest.mark.asyncio
 async def test_service_list_with_gremium_filter() -> None:
     m = _meeting_row()
-    out = await MeetingService(_ListSession([m], [])).list(m.gremium_id)  # type: ignore[arg-type]
+    out = await MeetingService(_ListSession([m], [])).list(_principal(), m.gremium_id)  # type: ignore[arg-type]
     assert [o.id for o in out] == [m.id]
 
 
 @pytest.mark.asyncio
 async def test_service_list_empty_returns_empty() -> None:
-    out = await MeetingService(_ListSession([])).list()  # type: ignore[arg-type]
+    out = await MeetingService(_ListSession([])).list(_principal())  # type: ignore[arg-type]
     assert out == []
 
 
 def _principal():  # noqa: ANN202
     from app.modules.auth.principal import Principal
 
-    return Principal(sub="mgr", permissions={"meeting.manage"})
+    # Admin ⇒ can_control kurzschließt ohne DB-Query gegen die Fake-Session.
+    return Principal(sub="mgr", permissions={"meeting.manage"}, roles=["admin"])
 
 
 def test_meeting_patch_requires_at_least_one_field() -> None:

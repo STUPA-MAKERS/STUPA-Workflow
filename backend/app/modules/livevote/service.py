@@ -14,11 +14,15 @@ Beamer-Stream konstruktionsbedingt namensfrei.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.gremium_roles import LEAD_ROLE_KEYS
+from app.modules.admin.models import GremiumMembership, GremiumRole
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.livevote.broker import MeetingBroker
 from app.modules.livevote.events import (
@@ -32,7 +36,7 @@ from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed, VoteOut
-from app.shared.errors import NotFoundError
+from app.shared.errors import ForbiddenError, NotFoundError
 
 
 def meeting_channel(meeting_id: UUID) -> str:
@@ -91,7 +95,11 @@ class MeetingService:
         self.publisher = publisher
 
     @staticmethod
-    def _to_out(meeting: Meeting, protocol_id: UUID | None = None) -> MeetingOut:
+    def _to_out(
+        meeting: Meeting,
+        protocol_id: UUID | None = None,
+        can_control: bool = False,
+    ) -> MeetingOut:
         return MeetingOut(
             id=meeting.id,
             gremiumId=meeting.gremium_id,
@@ -102,7 +110,35 @@ class MeetingService:
             activeApplicationId=meeting.active_application_id,
             protocolId=protocol_id,
             createdAt=meeting.created_at,
+            canControl=can_control,
         )
+
+    # -------------------------------------------------- Sitzungsleitung (#Meetings)
+    async def _led_gremium_ids(self, sub: str) -> set[UUID]:
+        """Gremium-IDs, in denen ``sub`` aktuell Vorstand/Schriftführung ist."""
+        now = datetime.now(UTC)
+        rows = (
+            await self.session.execute(
+                select(GremiumMembership.gremium_id)
+                .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+                .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
+                .where(
+                    PrincipalRow.sub == sub,
+                    GremiumRole.key.in_(LEAD_ROLE_KEYS),
+                    (GremiumMembership.valid_from.is_(None))
+                    | (GremiumMembership.valid_from <= now),
+                    (GremiumMembership.valid_until.is_(None))
+                    | (GremiumMembership.valid_until > now),
+                )
+            )
+        ).scalars()
+        return set(rows)
+
+    async def can_control(self, gremium_id: UUID, principal: Principal) -> bool:
+        """Admin **oder** Sitzungsleitung (Vorstand/Schriftführung) des Gremiums."""
+        if "admin" in principal.roles:
+            return True
+        return gremium_id in await self._led_gremium_ids(principal.sub)
 
     async def _get(self, meeting_id: UUID) -> Meeting:
         meeting = (
@@ -120,12 +156,15 @@ class MeetingService:
             )
         ).scalar_one_or_none()
 
-    async def get(self, meeting_id: UUID) -> MeetingOut:
+    async def get(self, meeting_id: UUID, principal: Principal) -> MeetingOut:
         """Sitzungs-State (404, falls unbekannt)."""
         meeting = await self._get(meeting_id)
-        return self._to_out(meeting, await self._protocol_id(meeting.id))
+        can = await self.can_control(meeting.gremium_id, principal)
+        return self._to_out(meeting, await self._protocol_id(meeting.id), can)
 
-    async def list(self, gremium_id: UUID | None = None) -> list[MeetingOut]:
+    async def list(
+        self, principal: Principal, gremium_id: UUID | None = None
+    ) -> list[MeetingOut]:
         """Sitzungen (neueste zuerst), optional auf ein Gremium gefiltert.
 
         Erlaubt das **Wiederfinden** angelegter Sitzungen (#104): ohne Liste war eine
@@ -146,7 +185,15 @@ class MeetingService:
             )
         ).all()
         proto_by_meeting = {meeting_id: pid for meeting_id, pid in proto_rows}
-        return [self._to_out(m, proto_by_meeting.get(m.id)) for m in meetings]
+        led = (
+            {m.gremium_id for m in meetings}
+            if "admin" in principal.roles
+            else await self._led_gremium_ids(principal.sub)
+        )
+        return [
+            self._to_out(m, proto_by_meeting.get(m.id), m.gremium_id in led)
+            for m in meetings
+        ]
 
     async def create(self, payload: MeetingCreate, principal: Principal) -> MeetingOut:
         """Sitzung (``planned``) anlegen."""
@@ -163,9 +210,16 @@ class MeetingService:
         await self.session.commit()
         return self._to_out(meeting)
 
-    async def patch(self, meeting_id: UUID, payload: MeetingPatch) -> MeetingOut:
-        """Steuerung anwenden + ``meeting_state`` broadcasten."""
+    async def patch(
+        self, meeting_id: UUID, payload: MeetingPatch, principal: Principal
+    ) -> MeetingOut:
+        """Steuerung anwenden + ``meeting_state`` broadcasten.
+
+        Nur Sitzungsleitung (Vorstand/Schriftführung) oder Admin (#Meetings);
+        ``meeting.manage`` allein genügt nicht."""
         meeting = await self._get(meeting_id)
+        if not await self.can_control(meeting.gremium_id, principal):
+            raise ForbiddenError("only the committee lead may control this meeting")
         if payload.status is not None:
             meeting.status = payload.status
         if payload.active_application_id is not None:
@@ -176,7 +230,7 @@ class MeetingService:
             meeting.start_time = payload.start_time
         await self.session.flush()
         await self.session.commit()
-        out = self._to_out(meeting)
+        out = self._to_out(meeting, can_control=True)
         if self.publisher is not None:
             await self.publisher.meeting_state(out)
         return out

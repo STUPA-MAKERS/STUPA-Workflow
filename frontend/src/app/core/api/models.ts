@@ -235,7 +235,9 @@ export interface ApplicationCreateBody {
   typeId: Uuid;
   budgetPotId?: Uuid | null;
   data: Record<string, unknown>;
-  applicantEmail: string;
+  // Optional: für eingeloggte Nutzer:innen leitet das Backend die Identität aus dem
+  // Account ab (#24); anonyme Einreichung erzwingt sie serverseitig.
+  applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
@@ -412,10 +414,11 @@ export interface NewApplication {
   typeId: Uuid;
   budgetPotId?: Uuid | null;
   data: Record<string, unknown>;
-  applicantEmail: string;
+  // Null für eingeloggte Nutzer:innen — das Backend leitet Identität/Altcha ab (#24).
+  applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
-  altcha: string;
+  altcha?: string | null;
 }
 
 // --- Form-Definition (config_schemas §5.1) — Spiegel von FormFieldDef ---------
@@ -594,6 +597,7 @@ export interface MeetingOutWire {
   /** Verknüpftes Protokoll (falls bereits angelegt). */
   protocolId?: Uuid | null;
   createdAt: IsoDateTime;
+  canControl?: boolean;
 }
 
 /** `ProtocolOut` — Sitzungsprotokoll (POST /meetings/{id}/protocol, PATCH /protocols/{id}). */
@@ -667,6 +671,8 @@ export interface Meeting {
   votes: MeetingVote[];
   protocolId: Uuid | null;
   createdAt: IsoDateTime;
+  /** Darf der aktuelle Nutzer die Sitzung steuern? (Vorstand/Schriftführung des Gremiums oder Admin.) */
+  canControl: boolean;
 }
 
 /** Protokoll (FE-View) — `isFinal` aus `status` abgeleitet. */

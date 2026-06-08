@@ -91,8 +91,13 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
     } @else if (error()) {
       <p class="mtg__status mtg__status--error" role="alert">{{ 'meetings.error' | t }}</p>
     } @else if (meeting(); as m) {
+      <!-- Sitzungssteuerung nur für die Sitzungsleitung (Vorstand/Schriftführung) (#Meetings). -->
+      @if (canManage() && !m.canControl) {
+        <p class="mtg__muted mtg__hint" role="note">{{ 'meetings.control.leadOnly' | t }}</p>
+      }
+
       <!-- Vorab-Terminierung geplanter Sitzungen (#7) -->
-      @if (canManage() && m.status === 'planned') {
+      @if (canManage() && m.canControl && m.status === 'planned') {
         <app-card [heading]="'meetings.plan.title' | t">
           <p class="mtg__lead">{{ 'meetings.plan.lead' | t }}</p>
           <div class="mtg__planRow">
@@ -124,7 +129,7 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
       }
 
       <!-- Sitzungssteuerung -->
-      @if (canManage()) {
+      @if (canManage() && m.canControl) {
         <app-card [heading]="'meetings.control.title' | t">
           <p class="mtg__lead">{{ 'meetings.control.lead' | t }}</p>
           <div class="mtg__statusActions" role="group" [attr.aria-label]="'meetings.control.session' | t">

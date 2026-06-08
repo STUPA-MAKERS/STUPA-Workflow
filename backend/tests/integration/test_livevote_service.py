@@ -76,16 +76,19 @@ async def _gremium_and_application(session: AsyncSession) -> tuple[Gremium, Appl
 async def test_meeting_crud_and_patch(session: AsyncSession) -> None:
     gremium, _ = await _gremium_and_application(session)
     svc = MeetingService(session)
+    # Admin ⇒ Sitzungssteuerung erlaubt (sonst bräuchte es eine Vorstands-Mitgliedschaft).
+    principal = Principal(sub="adm", roles=["admin"])
     created = await svc.create(
-        MeetingCreate(gremiumId=gremium.id, title="GV"), Principal(sub="adm")
+        MeetingCreate(gremiumId=gremium.id, title="GV"), principal
     )
     assert created.status == "planned"
 
-    fetched = await svc.get(created.id)
+    fetched = await svc.get(created.id, principal)
     assert fetched.title == "GV"
 
-    patched = await svc.patch(created.id, MeetingPatch(status="live"))
+    patched = await svc.patch(created.id, MeetingPatch(status="live"), principal)
     assert patched.status == "live"
+    assert patched.can_control is True
 
 
 async def test_open_vote_lookup(session: AsyncSession) -> None:

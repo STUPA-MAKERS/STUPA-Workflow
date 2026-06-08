@@ -125,21 +125,21 @@ async def create_meeting(
 @router.get("/meetings", response_model=list[MeetingOut], responses=_errors(401, 403))
 async def list_meetings(
     service: ServiceDep,
-    _principal: ReaderDep,
+    principal: ReaderDep,
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
 ) -> list[MeetingOut]:
     """Sitzungen auflisten (neueste zuerst), optional Gremium-gefiltert (#104)."""
-    return await service.list(gremium_id)
+    return await service.list(principal, gremium_id)
 
 
 @router.get(
     "/meetings/{meeting_id}", response_model=MeetingOut, responses=_errors(401, 403, 404)
 )
 async def get_meeting(
-    meeting_id: UUID, service: ServiceDep, _principal: ReaderDep
+    meeting_id: UUID, service: ServiceDep, principal: ReaderDep
 ) -> MeetingOut:
     """Sitzungs-State."""
-    return await service.get(meeting_id)
+    return await service.get(meeting_id, principal)
 
 
 @router.patch(
@@ -148,10 +148,13 @@ async def get_meeting(
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def patch_meeting(
-    meeting_id: UUID, payload: MeetingPatch, service: ServiceDep, _principal: ManagerDep
+    meeting_id: UUID, payload: MeetingPatch, service: ServiceDep, principal: ManagerDep
 ) -> MeetingOut:
-    """Steuerung (``activeApplicationId``/``status``) → ``meeting_state``-Broadcast."""
-    return await service.patch(meeting_id, payload)
+    """Steuerung (``activeApplicationId``/``status``) → ``meeting_state``-Broadcast.
+
+    Zusätzlich zu ``meeting.manage`` muss der Principal die Sitzungsleitung des
+    Gremiums sein (Vorstand/Schriftführung) oder Admin (#Meetings)."""
+    return await service.patch(meeting_id, payload, principal)
 
 
 # --------------------------------------------------------------------------- #
@@ -170,7 +173,7 @@ async def _authorize(
         await websocket.close(code=WS_UNAUTHENTICATED)
         return None
     try:
-        meeting = await meetings.get(meeting_id)
+        meeting = await meetings.get(meeting_id, principal)
     except NotFoundError:
         await websocket.close(code=WS_NOT_FOUND)
         return None

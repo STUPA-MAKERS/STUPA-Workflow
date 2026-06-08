@@ -426,6 +426,7 @@ let MOCK_MEETING: MeetingOutWire = {
   activeApplicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   gremiumId: null,
   protocolId: MOCK_PROTOCOL_ID,
+  canControl: true,
   votes: [
     {
       id: 'a0000000-0000-0000-0000-0000000000a1',

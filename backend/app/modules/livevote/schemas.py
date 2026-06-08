@@ -66,3 +66,6 @@ class MeetingOut(_CamelModel):
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
     protocol_id: UUID | None = Field(default=None, alias="protocolId")
     created_at: _datetime = Field(alias="createdAt")
+    # Darf der anfragende Principal die Sitzung steuern? True für Admin oder wer im
+    # Gremium die Sitzungsleitung (Vorstand/Schriftführung) innehat (#Meetings).
+    can_control: bool = Field(default=False, alias="canControl")

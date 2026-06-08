@@ -77,7 +77,7 @@ class _FakeMeetingService:
         self._meeting = meeting
         self._open_vote = open_vote
 
-    async def get(self, _meeting_id: UUID) -> MeetingOut:
+    async def get(self, _meeting_id: UUID, _principal: object = None) -> MeetingOut:
         if self._meeting is None:
             from app.shared.errors import NotFoundError
 

@@ -237,6 +237,7 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     votes: (wire.votes ?? []).map(mapMeetingVote),
     protocolId: wire.protocolId ?? null,
     createdAt: wire.createdAt,
+    canControl: wire.canControl ?? false,
   };
 }
 
@@ -336,9 +337,9 @@ export function toApplicationCreateBody(input: NewApplication): ApplicationCreat
     typeId: input.typeId,
     budgetPotId: input.budgetPotId ?? null,
     data: input.data,
-    applicantEmail: input.applicantEmail,
+    applicantEmail: input.applicantEmail ?? null,
     applicantName: input.applicantName ?? null,
     lang: input.lang,
-    altcha: input.altcha,
+    altcha: input.altcha ?? null,
   };
 }

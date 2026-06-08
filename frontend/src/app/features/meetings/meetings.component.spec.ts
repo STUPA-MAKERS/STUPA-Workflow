@@ -22,6 +22,7 @@ const MEETING: MeetingOutWire = {
   activeApplicationId: 'app-1',
   gremiumId: null,
   protocolId: 'p-1',
+  canControl: true,
   votes: [
     {
       id: 'v-1',
