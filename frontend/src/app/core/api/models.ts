@@ -549,8 +549,8 @@ export interface BallotResult {
 // FE arbeitet bis dahin gegen den Mock (network-plan §4).                       //
 // =========================================================================== //
 
-/** Sitzungs-Status (api.md §4 `meeting_state.status`). */
-export type MeetingStatus = 'draft' | 'live' | 'closed';
+/** Sitzungs-Status (api.md §4 `meeting_state.status`); BE-Enum: `planned|live|closed`. */
+export type MeetingStatus = 'planned' | 'live' | 'closed';
 /** Status eines Votes innerhalb einer Sitzung. */
 export type MeetingVoteStatus = 'pending' | 'open' | 'closed';
 

@@ -3,7 +3,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject } from 'rxjs';
@@ -81,11 +81,17 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
 }
 
 async function setup(
-  opts: { perms?: string[]; id?: string | null; gremien?: { id: string; name: string }[] } = {},
+  opts: {
+    perms?: string[];
+    id?: string | null;
+    gremien?: { id: string; name: string }[];
+    meetings?: MeetingOutWire[];
+  } = {},
 ) {
   const perms = opts.perms ?? ['meeting.manage', 'protocol.write'];
   const id = opts.id === undefined ? 'm-1' : opts.id;
   const ws = new FakeWs();
+  const navigate = jest.fn(() => Promise.resolve(true));
   const view = await render(MeetingsComponent, {
     providers: [
       provideHttpClient(),
@@ -93,6 +99,7 @@ async function setup(
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(perms) },
       { provide: WsService, useValue: ws },
+      { provide: Router, useValue: { navigate } },
       {
         provide: ActivatedRoute,
         useValue: { paramMap: of(convertToParamMap(id ? { id } : {})) },
@@ -102,7 +109,11 @@ async function setup(
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   // Gremien-Dropdown (#68) lädt beim Start `/gremien` (nur mit meeting.manage).
   http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush(opts.gremien ?? []));
-  return { ...view, http, ws };
+  // Übersichts-Route lädt die Sitzungs-Liste (#104) — exakt `/api/meetings`.
+  http
+    .match((r) => r.url.endsWith('/meetings') && r.method === 'GET')
+    .forEach((req) => req.flush(opts.meetings ?? []));
+  return { ...view, http, ws, navigate };
 }
 
 /** Meeting + (Auto-)Protokoll laden — beide Requests beantworten. */
@@ -222,8 +233,8 @@ describe('MeetingsComponent', () => {
     expect(screen.getByText('Geschlossen')).toBeInTheDocument();
   });
 
-  it('lets a manager create a meeting when none is loaded', async () => {
-    const { http } = await setup({
+  it('lets a manager create a meeting and redirects to its detail route (#104)', async () => {
+    const { http, navigate } = await setup({
       id: null,
       gremien: [{ id: 'g-1', name: 'StuPa' }],
     });
@@ -236,7 +247,18 @@ describe('MeetingsComponent', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ title: 'Neue Sitzung', gremiumId: 'g-1' });
     req.flush({ ...MEETING, title: 'Neue Sitzung', protocolId: null });
-    expect(await screen.findByText('Sitzungssteuerung')).toBeInTheDocument();
+    // Wiederauffindbarkeit: nach dem Anlegen auf `/meetings/{id}` navigieren.
+    expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
+  });
+
+  it('lists existing meetings and opens one (#104)', async () => {
+    const { navigate } = await setup({
+      id: null,
+      meetings: [{ ...MEETING, title: 'Vergangene Sitzung', status: 'closed' }],
+    });
+    expect(await screen.findByText('Vergangene Sitzung')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
   });
 
   it('closes the session via PATCH status', async () => {

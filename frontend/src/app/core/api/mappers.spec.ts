@@ -417,7 +417,7 @@ describe('mapMeeting', () => {
     const wire = {
       id: 'm-2',
       title: 'Leer',
-      status: 'draft',
+      status: 'planned',
       createdAt: '2026-06-12T17:00:00Z',
     } as unknown as MeetingOutWire;
     expect(mapMeeting(wire).votes).toEqual([]);

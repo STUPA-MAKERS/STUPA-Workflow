@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date as _date
+from datetime import datetime as _datetime
 from typing import Literal
 from uuid import UUID
 
@@ -50,3 +51,5 @@ class MeetingOut(_CamelModel):
     date: _date | None = None
     status: MeetingStatus
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
+    protocol_id: UUID | None = Field(default=None, alias="protocolId")
+    created_at: _datetime = Field(alias="createdAt")

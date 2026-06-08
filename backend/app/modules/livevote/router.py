@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, WebSocket
+from fastapi import APIRouter, Depends, Query, Request, WebSocket
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
@@ -120,6 +120,16 @@ async def create_meeting(
 ) -> MeetingOut:
     """Sitzung (``planned``) anlegen."""
     return await service.create(payload, principal)
+
+
+@router.get("/meetings", response_model=list[MeetingOut], responses=_errors(401, 403))
+async def list_meetings(
+    service: ServiceDep,
+    _principal: ReaderDep,
+    gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
+) -> list[MeetingOut]:
+    """Sitzungen auflisten (neueste zuerst), optional Gremium-gefiltert (#104)."""
+    return await service.list(gremium_id)
 
 
 @router.get(
