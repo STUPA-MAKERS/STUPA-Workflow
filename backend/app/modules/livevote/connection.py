@@ -76,7 +76,7 @@ async def resolve_ws_principal(
             select(PrincipalRow).where(PrincipalRow.id == session.principal_id)
         )
     ).scalar_one_or_none()
-    if row is None or not row.active:
+    if row is None or row.active is False:
         return None
     return await rbac.resolve_principal(db, row, now)
 

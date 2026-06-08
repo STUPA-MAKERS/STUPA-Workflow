@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from starlette.requests import Request
 
@@ -172,7 +174,20 @@ async def test_get_current_principal_ok(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(deps.rbac, "resolve_principal", _resolve)
     req = _request(cookies={_settings().session_cookie_name: "x"})
     principal = await get_current_principal(
-        req, fake_session(result(object())), _settings()
+        req, fake_session(result(SimpleNamespace(active=True))), _settings()
     )
     assert principal is not None
     assert principal.sub == "u1"
+
+
+async def test_get_current_principal_deactivated(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _sess(*a: object, **k: object) -> AuthSession:
+        return AuthSession(sid="s", principal_id="pid")
+
+    monkeypatch.setattr(deps.sessions, "load_principal_session", _sess)
+    req = _request(cookies={_settings().session_cookie_name: "x"})
+    # Deaktivierter Principal (active=False) → keine Auflösung (#30).
+    principal = await get_current_principal(
+        req, fake_session(result(SimpleNamespace(active=False))), _settings()
+    )
+    assert principal is None

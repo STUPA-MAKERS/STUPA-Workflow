@@ -184,7 +184,7 @@ async def oidc_callback(
     # Deaktivierte Principals (#30) dürfen sich nicht anmelden — fail-closed schon
     # beim Login, damit keine Session entsteht (die Request-Auflösung blockt sie
     # ohnehin, vgl. deps.get_current_principal).
-    if not row.active:
+    if row.active is False:
         raise ForbiddenError("Account is deactivated.")
     # Bootstrap-Admins (#70): erstmaliger/idempotenter admin-Grant beim Login, sonst
     # sperrt sich eine frische OIDC-Installation selbst aus. Der E-Mail-Bootstrap zählt
