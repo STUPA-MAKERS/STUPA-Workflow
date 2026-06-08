@@ -31,6 +31,7 @@ export const FIELD_TYPES: readonly FieldType[] = [
   'table',
   'markdown',
   'computed',
+  'positions',
 ] as const;
 
 /** Operatoren-Whitelist — Spiegel von `shared/forms/jsonlogic.ts` OPERATORS. */

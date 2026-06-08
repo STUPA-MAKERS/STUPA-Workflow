@@ -6,6 +6,7 @@ import { FormlySelectType } from './types/formly-select.type';
 import { FormlyCheckboxType } from './types/formly-checkbox.type';
 import { FormlyMultiCheckboxType } from './types/formly-multicheckbox.type';
 import { FormlyDisplayType } from './types/formly-display.type';
+import { FormlyPositionsType } from './types/formly-positions.type';
 
 /**
  * Formly-Grundkonfiguration. Registriert die UI-Kit-gebundenen Feldtypen für die
@@ -23,6 +24,7 @@ export function provideFormly(): Provider {
       { name: 'checkbox', component: FormlyCheckboxType },
       { name: 'multicheckbox', component: FormlyMultiCheckboxType },
       { name: 'display', component: FormlyDisplayType },
+      { name: 'positions', component: FormlyPositionsType },
     ],
     validationMessages: [
       { name: 'required', message: 'Dieses Feld ist erforderlich.' },

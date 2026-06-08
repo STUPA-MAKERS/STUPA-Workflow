@@ -26,6 +26,7 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   markdown: 'display',
   computed: 'display',
   table: 'display',
+  positions: 'positions',
 };
 
 /**
@@ -71,6 +72,10 @@ function mapField(
   if (f.type === 'markdown') props['text'] = help ?? label;
   if (f.type === 'computed') props['computed'] = true;
   if (f.type === 'table') props['text'] = '(Tabellen-Eingabe wird in einem späteren Schritt ergänzt.)';
+  if (f.type === 'positions') {
+    if (f.validation?.minOffers !== undefined) props['minOffers'] = f.validation.minOffers;
+    if (f.validation?.minPositions !== undefined) props['minPositions'] = f.validation.minPositions;
+  }
 
   const config: FormlyFieldConfig = { key: f.key, type: FORMLY_TYPE[f.type], props };
 

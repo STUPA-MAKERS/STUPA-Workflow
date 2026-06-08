@@ -346,6 +346,7 @@ export class ApplyWizardComponent {
 
   private formatValue(field: FormFieldDef, value: unknown): string {
     if (value === null || value === undefined || value === '') return '';
+    if (field.type === 'positions') return this.formatPositions(value);
     if (Array.isArray(value)) return value.map((v) => this.optionLabel(field, v)).join(', ');
     if (typeof value === 'boolean')
       return this.i18n.translate(value ? 'common.yes' : 'common.no');
@@ -355,5 +356,20 @@ export class ApplyWizardComponent {
   private optionLabel(field: FormFieldDef, value: unknown): string {
     const opt = field.options?.find((o) => o.value === value);
     return opt ? resolveI18n(opt.label, this.i18n.locale()) : String(value);
+  }
+
+  /** Kostenpositionen im Review: Anzahl Positionen + Σ der bevorzugten Werte. */
+  private formatPositions(value: unknown): string {
+    if (!Array.isArray(value)) return '';
+    let total = 0;
+    for (const p of value as { offers?: { value?: number | null; preferred?: boolean }[] }[]) {
+      const pref = (p.offers ?? []).find((o) => o.preferred);
+      total += pref?.value ?? 0;
+    }
+    const sum = new Intl.NumberFormat(this.i18n.locale(), {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(total);
+    return `${value.length} × ${this.i18n.translate('apply.positions.positionValue')} · ${this.i18n.translate('apply.positions.total')}: ${sum}`;
   }
 }

@@ -245,6 +245,10 @@ export class FormEditorComponent {
     return type === 'select' || type === 'multiselect';
   }
 
+  protected isPositions(type: FieldType): boolean {
+    return type === 'positions';
+  }
+
   // --- drag reorder --------------------------------------------------------
   protected onDragStart(i: number): void {
     this.dragIndex = i;
@@ -262,7 +266,7 @@ export class FormEditorComponent {
   // --- validation field setters (mirror form-builder) ----------------------
   protected setVal(
     i: number,
-    key: 'min' | 'max' | 'minLen' | 'maxLen' | 'pattern',
+    key: 'min' | 'max' | 'minLen' | 'maxLen' | 'pattern' | 'minOffers' | 'minPositions',
     value: string,
   ): void {
     const numeric = key !== 'pattern';

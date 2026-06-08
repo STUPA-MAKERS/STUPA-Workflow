@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
-import { render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { provideFormly } from '../formly.providers';
 
@@ -91,5 +91,34 @@ describe('Formly field types', () => {
     expect(screen.getByText('Bitte beachten.')).toBeInTheDocument();
     // computed without a value renders the em-dash placeholder.
     expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('positions: builds positions/offers, totals preferred values, validates', async () => {
+    localStorage.setItem('ap.locale', 'de');
+    const host = await renderFields([
+      { key: 'costs', type: 'positions', props: { label: 'Kosten', minOffers: 2, minPositions: 1 } },
+    ]);
+    const form = host.form;
+    expect(form.invalid).toBe(true); // leer → ungültig
+
+    await userEvent.click(screen.getByRole('button', { name: /Position hinzufügen/ }));
+    // Eine Position mit minOffers (2) Angeboten, erstes bevorzugt.
+    const value = host.model['costs'] as { label: string; offers: unknown[] }[];
+    expect(value).toHaveLength(1);
+    expect(value[0].offers).toHaveLength(2);
+
+    // Einzel-`input`-Events (Voll-Rerender je Tastendruck verlöre Zeichen) und nach
+    // jedem Event frisch abfragen, da das Rerender vorige Elemente ablöst.
+    fireEvent.input(screen.getByLabelText('Bezeichnung der Position'), { target: { value: 'Catering' } });
+    fireEvent.input(screen.getAllByLabelText('Vergleichsangebot')[0], { target: { value: 'Anbieter A' } });
+    fireEvent.input(screen.getAllByLabelText('Vergleichsangebot')[1], { target: { value: 'Anbieter B' } });
+    fireEvent.input(screen.getAllByLabelText('Wert (€)')[0], { target: { value: '500' } });
+    fireEvent.input(screen.getAllByLabelText('Wert (€)')[1], { target: { value: '600' } });
+
+    // Erstes Angebot ist bevorzugt → Positionswert 500 → Gesamt 500.
+    expect(form.valid).toBe(true);
+    const v = host.model['costs'] as { offers: { value: number; preferred: boolean }[] }[];
+    const pref = v[0].offers.find((o) => o.preferred);
+    expect(pref?.value).toBe(500);
   });
 });

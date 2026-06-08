@@ -135,6 +135,19 @@
               </fieldset>
             }
 
+            @if (isPositions(field.type)) {
+              <fieldset class="fe__sub">
+                <legend>{{ 'admin.form.positions' | t }}</legend>
+                <p class="fe__hint">{{ 'admin.form.positionsHint' | t }}</p>
+                <div class="fe__row">
+                  <label class="fe__lbl">{{ 'admin.form.minOffers' | t }}
+                    <input type="number" min="1" [ngModel]="field.validation?.minOffers" (ngModelChange)="setVal(fi, 'minOffers', $event)" placeholder="3" /></label>
+                  <label class="fe__lbl">{{ 'admin.form.minPositions' | t }}
+                    <input type="number" min="1" [ngModel]="field.validation?.minPositions" (ngModelChange)="setVal(fi, 'minPositions', $event)" placeholder="1" /></label>
+                </div>
+              </fieldset>
+            }
+
             @if (isExpanded(fi)) {
               <div class="fe__advanced">
                 <div class="fe__row">
