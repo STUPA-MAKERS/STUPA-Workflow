@@ -21,6 +21,7 @@ from uuid import UUID
 from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.models import ApplicationType
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
@@ -31,7 +32,8 @@ from app.modules.flow.dispatch import (
     NullActionDispatcher,
     build_dispatched_actions,
 )
-from app.modules.flow.models import Transition
+from app.modules.flow.models import State, Transition
+from app.modules.flow.routing import DecisionFacts, evaluate_decision
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.shared.errors import ConflictError, NotFoundError
 from app.shared.guards import eval_guard
@@ -66,6 +68,30 @@ class FlowService:
         if transition is None:
             raise NotFoundError(f"transition {transition_id} not found")
         return transition
+
+    async def _load_state(self, state_id: UUID) -> State | None:
+        return (
+            await self.session.execute(select(State).where(State.id == state_id))
+        ).scalar_one_or_none()
+
+    async def _decision_facts(self, app: Application) -> DecisionFacts:
+        """Fakten für ``decision``-Routing: Betrag, Typ-Key, Antragsteller-Rollen.
+
+        ``amount`` kommt direkt vom Antrag; ``type_key`` aus dem Antragstyp; die
+        Antragsteller-Rollen werden (sofern beim Anlegen hinterlegt) aus
+        ``data['_applicantRoles']`` gelesen (für intern angelegte Anträge, #24)."""
+        type_key: str | None = None
+        if app.type_id is not None:
+            app_type = (
+                await self.session.execute(
+                    select(ApplicationType).where(ApplicationType.id == app.type_id)
+                )
+            ).scalar_one_or_none()
+            if app_type is not None:
+                type_key = app_type.key
+        raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
+        roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
+        return DecisionFacts(amount=app.amount, type_key=type_key, applicant_roles=roles)
 
     async def _outgoing(self, app: Application) -> list[Transition]:
         return list(
@@ -134,6 +160,11 @@ class FlowService:
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return None
+        # Decision-State (#28): kein Guard-Scan, sondern Fakten-Routing — feuert
+        # automatisch den Übergang zum aufgelösten Ziel.
+        state = await self._load_state(app.current_state_id)
+        if state is not None and state.kind == "decision":
+            return await self.route_decision(application_id, principal, app=app, state=state)
         complete = await flow_context.fields_complete(self.session, app)
         ctx = flow_context.build_context(
             principal,
@@ -154,6 +185,73 @@ class FlowService:
                     manual=False,
                 )
         return None
+
+    # --------------------------------------------------------- decision routing
+    async def route_decision(
+        self,
+        application_id: UUID,
+        principal: Principal,
+        *,
+        app: Application | None = None,
+        state: State | None = None,
+    ) -> TransitionResult | None:
+        """``decision``-State auflösen + den Übergang zum Ziel-State feuern (#28).
+
+        Wertet ``config.rules`` gegen die Antrags-Fakten aus (erste passende Regel,
+        sonst ``config.else``), sucht unter den ausgehenden Übergängen den, dessen
+        Ziel-State-Key dem aufgelösten Key entspricht, und feuert ihn (``manual=False``).
+        Gibt ``None``, wenn der aktuelle State kein ``decision`` ist."""
+        if app is None:
+            app = await self._load_app(application_id)
+        if app.current_state_id is None:
+            return None
+        if state is None:
+            state = await self._load_state(app.current_state_id)
+        if state is None or state.kind != "decision":
+            return None
+
+        rules = state.config.get("rules") if isinstance(state.config, dict) else None
+        fallback = state.config.get("else") if isinstance(state.config, dict) else None
+        if not isinstance(rules, list) or not isinstance(fallback, str):
+            raise ConflictError(
+                f"decision state {state.key!r} is misconfigured", code="conflict"
+            )
+        facts = await self._decision_facts(app)
+        target_key = evaluate_decision(rules, fallback, facts)
+
+        for t in await self._outgoing(app):
+            to_state = await self._load_state(t.to_state_id)
+            if to_state is not None and to_state.key == target_key:
+                return await self.fire(
+                    application_id, t.id, principal, note="decision", manual=False
+                )
+        raise ConflictError(
+            f"decision state {state.key!r} has no transition to {target_key!r}",
+            code="conflict",
+        )
+
+    # ----------------------------------------------------------- branch firing
+    async def fire_branch(
+        self,
+        application_id: UUID,
+        branch: str,
+        principal: Principal,
+        *,
+        note: str | None = None,
+    ) -> TransitionResult:
+        """Den Übergang des aktuellen vote/approval-States mit ``branch`` feuern (#28).
+
+        ``branch`` ist ``pass``/``fail`` (vote) bzw. ``accept``/``reject`` (approval).
+        404, wenn kein passender Branch-Übergang existiert."""
+        app = await self._load_app(application_id)
+        for t in await self._outgoing(app):
+            if t.branch == branch:
+                return await self.fire(
+                    application_id, t.id, principal, note=note or branch, manual=False
+                )
+        raise NotFoundError(
+            f"no '{branch}' transition from the application's current state"
+        )
 
     # ------------------------------------------------------------------- fire
     async def fire(
