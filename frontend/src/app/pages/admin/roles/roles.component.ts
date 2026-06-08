@@ -57,17 +57,14 @@ interface RoleDraft {
         <app-button (click)="openAdd()">{{ 'admin.roles.addGlobalRole' | t }}</app-button>
       </header>
 
-      <app-data-table [columns]="columns()" [rows]="roles()" [rowKey]="rowId" [isExpanded]="rowExpanded">
+      <app-data-table [columns]="columns()" [rows]="roles()" [rowKey]="rowId" [isExpanded]="rowExpanded" [clickable]="true" (rowClick)="onRowClick($event)">
         <ng-template appCell="name" let-r><span class="roles__name">{{ roleLabel($any(r)) | capitalize }}</span></ng-template>
         <ng-template appCell="key" let-r><span class="roles__key">{{ $any(r).key }}</span></ng-template>
         <ng-template appCell="perms" let-r>{{ $any(r).permissions.length }} / {{ permissions().length }}</ng-template>
         <ng-template appCell="actions" let-r>
-          <span class="roles__row-actions">
-            <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.roles.editPerms' | t" (click)="toggle($any(r).id)"><app-icon name="chevron-down" /></app-button>
-            @if (canDelete($any(r))) {
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.roles.deleteRole' | t" (click)="deleteRole($any(r))"><app-icon name="delete" /></app-button>
-            }
-          </span>
+          @if (canDelete($any(r))) {
+            <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.roles.deleteRole' | t" (click)="$event.stopPropagation(); askDelete($any(r))"><app-icon name="delete" /></app-button>
+          }
         </ng-template>
 
         <ng-template appRowDetail let-r>
@@ -97,6 +94,17 @@ interface RoleDraft {
         </ng-template>
       </app-data-table>
     </section>
+
+    <!-- Löschen bestätigen (#40) -->
+    <app-dialog [open]="!!confirmRole()" [title]="'admin.roles.deleteRole' | t" [closeLabel]="'admin.gremien.cancel' | t" (closed)="confirmRole.set(null)">
+      @if (confirmRole(); as r) {
+        <p>{{ 'admin.roles.deleteConfirm' | t: { role: roleLabel(r) } }}</p>
+      }
+      <div dialog-footer class="roles__foot">
+        <app-button variant="ghost" (click)="confirmRole.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
+        <app-button variant="danger" (click)="confirmDelete()">{{ 'admin.roles.deleteRole' | t }}</app-button>
+      </div>
+    </app-dialog>
 
     <!-- Globale Rolle anlegen (Dialog, #21/#19) -->
     <app-dialog [open]="addOpen()" [title]="'admin.roles.addGlobalRole' | t" [closeLabel]="'admin.gremien.cancel' | t" (closed)="addOpen.set(false)">
@@ -208,6 +216,8 @@ export class AdminRolesComponent {
   protected readonly expanded = signal<Set<string>>(new Set());
   protected readonly addOpen = signal(false);
   protected readonly draft = signal<RoleDraft>({ key: '', labelDe: '', labelEn: '' });
+  /** Rolle, deren Löschung gerade bestätigt wird (#40). */
+  protected readonly confirmRole = signal<Role | null>(null);
 
   protected readonly columns = computed<ColumnDef[]>(() => [
     { key: 'name', label: this.i18n.translate('admin.roles.col.name') },
@@ -236,7 +246,19 @@ export class AdminRolesComponent {
     return role.key !== 'admin' && role.key !== 'member';
   }
 
-  protected deleteRole(role: Role): void {
+  /** Zeilen-Klick klappt die Rechte auf/zu (#40). */
+  protected onRowClick(row: unknown): void {
+    this.toggle((row as Role).id);
+  }
+
+  protected askDelete(role: Role): void {
+    this.confirmRole.set(role);
+  }
+
+  protected confirmDelete(): void {
+    const role = this.confirmRole();
+    if (!role) return;
+    this.confirmRole.set(null);
     this.api.deleteRole(role.id).subscribe({
       next: () => {
         this.roles.update((list) => list.filter((r) => r.id !== role.id));

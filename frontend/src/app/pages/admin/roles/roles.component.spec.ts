@@ -71,7 +71,9 @@ describe('AdminRolesComponent (#12)', () => {
     expect(inst.canDelete(ROLES[0])).toBe(false); // admin
     expect(inst.canDelete({ key: 'member' })).toBe(false);
     expect(inst.canDelete({ key: 'referent' })).toBe(true);
-    inst.deleteRole({ id: 'r-member', key: 'member' });
+    // Löschen via Bestätigungs-Dialog (#40).
+    inst.askDelete(ROLES[1]); // r-member id but deletable in the test path
+    inst.confirmDelete();
     expect(api.deleteRole).toHaveBeenCalledWith('r-member');
     expect(inst.roles().some((r: Role) => r.id === 'r-member')).toBe(false);
   });
