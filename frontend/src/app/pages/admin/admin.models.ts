@@ -35,6 +35,8 @@ export interface TransitionDef {
   guard?: Guard | null;
   actions?: ActionDef[];
   order?: number | null;
+  /** Automatischer Übergang (#8): feuert ohne Nutzer-Aktion, sobald der Guard erfüllt ist. */
+  automatic?: boolean;
 }
 
 /** Optionales Editor-Layout (Knoten-Positionen) — persistiert im Graphen. */

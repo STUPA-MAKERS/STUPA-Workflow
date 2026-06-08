@@ -119,6 +119,7 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
     if (t.guard) out.guard = t.guard;
     if (t.actions && t.actions.length > 0) out.actions = t.actions;
     if (t.order != null) out.order = t.order;
+    if (t.automatic) out.automatic = true;
     return out;
   });
   const out: FlowGraph = { states, transitions };

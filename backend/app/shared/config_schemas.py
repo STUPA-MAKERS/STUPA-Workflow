@@ -144,6 +144,8 @@ class TransitionDef(_CamelModel):
     guard: dict[str, Any] | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     order: int | None = None
+    # Automatischer Übergang (#8): vom Worker gefeuert, sobald der Guard erfüllt ist.
+    automatic: bool = False
 
 
 class FlowGraph(_CamelModel):

@@ -257,6 +257,7 @@ class ConfigService:
                     guard=trans.guard,
                     actions=trans.actions,
                     order=trans.order if trans.order is not None else order,
+                    automatic=trans.automatic,
                 )
             )
 

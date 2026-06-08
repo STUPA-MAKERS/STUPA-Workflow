@@ -116,6 +116,45 @@ class FlowService:
             if eval_guard(t.guard, ctx)
         ]
 
+    # --------------------------------------------------------- auto_advance
+    async def auto_advance(
+        self,
+        application_id: UUID,
+        principal: Principal,
+        *,
+        vote_result: str | None = None,
+        deadline_passed: bool = False,
+    ) -> TransitionResult | None:
+        """Ersten **automatischen** Übergang feuern, dessen Guard erfüllt ist (#8).
+
+        Vom Worker zyklisch aufgerufen (``manual=False``). Gibt das Ergebnis zurück,
+        falls ein Übergang gefeuert wurde, sonst ``None``. Idempotent über das
+        optimistische Locking in :meth:`fire` (konkurrierender Lauf → ``ConflictError``).
+        """
+        app = await self._load_app(application_id)
+        if app.current_state_id is None:
+            return None
+        complete = await flow_context.fields_complete(self.session, app)
+        ctx = flow_context.build_context(
+            principal,
+            fields_complete=complete,
+            vote_result=vote_result,
+            deadline_passed=deadline_passed,
+            manual=False,
+        )
+        for t in await self._outgoing(app):
+            if t.automatic and eval_guard(t.guard, ctx):
+                return await self.fire(
+                    application_id,
+                    t.id,
+                    principal,
+                    note="auto",
+                    vote_result=vote_result,
+                    deadline_passed=deadline_passed,
+                    manual=False,
+                )
+        return None
+
     # ------------------------------------------------------------------- fire
     async def fire(
         self,

@@ -91,6 +91,9 @@ class Transition(UUIDPkMixin, Base):
     guard: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     actions: Mapped[list] = mapped_column(JSONB, server_default="[]")
     order: Mapped[int] = mapped_column("order", Integer, server_default="0")
+    # Automatischer Übergang (#8): feuert ohne Nutzer-Aktion, sobald der Guard
+    # erfüllt ist (vom Worker zyklisch ausgewertet, ``manual=False``).
+    automatic: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     __table_args__ = (Index("ix_transition_flow_version_id_from_state_id",
                             "flow_version_id", "from_state_id"),)

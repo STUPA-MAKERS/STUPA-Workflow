@@ -34,6 +34,7 @@ from app.db import get_sessionmaker
 from app.modules.applications.models import Application
 from app.modules.auth.principal import Principal
 from app.modules.deadlines.service import DeadlineService, transition_ref
+from app.modules.flow.models import Transition
 from app.modules.flow.service import FlowService
 from app.modules.notifications.action_dispatcher import build_notify_dispatcher
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
@@ -92,7 +93,8 @@ async def process_deadlines(ctx: dict[str, Any]) -> str:
     reminded = await _process_reminders(ctx, settings, now)
     fired = await _process_actions(ctx, settings, now)
     closed = await _process_votes(ctx, now)
-    return f"reminders={reminded} actions={fired} votes={closed}"
+    advanced = await _process_auto_transitions(ctx)
+    return f"reminders={reminded} actions={fired} votes={closed} auto={advanced}"
 
 
 # --------------------------------------------------------------------------- #
@@ -210,6 +212,46 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
         # `fire` committet selbst; danach Marker in einer frischen Transaktion setzen.
         await svc.consume_action(deadline)
     return fired
+
+
+# --------------------------------------------------------------------------- #
+# 2b. Automatische Übergänge (#8)
+# --------------------------------------------------------------------------- #
+async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
+    """Konfigurierte **automatische** Übergänge feuern, deren Guard erfüllt ist (#8).
+
+    Scannt Anträge, deren aktueller State eine ausgehende ``automatic``-Transition
+    besitzt, und feuert (``manual=False``) den ersten passenden. Idempotent über das
+    optimistische Locking in ``flow.fire``; je Antrag eigene Session.
+    """
+    maker = _sessionmaker(ctx)
+    dispatcher = ctx.get("flow_dispatcher") or build_notify_dispatcher(ctx.get("redis"))
+    async with maker() as session:
+        auto_states = select(Transition.from_state_id).where(Transition.automatic)
+        ids = list(
+            (
+                await session.execute(
+                    select(Application.id).where(
+                        Application.current_state_id.is_not(None),
+                        Application.current_state_id.in_(auto_states),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    advanced = 0
+    for application_id in ids:
+        try:
+            async with maker() as session:
+                flow = FlowService(session, dispatcher)
+                if await flow.auto_advance(application_id, _system_principal()) is not None:
+                    advanced += 1
+        except (ConflictError, NotFoundError) as exc:
+            logger.info("auto-transition skipped (app=%s): %s", application_id, exc)
+        except Exception:  # noqa: BLE001 — ein kaputter Antrag darf den Zyklus nicht abbrechen
+            logger.exception("auto-transition failed (app=%s)", application_id)
+    return advanced
 
 
 # --------------------------------------------------------------------------- #

@@ -15,7 +15,7 @@ async function setup() {
   return { ...view, createFlowVersion };
 }
 
-describe('FlowEditorComponent', () => {
+describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('reports an empty graph as invalid and disables save', async () => {
@@ -39,42 +39,48 @@ describe('FlowEditorComponent', () => {
     expect(graph.layout?.positions).toBeDefined(); // layout persisted
   });
 
-  it('renders one diagram node per state', async () => {
-    await setup();
+  it('renders one canvas node per state', async () => {
+    const { container } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Vorlage übernehmen' }));
-    // 3 states → 3 <text> labels in the SVG
-    const svg = screen.getByRole('img', { name: 'Diagramm' });
-    expect(svg.querySelectorAll('text')).toHaveLength(3);
+    // 3 states → 3 node-text labels in the SVG canvas
+    expect(container.querySelectorAll('.fe__node-text')).toHaveLength(3);
   });
 
-  it('exposes guard operators only in expert mode', async () => {
-    await setup();
+  it('exposes guard operators only for a selected transition in expert mode', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
     await userEvent.click(screen.getByRole('button', { name: 'Vorlage übernehmen' }));
+    // Nothing selected → no inspector guard control.
     expect(screen.queryByRole('combobox', { name: 'Bedingung (Guard)' })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Experte' }));
-    expect(screen.getAllByRole('combobox', { name: 'Bedingung (Guard)' }).length).toBeGreaterThan(0);
+    c.selectEdge(0); // erste Transition auswählen
+    c.setMode('expert');
+    fixture.detectChanges();
+    expect(screen.getByRole('combobox', { name: 'Bedingung (Guard)' })).toBeInTheDocument();
   });
 
-  it('exercises state/transition/guard/action mutators', async () => {
+  it('exercises state/transition/guard/action/automatic mutators', async () => {
     const { fixture, createFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
 
     c.addState();
     c.addState();
-    c.graph().states[0].key = 'a';
-    c.graph().states[1].key = 'b';
-    c.touch();
+    expect(c.graph().states).toHaveLength(2);
+    c.setStateKey('state', 'a');
+    c.setStateKey('state2', 'b');
     c.setInitial('b');
     c.setInitial('a'); // a is initial; toggling exercises the reset branch
     expect(c.graph().states.filter((s: { isInitial?: boolean }) => s.isInitial)).toHaveLength(1);
-    c.setStateCategory(0, 'open');
-    c.setStateCategory(0, ''); // clear → null branch
+    c.setStateCategory('a', 'open');
+    c.setStateCategory('a', ''); // clear → null branch
+    c.setStateLabel('a', 'Entwurf');
+    c.setStateEditAllowed('a', false);
 
-    c.addTransition(); // seeds a→a
-    c.graph().transitions[0].to = 'b'; // a→b so b is reachable
-    c.touch();
+    // Übergang a→b anlegen (entspricht dem Aufziehen im Canvas).
+    c.graph.update((g: FlowGraph) => ({ ...g, transitions: [{ from: 'a', to: 'b', actions: [] }] }));
+    c.selectEdge(0);
     c.setGuard(0, 'roleIs', 'x');
     expect(c.guardOp(c.graph().transitions[0])).toBe('roleIs');
     expect(c.guardValue(c.graph().transitions[0])).toBe('x');
@@ -82,20 +88,28 @@ describe('FlowEditorComponent', () => {
     c.setGuard(0, '', ''); // remove guard branch
     expect(c.graph().transitions[0].guard).toBeUndefined();
 
+    c.setTransitionAutomatic(0, true); // #8
+    expect(c.graph().transitions[0].automatic).toBe(true);
+
     c.addAction(0, 'notify');
     c.addAction(0, ''); // no-op branch
     expect(c.graph().transitions[0].actions).toHaveLength(1);
     c.removeAction(0, 0);
     c.setTransitionLabel(0, 'go');
-    c.setTransitionLabel(0, ''); // null label branch
+    c.setTransitionEndpoint(0, 'to', 'b');
 
     c.setMode('expert');
     c.relayout();
     c.save(); // graph valid (a initial, b reachable) → success
     expect(createFlowVersion).toHaveBeenCalled();
+    const graph = createFlowVersion.mock.calls[0][1] as FlowGraph;
+    expect(graph.transitions[0].automatic).toBe(true); // automatisch serialisiert
 
-    c.removeTransition(0);
-    c.removeState(1);
+    c.selectEdge(0);
+    c.removeSelectedTransition();
+    expect(c.graph().transitions).toHaveLength(0);
+    c.selection.set({ kind: 'state', key: 'b' });
+    c.removeSelectedState();
     expect(c.graph().states).toHaveLength(1);
   });
 
