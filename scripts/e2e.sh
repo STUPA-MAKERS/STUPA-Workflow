@@ -51,9 +51,14 @@ if [[ -f "${ENV_FILE}" ]]; then
   mv -f "${ENV_FILE}" "${ENV_BACKUP}"
 fi
 cp .env.example "${ENV_FILE}"
+# OIDC + Altcha im e2e-Stack AUS: die optionalen Secrets dürfen NICHT als leerer
+# String gesetzt sein — `app.settings` validiert sie mit `min_length=16`, ein
+# präsentes "" bricht `get_settings()` (→ migrate exit 1). `.env.example` shippt sie
+# leer; hier die Zeilen entfernen ⇒ unset ⇒ Default None ⇒ Feature aus.
+# (oidc_enabled/altcha_enabled werden False; /api/auth/login → 404 für den RBAC-Test.)
+sed -i -E '/^[[:space:]]*(OIDC_CLIENT_SECRET|ALTCHA_HMAC_SECRET)[[:space:]]*=/d' "${ENV_FILE}"
 # Overrides ans Ende → letzter Wert je Key gewinnt. Wegwerf-Secrets ≥16 Zeichen.
-# OIDC bleibt unkonfiguriert (kein Mock-Keycloak) → Login 404 (RBAC-Negativtest).
-# Altcha AUS (ALTCHA_HMAC_SECRET leer) + Rate-Limit AUS → keine Flakes/Lockouts.
+# Rate-Limit AUS → keine Lockouts; FORWARDED_ALLOW_IPS=* ok (environment=development).
 cat >> "${ENV_FILE}" <<'EOF'
 
 # --- e2e overrides (vom Treiber erzeugt; NICHT committen) ----------------------
@@ -63,7 +68,6 @@ MINIO_ACCESS_KEY=e2e-minio-access
 MINIO_SECRET_KEY=e2e-minio-secret-key
 SESSION_SECRET=e2e-session-secret-0123456789
 MAGIC_LINK_SECRET=e2e-magic-link-secret-0123456789
-ALTCHA_HMAC_SECRET=
 RATE_LIMIT_ENABLED=false
 FORWARDED_ALLOW_IPS=*
 PUBLIC_BASE_URL=http://127.0.0.1:8080
@@ -81,7 +85,11 @@ echo "==> docker compose config (Validierung)"
 "${COMPOSE[@]}" config -q
 
 echo "==> docker compose up -d --build (Tier: ${TIER})"
-"${COMPOSE[@]}" up -d --build
+if ! "${COMPOSE[@]}" up -d --build; then
+  echo "FEHLER: compose up — Logs (migrate/api/web):"
+  "${COMPOSE[@]}" logs --no-color --tail=120 migrate api web || true
+  exit 1
+fi
 
 # --- warten bis api + web + mailpit healthy -------------------------------- #
 echo "==> Warte bis api + web + mailpit healthy (max ${TIMEOUT}s)"
