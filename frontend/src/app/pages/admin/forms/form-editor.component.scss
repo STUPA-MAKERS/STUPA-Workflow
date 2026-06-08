@@ -152,6 +152,12 @@
   color: var(--color-text-muted);
 }
 
+/* Feld-Schlüssel (Slug) — immer oben sichtbar, technisch abgesetzt. */
+.fe__key input {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-sm);
+}
+
 .fe__sub legend {
   font-size: var(--fs-xs);
   text-transform: uppercase;

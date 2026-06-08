@@ -107,6 +107,9 @@
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" (click)="removeQuestion(fi)"><app-icon name="delete" /></app-button>
             </div>
 
+            <label class="fe__lbl fe__key">{{ 'admin.common.key' | t }}
+              <input [(ngModel)]="field.key" (ngModelChange)="touch()" autocomplete="off" spellcheck="false" /></label>
+
             <div class="fe__row">
               <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
                 <input [(ngModel)]="field.label['de']" (ngModelChange)="touch()" [attr.placeholder]="'admin.forms.questionPlaceholder' | t" /></label>
@@ -150,10 +153,6 @@
 
             @if (isExpanded(fi)) {
               <div class="fe__advanced">
-                <div class="fe__row">
-                  <label class="fe__lbl">{{ 'admin.common.key' | t }}
-                    <input [(ngModel)]="field.key" (ngModelChange)="touch()" autocomplete="off" /></label>
-                </div>
                 <div class="fe__toggles">
                   <app-checkbox [(ngModel)]="field.isPII" (ngModelChange)="touch()">{{ 'admin.form.isPII' | t }}</app-checkbox>
                   <app-checkbox [ngModel]="field.isPromoted" (ngModelChange)="onPromotedToggle(fi, $event)">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
