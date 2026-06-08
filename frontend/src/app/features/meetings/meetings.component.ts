@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
@@ -242,6 +242,31 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
         </app-card>
       }
     } @else {
+      <!-- Übersicht: vorhandene Sitzungen (#104) -->
+      @if (canManage() || canWrite()) {
+        <app-card [heading]="'meetings.list.title' | t">
+          @if (loadingList()) {
+            <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
+          } @else if (meetings().length) {
+            <ul class="mtg__list">
+              @for (mtg of meetings(); track mtg.id) {
+                <li class="mtg__listItem">
+                  <span class="mtg__listTitle">{{ mtg.title }}</span>
+                  <app-badge [variant]="statusVariant(mtg.status)">
+                    {{ statusKey(mtg.status) | t }}
+                  </app-badge>
+                  <app-button variant="ghost" size="sm" (click)="openMeeting(mtg.id)">
+                    {{ 'meetings.list.open' | t }}
+                  </app-button>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="mtg__muted">{{ 'meetings.list.empty' | t }}</p>
+          }
+        </app-card>
+      }
+
       <!-- Keine Sitzung geladen → Anlegen (nur Sitzungsleitung) -->
       @if (canManage()) {
         <app-card [heading]="'meetings.create.title' | t">
@@ -486,6 +511,26 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
         gap: var(--space-3);
         max-width: 28rem;
       }
+      .mtg__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      .mtg__listItem {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        padding: var(--space-3);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+      }
+      .mtg__listTitle {
+        font-weight: var(--fw-medium);
+        margin-right: auto;
+      }
     `,
   ],
 })
@@ -496,6 +541,7 @@ export class MeetingsComponent implements OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly ws = inject(WsService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly useMock = inject(USE_MOCK_API);
   private readonly options = inject(AdminOptionsService);
@@ -504,6 +550,10 @@ export class MeetingsComponent implements OnDestroy {
   readonly error = signal(false);
   readonly meeting = signal<Meeting | null>(null);
   readonly protocol = signal<Protocol | null>(null);
+
+  /** Sitzungs-Liste (#104) — gezeigt, solange keine einzelne Sitzung geladen ist. */
+  readonly meetings = signal<Meeting[]>([]);
+  readonly loadingList = signal(false);
 
   readonly markdown = signal('');
   readonly dirty = signal(false);
@@ -528,7 +578,13 @@ export class MeetingsComponent implements OnDestroy {
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       const id = pm.get('id');
-      if (id) this.loadMeeting(id);
+      if (id) {
+        this.loadMeeting(id);
+      } else {
+        // Übersichts-Route `/meetings`: einzelne Sitzung lösen + Liste laden (#104).
+        this.meeting.set(null);
+        this.loadList();
+      }
     });
     // Gremien-Liste für das Anlege-Dropdown (#68) — nur wer Sitzungen verwaltet.
     if (this.canManage()) {
@@ -568,6 +624,22 @@ export class MeetingsComponent implements OnDestroy {
     if (m.protocolId && this.canWrite()) this.loadProtocol();
   }
 
+  /** Sitzungs-Liste laden (#104 — Wiederauffindbarkeit). */
+  private loadList(): void {
+    if (!this.canManage() && !this.canWrite()) return;
+    this.loadingList.set(true);
+    this.api.listMeetings().subscribe({
+      next: (list) => {
+        this.loadingList.set(false);
+        this.meetings.set(list);
+      },
+      error: () => {
+        this.loadingList.set(false);
+        this.meetings.set([]);
+      },
+    });
+  }
+
   create(event: Event): void {
     event.preventDefault();
     const title = this.newTitle().trim();
@@ -579,14 +651,20 @@ export class MeetingsComponent implements OnDestroy {
         this.creating.set(false);
         this.newTitle.set('');
         this.newGremiumId.set('');
-        this.adoptMeeting(m);
         this.toast.success(this.i18n.translate('meetings.toast.created'));
+        // Auf die Detail-Route navigieren, damit die Sitzung wiederauffindbar ist (#104).
+        void this.router.navigate(['/meetings', m.id]);
       },
       error: () => {
         this.creating.set(false);
         this.toast.error(this.i18n.translate('meetings.toast.createFailed'));
       },
     });
+  }
+
+  /** Eine Sitzung aus der Liste öffnen → Detail-Route (#104). */
+  openMeeting(id: Uuid): void {
+    void this.router.navigate(['/meetings', id]);
   }
 
   // --- Sitzungssteuerung ---------------------------------------------------

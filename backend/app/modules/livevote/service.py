@@ -29,6 +29,7 @@ from app.modules.livevote.events import (
 )
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
+from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed, VoteOut
 from app.shared.errors import NotFoundError
@@ -90,7 +91,7 @@ class MeetingService:
         self.publisher = publisher
 
     @staticmethod
-    def _to_out(meeting: Meeting) -> MeetingOut:
+    def _to_out(meeting: Meeting, protocol_id: UUID | None = None) -> MeetingOut:
         return MeetingOut(
             id=meeting.id,
             gremiumId=meeting.gremium_id,
@@ -98,6 +99,8 @@ class MeetingService:
             date=meeting.date,
             status=meeting.status,  # type: ignore[arg-type]
             activeApplicationId=meeting.active_application_id,
+            protocolId=protocol_id,
+            createdAt=meeting.created_at,
         )
 
     async def _get(self, meeting_id: UUID) -> Meeting:
@@ -108,9 +111,41 @@ class MeetingService:
             raise NotFoundError(f"meeting {meeting_id} not found")
         return meeting
 
+    async def _protocol_id(self, meeting_id: UUID) -> UUID | None:
+        """``protocol.id`` der Sitzung (UNIQUE ``meeting_id``) oder ``None``."""
+        return (
+            await self.session.execute(
+                select(Protocol.id).where(Protocol.meeting_id == meeting_id)
+            )
+        ).scalar_one_or_none()
+
     async def get(self, meeting_id: UUID) -> MeetingOut:
         """Sitzungs-State (404, falls unbekannt)."""
-        return self._to_out(await self._get(meeting_id))
+        meeting = await self._get(meeting_id)
+        return self._to_out(meeting, await self._protocol_id(meeting.id))
+
+    async def list(self, gremium_id: UUID | None = None) -> list[MeetingOut]:
+        """Sitzungen (neueste zuerst), optional auf ein Gremium gefiltert.
+
+        Erlaubt das **Wiederfinden** angelegter Sitzungen (#104): ohne Liste war eine
+        frisch erstellte Sitzung nach Reload nur über ihre UUID erreichbar.
+        """
+        stmt = select(Meeting).order_by(Meeting.created_at.desc())
+        if gremium_id is not None:
+            stmt = stmt.where(Meeting.gremium_id == gremium_id)
+        meetings = (await self.session.execute(stmt)).scalars().all()
+        if not meetings:
+            return []
+        # Protokoll-IDs gebündelt laden (kein N+1): meeting_id → protocol.id.
+        proto_rows = (
+            await self.session.execute(
+                select(Protocol.meeting_id, Protocol.id).where(
+                    Protocol.meeting_id.in_([m.id for m in meetings])
+                )
+            )
+        ).all()
+        proto_by_meeting = {meeting_id: pid for meeting_id, pid in proto_rows}
+        return [self._to_out(m, proto_by_meeting.get(m.id)) for m in meetings]
 
     async def create(self, payload: MeetingCreate, principal: Principal) -> MeetingOut:
         """Sitzung (``planned``) anlegen."""

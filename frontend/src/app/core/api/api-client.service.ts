@@ -274,6 +274,15 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
+  /** GET /meetings — Sitzungen auflisten (neueste zuerst), optional Gremium-gefiltert (#104). */
+  listMeetings(gremiumId?: Uuid): Observable<Meeting[]> {
+    let params = new HttpParams();
+    if (gremiumId) params = params.set('gremiumId', gremiumId);
+    return this.http
+      .get<MeetingOutWire[]>(`${this.base}/meetings`, { params })
+      .pipe(map((items) => items.map(mapMeeting)));
+  }
+
   /** GET /meetings/{id} — Sitzungs-State + Votes. */
   getMeeting(id: Uuid): Observable<Meeting> {
     return this.http.get<MeetingOutWire>(`${this.base}/meetings/${id}`).pipe(map(mapMeeting));

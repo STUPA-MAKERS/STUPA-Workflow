@@ -8,6 +8,7 @@ Integrationstest).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -143,7 +144,12 @@ async def test_publisher_meeting_state() -> None:
     broker = _CaptureBroker()
     mid, aid = uuid4(), uuid4()
     out = MeetingOut(
-        id=mid, gremiumId=uuid4(), title="GV", status="live", activeApplicationId=aid
+        id=mid,
+        gremiumId=uuid4(),
+        title="GV",
+        status="live",
+        activeApplicationId=aid,
+        createdAt=datetime(2026, 6, 8, tzinfo=UTC),
     )
     await BrokerPublisher(broker).meeting_state(out)
     [(channel, msg)] = broker.messages
@@ -181,7 +187,10 @@ class _FakeSession:
         self.added.append(obj)
 
     async def flush(self) -> None:
-        return None
+        # DB-Server-Default nachstellen: ``created_at`` wird beim Insert gesetzt.
+        for obj in self.added:
+            if getattr(obj, "created_at", None) is None:
+                obj.created_at = datetime(2026, 6, 8, tzinfo=UTC)  # type: ignore[attr-defined]
 
     async def commit(self) -> None:
         self.commits += 1
@@ -212,6 +221,7 @@ async def test_service_patch_applies_and_broadcasts_meeting_state() -> None:
     meeting.status = "planned"
     meeting.date = None
     meeting.active_application_id = None
+    meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
     session = _FakeSession(existing=meeting)
     broker = _CaptureBroker()
     svc = MeetingService(session, BrokerPublisher(broker))  # type: ignore[arg-type]
@@ -233,6 +243,7 @@ async def test_service_patch_without_publisher_is_silent() -> None:
     meeting.status = "planned"
     meeting.date = None
     meeting.active_application_id = None
+    meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     out = await svc.patch(meeting.id, MeetingPatch(status="closed"))
     assert out.status == "closed"
@@ -243,6 +254,64 @@ async def test_service_open_vote_returns_row() -> None:
     vote = Vote(application_id=uuid4(), eligible_group="stupa", config={})
     svc = MeetingService(_FakeSession(existing=vote))  # type: ignore[arg-type]
     assert await svc.open_vote(uuid4()) is vote
+
+
+# --------------------------------------------------------------------------- #
+# list() — Sitzungen wiederfinden (#104)
+# --------------------------------------------------------------------------- #
+class _ListResult:
+    def __init__(self, rows: list) -> None:
+        self._rows = rows
+
+    def scalars(self) -> _ListResult:
+        return self
+
+    def all(self) -> list:
+        return self._rows
+
+
+class _ListSession:
+    """Liefert die je ``execute`` vorab gequeueten Zeilen (FIFO)."""
+
+    def __init__(self, *result_sets: list) -> None:
+        self._queue = list(result_sets)
+
+    async def execute(self, _stmt: object) -> _ListResult:
+        return _ListResult(self._queue.pop(0) if self._queue else [])
+
+
+def _meeting_row(*, status: str = "planned") -> Meeting:
+    m = Meeting(gremium_id=uuid4(), title="GV")
+    m.id = uuid4()
+    m.status = status
+    m.date = None
+    m.active_application_id = None
+    m.created_at = datetime(2026, 6, 8, tzinfo=UTC)
+    return m
+
+
+@pytest.mark.asyncio
+async def test_service_list_maps_protocol_and_keeps_order() -> None:
+    m1, m2 = _meeting_row(), _meeting_row()
+    pid = uuid4()
+    session = _ListSession([m1, m2], [(m1.id, pid)])  # nur m1 hat ein Protokoll
+    out = await MeetingService(session).list()  # type: ignore[arg-type]
+    assert [o.id for o in out] == [m1.id, m2.id]
+    assert out[0].protocol_id == pid
+    assert out[1].protocol_id is None
+
+
+@pytest.mark.asyncio
+async def test_service_list_with_gremium_filter() -> None:
+    m = _meeting_row()
+    out = await MeetingService(_ListSession([m], [])).list(m.gremium_id)  # type: ignore[arg-type]
+    assert [o.id for o in out] == [m.id]
+
+
+@pytest.mark.asyncio
+async def test_service_list_empty_returns_empty() -> None:
+    out = await MeetingService(_ListSession([])).list()  # type: ignore[arg-type]
+    assert out == []
 
 
 def _principal():  # noqa: ANN202

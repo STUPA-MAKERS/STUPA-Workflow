@@ -45,7 +45,12 @@ _GREMIUM = uuid4()
 
 def _meeting(status: MeetingStatus = "live") -> MeetingOut:
     return MeetingOut(
-        id=uuid4(), gremiumId=_GREMIUM, title="GV", status=status, activeApplicationId=None
+        id=uuid4(),
+        gremiumId=_GREMIUM,
+        title="GV",
+        status=status,
+        activeApplicationId=None,
+        createdAt=datetime(2026, 6, 8, tzinfo=UTC),
     )
 
 

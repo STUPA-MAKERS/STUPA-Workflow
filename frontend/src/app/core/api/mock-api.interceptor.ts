@@ -500,6 +500,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/budget-pots')) return ok([...MOCK_BUDGET_POTS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
+    if (p.endsWith('/meetings')) return ok([MOCK_MEETING]);
     if (/\/meetings\/[^/]+$/.test(p)) return ok(MOCK_MEETING);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
   }
@@ -579,7 +580,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (/\/meetings\/[^/]+\/protocol$/.test(p)) return ok(MOCK_PROTOCOL);
     if (p.endsWith('/meetings')) {
       const title = (req.body as { title?: string } | null)?.title?.trim();
-      MOCK_MEETING = { ...MOCK_MEETING, title: title || MOCK_MEETING.title, status: 'live' };
+      // BE legt neue Sitzungen mit Status `planned` an (#104 — keine Drift mehr).
+      MOCK_MEETING = { ...MOCK_MEETING, title: title || MOCK_MEETING.title, status: 'planned' };
       return ok(MOCK_MEETING, 201);
     }
   }
