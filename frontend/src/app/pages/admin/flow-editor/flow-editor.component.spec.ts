@@ -46,16 +46,18 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(container.querySelectorAll('.fe__node-text')).toHaveLength(3);
   });
 
-  it('exposes guard operators only for a selected transition in expert mode', async () => {
+  it('exposes the guard control only for an automatic transition', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     await userEvent.click(screen.getByRole('button', { name: 'Vorlage übernehmen' }));
-    // Nothing selected → no inspector guard control.
-    expect(screen.queryByRole('combobox', { name: 'Bedingung (Guard)' })).not.toBeInTheDocument();
 
     c.selectEdge(0); // erste Transition auswählen
-    c.setMode('expert');
+    fixture.detectChanges();
+    // Manueller Übergang → kein Guard-Control.
+    expect(screen.queryByRole('combobox', { name: 'Bedingung (Guard)' })).not.toBeInTheDocument();
+
+    c.setTransitionAutomatic(0, true); // Guard erscheint erst für automatische Übergänge (FE3)
     fixture.detectChanges();
     expect(screen.getByRole('combobox', { name: 'Bedingung (Guard)' })).toBeInTheDocument();
   });
@@ -75,7 +77,8 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().states.filter((s: { isInitial?: boolean }) => s.isInitial)).toHaveLength(1);
     c.setStateCategory('a', 'open');
     c.setStateCategory('a', ''); // clear → null branch
-    c.setStateLabel('a', 'Entwurf');
+    c.setStateLabel('a', 'de', 'Entwurf');
+    c.setStateLabel('a', 'en', 'Draft');
     c.setStateEditAllowed('a', false);
 
     // Übergang a→b anlegen (entspricht dem Aufziehen im Canvas).
@@ -95,7 +98,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.addAction(0, ''); // no-op branch
     expect(c.graph().transitions[0].actions).toHaveLength(1);
     c.removeAction(0, 0);
-    c.setTransitionLabel(0, 'go');
+    c.setTransitionLabel(0, 'de', 'go');
     c.setTransitionEndpoint(0, 'to', 'b');
 
     c.setMode('expert');

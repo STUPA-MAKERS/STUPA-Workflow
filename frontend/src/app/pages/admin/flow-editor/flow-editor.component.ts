@@ -25,6 +25,7 @@ import {
   type StateCategory,
   type StateDef,
   type TransitionDef,
+  VOTE_RESULTS,
 } from '../admin.models';
 import {
   STATE_CATEGORIES,
@@ -162,14 +163,21 @@ export class FlowEditorComponent {
       });
   });
 
-  protected readonly viewBox = computed(() => {
-    const pos = this.positions();
-    const xs = Object.values(pos).map((p) => p.x);
-    const ys = Object.values(pos).map((p) => p.y);
-    const w = (xs.length ? Math.max(...xs) : 0) + NODE_W + MARGIN;
-    const h = (ys.length ? Math.max(...ys) : 0) + NODE_H + MARGIN;
-    return `0 0 ${Math.max(w, 480)} ${Math.max(h, 240)}`;
+  /**
+   * Canvas-Maße aus den Knoten-Positionen. Das SVG wird **1:1** gerendert
+   * (`width`/`height` == viewBox), in einem scrollbaren Wrapper — so skaliert das
+   * Diagramm beim Ziehen eines Knotens nicht um (kein Springen) und 1 User-Unit
+   * entspricht 1 Pixel (exaktes Drag-Mapping).
+   */
+  protected readonly canvasW = computed(() => {
+    const xs = Object.values(this.positions()).map((p) => p.x);
+    return Math.max((xs.length ? Math.max(...xs) : 0) + NODE_W + MARGIN, 480);
   });
+  protected readonly canvasH = computed(() => {
+    const ys = Object.values(this.positions()).map((p) => p.y);
+    return Math.max((ys.length ? Math.max(...ys) : 0) + NODE_H + MARGIN, 320);
+  });
+  protected readonly viewBox = computed(() => `0 0 ${this.canvasW()} ${this.canvasH()}`);
 
   /** Aktuell ausgewählter State (oder undefined). */
   protected readonly selectedState = computed<StateDef | undefined>(() => {
@@ -194,8 +202,56 @@ export class FlowEditorComponent {
     return this.i18n.translate(`admin.flow.cat.${c}` as TranslationKey);
   }
 
+  /** Von/Nach-Optionen als „Klarname (key)" (FE5). */
   protected stateOptions(): SelectOption[] {
-    return this.graph().states.map((s) => ({ value: s.key, label: s.key }));
+    return this.graph().states.map((s) => ({ value: s.key, label: `${this.label(s)} (${s.key})` }));
+  }
+
+  /** Guard-Operatoren mit übersetztem Klarnamen (FE2). */
+  protected guardOpOptions(): SelectOption[] {
+    return this.guardOps.map((op) => ({
+      value: op,
+      label: this.i18n.translate(`admin.flow.guardOp.${op}` as TranslationKey),
+    }));
+  }
+
+  /** Action-Typen mit übersetztem Klarnamen (FE6). */
+  protected actionOptions(): SelectOption[] {
+    return this.actionTypes.map((a) => ({
+      value: a,
+      label: this.i18n.translate(`admin.flow.actionType.${a}` as TranslationKey),
+    }));
+  }
+
+  /** Übersetzter Action-Klarname + Beschreibung (FE6/FE7). */
+  protected actionLabel(type: string): string {
+    return this.i18n.translate(`admin.flow.actionType.${type}` as TranslationKey);
+  }
+  protected actionDesc(type: string): string {
+    return this.i18n.translate(`admin.flow.actionDesc.${type}` as TranslationKey);
+  }
+
+  /** Wert-Optionen für `voteResult` (passed/rejected/tie) als Dropdown (FE1). */
+  protected readonly voteResultOptions: SelectOption[] = VOTE_RESULTS.map((v) => ({
+    value: v,
+    label: this.i18n.translate(`admin.flow.voteResult.${v}` as TranslationKey),
+  }));
+
+  /**
+   * Art des Wert-Controls je Guard-Operator (FE1):
+   * - `none`  → boolesche/parameterlose Operatoren (kein Wertfeld)
+   * - `vote`  → `voteResult` → Dropdown passed/rejected/tie
+   * - `text`  → `roleIs`/`permissionIs` → Freitext mit Annotation
+   */
+  protected guardValueKind(op: string): 'none' | 'vote' | 'text' {
+    if (op === 'voteResult') return 'vote';
+    if (op === 'fieldsComplete' || op === 'deadlinePassed' || op === 'manual' || !op) return 'none';
+    return 'text';
+  }
+
+  /** Annotation/Hinweis für das Guard-Wertfeld je Operator (FE1). */
+  protected guardValueHint(op: string): string {
+    return this.i18n.translate(`admin.flow.guardHint.${op}` as TranslationKey);
   }
 
   // --- mode / presets ------------------------------------------------------
@@ -266,10 +322,12 @@ export class FlowEditorComponent {
     this.selection.set({ kind: 'state', key });
   }
 
-  protected setStateLabel(key: string, value: string): void {
+  protected setStateLabel(key: string, lang: 'de' | 'en', value: string): void {
     this.graph.update((g) => ({
       ...g,
-      states: g.states.map((s) => (s.key === key ? { ...s, label: { ...s.label, de: value } } : s)),
+      states: g.states.map((s) =>
+        s.key === key ? { ...s, label: { ...s.label, [lang]: value } } : s,
+      ),
     }));
   }
 
@@ -309,12 +367,16 @@ export class FlowEditorComponent {
     }));
   }
 
-  protected setTransitionLabel(index: number, value: string): void {
+  protected setTransitionLabel(index: number, lang: 'de' | 'en', value: string): void {
     this.graph.update((g) => ({
       ...g,
-      transitions: (g.transitions ?? []).map((t, idx) =>
-        idx === index ? { ...t, label: value ? { de: value } : null } : t,
-      ),
+      transitions: (g.transitions ?? []).map((t, idx) => {
+        if (idx !== index) return t;
+        const label = { ...(t.label ?? {}), [lang]: value };
+        // Leere Sprachen wegräumen; bleibt nichts übrig → kein Label.
+        const cleaned = Object.fromEntries(Object.entries(label).filter(([, v]) => v));
+        return { ...t, label: Object.keys(cleaned).length ? cleaned : null };
+      }),
     }));
   }
 

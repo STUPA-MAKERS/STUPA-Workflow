@@ -65,11 +65,14 @@
   }
 
   <div class="fe__work">
-    <!-- Canvas -->
+    <!-- Canvas (scrollbarer Wrapper → 1:1-Rendering, kein Umskalieren beim Ziehen) -->
+    <div class="fe__canvas-wrap">
     <svg
       #canvas
       class="fe__canvas"
       [attr.viewBox]="viewBox()"
+      [attr.width]="canvasW()"
+      [attr.height]="canvasH()"
       role="application"
       [attr.aria-label]="'admin.flow.diagram' | t"
       (pointermove)="onCanvasPointerMove($event)"
@@ -134,6 +137,7 @@
         </g>
       }
     </svg>
+    </div>
 
     <!-- Inspektor -->
     <aside class="fe__panel" [attr.aria-label]="'admin.flow.inspector' | t">
@@ -142,7 +146,9 @@
         <label class="fe__lbl">{{ 'admin.common.key' | t }}
           <input [ngModel]="s.key" (ngModelChange)="setStateKey(s.key, $event)" autocomplete="off" /></label>
         <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
-          <input [ngModel]="s.label['de']" (ngModelChange)="setStateLabel(s.key, $event)" /></label>
+          <input [ngModel]="s.label['de']" (ngModelChange)="setStateLabel(s.key, 'de', $event)" /></label>
+        <label class="fe__lbl">{{ 'admin.common.labelEn' | t }}
+          <input [ngModel]="s.label['en']" (ngModelChange)="setStateLabel(s.key, 'en', $event)" /></label>
         <label class="fe__lbl">{{ 'admin.flow.category' | t }}
           <select [ngModel]="s.category ?? ''" (ngModelChange)="setStateCategory(s.key, $event)">
             <option value="">—</option>
@@ -174,37 +180,66 @@
           (ngModelChange)="setTransitionEndpoint(sel.index, 'to', $event)"
         />
         <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
-          <input [ngModel]="sel.t.label?.['de'] ?? ''" (ngModelChange)="setTransitionLabel(sel.index, $event)" /></label>
-        <app-checkbox [ngModel]="!!sel.t.automatic" (ngModelChange)="setTransitionAutomatic(sel.index, $event)" [hint]="'admin.flow.automaticHint' | t">
-          {{ 'admin.flow.automatic' | t }}
-        </app-checkbox>
+          <input [ngModel]="sel.t.label?.['de'] ?? ''" (ngModelChange)="setTransitionLabel(sel.index, 'de', $event)" /></label>
+        <label class="fe__lbl">{{ 'admin.common.labelEn' | t }}
+          <input [ngModel]="sel.t.label?.['en'] ?? ''" (ngModelChange)="setTransitionLabel(sel.index, 'en', $event)" /></label>
+        <div class="fe__auto" [class.fe__auto--on]="!!sel.t.automatic">
+          <app-checkbox [ngModel]="!!sel.t.automatic" (ngModelChange)="setTransitionAutomatic(sel.index, $event)" [hint]="'admin.flow.automaticHint' | t">
+            {{ 'admin.flow.automatic' | t }}
+          </app-checkbox>
+        </div>
+
+        <!-- Guard nur bei automatischen Übergängen (FE3): er entscheidet das Auto-Feuern. -->
+        @if (sel.t.automatic) {
+          <app-select
+            [label]="'admin.flow.guard' | t"
+            [placeholder]="'admin.flow.guardNone' | t"
+            [hint]="'admin.flow.guardHelp' | t"
+            [options]="guardOpOptions()"
+            [ngModel]="guardOp(sel.t)"
+            (ngModelChange)="setGuard(sel.index, $event, guardValue(sel.t))"
+          />
+          @switch (guardValueKind(guardOp(sel.t))) {
+            @case ('vote') {
+              <app-select
+                [label]="'admin.flow.guardValue' | t"
+                [options]="voteResultOptions"
+                [ngModel]="guardValue(sel.t)"
+                (ngModelChange)="setGuard(sel.index, guardOp(sel.t), $event)"
+              />
+            }
+            @case ('text') {
+              <label class="fe__lbl">{{ 'admin.flow.guardValue' | t }}
+                <input [ngModel]="guardValue(sel.t)" (ngModelChange)="setGuard(sel.index, guardOp(sel.t), $event)" />
+                <span class="fe__field-hint">{{ guardValueHint(guardOp(sel.t)) }}</span>
+              </label>
+            }
+          }
+        }
 
         @if (mode() === 'expert') {
-          <label class="fe__lbl">{{ 'admin.flow.guard' | t }}
-            <select #gop [ngModel]="guardOp(sel.t)" (ngModelChange)="setGuard(sel.index, $event, gval.value)">
-              <option value="">—</option>
-              @for (op of guardOps; track op) {
-                <option [value]="op">{{ op }}</option>
-              }
-            </select></label>
-          <label class="fe__lbl">{{ 'admin.flow.guardValue' | t }}
-            <input #gval [value]="guardValue(sel.t)" (input)="setGuard(sel.index, gop.value, gval.value)" /></label>
-
           <div class="fe__actions">
             <span class="fe__actions-label">{{ 'admin.flow.actions' | t }}:</span>
             @for (act of sel.t.actions ?? []; track $index; let ai = $index) {
-              <span class="fe__chip">
-                {{ act.type }}
+              <span class="fe__chip" [attr.title]="actionDesc(act.type)">
+                {{ actionLabel(act.type) }}
                 <button type="button" [attr.aria-label]="'admin.common.remove' | t" (click)="removeAction(sel.index, ai)">✕</button>
               </span>
             }
             <select #asel (change)="addAction(sel.index, asel.value); asel.value = ''">
               <option value="">{{ 'admin.flow.addAction' | t }}</option>
-              @for (at of actionTypes; track at) {
-                <option [value]="at">{{ at }}</option>
+              @for (opt of actionOptions(); track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
               }
             </select>
           </div>
+          @if ((sel.t.actions ?? []).length) {
+            <ul class="fe__action-descs">
+              @for (act of sel.t.actions ?? []; track $index) {
+                <li><strong>{{ actionLabel(act.type) }}</strong> — {{ actionDesc(act.type) }}</li>
+              }
+            </ul>
+          }
         }
         <app-button variant="danger" size="sm" (click)="removeSelectedTransition()">{{ 'admin.flow.removeTransition' | t }}</app-button>
       } @else {

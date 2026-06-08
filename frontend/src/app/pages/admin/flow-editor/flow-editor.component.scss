@@ -184,13 +184,25 @@ select {
   }
 }
 
-.fe__canvas {
-  width: 100%;
+.fe__canvas-wrap {
   height: 30rem;
+  overflow: auto;
   background: var(--color-surface-sunken);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.fe__canvas {
+  display: block;
+  /* 1:1 (px == user-units): kein Umskalieren beim Ziehen, exaktes Drag-Mapping. */
   touch-action: none;
+  user-select: none;
+}
+
+.fe__node-g {
+  cursor: grab;
 }
 
 .fe__edge {
@@ -306,6 +318,39 @@ select {
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
   margin: 0;
+}
+
+/* Controls im Panel füllen die Breite → saubere Ausrichtung (FE8). */
+.fe__panel .fe__lbl input,
+.fe__panel .fe__lbl select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fe__field-hint {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.fe__auto {
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.fe__auto--on {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.fe__action-descs {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
 }
 
 .fe__json pre {

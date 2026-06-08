@@ -142,6 +142,8 @@ export function parseFlowGraph(json: string): FlowGraph {
 
 const COL_GAP = 220;
 const ROW_GAP = 120;
+/** Linker/oberer Rand, damit Knoten nicht am Canvas-Rand kleben (#flow-pad). */
+const PAD = 40;
 
 /**
  * Fehlende Knoten-Positionen ergänzen: BFS-Schichten ab dem Initial-State
@@ -183,7 +185,7 @@ export function autoLayout(graph: FlowGraph): FlowGraph {
     const d = depth.get(s.key) ?? 0;
     const row = rowCursor.get(d) ?? 0;
     rowCursor.set(d, row + 1);
-    positions[s.key] = { x: d * COL_GAP, y: row * ROW_GAP };
+    positions[s.key] = { x: PAD + d * COL_GAP, y: PAD + row * ROW_GAP };
   }
   return { ...graph, layout: { positions } };
 }
