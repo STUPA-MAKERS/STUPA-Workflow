@@ -1,0 +1,41 @@
+# Local-only Keycloak for OIDC testing. NICHT für prod (dort echtes idp.reutlingen.university).
+# Start: docker compose -f docker-compose.yml -f docker-compose.keycloak.yml up -d
+#
+# Admin-Console: http://localhost:8081  (admin / admin)
+# Realm: antrag   Client: antragsplattform-demo-local (confidential)   Test-User: tester / tester
+#
+# issuer = http://host.docker.internal:8081/realms/antrag muss für Browser UND api-Container
+# identisch auflösen:
+#   - Browser:    einmalig in /etc/hosts ->  127.0.0.1 host.docker.internal
+#   - Container:  extra_hosts host-gateway (unten) -> Host-IP -> publizierter Port 8081
+# Keycloak start-dev leitet den issuer-Claim aus dem Host-Header ab, daher matcht beides.
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      # Realm "antrag" + Client + Test-User werden beim Boot importiert.
+      - ./keycloak:/opt/keycloak/data/import:ro
+    ports:
+      - "8081:8080"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /realms/master HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 200"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # host.docker.internal:8081 vom Container aus erreichbar machen (Linux native docker).
+  api:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  worker:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
