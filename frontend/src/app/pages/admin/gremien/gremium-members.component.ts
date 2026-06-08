@@ -18,13 +18,14 @@ import {
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminApiService } from '../admin-api.service';
-import type { AdminPrincipal, Gremium, Role } from '../admin.models';
+import type { AdminPrincipal, Gremium, GremiumMembership, GremiumRole } from '../admin.models';
 
 interface Member {
   assignmentId: string;
   name: string;
   email: string | null;
   roleLabel: string;
+  term: string;
 }
 
 /**
@@ -65,6 +66,7 @@ interface Member {
       <app-data-table [columns]="columns()" [rows]="members()" [rowKey]="rowId">
         <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
         <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
+        <ng-template appCell="term" let-m><span class="gm__muted">{{ $any(m).term }}</span></ng-template>
         <ng-template appCell="actions" let-m>
           <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberRemove' | t" (click)="removeMember($any(m).assignmentId)">
             <app-icon name="delete" />
@@ -118,6 +120,18 @@ interface Member {
           (ngModelChange)="addRoleId.set($event)"
           name="memberRole"
         />
+        @if (roleOptions().length === 0) {
+          <p class="gm__picked">
+            {{ 'admin.gremiumRoles.empty' | t }}
+            <a [routerLink]="['/admin/gremien', gremiumIdRef, 'roles']">{{ 'admin.gremiumRoles.manage' | t }}</a>
+          </p>
+        }
+        <div class="gm__term">
+          <label class="gm__lbl">{{ 'admin.gremien.termFrom' | t }}
+            <input class="gm__control" type="date" [ngModel]="addFrom()" (ngModelChange)="addFrom.set($event)" name="from" /></label>
+          <label class="gm__lbl">{{ 'admin.gremien.termUntil' | t }}
+            <input class="gm__control" type="date" [ngModel]="addUntil()" (ngModelChange)="addUntil.set($event)" name="until" /></label>
+        </div>
       </div>
       <div dialog-footer class="gm__dialog-foot">
         <app-button variant="ghost" (click)="closeAdd()">{{ 'admin.gremien.cancel' | t }}</app-button>
@@ -247,6 +261,20 @@ interface Member {
         margin: 0;
         font-size: var(--fs-sm);
       }
+      .gm__muted {
+        color: var(--color-text-muted);
+        font-size: var(--fs-sm);
+      }
+      .gm__term {
+        display: flex;
+        gap: var(--space-3);
+      }
+      .gm__term .gm__lbl {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        flex: 1;
+      }
       .gm__dialog-foot {
         display: flex;
         gap: var(--space-3);
@@ -261,46 +289,48 @@ export class GremiumMembersComponent {
   private readonly route = inject(ActivatedRoute);
 
   private readonly gremiumId = this.route.snapshot.paramMap.get('id') ?? '';
+  protected readonly gremiumIdRef = this.gremiumId;
 
   readonly gremium = signal<Gremium | null>(null);
-  private readonly principals = signal<AdminPrincipal[]>([]);
-  private readonly roles = signal<Role[]>([]);
+  private readonly principalsById = signal<Map<string, AdminPrincipal>>(new Map());
+  private readonly gremiumRoles = signal<GremiumRole[]>([]);
+  private readonly memberships = signal<GremiumMembership[]>([]);
 
   readonly addOpen = signal(false);
   readonly query = signal('');
   readonly candidates = signal<AdminPrincipal[]>([]);
   readonly selected = signal<AdminPrincipal | null>(null);
   readonly addRoleId = signal('');
+  readonly addFrom = signal('');
+  readonly addUntil = signal('');
 
   readonly roleOptions = computed<SelectOption[]>(() =>
-    this.roles().map((r) => ({ value: r.id, label: this.roleName(r) })),
+    this.gremiumRoles().map((r) => ({ value: r.id, label: this.roleName(r) })),
   );
 
   readonly columns = computed<ColumnDef[]>(() => [
     { key: 'name', label: this.i18n.translate('admin.users.col.name') },
     { key: 'email', label: this.i18n.translate('admin.users.col.email') },
     { key: 'roleLabel', label: this.i18n.translate('admin.gremien.memberRole') },
+    { key: 'term', label: this.i18n.translate('admin.gremien.term') },
     { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
   ]);
   readonly rowId = (m: unknown): string => (m as Member).assignmentId;
 
   readonly members = computed<Member[]>(() => {
-    const rolesById = new Map(this.roles().map((r) => [r.id, r]));
-    const out: Member[] = [];
-    for (const p of this.principals()) {
-      for (const a of p.assignments) {
-        if (a.gremiumId === this.gremiumId) {
-          const role = rolesById.get(a.roleId);
-          out.push({
-            assignmentId: a.id,
-            name: p.displayName || p.email || p.sub,
-            email: p.email ?? null,
-            roleLabel: role ? this.roleName(role) : a.roleId,
-          });
-        }
-      }
-    }
-    return out;
+    const rolesById = new Map(this.gremiumRoles().map((r) => [r.id, r]));
+    const byId = this.principalsById();
+    return this.memberships().map((m) => {
+      const p = byId.get(m.principalId);
+      const role = rolesById.get(m.gremiumRoleId);
+      return {
+        assignmentId: m.id,
+        name: p ? p.displayName || p.email || p.sub : m.principalId,
+        email: p?.email ?? null,
+        roleLabel: role ? this.roleName(role) : m.gremiumRoleId,
+        term: this.term(m),
+      };
+    });
   });
 
   constructor() {
@@ -308,18 +338,31 @@ export class GremiumMembersComponent {
       .listGremien()
       .pipe(takeUntilDestroyed())
       .subscribe((list) => this.gremium.set(list.find((g) => g.id === this.gremiumId) ?? null));
-    this.api.listRoles().subscribe((r) => this.roles.set(r));
-    this.refreshPrincipals();
+    this.api.listGremiumRoles(this.gremiumId as Uuid).subscribe((r) => this.gremiumRoles.set(r));
+    // Principal-Namen für die Anzeige (id → Principal).
+    this.api.listPrincipals('').subscribe((p) =>
+      this.principalsById.set(new Map(p.map((x) => [x.id, x]))),
+    );
+    this.refresh();
   }
 
-  private roleName(role: Role): string {
-    return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
+  private roleName(role: GremiumRole): string {
+    return role.name[this.i18n.locale()] ?? role.name['de'] ?? role.key;
+  }
+
+  private term(m: GremiumMembership): string {
+    const f = m.validFrom ? m.validFrom.slice(0, 10) : '';
+    const u = m.validUntil ? m.validUntil.slice(0, 10) : '';
+    if (!f && !u) return '—';
+    return `${f || '…'} – ${u || '…'}`;
   }
 
   openAdd(): void {
     this.query.set('');
     this.selected.set(null);
     this.addRoleId.set('');
+    this.addFrom.set('');
+    this.addUntil.set('');
     this.candidates.set([]);
     this.addOpen.set(true);
   }
@@ -347,28 +390,39 @@ export class GremiumMembersComponent {
     const roleId = this.addRoleId();
     if (!s || !roleId) return;
     this.api
-      .assignRole({ principalId: s.id, roleId, gremiumId: this.gremiumId as Uuid, validFrom: null, validUntil: null })
+      .createGremiumMembership(this.gremiumId as Uuid, {
+        principalId: s.id,
+        gremiumRoleId: roleId as Uuid,
+        validFrom: this.addFrom() || null,
+        validUntil: this.addUntil() || null,
+      })
       .subscribe({
         next: () => {
           this.toast.success(this.i18n.translate('admin.gremien.memberAdded'));
           this.addOpen.set(false);
-          this.refreshPrincipals();
+          this.refresh();
         },
-        error: () => this.toast.error(this.i18n.translate('admin.gremien.memberFailed')),
+        // 409 = überlappende Amtszeit (eine Rolle je Zeitpunkt).
+        error: (err: { status?: number }) =>
+          this.toast.error(
+            this.i18n.translate(
+              err.status === 409 ? 'admin.gremien.memberOverlap' : 'admin.gremien.memberFailed',
+            ),
+          ),
       });
   }
 
-  removeMember(assignmentId: string): void {
-    this.api.revokeRole(assignmentId as Uuid).subscribe({
+  removeMember(membershipId: string): void {
+    this.api.deleteGremiumMembership(membershipId as Uuid).subscribe({
       next: () => {
         this.toast.success(this.i18n.translate('admin.gremien.memberRemoved'));
-        this.refreshPrincipals();
+        this.refresh();
       },
       error: () => this.toast.error(this.i18n.translate('admin.gremien.memberFailed')),
     });
   }
 
-  private refreshPrincipals(): void {
-    this.api.listPrincipals('').subscribe((p) => this.principals.set(p));
+  private refresh(): void {
+    this.api.listGremiumMemberships(this.gremiumId as Uuid).subscribe((m) => this.memberships.set(m));
   }
 }

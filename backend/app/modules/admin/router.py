@@ -175,6 +175,7 @@ async def delete_gremium(
 @router.get(
     "/gremien/{gremium_id}/roles",
     response_model=list[GremiumRoleOut],
+    dependencies=[_ROLES],
     responses=_errors(401, 403),
 )
 async def list_gremium_roles(
@@ -222,6 +223,7 @@ async def delete_gremium_role(
 @router.get(
     "/gremien/{gremium_id}/memberships",
     response_model=list[GremiumMembershipOut],
+    dependencies=[_ROLES],
     responses=_errors(401, 403),
 )
 async def list_gremium_memberships(
@@ -333,6 +335,7 @@ async def create_flow_version(
 @router.get(
     "/flow-versions/global",
     response_model=FlowGraph | None,
+    dependencies=[_CONFIG],
     responses=_errors(401, 403),
 )
 async def get_global_flow(service: ServiceDep) -> FlowGraph | None:

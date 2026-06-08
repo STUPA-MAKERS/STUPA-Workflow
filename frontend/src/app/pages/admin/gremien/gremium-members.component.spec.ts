@@ -2,40 +2,29 @@ import { ActivatedRoute } from '@angular/router';
 import { of } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import { provideRouter } from '@angular/router';
-import type { AdminPrincipal, Gremium, Role } from '../admin.models';
+import type { AdminPrincipal, GremiumMembership, GremiumRole } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { GremiumMembersComponent } from './gremium-members.component';
 
-const GREMIUM: Gremium = {
-  id: 'g-1',
-  name: 'StuPa',
-  slug: 'stupa',
-  cdVariant: 'stupa',
-  defaultLang: 'de',
-  allowVoteDelegation: false,
-};
-const ROLES: Role[] = [{ id: 'r-member', key: 'member', label: { de: 'mitglied', en: 'member' }, permissions: [] }];
+const ROLES: GremiumRole[] = [
+  { id: 'gr-1', gremiumId: 'g-1', key: 'vorsitz', name: { de: 'Vorsitz', en: 'Chair' } },
+];
 const PRINCIPALS: AdminPrincipal[] = [
-  {
-    id: 'p-1',
-    sub: 'kc|alex',
-    email: 'alex@x.de',
-    displayName: 'Alex',
-    lastLogin: null,
-    assignments: [
-      { id: 'a-1', principalId: 'p-1', roleId: 'r-member', gremiumId: 'g-1', delegateVoting: false },
-    ],
-  },
+  { id: 'p-1', sub: 'kc|alex', email: 'alex@x.de', displayName: 'Alex', lastLogin: null, assignments: [] },
   { id: 'p-2', sub: 'kc|sam', email: 'sam@x.de', displayName: 'Sam', lastLogin: null, assignments: [] },
+];
+const MEMBERSHIPS: GremiumMembership[] = [
+  { id: 'm-1', principalId: 'p-1', gremiumId: 'g-1', gremiumRoleId: 'gr-1', validFrom: null, validUntil: null },
 ];
 
 function makeApi() {
   return {
-    listGremien: jest.fn(() => of([GREMIUM])),
-    listRoles: jest.fn(() => of(ROLES)),
+    listGremien: jest.fn(() => of([{ id: 'g-1', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de', allowVoteDelegation: false }])),
+    listGremiumRoles: jest.fn(() => of(ROLES)),
     listPrincipals: jest.fn(() => of(PRINCIPALS)),
-    assignRole: jest.fn(() => of({ id: 'a-new' })),
-    revokeRole: jest.fn(() => of(void 0)),
+    listGremiumMemberships: jest.fn(() => of(MEMBERSHIPS)),
+    createGremiumMembership: jest.fn(() => of({ id: 'm-new' })),
+    deleteGremiumMembership: jest.fn(() => of(void 0)),
   };
 }
 
@@ -50,27 +39,36 @@ async function setup(api = makeApi()) {
   return { ...view, api };
 }
 
-describe('GremiumMembersComponent (#18)', () => {
+describe('GremiumMembersComponent (#18/#62)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('lists the members assigned to this committee', async () => {
+  it('lists this committee’s memberships', async () => {
     await setup();
     expect(await screen.findByText('Alex')).toBeInTheDocument();
-    // Sam hat keine Zuweisung in g-1 → nicht als Mitglied gelistet.
-    expect(screen.queryByText('Sam')).not.toBeInTheDocument();
+    expect(screen.getByText('Vorsitz')).toBeInTheDocument();
   });
 
-  it('adds a member via typeahead pick + role', async () => {
+  it('adds a membership via typeahead pick + gremium role + term', async () => {
     const { api, fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     c.openAdd();
     c.onSearch('sam');
     c.pick(PRINCIPALS[1]);
-    c.addRoleId.set('r-member');
+    c.addRoleId.set('gr-1');
+    c.addFrom.set('2026-01-01');
     c.addMember();
-    expect(api.assignRole).toHaveBeenCalledWith(
-      expect.objectContaining({ principalId: 'p-2', roleId: 'r-member', gremiumId: 'g-1' }),
+    expect(api.createGremiumMembership).toHaveBeenCalledWith(
+      'g-1',
+      expect.objectContaining({ principalId: 'p-2', gremiumRoleId: 'gr-1', validFrom: '2026-01-01' }),
     );
+  });
+
+  it('removes a membership', async () => {
+    const { api, fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.removeMember('m-1');
+    expect(api.deleteGremiumMembership).toHaveBeenCalledWith('m-1');
   });
 });

@@ -78,7 +78,7 @@ async def get_current_principal(
             select(PrincipalRow).where(PrincipalRow.id == session.principal_id)
         )
     ).scalar_one_or_none()
-    if row is None:
+    if row is None or not row.active:
         return None
     return await rbac.resolve_principal(db, row, now)
 
