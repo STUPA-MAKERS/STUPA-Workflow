@@ -294,6 +294,24 @@ select {
 .fe__connector:hover {
   opacity: 1;
 }
+.fe__connector--branch {
+  fill: var(--color-warning, #c47d00);
+  opacity: 0.85;
+}
+.fe__dot-label {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  pointer-events: none;
+  user-select: none;
+}
+.fe__node-kind {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  user-select: none;
+}
 
 /* --- Inspektor-Panel ----------------------------------------------------- */
 .fe__panel {

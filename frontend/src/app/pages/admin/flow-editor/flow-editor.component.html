@@ -3,10 +3,6 @@
     <h1>{{ 'admin.flow.title' | t }}</h1>
   </header>
 
-  <p class="fe__desc">{{ 'admin.flow.canvasHint' | t }}</p>
-  <p class="fe__desc">{{ 'admin.flow.glossary' | t }}</p>
-
-  <!-- Globaler Flow (#28): ein Flow für ALLE Antragstypen — keine Typ-Auswahl mehr. -->
   <p class="fe__global">{{ 'admin.flow.globalNotice' | t }}</p>
 
   <div class="fe__toolbar">
@@ -84,16 +80,28 @@
           @if (n.isInitial) {
             <circle cx="14" [attr.cy]="NODE_H / 2" r="4" class="fe__node-initial-dot" />
           }
+          @if (n.kind !== 'normal') {
+            <text [attr.x]="NODE_W / 2" y="-6" text-anchor="middle" class="fe__node-kind">{{ kindLabel(n.kind) }}</text>
+          }
           <text [attr.x]="NODE_W / 2" [attr.y]="NODE_H / 2 + 5" text-anchor="middle" class="fe__node-text">{{ n.label }}</text>
-          <!-- Verbindungs-Punkt: hier ziehen, um einen Übergang zu erstellen -->
-          <circle
-            [attr.cx]="NODE_W"
-            [attr.cy]="NODE_H / 2"
-            r="7"
-            class="fe__connector"
-            [attr.aria-label]="'admin.flow.connectHint' | t"
-            (pointerdown)="onConnectPointerDown($event, n.key)"
-          />
+          <!-- Ausgangs-Punkt(e): ziehen erstellt einen Übergang; Branch-Knoten
+               (vote/approval) zeigen je einen beschrifteten Punkt pro Ausgang. -->
+          @for (d of n.dots; track d.branch ?? 'out') {
+            <g>
+              <circle
+                [attr.cx]="NODE_W"
+                [attr.cy]="d.cy"
+                r="7"
+                class="fe__connector"
+                [class.fe__connector--branch]="d.branch"
+                [attr.aria-label]="d.branch || ('admin.flow.connectHint' | t)"
+                (pointerdown)="onConnectPointerDown($event, n.key, d.branch)"
+              />
+              @if (d.branch) {
+                <text [attr.x]="NODE_W + 11" [attr.y]="d.cy + 4" class="fe__dot-label">{{ d.branch }}</text>
+              }
+            </g>
+          }
         </g>
       }
     </svg>

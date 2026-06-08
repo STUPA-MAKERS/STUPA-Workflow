@@ -109,6 +109,8 @@ export class FlowEditorComponent {
 
   private drag: { key: string; dx: number; dy: number; moved: boolean } | null = null;
   private connectFrom: string | null = null;
+  /** Branch (pass/fail/accept/reject), wenn von einem Branch-Punkt gezogen wird. */
+  private connectBranch: string | null = null;
 
   constructor() {
     // Globaler Flow (#28): den aktiven globalen Flow laden, falls vorhanden, sonst
@@ -164,16 +166,39 @@ export class FlowEditorComponent {
   protected readonly nodes = computed(() => {
     const pos = this.positions();
     const sel = this.selection();
-    return this.graph().states.map((s) => ({
-      key: s.key,
-      label: this.label(s),
-      category: s.category ?? null,
-      isInitial: !!s.isInitial,
-      selected: sel?.kind === 'state' && sel.key === s.key,
-      x: pos[s.key]?.x ?? 0,
-      y: pos[s.key]?.y ?? 0,
-    }));
+    return this.graph().states.map((s) => {
+      const dots = this.branchDotsFor(s.kind);
+      return {
+        key: s.key,
+        label: this.label(s),
+        kind: s.kind ?? 'normal',
+        category: s.category ?? null,
+        isInitial: !!s.isInitial,
+        selected: sel?.kind === 'state' && sel.key === s.key,
+        x: pos[s.key]?.x ?? 0,
+        y: pos[s.key]?.y ?? 0,
+        // Ausgangs-Punkte: für vote/approval ein Punkt je Branch (pass/fail bzw.
+        // accept/reject), sonst ein einzelner Standard-Punkt.
+        dots: dots.length
+          ? dots.map((b, i) => ({ branch: b, cy: this.dotY(i, dots.length) }))
+          : [{ branch: null as string | null, cy: NODE_H / 2 }],
+      };
+    });
   });
+
+  private branchDotsFor(kind: string | null | undefined): string[] {
+    if (kind === 'vote') return ['pass', 'fail'];
+    if (kind === 'approval') return ['accept', 'reject'];
+    return [];
+  }
+
+  private dotY(i: number, n: number): number {
+    if (n <= 1) return NODE_H / 2;
+    // Punkte gleichmäßig über die Knotenhöhe verteilen (Rand-Abstand 12px).
+    const top = 12;
+    const span = NODE_H - 2 * top;
+    return top + (span * i) / (n - 1);
+  }
 
   protected readonly edges = computed(() => {
     const pos = this.positions();
@@ -589,9 +614,10 @@ export class FlowEditorComponent {
   }
 
   /** Vom Verbindungs-Punkt eines Knotens eine neue Kante aufziehen. */
-  protected onConnectPointerDown(event: PointerEvent, key: string): void {
+  protected onConnectPointerDown(event: PointerEvent, key: string, branch: string | null = null): void {
     event.stopPropagation();
     this.connectFrom = key;
+    this.connectBranch = branch;
     const p = this.toSvg(event);
     this.tempEdge.set({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
     (event.target as Element).setPointerCapture?.(event.pointerId);
@@ -628,13 +654,18 @@ export class FlowEditorComponent {
       const target = this.nodeAt(this.toSvg(event));
       if (target && target !== this.connectFrom) {
         const from = this.connectFrom;
+        const branch = this.connectBranch as TransitionBranch | null;
         this.graph.update((g) => ({
           ...g,
-          transitions: [...(g.transitions ?? []), blankTransition(from, target)],
+          transitions: [
+            ...(g.transitions ?? []),
+            branch ? { ...blankTransition(from, target), branch } : blankTransition(from, target),
+          ],
         }));
         this.selection.set({ kind: 'transition', index: (this.graph().transitions?.length ?? 1) - 1 });
       }
       this.connectFrom = null;
+      this.connectBranch = null;
       this.tempEdge.set(null);
     }
   }

@@ -26,7 +26,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import ApplicantScope
 from app.modules.flow.models import State
 from app.settings import Settings
-from app.shared.errors import GoneError
+from app.shared.errors import ForbiddenError, GoneError
 
 logger = logging.getLogger("app.auth")
 
@@ -181,6 +181,11 @@ async def oidc_callback(
         settings, id_token=token_set["id_token"], nonce=nonce
     )
     row = await upsert_principal(db, claims)
+    # Deaktivierte Principals (#30) dürfen sich nicht anmelden — fail-closed schon
+    # beim Login, damit keine Session entsteht (die Request-Auflösung blockt sie
+    # ohnehin, vgl. deps.get_current_principal).
+    if not row.active:
+        raise ForbiddenError("Account is deactivated.")
     # Bootstrap-Admins (#70): erstmaliger/idempotenter admin-Grant beim Login, sonst
     # sperrt sich eine frische OIDC-Installation selbst aus. Der E-Mail-Bootstrap zählt
     # nur bei verifizierter Mail (claims.email_verified). Committet der Aufrufer.
