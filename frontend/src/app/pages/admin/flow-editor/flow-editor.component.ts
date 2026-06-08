@@ -78,10 +78,6 @@ export class FlowEditorComponent {
 
   protected readonly canvas = viewChild<ElementRef<SVGSVGElement>>('canvas');
 
-  /** Antragstypen als Auswahl (#69) — ersetzt das hartkodierte `'mock-type'`. */
-  protected readonly typeOptions = signal<SelectOption[]>([]);
-  protected readonly selectedTypeId = signal('');
-
   protected readonly categories = STATE_CATEGORIES;
   protected readonly guardOps = GUARD_LEAF_OPERATORS;
   protected readonly actionTypes = ACTION_TYPES;
@@ -91,9 +87,12 @@ export class FlowEditorComponent {
   protected readonly branches: TransitionBranch[] = ['pass', 'fail', 'accept', 'reject'];
   protected readonly decisionFields = ['amount', 'typeKey', 'applicantRole'];
   protected readonly decisionOps = ['==', '!=', '>', '>=', '<', '<=', 'in', 'has'];
-  /** Gremien + Gremium-Rollen für vote/approval-Config (#28/#42). */
+  /** Gremien + Gremium-Rollen + globale Rollen für vote/approval-Config (#28/#42). */
   protected readonly gremiumOptions = signal<SelectOption[]>([]);
   protected readonly gremiumRoleOptions = signal<SelectOption[]>([]);
+  protected readonly globalRoleOptions = signal<SelectOption[]>([]);
+  /** Rollen-Quelle eines approval-States: an Gremium gebunden oder global. */
+  protected readonly approvalScopes = ['gremium', 'global'];
 
   protected readonly graph = signal<FlowGraph>(autoLayout(blankGraph()));
 
@@ -111,15 +110,16 @@ export class FlowEditorComponent {
   private connectFrom: string | null = null;
 
   constructor() {
-    this.options
-      .applicationTypeOptions()
+    // Globaler Flow (#28): den aktiven globalen Flow laden, falls vorhanden, sonst
+    // mit leerem Graphen starten.
+    this.api
+      .getGlobalFlow()
       .pipe(takeUntilDestroyed())
       .subscribe({
-        next: (opts) => {
-          this.typeOptions.set(opts);
-          if (opts.length && !this.selectedTypeId()) this.selectedTypeId.set(opts[0].value);
+        next: (graph) => {
+          if (graph && graph.states?.length) this.graph.set(autoLayout(normalizeFlowGraph(graph)));
         },
-        error: () => this.typeOptions.set([]),
+        error: () => undefined,
       });
     // Gremien + Gremium-Rollen für vote/approval-State-Config (#28/#42).
     this.options
@@ -136,6 +136,32 @@ export class FlowEditorComponent {
           ),
         error: () => undefined,
       });
+    // Globale Rollen (approval kann auch eine globale Rolle entscheiden, #28-CR).
+    this.api
+      .listRoles()
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: (roles) =>
+          this.globalRoleOptions.set(
+            roles.map((r) => ({ value: r.key, label: `${r.label['de'] ?? r.key} (${r.key})` })),
+          ),
+        error: () => undefined,
+      });
+  }
+
+  /** Rollen-Quelle eines approval-States: `gremium`, wenn ein gremiumId-Feld gesetzt ist. */
+  protected approvalScope(s: StateDef): string {
+    return s.config?.gremiumId !== undefined ? 'gremium' : 'global';
+  }
+
+  protected setApprovalScope(key: string, scope: string): void {
+    // Wechsel der Quelle: Gremium + Rolle zurücksetzen (Gremium-Rollen ≠ globale Rollen).
+    const cur = this.stateByKey(key)?.config ?? {};
+    const next = { ...cur };
+    delete next.roleKey;
+    if (scope === 'gremium') next.gremiumId = '';
+    else delete next.gremiumId;
+    this.patchState(key, { config: next });
   }
 
   protected readonly validation = computed(() => validateFlowGraph(this.graph()));
@@ -227,6 +253,10 @@ export class FlowEditorComponent {
 
   protected kindLabel(k: string): string {
     return this.i18n.translate(`admin.flow.kind.${k}` as TranslationKey);
+  }
+
+  protected scopeLabel(sc: string): string {
+    return this.i18n.translate(`admin.flow.scope.${sc}` as TranslationKey);
   }
 
   /** Von/Nach-Optionen als „Klarname (key)" (FE5). */
@@ -631,15 +661,17 @@ export class FlowEditorComponent {
 
   // --- save ----------------------------------------------------------------
   protected save(): void {
-    const typeId = this.selectedTypeId();
-    if (!this.validation().valid || !typeId) {
-      this.toast.error(this.i18n.translate('admin.common.invalid'));
+    const v = this.validation();
+    if (!v.valid) {
+      // Konkrete Meldung statt generisch (z. B. „vote-State braucht pass+fail").
+      this.toast.error(v.errors[0] ?? this.i18n.translate('admin.common.invalid'));
       return;
     }
     const graph = normalizeFlowGraph(autoLayout(this.graph()));
-    this.api.createFlowVersion(typeId, graph).subscribe({
+    this.api.createGlobalFlowVersion(graph).subscribe({
       next: () => this.toast.success(this.i18n.translate('admin.common.saved')),
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: (err: { error?: { detail?: string } }) =>
+        this.toast.error(err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed')),
     });
   }
 }

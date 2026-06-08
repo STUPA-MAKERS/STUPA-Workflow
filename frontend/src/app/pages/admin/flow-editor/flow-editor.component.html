@@ -6,19 +6,8 @@
   <p class="fe__desc">{{ 'admin.flow.canvasHint' | t }}</p>
   <p class="fe__desc">{{ 'admin.flow.glossary' | t }}</p>
 
-  <!-- Antragstyp-Auswahl (#69): Flow-Version wird gegen eine echte Typ-UUID gespeichert. -->
-  <app-select
-    class="fe__type"
-    [label]="'admin.flow.applicationType' | t"
-    [placeholder]="'admin.flow.applicationTypePlaceholder' | t"
-    [options]="typeOptions()"
-    [required]="true"
-    [ngModel]="selectedTypeId()"
-    (ngModelChange)="selectedTypeId.set($event)"
-  />
-  @if (!typeOptions().length) {
-    <p class="fe__desc" role="alert">{{ 'admin.flow.noTypes' | t }}</p>
-  }
+  <!-- Globaler Flow (#28): ein Flow für ALLE Antragstypen — keine Typ-Auswahl mehr. -->
+  <p class="fe__global">{{ 'admin.flow.globalNotice' | t }}</p>
 
   <div class="fe__toolbar">
     <app-button variant="ghost" size="sm" (click)="addState()">+ {{ 'admin.flow.addState' | t }}</app-button>
@@ -145,7 +134,7 @@
           </select>
         </label>
 
-        @if (s.kind === 'vote' || s.kind === 'approval') {
+        @if (s.kind === 'vote') {
           <app-select
             [label]="'admin.flow.cfgGremium' | t"
             [placeholder]="'admin.flow.cfgGremiumPh' | t"
@@ -155,13 +144,38 @@
           />
         }
         @if (s.kind === 'approval') {
-          <app-select
-            [label]="'admin.flow.cfgRole' | t"
-            [placeholder]="'admin.flow.cfgRolePh' | t"
-            [options]="gremiumRoleOptions()"
-            [ngModel]="s.config?.roleKey ?? ''"
-            (ngModelChange)="setStateRoleKey(s.key, $event)"
-          />
+          <!-- Rollen-Quelle: an ein Gremium gebunden oder eine globale Rolle (#28-CR). -->
+          <label class="fe__lbl">{{ 'admin.flow.cfgRoleSource' | t }}
+            <select [ngModel]="approvalScope(s)" (ngModelChange)="setApprovalScope(s.key, $event)">
+              @for (sc of approvalScopes; track sc) {
+                <option [value]="sc">{{ scopeLabel(sc) }}</option>
+              }
+            </select>
+          </label>
+          @if (approvalScope(s) === 'gremium') {
+            <app-select
+              [label]="'admin.flow.cfgGremium' | t"
+              [placeholder]="'admin.flow.cfgGremiumPh' | t"
+              [options]="gremiumOptions()"
+              [ngModel]="s.config?.gremiumId ?? ''"
+              (ngModelChange)="setStateGremium(s.key, $event)"
+            />
+            <app-select
+              [label]="'admin.flow.cfgRole' | t"
+              [placeholder]="'admin.flow.cfgRolePh' | t"
+              [options]="gremiumRoleOptions()"
+              [ngModel]="s.config?.roleKey ?? ''"
+              (ngModelChange)="setStateRoleKey(s.key, $event)"
+            />
+          } @else {
+            <app-select
+              [label]="'admin.flow.cfgGlobalRole' | t"
+              [placeholder]="'admin.flow.cfgRolePh' | t"
+              [options]="globalRoleOptions()"
+              [ngModel]="s.config?.roleKey ?? ''"
+              (ngModelChange)="setStateRoleKey(s.key, $event)"
+            />
+          }
         }
         @if (s.kind === 'vote' || s.kind === 'approval') {
           <p class="fe__hint">{{ 'admin.flow.branchHint' | t }}</p>
@@ -297,6 +311,6 @@
     <span class="fe__status" [class.fe__status--ok]="validation().valid">
       {{ (validation().valid ? 'admin.common.valid' : 'admin.common.errors') | t }}
     </span>
-    <app-button [disabled]="!validation().valid || !selectedTypeId()" (click)="save()">{{ 'admin.flow.save' | t }}</app-button>
+    <app-button [disabled]="!validation().valid" (click)="save()">{{ 'admin.flow.save' | t }}</app-button>
   </footer>
 </section>

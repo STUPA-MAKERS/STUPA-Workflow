@@ -5,16 +5,19 @@ import { AdminApiService } from '../admin-api.service';
 import { FlowEditorComponent } from './flow-editor.component';
 
 async function setup() {
-  const createFlowVersion = jest.fn(() => of({ id: 'fv1' }));
+  // Globaler Flow (#28): laden + speichern statt per-Typ.
+  const getGlobalFlow = jest.fn(() => of(null));
+  const createGlobalFlowVersion = jest.fn(() => of({ id: 'gfv1' }));
   const listApplicationTypes = jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }]));
-  // vote/approval-State-Config (#28): Gremien + Gremium-Rollen-Quellen.
+  // vote/approval-State-Config (#28): Gremien + Gremium-Rollen + globale Rollen.
   const listGremienOptions = jest.fn(() => of([{ id: 'g1', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' }]));
   const listGremiumRoles = jest.fn(() => of([{ id: 'gr1', key: 'vorsitz', name: { de: 'Vorsitz' } }]));
-  const api = { createFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles };
+  const listRoles = jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
+  const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles };
   const view = await render(FlowEditorComponent, {
     providers: [{ provide: AdminApiService, useValue: api }],
   });
-  return { ...view, createFlowVersion };
+  return { ...view, createGlobalFlowVersion };
 }
 
 /** Baut über die Komponenten-API einen gültigen Graphen (a initial → b). */
@@ -38,13 +41,13 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   });
 
   it('builds a valid graph and saves it as a flow version', async () => {
-    const { fixture, createFlowVersion } = await setup();
+    const { fixture, createGlobalFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     buildValid(c);
     c.save();
-    expect(createFlowVersion).toHaveBeenCalledTimes(1);
-    const graph = createFlowVersion.mock.calls[0][1] as FlowGraph;
+    expect(createGlobalFlowVersion).toHaveBeenCalledTimes(1);
+    const graph = createGlobalFlowVersion.mock.calls[0][0] as FlowGraph;
     expect(graph.states.map((s) => s.key)).toEqual(['a', 'b']);
     expect(graph.states.filter((s) => s.isInitial)).toHaveLength(1);
     expect(graph.layout?.positions).toBeDefined();
@@ -72,7 +75,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   });
 
   it('exercises state/transition/guard/action/automatic mutators', async () => {
-    const { fixture, createFlowVersion } = await setup();
+    const { fixture, createGlobalFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     buildValid(c);
@@ -105,8 +108,8 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
 
     c.relayout();
     c.save();
-    expect(createFlowVersion).toHaveBeenCalled();
-    const graph = createFlowVersion.mock.calls[0][1] as FlowGraph;
+    expect(createGlobalFlowVersion).toHaveBeenCalled();
+    const graph = createGlobalFlowVersion.mock.calls[0][0] as FlowGraph;
     expect(graph.transitions[0].automatic).toBe(true);
 
     c.selectEdge(0);
@@ -118,10 +121,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   });
 
   it('saves nothing and warns when the graph is invalid', async () => {
-    const { fixture, createFlowVersion } = await setup();
+    const { fixture, createGlobalFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     c.save();
-    expect(createFlowVersion).not.toHaveBeenCalled();
+    expect(createGlobalFlowVersion).not.toHaveBeenCalled();
   });
 });

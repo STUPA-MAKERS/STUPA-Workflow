@@ -73,6 +73,34 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
     }
   }
 
+  // State-Art-Regeln (#28) — spiegelt `_validate_state_kinds` (BE), damit der Nutzer
+  // den Fehler SOFORT sieht (statt erst beim Speichern als 422).
+  for (const s of states) {
+    if (!s.kind || s.kind === 'normal') continue;
+    const outBranches = transitions
+      .filter((t) => t.from === s.key && t.branch)
+      .map((t) => t.branch as string)
+      .sort();
+    if (s.kind === 'vote') {
+      if (!s.config?.gremiumId) errors.push(`vote state "${s.key}" needs a committee (config.gremiumId)`);
+      if (outBranches.join(',') !== 'fail,pass') {
+        errors.push(`vote state "${s.key}" needs exactly two outgoing transitions: branch "pass" and "fail"`);
+      }
+    } else if (s.kind === 'approval') {
+      if (!s.config?.roleKey) errors.push(`approval state "${s.key}" needs a deciding role (config.roleKey)`);
+      if (outBranches.join(',') !== 'accept,reject') {
+        errors.push(`approval state "${s.key}" needs exactly two outgoing transitions: branch "accept" and "reject"`);
+      }
+    } else if (s.kind === 'decision') {
+      const rules = s.config?.rules ?? [];
+      const targets = [...rules.map((r) => r.to), s.config?.else ?? ''];
+      if (!s.config?.else) errors.push(`decision state "${s.key}" needs an else target (config.else)`);
+      for (const tgt of targets) {
+        if (tgt && !keySet.has(tgt)) errors.push(`decision state "${s.key}" routes to unknown state "${tgt}"`);
+      }
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 

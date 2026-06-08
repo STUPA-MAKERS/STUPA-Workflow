@@ -293,6 +293,18 @@ export class AdminApiService {
     );
   }
 
+  /** Aktiven globalen Flow (#28) laden — `null`, wenn noch keiner existiert. */
+  getGlobalFlow(): Observable<FlowGraph | null> {
+    if (this.mock) return of(null);
+    return this.http.get<FlowGraph | null>(`${this.base}/admin/flow-versions/global`);
+  }
+
+  /** Globalen Flow als neue Version anlegen (#28). */
+  createGlobalFlowVersion(graph: FlowGraph): Observable<{ id: Uuid }> {
+    if (this.mock) return of({ id: `gflow-${graph.states.length}` });
+    return this.http.post<{ id: Uuid }>(`${this.base}/admin/flow-versions/global`, { graph });
+  }
+
   // --- Webhooks ------------------------------------------------------------
   listWebhooks(): Observable<WebhookConfig[]> {
     if (this.mock) return of(structuredCopy(this.store.webhooks));

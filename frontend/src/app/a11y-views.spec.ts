@@ -293,6 +293,8 @@ describe('Kern-Views a11y (axe)', () => {
         createFlowVersion: jest.fn(() => of({ id: 'fv1' })),
         listApplicationTypes: jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }])),
         listGremiumRoles: jest.fn(() => of([])),
+        getGlobalFlow: jest.fn(() => of(null)),
+        createGlobalFlowVersion: jest.fn(() => of({ id: 'gfv1' })),
       } as unknown as Partial<AdminApiService>;
     }
 
