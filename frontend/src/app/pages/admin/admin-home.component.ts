@@ -5,7 +5,14 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { BadgeComponent, type BadgeVariant, CardComponent } from '@shared/ui';
+import {
+  BadgeComponent,
+  type BadgeVariant,
+  CardComponent,
+  CellDirective,
+  type ColumnDef,
+  DataTableComponent,
+} from '@shared/ui';
 import { AdminApiService } from './admin-api.service';
 import type { FormOverviewItem, FormStatus, Gremium } from './admin.models';
 
@@ -31,7 +38,7 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
   selector: 'app-admin-home',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, CardComponent, BadgeComponent],
+  imports: [RouterLink, TranslatePipe, CardComponent, BadgeComponent, DataTableComponent, CellDirective],
   template: `
     <section class="admin-home">
       <header class="admin-home__head">
@@ -69,28 +76,13 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
         } @else if (forms().length === 0) {
           <p class="admin-home__empty">{{ 'admin.forms.overviewEmpty' | t }}</p>
         } @else {
-          <table class="admin-home__table">
-            <thead>
-              <tr>
-                <th scope="col">{{ 'admin.forms.col.name' | t }}</th>
-                <th scope="col">{{ 'admin.forms.col.gremium' | t }}</th>
-                <th scope="col">{{ 'admin.forms.col.status' | t }}</th>
-                <th scope="col" class="admin-home__num">{{ 'admin.forms.col.version' | t }}</th>
-                <th scope="col"><span class="visually-hidden">{{ 'admin.forms.edit' | t }}</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (form of forms(); track form.id) {
-                <tr>
-                  <td class="admin-home__name">{{ name(form) }}</td>
-                  <td>{{ gremiumName(form.gremiumId) }}</td>
-                  <td><app-badge [variant]="statusVariant(form.status)">{{ statusLabel(form.status) }}</app-badge></td>
-                  <td class="admin-home__num">{{ form.version ? 'v' + form.version : '—' }}</td>
-                  <td class="admin-home__row-cta"><a routerLink="forms">{{ 'admin.forms.edit' | t }}</a></td>
-                </tr>
-              }
-            </tbody>
-          </table>
+          <app-data-table [columns]="formColumns()" [rows]="forms()" [rowKey]="rowId">
+            <ng-template appCell="name" let-f><span class="admin-home__name">{{ name($any(f)) }}</span></ng-template>
+            <ng-template appCell="gremium" let-f>{{ gremiumName($any(f).gremiumId) }}</ng-template>
+            <ng-template appCell="status" let-f><app-badge [variant]="statusVariant($any(f).status)">{{ statusLabel($any(f).status) }}</app-badge></ng-template>
+            <ng-template appCell="version" let-f>{{ $any(f).version ? 'v' + $any(f).version : '—' }}</ng-template>
+            <ng-template appCell="edit" let-f><a routerLink="forms">{{ 'admin.forms.edit' | t }}</a></ng-template>
+          </app-data-table>
         }
       </section>
     </section>
@@ -246,6 +238,15 @@ export class AdminHomeComponent {
       error: () => this.gremien.set([]),
     });
   }
+
+  protected readonly formColumns = computed<ColumnDef[]>(() => [
+    { key: 'name', label: this.i18n.translate('admin.forms.col.name') },
+    { key: 'gremium', label: this.i18n.translate('admin.forms.col.gremium') },
+    { key: 'status', label: this.i18n.translate('admin.forms.col.status') },
+    { key: 'version', label: this.i18n.translate('admin.forms.col.version'), align: 'end' },
+    { key: 'edit', label: this.i18n.translate('admin.forms.edit'), align: 'end' },
+  ]);
+  protected readonly rowId = (f: unknown): string => (f as FormOverviewItem).id;
 
   protected name(form: FormOverviewItem): string {
     return resolveI18n(form.name, this.i18n.locale());

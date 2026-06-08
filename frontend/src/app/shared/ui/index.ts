@@ -21,6 +21,7 @@ export type { Column } from './table/table.component';
 export { DataTableComponent } from './data-table/data-table.component';
 export type { ColumnDef } from './data-table/data-table.component';
 export { CellDirective } from './data-table/cell.directive';
+export { RowDetailDirective } from './data-table/row-detail.directive';
 export { ToastComponent } from './toast/toast.component';
 export { ToastService } from './toast/toast.service';
 export type { Toast, ToastVariant } from './toast/toast.service';

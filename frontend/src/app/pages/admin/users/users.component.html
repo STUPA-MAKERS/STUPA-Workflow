@@ -21,92 +21,71 @@
   @if (principals().length === 0) {
     <p class="users__empty">{{ 'admin.users.noResults' | t }}</p>
   } @else {
-    <table class="users__table">
-      <thead>
-        <tr>
-          <th scope="col">{{ 'admin.users.col.name' | t }}</th>
-          <th scope="col">{{ 'admin.users.col.email' | t }}</th>
-          <th scope="col">{{ 'admin.users.col.subject' | t }}</th>
-          <th scope="col">{{ 'admin.users.col.roles' | t }}</th>
-          <th scope="col">{{ 'admin.users.col.lastLogin' | t }}</th>
-          <th scope="col" class="users__col-actions">{{ 'admin.users.col.actions' | t }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (p of principals(); track p.id) {
-          <tr class="users__row">
-            <td class="users__name">{{ userLabel(p) }}</td>
-            <td class="users__muted">{{ p.email || '—' }}</td>
-            <td class="users__muted users__mono">{{ p.sub }}</td>
-            <td>
-              <div class="users__roles">
-                @if (p.assignments.length === 0) {
-                  <span class="users__muted">{{ 'admin.users.noRoles' | t }}</span>
-                }
-                @for (a of p.assignments; track a.id) {
-                  <span class="users__tag">
-                    <app-badge variant="primary">{{ roleLabel(a.roleId) | capitalize }}</app-badge>
-                    @if (a.validUntil) {
-                      <span class="users__until">→ {{ a.validUntil | slice: 0 : 10 }}</span>
-                    }
-                    <button
-                      type="button"
-                      class="users__tag-x"
-                      [attr.aria-label]="('admin.users.revoke' | t) + ': ' + (roleLabel(a.roleId) | capitalize)"
-                      (click)="revoke(a)"
-                    >×</button>
-                  </span>
-                }
-              </div>
-            </td>
-            <td class="users__muted">{{ p.lastLogin ? (p.lastLogin | slice: 0 : 10) : ('admin.users.never' | t) }}</td>
-            <td class="users__col-actions">
-              <app-button
-                variant="secondary"
-                size="sm"
-                [attr.aria-expanded]="isExpanded(p.id)"
-                (click)="toggleAssign(p.id)"
-              >{{ 'admin.users.addRole' | t }}</app-button>
-            </td>
-          </tr>
-
-          @if (isExpanded(p.id)) {
-            <tr class="users__assign-row">
-              <td colspan="6">
-                <fieldset class="users__assign">
-                  <legend>{{ 'admin.users.assignTitle' | t }}: {{ userLabel(p) }}</legend>
-                  <app-select
-                    class="users__lbl"
-                    [label]="'admin.users.role' | t"
-                    [placeholder]="'admin.users.selectRole' | t"
-                    [options]="roleOptions()"
-                    [ngModel]="draftFor(p.id).roleId"
-                    (ngModelChange)="patchDraft(p.id, { roleId: $event })"
-                    [name]="'role-' + p.id"
-                  />
-                  <app-datepicker
-                    class="users__lbl"
-                    [label]="'admin.users.validFrom' | t"
-                    [ngModel]="draftFor(p.id).validFrom"
-                    (ngModelChange)="patchDraft(p.id, { validFrom: $event })"
-                    [name]="'vf-' + p.id"
-                  />
-                  <app-datepicker
-                    class="users__lbl"
-                    [label]="'admin.users.validUntil' | t"
-                    [ngModel]="draftFor(p.id).validUntil"
-                    (ngModelChange)="patchDraft(p.id, { validUntil: $event })"
-                    [name]="'vu-' + p.id"
-                  />
-                  <app-button size="sm" [disabled]="!draftFor(p.id).roleId" (click)="assign(p)">
-                    {{ 'admin.users.assign' | t }}
-                  </app-button>
-                </fieldset>
-              </td>
-            </tr>
+    <app-data-table [columns]="columns()" [rows]="principals()" [rowKey]="rowId" [isExpanded]="rowExpanded">
+      <ng-template appCell="name" let-p><span class="users__name">{{ userLabel($any(p)) }}</span></ng-template>
+      <ng-template appCell="email" let-p><span class="users__muted">{{ $any(p).email || '—' }}</span></ng-template>
+      <ng-template appCell="subject" let-p><span class="users__muted users__mono">{{ $any(p).sub }}</span></ng-template>
+      <ng-template appCell="roles" let-p>
+        <div class="users__roles">
+          @if ($any(p).assignments.length === 0) {
+            <span class="users__muted">{{ 'admin.users.noRoles' | t }}</span>
           }
-        }
-      </tbody>
-    </table>
+          @for (a of $any(p).assignments; track a.id) {
+            <span class="users__tag">
+              <app-badge variant="primary">{{ roleLabel(a.roleId) | capitalize }}</app-badge>
+              @if (a.validUntil) {
+                <span class="users__until">→ {{ a.validUntil | slice: 0 : 10 }}</span>
+              }
+              <button
+                type="button"
+                class="users__tag-x"
+                [attr.aria-label]="('admin.users.revoke' | t) + ': ' + (roleLabel(a.roleId) | capitalize)"
+                (click)="revoke(a)"
+              >×</button>
+            </span>
+          }
+        </div>
+      </ng-template>
+      <ng-template appCell="lastLogin" let-p>
+        <span class="users__muted">{{ $any(p).lastLogin ? ($any(p).lastLogin | slice: 0 : 10) : ('admin.users.never' | t) }}</span>
+      </ng-template>
+      <ng-template appCell="actions" let-p>
+        <app-button variant="secondary" size="sm" [attr.aria-expanded]="isExpanded($any(p).id)" (click)="toggleAssign($any(p).id)">
+          {{ 'admin.users.addRole' | t }}
+        </app-button>
+      </ng-template>
+
+      <ng-template appRowDetail let-p>
+        <fieldset class="users__assign">
+          <legend>{{ 'admin.users.assignTitle' | t }}: {{ userLabel($any(p)) }}</legend>
+          <app-select
+            class="users__lbl"
+            [label]="'admin.users.role' | t"
+            [placeholder]="'admin.users.selectRole' | t"
+            [options]="roleOptions()"
+            [ngModel]="draftFor($any(p).id).roleId"
+            (ngModelChange)="patchDraft($any(p).id, { roleId: $event })"
+            [name]="'role-' + $any(p).id"
+          />
+          <app-datepicker
+            class="users__lbl"
+            [label]="'admin.users.validFrom' | t"
+            [ngModel]="draftFor($any(p).id).validFrom"
+            (ngModelChange)="patchDraft($any(p).id, { validFrom: $event })"
+            [name]="'vf-' + $any(p).id"
+          />
+          <app-datepicker
+            class="users__lbl"
+            [label]="'admin.users.validUntil' | t"
+            [ngModel]="draftFor($any(p).id).validUntil"
+            (ngModelChange)="patchDraft($any(p).id, { validUntil: $event })"
+            [name]="'vu-' + $any(p).id"
+          />
+          <app-button size="sm" [disabled]="!draftFor($any(p).id).roleId" (click)="assign($any(p))">
+            {{ 'admin.users.assign' | t }}
+          </app-button>
+        </fieldset>
+      </ng-template>
+    </app-data-table>
   }
 </section>

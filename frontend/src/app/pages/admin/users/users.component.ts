@@ -7,7 +7,11 @@ import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  CellDirective,
+  type ColumnDef,
+  DataTableComponent,
   DatepickerComponent,
+  RowDetailDirective,
   SelectComponent,
   type SelectOption,
   ToastService,
@@ -49,6 +53,9 @@ function emptyDraft(): AssignDraft {
     BadgeComponent,
     SelectComponent,
     DatepickerComponent,
+    DataTableComponent,
+    CellDirective,
+    RowDetailDirective,
   ],
   providers: [CapitalizePipe],
   templateUrl: './users.component.html',
@@ -75,6 +82,18 @@ export class UsersComponent {
       label: this.capitalize.transform(this.roleLabel(r.id)),
     })),
   );
+
+  protected readonly columns = computed<ColumnDef[]>(() => [
+    { key: 'name', label: this.i18n.translate('admin.users.col.name') },
+    { key: 'email', label: this.i18n.translate('admin.users.col.email') },
+    { key: 'subject', label: this.i18n.translate('admin.users.col.subject') },
+    { key: 'roles', label: this.i18n.translate('admin.users.col.roles') },
+    { key: 'lastLogin', label: this.i18n.translate('admin.users.col.lastLogin') },
+    { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
+  ]);
+  protected readonly rowId = (p: unknown): string => (p as AdminPrincipal).id;
+  /** Detail-Zeile (Zuweisen-Form) für aufgeklappte Principals. */
+  protected readonly rowExpanded = (p: unknown): boolean => this.isExpanded((p as AdminPrincipal).id);
 
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));

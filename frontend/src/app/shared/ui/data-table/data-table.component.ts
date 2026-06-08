@@ -3,6 +3,7 @@ import {
   type AfterContentInit,
   ChangeDetectionStrategy,
   Component,
+  ContentChild,
   ContentChildren,
   EventEmitter,
   Input,
@@ -12,6 +13,7 @@ import {
   signal,
 } from '@angular/core';
 import { CellDirective } from './cell.directive';
+import { RowDetailDirective } from './row-detail.directive';
 
 /** Spalten-Definition der {@link DataTableComponent}. */
 export interface ColumnDef {
@@ -59,6 +61,13 @@ export interface ColumnDef {
                 </td>
               }
             </tr>
+            @if (rowDetail && isExpanded && isExpanded(row)) {
+              <tr class="dt__detail-row">
+                <td [attr.colspan]="columns.length">
+                  <ng-container [ngTemplateOutlet]="rowDetail.tpl" [ngTemplateOutletContext]="{ $implicit: row }" />
+                </td>
+              </tr>
+            }
           } @empty {
             <tr>
               <td class="dt__empty" [attr.colspan]="columns.length">{{ emptyText }}</td>
@@ -104,6 +113,10 @@ export interface ColumnDef {
       .dt__row--clickable:focus-visible td {
         background: var(--color-surface-sunken);
       }
+      .dt__detail-row > td {
+        padding: 0;
+        background: var(--color-surface-sunken);
+      }
       .dt__empty {
         text-align: center;
         color: var(--color-text-muted);
@@ -123,7 +136,11 @@ export class DataTableComponent implements AfterContentInit {
   @Input() clickable = false;
   @Output() rowClick = new EventEmitter<unknown>();
 
+  /** Prädikat: für welche Zeilen die Detail-Zeile gezeigt wird. */
+  @Input() isExpanded?: (row: unknown) => boolean;
+
   @ContentChildren(CellDirective) private cellDirs!: QueryList<CellDirective>;
+  @ContentChild(RowDetailDirective) protected rowDetail?: RowDetailDirective;
   private readonly cellMap = signal<Map<string, TemplateRef<unknown>>>(new Map());
 
   ngAfterContentInit(): void {

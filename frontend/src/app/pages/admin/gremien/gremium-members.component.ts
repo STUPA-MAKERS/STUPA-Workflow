@@ -8,6 +8,9 @@ import type { Uuid } from '@core/api/models';
 import {
   BadgeComponent,
   ButtonComponent,
+  CellDirective,
+  type ColumnDef,
+  DataTableComponent,
   DialogComponent,
   SelectComponent,
   type SelectOption,
@@ -40,6 +43,8 @@ interface Member {
     BadgeComponent,
     SelectComponent,
     DialogComponent,
+    DataTableComponent,
+    CellDirective,
   ],
   template: `
     <a class="gm__back" routerLink="/admin/gremien">← {{ 'admin.gremien.title' | t }}</a>
@@ -55,30 +60,15 @@ interface Member {
     @if (members().length === 0) {
       <p class="gm__status">{{ 'admin.gremien.membersEmpty' | t }}</p>
     } @else {
-      <table class="gm__table">
-        <thead>
-          <tr>
-            <th>{{ 'admin.users.col.name' | t }}</th>
-            <th>{{ 'admin.users.col.email' | t }}</th>
-            <th>{{ 'admin.gremien.memberRole' | t }}</th>
-            <th class="gm__th-actions">{{ 'admin.users.col.actions' | t }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (m of members(); track m.assignmentId) {
-            <tr>
-              <td>{{ m.name }}</td>
-              <td>{{ m.email || '—' }}</td>
-              <td><app-badge variant="primary">{{ m.roleLabel }}</app-badge></td>
-              <td class="gm__th-actions">
-                <app-button variant="danger" size="sm" (click)="removeMember(m.assignmentId)">
-                  {{ 'admin.gremien.memberRemove' | t }}
-                </app-button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
+      <app-data-table [columns]="columns()" [rows]="members()" [rowKey]="rowId">
+        <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
+        <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
+        <ng-template appCell="actions" let-m>
+          <app-button variant="danger" size="sm" (click)="removeMember($any(m).assignmentId)">
+            {{ 'admin.gremien.memberRemove' | t }}
+          </app-button>
+        </ng-template>
+      </app-data-table>
     }
 
     <!-- Mitglied hinzufügen: Dialog mit Typeahead -->
@@ -283,6 +273,14 @@ export class GremiumMembersComponent {
   readonly roleOptions = computed<SelectOption[]>(() =>
     this.roles().map((r) => ({ value: r.id, label: this.roleName(r) })),
   );
+
+  readonly columns = computed<ColumnDef[]>(() => [
+    { key: 'name', label: this.i18n.translate('admin.users.col.name') },
+    { key: 'email', label: this.i18n.translate('admin.users.col.email') },
+    { key: 'roleLabel', label: this.i18n.translate('admin.gremien.memberRole') },
+    { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
+  ]);
+  readonly rowId = (m: unknown): string => (m as Member).assignmentId;
 
   readonly members = computed<Member[]>(() => {
     const rolesById = new Map(this.roles().map((r) => [r.id, r]));

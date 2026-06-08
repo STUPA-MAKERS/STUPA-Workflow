@@ -8,6 +8,9 @@ import type { Uuid } from '@core/api/models';
 import {
   BadgeComponent,
   ButtonComponent,
+  CellDirective,
+  type ColumnDef,
+  DataTableComponent,
   DialogComponent,
   SelectComponent,
   type SelectOption,
@@ -51,6 +54,8 @@ interface UsageRow {
     BadgeComponent,
     ButtonComponent,
     DialogComponent,
+    DataTableComponent,
+    CellDirective,
   ],
   templateUrl: './budget-dashboard.component.html',
   styleUrl: './budget-dashboard.component.scss',
@@ -145,6 +150,21 @@ export class BudgetDashboardComponent {
     walk(ks, 0);
     return out;
   });
+
+  readonly usageColumns = computed<ColumnDef[]>(() => [
+    { key: 'node', label: this.i18n.translate('budget.tree.col.node') },
+    { key: 'bar', label: this.i18n.translate('budget.usage.bar'), width: '12rem' },
+    { key: 'committed', label: this.i18n.translate('budget.tree.col.committed'), align: 'end' },
+    { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
+  ]);
+  readonly appColumns = computed<ColumnDef[]>(() => [
+    { key: 'id', label: this.i18n.translate('budget.apps.col.id') },
+    { key: 'ks', label: this.i18n.translate('budget.apps.col.ks') },
+    { key: 'stage', label: this.i18n.translate('budget.apps.col.stage') },
+    { key: 'amount', label: this.i18n.translate('budget.apps.col.amount'), align: 'end' },
+  ]);
+  readonly usageRowId = (r: unknown): string => (r as UsageRow).node.id;
+  readonly appRowId = (a: unknown): string => (a as BudgetApplication).applicationId;
 
   constructor() {
     this.load();

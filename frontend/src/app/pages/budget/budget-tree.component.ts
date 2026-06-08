@@ -3,7 +3,18 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
-import { BadgeComponent, ButtonComponent, CardComponent, DialogComponent, SelectComponent, type SelectOption } from '@shared/ui';
+import {
+  BadgeComponent,
+  ButtonComponent,
+  CardComponent,
+  CellDirective,
+  type ColumnDef,
+  DataTableComponent,
+  DialogComponent,
+  RowDetailDirective,
+  SelectComponent,
+  type SelectOption,
+} from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 
@@ -26,7 +37,7 @@ interface Row {
   selector: 'app-budget-tree',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, SelectComponent, BadgeComponent, DialogComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, SelectComponent, BadgeComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective],
   templateUrl: './budget-tree.component.html',
   styleUrl: './budget-tree.component.scss',
 })
@@ -80,6 +91,16 @@ export class BudgetTreeComponent {
     walk(top, 0);
     return out;
   });
+
+  readonly columns = computed<ColumnDef[]>(() => [
+    { key: 'node', label: this.i18n.translate('budget.tree.col.node') },
+    { key: 'allocated', label: this.i18n.translate('budget.tree.col.allocated'), align: 'end' },
+    { key: 'committed', label: this.i18n.translate('budget.tree.col.committed'), align: 'end' },
+    { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
+    { key: 'actions', label: this.i18n.translate('budget.tree.col.actions'), align: 'end' },
+  ]);
+  readonly rowId = (r: unknown): string => (r as Row).node.id;
+  readonly childExpanded = (r: unknown): boolean => this.addingChildOf() === (r as Row).node.id;
 
   constructor() {
     this.reload();

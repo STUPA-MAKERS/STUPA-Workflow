@@ -68,58 +68,40 @@
   </app-card>
 
   <!-- Kostenstellen-Baum des gewählten Budgets -->
-  <table class="bt__table">
-    <thead>
-      <tr>
-        <th>{{ 'budget.tree.col.node' | t }}</th>
-        <th class="bt__num">{{ 'budget.tree.col.allocated' | t }}</th>
-        <th class="bt__num">{{ 'budget.tree.col.committed' | t }}</th>
-        <th class="bt__num">{{ 'budget.tree.col.available' | t }}</th>
-        <th class="bt__col-actions">{{ 'budget.tree.col.actions' | t }}</th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (row of rows(); track row.node.id) {
-        <tr [class.bt__row--inactive]="!row.node.active">
-          <td>
-            <span class="bt__node" [style.paddingLeft.rem]="row.depth * 1.5">
-              <span class="bt__path">{{ row.node.pathKey }}</span>
-              <span class="bt__name">{{ row.node.name }}</span>
-            </span>
-          </td>
-          @if (alloc(row.node); as a) {
-            <td class="bt__num">{{ money(a.allocated, row.node.currency) }}</td>
-            <td class="bt__num">{{ money(a.committed, row.node.currency) }}</td>
-            <td class="bt__num" [class.bt__neg]="(+a.available) < 0">{{ money(a.available, row.node.currency) }}</td>
-          } @else {
-            <td class="bt__num bt__muted">—</td>
-            <td class="bt__num bt__muted">—</td>
-            <td class="bt__num bt__muted">—</td>
-          }
-          <td class="bt__col-actions">
-            <app-button variant="secondary" size="sm" [disabled]="!selectedFyId()" (click)="openLimit(row.node)">{{ 'budget.tree.setLimit' | t }}</app-button>
-            <app-button variant="ghost" size="sm" (click)="startAddChild(row.node)">{{ 'budget.tree.addChild' | t }}</app-button>
-            <app-button variant="danger" size="sm" (click)="deleteNode(row.node)">{{ 'budget.tree.delete' | t }}</app-button>
-          </td>
-        </tr>
-        @if (addingChildOf() === row.node.id) {
-          <tr class="bt__child-row">
-            <td colspan="5">
-              <div class="bt__child-form">
-                <span class="bt__child-hint">{{ 'budget.tree.addChildUnder' | t }}: {{ row.node.pathKey }}</span>
-                <label class="bt__lbl">{{ 'budget.tree.key' | t }}
-                  <input [ngModel]="childDraft().key" (ngModelChange)="patchChild('key', $event)" [name]="'ck-' + row.node.id" [placeholder]="'budget.tree.keyChildPlaceholder' | t" /></label>
-                <label class="bt__lbl">{{ 'budget.tree.name' | t }}
-                  <input [ngModel]="childDraft().name" (ngModelChange)="patchChild('name', $event)" [name]="'cn-' + row.node.id" /></label>
-                <app-button size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()" (click)="addChild(row.node)">{{ 'budget.tree.add' | t }}</app-button>
-                <app-button variant="ghost" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
-              </div>
-            </td>
-          </tr>
-        }
-      }
-    </tbody>
-  </table>
+  <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
+    <ng-template appCell="node" let-row>
+      <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
+        <span class="bt__path">{{ $any(row).node.pathKey }}</span>
+        <span class="bt__name">{{ $any(row).node.name }}</span>
+      </span>
+    </ng-template>
+    <ng-template appCell="allocated" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.allocated, $any(row).node.currency) : '—' }}</ng-template>
+    <ng-template appCell="committed" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.committed, $any(row).node.currency) : '—' }}</ng-template>
+    <ng-template appCell="available" let-row>
+      @if (alloc($any(row).node); as a) {
+        <span [class.bt__neg]="(+a.available) < 0">{{ money(a.available, $any(row).node.currency) }}</span>
+      } @else { — }
+    </ng-template>
+    <ng-template appCell="actions" let-row>
+      <span class="bt__col-actions">
+        <app-button variant="secondary" size="sm" [disabled]="!selectedFyId()" (click)="openLimit($any(row).node)">{{ 'budget.tree.setLimit' | t }}</app-button>
+        <app-button variant="ghost" size="sm" (click)="startAddChild($any(row).node)">{{ 'budget.tree.addChild' | t }}</app-button>
+        <app-button variant="danger" size="sm" (click)="deleteNode($any(row).node)">{{ 'budget.tree.delete' | t }}</app-button>
+      </span>
+    </ng-template>
+
+    <ng-template appRowDetail let-row>
+      <div class="bt__child-form">
+        <span class="bt__child-hint">{{ 'budget.tree.addChildUnder' | t }}: {{ $any(row).node.pathKey }}</span>
+        <label class="bt__lbl">{{ 'budget.tree.key' | t }}
+          <input [ngModel]="childDraft().key" (ngModelChange)="patchChild('key', $event)" [name]="'ck-' + $any(row).node.id" [placeholder]="'budget.tree.keyChildPlaceholder' | t" /></label>
+        <label class="bt__lbl">{{ 'budget.tree.name' | t }}
+          <input [ngModel]="childDraft().name" (ngModelChange)="patchChild('name', $event)" [name]="'cn-' + $any(row).node.id" /></label>
+        <app-button size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()" (click)="addChild($any(row).node)">{{ 'budget.tree.add' | t }}</app-button>
+        <app-button variant="ghost" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
+      </div>
+    </ng-template>
+  </app-data-table>
 }
 
 <!-- Limit (Zuteilung) je Kostenstelle setzen — Dialog pro Zeile -->

@@ -57,36 +57,24 @@
   <div class="bd__cols">
     <!-- Links: Auslastungs-Baum (ohne Box/Heading — der Budget-Name steht oben) -->
     <section class="bd__usage" [attr.aria-label]="'budget.usage.heading' | t">
-      <table class="bd__table">
-        <thead>
-          <tr>
-            <th>{{ 'budget.tree.col.node' | t }}</th>
-            <th>{{ 'budget.usage.bar' | t }}</th>
-            <th class="bd__num">{{ 'budget.tree.col.committed' | t }}</th>
-            <th class="bd__num">{{ 'budget.tree.col.available' | t }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (row of usageRows(); track row.node.id) {
-            <tr [class.bd__row--current]="row.node.id === selectedKsId()">
-              <td>
-                <button type="button" class="bd__ks" [style.paddingLeft.rem]="row.depth * 1.25" (click)="drillInto(row.node)">
-                  <span class="bd__path">{{ row.node.pathKey }}</span>
-                  <span class="bd__name">{{ row.node.name }}</span>
-                </button>
-              </td>
-              <td class="bd__bar-cell">
-                <div class="bd__track" role="img" [attr.aria-label]="(row.percent ?? 0) + '%'">
-                  <span class="bd__seg" [class.bd__seg--over]="row.committed > row.allocated && row.allocated > 0" [style.width.%]="barPct(row)"></span>
-                </div>
-                <span class="bd__pct">{{ row.percent === null ? '—' : row.percent + '%' }}</span>
-              </td>
-              <td class="bd__num">{{ money(row.committed, row.node.currency) }}</td>
-              <td class="bd__num" [class.bd__neg]="row.available < 0">{{ money(row.available, row.node.currency) }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
+      <app-data-table [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId" [boxed]="false">
+        <ng-template appCell="node" let-row>
+          <button type="button" class="bd__ks" [style.paddingLeft.rem]="$any(row).depth * 1.25" (click)="drillInto($any(row).node)">
+            <span class="bd__path">{{ $any(row).node.pathKey }}</span>
+            <span class="bd__name">{{ $any(row).node.name }}</span>
+          </button>
+        </ng-template>
+        <ng-template appCell="bar" let-row>
+          <span class="bd__bar-cell">
+            <span class="bd__track" role="img" [attr.aria-label]="($any(row).percent ?? 0) + '%'">
+              <span class="bd__seg" [class.bd__seg--over]="$any(row).committed > $any(row).allocated && $any(row).allocated > 0" [style.width.%]="barPct($any(row))"></span>
+            </span>
+            <span class="bd__pct">{{ $any(row).percent === null ? '—' : $any(row).percent + '%' }}</span>
+          </span>
+        </ng-template>
+        <ng-template appCell="committed" let-row>{{ money($any(row).committed, $any(row).node.currency) }}</ng-template>
+        <ng-template appCell="available" let-row><span [class.bd__neg]="$any(row).available < 0">{{ money($any(row).available, $any(row).node.currency) }}</span></ng-template>
+      </app-data-table>
     </section>
 
     <!-- Rechts: Anträge in der aktuellen Kostenstelle + Unterbaum -->
@@ -95,30 +83,16 @@
       @if (applications().length === 0) {
         <p class="bd__status">{{ 'budget.apps.empty' | t }}</p>
       } @else {
-        <table class="bd__table">
-          <thead>
-            <tr>
-              <th>{{ 'budget.apps.col.id' | t }}</th>
-              <th>{{ 'budget.apps.col.ks' | t }}</th>
-              <th>{{ 'budget.apps.col.stage' | t }}</th>
-              <th class="bd__num">{{ 'budget.apps.col.amount' | t }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (app of applications(); track app.applicationId) {
-              <tr class="bd__app-row" (click)="openApp(app)" tabindex="0" (keydown.enter)="openApp(app)">
-                <td class="bd__mono">{{ shortId(app.applicationId) }}…</td>
-                <td class="bd__mono">{{ app.pathKey }}</td>
-                <td>
-                  @if (app.stage) {
-                    <app-badge variant="neutral">{{ stageLabel(app.stage) }}</app-badge>
-                  } @else { — }
-                </td>
-                <td class="bd__num">{{ app.amount ? money(app.amount, app.currency ?? 'EUR') : '—' }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
+        <app-data-table [columns]="appColumns()" [rows]="applications()" [rowKey]="appRowId" [boxed]="false" [clickable]="true" (rowClick)="openApp($any($event))">
+          <ng-template appCell="id" let-a><span class="bd__mono">{{ shortId($any(a).applicationId) }}…</span></ng-template>
+          <ng-template appCell="ks" let-a><span class="bd__mono">{{ $any(a).pathKey }}</span></ng-template>
+          <ng-template appCell="stage" let-a>
+            @if ($any(a).stage) {
+              <app-badge variant="neutral">{{ stageLabel($any(a).stage) }}</app-badge>
+            } @else { — }
+          </ng-template>
+          <ng-template appCell="amount" let-a>{{ $any(a).amount ? money($any(a).amount, $any(a).currency ?? 'EUR') : '—' }}</ng-template>
+        </app-data-table>
       }
     </section>
   </div>
