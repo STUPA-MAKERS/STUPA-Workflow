@@ -238,6 +238,8 @@ describe('MeetingsComponent', () => {
       id: null,
       gremien: [{ id: 'g-1', name: 'StuPa' }],
     });
+    // Anlegen erfolgt jetzt über einen Dialog (#27): erst öffnen.
+    await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
     const input = await screen.findByLabelText('Titel');
     await userEvent.type(input, 'Neue Sitzung');
     // Pflicht-Gremium wählen (#68) — sonst bleibt »Sitzung anlegen« gesperrt.

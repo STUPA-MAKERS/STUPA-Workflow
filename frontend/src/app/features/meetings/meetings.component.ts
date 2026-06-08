@@ -23,7 +23,16 @@ import type { ServerMessage } from '@core/ws/ws-messages';
 import { BadgeComponent, type BadgeVariant } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
-import { DatepickerComponent, SelectComponent, type SelectOption } from '@shared/ui';
+import {
+  CellDirective,
+  type ColumnDef,
+  DataTableComponent,
+  DatepickerComponent,
+  DialogComponent,
+  IconComponent,
+  SelectComponent,
+  type SelectOption,
+} from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
 import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings.util';
@@ -53,6 +62,10 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
     CardComponent,
     SelectComponent,
     DatepickerComponent,
+    DataTableComponent,
+    CellDirective,
+    DialogComponent,
+    IconComponent,
     DatePipe,
   ],
   template: `
@@ -280,89 +293,102 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
         </app-card>
       }
     } @else {
-      <!-- Übersicht: vorhandene Sitzungen (#104) -->
+      <!-- Übersicht: vorhandene Sitzungen (#104) als geteilte Tabelle (#27) -->
       @if (canManage() || canWrite()) {
-        <app-card [heading]="'meetings.list.title' | t">
+        <section class="mtg__listSection">
+          <header class="mtg__listHead">
+            <h2 class="mtg__listH">{{ 'meetings.list.title' | t }}</h2>
+            <!-- Anlegen nur für Sitzungsleitung (#35) — über Dialog (#27). -->
+            @if (canManage()) {
+              <app-button size="sm" (click)="openCreate()">{{ 'meetings.list.new' | t }}</app-button>
+            }
+          </header>
           @if (loadingList()) {
             <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
-          } @else if (meetings().length) {
-            <ul class="mtg__list">
-              @for (mtg of meetings(); track mtg.id) {
-                <li class="mtg__listItem">
-                  <span class="mtg__listTitle">{{ mtg.title }}</span>
-                  @if (mtg.date) {
-                    <span class="mtg__muted">{{ mtg.date | date: 'mediumDate' }}{{ mtg.startTime ? ', ' + mtg.startTime : '' }}</span>
-                  }
-                  <app-badge [variant]="statusVariant(mtg.status)">
-                    {{ statusKey(mtg.status) | t }}
-                  </app-badge>
-                  <app-button variant="ghost" size="sm" (click)="openMeeting(mtg.id)">
-                    {{ 'meetings.list.open' | t }}
-                  </app-button>
-                </li>
-              }
-            </ul>
           } @else {
-            <p class="mtg__muted">{{ 'meetings.list.empty' | t }}</p>
-          }
-        </app-card>
-      }
-
-      <!-- Keine Sitzung geladen → Anlegen (nur Sitzungsleitung) -->
-      @if (canManage()) {
-        <app-card [heading]="'meetings.create.title' | t">
-          <p class="mtg__lead">{{ 'meetings.create.lead' | t }}</p>
-          <form class="mtg__createForm" (submit)="create($event)">
-            <label class="mtg__paneLabel" [for]="'mtg-new'">{{ 'meetings.create.name' | t }}</label>
-            <input
-              id="mtg-new"
-              class="mtg__input"
-              [placeholder]="'meetings.create.placeholder' | t"
-              [ngModel]="newTitle()"
-              (ngModelChange)="newTitle.set($event)"
-              name="title"
-            />
-            <!-- Gremium ist Pflicht (BE MeetingCreate.gremiumId, #68): echte Liste. -->
-            <app-select
-              name="gremium"
-              [label]="'meetings.create.gremium' | t"
-              [placeholder]="'meetings.create.gremiumPlaceholder' | t"
-              [options]="gremiumOptions()"
-              [required]="true"
-              [ngModel]="newGremiumId()"
-              (ngModelChange)="newGremiumId.set($event)"
-            />
-            @if (!gremiumOptions().length) {
-              <p class="mtg__muted mtg__hint">{{ 'meetings.create.noGremien' | t }}</p>
-            }
-            <app-datepicker
-              [label]="'meetings.create.date' | t"
-              [ngModel]="newDate()"
-              (ngModelChange)="newDate.set($event)"
-              name="date"
-            />
-            <label class="mtg__paneLabel" for="mtg-new-time">{{ 'meetings.create.time' | t }}</label>
-            <input
-              id="mtg-new-time"
-              class="mtg__input"
-              type="time"
-              [ngModel]="newTime()"
-              (ngModelChange)="newTime.set($event)"
-              name="time"
-            />
-            <app-button
-              type="submit"
-              size="sm"
-              [disabled]="!newTitle().trim() || !newGremiumId()"
-              [loading]="creating()"
+            <app-data-table
+              [columns]="listColumns()"
+              [rows]="meetings()"
+              [emptyText]="'meetings.list.empty' | t"
+              [clickable]="true"
+              (rowClick)="openMeeting($any($event).id)"
             >
-              {{ 'meetings.create.submit' | t }}
-            </app-button>
-          </form>
-        </app-card>
+              <ng-template appCell="date" let-m>
+                @if ($any(m).date) {
+                  <span class="mtg__muted">{{ $any(m).date | date: 'mediumDate' }}{{ $any(m).startTime ? ', ' + $any(m).startTime : '' }}</span>
+                } @else { — }
+              </ng-template>
+              <ng-template appCell="status" let-m>
+                <app-badge [variant]="statusVariant($any(m).status)">{{ statusKey($any(m).status) | t }}</app-badge>
+              </ng-template>
+              <ng-template appCell="actions" let-m>
+                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.list.open' | t" (click)="$event.stopPropagation(); openMeeting($any(m).id)">
+                  <app-icon name="chevron-down" class="mtg__openIcon" />
+                </app-button>
+              </ng-template>
+            </app-data-table>
+          }
+        </section>
       } @else {
         <p class="mtg__status">{{ 'meetings.empty' | t }}</p>
       }
+
+      <!-- Anlegen (nur Sitzungsleitung) als Dialog (#27/#19) -->
+      <app-dialog
+        [open]="createOpen()"
+        [title]="'meetings.create.title' | t"
+        [closeLabel]="'action.cancel' | t"
+        (closed)="createOpen.set(false)"
+      >
+        <form id="mtg-create" class="mtg__createForm" (submit)="create($event)">
+          <label class="mtg__paneLabel" [for]="'mtg-new'">{{ 'meetings.create.name' | t }}</label>
+          <input
+            id="mtg-new"
+            class="mtg__input"
+            [placeholder]="'meetings.create.placeholder' | t"
+            [ngModel]="newTitle()"
+            (ngModelChange)="newTitle.set($event)"
+            name="title"
+          />
+          <app-select
+            name="gremium"
+            [label]="'meetings.create.gremium' | t"
+            [placeholder]="'meetings.create.gremiumPlaceholder' | t"
+            [options]="gremiumOptions()"
+            [required]="true"
+            [ngModel]="newGremiumId()"
+            (ngModelChange)="newGremiumId.set($event)"
+          />
+          @if (!gremiumOptions().length) {
+            <p class="mtg__muted mtg__hint">{{ 'meetings.create.noGremien' | t }}</p>
+          }
+          <app-datepicker
+            [label]="'meetings.create.date' | t"
+            [ngModel]="newDate()"
+            (ngModelChange)="newDate.set($event)"
+            name="date"
+          />
+          <label class="mtg__paneLabel" for="mtg-new-time">{{ 'meetings.create.time' | t }}</label>
+          <input
+            id="mtg-new-time"
+            class="mtg__input"
+            type="time"
+            [ngModel]="newTime()"
+            (ngModelChange)="newTime.set($event)"
+            name="time"
+          />
+        </form>
+        <div dialog-footer class="mtg__dialogFoot">
+          <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+          <app-button
+            [disabled]="!newTitle().trim() || !newGremiumId()"
+            [loading]="creating()"
+            (click)="create($event)"
+          >
+            {{ 'meetings.create.submit' | t }}
+          </app-button>
+        </div>
+      </app-dialog>
     }
   `,
   styles: [
@@ -396,6 +422,29 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
       .mtg__lead {
         color: var(--color-text-muted);
         margin: 0 0 var(--space-3);
+      }
+      .mtg__listSection {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+      }
+      .mtg__listHead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-4);
+      }
+      .mtg__listH {
+        margin: 0;
+        font-size: var(--fs-lg);
+      }
+      .mtg__openIcon {
+        transform: rotate(-90deg);
+      }
+      .mtg__dialogFoot {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-3);
       }
       .mtg__muted {
         color: var(--color-text-muted);
@@ -638,6 +687,20 @@ export class MeetingsComponent implements OnDestroy {
   readonly newGremiumId = signal('');
   /** Gremien als Dropdown-Optionen (echte Liste, `/gremien`). */
   readonly gremiumOptions = signal<SelectOption[]>([]);
+  /** Sitzung-anlegen-Dialog offen (#27). */
+  readonly createOpen = signal(false);
+
+  /** Spalten der Sitzungs-Übersichtstabelle (#27). */
+  readonly listColumns = computed<ColumnDef[]>(() => [
+    { key: 'title', label: this.i18n.translate('meetings.create.name') },
+    { key: 'date', label: this.i18n.translate('meetings.create.date') },
+    { key: 'status', label: this.i18n.translate('meetings.list.status'), align: 'start', width: '9rem' },
+    { key: 'actions', label: '', align: 'end', width: '4rem' },
+  ]);
+
+  openCreate(): void {
+    this.createOpen.set(true);
+  }
 
   readonly canManage = computed(() => this.auth.can('meeting.manage'));
   readonly canWrite = computed(() => this.auth.can('protocol.write'));
@@ -727,6 +790,7 @@ export class MeetingsComponent implements OnDestroy {
         this.newGremiumId.set('');
         this.newDate.set('');
         this.newTime.set('');
+        this.createOpen.set(false);
         this.toast.success(this.i18n.translate('meetings.toast.created'));
         // Auf die Detail-Route navigieren, damit die Sitzung wiederauffindbar ist (#104).
         void this.router.navigate(['/meetings', m.id]);
