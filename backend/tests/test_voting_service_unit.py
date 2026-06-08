@@ -330,10 +330,16 @@ class _FakeFlow:
     calls: ClassVar[list[str | None]] = []
     new_state: ClassVar[Any] = uuid4()
     fire_raises: ClassVar[Exception | None] = None
+    branch: ClassVar[Any] = None
+    branch_calls: ClassVar[list[str]] = []
 
     def __init__(self, session: object, dispatcher: object) -> None:
         self.fired: dict[str, object] | None = None
         self._available: list[TransitionOut] = _FakeFlow.available
+
+    async def branch_transition(self, application_id, branch):  # noqa: ANN001
+        _FakeFlow.branch_calls.append(branch)
+        return _FakeFlow.branch
 
     async def available_transitions(self, application_id, principal, *, vote_result=None):  # noqa: ANN001
         _FakeFlow.calls.append(vote_result)
@@ -354,6 +360,8 @@ def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     _FakeFlow.calls = []
     _FakeFlow.new_state = uuid4()
     _FakeFlow.fire_raises = None
+    _FakeFlow.branch = None
+    _FakeFlow.branch_calls = []
     monkeypatch.setattr(voting_service, "FlowService", _FakeFlow)
     return _FakeFlow
 
@@ -371,6 +379,20 @@ async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None
     assert out.fired_transition_id == transition.id
     assert out.new_state_id == _patch_flow.new_state
     assert _patch_flow.calls == ["passed"]
+
+
+async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) -> None:
+    """#28: bei einem ``vote``-State feuert close() den ``pass``-Branch direkt —
+    ohne den Guard-basierten ``available_transitions``-Pfad."""
+    branch_t = TransitionOut(id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={})
+    _patch_flow.branch = branch_t
+    vote = _vote()
+    db = fake_session(result(vote), result("yes", "yes", "yes", "no"))
+    out = await VotingService(db).close(vote.id, _voter())
+    assert out.result == "passed"
+    assert out.fired_transition_id == branch_t.id
+    assert _patch_flow.branch_calls == ["pass"]  # passed → pass
+    assert _patch_flow.calls == []  # Guard-Pfad NICHT benutzt
 
 
 async def test_close_no_matching_branch_just_closes(

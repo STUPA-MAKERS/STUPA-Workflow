@@ -231,6 +231,19 @@ class FlowService:
         )
 
     # ----------------------------------------------------------- branch firing
+    async def branch_transition(
+        self, application_id: UUID, branch: str
+    ) -> Transition | None:
+        """Ausgehenden Übergang des aktuellen States mit ``branch`` finden (#28).
+
+        ``branch`` ist ``pass``/``fail`` (vote) bzw. ``accept``/``reject`` (approval);
+        ``None``, wenn der aktuelle State keinen solchen Branch-Ausgang hat."""
+        app = await self._load_app(application_id)
+        for t in await self._outgoing(app):
+            if t.branch == branch:
+                return t
+        return None
+
     async def fire_branch(
         self,
         application_id: UUID,
@@ -243,14 +256,13 @@ class FlowService:
 
         ``branch`` ist ``pass``/``fail`` (vote) bzw. ``accept``/``reject`` (approval).
         404, wenn kein passender Branch-Übergang existiert."""
-        app = await self._load_app(application_id)
-        for t in await self._outgoing(app):
-            if t.branch == branch:
-                return await self.fire(
-                    application_id, t.id, principal, note=note or branch, manual=False
-                )
-        raise NotFoundError(
-            f"no '{branch}' transition from the application's current state"
+        t = await self.branch_transition(application_id, branch)
+        if t is None:
+            raise NotFoundError(
+                f"no '{branch}' transition from the application's current state"
+            )
+        return await self.fire(
+            application_id, t.id, principal, note=note or branch, manual=False
         )
 
     # ------------------------------------------------------------------- fire

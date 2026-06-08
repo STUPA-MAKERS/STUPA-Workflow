@@ -299,10 +299,17 @@ class VotingService:
         outcome = tally_mod.result(config, counts, eligible)
 
         flow = FlowService(self.session, self.dispatcher)
-        available = await flow.available_transitions(
-            vote.application_id, principal, vote_result=outcome.result
-        )
-        branch = available[0] if available else None
+        # Global-Flow (#28): ein ``vote``-State hat zwei feste Ausgänge mit
+        # ``branch`` ``pass``/``fail``. ``passed`` → pass, sonst (``rejected``/``tie``)
+        # fail-closed → fail. Existiert kein Branch-Ausgang (Alt-Flow vor Cutover),
+        # fällt close() auf den Guard-basierten ``voteResult``-Pfad zurück.
+        branch_name = "pass" if outcome.result == "passed" else "fail"
+        branch = await flow.branch_transition(vote.application_id, branch_name)
+        if branch is None:
+            available = await flow.available_transitions(
+                vote.application_id, principal, vote_result=outcome.result
+            )
+            branch = available[0] if available else None
 
         # Vote-Zustand vormerken — NICHT separat committen: `fire` schreibt ihn
         # atomar mit Transition + status_event; ohne Branch committen wir hier.
