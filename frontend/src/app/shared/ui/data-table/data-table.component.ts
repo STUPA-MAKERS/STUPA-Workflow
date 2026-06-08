@@ -80,6 +80,8 @@ export interface ColumnDef {
   styles: [
     `
       .dt--boxed {
+        /* etwas Luft zwischen Seiten-Beschreibung und Tabelle (#65). */
+        margin-top: var(--space-2);
         background: var(--color-surface);
         border: var(--border-width) solid var(--color-border);
         border-radius: var(--radius-lg);

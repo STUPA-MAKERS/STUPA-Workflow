@@ -89,21 +89,34 @@ class GremiumRoleService:
         )
 
     # ----------------------------------------------------------- role catalogue
-    async def list_roles(self) -> list[GremiumRoleOut]:
+    async def list_roles(self, gremium_id: UUID) -> list[GremiumRoleOut]:
         rows = (
-            await self.session.scalars(select(GremiumRole).order_by(GremiumRole.key))
+            await self.session.scalars(
+                select(GremiumRole)
+                .where(GremiumRole.gremium_id == gremium_id)
+                .order_by(GremiumRole.key)
+            )
         ).all()
         return [_role_out(r) for r in rows]
 
-    async def create_role(self, payload: GremiumRoleCreate, actor: str) -> GremiumRoleOut:
+    async def create_role(
+        self, gremium_id: UUID, payload: GremiumRoleCreate, actor: str
+    ) -> GremiumRoleOut:
         existing = (
             await self.session.scalars(
-                select(GremiumRole).where(GremiumRole.key == payload.key)
+                select(GremiumRole).where(
+                    GremiumRole.gremium_id == gremium_id,
+                    GremiumRole.key == payload.key,
+                )
             )
         ).first()
         if existing is not None:
-            raise ConflictError(f"gremium role {payload.key!r} already exists")
-        row = GremiumRole(key=payload.key, name_i18n=payload.name)
+            raise ConflictError(
+                f"gremium role {payload.key!r} already exists in this gremium"
+            )
+        row = GremiumRole(
+            gremium_id=gremium_id, key=payload.key, name_i18n=payload.name
+        )
         self.session.add(row)
         await self.session.flush()
         await self._audit(actor, "gremium_role", row.id)
@@ -153,8 +166,11 @@ class GremiumRoleService:
     async def create_membership(
         self, gremium_id: UUID, payload: GremiumMembershipCreate, actor: str
     ) -> GremiumMembershipOut:
-        if await self.session.get(GremiumRole, payload.gremium_role_id) is None:
+        role = await self.session.get(GremiumRole, payload.gremium_role_id)
+        if role is None:
             raise NotFoundError(f"gremium role {payload.gremium_role_id} not found")
+        if role.gremium_id != gremium_id:
+            raise ConflictError("gremium role does not belong to this gremium")
         new_from = _parse_dt(payload.valid_from)
         new_until = _parse_dt(payload.valid_until)
         if new_from is not None and new_until is not None and new_from >= new_until:

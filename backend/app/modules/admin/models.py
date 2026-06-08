@@ -43,15 +43,22 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class GremiumRole(UUIDPkMixin, Base):
-    """Gremium-spezifische Rolle (#42) — ein **eigener** Rollensatz, getrennt von den
-    globalen Rollen (``role``). Definiert die wählbaren Ämter innerhalb von Gremien
-    (z. B. Vorsitz, Beisitz, Kassenwart). Gilt gremium-übergreifend als Katalog;
-    die konkrete Zugehörigkeit hält :class:`GremiumMembership`."""
+    """Gremium-spezifische Rolle (#42/#62) — ein **eigener** Rollensatz, getrennt von
+    den globalen Rollen (``role``) und **pro Gremium** gepflegt (z. B. Vorsitz,
+    Beisitz, Kassenwart je Gremium). Die konkrete Zugehörigkeit hält
+    :class:`GremiumMembership`."""
 
     __tablename__ = "gremium_role"
 
-    key: Mapped[str] = mapped_column(Text, unique=True)
+    gremium_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gremium.id", ondelete="CASCADE")
+    )
+    key: Mapped[str] = mapped_column(Text)
     name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+
+    __table_args__ = (
+        UniqueConstraint("gremium_id", "key", name="uq_gremium_role_gremium_key"),
+    )
 
 
 class GremiumMembership(UUIDPkMixin, Base):

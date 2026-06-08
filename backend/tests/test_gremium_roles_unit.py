@@ -49,8 +49,8 @@ def test_two_open_intervals_always_overlap() -> None:
     assert intervals_overlap(None, None, None, None)
 
 
-def _role() -> GremiumRole:
-    r = GremiumRole(key="vorsitz", name_i18n={"de": "Vorsitz"})
+def _role(gremium_id=None) -> GremiumRole:
+    r = GremiumRole(gremium_id=gremium_id or uuid4(), key="vorsitz", name_i18n={"de": "Vorsitz"})
     r.id = uuid4()
     return r
 
@@ -67,7 +67,7 @@ async def test_create_membership_rejects_overlap() -> None:
     pid, gid = uuid4(), uuid4()
     existing = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-12-31"))
     # gets: GremiumRole lookup; scalars: existing memberships query
-    db = fake_session(result(existing), gets=[_role()])
+    db = fake_session(result(existing), gets=[_role(gid)])
     payload = GremiumMembershipCreate(
         principalId=pid, gremiumRoleId=uuid4(), validFrom="2026-06-01", validUntil="2026-09-01"
     )
@@ -82,7 +82,7 @@ async def test_create_membership_allows_consecutive_term() -> None:
         result(existing),  # existing memberships
         result(),  # audit advisory lock
         result(),  # audit prev-hash
-        gets=[_role()],
+        gets=[_role(gid)],
     )
 
     async def _flush_assign() -> None:  # DB würde die PK setzen; Fake tut es nicht.

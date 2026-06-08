@@ -172,21 +172,30 @@ async def delete_gremium(
 # =========================================================================== #
 # Gremium-Rollen (#42) — eigener Rollensatz + zeitbegrenzte Mitgliedschaften
 # =========================================================================== #
-@router.get("/gremium-roles", response_model=list[GremiumRoleOut], responses=_errors(401, 403))
-async def list_gremium_roles(service: GremiumRoleServiceDep) -> list[GremiumRoleOut]:
-    return await service.list_roles()
+@router.get(
+    "/gremien/{gremium_id}/roles",
+    response_model=list[GremiumRoleOut],
+    responses=_errors(401, 403),
+)
+async def list_gremium_roles(
+    gremium_id: UUID, service: GremiumRoleServiceDep
+) -> list[GremiumRoleOut]:
+    return await service.list_roles(gremium_id)
 
 
 @router.post(
-    "/gremium-roles",
+    "/gremien/{gremium_id}/roles",
     response_model=GremiumRoleOut,
     status_code=201,
     responses=_errors(400, 401, 403, 409, 422),
 )
 async def create_gremium_role(
-    payload: GremiumRoleCreate, service: GremiumRoleServiceDep, principal: RolesAdmin
+    gremium_id: UUID,
+    payload: GremiumRoleCreate,
+    service: GremiumRoleServiceDep,
+    principal: RolesAdmin,
 ) -> GremiumRoleOut:
-    return await service.create_role(payload, principal.sub)
+    return await service.create_role(gremium_id, payload, principal.sub)
 
 
 @router.patch(
