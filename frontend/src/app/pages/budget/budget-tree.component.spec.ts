@@ -77,6 +77,42 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.rows()[1].depth).toBe(1);
   });
 
+  it('creates a top budget via the header-button dialog (POST /budgets)', async () => {
+    const { fixture, http } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openTop();
+    expect(c.topOpen()).toBe(true);
+    c.patchTop('key', 'AStA');
+    c.patchTop('name', 'AStA-Mittel');
+    c.createTop(new Event('submit'));
+    const post = http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'POST');
+    expect(post.request.body).toEqual({ key: 'AStA', name: 'AStA-Mittel' });
+    post.flush({ id: 'b-asta', parentId: null, key: 'AStA', pathKey: 'AStA', name: 'AStA-Mittel', currency: 'EUR', active: true, gremiumId: null, byFiscalYear: [], children: [] });
+    expect(c.topOpen()).toBe(false);
+    // reload nach Erfolg (TREE kennt b-asta nicht → fällt auf b-vs zurück)
+    http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(TREE);
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
+  });
+
+  it('creates a fiscal year for the selected budget via the header-button dialog (POST)', async () => {
+    const { fixture, http } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openFy();
+    expect(c.fyOpen()).toBe(true);
+    c.patchFy('label', '2027');
+    c.patchFy('startDate', '2027-01-01');
+    c.patchFy('endDate', '2027-12-31');
+    c.createFiscalYear(new Event('submit'));
+    const post = http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years') && r.method === 'POST');
+    expect(post.request.body).toEqual({ label: '2027', startDate: '2027-01-01', endDate: '2027-12-31' });
+    post.flush({ ...FY, id: 'fy-2', label: '2027', startDate: '2027-01-01', endDate: '2027-12-31' });
+    expect(c.fyOpen()).toBe(false);
+    // HHJ-Reload nach Erfolg
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
+  });
+
   it('sets a limit (allocation) via PUT for the selected fiscal year', async () => {
     const { fixture, http } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -4,6 +4,20 @@
   gap: var(--space-5);
 }
 
+.bt__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.bt__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 .bt__title {
   margin: 0;
 }
@@ -28,6 +42,20 @@
   flex-wrap: wrap;
   align-items: end;
   gap: var(--space-3);
+}
+
+.bt__form--dialog {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.bt__form--dialog .bt__lbl input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bt__form-full {
+  margin: 0;
 }
 
 .bt__lbl {

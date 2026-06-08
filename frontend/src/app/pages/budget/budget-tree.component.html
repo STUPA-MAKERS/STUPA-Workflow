@@ -1,6 +1,19 @@
 <header class="bt__head">
-  <h1 class="bt__title">{{ 'budget.tree.title' | t }}</h1>
-  <p class="bt__subtitle">{{ 'budget.tree.subtitle' | t }}</p>
+  <div>
+    <h1 class="bt__title">{{ 'budget.tree.title' | t }}</h1>
+    <p class="bt__subtitle">{{ 'budget.tree.subtitle' | t }}</p>
+  </div>
+  <div class="bt__head-actions">
+    <app-button size="sm" (click)="openTop()">{{ 'budget.tree.createTop' | t }}</app-button>
+    <app-button
+      size="sm"
+      variant="secondary"
+      [disabled]="!selectedTopId()"
+      (click)="openFy()"
+    >
+      {{ 'budget.tree.fyTitle' | t }}
+    </app-button>
+  </div>
 </header>
 
 <!-- Budget + Haushaltsjahr wählen (HHJ gehören zum gewählten Budget) -->
@@ -23,19 +36,6 @@
   />
 </div>
 
-<!-- Top-Budget anlegen (kein Gremium) -->
-<app-card [heading]="'budget.tree.createTop' | t">
-  <form class="bt__form" (submit)="createTop($event)">
-    <label class="bt__lbl">{{ 'budget.tree.key' | t }}
-      <input [ngModel]="newTop().key" (ngModelChange)="patchTop('key', $event)" name="topKey" [placeholder]="'budget.tree.keyTopPlaceholder' | t" /></label>
-    <label class="bt__lbl">{{ 'budget.tree.name' | t }}
-      <input [ngModel]="newTop().name" (ngModelChange)="patchTop('name', $event)" name="topName" /></label>
-    <app-button type="submit" size="sm" [disabled]="!newTop().key.trim() || !newTop().name.trim()">
-      {{ 'budget.tree.add' | t }}
-    </app-button>
-  </form>
-</app-card>
-
 @if (loading()) {
   <p class="bt__status" aria-live="polite">{{ 'budget.tree.loading' | t }}</p>
 } @else if (loadError()) {
@@ -43,8 +43,8 @@
 } @else if (!tree().length) {
   <p class="bt__status">{{ 'budget.tree.empty' | t }}</p>
 } @else if (selectedTopId()) {
-  <!-- Haushaltsjahre INNERHALB des gewählten Budgets -->
-  <app-card [heading]="'budget.tree.fyTitle' | t">
+  <!-- Haushaltsjahre INNERHALB des gewählten Budgets (Anlegen via Kopf-Button) -->
+  <app-card [heading]="'budget.tree.fiscalYear' | t">
     @if (fiscalYears().length) {
       <ul class="bt__fy-list">
         @for (fy of fiscalYears(); track fy.id) {
@@ -54,17 +54,6 @@
     } @else {
       <p class="bt__muted">{{ 'budget.tree.fyEmpty' | t }}</p>
     }
-    <form class="bt__form" (submit)="createFiscalYear($event)">
-      <label class="bt__lbl">{{ 'budget.tree.fyLabel' | t }}
-        <input [ngModel]="newFy().label" (ngModelChange)="patchFy('label', $event)" name="fyLabel" [placeholder]="'budget.tree.fyLabelPlaceholder' | t" /></label>
-      <label class="bt__lbl">{{ 'budget.tree.fyStart' | t }}
-        <input type="date" [ngModel]="newFy().startDate" (ngModelChange)="patchFy('startDate', $event)" name="fyStart" /></label>
-      <label class="bt__lbl">{{ 'budget.tree.fyEnd' | t }}
-        <input type="date" [ngModel]="newFy().endDate" (ngModelChange)="patchFy('endDate', $event)" name="fyEnd" /></label>
-      <app-button type="submit" size="sm" [disabled]="!newFy().label.trim() || !newFy().startDate || !newFy().endDate">
-        {{ 'budget.tree.add' | t }}
-      </app-button>
-    </form>
   </app-card>
 
   <!-- Kostenstellen-Baum des gewählten Budgets -->
@@ -121,5 +110,46 @@
   <div dialog-footer class="bt__dialog-foot">
     <app-button variant="ghost" (click)="closeLimit()">{{ 'budget.tree.cancel' | t }}</app-button>
     <app-button [disabled]="!limitValue().trim()" (click)="saveLimit()">{{ 'budget.tree.setLimit' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Top-Budget anlegen (Dialog, über den Kopf-Button) -->
+<app-dialog
+  [open]="topOpen()"
+  [title]="'budget.tree.createTop' | t"
+  [closeLabel]="'budget.tree.cancel' | t"
+  (closed)="closeTop()"
+>
+  <form id="bt-top-form" class="bt__form bt__form--dialog" (submit)="createTop($event)">
+    <label class="bt__lbl">{{ 'budget.tree.key' | t }}
+      <input [ngModel]="newTop().key" (ngModelChange)="patchTop('key', $event)" name="topKey" [placeholder]="'budget.tree.keyTopPlaceholder' | t" /></label>
+    <label class="bt__lbl">{{ 'budget.tree.name' | t }}
+      <input [ngModel]="newTop().name" (ngModelChange)="patchTop('name', $event)" name="topName" /></label>
+  </form>
+  <div dialog-footer class="bt__dialog-foot">
+    <app-button variant="ghost" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button [disabled]="!newTop().key.trim() || !newTop().name.trim()" (click)="createTop($event)">{{ 'budget.tree.add' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Haushaltsjahr anlegen (Dialog, über den Kopf-Button) — innerhalb des gewählten Budgets -->
+<app-dialog
+  [open]="fyOpen()"
+  [title]="'budget.tree.fyTitle' | t"
+  [closeLabel]="'budget.tree.cancel' | t"
+  (closed)="closeFy()"
+>
+  <form id="bt-fy-form" class="bt__form bt__form--dialog" (submit)="createFiscalYear($event)">
+    <p class="bt__muted bt__form-full">{{ 'budget.tree.fyTop' | t }}: <strong>{{ selectedTopLabel() }}</strong></p>
+    <label class="bt__lbl">{{ 'budget.tree.fyLabel' | t }}
+      <input [ngModel]="newFy().label" (ngModelChange)="patchFy('label', $event)" name="fyLabel" [placeholder]="'budget.tree.fyLabelPlaceholder' | t" /></label>
+    <label class="bt__lbl">{{ 'budget.tree.fyStart' | t }}
+      <input type="date" [ngModel]="newFy().startDate" (ngModelChange)="patchFy('startDate', $event)" name="fyStart" /></label>
+    <label class="bt__lbl">{{ 'budget.tree.fyEnd' | t }}
+      <input type="date" [ngModel]="newFy().endDate" (ngModelChange)="patchFy('endDate', $event)" name="fyEnd" /></label>
+  </form>
+  <div dialog-footer class="bt__dialog-foot">
+    <app-button variant="ghost" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button [disabled]="!newFy().label.trim() || !newFy().startDate || !newFy().endDate" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
   </div>
 </app-dialog>

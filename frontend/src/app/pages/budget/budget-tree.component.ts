@@ -56,6 +56,10 @@ export class BudgetTreeComponent {
 
   /** Top-Budget anlegen (kein Gremium — Budgets sind gremium-unabhängig). */
   readonly newTop = signal<{ key: string; name: string }>({ key: '', name: '' });
+  /** Top-Budget-Dialog (über den Kopf-Button geöffnet). */
+  readonly topOpen = signal(false);
+  /** Haushaltsjahr-Dialog (über den Kopf-Button geöffnet). */
+  readonly fyOpen = signal(false);
   /** Unterknoten anlegen: welcher Parent ist aufgeklappt + Entwurf. */
   readonly addingChildOf = signal<Uuid | null>(null);
   readonly childDraft = signal<{ key: string; name: string }>({ key: '', name: '' });
@@ -79,6 +83,12 @@ export class BudgetTreeComponent {
   private readonly selectedTop = computed<BudgetTreeNode | null>(
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
   );
+
+  /** Anzeige-Label des gewählten Budgets (für den HHJ-Dialog). */
+  readonly selectedTopLabel = computed<string>(() => {
+    const t = this.selectedTop();
+    return t ? `${t.key} – ${t.name}` : '';
+  });
 
   /** Unterbaum des gewählten Budgets → flache Zeilen (Pre-Order) mit Tiefe. */
   readonly rows = computed<Row[]>(() => {
@@ -162,6 +172,15 @@ export class BudgetTreeComponent {
     this.newTop.update((t) => ({ ...t, [key]: value }));
   }
 
+  openTop(): void {
+    this.newTop.set({ key: '', name: '' });
+    this.topOpen.set(true);
+  }
+
+  closeTop(): void {
+    this.topOpen.set(false);
+  }
+
   createTop(event: Event): void {
     event.preventDefault();
     const t = this.newTop();
@@ -170,6 +189,7 @@ export class BudgetTreeComponent {
       next: (node) => {
         this.toast.success(this.i18n.translate('budget.tree.toast.created'));
         this.newTop.set({ key: '', name: '' });
+        this.topOpen.set(false);
         this.selectedTopId.set(node.id);
         this.reload();
       },
@@ -246,6 +266,15 @@ export class BudgetTreeComponent {
     this.newFy.update((f) => ({ ...f, [key]: value }));
   }
 
+  openFy(): void {
+    this.newFy.set({ label: '', startDate: '', endDate: '' });
+    this.fyOpen.set(true);
+  }
+
+  closeFy(): void {
+    this.fyOpen.set(false);
+  }
+
   createFiscalYear(event: Event): void {
     event.preventDefault();
     const top = this.selectedTopId();
@@ -257,6 +286,7 @@ export class BudgetTreeComponent {
         next: () => {
           this.toast.success(this.i18n.translate('budget.tree.toast.fyCreated'));
           this.newFy.set({ label: '', startDate: '', endDate: '' });
+          this.fyOpen.set(false);
           this.loadFiscalYears(top);
         },
         error: () => this.toast.error(this.i18n.translate('budget.tree.toast.fyFailed')),
