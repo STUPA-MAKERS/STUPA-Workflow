@@ -306,6 +306,7 @@ export interface WebhookConfig {
 /** Gremium-Rolle (#42) — eigener Rollensatz, getrennt von den globalen Rollen. */
 export interface GremiumRole {
   id: Uuid;
+  gremiumId: Uuid;
   key: string;
   name: I18nMap;
 }

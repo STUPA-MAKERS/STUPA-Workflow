@@ -59,7 +59,9 @@ def _iso(value: datetime | None) -> str | None:
 
 
 def _role_out(row: GremiumRole) -> GremiumRoleOut:
-    return GremiumRoleOut(id=row.id, key=row.key, name=row.name_i18n or {})
+    return GremiumRoleOut(
+        id=row.id, gremium_id=row.gremium_id, key=row.key, name=row.name_i18n or {}
+    )
 
 
 def _membership_out(row: GremiumMembership) -> GremiumMembershipOut:

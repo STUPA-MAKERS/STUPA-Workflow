@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { Uuid } from '@core/api/models';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import {
   ButtonComponent,
@@ -37,6 +39,7 @@ function emptyDraft(): RoleDraft {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    RouterLink,
     TranslatePipe,
     CapitalizePipe,
     ButtonComponent,
@@ -47,6 +50,7 @@ function emptyDraft(): RoleDraft {
   ],
   template: `
     <section class="gr">
+      <a class="gr__back" [routerLink]="['/admin/gremien', gremiumIdRef]">← {{ 'admin.gremiumRoles.back' | t }}</a>
       <header class="gr__head">
         <div>
           <h1 class="gr__title">{{ 'admin.gremiumRoles.title' | t }}</h1>
@@ -115,6 +119,8 @@ function emptyDraft(): RoleDraft {
   styles: [
     `
       :host { display: flex; flex-direction: column; gap: var(--space-5); }
+      .gr__back { color: var(--color-text-muted); font-size: var(--fs-sm); text-decoration: none; }
+      .gr__back:hover { color: var(--color-primary); }
       .gr__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
       .gr__title { margin: 0; }
       .gr__sub { color: var(--color-text-muted); font-size: var(--fs-sm); margin: var(--space-1) 0 0; }
@@ -131,6 +137,11 @@ export class GremiumRolesComponent {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
+
+  /** Gremium, dessen Rollen hier verwaltet werden (#62 — Rollen sind pro Gremium). */
+  private readonly gremiumId = this.route.snapshot.paramMap.get('id') as Uuid;
+  protected readonly gremiumIdRef = this.gremiumId;
 
   protected readonly roles = signal<GremiumRole[]>([]);
   protected readonly draft = signal<RoleDraft | null>(null);
@@ -144,7 +155,7 @@ export class GremiumRolesComponent {
   ]);
 
   constructor() {
-    this.api.listGremiumRoles().subscribe((r) => this.roles.set(r));
+    this.api.listGremiumRoles(this.gremiumId).subscribe((r) => this.roles.set(r));
   }
 
   protected label(r: GremiumRole | null): string {
@@ -179,7 +190,7 @@ export class GremiumRolesComponent {
     const id = this.editingId();
     const req = id
       ? this.api.updateGremiumRole(id, { name })
-      : this.api.createGremiumRole({ key: d.key.trim(), name });
+      : this.api.createGremiumRole(this.gremiumId, { key: d.key.trim(), name });
     req.subscribe({
       next: (saved) => {
         this.roles.update((list) =>

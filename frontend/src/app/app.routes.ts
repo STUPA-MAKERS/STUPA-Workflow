@@ -222,7 +222,7 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'admin/gremium-roles',
+        path: 'admin/gremien/:id/roles',
         data: { title: 'admin.gremiumRoles.title', permission: 'admin.roles' },
         canActivate: [authGuard],
         loadComponent: () =>

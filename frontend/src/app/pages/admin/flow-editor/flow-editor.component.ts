@@ -87,10 +87,11 @@ export class FlowEditorComponent {
   protected readonly branches: TransitionBranch[] = ['pass', 'fail', 'accept', 'reject'];
   protected readonly decisionFields = ['amount', 'typeKey', 'applicantRole'];
   protected readonly decisionOps = ['==', '!=', '>', '>=', '<', '<=', 'in', 'has'];
-  /** Gremien + Gremium-Rollen + globale Rollen für vote/approval-Config (#28/#42). */
+  /** Gremien + globale Rollen für vote/approval-Config (#28/#42). */
   protected readonly gremiumOptions = signal<SelectOption[]>([]);
-  protected readonly gremiumRoleOptions = signal<SelectOption[]>([]);
   protected readonly globalRoleOptions = signal<SelectOption[]>([]);
+  /** Gremium-Rollen je Gremium (lazy geladen, #62 — Rollen sind pro Gremium). */
+  protected readonly rolesByGremium = signal<Record<string, SelectOption[]>>({});
   /** Rollen-Quelle eines approval-States: an Gremium gebunden oder global. */
   protected readonly approvalScopes = ['gremium', 'global'];
 
@@ -126,16 +127,6 @@ export class FlowEditorComponent {
       .gremiumOptions()
       .pipe(takeUntilDestroyed())
       .subscribe({ next: (o) => this.gremiumOptions.set(o), error: () => undefined });
-    this.api
-      .listGremiumRoles()
-      .pipe(takeUntilDestroyed())
-      .subscribe({
-        next: (roles) =>
-          this.gremiumRoleOptions.set(
-            roles.map((r) => ({ value: r.key, label: `${r.name['de'] ?? r.key} (${r.key})` })),
-          ),
-        error: () => undefined,
-      });
     // Globale Rollen (approval kann auch eine globale Rolle entscheiden, #28-CR).
     this.api
       .listRoles()
@@ -419,6 +410,28 @@ export class FlowEditorComponent {
 
   protected setStateGremium(key: string, gremiumId: string): void {
     this.patchConfig(key, { gremiumId: gremiumId || undefined });
+    if (gremiumId) this.ensureGremiumRoles(gremiumId);
+  }
+
+  /** Gremium-Rollen-Optionen eines Gremiums (#62) — lädt sie bei Bedarf nach. */
+  protected gremiumRoleOptionsFor(gremiumId: string | undefined): SelectOption[] {
+    if (!gremiumId) return [];
+    this.ensureGremiumRoles(gremiumId);
+    return this.rolesByGremium()[gremiumId] ?? [];
+  }
+
+  private ensureGremiumRoles(gremiumId: string): void {
+    if (this.rolesByGremium()[gremiumId]) return;
+    // Platzhalter setzen → kein Doppel-Load.
+    this.rolesByGremium.update((m) => ({ ...m, [gremiumId]: [] }));
+    this.api.listGremiumRoles(gremiumId).subscribe({
+      next: (roles) =>
+        this.rolesByGremium.update((m) => ({
+          ...m,
+          [gremiumId]: roles.map((r) => ({ value: r.key, label: `${r.name['de'] ?? r.key} (${r.key})` })),
+        })),
+      error: () => undefined,
+    });
   }
 
   protected setStateRoleKey(key: string, roleKey: string): void {

@@ -58,6 +58,7 @@ class GremiumUpdate(_CamelModel):
 # --------------------------------------------------------------------------- #
 class GremiumRoleOut(_CamelModel):
     id: UUID
+    gremium_id: UUID = Field(serialization_alias="gremiumId")
     key: str
     name: I18nMap
 

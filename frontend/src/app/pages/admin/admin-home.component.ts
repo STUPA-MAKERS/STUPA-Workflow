@@ -224,7 +224,6 @@ export class AdminHomeComponent {
     { link: 'users', title: 'admin.home.users', desc: 'admin.home.usersDesc' },
     { link: 'roles', title: 'admin.home.roles', desc: 'admin.home.rolesDesc' },
     { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc' },
-    { link: 'gremium-roles', title: 'admin.gremiumRoles.title', desc: 'admin.gremiumRoles.subtitle' },
     { link: 'budget-pots', title: 'budget.tree.title', desc: 'admin.home.budgetPotsDesc' },
     { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc' },
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc' },

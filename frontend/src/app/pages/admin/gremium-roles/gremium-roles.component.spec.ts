@@ -1,18 +1,19 @@
 import { of } from 'rxjs';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import type { GremiumRole } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { GremiumRolesComponent } from './gremium-roles.component';
 
 const ROLES: GremiumRole[] = [
-  { id: 'gr-1', key: 'vorsitz', name: { de: 'Vorsitz', en: 'Chair' } },
+  { id: 'gr-1', gremiumId: 'g-1', key: 'vorsitz', name: { de: 'Vorsitz', en: 'Chair' } },
 ];
 
 function makeApi() {
   return {
     listGremiumRoles: jest.fn(() => of(ROLES)),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    createGremiumRole: jest.fn((b: any) => of({ id: 'gr-new', ...b })),
+    createGremiumRole: jest.fn((_gid: string, b: any) => of({ id: 'gr-new', gremiumId: _gid, ...b })),
     updateGremiumRole: jest.fn((id: string, b: { name: unknown }) => of({ ...ROLES[0], id, ...b })),
     deleteGremiumRole: jest.fn(() => of(void 0)),
   };
@@ -20,7 +21,10 @@ function makeApi() {
 
 async function setup(api = makeApi()) {
   const view = await render(GremiumRolesComponent, {
-    providers: [{ provide: AdminApiService, useValue: api }],
+    providers: [
+      { provide: AdminApiService, useValue: api },
+      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: 'g-1' }) } } },
+    ],
   });
   return { ...view, api };
 }
@@ -42,7 +46,7 @@ describe('GremiumRolesComponent (#42)', () => {
     c.patch('key', 'beisitz');
     c.patch('labelDe', 'Beisitz');
     c.save();
-    expect(api.createGremiumRole).toHaveBeenCalledWith({
+    expect(api.createGremiumRole).toHaveBeenCalledWith('g-1', {
       key: 'beisitz',
       name: { de: 'Beisitz', en: 'Beisitz' },
     });

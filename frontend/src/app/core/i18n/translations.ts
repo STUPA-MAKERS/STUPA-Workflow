@@ -655,6 +655,8 @@ export const de = {
   'admin.gremiumRoles.empty': 'Noch keine Gremium-Rollen angelegt.',
   'admin.gremiumRoles.col.name': 'Rolle',
   'admin.gremiumRoles.col.key': 'Schlüssel',
+  'admin.gremiumRoles.back': 'Zurück zum Gremium',
+  'admin.gremiumRoles.manage': 'Rollen verwalten',
   'admin.gremiumRoles.deleteTitle': 'Gremium-Rolle löschen',
   'admin.gremiumRoles.deleteConfirm': '„{name}" wird gelöscht. Das ist nur möglich, wenn keine Mitgliedschaft sie verwendet.',
 
@@ -1585,6 +1587,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremiumRoles.empty': 'No committee roles yet.',
   'admin.gremiumRoles.col.name': 'Role',
   'admin.gremiumRoles.col.key': 'Key',
+  'admin.gremiumRoles.back': 'Back to committee',
+  'admin.gremiumRoles.manage': 'Manage roles',
   'admin.gremiumRoles.deleteTitle': 'Delete committee role',
   'admin.gremiumRoles.deleteConfirm': '“{name}” will be deleted. Only possible if no membership uses it.',
 

@@ -163,7 +163,7 @@
             <app-select
               [label]="'admin.flow.cfgRole' | t"
               [placeholder]="'admin.flow.cfgRolePh' | t"
-              [options]="gremiumRoleOptions()"
+              [options]="gremiumRoleOptionsFor(s.config?.gremiumId)"
               [ngModel]="s.config?.roleKey ?? ''"
               (ngModelChange)="setStateRoleKey(s.key, $event)"
             />

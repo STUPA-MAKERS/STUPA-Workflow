@@ -318,26 +318,26 @@ export class AdminApiService {
       : this.http.post<WebhookConfig>(`${this.base}/admin/webhooks`, hook);
   }
 
-  // --- Gremium-Rollen (#42) ------------------------------------------------
-  listGremiumRoles(): Observable<GremiumRole[]> {
-    if (this.mock) return of(structuredCopy(this.store.gremiumRoles ?? []));
-    return this.http.get<GremiumRole[]>(`${this.base}/admin/gremium-roles`);
+  // --- Gremium-Rollen (#42/#62 — pro Gremium) ------------------------------
+  listGremiumRoles(gremiumId: Uuid): Observable<GremiumRole[]> {
+    if (this.mock) return of(structuredCopy(this.store.gremiumRoles.filter((r) => r.gremiumId === gremiumId)));
+    return this.http.get<GremiumRole[]>(`${this.base}/admin/gremien/${gremiumId}/roles`);
   }
 
-  createGremiumRole(body: { key: string; name: I18nMap }): Observable<GremiumRole> {
+  createGremiumRole(gremiumId: Uuid, body: { key: string; name: I18nMap }): Observable<GremiumRole> {
     if (this.mock) {
-      const row = { id: `gr-${(this.store.gremiumRoles ?? []).length + 1}`, ...body };
-      this.store.gremiumRoles = [...(this.store.gremiumRoles ?? []), row];
+      const row = { id: `gr-${this.store.gremiumRoles.length + 1}`, gremiumId, ...body };
+      this.store.gremiumRoles = [...this.store.gremiumRoles, row];
       return of(structuredCopy(row));
     }
-    return this.http.post<GremiumRole>(`${this.base}/admin/gremium-roles`, body);
+    return this.http.post<GremiumRole>(`${this.base}/admin/gremien/${gremiumId}/roles`, body);
   }
 
   updateGremiumRole(id: Uuid, body: { name: I18nMap }): Observable<GremiumRole> {
     if (this.mock) {
-      const row = (this.store.gremiumRoles ?? []).find((r) => r.id === id);
+      const row = this.store.gremiumRoles.find((r) => r.id === id);
       if (row) Object.assign(row, body);
-      return of(structuredCopy(row ?? { id, key: '', name: body.name }));
+      return of(structuredCopy(row ?? { id, gremiumId: '', key: '', name: body.name }));
     }
     return this.http.patch<GremiumRole>(`${this.base}/admin/gremium-roles/${id}`, body);
   }
