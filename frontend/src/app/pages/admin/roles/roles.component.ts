@@ -62,7 +62,12 @@ interface RoleDraft {
         <ng-template appCell="key" let-r><span class="roles__key">{{ $any(r).key }}</span></ng-template>
         <ng-template appCell="perms" let-r>{{ $any(r).permissions.length }} / {{ permissions().length }}</ng-template>
         <ng-template appCell="actions" let-r>
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.roles.editPerms' | t" (click)="toggle($any(r).id)"><app-icon name="chevron-down" /></app-button>
+          <span class="roles__row-actions">
+            <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.roles.editPerms' | t" (click)="toggle($any(r).id)"><app-icon name="chevron-down" /></app-button>
+            @if (canDelete($any(r))) {
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.roles.deleteRole' | t" (click)="deleteRole($any(r))"><app-icon name="delete" /></app-button>
+            }
+          </span>
         </ng-template>
 
         <ng-template appRowDetail let-r>
@@ -128,6 +133,11 @@ interface RoleDraft {
       }
       .roles__name {
         font-weight: var(--fw-medium);
+      }
+      .roles__row-actions {
+        display: inline-flex;
+        gap: var(--space-1);
+        justify-content: flex-end;
       }
       .roles__key {
         font-family: var(--font-mono, monospace);
@@ -219,6 +229,21 @@ export class AdminRolesComponent {
 
   protected isLocked(role: Role): boolean {
     return role.key === 'admin';
+  }
+
+  /** Alle Rollen außer admin/member sind löschbar (#38). */
+  protected canDelete(role: Role): boolean {
+    return role.key !== 'admin' && role.key !== 'member';
+  }
+
+  protected deleteRole(role: Role): void {
+    this.api.deleteRole(role.id).subscribe({
+      next: () => {
+        this.roles.update((list) => list.filter((r) => r.id !== role.id));
+        this.toast.success(this.i18n.translate('admin.roles.deleted'));
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+    });
   }
 
   protected toggle(id: string): void {

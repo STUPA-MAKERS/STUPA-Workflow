@@ -235,6 +235,13 @@ async def test_role_crud_and_listing(session: AsyncSession) -> None:
     keys = {r.key for r in listed}
     assert key in keys and "admin" in keys  # neue + geseedete Rollen
 
+    # #38: löschbar — außer den geschützten admin/member.
+    await svc.delete_role(created.id, _ACTOR)
+    assert key not in {r.key for r in await svc.list_roles()}
+    admin = next(r for r in await svc.list_roles() if r.key == "admin")
+    with pytest.raises(ConflictError):
+        await svc.delete_role(admin.id, _ACTOR)
+
 
 async def test_role_assignment_and_group_mapping(session: AsyncSession) -> None:
     svc = ConfigService(session)

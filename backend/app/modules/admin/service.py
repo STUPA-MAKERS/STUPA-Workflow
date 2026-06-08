@@ -360,6 +360,21 @@ class ConfigService:
             id=role.id, key=role.key, label=role.name_i18n, permissions=sorted(perms)
         )
 
+    async def delete_role(self, role_id: UUID, actor: str) -> None:
+        """Rolle löschen (#38). ``admin``/``member`` sind geschützt (nicht löschbar).
+
+        Zuweisungen + Permissions kaskadieren (FK ``ON DELETE CASCADE``). Idempotent:
+        unbekannte id → 404.
+        """
+        role = await self.session.get(Role, role_id)
+        if role is None:
+            raise NotFoundError(f"role {role_id} not found")
+        if role.key in ("admin", "member"):
+            raise ConflictError(f"role {role.key!r} is protected and cannot be deleted")
+        await self._audit(actor, AuditAction.ROLE_CHANGE, "role", role.id)
+        await self.session.delete(role)
+        await self.session.commit()
+
     # --------------------------------------------------------- assignments #
     async def list_role_assignments(self) -> list[RoleAssignmentOut]:
         rows = (await self.session.scalars(select(RoleAssignmentRow))).all()

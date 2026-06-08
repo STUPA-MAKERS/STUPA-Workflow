@@ -16,6 +16,7 @@ function makeApi() {
     saveRolePermissions: jest.fn((id: string, perms: string[]) => of({ ...ROLES[0], id, permissions: perms })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createRole: jest.fn((body: any) => of({ id: 'r-new', key: body.key, label: body.label, permissions: [] })),
+    deleteRole: jest.fn(() => of(void 0)),
   };
 }
 
@@ -61,5 +62,17 @@ describe('AdminRolesComponent (#12)', () => {
       permissions: [],
     });
     expect(inst.roles().some((r: Role) => r.id === 'r-new')).toBe(true);
+  });
+
+  it('deletes custom roles but protects admin/member (#38)', async () => {
+    const { api, fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inst = fixture.componentInstance as any;
+    expect(inst.canDelete(ROLES[0])).toBe(false); // admin
+    expect(inst.canDelete({ key: 'member' })).toBe(false);
+    expect(inst.canDelete({ key: 'referent' })).toBe(true);
+    inst.deleteRole({ id: 'r-member', key: 'member' });
+    expect(api.deleteRole).toHaveBeenCalledWith('r-member');
+    expect(inst.roles().some((r: Role) => r.id === 'r-member')).toBe(false);
   });
 });

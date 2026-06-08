@@ -278,6 +278,18 @@ async def update_role(
     return await service.update_role(role_id, payload, principal.sub)
 
 
+@router.delete(
+    "/roles/{role_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404, 409),
+)
+async def delete_role(
+    role_id: UUID, service: ServiceDep, principal: RolesAdmin
+) -> None:
+    """Rolle löschen (#38); ``admin``/``member`` sind geschützt (409)."""
+    await service.delete_role(role_id, principal.sub)
+
+
 @router.get(
     "/role-assignments",
     response_model=list[RoleAssignmentOut],

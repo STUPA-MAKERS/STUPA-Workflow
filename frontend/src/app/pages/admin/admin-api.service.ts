@@ -190,6 +190,15 @@ export class AdminApiService {
     return this.http.post<Role>(`${this.base}/admin/roles`, body);
   }
 
+  /** Rolle löschen (#38) — DELETE /admin/roles/{id} (admin/member serverseitig geschützt). */
+  deleteRole(roleId: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.roles = this.store.roles.filter((r) => r.id !== roleId);
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/roles/${roleId}`);
+  }
+
   /** Katalog wählbarer Permission-Keys (GET /admin/permissions). */
   listPermissions(): Observable<string[]> {
     if (this.mock) return of([...MOCK_PERMISSIONS]);
