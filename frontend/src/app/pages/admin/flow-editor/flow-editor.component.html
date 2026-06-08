@@ -1,25 +1,10 @@
 <section class="fe">
   <header class="fe__head">
     <h1>{{ 'admin.flow.title' | t }}</h1>
-    <div class="fe__modes" role="tablist" [attr.aria-label]="'admin.flow.title' | t">
-      <button
-        type="button"
-        role="tab"
-        [attr.aria-selected]="mode() === 'simple'"
-        [class.fe__mode--on]="mode() === 'simple'"
-        (click)="setMode('simple')"
-      >{{ 'admin.flow.modeSimple' | t }}</button>
-      <button
-        type="button"
-        role="tab"
-        [attr.aria-selected]="mode() === 'expert'"
-        [class.fe__mode--on]="mode() === 'expert'"
-        (click)="setMode('expert')"
-      >{{ 'admin.flow.modeExpert' | t }}</button>
-    </div>
   </header>
 
   <p class="fe__desc">{{ 'admin.flow.canvasHint' | t }}</p>
+  <p class="fe__desc">{{ 'admin.flow.glossary' | t }}</p>
 
   <!-- Antragstyp-Auswahl (#69): Flow-Version wird gegen eine echte Typ-UUID gespeichert. -->
   <app-select
@@ -35,19 +20,36 @@
     <p class="fe__desc" role="alert">{{ 'admin.flow.noTypes' | t }}</p>
   }
 
-  @if (mode() === 'simple') {
-    <div class="fe__preset">
-      <label class="fe__lbl">
-        {{ 'admin.flow.preset' | t }}
-        <select [ngModel]="selectedPreset()" (ngModelChange)="selectedPreset.set($event)">
-          @for (p of presets; track p.key) {
-            <option [value]="p.key">{{ p.labelKey | t }}</option>
-          }
-        </select>
-      </label>
-      <app-button variant="secondary" size="sm" (click)="applyPreset()">{{ 'admin.flow.presetApply' | t }}</app-button>
+  <div class="fe__preset">
+    <label class="fe__lbl">
+      {{ 'admin.flow.preset' | t }}
+      <select [ngModel]="selectedPreset()" (ngModelChange)="selectedPreset.set($event)">
+        @for (opt of presetOptions(); track opt.key) {
+          <option [value]="opt.key">{{ opt.label }}</option>
+        }
+      </select>
+    </label>
+    <app-button variant="secondary" size="sm" (click)="applyPreset()">{{ 'admin.flow.presetApply' | t }}</app-button>
+    <app-button variant="ghost" size="sm" (click)="openSaveTemplate()">{{ 'admin.flow.saveTemplate' | t }}</app-button>
+    @if (selectedIsCustom()) {
+      <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.deleteTemplate' | t" (click)="deleteTemplate()">✕</app-button>
+    }
+  </div>
+
+  <!-- Aktuellen Graphen als Vorlage speichern (#20) -->
+  <app-dialog
+    [open]="saveOpen()"
+    [title]="'admin.flow.saveTemplate' | t"
+    [closeLabel]="'admin.flow.cancel' | t"
+    (closed)="saveOpen.set(false)"
+  >
+    <label class="fe__lbl">{{ 'admin.flow.templateName' | t }}
+      <input [ngModel]="templateName()" (ngModelChange)="templateName.set($event)" name="tplName" /></label>
+    <div dialog-footer class="fe__dialog-foot">
+      <app-button variant="ghost" (click)="saveOpen.set(false)">{{ 'admin.flow.cancel' | t }}</app-button>
+      <app-button [disabled]="!templateName().trim()" (click)="saveTemplate()">{{ 'action.save' | t }}</app-button>
     </div>
-  }
+  </app-dialog>
 
   <div class="fe__toolbar">
     <app-button variant="ghost" size="sm" (click)="addState()">+ {{ 'admin.flow.addState' | t }}</app-button>
@@ -217,29 +219,27 @@
           }
         }
 
-        @if (mode() === 'expert') {
-          <div class="fe__actions">
-            <span class="fe__actions-label">{{ 'admin.flow.actions' | t }}:</span>
-            @for (act of sel.t.actions ?? []; track $index; let ai = $index) {
-              <span class="fe__chip" [attr.title]="actionDesc(act.type)">
-                {{ actionLabel(act.type) }}
-                <button type="button" [attr.aria-label]="'admin.common.remove' | t" (click)="removeAction(sel.index, ai)">✕</button>
-              </span>
-            }
-            <select #asel (change)="addAction(sel.index, asel.value); asel.value = ''">
-              <option value="">{{ 'admin.flow.addAction' | t }}</option>
-              @for (opt of actionOptions(); track opt.value) {
-                <option [value]="opt.value">{{ opt.label }}</option>
-              }
-            </select>
-          </div>
-          @if ((sel.t.actions ?? []).length) {
-            <ul class="fe__action-descs">
-              @for (act of sel.t.actions ?? []; track $index) {
-                <li><strong>{{ actionLabel(act.type) }}</strong> — {{ actionDesc(act.type) }}</li>
-              }
-            </ul>
+        <div class="fe__actions">
+          <span class="fe__actions-label">{{ 'admin.flow.actions' | t }}:</span>
+          @for (act of sel.t.actions ?? []; track $index; let ai = $index) {
+            <span class="fe__chip" [attr.title]="actionDesc(act.type)">
+              {{ actionLabel(act.type) }}
+              <button type="button" [attr.aria-label]="'admin.common.remove' | t" (click)="removeAction(sel.index, ai)">✕</button>
+            </span>
           }
+          <select #asel (change)="addAction(sel.index, asel.value); asel.value = ''">
+            <option value="">{{ 'admin.flow.addAction' | t }}</option>
+            @for (opt of actionOptions(); track opt.value) {
+              <option [value]="opt.value">{{ opt.label }}</option>
+            }
+          </select>
+        </div>
+        @if ((sel.t.actions ?? []).length) {
+          <ul class="fe__action-descs">
+            @for (act of sel.t.actions ?? []; track $index) {
+              <li><strong>{{ actionLabel(act.type) }}</strong> — {{ actionDesc(act.type) }}</li>
+            }
+          </ul>
         }
         <app-button variant="danger" size="sm" (click)="removeSelectedTransition()">{{ 'admin.flow.removeTransition' | t }}</app-button>
       } @else {

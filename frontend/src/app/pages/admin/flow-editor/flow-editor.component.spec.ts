@@ -101,7 +101,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.setTransitionLabel(0, 'de', 'go');
     c.setTransitionEndpoint(0, 'to', 'b');
 
-    c.setMode('expert');
     c.relayout();
     c.save(); // graph valid (a initial, b reachable) → success
     expect(createFlowVersion).toHaveBeenCalled();
