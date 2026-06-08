@@ -50,6 +50,14 @@ from app.modules.admin.schemas import (
     WebhookOut,
     WebhookUpdate,
 )
+from app.modules.admin.gremium_roles import GremiumRoleService
+from app.modules.admin.schemas import (
+    GremiumMembershipCreate,
+    GremiumMembershipOut,
+    GremiumRoleCreate,
+    GremiumRoleOut,
+    GremiumRoleUpdate,
+)
 from app.modules.admin.service import ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
 from app.shared.config_schemas import export_json_schemas
@@ -77,8 +85,15 @@ def get_site_config_service(session: DbSession) -> SiteConfigService:
     return SiteConfigService(session)
 
 
+def get_gremium_role_service(session: DbSession) -> GremiumRoleService:
+    return GremiumRoleService(session)
+
+
 ServiceDep = Annotated[ConfigService, Depends(get_config_service)]
 SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
+GremiumRoleServiceDep = Annotated[
+    GremiumRoleService, Depends(get_gremium_role_service)
+]
 
 # Permission-Gates (Principal-Objekt injiziert für den Audit-actor).
 ConfigAdmin = Annotated[Principal, Depends(require_principal("admin.config"))]
@@ -152,6 +167,82 @@ async def delete_gremium(
     gremium_id: UUID, service: ServiceDep, principal: ConfigAdmin
 ) -> None:
     await service.delete_gremium(gremium_id, principal.sub)
+
+
+# =========================================================================== #
+# Gremium-Rollen (#42) — eigener Rollensatz + zeitbegrenzte Mitgliedschaften
+# =========================================================================== #
+@router.get("/gremium-roles", response_model=list[GremiumRoleOut], responses=_errors(401, 403))
+async def list_gremium_roles(service: GremiumRoleServiceDep) -> list[GremiumRoleOut]:
+    return await service.list_roles()
+
+
+@router.post(
+    "/gremium-roles",
+    response_model=GremiumRoleOut,
+    status_code=201,
+    responses=_errors(400, 401, 403, 409, 422),
+)
+async def create_gremium_role(
+    payload: GremiumRoleCreate, service: GremiumRoleServiceDep, principal: RolesAdmin
+) -> GremiumRoleOut:
+    return await service.create_role(payload, principal.sub)
+
+
+@router.patch(
+    "/gremium-roles/{role_id}",
+    response_model=GremiumRoleOut,
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def update_gremium_role(
+    role_id: UUID,
+    payload: GremiumRoleUpdate,
+    service: GremiumRoleServiceDep,
+    principal: RolesAdmin,
+) -> GremiumRoleOut:
+    return await service.update_role(role_id, payload, principal.sub)
+
+
+@router.delete("/gremium-roles/{role_id}", status_code=204, responses=_errors(401, 403, 404, 409))
+async def delete_gremium_role(
+    role_id: UUID, service: GremiumRoleServiceDep, principal: RolesAdmin
+) -> None:
+    await service.delete_role(role_id, principal.sub)
+
+
+@router.get(
+    "/gremien/{gremium_id}/memberships",
+    response_model=list[GremiumMembershipOut],
+    responses=_errors(401, 403),
+)
+async def list_gremium_memberships(
+    gremium_id: UUID, service: GremiumRoleServiceDep
+) -> list[GremiumMembershipOut]:
+    return await service.list_memberships(gremium_id)
+
+
+@router.post(
+    "/gremien/{gremium_id}/memberships",
+    response_model=GremiumMembershipOut,
+    status_code=201,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def create_gremium_membership(
+    gremium_id: UUID,
+    payload: GremiumMembershipCreate,
+    service: GremiumRoleServiceDep,
+    principal: RolesAdmin,
+) -> GremiumMembershipOut:
+    return await service.create_membership(gremium_id, payload, principal.sub)
+
+
+@router.delete(
+    "/gremium-memberships/{membership_id}", status_code=204, responses=_errors(401, 403, 404)
+)
+async def delete_gremium_membership(
+    membership_id: UUID, service: GremiumRoleServiceDep, principal: RolesAdmin
+) -> None:
+    await service.delete_membership(membership_id, principal.sub)
 
 
 # =========================================================================== #

@@ -42,6 +42,50 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     allow_vote_delegation: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
 
+class GremiumRole(UUIDPkMixin, Base):
+    """Gremium-spezifische Rolle (#42) — ein **eigener** Rollensatz, getrennt von den
+    globalen Rollen (``role``). Definiert die wählbaren Ämter innerhalb von Gremien
+    (z. B. Vorsitz, Beisitz, Kassenwart). Gilt gremium-übergreifend als Katalog;
+    die konkrete Zugehörigkeit hält :class:`GremiumMembership`."""
+
+    __tablename__ = "gremium_role"
+
+    key: Mapped[str] = mapped_column(Text, unique=True)
+    name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+
+
+class GremiumMembership(UUIDPkMixin, Base):
+    """Zeitlich begrenzte Zugehörigkeit eines Principals zu einem Gremium (#42).
+
+    Pro (Principal, Gremium) ist zu jedem Zeitpunkt **genau eine** Rolle aktiv —
+    überlappende Amtszeiten sind verboten (Service-seitig geprüft). Mehrere
+    **nicht-überlappende** Mitgliedschaften (aufeinanderfolgende Amtszeiten) sind
+    erlaubt. ``valid_from``/``valid_until`` = Amtszeit (NULL = offen)."""
+
+    __tablename__ = "gremium_membership"
+
+    principal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE")
+    )
+    gremium_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gremium.id", ondelete="CASCADE")
+    )
+    gremium_role_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gremium_role.id", ondelete="RESTRICT")
+    )
+    valid_from: Mapped[object | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    valid_until: Mapped[object | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_gremium_membership_principal", "principal_id"),
+        Index("ix_gremium_membership_gremium", "gremium_id"),
+    )
+
+
 class MailList(UUIDPkMixin, Base):
     """Verteiler je Gremium."""
 

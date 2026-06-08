@@ -54,6 +54,40 @@ class GremiumUpdate(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
+# Gremium-Rollen + Mitgliedschaften (#42)
+# --------------------------------------------------------------------------- #
+class GremiumRoleOut(_CamelModel):
+    id: UUID
+    key: str
+    name: I18nMap
+
+
+class GremiumRoleCreate(_CamelModel):
+    key: str = Field(min_length=1)
+    name: I18nMap = Field(default_factory=dict)
+
+
+class GremiumRoleUpdate(_CamelModel):
+    name: I18nMap | None = None
+
+
+class GremiumMembershipOut(_CamelModel):
+    id: UUID
+    principal_id: UUID = Field(serialization_alias="principalId")
+    gremium_id: UUID = Field(serialization_alias="gremiumId")
+    gremium_role_id: UUID = Field(serialization_alias="gremiumRoleId")
+    valid_from: str | None = Field(serialization_alias="validFrom")
+    valid_until: str | None = Field(serialization_alias="validUntil")
+
+
+class GremiumMembershipCreate(_CamelModel):
+    principal_id: UUID = Field(alias="principalId")
+    gremium_role_id: UUID = Field(alias="gremiumRoleId")
+    valid_from: str | None = Field(default=None, alias="validFrom")
+    valid_until: str | None = Field(default=None, alias="validUntil")
+
+
+# --------------------------------------------------------------------------- #
 # Application-Type
 # --------------------------------------------------------------------------- #
 class ApplicationTypeOut(_CamelModel):
