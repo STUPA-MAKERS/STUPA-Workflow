@@ -40,6 +40,15 @@ describe('AdminApiService — mock mode', () => {
     expect((await firstValueFrom(s.createFormVersion('t', []))).id).toBeTruthy();
     expect((await firstValueFrom(s.createFlowVersion('t', { states: [], transitions: [] }))).id).toBeTruthy();
     expect((await firstValueFrom(s.listGremien())).length).toBeGreaterThan(0);
+    // #105 — Gremien anlegen/bearbeiten im Mock-Store.
+    const before = (await firstValueFrom(s.listGremien())).length;
+    const newGremium = await firstValueFrom(
+      s.createGremium({ name: 'Neu', slug: 'neu', cdVariant: 'stupa', defaultLang: 'de' }),
+    );
+    expect(newGremium.name).toBe('Neu');
+    expect((await firstValueFrom(s.listGremien())).length).toBe(before + 1);
+    const edited = await firstValueFrom(s.updateGremium(newGremium.id, { name: 'Geändert' }));
+    expect(edited.name).toBe('Geändert');
     expect((await firstValueFrom(s.listRoles())).length).toBeGreaterThan(0);
 
     const rules = await firstValueFrom(s.listNotificationRules());

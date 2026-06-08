@@ -111,6 +111,22 @@ export interface Gremium {
   defaultLang: string;
 }
 
+/** Body für `POST /admin/gremien` (`GremiumCreate`). */
+export interface GremiumCreateBody {
+  name: string;
+  slug: string;
+  cdVariant: string;
+  defaultLang: string;
+}
+
+/** Body für `PATCH /admin/gremien/{id}` (`GremiumUpdate`) — alle Felder optional. */
+export interface GremiumUpdateBody {
+  name?: string;
+  slug?: string;
+  cdVariant?: string;
+  defaultLang?: string;
+}
+
 export interface Role {
   id: Uuid;
   key: string;
