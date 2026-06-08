@@ -222,6 +222,15 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/gremium-roles',
+        data: { title: 'admin.gremiumRoles.title', permission: 'admin.roles' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/gremium-roles/gremium-roles.component').then(
+            (m) => m.GremiumRolesComponent,
+          ),
+      },
+      {
         path: 'admin/audit',
         data: { title: 'admin.audit.title', permission: 'audit.read' },
         canActivate: [authGuard],

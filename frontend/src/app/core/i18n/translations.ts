@@ -623,6 +623,15 @@ export const de = {
   'admin.webhook.badUrl': 'Bitte eine gültige http(s)-URL angeben.',
   'admin.webhook.noEvents': 'Mindestens ein Ereignis auswählen.',
 
+  'admin.gremiumRoles.title': 'Gremium-Rollen',
+  'admin.gremiumRoles.subtitle': 'Eigener Rollensatz für Gremien (z. B. Vorsitz, Beisitz) — getrennt von den globalen Rollen.',
+  'admin.gremiumRoles.add': 'Gremium-Rolle hinzufügen',
+  'admin.gremiumRoles.empty': 'Noch keine Gremium-Rollen angelegt.',
+  'admin.gremiumRoles.col.name': 'Rolle',
+  'admin.gremiumRoles.col.key': 'Schlüssel',
+  'admin.gremiumRoles.deleteTitle': 'Gremium-Rolle löschen',
+  'admin.gremiumRoles.deleteConfirm': '„{name}" wird gelöscht. Das ist nur möglich, wenn keine Mitgliedschaft sie verwendet.',
+
   'admin.audit.title': 'Audit-Log',
   'admin.audit.desc': 'Revisionssicheres, fortlaufendes Protokoll aller sicherheitsrelevanten Aktionen.',
   'admin.audit.empty': 'Keine Audit-Einträge.',
@@ -1517,6 +1526,15 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.webhook.none': 'No webhooks configured.',
   'admin.webhook.badUrl': 'Please provide a valid http(s) URL.',
   'admin.webhook.noEvents': 'Select at least one event.',
+
+  'admin.gremiumRoles.title': 'Committee roles',
+  'admin.gremiumRoles.subtitle': 'A dedicated role set for committees (e.g. chair, assessor) — separate from the global roles.',
+  'admin.gremiumRoles.add': 'Add committee role',
+  'admin.gremiumRoles.empty': 'No committee roles yet.',
+  'admin.gremiumRoles.col.name': 'Role',
+  'admin.gremiumRoles.col.key': 'Key',
+  'admin.gremiumRoles.deleteTitle': 'Delete committee role',
+  'admin.gremiumRoles.deleteConfirm': '“{name}” will be deleted. Only possible if no membership uses it.',
 
   'admin.audit.title': 'Audit log',
   'admin.audit.desc': 'Tamper-evident, append-only record of all security-relevant actions.',

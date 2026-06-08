@@ -28,6 +28,8 @@ import {
   type FormStatus,
   type Gremium,
   type GremiumCreateBody,
+  type GremiumMembership,
+  type GremiumRole,
   type GremiumUpdateBody,
   type NotificationRule,
   type Role,
@@ -73,6 +75,7 @@ export class AdminApiService {
   // In-Memory-Store (nur Mock-Modus). Pro Service-Instanz, reicht für UI/Tests.
   private readonly store = {
     gremien: structuredCopy(MOCK_GREMIEN),
+    gremiumRoles: [] as GremiumRole[],
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     rules: structuredCopy(MOCK_NOTIFICATION_RULES),
     roles: structuredCopy(MOCK_ROLES),
@@ -301,6 +304,54 @@ export class AdminApiService {
     return hook.id
       ? this.http.patch<WebhookConfig>(`${this.base}/admin/webhooks/${hook.id}`, hook)
       : this.http.post<WebhookConfig>(`${this.base}/admin/webhooks`, hook);
+  }
+
+  // --- Gremium-Rollen (#42) ------------------------------------------------
+  listGremiumRoles(): Observable<GremiumRole[]> {
+    if (this.mock) return of(structuredCopy(this.store.gremiumRoles ?? []));
+    return this.http.get<GremiumRole[]>(`${this.base}/admin/gremium-roles`);
+  }
+
+  createGremiumRole(body: { key: string; name: I18nMap }): Observable<GremiumRole> {
+    if (this.mock) {
+      const row = { id: `gr-${(this.store.gremiumRoles ?? []).length + 1}`, ...body };
+      this.store.gremiumRoles = [...(this.store.gremiumRoles ?? []), row];
+      return of(structuredCopy(row));
+    }
+    return this.http.post<GremiumRole>(`${this.base}/admin/gremium-roles`, body);
+  }
+
+  updateGremiumRole(id: Uuid, body: { name: I18nMap }): Observable<GremiumRole> {
+    if (this.mock) {
+      const row = (this.store.gremiumRoles ?? []).find((r) => r.id === id);
+      if (row) Object.assign(row, body);
+      return of(structuredCopy(row ?? { id, key: '', name: body.name }));
+    }
+    return this.http.patch<GremiumRole>(`${this.base}/admin/gremium-roles/${id}`, body);
+  }
+
+  deleteGremiumRole(id: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.gremiumRoles = (this.store.gremiumRoles ?? []).filter((r) => r.id !== id);
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/gremium-roles/${id}`);
+  }
+
+  listGremiumMemberships(gremiumId: Uuid): Observable<GremiumMembership[]> {
+    if (this.mock) return of([]);
+    return this.http.get<GremiumMembership[]>(`${this.base}/admin/gremien/${gremiumId}/memberships`);
+  }
+
+  createGremiumMembership(
+    gremiumId: Uuid,
+    body: { principalId: Uuid; gremiumRoleId: Uuid; validFrom: string | null; validUntil: string | null },
+  ): Observable<GremiumMembership> {
+    return this.http.post<GremiumMembership>(`${this.base}/admin/gremien/${gremiumId}/memberships`, body);
+  }
+
+  deleteGremiumMembership(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/gremium-memberships/${id}`);
   }
 
   // --- Audit-Log (#45, P(audit.read)) --------------------------------------

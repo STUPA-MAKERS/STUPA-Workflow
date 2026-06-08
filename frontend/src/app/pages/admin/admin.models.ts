@@ -270,6 +270,23 @@ export interface WebhookConfig {
   active: boolean;
 }
 
+/** Gremium-Rolle (#42) — eigener Rollensatz, getrennt von den globalen Rollen. */
+export interface GremiumRole {
+  id: Uuid;
+  key: string;
+  name: I18nMap;
+}
+
+/** Zeitbegrenzte Gremium-Zugehörigkeit (#42, Amtszeit). */
+export interface GremiumMembership {
+  id: Uuid;
+  principalId: Uuid;
+  gremiumId: Uuid;
+  gremiumRoleId: Uuid;
+  validFrom: string | null;
+  validUntil: string | null;
+}
+
 /** Append-only Audit-Eintrag (T-23, `GET /admin/audit`). */
 export interface AuditEntry {
   id: number;
