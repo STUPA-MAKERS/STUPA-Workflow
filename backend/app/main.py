@@ -31,6 +31,7 @@ from app.modules.applications.router import router as applications_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
 from app.modules.budget.router import router as budget_router
+from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.delegations.router import router as delegations_router
 from app.modules.files.router import router as files_router
 from app.modules.files.storage import build_object_storage
@@ -73,6 +74,7 @@ api_router.include_router(voting_router)
 api_router.include_router(livevote_router)
 api_router.include_router(protocol_router)
 api_router.include_router(budget_router)
+api_router.include_router(budget_tree_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(notifications_router)
 api_router.include_router(files_router)
