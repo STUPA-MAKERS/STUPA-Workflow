@@ -129,6 +129,19 @@
   font-weight: var(--fw-semibold);
 }
 
+/* Zweispaltiger DE/EN-Editor (#16) — beide Sprachen nebeneinander. */
+.br__bi {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+@media (max-width: 40rem) {
+  .br__bi {
+    grid-template-columns: 1fr;
+  }
+}
+
 .br__sub {
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);

@@ -71,6 +71,7 @@
               @for (link of col.links; track $index; let li = $index) {
                 <div class="br__link">
                   <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />
+                  <input [attr.aria-label]="'admin.common.labelEn' | t" [(ngModel)]="link.label['en']" (ngModelChange)="reemit()" placeholder="EN" />
                   <input [attr.aria-label]="'admin.brand.url' | t" [(ngModel)]="link.url" (ngModelChange)="reemit()" placeholder="https://" />
                   <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeLink(col, li)">✕</app-button>
                 </div>
@@ -84,11 +85,15 @@
         <!-- Copyright + legal -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.copyright' | t }}</legend>
-          <input [attr.aria-label]="'admin.brand.copyright' | t" [(ngModel)]="d.copyright['de']" (ngModelChange)="reemit()" placeholder="DE" />
+          <div class="br__link">
+            <input [attr.aria-label]="('admin.brand.copyright' | t) + ' (DE)'" [(ngModel)]="d.copyright['de']" (ngModelChange)="reemit()" placeholder="DE" />
+            <input [attr.aria-label]="('admin.brand.copyright' | t) + ' (EN)'" [(ngModel)]="d.copyright['en']" (ngModelChange)="reemit()" placeholder="EN" />
+          </div>
           <h2 class="br__sub">{{ 'admin.brand.legal' | t }}</h2>
           @for (link of d.legalLinks; track $index; let li = $index) {
             <div class="br__link">
               <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />
+              <input [attr.aria-label]="'admin.common.labelEn' | t" [(ngModel)]="link.label['en']" (ngModelChange)="reemit()" placeholder="EN" />
               <input [attr.aria-label]="'admin.brand.url' | t" [(ngModel)]="link.url" (ngModelChange)="reemit()" placeholder="https://" />
               <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeLegalLink(li)">✕</app-button>
             </div>
@@ -99,14 +104,30 @@
         <!-- Freetexts -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.texts' | t }}</legend>
-          <label class="br__lbl">{{ 'admin.brand.text.loginHint' | t }}
-            <textarea rows="2" [(ngModel)]="d.freetexts.loginHint['de']" (ngModelChange)="reemit()"></textarea></label>
-          <label class="br__lbl">{{ 'admin.brand.text.welcome' | t }}
-            <textarea rows="2" [(ngModel)]="d.freetexts.welcome['de']" (ngModelChange)="reemit()"></textarea></label>
-          <label class="br__lbl">{{ 'admin.brand.text.support' | t }}
-            <textarea rows="2" [(ngModel)]="d.freetexts.support['de']" (ngModelChange)="reemit()"></textarea></label>
-          <label class="br__lbl">{{ 'admin.brand.text.emailFooter' | t }}
-            <textarea rows="2" [(ngModel)]="d.freetexts.emailFooter['de']" (ngModelChange)="reemit()"></textarea></label>
+          <div class="br__lbl">{{ 'admin.brand.text.loginHint' | t }}
+            <div class="br__bi">
+              <textarea rows="2" [attr.aria-label]="('admin.brand.text.loginHint' | t) + ' (DE)'" [(ngModel)]="d.freetexts.loginHint['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
+              <textarea rows="2" [attr.aria-label]="('admin.brand.text.loginHint' | t) + ' (EN)'" [(ngModel)]="d.freetexts.loginHint['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
+            </div>
+          </div>
+          <div class="br__lbl">{{ 'admin.brand.text.welcome' | t }}
+            <div class="br__bi">
+              <textarea rows="2" [attr.aria-label]="('admin.brand.text.welcome' | t) + ' (DE)'" [(ngModel)]="d.freetexts.welcome['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
+              <textarea rows="2" [attr.aria-label]="('admin.brand.text.welcome' | t) + ' (EN)'" [(ngModel)]="d.freetexts.welcome['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
+            </div>
+          </div>
+          <div class="br__lbl">{{ 'admin.brand.text.support' | t }}
+            <div class="br__bi">
+              <textarea rows="2" [attr.aria-label]="('admin.brand.text.support' | t) + ' (DE)'" [(ngModel)]="d.freetexts.support['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
+              <textarea rows="2" [attr.aria-label]="('admin.brand.text.support' | t) + ' (EN)'" [(ngModel)]="d.freetexts.support['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
+            </div>
+          </div>
+          <div class="br__lbl">{{ 'admin.brand.text.emailFooter' | t }}
+            <div class="br__bi">
+              <textarea rows="2" [attr.aria-label]="('admin.brand.text.emailFooter' | t) + ' (DE)'" [(ngModel)]="d.freetexts.emailFooter['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
+              <textarea rows="2" [attr.aria-label]="('admin.brand.text.emailFooter' | t) + ' (EN)'" [(ngModel)]="d.freetexts.emailFooter['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
+            </div>
+          </div>
         </fieldset>
       </div>
 

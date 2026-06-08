@@ -36,9 +36,19 @@ describe('BrandingEditorComponent (#21)', () => {
     expect(legal).toHaveTextContent('Datenschutz');
   });
 
+  it('exposes EN inputs for copyright and free texts (#16)', async () => {
+    await setup();
+    expect(screen.getByRole('textbox', { name: 'Copyright-Zeile (EN)' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Willkommenstext (EN)' })).toBeInTheDocument();
+    const supportEn = screen.getByRole('textbox', { name: 'Support-Hinweis (EN)' });
+    await userEvent.clear(supportEn);
+    await userEvent.type(supportEn, 'EN support');
+    expect(supportEn).toHaveValue('EN support');
+  });
+
   it('live-updates the preview as free text changes', async () => {
     await setup();
-    const welcome = screen.getByRole('textbox', { name: 'Willkommenstext' });
+    const welcome = screen.getByRole('textbox', { name: 'Willkommenstext (DE)' });
     await userEvent.clear(welcome);
     await userEvent.type(welcome, 'Servus');
     expect(screen.getByTestId('preview-welcome')).toHaveTextContent('Servus');
