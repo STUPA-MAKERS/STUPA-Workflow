@@ -37,6 +37,22 @@ from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlo
 _NUMERIC_TYPES = frozenset({"number", "currency"})
 _TEXT_TYPES = frozenset({"text", "textarea", "markdown"})
 
+# Reservierter Schlüssel des System-Titelfelds: jeder Antrag MUSS einen Titel haben.
+# Der Server hängt es an jede effektive Form (nicht im Builder editierbar).
+SYSTEM_TITLE_KEY = "title"
+
+
+def system_title_field() -> FormFieldDef:
+    """Pflicht-Titelfeld, das der Server jeder effektiven Form voranstellt."""
+    return FormFieldDef.model_validate(
+        {
+            "key": SYSTEM_TITLE_KEY,
+            "type": "text",
+            "label": {"de": "Titel", "en": "Title"},
+            "required": True,
+        }
+    )
+
 
 class FormDefinitionError(Exception):
     """Form-Definition verletzt eine Struktur-Regel (Speicher-Gate, T-11)."""
@@ -113,10 +129,15 @@ def effective_form(
 ) -> list[FormSection]:
     """Typ-Felder + Topf-Extra-Felder zu Abschnitten mergen (data-model §5.7).
 
-    ``main`` enthält immer die Typ-Felder. ``budget`` erscheint **nur**, wenn
+    ``main`` enthält immer die Typ-Felder, denen das System-Pflichtfeld ``title``
+    vorangestellt wird (jeder Antrag MUSS einen Titel haben), sofern der Typ nicht
+    selbst eines mit diesem Schlüssel definiert. ``budget`` erscheint **nur**, wenn
     ``pot_fields`` zugeordnet und nicht leer sind (Topf-Zuordnung).
     """
-    sections = [FormSection(key="main", fields=list(type_fields))]
+    main_fields = list(type_fields)
+    if not any(f.key == SYSTEM_TITLE_KEY for f in main_fields):
+        main_fields.insert(0, system_title_field())
+    sections = [FormSection(key="main", fields=main_fields)]
     if pot_fields:
         sections.append(FormSection(key="budget", fields=list(pot_fields)))
     return sections
@@ -212,6 +233,8 @@ def _validate_value(field: FormFieldDef, value: Any, errors: list[FieldError]) -
         _validate_file(field, value, errors)
     elif t == "table":
         _validate_table(field, value, errors)
+    elif t == "positions":
+        _validate_positions(field, value, errors)
     else:  # pragma: no cover via FormFieldDef.type (Literal) — defensiv geprüft im Test
         errors.append(FieldError(field=field.key, msg=f"unknown field type: {t!r}"))
 
@@ -323,6 +346,92 @@ def _validate_table(field: FormFieldDef, value: Any, errors: list[FieldError]) -
             _err(errors, field.key, f"row {i} must be an object")
 
 
+# Default-Mindestzahl Vergleichsangebote je Position, falls der Builder nichts setzt.
+_DEFAULT_MIN_OFFERS = 3
+_DEFAULT_MIN_POSITIONS = 1
+
+
+def _offer_value(offer: Mapping[str, Any]) -> Decimal | None:
+    """Numerischen Angebots-Wert als ``Decimal`` ziehen (ungültig → ``None``)."""
+    raw = offer.get("value")
+    if isinstance(raw, bool) or raw is None:
+        return None
+    try:
+        num = Decimal(str(raw))
+    except (InvalidOperation, ValueError):
+        return None
+    return num if num.is_finite() else None
+
+
+def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+    """Kostenpositionen prüfen: ≥ minPositions Positionen, je ≥ minOffers Angebote,
+    genau ein bevorzugtes Angebot, alle Werte endliche Zahlen > 0 (Position 0-indiziert)."""
+    if not isinstance(value, list):
+        _err(errors, field.key, "must be a list of positions")
+        return
+    v = field.validation
+    min_offers = (v.min_offers if v and v.min_offers else None) or _DEFAULT_MIN_OFFERS
+    min_positions = (
+        v.min_positions if v and v.min_positions else None
+    ) or _DEFAULT_MIN_POSITIONS
+
+    if len(value) < min_positions:
+        _err(errors, field.key, f"needs at least {min_positions} position(s)")
+
+    for i, pos in enumerate(value):
+        where = f"{field.key}[{i}]"
+        if not isinstance(pos, dict):
+            _err(errors, where, "must be an object")
+            continue
+        if not isinstance(pos.get("label"), str) or not pos["label"].strip():
+            _err(errors, where, "position needs a label")
+        offers = pos.get("offers")
+        if not isinstance(offers, list):
+            _err(errors, where, "offers must be a list")
+            continue
+        if len(offers) < min_offers:
+            _err(errors, where, f"needs at least {min_offers} comparison offer(s)")
+        preferred_count = 0
+        for j, offer in enumerate(offers):
+            owhere = f"{where}.offers[{j}]"
+            if not isinstance(offer, dict):
+                _err(errors, owhere, "must be an object")
+                continue
+            if not isinstance(offer.get("label"), str) or not offer["label"].strip():
+                _err(errors, owhere, "offer needs a label")
+            num = _offer_value(offer)
+            if num is None:
+                _err(errors, owhere, "offer value must be a finite number")
+            elif num <= 0:
+                _err(errors, owhere, "offer value must be greater than 0")
+            if offer.get("preferred") is True:
+                preferred_count += 1
+        if offers and preferred_count != 1:
+            _err(errors, where, "exactly one offer must be marked preferred")
+
+
+def positions_total(value: Any) -> Decimal | None:
+    """Σ der bevorzugten Angebots-Werte aller Positionen (= Positions-Gesamtbetrag).
+
+    ``None`` wenn keine gültige bevorzugte Position vorliegt (z. B. leere Liste).
+    """
+    if not isinstance(value, list):
+        return None
+    total = Decimal("0")
+    found = False
+    for pos in value:
+        if not isinstance(pos, dict):
+            continue
+        for offer in pos.get("offers") or []:
+            if isinstance(offer, dict) and offer.get("preferred") is True:
+                num = _offer_value(offer)
+                if num is not None:
+                    total += num
+                    found = True
+                break
+    return total if found else None
+
+
 # --------------------------------------------------------------------------- #
 # Promoted-Extraktion (für T-12/T-17)
 # --------------------------------------------------------------------------- #
@@ -335,6 +444,13 @@ def extract_promoted(
     """
     out: dict[str, Any] = {}
     for f in fields:
+        # `positions` promotet implizit den Positions-Gesamtbetrag in `amount`
+        # (Σ der bevorzugten Angebote) — ohne isPromoted-Flag; additiv bei mehreren.
+        if f.type == "positions":
+            total = positions_total(data.get(f.key))
+            if total is not None:
+                out["amount"] = out.get("amount", Decimal("0")) + total
+            continue
         if not (f.is_promoted and f.promote_target):
             continue
         value = data.get(f.key)

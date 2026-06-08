@@ -40,6 +40,9 @@ FieldType = Literal[
     "table",
     "markdown",
     "computed",
+    # Kostenpositionen: Liste von Positionen mit je ≥ minOffers Vergleichsangeboten;
+    # genau eines bevorzugt → dessen Wert = Positionswert; Σ Positionen = amount.
+    "positions",
 ]
 StateCategory = Literal["open", "running", "closed"]
 
@@ -88,6 +91,9 @@ class FieldValidation(_CamelModel):
     file_types: list[str] | None = Field(default=None, alias="fileTypes")
     max_size_mb: float | None = Field(default=None, alias="maxSizeMB", gt=0)
     max_rows: int | None = Field(default=None, alias="maxRows", ge=0)
+    # `positions`: Mindestzahl Vergleichsangebote je Position bzw. Mindestzahl Positionen.
+    min_offers: int | None = Field(default=None, alias="minOffers", ge=1)
+    min_positions: int | None = Field(default=None, alias="minPositions", ge=1)
 
 
 class FormFieldDef(_CamelModel):

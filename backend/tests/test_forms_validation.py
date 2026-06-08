@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from app.modules.forms.validation import (
+    SYSTEM_TITLE_KEY,
     AnswerValidationError,
     FieldError,
     FormDefinitionError,
@@ -21,10 +22,18 @@ from app.modules.forms.validation import (
     _validate_value,
     effective_form,
     extract_promoted,
+    positions_total,
     validate_answers,
     validate_definition,
 )
 from app.shared.config_schemas import FormFieldDef
+
+
+def _position(label: str, *offers: tuple[str, float, bool]) -> dict[str, Any]:
+    return {
+        "label": label,
+        "offers": [{"label": lbl, "value": v, "preferred": p} for (lbl, v, p) in offers],
+    }
 
 
 def _field(key: str, type: str, **kw: Any) -> FormFieldDef:
@@ -93,6 +102,90 @@ def test_effective_form_adds_budget_section_with_pot() -> None:
 def test_effective_form_empty_pot_no_budget_section() -> None:
     sections = effective_form([_field("title", "text")], [])
     assert [s.key for s in sections] == ["main"]
+
+
+def test_effective_form_injects_required_system_title_when_absent() -> None:
+    sections = effective_form([_field("amount", "currency")])
+    main = sections[0].fields
+    assert main[0].key == SYSTEM_TITLE_KEY and main[0].required is True
+    assert [f.key for f in main] == [SYSTEM_TITLE_KEY, "amount"]
+
+
+def test_effective_form_does_not_duplicate_existing_title() -> None:
+    main = effective_form([_field("title", "text"), _field("amount", "currency")])[0]
+    assert [f.key for f in main.fields] == ["title", "amount"]
+
+
+# --------------------------------------------------------------------------- #
+# positions (Kostenpositionen + Vergleichsangebote)
+# --------------------------------------------------------------------------- #
+def _positions_field(**kw: Any) -> FormFieldDef:
+    return _field("positions", "positions", **kw)
+
+
+def test_positions_valid() -> None:
+    field = _positions_field(validation={"minOffers": 2})
+    value = [
+        _position("Catering", ("A", 500, True), ("B", 600, False)),
+        _position("Technik", ("X", 200, False), ("Y", 150, True)),
+    ]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert errors == []
+
+
+def test_positions_too_few_offers_and_no_preferred() -> None:
+    field = _positions_field(validation={"minOffers": 3})
+    value = [_position("Catering", ("A", 500, False), ("B", 600, False))]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    msgs = " ".join(e.msg for e in errors)
+    assert "at least 3 comparison offer" in msgs
+    assert "exactly one offer must be marked preferred" in msgs
+
+
+def test_positions_default_min_offers_is_three() -> None:
+    field = _positions_field()  # keine validation → Default 3
+    value = [_position("P", ("A", 1, True), ("B", 2, False))]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("at least 3 comparison offer" in e.msg for e in errors)
+
+
+def test_positions_non_positive_value_rejected() -> None:
+    field = _positions_field(validation={"minOffers": 1})
+    value = [_position("P", ("A", 0, True))]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("greater than 0" in e.msg for e in errors)
+
+
+def test_positions_min_positions() -> None:
+    field = _positions_field(validation={"minOffers": 1, "minPositions": 2})
+    value = [_position("P", ("A", 5, True))]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("at least 2 position" in e.msg for e in errors)
+
+
+def test_positions_total_sums_preferred() -> None:
+    value = [
+        _position("Catering", ("A", 500, True), ("B", 600, False)),
+        _position("Technik", ("X", 200, False), ("Y", 150, True)),
+    ]
+    assert positions_total(value) == Decimal("650")
+    assert positions_total([]) is None
+
+
+def test_extract_promoted_positions_feeds_amount() -> None:
+    fields = [_positions_field()]
+    data = {
+        "positions": [
+            _position("Catering", ("A", 500, True), ("B", 600, False)),
+            _position("Technik", ("X", 200, False), ("Y", 150, True)),
+        ]
+    }
+    assert extract_promoted(fields, data) == {"amount": Decimal("650")}
 
 
 # --------------------------------------------------------------------------- #
