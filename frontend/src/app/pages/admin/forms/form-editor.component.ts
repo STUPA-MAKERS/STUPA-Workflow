@@ -19,6 +19,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import {
   FIELD_TYPES,
+  PROMOTE_TARGETS,
   blankField,
   blankOption,
   duplicateKeys,
@@ -62,6 +63,8 @@ export class FormEditorComponent {
   protected readonly typeId = signal<Uuid>('');
   protected readonly title = signal<I18nMap>({ de: '', en: '' });
   protected readonly description = signal<I18nMap>({ de: '', en: '' });
+  /** »Mit Budget«: erlaubt die Topf-Auswahl beim Antrag (application_type.has_budget). */
+  protected readonly hasBudget = signal(false);
   protected readonly fields = signal<FormFieldDef[]>([]);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
@@ -76,14 +79,20 @@ export class FormEditorComponent {
   /** Aktuell gezogene Karte (Drag-Reorder). */
   private dragIndex: number | null = null;
 
-  /** Ursprünglicher Titel — nur bei Änderung wird der Typ gepatcht. */
+  /** Ursprünglicher Typ-Stand — nur bei Änderung wird der Typ gepatcht. */
   private originalTitle: I18nMap = { de: '', en: '' };
+  private originalHasBudget = false;
 
   protected readonly fieldTypes = FIELD_TYPES;
   protected readonly typeMenu = TYPE_MENU;
   protected readonly fieldTypeOptions: SelectOption[] = FIELD_TYPES.map((t) => ({
     value: t,
     label: this.i18n.translate(`admin.form.type.${t}` as TranslationKey),
+  }));
+  /** Gültige Ziel-Kennzahlen als Dropdown (nur serverseitig ausgewertete Werte). */
+  protected readonly promoteTargetOptions: SelectOption[] = PROMOTE_TARGETS.map((v) => ({
+    value: v,
+    label: this.i18n.translate(`admin.form.metric.${v}` as TranslationKey),
   }));
 
   protected readonly duplicates = computed(() => duplicateKeys(this.fields()));
@@ -113,6 +122,8 @@ export class FormEditorComponent {
         if (t) {
           this.title.set({ de: t.name['de'] ?? '', en: t.name['en'] ?? '' });
           this.originalTitle = { ...this.title() };
+          this.hasBudget.set(t.hasBudget);
+          this.originalHasBudget = t.hasBudget;
         }
       },
       error: () => undefined,
@@ -142,6 +153,20 @@ export class FormEditorComponent {
 
   protected setDescription(lang: 'de' | 'en', value: string): void {
     this.description.update((d) => ({ ...d, [lang]: value }));
+  }
+
+  /** PII-/Kennzahl-Schalter: beim Aktivieren von »In Kennzahl übernehmen« eine
+   *  gültige Ziel-Kennzahl vorbelegen (Pflicht laut Validierung). */
+  protected onPromotedToggle(i: number, checked: boolean): void {
+    this.fields.update((list) =>
+      list.map((f, idx) => {
+        if (idx !== i) return f;
+        const next = { ...f, isPromoted: checked };
+        if (checked && !next.promoteTarget) next.promoteTarget = PROMOTE_TARGETS[0];
+        if (!checked) delete next.promoteTarget;
+        return next;
+      }),
+    );
   }
 
   // --- question mutations --------------------------------------------------
@@ -279,10 +304,11 @@ export class FormEditorComponent {
   }
 
   // --- save ----------------------------------------------------------------
-  private titleChanged(): boolean {
+  private typeChanged(): boolean {
     return (
       this.title()['de'] !== this.originalTitle['de'] ||
-      this.title()['en'] !== this.originalTitle['en']
+      this.title()['en'] !== this.originalTitle['en'] ||
+      this.hasBudget() !== this.originalHasBudget
     );
   }
 
@@ -296,9 +322,9 @@ export class FormEditorComponent {
     const description: I18nMap = { ...this.description() };
     this.saving.set(true);
 
-    const save$ = this.titleChanged()
+    const save$ = this.typeChanged()
       ? this.api
-          .updateApplicationType(id, { name: { ...this.title() } })
+          .updateApplicationType(id, { name: { ...this.title() }, hasBudget: this.hasBudget() })
           .pipe(switchMap(() => this.api.createFormVersion(id, normalized, description)))
       : this.api.createFormVersion(id, normalized, description);
 
@@ -306,6 +332,7 @@ export class FormEditorComponent {
       next: () => {
         this.saving.set(false);
         this.originalTitle = { ...this.title() };
+        this.originalHasBudget = this.hasBudget();
         this.toast.success(this.i18n.translate('admin.common.saved'));
       },
       error: () => {

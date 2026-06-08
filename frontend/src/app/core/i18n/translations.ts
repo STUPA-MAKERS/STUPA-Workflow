@@ -525,6 +525,7 @@ export const de = {
   'admin.form.type.table': 'Tabelle',
   'admin.form.type.markdown': 'Hinweistext (Markdown)',
   'admin.form.type.computed': 'Berechnetes Feld',
+  'admin.form.metric.amount': 'Betrag (Budget)',
 
   'admin.flow.title': 'Flow-Editor',
   'admin.flow.desc':
@@ -1516,6 +1517,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.type.table': 'Table',
   'admin.form.type.markdown': 'Info text (Markdown)',
   'admin.form.type.computed': 'Computed field',
+  'admin.form.metric.amount': 'Amount (budget)',
 
   'admin.flow.title': 'Flow editor',
   'admin.flow.desc':

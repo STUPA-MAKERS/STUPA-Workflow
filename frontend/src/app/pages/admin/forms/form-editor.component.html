@@ -75,6 +75,11 @@
           <label class="fe__lbl">{{ 'admin.forms.descEn' | t }}
             <textarea rows="3" [ngModel]="description()['en']" (ngModelChange)="setDescription('en', $event)"></textarea></label>
         </div>
+        <app-checkbox
+          [ngModel]="hasBudget()"
+          (ngModelChange)="hasBudget.set($event)"
+          [hint]="'admin.forms.hasBudgetHint' | t"
+        >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
       </article>
 
       @if (fields().length === 0) {
@@ -138,10 +143,15 @@
                 </div>
                 <div class="fe__toggles">
                   <app-checkbox [(ngModel)]="field.isPII" (ngModelChange)="touch()">{{ 'admin.form.isPII' | t }}</app-checkbox>
-                  <app-checkbox [(ngModel)]="field.isPromoted" (ngModelChange)="touch()">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
+                  <app-checkbox [ngModel]="field.isPromoted" (ngModelChange)="onPromotedToggle(fi, $event)">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
                   @if (field.isPromoted) {
-                    <label class="fe__lbl fe__lbl--inline">{{ 'admin.form.promoteTarget' | t }}
-                      <input [(ngModel)]="field.promoteTarget" (ngModelChange)="touch()" /></label>
+                    <app-select
+                      class="fe__lbl"
+                      [label]="'admin.form.promoteTarget' | t"
+                      [options]="promoteTargetOptions"
+                      [ngModel]="field.promoteTarget"
+                      (ngModelChange)="field.promoteTarget = $event; touch()"
+                    />
                   }
                 </div>
                 <div class="fe__row fe__row--four">

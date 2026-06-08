@@ -10,6 +10,14 @@ import type { FieldType, FormFieldDef } from '@core/api/models';
 
 export const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
+/**
+ * Gültige Ziel-Kennzahlen für »In Kennzahl übernehmen« (`promoteTarget`).
+ * Backend wertet derzeit ausschließlich `amount` aus (→ `application.amount`,
+ * Budget-Reservierung/-Buchung + Statistik). Daher Dropdown statt Freitext.
+ */
+export const PROMOTE_TARGETS = ['amount'] as const;
+export type PromoteTarget = (typeof PROMOTE_TARGETS)[number];
+
 export const FIELD_TYPES: readonly FieldType[] = [
   'text',
   'textarea',

@@ -79,6 +79,33 @@ describe('FormEditorComponent', () => {
     expect(c.fieldErrors()[0]).not.toContain('label (de) is required');
   });
 
+  it('toggles "Mit Budget" and persists it on the type (#24/budget)', async () => {
+    const { fixture, updateApplicationType } = await setup(
+      draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.hasBudget()).toBe(false);
+    c.hasBudget.set(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(updateApplicationType).toHaveBeenCalledTimes(1);
+    expect(updateApplicationType.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ hasBudget: true }),
+    );
+  });
+
+  it('defaults the promoted field metric to a valid target (amount)', async () => {
+    const { fixture } = await setup(
+      draft([{ key: 'sum', type: 'currency', label: { de: 'Summe', en: '' } }]),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.onPromotedToggle(0, true);
+    expect(c.fields()[0].promoteTarget).toBe('amount');
+    c.onPromotedToggle(0, false);
+    expect(c.fields()[0].promoteTarget).toBeUndefined();
+  });
+
   it('switches to preview mode', async () => {
     await setup(draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' }, required: true }]));
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
