@@ -680,6 +680,8 @@ export const de = {
   'admin.gremiumRoles.col.key': 'Schlüssel',
   'admin.gremiumRoles.back': 'Zurück zum Gremium',
   'admin.gremiumRoles.manage': 'Rollen verwalten',
+  'admin.gremiumRoles.forced': 'Pflichtrolle – in jedem Gremium vorhanden, nicht löschbar',
+  'admin.gremiumRoles.forcedShort': 'Pflicht',
   'admin.gremiumRoles.deleteTitle': 'Gremium-Rolle löschen',
   'admin.gremiumRoles.deleteConfirm': '„{name}" wird gelöscht. Das ist nur möglich, wenn keine Mitgliedschaft sie verwendet.',
 
@@ -1668,6 +1670,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremiumRoles.col.key': 'Key',
   'admin.gremiumRoles.back': 'Back to committee',
   'admin.gremiumRoles.manage': 'Manage roles',
+  'admin.gremiumRoles.forced': 'Required role – present in every committee, cannot be deleted',
+  'admin.gremiumRoles.forcedShort': 'Required',
   'admin.gremiumRoles.deleteTitle': 'Delete committee role',
   'admin.gremiumRoles.deleteConfirm': '“{name}” will be deleted. Only possible if no membership uses it.',
 

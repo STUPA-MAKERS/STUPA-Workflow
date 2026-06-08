@@ -349,6 +349,8 @@ export interface GremiumRole {
   gremiumId: Uuid;
   key: string;
   name: I18nMap;
+  /** Pflichtrolle (Vorstand/Schriftführung/Mitglied) — vorhanden in jedem Gremium, nicht löschbar. */
+  forced?: boolean;
 }
 
 /** Zeitbegrenzte Gremium-Zugehörigkeit (#42, Amtszeit). */

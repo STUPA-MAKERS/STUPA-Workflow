@@ -20,6 +20,7 @@ from uuid import UUID
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.models import ApplicationType, Gremium, Webhook
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
@@ -110,6 +111,8 @@ class ConfigService:
         )
         self.session.add(row)
         await self.session.flush()
+        # Pflichtrollen (Vorstand/Schriftführung) sofort anlegen (#Meetings).
+        await GremiumRoleService(self.session).ensure_forced_roles(row.id)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id)
         await self.session.commit()
         return _gremium_out(row)

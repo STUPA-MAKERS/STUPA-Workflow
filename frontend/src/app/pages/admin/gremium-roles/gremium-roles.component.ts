@@ -65,9 +65,13 @@ function emptyDraft(): RoleDraft {
             <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.edit' | t" (click)="openEdit(i)">
               <app-icon name="edit" />
             </app-button>
-            <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="askDelete($any(r))">
-              <app-icon name="delete" />
-            </app-button>
+            @if (!$any(r).forced) {
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="askDelete($any(r))">
+                <app-icon name="delete" />
+              </app-button>
+            } @else {
+              <span class="gr__forced" [title]="'admin.gremiumRoles.forced' | t">{{ 'admin.gremiumRoles.forcedShort' | t }}</span>
+            }
           </span>
         </ng-template>
       </app-data-table>
@@ -121,7 +125,8 @@ function emptyDraft(): RoleDraft {
       .gr__title { margin: 0; }
       .gr__sub { color: var(--color-text-muted); font-size: var(--fs-sm); margin: var(--space-1) 0 0; }
       .gr__mono { font-family: var(--font-mono, monospace); font-size: var(--fs-xs); }
-      .gr__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+      .gr__actions { display: inline-flex; align-items: center; gap: var(--space-1); justify-content: flex-end; }
+      .gr__forced { font-size: var(--fs-xs); color: var(--color-text-muted); padding: 0 var(--space-2); white-space: nowrap; }
       .gr__form { display: flex; flex-direction: column; gap: var(--space-4); }
       .field { display: flex; flex-direction: column; gap: var(--space-2); }
       .field__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); }

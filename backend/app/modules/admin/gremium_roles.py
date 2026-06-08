@@ -29,6 +29,21 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
+# Pflicht-Gremium-Rollen (#Meetings): existieren in JEDEM Gremium und sind nicht
+# löschbar. ``vorstand`` + ``schriftfuehrung`` bilden die **Sitzungsleitung**
+# (steuern die Sitzungssteuerung), ``member`` ist die gewöhnliche Mitgliedsrolle.
+# Anlegen passiert beim Gremium-Erstellen und idempotent beim Auflisten (Backfill
+# für Bestands-Gremien via Migration).
+FORCED_GREMIUM_ROLES: tuple[tuple[str, dict[str, str]], ...] = (
+    ("vorstand", {"de": "Vorstand", "en": "Board"}),
+    ("schriftfuehrung", {"de": "Schriftführung", "en": "Secretary"}),
+    ("member", {"de": "Mitglied", "en": "Member"}),
+)
+FORCED_ROLE_KEYS: frozenset[str] = frozenset(key for key, _ in FORCED_GREMIUM_ROLES)
+
+# Rollen, die die Sitzung leiten dürfen (Zugriff auf die Sitzungssteuerung).
+LEAD_ROLE_KEYS: frozenset[str] = frozenset({"vorstand", "schriftfuehrung"})
+
 
 def intervals_overlap(
     a_from: datetime | None,
@@ -60,7 +75,11 @@ def _iso(value: datetime | None) -> str | None:
 
 def _role_out(row: GremiumRole) -> GremiumRoleOut:
     return GremiumRoleOut(
-        id=row.id, gremium_id=row.gremium_id, key=row.key, name=row.name_i18n or {}
+        id=row.id,
+        gremium_id=row.gremium_id,
+        key=row.key,
+        name=row.name_i18n or {},
+        forced=row.key in FORCED_ROLE_KEYS,
     )
 
 
@@ -91,7 +110,34 @@ class GremiumRoleService:
         )
 
     # ----------------------------------------------------------- role catalogue
+    async def ensure_forced_roles(self, gremium_id: UUID) -> bool:
+        """Pflichtrollen (Vorstand/Schriftführung) idempotent für ein Gremium anlegen.
+
+        Gibt ``True`` zurück, wenn etwas angelegt wurde. Committet **nicht** selbst —
+        der Aufrufer steuert die Transaktion (so nutzbar beim Gremium-Anlegen wie
+        beim Auflisten)."""
+        present = set(
+            (
+                await self.session.scalars(
+                    select(GremiumRole.key).where(GremiumRole.gremium_id == gremium_id)
+                )
+            ).all()
+        )
+        added = False
+        for key, name in FORCED_GREMIUM_ROLES:
+            if key not in present:
+                self.session.add(
+                    GremiumRole(gremium_id=gremium_id, key=key, name_i18n=name)
+                )
+                added = True
+        if added:
+            await self.session.flush()
+        return added
+
     async def list_roles(self, gremium_id: UUID) -> list[GremiumRoleOut]:
+        # Bestands-Gremien lazy nachrüsten, damit die Pflichtrollen immer da sind.
+        if await self.ensure_forced_roles(gremium_id):
+            await self.session.commit()
         rows = (
             await self.session.scalars(
                 select(GremiumRole)
@@ -141,6 +187,8 @@ class GremiumRoleService:
         row = await self.session.get(GremiumRole, role_id)
         if row is None:
             raise NotFoundError(f"gremium role {role_id} not found")
+        if row.key in FORCED_ROLE_KEYS:
+            raise ConflictError("forced gremium role cannot be deleted")
         in_use = (
             await self.session.scalars(
                 select(GremiumMembership.id).where(
