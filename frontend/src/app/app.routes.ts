@@ -163,6 +163,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/gremien',
+        data: { title: 'admin.gremien.title', permission: 'admin.config' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/gremien/gremien.component').then((m) => m.AdminGremienComponent),
+      },
+      {
         path: 'admin/branding',
         data: { title: 'admin.brand.title', permission: 'admin.config' },
         canActivate: [authGuard],

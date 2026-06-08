@@ -25,6 +25,8 @@ import {
   type FlowGraph,
   type FormOverviewItem,
   type Gremium,
+  type GremiumCreateBody,
+  type GremiumUpdateBody,
   type NotificationRule,
   type Role,
   type RoleAssignment,
@@ -94,6 +96,26 @@ export class AdminApiService {
   listGremienOptions(): Observable<Gremium[]> {
     if (this.mock) return of(structuredCopy(this.store.gremien));
     return this.http.get<Gremium[]>(`${this.base}/gremien`);
+  }
+
+  /** POST /admin/gremien — Gremium anlegen (P `admin.config`), #105. */
+  createGremium(body: GremiumCreateBody): Observable<Gremium> {
+    if (this.mock) {
+      const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, ...body };
+      this.store.gremien.push(created);
+      return of(structuredCopy(created));
+    }
+    return this.http.post<Gremium>(`${this.base}/admin/gremien`, body);
+  }
+
+  /** PATCH /admin/gremien/{id} — Gremium bearbeiten (P `admin.config`), #105. */
+  updateGremium(id: Uuid, body: GremiumUpdateBody): Observable<Gremium> {
+    if (this.mock) {
+      const row = this.store.gremien.find((g) => g.id === id);
+      if (row) Object.assign(row, body);
+      return of(structuredCopy(row ?? this.store.gremien[0]));
+    }
+    return this.http.patch<Gremium>(`${this.base}/admin/gremien/${id}`, body);
   }
 
   listRoles(): Observable<Role[]> {
