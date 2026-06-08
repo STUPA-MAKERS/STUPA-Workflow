@@ -43,12 +43,9 @@
 
       @for (e of edges(); track e.index) {
         <g class="fe__edge-g" [class.fe__edge-g--sel]="e.selected" (pointerdown)="$event.stopPropagation(); selectEdge(e.index)">
-          <line [attr.x1]="e.x1" [attr.y1]="e.y1" [attr.x2]="e.x2" [attr.y2]="e.y2" class="fe__edge-hit" />
-          <line
-            [attr.x1]="e.x1"
-            [attr.y1]="e.y1"
-            [attr.x2]="e.x2"
-            [attr.y2]="e.y2"
+          <path [attr.d]="e.d" class="fe__edge-hit" />
+          <path
+            [attr.d]="e.d"
             class="fe__edge"
             [class.fe__edge--auto]="e.automatic"
             marker-end="url(#fe-arrow)"

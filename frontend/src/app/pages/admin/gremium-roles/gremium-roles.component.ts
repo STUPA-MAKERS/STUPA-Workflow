@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
@@ -39,7 +39,6 @@ function emptyDraft(): RoleDraft {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
-    RouterLink,
     TranslatePipe,
     CapitalizePipe,
     ButtonComponent,
@@ -50,7 +49,6 @@ function emptyDraft(): RoleDraft {
   ],
   template: `
     <section class="gr">
-      <a class="gr__back" [routerLink]="['/admin/gremien', gremiumIdRef]">← {{ 'admin.gremiumRoles.back' | t }}</a>
       <header class="gr__head">
         <div>
           <h1 class="gr__title">{{ 'admin.gremiumRoles.title' | t }}</h1>
@@ -119,16 +117,24 @@ function emptyDraft(): RoleDraft {
   styles: [
     `
       :host { display: flex; flex-direction: column; gap: var(--space-5); }
-      .gr__back { color: var(--color-text-muted); font-size: var(--fs-sm); text-decoration: none; }
-      .gr__back:hover { color: var(--color-primary); }
       .gr__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
       .gr__title { margin: 0; }
       .gr__sub { color: var(--color-text-muted); font-size: var(--fs-sm); margin: var(--space-1) 0 0; }
       .gr__mono { font-family: var(--font-mono, monospace); font-size: var(--fs-xs); }
       .gr__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
       .gr__form { display: flex; flex-direction: column; gap: var(--space-4); }
-      .field { display: flex; flex-direction: column; gap: var(--space-1); }
+      .field { display: flex; flex-direction: column; gap: var(--space-2); }
       .field__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+      .field__control {
+        height: var(--control-height);
+        padding: 0 var(--space-3);
+        background: var(--color-surface);
+        color: var(--color-text);
+        border: var(--border-width) solid var(--color-border-strong);
+        border-radius: var(--radius-md);
+        font-size: var(--fs-md);
+      }
+      .field__control:disabled { opacity: 0.6; cursor: not-allowed; }
       .gr__foot { display: flex; justify-content: flex-end; gap: var(--space-3); }
     `,
   ],
@@ -141,7 +147,6 @@ export class GremiumRolesComponent {
 
   /** Gremium, dessen Rollen hier verwaltet werden (#62 — Rollen sind pro Gremium). */
   private readonly gremiumId = this.route.snapshot.paramMap.get('id') as Uuid;
-  protected readonly gremiumIdRef = this.gremiumId;
 
   protected readonly roles = signal<GremiumRole[]>([]);
   protected readonly draft = signal<RoleDraft | null>(null);

@@ -9,6 +9,7 @@ export type IconName =
   | 'add'
   | 'remove'
   | 'members'
+  | 'roles'
   | 'chevron-down'
   | 'power';
 
@@ -68,6 +69,10 @@ export type IconName =
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
           <circle cx="9" cy="7" r="4" />
           <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+        }
+        @case ('roles') {
+          <circle cx="12" cy="8" r="6" />
+          <path d="M15.5 12.9 17 22l-5-3-5 3 1.5-9.1" />
         }
         @case ('chevron-down') {
           <path d="M6 9l6 6 6-6" />

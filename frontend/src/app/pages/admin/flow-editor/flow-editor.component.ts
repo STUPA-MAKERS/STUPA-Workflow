@@ -203,6 +203,7 @@ export class FlowEditorComponent {
   protected readonly edges = computed(() => {
     const pos = this.positions();
     const sel = this.selection();
+    const kindOf = new Map(this.graph().states.map((s) => [s.key, s.kind] as const));
     return (this.graph().transitions ?? [])
       .map((t, index) => ({ t, index }))
       .filter(({ t }) => pos[t.from] && pos[t.to])
@@ -210,7 +211,8 @@ export class FlowEditorComponent {
         const a = pos[t.from];
         const b = pos[t.to];
         const x1 = a.x + NODE_W;
-        const y1 = a.y + NODE_H / 2;
+        // Start am Branch-Punkt (pass/fail …), nicht in der Knotenmitte (#8).
+        const y1 = a.y + this.branchDotY(kindOf.get(t.from), t.branch);
         const x2 = b.x;
         const y2 = b.y + NODE_H / 2;
         return {
@@ -219,6 +221,7 @@ export class FlowEditorComponent {
           y1,
           x2,
           y2,
+          d: this.edgePath(x1, y1, x2, y2),
           mx: (x1 + x2) / 2,
           my: (y1 + y2) / 2,
           label: t.label?.['de'] ?? '',
@@ -227,6 +230,19 @@ export class FlowEditorComponent {
         };
       });
   });
+
+  /** Y-Offset des Ausgangs-Punkts für einen (ggf. Branch-)Übergang innerhalb des Knotens. */
+  private branchDotY(kind: string | null | undefined, branch: TransitionBranch | null | undefined): number {
+    const dots = this.branchDotsFor(kind);
+    const i = branch ? dots.indexOf(branch) : -1;
+    return i >= 0 ? this.dotY(i, dots.length) : NODE_H / 2;
+  }
+
+  /** Glatte (kubische Bézier) horizontale Kante zwischen zwei Punkten. */
+  private edgePath(x1: number, y1: number, x2: number, y2: number): string {
+    const dx = Math.max(Math.abs(x2 - x1) * 0.5, 30);
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+  }
 
   /**
    * Canvas-Maße aus den Knoten-Positionen. Das SVG wird **1:1** gerendert

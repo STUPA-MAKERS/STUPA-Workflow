@@ -71,7 +71,7 @@ export const routes: Routes = [
       },
       {
         path: 'applications/:id',
-        data: { title: 'nav.applications', permission: 'application.read' },
+        data: { title: 'applications.detail.crumb', permission: 'application.read', parent: ['applications'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/applications/applications-detail.component').then(
@@ -176,7 +176,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/forms/:id',
-        data: { title: 'admin.forms.listTitle', permission: 'form.configure' },
+        data: { title: 'admin.forms.edit', permission: 'form.configure', parent: ['admin/forms'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
@@ -200,7 +200,7 @@ export const routes: Routes = [
       {
         // Mitglieder-Unterseite je Gremium (#18).
         path: 'admin/gremien/:id/members',
-        data: { title: 'admin.gremien.membersOf', permission: 'admin.config' },
+        data: { title: 'admin.gremien.membersOf', permission: 'admin.config', parent: ['admin/gremien'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/gremien/gremium-members.component').then(
@@ -234,7 +234,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/gremien/:id/roles',
-        data: { title: 'admin.gremiumRoles.title', permission: 'admin.roles' },
+        data: { title: 'admin.gremiumRoles.title', permission: 'admin.roles', parent: ['admin/gremien'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/gremium-roles/gremium-roles.component').then(

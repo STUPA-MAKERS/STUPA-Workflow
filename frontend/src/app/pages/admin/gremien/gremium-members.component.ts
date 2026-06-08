@@ -50,7 +50,6 @@ interface Member {
     IconComponent,
   ],
   template: `
-    <a class="gm__back" routerLink="/admin/gremien">← {{ 'admin.gremien.title' | t }}</a>
 
     <header class="gm__head">
       <div>
@@ -145,14 +144,6 @@ interface Member {
         display: flex;
         flex-direction: column;
         gap: var(--space-5);
-      }
-      .gm__back {
-        color: var(--color-primary);
-        text-decoration: none;
-        font-size: var(--fs-sm);
-      }
-      .gm__back:hover {
-        text-decoration: underline;
       }
       .gm__head {
         display: flex;

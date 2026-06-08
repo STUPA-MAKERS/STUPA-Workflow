@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -45,7 +45,6 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     FormsModule,
     DatePipe,
     TranslatePipe,
@@ -56,8 +55,6 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
     AttachmentsPanelComponent,
   ],
   template: `
-    <a class="det__back" routerLink="/applications">← {{ 'applications.detail.back' | t }}</a>
-
     @if (loading()) {
       <p class="det__status" aria-live="polite">{{ 'applications.detail.loading' | t }}</p>
     } @else if (notFound()) {
@@ -305,15 +302,6 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
         display: flex;
         flex-direction: column;
         gap: var(--space-5);
-      }
-      .det__back {
-        color: var(--color-primary);
-        text-decoration: none;
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-medium);
-      }
-      .det__back:hover {
-        text-decoration: underline;
       }
       .det__status {
         color: var(--color-text-muted);

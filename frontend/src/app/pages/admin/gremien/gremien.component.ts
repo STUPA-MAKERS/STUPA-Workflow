@@ -87,8 +87,8 @@ function emptyForm(): GremiumForm {
           </ng-template>
           <ng-template appCell="actions" let-g>
             <span class="grem__th-actions">
-              <a class="grem__icon-link" [routerLink]="['/admin/gremien', $any(g).id]" [attr.aria-label]="'admin.gremien.members' | t" [attr.title]="'admin.gremien.members' | t"><app-icon name="members" /></a>
-              <a class="grem__icon-link" [routerLink]="['/admin/gremien', $any(g).id, 'roles']" [attr.aria-label]="'admin.gremiumRoles.manage' | t" [attr.title]="'admin.gremiumRoles.manage' | t"><app-icon name="edit" /></a>
+              <a class="grem__icon-link" [routerLink]="['/admin/gremien', $any(g).id, 'members']" [attr.aria-label]="'admin.gremien.members' | t" [attr.title]="'admin.gremien.members' | t"><app-icon name="members" /></a>
+              <a class="grem__icon-link" [routerLink]="['/admin/gremien', $any(g).id, 'roles']" [attr.aria-label]="'admin.gremiumRoles.manage' | t" [attr.title]="'admin.gremiumRoles.manage' | t"><app-icon name="roles" /></a>
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.editAction' | t" (click)="openEdit($any(g))"><app-icon name="edit" /></app-button>
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.deleteAction' | t" (click)="askDelete($any(g))"><app-icon name="delete" /></app-button>
             </span>
