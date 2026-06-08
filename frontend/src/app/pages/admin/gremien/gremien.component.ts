@@ -7,7 +7,10 @@ import type { Uuid } from '@core/api/models';
 import {
   BadgeComponent,
   ButtonComponent,
+  CellDirective,
   CheckboxComponent,
+  type ColumnDef,
+  DataTableComponent,
   DialogComponent,
   SelectComponent,
   type SelectOption,
@@ -53,6 +56,8 @@ function emptyForm(): GremiumForm {
     CheckboxComponent,
     SelectComponent,
     DialogComponent,
+    DataTableComponent,
+    CellDirective,
   ],
   template: `
     <header class="grem__head">
@@ -71,37 +76,20 @@ function emptyForm(): GremiumForm {
       } @else if (!gremien().length) {
         <p class="grem__status">{{ 'admin.gremien.empty' | t }}</p>
       } @else {
-        <table class="grem__table">
-          <thead>
-            <tr>
-              <th>{{ 'admin.gremien.name' | t }}</th>
-              <th>{{ 'admin.gremien.slug' | t }}</th>
-              <th>{{ 'admin.gremien.cdVariant' | t }}</th>
-              <th>{{ 'admin.gremien.defaultLang' | t }}</th>
-              <th>{{ 'admin.gremien.delegation' | t }}</th>
-              <th class="grem__th-actions">{{ 'admin.gremien.actions' | t }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (g of gremien(); track g.id) {
-              <tr>
-                <td>{{ g.name }}</td>
-                <td class="grem__mono">{{ g.slug }}</td>
-                <td>{{ g.cdVariant }}</td>
-                <td>{{ g.defaultLang }}</td>
-                <td>
-                  @if (g.allowVoteDelegation) {
-                    <app-badge variant="primary">{{ 'admin.gremien.delegationOn' | t }}</app-badge>
-                  } @else { — }
-                </td>
-                <td class="grem__th-actions">
-                  <a class="grem__link" [routerLink]="['/admin/gremien', g.id]">{{ 'admin.gremien.members' | t }}</a>
-                  <app-button variant="secondary" size="sm" (click)="openEdit(g)">{{ 'admin.gremien.editAction' | t }}</app-button>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
+        <app-data-table [columns]="columns()" [rows]="gremien()" [rowKey]="rowId">
+          <ng-template appCell="slug" let-g><span class="grem__mono">{{ $any(g).slug }}</span></ng-template>
+          <ng-template appCell="delegation" let-g>
+            @if ($any(g).allowVoteDelegation) {
+              <app-badge variant="primary">{{ 'admin.gremien.delegationOn' | t }}</app-badge>
+            } @else { — }
+          </ng-template>
+          <ng-template appCell="actions" let-g>
+            <span class="grem__th-actions">
+              <a class="grem__link" [routerLink]="['/admin/gremien', $any(g).id]">{{ 'admin.gremien.members' | t }}</a>
+              <app-button variant="secondary" size="sm" (click)="openEdit($any(g))">{{ 'admin.gremien.editAction' | t }}</app-button>
+            </span>
+          </ng-template>
+        </app-data-table>
       }
     </section>
 
@@ -263,6 +251,16 @@ export class AdminGremienComponent {
   readonly dialogOpen = signal(false);
   readonly editingId = signal<Uuid | null>(null);
   readonly form = signal<GremiumForm>(emptyForm());
+
+  readonly columns = computed<ColumnDef[]>(() => [
+    { key: 'name', label: this.i18n.translate('admin.gremien.name') },
+    { key: 'slug', label: this.i18n.translate('admin.gremien.slug') },
+    { key: 'cdVariant', label: this.i18n.translate('admin.gremien.cdVariant') },
+    { key: 'defaultLang', label: this.i18n.translate('admin.gremien.defaultLang') },
+    { key: 'delegation', label: this.i18n.translate('admin.gremien.delegation') },
+    { key: 'actions', label: this.i18n.translate('admin.gremien.actions'), align: 'end' },
+  ]);
+  readonly rowId = (g: unknown): string => (g as Gremium).id;
 
   readonly cdOptions: SelectOption[] = CD_VARIANTS.map((v) => ({ value: v, label: v }));
   readonly langOptions = computed<SelectOption[]>(() => [
