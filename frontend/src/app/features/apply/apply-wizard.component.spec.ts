@@ -67,6 +67,8 @@ function fakeApi(create = jest.fn(() => of({ applicationId: 'app-1' }))): Partia
     applicationTypes: () => of(TYPES),
     effectiveForm: () => of(EFF),
     createApplication: create as unknown as ApiClient['createApplication'],
+    // Anonyme Session (kein Principal) — Default-Pfad mit Kontakt-Schritt + Altcha (#24).
+    me: (() => of(null)) as unknown as ApiClient['me'],
   };
 }
 
@@ -79,6 +81,26 @@ async function setup(create?: jest.Mock) {
     ],
   });
   return view;
+}
+
+/** Wie {@link setup}, aber mit eingeloggter Session (Principal) für den #24-Pfad. */
+async function setupLoggedIn(create = jest.fn(() => of({ applicationId: 'app-1' }))) {
+  const api = {
+    ...fakeApi(create),
+    me: (() =>
+      of({
+        sub: 'u-7',
+        email: 'user@example.org',
+        display_name: 'Userin',
+        roles: [],
+        permissions: [],
+        groups: [],
+      })) as unknown as ApiClient['me'],
+  };
+  const view = await render(ApplyWizardComponent, {
+    providers: [provideRouter([]), provideFormly(), { provide: ApiClient, useValue: api }],
+  });
+  return { ...view, create };
 }
 
 describe('ApplyWizardComponent', () => {
@@ -173,6 +195,34 @@ describe('ApplyWizardComponent', () => {
     comp.discardDraft();
     expect(comp.model).toEqual({});
     expect(comp.activeIndex()).toBe(0);
+  });
+
+  it('skips the contact step and Altcha for a logged-in user (#24)', async () => {
+    const { fixture, create } = await setupLoggedIn();
+    const comp = fixture.componentInstance;
+    const router = TestBed.inject(Router);
+    jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
+    expect(comp.loggedIn()).toBe(true);
+    // Antragsart + 2 Sektionen + Prüfen — KEIN Kontakt-Schritt.
+    expect(comp.steps().length).toBe(4);
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main direkt
+
+    await userEvent.type(screen.getByLabelText(/Titel/), 'Sommerfest');
+    await userEvent.type(screen.getByLabelText(/Betrag/), '500');
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
+
+    // Kein Altcha-Widget, trotzdem absendbar.
+    expect(comp.canSubmit()).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: /Antrag absenden/ }));
+
+    expect(create).toHaveBeenCalledTimes(1);
+    const payload = create.mock.calls[0][0] as { applicantEmail: string | null; altcha: string | null };
+    // Identität/Altcha leitet das Backend ab → FE sendet null.
+    expect(payload.applicantEmail).toBeNull();
+    expect(payload.altcha).toBeNull();
   });
 
   it('blocks advancing past an invalid contact step', async () => {

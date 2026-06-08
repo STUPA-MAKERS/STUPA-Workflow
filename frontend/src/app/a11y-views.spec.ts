@@ -141,6 +141,8 @@ describe('Kern-Views a11y (axe)', () => {
     const fakeApi: Partial<ApiClient> = {
       applicationTypes: () => of(TYPES),
       effectiveForm: () => of(EFF),
+      // Anonyme Session — AuthService.ensureLoaded() im Wizard-Konstruktor (#24).
+      me: (() => of(null)) as unknown as ApiClient['me'],
     };
 
     @Component({

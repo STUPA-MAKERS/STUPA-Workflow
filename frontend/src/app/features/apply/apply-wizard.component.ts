@@ -8,6 +8,7 @@ import {
 import { Router } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
@@ -69,9 +70,13 @@ const DRAFT_PREFIX = 'ap.draft.';
 })
 export class ApplyWizardComponent {
   private readonly api = inject(ApiClient);
+  private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+
+  /** Eingeloggt? Dann entfällt der Kontakt-Schritt + Altcha; Identität kommt vom Account (#24). */
+  protected readonly loggedIn = this.auth.isAuthenticated;
 
   readonly types = signal<ApplicationType[]>([]);
   readonly typeId = signal<Uuid | null>(null);
@@ -100,27 +105,40 @@ export class ApplyWizardComponent {
     if (!this.effForm()) return [{ label: t('apply.steps.type') }];
     return [
       { label: t('apply.steps.type') },
-      { label: t('apply.steps.contact') },
+      ...(this.loggedIn() ? [] : [{ label: t('apply.steps.contact') }]),
       ...this.sections().map((s) => ({ label: s.label })),
       { label: t('apply.steps.review') },
     ];
   });
 
+  /** Index der ersten Form-Sektion: 1 ohne Kontakt-Schritt (eingeloggt), sonst 2. */
+  private readonly sectionBase = computed(() => (this.loggedIn() ? 1 : 2));
+
   readonly currentStep = computed<StepKind>(() => {
     const idx = this.activeIndex();
     if (idx === 0) return 'type';
-    if (idx === 1) return 'contact';
-    if (idx - 2 < this.sections().length) return 'section';
+    if (!this.loggedIn() && idx === 1) return 'contact';
+    if (idx - this.sectionBase() < this.sections().length) return 'section';
     return 'review';
   });
 
   readonly currentSection = computed<WizardSection | null>(
-    () => this.sections()[this.activeIndex() - 2] ?? null,
+    () => this.sections()[this.activeIndex() - this.sectionBase()] ?? null,
+  );
+
+  /** Im Review angezeigte Antragsteller-Mail: Account (eingeloggt) oder Kontakt-Feld. */
+  readonly reviewEmail = computed(() =>
+    this.loggedIn()
+      ? (this.auth.principal()?.email ?? this.auth.displayName())
+      : this.contactForm.controls.email.value,
   );
 
   readonly summary = computed<SummaryRow[]>(() => this.buildSummary());
 
   constructor() {
+    // Session laden (gecached), damit der Wizard Kontakt-Schritt/Altcha für
+    // eingeloggte Nutzer:innen überspringt (#24). /apply ist ungeschützt.
+    this.auth.ensureLoaded().subscribe();
     this.api.applicationTypes().subscribe({
       next: (t) => this.types.set(t.filter((x) => x.active)),
       error: () => this.toast.error(this.i18n.translate('apply.error.typesLoad')),
@@ -192,8 +210,9 @@ export class ApplyWizardComponent {
 
   readonly canSubmit = computed(
     () =>
-      this.altchaSolution() !== null &&
-      this.contactForm.valid &&
+      // Eingeloggt: kein Altcha/Kontakt nötig; anonym: beides Pflicht (#24).
+      (this.loggedIn() || this.altchaSolution() !== null) &&
+      (this.loggedIn() || this.contactForm.valid) &&
       this.sections().every((s) => s.form.valid),
   );
 
@@ -201,16 +220,18 @@ export class ApplyWizardComponent {
     if (!this.canSubmit() || this.submitting()) return;
     const typeId = this.typeId();
     const altcha = this.altchaSolution();
-    if (!typeId || !altcha) return;
+    if (!typeId) return;
+    if (!this.loggedIn() && !altcha) return;
 
     const payload: NewApplication = {
       typeId,
       budgetPotId: this.effForm()?.budgetPotId ?? null,
       data: { ...this.model },
-      applicantEmail: this.contactForm.controls.email.value,
-      applicantName: this.contactForm.controls.name.value || null,
+      // Eingeloggt: Identität/Altcha leitet das Backend aus dem Account ab (#24).
+      applicantEmail: this.loggedIn() ? null : this.contactForm.controls.email.value,
+      applicantName: this.loggedIn() ? null : this.contactForm.controls.name.value || null,
       lang: this.i18n.locale(),
-      altcha,
+      altcha: this.loggedIn() ? null : altcha,
     };
 
     this.submitting.set(true);

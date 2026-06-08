@@ -69,7 +69,7 @@
         <dl class="summary">
           <div class="summary__row">
             <dt>{{ 'apply.review.email' | t }}</dt>
-            <dd>{{ contactForm.controls.email.value }}</dd>
+            <dd>{{ reviewEmail() }}</dd>
           </div>
           @for (row of summary(); track row.label) {
             <div class="summary__row">
@@ -78,9 +78,11 @@
             </div>
           }
         </dl>
-        <div class="review__altcha">
-          <app-altcha (solved)="onAltchaSolved($event)" />
-        </div>
+        @if (!loggedIn()) {
+          <div class="review__altcha">
+            <app-altcha (solved)="onAltchaSolved($event)" />
+          </div>
+        }
       }
     }
 
