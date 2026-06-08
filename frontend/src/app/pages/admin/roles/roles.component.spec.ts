@@ -14,6 +14,8 @@ function makeApi() {
     listRoles: jest.fn(() => of(ROLES)),
     listPermissions: jest.fn(() => of(['admin.roles', 'application.read', 'flow.configure'])),
     saveRolePermissions: jest.fn((id: string, perms: string[]) => of({ ...ROLES[0], id, permissions: perms })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    createRole: jest.fn((body: any) => of({ id: 'r-new', key: body.key, label: body.label, permissions: [] })),
   };
 }
 
@@ -43,5 +45,21 @@ describe('AdminRolesComponent (#12)', () => {
     inst.togglePerm(role, 'application.read', false);
     inst.saveRole(inst.roles().find((r: Role) => r.id === 'r-member'));
     expect(api.saveRolePermissions).toHaveBeenCalledWith('r-member', ['flow.configure']);
+  });
+
+  it('creates a global role via the add dialog', async () => {
+    const { api, fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inst = fixture.componentInstance as any;
+    inst.openAdd();
+    inst.patchDraft('key', 'referent');
+    inst.patchDraft('labelDe', 'Referent');
+    inst.createRole();
+    expect(api.createRole).toHaveBeenCalledWith({
+      key: 'referent',
+      label: { de: 'Referent' },
+      permissions: [],
+    });
+    expect(inst.roles().some((r: Role) => r.id === 'r-new')).toBe(true);
   });
 });

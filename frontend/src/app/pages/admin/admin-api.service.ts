@@ -17,7 +17,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map, of } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
-import type { Uuid } from '@core/api/models';
+import type { I18nMap, Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
 import {
   type AdminPrincipal,
@@ -173,6 +173,21 @@ export class AdminApiService {
       return of(structuredCopy(this.store.roles[idx]));
     }
     return this.http.patch<Role>(`${this.base}/admin/roles/${roleId}`, { permissions });
+  }
+
+  /** Globale Rolle anlegen (#21) — POST /admin/roles (`RoleCreate`). */
+  createRole(body: { key: string; label: I18nMap; permissions?: string[] }): Observable<Role> {
+    if (this.mock) {
+      const role: Role = {
+        id: `role-${this.store.roles.length + 1}`,
+        key: body.key,
+        label: { ...body.label },
+        permissions: [...(body.permissions ?? [])],
+      };
+      this.store.roles.push(role);
+      return of(structuredCopy(role));
+    }
+    return this.http.post<Role>(`${this.base}/admin/roles`, body);
   }
 
   /** Katalog wählbarer Permission-Keys (GET /admin/permissions). */

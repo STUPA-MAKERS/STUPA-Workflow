@@ -1,63 +1,111 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
-import { ButtonComponent, CheckboxComponent, ToastService } from '@shared/ui';
+import {
+  ButtonComponent,
+  CellDirective,
+  CheckboxComponent,
+  type ColumnDef,
+  DataTableComponent,
+  DialogComponent,
+  RowDetailDirective,
+  ToastService,
+} from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import type { Role } from '../admin.models';
 
+/** Entwurf für eine neue globale Rolle. */
+interface RoleDraft {
+  key: string;
+  labelDe: string;
+  labelEn: string;
+}
+
 /**
- * Rollen-Rechte (#72) — aus dem Benutzer-Screen herausgelöst (eigene Seite, auf
- * Wunsch getrennt). Listet die Rollen und pflegt je Rolle die Berechtigungen
- * (Whitelist aus `/admin/permissions`). Der Server bleibt autoritativ.
+ * Rollen & Rechte (#21) als **Baum-Tabelle**: jede (globale) Rolle ist eine Zeile;
+ * Aufklappen zeigt ihre Berechtigungen als Checkbox-Detail. Im selben View ein
+ * **Dialog** zum Anlegen globaler Rollen. Die Admin-Rolle ist gesperrt (immer alle
+ * Rechte). Gremium-Rollen werden pro Gremium verwaltet — hier nur globale.
  */
 @Component({
   selector: 'app-admin-roles',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, CapitalizePipe, ButtonComponent, CheckboxComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    CapitalizePipe,
+    ButtonComponent,
+    CheckboxComponent,
+    DialogComponent,
+    DataTableComponent,
+    CellDirective,
+    RowDetailDirective,
+  ],
   providers: [CapitalizePipe],
   template: `
     <section class="roles">
-      <header>
-        <h1>{{ 'admin.roles.title' | t }}</h1>
-        <p class="roles__sub">{{ 'admin.roles.subtitle' | t }}</p>
+      <header class="roles__head">
+        <div>
+          <h1>{{ 'admin.roles.title' | t }}</h1>
+          <p class="roles__sub">{{ 'admin.roles.subtitle' | t }}</p>
+        </div>
+        <app-button (click)="openAdd()">{{ 'admin.roles.addGlobalRole' | t }}</app-button>
       </header>
 
-      @for (r of roles(); track r.id) {
-        <article class="roles__card">
-          <div class="roles__id">
-            <span class="roles__name">{{ roleLabel(r) | capitalize }}</span>
-            <span class="roles__key">{{ r.key }}</span>
-          </div>
+      <app-data-table [columns]="columns()" [rows]="roles()" [rowKey]="rowId" [isExpanded]="rowExpanded">
+        <ng-template appCell="name" let-r><span class="roles__name">{{ roleLabel($any(r)) | capitalize }}</span></ng-template>
+        <ng-template appCell="key" let-r><span class="roles__key">{{ $any(r).key }}</span></ng-template>
+        <ng-template appCell="perms" let-r>{{ $any(r).permissions.length }} / {{ permissions().length }}</ng-template>
+        <ng-template appCell="actions" let-r>
+          <app-button variant="secondary" size="sm" (click)="toggle($any(r).id)">{{ 'admin.roles.editPerms' | t }}</app-button>
+        </ng-template>
 
-          @if (isLocked(r)) {
-            <!-- Admin-Rolle hat IMMER alle Rechte — hier nicht bearbeitbar. -->
-            <p class="roles__locked">{{ 'admin.roles.adminLocked' | t }}</p>
-            <fieldset class="roles__grid">
-              @for (perm of permissions(); track perm) {
-                <span class="roles__perm-on">✓ {{ perm }}</span>
-              }
-            </fieldset>
-          } @else {
-            <fieldset class="roles__grid">
-              <legend class="sr-only">{{ 'admin.roles.permsFor' | t }} {{ roleLabel(r) | capitalize }}</legend>
-              @for (perm of permissions(); track perm) {
-                <app-checkbox
-                  [ngModel]="r.permissions.includes(perm)"
-                  (ngModelChange)="togglePerm(r, perm, $event)"
-                  [name]="r.id + '-' + perm"
-                >{{ perm }}</app-checkbox>
-              }
-            </fieldset>
-            <div class="roles__foot">
-              <app-button size="sm" (click)="saveRole(r)">{{ 'action.save' | t }}</app-button>
-            </div>
-          }
-        </article>
-      }
+        <ng-template appRowDetail let-r>
+          <div class="roles__detail">
+            @if (isLocked($any(r))) {
+              <p class="roles__locked">{{ 'admin.roles.adminLocked' | t }}</p>
+              <div class="roles__grid">
+                @for (perm of permissions(); track perm) {
+                  <span class="roles__perm-on">✓ {{ perm }}</span>
+                }
+              </div>
+            } @else {
+              <fieldset class="roles__grid">
+                @for (perm of permissions(); track perm) {
+                  <app-checkbox
+                    [ngModel]="$any(r).permissions.includes(perm)"
+                    (ngModelChange)="togglePerm($any(r), perm, $event)"
+                    [name]="$any(r).id + '-' + perm"
+                  >{{ perm }}</app-checkbox>
+                }
+              </fieldset>
+              <div class="roles__foot">
+                <app-button size="sm" (click)="saveRole($any(r))">{{ 'action.save' | t }}</app-button>
+              </div>
+            }
+          </div>
+        </ng-template>
+      </app-data-table>
     </section>
+
+    <!-- Globale Rolle anlegen (Dialog, #21/#19) -->
+    <app-dialog [open]="addOpen()" [title]="'admin.roles.addGlobalRole' | t" [closeLabel]="'admin.gremien.cancel' | t" (closed)="addOpen.set(false)">
+      <div class="roles__add">
+        <label class="roles__lbl">{{ 'admin.roles.roleKey' | t }}
+          <input [ngModel]="draft().key" (ngModelChange)="patchDraft('key', $event)" name="roleKey" placeholder="z. B. referent" /></label>
+        <label class="roles__lbl">{{ 'admin.common.labelDe' | t }}
+          <input [ngModel]="draft().labelDe" (ngModelChange)="patchDraft('labelDe', $event)" name="roleLabelDe" /></label>
+        <label class="roles__lbl">{{ 'admin.common.labelEn' | t }}
+          <input [ngModel]="draft().labelEn" (ngModelChange)="patchDraft('labelEn', $event)" name="roleLabelEn" /></label>
+      </div>
+      <div dialog-footer class="roles__foot">
+        <app-button variant="ghost" (click)="addOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
+        <app-button [disabled]="!draft().key.trim()" (click)="createRole()">{{ 'admin.gremien.add' | t }}</app-button>
+      </div>
+    </app-dialog>
   `,
   styles: [
     `
@@ -66,45 +114,43 @@ import type { Role } from '../admin.models';
         flex-direction: column;
         gap: var(--space-5);
       }
+      .roles__head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: var(--space-4);
+        flex-wrap: wrap;
+      }
       .roles__sub {
         color: var(--color-text-muted);
       }
-      .roles__card {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-4);
-        padding: var(--space-4);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
-        background: var(--color-surface);
-      }
-      .roles__id {
-        display: flex;
-        align-items: baseline;
-        gap: var(--space-3);
-      }
       .roles__name {
-        font-weight: var(--fw-semibold);
-        font-size: var(--fs-md);
+        font-weight: var(--fw-medium);
       }
       .roles__key {
-        color: var(--color-text-muted);
         font-family: var(--font-mono, monospace);
-        font-size: var(--fs-sm);
+        font-size: var(--fs-xs);
+        color: var(--color-text-muted);
+      }
+      .roles__detail {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        padding: var(--space-4);
       }
       .roles__grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
         align-items: center;
-        gap: var(--space-3);
+        gap: var(--space-2);
         margin: 0;
-        padding: var(--space-3);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-sm);
+        padding: 0;
+        border: 0;
       }
       .roles__foot {
         display: flex;
         justify-content: flex-end;
+        gap: var(--space-3);
       }
       .roles__locked {
         margin: 0;
@@ -115,16 +161,27 @@ import type { Role } from '../admin.models';
         font-size: var(--fs-sm);
         color: var(--color-success);
       }
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
+      .roles__add {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+      }
+      .roles__lbl {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-medium);
+      }
+      .roles__lbl input {
+        height: var(--control-height);
+        box-sizing: border-box;
+        padding: 0 var(--space-3);
+        font: inherit;
+        color: var(--color-text);
+        background: var(--color-surface);
+        border: var(--border-width) solid var(--color-border-strong);
+        border-radius: var(--radius-md);
       }
     `,
   ],
@@ -136,6 +193,18 @@ export class AdminRolesComponent {
 
   protected readonly roles = signal<Role[]>([]);
   protected readonly permissions = signal<string[]>([]);
+  protected readonly expanded = signal<Set<string>>(new Set());
+  protected readonly addOpen = signal(false);
+  protected readonly draft = signal<RoleDraft>({ key: '', labelDe: '', labelEn: '' });
+
+  protected readonly columns = computed<ColumnDef[]>(() => [
+    { key: 'name', label: this.i18n.translate('admin.roles.col.name') },
+    { key: 'key', label: this.i18n.translate('admin.roles.col.key') },
+    { key: 'perms', label: this.i18n.translate('admin.roles.col.perms') },
+    { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
+  ]);
+  protected readonly rowId = (r: unknown): string => (r as Role).id;
+  protected readonly rowExpanded = (r: unknown): boolean => this.expanded().has((r as Role).id);
 
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));
@@ -146,9 +215,17 @@ export class AdminRolesComponent {
     return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
   }
 
-  /** Admin-Rolle: immer alle Rechte, hier nicht editierbar (server-autoritativ). */
   protected isLocked(role: Role): boolean {
     return role.key === 'admin';
+  }
+
+  protected toggle(id: string): void {
+    this.expanded.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   protected togglePerm(role: Role, perm: string, on: boolean): void {
@@ -163,6 +240,32 @@ export class AdminRolesComponent {
       next: (saved) => {
         this.roles.update((list) => list.map((r) => (r.id === saved.id ? saved : r)));
         this.toast.success(this.i18n.translate('admin.common.saved'));
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+    });
+  }
+
+  // --- globale Rolle anlegen -----------------------------------------------
+  protected openAdd(): void {
+    this.draft.set({ key: '', labelDe: '', labelEn: '' });
+    this.addOpen.set(true);
+  }
+
+  protected patchDraft<K extends keyof RoleDraft>(key: K, value: string): void {
+    this.draft.update((d) => ({ ...d, [key]: value }));
+  }
+
+  protected createRole(): void {
+    const d = this.draft();
+    if (!d.key.trim()) return;
+    const label: Record<string, string> = {};
+    if (d.labelDe.trim()) label['de'] = d.labelDe.trim();
+    if (d.labelEn.trim()) label['en'] = d.labelEn.trim();
+    this.api.createRole({ key: d.key.trim(), label, permissions: [] }).subscribe({
+      next: (role) => {
+        this.roles.update((list) => [...list, role]);
+        this.addOpen.set(false);
+        this.toast.success(this.i18n.translate('admin.roles.created'));
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });
