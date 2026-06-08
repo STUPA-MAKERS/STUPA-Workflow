@@ -44,7 +44,8 @@ interface Crumb {
         flex-wrap: wrap;
         align-items: center;
         gap: var(--space-2);
-        padding-block: var(--space-2);
+        padding-top: var(--space-6);
+        padding-bottom: var(--space-2);
         font-size: var(--fs-sm);
       }
       .bc__crumb {

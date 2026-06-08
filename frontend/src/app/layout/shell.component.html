@@ -30,8 +30,8 @@
             [title]="'auth.signedInAs' | t"
             (click)="toggleAccountMenu()"
           >
+            <app-icon name="user" [size]="18" />
             <span class="account__name">{{ auth.displayName() }}</span>
-            <app-icon name="chevron-down" [size]="14" />
           </button>
           @if (accountMenuOpen()) {
             <button type="button" class="account__backdrop" aria-hidden="true" tabindex="-1" (click)="closeAccountMenu()"></button>

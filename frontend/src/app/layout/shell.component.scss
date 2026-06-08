@@ -170,21 +170,21 @@
 .account__name-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   height: var(--control-height);
-  padding-inline: var(--space-3);
-  border: var(--border-width) solid var(--color-border-strong);
+  padding-inline: var(--space-2);
+  border: 0;
   border-radius: var(--radius-md);
-  background: var(--color-surface);
+  background: transparent;
   color: var(--color-text);
   cursor: pointer;
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard);
+  transition: background-color var(--motion-fast) var(--ease-standard);
 }
 .account__name-btn:hover {
   background: var(--color-surface-sunken);
-  border-color: var(--color-primary);
+}
+.account__name-btn > app-icon {
+  color: var(--color-text-muted);
 }
 .account__name-btn:focus-visible {
   outline: 2px solid var(--color-focus-ring);
