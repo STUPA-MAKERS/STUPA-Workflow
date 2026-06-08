@@ -51,6 +51,15 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     budget_pot_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget_pot.id"), nullable=True
     )
+    # Kostenstelle (Budget-Baum, i.d.R. Leaf) + Haushaltsjahr [CR R7.1e]. HHJ wird bei
+    # der Budget-Zuordnung gesetzt (nicht bei Antragstellung); verschiebbar via
+    # `move-fiscal-year`. Beide additiv zum flachen `budget_pot_id` (T-17).
+    budget_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget.id"), nullable=True
+    )
+    fiscal_year_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("fiscal_year.id"), nullable=True
+    )
     amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(CHAR(3), nullable=True)
     data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
@@ -66,6 +75,8 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_application_current_state_id", "current_state_id"),
         Index("ix_application_gremium_id", "gremium_id"),
         Index("ix_application_budget_pot_id", "budget_pot_id"),
+        Index("ix_application_budget_id", "budget_id"),
+        Index("ix_application_fiscal_year_id", "fiscal_year_id"),
         Index("ix_application_type_id", "type_id"),
         Index("ix_application_created_at", "created_at"),
     )
