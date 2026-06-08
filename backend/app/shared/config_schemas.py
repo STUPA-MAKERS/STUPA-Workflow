@@ -225,11 +225,16 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                     "with branch 'pass' and 'fail'"
                 )
         elif s.kind == "approval":
-            if not isinstance(s.config.get("roleKey"), str) or not isinstance(
-                s.config.get("gremiumId"), str
-            ):
+            # ``roleKey`` Pflicht; ``gremiumId`` OPTIONAL: fehlt es, entscheidet eine
+            # **globale** Rolle (#28-CR), sonst die Gremium-Rolle im Gremium.
+            if not isinstance(s.config.get("roleKey"), str):
                 raise FlowValidationError(
-                    f"approval state {s.key!r} requires config.roleKey and config.gremiumId"
+                    f"approval state {s.key!r} requires config.roleKey"
+                )
+            gid = s.config.get("gremiumId")
+            if gid is not None and not isinstance(gid, str):
+                raise FlowValidationError(
+                    f"approval state {s.key!r} config.gremiumId must be a string"
                 )
             if branches != ["accept", "reject"]:
                 raise FlowValidationError(

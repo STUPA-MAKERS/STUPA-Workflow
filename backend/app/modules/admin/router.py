@@ -60,7 +60,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
-from app.shared.config_schemas import export_json_schemas
+from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ProblemDetail
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -319,6 +319,29 @@ async def create_flow_version(
 ) -> FlowVersionOut:
     """Neue Flow-Version anlegen (Graph wird serverseitig validiert)."""
     return await service.create_flow_version(type_id, payload, principal.sub)
+
+
+@router.get(
+    "/flow-versions/global",
+    response_model=FlowGraph | None,
+    responses=_errors(401, 403),
+)
+async def get_global_flow(service: ServiceDep) -> FlowGraph | None:
+    """Graph des aktiven globalen Flows (#28) — ``null``, wenn keiner existiert."""
+    return await service.get_active_global_flow()
+
+
+@router.post(
+    "/flow-versions/global",
+    response_model=FlowVersionOut,
+    status_code=201,
+    responses=_errors(400, 401, 403, 422),
+)
+async def create_global_flow(
+    payload: FlowVersionCreate, service: ServiceDep, principal: ConfigAdmin
+) -> FlowVersionOut:
+    """Globalen Flow als neue Version anlegen (#28; gilt für ALLE Antragstypen)."""
+    return await service.create_global_flow_version(payload, principal.sub)
 
 
 # =========================================================================== #

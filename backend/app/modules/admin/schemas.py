@@ -136,7 +136,8 @@ class FlowVersionCreate(_CamelModel):
 
 class FlowVersionOut(_CamelModel):
     id: UUID
-    application_type_id: UUID = Field(serialization_alias="applicationTypeId")
+    # ``None`` für den globalen Flow (#28).
+    application_type_id: UUID | None = Field(serialization_alias="applicationTypeId")
     version: int
     active: bool
 

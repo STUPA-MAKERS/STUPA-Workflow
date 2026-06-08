@@ -51,6 +51,7 @@ from app.modules.auth.models import RoleAssignment as RoleAssignmentRow
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.shared.config_schemas import (
     EventName,
+    FlowGraph,
     FlowValidationError,
     validate_flow_graph,
 )
@@ -303,6 +304,150 @@ class ConfigService:
             .limit(1)
         )
         return (current or 0) + 1
+
+    # ------------------------------------------------------ globaler Flow (#28)
+    async def get_active_global_flow(self) -> FlowGraph | None:
+        """Graph des aktiven **globalen** Flows (``application_type_id IS NULL``).
+
+        Liefert ``None``, wenn noch kein globaler Flow existiert (Editor startet
+        dann mit leerem Graphen)."""
+        version = await self.session.scalar(
+            select(FlowVersion)
+            .where(
+                FlowVersion.application_type_id.is_(None),
+                FlowVersion.active.is_(True),
+            )
+            .limit(1)
+        )
+        if version is None:
+            return None
+        states = (
+            await self.session.scalars(
+                select(State).where(State.flow_version_id == version.id)
+            )
+        ).all()
+        transitions = (
+            await self.session.scalars(
+                select(Transition)
+                .where(Transition.flow_version_id == version.id)
+                .order_by(Transition.order)
+            )
+        ).all()
+        key_by_id = {s.id: s.key for s in states}
+        return FlowGraph.model_validate(
+            {
+                "states": [
+                    {
+                        "key": s.key,
+                        "label": s.label_i18n,
+                        "color": s.color,
+                        "category": s.category,
+                        "editAllowed": s.edit_allowed,
+                        "isInitial": s.is_initial,
+                        "kind": s.kind,
+                        "config": s.config or {},
+                    }
+                    for s in states
+                ],
+                "transitions": [
+                    {
+                        "from": key_by_id[t.from_state_id],
+                        "to": key_by_id[t.to_state_id],
+                        "label": t.label_i18n or None,
+                        "guard": t.guard,
+                        "actions": t.actions or [],
+                        "order": t.order,
+                        "automatic": t.automatic,
+                        "branch": t.branch,
+                    }
+                    for t in transitions
+                ],
+                "layout": version.editor_layout or None,
+            }
+        )
+
+    async def create_global_flow_version(
+        self, payload: FlowVersionCreate, actor: str
+    ) -> FlowVersionOut:
+        """Globalen Flow als neue Version anlegen (``application_type_id=NULL``, #28).
+
+        Wie :meth:`create_flow_version`, aber typ-frei: der globale Flow gilt für ALLE
+        Antragstypen. Beim Aktivieren wird der bisherige aktive globale Flow deaktiviert."""
+        try:
+            validate_flow_graph(payload.graph)
+        except FlowValidationError as exc:
+            raise ValidationProblem(
+                "Invalid flow graph.", errors=[{"field": "graph", "msg": str(exc)}]
+            ) from exc
+
+        current = await self.session.scalar(
+            select(FlowVersion.version)
+            .where(FlowVersion.application_type_id.is_(None))
+            .order_by(FlowVersion.version.desc())
+            .limit(1)
+        )
+        next_version = (current or 0) + 1
+        if payload.activate:
+            await self.session.execute(
+                update(FlowVersion)
+                .where(
+                    FlowVersion.application_type_id.is_(None),
+                    FlowVersion.active.is_(True),
+                )
+                .values(active=False)
+            )
+        version = FlowVersion(
+            application_type_id=None,
+            version=next_version,
+            active=payload.activate,
+            editor_layout=payload.graph.layout or {},
+        )
+        self.session.add(version)
+        await self.session.flush()
+
+        id_by_key: dict[str, UUID] = {}
+        for state in payload.graph.states:
+            row = State(
+                flow_version_id=version.id,
+                key=state.key,
+                label_i18n=state.label,
+                color=state.color,
+                category=state.category or "open",
+                edit_allowed=state.edit_allowed,
+                is_initial=state.is_initial,
+                kind=state.kind,
+                config=state.config,
+            )
+            self.session.add(row)
+            await self.session.flush()
+            id_by_key[state.key] = row.id
+        for order, trans in enumerate(payload.graph.transitions):
+            self.session.add(
+                Transition(
+                    flow_version_id=version.id,
+                    from_state_id=id_by_key[trans.from_],
+                    to_state_id=id_by_key[trans.to],
+                    label_i18n=trans.label or {},
+                    guard=trans.guard,
+                    actions=trans.actions,
+                    order=trans.order if trans.order is not None else order,
+                    automatic=trans.automatic,
+                    branch=trans.branch,
+                )
+            )
+        action = (
+            AuditAction.CONFIG_ACTIVATION if payload.activate else AuditAction.CONFIG_CHANGE
+        )
+        await self._audit(
+            actor, action, "flow_version", version.id, {"version": next_version, "global": True}
+        )
+        await self.session.commit()
+        return FlowVersionOut(
+            id=version.id,
+            application_type_id=None,
+            version=next_version,
+            active=payload.activate,
+        )
 
     # =================================================================== #
     # Rollen / RBAC

@@ -317,17 +317,21 @@ class FlowService:
         cfg = state.config if isinstance(state.config, dict) else {}
         role_key = cfg.get("roleKey")
         gremium_id = cfg.get("gremiumId")
-        if not isinstance(role_key, str) or not isinstance(gremium_id, str):
+        if not isinstance(role_key, str):
             raise ConflictError(
                 f"approval state {state.key!r} is misconfigured", code="conflict"
             )
-        authorized = "admin" in principal.roles or await self._has_gremium_role(
-            principal.sub, role_key, UUID(gremium_id)
-        )
-        if not authorized:
-            raise ForbiddenError(
-                f"requires role {role_key!r} in the configured gremium"
+        # Globale Rolle (kein gremiumId) → Principal-Rolle; sonst Gremium-Rolle (#28).
+        if isinstance(gremium_id, str) and gremium_id:
+            authorized = "admin" in principal.roles or await self._has_gremium_role(
+                principal.sub, role_key, UUID(gremium_id)
             )
+            scope = "in the configured gremium"
+        else:
+            authorized = role_key in principal.roles or "admin" in principal.roles
+            scope = "globally"
+        if not authorized:
+            raise ForbiddenError(f"requires role {role_key!r} {scope}")
         return await self.fire_branch(
             application_id, decision, principal, note=f"approval:{decision}"
         )

@@ -235,6 +235,34 @@ async def test_submit_approval_unauthorized_raises_forbidden() -> None:
         await svc.submit_approval(app.id, "accept", _member())
 
 
+async def test_submit_approval_global_role_authorizes_via_principal() -> None:
+    """#28-CR: Approval ohne gremiumId entscheidet eine GLOBALE Rolle."""
+    appr = _state("approval", kind="approval", config={"roleKey": "finance"})
+    accepted, rejected = _state("accepted"), _state("rejected")
+    t_acc = _transition(appr, accepted, branch="accept")
+    t_rej = _transition(appr, rejected, branch="reject")
+    app = _app(appr)
+    # kein _has_gremium_role: _load_app, _load_state, fire_branch(_load_app, _outgoing)
+    db = fake_session(result(app), result(appr), result(app), result(t_acc, t_rej))
+    svc = FlowService(db)
+    calls: list = []
+    _stub_fire(svc, calls)
+    member = Principal(sub="u", roles=["finance"], permissions=set())
+    await svc.submit_approval(app.id, "accept", member)
+    assert calls == [t_acc.id]
+
+
+async def test_submit_approval_global_role_forbidden_without_role() -> None:
+    appr = _state("approval", kind="approval", config={"roleKey": "finance"})
+    app = _app(appr)
+    db = fake_session(result(app), result(appr))
+    svc = FlowService(db)
+    _stub_fire(svc, [])
+    nobody = Principal(sub="u", roles=["member"], permissions=set())
+    with pytest.raises(ForbiddenError):
+        await svc.submit_approval(app.id, "accept", nobody)
+
+
 async def test_submit_approval_non_approval_state_conflict() -> None:
     normal = _state("open")
     app = _app(normal)
