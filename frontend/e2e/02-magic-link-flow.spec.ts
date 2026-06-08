@@ -51,7 +51,7 @@ test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({
   const admin = await browser.newContext({ storageState: ADMIN_STATE });
   const ad = await admin.newPage();
   await ad.goto(`/applications/${appId}`);
-  await expect(ad.getByRole('heading')).toBeVisible();
+  await expect(ad.getByRole('button', { name: 'Zur Prüfung' })).toBeVisible();
   await ad.getByRole('button', { name: 'Zur Prüfung' }).click();
   // Bestätigungsdialog → Ausführen.
   await ad.getByRole('button', { name: 'Ausführen' }).click();

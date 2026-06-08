@@ -20,7 +20,13 @@ und räumt restlos ab (`down -v`). Voraussetzung: in `frontend/` einmalig
 
 Deterministisch, kein Keycloak/pytex/ClamAV auf dem Gate-Pfad:
 
-- **01 apply** — öffentlicher Apply-Wizard → Bestätigung (Szenario 1, Teil).
+- **01 apply** — öffentlicher Apply-Wizard durch ALLE Schritte bis zur Review-
+  Zusammenfassung (Antragsart → Kontakt → dynamisches Formular der geseedeten Form-
+  Version → Prüfen). Der finale Submit-Klick ist NICHT Teil der Assertion: die
+  FE-ALTCHA-Komponente ist ein Stub (`altcha-stub-solution`), den das Backend-Schema
+  als „malformed altcha solution" mit 422 ablehnt — der UI-Submit ist unabhängig von
+  T-40 blockiert (Issue #111; reale Captcha-Wiring ist ein eigener Task). Die
+  Antrags-*Erstellung* + Folge-Journey ist über 02 real abgedeckt (Szenario 1, Teil).
 - **02 magic-link-flow** — Antrag anlegen → Magic-Link (echtes SMTP via mailpit) →
   bearbeiten → Admin schaltet via Flow-Transition nach `pruefung` → read-only/gesperrt
   (Szenarien 1 + 2 + read-only).
@@ -61,6 +67,14 @@ als leere `test.fixme()`-Stubs Abdeckung vorzutäuschen:
 - **OIDC + Altcha AUS**: die optionalen Secrets dürfen NICHT als leerer String
   gesetzt sein (`min_length=16` in `app.settings` → sonst bricht `get_settings()` →
   migrate exit 1). `scripts/e2e.sh` strippt die leeren Zeilen aus dem e2e-`.env`.
+- **Migration 0019** (`application.manage`): die Flow-Transition-Endpunkte + das FE-
+  Gating verlangen die Permission `application.manage`, die in `0003` an KEINE Rolle
+  geseedet war (Seed-Lücke wie `form.configure`/`flow.configure` in 0010/0016) → ohne
+  sie kann auch ein Admin keinen Antrag durch den Flow schalten. `0019_seed_application_manage`
+  zieht sie idempotent an die admin-Rolle nach (down_revision = 0018, single head).
+- **web-Healthcheck/Mounts** (overlay): web nutzt `127.0.0.1` statt `localhost`
+  (IPv4; nginx lauscht nur IPv4, da der conf-Mount read-only ist) und `:z`-Mounts
+  (SELinux/podman lokal; No-op auf CI-docker).
 
 ## Gefundener Defekt (separater Bugfix-Task, nicht Teil von T-40)
 

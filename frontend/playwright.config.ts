@@ -30,6 +30,9 @@ export default defineConfig({
     : [['list']],
   use: {
     baseURL: BASE_URL,
+    // Deutsch erzwingen: die i18n-Erkennung (i18n.service.ts) liest navigator.language;
+    // Chromium defaultet auf en-US → die Specs matchen aber die de-Strings.
+    locale: 'de-DE',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

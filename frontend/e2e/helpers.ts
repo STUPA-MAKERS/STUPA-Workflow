@@ -21,9 +21,13 @@ export function readArtifacts(): Artifacts {
 
 export const MAILPIT_URL = process.env.E2E_MAILPIT_URL ?? 'http://127.0.0.1:8025';
 
-/** Eindeutiger Bezeichner pro Testlauf — verhindert Kreuz-Interferenz der Szenarien. */
+/**
+ * Eindeutiger Bezeichner pro Testlauf — verhindert Kreuz-Interferenz der Szenarien.
+ * Domain `e2e-antrag.de` (NICHT `.test`/`.example`): email-validator (Pydantic
+ * `EmailStr`) lehnt reservierte Special-Use-TLDs ab → sonst 422 bei POST /applications.
+ */
 export function uniqueEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@e2e.test`;
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@e2e-antrag.de`;
 }
 
 /**
