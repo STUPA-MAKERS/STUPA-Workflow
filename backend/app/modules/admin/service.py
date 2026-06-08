@@ -590,6 +590,10 @@ class ConfigService:
             raise NotFoundError(f"role assignment {assignment_id} not found")
         # Selbst-Aussperrung verhindern (#40): den eigenen Admin nicht entziehen.
         await self._guard_self_admin_removal(row, actor)
+        # Basisrolle member ist unentziehbar (#61): jeder Benutzer behält sie immer.
+        role = await self.session.get(Role, row.role_id)
+        if role is not None and role.key == "member" and row.gremium_id is None:
+            raise ConflictError("the member role cannot be removed")
         await self.session.delete(row)
         await self._audit(actor, AuditAction.ROLE_CHANGE, "role_assignment", assignment_id)
         await self.session.commit()

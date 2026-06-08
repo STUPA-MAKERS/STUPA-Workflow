@@ -18,7 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Applicant as ApplicantRow
 from app.modules.applications.models import Application, MagicLink
 from app.modules.auth import oidc, sessions, tokens
-from app.modules.auth.bootstrap import ensure_admin_for_principal
+from app.modules.auth.bootstrap import (
+    ensure_admin_for_principal,
+    ensure_member_for_principal,
+)
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import ApplicantScope
 from app.modules.flow.models import State
@@ -184,6 +187,8 @@ async def oidc_callback(
     await ensure_admin_for_principal(
         db, settings, row, email_verified=claims.email_verified
     )
+    # Jeder Benutzer hält immer die globale member-Rolle (#61).
+    await ensure_member_for_principal(db, row)
     cookie = await sessions.create_principal_session(
         db,
         secret=settings.session_secret,

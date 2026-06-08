@@ -125,9 +125,10 @@ export class UsersComponent {
     return p.displayName || p.email || p.sub;
   }
 
-  /** Admin-Rolle ist geschützt — kein Entziehen-Kreuz anzeigen (#44/#40). */
+  /** Geschützte Rollen (admin #44/#40, member #61) — kein Entziehen-Kreuz. */
   protected isAdminRole(roleId: string): boolean {
-    return this.rolesById().get(roleId)?.key === 'admin';
+    const key = this.rolesById().get(roleId)?.key;
+    return key === 'admin' || key === 'member';
   }
 
   /** Eigener Account — Deaktivieren ist gesperrt (#44). */

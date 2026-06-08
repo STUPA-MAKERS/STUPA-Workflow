@@ -96,6 +96,22 @@ def _admin_role() -> Role:
     return r
 
 
+def _member_role() -> Role:
+    r = Role(key="member", name_i18n={"de": "Mitglied"})
+    r.id = uuid4()
+    return r
+
+
+async def test_delete_role_assignment_blocks_member_removal() -> None:
+    """#61: die globale member-Rolle ist unentziehbar."""
+    row = _assignment(uuid4())  # gremium_id=None
+    # gets: assignment → (guard) Role=member (≠admin → früh raus) → (member-check) Role=member
+    db = fake_session(gets=[row, _member_role(), _member_role()])
+    with pytest.raises(ConflictError):
+        await ConfigService(db).delete_role_assignment(row.id, "actor")
+    assert db.deleted == []
+
+
 async def test_delete_role_assignment_blocks_self_admin_removal() -> None:
     """#40: ein Admin darf sich die eigene Admin-Rolle nicht entziehen."""
     pid = uuid4()

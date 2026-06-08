@@ -29,6 +29,7 @@ from app.settings import Settings
 logger = logging.getLogger("app.auth.bootstrap")
 
 _ADMIN_ROLE_KEY = "admin"
+_MEMBER_ROLE_KEY = "member"
 
 
 def _is_bootstrap_principal(
@@ -98,6 +99,26 @@ async def ensure_admin_for_principal(
     db.add(_new_assignment(row.id, role_id))
     await db.flush()
     logger.info("bootstrap admin role granted on login")
+    return True
+
+
+async def _role_id(db: AsyncSession, key: str) -> object | None:
+    return (await db.execute(select(Role.id).where(Role.key == key))).scalar_one_or_none()
+
+
+async def ensure_member_for_principal(db: AsyncSession, row: PrincipalRow) -> bool:
+    """Jedem Principal beim Login idempotent die globale ``member``-Rolle geben (#61).
+
+    Alle Benutzer halten **immer** die Basisrolle ``member`` (global, gremium-frei).
+    Committet nicht — der Aufrufer steuert die Transaktion."""
+    role_id = await _role_id(db, _MEMBER_ROLE_KEY)
+    if role_id is None:
+        logger.warning("bootstrap member: role %r missing (migrations applied?)", _MEMBER_ROLE_KEY)
+        return False
+    if await _has_admin_assignment(db, row.id, role_id):  # gleiche Abfrage (global, role_id)
+        return False
+    db.add(_new_assignment(row.id, role_id))
+    await db.flush()
     return True
 
 
