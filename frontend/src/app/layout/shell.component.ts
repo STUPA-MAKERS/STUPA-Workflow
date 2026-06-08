@@ -16,6 +16,12 @@ interface NavItem {
   labelKey: Parameters<TranslatePipe['transform']>[0];
   /** Sichtbar, wenn der Principal mind. eine dieser Permissions hat (leer = jede Session). */
   permissions: string[];
+  /**
+   * Exakter Aktiv-Abgleich (#106): nötig, wenn der Pfad Präfix eines anderen
+   * Nav-Eintrags ist (z. B. `/budget` vor `/budget/pots`) — sonst markiert die
+   * Kind-Route Eltern **und** Kind gleichzeitig aktiv.
+   */
+  exact?: boolean;
 }
 
 /** App-Rahmen: Header (Logo/Nav/Theme/Sprache/Konto), Inhalt, Footer, Toasts. */
@@ -78,7 +84,12 @@ export class ShellComponent {
     { path: '/applications', labelKey: 'nav.applications', permissions: ['application.read'] },
     { path: '/voting', labelKey: 'nav.voting', permissions: ['vote.cast', 'vote.manage'] },
     { path: '/meetings', labelKey: 'nav.meetings', permissions: ['meeting.manage', 'protocol.write'] },
-    { path: '/budget', labelKey: 'nav.budget', permissions: ['budget.view', 'budget.manage'] },
+    {
+      path: '/budget',
+      labelKey: 'nav.budget',
+      permissions: ['budget.view', 'budget.manage'],
+      exact: true,
+    },
     { path: '/budget/pots', labelKey: 'nav.budgetPots', permissions: ['budget.manage'] },
     { path: '/admin', labelKey: 'nav.admin', permissions: ['admin.config'] },
   ];
