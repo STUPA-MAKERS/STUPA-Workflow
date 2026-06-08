@@ -37,17 +37,19 @@
           }
           @for (a of $any(p).assignments; track a.id) {
             <span class="users__tag">
-              <app-badge variant="primary">{{ roleLabel(a.roleId) | capitalize }}</app-badge>
+              <app-badge variant="primary">
+                <span class="users__tag-label">{{ roleLabel(a.roleId) | capitalize }}</span>
+                @if (!isAdminRole(a.roleId)) {
+                  <button
+                    type="button"
+                    class="users__tag-x"
+                    [attr.aria-label]="('admin.users.revoke' | t) + ': ' + (roleLabel(a.roleId) | capitalize)"
+                    (click)="revoke(a)"
+                  >×</button>
+                }
+              </app-badge>
               @if (a.validUntil) {
                 <span class="users__until">→ {{ a.validUntil | slice: 0 : 10 }}</span>
-              }
-              @if (!isAdminRole(a.roleId)) {
-                <button
-                  type="button"
-                  class="users__tag-x"
-                  [attr.aria-label]="('admin.users.revoke' | t) + ': ' + (roleLabel(a.roleId) | capitalize)"
-                  (click)="revoke(a)"
-                >×</button>
               }
             </span>
           }

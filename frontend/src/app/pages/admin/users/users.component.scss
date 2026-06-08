@@ -122,25 +122,31 @@
   font-size: var(--fs-xs);
 }
 
+// × sitzt INNERHALB des Badges (#50): kleiner Abstand links, erbt die Badge-Farbe.
+.users__tag-label + .users__tag-x {
+  margin-left: var(--space-2);
+}
+
 .users__tag-x {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1rem;
+  height: 1rem;
   padding: 0;
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--color-text-muted);
+  color: currentColor;
+  opacity: 0.7;
   cursor: pointer;
-  font-size: var(--fs-md);
+  font-size: var(--fs-sm);
   line-height: 1;
 }
 
 .users__tag-x:hover {
+  opacity: 1;
   color: var(--color-danger);
-  background: var(--color-danger-subtle);
 }
 
 .users__col-actions {
