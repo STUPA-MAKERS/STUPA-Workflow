@@ -45,7 +45,7 @@ const STATUS_VARIANT: Record<FormStatus, BadgeVariant> = {
       <div class="admin-home__grid">
         @for (tile of tiles; track tile.link) {
           <a class="admin-home__tile" [routerLink]="tile.link">
-            <app-card [heading]="tile.title | t" [interactive]="true">
+            <app-card [heading]="tile.title | t" [headingLevel]="2" [interactive]="true">
               {{ tile.desc | t }}
             </app-card>
           </a>
