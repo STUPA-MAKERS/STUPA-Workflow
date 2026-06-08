@@ -1,0 +1,14 @@
+/* TypeScript-Config für die Playwright-E2E (T-40). Isoliert vom Angular-Build
+ * (tsconfig.app.json deckt nur src/** ab); validiert via `npm run e2e:tsc`. */
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../out-tsc/e2e",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "noPropertyAccessFromIndexSignature": false,
+    "skipLibCheck": true
+  },
+  "include": ["**/*.ts", "../playwright.config.ts"]
+}

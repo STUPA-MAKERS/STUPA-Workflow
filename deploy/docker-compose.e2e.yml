@@ -1,0 +1,76 @@
+# E2E-Overlay (T-40). NUR für die Playwright-E2E gegen den echten Stack — NICHT
+# für Prod. Zusammen mit dem Basis-Stack laden:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+# Treiber: scripts/e2e.sh (eigener COMPOSE_PROJECT_NAME, eigenes .env, down -v).
+#
+# Ergänzt gegenüber dem Basis-Stack:
+#  * mailpit  — SMTP-Sink + HTTP-API (Magic-Link-Mails abfangen, testing.md §3/§5).
+#               Ersetzt das im SDS genannte „MailHog"; API-kompatibler Nachfolger.
+#  * seed     — One-Shot (Backend-Image): aktive Form-/Flow-Version für den Default-
+#               Antragstyp + Admin-Session + Budget-Topf. `profiles:[seed]` ⇒ startet
+#               NICHT bei `up`, sondern gezielt via `run --rm seed` NACH api-healthy.
+#  * web      — zusätzlicher Host-Port-Reuse (Basis bindet bereits 127.0.0.1:8080).
+#
+# Mock bleibt AUS (#101): kein Mock-Keycloak. OIDC bleibt unkonfiguriert → Login-
+# Redirect 404 (vom RBAC-Negativtest bewusst geprüft). OIDC-/Live-Vote-/PDF-Pfade
+# laufen im opt-in „full"-Tier (siehe scripts/e2e.sh, .github/workflows/ci.yml).
+
+services:
+  web:
+    # Overlay-Override (Basis unberührt): zwei e2e-spezifische Anpassungen am web/nginx.
+    #  1. `:ro,z` statt `:ro` — SELinux-Relabel (Fedora/rootless podman lokal); ohne
+    #     `z` scheitert nginx mit „Permission denied" am gemounteten conf. Auf Nicht-
+    #     SELinux-Hosts (CI/ubuntu-docker) ist `z` ein No-op (wie beim backup-Service).
+    #  2. Healthcheck über `127.0.0.1` statt `localhost`: der nginx-Entrypoint kann die
+    #     IPv6-Listen-Direktive nicht ergänzen (conf read-only gemountet) → nginx
+    #     lauscht nur IPv4. `localhost` löst im Container teils auf `::1` auf →
+    #     busybox-`wget` schlägt fehl → web bleibt „unhealthy" (Stack-Timeout, kein
+    #     Playwright-Lauf). `127.0.0.1` erzwingt IPv4. Engeres Intervall fürs Gate.
+    volumes:
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro,z
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 5s
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+      MP_MAX_MESSAGES: "5000"
+    ports:
+      # HTTP-API nur lokal gebunden — Playwright (Host) scrapt hierüber den Token.
+      - "127.0.0.1:8025:8025"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8025/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  seed:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    profiles: ["seed"]
+    restart: "no"
+    env_file: .env
+    environment:
+      E2E_ARTIFACTS: /artifacts
+    command: ["python", "/seed/seed.py"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    volumes:
+      # `:z`/`,z` — SELinux-Relabel (Fedora/podman lokal); No-op auf CI/ubuntu-docker.
+      - ./e2e/seed.py:/seed/seed.py:ro,z
+      - ./e2e/.artifacts:/artifacts:z
+    networks:
+      - internal
