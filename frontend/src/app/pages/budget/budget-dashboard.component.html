@@ -55,9 +55,8 @@
   </section>
 } @else {
   <div class="bd__cols">
-    <!-- Links: Auslastungs-Baum -->
-    <section class="bd__panel" aria-labelledby="bd-usage-h">
-      <h2 id="bd-usage-h" class="bd__panel-h">{{ 'budget.usage.heading' | t }}</h2>
+    <!-- Links: Auslastungs-Baum (ohne Box/Heading — der Budget-Name steht oben) -->
+    <section class="bd__usage" [attr.aria-label]="'budget.usage.heading' | t">
       <table class="bd__table">
         <thead>
           <tr>

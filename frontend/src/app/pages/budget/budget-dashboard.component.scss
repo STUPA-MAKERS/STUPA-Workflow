@@ -103,6 +103,11 @@
   min-width: 0;
 }
 
+/* Linker Auslastungs-Teil ohne Box (#Image14). */
+.bd__usage {
+  min-width: 0;
+}
+
 .bd__panel-h {
   font-size: var(--fs-lg);
   margin: 0 0 var(--space-4);
@@ -174,15 +179,21 @@
   color: var(--color-text-muted);
 }
 
+/* Auslastungs-Spalte: feste Breite → Balken zeilenübergreifend bündig (Image 14). */
+.bd__table th:nth-child(2),
+.bd__table td:nth-child(2) {
+  width: 12rem;
+}
+
 .bd__bar-cell {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-width: 8rem;
 }
 
 .bd__track {
   flex: 1;
+  min-width: 0;
   height: 0.7rem;
   background: var(--color-surface-sunken);
   border: var(--border-width) solid var(--color-border);
