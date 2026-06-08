@@ -132,12 +132,12 @@ export const routes: Routes = [
           ),
       },
       {
-        // Budget-Töpfe in die Verwaltung verlegt (#6) — kein eigener Top-Level-Tab mehr.
+        // Kostenstellen-Baum in der Verwaltung (#9) — ersetzt die flache Töpfe-Liste.
         path: 'admin/budget-pots',
-        data: { title: 'budget.pots.title', permission: 'budget.manage' },
+        data: { title: 'budget.tree.title', permission: 'budget.manage' },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/budget/budget-pots.component').then((m) => m.BudgetPotsComponent),
+          import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
       },
       {
         path: 'admin',

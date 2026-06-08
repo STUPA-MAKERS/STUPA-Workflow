@@ -1,0 +1,146 @@
+<header class="bt__head">
+  <h1 class="bt__title">{{ 'budget.tree.title' | t }}</h1>
+  <p class="bt__subtitle">{{ 'budget.tree.subtitle' | t }}</p>
+</header>
+
+<!-- Filter + Haushaltsjahr-Auswahl -->
+<div class="bt__bar">
+  <app-select
+    class="bt__bar-field"
+    [label]="'budget.tree.gremiumFilter' | t"
+    [placeholder]="'budget.tree.allGremien' | t"
+    [options]="gremiumOptions()"
+    [ngModel]="gremiumFilter()"
+    (ngModelChange)="applyGremiumFilter($event)"
+  />
+  <app-select
+    class="bt__bar-field"
+    [label]="'budget.tree.fiscalYear' | t"
+    [placeholder]="'budget.tree.noFiscalYear' | t"
+    [options]="fyOptions()"
+    [ngModel]="selectedFyId()"
+    (ngModelChange)="selectedFyId.set($event)"
+  />
+</div>
+
+<!-- Top-Budget anlegen -->
+<app-card [heading]="'budget.tree.createTop' | t">
+  <form class="bt__form" (submit)="createTop($event)">
+    <app-select
+      [label]="'budget.tree.gremium' | t"
+      [placeholder]="'budget.tree.gremiumPlaceholder' | t"
+      [options]="gremiumOptions()"
+      [required]="true"
+      [ngModel]="newTop().gremiumId"
+      (ngModelChange)="patchTop('gremiumId', $event)"
+      name="topGremium"
+    />
+    <label class="bt__lbl">{{ 'budget.tree.key' | t }}
+      <input [ngModel]="newTop().key" (ngModelChange)="patchTop('key', $event)" name="topKey" [placeholder]="'budget.tree.keyTopPlaceholder' | t" /></label>
+    <label class="bt__lbl">{{ 'budget.tree.name' | t }}
+      <input [ngModel]="newTop().name" (ngModelChange)="patchTop('name', $event)" name="topName" /></label>
+    <app-button type="submit" size="sm" [disabled]="!newTop().gremiumId || !newTop().key.trim() || !newTop().name.trim()">
+      {{ 'budget.tree.add' | t }}
+    </app-button>
+  </form>
+</app-card>
+
+<!-- Baum -->
+@if (loading()) {
+  <p class="bt__status" aria-live="polite">{{ 'budget.tree.loading' | t }}</p>
+} @else if (loadError()) {
+  <p class="bt__status bt__status--error" role="alert">{{ 'budget.tree.error' | t }}</p>
+} @else if (rows().length === 0) {
+  <p class="bt__status">{{ 'budget.tree.empty' | t }}</p>
+} @else {
+  <table class="bt__table">
+    <thead>
+      <tr>
+        <th>{{ 'budget.tree.col.node' | t }}</th>
+        <th class="bt__num">{{ 'budget.tree.col.allocated' | t }}</th>
+        <th class="bt__num">{{ 'budget.tree.col.committed' | t }}</th>
+        <th class="bt__num">{{ 'budget.tree.col.available' | t }}</th>
+        <th class="bt__col-actions">{{ 'budget.tree.col.actions' | t }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of rows(); track row.node.id) {
+        <tr [class.bt__row--inactive]="!row.node.active">
+          <td>
+            <span class="bt__node" [style.paddingLeft.rem]="row.depth * 1.5">
+              <span class="bt__path">{{ row.node.pathKey }}</span>
+              <span class="bt__name">{{ row.node.name }}</span>
+              @if (!row.node.active) {
+                <app-badge variant="neutral">{{ 'budget.tree.inactive' | t }}</app-badge>
+              }
+            </span>
+          </td>
+          @if (alloc(row.node); as a) {
+            <td class="bt__num">
+              <input
+                class="bt__alloc"
+                inputmode="decimal"
+                [ngModel]="allocDraft()[row.node.id] ?? a.allocated"
+                (ngModelChange)="patchAlloc(row.node.id, $event)"
+                (blur)="saveAlloc(row.node)"
+                [name]="'alloc-' + row.node.id"
+                [attr.aria-label]="'budget.tree.col.allocated' | t"
+              />
+            </td>
+            <td class="bt__num">{{ money(a.committed, row.node.currency) }}</td>
+            <td class="bt__num" [class.bt__neg]="(+a.available) < 0">{{ money(a.available, row.node.currency) }}</td>
+          } @else {
+            <td class="bt__num bt__muted">—</td>
+            <td class="bt__num bt__muted">—</td>
+            <td class="bt__num bt__muted">—</td>
+          }
+          <td class="bt__col-actions">
+            <app-button variant="ghost" size="sm" (click)="startAddChild(row.node)">{{ 'budget.tree.addChild' | t }}</app-button>
+            <app-button variant="danger" size="sm" (click)="deleteNode(row.node)">{{ 'budget.tree.delete' | t }}</app-button>
+          </td>
+        </tr>
+        @if (addingChildOf() === row.node.id) {
+          <tr class="bt__child-row">
+            <td colspan="5">
+              <div class="bt__child-form">
+                <span class="bt__child-hint">{{ 'budget.tree.addChildUnder' | t }}: {{ row.node.pathKey }}</span>
+                <label class="bt__lbl">{{ 'budget.tree.key' | t }}
+                  <input [ngModel]="childDraft().key" (ngModelChange)="patchChild('key', $event)" [name]="'ck-' + row.node.id" [placeholder]="'budget.tree.keyChildPlaceholder' | t" /></label>
+                <label class="bt__lbl">{{ 'budget.tree.name' | t }}
+                  <input [ngModel]="childDraft().name" (ngModelChange)="patchChild('name', $event)" [name]="'cn-' + row.node.id" /></label>
+                <app-button size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()" (click)="addChild(row.node)">{{ 'budget.tree.add' | t }}</app-button>
+                <app-button variant="ghost" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
+              </div>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+}
+
+<!-- Haushaltsjahr anlegen -->
+@if (tree().length) {
+  <app-card [heading]="'budget.tree.fyTitle' | t">
+    <form class="bt__form" (submit)="createFiscalYear($event)">
+      <app-select
+        [label]="'budget.tree.fyTop' | t"
+        [placeholder]="'budget.tree.fyTopPlaceholder' | t"
+        [options]="topOptions()"
+        [required]="true"
+        [ngModel]="newFy().topId"
+        (ngModelChange)="patchFy('topId', $event)"
+        name="fyTop"
+      />
+      <label class="bt__lbl">{{ 'budget.tree.fyLabel' | t }}
+        <input [ngModel]="newFy().label" (ngModelChange)="patchFy('label', $event)" name="fyLabel" [placeholder]="'budget.tree.fyLabelPlaceholder' | t" /></label>
+      <label class="bt__lbl">{{ 'budget.tree.fyStart' | t }}
+        <input type="date" [ngModel]="newFy().startDate" (ngModelChange)="patchFy('startDate', $event)" name="fyStart" /></label>
+      <label class="bt__lbl">{{ 'budget.tree.fyEnd' | t }}
+        <input type="date" [ngModel]="newFy().endDate" (ngModelChange)="patchFy('endDate', $event)" name="fyEnd" /></label>
+      <app-button type="submit" size="sm" [disabled]="!newFy().topId || !newFy().label.trim() || !newFy().startDate || !newFy().endDate">
+        {{ 'budget.tree.add' | t }}
+      </app-button>
+    </form>
+  </app-card>
+}
