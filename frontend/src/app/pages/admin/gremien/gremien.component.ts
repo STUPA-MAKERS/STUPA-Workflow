@@ -5,7 +5,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
 import {
-  BadgeComponent,
   ButtonComponent,
   CellDirective,
   CheckboxComponent,
@@ -53,7 +52,6 @@ function emptyForm(): GremiumForm {
     RouterLink,
     TranslatePipe,
     ButtonComponent,
-    BadgeComponent,
     CheckboxComponent,
     SelectComponent,
     DialogComponent,
@@ -67,7 +65,7 @@ function emptyForm(): GremiumForm {
         <h1 class="grem__title">{{ 'admin.gremien.title' | t }}</h1>
         <p class="grem__subtitle">{{ 'admin.gremien.subtitle' | t }}</p>
       </div>
-      <app-button (click)="openCreate()">{{ 'admin.gremien.addGremium' | t }}</app-button>
+      <app-button size="sm" (click)="openCreate()">{{ 'admin.gremien.addGremium' | t }}</app-button>
     </header>
 
     <section class="grem__list" [attr.aria-label]="'admin.gremien.title' | t">
@@ -82,8 +80,10 @@ function emptyForm(): GremiumForm {
           <ng-template appCell="slug" let-g><span class="grem__mono">{{ $any(g).slug }}</span></ng-template>
           <ng-template appCell="delegation" let-g>
             @if ($any(g).allowVoteDelegation) {
-              <app-badge variant="primary">{{ 'admin.gremien.delegationOn' | t }}</app-badge>
-            } @else { — }
+              <span class="grem__yes" [attr.title]="'admin.gremien.delegation' | t" aria-label="✓">✓</span>
+            } @else {
+              <span class="grem__no" [attr.title]="'admin.gremien.delegation' | t" aria-label="✗">✗</span>
+            }
           </ng-template>
           <ng-template appCell="actions" let-g>
             <span class="grem__th-actions">
@@ -146,7 +146,7 @@ function emptyForm(): GremiumForm {
       }
       .grem__head {
         display: flex;
-        align-items: start;
+        align-items: center;
         justify-content: space-between;
         gap: var(--space-4);
         flex-wrap: wrap;
@@ -192,6 +192,18 @@ function emptyForm(): GremiumForm {
       .grem__mono {
         font-family: var(--font-mono, monospace);
         font-size: var(--fs-xs);
+      }
+      .grem__yes,
+      .grem__no {
+        font-size: var(--fs-md);
+        font-weight: var(--fw-bold);
+        line-height: 1;
+      }
+      .grem__yes {
+        color: var(--color-success);
+      }
+      .grem__no {
+        color: var(--color-danger);
       }
       .grem__th-actions {
         text-align: end;
@@ -269,7 +281,7 @@ export class AdminGremienComponent {
     { key: 'slug', label: this.i18n.translate('admin.gremien.slug') },
     { key: 'cdVariant', label: this.i18n.translate('admin.gremien.cdVariant') },
     { key: 'defaultLang', label: this.i18n.translate('admin.gremien.defaultLang') },
-    { key: 'delegation', label: this.i18n.translate('admin.gremien.delegation') },
+    { key: 'delegation', label: this.i18n.translate('admin.gremien.delegationShort'), align: 'start', width: '7rem' },
     { key: 'actions', label: this.i18n.translate('admin.gremien.actions'), align: 'end' },
   ]);
   readonly rowId = (g: unknown): string => (g as Gremium).id;

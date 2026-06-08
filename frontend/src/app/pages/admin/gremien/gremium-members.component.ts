@@ -56,7 +56,7 @@ interface Member {
         <h1 class="gm__title">{{ 'admin.gremien.membersOf' | t }}: {{ gremium()?.name ?? '…' }}</h1>
         <p class="gm__subtitle">{{ 'admin.gremien.membersHint' | t }}</p>
       </div>
-      <app-button (click)="openAdd()">{{ 'admin.gremien.addMember' | t }}</app-button>
+      <app-button size="sm" (click)="openAdd()">{{ 'admin.gremien.addMember' | t }}</app-button>
     </header>
 
     @if (members().length === 0) {
@@ -142,7 +142,7 @@ interface Member {
       }
       .gm__head {
         display: flex;
-        align-items: start;
+        align-items: center;
         justify-content: space-between;
         gap: var(--space-4);
         flex-wrap: wrap;

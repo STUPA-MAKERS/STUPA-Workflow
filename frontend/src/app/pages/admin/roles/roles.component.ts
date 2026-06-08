@@ -54,11 +54,16 @@ interface RoleDraft {
           <h1>{{ 'admin.roles.title' | t }}</h1>
           <p class="roles__sub">{{ 'admin.roles.subtitle' | t }}</p>
         </div>
-        <app-button (click)="openAdd()">{{ 'admin.roles.addGlobalRole' | t }}</app-button>
+        <app-button size="sm" (click)="openAdd()">{{ 'admin.roles.addGlobalRole' | t }}</app-button>
       </header>
 
       <app-data-table [columns]="columns()" [rows]="roles()" [rowKey]="rowId" [isExpanded]="rowExpanded" [clickable]="true" (rowClick)="onRowClick($event)">
-        <ng-template appCell="name" let-r><span class="roles__name">{{ roleLabel($any(r)) | capitalize }}</span></ng-template>
+        <ng-template appCell="name" let-r>
+          <span class="roles__name-cell">
+            <app-icon name="chevron-down" class="roles__chevron" [class.roles__chevron--open]="expanded().has($any(r).id)" [size]="16" />
+            <span class="roles__name">{{ roleLabel($any(r)) | capitalize }}</span>
+          </span>
+        </ng-template>
         <ng-template appCell="key" let-r><span class="roles__key">{{ $any(r).key }}</span></ng-template>
         <ng-template appCell="perms" let-r>{{ $any(r).permissions.length }} / {{ permissions().length }}</ng-template>
         <ng-template appCell="actions" let-r>
@@ -131,13 +136,26 @@ interface RoleDraft {
       }
       .roles__head {
         display: flex;
-        align-items: start;
+        align-items: center;
         justify-content: space-between;
         gap: var(--space-4);
         flex-wrap: wrap;
       }
       .roles__sub {
         color: var(--color-text-muted);
+      }
+      .roles__name-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+      .roles__chevron {
+        color: var(--color-text-muted);
+        transition: transform var(--motion-fast) var(--ease-standard);
+      }
+      .roles__chevron--open {
+        transform: rotate(180deg);
+        color: var(--color-primary);
       }
       .roles__name {
         font-weight: var(--fw-medium);

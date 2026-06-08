@@ -102,9 +102,15 @@ export interface ColumnDef {
         border-bottom: var(--border-width) solid var(--color-border);
       }
       .dt__table td {
-        padding: var(--space-3) var(--space-4);
+        /* feste Mindest-Zeilenhöhe → alle Zeilen gleich hoch, egal ob mit/ohne
+           Aktions-Button (sonst „springende" Höhen). */
+        height: 3rem;
+        padding: var(--space-2) var(--space-4);
         border-bottom: var(--border-width) solid var(--color-border);
         vertical-align: middle;
+      }
+      .dt__detail-row > td {
+        height: auto;
       }
       .dt__row--clickable {
         cursor: pointer;
