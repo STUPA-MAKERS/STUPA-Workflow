@@ -86,6 +86,8 @@ export class ApplyWizardComponent {
   readonly loadingForm = signal(false);
   readonly submitting = signal(false);
   readonly altchaSolution = signal<string | null>(null);
+  /** Ob für anonyme Einreichung eine Altcha-Lösung nötig ist (false ⇒ Altcha aus). */
+  readonly altchaRequired = signal(true);
 
   /** Geteiltes Formly-Modell über alle Sektionen (stabile Referenz). */
   model: Record<string, unknown> = {};
@@ -208,10 +210,16 @@ export class ApplyWizardComponent {
     this.altchaSolution.set(solution);
   }
 
+  /** Altcha ist serverseitig deaktiviert (404) → keine Lösung verlangen. */
+  onAltchaUnavailable(): void {
+    this.altchaRequired.set(false);
+  }
+
   readonly canSubmit = computed(
     () =>
-      // Eingeloggt: kein Altcha/Kontakt nötig; anonym: beides Pflicht (#24).
-      (this.loggedIn() || this.altchaSolution() !== null) &&
+      // Eingeloggt: kein Altcha/Kontakt nötig; anonym: beides Pflicht (#24) —
+      // außer Altcha ist serverseitig aus.
+      (this.loggedIn() || !this.altchaRequired() || this.altchaSolution() !== null) &&
       (this.loggedIn() || this.contactForm.valid) &&
       this.sections().every((s) => s.form.valid),
   );
@@ -221,7 +229,7 @@ export class ApplyWizardComponent {
     const typeId = this.typeId();
     const altcha = this.altchaSolution();
     if (!typeId) return;
-    if (!this.loggedIn() && !altcha) return;
+    if (!this.loggedIn() && this.altchaRequired() && !altcha) return;
 
     const payload: NewApplication = {
       typeId,

@@ -1,10 +1,11 @@
 import {
   type HttpEvent,
+  HttpErrorResponse,
   type HttpInterceptorFn,
   HttpResponse,
 } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { type Observable, of } from 'rxjs';
+import { type Observable, of, throwError } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
 import type {
@@ -488,6 +489,10 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'GET') {
     if (p.endsWith('/auth/me')) return ok(MOCK_PRINCIPAL);
+    // Altcha im Mock-Betrieb aus → 404 (Widget meldet „unavailable", kein Captcha).
+    if (p.endsWith('/altcha/challenge')) {
+      return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
+    }
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
     if (p.endsWith('/timeline')) return ok(MOCK_TIMELINE);

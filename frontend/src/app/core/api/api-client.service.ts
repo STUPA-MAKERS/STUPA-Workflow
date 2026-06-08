@@ -1,6 +1,6 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { type Observable, map } from 'rxjs';
+import { type Observable, catchError, map, of, throwError } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import { API_BASE_URL } from './api.config';
 import {
@@ -49,6 +49,7 @@ import type {
   MagicLinkVerifyResult,
   Meeting,
   MeetingCreateBody,
+  AltchaChallenge,
   MeetingOutWire,
   MeetingPatchBody,
   NewApplication,
@@ -155,6 +156,18 @@ export class ApiClient {
     return this.http
       .get<ApplicationOutWire>(`${this.base}/applications/${id}`)
       .pipe(map((wire) => mapApplication(wire, lang)));
+  }
+
+  /**
+   * GET /altcha/challenge — frische, server-signierte PoW-Challenge (Issue #23).
+   * Liefert `null`, wenn Altcha serverseitig deaktiviert ist (404 → kein Captcha).
+   */
+  altchaChallenge(): Observable<AltchaChallenge | null> {
+    return this.http.get<AltchaChallenge>(`${this.base}/altcha/challenge`).pipe(
+      catchError((err: HttpErrorResponse) =>
+        err.status === 404 ? of(null) : throwError(() => err),
+      ),
+    );
   }
 
   /** POST /applications — Body camelCase; Antwort ist `{ applicationId }` (kein Voll-DTO). */

@@ -106,7 +106,9 @@ export const de = {
   'altcha.idle': 'Ich bin kein Roboter',
   'altcha.verifying': 'Wird überprüft …',
   'altcha.solved': 'Bestätigt',
+  'altcha.error': 'Erneut versuchen',
   'altcha.noteSolved': 'Verifizierung abgeschlossen.',
+  'altcha.noteError': 'Verifizierung fehlgeschlagen. Bitte erneut versuchen.',
   'altcha.note': 'Spam-Schutz (Altcha) — keine Tracking-Cookies.',
 
   'status.loading': 'Antrag wird geladen …',
@@ -1099,7 +1101,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'altcha.idle': 'I am not a robot',
   'altcha.verifying': 'Verifying …',
   'altcha.solved': 'Confirmed',
+  'altcha.error': 'Try again',
   'altcha.noteSolved': 'Verification complete.',
+  'altcha.noteError': 'Verification failed. Please try again.',
   'altcha.note': 'Spam protection (Altcha) — no tracking cookies.',
 
   'status.loading': 'Loading application …',

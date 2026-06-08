@@ -80,7 +80,7 @@
         </dl>
         @if (!loggedIn()) {
           <div class="review__altcha">
-            <app-altcha (solved)="onAltchaSolved($event)" />
+            <app-altcha (solved)="onAltchaSolved($event)" (unavailable)="onAltchaUnavailable()" />
           </div>
         }
       }

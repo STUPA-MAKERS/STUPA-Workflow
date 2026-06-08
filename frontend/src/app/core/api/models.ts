@@ -136,6 +136,15 @@ export interface ApplicationCreatedWire {
   applicationId: Uuid;
 }
 
+/** `AltchaChallengeOut` — server-signierte PoW-Challenge (GET /altcha/challenge). */
+export interface AltchaChallenge {
+  algorithm: string;
+  challenge: string;
+  salt: string;
+  signature: string;
+  maxnumber: number;
+}
+
 /** `TimelineEventOut` — Status-Übergang in der Timeline. */
 export interface TimelineEventOutWire {
   fromStateId?: Uuid | null;
