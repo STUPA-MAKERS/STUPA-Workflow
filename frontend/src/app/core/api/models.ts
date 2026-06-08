@@ -136,6 +136,21 @@ export interface ApplicationCreatedWire {
   applicationId: Uuid;
 }
 
+/** Anwesenheits-Status eines Mitglieds in einer Sitzung (#Meetings). */
+export type AttendanceStatus = 'present' | 'excused' | 'absent';
+
+/** `AttendanceOut` — Anwesenheit eines Gremium-Mitglieds (GET/PUT …/attendance). */
+export interface Attendance {
+  principalId: Uuid;
+  displayName: string | null;
+  email: string | null;
+  /** `null` = noch nicht erfasst. */
+  status: AttendanceStatus | null;
+  source: 'self' | 'lead' | null;
+  /** Ist das der anfragende Nutzer (für die Selbst-Markierung)? */
+  isSelf: boolean;
+}
+
 /** `AltchaChallengeOut` — server-signierte PoW-Challenge (GET /altcha/challenge). */
 export interface AltchaChallenge {
   algorithm: string;
@@ -444,7 +459,8 @@ export type FieldType =
   | 'file'
   | 'table'
   | 'markdown'
-  | 'computed';
+  | 'computed'
+  | 'positions';
 
 export interface FieldOption {
   value: string;
@@ -460,6 +476,9 @@ export interface FieldValidation {
   fileTypes?: string[];
   maxSizeMB?: number;
   maxRows?: number;
+  /** `positions`: Mindestzahl Vergleichsangebote je Position / Mindestzahl Positionen. */
+  minOffers?: number;
+  minPositions?: number;
 }
 
 /** Eine Feld-Definition der effektiven Form (camelCase wie das OpenAPI-by_alias). */

@@ -117,10 +117,11 @@ async function setup(
   return { ...view, http, ws, navigate };
 }
 
-/** Meeting + (Auto-)Protokoll laden — beide Requests beantworten. */
+/** Meeting + (Auto-)Protokoll + Anwesenheit laden — alle Requests beantworten. */
 function flushLoad(http: HttpTestingController): void {
   http.expectOne('/api/meetings/m-1').flush(MEETING);
   http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+  http.expectOne('/api/meetings/m-1/attendance').flush([]);
 }
 
 describe('MeetingsComponent', () => {

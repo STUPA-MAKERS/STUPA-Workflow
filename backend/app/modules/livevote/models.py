@@ -16,10 +16,18 @@ import uuid
 from datetime import date as _date
 from datetime import time as _time
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Text, Time
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Index,
+    Text,
+    Time,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base, CreatedAtMixin, UUIDPkMixin
+from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
 
 class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
@@ -45,4 +53,34 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
             "status IN ('planned','live','closed')", name="meeting_status"
         ),
         Index("ix_meeting_gremium_id", "gremium_id"),
+    )
+
+
+class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
+    """Anwesenheit je (Sitzung, Mitglied) (#Meetings/#55/#56).
+
+    ``status`` = present/excused/absent; ``source`` zeigt, wer den Eintrag setzte
+    (``self`` = Mitglied selbst, ``lead`` = Sitzungsleitung). Genau **ein** Eintrag
+    je (meeting, principal) — Upsert über die Unique-Constraint.
+    """
+
+    __tablename__ = "meeting_attendance"
+
+    meeting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("meeting.id", ondelete="CASCADE")
+    )
+    principal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE")
+    )
+    status: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(Text, server_default="lead")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("meeting_id", "principal_id", name="uq_attendance_meeting_principal"),
+        CheckConstraint(
+            "status IN ('present','excused','absent')", name="attendance_status"
+        ),
+        CheckConstraint("source IN ('self','lead')", name="attendance_source"),
+        Index("ix_attendance_meeting", "meeting_id"),
     )

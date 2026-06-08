@@ -50,6 +50,8 @@ import type {
   Meeting,
   MeetingCreateBody,
   AltchaChallenge,
+  Attendance,
+  AttendanceStatus,
   MeetingOutWire,
   MeetingPatchBody,
   NewApplication,
@@ -319,6 +321,32 @@ export class ApiClient {
     return this.http
       .patch<MeetingOutWire>(`${this.base}/meetings/${id}`, body)
       .pipe(map(mapMeeting));
+  }
+
+  // --- attendance (#Meetings/#55/#56) --------------------------------------
+  /** GET /meetings/{id}/attendance — Roster der aktuellen Mitglieder + Status. */
+  listAttendance(meetingId: Uuid): Observable<Attendance[]> {
+    return this.http.get<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance`);
+  }
+
+  /** PUT /meetings/{id}/attendance/me — eigene Anwesenheit markieren. */
+  setOwnAttendance(meetingId: Uuid, status: AttendanceStatus): Observable<Attendance[]> {
+    return this.http.put<Attendance[]>(
+      `${this.base}/meetings/${meetingId}/attendance/me`,
+      { status },
+    );
+  }
+
+  /** PUT /meetings/{id}/attendance/{principalId} — Mitglied setzen (Sitzungsleitung). */
+  setMemberAttendance(
+    meetingId: Uuid,
+    principalId: Uuid,
+    status: AttendanceStatus,
+  ): Observable<Attendance[]> {
+    return this.http.put<Attendance[]>(
+      `${this.base}/meetings/${meetingId}/attendance/${principalId}`,
+      { status },
+    );
   }
 
   /** POST /votes/{id}/open — Vote öffnen (auch live; P(vote.manage)). */

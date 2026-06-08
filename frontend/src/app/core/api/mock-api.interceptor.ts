@@ -453,6 +453,21 @@ let MOCK_MEETING: MeetingOutWire = {
   createdAt: '2026-06-12T17:00:00Z',
 };
 
+interface MockAttendance {
+  principalId: string;
+  displayName: string | null;
+  email: string | null;
+  status: 'present' | 'excused' | 'absent' | null;
+  source: 'self' | 'lead' | null;
+  isSelf: boolean;
+}
+
+let MOCK_ATTENDANCE: MockAttendance[] = [
+  { principalId: 'me', displayName: 'Demo-Nutzer:in', email: null, status: null, source: null, isSelf: true },
+  { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', isSelf: false },
+  { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', isSelf: false },
+];
+
 let MOCK_PROTOCOL: ProtocolOutWire = {
   id: MOCK_PROTOCOL_ID,
   meetingId: MOCK_MEETING_ID,
@@ -511,8 +526,26 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
     if (p.endsWith('/meetings')) return ok([MOCK_MEETING]);
+    if (/\/meetings\/[^/]+\/attendance$/.test(p)) return ok([...MOCK_ATTENDANCE]);
     if (/\/meetings\/[^/]+$/.test(p)) return ok(MOCK_MEETING);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
+  }
+
+  if (req.method === 'PUT') {
+    // Anwesenheit setzen (…/attendance/me oder …/attendance/{principalId}).
+    const att = /\/meetings\/[^/]+\/attendance\/([^/]+)$/.exec(p);
+    if (att) {
+      const status = (req.body as { status?: string } | null)?.status ?? 'present';
+      const target = att[1];
+      MOCK_ATTENDANCE = MOCK_ATTENDANCE.map((a) =>
+        a.isSelf && target === 'me'
+          ? { ...a, status: status as MockAttendance['status'], source: 'self' }
+          : a.principalId === target
+            ? { ...a, status: status as MockAttendance['status'], source: 'lead' }
+            : a,
+      );
+      return ok([...MOCK_ATTENDANCE]);
+    }
   }
 
   if (req.method === 'POST') {

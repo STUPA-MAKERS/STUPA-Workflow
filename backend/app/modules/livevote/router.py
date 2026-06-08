@@ -31,13 +31,20 @@ from app.modules.livevote.connection import (
     LiveVoteConnection,
     resolve_ws_principal,
 )
+from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.events import ErrorEvent
 from app.modules.livevote.locks import InMemoryLocker, Locker
-from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
+from app.modules.livevote.schemas import (
+    AttendanceOut,
+    AttendanceSetBody,
+    MeetingCreate,
+    MeetingOut,
+    MeetingPatch,
+)
 from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
-from app.shared.errors import NotFoundError, ProblemDetail
+from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
 
 router = APIRouter(tags=["livevote"])
 
@@ -84,6 +91,10 @@ def get_meeting_service_ws(
     return MeetingService(session, BrokerPublisher(broker))
 
 
+def get_attendance_service(session: DbSession) -> AttendanceService:
+    return AttendanceService(session)
+
+
 def get_voting_service_ws(session: DbSession) -> VotingService:
     """Voting-Service für den WS-Cast-Pfad (eigene Session, Flow-Dispatch default)."""
     return VotingService(session)
@@ -99,6 +110,7 @@ async def get_ws_principal(
 
 
 ServiceDep = Annotated[MeetingService, Depends(get_meeting_service)]
+AttendanceDep = Annotated[AttendanceService, Depends(get_attendance_service)]
 ManagerDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -155,6 +167,56 @@ async def patch_meeting(
     Zusätzlich zu ``meeting.manage`` muss der Principal die Sitzungsleitung des
     Gremiums sein (Vorstand/Schriftführung) oder Admin (#Meetings)."""
     return await service.patch(meeting_id, payload, principal)
+
+
+# --------------------------------------------------------------------------- #
+# Anwesenheit (#Meetings/#55/#56)
+# --------------------------------------------------------------------------- #
+@router.get(
+    "/meetings/{meeting_id}/attendance",
+    response_model=list[AttendanceOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_attendance(
+    meeting_id: UUID, attendance: AttendanceDep, principal: ReaderDep
+) -> list[AttendanceOut]:
+    """Anwesenheits-Roster (aktuelle Gremium-Mitglieder + Status)."""
+    return await attendance.roster(meeting_id, principal.sub)
+
+
+@router.put(
+    "/meetings/{meeting_id}/attendance/me",
+    response_model=list[AttendanceOut],
+    responses=_errors(401, 403, 404, 422),
+)
+async def set_own_attendance(
+    meeting_id: UUID,
+    payload: AttendanceSetBody,
+    attendance: AttendanceDep,
+    principal: ReaderDep,
+) -> list[AttendanceOut]:
+    """Eigene Anwesenheit markieren (nur Gremium-Mitglieder)."""
+    return await attendance.set_self(meeting_id, payload.status, principal.sub)
+
+
+@router.put(
+    "/meetings/{meeting_id}/attendance/{principal_id}",
+    response_model=list[AttendanceOut],
+    responses=_errors(401, 403, 404, 422),
+)
+async def set_member_attendance(
+    meeting_id: UUID,
+    principal_id: UUID,
+    payload: AttendanceSetBody,
+    attendance: AttendanceDep,
+    service: ServiceDep,
+    principal: ManagerDep,
+) -> list[AttendanceOut]:
+    """Anwesenheit eines Mitglieds setzen — nur Sitzungsleitung/Admin (#Meetings)."""
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_control:
+        raise ForbiddenError("only the committee lead may set members' attendance")
+    return await attendance.set_for(meeting_id, principal_id, payload.status, principal.sub)
 
 
 # --------------------------------------------------------------------------- #

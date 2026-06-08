@@ -69,3 +69,25 @@ class MeetingOut(_CamelModel):
     # Darf der anfragende Principal die Sitzung steuern? True für Admin oder wer im
     # Gremium die Sitzungsleitung (Vorstand/Schriftführung) innehat (#Meetings).
     can_control: bool = Field(default=False, alias="canControl")
+
+
+AttendanceStatus = Literal["present", "excused", "absent"]
+
+
+class AttendanceOut(_CamelModel):
+    """Anwesenheit eines Gremium-Mitglieds für eine Sitzung (#Meetings)."""
+
+    principal_id: UUID = Field(alias="principalId")
+    display_name: str | None = Field(default=None, alias="displayName")
+    email: str | None = None
+    # ``None`` = noch nicht erfasst (Mitglied der Roster ohne Eintrag).
+    status: AttendanceStatus | None = None
+    source: Literal["self", "lead"] | None = None
+    # Ist der anfragende Principal dieses Mitglied (für die Selbst-Markierung)?
+    is_self: bool = Field(default=False, alias="isSelf")
+
+
+class AttendanceSetBody(_CamelModel):
+    """``PUT …/attendance/{principalId}`` bzw. ``…/me`` — Anwesenheit setzen."""
+
+    status: AttendanceStatus

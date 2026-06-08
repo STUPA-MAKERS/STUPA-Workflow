@@ -17,7 +17,14 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { Meeting, MeetingVote, Protocol, Uuid } from '@core/api/models';
+import type {
+  Attendance,
+  AttendanceStatus,
+  Meeting,
+  MeetingVote,
+  Protocol,
+  Uuid,
+} from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
 import { BadgeComponent, type BadgeVariant } from '@shared/ui/badge/badge.component';
@@ -295,6 +302,43 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
               }
             </div>
           }
+        </app-card>
+      }
+
+      <!-- Anwesenheit (#Meetings/#55/#56) -->
+      @if (attendance().length) {
+        <app-card [heading]="'meetings.attendance.title' | t">
+          <p class="mtg__lead">
+            {{ (m.canControl ? 'meetings.attendance.leadLead' : 'meetings.attendance.lead') | t }}
+          </p>
+          <ul class="mtg__att">
+            @for (a of attendance(); track a.principalId) {
+              <li class="mtg__attRow">
+                <span class="mtg__attName">
+                  {{ a.displayName || a.email || a.principalId }}
+                  @if (a.isSelf) { <span class="mtg__attYou">{{ 'meetings.attendance.you' | t }}</span> }
+                </span>
+                @if (m.canControl || a.isSelf) {
+                  <span class="mtg__attBtns" role="group" [attr.aria-label]="'meetings.attendance.title' | t">
+                    @for (s of attendanceStatuses; track s) {
+                      <app-button
+                        [variant]="a.status === s ? attBtnVariant(s) : 'ghost'"
+                        size="sm"
+                        [disabled]="savingAttendance()"
+                        (click)="setAttendance(a, s)"
+                      >
+                        {{ attendanceKey(s) | t }}
+                      </app-button>
+                    }
+                  </span>
+                } @else {
+                  <app-badge [variant]="a.status ? attBadgeVariant(a.status) : 'neutral'">
+                    {{ (a.status ? attendanceKey(a.status) : 'meetings.attendance.unknown') | t }}
+                  </app-badge>
+                }
+              </li>
+            }
+          </ul>
         </app-card>
       }
     } @else {
@@ -615,6 +659,40 @@ import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings
         margin-top: var(--space-4);
         flex-wrap: wrap;
       }
+      .mtg__att {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      .mtg__attRow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding: var(--space-2) var(--space-3);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        flex-wrap: wrap;
+      }
+      .mtg__attName {
+        font-weight: var(--fw-medium);
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+      .mtg__attYou {
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-normal);
+        color: var(--color-text-muted);
+      }
+      .mtg__attBtns {
+        display: inline-flex;
+        gap: var(--space-1);
+        flex-wrap: wrap;
+      }
       .mtg__createForm {
         display: flex;
         flex-direction: column;
@@ -666,6 +744,11 @@ export class MeetingsComponent implements OnDestroy {
   readonly error = signal(false);
   readonly meeting = signal<Meeting | null>(null);
   readonly protocol = signal<Protocol | null>(null);
+
+  /** Anwesenheits-Roster der Sitzung (#Meetings/#55/#56). */
+  readonly attendance = signal<Attendance[]>([]);
+  readonly savingAttendance = signal(false);
+  readonly attendanceStatuses: readonly AttendanceStatus[] = ['present', 'excused', 'absent'];
 
   /** Sitzungs-Liste (#104) — gezeigt, solange keine einzelne Sitzung geladen ist. */
   readonly meetings = signal<Meeting[]>([]);
@@ -762,6 +845,7 @@ export class MeetingsComponent implements OnDestroy {
     this.planTime.set(m.startTime ?? '');
     this.connectLive(m.id);
     if (m.protocolId && this.canWrite()) this.loadProtocol();
+    this.loadAttendance(m.id);
   }
 
   /** Sitzungs-Liste laden (#104 — Wiederauffindbarkeit). */
@@ -941,6 +1025,46 @@ export class MeetingsComponent implements OnDestroy {
         this.toast.error(this.i18n.translate('meetings.toast.finalizeFailed'));
       },
     });
+  }
+
+  // --- Anwesenheit (#Meetings/#55/#56) -------------------------------------
+  private loadAttendance(meetingId: Uuid): void {
+    this.api.listAttendance(meetingId).subscribe({
+      next: (rows) => this.attendance.set(rows),
+      error: () => this.attendance.set([]),
+    });
+  }
+
+  setAttendance(member: Attendance, status: AttendanceStatus): void {
+    const m = this.meeting();
+    if (!m || this.savingAttendance() || member.status === status) return;
+    this.savingAttendance.set(true);
+    // Eigene Anwesenheit als »self« markieren; Mitglieder setzt die Leitung.
+    const req = member.isSelf
+      ? this.api.setOwnAttendance(m.id, status)
+      : this.api.setMemberAttendance(m.id, member.principalId, status);
+    req.subscribe({
+      next: (rows) => {
+        this.savingAttendance.set(false);
+        this.attendance.set(rows);
+      },
+      error: () => {
+        this.savingAttendance.set(false);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
+    });
+  }
+
+  attendanceKey(status: AttendanceStatus | 'unknown'): TranslationKey {
+    return `meetings.attendance.${status}` as TranslationKey;
+  }
+
+  attBtnVariant(status: AttendanceStatus): 'primary' | 'secondary' | 'danger' {
+    return status === 'present' ? 'primary' : status === 'excused' ? 'secondary' : 'danger';
+  }
+
+  attBadgeVariant(status: AttendanceStatus): BadgeVariant {
+    return status === 'present' ? 'success' : status === 'excused' ? 'warning' : 'danger';
   }
 
   // --- Live (WebSocket) ----------------------------------------------------
