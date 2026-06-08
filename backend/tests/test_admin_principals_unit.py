@@ -107,6 +107,23 @@ async def test_delete_role_assignment_blocks_self_admin_removal() -> None:
     assert db.deleted == []
 
 
+async def test_set_principal_active_blocks_self_deactivation() -> None:
+    """#44: ein Account darf sich nicht selbst deaktivieren."""
+    pid = uuid4()
+    db = fake_session(gets=[_principal(pid, "me-sub")])
+    with pytest.raises(ConflictError):
+        await ConfigService(db).set_principal_active(pid, False, "me-sub")
+
+
+async def test_set_principal_active_allows_self_reactivation() -> None:
+    """Sich selbst (re)aktivieren bleibt erlaubt — nur Deaktivieren blockt."""
+    pid = uuid4()
+    # gets: principal; results: audit lock/hash + final assignments query
+    db = fake_session(result(), result(), result(), gets=[_principal(pid, "me-sub")])
+    out = await ConfigService(db).set_principal_active(pid, True, "me-sub")
+    assert out.active is True
+
+
 async def test_delete_role_assignment_allows_admin_of_other_principal() -> None:
     """Fremden Admin entziehen bleibt erlaubt (nur Selbst-Aussperrung blockt)."""
     pid = uuid4()

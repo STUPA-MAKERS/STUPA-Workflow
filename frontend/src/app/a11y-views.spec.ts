@@ -304,7 +304,7 @@ describe('Kern-Views a11y (axe)', () => {
 
     it('/admin/users has no violations', async () => {
       const { container } = await render(UsersHost, {
-        providers: [provideRouter([]), { provide: AdminApiService, useValue: fakeAdminApi() }],
+        providers: [provideRouter([]), ...adminHttp, { provide: AdminApiService, useValue: fakeAdminApi() }],
       });
       expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });

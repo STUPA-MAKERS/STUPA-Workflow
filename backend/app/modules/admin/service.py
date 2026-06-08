@@ -501,10 +501,15 @@ class ConfigService:
     async def set_principal_active(
         self, principal_id: UUID, active: bool, actor: str
     ) -> PrincipalOut:
-        """Benutzer aktivieren/deaktivieren (#30). 404 bei unbekannter id."""
+        """Benutzer aktivieren/deaktivieren (#30). 404 bei unbekannter id.
+
+        Selbst-Aussperrung verhindern (#44): den eigenen Account nicht deaktivieren
+        (``actor`` ist der OIDC-``sub``)."""
         principal = await self.session.get(Principal, principal_id)
         if principal is None:
             raise NotFoundError(f"principal {principal_id} not found")
+        if not active and principal.sub == actor:
+            raise ConflictError("you cannot deactivate your own account")
         principal.active = active
         await self._audit(actor, AuditAction.ROLE_CHANGE, "principal", principal.id)
         await self.session.commit()

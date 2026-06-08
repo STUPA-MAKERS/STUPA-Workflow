@@ -1,6 +1,7 @@
 import { SlicePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
@@ -68,6 +69,10 @@ export class UsersComponent {
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
   private readonly capitalize = inject(CapitalizePipe);
+  private readonly auth = inject(AuthService);
+
+  /** OIDC-`sub` des angemeldeten Benutzers — für Selbst-Schutz (#44). */
+  protected readonly mySub = computed(() => this.auth.principal()?.sub ?? null);
 
   protected readonly query = signal('');
   protected readonly principals = signal<AdminPrincipal[]>([]);
@@ -118,6 +123,16 @@ export class UsersComponent {
 
   protected userLabel(p: AdminPrincipal): string {
     return p.displayName || p.email || p.sub;
+  }
+
+  /** Admin-Rolle ist geschützt — kein Entziehen-Kreuz anzeigen (#44/#40). */
+  protected isAdminRole(roleId: string): boolean {
+    return this.rolesById().get(roleId)?.key === 'admin';
+  }
+
+  /** Eigener Account — Deaktivieren ist gesperrt (#44). */
+  protected isSelf(p: AdminPrincipal): boolean {
+    return this.mySub() !== null && p.sub === this.mySub();
   }
 
   // --- Ausklappen -----------------------------------------------------------

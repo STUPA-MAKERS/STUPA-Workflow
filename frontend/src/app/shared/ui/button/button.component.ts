@@ -14,6 +14,7 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
       [disabled]="disabled || loading"
       [attr.aria-busy]="loading ? 'true' : null"
       [attr.aria-label]="ariaLabel || null"
+      [attr.title]="tooltip()"
       [class]="'btn btn--' + variant + ' btn--' + size + (iconOnly ? ' btn--icon' : '')"
     >
       @if (loading) {
@@ -137,4 +138,11 @@ export class ButtonComponent {
   @Input() iconOnly = false;
   /** Barrierefreier Name — Pflicht für Icon-Buttons ohne sichtbaren Text. */
   @Input() ariaLabel = '';
+  /** Hover-Tooltip; bei Icon-Buttons fällt er automatisch auf `ariaLabel` zurück (#47). */
+  @Input() title = '';
+
+  /** Tooltip-Text: explizit gesetzt, sonst für Icon-Buttons der `ariaLabel`. */
+  protected tooltip(): string | null {
+    return this.title || (this.iconOnly ? this.ariaLabel : '') || null;
+  }
 }

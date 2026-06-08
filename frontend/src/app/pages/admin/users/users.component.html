@@ -41,12 +41,14 @@
               @if (a.validUntil) {
                 <span class="users__until">→ {{ a.validUntil | slice: 0 : 10 }}</span>
               }
-              <button
-                type="button"
-                class="users__tag-x"
-                [attr.aria-label]="('admin.users.revoke' | t) + ': ' + (roleLabel(a.roleId) | capitalize)"
-                (click)="revoke(a)"
-              >×</button>
+              @if (!isAdminRole(a.roleId)) {
+                <button
+                  type="button"
+                  class="users__tag-x"
+                  [attr.aria-label]="('admin.users.revoke' | t) + ': ' + (roleLabel(a.roleId) | capitalize)"
+                  (click)="revoke(a)"
+                >×</button>
+              }
             </span>
           }
         </div>
@@ -59,7 +61,7 @@
           <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.users.addRole' | t" [attr.aria-expanded]="isExpanded($any(p).id)" (click)="toggleAssign($any(p).id)">
             <app-icon name="add" />
           </app-button>
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="($any(p).active === false ? 'admin.users.activate' : 'admin.users.deactivate') | t" (click)="setActive($any(p), $any(p).active === false)">
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="isSelf($any(p)) && $any(p).active !== false" [ariaLabel]="($any(p).active === false ? 'admin.users.activate' : 'admin.users.deactivate') | t" [attr.title]="isSelf($any(p)) && $any(p).active !== false ? ('admin.users.cannotDeactivateSelf' | t) : null" (click)="setActive($any(p), $any(p).active === false)">
             <app-icon name="power" />
           </app-button>
         </span>

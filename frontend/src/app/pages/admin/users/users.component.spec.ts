@@ -1,9 +1,12 @@
 import { of } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { AuthService } from '@core/auth/auth.service';
 import type { AdminPrincipal, Role } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { UsersComponent } from './users.component';
+
+const authStub = { principal: () => null } as unknown as AuthService;
 
 const ROLES: Role[] = [
   { id: 'r-admin', key: 'admin', label: { de: 'administrator', en: 'administrator' }, permissions: ['admin.roles'] },
@@ -39,7 +42,10 @@ function makeApi(over: Partial<Record<keyof AdminApiService, unknown>> = {}) {
 
 async function setup(api = makeApi()) {
   const view = await render(UsersComponent, {
-    providers: [{ provide: AdminApiService, useValue: api }],
+    providers: [
+      { provide: AdminApiService, useValue: api },
+      { provide: AuthService, useValue: authStub },
+    ],
   });
   return { ...view, api };
 }
