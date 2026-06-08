@@ -6,3 +6,8 @@ frontend/.angular
 **/coverage
 .git
 **/__pycache__
+# Secrets nie in den Build-Context ziehen (#20, defense-in-depth). .env.example
+# bleibt erlaubt (Doku, keine echten Werte).
+**/.env
+**/.env.*
+!**/.env.example
