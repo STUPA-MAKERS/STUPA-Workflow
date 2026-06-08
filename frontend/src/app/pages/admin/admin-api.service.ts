@@ -127,6 +127,14 @@ export class AdminApiService {
     return this.http.patch<Gremium>(`${this.base}/admin/gremien/${id}`, body);
   }
 
+  deleteGremium(id: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.gremien = this.store.gremien.filter((g) => g.id !== id);
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/gremien/${id}`);
+  }
+
   listRoles(): Observable<Role[]> {
     if (this.mock) return of(structuredCopy(this.store.roles));
     return this.http.get<Role[]>(`${this.base}/admin/roles`);

@@ -89,6 +89,7 @@ function emptyForm(): GremiumForm {
             <span class="grem__th-actions">
               <a class="grem__icon-link" [routerLink]="['/admin/gremien', $any(g).id]" [attr.aria-label]="'admin.gremien.members' | t" [attr.title]="'admin.gremien.members' | t"><app-icon name="members" /></a>
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.editAction' | t" (click)="openEdit($any(g))"><app-icon name="edit" /></app-button>
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.deleteAction' | t" (click)="askDelete($any(g))"><app-icon name="delete" /></app-button>
             </span>
           </ng-template>
         </app-data-table>
@@ -134,6 +135,20 @@ function emptyForm(): GremiumForm {
         <app-button [disabled]="!form().name.trim()" [loading]="saving()" (click)="submit($event)">
           {{ (editingId() ? 'admin.gremien.save' : 'admin.gremien.add') | t }}
         </app-button>
+      </div>
+    </app-dialog>
+
+    <!-- Löschen mit Bestätigung (#41). -->
+    <app-dialog
+      [open]="confirmDelete() !== null"
+      [title]="'admin.gremien.deleteTitle' | t"
+      [closeLabel]="'admin.gremien.cancel' | t"
+      (closed)="confirmDelete.set(null)"
+    >
+      <p class="grem__confirm">{{ 'admin.gremien.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}</p>
+      <div dialog-footer class="grem__dialog-foot">
+        <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
+        <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{ 'admin.gremien.deleteAction' | t }}</app-button>
       </div>
     </app-dialog>
   `,
@@ -275,6 +290,8 @@ export class AdminGremienComponent {
   readonly dialogOpen = signal(false);
   readonly editingId = signal<Uuid | null>(null);
   readonly form = signal<GremiumForm>(emptyForm());
+  readonly confirmDelete = signal<Gremium | null>(null);
+  readonly deleting = signal(false);
 
   readonly columns = computed<ColumnDef[]>(() => [
     { key: 'name', label: this.i18n.translate('admin.gremien.name') },
@@ -366,6 +383,28 @@ export class AdminGremienComponent {
   private onSaveError(): void {
     this.saving.set(false);
     this.toast.error(this.i18n.translate('admin.gremien.toast.failed'));
+  }
+
+  askDelete(g: Gremium): void {
+    this.confirmDelete.set(g);
+  }
+
+  doDelete(): void {
+    const g = this.confirmDelete();
+    if (!g || this.deleting()) return;
+    this.deleting.set(true);
+    this.api.deleteGremium(g.id).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.confirmDelete.set(null);
+        this.toast.success(this.i18n.translate('admin.gremien.toast.deleted'));
+        this.reload();
+      },
+      error: () => {
+        this.deleting.set(false);
+        this.toast.error(this.i18n.translate('admin.gremien.toast.failed'));
+      },
+    });
   }
 
   private reload(): void {

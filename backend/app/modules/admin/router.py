@@ -143,6 +143,17 @@ async def update_gremium(
     return await service.update_gremium(gremium_id, payload, principal.sub)
 
 
+@router.delete(
+    "/gremien/{gremium_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_gremium(
+    gremium_id: UUID, service: ServiceDep, principal: ConfigAdmin
+) -> None:
+    await service.delete_gremium(gremium_id, principal.sub)
+
+
 # =========================================================================== #
 # Gremien (authentifiziert, ohne Admin-Recht) — Dropdown-Quelle (#68)
 # =========================================================================== #

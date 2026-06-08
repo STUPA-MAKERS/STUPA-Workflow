@@ -135,6 +135,16 @@ class ConfigService:
         await self.session.commit()
         return _gremium_out(row)
 
+    async def delete_gremium(self, gremium_id: UUID, actor: str) -> None:
+        """Gremium löschen (#41). Rollenzuweisungen kaskadieren (FK ON DELETE
+        CASCADE). 404 bei unbekannter id."""
+        row = await self.session.get(Gremium, gremium_id)
+        if row is None:
+            raise NotFoundError(f"gremium {gremium_id} not found")
+        await self.session.delete(row)
+        await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
+        await self.session.commit()
+
     async def _gremium_by_slug(self, slug: str) -> Gremium | None:
         return (
             await self.session.scalars(select(Gremium).where(Gremium.slug == slug))
