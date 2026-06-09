@@ -23,33 +23,33 @@ down_revision: str | None = "0037_deadline_policy"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-_CONSTRAINT = "state_kind"
-
-
-def _drop_constraint_if_exists(bind: sa.Connection) -> None:
-    insp = sa.inspect(bind)
-    names = {c["name"] for c in insp.get_check_constraints("state")}
-    if _CONSTRAINT in names:
-        op.drop_constraint(_CONSTRAINT, "state", type_="check")
+# DB-Name des Constraints (Model ``CheckConstraint(name="state_kind")`` +
+# Naming-Convention ⇒ ``ck_state_state_kind``). Roh-SQL mit explizitem Namen +
+# ``IF EXISTS`` → idempotent, unabhängig von der Alembic-Convention.
+_DB_NAME = "ck_state_state_kind"
 
 
 def upgrade() -> None:
     bind = op.get_bind()
     # Cutover: approval/decision → normal (Alt-Konfiguration verwerfen).
     bind.execute(
-        sa.text(
-            "UPDATE state SET kind = 'normal' WHERE kind IN ('approval','decision')"
-        )
+        sa.text("UPDATE state SET kind = 'normal' WHERE kind IN ('approval','decision')")
     )
-    _drop_constraint_if_exists(bind)
-    op.create_check_constraint(
-        _CONSTRAINT, "state", "kind IN ('normal','vote')"
+    bind.execute(sa.text(f"ALTER TABLE state DROP CONSTRAINT IF EXISTS {_DB_NAME}"))
+    bind.execute(
+        sa.text(
+            f"ALTER TABLE state ADD CONSTRAINT {_DB_NAME} "
+            "CHECK (kind IN ('normal','vote'))"
+        )
     )
 
 
 def downgrade() -> None:
     bind = op.get_bind()
-    _drop_constraint_if_exists(bind)
-    op.create_check_constraint(
-        _CONSTRAINT, "state", "kind IN ('normal','vote','approval','decision')"
+    bind.execute(sa.text(f"ALTER TABLE state DROP CONSTRAINT IF EXISTS {_DB_NAME}"))
+    bind.execute(
+        sa.text(
+            f"ALTER TABLE state ADD CONSTRAINT {_DB_NAME} "
+            "CHECK (kind IN ('normal','vote','approval','decision'))"
+        )
     )
