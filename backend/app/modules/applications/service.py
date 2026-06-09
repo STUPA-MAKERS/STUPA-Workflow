@@ -590,37 +590,61 @@ class ApplicationsService:
         return row is not None
 
     async def list_tasks(self, principal: Any) -> list[ApplicationListItem]:
-        """Offene Entscheidungen für die eigene Rolle (#64): Anträge in ``vote``-
-        States, in denen der Principal handeln darf (Gremium-Mitgliedschaft; Admin
-        sieht alle)."""
-        states = (
-            await self.session.scalars(
-                select(State).where(State.kind == "vote")
-            )
-        ).all()
-        by_id = {s.id: s for s in states}
-        if not by_id:
-            return []
+        """Offene Aufgaben des Principals (#64, #flow-redesign).
+
+        Ein Antrag ist eine Aufgabe, wenn der Principal dort handeln kann:
+        * ``vote``-State + Gremium-Mitgliedschaft (oder Admin) → abstimmen, **oder**
+        * mindestens ein **manueller** Übergang ist feuerbar (Guard erfüllt) und der
+          Principal darf Übergänge auslösen (``application.transition`` / Admin).
+
+        Frühere Logik beschränkte sich auf ``vote``-States — dadurch fehlten nach dem
+        Flow-Redesign (approval/decision → Guards auf manuellen Übergängen) alle
+        Anträge mit feuerbaren manuellen Übergängen."""
+        from app.modules.flow.service import FlowService
+
+        flow = FlowService(self.session)
+        is_admin = "admin" in principal.roles
+        can_transition = is_admin or principal.has("application.transition")
+
+        # Alle offenen Anträge (mit aktuellem State) — neueste zuerst.
         apps = (
             await self.session.scalars(
                 select(Application)
-                .where(Application.current_state_id.in_(list(by_id.keys())))
+                .where(Application.current_state_id.is_not(None))
                 .order_by(Application.created_at.desc())
             )
         ).all()
-        is_admin = "admin" in principal.roles
+        if not apps:
+            return []
+        states = (
+            await self.session.scalars(
+                select(State).where(
+                    State.id.in_({a.current_state_id for a in apps})
+                )
+            )
+        ).all()
+        by_id = {s.id: s for s in states}
+
         items: list[ApplicationListItem] = []
         for app in apps:
             s = by_id.get(app.current_state_id)
             if s is None:
                 continue
-            cfg = s.config if isinstance(s.config, dict) else {}
-            ok = is_admin
-            if not ok and s.kind == "vote":
-                gid = cfg.get("gremiumId")
-                ok = isinstance(gid, str) and bool(gid) and await self._in_gremium(
-                    principal.sub, UUID(gid)
-                )
+            ok = False
+            if s.kind == "vote":
+                if is_admin:
+                    ok = True
+                else:
+                    cfg = s.config if isinstance(s.config, dict) else {}
+                    gid = cfg.get("gremiumId")
+                    ok = (
+                        isinstance(gid, str)
+                        and bool(gid)
+                        and await self._in_gremium(principal.sub, UUID(gid))
+                    )
+            if not ok and can_transition:
+                # Mind. ein feuerbarer manueller Übergang (Guards inkl. Akteur-Gates).
+                ok = len(await flow.available_transitions(app.id, principal)) > 0
             if ok:
                 items.append(
                     ApplicationListItem(

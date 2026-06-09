@@ -183,6 +183,20 @@ export class BudgetPieComponent {
 
 /** SVG-Pfad eines Donut-Segments zwischen zwei Winkeln (Radiant). */
 function donutArc(start: number, end: number): string {
+  // Voller Kreis (ein einzelnes 100%-Stück): start==end → ein einzelner Bogen
+  // zeichnet nichts. Stattdessen den ganzen Ring (Außenkreis CW, Loch CCW).
+  if (end - start >= Math.PI * 2 - 1e-6) {
+    return [
+      `M ${CX - R} ${CY}`,
+      `A ${R} ${R} 0 1 1 ${CX + R} ${CY}`,
+      `A ${R} ${R} 0 1 1 ${CX - R} ${CY}`,
+      'Z',
+      `M ${CX - INNER} ${CY}`,
+      `A ${INNER} ${INNER} 0 1 0 ${CX + INNER} ${CY}`,
+      `A ${INNER} ${INNER} 0 1 0 ${CX - INNER} ${CY}`,
+      'Z',
+    ].join(' ');
+  }
   const large = end - start > Math.PI ? 1 : 0;
   const x0 = CX + R * Math.cos(start);
   const y0 = CY + R * Math.sin(start);
