@@ -1195,7 +1195,7 @@ export const de = {
   'admin.gremien.toast.updated': 'Gremium gespeichert.',
   'admin.gremien.toast.deleted': 'Gremium gelöscht.',
   'admin.gremien.toast.failed': 'Gremium konnte nicht gespeichert werden.',
-  'admin.users.title': 'Benutzer & Rollen',
+  'admin.users.title': 'Benutzer',
   'admin.users.subtitle':
     'Benutzer suchen, Rollen zuweisen oder entziehen und Rechte je Rolle pflegen.',
   'admin.users.search': 'Benutzer suchen',

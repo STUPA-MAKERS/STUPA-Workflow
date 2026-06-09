@@ -665,6 +665,7 @@ export interface MeetingOutWire {
   status: MeetingStatus;
   activeApplicationId?: Uuid | null;
   gremiumId?: Uuid | null;
+  gremiumName?: string | null;
   votes: MeetingVoteOutWire[];
   /** Verknüpftes Protokoll (falls bereits angelegt). */
   protocolId?: Uuid | null;

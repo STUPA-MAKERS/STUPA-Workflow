@@ -133,7 +133,7 @@ const AUTOSAVE_DELAY_MS = 1000;
               }
             </dl>
             <app-badge [variant]="voteVariant(bv.status)">{{ voteStatusKey(bv.status) | t }}</app-badge>
-            @if (bv.result) { <app-badge variant="info">{{ bv.result }}</app-badge> }
+            @if (bv.result) { <app-badge [variant]="voteResultVariant(bv.result)">{{ voteResultKey(bv.result) | t }}</app-badge> }
           } @else {
             <p class="mtg__muted">{{ 'meetings.beamer.idle' | t }}</p>
           }
@@ -153,7 +153,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                   <div class="mtg__voteHead">
                     <span class="mtg__voteTitle">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
                     <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
-                    @if (vote.result) { <app-badge variant="info">{{ vote.result }}</app-badge> }
+                    @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
                   </div>
                   @if (vote.status === 'open' && canVote()) {
                     <div class="mtg__voteActions">
@@ -313,7 +313,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                       <div class="mtg__voteHead">
                         <span class="mtg__voteTitle">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
                         <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
-                        @if (vote.result) { <app-badge variant="info">{{ vote.result }}</app-badge> }
+                        @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
                       </div>
                       @if (vote.counts) {
                         <dl class="mtg__tally">
@@ -417,7 +417,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                   @if (vote.applicationId && vote.applicationId === m.activeApplicationId) {
                     <app-badge variant="primary">{{ 'meetings.vote.active' | t }}</app-badge>
                   }
-                  @if (vote.result) { <app-badge variant="info">{{ vote.result }}</app-badge> }
+                  @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
                 </div>
                 @if (vote.counts) {
                   <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
@@ -2486,6 +2486,16 @@ export class MeetingsComponent implements OnDestroy {
 
   voteStatusKey(status: MeetingVote['status']): TranslationKey {
     return `meetings.voteStatus.${status}` as TranslationKey;
+  }
+
+  /** Übersetztes Label des Abstimmungs-Ergebnisses (Angenommen/Abgelehnt/…). */
+  voteResultKey(result: string | null | undefined): TranslationKey {
+    return `vote.result.${result ?? 'tie'}` as TranslationKey;
+  }
+
+  /** Ergebnis-Farbe: angenommen → grün, abgelehnt → rot, sonst neutral. */
+  voteResultVariant(result: string | null | undefined): BadgeVariant {
+    return result === 'passed' ? 'success' : result === 'rejected' ? 'danger' : 'neutral';
   }
 
   countEntries(vote: MeetingVote): { key: string; value: number }[] {

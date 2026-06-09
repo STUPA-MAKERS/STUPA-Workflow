@@ -75,6 +75,7 @@ class MeetingOut(_CamelModel):
 
     id: UUID
     gremium_id: UUID = Field(alias="gremiumId")
+    gremium_name: str | None = Field(default=None, alias="gremiumName")
     title: str
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")

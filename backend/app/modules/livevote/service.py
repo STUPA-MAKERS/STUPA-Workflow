@@ -30,7 +30,7 @@ from app.modules.admin.gremium_roles import (
     gremium_ids_with_permission,
     gremium_member_ids,
 )
-from app.modules.admin.models import GremiumMembership, GremiumRole
+from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.livevote.broker import MeetingBroker
@@ -155,11 +155,13 @@ class MeetingService:
         can_manage_votes: bool = False,
         can_vote: bool = False,
         protokollant_name: str | None = None,
+        gremium_name: str | None = None,
         votes: list[MeetingVoteOut] | None = None,
     ) -> MeetingOut:
         return MeetingOut(
             id=meeting.id,
             gremiumId=meeting.gremium_id,
+            gremiumName=gremium_name,
             title=meeting.title,
             date=meeting.date,
             startTime=meeting.start_time,
@@ -224,6 +226,12 @@ class MeetingService:
             return None
         row = await session.get(PrincipalRow, principal_id)
         return (row.display_name or row.email) if row is not None else None
+
+    async def _gremium_name_for(self, gremium_id: UUID | None) -> str | None:
+        if gremium_id is None:
+            return None
+        row = await self.session.get(Gremium, gremium_id)
+        return row.name if row is not None else None
 
     async def can_manage(self, gremium_id: UUID, principal: Principal) -> bool:
         """Sitzung verwalten: globale ``meeting.manage`` ODER Gremium-``session.manage``."""
@@ -299,9 +307,14 @@ class MeetingService:
     ) -> MeetingOut:
         """``MeetingOut`` mit den vier Berechtigungs-Flags des Principals bauen."""
         name = await self._name_for(self.session, meeting.protokollant_id)
+        gremium_name = await self._gremium_name_for(meeting.gremium_id)
         if principal is None:
             return self._to_out(
-                meeting, protocol_id, protokollant_name=name, votes=votes
+                meeting,
+                protocol_id,
+                protokollant_name=name,
+                gremium_name=gremium_name,
+                votes=votes,
             )
         return self._to_out(
             meeting,
@@ -311,6 +324,7 @@ class MeetingService:
             can_manage_votes=await self.can_manage_votes(meeting, principal),
             can_vote=await self.can_vote(meeting.gremium_id, principal),
             protokollant_name=name,
+            gremium_name=gremium_name,
             votes=votes,
         )
 
@@ -428,6 +442,14 @@ class MeetingService:
         # Gremium-Scopes des Principals einmal laden (kein N+1 je Sitzung). Admin/globaler
         # ``meeting.manage`` kurzschließt sämtliche Gremium-Queries.
         all_gids = {m.gremium_id for m in meetings}
+        # Gremium-Namen gebündelt (Timeline zeigt Zugehörigkeit, #104).
+        gremium_names = dict(
+            (
+                await self.session.execute(
+                    select(Gremium.id, Gremium.name).where(Gremium.id.in_(all_gids))
+                )
+            ).all()
+        )
         if "admin" in principal.roles or principal.has("meeting.manage"):
             manage_ids = write_ids = votes_mgmt_ids = vote_ids = all_gids
             my_id: UUID | None = None
@@ -457,6 +479,7 @@ class MeetingService:
                     can_write=(m.gremium_id in write_ids) or is_prot,
                     can_manage_votes=(m.gremium_id in votes_mgmt_ids) or is_prot,
                     can_vote=m.gremium_id in vote_ids,
+                    gremium_name=gremium_names.get(m.gremium_id),
                     votes=votes_by_meeting.get(m.id, []),
                 )
             )
