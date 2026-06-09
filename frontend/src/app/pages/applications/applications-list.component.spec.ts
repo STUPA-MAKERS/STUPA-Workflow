@@ -92,6 +92,7 @@ describe('ApplicationsListComponent', () => {
     flushTypes(http);
     http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
     detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
 
     // The status filter is a dropdown (not free text); option label = state name,
     // option value = the backend state UUID (sent filter value unchanged).
@@ -127,6 +128,7 @@ describe('ApplicationsListComponent', () => {
     detectChanges();
 
     const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
     await userEvent.type(screen.getByLabelText('Suche'), 'Beamer');
     await userEvent.click(screen.getByRole('button', { name: 'Filtern' }));
 
@@ -178,6 +180,7 @@ describe('ApplicationsListComponent', () => {
     detectChanges();
 
     const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
     await userEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
     expect(navigate).toHaveBeenCalledWith(
       [],

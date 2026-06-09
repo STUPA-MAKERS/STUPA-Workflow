@@ -21,7 +21,7 @@ import type {
 } from '@core/api/models';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
-import { SelectComponent, type SelectOption } from '@shared/ui';
+import { IconComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { stateBadgeVariant } from './applications.util';
 
 /**
@@ -36,62 +36,68 @@ import { stateBadgeVariant } from './applications.util';
   selector: 'app-applications-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, FormsModule, DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, SelectComponent],
+  imports: [RouterLink, FormsModule, DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, IconComponent, SelectComponent],
   template: `
     <header class="apps__head">
-      <h1 class="apps__title">{{ 'applications.list.title' | t }}</h1>
-      <p class="apps__subtitle">{{ 'applications.list.subtitle' | t }}</p>
-    </header>
-
-    <form class="apps__filters" (submit)="applyFilters($event)" role="search">
-      <div class="field">
-        <label class="field__label" [for]="'apps-q'">{{ 'applications.list.search' | t }}</label>
-        <input
-          id="apps-q"
-          class="field__control"
-          type="search"
-          [placeholder]="'applications.list.search.placeholder' | t"
-          [ngModel]="q()"
-          (ngModelChange)="q.set($event)"
-          name="q"
-        />
-      </div>
-
-      <div class="field">
-        <label class="field__label" [for]="'apps-type'">{{ 'applications.list.filter.type' | t }}</label>
-        <select
-          id="apps-type"
-          class="field__control"
-          [ngModel]="typeId()"
-          (ngModelChange)="typeId.set($event)"
-          name="type"
-        >
-          <option value="">{{ 'applications.list.filter.all' | t }}</option>
-          @for (type of types(); track type.id) {
-            <option [value]="type.id">{{ type.name }}</option>
+      <div class="apps__headRow">
+        <div>
+          <h1 class="apps__title">{{ 'applications.list.title' | t }}</h1>
+          <p class="apps__subtitle">{{ 'applications.list.subtitle' | t }}</p>
+        </div>
+        <!-- Filter in einem Popout (#20): Button mit Icon + Aktiv-Indikator. -->
+        <div class="apps__filterWrap">
+          <app-button variant="secondary" size="sm" (click)="filtersOpen.set(!filtersOpen())">
+            <app-icon name="filter" />
+            {{ 'applications.list.filter.button' | t }}
+            @if (activeFilterCount() > 0) {
+              <span class="apps__filterCount" aria-hidden="true">{{ activeFilterCount() }}</span>
+            }
+          </app-button>
+          @if (filtersOpen()) {
+            <form class="apps__filterPanel" (submit)="applyFilters($event)" role="search">
+              <div class="field">
+                <label class="field__label" [for]="'apps-q'">{{ 'applications.list.search' | t }}</label>
+                <input
+                  id="apps-q"
+                  class="field__control"
+                  type="search"
+                  [placeholder]="'applications.list.search.placeholder' | t"
+                  [ngModel]="q()"
+                  (ngModelChange)="q.set($event)"
+                  name="q"
+                />
+              </div>
+              <div class="field">
+                <label class="field__label" [for]="'apps-type'">{{ 'applications.list.filter.type' | t }}</label>
+                <select id="apps-type" class="field__control" [ngModel]="typeId()" (ngModelChange)="typeId.set($event)" name="type">
+                  <option value="">{{ 'applications.list.filter.all' | t }}</option>
+                  @for (type of types(); track type.id) {
+                    <option [value]="type.id">{{ type.name }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <app-select
+                  id="apps-state"
+                  name="state"
+                  [label]="'applications.list.filter.state' | t"
+                  [placeholder]="'applications.list.filter.all' | t"
+                  [options]="stateOptions()"
+                  [ngModel]="state()"
+                  (ngModelChange)="state.set($event)"
+                />
+              </div>
+              <div class="apps__filterActions">
+                <app-button type="submit" size="sm">{{ 'applications.list.filter.apply' | t }}</app-button>
+                <app-button type="button" variant="ghost" size="sm" (click)="reset()">
+                  {{ 'applications.list.filter.reset' | t }}
+                </app-button>
+              </div>
+            </form>
           }
-        </select>
+        </div>
       </div>
-
-      <div class="field">
-        <app-select
-          id="apps-state"
-          name="state"
-          [label]="'applications.list.filter.state' | t"
-          [placeholder]="'applications.list.filter.all' | t"
-          [options]="stateOptions()"
-          [ngModel]="state()"
-          (ngModelChange)="state.set($event)"
-        />
-      </div>
-
-      <div class="apps__filterActions">
-        <app-button type="submit" size="sm">{{ 'applications.list.filter.apply' | t }}</app-button>
-        <app-button type="button" variant="ghost" size="sm" (click)="reset()">
-          {{ 'applications.list.filter.reset' | t }}
-        </app-button>
-      </div>
-    </form>
+    </header>
 
     @if (loading()) {
       <p class="apps__status" aria-live="polite">{{ 'applications.list.loading' | t }}</p>
@@ -177,19 +183,47 @@ import { stateBadgeVariant } from './applications.util';
       .apps__head {
         margin-bottom: var(--space-5);
       }
+      .apps__headRow {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: var(--space-4);
+        flex-wrap: wrap;
+      }
       .apps__subtitle {
         color: var(--color-text-muted);
       }
-      .apps__filters {
+      .apps__filterWrap {
+        position: relative;
+      }
+      .apps__filterCount {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.25rem;
+        height: 1.25rem;
+        padding: 0 var(--space-1);
+        margin-left: var(--space-2);
+        border-radius: 999px;
+        background: var(--color-primary);
+        color: var(--color-on-primary, #fff);
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-bold);
+      }
+      .apps__filterPanel {
+        position: absolute;
+        right: 0;
+        z-index: var(--z-dropdown, 50);
+        margin-top: var(--space-2);
+        width: min(22rem, 90vw);
         display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
+        flex-direction: column;
         gap: var(--space-4);
-        margin-bottom: var(--space-5);
         padding: var(--space-4);
-        background: var(--color-surface);
+        background: var(--color-bg-elevated, var(--color-surface));
         border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
       }
       .field {
         display: flex;
@@ -229,11 +263,17 @@ import { stateBadgeVariant } from './applications.util';
       }
       .apps__tableWrap {
         overflow-x: auto;
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
       }
       .apps__table {
         width: 100%;
         border-collapse: collapse;
         font-size: var(--fs-sm);
+      }
+      .apps__table tbody tr:last-child td {
+        border-bottom: none;
       }
       .apps__caption {
         text-align: start;
@@ -313,6 +353,12 @@ export class ApplicationsListComponent {
   readonly typeId = signal('');
   readonly state = signal('');
 
+  /** Filter-Popout offen? + Zahl aktiver Filter (für den Indikator). */
+  readonly filtersOpen = signal(false);
+  readonly activeFilterCount = computed(
+    () => [this.q(), this.typeId(), this.state()].filter((v) => v.trim() !== '').length,
+  );
+
   /**
    * Status-Dropdown-Optionen aus den **realen** Status der geladenen Anträge
    * akkumuliert (Wert = State-UUID, Label = aufgelöster State-Name). Der gesendete
@@ -386,6 +432,7 @@ export class ApplicationsListComponent {
 
   applyFilters(event: Event): void {
     event.preventDefault();
+    this.filtersOpen.set(false);
     this.navigate({
       q: this.q() || null,
       type: this.typeId() || null,
@@ -398,6 +445,7 @@ export class ApplicationsListComponent {
     this.q.set('');
     this.typeId.set('');
     this.state.set('');
+    this.filtersOpen.set(false);
     this.navigate({ q: null, type: null, state: null, gremium: null, topf: null, offset: null });
   }
 
