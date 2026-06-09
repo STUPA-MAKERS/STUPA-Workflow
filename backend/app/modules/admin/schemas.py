@@ -61,18 +61,23 @@ class GremiumRoleOut(_CamelModel):
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     key: str
     name: I18nMap
-    # Pflichtrollen (Vorstand/Schriftführung) sind in jedem Gremium vorhanden und
+    # Pflichtrollen (Vorstand/Manager/Mitglied) sind in jedem Gremium vorhanden und
     # nicht löschbar; das FE blendet die Löschen-Aktion dafür aus (#Meetings).
     forced: bool = False
+    # Granulare Sitzungs-Berechtigungen dieser Rolle (session.manage/vote.manage/
+    # vote.cast/protocol.write).
+    permissions: list[str] = Field(default_factory=list)
 
 
 class GremiumRoleCreate(_CamelModel):
     key: str = Field(min_length=1)
     name: I18nMap = Field(default_factory=dict)
+    permissions: list[str] = Field(default_factory=list)
 
 
 class GremiumRoleUpdate(_CamelModel):
     name: I18nMap | None = None
+    permissions: list[str] | None = None
 
 
 class GremiumMembershipOut(_CamelModel):

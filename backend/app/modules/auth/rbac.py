@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.auth.models import GroupMapping, Role, RoleAssignment, RolePermission
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
@@ -90,6 +91,27 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
                 await db.execute(select(Role.key).where(Role.id.in_(role_ids)))
             ).scalars().all()
         )
+
+    # Gremium-Mitgliedschaften (#Sessions): wer in einem Gremium eine aktive Rolle mit
+    # ``vote.cast`` hat, ist in der Gremium-Gruppe stimmberechtigt. ``Vote.eligible_group``
+    # = str(gremium_id), daher gatet ``in_group`` damit das »Vote«-Recht der Rolle. Das
+    # bloße Mitlesen einer Sitzung läuft über ``MeetingService.is_member`` (eigene Query).
+    membership_rows = (
+        await db.execute(
+            select(GremiumMembership.gremium_id, GremiumRole.permissions)
+            .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+            .where(
+                GremiumMembership.principal_id == row.id,
+                (GremiumMembership.valid_from.is_(None))
+                | (GremiumMembership.valid_from <= now),
+                (GremiumMembership.valid_until.is_(None))
+                | (GremiumMembership.valid_until > now),
+            )
+        )
+    ).all()
+    for gremium_id, perms in membership_rows:
+        if "vote.cast" in (perms or []):
+            groups.add(str(gremium_id))
 
     return Principal(
         sub=row.sub,

@@ -49,6 +49,7 @@ describe('GremiumRolesComponent (#42)', () => {
     expect(api.createGremiumRole).toHaveBeenCalledWith('g-1', {
       key: 'beisitz',
       name: { de: 'Beisitz', en: 'Beisitz' },
+      permissions: ['vote.cast'],
     });
     expect(c.roles().some((r: GremiumRole) => r.id === 'gr-new')).toBe(true);
   });

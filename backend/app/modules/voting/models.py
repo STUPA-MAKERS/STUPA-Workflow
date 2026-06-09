@@ -42,14 +42,22 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "vote"
 
-    application_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("application.id", ondelete="CASCADE")
+    # NULL = generische Beschlussfrage eines Freitext-TOP (kein Antrag); dann fällt der
+    # Vote KEINEN Flow-Branch, sondern wird nur im Protokoll ausgewiesen. Bei Antrags-
+    # TOPs ist es der Antrag, dessen pass/fail-Branch beim Close gefeuert wird.
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
     # `meeting` existiert ab T-16 (Live-Vote); die FK wird hier nun gesetzt (frische
     # Schemata via create_all, ältere via Migration 0008). SET NULL: gelöschte Sitzung
     # entkoppelt den (Async-)Vote, statt ihn zu kaskadieren.
     meeting_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
+    )
+    # An welchen Tagesordnungspunkt die Abstimmung gebunden ist (Live-Vote). CASCADE:
+    # entfällt der TOP, entfällt die generische Beschlussfrage mit.
+    agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting_agenda_item.id", ondelete="CASCADE"), nullable=True
     )
     eligible_group: Mapped[str] = mapped_column(Text)
     # Beschluss-/Abstimmungsfrage (Live-Vote): »Worüber wird abgestimmt?« — wird im

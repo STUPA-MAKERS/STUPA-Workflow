@@ -99,6 +99,10 @@ async function setup(
     appsReq.flush(PAGE);
   }
   http.expectOne((r) => r.url.endsWith('/api/application-types')).flush(TYPES);
+  // Sitzungs-Shortcuts (#Sessions) laden `/meetings` — im Test leer beantworten.
+  http
+    .match((r) => r.url.endsWith('/api/meetings') && r.method === 'GET')
+    .forEach((req) => req.flush([]));
 
   view.detectChanges();
   return { ...view, auth, http };

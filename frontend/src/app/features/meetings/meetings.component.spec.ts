@@ -23,6 +23,10 @@ const MEETING: MeetingOutWire = {
   gremiumId: null,
   protocolId: 'p-1',
   canControl: true,
+  canManage: true,
+  canWrite: true,
+  canManageVotes: true,
+  canVote: false,
   votes: [
     {
       id: 'v-1',
@@ -183,7 +187,9 @@ describe('MeetingsComponent', () => {
     ]);
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
 
+    // Danger-Aktion: erst Bestätigungs-Dialog, dann bestätigen.
     await userEvent.click(await screen.findByRole('button', { name: /Finalisieren/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /Abschließen & finalisieren/i }));
     // Erst werden die TOP-Texte zum Protokoll-Markdown zusammengesetzt (PATCH) …
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');

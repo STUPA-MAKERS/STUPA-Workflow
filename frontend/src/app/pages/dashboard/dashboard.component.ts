@@ -7,7 +7,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { ApplicationListItem, ApplicationType, Uuid } from '@core/api/models';
+import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
@@ -103,6 +103,29 @@ export class DashboardComponent {
 
   /** Antrags-Panels nur, wenn der Nutzer Anträge lesen darf. */
   readonly canReadApplications = computed(() => this.auth.canAny('application.read'));
+
+  // --- Sitzungs-Shortcuts: laufende/anstehende Sitzungen prominent (#Sessions) ---
+  private readonly meetings = toSignal(
+    this.api.listMeetings().pipe(catchError(() => of([] as Meeting[]))),
+    { initialValue: [] as Meeting[] },
+  );
+  /** Laufende zuerst, dann geplante (nächste Termine), max. 4 — große Shortcuts. */
+  readonly sessionShortcuts = computed<Meeting[]>(() => {
+    const rank = (m: Meeting): number => (m.status === 'live' ? 0 : m.status === 'planned' ? 1 : 2);
+    return this.meetings()
+      .filter((m) => m.status !== 'closed')
+      .slice()
+      .sort((a, b) => rank(a) - rank(b) || (a.date ?? '').localeCompare(b.date ?? ''))
+      .slice(0, 4);
+  });
+
+  sessionStatusKey(status: Meeting['status']): TranslationKey {
+    return `meetings.status.${status}` as TranslationKey;
+  }
+
+  sessionVariant(status: Meeting['status']): 'success' | 'info' | 'neutral' {
+    return status === 'live' ? 'success' : status === 'planned' ? 'info' : 'neutral';
+  }
 
   /** Globale Rollen des Nutzers (Badges, #54). */
   readonly roles = computed(() => this.auth.roles());

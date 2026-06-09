@@ -332,6 +332,11 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
+  /** DELETE /meetings/{id} — Sitzung löschen (P(session.manage)/Admin). */
+  deleteMeeting(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/meetings/${id}`);
+  }
+
   // --- attendance (#Meetings/#55/#56) --------------------------------------
   /** GET /meetings/{id}/attendance — Roster der aktuellen Mitglieder + Status. */
   listAttendance(meetingId: Uuid): Observable<Attendance[]> {
@@ -414,9 +419,9 @@ export class ApiClient {
   openMeetingVote(
     meetingId: Uuid,
     body: {
-      applicationId: Uuid;
+      agendaItemId: Uuid;
       question?: string | null;
-      options: string[];
+      options?: string[];
       majorityRule?: 'simple' | 'absolute' | 'two_thirds';
       secret?: boolean;
     },

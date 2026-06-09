@@ -54,7 +54,12 @@ from app.modules.voting.schemas import VoteCreate
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
 from app.shared.config_schemas import VoteConfig
-from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
+from app.shared.errors import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ProblemDetail,
+)
 
 router = APIRouter(tags=["livevote"])
 
@@ -149,9 +154,13 @@ WsPrincipalDep = Annotated[Principal | None, Depends(get_ws_principal)]
     "/meetings", response_model=MeetingOut, responses=_errors(400, 401, 403, 422)
 )
 async def create_meeting(
-    payload: MeetingCreate, service: ServiceDep, principal: ManagerDep
+    payload: MeetingCreate, service: ServiceDep, principal: ReaderDep
 ) -> MeetingOut:
-    """Sitzung (``planned``) anlegen."""
+    """Sitzung (``planned``) anlegen — Sitzungsverwalter (``session.manage``)/Admin.
+
+    Die RBAC ist gremium-genau (Vorstand/Manager des Gremiums oder globale
+    ``meeting.manage``); der Service wirft 403, wenn der Principal das Gremium nicht
+    verwalten darf."""
     return await service.create(payload, principal)
 
 
@@ -175,18 +184,26 @@ async def get_meeting(
     return await service.get(meeting_id, principal)
 
 
+@router.delete("/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404))
+async def delete_meeting(
+    meeting_id: UUID, service: ServiceDep, principal: ReaderDep
+) -> None:
+    """Sitzung löschen — nur Sitzungsverwalter (``session.manage``)/Admin."""
+    await service.delete(meeting_id, principal)
+
+
 @router.patch(
     "/meetings/{meeting_id}",
     response_model=MeetingOut,
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def patch_meeting(
-    meeting_id: UUID, payload: MeetingPatch, service: ServiceDep, principal: ManagerDep
+    meeting_id: UUID, payload: MeetingPatch, service: ServiceDep, principal: ReaderDep
 ) -> MeetingOut:
-    """Steuerung (``activeApplicationId``/``status``) → ``meeting_state``-Broadcast.
+    """Steuerung/Planung → ``meeting_state``-Broadcast.
 
-    Zusätzlich zu ``meeting.manage`` muss der Principal die Sitzungsleitung des
-    Gremiums sein (Vorstand/Schriftführung) oder Admin (#Meetings)."""
+    Feld-genaue RBAC im Service: Status/aktiver Antrag = ``canWrite`` (Protokollant
+    oder Verwalter); Datum/Zeit/Protokollant = ``canManage`` (Sitzungsverwalter)."""
     return await service.patch(meeting_id, payload, principal)
 
 
@@ -231,12 +248,12 @@ async def set_member_attendance(
     payload: AttendanceSetBody,
     attendance: AttendanceDep,
     service: ServiceDep,
-    principal: ManagerDep,
+    principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Anwesenheit eines Mitglieds setzen — nur Sitzungsleitung/Admin (#Meetings)."""
+    """Anwesenheit eines Mitglieds setzen — wer die Sitzung führt (Protokollant/Verwalter)."""
     meeting = await service.get(meeting_id, principal)
-    if not meeting.can_control:
-        raise ForbiddenError("only the committee lead may set members' attendance")
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to set members' attendance")
     return await attendance.set_for(meeting_id, principal_id, payload.status, principal.sub)
 
 
@@ -265,16 +282,23 @@ async def open_meeting_vote(
     payload: MeetingVoteOpenBody,
     service: ServiceDep,
     voting: VotingDep,
+    agenda: AgendaDep,
     broker: BrokerRestDep,
-    principal: ManagerDep,
+    principal: ReaderDep,
 ) -> MeetingOut:
-    """Abstimmung für einen Antrag in dieser Sitzung anlegen + sofort öffnen (Live-Vote).
+    """Beschlussfrage eines TOP in dieser Sitzung anlegen + sofort öffnen (Live-Vote).
 
-    Nur Sitzungsleitung/Admin. ``eligibleGroup`` = Gremium der Sitzung; die
-    Beschlussfrage (``question``) erscheint im Protokoll. Broadcastet ``vote_opened``."""
+    Verwalter/Protokollant/``vote.manage``. Antrags-TOPs erlauben genau **eine**
+    Abstimmung (sie feuert beim Schließen den pass/fail-Branch); Freitext-TOPs
+    erlauben **mehrere** generische Beschlussfragen. ``eligibleGroup`` = Gremium der
+    Sitzung; ``eligibleCount`` defaultet auf den Roster (Mitglieder mit ``vote.cast``).
+    Broadcastet ``vote_opened``."""
     meeting = await service.get(meeting_id, principal)
-    if not meeting.can_control:
-        raise ForbiddenError("only the committee lead may open a vote")
+    if not meeting.can_manage_votes:
+        raise ForbiddenError("not allowed to open a vote in this meeting")
+    item = await agenda.item(meeting_id, payload.agenda_item_id)
+    if item.application_id is not None and await service.agenda_item_has_vote(item.id):
+        raise ConflictError("this application TOP already has a decision vote")
     config = VoteConfig.model_validate(
         {
             "options": payload.options,
@@ -282,13 +306,18 @@ async def open_meeting_vote(
             "secret": payload.secret,
         }
     )
+    eligible = payload.eligible_count
+    if eligible is None:
+        eligible = await service.vote_eligible_count(meeting.gremium_id)
     create = VoteCreate(
         config=config,
         eligibleGroup=str(meeting.gremium_id),
         question=payload.question,
-        eligibleCount=payload.eligible_count,
+        eligibleCount=eligible,
     )
-    vote = await voting.create(payload.application_id, create, meeting_id=meeting_id)
+    vote = await voting.create(
+        item.application_id, create, meeting_id=meeting_id, agenda_item_id=item.id
+    )
     opened = await voting.open(vote.id, now=datetime.now(UTC))
     await BrokerPublisher(broker).vote_opened(opened)
     return await service.get(meeting_id, principal)
@@ -316,12 +345,12 @@ async def add_agenda_item(
     payload: AgendaAddBody,
     agenda: AgendaDep,
     service: ServiceDep,
-    principal: ManagerDep,
+    principal: ReaderDep,
 ) -> list[AgendaItemOut]:
     """TOP setzen (Antrag oder Freitext) — nur Sitzungsleitung/Admin (#Meetings)."""
     meeting = await service.get(meeting_id, principal)
-    if not meeting.can_control:
-        raise ForbiddenError("only the committee lead may edit the agenda")
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
     return await agenda.add(meeting_id, payload.application_id, payload.title)
 
 
@@ -335,12 +364,12 @@ async def remove_agenda_item(
     item_id: UUID,
     agenda: AgendaDep,
     service: ServiceDep,
-    principal: ManagerDep,
+    principal: ReaderDep,
 ) -> list[AgendaItemOut]:
     """TOP von der Tagesordnung entfernen — nur Sitzungsleitung/Admin."""
     meeting = await service.get(meeting_id, principal)
-    if not meeting.can_control:
-        raise ForbiddenError("only the committee lead may edit the agenda")
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
     return await agenda.remove(meeting_id, item_id)
 
 
@@ -354,12 +383,12 @@ async def reorder_agenda(
     payload: AgendaReorderBody,
     agenda: AgendaDep,
     service: ServiceDep,
-    principal: ManagerDep,
+    principal: ReaderDep,
 ) -> list[AgendaItemOut]:
     """TOPs umsortieren (Drag&Drop) — nur Sitzungsleitung/Admin."""
     meeting = await service.get(meeting_id, principal)
-    if not meeting.can_control:
-        raise ForbiddenError("only the committee lead may edit the agenda")
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
     return await agenda.reorder(meeting_id, payload.item_ids)
 
 
@@ -374,12 +403,12 @@ async def set_agenda_body(
     payload: AgendaBodyBody,
     agenda: AgendaDep,
     service: ServiceDep,
-    principal: ManagerDep,
+    principal: ReaderDep,
 ) -> list[AgendaItemOut]:
     """Markdown-Text eines TOP setzen (pro-TOP-Editor) — nur Sitzungsleitung/Admin."""
     meeting = await service.get(meeting_id, principal)
-    if not meeting.can_control:
-        raise ForbiddenError("only the committee lead may edit the agenda")
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
     return await agenda.set_body(meeting_id, item_id, payload.body)
 
 
@@ -403,10 +432,14 @@ async def _authorize(
     except NotFoundError:
         await websocket.close(code=WS_NOT_FOUND)
         return None
+    # Voter-Kanal: alle aktiven Gremium-Mitglieder dürfen live mitlesen (das STIMMRECHT
+    # ist separat über ``vote.cast``/``in_group`` gegatet); die »Beamer«-Ansicht für
+    # Mitglieder ist eine FE-Anzeige auf derselben Verbindung. Der dedizierte read-only
+    # Beamer-Kanal (unbeaufsichtigte Projektion) bleibt ``meeting.manage``-gegatet.
     eligible = (
         principal.has(MANAGE_PERMISSION)
         if beamer
-        else principal.in_group(str(meeting.gremium_id))
+        else await meetings.is_member(meeting.gremium_id, principal)
     )
     if not eligible:
         await websocket.accept()

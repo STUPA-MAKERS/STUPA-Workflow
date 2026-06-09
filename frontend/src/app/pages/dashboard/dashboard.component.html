@@ -22,6 +22,30 @@
   <span class="dash__cta-action">{{ 'dashboard.apply.cta' | t }} →</span>
 </a>
 
+<!-- Laufende / anstehende Sitzungen — große Shortcuts (#Sessions). -->
+@if (sessionShortcuts().length) {
+  <section class="dash__sessions" aria-labelledby="dash-sessions-h">
+    <h2 id="dash-sessions-h" class="dash__quick-h">{{ 'dashboard.sessions.title' | t }}</h2>
+    <div class="dash__grid">
+      @for (s of sessionShortcuts(); track s.id) {
+        <a class="dash__tile dash__session" [class.dash__session--live]="s.status === 'live'" [routerLink]="['/meetings', s.id]">
+          <app-card [heading]="s.title" [interactive]="true">
+            <div class="dash__session-meta">
+              <app-badge [variant]="sessionVariant(s.status)">{{ sessionStatusKey(s.status) | t }}</app-badge>
+              @if (s.date) {
+                <time [attr.datetime]="s.date">{{ s.date | date: 'mediumDate' }}{{ s.startTime ? ', ' + s.startTime : '' }}</time>
+              }
+            </div>
+            <span card-footer class="dash__link">
+              {{ (s.status === 'live' ? 'dashboard.sessions.join' : 'dashboard.sessions.inspect') | t }} →
+            </span>
+          </app-card>
+        </a>
+      }
+    </div>
+  </section>
+}
+
 @if (canReadApplications()) {
   <div class="dash__panels">
     <!-- Offene Aufgaben: Anträge, die auf den Nutzer warten. -->

@@ -348,7 +348,7 @@ const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
 
 /**
  * Offene Entscheidungen für die eigene Rolle (#64): GET /applications/tasks.
- * Nur Anträge in vote/approval-States, in denen der Principal handeln darf.
+ * Nur Anträge in vote-States, in denen der Principal handeln darf.
  * Approval-Zeilen tragen Inline-Annehmen/Ablehnen, vote-Zeilen öffnen das Detail.
  */
 const MOCK_TASKS: ApplicationListItemWire[] = [
@@ -698,19 +698,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         is_comparison_offer: false,
       };
       return ok(created, 201);
-    }
-    if (/\/applications\/[^/]+\/approval$/.test(p)) {
-      // Approval entscheiden (#28): Branch feuert → Antrag verlässt den
-      // approval-State, Aufgabe verschwindet beim Reload.
-      const appId = p.split('/').slice(-2)[0];
-      const idx = MOCK_TASKS.findIndex((t) => t.id === appId);
-      if (idx >= 0) MOCK_TASKS.splice(idx, 1);
-      const result: TransitionResult = {
-        newStateId: REVIEW_STATE.id,
-        statusEventId: 'e0000000-0000-0000-0000-000000000002',
-        dispatchedActions: [],
-      };
-      return ok(result);
     }
     if (p.endsWith('/transition')) {
       const transitionId =

@@ -98,7 +98,7 @@ export interface StateOutWire {
   label: I18nMap;
   category: string;
   editAllowed: boolean;
-  /** State-Art (#28): normal|vote|approval|decision. */
+  /** State-Art (#28): normal|vote. */
   kind?: string;
 }
 
@@ -327,7 +327,7 @@ export interface ApplicationState {
   label: string;
   category: string;
   editAllowed: boolean;
-  /** State-Art (#28): normal|vote|approval|decision. */
+  /** State-Art (#28): normal|vote. */
   kind: string;
 }
 
@@ -636,11 +636,16 @@ export type MeetingVoteStatus = 'pending' | 'open' | 'closed';
 /** `MeetingVoteOut` — Vote-Zusammenfassung im Sitzungs-State (GET /meetings/{id}). */
 export interface MeetingVoteOutWire {
   id: Uuid;
-  applicationId: Uuid;
+  /** `null` = generische Beschlussfrage (Freitext-TOP), kein Antrag. */
+  applicationId?: Uuid | null;
+  /** An welchen TOP die Abstimmung gebunden ist (Gruppierung im FE). */
+  agendaItemId?: Uuid | null;
   /** Antrags-Titel (vom Backend mitgeliefert; sonst aus dem Antrag aufzulösen). */
   title?: string | null;
   /** Beschlussfrage der (Live-)Abstimmung — fürs Protokoll (#Meetings). */
   question?: string | null;
+  /** Optionen (für die Stimmabgabe). */
+  options?: string[] | null;
   status: MeetingVoteStatus;
   /** Endergebnis (z. B. `accepted`/`rejected`), erst nach `closed`. */
   result?: string | null;
@@ -662,7 +667,18 @@ export interface MeetingOutWire {
   /** Verknüpftes Protokoll (falls bereits angelegt). */
   protocolId?: Uuid | null;
   createdAt: IsoDateTime;
+  protokollantId?: Uuid | null;
+  protokollantName?: string | null;
+  /** Master-Flag: darf der Nutzer die Sitzung führen (Protokoll/TOPs/Status)? */
   canControl?: boolean;
+  /** Sitzung verwalten (anlegen/planen/Protokollant zuweisen). */
+  canManage?: boolean;
+  /** Protokoll/TOPs schreiben (zugewiesener Protokollant oder Verwalter). */
+  canWrite?: boolean;
+  /** Beschlussfragen öffnen/schließen. */
+  canManageVotes?: boolean;
+  /** In dieser Sitzung stimmberechtigt (Rolle mit vote.cast). */
+  canVote?: boolean;
 }
 
 /** `ProtocolOut` — Sitzungsprotokoll (POST /meetings/{id}/protocol, PATCH /protocols/{id}). */
@@ -686,9 +702,11 @@ export interface MeetingCreateBody {
   date?: string | null;
   /** Geplante Uhrzeit (`HH:mm`), optional (#34). */
   startTime?: string | null;
+  /** Zugewiesener Protokollant (Mitglied des Gremiums), optional. */
+  protokollantId?: Uuid | null;
 }
 
-/** Body für `PATCH /meetings/{id}` — Status, aktiven Antrag und/oder Datum setzen. */
+/** Body für `PATCH /meetings/{id}` — Status, aktiven Antrag, Datum und/oder Protokollant. */
 export interface MeetingPatchBody {
   status?: MeetingStatus;
   activeApplicationId?: Uuid | null;
@@ -696,6 +714,8 @@ export interface MeetingPatchBody {
   date?: string | null;
   /** Geplante Uhrzeit (`HH:mm`) (#34). */
   startTime?: string | null;
+  /** Protokollant (um)setzen. */
+  protokollantId?: Uuid | null;
 }
 
 /** Body für `PATCH /protocols/{id}` — Markdown aktualisieren. */
@@ -713,9 +733,13 @@ export interface ProtocolVotesBody {
 /** Vote-Zusammenfassung (FE-View) — `null`-Defaults normalisiert. */
 export interface MeetingVote {
   id: Uuid;
-  applicationId: Uuid;
+  /** `null` = generische Beschlussfrage (Freitext-TOP). */
+  applicationId: Uuid | null;
+  /** TOP, an den die Abstimmung gebunden ist. */
+  agendaItemId: Uuid | null;
   title: string | null;
   question: string | null;
+  options: string[];
   status: MeetingVoteStatus;
   result: string | null;
   counts: Record<string, number> | null;
@@ -737,8 +761,18 @@ export interface Meeting {
   votes: MeetingVote[];
   protocolId: Uuid | null;
   createdAt: IsoDateTime;
-  /** Darf der aktuelle Nutzer die Sitzung steuern? (Vorstand/Schriftführung des Gremiums oder Admin.) */
+  protokollantId: Uuid | null;
+  protokollantName: string | null;
+  /** Master-Flag: darf der Nutzer die Sitzung führen (Protokoll/TOPs/Status)? */
   canControl: boolean;
+  /** Sitzung verwalten (anlegen/planen/Protokollant zuweisen). */
+  canManage: boolean;
+  /** Protokoll/TOPs schreiben (zugewiesener Protokollant oder Verwalter). */
+  canWrite: boolean;
+  /** Beschlussfragen öffnen/schließen. */
+  canManageVotes: boolean;
+  /** In dieser Sitzung stimmberechtigt. */
+  canVote: boolean;
 }
 
 /** Protokoll (FE-View) — `isFinal` aus `status` abgeleitet. */

@@ -15,16 +15,18 @@ import {
   ToastService,
 } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
-import type { GremiumRole } from '../admin.models';
+import { GREMIUM_PERMISSIONS, type GremiumRole } from '../admin.models';
+import type { TranslationKey } from '@core/i18n/translations';
 
 interface RoleDraft {
   key: string;
   labelDe: string;
   labelEn: string;
+  permissions: string[];
 }
 
 function emptyDraft(): RoleDraft {
-  return { key: '', labelDe: '', labelEn: '' };
+  return { key: '', labelDe: '', labelEn: '', permissions: ['vote.cast'] };
 }
 
 /**
@@ -60,6 +62,15 @@ function emptyDraft(): RoleDraft {
       <app-data-table [columns]="columns()" [rows]="roles()" [emptyText]="'admin.gremiumRoles.empty' | t">
         <ng-template appCell="name" let-r>{{ label($any(r)) | capitalize }}</ng-template>
         <ng-template appCell="key" let-r><span class="gr__mono">{{ $any(r).key }}</span></ng-template>
+        <ng-template appCell="permissions" let-r>
+          <span class="gr__permTags">
+            @for (p of $any(r).permissions ?? []; track p) {
+              <span class="gr__permTag">{{ permLabel(p) | t }}</span>
+            } @empty {
+              <span class="gr__mono">—</span>
+            }
+          </span>
+        </ng-template>
         <ng-template appCell="actions" let-r let-i="index">
           <span class="gr__actions">
             <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.edit' | t" (click)="openEdit(i)">
@@ -101,6 +112,19 @@ function emptyDraft(): RoleDraft {
             <span class="field__label">{{ 'admin.common.labelEn' | t }}</span>
             <input class="field__control" [ngModel]="d.labelEn" (ngModelChange)="patch('labelEn', $event)" name="labelEn" />
           </label>
+          <fieldset class="gr__perms">
+            <legend class="field__label">{{ 'admin.gremiumRoles.permissions' | t }}</legend>
+            @for (p of allPermissions; track p) {
+              <label class="gr__perm">
+                <input
+                  type="checkbox"
+                  [checked]="d.permissions.includes(p)"
+                  (change)="togglePerm(p, $any($event.target).checked)"
+                />
+                <span>{{ permLabel(p) | t }}</span>
+              </label>
+            }
+          </fieldset>
         </form>
       }
       <div dialog-footer class="gr__foot">
@@ -144,6 +168,17 @@ function emptyDraft(): RoleDraft {
       }
       .field__control:disabled { opacity: 0.6; cursor: not-allowed; }
       .gr__foot { display: flex; justify-content: flex-end; gap: var(--space-3); }
+      .gr__perms { display: flex; flex-direction: column; gap: var(--space-2); border: 0; margin: 0; padding: 0; }
+      .gr__perm { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); }
+      .gr__permTags { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+      .gr__permTag {
+        font-size: var(--fs-xs);
+        padding: 0 var(--space-2);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface-sunken);
+        color: var(--color-text-muted);
+        white-space: nowrap;
+      }
     `,
   ],
 })
@@ -164,8 +199,25 @@ export class GremiumRolesComponent {
   protected readonly columns = computed<ColumnDef[]>(() => [
     { key: 'name', label: this.i18n.translate('admin.gremiumRoles.col.name') },
     { key: 'key', label: this.i18n.translate('admin.gremiumRoles.col.key') },
+    { key: 'permissions', label: this.i18n.translate('admin.gremiumRoles.permissions') },
     { key: 'actions', label: this.i18n.translate('admin.common.actions'), align: 'end', width: '7rem' },
   ]);
+
+  protected readonly allPermissions = GREMIUM_PERMISSIONS;
+
+  protected permLabel(p: string): TranslationKey {
+    return `admin.gremiumPerm.${p}` as TranslationKey;
+  }
+
+  protected togglePerm(perm: string, on: boolean): void {
+    this.draft.update((d) => {
+      if (!d) return d;
+      const set = new Set(d.permissions);
+      if (on) set.add(perm);
+      else set.delete(perm);
+      return { ...d, permissions: GREMIUM_PERMISSIONS.filter((p) => set.has(p)) };
+    });
+  }
 
   constructor() {
     this.api.listGremiumRoles(this.gremiumId).subscribe((r) => this.roles.set(r));
@@ -184,7 +236,12 @@ export class GremiumRolesComponent {
   protected openEdit(i: number): void {
     const r = this.roles()[i];
     this.editingId.set(r.id);
-    this.draft.set({ key: r.key, labelDe: r.name['de'] ?? '', labelEn: r.name['en'] ?? '' });
+    this.draft.set({
+      key: r.key,
+      labelDe: r.name['de'] ?? '',
+      labelEn: r.name['en'] ?? '',
+      permissions: [...(r.permissions ?? [])],
+    });
   }
 
   protected close(): void {
@@ -200,10 +257,11 @@ export class GremiumRolesComponent {
     const d = this.draft();
     if (!d || !d.key.trim()) return;
     const name = { de: d.labelDe.trim() || d.key, en: d.labelEn.trim() || d.labelDe.trim() || d.key };
+    const permissions = [...d.permissions];
     const id = this.editingId();
     const req = id
-      ? this.api.updateGremiumRole(id, { name })
-      : this.api.createGremiumRole(this.gremiumId, { key: d.key.trim(), name });
+      ? this.api.updateGremiumRole(id, { name, permissions })
+      : this.api.createGremiumRole(this.gremiumId, { key: d.key.trim(), name, permissions });
     req.subscribe({
       next: (saved) => {
         this.roles.update((list) =>

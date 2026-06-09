@@ -112,6 +112,7 @@ class VotingService:
             id=vote.id,
             applicationId=vote.application_id,
             meetingId=vote.meeting_id,
+            agendaItemId=getattr(vote, "agenda_item_id", None),
             question=getattr(vote, "question", None),
             eligibleGroup=vote.eligible_group,
             config=config,
@@ -126,18 +127,24 @@ class VotingService:
     # --------------------------------------------------------------- create
     async def create(
         self,
-        application_id: UUID,
+        application_id: UUID | None,
         payload: VoteCreate,
         *,
         meeting_id: UUID | None = None,
+        agenda_item_id: UUID | None = None,
     ) -> VoteOut:
-        """Abstimmung (``draft``) anlegen. 404, wenn der Antrag fehlt.
+        """Abstimmung (``draft``) anlegen.
 
-        ``meeting_id`` bindet die Abstimmung an eine Sitzung (Live-Vote, T-16)."""
-        await self._get_application(application_id)
+        ``application_id`` ist optional: ``None`` = generische Beschlussfrage eines
+        Freitext-TOP (kein Antrag, kein Flow-Branch beim Close). ``meeting_id`` bindet
+        die Abstimmung an eine Sitzung (Live-Vote, T-16); ``agenda_item_id`` an den TOP.
+        """
+        if application_id is not None:
+            await self._get_application(application_id)
         vote = Vote(
             application_id=application_id,
             meeting_id=meeting_id,
+            agenda_item_id=agenda_item_id,
             eligible_group=payload.eligible_group,
             question=payload.question,
             config=payload.config.model_dump(by_alias=True),
@@ -309,12 +316,17 @@ class VotingService:
         eligible = vote.eligible_count or 0
         outcome = tally_mod.result(config, counts, eligible)
 
-        flow = FlowService(self.session, self.dispatcher)
-        # Global-Flow (#28): ein ``vote``-State hat zwei feste Ausgänge mit
-        # ``branch`` ``pass``/``fail``. ``passed`` → pass, sonst (``rejected``/``tie``)
-        # fail-closed → fail.
+        # Global-Flow (#28): ein ``vote``-State hat zwei feste Ausgänge mit ``branch``
+        # ``pass``/``fail``. ``passed`` → pass, sonst (``rejected``/``tie``) fail-closed
+        # → fail. Generische Beschlussfragen (ohne Antrag) feuern KEINEN Branch — sie
+        # halten nur das Ergebnis fürs Protokoll.
         branch_name = "pass" if outcome.result == "passed" else "fail"
-        branch = await flow.branch_transition(vote.application_id, branch_name)
+        flow = FlowService(self.session, self.dispatcher)
+        branch = (
+            await flow.branch_transition(vote.application_id, branch_name)
+            if vote.application_id is not None
+            else None
+        )
 
         # Vote-Zustand vormerken — NICHT separat committen: `fire` schreibt ihn
         # atomar mit Transition + status_event; ohne Branch committen wir hier.
@@ -323,7 +335,7 @@ class VotingService:
         vote.result_branch_transition_id = branch.id if branch is not None else None
 
         new_state_id: UUID | None = None
-        if branch is not None:
+        if branch is not None and vote.application_id is not None:
             fired = await flow.fire_branch(
                 vote.application_id, branch_name, principal, note=f"vote:{outcome.result}"
             )

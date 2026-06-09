@@ -66,9 +66,11 @@ class VoteOut(_CamelModel):
     """Vote-State + Tally (``GET /votes/{id}``)."""
 
     id: UUID
-    application_id: UUID = Field(alias="applicationId")
+    # None = generische Beschlussfrage (Freitext-TOP), kein Antrag.
+    application_id: UUID | None = Field(default=None, alias="applicationId")
     # Sitzung, an die der Vote hängt (Live-Vote, T-16); None bei reinem Async-Vote.
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
+    agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
     question: str | None = None
     eligible_group: str = Field(alias="eligibleGroup")
     config: VoteConfig

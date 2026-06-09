@@ -52,7 +52,8 @@ export function topSnippet(
  */
 export function voteSnippet(vote: MeetingVote): string {
   const lines: string[] = [`\n:::vote{#${vote.id}}`];
-  const heading = vote.title?.trim() ? vote.title.trim() : vote.applicationId;
+  const heading =
+    vote.title?.trim() || vote.question?.trim() || vote.applicationId || 'Beschluss';
   lines.push(`### ${heading}`);
   if (vote.counts && Object.keys(vote.counts).length > 0) {
     lines.push('', '| Option | Stimmen |', '| --- | --- |');

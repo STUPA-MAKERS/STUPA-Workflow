@@ -434,7 +434,10 @@ export class AdminApiService {
     return this.http.get<GremiumRole[]>(`${this.base}/admin/gremien/${gremiumId}/roles`);
   }
 
-  createGremiumRole(gremiumId: Uuid, body: { key: string; name: I18nMap }): Observable<GremiumRole> {
+  createGremiumRole(
+    gremiumId: Uuid,
+    body: { key: string; name: I18nMap; permissions?: string[] },
+  ): Observable<GremiumRole> {
     if (this.mock) {
       const row = { id: `gr-${this.store.gremiumRoles.length + 1}`, gremiumId, ...body };
       this.store.gremiumRoles = [...this.store.gremiumRoles, row];
@@ -443,13 +446,21 @@ export class AdminApiService {
     return this.http.post<GremiumRole>(`${this.base}/admin/gremien/${gremiumId}/roles`, body);
   }
 
-  updateGremiumRole(id: Uuid, body: { name: I18nMap }): Observable<GremiumRole> {
+  updateGremiumRole(
+    id: Uuid,
+    body: { name?: I18nMap; permissions?: string[] },
+  ): Observable<GremiumRole> {
     if (this.mock) {
       const row = this.store.gremiumRoles.find((r) => r.id === id);
       if (row) Object.assign(row, body);
-      return of(structuredCopy(row ?? { id, gremiumId: '', key: '', name: body.name }));
+      return of(structuredCopy(row ?? { id, gremiumId: '', key: '', name: body.name ?? {} }));
     }
     return this.http.patch<GremiumRole>(`${this.base}/admin/gremium-roles/${id}`, body);
+  }
+
+  /** Granulare Berechtigungen einer Gremium-Rolle setzen (#Sessions). */
+  saveGremiumRolePermissions(id: Uuid, permissions: string[]): Observable<GremiumRole> {
+    return this.updateGremiumRole(id, { permissions });
   }
 
   deleteGremiumRole(id: Uuid): Observable<void> {

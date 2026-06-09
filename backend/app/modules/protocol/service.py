@@ -34,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium, MailList
 from app.modules.files.storage import ObjectStorage, StorageError
-from app.modules.livevote.models import Meeting
+from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.queue import MailQueue
 from app.modules.pdf.nextcloud import NextcloudError, NextcloudExporter
@@ -220,7 +220,7 @@ class ProtocolService:
             view = await voting.get(vote_id)
             snippets.append(
                 build_vote_snippet(
-                    _vote_title(view.application_id),
+                    _vote_title(view.application_id, view.question),
                     view.tally.result,
                     view.tally.counts,
                     question=view.question,
@@ -259,15 +259,57 @@ class ProtocolService:
         meeting = await self.session.get(Meeting, protocol.meeting_id)
         gremium = await self.session.get(Gremium, protocol.gremium_id)
         title = meeting.title if meeting is not None else "Protokoll"
+        # Quelle der Wahrheit ist der pro-TOP-Editor (Tagesordnung). Existieren TOPs,
+        # wird das Protokoll aus ihren Markdown-Bodies + Beschluss-Snippets montiert;
+        # andernfalls Fallback auf das frei editierte ``protocol.markdown`` (Bestand).
+        assembled = await self._assemble_from_agenda(protocol.meeting_id)
         return build_protocol_document(
             ProtocolDoc(
                 title=title,
                 gremium_slug=gremium.slug if gremium is not None else None,
                 cd_variant=protocol.cd_variant,
                 date=meeting.date if meeting is not None else None,
-                markdown=protocol.markdown,
+                markdown=assembled or protocol.markdown,
             )
         )
+
+    async def _assemble_from_agenda(self, meeting_id: UUID) -> str:
+        """Protokoll-Markdown aus den TOP-Bodies + ihren Beschluss-Abstimmungen bauen."""
+        items = (
+            await self.session.execute(
+                select(MeetingAgendaItem)
+                .where(MeetingAgendaItem.meeting_id == meeting_id)
+                .order_by(MeetingAgendaItem.position)
+            )
+        ).scalars().all()
+        if not items:
+            return ""
+        voting = VotingService(self.session)
+        blocks: list[str] = []
+        for idx, item in enumerate(items, start=1):
+            heading = (item.title or "Tagesordnungspunkt").strip()
+            block = [f"## TOP {idx}: {heading}"]
+            if item.body and item.body.strip():
+                block.append(item.body.strip())
+            votes = (
+                await self.session.execute(
+                    select(Vote)
+                    .where(Vote.agenda_item_id == item.id)
+                    .order_by(Vote.created_at)
+                )
+            ).scalars().all()
+            for vote in votes:
+                view = await voting.get(vote.id)
+                block.append(
+                    build_vote_snippet(
+                        view.question or "Beschlussfrage",
+                        view.tally.result,
+                        view.tally.counts,
+                        question=view.question,
+                    )
+                )
+            blocks.append("\n\n".join(block))
+        return "\n\n".join(blocks) + "\n"
 
     async def _render(self, protocol: Protocol, markdown: str) -> None:
         """pytex → PDF → MinIO → (Nextcloud). Ohne Storage »aus« (DEV); Backend-Fehler → 503."""
@@ -353,10 +395,12 @@ class ProtocolService:
         return vote
 
 
-def _vote_title(application_id: UUID) -> str:
-    """Snippet-Überschrift einer eingebetteten Abstimmung (Antrags-Referenz).
+def _vote_title(application_id: UUID | None, question: str | None = None) -> str:
+    """Snippet-Überschrift einer eingebetteten Abstimmung.
 
-    ``VoteConfig`` trägt keinen Titel (strikt validiert) — der Bezug ist der Antrag.
-    Die Kurz-Referenz unterscheidet mehrere eingebettete Votes; der Protokollant
-    kann die Überschrift im Editor frei nacharbeiten."""
-    return f"Abstimmung – Antrag {str(application_id)[:8]}"
+    Antrags-TOP: Kurz-Referenz auf den Antrag. Generische Beschlussfrage (kein
+    Antrag): die Frage selbst. Der Protokollant kann die Überschrift im Editor frei
+    nacharbeiten."""
+    if application_id is not None:
+        return f"Abstimmung – Antrag {str(application_id)[:8]}"
+    return question.strip() if question and question.strip() else "Beschlussfrage"

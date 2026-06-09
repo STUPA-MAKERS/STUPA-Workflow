@@ -48,6 +48,11 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Der je Sitzung zugewiesene Protokollant (genau einer). Er führt die Live-Sitzung
+    # und schreibt das Protokoll; SET NULL, falls der Principal gelöscht wird.
+    protokollant_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(

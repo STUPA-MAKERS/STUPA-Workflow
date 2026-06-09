@@ -26,10 +26,12 @@ class MeetingCreate(_CamelModel):
     title: str = Field(min_length=1)
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
+    # Genau ein zugewiesener Protokollant (Mitglied des Gremiums).
+    protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
 
 
 class MeetingPatch(_CamelModel):
-    """``PATCH /api/meetings/{id}`` — Sitzungs-Steuerung (Beamer/Live).
+    """``PATCH /api/meetings/{id}`` — Sitzungs-Steuerung/Planung.
 
     Mindestens ein Feld muss gesetzt sein; jede Änderung publiziert ``meeting_state``.
     """
@@ -38,18 +40,17 @@ class MeetingPatch(_CamelModel):
     status: MeetingStatus | None = None
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
+    protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
-        # ``date`` zählt mit: geplante Sitzungen lassen sich so vorab terminieren.
-        if (
-            self.status is None
-            and self.active_application_id is None
-            and "date" not in self.model_fields_set
-            and "start_time" not in self.model_fields_set
-        ):
+        # ``date``/``protokollantId`` zählen mit: geplante Sitzungen vorab terminieren
+        # bzw. den Protokollanten (um)setzen.
+        managed = {"date", "start_time", "protokollant_id"} & self.model_fields_set
+        if self.status is None and self.active_application_id is None and not managed:
             raise ValueError(
-                "at least one of 'status', 'activeApplicationId', 'date' or 'startTime' required"
+                "at least one of 'status', 'activeApplicationId', 'date', "
+                "'startTime' or 'protokollantId' required"
             )
         return self
 
@@ -58,8 +59,13 @@ class MeetingVoteOut(_CamelModel):
     """Eine an die Sitzung gebundene Abstimmung (für die Sitzungssteuerung)."""
 
     id: UUID
-    application_id: UUID = Field(alias="applicationId")
+    # NULL = generische Beschlussfrage (Freitext-TOP), kein Antrag.
+    application_id: UUID | None = Field(default=None, alias="applicationId")
+    # An welchen TOP die Abstimmung gebunden ist (für die Gruppierung im FE).
+    agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
     question: str | None = None
+    # Optionen (für die Stimmabgabe im FE).
+    options: list[str] = Field(default_factory=list)
     status: Literal["draft", "open", "closed"]
     result: str | None = None
 
@@ -76,9 +82,15 @@ class MeetingOut(_CamelModel):
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
     protocol_id: UUID | None = Field(default=None, alias="protocolId")
     created_at: _datetime = Field(alias="createdAt")
-    # Darf der anfragende Principal die Sitzung steuern? True für Admin oder wer im
-    # Gremium die Sitzungsleitung (Vorstand/Schriftführung) innehat (#Meetings).
+    protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
+    protokollant_name: str | None = Field(default=None, alias="protokollantName")
+    # Master-Flag fürs FE: darf der Principal die Sitzung **führen** (Protokoll/TOPs/
+    # Status)? = Protokollant oder Sitzungsverwalter. Granulare Flags darunter.
     can_control: bool = Field(default=False, alias="canControl")
+    can_manage: bool = Field(default=False, alias="canManage")
+    can_write: bool = Field(default=False, alias="canWrite")
+    can_manage_votes: bool = Field(default=False, alias="canManageVotes")
+    can_vote: bool = Field(default=False, alias="canVote")
     # An die Sitzung gebundene Abstimmungen (Sitzungssteuerung).
     votes: list[MeetingVoteOut] = Field(default_factory=list)
 
@@ -127,20 +139,28 @@ class AssignableApplicationOut(_CamelModel):
 
 
 class MeetingVoteOpenBody(_CamelModel):
-    """``POST /meetings/{id}/votes`` — Abstimmung für einen Antrag öffnen (Live-Vote).
+    """``POST /meetings/{id}/votes`` — Beschlussfrage eines TOP öffnen (Live-Vote).
 
-    Bindet eine neue Abstimmung an die Sitzung und öffnet sie sofort. ``question``
-    (Beschlussfrage) wandert ins Protokoll-Snippet.
+    Bindet eine neue Abstimmung an den TOP (``agendaItemId``) und öffnet sie sofort.
+    Bei Antrags-TOPs ist genau **eine** Abstimmung erlaubt (sie feuert beim Schließen
+    den pass/fail-Branch des Antrags); Freitext-TOPs erlauben **mehrere** generische
+    Beschlussfragen. ``question`` (Beschlussfrage) wandert ins Protokoll-Snippet.
     """
 
-    application_id: UUID = Field(alias="applicationId")
+    agenda_item_id: UUID = Field(alias="agendaItemId")
     question: str | None = None
-    options: list[str] = Field(min_length=2)
+    options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
         default="simple", alias="majorityRule"
     )
     secret: bool = False
     eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
+
+    @model_validator(mode="after")
+    def _min_options(self) -> MeetingVoteOpenBody:
+        if len(self.options) < 2:
+            raise ValueError("at least two options are required")
+        return self
 
 
 class AgendaAddBody(_CamelModel):

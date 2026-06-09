@@ -353,9 +353,19 @@ export interface GremiumRole {
   gremiumId: Uuid;
   key: string;
   name: I18nMap;
-  /** Pflichtrolle (Vorstand/Schriftführung/Mitglied) — vorhanden in jedem Gremium, nicht löschbar. */
+  /** Pflichtrolle (Vorstand/Manager/Mitglied) — vorhanden in jedem Gremium, nicht löschbar. */
   forced?: boolean;
+  /** Granulare Sitzungs-Berechtigungen (session.manage/vote.manage/vote.cast/protocol.write). */
+  permissions?: string[];
 }
+
+/** Konfigurierbare granulare Gremium-Rollen-Berechtigungen (#Sessions). */
+export const GREMIUM_PERMISSIONS = [
+  'session.manage',
+  'vote.manage',
+  'vote.cast',
+  'protocol.write',
+] as const;
 
 /** Art einer benannten Frist-Policy. */
 export type DeadlineKind = 'absolute' | 'relative_submitted' | 'relative_changed';

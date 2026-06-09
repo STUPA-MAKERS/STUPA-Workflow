@@ -55,6 +55,20 @@ class AgendaService:
                 out[s.id] = s
         return out
 
+    async def item(self, meeting_id: UUID, item_id: UUID) -> MeetingAgendaItem:
+        """Einen TOP der Sitzung laden (404, falls unbekannt)."""
+        row = (
+            await self.session.execute(
+                select(MeetingAgendaItem).where(
+                    MeetingAgendaItem.meeting_id == meeting_id,
+                    MeetingAgendaItem.id == item_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise NotFoundError(f"agenda item {item_id} not found")
+        return row
+
     async def list(self, meeting_id: UUID) -> list[AgendaItemOut]:
         await self._meeting(meeting_id)
         rows = (

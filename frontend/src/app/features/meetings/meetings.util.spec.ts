@@ -11,7 +11,10 @@ function vote(overrides: Partial<MeetingVote> = {}): MeetingVote {
   return {
     id: 'v-1',
     applicationId: 'app-1',
+    agendaItemId: null,
+    options: ['yes', 'no', 'abstain'],
     title: 'Förderung Ersti-Wochenende',
+    question: null,
     status: 'closed',
     result: 'accepted',
     counts: { yes: 12, no: 3, abstain: 1 },

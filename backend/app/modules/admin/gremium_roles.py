@@ -27,22 +27,84 @@ from app.modules.admin.schemas import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
+from app.modules.auth.models import Principal as PrincipalRow
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
-# Pflicht-Gremium-Rollen (#Meetings): existieren in JEDEM Gremium und sind nicht
-# löschbar. ``vorstand`` + ``schriftfuehrung`` bilden die **Sitzungsleitung**
-# (steuern die Sitzungssteuerung), ``member`` ist die gewöhnliche Mitgliedsrolle.
-# Anlegen passiert beim Gremium-Erstellen und idempotent beim Auflisten (Backfill
-# für Bestands-Gremien via Migration).
-FORCED_GREMIUM_ROLES: tuple[tuple[str, dict[str, str]], ...] = (
-    ("vorstand", {"de": "Vorstand", "en": "Board"}),
-    ("schriftfuehrung", {"de": "Schriftführung", "en": "Secretary"}),
-    ("member", {"de": "Mitglied", "en": "Member"}),
+# Granulare, **pro Gremium-Rolle** konfigurierbare Berechtigungen (Sitzungs-Domäne).
+# Getrennt vom globalen 16-Permission-Satz: diese gelten nur innerhalb des Gremiums
+# und werden über die aktive ``gremium_membership`` aufgelöst.
+#   session.manage  — Sitzungen anlegen/bearbeiten, Protokollant zuweisen, Status setzen
+#   vote.manage     — Abstimmungen (Beschlussfragen) öffnen/schließen
+#   vote.cast       — in Sitzungs-Abstimmungen mitstimmen
+#   protocol.write  — als Protokollant zuweisbar / Protokoll schreiben
+GREMIUM_PERMISSIONS: tuple[str, ...] = (
+    "session.manage",
+    "vote.manage",
+    "vote.cast",
+    "protocol.write",
 )
-FORCED_ROLE_KEYS: frozenset[str] = frozenset(key for key, _ in FORCED_GREMIUM_ROLES)
+_ALL_PERMS: list[str] = list(GREMIUM_PERMISSIONS)
 
-# Rollen, die die Sitzung leiten dürfen (Zugriff auf die Sitzungssteuerung).
-LEAD_ROLE_KEYS: frozenset[str] = frozenset({"vorstand", "schriftfuehrung"})
+# Pflicht-Gremium-Rollen: existieren in JEDEM Gremium und sind nicht löschbar.
+# ``vorstand`` + ``manager`` dürfen per Default Sitzungen verwalten (session.manage)
+# und Abstimmungen führen; ``member`` darf per Default nur mitstimmen (vote.cast).
+# Der je Sitzung zugewiesene **Protokollant** schreibt das Protokoll (zusätzlich zu
+# einer ``protocol.write``-Rolle). Anlegen beim Gremium-Erstellen + idempotenter
+# Backfill beim Auflisten (Bestands-Gremien via Migration 0040).
+FORCED_GREMIUM_ROLES: tuple[tuple[str, dict[str, str], list[str]], ...] = (
+    ("vorstand", {"de": "Vorstand", "en": "Board"}, list(_ALL_PERMS)),
+    ("manager", {"de": "Manager", "en": "Manager"}, list(_ALL_PERMS)),
+    ("member", {"de": "Mitglied", "en": "Member"}, ["vote.cast"]),
+)
+FORCED_ROLE_KEYS: frozenset[str] = frozenset(key for key, _, _ in FORCED_GREMIUM_ROLES)
+FORCED_ROLE_DEFAULT_PERMS: dict[str, list[str]] = {
+    key: perms for key, _, perms in FORCED_GREMIUM_ROLES
+}
+
+
+def _time_valid_clause(now: datetime):
+    """SQLAlchemy-Klausel: ``gremium_membership`` ist zum Zeitpunkt ``now`` aktiv."""
+    return (
+        (GremiumMembership.valid_from.is_(None))
+        | (GremiumMembership.valid_from <= now)
+    ) & (
+        (GremiumMembership.valid_until.is_(None))
+        | (GremiumMembership.valid_until > now)
+    )
+
+
+async def active_gremium_roles(
+    session: AsyncSession, sub: str, now: datetime | None = None
+) -> list[tuple[UUID, GremiumRole]]:
+    """Aktive (Gremium, Rolle)-Paare eines Principals (zeit-validiert)."""
+    now = now or datetime.now(UTC)
+    rows = (
+        await session.execute(
+            select(GremiumMembership.gremium_id, GremiumRole)
+            .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+            .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
+            .where(PrincipalRow.sub == sub, _time_valid_clause(now))
+        )
+    ).all()
+    return [(gid, role) for gid, role in rows]
+
+
+async def gremium_ids_with_permission(
+    session: AsyncSession, sub: str, perm: str, now: datetime | None = None
+) -> set[UUID]:
+    """Gremium-IDs, in denen die aktive Rolle des Principals ``perm`` gewährt."""
+    return {
+        gid
+        for gid, role in await active_gremium_roles(session, sub, now)
+        if perm in (role.permissions or [])
+    }
+
+
+async def gremium_member_ids(
+    session: AsyncSession, sub: str, now: datetime | None = None
+) -> set[UUID]:
+    """Gremium-IDs, in denen der Principal aktuell (beliebige Rolle) Mitglied ist."""
+    return {gid for gid, _ in await active_gremium_roles(session, sub, now)}
 
 
 def intervals_overlap(
@@ -73,6 +135,12 @@ def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
 
 
+def _sanitize_perms(perms: list[str] | None) -> list[str]:
+    """Nur bekannte Gremium-Permissions, dedupliziert, in Katalog-Reihenfolge."""
+    given = set(perms or [])
+    return [p for p in GREMIUM_PERMISSIONS if p in given]
+
+
 def _role_out(row: GremiumRole) -> GremiumRoleOut:
     return GremiumRoleOut(
         id=row.id,
@@ -80,6 +148,7 @@ def _role_out(row: GremiumRole) -> GremiumRoleOut:
         key=row.key,
         name=row.name_i18n or {},
         forced=row.key in FORCED_ROLE_KEYS,
+        permissions=list(row.permissions or []),
     )
 
 
@@ -124,10 +193,15 @@ class GremiumRoleService:
             ).all()
         )
         added = False
-        for key, name in FORCED_GREMIUM_ROLES:
+        for key, name, perms in FORCED_GREMIUM_ROLES:
             if key not in present:
                 self.session.add(
-                    GremiumRole(gremium_id=gremium_id, key=key, name_i18n=name)
+                    GremiumRole(
+                        gremium_id=gremium_id,
+                        key=key,
+                        name_i18n=name,
+                        permissions=list(perms),
+                    )
                 )
                 added = True
         if added:
@@ -163,7 +237,10 @@ class GremiumRoleService:
                 f"gremium role {payload.key!r} already exists in this gremium"
             )
         row = GremiumRole(
-            gremium_id=gremium_id, key=payload.key, name_i18n=payload.name
+            gremium_id=gremium_id,
+            key=payload.key,
+            name_i18n=payload.name,
+            permissions=_sanitize_perms(payload.permissions),
         )
         self.session.add(row)
         await self.session.flush()
@@ -179,6 +256,10 @@ class GremiumRoleService:
             raise NotFoundError(f"gremium role {role_id} not found")
         if payload.name is not None:
             row.name_i18n = payload.name
+        if payload.permissions is not None:
+            # Granulare Berechtigungen sind auch auf Pflichtrollen editierbar
+            # (nur der Schlüssel/das Löschen ist bei Pflichtrollen gesperrt).
+            row.permissions = _sanitize_perms(payload.permissions)
         await self._audit(actor, "gremium_role", row.id)
         await self.session.commit()
         return _role_out(row)

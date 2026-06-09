@@ -218,9 +218,11 @@ export function mapVersion(wire: VersionOutWire): ApplicationVersion {
 export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
   return {
     id: wire.id,
-    applicationId: wire.applicationId,
+    applicationId: wire.applicationId ?? null,
+    agendaItemId: wire.agendaItemId ?? null,
     title: wire.title ?? null,
     question: wire.question ?? null,
+    options: wire.options ?? [],
     status: wire.status,
     result: wire.result ?? null,
     counts: wire.counts ?? null,
@@ -230,6 +232,7 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
 }
 
 export function mapMeeting(wire: MeetingOutWire): Meeting {
+  const canWrite = wire.canWrite ?? wire.canControl ?? false;
   return {
     id: wire.id,
     title: wire.title,
@@ -241,7 +244,13 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     votes: (wire.votes ?? []).map(mapMeetingVote),
     protocolId: wire.protocolId ?? null,
     createdAt: wire.createdAt,
-    canControl: wire.canControl ?? false,
+    protokollantId: wire.protokollantId ?? null,
+    protokollantName: wire.protokollantName ?? null,
+    canControl: wire.canControl ?? canWrite,
+    canManage: wire.canManage ?? false,
+    canWrite,
+    canManageVotes: wire.canManageVotes ?? false,
+    canVote: wire.canVote ?? false,
   };
 }
 

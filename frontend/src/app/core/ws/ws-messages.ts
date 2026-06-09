@@ -8,7 +8,10 @@ export interface MeetingStateMsg {
 export interface VoteOpenedMsg {
   type: 'vote_opened';
   voteId: string;
-  applicationId: string;
+  /** `null` = generische Beschlussfrage (Freitext-TOP). */
+  applicationId?: string | null;
+  agendaItemId?: string | null;
+  question?: string | null;
   options: string[];
   closesAt: string | null;
 }

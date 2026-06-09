@@ -46,6 +46,7 @@ import {
 import { MarkdownEditorComponent } from '@shared/ui/markdown-editor/markdown-editor.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
+import { renderMarkdown } from './meetings.util';
 
 /** Wartezeit nach der letzten Eingabe, bevor das Protokoll automatisch gespeichert wird (#56). */
 const AUTOSAVE_DELAY_MS = 1000;
@@ -95,178 +96,148 @@ const AUTOSAVE_DELAY_MS = 1000;
           <app-badge [variant]="statusVariant(m.status)">
             {{ statusKey(m.status) | t }}
           </app-badge>
+          @if (m.protokollantName) {
+            <span class="mtg__muted">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
+          }
+          <app-button
+            variant="ghost"
+            size="sm"
+            class="mtg__beamerToggle"
+            (click)="beamerMode.set(!beamerMode())"
+          >
+            {{ (beamerMode() ? 'meetings.beamer.exit' : 'meetings.beamer.enter') | t }}
+          </app-button>
         </div>
       }
     </header>
 
-    @if (!canManage() && !canWrite()) {
+    @if (showForbidden()) {
       <p class="mtg__status" role="alert">{{ 'rbac.forbidden' | t }}</p>
     } @else if (loading()) {
       <p class="mtg__status" aria-live="polite">{{ 'meetings.loading' | t }}</p>
     } @else if (error()) {
       <p class="mtg__status mtg__status--error" role="alert">{{ 'meetings.error' | t }}</p>
     } @else if (meeting(); as m) {
-      <!-- Sitzungssteuerung nur für die Sitzungsleitung (Vorstand/Schriftführung) (#Meetings). -->
-      @if (canManage() && !m.canControl) {
-        <p class="mtg__muted mtg__hint" role="note">{{ 'meetings.control.leadOnly' | t }}</p>
+      <!-- Beamer-Ansicht: nur aktuelle Frage + Live-Ergebnis, keine Dialoge (#Sessions). -->
+      @if (beamerMode()) {
+        <section class="mtg__beamer" [attr.aria-label]="'meetings.beamer.heading' | t">
+          @if (beamerVote(); as bv) {
+            <h2 class="mtg__beamerQ">{{ bv.question || bv.title || ('meetings.vote.untitled' | t) }}</h2>
+            <dl class="mtg__beamerTally">
+              @for (entry of countEntries(bv); track entry.key) {
+                <div [class.mtg__tally--leading]="entry.key === bv.leading">
+                  <dt>{{ entry.key }}</dt>
+                  <dd>{{ entry.value }}</dd>
+                </div>
+              }
+            </dl>
+            <app-badge [variant]="voteVariant(bv.status)">{{ voteStatusKey(bv.status) | t }}</app-badge>
+            @if (bv.result) { <app-badge variant="info">{{ bv.result }}</app-badge> }
+          } @else {
+            <p class="mtg__muted">{{ 'meetings.beamer.idle' | t }}</p>
+          }
+        </section>
       }
 
-      <!-- Vorab-Terminierung geplanter Sitzungen (#7) -->
-      @if (canManage() && m.canControl && m.status === 'planned') {
-        <app-card [heading]="'meetings.plan.title' | t">
-          <p class="mtg__lead">{{ 'meetings.plan.lead' | t }}</p>
-          <div class="mtg__planRow">
-            <app-datepicker
-              [label]="'meetings.plan.date' | t"
-              [ngModel]="planDate()"
-              (ngModelChange)="planDate.set($event)"
-              name="planDate"
-            />
-            <label class="mtg__paneLabel" for="mtg-plan-time">{{ 'meetings.create.time' | t }}</label>
-            <input
-              id="mtg-plan-time"
-              class="mtg__input"
-              type="time"
-              [ngModel]="planTime()"
-              (ngModelChange)="planTime.set($event)"
-              name="planTime"
-            />
-            <app-button
-              size="sm"
-              [loading]="savingDate()"
-              [disabled]="!planDate()"
-              (click)="savePlannedDate()"
-            >
-              {{ 'meetings.plan.save' | t }}
-            </app-button>
-          </div>
-        </app-card>
-      }
-
-      <!-- Sitzungssteuerung -->
-      @if (canManage() && m.canControl) {
-        <app-card [heading]="'meetings.control.title' | t">
-          <p class="mtg__lead">{{ 'meetings.control.lead' | t }}</p>
-          <div class="mtg__statusActions" role="group" [attr.aria-label]="'meetings.control.session' | t">
-            <app-button
-              variant="secondary"
-              size="sm"
-              [disabled]="m.status === 'live'"
-              (click)="setStatus('live')"
-            >
-              {{ 'meetings.control.open' | t }}
-            </app-button>
-            <app-button
-              variant="secondary"
-              size="sm"
-              [disabled]="m.status === 'closed'"
-              (click)="setStatus('closed')"
-            >
-              {{ 'meetings.control.closeSession' | t }}
-            </app-button>
-          </div>
-
-          @if (m.votes.length) {
-            <ul class="mtg__votes">
-              @for (vote of m.votes; track vote.id) {
-                <li class="mtg__vote" [class.mtg__vote--active]="vote.applicationId === m.activeApplicationId">
+      <!-- Mitglied: Live-Verfolgung (Protokoll lesen, offene Abstimmungen mitstimmen). -->
+      @if (isFollower() && !beamerMode()) {
+        <app-card [heading]="'meetings.follow.title' | t">
+          <p class="mtg__lead">{{ 'meetings.follow.lead' | t }}</p>
+          @for (item of agenda(); track item.id; let i = $index) {
+            <article class="mtg__followTop">
+              <h3 class="mtg__topTitle">{{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || ('meetings.agenda.untitled' | t) }}</h3>
+              @if (item.body) { <div class="mtg__preview" [innerHTML]="renderBody(item.body)"></div> }
+              @for (vote of votesForTop(item.id); track vote.id) {
+                <div class="mtg__vote">
                   <div class="mtg__voteHead">
-                    <span class="mtg__voteTitle">{{ vote.question || vote.title || vote.applicationId }}</span>
-                    <app-badge [variant]="voteVariant(vote.status)">
-                      {{ voteStatusKey(vote.status) | t }}
-                    </app-badge>
-                    @if (vote.applicationId === m.activeApplicationId) {
-                      <app-badge variant="primary">{{ 'meetings.vote.active' | t }}</app-badge>
-                    }
-                    @if (vote.result) {
-                      <app-badge variant="info">{{ vote.result }}</app-badge>
-                    }
+                    <span class="mtg__voteTitle">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
+                    <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
+                    @if (vote.result) { <app-badge variant="info">{{ vote.result }}</app-badge> }
                   </div>
-                  @if (vote.counts) {
-                    <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
+                  @if (vote.status === 'open' && canVote()) {
+                    <div class="mtg__voteActions">
+                      @for (opt of voteOptionsFor(vote); track opt) {
+                        <app-button size="sm" variant="secondary" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}</app-button>
+                      }
+                    </div>
+                  }
+                  @if (vote.counts && vote.status === 'closed') {
+                    <dl class="mtg__tally">
                       @for (entry of countEntries(vote); track entry.key) {
-                        <div [class.mtg__tally--leading]="entry.key === vote.leading">
-                          <dt>{{ entry.key }}</dt>
-                          <dd>{{ entry.value }}</dd>
-                        </div>
+                        <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ entry.key }}</dt><dd>{{ entry.value }}</dd></div>
                       }
                     </dl>
                   }
-                  <div class="mtg__voteActions">
-                    <app-button
-                      variant="ghost"
-                      size="sm"
-                      [disabled]="vote.applicationId === m.activeApplicationId"
-                      (click)="setActive(vote.applicationId)"
-                    >
-                      {{ 'meetings.vote.setActive' | t }}
-                    </app-button>
-                    @if (vote.status !== 'open') {
-                      <app-button
-                        variant="primary"
-                        size="sm"
-                        [disabled]="vote.status === 'closed'"
-                        (click)="openVote(vote.id)"
-                      >
-                        {{ 'meetings.vote.open' | t }}
-                      </app-button>
-                    } @else {
-                      <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">
-                        {{ 'meetings.vote.close' | t }}
-                      </app-button>
-                    }
-                  </div>
-                </li>
+                </div>
               }
-            </ul>
-          } @else {
-            <p class="mtg__muted">{{ 'meetings.control.noVotes' | t }}</p>
+            </article>
+          } @empty {
+            <p class="mtg__muted">{{ 'meetings.follow.noTops' | t }}</p>
           }
         </app-card>
       }
 
-      <!-- Abstimmung für einen Antrag öffnen (Live-Vote mit Beschlussfrage, #Meetings) -->
-      <app-dialog
-        [open]="voteDialogOpen()"
-        [title]="'meetings.vote.dialogTitle' | t"
-        [closeLabel]="'action.cancel' | t"
-        (closed)="closeVoteDialog()"
-      >
-        <form class="mtg__voteForm" (submit)="$event.preventDefault(); submitVote()">
-          <label class="mtg__paneLabel" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
-          <input
-            id="mtg-vq"
-            class="mtg__input"
-            [ngModel]="voteQuestion()"
-            (ngModelChange)="voteQuestion.set($event)"
-            name="vq"
-            [placeholder]="'meetings.vote.questionPlaceholder' | t"
-          />
-          <label class="mtg__paneLabel" for="mtg-vo">{{ 'meetings.vote.options' | t }}</label>
-          <textarea
-            id="mtg-vo"
-            class="mtg__textarea"
-            rows="4"
-            [ngModel]="voteOptions()"
-            (ngModelChange)="voteOptions.set($event)"
-            name="vo"
-          ></textarea>
-          <label class="mtg__voteSecret">
-            <input type="checkbox" [checked]="voteSecret()" (change)="voteSecret.set($any($event.target).checked)" />
-            {{ 'meetings.vote.secret' | t }}
-          </label>
-        </form>
-        <div dialog-footer class="mtg__dialogFoot">
-          <app-button variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
-          <app-button [disabled]="voteOptionList().length < 2 || openingVote()" [loading]="openingVote()" (click)="submitVote()">
-            {{ 'meetings.vote.openSubmit' | t }}
-          </app-button>
-        </div>
-      </app-dialog>
+      @if (!beamerMode() && !isFollower()) {
+      <!-- Toolbar oberhalb des Bodies: Steuerung + Einstellungen + Löschen (Icon-Buttons). -->
+      <div class="mtg__toolbar" role="toolbar" [attr.aria-label]="'meetings.control.title' | t">
+        @if (m.canControl) {
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live'" [ariaLabel]="'meetings.control.open' | t" [title]="'meetings.control.open' | t" (click)="setStatus('live')"><app-icon name="power" /></app-button>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'closed'" [ariaLabel]="'meetings.control.closeSession' | t" [title]="'meetings.control.closeSession' | t" (click)="setStatus('closed')"><app-icon name="check" /></app-button>
+        }
+        <span class="mtg__toolbarSpacer"></span>
+        <app-button variant="ghost" size="sm" (click)="beamerMode.set(true)">{{ 'meetings.beamer.enter' | t }}</app-button>
+        @if (m.canManage) {
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="openSettings(m)"><app-icon name="edit" /></app-button>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="askDeleteMeeting(m)"><app-icon name="delete" /></app-button>
+        }
+      </div>
 
-      <!-- Protokoll & Tagesordnung: TOPs links (sortierbar), pro-TOP-Editor rechts (#58) -->
-      @if (canWrite() || canManage()) {
-        <app-card [heading]="'meetings.protocol.title' | t">
+      <!-- 3-Spalten-Shell: TOPs links, Protokoll-Body Mitte, Anwesenheit rechts. -->
+      <div class="mtg__shell">
+        <!-- LINKS: Tagesordnung -->
+        <aside class="mtg__side mtg__side--left" [attr.aria-label]="'meetings.agenda.title' | t">
+          <h2 class="mtg__sideH">{{ 'meetings.agenda.title' | t }}</h2>
+          <ol class="mtg__tocList">
+            @for (item of agenda(); track item.id; let i = $index) {
+              <li
+                class="mtg__tocItem"
+                [class.mtg__tocItem--sel]="selectedTopId() === item.id"
+                [attr.draggable]="m.canWrite && !protocol()?.isFinal"
+                (dragstart)="onTopDragStart(i)"
+                (dragover)="onTopDragOver($event)"
+                (drop)="onTopDrop(i)"
+                (click)="selectTop(item.id)"
+              >
+                @if (m.canWrite && !protocol()?.isFinal) {
+                  <span class="mtg__tocGrip" aria-hidden="true">⠿</span>
+                }
+                <span class="mtg__tocNum">{{ i + 1 }}</span>
+                <span class="mtg__tocTitle">{{ item.title || ('meetings.agenda.untitled' | t) }}</span>
+                @if (votesForTop(item.id).length) {
+                  <span class="mtg__tocNum" [attr.aria-label]="'meetings.vote.count' | t">⚖ {{ votesForTop(item.id).length }}</span>
+                }
+                @if (m.canWrite && !protocol()?.isFinal) {
+                  <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); removeFromAgenda(item.id)"><app-icon name="delete" /></app-button>
+                }
+              </li>
+            } @empty {
+              <li class="mtg__muted mtg__tocEmpty">{{ 'meetings.agenda.empty' | t }}</li>
+            }
+          </ol>
+          @if (m.canWrite && !protocol()?.isFinal) {
+            <div class="mtg__tocAdd">
+              <app-select [placeholder]="'meetings.agenda.addPlaceholder' | t" [options]="assignableOptions()" [ngModel]="agendaPick()" (ngModelChange)="agendaPick.set($event)" />
+              <app-button size="sm" [disabled]="!agendaPick() || savingAgenda()" (click)="addToAgenda()">{{ 'meetings.agenda.add' | t }}</app-button>
+            </div>
+            <div class="mtg__tocAdd">
+              <input class="mtg__input" [placeholder]="'meetings.agenda.freetextPlaceholder' | t" [ngModel]="agendaFreetext()" (ngModelChange)="agendaFreetext.set($event)" (keyup.enter)="addFreetext()" name="agendaFreetext" />
+              <app-button variant="secondary" size="sm" [disabled]="!agendaFreetext().trim() || savingAgenda()" (click)="addFreetext()">{{ 'meetings.agenda.addFreetext' | t }}</app-button>
+            </div>
+          }
+        </aside>
+
+        <!-- MITTE: Protokoll-Body (pro-TOP-Editor + Beschlussfragen) -->
+        <div class="mtg__main">
           @if (!protocol()) {
             <p class="mtg__muted">{{ 'meetings.protocol.none' | t }}</p>
             @if (canWrite()) {
@@ -292,74 +263,66 @@ const AUTOSAVE_DELAY_MS = 1000;
               </span>
             </div>
 
-            <div class="mtg__tops">
-              <!-- Links: TOP-Inhaltsverzeichnis (drag-sortierbar) -->
-              <aside class="mtg__toc" [attr.aria-label]="'meetings.agenda.title' | t">
-                <ol class="mtg__tocList">
-                  @for (item of agenda(); track item.id; let i = $index) {
-                    <li
-                      class="mtg__tocItem"
-                      [class.mtg__tocItem--sel]="selectedTopId() === item.id"
-                      [attr.draggable]="m.canControl && !proto.isFinal"
-                      (dragstart)="onTopDragStart(i)"
-                      (dragover)="onTopDragOver($event)"
-                      (drop)="onTopDrop(i)"
-                      (click)="selectTop(item.id)"
-                    >
-                      @if (m.canControl && !proto.isFinal) {
-                        <span class="mtg__tocGrip" aria-hidden="true">⠿</span>
-                      }
-                      <span class="mtg__tocNum">{{ i + 1 }}</span>
-                      <span class="mtg__tocTitle">{{ item.title || ('meetings.agenda.untitled' | t) }}</span>
-                      @if (m.canControl && item.applicationId) {
-                        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.openFor' | t" [attr.title]="'meetings.vote.openFor' | t" (click)="$event.stopPropagation(); openVoteDialog(item)"><app-icon name="roles" /></app-button>
-                      }
-                      @if (m.canControl && !proto.isFinal) {
-                        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); removeFromAgenda(item.id)"><app-icon name="delete" /></app-button>
-                      }
-                    </li>
-                  } @empty {
-                    <li class="mtg__muted mtg__tocEmpty">{{ 'meetings.agenda.empty' | t }}</li>
+            <div class="mtg__topEditor">
+              @if (selectedTop(); as top) {
+                <div class="mtg__topHead">
+                  <h3 class="mtg__topTitle">{{ 'meetings.agenda.top' | t: { n: selectedIndex() + 1 } }}: {{ top.title || ('meetings.agenda.untitled' | t) }}</h3>
+                  @if (top.applicationId) {
+                    <a class="mtg__pdf" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
                   }
-                </ol>
-                @if (m.canControl && !proto.isFinal) {
-                  <div class="mtg__tocAdd">
-                    <app-select [placeholder]="'meetings.agenda.addPlaceholder' | t" [options]="assignableOptions()" [ngModel]="agendaPick()" (ngModelChange)="agendaPick.set($event)" />
-                    <app-button size="sm" [disabled]="!agendaPick() || savingAgenda()" (click)="addToAgenda()">{{ 'meetings.agenda.add' | t }}</app-button>
-                  </div>
-                  <div class="mtg__tocAdd">
-                    <input class="mtg__input" [placeholder]="'meetings.agenda.freetextPlaceholder' | t" [ngModel]="agendaFreetext()" (ngModelChange)="agendaFreetext.set($event)" (keyup.enter)="addFreetext()" name="agendaFreetext" />
-                    <app-button variant="secondary" size="sm" [disabled]="!agendaFreetext().trim() || savingAgenda()" (click)="addFreetext()">{{ 'meetings.agenda.addFreetext' | t }}</app-button>
-                  </div>
-                }
-              </aside>
+                </div>
+                <app-markdown-editor
+                  [docKey]="top.id"
+                  [value]="top.body ?? ''"
+                  [disabled]="proto.isFinal || !m.canWrite"
+                  [placeholder]="'meetings.protocol.placeholder' | t"
+                  (valueChange)="onTopBodyChange(top.id, $event)"
+                />
 
-              <!-- Rechts: Markdown-Editor des gewählten TOP (WYSIWYG, kein separater Preview) -->
-              <div class="mtg__topEditor">
-                @if (selectedTop(); as top) {
-                  <div class="mtg__topHead">
-                    <h3 class="mtg__topTitle">{{ 'meetings.agenda.top' | t: { n: selectedIndex() + 1 } }}: {{ top.title || ('meetings.agenda.untitled' | t) }}</h3>
-                    @if (top.applicationId) {
-                      <a class="mtg__pdf" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
-                    }
-                  </div>
-                  <app-markdown-editor
-                    [docKey]="top.id"
-                    [value]="top.body ?? ''"
-                    [disabled]="proto.isFinal || !m.canControl"
-                    [placeholder]="'meetings.protocol.placeholder' | t"
-                    (valueChange)="onTopBodyChange(top.id, $event)"
-                  />
-                } @else {
-                  <p class="mtg__muted mtg__topEmpty">{{ 'meetings.protocol.selectTop' | t }}</p>
-                }
-              </div>
+                <!-- Beschlussfragen/Abstimmungen dieses TOP (#Sessions). -->
+                <div class="mtg__topVotes">
+                  @for (vote of votesForTop(top.id); track vote.id) {
+                    <div class="mtg__vote">
+                      <div class="mtg__voteHead">
+                        <span class="mtg__voteTitle">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
+                        <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
+                        @if (vote.result) { <app-badge variant="info">{{ vote.result }}</app-badge> }
+                      </div>
+                      @if (vote.counts) {
+                        <dl class="mtg__tally">
+                          @for (entry of countEntries(vote); track entry.key) {
+                            <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ entry.key }}</dt><dd>{{ entry.value }}</dd></div>
+                          }
+                        </dl>
+                      }
+                      @if (vote.status === 'open' && canVote()) {
+                        <div class="mtg__voteActions">
+                          @for (opt of voteOptionsFor(vote); track opt) {
+                            <app-button size="sm" variant="secondary" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}</app-button>
+                          }
+                        </div>
+                      }
+                      @if (m.canManageVotes && vote.status === 'open') {
+                        <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+                      }
+                    </div>
+                  }
+                  @if (m.canManageVotes && !proto.isFinal && canAddVote(top)) {
+                    <app-button size="sm" variant="secondary" (click)="openVoteDialog(top)">
+                      {{ (top.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}
+                    </app-button>
+                  }
+                </div>
+              } @else {
+                <p class="mtg__muted mtg__topEmpty">{{ 'meetings.protocol.selectTop' | t }}</p>
+              }
             </div>
 
-            <div class="mtg__protoActions">
+            <!-- Danger-Zone: Protokoll finalisieren + Sitzung abschließen (mit Bestätigung). -->
+            <div class="mtg__protoActions mtg__danger">
               @if (!proto.isFinal) {
                 @if (canWrite()) {
-                  <app-button variant="primary" size="sm" [disabled]="savingTop() || !agenda().length" [loading]="finalizing()" (click)="finalize()">
+                  <app-button variant="danger" size="sm" [disabled]="savingTop() || !agenda().length" [loading]="finalizing()" (click)="finalizeConfirmOpen.set(true)">
                     {{ 'meetings.protocol.finalize' | t }}
                   </app-button>
                   @if (savingTop()) { <span class="mtg__muted mtg__hint">{{ 'meetings.protocol.saving' | t }}</span> }
@@ -369,15 +332,11 @@ const AUTOSAVE_DELAY_MS = 1000;
               }
             </div>
           }
-        </app-card>
-      }
+        </div>
 
-      <!-- Anwesenheit (#Meetings/#55/#56) -->
-      @if (attendance().length) {
-        <app-card [heading]="'meetings.attendance.title' | t">
-          <p class="mtg__lead">
-            {{ (m.canControl ? 'meetings.attendance.leadLead' : 'meetings.attendance.lead') | t }}
-          </p>
+        <!-- RECHTS: Anwesenheit -->
+        <aside class="mtg__side mtg__side--right" [attr.aria-label]="'meetings.attendance.title' | t">
+          <h2 class="mtg__sideH">{{ 'meetings.attendance.title' | t }}</h2>
           <ul class="mtg__att">
             @for (a of attendance(); track a.principalId) {
               <li class="mtg__attRow">
@@ -404,10 +363,100 @@ const AUTOSAVE_DELAY_MS = 1000;
                   </app-badge>
                 }
               </li>
+            } @empty {
+              <li class="mtg__muted mtg__tocEmpty">{{ 'meetings.attendance.empty' | t }}</li>
+            }
+          </ul>
+        </aside>
+      </div>
+
+      <!-- Session-Abstimmungen ohne TOP-Bindung (Bestand/aktiv) — Steuerung. -->
+      @if (looseVotes().length) {
+        <app-card [heading]="'meetings.control.title' | t">
+          <ul class="mtg__votes">
+            @for (vote of looseVotes(); track vote.id) {
+              <li class="mtg__vote" [class.mtg__vote--active]="vote.applicationId && vote.applicationId === m.activeApplicationId">
+                <div class="mtg__voteHead">
+                  <span class="mtg__voteTitle">{{ vote.question || vote.title || ('meetings.vote.untitled' | t) }}</span>
+                  <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
+                  @if (vote.applicationId && vote.applicationId === m.activeApplicationId) {
+                    <app-badge variant="primary">{{ 'meetings.vote.active' | t }}</app-badge>
+                  }
+                  @if (vote.result) { <app-badge variant="info">{{ vote.result }}</app-badge> }
+                </div>
+                @if (vote.counts) {
+                  <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
+                    @for (entry of countEntries(vote); track entry.key) {
+                      <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ entry.key }}</dt><dd>{{ entry.value }}</dd></div>
+                    }
+                  </dl>
+                }
+                @if (vote.status === 'open' && canVote()) {
+                  <div class="mtg__voteActions">
+                    @for (opt of voteOptionsFor(vote); track opt) {
+                      <app-button size="sm" variant="secondary" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}</app-button>
+                    }
+                  </div>
+                }
+                @if (m.canManageVotes) {
+                  <div class="mtg__voteActions">
+                    @if (vote.applicationId) {
+                      <app-button variant="ghost" size="sm" [disabled]="vote.applicationId === m.activeApplicationId" (click)="setActive(vote.applicationId)">{{ 'meetings.vote.setActive' | t }}</app-button>
+                    }
+                    @if (vote.status !== 'open') {
+                      <app-button variant="primary" size="sm" [disabled]="vote.status === 'closed'" (click)="openVote(vote.id)">{{ 'meetings.vote.open' | t }}</app-button>
+                    } @else {
+                      <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+                    }
+                  </div>
+                }
+              </li>
             }
           </ul>
         </app-card>
       }
+
+      <!-- Abstimmung/Beschlussfrage öffnen (Dialog) -->
+      <app-dialog
+        [open]="voteDialogOpen()"
+        [title]="'meetings.vote.dialogTitle' | t"
+        [closeLabel]="'action.cancel' | t"
+        (closed)="closeVoteDialog()"
+      >
+        <form class="mtg__voteForm" (submit)="$event.preventDefault(); submitVote()">
+          <label class="mtg__paneLabel" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
+          <input id="mtg-vq" class="mtg__input" [ngModel]="voteQuestion()" (ngModelChange)="voteQuestion.set($event)" name="vq" [placeholder]="'meetings.vote.questionPlaceholder' | t" />
+          <label class="mtg__paneLabel" for="mtg-vo">{{ 'meetings.vote.options' | t }}</label>
+          <textarea id="mtg-vo" class="mtg__textarea" rows="4" [ngModel]="voteOptions()" (ngModelChange)="voteOptions.set($event)" name="vo"></textarea>
+          <label class="mtg__voteSecret">
+            <input type="checkbox" [checked]="voteSecret()" (change)="voteSecret.set($any($event.target).checked)" />
+            {{ 'meetings.vote.secret' | t }}
+          </label>
+        </form>
+        <div dialog-footer class="mtg__dialogFoot">
+          <app-button variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
+          <app-button [disabled]="voteOptionList().length < 2 || openingVote()" [loading]="openingVote()" (click)="submitVote()">
+            {{ 'meetings.vote.openSubmit' | t }}
+          </app-button>
+        </div>
+      </app-dialog>
+
+      <!-- Finalisieren-Bestätigung (Danger) -->
+      <app-dialog
+        [open]="finalizeConfirmOpen()"
+        [title]="'meetings.finalizeConfirm.title' | t"
+        [closeLabel]="'action.cancel' | t"
+        (closed)="finalizeConfirmOpen.set(false)"
+      >
+        <p>{{ 'meetings.finalizeConfirm.body' | t }}</p>
+        <div dialog-footer class="mtg__dialogFoot">
+          <app-button variant="ghost" (click)="finalizeConfirmOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+          <app-button variant="danger" [loading]="finalizing()" (click)="finalizeConfirmOpen.set(false); finalize()">
+            {{ 'meetings.finalizeConfirm.confirm' | t }}
+          </app-button>
+        </div>
+      </app-dialog>
+      } <!-- /@if (!beamerMode() && !isFollower()) -->
     } @else {
       <!-- Übersicht: vorhandene Sitzungen (#104) als geteilte Tabelle (#27) -->
       @if (canManage() || canWrite()) {
@@ -438,9 +487,19 @@ const AUTOSAVE_DELAY_MS = 1000;
                 <app-badge [variant]="statusVariant($any(m).status)">{{ statusKey($any(m).status) | t }}</app-badge>
               </ng-template>
               <ng-template appCell="actions" let-m>
-                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.list.open' | t" (click)="$event.stopPropagation(); openMeeting($any(m).id)">
-                  <app-icon name="chevron-down" class="mtg__openIcon" />
-                </app-button>
+                <span class="mtg__rowActions">
+                  @if (canManageAny()) {
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="$event.stopPropagation(); openSettings($any(m))">
+                      <app-icon name="edit" />
+                    </app-button>
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="$event.stopPropagation(); askDeleteMeeting($any(m))">
+                      <app-icon name="delete" />
+                    </app-button>
+                  }
+                  <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.list.open' | t" (click)="$event.stopPropagation(); openMeeting($any(m).id)">
+                    <app-icon name="chevron-down" class="mtg__openIcon" />
+                  </app-button>
+                </span>
               </ng-template>
             </app-data-table>
           }
@@ -506,6 +565,50 @@ const AUTOSAVE_DELAY_MS = 1000;
         </div>
       </app-dialog>
     }
+
+    <!-- Einstellungen: Protokollant + Datum/Zeit (Toolbar ODER Listen-Edit), top-level. -->
+    <app-dialog
+      [open]="settingsMeeting() !== null"
+      [title]="'meetings.settings.title' | t"
+      [closeLabel]="'action.cancel' | t"
+      (closed)="closeSettings()"
+    >
+      <form class="mtg__createForm" (submit)="$event.preventDefault(); saveSettings()">
+        <app-select
+          name="setProt"
+          [label]="'meetings.protokollant.label' | t"
+          [options]="protokollantOptions()"
+          [ngModel]="settingsProtokollant()"
+          (ngModelChange)="settingsProtokollant.set($event)"
+        />
+        <app-datepicker
+          [label]="'meetings.create.date' | t"
+          [ngModel]="settingsDate()"
+          (ngModelChange)="settingsDate.set($event)"
+          name="setDate"
+        />
+        <label class="mtg__paneLabel" for="mtg-set-time">{{ 'meetings.create.time' | t }}</label>
+        <input id="mtg-set-time" class="mtg__input" type="time" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
+      </form>
+      <div dialog-footer class="mtg__dialogFoot">
+        <app-button variant="ghost" (click)="closeSettings()">{{ 'action.cancel' | t }}</app-button>
+        <app-button [loading]="savingSettings()" (click)="saveSettings()">{{ 'action.save' | t }}</app-button>
+      </div>
+    </app-dialog>
+
+    <!-- Sitzung löschen (Bestätigung), top-level. -->
+    <app-dialog
+      [open]="confirmDeleteMeeting() !== null"
+      [title]="'meetings.delete.title' | t"
+      [closeLabel]="'action.cancel' | t"
+      (closed)="confirmDeleteMeeting.set(null)"
+    >
+      <p>{{ 'meetings.delete.body' | t: { name: confirmDeleteMeeting()?.title ?? '' } }}</p>
+      <div dialog-footer class="mtg__dialogFoot">
+        <app-button variant="ghost" (click)="confirmDeleteMeeting.set(null)">{{ 'action.cancel' | t }}</app-button>
+        <app-button variant="danger" [loading]="deletingMeeting()" (click)="doDeleteMeeting()">{{ 'meetings.delete.confirm' | t }}</app-button>
+      </div>
+    </app-dialog>
   `,
   styles: [
     `
@@ -1007,6 +1110,109 @@ const AUTOSAVE_DELAY_MS = 1000;
         font-weight: var(--fw-medium);
         margin-right: auto;
       }
+      .mtg__beamerToggle {
+        margin-left: auto;
+      }
+      .mtg__topVotes {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        margin-top: var(--space-3);
+      }
+      .mtg__followTop {
+        padding: var(--space-3) 0;
+        border-bottom: var(--border-width) solid var(--color-border);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      .mtg__danger {
+        border-top: var(--border-width) solid var(--color-danger);
+        padding-top: var(--space-3);
+        margin-top: var(--space-4);
+      }
+      .mtg__beamer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-5);
+        padding: var(--space-7) var(--space-4);
+        text-align: center;
+      }
+      .mtg__beamerQ {
+        font-size: var(--fs-2xl, 2rem);
+        margin: 0;
+      }
+      .mtg__beamerTally {
+        display: flex;
+        gap: var(--space-6);
+        font-size: var(--fs-xl, 1.5rem);
+      }
+      .mtg__beamerTally > div {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+      }
+      .mtg__beamerTally dd {
+        margin: 0;
+        font-weight: var(--fw-bold, 700);
+      }
+      .mtg__toolbar {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        flex-wrap: wrap;
+      }
+      .mtg__toolbarSpacer {
+        margin-left: auto;
+      }
+      .mtg__shell {
+        display: grid;
+        grid-template-columns: minmax(0, 16rem) minmax(0, 1fr) minmax(0, 16rem);
+        gap: var(--space-4);
+        align-items: start;
+      }
+      @media (max-width: 64rem) {
+        .mtg__shell {
+          grid-template-columns: 1fr;
+        }
+      }
+      .mtg__side {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        padding: var(--space-3);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        position: sticky;
+        top: var(--space-4);
+      }
+      @media (max-width: 64rem) {
+        .mtg__side {
+          position: static;
+        }
+      }
+      .mtg__sideH {
+        margin: 0;
+        font-size: var(--fs-md);
+      }
+      .mtg__main {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        min-width: 0;
+      }
+      .mtg__rowActions {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        justify-content: flex-end;
+      }
     `,
   ],
 })
@@ -1026,6 +1232,8 @@ export class MeetingsComponent implements OnDestroy {
   readonly error = signal(false);
   readonly meeting = signal<Meeting | null>(null);
   readonly protocol = signal<Protocol | null>(null);
+  /** Detail-Route (`/meetings/:id`) vs. Übersicht (`/meetings`). */
+  readonly detailMode = signal(false);
 
   /** Anwesenheits-Roster der Sitzung (#Meetings/#55/#56). */
   readonly attendance = signal<Attendance[]>([]);
@@ -1092,15 +1300,64 @@ export class MeetingsComponent implements OnDestroy {
     { key: 'title', label: this.i18n.translate('meetings.create.name') },
     { key: 'date', label: this.i18n.translate('meetings.create.date') },
     { key: 'status', label: this.i18n.translate('meetings.list.status'), align: 'start', width: '9rem' },
-    { key: 'actions', label: '', align: 'end', width: '4rem' },
+    { key: 'actions', label: '', align: 'end', width: '9rem' },
   ]);
 
   openCreate(): void {
     this.createOpen.set(true);
   }
 
-  readonly canManage = computed(() => this.auth.can('meeting.manage'));
-  readonly canWrite = computed(() => this.auth.can('protocol.write'));
+  /** Globale Verwalter-Rechte — Gating der Übersicht/Anlegen (ohne geladene Sitzung). */
+  readonly canManageAny = computed(() => this.auth.can('meeting.manage'));
+  /** Per-Sitzung-Flags aus der geladenen Sitzung (Backend, gremium-genau). */
+  readonly canManage = computed(() => this.meeting()?.canManage ?? this.canManageAny());
+  readonly canWrite = computed(() => this.meeting()?.canWrite ?? false);
+  readonly canManageVotes = computed(() => this.meeting()?.canManageVotes ?? false);
+  readonly canVote = computed(() => this.meeting()?.canVote ?? false);
+  readonly canWriteGlobal = computed(() => this.auth.can('protocol.write'));
+  /** Übersicht ohne Detail-Route + ohne Verwalter-Recht ⇒ keine Berechtigung. */
+  readonly showForbidden = computed(
+    () => !this.detailMode() && !this.canManageAny() && !this.canWriteGlobal(),
+  );
+  /** Mitglied ohne Schreib-/Verwaltungsrecht → reine Live-Verfolgung. */
+  readonly isFollower = computed(() => {
+    const m = this.meeting();
+    return !!m && !m.canWrite && !m.canManage;
+  });
+  /** Beamer-Anzeige (nur aktuelle Frage + Live-Ergebnis, keine Dialoge). */
+  readonly beamerMode = signal(false);
+
+  /** Einstellungs-Dialog (Protokollant + Datum/Zeit) — aus Toolbar ODER Listen-Edit. */
+  readonly settingsMeeting = signal<Meeting | null>(null);
+  readonly settingsRoster = signal<Attendance[]>([]);
+  readonly settingsProtokollant = signal<string>('');
+  readonly settingsDate = signal<string>('');
+  readonly settingsTime = signal<string>('');
+  readonly savingSettings = signal(false);
+  /** Protokollant-Auswahl aus dem Anwesenheits-Roster (alle Gremium-Mitglieder). */
+  readonly protokollantOptions = computed<SelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('meetings.protokollant.none') },
+    ...this.settingsRoster().map((a) => ({
+      value: a.principalId,
+      label: a.displayName || a.email || a.principalId,
+    })),
+  ]);
+  /** Löschen-Bestätigung (Toolbar ODER Listen-Zeile). */
+  readonly confirmDeleteMeeting = signal<Meeting | null>(null);
+  readonly deletingMeeting = signal(false);
+  /** Bestätigungs-Dialog fürs Finalisieren (Danger). */
+  readonly finalizeConfirmOpen = signal(false);
+  /** Casting-Status je Vote (für Mitglied/Protokollant-Stimmabgabe). */
+  readonly casting = signal<Uuid | null>(null);
+
+  /** Votes eines TOP (gruppiert über agendaItemId). */
+  votesForTop(topId: Uuid): MeetingVote[] {
+    return (this.meeting()?.votes ?? []).filter((v) => v.agendaItemId === topId);
+  }
+  /** Sitzungs-Votes ohne TOP-Bindung (Bestand/aktiv) — in der Steuerung gelistet. */
+  readonly looseVotes = computed<MeetingVote[]>(() =>
+    (this.meeting()?.votes ?? []).filter((v) => !v.agendaItemId),
+  );
 
   /** Aktuell gewählter TOP (rechter Editor) + sein 0-basierter Index. */
   readonly selectedTop = computed<AgendaItem | null>(
@@ -1115,6 +1372,7 @@ export class MeetingsComponent implements OnDestroy {
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       const id = pm.get('id');
+      this.detailMode.set(!!id);
       if (id) {
         this.loadMeeting(id);
       } else {
@@ -1512,9 +1770,13 @@ export class MeetingsComponent implements OnDestroy {
   }
 
 
-  // --- Live-Abstimmung öffnen (#Meetings) ----------------------------------
+  // --- Live-Abstimmung/Beschlussfrage öffnen (#Sessions) -------------------
+  /** App-TOP: genau eine Abstimmung; Freitext-TOP: beliebig viele Beschlussfragen. */
+  canAddVote(item: AgendaItem): boolean {
+    return !item.applicationId || this.votesForTop(item.id).length === 0;
+  }
+
   openVoteDialog(item: AgendaItem): void {
-    if (!item.applicationId) return;
     this.voteItem.set(item);
     this.voteQuestion.set(item.title ?? '');
     this.voteOptions.set('Ja\nNein\nEnthaltung');
@@ -1530,11 +1792,11 @@ export class MeetingsComponent implements OnDestroy {
     const m = this.meeting();
     const item = this.voteItem();
     const options = this.voteOptionList();
-    if (!m || !item?.applicationId || options.length < 2 || this.openingVote()) return;
+    if (!m || !item || options.length < 2 || this.openingVote()) return;
     this.openingVote.set(true);
     this.api
       .openMeetingVote(m.id, {
-        applicationId: item.applicationId,
+        agendaItemId: item.id,
         question: this.voteQuestion().trim() || null,
         options,
         secret: this.voteSecret(),
@@ -1557,6 +1819,110 @@ export class MeetingsComponent implements OnDestroy {
   resolveLabel(map: I18nMap): string {
     return map[this.i18n.locale()] ?? map['de'] ?? Object.values(map)[0] ?? '';
   }
+
+  // --- Einstellungen (Protokollant + Datum) / Löschen / Stimmabgabe / Beamer ----
+  /** Einstellungs-Dialog öffnen (aus Toolbar oder Listen-Edit) + Roster laden. */
+  openSettings(m: Meeting): void {
+    this.settingsMeeting.set(m);
+    this.settingsProtokollant.set(m.protokollantId ?? '');
+    this.settingsDate.set(m.date ?? '');
+    this.settingsTime.set(m.startTime ?? '');
+    this.settingsRoster.set([]);
+    this.api.listAttendance(m.id).subscribe({
+      next: (rows) => this.settingsRoster.set(rows),
+      error: () => this.settingsRoster.set([]),
+    });
+  }
+
+  closeSettings(): void {
+    this.settingsMeeting.set(null);
+  }
+
+  /** Protokollant + Datum/Zeit in einem Zug speichern (PATCH). */
+  saveSettings(): void {
+    const m = this.settingsMeeting();
+    if (!m || this.savingSettings()) return;
+    this.savingSettings.set(true);
+    this.api
+      .patchMeeting(m.id, {
+        protokollantId: this.settingsProtokollant() || null,
+        date: this.settingsDate().trim() || null,
+        startTime: this.settingsTime().trim() || null,
+      })
+      .subscribe({
+        next: (updated) => {
+          this.savingSettings.set(false);
+          this.settingsMeeting.set(null);
+          if (this.meeting()?.id === updated.id) this.meeting.set(updated);
+          this.meetings.update((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+          this.toast.success(this.i18n.translate('meetings.toast.settingsSaved'));
+        },
+        error: () => {
+          this.savingSettings.set(false);
+          this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        },
+      });
+  }
+
+  askDeleteMeeting(m: Meeting): void {
+    this.confirmDeleteMeeting.set(m);
+  }
+
+  doDeleteMeeting(): void {
+    const m = this.confirmDeleteMeeting();
+    if (!m || this.deletingMeeting()) return;
+    this.deletingMeeting.set(true);
+    this.api.deleteMeeting(m.id).subscribe({
+      next: () => {
+        this.deletingMeeting.set(false);
+        this.confirmDeleteMeeting.set(null);
+        this.meetings.update((list) => list.filter((x) => x.id !== m.id));
+        this.toast.success(this.i18n.translate('meetings.toast.deleted'));
+        // Aus der Detailansicht zurück zur Übersicht.
+        if (this.meeting()?.id === m.id) void this.router.navigate(['/meetings']);
+      },
+      error: () => {
+        this.deletingMeeting.set(false);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
+    });
+  }
+
+  /** Stimme abgeben (Protokollant/Mitglied mit `vote.cast`). */
+  cast(voteId: Uuid, choice: string): void {
+    if (this.casting()) return;
+    this.casting.set(voteId);
+    this.api.castBallot(voteId, choice).subscribe({
+      next: () => {
+        this.casting.set(null);
+        this.toast.success(this.i18n.translate('meetings.toast.voteCast'));
+      },
+      error: () => {
+        this.casting.set(null);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
+    });
+  }
+
+  /** Auswahl-Optionen einer Abstimmung (Fallback: Zähl-Schlüssel). */
+  voteOptionsFor(vote: MeetingVote): string[] {
+    return vote.options.length ? vote.options : Object.keys(vote.counts ?? {});
+  }
+
+  /** TOP-Markdown für die Live-/Beamer-Ansicht rendern (sanitisiert via [innerHTML]). */
+  renderBody(body: string): string {
+    return renderMarkdown(body);
+  }
+
+  /** Beamer: aktuell offene Abstimmung, sonst die zuletzt geschlossene (persistiert). */
+  readonly beamerVote = computed<MeetingVote | null>(() => {
+    const votes = this.meeting()?.votes ?? [];
+    return (
+      votes.find((v) => v.status === 'open') ??
+      [...votes].reverse().find((v) => v.status === 'closed') ??
+      null
+    );
+  });
 
   // --- Live (WebSocket) ----------------------------------------------------
   private connectLive(meetingId: Uuid): void {
@@ -1582,7 +1948,30 @@ export class MeetingsComponent implements OnDestroy {
         });
         break;
       case 'vote_opened':
-        this.patchVote(msg.voteId, { status: 'open', closesAt: msg.closesAt });
+        if (m.votes.some((v) => v.id === msg.voteId)) {
+          this.patchVote(msg.voteId, { status: 'open', closesAt: msg.closesAt });
+        } else {
+          // Live geöffnete Abstimmung, die beim Laden noch nicht existierte (Follower).
+          this.meeting.set({
+            ...m,
+            votes: [
+              ...m.votes,
+              {
+                id: msg.voteId,
+                applicationId: msg.applicationId ?? null,
+                agendaItemId: msg.agendaItemId ?? null,
+                title: null,
+                question: msg.question ?? null,
+                options: msg.options ?? [],
+                status: 'open',
+                result: null,
+                counts: null,
+                leading: null,
+                closesAt: msg.closesAt,
+              },
+            ],
+          });
+        }
         break;
       case 'vote_tally':
         this.patchVote(msg.voteId, { counts: msg.counts, leading: msg.leading });

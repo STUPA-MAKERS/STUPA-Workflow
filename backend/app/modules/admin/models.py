@@ -55,6 +55,9 @@ class GremiumRole(UUIDPkMixin, Base):
     )
     key: Mapped[str] = mapped_column(Text)
     name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    # Granulare, pro Gremium-Rolle konfigurierbare Berechtigungen der Sitzungs-Domäne
+    # (session.manage / vote.manage / vote.cast / protocol.write). Liste von Keys.
+    permissions: Mapped[list] = mapped_column(JSONB, server_default="[]")
 
     __table_args__ = (
         UniqueConstraint("gremium_id", "key", name="uq_gremium_role_gremium_key"),

@@ -58,7 +58,11 @@ class VoteOpenedEvent(_CamelModel):
 
     type: Literal["vote_opened"] = "vote_opened"
     vote_id: UUID = Field(alias="voteId")
-    application_id: UUID = Field(alias="applicationId")
+    # None = generische Beschlussfrage (Freitext-TOP), kein Antrag.
+    application_id: UUID | None = Field(default=None, alias="applicationId")
+    agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
+    # Beschlussfrage (»Worüber wird abgestimmt?«) — fürs Live-Dialog/Beamer.
+    question: str | None = None
     options: list[str]
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     # Geheime Abstimmung → FE blendet Live-Balken aus (showBars = !secret || isClosed).

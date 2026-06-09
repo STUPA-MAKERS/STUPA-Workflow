@@ -247,7 +247,8 @@ async def test_finalize_renders_stores_and_mails() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
-        results=[result(proto), result(["a@x.de", "b@x.de"])],
+        # result() = leere Tagesordnung (Protokoll-Montage), dann die Verteiler.
+        results=[result(proto), result(), result(["a@x.de", "b@x.de"])],
     )
     out = await _service(
         session, storage=storage, pytex=pytex, nextcloud=nextcloud, mail_queue=mail
@@ -271,7 +272,7 @@ async def test_finalize_without_storage_degrades_but_mails() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
-        results=[result(proto), result(["a@x.de"])],
+        results=[result(proto), result(), result(["a@x.de"])],
     )
     out = await _service(session, storage=None, pytex=pytex, mail_queue=mail).finalize(
         PID, now=NOW
@@ -341,7 +342,7 @@ async def test_finalize_deduplicates_recipients_across_lists() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
-        results=[result(proto), result(["a@x", "b@x"], ["b@x", "c@x"])],
+        results=[result(proto), result(), result(["a@x", "b@x"], ["b@x", "c@x"])],
     )
     await _service(
         session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=mail
