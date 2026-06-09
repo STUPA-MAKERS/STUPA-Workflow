@@ -18,9 +18,9 @@ export const FLOW_PRESETS: readonly FlowPreset[] = [
     labelKey: 'admin.flow.preset.simple',
     graph: {
       states: [
-        { key: 'draft', label: { de: 'Entwurf', en: 'Draft' }, category: 'open', isInitial: true },
-        { key: 'submitted', label: { de: 'Eingereicht', en: 'Submitted' }, category: 'running' },
-        { key: 'decided', label: { de: 'Entschieden', en: 'Decided' }, category: 'closed', editAllowed: false },
+        { key: 'draft', label: { de: 'Entwurf', en: 'Draft' }, color: '#4a90d9', isInitial: true },
+        { key: 'submitted', label: { de: 'Eingereicht', en: 'Submitted' }, color: '#e8a33d' },
+        { key: 'decided', label: { de: 'Entschieden', en: 'Decided' }, color: '#5cb85c', editAllowed: false },
       ],
       transitions: [
         { from: 'draft', to: 'submitted', label: { de: 'Einreichen', en: 'Submit' }, actions: [] },
@@ -33,11 +33,11 @@ export const FLOW_PRESETS: readonly FlowPreset[] = [
     labelKey: 'admin.flow.preset.vote',
     graph: {
       states: [
-        { key: 'draft', label: { de: 'Entwurf', en: 'Draft' }, category: 'open', isInitial: true },
-        { key: 'review', label: { de: 'Prüfung', en: 'Review' }, category: 'running' },
-        { key: 'vote', label: { de: 'Abstimmung', en: 'Vote' }, category: 'running', kind: 'vote', config: { gremiumId: '' } },
-        { key: 'approved', label: { de: 'Angenommen', en: 'Approved' }, category: 'closed', editAllowed: false },
-        { key: 'rejected', label: { de: 'Abgelehnt', en: 'Rejected' }, category: 'closed', editAllowed: false },
+        { key: 'draft', label: { de: 'Entwurf', en: 'Draft' }, color: '#4a90d9', isInitial: true },
+        { key: 'review', label: { de: 'Prüfung', en: 'Review' }, color: '#e8a33d' },
+        { key: 'vote', label: { de: 'Abstimmung', en: 'Vote' }, color: '#9b59b6', kind: 'vote', config: { gremiumId: '' } },
+        { key: 'approved', label: { de: 'Angenommen', en: 'Approved' }, color: '#5cb85c', editAllowed: false },
+        { key: 'rejected', label: { de: 'Abgelehnt', en: 'Rejected' }, color: '#d9534f', editAllowed: false },
       ],
       transitions: [
         { from: 'draft', to: 'review', label: { de: 'Einreichen', en: 'Submit' }, actions: [] },

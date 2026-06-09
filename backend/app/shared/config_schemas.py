@@ -47,8 +47,6 @@ FieldType = Literal[
     # folgenden Felder in einen neuen Schritt. Kein Antwortwert, keine Validierung.
     "section",
 ]
-StateCategory = Literal["open", "running", "closed"]
-
 # Event-Namen (api.md §6) — geteilt von Notification- und Webhook-Config.
 EventName = Literal[
     "application_created",
@@ -144,7 +142,6 @@ TransitionBranch = Literal["pass", "fail"]
 class StateDef(_CamelModel):
     key: str = Field(pattern=KEY_PATTERN)
     label: I18nMap
-    category: StateCategory | None = None
     color: str | None = None
     edit_allowed: bool = Field(default=True, alias="editAllowed")
     is_initial: bool = Field(default=False, alias="isInitial")

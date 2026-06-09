@@ -41,7 +41,7 @@ class _FakeApp:
 
 def _state() -> StateOut:
     return StateOut(
-        id=uuid4(), key="draft", label={"de": "Entwurf"}, category="open", editAllowed=True
+        id=uuid4(), key="draft", label={"de": "Entwurf"}, color="#4a90d9", editAllowed=True
     )
 
 

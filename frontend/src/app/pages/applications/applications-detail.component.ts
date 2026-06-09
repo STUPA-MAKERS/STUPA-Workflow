@@ -38,7 +38,7 @@ import {
 } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
-import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applications.util';
+import { applicationTitle, formatFieldValue } from './applications.util';
 
 /** Vergleichsangebot bzw. Kostenposition für die strukturierte Detailanzeige (#1). */
 interface DetailOffer {
@@ -103,7 +103,7 @@ interface DetailPosition {
         </div>
         <div class="det__meta">
           @if (application.state) {
-            <app-badge [variant]="stateVariant(application.state.category)">
+            <app-badge [color]="application.state.color">
               {{ application.state.label }}
             </app-badge>
           }
@@ -721,7 +721,6 @@ export class ApplicationsDetailComponent {
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
-  readonly stateVariant = stateBadgeVariant;
   readonly fmt = formatFieldValue;
 
   private id: Uuid = '';

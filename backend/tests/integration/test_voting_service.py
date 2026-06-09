@@ -83,13 +83,13 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
     await session.flush()
     states = {
         "voting": State(flow_version_id=flow.id, key="voting", label_i18n={},
-                        category="running", edit_allowed=False, is_initial=True),
+                        edit_allowed=False, is_initial=True),
         "approved": State(flow_version_id=flow.id, key="approved", label_i18n={},
-                          category="closed", edit_allowed=False),
+                          edit_allowed=False),
         "rejected": State(flow_version_id=flow.id, key="rejected", label_i18n={},
-                          category="closed", edit_allowed=False),
+                          edit_allowed=False),
         "review": State(flow_version_id=flow.id, key="review", label_i18n={},
-                        category="open", edit_allowed=True),
+                        edit_allowed=True),
     }
     session.add_all(list(states.values()))
     await session.flush()

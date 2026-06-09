@@ -29,14 +29,14 @@ const OPEN_STATE: StateOutWire = {
   id: 's-open',
   key: 'submitted',
   label: { de: 'Eingereicht', en: 'Submitted' },
-  category: 'open',
+  color: '#4a90d9',
   editAllowed: true,
 };
 const CLOSED_STATE: StateOutWire = {
   id: 's-closed',
   key: 'decided',
   label: { de: 'Entschieden', en: 'Decided' },
-  category: 'closed',
+  color: null,
   editAllowed: false,
 };
 
@@ -72,9 +72,12 @@ const PAGE: Page<ApplicationListItemWire> = {
   offset: 0,
 };
 
+// Offene Aufgaben (GET /applications/tasks): nur der actionable Antrag app-1.
+const TASKS: ApplicationListItemWire[] = [item('app-1', 't1', OPEN_STATE)];
+
 async function setup(
   principal: Principal,
-  opts: { apps?: 'ok' | 'empty' | 'error' } = {},
+  opts: { apps?: 'ok' | 'empty' | 'error'; tasks?: ApplicationListItemWire[] } = {},
 ) {
   const view = await render(DashboardComponent, {
     providers: [
@@ -98,6 +101,10 @@ async function setup(
   } else {
     appsReq.flush(PAGE);
   }
+  // „Offene Aufgaben" laden GET /applications/tasks getrennt von „Meine Anträge".
+  http
+    .expectOne((r) => r.url.endsWith('/api/applications/tasks'))
+    .flush(opts.tasks ?? (opts.apps === 'empty' ? [] : TASKS));
   http.expectOne((r) => r.url.endsWith('/api/application-types')).flush(TYPES);
   // Sitzungs-Shortcuts (#Sessions) laden `/meetings` — im Test leer beantworten.
   http

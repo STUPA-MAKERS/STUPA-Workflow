@@ -170,7 +170,7 @@ export class BudgetDashboardComponent {
       title: this.titleOf(a),
       typeLabel: a.pathKey,
       stateLabel: a.stage ? this.stageLabel(a.stage) : null,
-      stateCategory: null,
+      stateColor: null,
       amount: a.amount,
       currency: a.currency,
       createdAt: a.createdAt,

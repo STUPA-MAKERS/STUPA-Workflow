@@ -8,7 +8,6 @@
  */
 import {
   type FlowGraph,
-  type StateCategory,
   type StateDef,
   type TransitionDef,
 } from './admin.models';
@@ -135,7 +134,6 @@ function findUnreachable(
 export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
   const states: StateDef[] = graph.states.map((s) => {
     const out: StateDef = { key: s.key, label: s.label };
-    if (s.category) out.category = s.category;
     if (s.color) out.color = s.color;
     if (s.editAllowed === false) out.editAllowed = false;
     if (s.isInitial) out.isInitial = true;
@@ -235,5 +233,3 @@ export function blankState(key = '', isInitial = false): StateDef {
 export function blankTransition(from = '', to = ''): TransitionDef {
   return { from, to, actions: [] };
 }
-
-export const STATE_CATEGORIES: readonly StateCategory[] = ['open', 'running', 'closed'] as const;

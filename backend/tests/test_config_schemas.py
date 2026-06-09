@@ -107,9 +107,9 @@ def test_form_field_rejects_extra_keys() -> None:
 def _valid_graph_dict() -> dict:
     return {
         "states": [
-            {"key": "draft", "label": {"de": "Entwurf"}, "category": "open", "isInitial": True},
-            {"key": "review", "label": {"de": "Prüfung"}, "category": "running"},
-            {"key": "approved", "label": {"de": "Bewilligt"}, "category": "closed"},
+            {"key": "draft", "label": {"de": "Entwurf"}, "color": "#4a90d9", "isInitial": True},
+            {"key": "review", "label": {"de": "Prüfung"}, "color": "#4a90d9"},
+            {"key": "approved", "label": {"de": "Bewilligt"}, "color": "#4a90d9"},
         ],
         "transitions": [
             {
@@ -141,11 +141,11 @@ def test_flow_graph_from_alias_parsed() -> None:
 def _vote_graph_dict() -> dict:
     return {
         "states": [
-            {"key": "draft", "label": {"de": "Entwurf"}, "category": "open", "isInitial": True},
-            {"key": "voting", "label": {"de": "Abstimmung"}, "category": "running",
+            {"key": "draft", "label": {"de": "Entwurf"}, "color": "#4a90d9", "isInitial": True},
+            {"key": "voting", "label": {"de": "Abstimmung"}, "color": "#4a90d9",
              "kind": "vote", "config": {"gremiumId": "g-1"}},
-            {"key": "passed", "label": {"de": "Angenommen"}, "category": "closed"},
-            {"key": "failed", "label": {"de": "Abgelehnt"}, "category": "closed"},
+            {"key": "passed", "label": {"de": "Angenommen"}, "color": "#4a90d9"},
+            {"key": "failed", "label": {"de": "Abgelehnt"}, "color": "#4a90d9"},
         ],
         "transitions": [
             {"from": "draft", "to": "voting"},

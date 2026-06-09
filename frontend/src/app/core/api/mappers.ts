@@ -42,6 +42,8 @@ import type {
   DataDiffWire,
   Meeting,
   MeetingOutWire,
+  MeetingPage,
+  MeetingPageWire,
   MeetingVote,
   MeetingVoteOutWire,
   NewApplication,
@@ -66,7 +68,7 @@ export function mapState(
     id: wire.id,
     key: wire.key,
     label: resolveI18n(wire.label, lang),
-    category: wire.category,
+    color: wire.color ?? null,
     editAllowed: wire.editAllowed,
     kind: wire.kind ?? 'normal',
   };
@@ -251,6 +253,13 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     canWrite,
     canManageVotes: wire.canManageVotes ?? false,
     canVote: wire.canVote ?? false,
+  };
+}
+
+export function mapMeetingPage(wire: MeetingPageWire): MeetingPage {
+  return {
+    items: (wire.items ?? []).map(mapMeeting),
+    nextCursor: wire.nextCursor ?? null,
   };
 }
 

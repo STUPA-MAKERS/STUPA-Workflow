@@ -116,9 +116,10 @@ def test_application_filterable_fk_indexes() -> None:
     } <= names
 
 
-def test_state_category_check_constraint() -> None:
-    checks = {c.name for c in _table("state").constraints if c.name}
-    assert "ck_state_state_category" in checks
+def test_state_has_color_column() -> None:
+    cols = {c.name for c in _table("state").columns}
+    assert "color" in cols
+    assert "category" not in cols
 
 
 def test_role_permission_composite_pk() -> None:

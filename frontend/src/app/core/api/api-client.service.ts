@@ -13,6 +13,7 @@ import {
   mapBudgetStats,
   mapComment,
   mapMeeting,
+  mapMeetingPage,
   mapProtocol,
   mapSignedUrl,
   mapTimelineEvent,
@@ -55,6 +56,8 @@ import type {
   Attendance,
   AttendanceStatus,
   MeetingOutWire,
+  MeetingPage,
+  MeetingPageWire,
   MeetingPatchBody,
   NewApplication,
   Page,
@@ -64,6 +67,7 @@ import type {
   ProtocolVotesBody,
   SignedUrl,
   SignedUrlOutWire,
+  TimelineDirection,
   TimelineEntry,
   TimelineEventOutWire,
   Transition,
@@ -329,6 +333,28 @@ export class ApiClient {
     return this.http
       .get<MeetingOutWire[]>(`${this.base}/meetings`, { params })
       .pipe(map((items) => items.map(mapMeeting)));
+  }
+
+  /**
+   * GET /meetings/timeline — Keyset-paginierte Timeline um *jetzt* (#104).
+   *
+   * `direction: 'upcoming'` läuft chronologisch vorwärts, `'past'` rückwärts
+   * (Infinite-Scroll nach oben). `cursor` stammt aus `nextCursor` der Vorseite;
+   * `null`/leer ⇒ Beginn ab *jetzt*. `nextCursor === null` ⇒ Ende der Richtung.
+   */
+  listMeetingsTimeline(opts: {
+    direction: TimelineDirection;
+    cursor?: string | null;
+    limit?: number;
+    gremiumId?: Uuid;
+  }): Observable<MeetingPage> {
+    let params = new HttpParams().set('direction', opts.direction);
+    if (opts.cursor) params = params.set('cursor', opts.cursor);
+    if (opts.limit) params = params.set('limit', String(opts.limit));
+    if (opts.gremiumId) params = params.set('gremiumId', opts.gremiumId);
+    return this.http
+      .get<MeetingPageWire>(`${this.base}/meetings/timeline`, { params })
+      .pipe(map(mapMeetingPage));
   }
 
   /** GET /meetings/{id} — Sitzungs-State + Votes. */

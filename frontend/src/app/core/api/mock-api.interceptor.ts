@@ -274,7 +274,7 @@ const SUBMITTED_STATE: StateOutWire = {
   id: '66666666-6666-6666-6666-666666666661',
   key: 'submitted',
   label: { de: 'Eingereicht', en: 'Submitted' },
-  category: 'open',
+  color: '#4a90d9',
   editAllowed: true,
 };
 
@@ -282,7 +282,7 @@ const REVIEW_STATE: StateOutWire = {
   id: '66666666-6666-6666-6666-666666666662',
   key: 'review',
   label: { de: 'In Prüfung', en: 'In review' },
-  category: 'open',
+  color: '#e8a33d',
   editAllowed: false,
 };
 
@@ -326,7 +326,7 @@ const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
         id: '66666666-6666-6666-6666-666666666663',
         key: 'draft',
         label: { de: 'Entwurf', en: 'Draft' },
-        category: 'open',
+        color: null,
         editAllowed: true,
       },
       gremiumId: null,
@@ -358,7 +358,7 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
       id: '66666666-6666-6666-6666-666666666671',
       key: 'finance_approval',
       label: { de: 'Finanz-Freigabe', en: 'Finance approval' },
-      category: 'pending',
+      color: '#9b59b6',
       editAllowed: false,
       kind: 'vote',
     },
@@ -377,7 +377,7 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
       id: '66666666-6666-6666-6666-666666666672',
       key: 'plenum_vote',
       label: { de: 'Abstimmung Plenum', en: 'Plenum vote' },
-      category: 'pending',
+      color: '#9b59b6',
       editAllowed: false,
       kind: 'vote',
     },

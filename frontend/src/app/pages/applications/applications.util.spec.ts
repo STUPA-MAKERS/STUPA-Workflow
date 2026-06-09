@@ -3,22 +3,7 @@ import {
   formatBytes,
   formatFieldValue,
   scanBadgeVariant,
-  stateBadgeVariant,
 } from './applications.util';
-
-describe('stateBadgeVariant', () => {
-  it('maps the backend state categories', () => {
-    expect(stateBadgeVariant('open')).toBe('info');
-    expect(stateBadgeVariant('running')).toBe('warning');
-    expect(stateBadgeVariant('closed')).toBe('neutral');
-  });
-
-  it('falls back to neutral for unknown/empty categories', () => {
-    expect(stateBadgeVariant(undefined)).toBe('neutral');
-    expect(stateBadgeVariant(null)).toBe('neutral');
-    expect(stateBadgeVariant('weird')).toBe('neutral');
-  });
-});
 
 describe('applicationTitle', () => {
   it('prefers the first non-empty known title field', () => {

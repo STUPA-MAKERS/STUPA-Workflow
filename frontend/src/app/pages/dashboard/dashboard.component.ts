@@ -10,7 +10,6 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
-import { stateBadgeVariant } from '../applications/applications.util';
 
 /** Wie viele Antrags-Zeilen je Panel maximal gezeigt werden. */
 const PREVIEW_ROWS = 5;
@@ -40,10 +39,16 @@ export class DashboardComponent {
   readonly auth = inject(AuthService);
   private readonly api = inject(ApiClient);
 
-  /** Lesbare/relevante Anträge (Quelle für Aufgaben- und Antrags-Panel). */
+  /** „Meine Anträge": lesbare/relevante Anträge des Nutzers. */
   private readonly applications = toSignal(
     this.api.listApplications().pipe(catchError(() => of(null))),
     { initialValue: undefined },
+  );
+
+  /** „Offene Aufgaben": echte offene Entscheidungen (GET /applications/tasks). */
+  private readonly tasks = toSignal(
+    this.api.listTasks().pipe(catchError(() => of([] as ApplicationListItem[]))),
+    { initialValue: [] as ApplicationListItem[] },
   );
 
   private readonly types = toSignal(
@@ -63,15 +68,11 @@ export class DashboardComponent {
   private readonly items = computed<ApplicationListItem[]>(() => this.applications()?.items ?? []);
   readonly total = computed(() => this.applications()?.total ?? 0);
 
-  /** Offene Aufgaben: nicht-abgeschlossene Anträge (warten auf Bearbeitung/Prüfung). */
-  readonly openTasks = computed(() =>
-    this.items().filter((a) => a.state?.category && a.state.category !== 'closed'),
-  );
+  /** Offene Aufgaben: Anträge mit einer für mich offenen Entscheidung. */
+  readonly openTasks = computed(() => this.tasks());
 
   readonly taskRows = computed(() => this.openTasks().slice(0, PREVIEW_ROWS));
   readonly applicationRows = computed(() => this.items().slice(0, PREVIEW_ROWS));
-
-  readonly stateVariant = stateBadgeVariant;
 
   name(item: ApplicationListItem): string {
     return this.typeName()(item.typeId);

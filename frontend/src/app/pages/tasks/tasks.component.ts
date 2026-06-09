@@ -11,7 +11,6 @@ import {
   type ColumnDef,
   DataTableComponent,
 } from '@shared/ui';
-import { stateBadgeVariant } from '../applications/applications.util';
 
 /**
  * Aufgaben (#64): Anträge mit ausstehender Entscheidung für die eigene Rolle
@@ -41,7 +40,7 @@ import { stateBadgeVariant } from '../applications/applications.util';
       >
         <ng-template appCell="title" let-r>{{ titleOf($any(r)) }}</ng-template>
         <ng-template appCell="state" let-r>
-          <app-badge [variant]="stateVariant($any(r).state?.category)">{{ $any(r).state?.label }}</app-badge>
+          <app-badge [color]="$any(r).state?.color">{{ $any(r).state?.label }}</app-badge>
         </ng-template>
         <ng-template appCell="amount" let-r>{{ $any(r).amount ? ($any(r).amount + ' ' + ($any(r).currency ?? '')) : '—' }}</ng-template>
         <ng-template appCell="createdAt" let-r>{{ $any(r).createdAt | date: 'mediumDate' }}</ng-template>
@@ -65,7 +64,6 @@ export class TasksComponent {
 
   protected readonly tasks = signal<ApplicationListItem[]>([]);
   protected readonly loading = signal(true);
-  protected readonly stateVariant = stateBadgeVariant;
 
   protected readonly columns = signal<ColumnDef[]>([
     { key: 'title', label: this.i18n.translate('tasks.col.title') },

@@ -4,7 +4,6 @@ import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
-import { stateBadgeVariant } from './applications.util';
 
 /** Normalisierte Antrags-Zeile für die geteilte Tabelle. */
 export interface ApplicationRow {
@@ -14,8 +13,8 @@ export interface ApplicationRow {
   /** Antragstyp (graue Unterzeile + Typ-Spalte); leer = ausblenden. */
   typeLabel?: string | null;
   stateLabel?: string | null;
-  /** Status-Kategorie → Badge-Variante. */
-  stateCategory?: string | null;
+  /** Frei konfigurierte State-Farbe (Hex); `null` → neutrales Badge. */
+  stateColor?: string | null;
   amount?: string | number | null;
   currency?: string | null;
   createdAt?: string | null;
@@ -77,7 +76,7 @@ export interface SortState {
               </td>
               <td>
                 @if (row.stateLabel) {
-                  <app-badge [variant]="stateVariant(row.stateCategory)">{{ row.stateLabel }}</app-badge>
+                  <app-badge [color]="row.stateColor">{{ row.stateLabel }}</app-badge>
                 } @else {
                   —
                 }
@@ -184,12 +183,6 @@ export class ApplicationsTableComponent {
   /** Aktuelle Sortierung; ``null`` → Header nicht klickbar. */
   readonly sort = input<SortState | null>(null);
   readonly sortChange = output<SortState>();
-
-  protected readonly stateVariant = stateBadgeVariant;
-
-  protected stateVariantOf(category?: string | null): ReturnType<typeof stateBadgeVariant> {
-    return stateBadgeVariant(category ?? undefined);
-  }
 
   protected money(value: string | number | null | undefined, currency?: string | null): string {
     if (value === null || value === undefined || value === '') return '—';

@@ -63,7 +63,7 @@ class StateOut(_CamelModel):
     id: UUID
     key: str
     label: I18nMap
-    category: str
+    color: str | None = None
     edit_allowed: bool = Field(alias="editAllowed")
     # State-Art (#28) — das FE zeigt z. B. bei ``approval`` Annehmen/Ablehnen-Aktionen.
     kind: str = "normal"

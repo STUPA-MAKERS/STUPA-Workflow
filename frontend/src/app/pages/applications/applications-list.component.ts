@@ -447,7 +447,7 @@ export class ApplicationsListComponent {
       title: this.titleOf(item),
       typeLabel: this.typeName(item.typeId),
       stateLabel: item.state?.label ?? null,
-      stateCategory: item.state?.category ?? null,
+      stateColor: item.state?.color ?? null,
       amount: item.amount ?? null,
       currency: item.currency ?? null,
       createdAt: item.createdAt ?? null,

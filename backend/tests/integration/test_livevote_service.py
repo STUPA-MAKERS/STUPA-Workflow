@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import AsyncIterator
+from datetime import date as _date
 
 import pytest
 from sqlalchemy import func, select
@@ -32,7 +33,7 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService, meetin
 from app.modules.voting.models import Ballot, Vote
 from app.modules.voting.service import VotingService
 from app.shared.config_schemas import VoteConfig
-from app.shared.errors import ConflictError
+from app.shared.errors import BadRequestError, ConflictError
 
 pytestmark = pytest.mark.integration
 
@@ -89,6 +90,52 @@ async def test_meeting_crud_and_patch(session: AsyncSession) -> None:
     patched = await svc.patch(created.id, MeetingPatch(status="live"), principal)
     assert patched.status == "live"
     assert patched.can_control is True
+
+
+async def test_list_timeline_keyset_pagination(session: AsyncSession) -> None:
+    """Timeline-Keyset (#104): past rückwärts, upcoming vorwärts, undatiert ans Ende."""
+    gremium, _ = await _gremium_and_application(session)
+    svc = MeetingService(session)
+    principal = Principal(sub="adm", roles=["admin"])
+    # Heute ist 2026 ⇒ 2020/2021 vergangen, 2030/2031 zukünftig, undatiert = Zukunftsende.
+    await svc.create(MeetingCreate(gremiumId=gremium.id, title="past-2020", date=_date(2020, 1, 1)), principal)
+    await svc.create(MeetingCreate(gremiumId=gremium.id, title="past-2021", date=_date(2021, 6, 15)), principal)
+    await svc.create(MeetingCreate(gremiumId=gremium.id, title="fut-2030", date=_date(2030, 1, 1)), principal)
+    await svc.create(MeetingCreate(gremiumId=gremium.id, title="fut-2031", date=_date(2031, 1, 1)), principal)
+    await svc.create(MeetingCreate(gremiumId=gremium.id, title="undated"), principal)
+
+    # --- upcoming: frühestes zuerst, undatiert zuletzt; paginiert über den Cursor. ---
+    up: list[str] = []
+    cursor: str | None = None
+    while True:
+        page = await svc.list_timeline(
+            principal, direction="upcoming", cursor=cursor, limit=2, gremium_id=gremium.id
+        )
+        up.extend(m.title for m in page.items)
+        cursor = page.next_cursor
+        if cursor is None:
+            break
+    assert up == ["fut-2030", "fut-2031", "undated"]
+
+    # --- past: jüngstes zuerst, rückwärts; undatierte/zukünftige nicht enthalten. ---
+    past: list[str] = []
+    cursor = None
+    while True:
+        page = await svc.list_timeline(
+            principal, direction="past", cursor=cursor, limit=1, gremium_id=gremium.id
+        )
+        past.extend(m.title for m in page.items)
+        cursor = page.next_cursor
+        if cursor is None:
+            break
+    assert past == ["past-2021", "past-2020"]
+
+
+async def test_list_timeline_rejects_bad_cursor(session: AsyncSession) -> None:
+    svc = MeetingService(session)
+    principal = Principal(sub="adm", roles=["admin"])
+    with pytest.raises(BadRequestError):
+        await svc.list_timeline(principal, direction="past", cursor="!!not-base64!!")
 
 
 async def test_open_vote_lookup(session: AsyncSession) -> None:

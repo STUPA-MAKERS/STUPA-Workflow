@@ -37,7 +37,7 @@ const STATE: StateOutWire = {
   id: 's1',
   key: 'submitted',
   label: { de: 'Eingereicht', en: 'Submitted' },
-  category: 'open',
+  color: '#4a90d9',
   editAllowed: true,
 };
 
@@ -51,12 +51,12 @@ describe('mapState', () => {
     expect(mapState(STATE, 'fr')?.label).toBe('Eingereicht');
   });
 
-  it('keeps the structural fields (id/key/category/editAllowed)', () => {
+  it('keeps the structural fields (id/key/color/editAllowed)', () => {
     expect(mapState(STATE, 'de')).toEqual({
       id: 's1',
       key: 'submitted',
       label: 'Eingereicht',
-      category: 'open',
+      color: '#4a90d9',
       editAllowed: true,
       kind: 'normal',
     });
@@ -90,7 +90,7 @@ describe('mapApplication', () => {
     expect(view).toEqual({
       id: 'a1',
       typeId: 't1',
-      state: { id: 's1', key: 'submitted', label: 'Eingereicht', category: 'open', editAllowed: true, kind: 'normal' },
+      state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: '#4a90d9', editAllowed: true, kind: 'normal' },
       gremiumId: 'g1',
       budgetPotId: 'p1',
       amount: '250.00',
@@ -158,7 +158,7 @@ describe('mapTimelineEvent', () => {
     const view = mapTimelineEvent(wire, 'en');
     expect(view).toEqual({
       toStateId: 's1',
-      toState: { id: 's1', key: 'submitted', label: 'Submitted', category: 'open', editAllowed: true, kind: 'normal' },
+      toState: { id: 's1', key: 'submitted', label: 'Submitted', color: '#4a90d9', editAllowed: true, kind: 'normal' },
       label: 'Submitted',
       actor: 'Referat',
       at: '2026-06-05T10:00:00Z',

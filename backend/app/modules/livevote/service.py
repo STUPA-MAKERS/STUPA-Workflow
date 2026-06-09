@@ -14,10 +14,15 @@ Beamer-Stream konstruktionsbedingt namensfrei.
 
 from __future__ import annotations
 
+import base64
 from datetime import UTC, datetime
+from datetime import date as _date
+from datetime import datetime as _datetime
+from datetime import time as _time
+from typing import Any, Literal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import DateTime, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.gremium_roles import (
@@ -39,18 +44,53 @@ from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import (
     MeetingCreate,
     MeetingOut,
+    MeetingPage,
     MeetingPatch,
     MeetingVoteOut,
 )
 from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed, VoteOut
-from app.shared.errors import ForbiddenError, NotFoundError
+from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError
 
 
 def meeting_channel(meeting_id: UUID) -> str:
     """PubSub-Kanal einer Sitzung (api.md §4)."""
     return f"meeting:{meeting_id}"
+
+
+# Sortier-/Boundary-Schlüssel der Timeline (#104): terminierter Zeitpunkt einer
+# Sitzung. Fehlt die Uhrzeit, gilt Mitternacht; fehlt das Datum (offen geplant),
+# rückt die Sitzung ans **Ende** der Zukunft (fernes Sentinel-Datum).
+_MIDNIGHT = _time(0, 0)
+_UNDATED_FALLBACK = _date(9999, 12, 31)
+
+
+def _sort_ts_expr() -> Any:
+    """SQL-Ausdruck ``date + start_time`` als ``timestamp`` (Keyset-Schlüssel)."""
+    return cast(
+        func.coalesce(Meeting.date, _UNDATED_FALLBACK)
+        + func.coalesce(Meeting.start_time, _MIDNIGHT),
+        DateTime,
+    )
+
+
+def _encode_cursor(ts: _datetime, meeting_id: UUID) -> str:
+    """Opaker Keyset-Cursor aus (Sortier-Zeitstempel, ID)."""
+    raw = f"{ts.isoformat()}|{meeting_id}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _decode_cursor(cursor: str | None) -> tuple[_datetime, UUID] | None:
+    """Cursor → (Zeitstempel, ID); ``None`` bei leerem Cursor, 400 bei Murks."""
+    if not cursor:
+        return None
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode()).decode()
+        ts_str, id_str = raw.split("|", 1)
+        return _datetime.fromisoformat(ts_str), UUID(id_str)
+    except (ValueError, TypeError) as exc:
+        raise BadRequestError("invalid pagination cursor") from exc
 
 
 class BrokerPublisher:
@@ -302,7 +342,67 @@ class MeetingService:
         stmt = select(Meeting).order_by(Meeting.created_at.desc())
         if gremium_id is not None:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
-        meetings = (await self.session.execute(stmt)).scalars().all()
+        meetings = list((await self.session.execute(stmt)).scalars().all())
+        return await self._decorate(meetings, principal)
+
+    async def list_timeline(
+        self,
+        principal: Principal,
+        *,
+        direction: Literal["past", "upcoming"],
+        cursor: str | None = None,
+        limit: int = 20,
+        gremium_id: UUID | None = None,
+    ) -> MeetingPage:
+        """Keyset-paginierte Sitzungs-Timeline um *jetzt* herum (#104).
+
+        ``upcoming`` läuft chronologisch vorwärts ab dem aktuellen Zeitpunkt
+        (frühestes zuerst, undatierte Sitzungen am Ende), ``past`` rückwärts in die
+        Vergangenheit (jüngstes zuerst). Der ``cursor`` trägt den Sortier-Zeitstempel
+        und die ID der zuletzt gelieferten Sitzung — stabil auch bei gleichem Termin.
+        """
+        sort_ts = _sort_ts_expr()
+        # Naiver „Jetzt"-Zeitstempel — vergleichbar mit dem (datums-basierten) Sort-Key.
+        now_ts = datetime.now(UTC).replace(tzinfo=None)
+        cur = _decode_cursor(cursor)
+        stmt = select(Meeting, sort_ts)
+        if gremium_id is not None:
+            stmt = stmt.where(Meeting.gremium_id == gremium_id)
+        if direction == "upcoming":
+            stmt = stmt.where(sort_ts >= now_ts)
+            if cur is not None:
+                cts, cid = cur
+                stmt = stmt.where(
+                    or_(sort_ts > cts, and_(sort_ts == cts, Meeting.id > cid))
+                )
+            stmt = stmt.order_by(sort_ts.asc(), Meeting.id.asc())
+        else:
+            stmt = stmt.where(sort_ts < now_ts)
+            if cur is not None:
+                cts, cid = cur
+                stmt = stmt.where(
+                    or_(sort_ts < cts, and_(sort_ts == cts, Meeting.id < cid))
+                )
+            stmt = stmt.order_by(sort_ts.desc(), Meeting.id.desc())
+        # Ein Element über das Limit hinaus laden → verrät, ob eine Folgeseite existiert.
+        rows = (await self.session.execute(stmt.limit(limit + 1))).all()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        items = await self._decorate([row[0] for row in rows], principal)
+        next_cursor = (
+            _encode_cursor(rows[-1][1], rows[-1][0].id) if has_more and rows else None
+        )
+        return MeetingPage(items=items, next_cursor=next_cursor)
+
+    async def _decorate(
+        self, meetings: list[Meeting], principal: Principal
+    ) -> list[MeetingOut]:
+        """Sitzungen mit Protokoll-ID, Votes und per-Principal-RBAC-Flags anreichern.
+
+        Geteilt von :meth:`list` und :meth:`list_timeline`; lädt alles gebündelt
+        (kein N+1) und filtert **keine** Sitzungen heraus — Sichtbarkeit ist
+        modulweit, die Flags sind rein per-Principal.
+        """
         if not meetings:
             return []
         # Protokoll-IDs gebündelt laden (kein N+1): meeting_id → protocol.id.

@@ -20,7 +20,7 @@ function app(editAllowed: boolean, data: Record<string, unknown> = { title: 'Som
       id: 's1',
       key: 'submitted',
       label: editAllowed ? 'Eingereicht' : 'Beschlossen',
-      category: 'open',
+      color: '#4a90d9',
       editAllowed,
     },
     gremiumId: null,

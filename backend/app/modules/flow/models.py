@@ -69,7 +69,6 @@ class State(UUIDPkMixin, Base):
     key: Mapped[str] = mapped_column(Text)
     label_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
-    category: Mapped[str] = mapped_column(Text)
     edit_allowed: Mapped[bool] = mapped_column(Boolean, server_default="true")
     is_initial: Mapped[bool] = mapped_column(Boolean, server_default="false")
     # Global-Flow-Redesign (#28, Cleanup): nur noch zwei State-Arten.
@@ -83,9 +82,6 @@ class State(UUIDPkMixin, Base):
 
     __table_args__ = (
         UniqueConstraint("flow_version_id", "key"),
-        CheckConstraint(
-            "category IN ('open','running','closed')", name="state_category"
-        ),
         CheckConstraint("kind IN ('normal','vote')", name="state_kind"),
         Index(
             "uq_state_one_initial_per_flow",

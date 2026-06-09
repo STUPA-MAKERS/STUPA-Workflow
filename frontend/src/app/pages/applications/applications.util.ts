@@ -2,24 +2,6 @@ import type { BadgeVariant } from '@shared/ui/badge/badge.component';
 import type { ScanState } from '@core/api/models';
 
 /**
- * Status-Kategorie → Badge-Variante. Die Kategorien sind backend-seitig auf
- * `open|running|closed` beschränkt (flow/models.py `state_category`-Constraint);
- * unbekannte Werte fallen neutral aus.
- */
-export function stateBadgeVariant(category: string | null | undefined): BadgeVariant {
-  switch (category) {
-    case 'open':
-      return 'info';
-    case 'running':
-      return 'warning';
-    case 'closed':
-      return 'neutral';
-    default:
-      return 'neutral';
-  }
-}
-
-/**
  * Anzeige-Titel eines Antrags aus den freien `data`-Feldern ableiten. Forms
  * haben kein garantiertes `title`-Feld; wir nehmen den ersten nicht-leeren
  * String aus den üblichen Schlüsseln, sonst den Fallback (i18n „Ohne Titel“).

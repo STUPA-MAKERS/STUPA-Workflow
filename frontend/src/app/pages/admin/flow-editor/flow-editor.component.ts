@@ -31,7 +31,6 @@ import {
   type NotifyRecipient,
   type NotifyRecipientKind,
   NOTIFY_RECIPIENT_KINDS,
-  type StateCategory,
   type StateConfig,
   type StateDef,
   type StateKind,
@@ -39,7 +38,6 @@ import {
   type TransitionDef,
 } from '../admin.models';
 import {
-  STATE_CATEGORIES,
   autoLayout,
   blankState,
   blankTransition,
@@ -100,7 +98,6 @@ export class FlowEditorComponent {
 
   protected readonly canvas = viewChild<ElementRef<SVGSVGElement>>('canvas');
 
-  protected readonly categories = STATE_CATEGORIES;
   protected readonly actionTypes = ACTION_TYPES;
   protected readonly compareOps = COMPARE_OPS;
 
@@ -269,7 +266,7 @@ export class FlowEditorComponent {
         key: s.key,
         label: this.label(s),
         kind: s.kind ?? 'normal',
-        category: s.category ?? null,
+        color: s.color ?? null,
         isInitial: !!s.isInitial,
         selected: sel?.kind === 'state' && sel.key === s.key,
         x: pos[s.key]?.x ?? 0,
@@ -459,10 +456,6 @@ export class FlowEditorComponent {
     return s.label['de'] || s.label['en'] || s.key;
   }
 
-  protected catLabel(c: StateCategory): string {
-    return this.i18n.translate(`admin.flow.cat.${c}` as TranslationKey);
-  }
-
   protected kindLabel(k: string): string {
     return this.i18n.translate(`admin.flow.kind.${k}` as TranslationKey);
   }
@@ -599,12 +592,10 @@ export class FlowEditorComponent {
     }));
   }
 
-  protected setStateCategory(key: string, category: string): void {
+  protected setStateColor(key: string, color: string): void {
     this.graph.update((g) => ({
       ...g,
-      states: g.states.map((s) =>
-        s.key === key ? { ...s, category: (category || null) as StateCategory | null } : s,
-      ),
+      states: g.states.map((s) => (s.key === key ? { ...s, color: color || null } : s)),
     }));
   }
 

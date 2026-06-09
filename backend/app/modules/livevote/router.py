@@ -17,7 +17,7 @@ Auth ist fail-closed: REST 401/403 via ``require_principal``; WS schließt mit
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, WebSocket
@@ -46,6 +46,7 @@ from app.modules.livevote.schemas import (
     AttendanceSetBody,
     MeetingCreate,
     MeetingOut,
+    MeetingPage,
     MeetingPatch,
     MeetingVoteOpenBody,
 )
@@ -172,6 +173,31 @@ async def list_meetings(
 ) -> list[MeetingOut]:
     """Sitzungen auflisten (neueste zuerst), optional Gremium-gefiltert (#104)."""
     return await service.list(principal, gremium_id)
+
+
+@router.get(
+    "/meetings/timeline", response_model=MeetingPage, responses=_errors(400, 401, 403)
+)
+async def list_meetings_timeline(
+    service: ServiceDep,
+    principal: ReaderDep,
+    direction: Annotated[Literal["past", "upcoming"], Query()] = "upcoming",
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
+) -> MeetingPage:
+    """Keyset-paginierte Sitzungs-Timeline um *jetzt* herum (#104).
+
+    ``upcoming`` liefert anstehende Sitzungen chronologisch vorwärts, ``past`` die
+    vergangenen rückwärts (für Infinite-Scroll nach oben). ``cursor`` stammt aus
+    ``nextCursor`` der vorigen Seite; ``None`` ⇒ Beginn ab *jetzt*."""
+    return await service.list_timeline(
+        principal,
+        direction=direction,
+        cursor=cursor,
+        limit=limit,
+        gremium_id=gremium_id,
+    )
 
 
 @router.get(

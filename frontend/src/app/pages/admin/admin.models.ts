@@ -17,8 +17,6 @@ import type { FormFieldDef, I18nMap, Uuid } from '@core/api/models';
 
 // --- Flow-Graph (config_schemas §5.2) ---------------------------------------
 
-export type StateCategory = 'open' | 'running' | 'closed';
-
 /** State-Art im globalen Flow (#28-Redesign): nur noch normal + vote. */
 export type StateKind = 'normal' | 'vote';
 
@@ -36,7 +34,7 @@ export interface StateConfig {
 export interface StateDef {
   key: string;
   label: I18nMap;
-  category?: StateCategory | null;
+  /** Anzeigefarbe des State-Badges (Hex), optional. */
   color?: string | null;
   editAllowed?: boolean;
   isInitial?: boolean;

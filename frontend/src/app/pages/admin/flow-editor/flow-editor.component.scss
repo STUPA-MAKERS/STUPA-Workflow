@@ -276,12 +276,28 @@ select {
   stroke-width: 3;
 }
 
-.fe__node[data-cat='running'] {
-  fill: var(--color-warning-subtle);
+.fe__color-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.fe__node[data-cat='closed'] {
-  fill: var(--color-success-subtle, var(--color-surface));
+.fe__color-row input[type='color'] {
+  width: 2.5rem;
+  height: 2rem;
+  padding: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.fe__color-clear {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--fs-xs);
 }
 
 .fe__node-initial-dot {

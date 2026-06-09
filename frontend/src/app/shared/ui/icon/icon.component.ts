@@ -12,6 +12,7 @@ export type IconName =
   | 'roles'
   | 'user'
   | 'chevron-down'
+  | 'chevron-up'
   | 'power'
   | 'filter'
   | 'check'
@@ -40,6 +41,7 @@ const FA: Record<IconName, string> = {
   roles: 'fa-user-shield',
   user: 'fa-user',
   'chevron-down': 'fa-chevron-down',
+  'chevron-up': 'fa-chevron-up',
   power: 'fa-power-off',
   filter: 'fa-filter',
   check: 'fa-check',

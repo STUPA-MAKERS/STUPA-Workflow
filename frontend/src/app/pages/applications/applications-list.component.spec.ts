@@ -19,7 +19,7 @@ const OPEN_STATE: StateOutWire = {
   id: 's1',
   key: 'submitted',
   label: { de: 'Eingereicht', en: 'Submitted' },
-  category: 'open',
+  color: '#4a90d9',
   editAllowed: true,
 };
 

@@ -98,7 +98,7 @@ def _state_out(state: State | None) -> StateOut | None:
         id=state.id,
         key=state.key,
         label=state.label_i18n,
-        category=state.category,
+        color=state.color,
         editAllowed=state.edit_allowed,
         kind=state.kind,
     )

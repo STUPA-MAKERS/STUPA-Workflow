@@ -96,7 +96,8 @@ export interface StateOutWire {
   id: Uuid;
   key: string;
   label: I18nMap;
-  category: string;
+  /** Anzeigefarbe des State-Badges (Hex), optional. */
+  color?: string | null;
   editAllowed: boolean;
   /** State-Art (#28): normal|vote. */
   kind?: string;
@@ -325,7 +326,8 @@ export interface ApplicationState {
   id: Uuid;
   key: string;
   label: string;
-  category: string;
+  /** Anzeigefarbe des State-Badges (Hex), optional. */
+  color?: string | null;
   editAllowed: boolean;
   /** State-Art (#28): normal|vote. */
   kind: string;
@@ -773,6 +775,21 @@ export interface Meeting {
   canManageVotes: boolean;
   /** In dieser Sitzung stimmberechtigt. */
   canVote: boolean;
+}
+
+/** Richtung der Sitzungs-Timeline relativ zu *jetzt* (#104). */
+export type TimelineDirection = 'past' | 'upcoming';
+
+/** `MeetingPage` — Cursor-Seite der Timeline (Wire). */
+export interface MeetingPageWire {
+  items: MeetingOutWire[];
+  nextCursor?: string | null;
+}
+
+/** Sitzungs-Timeline-Seite (FE-View); `nextCursor === null` ⇒ Ende erreicht. */
+export interface MeetingPage {
+  items: Meeting[];
+  nextCursor: string | null;
 }
 
 /** Protokoll (FE-View) — `isFinal` aus `status` abgeleitet. */

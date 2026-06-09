@@ -91,7 +91,6 @@ async def _seed_type(
         flow_version_id=flow.id,
         key="draft",
         label_i18n={"de": "Entwurf"},
-        category="open",
         edit_allowed=True,
         is_initial=True,
     )
@@ -99,7 +98,6 @@ async def _seed_type(
         flow_version_id=flow.id,
         key="voting",
         label_i18n={"de": "Abstimmung"},
-        category="running",
         edit_allowed=False,
     )
     session.add_all([draft, locked])

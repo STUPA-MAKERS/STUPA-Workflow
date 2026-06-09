@@ -84,22 +84,22 @@ def test_partial_unique_one_initial_state(engine: Engine) -> None:
         ).scalar_one()
         conn.execute(
             text(
-                "INSERT INTO state (flow_version_id, key, category, is_initial) "
-                "VALUES (:f, 'a', 'open', true)"
+                "INSERT INTO state (flow_version_id, key, is_initial) "
+                "VALUES (:f, 'a', true)"
             ),
             {"f": fv},
         )
     with pytest.raises(IntegrityError), engine.begin() as conn:  # noqa: PT012
         conn.execute(
             text(
-                "INSERT INTO state (flow_version_id, key, category, is_initial) "
-                "VALUES (:f, 'b', 'open', true)"
+                "INSERT INTO state (flow_version_id, key, is_initial) "
+                "VALUES (:f, 'b', true)"
             ),
             {"f": fv},
         )
 
 
-def test_state_category_check(engine: Engine) -> None:
+def test_state_color_column(engine: Engine) -> None:
     with engine.begin() as conn:
         type_id = _new_type(conn)
         fv = conn.execute(
@@ -109,14 +109,14 @@ def test_state_category_check(engine: Engine) -> None:
             ),
             {"t": type_id},
         ).scalar_one()
-    with pytest.raises(IntegrityError), engine.begin() as conn:  # noqa: PT012
-        conn.execute(
+        color = conn.execute(
             text(
-                "INSERT INTO state (flow_version_id, key, category) "
-                "VALUES (:f, 'x', 'bogus')"
+                "INSERT INTO state (flow_version_id, key, color) "
+                "VALUES (:f, 'x', '#4a90d9') RETURNING color"
             ),
             {"f": fv},
-        )
+        ).scalar_one()
+    assert color == "#4a90d9"
 
 
 def test_gin_index_on_application_data(engine: Engine) -> None:

@@ -89,8 +89,8 @@ async def _make_type(session: AsyncSession) -> ApplicationType:
 def _graph(*, with_action: bool = True) -> dict:
     return {
         "states": [
-            {"key": "draft", "label": {"de": "Entwurf"}, "isInitial": True, "category": "open"},
-            {"key": "review", "label": {"de": "Prüfung"}, "category": "running"},
+            {"key": "draft", "label": {"de": "Entwurf"}, "isInitial": True, "color": "#4a90d9"},
+            {"key": "review", "label": {"de": "Prüfung"}, "color": "#4a90d9"},
         ],
         "transitions": [
             {

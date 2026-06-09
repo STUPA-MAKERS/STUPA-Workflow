@@ -10,7 +10,7 @@ function task(id: string, kind: string, title = 'Mein Antrag'): ApplicationListI
     id,
     typeId: 't1',
     title,
-    state: { id: 's1', key: 's', label: 'Abstimmung', category: 'running', editAllowed: false, kind },
+    state: { id: 's1', key: 's', label: 'Abstimmung', color: '#9b59b6', editAllowed: false, kind },
     gremiumId: null,
     budgetPotId: null,
     amount: '120.00',

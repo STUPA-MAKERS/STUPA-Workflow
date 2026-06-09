@@ -2,12 +2,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  type ElementRef,
   type OnDestroy,
   computed,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -34,9 +37,6 @@ import { BadgeComponent, type BadgeVariant } from '@shared/ui/badge/badge.compon
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 import {
-  CellDirective,
-  type ColumnDef,
-  DataTableComponent,
   DatepickerComponent,
   DialogComponent,
   IconComponent,
@@ -77,12 +77,11 @@ const AUTOSAVE_DELAY_MS = 1000;
     CardComponent,
     SelectComponent,
     DatepickerComponent,
-    DataTableComponent,
-    CellDirective,
     DialogComponent,
     IconComponent,
     MarkdownEditorComponent,
     DatePipe,
+    NgTemplateOutlet,
   ],
   template: `
     <header class="mtg__head">
@@ -470,38 +469,70 @@ const AUTOSAVE_DELAY_MS = 1000;
           </header>
           @if (loadingList()) {
             <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
+          } @else if (!meetings().length) {
+            <p class="mtg__muted">{{ 'meetings.list.empty' | t }}</p>
           } @else {
-            <app-data-table
-              [columns]="listColumns()"
-              [rows]="meetings()"
-              [emptyText]="'meetings.list.empty' | t"
-              [clickable]="true"
-              (rowClick)="openMeeting($any($event).id)"
-            >
-              <ng-template appCell="date" let-m>
-                @if ($any(m).date) {
-                  <span class="mtg__muted">{{ $any(m).date | date: 'mediumDate' }}{{ $any(m).startTime ? ', ' + $any(m).startTime : '' }}</span>
-                } @else { — }
-              </ng-template>
-              <ng-template appCell="status" let-m>
-                <app-badge [variant]="statusVariant($any(m).status)">{{ statusKey($any(m).status) | t }}</app-badge>
-              </ng-template>
-              <ng-template appCell="actions" let-m>
-                <span class="mtg__rowActions">
+            <!-- Timeline (#104): Vergangenes oben (lazy beim Hochscrollen), Anstehendes unten. -->
+            <div class="mtg__timeline" #tlScroll (scroll)="onTimelineScroll(tlScroll)">
+              @if (hasMorePast()) {
+                <button type="button" class="mtg__tlMore" (click)="loadMorePast(tlScroll)">
+                  <app-icon name="chevron-up" /> {{ 'meetings.list.loadPast' | t }}
+                </button>
+              }
+              @for (m of pastVisible(); track m.id) {
+                <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: true }" />
+              }
+              <div class="mtg__tlNow" #nowMarker>
+                <span class="mtg__tlNowLabel">{{ 'meetings.list.now' | t }}</span>
+              </div>
+              @for (m of upcomingSessions(); track m.id) {
+                <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
+              } @empty {
+                <p class="mtg__muted mtg__tlNoUp">{{ 'meetings.list.noUpcoming' | t }}</p>
+              }
+            </div>
+
+            <ng-template #tlRow let-m let-past="past">
+              <article
+                class="mtg__tlItem"
+                [class.mtg__tlItem--past]="past"
+                [class.mtg__tlItem--live]="m.status === 'live'"
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="('meetings.list.open' | t) + ': ' + m.title"
+                (click)="openMeeting(m.id)"
+                (keydown.enter)="openMeeting(m.id)"
+              >
+                <span class="mtg__tlDot" [class.mtg__tlDot--live]="m.status === 'live'"></span>
+                <div class="mtg__tlBody">
+                  <div class="mtg__tlMeta">
+                    <span class="mtg__muted mtg__tlDate">
+                      @if (m.date) {
+                        {{ m.date | date: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}
+                      } @else {
+                        {{ 'meetings.list.noDate' | t }}
+                      }
+                    </span>
+                    <app-badge [variant]="statusVariant(m.status)">{{ statusKey(m.status) | t }}</app-badge>
+                  </div>
+                  <h3 class="mtg__tlTitle">{{ m.title }}</h3>
+                  @if (m.protokollantName) {
+                    <span class="mtg__muted mtg__tlProto">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
+                  }
+                </div>
+                <span class="mtg__rowActions" (click)="$event.stopPropagation()">
                   @if (canManageAny()) {
-                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="$event.stopPropagation(); openSettings($any(m))">
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="openSettings(m)">
                       <app-icon name="edit" />
                     </app-button>
-                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="$event.stopPropagation(); askDeleteMeeting($any(m))">
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="askDeleteMeeting(m)">
                       <app-icon name="delete" />
                     </app-button>
                   }
-                  <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.list.open' | t" (click)="$event.stopPropagation(); openMeeting($any(m).id)">
-                    <app-icon name="chevron-down" class="mtg__openIcon" />
-                  </app-button>
+                  <app-icon name="chevron-down" class="mtg__openIcon" />
                 </span>
-              </ng-template>
-            </app-data-table>
+              </article>
+            </ng-template>
           }
         </section>
       } @else {
@@ -1213,6 +1244,136 @@ const AUTOSAVE_DELAY_MS = 1000;
         gap: var(--space-1);
         justify-content: flex-end;
       }
+      /* --- Timeline (#104) --- */
+      .mtg__timeline {
+        position: relative;
+        max-height: min(70vh, 640px);
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-1);
+      }
+      /* durchgehende Rail-Linie hinter den Punkten */
+      .mtg__timeline::before {
+        content: '';
+        position: absolute;
+        left: calc(var(--space-1) + 15px);
+        top: 0;
+        bottom: 0;
+        width: var(--border-width);
+        background: var(--color-border);
+      }
+      .mtg__tlMore {
+        z-index: 1;
+        align-self: center;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        background: var(--color-surface);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: 999px;
+        color: var(--color-text-muted);
+        padding: var(--space-1) var(--space-3);
+        font-size: var(--fs-sm);
+        cursor: pointer;
+      }
+      .mtg__tlMore:hover {
+        color: var(--color-text);
+        border-color: var(--color-primary);
+      }
+      .mtg__tlItem {
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-3);
+        padding: var(--space-3) var(--space-3) var(--space-3) var(--space-6);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        cursor: pointer;
+        transition: border-color 0.12s ease, background 0.12s ease;
+      }
+      .mtg__tlItem:hover {
+        border-color: var(--color-primary);
+      }
+      .mtg__tlItem:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+      }
+      .mtg__tlItem--past {
+        opacity: 0.82;
+      }
+      .mtg__tlItem--live {
+        border-color: var(--color-primary);
+        background: var(--color-primary-subtle);
+        opacity: 1;
+      }
+      .mtg__tlDot {
+        position: absolute;
+        left: 10px;
+        top: var(--space-4);
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--color-text-muted);
+        box-shadow: 0 0 0 3px var(--color-surface);
+      }
+      .mtg__tlItem--live .mtg__tlDot,
+      .mtg__tlDot--live {
+        background: var(--color-primary);
+      }
+      .mtg__tlBody {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+      }
+      .mtg__tlMeta {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+      .mtg__tlDate {
+        font-size: var(--fs-sm);
+      }
+      .mtg__tlTitle {
+        margin: 0;
+        font-size: var(--fs-md);
+        font-weight: var(--fw-semibold);
+      }
+      .mtg__tlProto {
+        font-size: var(--fs-sm);
+      }
+      .mtg__tlNow {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        padding-left: var(--space-6);
+        margin: var(--space-1) 0;
+      }
+      .mtg__tlNow::after {
+        content: '';
+        flex: 1;
+        height: var(--border-width);
+        background: var(--color-primary);
+        opacity: 0.4;
+        margin-left: var(--space-2);
+      }
+      .mtg__tlNowLabel {
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-semibold);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-primary);
+        background: var(--color-surface);
+      }
+      .mtg__tlNoUp {
+        padding-left: var(--space-6);
+      }
     `,
   ],
 })
@@ -1295,13 +1456,84 @@ export class MeetingsComponent implements OnDestroy {
   /** Sitzung-anlegen-Dialog offen (#27). */
   readonly createOpen = signal(false);
 
-  /** Spalten der Sitzungs-Übersichtstabelle (#27). */
-  readonly listColumns = computed<ColumnDef[]>(() => [
-    { key: 'title', label: this.i18n.translate('meetings.create.name') },
-    { key: 'date', label: this.i18n.translate('meetings.create.date') },
-    { key: 'status', label: this.i18n.translate('meetings.list.status'), align: 'start', width: '9rem' },
-    { key: 'actions', label: '', align: 'end', width: '9rem' },
-  ]);
+  // --- Timeline (#104) -----------------------------------------------------
+  /** Wie viele Vergangenheits-Sitzungen pro Nachlade-Schritt sichtbar werden. */
+  private readonly PAST_CHUNK = 12;
+  /** Aktuell sichtbares Vergangenheits-Fenster (wächst beim Hochscrollen). */
+  readonly pastWindow = signal(this.PAST_CHUNK);
+  private didInitialScroll = false;
+  private loadingMore = false;
+
+  readonly timelineScroll = viewChild<ElementRef<HTMLElement>>('tlScroll');
+  readonly nowMarker = viewChild<ElementRef<HTMLElement>>('nowMarker');
+
+  /** Vergangen: geschlossen, oder geplant mit Datum vor heute. Live nie. */
+  private isPast(m: Meeting): boolean {
+    if (m.status === 'live') return false;
+    if (m.status === 'closed') return true;
+    return !!m.date && m.date < this.todayIso();
+  }
+
+  /** Lokales Heute als `YYYY-MM-DD` (Vergleichsschlüssel für `date`). */
+  private todayIso(): string {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  }
+
+  /** Sortierschlüssel aus Datum+Uhrzeit; ohne Datum ⇒ leer (ans Ende). */
+  private dateKey(m: Meeting): string {
+    return m.date ? `${m.date} ${m.startTime ?? ''}` : '';
+  }
+
+  /** Anstehend (unten): live zuerst, dann nach Datum aufsteigend; ohne Datum ans Ende. */
+  readonly upcomingSessions = computed<Meeting[]>(() =>
+    this.meetings()
+      .filter((m) => !this.isPast(m))
+      .sort((a, b) => {
+        if (a.status === 'live' && b.status !== 'live') return -1;
+        if (b.status === 'live' && a.status !== 'live') return 1;
+        const ak = this.dateKey(a);
+        const bk = this.dateKey(b);
+        if (!ak) return 1;
+        if (!bk) return -1;
+        return ak < bk ? -1 : ak > bk ? 1 : 0;
+      }),
+  );
+
+  /** Vergangene Sitzungen, neueste zuerst — Basis für das „ab jetzt"-Fenster. */
+  private readonly pastDesc = computed<Meeting[]>(() =>
+    this.meetings()
+      .filter((m) => this.isPast(m))
+      .sort((a, b) => (this.dateKey(a) < this.dateKey(b) ? 1 : -1)),
+  );
+
+  readonly hasMorePast = computed(() => this.pastDesc().length > this.pastWindow());
+
+  /** Sichtbares Vergangenheits-Fenster, chronologisch (ältestes oben, neuestes am „jetzt"). */
+  readonly pastVisible = computed<Meeting[]>(() =>
+    this.pastDesc().slice(0, this.pastWindow()).reverse(),
+  );
+
+  /** Hochscrollen nahe dem oberen Rand lädt ein weiteres Vergangenheits-Fenster. */
+  onTimelineScroll(el: HTMLElement): void {
+    if (el.scrollTop <= 80 && this.hasMorePast() && !this.loadingMore) {
+      this.loadMorePast(el);
+    }
+  }
+
+  /** Fenster vergrößern und Scroll-Position über die neu eingefügte Höhe halten. */
+  loadMorePast(el: HTMLElement): void {
+    if (this.loadingMore || !this.hasMorePast()) return;
+    this.loadingMore = true;
+    const prevHeight = el.scrollHeight;
+    this.pastWindow.update((n) => n + this.PAST_CHUNK);
+    requestAnimationFrame(() => {
+      el.scrollTop += el.scrollHeight - prevHeight;
+      this.loadingMore = false;
+    });
+  }
 
   openCreate(): void {
     this.createOpen.set(true);
@@ -1381,6 +1613,19 @@ export class MeetingsComponent implements OnDestroy {
         this.loadList();
       }
     });
+    // Timeline (#104): einmalig auf den „jetzt"-Marker positionieren, sobald die
+    // Liste geladen + gerendert ist — Anstehendes sichtbar, Vergangenes per Hochscrollen.
+    effect(() => {
+      const marker = this.nowMarker()?.nativeElement;
+      const scroller = this.timelineScroll()?.nativeElement;
+      this.meetings(); // Abhängigkeit: neu positionieren, wenn Liste eintrifft
+      if (marker && scroller && !this.didInitialScroll && !this.loadingList()) {
+        this.didInitialScroll = true;
+        requestAnimationFrame(() => {
+          scroller.scrollTop = Math.max(0, marker.offsetTop - 8);
+        });
+      }
+    });
     // Gremien-Liste für das Anlege-Dropdown (#68) — nur wer Sitzungen verwaltet.
     if (this.canManage()) {
       this.options
@@ -1427,6 +1672,8 @@ export class MeetingsComponent implements OnDestroy {
   /** Sitzungs-Liste laden (#104 — Wiederauffindbarkeit). */
   private loadList(): void {
     if (!this.canManage() && !this.canWrite()) return;
+    this.didInitialScroll = false;
+    this.pastWindow.set(this.PAST_CHUNK);
     this.loadingList.set(true);
     this.api.listMeetings().subscribe({
       next: (list) => {

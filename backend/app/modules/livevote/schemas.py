@@ -95,6 +95,21 @@ class MeetingOut(_CamelModel):
     votes: list[MeetingVoteOut] = Field(default_factory=list)
 
 
+TimelineDirection = Literal["past", "upcoming"]
+
+
+class MeetingPage(_CamelModel):
+    """Cursor-Seite der Sitzungs-Timeline (#104).
+
+    Keyset-paginiert um *jetzt* herum: ``upcoming`` läuft chronologisch vorwärts
+    (frühestes zuerst), ``past`` rückwärts (jüngstes zuerst). ``nextCursor`` ist
+    ``None``, sobald in dieser Richtung keine weiteren Sitzungen folgen.
+    """
+
+    items: list[MeetingOut]
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
+
+
 AttendanceStatus = Literal["present", "excused", "absent"]
 
 

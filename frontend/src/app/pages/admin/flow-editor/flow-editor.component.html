@@ -80,7 +80,7 @@
             class="fe__node"
             [class.fe__node--initial]="n.isInitial"
             [class.fe__node--sel]="n.selected"
-            [attr.data-cat]="n.category"
+            [attr.fill]="n.color || null"
             (pointerdown)="onNodePointerDown($event, n.key)"
           />
           @if (n.isInitial) {
@@ -124,13 +124,19 @@
           <input [ngModel]="s.label['de']" (ngModelChange)="setStateLabel(s.key, 'de', $event)" /></label>
         <label class="fe__lbl">{{ 'admin.common.labelEn' | t }}
           <input [ngModel]="s.label['en']" (ngModelChange)="setStateLabel(s.key, 'en', $event)" /></label>
-        <label class="fe__lbl">{{ 'admin.flow.category' | t }}
-          <select [ngModel]="s.category ?? ''" (ngModelChange)="setStateCategory(s.key, $event)">
-            <option value="">—</option>
-            @for (c of categories; track c) {
-              <option [value]="c">{{ catLabel(c) }}</option>
+        <label class="fe__lbl">{{ 'admin.flow.color' | t }}
+          <span class="fe__color-row">
+            <input
+              type="color"
+              [ngModel]="s.color || '#4a90d9'"
+              (ngModelChange)="setStateColor(s.key, $event)"
+            />
+            @if (s.color) {
+              <button type="button" class="fe__color-clear" (click)="setStateColor(s.key, '')">
+                {{ 'admin.flow.colorClear' | t }}
+              </button>
             }
-          </select>
+          </span>
         </label>
         <app-checkbox [ngModel]="s.isInitial" (ngModelChange)="$event && setInitial(s.key)">
           {{ 'admin.flow.initial' | t }}

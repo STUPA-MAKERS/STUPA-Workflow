@@ -15,7 +15,7 @@ function graph(overrides: Partial<FlowGraph> = {}): FlowGraph {
     states: [
       { key: 'draft', label: { de: 'Entwurf', en: 'Draft' }, isInitial: true },
       { key: 'review', label: { de: 'Prüfung', en: 'Review' } },
-      { key: 'done', label: { de: 'Fertig', en: 'Done' }, category: 'closed' },
+      { key: 'done', label: { de: 'Fertig', en: 'Done' }, color: '#5cb85c' },
     ],
     transitions: [
       { from: 'draft', to: 'review', actions: [] },

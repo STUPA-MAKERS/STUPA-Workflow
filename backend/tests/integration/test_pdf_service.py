@@ -68,7 +68,6 @@ async def _seed_type(session: AsyncSession, *, cd_variant: str = "makers") -> Ap
         flow_version_id=flow.id,
         key="draft",
         label_i18n={"de": "Entwurf"},
-        category="open",
         edit_allowed=True,
         is_initial=True,
     )

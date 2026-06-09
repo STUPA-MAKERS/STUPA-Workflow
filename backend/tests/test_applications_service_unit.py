@@ -129,13 +129,14 @@ def test_state_out_maps_fields() -> None:
         id=uuid4(),
         key="draft",
         label_i18n={"de": "Entwurf"},
-        category="open",
+        color="#4a90d9",
         edit_allowed=True,
         kind="normal",
     )
     out = _state_out(state)  # type: ignore[arg-type]
     assert out is not None
     assert out.key == "draft"
+    assert out.color == "#4a90d9"
     assert out.edit_allowed is True
     assert out.kind == "normal"
     assert out.label == {"de": "Entwurf"}

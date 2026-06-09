@@ -82,8 +82,8 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.setInitial('b');
     c.setInitial('a');
     expect(c.graph().states.filter((s: { isInitial?: boolean }) => s.isInitial)).toHaveLength(1);
-    c.setStateCategory('a', 'open');
-    c.setStateCategory('a', '');
+    c.setStateColor('a', '#4a90d9');
+    c.setStateColor('a', '');
     c.setStateLabel('a', 'de', 'Entwurf');
     c.setStateLabel('a', 'en', 'Draft');
     c.setStateEditAllowed('a', false);
