@@ -125,4 +125,15 @@ describe('renderMarkdown', () => {
   it('renders a horizontal rule', () => {
     expect(renderMarkdown('---')).toContain('<hr>');
   });
+
+  it('renders a GitHub callout from a [!NOTE] blockquote', () => {
+    const out = renderMarkdown('> [!WARNING]\n> Achtung, Quorum knapp.');
+    expect(out).toContain('class="callout callout--warning"');
+    expect(out).toContain('<p class="callout__title">Warning</p>');
+    expect(out).toContain('Achtung, Quorum knapp.');
+  });
+
+  it('keeps a plain blockquote when there is no callout marker', () => {
+    expect(renderMarkdown('> Zitat')).toContain('<blockquote>Zitat</blockquote>');
+  });
 });

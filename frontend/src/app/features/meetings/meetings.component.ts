@@ -726,6 +726,26 @@ const AUTOSAVE_DELAY_MS = 1000;
         border-radius: var(--radius-sm);
         font-size: 0.9em;
       }
+      .mtg__preview .callout {
+        margin: var(--space-2) 0;
+        padding: var(--space-2) var(--space-3);
+        border-left: 4px solid var(--callout-color, var(--color-border-strong));
+        border-radius: var(--radius-sm);
+        background: color-mix(in srgb, var(--callout-color, var(--color-border-strong)) 8%, transparent);
+      }
+      .mtg__preview .callout :last-child {
+        margin-bottom: 0;
+      }
+      .mtg__preview .callout__title {
+        font-weight: var(--fw-semibold);
+        color: var(--callout-color, var(--color-text));
+        margin: 0 0 var(--space-1);
+      }
+      .mtg__preview .callout--note { --callout-color: #1f6feb; }
+      .mtg__preview .callout--tip { --callout-color: #1a7f37; }
+      .mtg__preview .callout--important { --callout-color: #8250df; }
+      .mtg__preview .callout--warning { --callout-color: #9a6700; }
+      .mtg__preview .callout--caution { --callout-color: #cf222e; }
       .mtg__preview a {
         color: var(--color-primary);
         text-decoration: underline;

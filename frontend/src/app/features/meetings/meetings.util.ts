@@ -98,6 +98,35 @@ function isTableSeparator(line: string): boolean {
   return /^\|?[\s:|-]+\|?$/.test(line.trim()) && line.includes('-') && line.includes('|');
 }
 
+// GitHub-Callout-Typen (`> [!NOTE]` …) → Titel + CSS-Modifier.
+const CALLOUT_TITLES: Record<string, string> = {
+  note: 'Note',
+  tip: 'Tip',
+  important: 'Important',
+  warning: 'Warning',
+  caution: 'Caution',
+};
+
+/**
+ * Eine Gruppe zusammenhängender ``>``-Zeilen rendern: GitHub-Callout
+ * (`> [!NOTE]`/`[!TIP]`/`[!IMPORTANT]`/`[!WARNING]`/`[!CAUTION]`) oder sonst ein
+ * gewöhnliches Blockzitat. Inhalt wird zeilenweise inline-gerendert.
+ */
+function renderQuote(lines: string[]): string {
+  const marker = /^\[!(\w+)\]\s*(.*)$/.exec(lines[0].trim());
+  const kind = marker ? marker[1].toLowerCase() : '';
+  if (marker && kind in CALLOUT_TITLES) {
+    const first = marker[2].trim();
+    const body = [...(first ? [first] : []), ...lines.slice(1)];
+    const inner = body.length ? `<p>${body.map(inline).join('<br>')}</p>` : '';
+    return (
+      `<div class="callout callout--${kind}">` +
+      `<p class="callout__title">${CALLOUT_TITLES[kind]}</p>${inner}</div>`
+    );
+  }
+  return `<blockquote>${lines.map(inline).join('<br>')}</blockquote>`;
+}
+
 /**
  * Minimaler, abhängigkeitsfreier Markdown→HTML-Renderer für die Vorschau
  * (siehe Datei-Header). Unterstützt Überschriften, Fett/Kursiv/Code, **Links**,
@@ -176,7 +205,15 @@ export function renderMarkdown(markdown: string): string {
     } else if (quote) {
       flushParagraph();
       closeList();
-      html.push(`<blockquote>${inline(quote[1])}</blockquote>`);
+      // Zusammenhängende ``>``-Zeilen sammeln (für GitHub-Callouts + mehrzeilige Zitate).
+      const quoteLines: string[] = [quote[1]];
+      while (i + 1 < lines.length) {
+        const m = /^>\s?(.*)$/.exec(lines[i + 1].trimEnd());
+        if (!m) break;
+        quoteLines.push(m[1]);
+        i++;
+      }
+      html.push(renderQuote(quoteLines));
     } else if (line.trim() === '') {
       flushParagraph();
       closeList();

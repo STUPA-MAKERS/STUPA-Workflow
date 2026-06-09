@@ -21,9 +21,14 @@ ARG TECTONIC_VERSION=0.15.0
 ARG TECTONIC_SHA256_AMD64=dfb82876f2986862996e564fa507a9e576e0c1e3bee63c2c1bd677c2543e6407
 ARG TECTONIC_SHA256_ARM64=1f59f9fb8eb65e8ba18658fc9016767e7d3e12488ded8b8fffa34254e51ce42c
 
+# fontconfig + Basis-Fonts: ohne sie scheitert XeTeX/fontspec schon am Default-
+# Font ("Fontconfig error: Cannot load default config file"). CD-spezifische
+# Fonts (z. B. Blender für die STUPA-Variante) müssen zusätzlich bereitgestellt
+# werden — s. /usr/share/fonts (unten optional einkopieren).
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends curl ca-certificates; \
+    apt-get install -y --no-install-recommends \
+        curl ca-certificates fontconfig fonts-dejavu-core; \
     rm -rf /var/lib/apt/lists/*; \
     case "$(dpkg --print-architecture)" in \
         amd64) target="x86_64-unknown-linux-musl";  sha256="${TECTONIC_SHA256_AMD64}" ;; \
