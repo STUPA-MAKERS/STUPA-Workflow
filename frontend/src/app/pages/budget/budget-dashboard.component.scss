@@ -10,6 +10,18 @@
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
+  /* Titel auf normale Body-Breite zentriert — fluchtet mit der Mittelspalte. */
+  width: 100%;
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
+}
+
+/* Status-/Empty-Zeilen ebenfalls auf Body-Breite (wie der Titel). */
+.bd__status,
+.bd__empty {
+  width: 100%;
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
 }
 
 .bd__exportBtn {
@@ -103,10 +115,15 @@
   gap: var(--space-5);
 }
 
-/* Drei Zonen: Navigation (Budget→Jahr) | Hauptinhalt | Charts. */
+/* Drei Zonen: Navigation (Budget→Jahr) | Hauptinhalt (Body-Breite) | Charts.
+   Mittelspalte auf ``--layout-max-width`` gekappt + durch symmetrische 1fr-Seiten
+   zentriert; nur Baum (links) und Charts (rechts) ragen in die Ränder hinaus. */
 .bd__layout {
   display: grid;
-  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr) minmax(10rem, 13rem);
+  grid-template-columns:
+    minmax(11rem, 1fr)
+    minmax(0, var(--layout-max-width))
+    minmax(10rem, 1fr);
   gap: var(--space-5);
   align-items: start;
 }
@@ -114,6 +131,15 @@
   position: sticky;
   top: var(--space-4);
   min-width: 0;
+  /* an die Mittelspalte heranrücken (rechtsbündig im linken Rand). */
+  justify-self: end;
+  width: 100%;
+  max-width: 14rem;
+}
+.bd__charts {
+  justify-self: start;
+  width: 100%;
+  max-width: 13rem;
 }
 .bd__main {
   min-width: 0;
