@@ -42,8 +42,9 @@ def upgrade() -> None:
             "application_id",
             sa.Uuid(),
             sa.ForeignKey("application.id", ondelete="CASCADE"),
-            nullable=False,
+            nullable=True,
         ),
+        sa.Column("title", sa.Text(), nullable=True),
         sa.Column("position", sa.Integer(), server_default="0", nullable=False),
         sa.Column(
             "created_at",

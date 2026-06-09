@@ -267,30 +267,30 @@ async def add_agenda_item(
     service: ServiceDep,
     principal: ManagerDep,
 ) -> list[AgendaItemOut]:
-    """Antrag auf die Tagesordnung setzen — nur Sitzungsleitung/Admin (#Meetings)."""
+    """TOP setzen (Antrag oder Freitext) — nur Sitzungsleitung/Admin (#Meetings)."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_control:
         raise ForbiddenError("only the committee lead may edit the agenda")
-    return await agenda.add(meeting_id, payload.application_id)
+    return await agenda.add(meeting_id, payload.application_id, payload.title)
 
 
 @router.delete(
-    "/meetings/{meeting_id}/agenda/{application_id}",
+    "/meetings/{meeting_id}/agenda/{item_id}",
     response_model=list[AgendaItemOut],
     responses=_errors(401, 403, 404),
 )
 async def remove_agenda_item(
     meeting_id: UUID,
-    application_id: UUID,
+    item_id: UUID,
     agenda: AgendaDep,
     service: ServiceDep,
     principal: ManagerDep,
 ) -> list[AgendaItemOut]:
-    """Antrag von der Tagesordnung entfernen — nur Sitzungsleitung/Admin."""
+    """TOP von der Tagesordnung entfernen — nur Sitzungsleitung/Admin."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_control:
         raise ForbiddenError("only the committee lead may edit the agenda")
-    return await agenda.remove(meeting_id, application_id)
+    return await agenda.remove(meeting_id, item_id)
 
 
 # --------------------------------------------------------------------------- #

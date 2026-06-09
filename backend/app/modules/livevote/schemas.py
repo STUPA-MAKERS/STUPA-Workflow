@@ -94,9 +94,10 @@ class AttendanceSetBody(_CamelModel):
 
 
 class AgendaItemOut(_CamelModel):
-    """Tagesordnungspunkt: ein der Sitzung zugeordneter Antrag (#10/#58)."""
+    """Tagesordnungspunkt: ein zugeordneter Antrag **oder** Freitext-TOP (#10/#58)."""
 
-    application_id: UUID = Field(alias="applicationId")
+    id: UUID
+    application_id: UUID | None = Field(default=None, alias="applicationId")
     title: str | None = None
     position: int = 0
     # Aktueller Status des Antrags (i18n-Label), z. B. zum Anzeigen in der Liste.
@@ -112,6 +113,16 @@ class AssignableApplicationOut(_CamelModel):
 
 
 class AgendaAddBody(_CamelModel):
-    """``POST /meetings/{id}/agenda`` — Antrag auf die Tagesordnung setzen."""
+    """``POST /meetings/{id}/agenda`` — TOP setzen: Antrag **oder** Freitext.
 
-    application_id: UUID = Field(alias="applicationId")
+    Genau eins von ``applicationId`` / ``title`` ist Pflicht.
+    """
+
+    application_id: UUID | None = Field(default=None, alias="applicationId")
+    title: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _one_of(self) -> AgendaAddBody:
+        if (self.application_id is None) == (self.title is None):
+            raise ValueError("exactly one of applicationId or title is required")
+        return self

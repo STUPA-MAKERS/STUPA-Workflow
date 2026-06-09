@@ -100,9 +100,12 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     meeting_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("meeting.id", ondelete="CASCADE")
     )
-    application_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("application.id", ondelete="CASCADE")
+    # NULL = Freitext-TOP (kein Antrag); dann trägt ``title`` den TOP-Text.
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
+    # Freitext-Titel eines TOP ohne Antrag (z. B. »Verschiedenes«).
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")
 
     __table_args__ = (

@@ -383,10 +383,17 @@ export class ApiClient {
     });
   }
 
-  /** DELETE /meetings/{id}/agenda/{applicationId} — Antrag von der TO entfernen. */
-  removeAgendaItem(meetingId: Uuid, applicationId: Uuid): Observable<AgendaItem[]> {
+  /** POST /meetings/{id}/agenda — Freitext-TOP (ohne Antrag) anlegen. */
+  addAgendaFreetext(meetingId: Uuid, title: string): Observable<AgendaItem[]> {
+    return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
+      title,
+    });
+  }
+
+  /** DELETE /meetings/{id}/agenda/{itemId} — TOP von der Tagesordnung entfernen. */
+  removeAgendaItem(meetingId: Uuid, itemId: Uuid): Observable<AgendaItem[]> {
     return this.http.delete<AgendaItem[]>(
-      `${this.base}/meetings/${meetingId}/agenda/${applicationId}`,
+      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
     );
   }
 

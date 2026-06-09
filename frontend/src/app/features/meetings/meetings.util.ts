@@ -31,12 +31,18 @@ export function antragSnippet(applicationId: string, title: string | null): stri
 }
 
 /**
- * TOP-Snippet aus einem Tagesordnungspunkt: nummerierte TOP-Überschrift + die
- * Antrags-Referenz (pytex-Shortcode). Quelle ist die Sitzungs-Tagesordnung (#58).
+ * TOP-Snippet aus einem Tagesordnungspunkt: nummerierte TOP-Überschrift, bei
+ * Antrags-TOPs zusätzlich die Antrags-Referenz (pytex-Shortcode). Freitext-TOPs
+ * (``applicationId === null``) tragen nur die Überschrift (#58).
  */
-export function topSnippet(position: number, title: string | null, applicationId: string): string {
-  const heading = title?.trim() ? title.trim() : applicationId;
-  return `\n## TOP ${position}: ${heading}\n\n:::antrag{#${applicationId}}\n:::\n`;
+export function topSnippet(
+  position: number,
+  title: string | null,
+  applicationId: string | null,
+): string {
+  const heading = title?.trim() ? title.trim() : (applicationId ?? `TOP ${position}`);
+  const ref = applicationId ? `\n:::antrag{#${applicationId}}\n:::\n` : '';
+  return `\n## TOP ${position}: ${heading}\n${ref}`;
 }
 
 /**

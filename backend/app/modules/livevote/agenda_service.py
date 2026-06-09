@@ -66,7 +66,7 @@ class AgendaService:
         ).all()
         if not rows:
             return []
-        app_ids = [r.application_id for r in rows]
+        app_ids = [r.application_id for r in rows if r.application_id is not None]
         apps = {
             a.id: a
             for a in (
@@ -90,12 +90,15 @@ class AgendaService:
         )
         out: list[AgendaItemOut] = []
         for r in rows:
-            app = apps.get(r.application_id)
+            app = apps.get(r.application_id) if r.application_id is not None else None
             state = states.get(app.current_state_id) if app is not None else None
+            # Antrag-TOP: Titel/Status aus dem Antrag; Freitext-TOP: ``title``-Spalte.
+            title = _title_of(app.data) if app is not None else r.title
             out.append(
                 AgendaItemOut(
+                    id=r.id,
                     applicationId=r.application_id,
-                    title=_title_of(app.data) if app is not None else None,
+                    title=title,
                     position=r.position,
                     stateLabel=state.label_i18n if state is not None else None,
                 )
@@ -137,8 +140,38 @@ class AgendaService:
             )
         return out
 
-    async def add(self, meeting_id: UUID, application_id: UUID) -> list[AgendaItemOut]:
+    async def _next_position(self, meeting_id: UUID) -> int:
+        max_pos = (
+            await self.session.execute(
+                select(func.max(MeetingAgendaItem.position)).where(
+                    MeetingAgendaItem.meeting_id == meeting_id
+                )
+            )
+        ).scalar_one_or_none()
+        return (max_pos + 1) if max_pos is not None else 0
+
+    async def add(
+        self,
+        meeting_id: UUID,
+        application_id: UUID | None = None,
+        title: str | None = None,
+    ) -> list[AgendaItemOut]:
+        """TOP setzen: Antrag (Abstimmungs-State des Gremiums) **oder** Freitext."""
         meeting = await self._meeting(meeting_id)
+        if title is not None:
+            # Freitext-TOP (kein Antrag) — direkt anhängen.
+            self.session.add(
+                MeetingAgendaItem(
+                    meeting_id=meeting_id,
+                    application_id=None,
+                    title=title.strip(),
+                    position=await self._next_position(meeting_id),
+                )
+            )
+            await self.session.flush()
+            await self.session.commit()
+            return await self.list(meeting_id)
+
         app = await self.session.get(Application, application_id)
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
@@ -156,30 +189,23 @@ class AgendaService:
             )
         ).scalar_one_or_none()
         if existing is None:
-            max_pos = (
-                await self.session.execute(
-                    select(func.max(MeetingAgendaItem.position)).where(
-                        MeetingAgendaItem.meeting_id == meeting_id
-                    )
-                )
-            ).scalar_one_or_none()
             self.session.add(
                 MeetingAgendaItem(
                     meeting_id=meeting_id,
                     application_id=application_id,
-                    position=(max_pos + 1) if max_pos is not None else 0,
+                    position=await self._next_position(meeting_id),
                 )
             )
             await self.session.flush()
             await self.session.commit()
         return await self.list(meeting_id)
 
-    async def remove(self, meeting_id: UUID, application_id: UUID) -> list[AgendaItemOut]:
+    async def remove(self, meeting_id: UUID, item_id: UUID) -> list[AgendaItemOut]:
         row = (
             await self.session.execute(
                 select(MeetingAgendaItem).where(
                     MeetingAgendaItem.meeting_id == meeting_id,
-                    MeetingAgendaItem.application_id == application_id,
+                    MeetingAgendaItem.id == item_id,
                 )
             )
         ).scalar_one_or_none()

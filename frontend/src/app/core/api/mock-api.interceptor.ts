@@ -469,16 +469,18 @@ let MOCK_ATTENDANCE: MockAttendance[] = [
 ];
 
 interface MockAgendaItem {
-  applicationId: string;
+  id: string;
+  applicationId: string | null;
   title: string | null;
   position: number;
   stateLabel?: Record<string, string> | null;
 }
 
 let MOCK_AGENDA: MockAgendaItem[] = [];
-const MOCK_ASSIGNABLE: MockAgendaItem[] = [
-  { applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', title: 'Förderung Ersti-Wochenende', position: 0, stateLabel: { de: 'Abstimmung', en: 'Vote' } },
-  { applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', title: 'Anschaffung Beamer', position: 0, stateLabel: { de: 'Abstimmung', en: 'Vote' } },
+let MOCK_AGENDA_SEQ = 0;
+const MOCK_ASSIGNABLE: { applicationId: string; title: string; stateLabel: Record<string, string> }[] = [
+  { applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', title: 'Förderung Ersti-Wochenende', stateLabel: { de: 'Abstimmung', en: 'Vote' } },
+  { applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', title: 'Anschaffung Beamer', stateLabel: { de: 'Abstimmung', en: 'Vote' } },
 ];
 
 let MOCK_PROTOCOL: ProtocolOutWire = {
@@ -570,12 +572,19 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
     // Antrag auf die Tagesordnung setzen.
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) {
-      const appId = (req.body as { applicationId?: string } | null)?.applicationId;
-      const src = MOCK_ASSIGNABLE.find((a) => a.applicationId === appId);
-      if (appId && !MOCK_AGENDA.some((a) => a.applicationId === appId)) {
+      const body = req.body as { applicationId?: string; title?: string } | null;
+      const appId = body?.applicationId;
+      const freetext = body?.title;
+      if (freetext) {
         MOCK_AGENDA = [
           ...MOCK_AGENDA,
-          { applicationId: appId, title: src?.title ?? null, position: MOCK_AGENDA.length, stateLabel: src?.stateLabel ?? null },
+          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: null, title: freetext, position: MOCK_AGENDA.length },
+        ];
+      } else if (appId && !MOCK_AGENDA.some((a) => a.applicationId === appId)) {
+        const src = MOCK_ASSIGNABLE.find((a) => a.applicationId === appId);
+        MOCK_AGENDA = [
+          ...MOCK_AGENDA,
+          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: appId, title: src?.title ?? null, position: MOCK_AGENDA.length, stateLabel: src?.stateLabel ?? null },
         ];
       }
       return ok([...MOCK_AGENDA]);
@@ -695,7 +704,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   if (req.method === 'DELETE') {
     const agenda = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
     if (agenda) {
-      MOCK_AGENDA = MOCK_AGENDA.filter((a) => a.applicationId !== agenda[1]);
+      MOCK_AGENDA = MOCK_AGENDA.filter((a) => a.id !== agenda[1]);
       return ok([...MOCK_AGENDA]);
     }
   }

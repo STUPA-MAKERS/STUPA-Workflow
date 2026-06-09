@@ -75,6 +75,12 @@ export interface ApplicationListQuery {
   type?: Uuid;
   topf?: Uuid;
   q?: string;
+  amountMin?: number;
+  amountMax?: number;
+  createdFrom?: string;
+  createdTo?: string;
+  sort?: 'createdAt' | 'amount';
+  order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }
@@ -153,9 +159,11 @@ export interface Attendance {
   isSelf: boolean;
 }
 
-/** `AgendaItemOut` — ein der Sitzung zugeordneter Antrag (Tagesordnung, #10/#58). */
+/** `AgendaItemOut` — ein TOP: zugeordneter Antrag oder Freitext (Tagesordnung, #10/#58). */
 export interface AgendaItem {
-  applicationId: Uuid;
+  id: Uuid;
+  /** `null` bei einem Freitext-TOP (ohne Antrag). */
+  applicationId: Uuid | null;
   title: string | null;
   position: number;
   stateLabel?: I18nMap | null;

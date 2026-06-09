@@ -249,20 +249,37 @@ const AUTOSAVE_DELAY_MS = 1000;
             @if (!assignableOptions().length) {
               <p class="mtg__muted mtg__hint">{{ 'meetings.agenda.noneAssignable' | t }}</p>
             }
+            <div class="mtg__agendaAdd">
+              <input
+                class="mtg__input"
+                [placeholder]="'meetings.agenda.freetextPlaceholder' | t"
+                [ngModel]="agendaFreetext()"
+                (ngModelChange)="agendaFreetext.set($event)"
+                (keyup.enter)="addFreetext()"
+                name="agendaFreetext"
+              />
+              <app-button variant="secondary" size="sm" [disabled]="!agendaFreetext().trim() || savingAgenda()" (click)="addFreetext()">
+                {{ 'meetings.agenda.addFreetext' | t }}
+              </app-button>
+            </div>
           }
           @if (agenda().length) {
             <ol class="mtg__agenda">
-              @for (item of agenda(); track item.applicationId; let i = $index) {
+              @for (item of agenda(); track item.id; let i = $index) {
                 <li class="mtg__agendaRow">
                   <span class="mtg__agendaTop">{{ 'meetings.agenda.top' | t: { n: i + 1 } }}</span>
-                  <a class="mtg__agendaTitle" [routerLink]="['/applications', item.applicationId]">
-                    {{ item.title || item.applicationId }}
-                  </a>
+                  @if (item.applicationId) {
+                    <a class="mtg__agendaTitle" [routerLink]="['/applications', item.applicationId]">
+                      {{ item.title || item.applicationId }}
+                    </a>
+                  } @else {
+                    <span class="mtg__agendaTitle">{{ item.title }}</span>
+                  }
                   @if (item.stateLabel) {
                     <app-badge variant="info">{{ resolveLabel(item.stateLabel) }}</app-badge>
                   }
                   @if (m.canControl) {
-                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="removeFromAgenda(item.applicationId)">
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="removeFromAgenda(item.id)">
                       <app-icon name="delete" />
                     </app-button>
                   }
@@ -930,6 +947,7 @@ export class MeetingsComponent implements OnDestroy {
   readonly assignable = signal<AssignableApplication[]>([]);
   readonly savingAgenda = signal(false);
   readonly agendaPick = signal<string>('');
+  readonly agendaFreetext = signal<string>('');
   readonly assignableOptions = computed<SelectOption[]>(() =>
     this.assignable().map((a) => ({ value: a.applicationId, label: a.title || a.applicationId })),
   );
@@ -1320,11 +1338,29 @@ export class MeetingsComponent implements OnDestroy {
     });
   }
 
-  removeFromAgenda(applicationId: Uuid): void {
+  addFreetext(): void {
+    const m = this.meeting();
+    const title = this.agendaFreetext().trim();
+    if (!m || !title || this.savingAgenda()) return;
+    this.savingAgenda.set(true);
+    this.api.addAgendaFreetext(m.id, title).subscribe({
+      next: (rows) => {
+        this.savingAgenda.set(false);
+        this.agenda.set(rows);
+        this.agendaFreetext.set('');
+      },
+      error: () => {
+        this.savingAgenda.set(false);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
+    });
+  }
+
+  removeFromAgenda(itemId: Uuid): void {
     const m = this.meeting();
     if (!m || this.savingAgenda()) return;
     this.savingAgenda.set(true);
-    this.api.removeAgendaItem(m.id, applicationId).subscribe({
+    this.api.removeAgendaItem(m.id, itemId).subscribe({
       next: (rows) => {
         this.savingAgenda.set(false);
         this.agenda.set(rows);
