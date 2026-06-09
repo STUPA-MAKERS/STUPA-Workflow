@@ -123,10 +123,19 @@ def rollup_committed(
 
 
 def node_available(
-    allocated: Decimal | None, committed: Decimal
+    allocated: Decimal | None,
+    bound: Decimal,
+    expended: Decimal = _ZERO,
+    income: Decimal = _ZERO,
 ) -> Decimal:
-    """Freie Summe eines Knotens = verfügbar (allocated) − gebunden (committed)."""
-    return as_amount(allocated) - committed
+    """Freie Summe eines Knotens (#25).
+
+    ``available = allocated − gebunden − ausgegeben + Einnahmen``. *Gebunden* (bound)
+    sind angenommene Anträge (anteilig gemindert um an sie gebundene Ausgaben),
+    *ausgegeben* (expended) die tatsächlichen Ausgaben, *Einnahmen* (income) erhöhen das
+    verfügbare Budget. Kann negativ werden (Überbuchung) — bewusst nicht geklemmt.
+    """
+    return as_amount(allocated) - bound - expended + income
 
 
 def pick_fiscal_year[T](active_ids: Sequence[T]) -> T | None:
@@ -146,25 +155,37 @@ NodeTuple = tuple[
 def _views_for_node(
     node_id: object,
     alloc_by_node: dict[tuple[object, object], Decimal],
-    committed_by_node: dict[tuple[object, object], Decimal],
+    bound_by_node: dict[tuple[object, object], Decimal],
     requested_by_node: dict[tuple[object, object], Decimal],
+    expended_by_node: dict[tuple[object, object], Decimal],
+    income_by_node: dict[tuple[object, object], Decimal],
 ) -> list[dict]:
-    """``AllocationView``-Dicts eines Knotens je relevantem HHJ (allocated/bound/beantragt)."""
+    """``AllocationView``-Dicts eines Knotens je relevantem HHJ.
+
+    ``committed`` = gebunden + ausgegeben (Gesamt-Verbrauch, Rückwärtskompatibilität).
+    """
     fys = {fy for (nid, fy) in alloc_by_node if nid == node_id}
-    fys |= {fy for (nid, fy) in committed_by_node if nid == node_id}
+    fys |= {fy for (nid, fy) in bound_by_node if nid == node_id}
     fys |= {fy for (nid, fy) in requested_by_node if nid == node_id}
+    fys |= {fy for (nid, fy) in expended_by_node if nid == node_id}
+    fys |= {fy for (nid, fy) in income_by_node if nid == node_id}
     views: list[dict] = []
     for fy in sorted(fys, key=str):
         allocated = alloc_by_node.get((node_id, fy), _ZERO)
-        committed = committed_by_node.get((node_id, fy), _ZERO)
+        bound = bound_by_node.get((node_id, fy), _ZERO)
         requested = requested_by_node.get((node_id, fy), _ZERO)
+        expended = expended_by_node.get((node_id, fy), _ZERO)
+        income = income_by_node.get((node_id, fy), _ZERO)
         views.append(
             {
                 "fiscal_year_id": fy,
                 "allocated": allocated,
-                "committed": committed,
+                "bound": bound,
+                "expended": expended,
+                "income": income,
+                "committed": bound + expended,
                 "requested": requested,
-                "available": node_available(allocated, committed),
+                "available": node_available(allocated, bound, expended, income),
             }
         )
     return views
@@ -189,24 +210,31 @@ def _rollup_by_fy(
 def build_forest(
     nodes: Sequence[NodeTuple],
     allocations: Sequence[tuple[object, object, Decimal | None]],
-    committed_rows: Sequence[tuple[object, str, Decimal | None]],
+    bound_rows: Sequence[tuple[object, str, Decimal | None]],
     requested_rows: Sequence[tuple[object, str, Decimal | None]] = (),
+    expended_rows: Sequence[tuple[object, str, Decimal | None]] = (),
+    income_rows: Sequence[tuple[object, str, Decimal | None]] = (),
     *,
     gremium_id: object | None = None,
 ) -> list[dict]:
     """Reiner Baum-Aufbau für ``GET /budgets`` → DTO-fertige (snake_case) Dicts.
 
     * ``allocations`` = ``(budget_id, fiscal_year_id, allocated)`` — Top-Down (R7.1b).
-    * ``committed_rows`` = ``(fiscal_year_id, leaf_path_key, amount)`` je **gebundenem**
-      (angenommenem) Antrag/Ausgabe → Roll-up je HHJ über Pfad-Präfix (R7.1c).
+    * ``bound_rows`` = ``(fiscal_year_id, leaf_path_key, amount)`` je **gebundenem**
+      (angenommenem) Antrag, anteilig gemindert um an ihn gebundene Ausgaben (#25).
     * ``requested_rows`` = dito für **beantragte** (in-flight) Anträge.
+    * ``expended_rows`` = dito für **tatsächliche Ausgaben** (#25, ``kind='expense'``).
+    * ``income_rows`` = dito für **Einnahmen** (#25, ``kind='income'``).
     * ``gremium_id`` filtert die **Wurzeln** (Top-Level-Budgets) optional.
 
-    Verbrauch fließt rauf, Allokation bleibt am Knoten — getrennt je HHJ ausgewiesen.
+    Verbrauch (gebunden + ausgegeben) fließt rauf, Allokation bleibt am Knoten,
+    Einnahmen erhöhen verfügbar — getrennt je HHJ ausgewiesen.
     """
     node_paths = [(nid, path) for nid, _, _, _, path, *_ in nodes]
-    committed_by_node = _rollup_by_fy(node_paths, committed_rows)
+    bound_by_node = _rollup_by_fy(node_paths, bound_rows)
     requested_by_node = _rollup_by_fy(node_paths, requested_rows)
+    expended_by_node = _rollup_by_fy(node_paths, expended_rows)
+    income_by_node = _rollup_by_fy(node_paths, income_rows)
 
     alloc_by_node: dict[tuple[object, object], Decimal] = {
         (bid, fy): as_amount(value) for bid, fy, value in allocations
@@ -231,7 +259,12 @@ def build_forest(
             "accepted_state_keys": list(acc or []),
             "denied_state_keys": list(den or []),
             "by_fiscal_year": _views_for_node(
-                nid, alloc_by_node, committed_by_node, requested_by_node
+                nid,
+                alloc_by_node,
+                bound_by_node,
+                requested_by_node,
+                expended_by_node,
+                income_by_node,
             ),
             "children": [to_dict(c) for c in children_of.get(nid, [])],
         }

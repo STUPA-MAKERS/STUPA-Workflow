@@ -37,6 +37,12 @@ interface UsageRow {
   depth: number;
   allocated: number;
   committed: number;
+  /** Gebunden: angenommene Anträge minus gebundene Ausgaben (#25). */
+  bound: number;
+  /** Ausgegeben: tatsächliche Ausgaben (#25). */
+  expended: number;
+  /** Einnahmen (#25). */
+  income: number;
   requested: number;
   available: number;
   /** committed/allocated in Prozent (null wenn keine Zuteilung). */
@@ -139,6 +145,9 @@ export class BudgetDashboardComponent {
       const a = node.byFiscalYear.find((x) => x.fiscalYearId === fy);
       const allocated = a ? Number(a.allocated) : 0;
       const committed = a ? Number(a.committed) : 0;
+      const bound = a ? Number(a.bound) : 0;
+      const expended = a ? Number(a.expended) : 0;
+      const income = a ? Number(a.income) : 0;
       const requested = a ? Number(a.requested) : 0;
       const available = a ? Number(a.available) : 0;
       out.push({
@@ -146,6 +155,9 @@ export class BudgetDashboardComponent {
         depth,
         allocated,
         committed,
+        bound,
+        expended,
+        income,
         requested,
         available,
         percent: a && allocated > 0 ? Math.round((committed / allocated) * 100) : null,
@@ -160,7 +172,8 @@ export class BudgetDashboardComponent {
     { key: 'node', label: this.i18n.translate('budget.tree.col.node') },
     { key: 'bar', label: this.i18n.translate('budget.usage.bar'), width: '10rem' },
     { key: 'requested', label: this.i18n.translate('budget.tree.col.requested'), align: 'end' },
-    { key: 'committed', label: this.i18n.translate('budget.tree.col.committed'), align: 'end' },
+    { key: 'bound', label: this.i18n.translate('budget.tree.col.bound'), align: 'end' },
+    { key: 'expended', label: this.i18n.translate('budget.tree.col.expended'), align: 'end' },
     { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
   ]);
   /** Antrags-Zeilen für die geteilte Tabelle (Optik wie ``/applications``). */

@@ -8,10 +8,71 @@ import type { Uuid } from '@core/api/models';
 export interface BudgetAllocationView {
   fiscalYearId: Uuid;
   allocated: string;
+  /** Gebunden: angenommene Anträge, anteilig um gebundene Ausgaben gemindert (#25). */
+  bound: string;
+  /** Ausgegeben: tatsächliche Ausgaben (#25). */
+  expended: string;
+  /** Einnahmen (#25) — erhöhen das verfügbare Budget. */
+  income: string;
+  /** Gesamt-Verbrauch (= bound + expended, abwärtskompatibel). */
   committed: string;
   /** Beantragt (in-flight Anträge, weder accepted noch denied). */
   requested: string;
   available: string;
+}
+
+/** Buchungsart einer tatsächlichen Bewegung (#25). */
+export type ExpenseKind = 'expense' | 'income';
+
+/** Gebuchte Ausgabe/Einnahme (#25); Geld als String (Decimal). */
+export interface Expense {
+  id: Uuid;
+  budgetId: Uuid;
+  pathKey: string | null;
+  fiscalYearId: Uuid;
+  kind: ExpenseKind;
+  amount: string;
+  currency: string;
+  description: string;
+  applicationId: Uuid | null;
+  applicationTitle: string | null;
+  actor: string | null;
+  createdAt: string;
+}
+
+/** Offset-Seite gebuchter Ausgaben/Einnahmen. */
+export interface ExpensePage {
+  items: Expense[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** Buchung anlegen (#25): eigenständig (``budgetId``) oder an Antrag gebunden. */
+export interface ExpenseCreate {
+  amount: string;
+  description: string;
+  kind?: ExpenseKind;
+  budgetId?: Uuid | null;
+  fiscalYearId?: Uuid | null;
+  applicationId?: Uuid | null;
+}
+
+/** Buchung ändern (Betrag/Beschreibung). */
+export interface ExpenseUpdate {
+  amount?: string;
+  description?: string;
+}
+
+/** Filter/Paging der Buchungsliste (#25). */
+export interface ExpenseQuery {
+  budget?: Uuid;
+  fiscalYear?: Uuid;
+  kind?: ExpenseKind;
+  applicationId?: Uuid;
+  q?: string;
+  limit?: number;
+  offset?: number;
 }
 
 /** Baumknoten (Kostenstelle) inkl. Summen je HHJ + Kinder (rekursiv). */
@@ -139,6 +200,32 @@ export class BudgetTreeApi {
     return this.http.get<BudgetApplication[]>(`${this.base}/budgets/${budgetId}/applications`, {
       params,
     });
+  }
+
+  /** Gebuchte Ausgaben/Einnahmen (#25), gefiltert + offset-paginiert. */
+  listExpenses(query: ExpenseQuery = {}): Observable<ExpensePage> {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== null && value !== '') {
+        params[key] = String(value);
+      }
+    }
+    return this.http.get<ExpensePage>(`${this.base}/expenses`, { params });
+  }
+
+  /** Buchung anlegen (#25): eigenständig oder an einen Antrag gebunden. */
+  bookExpense(body: ExpenseCreate): Observable<Expense> {
+    return this.http.post<Expense>(`${this.base}/expenses`, body);
+  }
+
+  /** Betrag/Beschreibung einer Buchung ändern (#25). */
+  updateExpense(id: Uuid, body: ExpenseUpdate): Observable<Expense> {
+    return this.http.patch<Expense>(`${this.base}/budget-expenses/${id}`, body);
+  }
+
+  /** Buchung löschen (#25). */
+  deleteExpense(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/budget-expenses/${id}`);
   }
 
   /** Budget-Baum als ``.xlsx`` (P(``budget.export``)), gefiltert wie das Dashboard. */

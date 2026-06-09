@@ -121,6 +121,11 @@ export class ShellComponent {
       labelKey: 'nav.budget',
       permissions: ['budget.view', 'budget.manage'],
     },
+    {
+      path: '/expenses',
+      labelKey: 'nav.expenses',
+      permissions: ['budget.view', 'budget.manage'],
+    },
     { path: '/admin', labelKey: 'nav.admin', permissions: ['admin.config'] },
   ];
 

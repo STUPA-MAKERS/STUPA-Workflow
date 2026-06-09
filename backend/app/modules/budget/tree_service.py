@@ -11,13 +11,12 @@ import uuid
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.applications.service import _title_of
-from app.modules.flow.models import State
 from app.modules.budget import tree_rules
 from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree_models import (
@@ -39,12 +38,15 @@ from app.modules.budget.tree_schemas import (
     BudgetTreeNodeOut,
     ExpenseCreate,
     ExpenseOut,
+    ExpenseUpdate,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
     MoveFiscalYearRequest,
 )
+from app.modules.flow.models import State
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.paging import Page
 
 _ZERO = Decimal("0")
 
@@ -516,16 +518,66 @@ class BudgetTreeService:
             )
         return picked
 
+    @staticmethod
+    def _expense_out(
+        e: BudgetExpense, path_key: str | None, app_title: str | None = None
+    ) -> ExpenseOut:
+        return ExpenseOut(
+            id=e.id,
+            budgetId=e.budget_id,
+            pathKey=path_key,
+            fiscalYearId=e.fiscal_year_id,
+            kind=e.kind,  # type: ignore[arg-type]
+            amount=e.amount,
+            currency=e.currency,
+            description=e.description,
+            applicationId=e.application_id,
+            applicationTitle=app_title,
+            actor=e.actor,
+            createdAt=e.created_at,
+        )
+
     async def create_expense(
         self, budget_id: UUID, payload: ExpenseCreate, *, actor: str
     ) -> ExpenseOut:
-        """Eigenständige Ausgabe gegen eine Kostenstelle buchen (#25, ohne Antrag)."""
-        node = await self._get_node(budget_id)
-        fy_id = await self._resolve_expense_fiscal_year(node, payload.fiscal_year_id)
+        """(Kompat) Buchung gegen die Kostenstelle aus dem Pfad (``/budgets/{id}``)."""
+        return await self.book_expense(
+            payload.model_copy(update={"budget_id": budget_id}), actor=actor
+        )
+
+    async def book_expense(self, payload: ExpenseCreate, *, actor: str) -> ExpenseOut:
+        """Ausgabe/Einnahme buchen (#25).
+
+        Gebunden (``applicationId`` gesetzt) erbt Kostenstelle + HHJ vom Antrag;
+        eigenständig braucht ``budgetId`` (HHJ ggf. automatisch aufgelöst).
+        """
+        app_title: str | None = None
+        if payload.application_id is not None:
+            app = await self.session.get(Application, payload.application_id)
+            if app is None:
+                raise NotFoundError(f"application {payload.application_id} not found")
+            if app.budget_id is None or app.fiscal_year_id is None:
+                raise ValidationProblem(
+                    "Application has no budget/fiscal year assigned.",
+                    errors=[{"field": "applicationId", "msg": "no budget assigned"}],
+                )
+            node = await self._get_node(app.budget_id)
+            fy_id = app.fiscal_year_id
+            app_title = _title_of(app.data)
+        else:
+            if payload.budget_id is None:
+                raise ValidationProblem(
+                    "budgetId is required for a standalone booking.",
+                    errors=[{"field": "budgetId", "msg": "required"}],
+                )
+            node = await self._get_node(payload.budget_id)
+            fy_id = await self._resolve_expense_fiscal_year(node, payload.fiscal_year_id)
         expense = BudgetExpense(
             id=uuid.uuid4(),
             budget_id=node.id,
             fiscal_year_id=fy_id,
+            application_id=payload.application_id,
+            kind=payload.kind,
             amount=payload.amount,
             currency=node.currency,
             description=payload.description,
@@ -533,52 +585,89 @@ class BudgetTreeService:
         )
         self.session.add(expense)
         await self.session.commit()
-        return ExpenseOut(
-            id=expense.id,
-            budgetId=node.id,
-            pathKey=node.path_key,
-            fiscalYearId=fy_id,
-            amount=expense.amount,
-            currency=expense.currency,
-            description=expense.description,
-            actor=expense.actor,
-            createdAt=expense.created_at,
-        )
+        return self._expense_out(expense, node.path_key, app_title)
+
+    async def update_expense(
+        self, expense_id: UUID, payload: ExpenseUpdate
+    ) -> ExpenseOut:
+        """Betrag/Beschreibung einer Buchung ändern (#25). HHJ/Kostenstelle/Bindung fix."""
+        expense = await self.session.get(BudgetExpense, expense_id)
+        if expense is None:
+            raise NotFoundError(f"budget expense {expense_id} not found")
+        if payload.amount is not None:
+            expense.amount = payload.amount
+        if payload.description is not None:
+            expense.description = payload.description
+        await self.session.commit()
+        node = await self._get_node(expense.budget_id)
+        app_title: str | None = None
+        if expense.application_id is not None:
+            app = await self.session.get(Application, expense.application_id)
+            app_title = _title_of(app.data) if app is not None else None
+        return self._expense_out(expense, node.path_key, app_title)
 
     async def list_expenses(
         self, budget_id: UUID, fiscal_year_id: UUID | None = None
     ) -> list[ExpenseOut]:
-        """Ausgaben dieser Kostenstelle **und ihres Unterbaums** (#25, optional HHJ)."""
-        node = await self._get_node(budget_id)
-        subtree = select(Budget.id).where(
-            or_(
-                Budget.path_key == node.path_key,
-                Budget.path_key.like(node.path_key + _SEP + "%"),
+        """(Kompat) Buchungen dieser Kostenstelle + Unterbaum (#25, optional HHJ)."""
+        page = await self.list_expenses_paged(
+            budget_id=budget_id, fiscal_year_id=fiscal_year_id, limit=10_000, offset=0
+        )
+        return page.items
+
+    async def list_expenses_paged(
+        self,
+        *,
+        budget_id: UUID | None = None,
+        fiscal_year_id: UUID | None = None,
+        kind: str | None = None,
+        application_id: UUID | None = None,
+        q: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Page[ExpenseOut]:
+        """Buchungen (Ausgaben/Einnahmen) gefiltert + offset-paginiert (#25).
+
+        ``budget_id`` schränkt auf die Kostenstelle **und ihren Unterbaum** ein.
+        """
+        filters = []
+        if budget_id is not None:
+            node = await self._get_node(budget_id)
+            subtree = select(Budget.id).where(
+                or_(
+                    Budget.path_key == node.path_key,
+                    Budget.path_key.like(node.path_key + _SEP + "%"),
+                )
             )
-        )
-        stmt = (
-            select(BudgetExpense, Budget.path_key)
-            .join(Budget, Budget.id == BudgetExpense.budget_id)
-            .where(BudgetExpense.budget_id.in_(subtree))
-            .order_by(BudgetExpense.created_at.desc())
-        )
+            filters.append(BudgetExpense.budget_id.in_(subtree))
         if fiscal_year_id is not None:
-            stmt = stmt.where(BudgetExpense.fiscal_year_id == fiscal_year_id)
-        rows = (await self.session.execute(stmt)).all()
-        return [
-            ExpenseOut(
-                id=e.id,
-                budgetId=e.budget_id,
-                pathKey=path_key,
-                fiscalYearId=e.fiscal_year_id,
-                amount=e.amount,
-                currency=e.currency,
-                description=e.description,
-                actor=e.actor,
-                createdAt=e.created_at,
+            filters.append(BudgetExpense.fiscal_year_id == fiscal_year_id)
+        if kind is not None:
+            filters.append(BudgetExpense.kind == kind)
+        if application_id is not None:
+            filters.append(BudgetExpense.application_id == application_id)
+        if q:
+            filters.append(BudgetExpense.description.ilike(f"%{q}%"))
+
+        total = await self.session.scalar(
+            select(func.count()).select_from(BudgetExpense).where(*filters)
+        )
+        rows = (
+            await self.session.execute(
+                select(BudgetExpense, Budget.path_key, Application.data)
+                .join(Budget, Budget.id == BudgetExpense.budget_id)
+                .outerjoin(Application, Application.id == BudgetExpense.application_id)
+                .where(*filters)
+                .order_by(BudgetExpense.created_at.desc())
+                .limit(limit)
+                .offset(offset)
             )
-            for (e, path_key) in rows
+        ).all()
+        items = [
+            self._expense_out(e, path_key, _title_of(data) if data else None)
+            for (e, path_key, data) in rows
         ]
+        return Page(items=items, total=total or 0, limit=limit, offset=offset)
 
     async def delete_expense(self, expense_id: UUID) -> None:
         """Ausgabe löschen (#25)."""
@@ -614,6 +703,7 @@ class BudgetTreeService:
         app_rows = (
             await self.session.execute(
                 select(
+                    Application.id,
                     Budget.path_key,
                     Application.fiscal_year_id,
                     Application.amount,
@@ -628,16 +718,28 @@ class BudgetTreeService:
             )
         ).all()
 
-        # Eigenständige Ausgaben (#25) zählen immer als gebundener Verbrauch.
+        # Ausgaben/Einnahmen (#25): tatsächlicher Verbrauch (expended) bzw. Einnahmen
+        # (income). Antrags-gebundene Ausgaben tragen ``application_id`` → sie ersetzen
+        # den gebundenen Betrag des Antrags anteilig.
         expense_rows = (
             await self.session.execute(
                 select(
                     Budget.path_key,
                     BudgetExpense.fiscal_year_id,
                     BudgetExpense.amount,
+                    BudgetExpense.kind,
+                    BudgetExpense.application_id,
                 ).join(Budget, Budget.id == BudgetExpense.budget_id)
             )
         ).all()
+
+        # Σ an einen Antrag gebundene **Ausgaben** (income mindert die Bindung nicht).
+        spent_per_app: dict[object, Decimal] = {}
+        for _path, _fy, amount, kind, app_id in expense_rows:
+            if kind == "expense" and app_id is not None:
+                spent_per_app[app_id] = spent_per_app.get(app_id, _ZERO) + (
+                    amount or _ZERO
+                )
 
         # Top-Budget-Config: erstes Pfad-Segment → (accepted, denied) State-Keys.
         top_config: dict[str, tuple[set[str], set[str]]] = {
@@ -646,17 +748,31 @@ class BudgetTreeService:
             if n.parent_id is None
         }
 
-        committed_rows: list[tuple[object, str, Decimal | None]] = []
+        bound_rows: list[tuple[object, str, Decimal | None]] = []
         requested_rows: list[tuple[object, str, Decimal | None]] = []
-        for path, fy, amount, state_key in app_rows:
+        for app_id, path, fy, amount, state_key in app_rows:
             accepted, denied = top_config.get(path.split("-")[0], (set(), set()))
             if state_key in accepted:
-                committed_rows.append((fy, path, amount))
+                # Bindung anteilig um bereits gebundene Ausgaben mindern (#25).
+                spent = spent_per_app.get(app_id, _ZERO)
+                remaining = (amount or _ZERO) - spent
+                if remaining > _ZERO:
+                    bound_rows.append((fy, path, remaining))
             elif state_key in denied:
                 continue  # ausgeschlossen
             else:
                 requested_rows.append((fy, path, amount))
-        committed_rows += [(fy, path, amount) for path, fy, amount in expense_rows]
+
+        expended_rows = [
+            (fy, path, amount)
+            for path, fy, amount, kind, _app in expense_rows
+            if kind == "expense"
+        ]
+        income_rows = [
+            (fy, path, amount)
+            for path, fy, amount, kind, _app in expense_rows
+            if kind == "income"
+        ]
 
         node_tuples = [
             (
@@ -668,6 +784,12 @@ class BudgetTreeService:
         ]
         alloc_tuples = [(a.budget_id, a.fiscal_year_id, a.allocated) for a in allocs]
         forest = tree_rules.build_forest(
-            node_tuples, alloc_tuples, committed_rows, requested_rows, gremium_id=gremium_id
+            node_tuples,
+            alloc_tuples,
+            bound_rows,
+            requested_rows,
+            expended_rows,
+            income_rows,
+            gremium_id=gremium_id,
         )
         return [BudgetTreeNodeOut.model_validate(d) for d in forest]

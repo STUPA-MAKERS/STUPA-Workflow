@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.modules.budget.schemas import _CamelModel
 
@@ -59,10 +60,20 @@ class BudgetNodeOut(_CamelModel):
 
 
 class AllocationView(_CamelModel):
-    """Verfügbar/gebunden/beantragt eines Knotens in **einem** HHJ (R7.1b/c)."""
+    """Budget-Sicht eines Knotens in **einem** HHJ (R7.1b/c, #25).
+
+    ``committed`` = ``bound + expended`` (Gesamt-Verbrauch, abwärtskompatibel).
+    ``available = allocated − bound − expended + income``.
+    """
 
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
     allocated: Decimal
+    # Gebunden: angenommene Anträge, anteilig um gebundene Ausgaben gemindert.
+    bound: Decimal = Decimal("0")
+    # Ausgegeben: tatsächliche Ausgaben (kind='expense').
+    expended: Decimal = Decimal("0")
+    # Einnahmen (kind='income') — erhöhen das verfügbare Budget.
+    income: Decimal = Decimal("0")
     committed: Decimal
     requested: Decimal = Decimal("0")
     available: Decimal
@@ -174,28 +185,62 @@ class BudgetApplicationOut(_CamelModel):
 
 
 # ------------------------------------------------------------------- expense
-class ExpenseCreate(_CamelModel):
-    """Eigenständige Ausgabe buchen (#25) — ohne Antrag, gegen Kostenstelle + HHJ.
+ExpenseKind = Literal["expense", "income"]
 
-    ``fiscalYearId`` ist optional: fehlt es, wird das **eine** aktive HHJ des
-    Top-Budgets gewählt (mehrdeutig/keins → 422).
+
+class ExpenseCreate(_CamelModel):
+    """Ausgabe/Einnahme buchen (#25) — gegen Kostenstelle + HHJ, optional an Antrag.
+
+    * ``budgetId`` Pflicht für eigenständige Buchungen; bei gebundenen (``applicationId``
+      gesetzt) wird die Kostenstelle **vom Antrag geerbt** und ``budgetId``/``fiscalYearId``
+      ignoriert.
+    * ``applicationId`` bindet die Buchung an einen Antrag (ersetzt dessen Bindung
+      anteilig). Nur für ``kind='expense'`` erlaubt.
+    * ``fiscalYearId`` optional bei eigenständigen Ausgaben: fehlt es, wird das **eine**
+      aktive HHJ des Top-Budgets gewählt (mehrdeutig/keins → 422).
     """
 
     amount: Decimal = Field(gt=0, allow_inf_nan=False)
     description: str = Field(min_length=1)
+    kind: ExpenseKind = "expense"
+    budget_id: UUID | None = Field(default=None, alias="budgetId")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
+    application_id: UUID | None = Field(default=None, alias="applicationId")
+
+    @model_validator(mode="after")
+    def _income_not_linkable(self) -> ExpenseCreate:
+        if self.kind == "income" and self.application_id is not None:
+            raise ValueError("income cannot be linked to an application")
+        return self
+
+
+class ExpenseUpdate(_CamelModel):
+    """Gebuchte Ausgabe/Einnahme ändern (Betrag/Beschreibung). Kostenstelle, HHJ und
+    Antragsbindung bleiben fix (Pfad-/Buchungsstabilität)."""
+
+    amount: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
+    description: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> ExpenseUpdate:
+        if self.amount is None and self.description is None:
+            raise ValueError("at least one of 'amount' or 'description' required")
+        return self
 
 
 class ExpenseOut(_CamelModel):
-    """Gebuchte Ausgabe (Stammdaten)."""
+    """Gebuchte Ausgabe/Einnahme (Stammdaten)."""
 
     id: UUID
     budget_id: UUID = Field(alias="budgetId")
     path_key: str | None = Field(default=None, alias="pathKey")
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
+    kind: ExpenseKind = "expense"
     amount: Decimal
     currency: str
     description: str
+    application_id: UUID | None = Field(default=None, alias="applicationId")
+    application_title: str | None = Field(default=None, alias="applicationTitle")
     actor: str | None = None
     created_at: datetime = Field(alias="createdAt")
 
@@ -214,7 +259,9 @@ __all__ = [
     "BudgetNodeUpdate",
     "BudgetTreeNodeOut",
     "ExpenseCreate",
+    "ExpenseKind",
     "ExpenseOut",
+    "ExpenseUpdate",
     "FiscalYearCreate",
     "FiscalYearOut",
     "FiscalYearUpdate",
