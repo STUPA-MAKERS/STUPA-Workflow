@@ -289,9 +289,32 @@
           }
         }
 
-        <!-- Actions (#28): webhook / notify / addToNextSession / assignBudget -->
-        <div class="fe__actions-block">
-          <span class="fe__actions-label">{{ 'admin.flow.actions' | t }}</span>
+        <!-- Aktionen-Einstellungen liegen in eigener Pane unterhalb des Graphen (#flow). -->
+        <app-button variant="danger" size="sm" (click)="removeSelectedTransition()">{{ 'admin.flow.removeTransition' | t }}</app-button>
+      } @else {
+        <p class="fe__panel-empty">{{ 'admin.flow.selectHint' | t }}</p>
+      }
+    </aside>
+  </div>
+
+  <!-- Aktionen des gewählten Übergangs: eigene Pane unterhalb des Graphen (#flow). -->
+  @if (selectedTransition(); as sel) {
+    <section class="fe__actionsPane" [attr.aria-label]="'admin.flow.actions' | t">
+      <header class="fe__actionsPane-head">
+        <div class="fe__actionsPane-title">
+          <h2 class="fe__panel-h">{{ 'admin.flow.actions' | t }}</h2>
+          <span class="fe__actionsPane-sub">{{ sel.t.label?.['de'] || sel.t.label?.['en'] || (sel.t.from + ' → ' + sel.t.to) }}</span>
+        </div>
+        <select class="fe__actionsPane-add" #asel (change)="addAction(sel.index, asel.value); asel.value = ''">
+          <option value="">{{ 'admin.flow.addAction' | t }}</option>
+          @for (opt of actionOptions(); track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </header>
+
+      @if ((sel.t.actions ?? []).length) {
+        <div class="fe__actions-grid">
           @for (act of sel.t.actions ?? []; track $index; let ai = $index) {
             <div class="fe__action-card">
               <div class="fe__action-head">
@@ -346,19 +369,12 @@
               }
             </div>
           }
-          <select #asel (change)="addAction(sel.index, asel.value); asel.value = ''">
-            <option value="">{{ 'admin.flow.addAction' | t }}</option>
-            @for (opt of actionOptions(); track opt.value) {
-              <option [value]="opt.value">{{ opt.label }}</option>
-            }
-          </select>
         </div>
-        <app-button variant="danger" size="sm" (click)="removeSelectedTransition()">{{ 'admin.flow.removeTransition' | t }}</app-button>
       } @else {
-        <p class="fe__panel-empty">{{ 'admin.flow.selectHint' | t }}</p>
+        <p class="fe__panel-empty">{{ 'admin.flow.actionsEmpty' | t }}</p>
       }
-    </aside>
-  </div>
+    </section>
+  }
 
   <details class="fe__json">
     <summary>{{ 'admin.common.json' | t }}</summary>
