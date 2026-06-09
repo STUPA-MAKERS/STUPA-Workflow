@@ -214,10 +214,10 @@ interface DetailPosition {
                     @for (o of p.offers; track $index) {
                       <li class="det__offer" [class.det__offer--pref]="o.preferred">
                         <span class="det__offer-label">{{ o.label || '—' }}</span>
-                        <span class="det__offer-val">{{ money(o.value) }}</span>
                         @if (o.preferred) {
                           <app-badge variant="success">{{ 'apply.positions.preferred' | t }}</app-badge>
                         }
+                        <span class="det__offer-val">{{ money(o.value) }}</span>
                       </li>
                     }
                   </ul>
@@ -285,61 +285,62 @@ interface DetailPosition {
 
       <!-- RECHTS: Kommentare als Chat (#det) -->
       <aside class="det__rail det__rail--right">
-        <app-card [heading]="'applications.comments.title' | t" class="det__chatCard">
-          <div class="det__chat">
-            <div class="det__chatScroll">
-              @for (comment of comments(); track comment.id) {
-                <div
-                  class="det__msg"
-                  [class.det__msg--own]="comment.authorKind !== 'applicant'"
-                  [class.det__msg--internal]="!comment.isPublic"
-                >
-                  <div class="det__msg-meta">
-                    <span class="det__msg-author">{{ comment.author || (comment.authorKind === 'applicant' ? ('applications.comments.author.applicant' | t) : ('applications.comments.author.committee' | t)) }}</span>
+        <section class="det__chat" [attr.aria-label]="'applications.comments.title' | t">
+          <header class="det__chatHead">{{ 'applications.comments.title' | t }}</header>
+          <div class="det__chatScroll">
+            @for (comment of comments(); track comment.id) {
+              <article
+                class="det__msg"
+                [class.det__msg--own]="comment.authorKind !== 'applicant'"
+                [class.det__msg--internal]="!comment.isPublic"
+              >
+                <span class="det__avatar" aria-hidden="true">{{ initial(authorName(comment)) }}</span>
+                <div class="det__msgBody">
+                  <div class="det__msgTop">
+                    <span class="det__msgAuthor">{{ authorName(comment) }}</span>
                     @if (!comment.isPublic) {
-                      <span class="det__msg-internal">· {{ 'applications.comments.internal' | t }}</span>
+                      <span class="det__intern"><app-icon name="filter" [size]="10" /> {{ 'applications.comments.internal' | t }}</span>
                     }
-                    <time [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
+                    <time class="det__msgTime" [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
                   </div>
                   <div class="det__bubble">{{ comment.body }}</div>
                 </div>
-              } @empty {
-                <p class="det__muted det__chatEmpty">{{ 'applications.comments.empty' | t }}</p>
-              }
-            </div>
-
-            <form class="det__chatForm" (submit)="submitComment($event)">
-              @if (canManage()) {
-                <label class="det__chatVis">
-                  {{ 'applications.comments.visibility' | t }}
-                  <select
-                    class="field__control"
-                    [ngModel]="visibility()"
-                    (ngModelChange)="visibility.set($event)"
-                    name="visibility"
-                  >
-                    <option value="public">{{ 'applications.comments.public' | t }}</option>
-                    <option value="internal">{{ 'applications.comments.internal' | t }}</option>
-                  </select>
-                </label>
-              }
-              <div class="det__chatInputRow">
-                <textarea
-                  class="field__control det__chatInput"
-                  rows="2"
-                  [placeholder]="'applications.comments.placeholder' | t"
-                  [ngModel]="newComment()"
-                  (ngModelChange)="newComment.set($event)"
-                  name="comment"
-                  [attr.aria-label]="'applications.comments.add' | t"
-                ></textarea>
-                <app-button type="submit" size="sm" [disabled]="!newComment().trim()" [loading]="posting()">
-                  {{ 'applications.comments.send' | t }}
-                </app-button>
-              </div>
-            </form>
+              </article>
+            } @empty {
+              <p class="det__muted det__chatEmpty">{{ 'applications.comments.empty' | t }}</p>
+            }
           </div>
-        </app-card>
+
+          <form class="det__composer" (submit)="submitComment($event)">
+            @if (canManage()) {
+              <div class="det__visToggle" role="group" [attr.aria-label]="'applications.comments.visibility' | t">
+                <button type="button" [class.is-active]="visibility() === 'public'" (click)="visibility.set('public')">{{ 'applications.comments.public' | t }}</button>
+                <button type="button" [class.is-active]="visibility() === 'internal'" (click)="visibility.set('internal')">{{ 'applications.comments.internal' | t }}</button>
+              </div>
+            }
+            <div class="det__composerRow">
+              <textarea
+                class="det__composerInput"
+                rows="1"
+                [placeholder]="'applications.comments.placeholder' | t"
+                [ngModel]="newComment()"
+                (ngModelChange)="newComment.set($event)"
+                name="comment"
+                [attr.aria-label]="'applications.comments.add' | t"
+              ></textarea>
+              <app-button
+                type="submit"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'applications.comments.send' | t"
+                [disabled]="!newComment().trim()"
+                [loading]="posting()"
+              >
+                <app-icon name="send" [size]="15" />
+              </app-button>
+            </div>
+          </form>
+        </section>
       </aside>
       </div><!-- /det__layout -->
     }
@@ -715,94 +716,159 @@ interface DetailPosition {
         }
       }
 
-      /* --- Chat (Kommentare) --- */
+      /* --- Chat (Kommentare) — eigenständiges Panel (#det) --- */
       .det__chat {
         display: flex;
         flex-direction: column;
-        gap: var(--space-3);
-        max-height: calc(100vh - var(--layout-header-height) - 12rem);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+        overflow: hidden;
+        max-height: calc(100vh - var(--layout-header-height) - 6rem);
+      }
+      .det__chatHead {
+        padding: var(--space-3) var(--space-4);
+        font-weight: var(--fw-semibold);
+        border-bottom: var(--border-width) solid var(--color-border);
       }
       .det__chatScroll {
         display: flex;
         flex-direction: column;
         gap: var(--space-3);
         overflow-y: auto;
-        padding-right: var(--space-1);
-        min-height: 4rem;
+        padding: var(--space-4);
+        min-height: 5rem;
       }
       .det__chatEmpty {
-        margin: 0;
+        margin: auto;
         text-align: center;
         font-size: var(--fs-sm);
+        padding: var(--space-4) 0;
       }
       .det__msg {
         display: flex;
-        flex-direction: column;
-        gap: 2px;
-        max-width: 88%;
+        gap: var(--space-2);
+        max-width: 90%;
         align-self: flex-start;
       }
       .det__msg--own {
         align-self: flex-end;
+        flex-direction: row-reverse;
+      }
+      .det__avatar {
+        flex: 0 0 auto;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-semibold);
+        background: var(--color-surface-sunken);
+        color: var(--color-text-muted);
+      }
+      .det__msg--own .det__avatar {
+        background: var(--color-primary-subtle);
+        color: var(--color-primary);
+      }
+      .det__msgBody {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+      .det__msg--own .det__msgBody {
         align-items: flex-end;
       }
-      .det__msg-meta {
+      .det__msgTop {
         display: flex;
         align-items: baseline;
-        gap: var(--space-1);
+        gap: var(--space-2);
         font-size: var(--fs-xs);
         color: var(--color-text-muted);
       }
-      .det__msg-author {
+      .det__msgAuthor {
         font-weight: var(--fw-semibold);
         color: var(--color-text);
       }
-      .det__msg-internal {
+      .det__intern {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
         color: var(--color-warning, #c08a2a);
+      }
+      .det__msgTime {
+        white-space: nowrap;
       }
       .det__bubble {
         padding: var(--space-2) var(--space-3);
-        border-radius: var(--radius-lg);
-        border-bottom-left-radius: var(--radius-sm);
+        border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
         background: var(--color-surface-sunken);
         white-space: pre-wrap;
         word-break: break-word;
         font-size: var(--fs-sm);
-        line-height: 1.45;
+        line-height: 1.5;
       }
       .det__msg--own .det__bubble {
+        border-radius: var(--radius-lg) 0 var(--radius-lg) var(--radius-lg);
         background: var(--color-primary-subtle);
-        border-bottom-left-radius: var(--radius-lg);
-        border-bottom-right-radius: var(--radius-sm);
       }
       .det__msg--internal .det__bubble {
         background: transparent;
         border: var(--border-width) dashed var(--color-border-strong);
       }
-      .det__chatForm {
+      .det__composer {
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
+        padding: var(--space-3) var(--space-4);
         border-top: var(--border-width) solid var(--color-border);
-        padding-top: var(--space-3);
       }
-      .det__chatVis {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        font-size: var(--fs-sm);
+      .det__visToggle {
+        display: inline-flex;
+        align-self: flex-start;
+        padding: 2px;
+        gap: 2px;
+        background: var(--color-surface-sunken);
+        border-radius: var(--radius-pill);
+      }
+      .det__visToggle button {
+        border: 0;
+        background: transparent;
         color: var(--color-text-muted);
+        font: inherit;
+        font-size: var(--fs-xs);
+        padding: var(--space-1) var(--space-3);
+        border-radius: var(--radius-pill);
+        cursor: pointer;
       }
-      .det__chatInputRow {
+      .det__visToggle button.is-active {
+        background: var(--color-surface);
+        color: var(--color-text);
+        box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.2));
+      }
+      .det__composerRow {
         display: flex;
         align-items: flex-end;
         gap: var(--space-2);
       }
-      .det__chatInput {
+      .det__composerInput {
         flex: 1;
         min-width: 0;
-        resize: vertical;
-        min-height: 2.6rem;
+        resize: none;
+        max-height: 8rem;
+        padding: var(--space-2) var(--space-3);
+        background: var(--color-bg);
+        color: var(--color-text);
+        border: var(--border-width) solid var(--color-border-strong);
+        border-radius: var(--radius-lg);
+        font: inherit;
+        font-size: var(--fs-sm);
+        line-height: 1.4;
+      }
+      .det__composerInput:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
       }
 
       /* --- Edit-Formular: konsistente vertikale Abstände (#det Image 7) --- */
@@ -1158,6 +1224,25 @@ export class ApplicationsDetailComponent {
         this.toast.error(this.i18n.translate('applications.detail.deleteFailed'));
       },
     });
+  }
+
+  /** Anzeigename eines Kommentars (Autor oder rollenbasierter Fallback). */
+  protected authorName(comment: ApplicationComment): string {
+    if (comment.author) return comment.author;
+    return this.i18n.translate(
+      comment.authorKind === 'applicant'
+        ? 'applications.comments.author.applicant'
+        : 'applications.comments.author.committee',
+    );
+  }
+
+  /** Initiale(n) für den Chat-Avatar. */
+  protected initial(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    const first = parts[0][0];
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+    return (first + last).toUpperCase();
   }
 
   submitComment(event: Event): void {
