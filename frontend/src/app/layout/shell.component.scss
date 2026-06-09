@@ -262,6 +262,11 @@
   padding-block: var(--space-8);
 }
 
+/* Volle Breite (Route-Data `wide`) — Inhalte mit zwei Sidebars (z. B. Budget). */
+.main--wide {
+  max-width: none;
+}
+
 .footer {
   border-top: var(--border-width) solid var(--color-border);
   background: var(--color-bg-elevated);

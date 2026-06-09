@@ -63,7 +63,8 @@ export const de = {
   'home.subtitle': 'Anträge, Abstimmungen, Sitzungsprotokolle und Budget — an einem Ort.',
   'home.cta': 'Jetzt Antrag stellen',
   'home.cards.applications.title': 'Anträge',
-  'home.cards.applications.body': 'Stelle Anträge an das Studierendenparlament und verfolge ihren Status.',
+  'home.cards.applications.body':
+    'Stelle Anträge an das Studierendenparlament und verfolge ihren Status.',
   'home.cards.voting.title': 'Live-Vote',
   'home.cards.voting.body': 'Nimm an Abstimmungen teil und sieh Ergebnisse in Echtzeit.',
   'home.cards.budget.title': 'Budget',
@@ -126,7 +127,8 @@ export const de = {
   'apply.confirm.body':
     'Vielen Dank! Dein Antrag wurde aufgenommen. Wir haben dir eine E-Mail mit einem persönlichen Link gesendet — darüber kannst du den Status verfolgen und deinen Antrag bei Bedarf bearbeiten, ohne dich anzumelden.',
   'apply.confirm.ref': 'Vorgangsnummer:',
-  'apply.confirm.hint': 'Keine Mail erhalten? Prüfe den Spam-Ordner. Der Link ist zeitlich begrenzt gültig.',
+  'apply.confirm.hint':
+    'Keine Mail erhalten? Prüfe den Spam-Ordner. Der Link ist zeitlich begrenzt gültig.',
   'apply.confirm.home': 'Zur Startseite',
 
   'altcha.idle': 'Ich bin kein Roboter',
@@ -181,7 +183,8 @@ export const de = {
   'dashboard.sessions.join': 'Live beitreten',
   'dashboard.sessions.inspect': 'Tagesordnung ansehen',
   'dashboard.apply.title': 'Antrag stellen',
-  'dashboard.apply.body': 'Neuen Antrag an das Studierendenparlament stellen — Schritt für Schritt.',
+  'dashboard.apply.body':
+    'Neuen Antrag an das Studierendenparlament stellen — Schritt für Schritt.',
   'dashboard.apply.cta': 'Jetzt stellen',
   'dashboard.tasks.title': 'Offene Aufgaben',
   'dashboard.tasks.subtitle': 'Anträge, die auf deine Bearbeitung oder Prüfung warten.',
@@ -252,7 +255,8 @@ export const de = {
   'applications.detail.deleted': 'Antrag gelöscht.',
   'applications.detail.deleteFailed': 'Löschen fehlgeschlagen.',
   'applications.detail.deleteTitle': 'Antrag löschen',
-  'applications.detail.deleteConfirm': 'Diesen Antrag endgültig löschen? Das kann nicht rückgängig gemacht werden.',
+  'applications.detail.deleteConfirm':
+    'Diesen Antrag endgültig löschen? Das kann nicht rückgängig gemacht werden.',
   'applications.detail.data.title': 'Antragsdaten',
   'applications.detail.data.empty': 'Keine Angaben vorhanden.',
   'applications.history.title': 'Versionshistorie',
@@ -342,17 +346,20 @@ export const de = {
   'meetings.list.loading': 'Sitzungen werden geladen …',
   'meetings.control.title': 'Sitzungssteuerung',
   'meetings.control.lead': 'Setze den aktiven Antrag und öffne bzw. schließe Abstimmungen live.',
-  'meetings.control.leadOnly': 'Nur die Sitzungsleitung (Vorstand/Schriftführung) dieses Gremiums kann die Sitzung steuern.',
+  'meetings.control.leadOnly':
+    'Nur die Sitzungsleitung (Vorstand/Schriftführung) dieses Gremiums kann die Sitzung steuern.',
   'meetings.attendance.title': 'Anwesenheit',
   'meetings.attendance.lead': 'Markiere deine eigene Anwesenheit für diese Sitzung.',
-  'meetings.attendance.leadLead': 'Anwesenheit der Mitglieder erfassen; Mitglieder können sich auch selbst eintragen.',
+  'meetings.attendance.leadLead':
+    'Anwesenheit der Mitglieder erfassen; Mitglieder können sich auch selbst eintragen.',
   'meetings.attendance.you': '(du)',
   'meetings.attendance.present': 'Anwesend',
   'meetings.attendance.excused': 'Entschuldigt',
   'meetings.attendance.absent': 'Abwesend',
   'meetings.attendance.unknown': 'Offen',
   'meetings.agenda.title': 'Tagesordnung',
-  'meetings.agenda.lead': 'Anträge in Abstimmung dieser Sitzung zuordnen — Quelle der Protokoll-TOPs.',
+  'meetings.agenda.lead':
+    'Anträge in Abstimmung dieser Sitzung zuordnen — Quelle der Protokoll-TOPs.',
   'meetings.agenda.add': 'Hinzufügen',
   'meetings.agenda.addPlaceholder': 'Antrag wählen …',
   'meetings.agenda.empty': 'Noch keine Anträge auf der Tagesordnung.',
@@ -392,7 +399,8 @@ export const de = {
   'meetings.protocol.snippetAntrag': 'Antrag',
   'meetings.protocol.snippetVote': 'Ergebnis',
   'meetings.protocol.markdown': 'Markdown',
-  'meetings.protocol.placeholder': 'Protokolltext in Markdown … Bausteine über die Leiste einfügen.',
+  'meetings.protocol.placeholder':
+    'Protokolltext in Markdown … Bausteine über die Leiste einfügen.',
   'meetings.protocol.preview': 'Vorschau',
   'meetings.protocol.finalize': 'Finalisieren & versenden',
   'meetings.protocol.saving': 'Wird gespeichert …',
@@ -527,7 +535,8 @@ export const de = {
   'admin.home.budgetPots': 'Budget-Töpfe',
   'admin.home.budgetPotsDesc': 'Budgets & Kostenstellen (Baum) je Gremium pflegen.',
   'budget.tree.title': 'Budgets & Kostenstellen',
-  'budget.tree.subtitle': 'Hierarchische Budgets: Budget → Kostenstellen. Verfügbar = Roll-Down, gebunden = Roll-Up.',
+  'budget.tree.subtitle':
+    'Hierarchische Budgets: Budget → Kostenstellen. Verfügbar = Roll-Down, gebunden = Roll-Up.',
   'budget.tree.budget': 'Budget',
   'budget.tree.budgetPlaceholder': 'Budget wählen …',
   'budget.tree.fyEmpty': 'Noch keine Haushaltsjahre in diesem Budget.',
@@ -560,13 +569,14 @@ export const de = {
   'budget.tree.noYears': 'Keine Haushaltsjahre',
   'budget.pie.allocated': 'Zuteilung je Unter-Kostenstelle',
   'budget.pie.committed': 'Gebunden je Unter-Kostenstelle',
-  'budget.pie.own': 'Direkt',
+  'budget.pie.own': 'Keine Sub-Kostenstelle zugeordnet',
   'budget.pie.hint': 'Auf ein Segment zeigen für Details',
   'budget.pie.empty': 'Keine Daten',
   'budget.tree.inactive': 'inaktiv',
   'budget.tree.col.color': 'Farbe',
   'budget.tree.stateConfig': 'Beantragt/Gebunden-States',
-  'budget.tree.stateConfigHint': 'Flow-States, die als angenommen (→ gebunden) bzw. abgelehnt (→ ausgeschlossen) zählen. Alles andere ist beantragt.',
+  'budget.tree.stateConfigHint':
+    'Flow-States, die als angenommen (→ gebunden) bzw. abgelehnt (→ ausgeschlossen) zählen. Alles andere ist beantragt.',
   'budget.tree.stateCol': 'Status',
   'budget.tree.accepted': 'Angenommen',
   'budget.tree.denied': 'Abgelehnt',
@@ -690,13 +700,17 @@ export const de = {
   'admin.flow.cfgRoleSource': 'Rollen-Quelle',
   'admin.flow.scope.gremium': 'Rolle im Gremium',
   'admin.flow.scope.global': 'Globale Rolle',
-  'admin.flow.globalNotice': 'Dies ist der globale Flow für ALLE Antragstypen. Welcher Weg greift, steuern Verzweigungs-/Abstimmungs-/Freigabe-States.',
-  'admin.flow.branchHint': 'Dieser State hat zwei Ausgänge — markiere die Übergänge mit Zweig „pass"/„fail" bzw. „accept"/„reject".',
+  'admin.flow.globalNotice':
+    'Dies ist der globale Flow für ALLE Antragstypen. Welcher Weg greift, steuern Verzweigungs-/Abstimmungs-/Freigabe-States.',
+  'admin.flow.branchHint':
+    'Dieser State hat zwei Ausgänge — markiere die Übergänge mit Zweig „pass"/„fail" bzw. „accept"/„reject".',
   'admin.flow.cfgDeadline': 'Frist',
   'admin.flow.cfgDeadlinePh': 'Keine Frist',
-  'admin.flow.cfgDeadlineHint': 'Beim Betreten dieses States wird die gewählte Frist angelegt. Verbinde einen Ausgang mit dem Guard „Frist abgelaufen", damit er bei Ablauf automatisch feuert.',
+  'admin.flow.cfgDeadlineHint':
+    'Beim Betreten dieses States wird die gewählte Frist angelegt. Verbinde einen Ausgang mit dem Guard „Frist abgelaufen", damit er bei Ablauf automatisch feuert.',
   'admin.flow.guardPriority': 'Guard-Priorität',
-  'admin.flow.guardPriorityHint': 'Pro unterschiedlichem Guard ein Ausgangs-Punkt. Die Reihenfolge bestimmt die Auswertung — der erste passende Guard gewinnt.',
+  'admin.flow.guardPriorityHint':
+    'Pro unterschiedlichem Guard ein Ausgangs-Punkt. Die Reihenfolge bestimmt die Auswertung — der erste passende Guard gewinnt.',
   'admin.flow.guardDefault': 'Kein Guard (Catch-all)',
   'admin.flow.moveUp': 'Nach oben',
   'admin.flow.moveDown': 'Nach unten',
@@ -790,13 +804,19 @@ export const de = {
   'admin.flow.actRecipients': 'Empfänger',
   'admin.flow.actEmailPh': 'name@beispiel.de',
   'admin.flow.addRecipient': 'Empfänger',
-  'admin.flow.actionDesc.notify': 'Versendet konfigurierte E-Mail-Benachrichtigungen an die Empfänger der Regel.',
-  'admin.flow.actionDesc.webhook': 'Ruft die hinterlegten ausgehenden Webhooks für dieses Ereignis auf.',
-  'admin.flow.actionDesc.exportPdf': 'Erzeugt ein PDF (z. B. Beschluss/Protokoll-Auszug) und legt es ab.',
-  'admin.flow.actionDesc.setEditLock': 'Sperrt die weitere Bearbeitung des Antrags (folgt aus dem Ziel-Status).',
-  'admin.flow.actionDesc.budgetReserve': 'Reserviert den beantragten Betrag im zugeordneten Budget-Topf.',
+  'admin.flow.actionDesc.notify':
+    'Versendet konfigurierte E-Mail-Benachrichtigungen an die Empfänger der Regel.',
+  'admin.flow.actionDesc.webhook':
+    'Ruft die hinterlegten ausgehenden Webhooks für dieses Ereignis auf.',
+  'admin.flow.actionDesc.exportPdf':
+    'Erzeugt ein PDF (z. B. Beschluss/Protokoll-Auszug) und legt es ab.',
+  'admin.flow.actionDesc.setEditLock':
+    'Sperrt die weitere Bearbeitung des Antrags (folgt aus dem Ziel-Status).',
+  'admin.flow.actionDesc.budgetReserve':
+    'Reserviert den beantragten Betrag im zugeordneten Budget-Topf.',
   'admin.flow.actionDesc.budgetBook': 'Bucht den Betrag final aus dem Budget-Topf aus.',
-  'admin.flow.actionDesc.openVote': 'Öffnet eine Abstimmung für den Antrag in der laufenden Sitzung.',
+  'admin.flow.actionDesc.openVote':
+    'Öffnet eine Abstimmung für den Antrag in der laufenden Sitzung.',
   'admin.flow.actionDesc.requeue': 'Legt den Antrag zur erneuten Bearbeitung/Wiedervorlage zurück.',
   'admin.flow.applicationType': 'Antragstyp',
   'admin.flow.applicationTypePlaceholder': 'Antragstyp wählen …',
@@ -853,7 +873,8 @@ export const de = {
   'admin.webhook.noEvents': 'Mindestens ein Ereignis auswählen.',
 
   'admin.gremiumRoles.title': 'Gremium-Rollen',
-  'admin.gremiumRoles.subtitle': 'Eigener Rollensatz für Gremien (z. B. Vorsitz, Beisitz) — getrennt von den globalen Rollen.',
+  'admin.gremiumRoles.subtitle':
+    'Eigener Rollensatz für Gremien (z. B. Vorsitz, Beisitz) — getrennt von den globalen Rollen.',
   'admin.gremiumRoles.add': 'Gremium-Rolle hinzufügen',
   'admin.gremiumRoles.empty': 'Noch keine Gremium-Rollen angelegt.',
   'admin.gremiumRoles.col.name': 'Rolle',
@@ -863,7 +884,8 @@ export const de = {
   'admin.gremiumRoles.forced': 'Pflichtrolle – in jedem Gremium vorhanden, nicht löschbar',
   'admin.gremiumRoles.forcedShort': 'Pflicht',
   'admin.gremiumRoles.deleteTitle': 'Gremium-Rolle löschen',
-  'admin.gremiumRoles.deleteConfirm': '„{name}" wird gelöscht. Das ist nur möglich, wenn keine Mitgliedschaft sie verwendet.',
+  'admin.gremiumRoles.deleteConfirm':
+    '„{name}" wird gelöscht. Das ist nur möglich, wenn keine Mitgliedschaft sie verwendet.',
   'admin.gremiumRoles.permissions': 'Berechtigungen',
   'admin.gremiumPerm.session.manage': 'Sitzungen verwalten',
   'admin.gremiumPerm.vote.manage': 'Abstimmungen führen',
@@ -871,7 +893,8 @@ export const de = {
   'admin.gremiumPerm.protocol.write': 'Protokoll führen',
 
   'admin.audit.title': 'Audit-Log',
-  'admin.audit.desc': 'Revisionssicheres, fortlaufendes Protokoll aller sicherheitsrelevanten Aktionen.',
+  'admin.audit.desc':
+    'Revisionssicheres, fortlaufendes Protokoll aller sicherheitsrelevanten Aktionen.',
   'admin.audit.empty': 'Keine Audit-Einträge.',
   'admin.audit.error': 'Audit-Log konnte nicht geladen werden.',
   'admin.audit.loadMore': 'Mehr laden',
@@ -956,7 +979,8 @@ export const de = {
   'admin.forms.manage': 'Formulare verwalten',
   // Formular-Builder NC-Forms-Stil (#13)
   'admin.forms.listTitle': 'Anträge & Formulare',
-  'admin.forms.listSubtitle': 'Antragstypen anlegen und ihre Formulare im Nextcloud-Forms-Stil bearbeiten.',
+  'admin.forms.listSubtitle':
+    'Antragstypen anlegen und ihre Formulare im Nextcloud-Forms-Stil bearbeiten.',
   'admin.forms.add': 'Formular anlegen',
   'admin.forms.create': 'Neues Formular',
   'admin.forms.nameDe': 'Titel (DE)',
@@ -974,7 +998,8 @@ export const de = {
   'admin.forms.untitled': 'Unbenanntes Formular',
   'admin.forms.untitledQuestion': 'Unbenannte Frage',
   'admin.forms.untitledSection': 'Unbenannter Abschnitt',
-  'admin.forms.sectionHint': 'Trennt das Formular hier in einen neuen Schritt. Trägt nur einen Titel.',
+  'admin.forms.sectionHint':
+    'Trennt das Formular hier in einen neuen Schritt. Trägt nur einen Titel.',
   'admin.forms.sectionTitleDe': 'Abschnitts-Titel (DE)',
   'admin.forms.sectionTitleEn': 'Abschnitts-Titel (EN)',
   'admin.forms.back': 'Zurück zur Übersicht',
@@ -1003,6 +1028,7 @@ export const de = {
   'budget.apps.heading': 'Anträge in dieser Kostenstelle',
   'budget.apps.empty': 'Keine Anträge in dieser Kostenstelle (inkl. Unterbaum).',
   'budget.apps.col.id': 'Antrag',
+  'budget.apps.col.title': 'Antrag',
   'budget.apps.col.ks': 'Kostenstelle',
   'budget.apps.col.stage': 'Stufe',
   'budget.apps.col.amount': 'Betrag',
@@ -1060,7 +1086,8 @@ export const de = {
   'budget.mixedCurrency': 'Mehrere Währungen — Summen ohne Währungssymbol.',
 
   'budget.usage.heading': 'Auslastung je Budget',
-  'budget.usage.subtitle': 'Gebundene Mittel (ausgezahlt / bewilligt / reserviert) gegen das Budget-Limit.',
+  'budget.usage.subtitle':
+    'Gebundene Mittel (ausgezahlt / bewilligt / reserviert) gegen das Budget-Limit.',
   'budget.usage.empty': 'Keine Budgets für die aktuelle Auswahl.',
   'budget.usage.unlimited': 'ohne Limit',
   'budget.usage.overcommitted': 'Überzeichnet',
@@ -1090,9 +1117,11 @@ export const de = {
   'admin.home.users': 'Benutzer & Rollen',
   'admin.home.usersDesc': 'Benutzer suchen, Rollen zuweisen/entziehen, Rechte pflegen.',
   'admin.home.gremien': 'Gremien',
-  'admin.home.gremienDesc': 'Gremien anlegen und bearbeiten (Stammdaten für Sitzungen, Budgets, Antragstypen).',
+  'admin.home.gremienDesc':
+    'Gremien anlegen und bearbeiten (Stammdaten für Sitzungen, Budgets, Antragstypen).',
   'admin.gremien.title': 'Gremien',
-  'admin.gremien.subtitle': 'Gremien als Stammdaten anlegen und pflegen — überall als Pflichtfeld referenziert.',
+  'admin.gremien.subtitle':
+    'Gremien als Stammdaten anlegen und pflegen — überall als Pflichtfeld referenziert.',
   'admin.gremien.create': 'Gremium anlegen',
   'admin.gremien.edit': 'Gremium bearbeiten',
   'admin.gremien.name': 'Name',
@@ -1109,7 +1138,8 @@ export const de = {
   'admin.gremien.editAction': 'Bearbeiten',
   'admin.gremien.deleteAction': 'Löschen',
   'admin.gremien.deleteTitle': 'Gremium löschen',
-  'admin.gremien.deleteConfirm': '„{name}" und alle zugehörigen Rollenzuweisungen werden unwiderruflich gelöscht.',
+  'admin.gremien.deleteConfirm':
+    '„{name}" und alle zugehörigen Rollenzuweisungen werden unwiderruflich gelöscht.',
   'admin.gremien.actions': 'Aktionen',
   'admin.gremien.addGremium': 'Gremium hinzufügen',
   'admin.gremien.delegation': 'Stimm-Delegation erlauben',
@@ -1199,7 +1229,8 @@ export const de = {
   'admin.roles.deleteConfirm': 'Rolle „{role}" wirklich löschen? Zuweisungen gehen verloren.',
   'admin.roles.deleted': 'Rolle gelöscht.',
   'admin.roles.created': 'Rolle angelegt.',
-  'admin.roles.adminLocked': 'Die Administrator-Rolle hat immer alle Rechte und ist hier nicht bearbeitbar.',
+  'admin.roles.adminLocked':
+    'Die Administrator-Rolle hat immer alle Rechte und ist hier nicht bearbeitbar.',
   'admin.home.roles': 'Rollen & Rechte',
   'admin.home.rolesDesc': 'Berechtigungen je Rolle pflegen.',
 } as const;
@@ -1260,7 +1291,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'home.subtitle': 'Applications, votes, meeting minutes and budget — in one place.',
   'home.cta': 'Submit an application',
   'home.cards.applications.title': 'Applications',
-  'home.cards.applications.body': 'Submit applications to the Student Parliament and track their status.',
+  'home.cards.applications.body':
+    'Submit applications to the Student Parliament and track their status.',
   'home.cards.voting.title': 'Live vote',
   'home.cards.voting.body': 'Take part in votes and see results in real time.',
   'home.cards.budget.title': 'Budget',
@@ -1323,7 +1355,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.confirm.body':
     'Thank you! Your application has been received. We have sent you an email with a personal link — use it to track the status and edit your application if needed, without signing in.',
   'apply.confirm.ref': 'Reference number:',
-  'apply.confirm.hint': 'No email received? Check your spam folder. The link is valid for a limited time.',
+  'apply.confirm.hint':
+    'No email received? Check your spam folder. The link is valid for a limited time.',
   'apply.confirm.home': 'Back to start',
 
   'altcha.idle': 'I am not a robot',
@@ -1449,7 +1482,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.detail.deleted': 'Application deleted.',
   'applications.detail.deleteFailed': 'Delete failed.',
   'applications.detail.deleteTitle': 'Delete application',
-  'applications.detail.deleteConfirm': 'Permanently delete this application? This cannot be undone.',
+  'applications.detail.deleteConfirm':
+    'Permanently delete this application? This cannot be undone.',
   'applications.detail.data.title': 'Application data',
   'applications.detail.data.empty': 'No data provided.',
   'applications.history.title': 'Version history',
@@ -1497,13 +1531,11 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.actions.confirm.notePlaceholder': 'Reason or note …',
   'applications.actions.confirm.submit': 'Run',
   'applications.actions.success': 'Status changed.',
-  'applications.actions.conflict':
-    'Status change not possible (status changed or a guard failed).',
+  'applications.actions.conflict': 'Status change not possible (status changed or a guard failed).',
   'applications.actions.error': 'Status change failed.',
   'applications.attachments.title': 'Attachments',
   'applications.attachments.empty': 'No attachments uploaded yet.',
-  'applications.attachments.sessionHint':
-    'Only attachments uploaded in this session are shown.',
+  'applications.attachments.sessionHint': 'Only attachments uploaded in this session are shown.',
   'applications.attachments.upload': 'Upload file',
   'applications.attachments.uploading': 'Uploading …',
   'applications.attachments.hint': 'Max 10 MB. Scanned for malware after upload.',
@@ -1539,7 +1571,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.list.loading': 'Loading meetings …',
   'meetings.control.title': 'Session control',
   'meetings.control.lead': 'Set the active application and open or close votes live.',
-  'meetings.control.leadOnly': 'Only this committee’s session lead (board/secretary) can control the meeting.',
+  'meetings.control.leadOnly':
+    'Only this committee’s session lead (board/secretary) can control the meeting.',
   'meetings.attendance.title': 'Attendance',
   'meetings.attendance.lead': 'Mark your own attendance for this meeting.',
   'meetings.attendance.leadLead': 'Record members’ attendance; members can also mark themselves.',
@@ -1549,7 +1582,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.attendance.absent': 'Absent',
   'meetings.attendance.unknown': 'Open',
   'meetings.agenda.title': 'Agenda',
-  'meetings.agenda.lead': 'Assign applications being voted on in this meeting — the source of the protocol TOPs.',
+  'meetings.agenda.lead':
+    'Assign applications being voted on in this meeting — the source of the protocol TOPs.',
   'meetings.agenda.add': 'Add',
   'meetings.agenda.addPlaceholder': 'Choose application …',
   'meetings.agenda.empty': 'No applications on the agenda yet.',
@@ -1605,7 +1639,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.create.placeholder': 'e.g. STUPA session June 12',
   'meetings.create.gremium': 'Committee',
   'meetings.create.gremiumPlaceholder': 'Choose a committee …',
-  'meetings.create.noGremien': 'No committee available — please create one in administration first.',
+  'meetings.create.noGremien':
+    'No committee available — please create one in administration first.',
   'meetings.create.submit': 'Create meeting',
   'meetings.create.date': 'Planned date',
   'meetings.create.time': 'Time',
@@ -1632,8 +1667,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.protokollant.title': 'Minute-taker',
   'meetings.protokollant.label': 'Minute-taker',
   'meetings.protokollant.none': '— nobody —',
-  'meetings.protokollant.lead':
-    'Exactly one member runs the live session and writes the minutes.',
+  'meetings.protokollant.lead': 'Exactly one member runs the live session and writes the minutes.',
   'meetings.beamer.enter': 'Beamer view',
   'meetings.beamer.exit': 'Leave beamer view',
   'meetings.beamer.heading': 'Beamer',
@@ -1724,7 +1758,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.home.budgetPots': 'Budget pots',
   'admin.home.budgetPotsDesc': 'Maintain budgets & cost centres (tree) per committee.',
   'budget.tree.title': 'Budgets & cost centres',
-  'budget.tree.subtitle': 'Hierarchical budgets: budget → cost centres. Available = roll-down, committed = roll-up.',
+  'budget.tree.subtitle':
+    'Hierarchical budgets: budget → cost centres. Available = roll-down, committed = roll-up.',
   'budget.tree.budget': 'Budget',
   'budget.tree.budgetPlaceholder': 'Choose a budget …',
   'budget.tree.fyEmpty': 'No fiscal years in this budget yet.',
@@ -1757,13 +1792,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.noYears': 'No fiscal years',
   'budget.pie.allocated': 'Allocation per sub-cost-centre',
   'budget.pie.committed': 'Committed per sub-cost-centre',
-  'budget.pie.own': 'Direct',
+  'budget.pie.own': 'No sub-cost-center assigned',
   'budget.pie.hint': 'Hover a segment for details',
   'budget.pie.empty': 'No data',
   'budget.tree.inactive': 'inactive',
   'budget.tree.col.color': 'Colour',
   'budget.tree.stateConfig': 'Requested/committed states',
-  'budget.tree.stateConfigHint': 'Flow states that count as accepted (→ committed) or denied (→ excluded). Everything else is requested.',
+  'budget.tree.stateConfigHint':
+    'Flow states that count as accepted (→ committed) or denied (→ excluded). Everything else is requested.',
   'budget.tree.stateCol': 'Status',
   'budget.tree.accepted': 'Accepted',
   'budget.tree.denied': 'Denied',
@@ -1836,7 +1872,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.dupKeys': 'Duplicate field keys: {keys}',
   'admin.form.applicationType': 'Application type',
   'admin.form.applicationTypePlaceholder': 'Choose an application type …',
-  'admin.form.noTypes': 'No application type available — please create one in administration first.',
+  'admin.form.noTypes':
+    'No application type available — please create one in administration first.',
   'admin.form.save': 'Save as form version',
   'admin.form.type.text': 'Short text',
   'admin.form.type.textarea': 'Long text',
@@ -1886,13 +1923,17 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.cfgRoleSource': 'Role source',
   'admin.flow.scope.gremium': 'Role in committee',
   'admin.flow.scope.global': 'Global role',
-  'admin.flow.globalNotice': 'This is the global flow for ALL application types. Decision/vote/approval states control which path applies.',
-  'admin.flow.branchHint': 'This state has two outgoing edges — mark transitions with branch “pass”/“fail” or “accept”/“reject”.',
+  'admin.flow.globalNotice':
+    'This is the global flow for ALL application types. Decision/vote/approval states control which path applies.',
+  'admin.flow.branchHint':
+    'This state has two outgoing edges — mark transitions with branch “pass”/“fail” or “accept”/“reject”.',
   'admin.flow.cfgDeadline': 'Deadline',
   'admin.flow.cfgDeadlinePh': 'No deadline',
-  'admin.flow.cfgDeadlineHint': 'Entering this state schedules the chosen deadline. Wire an outgoing edge with the “deadline passed” guard so it fires automatically on expiry.',
+  'admin.flow.cfgDeadlineHint':
+    'Entering this state schedules the chosen deadline. Wire an outgoing edge with the “deadline passed” guard so it fires automatically on expiry.',
   'admin.flow.guardPriority': 'Guard priority',
-  'admin.flow.guardPriorityHint': 'One output dot per distinct guard. The order sets evaluation — the first matching guard wins.',
+  'admin.flow.guardPriorityHint':
+    'One output dot per distinct guard. The order sets evaluation — the first matching guard wins.',
   'admin.flow.guardDefault': 'No guard (catch-all)',
   'admin.flow.moveUp': 'Move up',
   'admin.flow.moveDown': 'Move down',
@@ -1986,17 +2027,21 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.actRecipients': 'Recipients',
   'admin.flow.actEmailPh': 'name@example.com',
   'admin.flow.addRecipient': 'Recipient',
-  'admin.flow.actionDesc.notify': 'Sends the configured email notifications to the rule recipients.',
+  'admin.flow.actionDesc.notify':
+    'Sends the configured email notifications to the rule recipients.',
   'admin.flow.actionDesc.webhook': 'Calls the configured outgoing webhooks for this event.',
-  'admin.flow.actionDesc.exportPdf': 'Generates a PDF (e.g. decision/protocol excerpt) and stores it.',
-  'admin.flow.actionDesc.setEditLock': 'Locks further editing of the application (follows from the target state).',
+  'admin.flow.actionDesc.exportPdf':
+    'Generates a PDF (e.g. decision/protocol excerpt) and stores it.',
+  'admin.flow.actionDesc.setEditLock':
+    'Locks further editing of the application (follows from the target state).',
   'admin.flow.actionDesc.budgetReserve': 'Reserves the requested amount in the linked budget pot.',
   'admin.flow.actionDesc.budgetBook': 'Books the amount out of the budget pot for good.',
   'admin.flow.actionDesc.openVote': 'Opens a vote for the application in the running meeting.',
   'admin.flow.actionDesc.requeue': 'Puts the application back for re-processing / requeue.',
   'admin.flow.applicationType': 'Application type',
   'admin.flow.applicationTypePlaceholder': 'Choose an application type …',
-  'admin.flow.noTypes': 'No application type available — please create one in administration first.',
+  'admin.flow.noTypes':
+    'No application type available — please create one in administration first.',
   'admin.flow.save': 'Save as flow version',
   'admin.flow.cat.open': 'Open',
   'admin.flow.cat.running': 'Running',
@@ -2049,7 +2094,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.webhook.noEvents': 'Select at least one event.',
 
   'admin.gremiumRoles.title': 'Committee roles',
-  'admin.gremiumRoles.subtitle': 'A dedicated role set for committees (e.g. chair, assessor) — separate from the global roles.',
+  'admin.gremiumRoles.subtitle':
+    'A dedicated role set for committees (e.g. chair, assessor) — separate from the global roles.',
   'admin.gremiumRoles.add': 'Add committee role',
   'admin.gremiumRoles.empty': 'No committee roles yet.',
   'admin.gremiumRoles.col.name': 'Role',
@@ -2059,7 +2105,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremiumRoles.forced': 'Required role – present in every committee, cannot be deleted',
   'admin.gremiumRoles.forcedShort': 'Required',
   'admin.gremiumRoles.deleteTitle': 'Delete committee role',
-  'admin.gremiumRoles.deleteConfirm': '“{name}” will be deleted. Only possible if no membership uses it.',
+  'admin.gremiumRoles.deleteConfirm':
+    '“{name}” will be deleted. Only possible if no membership uses it.',
   'admin.gremiumRoles.permissions': 'Permissions',
   'admin.gremiumPerm.session.manage': 'Manage sessions',
   'admin.gremiumPerm.vote.manage': 'Run votes',
@@ -2152,7 +2199,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.manage': 'Manage forms',
   // Form builder, Nextcloud Forms style (#13)
   'admin.forms.listTitle': 'Applications & forms',
-  'admin.forms.listSubtitle': 'Create application types and edit their forms in Nextcloud Forms style.',
+  'admin.forms.listSubtitle':
+    'Create application types and edit their forms in Nextcloud Forms style.',
   'admin.forms.add': 'New form',
   'admin.forms.create': 'New form',
   'admin.forms.nameDe': 'Title (DE)',
@@ -2199,6 +2247,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.apps.heading': 'Applications in this cost centre',
   'budget.apps.empty': 'No applications in this cost centre (incl. subtree).',
   'budget.apps.col.id': 'Application',
+  'budget.apps.col.title': 'Application',
   'budget.apps.col.ks': 'Cost centre',
   'budget.apps.col.stage': 'Stage',
   'budget.apps.col.amount': 'Amount',
@@ -2286,9 +2335,11 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.home.users': 'Users & Roles',
   'admin.home.usersDesc': 'Search users, assign/revoke roles, manage permissions.',
   'admin.home.gremien': 'Committees',
-  'admin.home.gremienDesc': 'Create and edit committees (master data for meetings, budgets, application types).',
+  'admin.home.gremienDesc':
+    'Create and edit committees (master data for meetings, budgets, application types).',
   'admin.gremien.title': 'Committees',
-  'admin.gremien.subtitle': 'Create and maintain committees as master data — referenced as a required field everywhere.',
+  'admin.gremien.subtitle':
+    'Create and maintain committees as master data — referenced as a required field everywhere.',
   'admin.gremien.create': 'Create committee',
   'admin.gremien.edit': 'Edit committee',
   'admin.gremien.name': 'Name',
@@ -2305,7 +2356,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.editAction': 'Edit',
   'admin.gremien.deleteAction': 'Delete',
   'admin.gremien.deleteTitle': 'Delete committee',
-  'admin.gremien.deleteConfirm': '“{name}” and all its role assignments will be permanently deleted.',
+  'admin.gremien.deleteConfirm':
+    '“{name}” and all its role assignments will be permanently deleted.',
   'admin.gremien.actions': 'Actions',
   'admin.gremien.addGremium': 'Add committee',
   'admin.gremien.delegation': 'Allow vote delegation',
@@ -2341,8 +2393,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.toast.deleted': 'Committee deleted.',
   'admin.gremien.toast.failed': 'Committee could not be saved.',
   'admin.users.title': 'Users & Roles',
-  'admin.users.subtitle':
-    'Search users, assign or revoke roles, and manage permissions per role.',
+  'admin.users.subtitle': 'Search users, assign or revoke roles, and manage permissions per role.',
   'admin.users.search': 'Search users',
   'admin.users.searchPlaceholder': 'Name, email or OIDC subject …',
   'admin.users.searchAction': 'Search',
@@ -2395,7 +2446,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.roles.deleteConfirm': 'Really delete the role "{role}"? Its assignments are lost.',
   'admin.roles.deleted': 'Role deleted.',
   'admin.roles.created': 'Role created.',
-  'admin.roles.adminLocked': 'The administrator role always has all permissions and cannot be edited here.',
+  'admin.roles.adminLocked':
+    'The administrator role always has all permissions and cannot be edited here.',
   'admin.home.roles': 'Roles & permissions',
   'admin.home.rolesDesc': 'Maintain permissions per role.',
 };

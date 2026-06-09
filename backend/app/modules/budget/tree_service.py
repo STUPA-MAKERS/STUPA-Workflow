@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
+from app.modules.applications.service import _title_of
 from app.modules.flow.models import State
 from app.modules.budget import tree_rules
 from app.modules.budget.models import BudgetEntry
@@ -271,6 +272,7 @@ class BudgetTreeService:
         return [
             BudgetApplicationOut(
                 applicationId=app.id,
+                title=_title_of(app.data),
                 budgetId=app.budget_id,
                 pathKey=path_key,
                 fiscalYearId=app.fiscal_year_id,

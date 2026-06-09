@@ -122,7 +122,7 @@ export const routes: Routes = [
       },
       {
         path: 'budget',
-        data: { title: 'nav.budget', permission: ['budget.view', 'budget.manage'] },
+        data: { title: 'nav.budget', permission: ['budget.view', 'budget.manage'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/budget/budget-dashboard.component').then(

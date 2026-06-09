@@ -1,6 +1,15 @@
 import { UpperCasePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  ActivatedRoute,
+  NavigationEnd,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
+import { filter } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ThemeService } from '@core/theme/theme.service';
@@ -48,6 +57,11 @@ export class ShellComponent {
   readonly i18n = inject(I18nService);
   readonly auth = inject(AuthService);
   private readonly admin = inject(AdminApiService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+
+  /** Inhalt volle Breite (Route-Data `wide`) — z. B. Budget-Tab mit zwei Sidebars. */
+  readonly wide = signal(false);
 
   /** Gepflegte Footer-Inhalte (#82): rechtliche Links + Copyright aus der aktiven Site-Config. */
   private readonly legalLinks = signal<FooterLink[]>([]);
@@ -79,6 +93,22 @@ export class ShellComponent {
         /* Default-Fußzeile bleibt */
       },
     });
+
+    // Volle Breite je Route-Data (tiefste aktive Route gewinnt).
+    this.router.events
+      .pipe(
+        filter((e) => e instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => {
+        let r = this.route.firstChild;
+        let wide = false;
+        while (r) {
+          wide = r.snapshot.data['wide'] === true || wide;
+          r = r.firstChild;
+        }
+        this.wide.set(wide);
+      });
   }
 
   private readonly nav: NavItem[] = [

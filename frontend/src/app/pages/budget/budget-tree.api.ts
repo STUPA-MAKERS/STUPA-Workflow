@@ -83,6 +83,7 @@ export interface FiscalYearCreate {
 /** Ein Antrag innerhalb einer Kostenstelle (+ Unterbaum) — Budget-Statistik (#17). */
 export interface BudgetApplication {
   applicationId: Uuid;
+  title: string | null;
   budgetId: Uuid | null;
   pathKey: string | null;
   fiscalYearId: Uuid | null;

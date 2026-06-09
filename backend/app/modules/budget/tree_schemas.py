@@ -162,6 +162,7 @@ class BudgetApplicationOut(_CamelModel):
     Liste (#17). Geld als ``Decimal``; ``stage`` aus dem ``budget_entry`` (oder None)."""
 
     application_id: UUID = Field(alias="applicationId")
+    title: str | None = None
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     path_key: str | None = Field(default=None, alias="pathKey")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")

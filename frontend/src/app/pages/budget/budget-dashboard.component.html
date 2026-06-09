@@ -69,7 +69,7 @@
           <p class="bd__status">{{ 'budget.apps.empty' | t }}</p>
         } @else {
           <app-data-table [columns]="appColumns()" [rows]="applications()" [rowKey]="appRowId" [boxed]="false" [clickable]="true" (rowClick)="openApp($any($event))">
-            <ng-template appCell="id" let-a><span class="bd__mono">{{ shortId($any(a).applicationId) }}…</span></ng-template>
+            <ng-template appCell="title" let-a>{{ titleOf($any(a)) }}</ng-template>
             <ng-template appCell="ks" let-a><span class="bd__mono">{{ $any(a).pathKey }}</span></ng-template>
             <ng-template appCell="stage" let-a>
               @if ($any(a).stage) {
@@ -99,7 +99,7 @@
 >
   @if (dialogApp(); as app) {
     <dl class="bd__dl">
-      <div><dt>{{ 'budget.apps.col.id' | t }}</dt><dd class="bd__mono">{{ app.applicationId }}</dd></div>
+      <div><dt>{{ 'budget.apps.col.title' | t }}</dt><dd>{{ titleOf(app) }}</dd></div>
       <div><dt>{{ 'budget.apps.col.ks' | t }}</dt><dd class="bd__mono">{{ app.pathKey }}</dd></div>
       <div><dt>{{ 'budget.apps.col.stage' | t }}</dt><dd>{{ stageLabel(app.stage) }}</dd></div>
       <div><dt>{{ 'budget.apps.col.amount' | t }}</dt><dd>{{ app.amount ? money(app.amount, app.currency ?? 'EUR') : '—' }}</dd></div>

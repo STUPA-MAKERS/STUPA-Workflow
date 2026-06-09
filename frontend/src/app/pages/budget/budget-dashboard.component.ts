@@ -155,11 +155,16 @@ export class BudgetDashboardComponent {
     { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
   ]);
   readonly appColumns = computed<ColumnDef[]>(() => [
-    { key: 'id', label: this.i18n.translate('budget.apps.col.id') },
+    { key: 'title', label: this.i18n.translate('budget.apps.col.title') },
     { key: 'ks', label: this.i18n.translate('budget.apps.col.ks') },
     { key: 'stage', label: this.i18n.translate('budget.apps.col.stage') },
     { key: 'amount', label: this.i18n.translate('budget.apps.col.amount'), align: 'end' },
   ]);
+
+  /** Antragstitel mit Fallback (kurze Id), wenn kein Titel gesetzt ist. */
+  titleOf(app: BudgetApplication): string {
+    return app.title?.trim() || `${this.shortId(app.applicationId)}…`;
+  }
   readonly usageRowId = (r: unknown): string => (r as UsageRow).node.id;
   readonly appRowId = (a: unknown): string => (a as BudgetApplication).applicationId;
 
