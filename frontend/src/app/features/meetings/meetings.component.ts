@@ -92,7 +92,7 @@ const AUTOSAVE_DELAY_MS = 1000;
         <div class="mtg__meta">
           <span class="mtg__name">{{ m.title }}</span>
           @if (m.date) {
-            <span class="mtg__muted">{{ m.date | date: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}</span>
+            <span class="mtg__muted">{{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}</span>
           }
           <app-badge [variant]="statusVariant(m.status)">
             {{ statusKey(m.status) | t }}
@@ -568,7 +568,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                   <div class="mtg__tlMeta">
                     <span class="mtg__muted mtg__tlDate">
                       @if (m.date) {
-                        {{ m.date | date: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}
+                        {{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}
                       } @else {
                         {{ 'meetings.list.noDate' | t }}
                       }
@@ -2412,7 +2412,12 @@ export class MeetingsComponent implements OnDestroy {
     this.settingsTime.set(m.startTime ?? '');
     this.settingsRoster.set([]);
     this.api.listAttendance(m.id).subscribe({
-      next: (rows) => this.settingsRoster.set(rows),
+      next: (rows) => {
+        this.settingsRoster.set(rows);
+        // Auswahl erst NACH dem Laden der Optionen (erneut) setzen — sonst snappt
+        // das native <select> auf „niemand", weil die Option noch fehlte.
+        this.settingsProtokollant.set(m.protokollantId ?? '');
+      },
       error: () => this.settingsRoster.set([]),
     });
   }
