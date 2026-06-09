@@ -91,6 +91,7 @@ function emptyHook(): WebhookConfig {
           </app-checkbox>
           <fieldset class="cfg__events">
             <legend>{{ 'admin.webhook.events' | t }}</legend>
+            <p class="cfg__hint">{{ 'admin.webhook.eventsHint' | t }}</p>
             @for (ev of allEvents; track ev) {
               <app-checkbox [ngModel]="d.events.includes(ev)" (ngModelChange)="toggleEvent(ev)" [name]="'ev-' + ev">
                 {{ ev }}
@@ -137,7 +138,7 @@ export class WebhooksComponent {
     if (!d) return [] as string[];
     const errs: string[] = [];
     if (!/^https?:\/\/.+/i.test(d.url)) errs.push('admin.webhook.badUrl');
-    if (d.events.length === 0) errs.push('admin.webhook.noEvents');
+    // Trigger sind optional (TASKS #6) — sie kommen i. d. R. aus dem Flow-Graph.
     return errs;
   });
 

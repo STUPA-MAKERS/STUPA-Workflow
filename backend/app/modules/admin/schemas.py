@@ -253,7 +253,8 @@ class WebhookCreate(_CamelModel):
 
     name: str = Field(min_length=1)
     url: str = Field(min_length=1)
-    events: list[EventName] = Field(min_length=1)
+    # Trigger sind optional (TASKS #6) — sie kommen i. d. R. aus dem Flow-Graph.
+    events: list[EventName] = Field(default_factory=list)
     active: bool = True
 
     @field_validator("url")
@@ -267,7 +268,7 @@ class WebhookCreate(_CamelModel):
 class WebhookUpdate(_CamelModel):
     name: str | None = None
     url: str | None = None
-    events: list[EventName] | None = Field(default=None, min_length=1)
+    events: list[EventName] | None = None
     active: bool | None = None
 
     @field_validator("url")

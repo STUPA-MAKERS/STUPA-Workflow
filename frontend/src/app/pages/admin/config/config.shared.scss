@@ -22,6 +22,12 @@
   color: var(--color-text-muted);
 }
 
+.cfg__hint {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  margin: 0 0 var(--space-2);
+}
+
 .cfg__card {
   display: flex;
   flex-direction: column;

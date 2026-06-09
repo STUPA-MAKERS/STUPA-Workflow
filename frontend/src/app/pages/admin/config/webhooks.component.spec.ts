@@ -22,7 +22,7 @@ describe('WebhooksComponent', () => {
     expect(screen.getByText('Keine Webhooks konfiguriert.')).toBeInTheDocument();
   });
 
-  it('validates URL and at least one event before allowing save', async () => {
+  it('validates the URL but allows saving without any event (triggers optional)', async () => {
     const { saveWebhook } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Webhook hinzufügen' }));
 
@@ -30,13 +30,13 @@ describe('WebhooksComponent', () => {
     const save = screen.getByRole('button', { name: 'Speichern' });
     expect(save).toBeDisabled();
 
+    // Gültige URL genügt — ohne ein einziges Ereignis ist Speichern erlaubt (#6).
     await userEvent.type(screen.getByRole('textbox', { name: 'Ziel-URL' }), 'https://hook.test');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'application_created' }));
 
     expect(save).toBeEnabled();
     await userEvent.click(save);
     expect(saveWebhook).toHaveBeenCalledTimes(1);
-    expect(saveWebhook.mock.calls[0][0].events).toEqual(['application_created']);
+    expect(saveWebhook.mock.calls[0][0].events).toEqual([]);
   });
 
   it('edits an existing webhook via the dialog', async () => {
