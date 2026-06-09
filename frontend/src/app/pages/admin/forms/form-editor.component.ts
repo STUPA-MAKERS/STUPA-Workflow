@@ -211,6 +211,11 @@ export class FormEditorComponent {
       next.options = [blankOption()];
     }
     if (type === 'computed' && !next.compute) next.compute = { var: '' };
+    // Nicht-numerische Typen können nicht in eine Kennzahl promotet werden (#13).
+    if (type !== 'number' && type !== 'currency') {
+      delete next.isPromoted;
+      delete next.promoteTarget;
+    }
     return next;
   }
 
@@ -247,6 +252,16 @@ export class FormEditorComponent {
 
   protected isPositions(type: FieldType): boolean {
     return type === 'positions';
+  }
+
+  /** Numerisch (min/max + promotebar). */
+  protected isNumeric(type: FieldType): boolean {
+    return type === 'number' || type === 'currency';
+  }
+
+  /** Text (Längen/Pattern-Validierung sinnvoll). */
+  protected isText(type: FieldType): boolean {
+    return type === 'text' || type === 'textarea';
   }
 
   // --- drag reorder --------------------------------------------------------

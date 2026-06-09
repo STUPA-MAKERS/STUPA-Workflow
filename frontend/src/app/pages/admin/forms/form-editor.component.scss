@@ -158,6 +158,13 @@
   font-size: var(--fs-sm);
 }
 
+/* Hinweis (z. B. „promotet automatisch") — unaufdringlich neben den Schaltern. */
+.fe__note {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 .fe__sub legend {
   font-size: var(--fs-xs);
   text-transform: uppercase;

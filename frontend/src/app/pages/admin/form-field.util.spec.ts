@@ -99,6 +99,17 @@ describe('round-trip', () => {
     const back = parseFields(serializeFields(fields));
     expect(back).toEqual(fields.map(normalizeFormField));
   });
+
+  it('keeps isPromoted only for numeric types', () => {
+    const num = normalizeFormField(
+      field({ key: 'amount', type: 'currency', isPromoted: true, promoteTarget: 'amount' }),
+    );
+    expect(num.isPromoted).toBe(true);
+    // positions auto-promotes without the flag → strip it (backend rejects it, 422).
+    const pos = normalizeFormField(field({ key: 'positions', type: 'positions', isPromoted: true }));
+    expect(pos.isPromoted).toBeUndefined();
+    expect(pos.promoteTarget).toBeUndefined();
+  });
 });
 
 describe('blankField', () => {

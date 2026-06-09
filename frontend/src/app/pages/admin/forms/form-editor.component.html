@@ -155,29 +155,47 @@
               <div class="fe__advanced">
                 <div class="fe__toggles">
                   <app-checkbox [(ngModel)]="field.isPII" (ngModelChange)="touch()">{{ 'admin.form.isPII' | t }}</app-checkbox>
-                  <app-checkbox [ngModel]="field.isPromoted" (ngModelChange)="onPromotedToggle(fi, $event)">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
-                  @if (field.isPromoted) {
-                    <app-select
-                      class="fe__lbl"
-                      [label]="'admin.form.promoteTarget' | t"
-                      [options]="promoteTargetOptions"
-                      [ngModel]="field.promoteTarget"
-                      (ngModelChange)="field.promoteTarget = $event; touch()"
-                    />
+                  @if (isNumeric(field.type)) {
+                    <app-checkbox [ngModel]="field.isPromoted" (ngModelChange)="onPromotedToggle(fi, $event)">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
+                    @if (field.isPromoted) {
+                      <app-select
+                        class="fe__lbl"
+                        [label]="'admin.form.promoteTarget' | t"
+                        [options]="promoteTargetOptions"
+                        [ngModel]="field.promoteTarget"
+                        (ngModelChange)="field.promoteTarget = $event; touch()"
+                      />
+                    }
+                  } @else if (isPositions(field.type)) {
+                    <span class="fe__note">↳ {{ 'admin.form.autoPromoted' | t }}</span>
                   }
                 </div>
-                <div class="fe__row fe__row--four">
-                  <label class="fe__lbl">{{ 'admin.form.min' | t }}
-                    <input type="number" [ngModel]="field.validation?.min" (ngModelChange)="setVal(fi, 'min', $event)" /></label>
-                  <label class="fe__lbl">{{ 'admin.form.max' | t }}
-                    <input type="number" [ngModel]="field.validation?.max" (ngModelChange)="setVal(fi, 'max', $event)" /></label>
-                  <label class="fe__lbl">{{ 'admin.form.minLen' | t }}
-                    <input type="number" [ngModel]="field.validation?.minLen" (ngModelChange)="setVal(fi, 'minLen', $event)" /></label>
-                  <label class="fe__lbl">{{ 'admin.form.maxLen' | t }}
-                    <input type="number" [ngModel]="field.validation?.maxLen" (ngModelChange)="setVal(fi, 'maxLen', $event)" /></label>
-                </div>
-                <label class="fe__lbl">{{ 'admin.form.pattern' | t }}
-                  <input [ngModel]="field.validation?.pattern" (ngModelChange)="setVal(fi, 'pattern', $event)" /></label>
+
+                <!-- Validierung nur für Feldtypen, für die sie greift. -->
+                @if (isNumeric(field.type) || isText(field.type)) {
+                  <fieldset class="fe__sub">
+                    <legend>{{ 'admin.form.validation' | t }}</legend>
+                    @if (isNumeric(field.type)) {
+                      <div class="fe__row">
+                        <label class="fe__lbl">{{ 'admin.form.min' | t }}
+                          <input type="number" [ngModel]="field.validation?.min" (ngModelChange)="setVal(fi, 'min', $event)" /></label>
+                        <label class="fe__lbl">{{ 'admin.form.max' | t }}
+                          <input type="number" [ngModel]="field.validation?.max" (ngModelChange)="setVal(fi, 'max', $event)" /></label>
+                      </div>
+                    }
+                    @if (isText(field.type)) {
+                      <div class="fe__row">
+                        <label class="fe__lbl">{{ 'admin.form.minLen' | t }}
+                          <input type="number" [ngModel]="field.validation?.minLen" (ngModelChange)="setVal(fi, 'minLen', $event)" /></label>
+                        <label class="fe__lbl">{{ 'admin.form.maxLen' | t }}
+                          <input type="number" [ngModel]="field.validation?.maxLen" (ngModelChange)="setVal(fi, 'maxLen', $event)" /></label>
+                      </div>
+                      <label class="fe__lbl">{{ 'admin.form.pattern' | t }}
+                        <input [ngModel]="field.validation?.pattern" (ngModelChange)="setVal(fi, 'pattern', $event)" /></label>
+                    }
+                  </fieldset>
+                }
+
                 <label class="fe__lbl">{{ 'admin.form.visibleIf' | t }}
                   <textarea rows="2" [ngModel]="logicRaw(fi, 'visibleIf', field.visibleIf)" (ngModelChange)="onLogicInput(fi, 'visibleIf', $event)" placeholder='{"==":[{"var":"x"},1]}'></textarea></label>
                 @if (field.type === 'computed') {

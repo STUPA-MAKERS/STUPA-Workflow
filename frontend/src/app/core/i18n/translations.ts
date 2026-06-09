@@ -554,6 +554,7 @@ export const de = {
   'admin.form.type.computed': 'Berechnetes Feld',
   'admin.form.type.positions': 'Kostenpositionen',
   'admin.form.metric.amount': 'Betrag (Budget)',
+  'admin.form.autoPromoted': 'Fließt automatisch als Summe in den Betrag (Budget).',
   'admin.form.positions': 'Kostenpositionen',
   'admin.form.positionsHint':
     'Antragsteller listen Positionen; jede mit mehreren Vergleichsangeboten. Ein Angebot wird bevorzugt — dessen Wert zählt; die Summe der Positionen ergibt den Betrag.',
@@ -1583,6 +1584,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.type.computed': 'Computed field',
   'admin.form.type.positions': 'Cost positions',
   'admin.form.metric.amount': 'Amount (budget)',
+  'admin.form.autoPromoted': 'Automatically summed into the budget amount.',
   'admin.form.positions': 'Cost positions',
   'admin.form.positionsHint':
     'Applicants list positions, each with several comparison offers. One offer is marked preferred — its value counts; the sum of positions is the amount.',
