@@ -117,11 +117,13 @@ async function setup(
   return { ...view, http, ws, navigate };
 }
 
-/** Meeting + (Auto-)Protokoll + Anwesenheit laden — alle Requests beantworten. */
+/** Meeting + (Auto-)Protokoll + Anwesenheit + Tagesordnung laden — alle Requests beantworten. */
 function flushLoad(http: HttpTestingController): void {
   http.expectOne('/api/meetings/m-1').flush(MEETING);
   http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
   http.expectOne('/api/meetings/m-1/attendance').flush([]);
+  http.expectOne('/api/meetings/m-1/agenda').flush([]);
+  http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
 }
 
 describe('MeetingsComponent', () => {

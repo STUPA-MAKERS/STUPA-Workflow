@@ -152,6 +152,21 @@ export interface Attendance {
   isSelf: boolean;
 }
 
+/** `AgendaItemOut` — ein der Sitzung zugeordneter Antrag (Tagesordnung, #10/#58). */
+export interface AgendaItem {
+  applicationId: Uuid;
+  title: string | null;
+  position: number;
+  stateLabel?: I18nMap | null;
+}
+
+/** `AssignableApplicationOut` — Antrag in einem Abstimmungs-State, noch nicht auf der TO. */
+export interface AssignableApplication {
+  applicationId: Uuid;
+  title: string | null;
+  stateLabel?: I18nMap | null;
+}
+
 /** `AltchaChallengeOut` — server-signierte PoW-Challenge (GET /altcha/challenge). */
 export interface AltchaChallenge {
   algorithm: string;

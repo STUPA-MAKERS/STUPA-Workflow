@@ -31,6 +31,15 @@ export function antragSnippet(applicationId: string, title: string | null): stri
 }
 
 /**
+ * TOP-Snippet aus einem Tagesordnungspunkt: nummerierte TOP-Überschrift + die
+ * Antrags-Referenz (pytex-Shortcode). Quelle ist die Sitzungs-Tagesordnung (#58).
+ */
+export function topSnippet(position: number, title: string | null, applicationId: string): string {
+  const heading = title?.trim() ? title.trim() : applicationId;
+  return `\n## TOP ${position}: ${heading}\n\n:::antrag{#${applicationId}}\n:::\n`;
+}
+
+/**
  * Markdown-Snippet, das das Ergebnis einer Abstimmung einbettet. Enthält eine
  * lesbare Ergebnistabelle (Option → Stimmen) **und** den `:::vote`-Shortcode, an
  * den pytex die kanonische Auswertung hängt.

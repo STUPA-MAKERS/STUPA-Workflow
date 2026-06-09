@@ -10,7 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
@@ -18,8 +18,11 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type {
+  AgendaItem,
+  AssignableApplication,
   Attendance,
   AttendanceStatus,
+  I18nMap,
   Meeting,
   MeetingVote,
   Protocol,
@@ -42,7 +45,13 @@ import {
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
-import { antragSnippet, insertAt, renderMarkdown, voteSnippet } from './meetings.util';
+import {
+  antragSnippet,
+  insertAt,
+  renderMarkdown,
+  topSnippet,
+  voteSnippet,
+} from './meetings.util';
 
 /** Wartezeit nach der letzten Eingabe, bevor das Protokoll automatisch gespeichert wird (#56). */
 const AUTOSAVE_DELAY_MS = 1000;
@@ -66,6 +75,7 @@ const AUTOSAVE_DELAY_MS = 1000;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    RouterLink,
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
@@ -220,6 +230,51 @@ const AUTOSAVE_DELAY_MS = 1000;
         </app-card>
       }
 
+      <!-- Tagesordnung: Anträge in Abstimmung dieser Sitzung zuordnen (#10) -->
+      @if (canManage() || agenda().length) {
+        <app-card [heading]="'meetings.agenda.title' | t">
+          <p class="mtg__lead">{{ 'meetings.agenda.lead' | t }}</p>
+          @if (m.canControl) {
+            <div class="mtg__agendaAdd">
+              <app-select
+                [placeholder]="'meetings.agenda.addPlaceholder' | t"
+                [options]="assignableOptions()"
+                [ngModel]="agendaPick()"
+                (ngModelChange)="agendaPick.set($event)"
+              />
+              <app-button size="sm" [disabled]="!agendaPick() || savingAgenda()" (click)="addToAgenda()">
+                {{ 'meetings.agenda.add' | t }}
+              </app-button>
+            </div>
+            @if (!assignableOptions().length) {
+              <p class="mtg__muted mtg__hint">{{ 'meetings.agenda.noneAssignable' | t }}</p>
+            }
+          }
+          @if (agenda().length) {
+            <ol class="mtg__agenda">
+              @for (item of agenda(); track item.applicationId; let i = $index) {
+                <li class="mtg__agendaRow">
+                  <span class="mtg__agendaTop">{{ 'meetings.agenda.top' | t: { n: i + 1 } }}</span>
+                  <a class="mtg__agendaTitle" [routerLink]="['/applications', item.applicationId]">
+                    {{ item.title || item.applicationId }}
+                  </a>
+                  @if (item.stateLabel) {
+                    <app-badge variant="info">{{ resolveLabel(item.stateLabel) }}</app-badge>
+                  }
+                  @if (m.canControl) {
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="removeFromAgenda(item.applicationId)">
+                      <app-icon name="delete" />
+                    </app-button>
+                  }
+                </li>
+              }
+            </ol>
+          } @else {
+            <p class="mtg__muted">{{ 'meetings.agenda.empty' | t }}</p>
+          }
+        </app-card>
+      }
+
       <!-- Protokoll-Editor -->
       @if (canWrite()) {
         <app-card [heading]="'meetings.protocol.title' | t">
@@ -250,6 +305,18 @@ const AUTOSAVE_DELAY_MS = 1000;
                   </app-button>
                   <app-button variant="ghost" size="sm" (click)="insertVote(vote)">
                     + {{ 'meetings.protocol.snippetVote' | t }}: {{ vote.title || vote.applicationId }}
+                  </app-button>
+                }
+              </div>
+            }
+
+            <!-- TOPs aus der Tagesordnung einfügen (#58) -->
+            @if (!proto.isFinal && agenda().length) {
+              <div class="mtg__snippets" role="group" [attr.aria-label]="'meetings.protocol.tops' | t">
+                <span class="mtg__snippetsLabel">{{ 'meetings.protocol.tops' | t }}</span>
+                @for (item of agenda(); track item.applicationId; let i = $index) {
+                  <app-button variant="ghost" size="sm" (click)="insertTop(item, i)">
+                    + {{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || item.applicationId }}
                   </app-button>
                 }
               </div>
@@ -741,6 +808,46 @@ const AUTOSAVE_DELAY_MS = 1000;
         gap: var(--space-1);
         flex-wrap: wrap;
       }
+      .mtg__agendaAdd {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-bottom: var(--space-3);
+        flex-wrap: wrap;
+      }
+      .mtg__agenda {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      .mtg__agendaRow {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        padding: var(--space-2) var(--space-3);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        flex-wrap: wrap;
+      }
+      .mtg__agendaTop {
+        font-family: var(--font-mono, monospace);
+        font-size: var(--fs-xs);
+        color: var(--color-text-muted);
+        white-space: nowrap;
+      }
+      .mtg__agendaTitle {
+        font-weight: var(--fw-medium);
+        color: var(--color-text);
+        text-decoration: none;
+        margin-right: auto;
+      }
+      .mtg__agendaTitle:hover {
+        color: var(--color-primary);
+        text-decoration: underline;
+      }
       .mtg__createForm {
         display: flex;
         flex-direction: column;
@@ -797,6 +904,15 @@ export class MeetingsComponent implements OnDestroy {
   readonly attendance = signal<Attendance[]>([]);
   readonly savingAttendance = signal(false);
   readonly attendanceStatuses: readonly AttendanceStatus[] = ['present', 'excused', 'absent'];
+
+  /** Tagesordnung + zuweisbare Abstimmungs-Anträge (#10/#58). */
+  readonly agenda = signal<AgendaItem[]>([]);
+  readonly assignable = signal<AssignableApplication[]>([]);
+  readonly savingAgenda = signal(false);
+  readonly agendaPick = signal<string>('');
+  readonly assignableOptions = computed<SelectOption[]>(() =>
+    this.assignable().map((a) => ({ value: a.applicationId, label: a.title || a.applicationId })),
+  );
 
   /** Sitzungs-Liste (#104) — gezeigt, solange keine einzelne Sitzung geladen ist. */
   readonly meetings = signal<Meeting[]>([]);
@@ -898,6 +1014,7 @@ export class MeetingsComponent implements OnDestroy {
     this.connectLive(m.id);
     if (m.protocolId && this.canWrite()) this.loadProtocol();
     this.loadAttendance(m.id);
+    this.loadAgenda(m.id);
   }
 
   /** Sitzungs-Liste laden (#104 — Wiederauffindbarkeit). */
@@ -1146,6 +1263,68 @@ export class MeetingsComponent implements OnDestroy {
 
   attBadgeVariant(status: AttendanceStatus): BadgeVariant {
     return status === 'present' ? 'success' : status === 'excused' ? 'warning' : 'danger';
+  }
+
+  // --- Tagesordnung (#10/#58) ----------------------------------------------
+  private loadAgenda(meetingId: Uuid): void {
+    this.api.listAgenda(meetingId).subscribe({
+      next: (rows) => this.agenda.set(rows),
+      error: () => this.agenda.set([]),
+    });
+    if (this.canManage()) this.refreshAssignable(meetingId);
+  }
+
+  private refreshAssignable(meetingId: Uuid): void {
+    this.api.listAssignableApplications(meetingId).subscribe({
+      next: (rows) => this.assignable.set(rows),
+      error: () => this.assignable.set([]),
+    });
+  }
+
+  addToAgenda(): void {
+    const m = this.meeting();
+    const appId = this.agendaPick();
+    if (!m || !appId || this.savingAgenda()) return;
+    this.savingAgenda.set(true);
+    this.api.addAgendaItem(m.id, appId).subscribe({
+      next: (rows) => {
+        this.savingAgenda.set(false);
+        this.agenda.set(rows);
+        this.agendaPick.set('');
+        this.refreshAssignable(m.id);
+      },
+      error: () => {
+        this.savingAgenda.set(false);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
+    });
+  }
+
+  removeFromAgenda(applicationId: Uuid): void {
+    const m = this.meeting();
+    if (!m || this.savingAgenda()) return;
+    this.savingAgenda.set(true);
+    this.api.removeAgendaItem(m.id, applicationId).subscribe({
+      next: (rows) => {
+        this.savingAgenda.set(false);
+        this.agenda.set(rows);
+        this.refreshAssignable(m.id);
+      },
+      error: () => {
+        this.savingAgenda.set(false);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
+    });
+  }
+
+  /** TOP aus einem Tagesordnungspunkt in das Protokoll-Markdown einfügen (#58). */
+  insertTop(item: AgendaItem, index: number): void {
+    this.insertSnippet(topSnippet(index + 1, item.title, item.applicationId));
+  }
+
+  /** i18n-Map (z. B. State-Label) für die aktuelle Sprache auflösen. */
+  resolveLabel(map: I18nMap): string {
+    return map[this.i18n.locale()] ?? map['de'] ?? Object.values(map)[0] ?? '';
   }
 
   // --- Live (WebSocket) ----------------------------------------------------

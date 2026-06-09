@@ -31,10 +31,14 @@ from app.modules.livevote.connection import (
     LiveVoteConnection,
     resolve_ws_principal,
 )
+from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.events import ErrorEvent
 from app.modules.livevote.locks import InMemoryLocker, Locker
 from app.modules.livevote.schemas import (
+    AgendaAddBody,
+    AgendaItemOut,
+    AssignableApplicationOut,
     AttendanceOut,
     AttendanceSetBody,
     MeetingCreate,
@@ -95,6 +99,10 @@ def get_attendance_service(session: DbSession) -> AttendanceService:
     return AttendanceService(session)
 
 
+def get_agenda_service(session: DbSession) -> AgendaService:
+    return AgendaService(session)
+
+
 def get_voting_service_ws(session: DbSession) -> VotingService:
     """Voting-Service für den WS-Cast-Pfad (eigene Session, Flow-Dispatch default)."""
     return VotingService(session)
@@ -111,6 +119,7 @@ async def get_ws_principal(
 
 ServiceDep = Annotated[MeetingService, Depends(get_meeting_service)]
 AttendanceDep = Annotated[AttendanceService, Depends(get_attendance_service)]
+AgendaDep = Annotated[AgendaService, Depends(get_agenda_service)]
 ManagerDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -217,6 +226,71 @@ async def set_member_attendance(
     if not meeting.can_control:
         raise ForbiddenError("only the committee lead may set members' attendance")
     return await attendance.set_for(meeting_id, principal_id, payload.status, principal.sub)
+
+
+# --------------------------------------------------------------------------- #
+# Tagesordnung (#10/#58)
+# --------------------------------------------------------------------------- #
+@router.get(
+    "/meetings/{meeting_id}/agenda",
+    response_model=list[AgendaItemOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_agenda(
+    meeting_id: UUID, agenda: AgendaDep, _principal: ReaderDep
+) -> list[AgendaItemOut]:
+    """Tagesordnung der Sitzung (zugewiesene Anträge, geordnet)."""
+    return await agenda.list(meeting_id)
+
+
+@router.get(
+    "/meetings/{meeting_id}/agenda/assignable",
+    response_model=list[AssignableApplicationOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_assignable(
+    meeting_id: UUID, agenda: AgendaDep, _principal: ReaderDep
+) -> list[AssignableApplicationOut]:
+    """Anträge in einem Abstimmungs-State dieses Gremiums, noch nicht auf der TO."""
+    return await agenda.assignable(meeting_id)
+
+
+@router.post(
+    "/meetings/{meeting_id}/agenda",
+    response_model=list[AgendaItemOut],
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def add_agenda_item(
+    meeting_id: UUID,
+    payload: AgendaAddBody,
+    agenda: AgendaDep,
+    service: ServiceDep,
+    principal: ManagerDep,
+) -> list[AgendaItemOut]:
+    """Antrag auf die Tagesordnung setzen — nur Sitzungsleitung/Admin (#Meetings)."""
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_control:
+        raise ForbiddenError("only the committee lead may edit the agenda")
+    return await agenda.add(meeting_id, payload.application_id)
+
+
+@router.delete(
+    "/meetings/{meeting_id}/agenda/{application_id}",
+    response_model=list[AgendaItemOut],
+    responses=_errors(401, 403, 404),
+)
+async def remove_agenda_item(
+    meeting_id: UUID,
+    application_id: UUID,
+    agenda: AgendaDep,
+    service: ServiceDep,
+    principal: ManagerDep,
+) -> list[AgendaItemOut]:
+    """Antrag von der Tagesordnung entfernen — nur Sitzungsleitung/Admin."""
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_control:
+        raise ForbiddenError("only the committee lead may edit the agenda")
+    return await agenda.remove(meeting_id, application_id)
 
 
 # --------------------------------------------------------------------------- #

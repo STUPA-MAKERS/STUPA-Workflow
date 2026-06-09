@@ -21,6 +21,7 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     Index,
+    Integer,
     Text,
     Time,
     UniqueConstraint,
@@ -83,4 +84,28 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
         ),
         CheckConstraint("source IN ('self','lead')", name="attendance_source"),
         Index("ix_attendance_meeting", "meeting_id"),
+    )
+
+
+class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
+    """Tagesordnungspunkt: ein der Sitzung zugeordneter Antrag (#10/#58).
+
+    Geordnete Liste (``position``) der auf der Sitzung zu behandelnden Anträge —
+    Quelle der Protokoll-TOPs und (perspektivisch) der Live-Abstimmungen. Pro
+    (Sitzung, Antrag) genau einmal.
+    """
+
+    __tablename__ = "meeting_agenda_item"
+
+    meeting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("meeting.id", ondelete="CASCADE")
+    )
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    position: Mapped[int] = mapped_column(Integer, server_default="0")
+
+    __table_args__ = (
+        UniqueConstraint("meeting_id", "application_id", name="uq_agenda_meeting_application"),
+        Index("ix_agenda_meeting", "meeting_id"),
     )

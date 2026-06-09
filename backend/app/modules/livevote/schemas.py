@@ -91,3 +91,27 @@ class AttendanceSetBody(_CamelModel):
     """``PUT …/attendance/{principalId}`` bzw. ``…/me`` — Anwesenheit setzen."""
 
     status: AttendanceStatus
+
+
+class AgendaItemOut(_CamelModel):
+    """Tagesordnungspunkt: ein der Sitzung zugeordneter Antrag (#10/#58)."""
+
+    application_id: UUID = Field(alias="applicationId")
+    title: str | None = None
+    position: int = 0
+    # Aktueller Status des Antrags (i18n-Label), z. B. zum Anzeigen in der Liste.
+    state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
+
+
+class AssignableApplicationOut(_CamelModel):
+    """Antrag in einem Abstimmungs-State des Sitzungs-Gremiums (noch nicht auf der TO)."""
+
+    application_id: UUID = Field(alias="applicationId")
+    title: str | None = None
+    state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
+
+
+class AgendaAddBody(_CamelModel):
+    """``POST /meetings/{id}/agenda`` — Antrag auf die Tagesordnung setzen."""
+
+    application_id: UUID = Field(alias="applicationId")

@@ -49,7 +49,9 @@ import type {
   MagicLinkVerifyResult,
   Meeting,
   MeetingCreateBody,
+  AgendaItem,
   AltchaChallenge,
+  AssignableApplication,
   Attendance,
   AttendanceStatus,
   MeetingOutWire,
@@ -346,6 +348,33 @@ export class ApiClient {
     return this.http.put<Attendance[]>(
       `${this.base}/meetings/${meetingId}/attendance/${principalId}`,
       { status },
+    );
+  }
+
+  // --- agenda / Tagesordnung (#10/#58) -------------------------------------
+  /** GET /meetings/{id}/agenda — zugewiesene Anträge (geordnet). */
+  listAgenda(meetingId: Uuid): Observable<AgendaItem[]> {
+    return this.http.get<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`);
+  }
+
+  /** GET /meetings/{id}/agenda/assignable — Abstimmungs-Anträge, noch nicht auf der TO. */
+  listAssignableApplications(meetingId: Uuid): Observable<AssignableApplication[]> {
+    return this.http.get<AssignableApplication[]>(
+      `${this.base}/meetings/${meetingId}/agenda/assignable`,
+    );
+  }
+
+  /** POST /meetings/{id}/agenda — Antrag auf die Tagesordnung setzen (Sitzungsleitung). */
+  addAgendaItem(meetingId: Uuid, applicationId: Uuid): Observable<AgendaItem[]> {
+    return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
+      applicationId,
+    });
+  }
+
+  /** DELETE /meetings/{id}/agenda/{applicationId} — Antrag von der TO entfernen. */
+  removeAgendaItem(meetingId: Uuid, applicationId: Uuid): Observable<AgendaItem[]> {
+    return this.http.delete<AgendaItem[]>(
+      `${this.base}/meetings/${meetingId}/agenda/${applicationId}`,
     );
   }
 

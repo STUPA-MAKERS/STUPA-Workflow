@@ -468,6 +468,19 @@ let MOCK_ATTENDANCE: MockAttendance[] = [
   { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', isSelf: false },
 ];
 
+interface MockAgendaItem {
+  applicationId: string;
+  title: string | null;
+  position: number;
+  stateLabel?: Record<string, string> | null;
+}
+
+let MOCK_AGENDA: MockAgendaItem[] = [];
+const MOCK_ASSIGNABLE: MockAgendaItem[] = [
+  { applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', title: 'Förderung Ersti-Wochenende', position: 0, stateLabel: { de: 'Abstimmung', en: 'Vote' } },
+  { applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', title: 'Anschaffung Beamer', position: 0, stateLabel: { de: 'Abstimmung', en: 'Vote' } },
+];
+
 let MOCK_PROTOCOL: ProtocolOutWire = {
   id: MOCK_PROTOCOL_ID,
   meetingId: MOCK_MEETING_ID,
@@ -527,6 +540,11 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
     if (p.endsWith('/meetings')) return ok([MOCK_MEETING]);
     if (/\/meetings\/[^/]+\/attendance$/.test(p)) return ok([...MOCK_ATTENDANCE]);
+    if (/\/meetings\/[^/]+\/agenda\/assignable$/.test(p)) {
+      const taken = new Set(MOCK_AGENDA.map((a) => a.applicationId));
+      return ok(MOCK_ASSIGNABLE.filter((a) => !taken.has(a.applicationId)));
+    }
+    if (/\/meetings\/[^/]+\/agenda$/.test(p)) return ok([...MOCK_AGENDA]);
     if (/\/meetings\/[^/]+$/.test(p)) return ok(MOCK_MEETING);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
   }
@@ -550,6 +568,18 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'POST') {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
+    // Antrag auf die Tagesordnung setzen.
+    if (/\/meetings\/[^/]+\/agenda$/.test(p)) {
+      const appId = (req.body as { applicationId?: string } | null)?.applicationId;
+      const src = MOCK_ASSIGNABLE.find((a) => a.applicationId === appId);
+      if (appId && !MOCK_AGENDA.some((a) => a.applicationId === appId)) {
+        MOCK_AGENDA = [
+          ...MOCK_AGENDA,
+          { applicationId: appId, title: src?.title ?? null, position: MOCK_AGENDA.length, stateLabel: src?.stateLabel ?? null },
+        ];
+      }
+      return ok([...MOCK_AGENDA]);
+    }
     if (p.endsWith('/auth/magic-link/verify')) {
       // Cookie-Modell: der echte Server setzt eine HttpOnly-Applicant-Cookie;
       // der Mock liefert nur Scope + App-ID, keinen Session-Token.
@@ -660,6 +690,14 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     const markdown = (req.body as { markdown?: string } | null)?.markdown ?? MOCK_PROTOCOL.markdown;
     MOCK_PROTOCOL = { ...MOCK_PROTOCOL, markdown };
     return ok(MOCK_PROTOCOL);
+  }
+
+  if (req.method === 'DELETE') {
+    const agenda = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
+    if (agenda) {
+      MOCK_AGENDA = MOCK_AGENDA.filter((a) => a.applicationId !== agenda[1]);
+      return ok([...MOCK_AGENDA]);
+    }
   }
 
   return next(req);
