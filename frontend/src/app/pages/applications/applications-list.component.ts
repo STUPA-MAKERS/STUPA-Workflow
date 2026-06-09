@@ -209,8 +209,8 @@ import { downloadBlob } from '@shared/download.util';
         width: 100%;
         max-width: 16rem;
         position: sticky;
-        top: var(--space-4);
-        max-height: calc(100vh - 8rem);
+        top: calc(var(--layout-header-height) + var(--space-4));
+        max-height: calc(100vh - var(--layout-header-height) - 2 * var(--space-4));
         overflow-y: auto;
       }
       @media (max-width: 60rem) {

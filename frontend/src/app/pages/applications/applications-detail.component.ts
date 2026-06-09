@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -34,7 +34,7 @@ import { ToastService } from '@shared/ui/toast/toast.service';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
-  flattenBudgetTreeRows,
+  flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
@@ -69,7 +69,7 @@ interface DetailPosition {
   imports: [
     FormsModule,
     FormlyForm,
-    DatePipe,
+    LocalizedDatePipe,
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
@@ -125,11 +125,11 @@ interface DetailPosition {
         <dl class="det__facts">
           <div>
             <dt>{{ 'applications.detail.created' | t }}</dt>
-            <dd><time [attr.datetime]="application.createdAt">{{ application.createdAt | date: 'medium' }}</time></dd>
+            <dd><time [attr.datetime]="application.createdAt">{{ application.createdAt | ldate: 'medium' }}</time></dd>
           </div>
           <div>
             <dt>{{ 'applications.detail.updated' | t }}</dt>
-            <dd><time [attr.datetime]="application.updatedAt">{{ application.updatedAt | date: 'medium' }}</time></dd>
+            <dd><time [attr.datetime]="application.updatedAt">{{ application.updatedAt | ldate: 'medium' }}</time></dd>
           </div>
           @if (application.applicant) {
             <div>
@@ -238,7 +238,7 @@ interface DetailPosition {
                   @if (version.changedBy) {
                     <span class="det__muted">{{ 'applications.history.by' | t: { actor: version.changedBy } }}</span>
                   }
-                  <time class="det__muted" [attr.datetime]="version.at">{{ version.at | date: 'short' }}</time>
+                  <time class="det__muted" [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
                 </div>
                 @if (!version.diff) {
                   <p class="det__muted">{{ 'applications.history.initial' | t }}</p>
@@ -290,7 +290,7 @@ interface DetailPosition {
                   <app-badge [variant]="comment.isPublic ? 'info' : 'neutral'">
                     {{ (comment.isPublic ? 'applications.comments.public' : 'applications.comments.internal') | t }}
                   </app-badge>
-                  <time class="det__muted" [attr.datetime]="comment.at">{{ comment.at | date: 'short' }}</time>
+                  <time class="det__muted" [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
                 </div>
                 <p class="det__comment-body">{{ comment.body }}</p>
               </li>
@@ -686,12 +686,9 @@ export class ApplicationsDetailComponent {
   protected readonly budgetChoice = signal('');
   protected readonly assigningBudget = signal(false);
   protected readonly budgetDialogOpen = signal(false);
-  /** ``budgetId`` → „KEY – Name" (für das Badge der aktuellen Kostenstelle). */
+  /** ``budgetId`` → „VOLLER-PFAD – Name" (Badge der aktuellen Kostenstelle, #det). */
   private readonly budgetLabels = computed(
-    () =>
-      new Map(
-        flattenBudgetTreeRows(this.budgetTree()).map((r) => [r.id, `${r.key} – ${r.name}`]),
-      ),
+    () => new Map(flattenBudgetOptions(this.budgetTree()).map((o) => [o.value, o.label])),
   );
   protected budgetLabel(id: string | null | undefined): string {
     return (id && this.budgetLabels().get(id)) || '';

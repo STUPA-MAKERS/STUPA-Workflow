@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -31,7 +31,7 @@ const PREVIEW_ROWS = 5;
   selector: 'app-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, TranslatePipe, BadgeComponent, CapitalizePipe],
+  imports: [RouterLink, LocalizedDatePipe, TranslatePipe, BadgeComponent, CapitalizePipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })

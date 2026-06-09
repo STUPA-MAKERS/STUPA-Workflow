@@ -92,7 +92,6 @@ import { formatBytes, scanBadgeVariant } from './applications.util';
       } @else {
         <p class="att__muted">{{ 'applications.attachments.empty' | t }}</p>
       }
-      <p class="att__muted att__sessionHint">{{ 'applications.attachments.sessionHint' | t }}</p>
     </app-card>
   `,
   styles: [

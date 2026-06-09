@@ -122,29 +122,39 @@ import { PALETTE } from './budget-year-tree.component';
       .cct__children > .cct__branch {
         position: relative;
       }
-      /* Senkrechte Linie: durchgehend, bei der letzten Verzweigung nur bis zum
-         Querstrich (kein Stray-Down-Line). */
+      /* Senkrechte Linie zentriert unter der Punkt-/Knoten-Mitte. Punktmitte =
+         space-2 + 4.5px; Kind-Einzug = space-3 + 4px ⇒ linke Kante der 1px-Linie bei
+         space-2 − space-3 (Mitte landet damit auf der Punktmitte). */
       .cct__children > .cct__branch::before {
         content: '';
         position: absolute;
-        /* Linie unter die Knoten-Mitte (= Punkt-Mitte des Top-Knotens): Punktmitte
-           = space-2 + 4.5px; Kind-Einzug = space-3 + 4px ⇒ Versatz space-2 − space-3 + 0.5px. */
-        left: calc(var(--space-2) - var(--space-3) + 0.5px);
+        left: calc(var(--space-2) - var(--space-3));
         top: 0;
         bottom: 0;
         border-left: 1px dotted var(--color-success, #5fb37a);
       }
+      /* Erstes Kind: Linie nach oben bis zum Punkt verlängern (verbunden). */
+      .cct__children > .cct__branch:first-child::before {
+        top: calc(-1 * (var(--space-1) + 0.7em));
+      }
+      /* Letztes Kind: Linie endet am Querstrich (kein Überstand). */
       .cct__children > .cct__branch:last-child::before {
         bottom: auto;
         height: 0.8em;
+      }
+      /* Einziges Kind: vom Punkt bis zum eigenen Querstrich. */
+      .cct__children > .cct__branch:first-child:last-child::before {
+        top: calc(-1 * (var(--space-1) + 0.7em));
+        bottom: auto;
+        height: calc(var(--space-1) + 0.7em + 0.8em);
       }
       /* Querstrich zum Knoten. */
       .cct__children > .cct__branch::after {
         content: '';
         position: absolute;
-        left: calc(var(--space-2) - var(--space-3) + 0.5px);
+        left: calc(var(--space-2) - var(--space-3));
         top: 0.8em;
-        width: calc(var(--space-3) - var(--space-2) - 0.5px);
+        width: var(--space-3);
         border-top: 1px dotted var(--color-success, #5fb37a);
       }
       .cct__node--active {

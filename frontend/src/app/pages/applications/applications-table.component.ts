@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -37,7 +37,7 @@ export interface SortState {
   selector: 'app-applications-table',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, TranslatePipe, BadgeComponent],
+  imports: [RouterLink, LocalizedDatePipe, TranslatePipe, BadgeComponent],
   template: `
     <div class="atbl__wrap">
       <table class="atbl">
@@ -88,7 +88,7 @@ export interface SortState {
               <td class="atbl__num">{{ money(row.amount, row.currency) }}</td>
               <td>
                 @if (row.createdAt) {
-                  <time [attr.datetime]="row.createdAt">{{ row.createdAt | date: 'mediumDate' }}</time>
+                  <time [attr.datetime]="row.createdAt">{{ row.createdAt | ldate: 'mediumDate' }}</time>
                 } @else {
                   —
                 }

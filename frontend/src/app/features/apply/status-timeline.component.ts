@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormGroup } from '@angular/forms';
@@ -46,7 +46,7 @@ interface ReadonlyRow {
     ReactiveFormsModule,
     RouterLink,
     FormlyForm,
-    DatePipe,
+    LocalizedDatePipe,
     BadgeComponent,
     CardComponent,
     ButtonComponent,

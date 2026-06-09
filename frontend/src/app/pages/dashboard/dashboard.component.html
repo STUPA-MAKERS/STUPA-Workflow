@@ -34,7 +34,7 @@
           </span>
           <span class="dash__session-title">{{ s.title }}</span>
           @if (s.date) {
-            <time class="dash__session-date" [attr.datetime]="s.date">{{ s.date | date: 'mediumDate' }}{{ s.startTime ? ', ' + s.startTime : '' }}</time>
+            <time class="dash__session-date" [attr.datetime]="s.date">{{ s.date | ldate: 'mediumDate' }}{{ s.startTime ? ', ' + s.startTime : '' }}</time>
           }
           <span class="dash__link">
             {{ (s.status === 'live' ? 'dashboard.sessions.join' : 'dashboard.sessions.inspect') | t }} →
@@ -124,7 +124,7 @@
                   <app-badge [color]="item.state.color">{{ item.state.label }}</app-badge>
                 }
                 @if (created(item); as c) {
-                  <time class="dash__row-date" [attr.datetime]="c">{{ c | date: 'mediumDate' }}</time>
+                  <time class="dash__row-date" [attr.datetime]="c">{{ c | ldate: 'mediumDate' }}</time>
                 }
               </span>
             </li>

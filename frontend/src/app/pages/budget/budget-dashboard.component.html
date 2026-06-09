@@ -68,7 +68,7 @@
             </span>
           </ng-template>
           <ng-template appCell="requested" let-row><span class="bd__muted">{{ money($any(row).requested, $any(row).node.currency) }}</span></ng-template>
-          <ng-template appCell="bound" let-row>{{ money($any(row).bound, $any(row).node.currency) }}</ng-template>
+          <ng-template appCell="bound" let-row>{{ money($any(row).committed, $any(row).node.currency) }}</ng-template>
           <ng-template appCell="expended" let-row>
             {{ money($any(row).expended, $any(row).node.currency) }}@if ($any(row).income > 0) {<span class="bd__muted"> (+{{ money($any(row).income, $any(row).node.currency) }})</span>}
           </ng-template>

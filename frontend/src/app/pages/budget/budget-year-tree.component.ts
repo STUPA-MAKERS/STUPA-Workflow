@@ -104,26 +104,34 @@ export interface BudgetYearSelection {
       .byt__years > li {
         position: relative;
       }
-      /* Senkrechte unter die Punkt-/Knoten-Mitte (= space-2 + 4.5px); Einzug
-         space-3 + 4px ⇒ Versatz space-2 − space-3 + 0.5px (vgl. cost-centre-tree). */
+      /* Senkrechte zentriert unter der Punkt-/Knoten-Mitte (vgl. cost-centre-tree). */
       .byt__years > li::before {
         content: '';
         position: absolute;
-        left: calc(var(--space-2) - var(--space-3) + 0.5px);
+        left: calc(var(--space-2) - var(--space-3));
         top: 0;
         bottom: 0;
         border-left: 1px dotted var(--color-success, #5fb37a);
+      }
+      /* Erstes Jahr: Linie nach oben bis zum Punkt verlängern (verbunden). */
+      .byt__years > li:first-child::before {
+        top: calc(-1 * (var(--space-1) + 0.7em));
       }
       .byt__years > li:last-child::before {
         bottom: auto;
         height: 0.75em;
       }
+      .byt__years > li:first-child:last-child::before {
+        top: calc(-1 * (var(--space-1) + 0.7em));
+        bottom: auto;
+        height: calc(var(--space-1) + 0.7em + 0.75em);
+      }
       .byt__years > li::after {
         content: '';
         position: absolute;
-        left: calc(var(--space-2) - var(--space-3) + 0.5px);
+        left: calc(var(--space-2) - var(--space-3));
         top: 0.75em;
-        width: calc(var(--space-3) - var(--space-2) - 0.5px);
+        width: var(--space-3);
         border-top: 1px dotted var(--color-success, #5fb37a);
       }
       .byt__node--year {

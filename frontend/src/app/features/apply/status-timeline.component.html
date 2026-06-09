@@ -47,7 +47,7 @@
                   <div class="timeline__body">
                     <p class="timeline__label">{{ entry.label }}</p>
                     <time class="timeline__time" [attr.datetime]="entry.at">
-                      {{ entry.at | date: 'medium' }}
+                      {{ entry.at | ldate: 'medium' }}
                     </time>
                     @if (entry.note) {
                       <p class="timeline__note">{{ entry.note }}</p>
@@ -93,7 +93,7 @@
               @for (c of comments(); track c.id) {
                 <li class="comments__item">
                   <p class="comments__meta">
-                    {{ c.author || ('status.comments.committee' | t) }} · {{ c.at | date: 'short' }}
+                    {{ c.author || ('status.comments.committee' | t) }} · {{ c.at | ldate: 'short' }}
                   </p>
                   <p class="comments__body">{{ c.body }}</p>
                 </li>

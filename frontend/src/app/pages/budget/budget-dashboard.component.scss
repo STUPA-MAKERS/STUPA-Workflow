@@ -129,14 +129,14 @@
 }
 .bd__nav {
   position: sticky;
-  top: var(--space-4);
+  top: calc(var(--layout-header-height) + var(--space-4));
   min-width: 0;
   /* an die Mittelspalte heranrücken (rechtsbündig im linken Rand). */
   justify-self: end;
   width: 100%;
   max-width: 14rem;
   /* schwebt mit und scrollt nicht weg, auch bei langem Baum. */
-  max-height: calc(100vh - 2 * var(--space-4));
+  max-height: calc(100vh - var(--layout-header-height) - 2 * var(--space-4));
   overflow-y: auto;
 }
 .bd__charts {
@@ -155,8 +155,8 @@
   flex-direction: column;
   gap: var(--space-5);
   position: sticky;
-  top: var(--space-4);
-  max-height: calc(100vh - 2 * var(--space-4));
+  top: calc(var(--layout-header-height) + var(--space-4));
+  max-height: calc(100vh - var(--layout-header-height) - 2 * var(--space-4));
   overflow-y: auto;
 }
 .bd__apps {

@@ -10,7 +10,8 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { DatePipe, NgTemplateOutlet } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -82,7 +83,7 @@ const AUTOSAVE_DELAY_MS = 1000;
     DialogComponent,
     IconComponent,
     MarkdownEditorComponent,
-    DatePipe,
+    LocalizedDatePipe,
     NgTemplateOutlet,
   ],
   template: `

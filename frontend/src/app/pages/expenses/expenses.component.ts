@@ -8,7 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
@@ -49,7 +49,7 @@ import {
   imports: [
     FormsModule,
     RouterLink,
-    DatePipe,
+    LocalizedDatePipe,
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
@@ -126,7 +126,7 @@ import {
           <ul class="exp__list">
             @for (e of items(); track e.id) {
               <li class="exp__row" [class.exp__row--income]="e.kind === 'income'">
-                <span class="exp__date">{{ e.createdAt | date: 'mediumDate' }}</span>
+                <span class="exp__date">{{ e.createdAt | ldate: 'mediumDate' }}</span>
                 <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">
                   {{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}
                 </app-badge>
@@ -281,9 +281,9 @@ import {
       /* Kostenstellen-Baum schwebt mit (sticky) und scrollt nicht weg (#25). */
       .exp__tree {
         position: sticky;
-        top: var(--space-4);
+        top: calc(var(--layout-header-height) + var(--space-4));
         align-self: start;
-        max-height: calc(100vh - 2 * var(--space-4));
+        max-height: calc(100vh - var(--layout-header-height) - 2 * var(--space-4));
         overflow-y: auto;
       }
       .exp__main { min-width: 0; }
