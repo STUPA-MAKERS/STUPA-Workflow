@@ -68,17 +68,42 @@
   width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-sm);
+  margin-top: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 .bt__states th,
 .bt__states td {
   text-align: start;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border-bottom: var(--border-width) solid var(--color-border);
+  vertical-align: middle;
+}
+.bt__states thead th {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  background: var(--color-surface-sunken);
+}
+.bt__states tbody tr:last-child td {
+  border-bottom: none;
+}
+.bt__states tbody tr:hover td {
+  background: var(--color-surface-sunken);
 }
 .bt__states th:not(:first-child),
 .bt__states td:not(:first-child) {
   text-align: center;
-  width: 6rem;
+  width: 7rem;
+}
+.bt__states td input[type='checkbox'] {
+  width: 1.05rem;
+  height: 1.05rem;
+  cursor: pointer;
+  accent-color: var(--color-primary);
 }
 .bt__color {
   width: 2rem;

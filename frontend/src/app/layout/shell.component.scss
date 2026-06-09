@@ -138,7 +138,8 @@
   -webkit-appearance: none;
   // Kompakt: Globus-Icon links, schmales Kürzel (DE/EN); Chevron als Maske
   // rechts (folgt der Textfarbe → in beiden Themes + auf Hover sichtbar, #53).
-  padding-inline: calc(var(--space-2) + 1.1rem) var(--space-5);
+  // FA-Globus ist breiter als das alte SVG → mehr Innenabstand links.
+  padding-inline: calc(var(--space-2) + 1.6rem) var(--space-5);
 }
 .lang::after {
   // Chevron, der currentColor (Textfarbe) erbt — bleibt auf Hover/Dark sichtbar.
