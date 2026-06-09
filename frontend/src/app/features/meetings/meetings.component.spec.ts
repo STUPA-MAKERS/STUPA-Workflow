@@ -192,9 +192,14 @@ describe('MeetingsComponent', () => {
     ]);
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
 
-    // Danger-Aktion: erst Bestätigungs-Dialog, dann bestätigen.
-    await userEvent.click(await screen.findByRole('button', { name: /Finalisieren/i }));
-    await userEvent.click(await screen.findByRole('button', { name: /Abschließen & finalisieren/i }));
+    // Schließen ist unwiderruflich: Toolbar-Button öffnet den Bestätigungs-Dialog,
+    // bestätigen schließt die Sitzung (PATCH status) und finalisiert implizit.
+    await userEvent.click(await screen.findByRole('button', { name: 'Schließen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Sitzung schließen' }));
+    const closeReq = http.expectOne('/api/meetings/m-1');
+    expect(closeReq.request.method).toBe('PATCH');
+    expect(closeReq.request.body).toEqual({ status: 'closed' });
+    closeReq.flush({ ...MEETING, status: 'closed' });
     // Erst werden die TOP-Texte zum Protokoll-Markdown zusammengesetzt (PATCH) …
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
@@ -264,9 +269,11 @@ describe('MeetingsComponent', () => {
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
   });
 
-  it('closes the session via PATCH status', async () => {
+  it('closes the session via PATCH status after confirming', async () => {
     const { http } = await setup();
     flushLoad(http);
+    // Toolbar "Schließen" öffnet den unwiderruflichen Bestätigungs-Dialog.
+    await userEvent.click(await screen.findByRole('button', { name: 'Schließen' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Sitzung schließen' }));
     const req = http.expectOne('/api/meetings/m-1');
     expect(req.request.method).toBe('PATCH');

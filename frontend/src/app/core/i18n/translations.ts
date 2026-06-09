@@ -386,6 +386,7 @@ export const de = {
   'meetings.control.session': 'Sitzungs-Status',
   'meetings.control.open': 'Sitzung eröffnen',
   'meetings.control.closeSession': 'Sitzung schließen',
+  'meetings.control.closeShort': 'Schließen',
   'meetings.control.noVotes': 'Für diese Sitzung sind noch keine Abstimmungen angelegt.',
   'meetings.voteStatus.pending': 'Geplant',
   'meetings.voteStatus.open': 'Offen',
@@ -475,10 +476,12 @@ export const de = {
   'meetings.follow.title': 'Live-Sitzung',
   'meetings.follow.lead': 'Folge der Sitzung live und stimme bei offenen Fragen ab.',
   'meetings.follow.noTops': 'Es sind noch keine Tagesordnungspunkte vorhanden.',
-  'meetings.finalizeConfirm.title': 'Sitzung abschließen?',
-  'meetings.finalizeConfirm.body':
-    'Das Protokoll wird finalisiert, als PDF erzeugt und versandt. Diese Aktion kann nicht rückgängig gemacht werden.',
-  'meetings.finalizeConfirm.confirm': 'Abschließen & finalisieren',
+  'meetings.closeConfirm.title': 'Sitzung schließen?',
+  'meetings.closeConfirm.body':
+    'Das Schließen ist unwiderruflich: Das Protokoll wird finalisiert, als PDF erzeugt und versandt.',
+  'meetings.closeConfirm.confirm': 'Sitzung schließen',
+  'meetings.protocol.finalizeOnClose':
+    'Das Protokoll wird beim Schließen der Sitzung automatisch finalisiert und versandt.',
 
   'notFound.heading': 'Seite nicht gefunden',
   'notFound.body': 'Die angeforderte Seite existiert nicht.',
@@ -1636,6 +1639,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.control.session': 'Session status',
   'meetings.control.open': 'Open session',
   'meetings.control.closeSession': 'Close session',
+  'meetings.control.closeShort': 'Close',
   'meetings.control.noVotes': 'No votes have been created for this meeting yet.',
   'meetings.voteStatus.pending': 'Planned',
   'meetings.voteStatus.open': 'Open',
@@ -1724,10 +1728,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.follow.title': 'Live session',
   'meetings.follow.lead': 'Follow the session live and vote on open questions.',
   'meetings.follow.noTops': 'No agenda items yet.',
-  'meetings.finalizeConfirm.title': 'Close the session?',
-  'meetings.finalizeConfirm.body':
-    'The minutes will be finalized, rendered as a PDF and sent. This action cannot be undone.',
-  'meetings.finalizeConfirm.confirm': 'Close & finalize',
+  'meetings.closeConfirm.title': 'Close the session?',
+  'meetings.closeConfirm.body':
+    'Closing is irreversible: the minutes will be finalized, rendered as a PDF and sent.',
+  'meetings.closeConfirm.confirm': 'Close session',
+  'meetings.protocol.finalizeOnClose':
+    'The minutes are finalized and sent automatically when the session is closed.',
 
   'notFound.heading': 'Page not found',
   'notFound.body': 'The requested page does not exist.',
