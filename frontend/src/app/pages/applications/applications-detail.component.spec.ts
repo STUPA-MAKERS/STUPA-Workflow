@@ -15,7 +15,6 @@ import type {
   ApplicationOutWire,
   CommentOutWire,
   StateOutWire,
-  TransitionOutWire,
   VersionOutWire,
 } from '@core/api/models';
 
@@ -67,10 +66,6 @@ const COMMENTS: CommentOutWire[] = [
   },
 ];
 
-const TRANSITIONS: TransitionOutWire[] = [
-  { id: 'tr1', fromStateId: 's1', toStateId: 's2', label: { de: 'In Prüfung nehmen', en: 'Review' } },
-];
-
 function fakeAuth(permissions: string[]): Partial<AuthService> {
   return { can: (p: string) => permissions.includes(p) };
 }
@@ -99,8 +94,7 @@ const url =
   (r: { url: string }) =>
     r.url === `/api/applications/${id}${suffix}`;
 
-/** Flush the detail GET and the aux loads it triggers (versions/comments/transitions
- *  + the effective form used for data-field labels). */
+/** Flush the effective-form request used for data-field labels. */
 function flushForm(http: HttpTestingController) {
   http
     .expectOne((r) => r.url === '/api/application-types/t1/form')
@@ -114,11 +108,11 @@ function flushForm(http: HttpTestingController) {
 }
 
 // `form` nur beim initialen Laden (loadApplication); ein refresh() lädt die Form nicht neu.
-function flushAll(http: HttpTestingController, manage = true, id = 'app-1', form = true) {
+// Statuswechsel laufen über den Flow → keine /transitions-Anfrage mehr.
+function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
   http.expectOne(url('', id)).flush({ ...appWire(), id });
   http.expectOne(url('/versions', id)).flush(VERSIONS);
   http.expectOne(url('/comments', id)).flush(COMMENTS);
-  if (manage) http.expectOne(url('/transitions', id)).flush(TRANSITIONS);
   if (form) flushForm(http);
 }
 
@@ -143,68 +137,17 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('shows RBAC-gated transition actions only for managers', async () => {
-    const { http, detectChanges } = await setup();
-    flushAll(http);
-    detectChanges();
-    expect(screen.getByRole('heading', { name: 'Statuswechsel' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'In Prüfung nehmen' })).toBeInTheDocument();
-    http.verify();
-  });
-
-  it('hides actions and never requests transitions without application.manage', async () => {
+  it('hides the internal-visibility select for non-managers', async () => {
     const { http, detectChanges } = await setup(['application.read']);
-    // no /transitions request expected
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
     detectChanges();
 
+    // No manual status-change UI (handled via the flow) and no manager-only options.
     expect(screen.queryByRole('heading', { name: 'Statuswechsel' })).not.toBeInTheDocument();
-    // internal-visibility select is manager-only
     expect(screen.queryByText('Sichtbarkeit')).not.toBeInTheDocument();
     flushForm(http);
-    http.verify();
-  });
-
-  it('fires a confirmed transition and reloads on success', async () => {
-    const { http, detectChanges, toast } = await setup();
-    flushAll(http);
-    detectChanges();
-    const success = jest.spyOn(toast, 'success');
-
-    await userEvent.click(screen.getByRole('button', { name: 'In Prüfung nehmen' }));
-    expect(screen.getByText('Statuswechsel bestätigen')).toBeInTheDocument(); // confirm dialog
-    await userEvent.click(screen.getByRole('button', { name: 'Ausführen' }));
-
-    const post = http.expectOne(url('/transition'));
-    expect(post.request.method).toBe('POST');
-    expect(post.request.body).toEqual({ transitionId: 'tr1', note: null });
-    post.flush({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] });
-
-    expect(success).toHaveBeenCalled();
-    // refresh re-loads detail + aux (not the static form)
-    flushAll(http, true, 'app-1', false);
-    http.verify();
-  });
-
-  it('surfaces a 409 conflict as a dedicated toast', async () => {
-    const { http, detectChanges, toast } = await setup();
-    flushAll(http);
-    detectChanges();
-    const error = jest.spyOn(toast, 'error');
-
-    await userEvent.click(screen.getByRole('button', { name: 'In Prüfung nehmen' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Ausführen' }));
-
-    http
-      .expectOne(url('/transition'))
-      .flush({ title: 'Conflict' }, { status: 409, statusText: 'Conflict' });
-
-    expect(error).toHaveBeenCalledWith(
-      'Statuswechsel nicht möglich (Status hat sich geändert oder Bedingung nicht erfüllt).',
-    );
-    flushAll(http, true, 'app-1', false); // refresh after the failed attempt (no form reload)
     http.verify();
   });
 
@@ -243,7 +186,6 @@ describe('ApplicationsDetailComponent', () => {
       { version: 2, data: {}, diff: { added: {}, removed: {}, changed: {} }, changedBy: null, at: '2026-06-05T11:00:00Z' },
     ]);
     http.expectOne(url('/comments')).flush(COMMENTS);
-    http.expectOne(url('/transitions')).flush(TRANSITIONS);
     detectChanges();
     expect(screen.getByText('Keine Feldänderungen.')).toBeInTheDocument();
     flushForm(http);
@@ -272,7 +214,7 @@ describe('ApplicationsDetailComponent', () => {
       ['application.read', 'application.manage'],
       paramMap$,
     );
-    flushAll(http, true, 'app-1');
+    flushAll(http);
     detectChanges();
 
     // simulate Detail→Detail navigation: same component instance, new param
@@ -281,7 +223,6 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('', 'app-2')).flush({ ...appWire(), id: 'app-2' });
     http.expectOne(url('/versions', 'app-2')).flush(VERSIONS);
     http.expectOne(url('/comments', 'app-2')).flush(COMMENTS);
-    http.expectOne(url('/transitions', 'app-2')).flush(TRANSITIONS);
     flushForm(http); // loadApplication for app-2 also fetches the effective form
     detectChanges();
 
@@ -289,15 +230,11 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('renders data with form-field labels and a fallback for an unlabelled transition', async () => {
+  it('renders data with form-field labels and typed values', async () => {
     const { http, detectChanges } = await setup();
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
-    // Transition without a usable label → must fall back to a generic action label.
-    http.expectOne(url('/transitions')).flush([
-      { id: 'tr1', fromStateId: 's1', toStateId: 's2', label: {} },
-    ]);
     http.expectOne((r) => r.url === '/api/application-types/t1/form').flush({
       applicationTypeId: 't1',
       formVersionId: 'fv1',
@@ -309,8 +246,6 @@ describe('ApplicationsDetailComponent', () => {
 
     // data row uses the field label, not the raw key, and formats the currency value.
     expect(screen.getByText('Beantragte Summe')).toBeInTheDocument();
-    // the empty-labelled transition renders the generic fallback, not a blank button.
-    expect(screen.getByRole('button', { name: 'Weiter' })).toBeInTheDocument();
     http.verify();
   });
 

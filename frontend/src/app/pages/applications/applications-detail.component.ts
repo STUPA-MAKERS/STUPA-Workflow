@@ -19,14 +19,12 @@ import type {
   ApplicationVersion,
   CommentVisibility,
   FormFieldDef,
-  Transition,
   Uuid,
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
-import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applications.util';
@@ -53,7 +51,6 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
     BadgeComponent,
     ButtonComponent,
     CardComponent,
-    DialogComponent,
     AttachmentsPanelComponent,
   ],
   template: `
@@ -137,22 +134,7 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
         </app-card>
       }
 
-      <!-- Statuswechsel-Aktionen (RBAC: application.manage) -->
-      @if (canManage()) {
-        <app-card [heading]="'applications.actions.title' | t">
-          @if (transitions().length) {
-            <div class="det__actions">
-              @for (transition of transitions(); track transition.id) {
-                <app-button variant="secondary" size="sm" (click)="openConfirm(transition)">
-                  {{ transitionLabel(transition) }}
-                </app-button>
-              }
-            </div>
-          } @else {
-            <p class="det__muted">{{ 'applications.actions.none' | t }}</p>
-          }
-        </app-card>
-      }
+      <!-- Statuswechsel laufen über den Flow (Abstimmungen/Freigaben), nicht manuell hier. -->
 
       <!-- Versions-Historie + Diff -->
       <app-card [heading]="'applications.history.title' | t">
@@ -268,35 +250,6 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
       <!-- Anhänge (T-13-Contract): Upload + signierte Download-URLs + Scan-Status -->
       <app-attachments-panel [applicationId]="application.id" [canUpload]="canManage()" />
     }
-
-    <app-dialog
-      [open]="pending() !== null"
-      [title]="'applications.actions.confirm.title' | t"
-      [closeLabel]="'action.close' | t"
-      (closed)="cancelConfirm()"
-    >
-      @if (pending(); as transition) {
-        <p>{{ 'applications.actions.confirm.body' | t: { label: transition.label } }}</p>
-        <label class="field__label" [for]="'det-note'">{{ 'applications.actions.confirm.note' | t }}</label>
-        <textarea
-          id="det-note"
-          class="field__control det__textarea"
-          rows="2"
-          [placeholder]="'applications.actions.confirm.notePlaceholder' | t"
-          [ngModel]="note()"
-          (ngModelChange)="note.set($event)"
-          name="note"
-        ></textarea>
-      }
-      <div dialog-footer>
-        <app-button variant="ghost" size="sm" (click)="cancelConfirm()">
-          {{ 'action.cancel' | t }}
-        </app-button>
-        <app-button variant="primary" size="sm" [loading]="firing()" (click)="confirmTransition()">
-          {{ 'applications.actions.confirm.submit' | t }}
-        </app-button>
-      </div>
-    </app-dialog>
   `,
   styles: [
     `
@@ -486,7 +439,6 @@ export class ApplicationsDetailComponent {
   readonly app = signal<Application | null>(null);
   readonly versions = signal<ApplicationVersion[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
-  readonly transitions = signal<Transition[]>([]);
   /** Feld-Definitionen der effektiven Form — für Labels/typisierte Werte (sonst leer). */
   readonly formFields = signal<FormFieldDef[]>([]);
 
@@ -494,9 +446,6 @@ export class ApplicationsDetailComponent {
   readonly visibility = signal<CommentVisibility>('public');
   readonly posting = signal(false);
 
-  readonly pending = signal<Transition | null>(null);
-  readonly note = signal('');
-  readonly firing = signal(false);
   readonly approving = signal(false);
 
   readonly canManage = computed(() => this.auth.can('application.manage'));
@@ -524,10 +473,7 @@ export class ApplicationsDetailComponent {
     this.app.set(null);
     this.versions.set([]);
     this.comments.set([]);
-    this.transitions.set([]);
     this.formFields.set([]);
-    this.pending.set(null);
-    this.note.set('');
     this.newComment.set('');
     this.visibility.set('public');
     this.notFound.set(false);
@@ -558,16 +504,11 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Versions/Kommentare/Transitions nachladen — Fehler degradieren still zu leer. */
+  /** Versionen/Kommentare nachladen — Fehler degradieren still zu leer.
+   *  Statuswechsel laufen über den Flow, nicht über manuelle Transitionen hier. */
   private loadAux(): void {
     this.api.versions(this.id).subscribe({ next: (v) => this.versions.set(v), error: () => {} });
     this.api.comments(this.id).subscribe({ next: (c) => this.comments.set(c), error: () => {} });
-    if (this.canManage()) {
-      this.api.transitions(this.id).subscribe({
-        next: (t) => this.transitions.set(t),
-        error: () => this.transitions.set([]),
-      });
-    }
   }
 
   /** Antragsdaten als Label/Wert-Zeilen: Feld-Definition → Label + typisierter Wert;
@@ -639,10 +580,6 @@ export class ApplicationsDetailComponent {
     return `${value.length} × ${this.i18n.translate('applications.detail.positionsTotal')}: ${sum}`;
   }
 
-  /** Übergangs-Label mit Fallback (leeres i18n-Label → generisch „Weiter“). */
-  transitionLabel(transition: Transition): string {
-    return transition.label?.trim() || this.i18n.translate('applications.actions.advance');
-  }
 
   amount(app: Application): string {
     if (app.amount === null) return this.i18n.translate('applications.detail.notProvided');
@@ -674,40 +611,6 @@ export class ApplicationsDetailComponent {
       error: () => {
         this.posting.set(false);
         this.toast.error(this.i18n.translate('applications.comments.error'));
-      },
-    });
-  }
-
-  openConfirm(transition: Transition): void {
-    this.note.set('');
-    this.pending.set(transition);
-  }
-
-  cancelConfirm(): void {
-    this.pending.set(null);
-  }
-
-  confirmTransition(): void {
-    const transition = this.pending();
-    if (!transition || this.firing()) return;
-    this.firing.set(true);
-    const note = this.note().trim() || null;
-    this.api.fireTransition(this.id, { transitionId: transition.id, note }).subscribe({
-      next: () => {
-        this.firing.set(false);
-        this.pending.set(null);
-        this.toast.success(this.i18n.translate('applications.actions.success'));
-        this.refresh();
-      },
-      error: (err: { status?: number }) => {
-        this.firing.set(false);
-        this.pending.set(null);
-        // 409: Status hat sich geändert oder ein Guard schlug fehl → Liste der
-        // erlaubten Übergänge ist veraltet; Detail + Aktionen neu laden.
-        const key =
-          err.status === 409 ? 'applications.actions.conflict' : 'applications.actions.error';
-        this.toast.error(this.i18n.translate(key));
-        this.refresh();
       },
     });
   }
