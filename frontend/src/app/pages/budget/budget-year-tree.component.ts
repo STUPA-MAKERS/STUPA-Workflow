@@ -100,15 +100,16 @@ export interface BudgetYearSelection {
         list-style: none;
         margin: 0 0 var(--space-1) 0;
         padding: 0 0 0 calc(var(--space-3) + 4px);
-        margin-left: calc(var(--space-2) + 4px);
       }
       .byt__years > li {
         position: relative;
       }
+      /* Senkrechte unter die Punkt-/Knoten-Mitte (= space-2 + 4.5px); Einzug
+         space-3 + 4px ⇒ Versatz space-2 − space-3 + 0.5px (vgl. cost-centre-tree). */
       .byt__years > li::before {
         content: '';
         position: absolute;
-        left: calc(-1 * (var(--space-2) + 1px));
+        left: calc(var(--space-2) - var(--space-3) + 0.5px);
         top: 0;
         bottom: 0;
         border-left: 1px dotted var(--color-success, #5fb37a);
@@ -120,9 +121,9 @@ export interface BudgetYearSelection {
       .byt__years > li::after {
         content: '';
         position: absolute;
-        left: calc(-1 * (var(--space-2) + 1px));
+        left: calc(var(--space-2) - var(--space-3) + 0.5px);
         top: 0.75em;
-        width: var(--space-2);
+        width: calc(var(--space-3) - var(--space-2) - 0.5px);
         border-top: 1px dotted var(--color-success, #5fb37a);
       }
       .byt__node--year {

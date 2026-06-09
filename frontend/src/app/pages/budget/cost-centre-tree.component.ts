@@ -127,7 +127,9 @@ import { PALETTE } from './budget-year-tree.component';
       .cct__children > .cct__branch::before {
         content: '';
         position: absolute;
-        left: calc(-1 * (var(--space-2) + 1px));
+        /* Linie unter die Knoten-Mitte (= Punkt-Mitte des Top-Knotens): Punktmitte
+           = space-2 + 4.5px; Kind-Einzug = space-3 + 4px ⇒ Versatz space-2 − space-3 + 0.5px. */
+        left: calc(var(--space-2) - var(--space-3) + 0.5px);
         top: 0;
         bottom: 0;
         border-left: 1px dotted var(--color-success, #5fb37a);
@@ -140,9 +142,9 @@ import { PALETTE } from './budget-year-tree.component';
       .cct__children > .cct__branch::after {
         content: '';
         position: absolute;
-        left: calc(-1 * (var(--space-2) + 1px));
+        left: calc(var(--space-2) - var(--space-3) + 0.5px);
         top: 0.8em;
-        width: var(--space-2);
+        width: calc(var(--space-3) - var(--space-2) - 0.5px);
         border-top: 1px dotted var(--color-success, #5fb37a);
       }
       .cct__node--active {

@@ -71,6 +71,8 @@ export interface ExpenseQuery {
   kind?: ExpenseKind;
   applicationId?: Uuid;
   q?: string;
+  amountMin?: number;
+  amountMax?: number;
   limit?: number;
   offset?: number;
 }

@@ -623,6 +623,8 @@ class BudgetTreeService:
         kind: str | None = None,
         application_id: UUID | None = None,
         q: str | None = None,
+        amount_min: Decimal | None = None,
+        amount_max: Decimal | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> Page[ExpenseOut]:
@@ -648,6 +650,10 @@ class BudgetTreeService:
             filters.append(BudgetExpense.application_id == application_id)
         if q:
             filters.append(BudgetExpense.description.ilike(f"%{q}%"))
+        if amount_min is not None:
+            filters.append(BudgetExpense.amount >= amount_min)
+        if amount_max is not None:
+            filters.append(BudgetExpense.amount <= amount_max)
 
         total = await self.session.scalar(
             select(func.count()).select_from(BudgetExpense).where(*filters)

@@ -17,6 +17,7 @@ Disjunktheit) → 422; Löschen mit Kindern/Zuteilungen → 409.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -248,17 +249,22 @@ async def list_expenses(
     kind: Annotated[ExpenseKind | None, Query()] = None,
     application_id: Annotated[UUID | None, Query(alias="applicationId")] = None,
     q: Annotated[str | None, Query()] = None,
+    amount_min: Annotated[Decimal | None, Query(alias="amountMin", ge=0)] = None,
+    amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[ExpenseOut]:
     """Buchungen gefiltert + offset-paginiert (#25). ``budget`` schließt den
-    Unterbaum ein; ``kind`` = ``expense``/``income``; ``q`` = Beschreibungssuche."""
+    Unterbaum ein; ``kind`` = ``expense``/``income``; ``q`` = Beschreibungssuche;
+    ``amountMin``/``amountMax`` = Betragsbereich."""
     return await service.list_expenses_paged(
         budget_id=budget_id,
         fiscal_year_id=fiscal_year_id,
         kind=kind,
         application_id=application_id,
         q=q,
+        amount_min=amount_min,
+        amount_max=amount_max,
         limit=limit,
         offset=offset,
     )

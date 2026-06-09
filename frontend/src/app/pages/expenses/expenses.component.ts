@@ -80,6 +80,29 @@ import {
           (ngModelChange)="onSearch($event)"
           [attr.aria-label]="'expenses.search' | t"
         />
+        <div class="exp__amountFilter">
+          <input
+            class="exp__input exp__amountInput"
+            type="number"
+            min="0"
+            step="0.01"
+            [placeholder]="'expenses.filter.amountMin' | t"
+            [attr.aria-label]="'expenses.filter.amountMin' | t"
+            [ngModel]="amountMin()"
+            (ngModelChange)="onAmountFilter('min', $event)"
+          />
+          <span aria-hidden="true">–</span>
+          <input
+            class="exp__input exp__amountInput"
+            type="number"
+            min="0"
+            step="0.01"
+            [placeholder]="'expenses.filter.amountMax' | t"
+            [attr.aria-label]="'expenses.filter.amountMax' | t"
+            [ngModel]="amountMax()"
+            (ngModelChange)="onAmountFilter('max', $event)"
+          />
+        </div>
       </div>
     </header>
 
@@ -163,19 +186,48 @@ import {
 
         @if (newKind() === 'expense') {
           <label class="exp__label" for="exp-app">{{ 'expenses.field.linkApplication' | t }}</label>
-          <input id="exp-app" class="exp__input" type="search" [ngModel]="appQuery()" (ngModelChange)="onAppSearch($event)" name="appSearch" [placeholder]="'expenses.field.linkApplicationPlaceholder' | t" />
-          @if (appOptions().length) {
-            <app-select name="appPick" [options]="appOptions()" [placeholder]="'expenses.field.linkApplicationPick' | t" [ngModel]="newApplicationId()" (ngModelChange)="newApplicationId.set($event)" />
-          }
           @if (newApplicationId()) {
+            <div class="exp__picked">
+              <span class="exp__pickedText">{{ appQuery() }}</span>
+              <app-button type="button" variant="ghost" size="sm" (click)="clearApp()">{{ 'expenses.field.unlink' | t }}</app-button>
+            </div>
             <p class="exp__hint">{{ 'expenses.field.inheritedCostCentre' | t }}</p>
+          } @else {
+            <div class="exp__typeahead">
+              <input
+                id="exp-app"
+                class="exp__input"
+                type="search"
+                autocomplete="off"
+                [ngModel]="appQuery()"
+                (ngModelChange)="onAppSearch($event)"
+                name="appSearch"
+                [placeholder]="'expenses.field.linkApplicationPlaceholder' | t"
+                role="combobox"
+                [attr.aria-expanded]="appCandidates().length > 0"
+                aria-autocomplete="list"
+              />
+              @if (appCandidates().length) {
+                <ul class="exp__suggest" role="listbox">
+                  @for (a of appCandidates(); track a.id) {
+                    <li>
+                      <button type="button" class="exp__suggestItem" (click)="pickApp(a)">{{ a.title }}</button>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
           }
         }
 
         @if (!newApplicationId()) {
           <app-select name="cc" [label]="'expenses.field.costCentre' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="newBudgetId()" (ngModelChange)="onPickBudget($event)" />
-          @if (fiscalYearOptions().length > 1) {
-            <app-select name="fy" [label]="'expenses.field.fiscalYear' | t" [placeholder]="'expenses.field.fiscalYearPlaceholder' | t" [options]="fiscalYearOptions()" [ngModel]="newFiscalYearId()" (ngModelChange)="newFiscalYearId.set($event)" />
+          @if (newBudgetId()) {
+            @if (fiscalYearOptions().length) {
+              <app-select name="fy" [label]="'expenses.field.fiscalYear' | t" [placeholder]="'expenses.field.fiscalYearPlaceholder' | t" [options]="fiscalYearOptions()" [required]="true" [ngModel]="newFiscalYearId()" (ngModelChange)="newFiscalYearId.set($event)" />
+            } @else {
+              <p class="exp__hint exp__hint--warn">{{ 'expenses.field.noFiscalYear' | t }}</p>
+            }
           }
         }
       </form>
@@ -211,7 +263,7 @@ import {
   styles: [
     `
       :host { display: block; }
-      .exp__head { max-width: var(--layout-max-width); margin-inline: auto; margin-bottom: var(--space-5); }
+      .exp__head { margin-bottom: var(--space-5); }
       .exp__titleRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
       .exp__title { margin: 0; }
       .exp__filters { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-3); }
@@ -225,7 +277,15 @@ import {
         font: inherit;
       }
       .exp__search { min-width: 16rem; }
-      .exp__layout { display: grid; grid-template-columns: minmax(12rem, 16rem) 1fr; gap: var(--space-5); }
+      .exp__layout { display: grid; grid-template-columns: minmax(12rem, 16rem) 1fr; gap: var(--space-5); align-items: start; }
+      /* Kostenstellen-Baum schwebt mit (sticky) und scrollt nicht weg (#25). */
+      .exp__tree {
+        position: sticky;
+        top: var(--space-4);
+        align-self: start;
+        max-height: calc(100vh - 2 * var(--space-4));
+        overflow-y: auto;
+      }
       .exp__main { min-width: 0; }
       .exp__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
       .exp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
@@ -255,9 +315,55 @@ import {
       .exp__form { display: flex; flex-direction: column; gap: var(--space-2); }
       .exp__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); margin-top: var(--space-2); }
       .exp__hint { font-size: var(--fs-sm); color: var(--color-text-muted); margin: 0; }
+      .exp__hint--warn { color: var(--color-danger); }
       .exp__dialogFoot { display: flex; justify-content: flex-end; gap: var(--space-3); }
+      /* Antrags-Typeahead (wie Nutzersuche) */
+      .exp__typeahead { position: relative; }
+      .exp__suggest {
+        list-style: none;
+        margin: var(--space-1) 0 0;
+        padding: var(--space-1);
+        position: absolute;
+        z-index: 10;
+        left: 0;
+        right: 0;
+        max-height: 14rem;
+        overflow-y: auto;
+        background: var(--color-surface);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.3));
+      }
+      .exp__suggestItem {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: var(--space-2) var(--space-3);
+        background: transparent;
+        border: 0;
+        border-radius: var(--radius-sm);
+        color: var(--color-text);
+        cursor: pointer;
+        font: inherit;
+      }
+      .exp__suggestItem:hover { background: var(--color-primary-subtle); }
+      .exp__picked {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+      }
+      .exp__pickedText { font-weight: var(--fw-medium); }
+      /* Betrags-Filter (von/bis) */
+      .exp__amountFilter { display: inline-flex; align-items: center; gap: var(--space-1); }
+      .exp__amountInput { width: 6rem; }
       @media (max-width: 720px) {
         .exp__layout { grid-template-columns: 1fr; }
+        .exp__tree { position: static; max-height: none; }
         .exp__row { grid-template-columns: 1fr auto; }
       }
     `,
@@ -283,6 +389,8 @@ export class ExpensesComponent {
 
   readonly kind = signal<'' | ExpenseKind>('');
   readonly q = signal('');
+  readonly amountMin = signal('');
+  readonly amountMax = signal('');
   readonly budgetId = signal('');
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -301,7 +409,8 @@ export class ExpensesComponent {
   readonly newFiscalYearId = signal('');
   readonly newApplicationId = signal('');
   readonly appQuery = signal('');
-  readonly appOptions = signal<SelectOption[]>([]);
+  /** Antrags-Treffer der Typeahead-Suche (max. 8). */
+  readonly appCandidates = signal<{ id: string; title: string }[]>([]);
   readonly fiscalYearOptions = signal<SelectOption[]>([]);
   readonly saving = signal(false);
 
@@ -311,12 +420,13 @@ export class ExpensesComponent {
   readonly editDescription = signal('');
   readonly confirmDelete = signal<Expense | null>(null);
 
-  readonly canSubmitCreate = computed(
-    () =>
-      !!this.newDescription().trim() &&
-      Number(this.newAmount()) > 0 &&
-      (!!this.newApplicationId() || !!this.newBudgetId()),
-  );
+  readonly canSubmitCreate = computed(() => {
+    if (!this.newDescription().trim() || !(Number(this.newAmount()) > 0)) return false;
+    // Gebunden: Kostenstelle + HHJ werden vom Antrag geerbt.
+    if (this.newApplicationId()) return true;
+    // Eigenständig: Kostenstelle **und** HHJ explizit erforderlich (sonst 422).
+    return !!this.newBudgetId() && !!this.newFiscalYearId();
+  });
 
   constructor() {
     this.api.tree().subscribe({
@@ -358,6 +468,15 @@ export class ExpensesComponent {
 
   onSearch(value: string): void {
     this.q.set(value);
+    this.debouncedReload();
+  }
+
+  onAmountFilter(which: 'min' | 'max', value: string): void {
+    (which === 'min' ? this.amountMin : this.amountMax).set(value);
+    this.debouncedReload();
+  }
+
+  private debouncedReload(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => this.reload(), 250);
   }
@@ -382,6 +501,8 @@ export class ExpensesComponent {
         budget: this.budgetId() || undefined,
         kind: this.kind() || undefined,
         q: this.q().trim() || undefined,
+        amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,
+        amountMax: this.amountMax().trim() ? Number(this.amountMax()) : undefined,
         limit: this.PAGE,
         offset: this.nextOffset,
       })
@@ -409,7 +530,7 @@ export class ExpensesComponent {
     this.newFiscalYearId.set('');
     this.newApplicationId.set('');
     this.appQuery.set('');
-    this.appOptions.set([]);
+    this.appCandidates.set([]);
     this.fiscalYearOptions.set([]);
     if (this.budgetId()) this.loadFiscalYears(this.budgetId());
     this.createOpen.set(true);
@@ -418,26 +539,36 @@ export class ExpensesComponent {
   setNewKindIncome(): void {
     this.newKind.set('income');
     // Einnahmen sind nicht an Anträge bindbar.
-    this.newApplicationId.set('');
-    this.appQuery.set('');
-    this.appOptions.set([]);
+    this.clearApp();
   }
 
+  /** Antrags-Typeahead (wie die Nutzersuche): Treffer als Vorschlagsliste. */
   onAppSearch(value: string): void {
     this.appQuery.set(value);
     const q = value.trim();
     if (!q) {
-      this.appOptions.set([]);
-      this.newApplicationId.set('');
+      this.appCandidates.set([]);
       return;
     }
-    this.apps.listApplications({ q, limit: 20 }).subscribe({
+    this.apps.listApplications({ q, limit: 8 }).subscribe({
       next: (page) =>
-        this.appOptions.set(
-          page.items.map((a) => ({ value: a.id, label: a.title || a.id })),
+        this.appCandidates.set(
+          page.items.map((a) => ({ id: a.id, title: a.title || a.id })),
         ),
-      error: () => this.appOptions.set([]),
+      error: () => this.appCandidates.set([]),
     });
+  }
+
+  pickApp(a: { id: string; title: string }): void {
+    this.newApplicationId.set(a.id);
+    this.appQuery.set(a.title);
+    this.appCandidates.set([]);
+  }
+
+  clearApp(): void {
+    this.newApplicationId.set('');
+    this.appQuery.set('');
+    this.appCandidates.set([]);
   }
 
   onPickBudget(id: string): void {
@@ -453,8 +584,10 @@ export class ExpensesComponent {
     if (!top) return;
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys: FiscalYear[]) => {
+        // Alle HHJ anbieten (Backend lässt explizite, auch inaktive HHJ zu); ein
+        // einzelnes aktives HHJ wird vorausgewählt.
+        this.fiscalYearOptions.set(fys.map((f) => ({ value: f.id, label: f.label })));
         const active = fys.filter((f) => f.active);
-        this.fiscalYearOptions.set(active.map((f) => ({ value: f.id, label: f.label })));
         if (active.length === 1) this.newFiscalYearId.set(active[0].id);
       },
       error: () => this.fiscalYearOptions.set([]),
@@ -488,11 +621,17 @@ export class ExpensesComponent {
           this.toast.success(this.i18n.translate('expenses.toast.created'));
           this.reload();
         },
-        error: () => {
+        error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.i18n.translate('expenses.toast.failed'));
+          this.toast.error(this.problemDetail(err));
         },
       });
+  }
+
+  /** Lesbaren Fehlertext aus dem problem+json (``detail``) ziehen, sonst generisch. */
+  private problemDetail(err: unknown): string {
+    const detail = (err as { error?: { detail?: string } } | null)?.error?.detail;
+    return detail || this.i18n.translate('expenses.toast.failed');
   }
 
   // --- edit ---
