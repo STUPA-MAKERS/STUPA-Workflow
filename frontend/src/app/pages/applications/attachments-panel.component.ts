@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  effect,
   inject,
   input,
   signal,
@@ -178,6 +179,20 @@ export class AttachmentsPanelComponent {
   readonly downloadingId = signal<Uuid | null>(null);
 
   readonly scanVariant = scanBadgeVariant;
+
+  constructor() {
+    // Bestehende Anhänge laden, sobald die applicationId steht (Hydration nach Reload).
+    effect(() => {
+      const id = this.applicationId();
+      if (!id) return;
+      this.api.listAttachments(id).subscribe({
+        next: (list) => this.attachments.set(list),
+        error: () => {
+          /* kein List-Endpunkt/Fehler → leer lassen (Upload zeigt Session-Stand) */
+        },
+      });
+    });
+  }
 
   size(att: Attachment): string {
     return formatBytes(att.size);

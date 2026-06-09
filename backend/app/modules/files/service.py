@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application
@@ -142,6 +143,19 @@ class FilesService:
             )
             return
         await self.queue.enqueue(attachment_id)
+
+    async def list_for_application(
+        self, application_id: uuid.UUID
+    ) -> list[AttachmentOut]:
+        """Alle Anhänge eines Antrags (für das Panel nach Reload). Älteste zuerst."""
+        rows = (
+            await self.session.scalars(
+                select(Attachment)
+                .where(Attachment.application_id == application_id)
+                .order_by(Attachment.created_at)
+            )
+        ).all()
+        return [_attachment_out(a) for a in rows]
 
     # -------------------------------------------------------------- downloads #
     async def get_attachment(self, attachment_id: uuid.UUID) -> Attachment:

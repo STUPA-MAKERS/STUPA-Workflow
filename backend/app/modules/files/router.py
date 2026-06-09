@@ -21,6 +21,7 @@ from app.modules.applications.access import (
     READ_PERMISSION,
     Access,
     require_app_edit,
+    require_app_read,
     resolve_access,
 )
 from app.modules.auth.principal import Applicant, Principal
@@ -105,6 +106,20 @@ async def upload_attachment(
         field_key=field_key,
         is_comparison_offer=is_comparison_offer,
     )
+
+
+@router.get(
+    "/applications/{application_id}/attachments",
+    response_model=list[AttachmentOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_attachments(
+    application_id: UUID,
+    service: ServiceDep,
+    access: Annotated[Access, Depends(require_app_read)],
+) -> list[AttachmentOut]:
+    """Anhänge eines Antrags auflisten (Panel-Hydration nach Reload). A/P-Zugriff."""
+    return await service.list_for_application(access.application_id)
 
 
 @router.get(

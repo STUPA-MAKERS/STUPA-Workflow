@@ -116,6 +116,13 @@ function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
   if (form) flushForm(http);
 }
 
+// Das Anhänge-Panel lädt beim Rendern bestehende Anhänge — tolerant leeren (falls vorhanden).
+function flushAttachments(http: HttpTestingController) {
+  for (const req of http.match((r) => r.method === 'GET' && /\/attachments$/.test(r.url))) {
+    req.flush([]);
+  }
+}
+
 describe('ApplicationsDetailComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
@@ -134,6 +141,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.getByText('Fest')).toBeInTheDocument();
     // comment body
     expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
+    flushAttachments(http);
     http.verify();
   });
 
@@ -148,6 +156,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.queryByRole('heading', { name: 'Statuswechsel' })).not.toBeInTheDocument();
     expect(screen.queryByText('Sichtbarkeit')).not.toBeInTheDocument();
     flushForm(http);
+    flushAttachments(http);
     http.verify();
   });
 
@@ -175,6 +184,7 @@ describe('ApplicationsDetailComponent', () => {
     );
     detectChanges();
     expect(screen.getByText('Danke!')).toBeInTheDocument();
+    flushAttachments(http);
     http.verify();
   });
 
@@ -189,6 +199,7 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     expect(screen.getByText('Keine Feldänderungen.')).toBeInTheDocument();
     flushForm(http);
+    flushAttachments(http);
     http.verify();
   });
 
@@ -205,6 +216,7 @@ describe('ApplicationsDetailComponent', () => {
       .flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
 
     expect(error).toHaveBeenCalledWith('Kommentar konnte nicht gespeichert werden.');
+    flushAttachments(http);
     http.verify();
   });
 
@@ -227,6 +239,7 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
 
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    flushAttachments(http);
     http.verify();
   });
 
@@ -246,6 +259,7 @@ describe('ApplicationsDetailComponent', () => {
 
     // data row uses the field label, not the raw key, and formats the currency value.
     expect(screen.getByText('Beantragte Summe')).toBeInTheDocument();
+    flushAttachments(http);
     http.verify();
   });
 
@@ -254,6 +268,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('')).flush({ title: 'Not found' }, { status: 404, statusText: 'Not Found' });
     detectChanges();
     expect(screen.getByText('Antrag nicht gefunden.')).toBeInTheDocument();
+    flushAttachments(http);
     http.verify();
   });
 });

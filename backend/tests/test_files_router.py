@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.deps import Principal, get_current_principal
+from app.deps import Principal, get_current_principal, get_session
 from app.main import create_app
 from app.modules.files.models import Attachment
 from app.modules.files.router import get_files_service
@@ -63,16 +63,38 @@ class _FakeService:
     async def signed_url(self, attachment_id: UUID) -> SignedUrlOut:
         return SignedUrlOut(url="https://minio.local/k", expiresIn=300)
 
+    async def list_for_application(self, application_id: UUID) -> list[AttachmentOut]:
+        self.listed = application_id
+        return [
+            AttachmentOut(
+                id=ATT_ID, filename="doc.pdf", mime="application/pdf",
+                size=3, scanned=True, is_comparison_offer=False,
+            )
+        ]
+
 
 @pytest.fixture
 def fake_service() -> _FakeService:
     return _FakeService()
 
 
+class _NoCreatorDb:
+    """Session-Stub: ``scalar`` → None (kein created_by) für den Ersteller-Check (#24)."""
+
+    async def scalar(self, *_a: object, **_k: object) -> None:
+        return None
+
+
+async def _fake_session():  # noqa: ANN202
+    yield _NoCreatorDb()
+
+
 @pytest.fixture
 def app(fake_service: _FakeService) -> FastAPI:
     application = create_app()
     application.dependency_overrides[get_files_service] = lambda: fake_service
+    # require_app_edit/read fragen created_by ab — ohne echte DB ein No-Creator-Stub.
+    application.dependency_overrides[get_session] = _fake_session
     return application
 
 
@@ -94,6 +116,16 @@ def test_upload_requires_auth_401(client: TestClient) -> None:
         files={"file": ("doc.pdf", b"%PDF", "application/pdf")},
     )
     assert r.status_code == 401
+
+
+def test_list_attachments_ok(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as(app, "application.read")
+    r = client.get(f"/api/applications/{APP_ID}/attachments")
+    assert r.status_code == 200
+    assert r.json()[0]["filename"] == "doc.pdf"
+    assert fake_service.listed == APP_ID
 
 
 def test_upload_forbidden_without_manage(app: FastAPI, client: TestClient) -> None:

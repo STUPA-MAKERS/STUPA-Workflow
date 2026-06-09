@@ -271,6 +271,13 @@ export class ApiClient {
       .pipe(map(mapAttachment));
   }
 
+  /** GET /applications/{id}/attachments — bestehende Anhänge (Panel-Hydration). */
+  listAttachments(id: Uuid): Observable<Attachment[]> {
+    return this.http
+      .get<AttachmentOutWire[]>(`${this.base}/applications/${id}/attachments`)
+      .pipe(map((list) => list.map(mapAttachment)));
+  }
+
   /**
    * GET /attachments/{id} — kurzlebige signierte MinIO-URL. 409 = noch nicht
    * sauber gescannt / Quarantäne, 410 = abgelaufen/verbraucht (api.md §files).
