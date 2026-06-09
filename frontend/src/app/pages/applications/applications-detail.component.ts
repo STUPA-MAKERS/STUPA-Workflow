@@ -20,6 +20,7 @@ import type {
   ApplicationVersion,
   CommentVisibility,
   FormFieldDef,
+  Transition,
   Uuid,
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
@@ -185,22 +186,26 @@ interface DetailPosition {
         }
       </app-card>
 
-      <!-- Approval-State (#28): Annehmen/Ablehnen (Server prüft Rolle im Gremium) -->
-      @if (application.state?.kind === 'approval') {
-        <app-card [heading]="'applications.approval.title' | t">
-          <p class="det__muted">{{ 'applications.approval.lead' | t }}</p>
+      <!-- Manuelle Übergänge (#28): nur die für die eigene Rolle gültigen (Server
+           filtert per Guard); ein Klick feuert den Übergang. -->
+      @if (canTransition() && transitions().length) {
+        <app-card [heading]="'applications.transitions.title' | t">
+          <p class="det__muted">{{ 'applications.transitions.lead' | t }}</p>
           <div class="det__actions">
-            <app-button variant="primary" size="sm" [loading]="approving()" (click)="submitApproval('accept')">
-              {{ 'applications.approval.accept' | t }}
-            </app-button>
-            <app-button variant="danger" size="sm" [loading]="approving()" (click)="submitApproval('reject')">
-              {{ 'applications.approval.reject' | t }}
-            </app-button>
+            @for (t of transitions(); track t.id) {
+              <app-button
+                variant="primary"
+                size="sm"
+                [loading]="firing() === t.id"
+                [disabled]="firing() !== null"
+                (click)="fire(t)"
+              >
+                {{ t.label || ('applications.transitions.fallback' | t) }}
+              </app-button>
+            }
           </div>
         </app-card>
       }
-
-      <!-- Statuswechsel laufen über den Flow (Abstimmungen/Freigaben), nicht manuell hier. -->
 
       <!-- Versions-Historie + Diff -->
       <app-card [heading]="'applications.history.title' | t">
@@ -608,7 +613,10 @@ export class ApplicationsDetailComponent {
   readonly visibility = signal<CommentVisibility>('public');
   readonly posting = signal(false);
 
-  readonly approving = signal(false);
+  /** Verfügbare manuelle Übergänge (vom Server guard-gefiltert) + laufender Fire. */
+  readonly transitions = signal<Transition[]>([]);
+  readonly firing = signal<Uuid | null>(null);
+  readonly canTransition = computed(() => this.auth.can('application.transition'));
 
   // Inline-Bearbeitung (Ersteller:in/Verwalter:in, #24) + Löschen.
   readonly editing = signal(false);
@@ -678,11 +686,17 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Versionen/Kommentare nachladen — Fehler degradieren still zu leer.
-   *  Statuswechsel laufen über den Flow, nicht über manuelle Transitionen hier. */
+  /** Versionen/Kommentare/verfügbare Übergänge nachladen — Fehler degradieren still
+   *  zu leer. Übergänge nur mit der nötigen Permission (Server filtert zusätzlich). */
   private loadAux(): void {
     this.api.versions(this.id).subscribe({ next: (v) => this.versions.set(v), error: () => {} });
     this.api.comments(this.id).subscribe({ next: (c) => this.comments.set(c), error: () => {} });
+    if (this.canTransition()) {
+      this.api.transitions(this.id).subscribe({
+        next: (t) => this.transitions.set(t),
+        error: () => this.transitions.set([]),
+      });
+    }
   }
 
   /** Antragsdaten als Label/Wert-Zeilen: Feld-Definition → Label + typisierter Wert;
@@ -881,21 +895,22 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Approval-State entscheiden (#28): Annehmen/Ablehnen → POST /approval. */
-  submitApproval(decision: 'accept' | 'reject'): void {
-    if (this.approving()) return;
-    this.approving.set(true);
-    this.api.submitApproval(this.id, decision).subscribe({
+  /** Einen manuellen Übergang feuern (#28): POST /transition → Antrag neu laden.
+   *  Der Server prüft den Guard erneut (403/409 möglich → Toast + Refresh). */
+  fire(t: Transition): void {
+    if (this.firing() !== null) return;
+    this.firing.set(t.id);
+    this.api.fireTransition(this.id, { transitionId: t.id }).subscribe({
       next: () => {
-        this.approving.set(false);
+        this.firing.set(null);
         this.toast.success(this.i18n.translate('applications.actions.success'));
         this.refresh();
       },
       error: (err: { status?: number }) => {
-        this.approving.set(false);
+        this.firing.set(null);
         const key =
           err.status === 403
-            ? 'applications.approval.forbidden'
+            ? 'applications.transitions.forbidden'
             : err.status === 409
               ? 'applications.actions.conflict'
               : 'applications.actions.error';

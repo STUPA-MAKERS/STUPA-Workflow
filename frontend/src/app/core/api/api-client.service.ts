@@ -245,11 +245,6 @@ export class ApiClient {
     return this.http.post<TransitionResult>(`${this.base}/applications/${id}/transition`, req);
   }
 
-  /** POST /applications/{id}/approval — Approval-State entscheiden (#28). */
-  submitApproval(id: Uuid, decision: 'accept' | 'reject'): Observable<TransitionResult> {
-    return this.http.post<TransitionResult>(`${this.base}/applications/${id}/approval`, { decision });
-  }
-
   // --- files / attachments (T-13) ------------------------------------------
   /**
    * POST /applications/{id}/attachments — Multipart-Upload (≤10 MB, A(edit)/P).
