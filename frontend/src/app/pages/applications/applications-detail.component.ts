@@ -33,9 +33,10 @@ import { IconComponent } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import {
   BudgetTreeApi,
-  type BudgetTreeRow,
+  type BudgetTreeNode,
   flattenBudgetTreeRows,
 } from '../budget/budget-tree.api';
+import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applications.util';
 
@@ -75,6 +76,7 @@ interface DetailPosition {
     CardComponent,
     DialogComponent,
     IconComponent,
+    CostCentreTreeComponent,
     AttachmentsPanelComponent,
   ],
   template: `
@@ -361,25 +363,14 @@ interface DetailPosition {
       (closed)="budgetDialogOpen.set(false)"
     >
       <p class="det__muted">{{ 'applications.budget.lead' | t }}</p>
-      <div class="det__ccTree" role="listbox" [attr.aria-label]="'applications.budget.field' | t">
-        <button
-          type="button"
-          class="det__ccNode det__ccNode--root"
-          [class.det__ccNode--active]="!budgetChoice()"
-          (click)="budgetChoice.set('')"
-        >{{ 'applications.budget.none' | t }}</button>
-        @for (n of budgetRows(); track n.id) {
-          <button
-            type="button"
-            class="det__ccNode"
-            [class.det__ccNode--active]="budgetChoice() === n.id"
-            [style.paddingLeft.rem]="0.75 + n.depth * 0.9"
-            (click)="budgetChoice.set(n.id)"
-          >
-            <span class="det__ccKey">{{ n.key }}</span>
-            <span class="det__ccName">{{ n.name }}</span>
-          </button>
-        }
+      <div class="det__ccTree">
+        <app-cost-centre-tree
+          [nodes]="budgetTree()"
+          [selectedId]="budgetChoice()"
+          [allLabel]="'applications.budget.none' | t"
+          [ariaLabel]="'applications.budget.field' | t"
+          (picked)="budgetChoice.set($event)"
+        />
       </div>
       <div dialog-footer>
         <app-button variant="ghost" size="sm" (click)="budgetDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
@@ -556,52 +547,12 @@ interface DetailPosition {
         gap: var(--space-2);
       }
       .det__ccTree {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
         margin-top: var(--space-3);
         max-height: 50vh;
         overflow-y: auto;
         border: var(--border-width) solid var(--color-border);
         border-radius: var(--radius-md);
-        padding: var(--space-1);
-      }
-      .det__ccNode {
-        display: flex;
-        align-items: baseline;
-        gap: var(--space-2);
-        width: 100%;
-        text-align: start;
-        border: 0;
-        background: transparent;
-        color: var(--color-text);
-        font: inherit;
-        cursor: pointer;
-        padding: var(--space-2) var(--space-3);
-        border-radius: var(--radius-md);
-      }
-      .det__ccNode:hover {
-        background: var(--color-surface-sunken);
-      }
-      .det__ccNode--active {
-        background: var(--color-primary-subtle, var(--color-surface-sunken));
-        color: var(--color-primary);
-        font-weight: var(--fw-medium);
-      }
-      .det__ccNode--root {
-        font-weight: var(--fw-semibold);
-      }
-      .det__ccKey {
-        font-variant-numeric: tabular-nums;
-        font-size: var(--fs-xs);
-        color: var(--color-text-muted);
-        flex: none;
-      }
-      .det__ccNode--active .det__ccKey {
-        color: inherit;
-      }
-      .det__ccName {
-        font-size: var(--fs-sm);
+        padding: var(--space-2);
       }
       .det__history {
         display: flex;
@@ -731,13 +682,16 @@ export class ApplicationsDetailComponent {
   readonly canTransition = computed(() => this.auth.can('application.transition'));
 
   /** Kostenstellen-Zuordnung (#17): Baum, Dialog-Auswahl, laufende Zuweisung. */
-  protected readonly budgetRows = signal<BudgetTreeRow[]>([]);
+  protected readonly budgetTree = signal<BudgetTreeNode[]>([]);
   protected readonly budgetChoice = signal('');
   protected readonly assigningBudget = signal(false);
   protected readonly budgetDialogOpen = signal(false);
   /** ``budgetId`` → „KEY – Name" (für das Badge der aktuellen Kostenstelle). */
   private readonly budgetLabels = computed(
-    () => new Map(this.budgetRows().map((r) => [r.id, `${r.key} – ${r.name}`])),
+    () =>
+      new Map(
+        flattenBudgetTreeRows(this.budgetTree()).map((r) => [r.id, `${r.key} – ${r.name}`]),
+      ),
   );
   protected budgetLabel(id: string | null | undefined): string {
     return (id && this.budgetLabels().get(id)) || '';
@@ -839,8 +793,8 @@ export class ApplicationsDetailComponent {
     if (this.canManage()) {
       this.budgetChoice.set(this.app()?.budgetId ?? '');
       this.budgetApi.tree().subscribe({
-        next: (tree) => this.budgetRows.set(flattenBudgetTreeRows(tree)),
-        error: () => this.budgetRows.set([]),
+        next: (tree) => this.budgetTree.set(tree),
+        error: () => this.budgetTree.set([]),
       });
     }
   }

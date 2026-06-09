@@ -22,11 +22,8 @@ import type {
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { IconComponent, SelectComponent, type SelectOption } from '@shared/ui';
-import {
-  BudgetTreeApi,
-  type BudgetTreeRow,
-  flattenBudgetTreeRows,
-} from '../budget/budget-tree.api';
+import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
+import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { stateBadgeVariant } from './applications.util';
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
@@ -43,28 +40,17 @@ import { downloadBlob } from '@shared/download.util';
   selector: 'app-applications-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, FormsModule, DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, IconComponent, SelectComponent],
+  imports: [RouterLink, FormsModule, DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, IconComponent, SelectComponent, CostCentreTreeComponent],
   template: `
     <div class="apps__layout">
-    <aside class="apps__tree" [attr.aria-label]="'applications.list.filter.budget' | t">
-      <button
-        type="button"
-        class="apps__treeNode apps__treeNode--root"
-        [class.apps__treeNode--active]="!budgetId()"
-        (click)="selectBudgetNode('')"
-      >{{ 'applications.list.filter.all' | t }}</button>
-      @for (n of budgetRows(); track n.id) {
-        <button
-          type="button"
-          class="apps__treeNode"
-          [class.apps__treeNode--active]="budgetId() === n.id"
-          [style.paddingLeft.rem]="0.75 + n.depth * 0.9"
-          (click)="selectBudgetNode(n.id)"
-        >
-          <span class="apps__treeKey">{{ n.key }}</span>
-          <span class="apps__treeName">{{ n.name }}</span>
-        </button>
-      }
+    <aside class="apps__tree">
+      <app-cost-centre-tree
+        [nodes]="budgetTree()"
+        [selectedId]="budgetId()"
+        [allLabel]="'applications.list.filter.all' | t"
+        [ariaLabel]="'applications.list.filter.budget' | t"
+        (picked)="selectBudgetNode($event)"
+      />
     </aside>
     <div class="apps__main">
     <header class="apps__head">
@@ -262,55 +248,12 @@ import { downloadBlob } from '@shared/download.util';
         max-height: calc(100vh - 8rem);
         overflow-y: auto;
       }
-      .apps__treeNode {
-        display: flex;
-        align-items: baseline;
-        gap: var(--space-2);
-        width: 100%;
-        text-align: start;
-        border: 0;
-        background: transparent;
-        color: var(--color-text);
-        font: inherit;
-        cursor: pointer;
-        padding: var(--space-2) var(--space-3);
-        border-radius: var(--radius-md);
-      }
-      .apps__treeNode:hover {
-        background: var(--color-surface-sunken);
-      }
-      .apps__treeNode--active {
-        background: var(--color-primary-subtle, var(--color-surface-sunken));
-        color: var(--color-primary);
-        font-weight: var(--fw-medium);
-      }
-      .apps__treeNode--root {
-        font-weight: var(--fw-semibold);
-        margin-bottom: var(--space-1);
-      }
-      .apps__treeKey {
-        font-variant-numeric: tabular-nums;
-        font-size: var(--fs-xs);
-        color: var(--color-text-muted);
-        flex: none;
-      }
-      .apps__treeNode--active .apps__treeKey {
-        color: inherit;
-      }
-      .apps__treeName {
-        font-size: var(--fs-sm);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
       @media (max-width: 50rem) {
         .apps__layout {
           grid-template-columns: 1fr;
         }
         .apps__tree {
           position: static;
-          flex-direction: row;
-          flex-wrap: wrap;
           max-height: none;
         }
       }
@@ -551,8 +494,8 @@ export class ApplicationsListComponent {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
-  /** Kostenstellen-Baum (eingerückt) für den linken Tree-Picker. */
-  readonly budgetRows = signal<BudgetTreeRow[]>([]);
+  /** Kostenstellen-Baum für den linken Tree-Picker (gleiche Optik wie Budget-Tab). */
+  readonly budgetTree = signal<BudgetTreeNode[]>([]);
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
@@ -603,8 +546,8 @@ export class ApplicationsListComponent {
     });
     // Kostenstellen-Baum für den linken Filter-Picker (eager).
     this.budgetApi.tree().subscribe({
-      next: (tree) => this.budgetRows.set(flattenBudgetTreeRows(tree)),
-      error: () => this.budgetRows.set([]),
+      next: (tree) => this.budgetTree.set(tree),
+      error: () => this.budgetTree.set([]),
     });
 
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
