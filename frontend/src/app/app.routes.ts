@@ -63,7 +63,7 @@ export const routes: Routes = [
       },
       {
         path: 'applications/:id',
-        data: { title: 'applications.detail.crumb', permission: 'application.read', parent: ['applications'] },
+        data: { title: 'applications.detail.crumb', permission: 'application.read', parent: ['applications'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/applications/applications-detail.component').then(

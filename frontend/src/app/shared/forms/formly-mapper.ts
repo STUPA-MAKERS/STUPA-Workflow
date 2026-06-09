@@ -48,7 +48,20 @@ export function toFormlyFields(
   lang: Lang | string,
   extraContext: Record<string, unknown> = {},
 ): FormlyFieldConfig[] {
-  return fields.filter((f) => f.type !== 'section').map((f) => mapField(f, lang, extraContext));
+  // Abschnitts-/Gruppen-Marker (#13) als Überschrift rendern, statt sie zu verwerfen —
+  // so erscheinen Frage-Gruppen auch im Inline-Editor gruppiert.
+  return fields.map((f) =>
+    f.type === 'section'
+      ? sectionHeading(f, lang)
+      : mapField(f, lang, extraContext),
+  );
+}
+
+/** Abschnitts-Marker → nicht-editierbare Überschrift (Formly `display`, `heading`). */
+function sectionHeading(f: FormFieldDef, lang: Lang | string): FormlyFieldConfig {
+  const props: Record<string, unknown> = { heading: true, label: resolveI18n(f.label, lang) };
+  if (f.help) props['description'] = resolveI18n(f.help, lang);
+  return { type: 'display', props };
 }
 
 function mapField(

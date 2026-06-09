@@ -97,14 +97,19 @@ describe('toFormlyFields', () => {
     expect(callExpr(total, 'model.total', { amount: 100 })).toBeNull();
   });
 
-  it('drops section markers (structural only, not real fields)', () => {
+  it('renders section markers as group headings (not editable fields)', () => {
     const fields: FormFieldDef[] = [
       { key: 'section_1', type: 'section', label: { de: 'Schritt 1' } },
       { key: 'name', type: 'text', label: { de: 'Name' } },
     ];
     const out = toFormlyFields(fields, 'de');
-    expect(out).toHaveLength(1);
-    expect(out[0].key).toBe('name');
+    expect(out).toHaveLength(2);
+    // Abschnitts-Marker → keyless display-Überschrift; echtes Feld unverändert.
+    expect(out[0].type).toBe('display');
+    expect(out[0].props?.['heading']).toBe(true);
+    expect(out[0].props?.['label']).toBe('Schritt 1');
+    expect(out[0].key).toBeUndefined();
+    expect(out[1].key).toBe('name');
   });
 
   it('wires visibleIf to a negated hide expression', () => {

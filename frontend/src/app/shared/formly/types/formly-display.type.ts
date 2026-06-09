@@ -8,15 +8,38 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="display" [class.display--computed]="isComputed">
-      @if (props.label) {
-        <span class="display__label">{{ props.label }}</span>
-      }
-      <p class="display__value">{{ text }}</p>
-    </div>
+    @if (isHeading) {
+      <div class="display__heading">
+        <h3 class="display__headingTitle">{{ props.label || text }}</h3>
+        @if (props.description) {
+          <p class="display__headingSub">{{ props.description }}</p>
+        }
+      </div>
+    } @else {
+      <div class="display" [class.display--computed]="isComputed">
+        @if (props.label) {
+          <span class="display__label">{{ props.label }}</span>
+        }
+        <p class="display__value">{{ text }}</p>
+      </div>
+    }
   `,
   styles: [
     `
+      .display__heading {
+        margin-top: var(--space-2);
+        padding-bottom: var(--space-2);
+        border-bottom: var(--border-width) solid var(--color-border);
+      }
+      .display__headingTitle {
+        margin: 0;
+        font-size: var(--fs-md);
+      }
+      .display__headingSub {
+        margin: var(--space-1) 0 0;
+        font-size: var(--fs-sm);
+        color: var(--color-text-muted);
+      }
       .display {
         display: flex;
         flex-direction: column;
@@ -43,6 +66,11 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 export class FormlyDisplayType extends FieldType<FieldTypeConfig> {
   get isComputed(): boolean {
     return Boolean(this.props['computed']);
+  }
+
+  /** Abschnitts-/Gruppen-Überschrift (statt Wert-Anzeige). */
+  get isHeading(): boolean {
+    return Boolean(this.props['heading']);
   }
 
   get text(): string {

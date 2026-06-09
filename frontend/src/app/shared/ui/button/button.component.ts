@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostBinding, Input } from '@angular/core';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -27,6 +27,13 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
     `
       :host {
         display: inline-flex;
+      }
+      /* Volle Breite (z. B. gestapelte Aktionen): Host + Button strecken. */
+      :host(.btn-block) {
+        display: flex;
+      }
+      :host(.btn-block) .btn {
+        width: 100%;
       }
       .btn {
         display: inline-flex;
@@ -146,6 +153,8 @@ export class ButtonComponent {
   @Input() loading = false;
   /** Quadratischer Icon-Button (gleiche Höhe/Breite) für einzelne Glyphs (✕ ↑ ↓). */
   @Input() iconOnly = false;
+  /** Volle Breite des Containers (gestapelte Aktionen gleicher Breite). */
+  @Input() @HostBinding('class.btn-block') block = false;
   /** Barrierefreier Name — Pflicht für Icon-Buttons ohne sichtbaren Text. */
   @Input() ariaLabel = '';
   /** Hover-Tooltip; bei Icon-Buttons fällt er automatisch auf `ariaLabel` zurück (#47). */
