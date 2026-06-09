@@ -16,9 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
+from app.modules.flow.models import State
 from app.modules.budget import tree_rules
 from app.modules.budget.models import BudgetEntry
-from app.modules.budget.rules import COMMITTED_STAGES
 from app.modules.budget.tree_models import (
     Budget,
     BudgetAllocation,
@@ -58,6 +58,9 @@ def _node_out(b: Budget) -> BudgetNodeOut:
         name=b.name,
         currency=b.currency,
         active=b.active,
+        color=b.color,
+        acceptedStateKeys=list(b.accepted_state_keys or []),
+        deniedStateKeys=list(b.denied_state_keys or []),
     )
 
 
@@ -163,6 +166,7 @@ class BudgetTreeService:
             name=payload.name,
             currency=payload.currency,
             active=payload.active,
+            color=payload.color,
         )
         self.session.add(node)
         await self.session.commit()
@@ -583,7 +587,12 @@ class BudgetTreeService:
     async def get_tree(
         self, *, gremium_id: UUID | None = None
     ) -> list[BudgetTreeNodeOut]:
-        """Kostenstellen-Baum mit allocated/committed/available je HHJ (R7.4)."""
+        """Kostenstellen-Baum mit allocated/committed/beantragt/available je HHJ (R7.4).
+
+        Klassifikation per Top-Budget (#budget-redesign): ein Antrag zählt als
+        **gebunden** (committed), wenn sein aktueller Flow-State-Key in den
+        ``accepted_state_keys`` des Top-Budgets liegt; als **beantragt** (requested),
+        wenn er weder accepted noch denied ist; denied wird ausgeschlossen."""
         nodes = (
             await self.session.execute(
                 select(Budget).order_by(Budget.path_key)
@@ -592,21 +601,17 @@ class BudgetTreeService:
         allocs = (
             await self.session.execute(select(BudgetAllocation))
         ).scalars().all()
-        rows = (
+        # Anträge mit Kostenstelle + HHJ + aktuellem Flow-State-Key.
+        app_rows = (
             await self.session.execute(
                 select(
                     Budget.path_key,
                     Application.fiscal_year_id,
                     Application.amount,
+                    State.key,
                 )
                 .join(Application, Application.budget_id == Budget.id)
-                .join(
-                    BudgetEntry,
-                    and_(
-                        BudgetEntry.application_id == Application.id,
-                        BudgetEntry.stage.in_(tuple(COMMITTED_STAGES)),
-                    ),
-                )
+                .join(State, State.id == Application.current_state_id)
                 .where(
                     Application.amount.is_not(None),
                     Application.fiscal_year_id.is_not(None),
@@ -614,8 +619,7 @@ class BudgetTreeService:
             )
         ).all()
 
-        # Eigenständige Ausgaben (#25) zählen ebenfalls als gebundener Verbrauch und
-        # fließen über das path_key-Präfix in denselben Roll-up wie genehmigte Anträge.
+        # Eigenständige Ausgaben (#25) zählen immer als gebundener Verbrauch.
         expense_rows = (
             await self.session.execute(
                 select(
@@ -626,14 +630,35 @@ class BudgetTreeService:
             )
         ).all()
 
+        # Top-Budget-Config: erstes Pfad-Segment → (accepted, denied) State-Keys.
+        top_config: dict[str, tuple[set[str], set[str]]] = {
+            n.path_key: (set(n.accepted_state_keys or []), set(n.denied_state_keys or []))
+            for n in nodes
+            if n.parent_id is None
+        }
+
+        committed_rows: list[tuple[object, str, Decimal | None]] = []
+        requested_rows: list[tuple[object, str, Decimal | None]] = []
+        for path, fy, amount, state_key in app_rows:
+            accepted, denied = top_config.get(path.split("-")[0], (set(), set()))
+            if state_key in accepted:
+                committed_rows.append((fy, path, amount))
+            elif state_key in denied:
+                continue  # ausgeschlossen
+            else:
+                requested_rows.append((fy, path, amount))
+        committed_rows += [(fy, path, amount) for path, fy, amount in expense_rows]
+
         node_tuples = [
-            (n.id, n.parent_id, n.gremium_id, n.key, n.path_key, n.name, n.currency, n.active)
+            (
+                n.id, n.parent_id, n.gremium_id, n.key, n.path_key, n.name,
+                n.currency, n.active, n.color,
+                list(n.accepted_state_keys or []), list(n.denied_state_keys or []),
+            )
             for n in nodes
         ]
         alloc_tuples = [(a.budget_id, a.fiscal_year_id, a.allocated) for a in allocs]
-        committed_rows = [(fy, path, amount) for path, fy, amount in rows]
-        committed_rows += [(fy, path, amount) for path, fy, amount in expense_rows]
         forest = tree_rules.build_forest(
-            node_tuples, alloc_tuples, committed_rows, gremium_id=gremium_id
+            node_tuples, alloc_tuples, committed_rows, requested_rows, gremium_id=gremium_id
         )
         return [BudgetTreeNodeOut.model_validate(d) for d in forest]

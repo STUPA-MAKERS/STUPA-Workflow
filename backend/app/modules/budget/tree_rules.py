@@ -135,60 +135,78 @@ def pick_fiscal_year[T](active_ids: Sequence[T]) -> T | None:
     return active_ids[0] if len(active_ids) == 1 else None
 
 
-# Knoten-Tupel: (id, parent_id, gremium_id, key, path_key, name, currency, active).
-NodeTuple = tuple[object, object | None, object | None, str, str, str, str, bool]
+# Knoten-Tupel: (id, parent_id, gremium_id, key, path_key, name, currency, active,
+# color, accepted_state_keys, denied_state_keys).
+NodeTuple = tuple[
+    object, object | None, object | None, str, str, str, str, bool,
+    str | None, list, list,
+]
 
 
 def _views_for_node(
     node_id: object,
     alloc_by_node: dict[tuple[object, object], Decimal],
     committed_by_node: dict[tuple[object, object], Decimal],
+    requested_by_node: dict[tuple[object, object], Decimal],
 ) -> list[dict]:
-    """``AllocationView``-Dicts eines Knotens je relevantem HHJ (allocated ODER bound)."""
+    """``AllocationView``-Dicts eines Knotens je relevantem HHJ (allocated/bound/beantragt)."""
     fys = {fy for (nid, fy) in alloc_by_node if nid == node_id}
     fys |= {fy for (nid, fy) in committed_by_node if nid == node_id}
+    fys |= {fy for (nid, fy) in requested_by_node if nid == node_id}
     views: list[dict] = []
     for fy in sorted(fys, key=str):
         allocated = alloc_by_node.get((node_id, fy), _ZERO)
         committed = committed_by_node.get((node_id, fy), _ZERO)
+        requested = requested_by_node.get((node_id, fy), _ZERO)
         views.append(
             {
                 "fiscal_year_id": fy,
                 "allocated": allocated,
                 "committed": committed,
+                "requested": requested,
                 "available": node_available(allocated, committed),
             }
         )
     return views
 
 
+def _rollup_by_fy(
+    node_paths: Sequence[tuple[object, str]],
+    rows: Sequence[tuple[object, str, Decimal | None]],
+) -> dict[tuple[object, object], Decimal]:
+    """``(fy, leaf_path, amount)``-Zeilen je HHJ über das Pfad-Präfix rauf-rollen."""
+    fy_leaves: dict[object, list[tuple[str, Decimal | None]]] = {}
+    for fy_id, leaf_path, amount in rows:
+        fy_leaves.setdefault(fy_id, []).append((leaf_path, amount))
+    out: dict[tuple[object, object], Decimal] = {}
+    for fy_id, leaves in fy_leaves.items():
+        for nid, total in rollup_committed(node_paths, leaves).items():
+            if total != _ZERO:
+                out[(nid, fy_id)] = total
+    return out
+
+
 def build_forest(
     nodes: Sequence[NodeTuple],
     allocations: Sequence[tuple[object, object, Decimal | None]],
     committed_rows: Sequence[tuple[object, str, Decimal | None]],
+    requested_rows: Sequence[tuple[object, str, Decimal | None]] = (),
     *,
     gremium_id: object | None = None,
 ) -> list[dict]:
     """Reiner Baum-Aufbau für ``GET /budgets`` → DTO-fertige (snake_case) Dicts.
 
     * ``allocations`` = ``(budget_id, fiscal_year_id, allocated)`` — Top-Down (R7.1b).
-    * ``committed_rows`` = ``(fiscal_year_id, leaf_path_key, amount)`` je gebundenem
-      (genehmigtem) Antrag → Roll-up je HHJ über Pfad-Präfix (R7.1c).
+    * ``committed_rows`` = ``(fiscal_year_id, leaf_path_key, amount)`` je **gebundenem**
+      (angenommenem) Antrag/Ausgabe → Roll-up je HHJ über Pfad-Präfix (R7.1c).
+    * ``requested_rows`` = dito für **beantragte** (in-flight) Anträge.
     * ``gremium_id`` filtert die **Wurzeln** (Top-Level-Budgets) optional.
 
     Verbrauch fließt rauf, Allokation bleibt am Knoten — getrennt je HHJ ausgewiesen.
     """
-    node_paths = [(nid, path) for nid, _, _, _, path, _, _, _ in nodes]
-
-    # committed je HHJ rollup'en (Verbrauch fließt rauf).
-    fy_leaves: dict[object, list[tuple[str, Decimal | None]]] = {}
-    for fy_id, leaf_path, amount in committed_rows:
-        fy_leaves.setdefault(fy_id, []).append((leaf_path, amount))
-    committed_by_node: dict[tuple[object, object], Decimal] = {}
-    for fy_id, leaves in fy_leaves.items():
-        for nid, total in rollup_committed(node_paths, leaves).items():
-            if total != _ZERO:
-                committed_by_node[(nid, fy_id)] = total
+    node_paths = [(nid, path) for nid, _, _, _, path, *_ in nodes]
+    committed_by_node = _rollup_by_fy(node_paths, committed_rows)
+    requested_by_node = _rollup_by_fy(node_paths, requested_rows)
 
     alloc_by_node: dict[tuple[object, object], Decimal] = {
         (bid, fy): as_amount(value) for bid, fy, value in allocations
@@ -199,7 +217,7 @@ def build_forest(
         children_of.setdefault(n[1], []).append(n)
 
     def to_dict(n: NodeTuple) -> dict:
-        nid, parent_id, n_gremium, key, path, name, currency, active = n
+        nid, parent_id, n_gremium, key, path, name, currency, active, color, acc, den = n
         return {
             "id": nid,
             "parent_id": parent_id,
@@ -209,7 +227,12 @@ def build_forest(
             "name": name,
             "currency": currency,
             "active": active,
-            "by_fiscal_year": _views_for_node(nid, alloc_by_node, committed_by_node),
+            "color": color,
+            "accepted_state_keys": list(acc or []),
+            "denied_state_keys": list(den or []),
+            "by_fiscal_year": _views_for_node(
+                nid, alloc_by_node, committed_by_node, requested_by_node
+            ),
             "children": [to_dict(c) for c in children_of.get(nid, [])],
         }
 

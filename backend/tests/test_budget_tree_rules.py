@@ -99,8 +99,14 @@ def test_rollup_committed() -> None:
 
 
 # --------------------------------------------------------------- build_forest
-def _node(nid, parent, gremium, key, path, name="N", currency="EUR", active=True):  # noqa: ANN001
-    return (nid, parent, gremium, key, path, name, currency, active)
+def _node(  # noqa: ANN001
+    nid, parent, gremium, key, path, name="N", currency="EUR", active=True,
+    color=None, accepted=(), denied=(),
+):
+    return (
+        nid, parent, gremium, key, path, name, currency, active,
+        color, list(accepted), list(denied),
+    )
 
 
 def test_build_forest_tree_and_rollup() -> None:

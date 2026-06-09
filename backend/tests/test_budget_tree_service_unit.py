@@ -424,18 +424,26 @@ async def test_get_tree_assembles() -> None:
     g = uuid.uuid4()
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=g, key="VS")
+    top.accepted_state_keys = ["approved"]  # angenommene States → gebunden
+    top.denied_state_keys = ["rejected"]
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
     sess = fake_session(
-        result(top),                              # nodes
-        result(alloc),                            # allocations
-        result(("VS", fy_id, Decimal("250"))),    # committed rows
+        result(top),                                            # nodes
+        result(alloc),                                          # allocations
+        result(                                                 # app rows (path, fy, amount, state)
+            ("VS", fy_id, Decimal("250"), "approved"),          # → committed
+            ("VS", fy_id, Decimal("120"), "submitted"),         # → requested (in-flight)
+            ("VS", fy_id, Decimal("999"), "rejected"),          # → excluded
+        ),
+        result(),                                               # expense rows (none)
     )
     svc = BudgetTreeService(sess)
     tree = await svc.get_tree()
     assert len(tree) == 1
     view = tree[0].by_fiscal_year[0]
     assert view.allocated == Decimal("1000")
-    assert view.committed == Decimal("250")
+    assert view.committed == Decimal("250")    # nur 'approved'
+    assert view.requested == Decimal("120")    # 'submitted', nicht 'rejected'
     assert view.available == Decimal("750")
 
 

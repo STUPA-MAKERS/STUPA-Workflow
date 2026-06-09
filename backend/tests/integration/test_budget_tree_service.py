@@ -24,14 +24,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Application
-from app.modules.budget.models import BudgetEntry, BudgetPot
+from app.modules.budget.tree_models import Budget
 from app.modules.budget.tree_schemas import (
     AllocationSet,
     BudgetNodeCreate,
     FiscalYearCreate,
 )
 from app.modules.budget.tree_service import BudgetTreeService
-from app.modules.flow.models import FlowVersion
+from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.models import FormVersion
 from app.shared.errors import ConflictError, ValidationProblem
 
@@ -140,33 +140,33 @@ async def test_committed_rollup(session: AsyncSession) -> None:
         FiscalYearCreate(label="HHJ", startDate=date(2026, 1, 1), endDate=date(2026, 12, 31)),
     )
 
-    # Minimaler genehmigter Antrag (budget_entry-Stufe 'approved' = gebunden).
+    # Genehmigter Antrag = aktueller Flow-State in den accepted_state_keys des Top-Budgets.
     app_type = ApplicationType(key=f"t-{_suffix()}", name_i18n={})
     session.add(app_type)
     await session.flush()
     fv = FormVersion(application_type_id=app_type.id, version=1)
     flv = FlowVersion(application_type_id=app_type.id, version=1)
-    pot = BudgetPot(gremium_id=g.id, name="pot")
-    session.add_all([fv, flv, pot])
+    session.add_all([fv, flv])
+    await session.flush()
+    state = State(
+        flow_version_id=flv.id, key="approved", label_i18n={}, category="closed"
+    )
+    session.add(state)
     await session.flush()
     app = Application(
         type_id=app_type.id,
         form_version_id=fv.id,
         flow_version_id=flv.id,
+        current_state_id=state.id,
         budget_id=leaf.id,
         fiscal_year_id=fy.id,
         amount=Decimal("250"),
     )
     session.add(app)
-    await session.flush()
-    session.add(
-        BudgetEntry(
-            budget_pot_id=pot.id,
-            application_id=app.id,
-            stage="approved",
-            amount=Decimal("250"),
-        )
-    )
+    # Top-Budget: 'approved' zählt als gebunden.
+    top_row = await session.get(Budget, top.id)
+    assert top_row is not None
+    top_row.accepted_state_keys = ["approved"]
     await session.commit()
 
     tree = await svc.get_tree(gremium_id=g.id)

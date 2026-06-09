@@ -32,6 +32,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
@@ -58,6 +59,12 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     name: Mapped[str] = mapped_column(Text)
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    # Anzeigefarbe der Kostenstelle (Pie-Charts + Baum, #budget-redesign); NULL = auto.
+    color: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Nur am Top-Level relevant: Flow-State-Keys, die als angenommen (→ gebunden) bzw.
+    # abgelehnt (→ ausgeschlossen) gelten. Alles andere zählt als »beantragt«.
+    accepted_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    denied_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
 
     __table_args__ = (
         UniqueConstraint("parent_id", "key", name="uq_budget_parent_key"),

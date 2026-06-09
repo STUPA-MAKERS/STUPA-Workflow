@@ -26,13 +26,20 @@ class BudgetNodeCreate(_CamelModel):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     currency: str = Field(default="EUR", min_length=3, max_length=3)
     active: bool = True
+    color: str | None = None
 
 
 class BudgetNodeUpdate(_CamelModel):
-    """Kostenstelle teil-aktualisieren (Key/Parent unveränderlich → Pfad-Stabilität)."""
+    """Kostenstelle teil-aktualisieren (Key/Parent unveränderlich → Pfad-Stabilität).
+
+    ``None`` = unverändert. ``color=""`` löscht die Farbe. ``acceptedStateKeys``/
+    ``deniedStateKeys`` nur am Top-Level sinnvoll (Beantragt/Gebunden-Klassifikation)."""
 
     name: str | None = Field(default=None, min_length=1)
     active: bool | None = None
+    color: str | None = None
+    accepted_state_keys: list[str] | None = Field(default=None, alias="acceptedStateKeys")
+    denied_state_keys: list[str] | None = Field(default=None, alias="deniedStateKeys")
 
 
 class BudgetNodeOut(_CamelModel):
@@ -46,14 +53,18 @@ class BudgetNodeOut(_CamelModel):
     name: str
     currency: str
     active: bool
+    color: str | None = None
+    accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
+    denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
 
 
 class AllocationView(_CamelModel):
-    """Verfügbar vs. gebunden eines Knotens in **einem** HHJ (R7.1b/c)."""
+    """Verfügbar/gebunden/beantragt eines Knotens in **einem** HHJ (R7.1b/c)."""
 
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
     allocated: Decimal
     committed: Decimal
+    requested: Decimal = Decimal("0")
     available: Decimal
 
 
@@ -68,6 +79,9 @@ class BudgetTreeNodeOut(_CamelModel):
     name: str
     currency: str
     active: bool
+    color: str | None = None
+    accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
+    denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
     by_fiscal_year: list[AllocationView] = Field(
         default_factory=list, alias="byFiscalYear"
     )
