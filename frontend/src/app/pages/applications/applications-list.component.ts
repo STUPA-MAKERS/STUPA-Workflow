@@ -42,17 +42,6 @@ import { downloadBlob } from '@shared/download.util';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, FormsModule, DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, IconComponent, SelectComponent, CostCentreTreeComponent],
   template: `
-    <div class="apps__layout">
-    <aside class="apps__tree">
-      <app-cost-centre-tree
-        [nodes]="budgetTree()"
-        [selectedId]="budgetId()"
-        [allLabel]="'applications.list.filter.all' | t"
-        [ariaLabel]="'applications.list.filter.budget' | t"
-        (picked)="selectBudgetNode($event)"
-      />
-    </aside>
-    <div class="apps__main">
     <header class="apps__head">
       <div class="apps__headRow">
         <div>
@@ -142,6 +131,17 @@ import { downloadBlob } from '@shared/download.util';
       </div>
     </header>
 
+    <div class="apps__layout">
+    <aside class="apps__tree">
+      <app-cost-centre-tree
+        [nodes]="budgetTree()"
+        [selectedId]="budgetId()"
+        [allLabel]="'applications.list.filter.all' | t"
+        [ariaLabel]="'applications.list.filter.budget' | t"
+        (picked)="selectBudgetNode($event)"
+      />
+    </aside>
+    <div class="apps__main">
     @if (loading()) {
       <p class="apps__status" aria-live="polite">{{ 'applications.list.loading' | t }}</p>
     } @else if (error()) {
@@ -226,9 +226,20 @@ import { downloadBlob } from '@shared/download.util';
   `,
   styles: [
     `
+      /* Body (Kopf + Tabelle) auf normale Breite zentriert; der Baum sitzt im
+         linken Rand außerhalb des Bodys (Breakout, wie der Budget-Tab). */
+      .apps__head {
+        width: 100%;
+        max-width: var(--layout-max-width);
+        margin-inline: auto;
+        margin-bottom: var(--space-5);
+      }
       .apps__layout {
         display: grid;
-        grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+        grid-template-columns:
+          minmax(12rem, 1fr)
+          minmax(0, var(--layout-max-width))
+          minmax(0, 1fr);
         gap: var(--space-5);
         align-items: start;
       }
@@ -236,19 +247,23 @@ import { downloadBlob } from '@shared/download.util';
         min-width: 0;
       }
       .apps__tree {
+        justify-self: end;
+        width: 100%;
+        max-width: 16rem;
         position: sticky;
         top: var(--space-4);
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        padding: var(--space-2);
-        background: var(--color-surface);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-lg);
         max-height: calc(100vh - 8rem);
         overflow-y: auto;
       }
-      @media (max-width: 50rem) {
+      @media (max-width: 60rem) {
+        .apps__layout {
+          grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+        }
+        .apps__head {
+          max-width: none;
+        }
+      }
+      @media (max-width: 40rem) {
         .apps__layout {
           grid-template-columns: 1fr;
         }
@@ -256,9 +271,6 @@ import { downloadBlob } from '@shared/download.util';
           position: static;
           max-height: none;
         }
-      }
-      .apps__head {
-        margin-bottom: var(--space-5);
       }
       .apps__headRow {
         display: flex;

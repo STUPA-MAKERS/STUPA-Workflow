@@ -36,27 +36,29 @@ import { PALETTE } from './budget-year-tree.component';
 
     <ng-template #branch let-list let-depth="depth">
       @for (n of list; track n.id) {
-        <button
-          type="button"
-          class="cct__node"
-          [class.cct__node--top]="depth === 0"
-          [class.cct__node--child]="depth > 0"
-          [class.cct__node--active]="selectedId() === n.id"
-          (click)="picked.emit(n.id)"
-        >
-          @if (depth === 0) {
-            <span class="cct__dot" [style.background]="dotColor(n)"></span>
+        <div class="cct__branch">
+          <button
+            type="button"
+            class="cct__node"
+            [class.cct__node--top]="depth === 0"
+            [class.cct__node--child]="depth > 0"
+            [class.cct__node--active]="selectedId() === n.id"
+            (click)="picked.emit(n.id)"
+          >
+            @if (depth === 0) {
+              <span class="cct__dot" [style.background]="dotColor(n)"></span>
+            }
+            <span class="cct__key">{{ n.key }}</span>
+            <span class="cct__label">{{ n.name }}</span>
+          </button>
+          @if (n.children?.length) {
+            <div class="cct__children">
+              <ng-container
+                *ngTemplateOutlet="branch; context: { $implicit: n.children, depth: depth + 1 }"
+              ></ng-container>
+            </div>
           }
-          <span class="cct__key">{{ n.key }}</span>
-          <span class="cct__label">{{ n.name }}</span>
-        </button>
-        @if (n.children?.length) {
-          <div class="cct__children">
-            <ng-container
-              *ngTemplateOutlet="branch; context: { $implicit: n.children, depth: depth + 1 }"
-            ></ng-container>
-          </div>
-        }
+        </div>
       }
     </ng-template>
   `,
@@ -91,7 +93,6 @@ import { PALETTE } from './budget-year-tree.component';
       .cct__node--child {
         color: var(--color-text-muted);
         font-size: var(--fs-xs);
-        position: relative;
       }
       .cct__dot {
         width: 9px;
@@ -113,17 +114,34 @@ import { PALETTE } from './budget-year-tree.component';
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      /* Gepunktete, hellgrüne Verbindungslinien zu den Unterknoten (wie byt). */
+      /* Gepunktete, hellgrüne Verbindungslinien (echter Baum: letzte Zeile ohne
+         durchlaufende Linie nach unten). */
       .cct__children {
-        padding-left: calc(var(--space-2) + 4px);
-        margin-left: calc(var(--space-2) + 4px);
-        border-left: 1px dotted var(--color-success, #5fb37a);
+        padding-left: calc(var(--space-3) + 4px);
       }
-      .cct__node--child::before {
+      .cct__children > .cct__branch {
+        position: relative;
+      }
+      /* Senkrechte Linie: durchgehend, bei der letzten Verzweigung nur bis zum
+         Querstrich (kein Stray-Down-Line). */
+      .cct__children > .cct__branch::before {
         content: '';
         position: absolute;
-        left: calc(-1 * (var(--space-2) + 4px));
-        top: 0.7em;
+        left: calc(-1 * (var(--space-2) + 1px));
+        top: 0;
+        bottom: 0;
+        border-left: 1px dotted var(--color-success, #5fb37a);
+      }
+      .cct__children > .cct__branch:last-child::before {
+        bottom: auto;
+        height: 0.8em;
+      }
+      /* Querstrich zum Knoten. */
+      .cct__children > .cct__branch::after {
+        content: '';
+        position: absolute;
+        left: calc(-1 * (var(--space-2) + 1px));
+        top: 0.8em;
         width: var(--space-2);
         border-top: 1px dotted var(--color-success, #5fb37a);
       }

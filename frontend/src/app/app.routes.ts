@@ -48,7 +48,7 @@ export const routes: Routes = [
       },
       {
         path: 'applications',
-        data: { title: 'nav.applications', permission: 'application.read' },
+        data: { title: 'nav.applications', permission: 'application.read', wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/applications/applications-list.component').then(
