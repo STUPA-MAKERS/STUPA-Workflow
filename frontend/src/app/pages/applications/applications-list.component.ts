@@ -236,6 +236,8 @@ import { stateBadgeVariant } from './applications.util';
         z-index: var(--z-dropdown, 50);
         margin-top: var(--space-2);
         width: min(22rem, 90vw);
+        max-height: 80vh;
+        overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
@@ -244,6 +246,12 @@ import { stateBadgeVariant } from './applications.util';
         border: var(--border-width) solid var(--color-border);
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-lg);
+      }
+      /* Im senkrechten Popout duerfen die Felder NICHT vertikal wachsen
+         (die geteilte .field-Regel hat flex 1 1 12rem fuer die alte Zeile). */
+      .apps__filterPanel .field {
+        flex: 0 0 auto;
+        min-width: 0;
       }
       .field {
         display: flex;
