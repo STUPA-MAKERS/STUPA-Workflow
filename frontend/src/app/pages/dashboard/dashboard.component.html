@@ -79,7 +79,7 @@
                 @if (item.state) {
                   <app-badge [variant]="stateVariant(item.state.category)">{{ item.state.label }}</app-badge>
                 }
-                <span class="dash__row-cta">{{ 'dashboard.open' | t }} →</span>
+                <a class="dash__row-cta" [routerLink]="['/applications', item.id]">{{ 'dashboard.open' | t }} →</a>
               </span>
             </li>
           }
@@ -134,20 +134,4 @@
       }
     </section>
   </div>
-}
-
-<!-- Schnellzugriffe: distinkte Ziele (kein Antrags-Inhalt), RBAC-gegated. -->
-@if (visibleQuickLinks().length) {
-  <section class="dash__quick" aria-labelledby="dash-quick-h">
-    <h2 id="dash-quick-h" class="dash__quick-h">{{ 'dashboard.quickLinks' | t }}</h2>
-    <div class="dash__grid">
-      @for (link of visibleQuickLinks(); track link.route) {
-        <a class="dash__tile" [routerLink]="link.route">
-          <app-card [heading]="link.titleKey | t" [interactive]="true">
-            <span card-footer class="dash__link">{{ 'dashboard.viewAll' | t }} →</span>
-          </app-card>
-        </a>
-      }
-    </div>
-  </section>
 }

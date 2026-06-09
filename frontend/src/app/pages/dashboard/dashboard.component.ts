@@ -9,16 +9,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
-import { CardComponent } from '@shared/ui/card/card.component';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import { stateBadgeVariant } from '../applications/applications.util';
-
-/** Sekundär-Kachel (eigene Zielseite, kein Antrags-Inhalt) — RBAC-gated. */
-interface QuickLink {
-  readonly permissions: string[];
-  readonly titleKey: TranslationKey;
-  readonly route: string;
-}
 
 /** Wie viele Antrags-Zeilen je Panel maximal gezeigt werden. */
 const PREVIEW_ROWS = 5;
@@ -40,7 +32,7 @@ const PREVIEW_ROWS = 5;
   selector: 'app-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, TranslatePipe, CardComponent, BadgeComponent, CapitalizePipe],
+  imports: [RouterLink, DatePipe, TranslatePipe, BadgeComponent, CapitalizePipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
@@ -93,18 +85,6 @@ export class DashboardComponent {
   created(item: ApplicationListItem): string | null {
     return item.createdAt ?? null;
   }
-
-  // --- Schnellzugriffe (distinkte Ziele, kein Antrags-Inhalt) ---------------
-  private readonly quickLinks: QuickLink[] = [
-    { permissions: ['vote.cast', 'vote.manage'], titleKey: 'dashboard.votes.title', route: '/voting' },
-    { permissions: ['meeting.manage', 'protocol.write'], titleKey: 'dashboard.meetings.title', route: '/meetings' },
-    { permissions: ['budget.view', 'budget.manage'], titleKey: 'dashboard.budget.title', route: '/budget' },
-    { permissions: ['admin.config'], titleKey: 'dashboard.admin.title', route: '/admin' },
-  ];
-
-  readonly visibleQuickLinks = computed(() =>
-    this.quickLinks.filter((q) => this.auth.canAny(...q.permissions)),
-  );
 
   /** Antrags-Panels nur, wenn der Nutzer Anträge lesen darf. */
   readonly canReadApplications = computed(() => this.auth.canAny('application.read'));

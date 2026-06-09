@@ -142,28 +142,6 @@ describe('DashboardComponent', () => {
     http.verify();
   });
 
-  it('shows the role-permitted quick links and hides the rest', async () => {
-    const { http } = await setup(MEMBER);
-    expect(screen.getByText('Meine Abstimmungen')).toBeInTheDocument();
-    expect(screen.queryByText('Verwaltung')).not.toBeInTheDocument();
-    expect(screen.queryByText('Budget')).not.toBeInTheDocument();
-    http.verify();
-  });
-
-  it('shows every quick link for an admin principal', async () => {
-    const admin: Principal = {
-      ...MEMBER,
-      display_name: 'Adam Admin',
-      roles: ['admin'],
-      permissions: ['application.read', 'admin.config', 'budget.view', 'meeting.manage'],
-    };
-    const { http } = await setup(admin);
-    expect(screen.getByText('Verwaltung')).toBeInTheDocument();
-    expect(screen.getByText('Budget')).toBeInTheDocument();
-    expect(screen.getByText('Sitzungen')).toBeInTheDocument();
-    http.verify();
-  });
-
   it('shows an empty state with an apply CTA when there are no applications', async () => {
     const { http } = await setup(MEMBER, { apps: 'empty' });
     expect(screen.getByText('Noch keine Anträge.')).toBeInTheDocument();
