@@ -1020,6 +1020,18 @@ export const de = {
   'admin.forms.advanced': 'Erweiterte Optionen',
   'admin.forms.duplicate': 'Duplizieren',
 
+  // Frage-Gruppen (#13 — Gruppen-Container = je ein Wizard-Schritt)
+  'admin.form.groupStep': 'Schritt {n}',
+  'admin.form.groupTitleDe': 'Gruppen-Titel (DE)',
+  'admin.form.groupTitleEn': 'Gruppen-Titel (EN)',
+  'admin.form.groupTitlePlaceholder': 'Titel des Schritts …',
+  'admin.form.groupEmpty': 'Noch keine Fragen in dieser Gruppe.',
+  'admin.form.addGroup': 'Gruppe',
+  'admin.form.deleteGroup': 'Gruppe löschen',
+  'admin.form.moveGroupUp': 'Gruppe nach oben',
+  'admin.form.moveGroupDown': 'Gruppe nach unten',
+  'admin.form.dragGroup': 'Gruppe zum Umsortieren ziehen',
+
   // Budget-Statistik-Dashboard (T-35)
   'budget.title': 'Budget-Statistik',
   'budget.subtitle': 'Auslastung der Kostenstellen und Anträge je Budget/HHJ.',
@@ -2247,6 +2259,18 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.drag': 'Drag to reorder',
   'admin.forms.advanced': 'Advanced options',
   'admin.forms.duplicate': 'Duplicate',
+
+  // Question groups (#13 — group containers = one wizard step each)
+  'admin.form.groupStep': 'Step {n}',
+  'admin.form.groupTitleDe': 'Group title (DE)',
+  'admin.form.groupTitleEn': 'Group title (EN)',
+  'admin.form.groupTitlePlaceholder': 'Step title …',
+  'admin.form.groupEmpty': 'No questions in this group yet.',
+  'admin.form.addGroup': 'Group',
+  'admin.form.deleteGroup': 'Delete group',
+  'admin.form.moveGroupUp': 'Move group up',
+  'admin.form.moveGroupDown': 'Move group down',
+  'admin.form.dragGroup': 'Drag group to reorder',
 
   // Budget statistics dashboard (T-35)
   'budget.title': 'Budget statistics',
