@@ -473,6 +473,7 @@ let MOCK_MEETING: MeetingOutWire = {
   status: 'live',
   activeApplicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   gremiumId: null,
+  gremiumName: 'Studierendenparlament',
   protocolId: MOCK_PROTOCOL_ID,
   canControl: true,
   votes: [

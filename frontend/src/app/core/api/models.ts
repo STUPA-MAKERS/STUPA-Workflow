@@ -761,6 +761,8 @@ export interface Meeting {
   status: MeetingStatus;
   activeApplicationId: Uuid | null;
   gremiumId: Uuid | null;
+  /** Name des zugehörigen Gremiums (für Timeline-Anzeige, #104). */
+  gremiumName: string | null;
   votes: MeetingVote[];
   protocolId: Uuid | null;
   createdAt: IsoDateTime;

@@ -461,8 +461,31 @@ const AUTOSAVE_DELAY_MS = 1000;
         <form class="mtg__voteForm" (submit)="$event.preventDefault(); submitVote()">
           <label class="mtg__paneLabel" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
           <input id="mtg-vq" class="mtg__input" [ngModel]="voteQuestion()" (ngModelChange)="voteQuestion.set($event)" name="vq" [placeholder]="'meetings.vote.questionPlaceholder' | t" />
-          <label class="mtg__paneLabel" for="mtg-vo">{{ 'meetings.vote.options' | t }}</label>
-          <textarea id="mtg-vo" class="mtg__textarea" rows="4" [ngModel]="voteOptions()" (ngModelChange)="voteOptions.set($event)" name="vo"></textarea>
+          <span class="mtg__paneLabel">{{ 'meetings.vote.options' | t }}</span>
+          <div class="mtg__voteOpts">
+            @for (opt of voteOptions(); track $index) {
+              <div class="mtg__voteOptRow">
+                <input
+                  class="mtg__input"
+                  [ngModel]="opt"
+                  (ngModelChange)="setVoteOption($index, $event)"
+                  [name]="'vo-' + $index"
+                  [attr.aria-label]="('meetings.vote.option' | t) + ' ' + ($index + 1)"
+                  [placeholder]="('meetings.vote.option' | t) + ' ' + ($index + 1)"
+                />
+                <app-button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'admin.common.remove' | t"
+                  [disabled]="voteOptions().length <= 2"
+                  (click)="removeVoteOption($index)"
+                ><app-icon name="remove" /></app-button>
+              </div>
+            }
+            <app-button type="button" variant="ghost" size="sm" (click)="addVoteOption()">+ {{ 'meetings.vote.addOption' | t }}</app-button>
+          </div>
           <label class="mtg__voteSecret">
             <input type="checkbox" [checked]="voteSecret()" (change)="voteSecret.set($any($event.target).checked)" />
             {{ 'meetings.vote.secret' | t }}
@@ -555,6 +578,9 @@ const AUTOSAVE_DELAY_MS = 1000;
                       }
                     </span>
                     <app-badge [variant]="statusVariant(m.status)">{{ statusKey(m.status) | t }}</app-badge>
+                    @if (m.gremiumName) {
+                      <span class="mtg__tlGremium"><app-icon name="parliament" [size]="12" /> {{ m.gremiumName }}</span>
+                    }
                   </div>
                   <h3 class="mtg__tlTitle">{{ m.title }}</h3>
                   @if (m.protokollantName) {
@@ -1213,6 +1239,19 @@ const AUTOSAVE_DELAY_MS = 1000;
         gap: var(--space-2);
         font-size: var(--fs-sm);
       }
+      .mtg__voteOpts {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      .mtg__voteOptRow {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+      .mtg__voteOptRow .mtg__input {
+        flex: 1 1 auto;
+      }
       .mtg__createForm {
         display: flex;
         flex-direction: column;
@@ -1488,6 +1527,13 @@ const AUTOSAVE_DELAY_MS = 1000;
       .mtg__tlDate {
         font-size: var(--fs-sm);
       }
+      .mtg__tlGremium {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        font-size: var(--fs-sm);
+        color: var(--color-text-muted);
+      }
       .mtg__tlTitle {
         margin: 0;
         font-size: var(--fs-md);
@@ -1563,15 +1609,24 @@ export class MeetingsComponent implements OnDestroy {
   readonly voteDialogOpen = signal(false);
   private readonly voteItem = signal<AgendaItem | null>(null);
   readonly voteQuestion = signal<string>('');
-  readonly voteOptions = signal<string>('Ja\nNein\nEnthaltung');
+  /** Strukturierte Optionszeilen (statt Freitext mit Zeilenumbruch). */
+  readonly voteOptions = signal<string[]>(['Ja', 'Nein', 'Enthaltung']);
   readonly voteSecret = signal(false);
   readonly openingVote = signal(false);
   readonly voteOptionList = computed(() =>
     this.voteOptions()
-      .split(/[\n,]/)
       .map((o) => o.trim())
       .filter((o) => o.length > 0),
   );
+  setVoteOption(i: number, value: string): void {
+    this.voteOptions.update((opts) => opts.map((o, idx) => (idx === i ? value : o)));
+  }
+  addVoteOption(): void {
+    this.voteOptions.update((opts) => [...opts, '']);
+  }
+  removeVoteOption(i: number): void {
+    this.voteOptions.update((opts) => opts.filter((_, idx) => idx !== i));
+  }
   readonly assignableOptions = computed<SelectOption[]>(() =>
     this.assignable().map((a) => ({ value: a.applicationId, label: a.title || a.applicationId })),
   );
@@ -2255,7 +2310,7 @@ export class MeetingsComponent implements OnDestroy {
   openVoteDialog(item: AgendaItem): void {
     this.voteItem.set(item);
     this.voteQuestion.set(item.title ?? '');
-    this.voteOptions.set('Ja\nNein\nEnthaltung');
+    this.voteOptions.set(['Ja', 'Nein', 'Enthaltung']);
     this.voteSecret.set(false);
     this.voteDialogOpen.set(true);
   }
