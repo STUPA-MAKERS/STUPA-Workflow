@@ -85,6 +85,11 @@ export class DashboardComponent {
     return this.typeName()(item.typeId);
   }
 
+  /** Antragstitel (System-Titelfeld) mit Fallback auf den Antragstyp. */
+  titleOf(item: ApplicationListItem): string {
+    return item.title?.trim() || this.typeName()(item.typeId);
+  }
+
   created(item: ApplicationListItem): string | null {
     return item.createdAt ?? null;
   }

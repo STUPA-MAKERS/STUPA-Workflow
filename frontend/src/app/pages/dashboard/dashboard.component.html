@@ -29,17 +29,16 @@
     <div class="dash__grid">
       @for (s of sessionShortcuts(); track s.id) {
         <a class="dash__tile dash__session" [class.dash__session--live]="s.status === 'live'" [routerLink]="['/meetings', s.id]">
-          <app-card [heading]="s.title" [interactive]="true">
-            <div class="dash__session-meta">
-              <app-badge [variant]="sessionVariant(s.status)">{{ sessionStatusKey(s.status) | t }}</app-badge>
-              @if (s.date) {
-                <time [attr.datetime]="s.date">{{ s.date | date: 'mediumDate' }}{{ s.startTime ? ', ' + s.startTime : '' }}</time>
-              }
-            </div>
-            <span card-footer class="dash__link">
-              {{ (s.status === 'live' ? 'dashboard.sessions.join' : 'dashboard.sessions.inspect') | t }} →
-            </span>
-          </app-card>
+          <span class="dash__session-badge">
+            <app-badge [variant]="sessionVariant(s.status)">{{ sessionStatusKey(s.status) | t }}</app-badge>
+          </span>
+          <span class="dash__session-title">{{ s.title }}</span>
+          @if (s.date) {
+            <time class="dash__session-date" [attr.datetime]="s.date">{{ s.date | date: 'mediumDate' }}{{ s.startTime ? ', ' + s.startTime : '' }}</time>
+          }
+          <span class="dash__link">
+            {{ (s.status === 'live' ? 'dashboard.sessions.join' : 'dashboard.sessions.inspect') | t }} →
+          </span>
         </a>
       }
     </div>
@@ -70,7 +69,12 @@
         <ul class="dash__list">
           @for (item of taskRows(); track item.id) {
             <li class="dash__row">
-              <a class="dash__row-link" [routerLink]="['/applications', item.id]">{{ name(item) }}</a>
+              <a class="dash__row-link" [routerLink]="['/applications', item.id]">
+                <span class="dash__row-title">{{ titleOf(item) }}</span>
+                @if (item.title?.trim()) {
+                  <span class="dash__row-type">{{ name(item) }}</span>
+                }
+              </a>
               <span class="dash__row-meta">
                 @if (item.state) {
                   <app-badge [variant]="stateVariant(item.state.category)">{{ item.state.label }}</app-badge>
@@ -109,7 +113,12 @@
         <ul class="dash__list">
           @for (item of applicationRows(); track item.id) {
             <li class="dash__row">
-              <a class="dash__row-link" [routerLink]="['/applications', item.id]">{{ name(item) }}</a>
+              <a class="dash__row-link" [routerLink]="['/applications', item.id]">
+                <span class="dash__row-title">{{ titleOf(item) }}</span>
+                @if (item.title?.trim()) {
+                  <span class="dash__row-type">{{ name(item) }}</span>
+                }
+              </a>
               <span class="dash__row-meta">
                 @if (item.state) {
                   <app-badge [variant]="stateVariant(item.state.category)">{{ item.state.label }}</app-badge>

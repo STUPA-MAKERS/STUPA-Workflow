@@ -156,13 +156,28 @@
 }
 
 .dash__row-link {
-  color: var(--color-primary);
-  font-weight: var(--fw-medium);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
   text-decoration: none;
 }
 
-.dash__row-link:hover {
+.dash__row-title {
+  color: var(--color-primary);
+  font-weight: var(--fw-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash__row-link:hover .dash__row-title {
   text-decoration: underline;
+}
+
+.dash__row-type {
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
 }
 
 .dash__row-meta {
@@ -227,13 +242,43 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.dash__session-meta {
+/* Kompakte Sitzungs-Kachel: flacher Anchor (kein app-card), Badge oben rechts. */
+.dash__session {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition:
+    box-shadow var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard);
+}
+.dash__session:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-strong);
+}
+.dash__session--live {
+  border-color: var(--color-success);
+}
+.dash__session-badge {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+.dash__session-title {
+  font-weight: var(--fw-semibold);
+  /* Platz für das Badge oben rechts. */
+  padding-right: 4.5rem;
+}
+.dash__session-date {
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
 }
-.dash__session--live :where(.card, [class*='card']) {
-  border-color: var(--color-success);
+.dash__session .dash__link {
+  margin-top: var(--space-1);
 }
