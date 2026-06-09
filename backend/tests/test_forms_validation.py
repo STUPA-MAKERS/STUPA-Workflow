@@ -116,6 +116,46 @@ def test_effective_form_does_not_duplicate_existing_title() -> None:
     assert [f.key for f in main.fields] == ["title", "amount"]
 
 
+def test_effective_form_splits_at_section_markers() -> None:
+    sections = effective_form(
+        [
+            _field("title", "text"),
+            _field("a", "text"),
+            _field("step2", "section", label={"de": "Kosten", "en": "Costs"}),
+            _field("b", "currency"),
+        ]
+    )
+    # main (title + a) then a labelled "step2" section (b); markers are NOT fields.
+    assert [s.key for s in sections] == ["main", "step2"]
+    assert [f.key for f in sections[0].fields] == ["title", "a"]
+    assert [f.key for f in sections[1].fields] == ["b"]
+    assert sections[1].label == {"de": "Kosten", "en": "Costs"}
+    assert all(f.type != "section" for s in sections for f in s.fields)
+
+
+def test_effective_form_leading_section_titles_first_section() -> None:
+    sections = effective_form(
+        [
+            _field("intro", "section", label={"de": "Start"}),
+            _field("a", "text"),
+        ]
+    )
+    # A leading marker titles the first section instead of creating an empty one.
+    assert [s.key for s in sections] == ["intro"]
+    assert sections[0].label == {"de": "Start"}
+    # title is auto-injected (no title field present) → intro section holds title + a.
+    assert [f.key for f in sections[0].fields] == [SYSTEM_TITLE_KEY, "a"]
+
+
+def test_validate_answers_ignores_section_markers() -> None:
+    # A section marker is never "required" and contributes no answer value.
+    result = validate_answers(
+        [_field("s", "section", label={"de": "X"}), _field("name", "text")],
+        {"name": "ok"},
+    )
+    assert result == {"name": "ok"}
+
+
 # --------------------------------------------------------------------------- #
 # positions (Kostenpositionen + Vergleichsangebote)
 # --------------------------------------------------------------------------- #

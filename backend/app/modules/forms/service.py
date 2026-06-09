@@ -154,7 +154,12 @@ class FormsService:
             formVersionId=app_type.active_form_version_id,
             budgetPotId=budget_pot_id,
             sections=[
-                FormSectionOut(key=s.key, label=SECTION_LABELS[s.key], fields=s.fields)
+                FormSectionOut(
+                    key=s.key,
+                    # Marker-Abschnitte tragen ihr eigenes Label; main/budget aus den Defaults.
+                    label=s.label or SECTION_LABELS.get(s.key) or SECTION_LABELS["main"],
+                    fields=s.fields,
+                )
                 for s in sections
             ],
         )

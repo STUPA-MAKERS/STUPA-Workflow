@@ -76,10 +76,15 @@ class AnswerValidationError(Exception):
 
 @dataclass(frozen=True)
 class FormSection:
-    """Ein Abschnitt der effektiven Form (``main`` = Typ, ``budget`` = Topf-Extra)."""
+    """Ein Abschnitt der effektiven Form (``main`` = Typ, ``budget`` = Topf-Extra).
+
+    ``label`` ist gesetzt, wenn der Abschnitt von einem ``section``-Marker im
+    Formular stammt (mehrstufige Formulare); sonst ``None`` (Standard-Labels
+    ``main``/``budget`` löst der Service auf)."""
 
     key: str
     fields: list[FormFieldDef]
+    label: dict[str, str] | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -134,12 +139,40 @@ def effective_form(
     selbst eines mit diesem Schlüssel definiert. ``budget`` erscheint **nur**, wenn
     ``pot_fields`` zugeordnet und nicht leer sind (Topf-Zuordnung).
     """
-    main_fields = list(type_fields)
-    if not any(f.key == SYSTEM_TITLE_KEY for f in main_fields):
-        main_fields.insert(0, system_title_field())
-    sections = [FormSection(key="main", fields=main_fields)]
+    sections = _split_sections(list(type_fields))
+    # System-Titelfeld dem ERSTEN Abschnitt voranstellen (nach dem Split, damit ein
+    # führender Marker keinen Titel-only-Schritt erzeugt), sofern nicht selbst definiert.
+    if not any(f.key == SYSTEM_TITLE_KEY for s in sections for f in s.fields):
+        sections[0].fields.insert(0, system_title_field())
     if pot_fields:
         sections.append(FormSection(key="budget", fields=list(pot_fields)))
+    return sections
+
+
+def _split_sections(fields: Sequence[FormFieldDef]) -> list[FormSection]:
+    """Felder an ``section``-Markern in mehrere Abschnitte (= Wizard-Schritte)
+    aufteilen. Der Marker selbst trägt nur das Abschnitts-Label und erscheint
+    **nicht** als Feld. Ohne Marker entsteht genau ein ``main``-Abschnitt
+    (Rückwärtskompatibilität)."""
+    sections: list[FormSection] = []
+    cur_key = "main"
+    cur_label: dict[str, str] | None = None
+    cur_fields: list[FormFieldDef] = []
+
+    for f in fields:
+        if f.type == "section":
+            # Aktuellen Abschnitt schließen, sofern er Felder hat; sonst nur das
+            # Label des neuen Markers übernehmen (führende/aufeinanderfolgende Marker).
+            if cur_fields:
+                sections.append(FormSection(key=cur_key, fields=cur_fields, label=cur_label))
+                cur_fields = []
+            cur_key = f.key
+            cur_label = dict(f.label) if f.label else None
+            continue
+        cur_fields.append(f)
+
+    if cur_fields or not sections:
+        sections.append(FormSection(key=cur_key, fields=cur_fields, label=cur_label))
     return sections
 
 
@@ -174,8 +207,8 @@ def validate_answers(
 
     # 2. Pro-Feld: Sichtbarkeit → required → Typ-Validierung.
     for f in fields:
-        if f.type == "computed":
-            continue  # abgeleitet, nicht vom Antragsteller geliefert
+        if f.type in ("computed", "section"):
+            continue  # abgeleitet bzw. reiner Struktur-Marker — kein Antwortwert
         if not _is_visible(f, eval_ctx):
             continue
         value = data.get(f.key)

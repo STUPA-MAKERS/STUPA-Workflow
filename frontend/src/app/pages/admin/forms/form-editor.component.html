@@ -31,6 +31,9 @@
           <p class="fe__status">{{ 'admin.forms.empty' | t }}</p>
         }
         @for (field of fields(); track $index) {
+          @if (field.type === 'section') {
+            <h3 class="fe__pv-section">{{ resolved(field.label) || ('admin.forms.untitledSection' | t) }}</h3>
+          } @else {
           <div class="fe__pv-field">
             <label class="fe__pv-label">
               {{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}
@@ -58,6 +61,7 @@
               @default { <input class="fe__pv-control" type="text" disabled /> }
             }
           </div>
+          }
         }
       </article>
     } @else {
@@ -88,7 +92,7 @@
 
       <ol class="fe__list">
         @for (field of fields(); track $index; let fi = $index) {
-          <li class="fe__card" draggable="true" (dragstart)="onDragStart(fi)" (dragover)="onDragOver($event)" (drop)="onDrop(fi)">
+          <li class="fe__card" [class.fe__card--section]="field.type === 'section'" draggable="true" (dragstart)="onDragStart(fi)" (dragover)="onDragOver($event)" (drop)="onDrop(fi)">
             <div class="fe__card-head">
               <span class="fe__drag" [attr.title]="'admin.forms.drag' | t" aria-hidden="true">⠿</span>
               <app-select
@@ -99,29 +103,39 @@
                 (ngModelChange)="onTypeChange(fi, $event)"
               />
               <span class="fe__spacer"></span>
-              <app-checkbox [ngModel]="field.required" (ngModelChange)="touch()">{{ 'admin.common.required' | t }}</app-checkbox>
+              @if (field.type !== 'section') {
+                <app-checkbox [ngModel]="field.required" (ngModelChange)="touch()">{{ 'admin.common.required' | t }}</app-checkbox>
+              }
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveUp' | t" (click)="move(fi, -1)">↑</app-button>
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveDown' | t" (click)="move(fi, 1)">↓</app-button>
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.advanced' | t" [attr.title]="'admin.forms.advanced' | t" (click)="toggleExpanded(fi)">⋯</app-button>
+              @if (field.type !== 'section') {
+                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.advanced' | t" [attr.title]="'admin.forms.advanced' | t" (click)="toggleExpanded(fi)">⋯</app-button>
+              }
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.duplicate' | t" [attr.title]="'admin.forms.duplicate' | t" (click)="duplicateQuestion(fi)"><app-icon name="add" /></app-button>
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" (click)="removeQuestion(fi)"><app-icon name="delete" /></app-button>
             </div>
 
-            <label class="fe__lbl fe__key">{{ 'admin.common.key' | t }}
-              <input [(ngModel)]="field.key" (ngModelChange)="touch()" autocomplete="off" spellcheck="false" /></label>
+            @if (field.type === 'section') {
+              <p class="fe__section-hint">{{ 'admin.forms.sectionHint' | t }}</p>
+            } @else {
+              <label class="fe__lbl fe__key">{{ 'admin.common.key' | t }}
+                <input [(ngModel)]="field.key" (ngModelChange)="touch()" autocomplete="off" spellcheck="false" /></label>
+            }
 
             <div class="fe__row">
-              <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
+              <label class="fe__lbl">{{ (field.type === 'section' ? 'admin.forms.sectionTitleDe' : 'admin.common.labelDe') | t }}
                 <input [(ngModel)]="field.label['de']" (ngModelChange)="touch()" [attr.placeholder]="'admin.forms.questionPlaceholder' | t" /></label>
-              <label class="fe__lbl">{{ 'admin.common.labelEn' | t }}
+              <label class="fe__lbl">{{ (field.type === 'section' ? 'admin.forms.sectionTitleEn' : 'admin.common.labelEn') | t }}
                 <input [(ngModel)]="field.label['en']" (ngModelChange)="touch()" /></label>
             </div>
-            <div class="fe__row">
-              <label class="fe__lbl">{{ 'admin.forms.helpDe' | t }}
-                <input [ngModel]="field.help && field.help['de']" (ngModelChange)="field.help = { de: $event, en: (field.help && field.help['en']) || '' }; touch()" /></label>
-              <label class="fe__lbl">{{ 'admin.forms.helpEn' | t }}
-                <input [ngModel]="field.help && field.help['en']" (ngModelChange)="field.help = { de: (field.help && field.help['de']) || '', en: $event }; touch()" /></label>
-            </div>
+            @if (field.type !== 'section') {
+              <div class="fe__row">
+                <label class="fe__lbl">{{ 'admin.forms.helpDe' | t }}
+                  <input [ngModel]="field.help && field.help['de']" (ngModelChange)="field.help = { de: $event, en: (field.help && field.help['en']) || '' }; touch()" /></label>
+                <label class="fe__lbl">{{ 'admin.forms.helpEn' | t }}
+                  <input [ngModel]="field.help && field.help['en']" (ngModelChange)="field.help = { de: (field.help && field.help['de']) || '', en: $event }; touch()" /></label>
+              </div>
+            }
 
             @if (isChoice(field.type)) {
               <fieldset class="fe__sub">

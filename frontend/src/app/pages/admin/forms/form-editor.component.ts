@@ -171,8 +171,20 @@ export class FormEditorComponent {
 
   // --- question mutations --------------------------------------------------
   protected addQuestion(type: FieldType): void {
-    this.fields.update((list) => [...list, blankField(type, '')]);
+    this.fields.update((list) => {
+      // Abschnitts-Marker brauchen keinen sprechenden Key → automatisch vergeben.
+      const key = type === 'section' ? this.uniqueSectionKey(list) : '';
+      return [...list, blankField(type, key)];
+    });
     this.typeMenuOpen.set(false);
+  }
+
+  /** Eindeutigen `section_N`-Key für einen neuen Abschnitts-Marker. */
+  private uniqueSectionKey(list: FormFieldDef[]): string {
+    const used = new Set(list.map((f) => f.key));
+    let i = 1;
+    while (used.has(`section_${i}`)) i++;
+    return `section_${i}`;
   }
 
   protected removeQuestion(i: number): void {
@@ -207,6 +219,17 @@ export class FormEditorComponent {
 
   private adaptToType(field: FormFieldDef, type: FieldType): FormFieldDef {
     const next: FormFieldDef = { ...field, type };
+    // Abschnitts-Marker tragen nur einen Titel — alles Feld-Spezifische entfernen.
+    if (type === 'section') {
+      delete next.options;
+      delete next.compute;
+      delete next.validation;
+      delete next.isPromoted;
+      delete next.promoteTarget;
+      delete next.required;
+      if (!next.key) next.key = this.uniqueSectionKey(this.fields());
+      return next;
+    }
     if ((type === 'select' || type === 'multiselect') && !next.options?.length) {
       next.options = [blankOption()];
     }

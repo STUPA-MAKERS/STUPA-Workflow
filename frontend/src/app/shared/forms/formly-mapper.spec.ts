@@ -97,6 +97,16 @@ describe('toFormlyFields', () => {
     expect(callExpr(total, 'model.total', { amount: 100 })).toBeNull();
   });
 
+  it('drops section markers (structural only, not real fields)', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'section_1', type: 'section', label: { de: 'Schritt 1' } },
+      { key: 'name', type: 'text', label: { de: 'Name' } },
+    ];
+    const out = toFormlyFields(fields, 'de');
+    expect(out).toHaveLength(1);
+    expect(out[0].key).toBe('name');
+  });
+
   it('wires visibleIf to a negated hide expression', () => {
     const fields: FormFieldDef[] = [
       {

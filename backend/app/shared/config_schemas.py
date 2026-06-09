@@ -43,6 +43,9 @@ FieldType = Literal[
     # Kostenpositionen: Liste von Positionen mit je ≥ minOffers Vergleichsangeboten;
     # genau eines bevorzugt → dessen Wert = Positionswert; Σ Positionen = amount.
     "positions",
+    # Abschnitts-Marker (mehrstufige Formulare): trägt nur ein Label und trennt die
+    # folgenden Felder in einen neuen Schritt. Kein Antwortwert, keine Validierung.
+    "section",
 ]
 StateCategory = Literal["open", "running", "closed"]
 

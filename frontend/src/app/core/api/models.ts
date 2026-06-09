@@ -490,7 +490,8 @@ export type FieldType =
   | 'table'
   | 'markdown'
   | 'computed'
-  | 'positions';
+  | 'positions'
+  | 'section';
 
 export interface FieldOption {
   value: string;

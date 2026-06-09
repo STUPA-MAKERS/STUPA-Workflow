@@ -27,6 +27,9 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   computed: 'display',
   table: 'display',
   positions: 'positions',
+  // Abschnitts-Marker sind strukturell; sie werden in `toFormlyFields` herausgefiltert
+  // und sollten nie gemappt werden (Backend strippt sie aus der effektiven Form).
+  section: 'display',
 };
 
 /**
@@ -45,7 +48,7 @@ export function toFormlyFields(
   lang: Lang | string,
   extraContext: Record<string, unknown> = {},
 ): FormlyFieldConfig[] {
-  return fields.map((f) => mapField(f, lang, extraContext));
+  return fields.filter((f) => f.type !== 'section').map((f) => mapField(f, lang, extraContext));
 }
 
 function mapField(
