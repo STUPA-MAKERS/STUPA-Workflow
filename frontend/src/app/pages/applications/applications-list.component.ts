@@ -107,6 +107,7 @@ import { stateBadgeVariant } from './applications.util';
           </caption>
           <thead>
             <tr>
+              <th scope="col">{{ 'applications.list.col.title' | t }}</th>
               <th scope="col">{{ 'applications.list.col.type' | t }}</th>
               <th scope="col">{{ 'applications.list.col.state' | t }}</th>
               <th scope="col" class="apps__num">{{ 'applications.list.col.amount' | t }}</th>
@@ -118,10 +119,11 @@ import { stateBadgeVariant } from './applications.util';
               <tr>
                 <td>
                   <a class="apps__rowLink" [routerLink]="['/applications', item.id]">
-                    {{ typeName(item.typeId) }}
+                    {{ titleOf(item) }}
                     <span class="apps__rowHint">{{ 'applications.list.open' | t }}</span>
                   </a>
                 </td>
+                <td>{{ typeName(item.typeId) }}</td>
                 <td>
                   @if (item.state) {
                     <app-badge [variant]="stateVariant(item.state.category)">
@@ -138,7 +140,7 @@ import { stateBadgeVariant } from './applications.util';
               </tr>
             } @empty {
               <tr>
-                <td class="apps__empty" colspan="4">{{ 'applications.list.empty' | t }}</td>
+                <td class="apps__empty" colspan="5">{{ 'applications.list.empty' | t }}</td>
               </tr>
             }
           </tbody>
@@ -352,6 +354,11 @@ export class ApplicationsListComponent {
 
   typeName(typeId: Uuid): string {
     return this.typesById().get(typeId) ?? typeId;
+  }
+
+  /** Antragstitel (System-Titelfeld) mit Fallback „Ohne Titel". */
+  titleOf(item: ApplicationListItem): string {
+    return item.title?.trim() || this.i18n.translate('applications.list.untitled');
   }
 
   /** Reale Status der geladenen Anträge in die Dropdown-Optionen übernehmen. */

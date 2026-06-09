@@ -34,6 +34,7 @@ import { stateBadgeVariant } from '../applications/applications.util';
         [clickable]="true"
         (rowClick)="open($any($event).id)"
       >
+        <ng-template appCell="title" let-r>{{ titleOf($any(r)) }}</ng-template>
         <ng-template appCell="state" let-r>
           <app-badge [variant]="stateVariant($any(r).state?.category)">{{ $any(r).state?.label }}</app-badge>
         </ng-template>
@@ -61,10 +62,16 @@ export class TasksComponent {
   protected readonly stateVariant = stateBadgeVariant;
 
   protected readonly columns = signal<ColumnDef[]>([
+    { key: 'title', label: this.i18n.translate('tasks.col.title') },
     { key: 'state', label: this.i18n.translate('tasks.col.state') },
     { key: 'amount', label: this.i18n.translate('tasks.col.amount'), align: 'end', width: '10rem' },
     { key: 'createdAt', label: this.i18n.translate('tasks.col.created'), width: '10rem' },
   ]);
+
+  /** Antragstitel (System-Titelfeld) mit Fallback. */
+  protected titleOf(item: ApplicationListItem): string {
+    return item.title?.trim() || this.i18n.translate('applications.list.untitled');
+  }
 
   constructor() {
     this.api.listTasks().subscribe({

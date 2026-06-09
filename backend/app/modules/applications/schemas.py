@@ -125,6 +125,8 @@ class VersionOut(_CamelModel):
 class ApplicationListItem(_CamelModel):
     id: UUID
     type_id: UUID = Field(alias="typeId")
+    # Antragstitel (System-Titelfeld ``data['title']``), für die Listenspalte (#13).
+    title: str | None = None
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")

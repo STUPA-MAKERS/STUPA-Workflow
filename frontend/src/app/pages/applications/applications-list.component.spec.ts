@@ -37,6 +37,7 @@ function listPage(items: ApplicationListItemWire[], total = items.length): Page<
 const ITEM: ApplicationListItemWire = {
   id: 'app-1',
   typeId: 't1',
+  title: 'Mein Antrag',
   state: OPEN_STATE,
   gremiumId: null,
   budgetPotId: null,
@@ -78,8 +79,10 @@ describe('ApplicationsListComponent', () => {
     const badge = screen.getAllByText('Eingereicht').find((el) => el.tagName !== 'OPTION');
     expect(badge).toBeTruthy();
     expect(screen.getByText(/250/)).toBeInTheDocument();
-    // row links to the detail route (the type name also appears in the filter <option>)
-    const link = screen.getByRole('link', { name: /Finanzantrag/ });
+    // type name shows as a plain cell (and in the filter <option>)
+    expect(screen.getAllByText('Finanzantrag').length).toBeGreaterThan(0);
+    // the row link now carries the application title and points at the detail route
+    const link = screen.getByRole('link', { name: /Mein Antrag/ });
     expect(link).toHaveAttribute('href', '/applications/app-1');
     http.verify();
   });

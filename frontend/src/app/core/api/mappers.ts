@@ -106,6 +106,7 @@ export function mapApplicationListItem(
   return {
     id: wire.id,
     typeId: wire.typeId,
+    title: wire.title ?? null,
     state: mapState(wire.state, lang),
     gremiumId: wire.gremiumId ?? null,
     budgetPotId: wire.budgetPotId ?? null,

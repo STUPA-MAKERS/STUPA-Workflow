@@ -82,6 +82,14 @@ def _field_from_row(row: Any) -> FormFieldDef:  # noqa: ANN401 — form_field-Ze
     )
 
 
+def _title_of(data: dict[str, Any] | None) -> str | None:
+    """Antragstitel aus den Daten ziehen (System-Titelfeld ``title``), für die Liste."""
+    if not data:
+        return None
+    value = data.get("title")
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
 def _state_out(state: State | None) -> StateOut | None:
     if state is None:
         return None
@@ -467,6 +475,7 @@ class ApplicationsService:
                 ApplicationListItem(
                     id=app.id,
                     typeId=app.type_id,
+                    title=_title_of(app.data),
                     state=_state_out(state),
                     gremiumId=app.gremium_id,
                     budgetPotId=app.budget_pot_id,
@@ -544,6 +553,7 @@ class ApplicationsService:
                     ApplicationListItem(
                         id=app.id,
                         typeId=app.type_id,
+                        title=_title_of(app.data),
                         state=_state_out(s),
                         gremiumId=app.gremium_id,
                         budgetPotId=app.budget_pot_id,

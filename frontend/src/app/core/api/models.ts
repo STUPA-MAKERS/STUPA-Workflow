@@ -122,6 +122,7 @@ export interface ApplicationOutWire {
 export interface ApplicationListItemWire {
   id: Uuid;
   typeId: Uuid;
+  title?: string | null;
   state?: StateOutWire | null;
   gremiumId?: Uuid | null;
   budgetPotId?: Uuid | null;
@@ -326,6 +327,7 @@ export interface Application {
 export interface ApplicationListItem {
   id: Uuid;
   typeId: Uuid;
+  title: string | null;
   state: ApplicationState | null;
   gremiumId: Uuid | null;
   budgetPotId: Uuid | null;
