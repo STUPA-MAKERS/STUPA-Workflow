@@ -137,8 +137,10 @@ export class FlowEditorComponent {
 
   private drag: { key: string; dx: number; dy: number; moved: boolean } | null = null;
   private connectFrom: string | null = null;
-  /** Branch (pass/fail/accept/reject), wenn von einem Branch-Punkt gezogen wird. */
+  /** Branch (pass/fail), wenn von einem Branch-Punkt gezogen wird. */
   private connectBranch: string | null = null;
+  /** Guard des Ausgangs-Punkts, von dem gezogen wird (geerbt vom neuen Übergang). */
+  private connectGuard: TransitionDef['guard'] | null = null;
 
   /**
    * Sichtfenster (Zoom/Pan) in Welt-Koordinaten. ``null`` = ganzer Inhalt (Fit).
@@ -251,12 +253,15 @@ export class FlowEditorComponent {
         ? branches.map((b, i) => ({
             id: b,
             branch: b as string | null,
+            guard: null as TransitionDef['guard'] | null,
             cy: this.dotY(i, branches.length),
             label: b,
           }))
         : this.outDots(s.key, transitions).map((gp, i, arr) => ({
             id: gp.sig || 'out',
             branch: null as string | null,
+            // Beim Aufziehen vom Guard-Punkt erbt der neue Übergang dessen Guard.
+            guard: gp.guard ?? null,
             cy: this.dotY(i, arr.length),
             label: gp.sig ? this.guardGroupLabel(gp) : '',
           }));
@@ -936,11 +941,18 @@ export class FlowEditorComponent {
     (event.target as Element).setPointerCapture?.(event.pointerId);
   }
 
-  /** Vom Verbindungs-Punkt eines Knotens eine neue Kante aufziehen. */
-  protected onConnectPointerDown(event: PointerEvent, key: string, branch: string | null = null): void {
+  /** Vom Verbindungs-Punkt eines Knotens eine neue Kante aufziehen. Ein Branch-/
+   *  Guard-Punkt überträgt seinen Branch bzw. Guard auf den neuen Übergang. */
+  protected onConnectPointerDown(
+    event: PointerEvent,
+    key: string,
+    branch: string | null = null,
+    guard: TransitionDef['guard'] | null = null,
+  ): void {
     event.stopPropagation();
     this.connectFrom = key;
     this.connectBranch = branch;
+    this.connectGuard = guard;
     const p = this.toSvg(event);
     this.tempEdge.set({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
     (event.target as Element).setPointerCapture?.(event.pointerId);
@@ -989,17 +1001,16 @@ export class FlowEditorComponent {
       if (target && target !== this.connectFrom) {
         const from = this.connectFrom;
         const branch = this.connectBranch as TransitionBranch | null;
-        this.graph.update((g) => ({
-          ...g,
-          transitions: [
-            ...(g.transitions ?? []),
-            branch ? { ...blankTransition(from, target), branch } : blankTransition(from, target),
-          ],
-        }));
+        const guard = this.connectGuard;
+        const t: TransitionDef = blankTransition(from, target);
+        if (branch) t.branch = branch;
+        if (guard) t.guard = guard;
+        this.graph.update((g) => ({ ...g, transitions: [...(g.transitions ?? []), t] }));
         this.selection.set({ kind: 'transition', index: (this.graph().transitions?.length ?? 1) - 1 });
       }
       this.connectFrom = null;
       this.connectBranch = null;
+      this.connectGuard = null;
       this.tempEdge.set(null);
     }
   }

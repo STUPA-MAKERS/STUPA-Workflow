@@ -194,10 +194,10 @@ interface DetailPosition {
           <div class="det__actions">
             @for (t of transitions(); track t.id) {
               <app-button
-                variant="primary"
+                [variant]="transitionVariant(t)"
                 size="sm"
                 [loading]="firing() === t.id"
-                [disabled]="firing() !== null"
+                [disabled]="firing() !== null && firing() !== t.id"
                 (click)="fire(t)"
               >
                 {{ t.label || ('applications.transitions.fallback' | t) }}
@@ -491,6 +491,7 @@ interface DetailPosition {
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-2);
+        margin-top: var(--space-3);
       }
       .det__history {
         display: flex;
@@ -617,6 +618,15 @@ export class ApplicationsDetailComponent {
   readonly transitions = signal<Transition[]>([]);
   readonly firing = signal<Uuid | null>(null);
   readonly canTransition = computed(() => this.auth.can('application.transition'));
+
+  /** Ablehnende Übergänge (Ablehnen/Zurückweisen/…) automatisch rot darstellen. */
+  protected transitionVariant(t: Transition): 'primary' | 'danger' {
+    return /ablehn|abweis|zurückweis|verwerf|abbrech|widerruf|storn|deny|reject|decline|cancel/i.test(
+      t.label ?? '',
+    )
+      ? 'danger'
+      : 'primary';
+  }
 
   // Inline-Bearbeitung (Ersteller:in/Verwalter:in, #24) + Löschen.
   readonly editing = signal(false);

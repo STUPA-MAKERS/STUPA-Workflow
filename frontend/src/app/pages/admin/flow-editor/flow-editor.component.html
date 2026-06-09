@@ -102,7 +102,7 @@
                 [class.fe__connector--branch]="d.branch"
                 [class.fe__connector--guard]="d.label && !d.branch"
                 [attr.aria-label]="d.label || ('admin.flow.connectHint' | t)"
-                (pointerdown)="onConnectPointerDown($event, n.key, d.branch)"
+                (pointerdown)="onConnectPointerDown($event, n.key, d.branch, d.guard)"
               />
               @if (d.label) {
                 <text [attr.x]="NODE_W + 11" [attr.y]="d.cy + 4" class="fe__dot-label">{{ d.label }}</text>
