@@ -157,6 +157,62 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().transitions.map((t: { order?: number }) => t.order)).toEqual([0, 1, 2]);
   });
 
+  it('undoes and redoes structural edits', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    fixture.detectChanges(); // Historie erfasst den Bau
+    expect(c.graph().states).toHaveLength(2);
+
+    c.selection.set({ kind: 'state', key: 'b' });
+    c.removeSelectedState();
+    fixture.detectChanges();
+    expect(c.graph().states).toHaveLength(1);
+
+    c.undo();
+    fixture.detectChanges();
+    expect(c.graph().states).toHaveLength(2);
+
+    c.redo();
+    fixture.detectChanges();
+    expect(c.graph().states).toHaveLength(1);
+  });
+
+  it('handles Insert (add), Delete (remove) and Ctrl+Z/Y keys', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.onKeydown(new KeyboardEvent('keydown', { key: 'Insert' }));
+    fixture.detectChanges();
+    expect(c.graph().states).toHaveLength(1);
+
+    c.selection.set({ kind: 'state', key: c.graph().states[0].key });
+    c.onKeydown(new KeyboardEvent('keydown', { key: 'Delete' }));
+    fixture.detectChanges();
+    expect(c.graph().states).toHaveLength(0);
+
+    c.onKeydown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+    fixture.detectChanges();
+    expect(c.graph().states).toHaveLength(1);
+
+    c.onKeydown(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true }));
+    fixture.detectChanges();
+    expect(c.graph().states).toHaveLength(0);
+  });
+
+  it('ignores Delete/Insert while typing in an input', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addState();
+    fixture.detectChanges();
+    c.selection.set({ kind: 'state', key: c.graph().states[0].key });
+    const input = document.createElement('input');
+    c.onKeydown({ key: 'Delete', target: input, preventDefault: () => {} } as unknown as KeyboardEvent);
+    expect(c.graph().states).toHaveLength(1); // nicht gelöscht
+  });
+
   it('saves nothing and warns when the graph is invalid', async () => {
     const { fixture, createGlobalFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

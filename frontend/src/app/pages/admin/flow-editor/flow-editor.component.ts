@@ -2,7 +2,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   type ElementRef,
+  HostListener,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -114,6 +116,15 @@ export class FlowEditorComponent {
 
   protected readonly graph = signal<FlowGraph>(autoLayout(blankGraph()));
 
+  /** Undo/Redo-Historie über Graph-Snapshots (#flow-shortcuts). */
+  private undoStack: FlowGraph[] = [];
+  private redoStack: FlowGraph[] = [];
+  private lastGraph: FlowGraph = this.graph();
+  private applyingHistory = false;
+  /** Reaktive Verfügbarkeit für die Toolbar-Buttons. */
+  protected readonly canUndo = signal(false);
+  protected readonly canRedo = signal(false);
+
   /** Aktuell ausgewählter Knoten/Kante für das Inspektor-Panel. */
   protected readonly selection = signal<Selection>(null);
   /** Temporäre Kante während des Aufziehens eines neuen Übergangs. */
@@ -146,7 +157,11 @@ export class FlowEditorComponent {
       .pipe(takeUntilDestroyed())
       .subscribe({
         next: (graph) => {
-          if (graph && graph.states?.length) this.graph.set(autoLayout(normalizeFlowGraph(graph)));
+          if (graph && graph.states?.length) {
+            // Initiales Laden ist kein Undo-Schritt.
+            this.applyingHistory = true;
+            this.graph.set(autoLayout(normalizeFlowGraph(graph)));
+          }
         },
         error: () => undefined,
       });
@@ -186,6 +201,30 @@ export class FlowEditorComponent {
           ),
         error: () => undefined,
       });
+
+    // Strukturelle Graph-Änderungen (States/Transitions, nicht reine Positionen)
+    // als Undo-Schritt festhalten — Knoten-Verschiebungen fluten die Historie nicht.
+    effect(() => {
+      const g = this.graph();
+      if (this.applyingHistory) {
+        this.applyingHistory = false;
+        this.lastGraph = g;
+        return;
+      }
+      if (g === this.lastGraph) return;
+      if (structuralKey(g) !== structuralKey(this.lastGraph)) {
+        this.undoStack.push(this.lastGraph);
+        if (this.undoStack.length > 100) this.undoStack.shift();
+        this.redoStack = [];
+        this.syncHistoryFlags();
+      }
+      this.lastGraph = g; // auch bei Layout-only-Änderungen mitziehen
+    });
+  }
+
+  private syncHistoryFlags(): void {
+    this.canUndo.set(this.undoStack.length > 0);
+    this.canRedo.set(this.redoStack.length > 0);
   }
 
   /** Gültige Ergebnis-Zweige je Quell-State-Art (#28): vote→pass/fail, sonst keine. */
@@ -823,6 +862,70 @@ export class FlowEditorComponent {
     this.graph.update((g) => autoLayout({ ...g, layout: null }));
   }
 
+  // --- Undo/Redo + Tastatur (#flow-shortcuts) ------------------------------
+  protected undo(): void {
+    const prev = this.undoStack.pop();
+    if (prev === undefined) return;
+    this.redoStack.push(this.graph());
+    this.applyingHistory = true;
+    this.graph.set(prev);
+    this.selection.set(null);
+    this.syncHistoryFlags();
+  }
+
+  protected redo(): void {
+    const next = this.redoStack.pop();
+    if (next === undefined) return;
+    this.undoStack.push(this.graph());
+    this.applyingHistory = true;
+    this.graph.set(next);
+    this.selection.set(null);
+    this.syncHistoryFlags();
+  }
+
+  /** Ausgewählten Knoten/Kante löschen (Del/Backspace). */
+  protected deleteSelected(): void {
+    const sel = this.selection();
+    if (sel?.kind === 'state') this.removeSelectedState();
+    else if (sel?.kind === 'transition') this.removeSelectedTransition();
+  }
+
+  /**
+   * Editor-Tastenkürzel: Entf/Rück = Auswahl löschen, Einfg = State hinzufügen,
+   * Strg+Z = Undo, Strg+Y / Strg+Shift+Z = Redo. In Eingabefeldern inaktiv
+   * (außer Undo/Redo), damit normales Tippen unberührt bleibt.
+   */
+  @HostListener('document:keydown', ['$event'])
+  protected onKeydown(event: KeyboardEvent): void {
+    const target = event.target as HTMLElement | null;
+    const tag = target?.tagName;
+    const typing =
+      tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!target?.isContentEditable;
+    const mod = event.ctrlKey || event.metaKey;
+    const key = event.key.toLowerCase();
+
+    if (mod && key === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      this.undo();
+      return;
+    }
+    if (mod && (key === 'y' || (key === 'z' && event.shiftKey))) {
+      event.preventDefault();
+      this.redo();
+      return;
+    }
+    if (typing) return;
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      this.deleteSelected();
+      return;
+    }
+    if (event.key === 'Insert') {
+      event.preventDefault();
+      this.addState();
+    }
+  }
+
   // --- Canvas-Interaktion (Drag & Connect) ---------------------------------
   /** Knoten greifen → verschieben **oder** (bei Klick ohne Bewegung) auswählen. */
   protected onNodePointerDown(event: PointerEvent, key: string): void {
@@ -1008,6 +1111,12 @@ export class FlowEditorComponent {
         this.toast.error(err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed')),
     });
   }
+}
+
+/** Strukturelle Signatur (ohne Layout): zwei Graphen sind „gleich", wenn sich nur
+ *  Knoten-Positionen unterscheiden — solche Änderungen sind kein Undo-Schritt. */
+function structuralKey(g: FlowGraph): string {
+  return JSON.stringify([g.states, g.transitions]);
 }
 
 function blankGraph(): FlowGraph {

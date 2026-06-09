@@ -7,6 +7,8 @@
 
   <div class="fe__toolbar">
     <app-button variant="ghost" size="sm" (click)="addState()">+ {{ 'admin.flow.addState' | t }}</app-button>
+    <app-button variant="ghost" size="sm" [disabled]="!canUndo()" [ariaLabel]="'admin.flow.undo' | t" (click)="undo()">↶ {{ 'admin.flow.undo' | t }}</app-button>
+    <app-button variant="ghost" size="sm" [disabled]="!canRedo()" [ariaLabel]="'admin.flow.redo' | t" (click)="redo()">↷ {{ 'admin.flow.redo' | t }}</app-button>
     <app-button variant="ghost" size="sm" (click)="relayout()">{{ 'admin.flow.relayout' | t }}</app-button>
     <span class="fe__toolbar-zoom" role="group" [attr.aria-label]="'admin.flow.zoom' | t">
       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomOut' | t" (click)="zoomOut()">−</app-button>
