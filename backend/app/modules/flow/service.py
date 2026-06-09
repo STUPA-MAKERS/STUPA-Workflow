@@ -34,11 +34,34 @@ from app.modules.flow.dispatch import (
     NullActionDispatcher,
     build_dispatched_actions,
 )
+from app.modules.deadlines.models import Deadline
+from app.modules.deadlines.service import (
+    DeadlinePolicyService,
+    DeadlineService,
+    resolve_due_at,
+)
 from app.modules.flow.models import State, Transition
 from app.modules.flow.routing import DecisionFacts, evaluate_decision
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 from app.shared.guards import eval_guard
+
+
+def _guard_fires_on_deadline(guard: Any) -> bool:
+    """``True`` wenn der Guard (rekursiv durch ``and``/``or``/``not``) den Operator
+    ``deadlinePassed`` mit Wahrheitswert ``true`` enthält — also der Übergang, den die
+    Frist beim Ablauf feuern soll (flows §9.4)."""
+    if not isinstance(guard, dict):
+        return False
+    for op, value in guard.items():
+        if op == "deadlinePassed":
+            return bool(value)
+        if op in ("and", "or") and isinstance(value, list):
+            if any(_guard_fires_on_deadline(g) for g in value):
+                return True
+        elif op == "not" and _guard_fires_on_deadline(value):
+            return True
+    return False
 
 
 class FlowService:
@@ -109,6 +132,58 @@ class FlowService:
             )
             .scalars()
             .all()
+        )
+
+    # ------------------------------------------------------- deadline scheduling
+    async def schedule_state_deadline(self, app: Application, state: State) -> None:
+        """Beim Betreten eines States dessen benannte Frist-Policy materialisieren (#13).
+
+        Trägt der ``state.config`` einen ``deadlinePolicyKey``, wird die Policy aufgelöst
+        (``absolute`` → Datum; ``relative_submitted`` → ``created_at + X``;
+        ``relative_changed`` → ``updated_at + X``) und eine :class:`Deadline` mit
+        ``action_on_pass`` auf den ``deadlinePassed``-Übergang dieses States angelegt.
+        Der bestehende T-44-Cron feuert sie bei Ablauf. Eventuelle frühere, noch nicht
+        gefeuerte Flow-Fristen des Antrags werden zuvor entfernt (kein Stapeln bei
+        erneutem State-Wechsel)."""
+        cfg = state.config if isinstance(state.config, dict) else {}
+        key = cfg.get("deadlinePolicyKey")
+        if not isinstance(key, str) or not key:
+            return
+        policy = await DeadlinePolicyService(self.session).get_by_key(key)
+        if policy is None:
+            return
+        due_at = resolve_due_at(
+            policy, submitted_at=app.created_at, changed_at=app.updated_at
+        )
+        if due_at is None:
+            return
+        # Ziel-Übergang = der vom State ausgehende Übergang mit Guard ``deadlinePassed``.
+        transitions = (
+            await self.session.execute(
+                select(Transition).where(
+                    Transition.flow_version_id == app.flow_version_id,
+                    Transition.from_state_id == state.id,
+                )
+            )
+        ).scalars().all()
+        target = next(
+            (t for t in transitions if _guard_fires_on_deadline(t.guard)), None
+        )
+        if target is None:
+            return
+        # Alte, noch nicht gefeuerte Flow-Fristen des Antrags entfernen (Idempotenz).
+        await self.session.execute(
+            Deadline.__table__.delete().where(
+                Deadline.application_id == app.id,
+                Deadline.kind == "flow_deadline",
+                Deadline.action_on_pass.isnot(None),
+            )
+        )
+        await DeadlineService(self.session).create(
+            kind="flow_deadline",
+            due_at=due_at,
+            application_id=app.id,
+            action_on_pass={"transitionId": str(target.id)},
         )
 
     # ------------------------------------------------------- available_transitions
@@ -422,6 +497,13 @@ class FlowService:
             },
         )
         await self.session.commit()
+
+        # Frist des neuen States materialisieren (#13): trägt er eine benannte
+        # Deadline-Policy, legt das eine fällige Frist an, die der T-44-Cron feuert.
+        to_state = await self._load_state(to_state_id)
+        if to_state is not None:
+            await self.session.refresh(app)
+            await self.schedule_state_deadline(app, to_state)
 
         # --- Nach Commit: Worker-Actions dispatchen (idempotent, retrybar). --------
         dispatched = build_dispatched_actions(

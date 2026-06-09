@@ -223,6 +223,17 @@
           </div>
         }
 
+        <!-- Frist (#13): benannte Deadline-Policy referenzieren. Beim Betreten des
+             States legt der Server die Frist an; der `deadlinePassed`-Übergang feuert. -->
+        <app-select
+          [label]="'admin.flow.cfgDeadline' | t"
+          [placeholder]="'admin.flow.cfgDeadlinePh' | t"
+          [options]="deadlinePolicyOptions()"
+          [ngModel]="s.config?.deadlinePolicyKey ?? ''"
+          (ngModelChange)="setStateDeadlinePolicy(s.key, $event)"
+        />
+        <p class="fe__hint">{{ 'admin.flow.cfgDeadlineHint' | t }}</p>
+
         <!-- Guard-Priorität: ein Ausgangs-Punkt je Guard; Reihenfolge = Auswertung
              (erster passender Guard gewinnt). Nur sinnvoll ab zwei Gruppen (#8). -->
         @if ((s.kind ?? 'normal') === 'normal' && guardGroupsFor(s.key).length > 1) {

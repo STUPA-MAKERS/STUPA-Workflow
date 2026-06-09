@@ -41,6 +41,11 @@ export interface StateConfig {
   /** decision: Regeln (erste passende gewinnt) + Fallback-Ziel. */
   rules?: DecisionRule[];
   else?: string;
+  /**
+   * Schlüssel einer benannten Deadline-Policy (#13): beim Betreten des States legt
+   * der Server eine Frist an, die der `deadlinePassed`-Übergang des States feuert.
+   */
+  deadlinePolicyKey?: string;
 }
 
 export interface StateDef {

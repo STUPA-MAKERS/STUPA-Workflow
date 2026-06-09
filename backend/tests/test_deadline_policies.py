@@ -120,3 +120,52 @@ def test_create_relative_policy(
     assert res.status_code == 201
     assert res.json()["kind"] == "relative_changed"
     assert fake_service.created is not None and fake_service.created["offset_days"] == 7
+
+
+# --------------------------------------------------------------------------- #
+# Flow-Enforcement: schedule_state_deadline + guard scanner
+# --------------------------------------------------------------------------- #
+from types import SimpleNamespace  # noqa: E402
+
+from app.modules.flow.service import (  # noqa: E402
+    FlowService,
+    _guard_fires_on_deadline,
+)
+from tests.flow_fakes import fake_session, result  # noqa: E402
+
+
+def test_guard_scanner_detects_deadline_passed_nested() -> None:
+    assert _guard_fires_on_deadline({"deadlinePassed": True}) is True
+    assert _guard_fires_on_deadline({"deadlinePassed": False}) is False
+    assert _guard_fires_on_deadline({"and": [{"manual": True}, {"deadlinePassed": True}]}) is True
+    assert _guard_fires_on_deadline({"or": [{"roleIs": "x"}, {"manual": True}]}) is False
+    assert _guard_fires_on_deadline({"not": {"deadlinePassed": True}}) is True
+    assert _guard_fires_on_deadline(None) is False
+
+
+@pytest.mark.asyncio
+async def test_schedule_state_deadline_creates_row_for_policy() -> None:
+    flow_id, state_id, trans_id = uuid4(), uuid4(), uuid4()
+    policy = _policy("relative_submitted", offset_days=10)
+    policy.id = uuid4()
+    transition = SimpleNamespace(id=trans_id, guard={"deadlinePassed": True})
+    # execute-Queue: (1) get_by_key→policy, (2) outgoing transitions, (3) delete
+    session = fake_session(result(policy), result(transition), result())
+    app = SimpleNamespace(id=uuid4(), flow_version_id=flow_id, created_at=_NOW, updated_at=_NOW)
+    state = SimpleNamespace(id=state_id, config={"deadlinePolicyKey": "k"})
+
+    await FlowService(session).schedule_state_deadline(app, state)
+
+    created = [o for o in session.added if getattr(o, "kind", None) == "flow_deadline"]
+    assert len(created) == 1
+    assert created[0].due_at == _NOW + timedelta(days=10)
+    assert created[0].action_on_pass == {"transitionId": str(trans_id)}
+
+
+@pytest.mark.asyncio
+async def test_schedule_state_deadline_noop_without_policy_key() -> None:
+    session = fake_session()
+    app = SimpleNamespace(id=uuid4(), flow_version_id=uuid4(), created_at=_NOW, updated_at=_NOW)
+    state = SimpleNamespace(id=uuid4(), config={})
+    await FlowService(session).schedule_state_deadline(app, state)
+    assert session.added == []

@@ -301,6 +301,13 @@ class ApplicationsService:
             )
         )
         await self.session.commit()
+
+        # Frist des Initial-States materialisieren (#13): trägt er eine benannte
+        # Deadline-Policy (z. B. „eingereicht + X Tage"), legt das die fällige Frist an.
+        from app.modules.flow.service import FlowService
+
+        await self.session.refresh(app)
+        await FlowService(self.session).schedule_state_deadline(app, initial)
         return app, str(payload.applicant_email)
 
     async def _resolve_flow_version_id(self, app_type: ApplicationType) -> UUID:

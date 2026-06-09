@@ -108,6 +108,8 @@ export class FlowEditorComponent {
   protected readonly rolesByGremium = signal<Record<string, SelectOption[]>>({});
   /** Rollen-Quelle eines approval-States: an Gremium gebunden oder global. */
   protected readonly approvalScopes = ['gremium', 'global'];
+  /** Benannte Deadline-Policies (#13) — ein State kann eine per Schlüssel referenzieren. */
+  protected readonly deadlinePolicyOptions = signal<SelectOption[]>([]);
 
   protected readonly graph = signal<FlowGraph>(autoLayout(blankGraph()));
 
@@ -160,6 +162,17 @@ export class FlowEditorComponent {
         next: (roles) =>
           this.globalRoleOptions.set(
             roles.map((r) => ({ value: r.key, label: `${r.label['de'] ?? r.key} (${r.key})` })),
+          ),
+        error: () => undefined,
+      });
+    // Benannte Deadline-Policies (#13): pro State referenzierbar per Schlüssel.
+    this.api
+      .listDeadlinePolicies()
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: (policies) =>
+          this.deadlinePolicyOptions.set(
+            policies.map((p) => ({ value: p.key, label: `${p.label['de'] ?? p.key} (${p.key})` })),
           ),
         error: () => undefined,
       });
@@ -611,6 +624,11 @@ export class FlowEditorComponent {
 
   protected setStateRoleKey(key: string, roleKey: string): void {
     this.patchConfig(key, { roleKey: roleKey || undefined });
+  }
+
+  /** Deadline-Policy eines States setzen/entfernen (#13). */
+  protected setStateDeadlinePolicy(key: string, policyKey: string): void {
+    this.patchConfig(key, { deadlinePolicyKey: policyKey || undefined });
   }
 
   protected setDecisionElse(key: string, value: string): void {

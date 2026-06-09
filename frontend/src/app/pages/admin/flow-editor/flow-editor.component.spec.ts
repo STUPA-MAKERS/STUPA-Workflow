@@ -13,7 +13,8 @@ async function setup() {
   const listGremienOptions = jest.fn(() => of([{ id: 'g1', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' }]));
   const listGremiumRoles = jest.fn(() => of([{ id: 'gr1', key: 'vorsitz', name: { de: 'Vorsitz' } }]));
   const listRoles = jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
-  const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles };
+  const listDeadlinePolicies = jest.fn(() => of([{ id: 'dp1', key: 'semester', label: { de: 'Semesterfrist' }, kind: 'absolute' }]));
+  const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles, listDeadlinePolicies };
   const view = await render(FlowEditorComponent, {
     providers: [{ provide: AdminApiService, useValue: api }],
   });
