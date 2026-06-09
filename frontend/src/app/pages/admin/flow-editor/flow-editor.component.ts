@@ -18,18 +18,23 @@ import { AdminApiService } from '../admin-api.service';
 import { AdminOptionsService } from '../admin-options.service';
 import {
   ACTION_TYPES,
+  type ActionDef,
   type ActionType,
-  type DecisionRule,
+  COMPARE_OPS,
+  type CompareOp,
   type FlowGraph,
-  GUARD_LEAF_OPERATORS,
+  GUARD_ACTOR_OPERATORS,
+  GUARD_CONDITION_OPERATORS,
   type GuardLeafOperator,
+  type NotifyRecipient,
+  type NotifyRecipientKind,
+  NOTIFY_RECIPIENT_KINDS,
   type StateCategory,
   type StateConfig,
   type StateDef,
   type StateKind,
   type TransitionBranch,
   type TransitionDef,
-  VOTE_RESULTS,
 } from '../admin.models';
 import {
   STATE_CATEGORIES,
@@ -94,20 +99,16 @@ export class FlowEditorComponent {
   protected readonly canvas = viewChild<ElementRef<SVGSVGElement>>('canvas');
 
   protected readonly categories = STATE_CATEGORIES;
-  protected readonly guardOps = GUARD_LEAF_OPERATORS;
   protected readonly actionTypes = ACTION_TYPES;
+  protected readonly compareOps = COMPARE_OPS;
 
-  /** State-Arten (#28) + Branch-/Decision-Auswahllisten. */
-  protected readonly stateKinds: StateKind[] = ['normal', 'vote', 'approval', 'decision'];
-  protected readonly decisionFields = ['amount', 'typeKey', 'applicantRole'];
-  protected readonly decisionOps = ['==', '!=', '>', '>=', '<', '<=', 'in', 'has'];
-  /** Gremien + globale Rollen für vote/approval-Config (#28/#42). */
+  /** State-Arten (#28-Redesign): nur noch normal + vote. */
+  protected readonly stateKinds: StateKind[] = ['normal', 'vote'];
+  /** Gremien + globale Rollen für Config + Guards/Actions. */
   protected readonly gremiumOptions = signal<SelectOption[]>([]);
   protected readonly globalRoleOptions = signal<SelectOption[]>([]);
-  /** Gremium-Rollen je Gremium (lazy geladen, #62 — Rollen sind pro Gremium). */
-  protected readonly rolesByGremium = signal<Record<string, SelectOption[]>>({});
-  /** Rollen-Quelle eines approval-States: an Gremium gebunden oder global. */
-  protected readonly approvalScopes = ['gremium', 'global'];
+  /** Konfigurierte Webhooks (für die `webhook`-Action). */
+  protected readonly webhookOptions = signal<SelectOption[]>([]);
   /** Benannte Deadline-Policies (#13) — ein State kann eine per Schlüssel referenzieren. */
   protected readonly deadlinePolicyOptions = signal<SelectOption[]>([]);
 
@@ -149,12 +150,12 @@ export class FlowEditorComponent {
         },
         error: () => undefined,
       });
-    // Gremien + Gremium-Rollen für vote/approval-State-Config (#28/#42).
+    // Gremien für vote-State-Config + Committee-Guards/Actions.
     this.options
       .gremiumOptions()
       .pipe(takeUntilDestroyed())
       .subscribe({ next: (o) => this.gremiumOptions.set(o), error: () => undefined });
-    // Globale Rollen (approval kann auch eine globale Rolle entscheiden, #28-CR).
+    // Globale Rollen für roleIs/applicantRoleIs-Guards.
     this.api
       .listRoles()
       .pipe(takeUntilDestroyed())
@@ -163,6 +164,15 @@ export class FlowEditorComponent {
           this.globalRoleOptions.set(
             roles.map((r) => ({ value: r.key, label: `${r.label['de'] ?? r.key} (${r.key})` })),
           ),
+        error: () => undefined,
+      });
+    // Konfigurierte Webhooks für die `webhook`-Action.
+    this.api
+      .listWebhooks()
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: (hooks) =>
+          this.webhookOptions.set(hooks.map((h) => ({ value: h.id, label: h.name || h.url }))),
         error: () => undefined,
       });
     // Benannte Deadline-Policies (#13): pro State referenzierbar per Schlüssel.
@@ -178,28 +188,9 @@ export class FlowEditorComponent {
       });
   }
 
-  /** Gültige Ergebnis-Zweige je Quell-State-Art (#28): vote→pass/fail, approval→
-   *  accept/reject, sonst keine. So bietet das Branch-Dropdown nur Sinnvolles. */
+  /** Gültige Ergebnis-Zweige je Quell-State-Art (#28): vote→pass/fail, sonst keine. */
   protected branchesFor(fromKey: string): TransitionBranch[] {
-    const kind = this.stateByKey(fromKey)?.kind;
-    if (kind === 'vote') return ['pass', 'fail'];
-    if (kind === 'approval') return ['accept', 'reject'];
-    return [];
-  }
-
-  /** Rollen-Quelle eines approval-States: `gremium`, wenn ein gremiumId-Feld gesetzt ist. */
-  protected approvalScope(s: StateDef): string {
-    return s.config?.gremiumId !== undefined ? 'gremium' : 'global';
-  }
-
-  protected setApprovalScope(key: string, scope: string): void {
-    // Wechsel der Quelle: Gremium + Rolle zurücksetzen (Gremium-Rollen ≠ globale Rollen).
-    const cur = this.stateByKey(key)?.config ?? {};
-    const next = { ...cur };
-    delete next.roleKey;
-    if (scope === 'gremium') next.gremiumId = '';
-    else delete next.gremiumId;
-    this.patchState(key, { config: next });
+    return this.stateByKey(fromKey)?.kind === 'vote' ? ['pass', 'fail'] : [];
   }
 
   protected readonly validation = computed(() => validateFlowGraph(this.graph()));
@@ -245,9 +236,7 @@ export class FlowEditorComponent {
   });
 
   private branchDotsFor(kind: string | null | undefined): string[] {
-    if (kind === 'vote') return ['pass', 'fail'];
-    if (kind === 'approval') return ['accept', 'reject'];
-    return [];
+    return kind === 'vote' ? ['pass', 'fail'] : [];
   }
 
   /** Ausgehende Übergänge nach Guard gruppieren, in Array-(=Prioritäts-)Reihenfolge. */
@@ -434,20 +423,33 @@ export class FlowEditorComponent {
     return this.i18n.translate(`admin.flow.kind.${k}` as TranslationKey);
   }
 
-  protected scopeLabel(sc: string): string {
-    return this.i18n.translate(`admin.flow.scope.${sc}` as TranslationKey);
-  }
-
   /** Von/Nach-Optionen als „Klarname (key)" (FE5). */
   protected stateOptions(): SelectOption[] {
     return this.graph().states.map((s) => ({ value: s.key, label: `${this.label(s)} (${s.key})` }));
   }
 
-  /** Guard-Operatoren mit übersetztem Klarnamen (FE2). */
-  protected guardOpOptions(): SelectOption[] {
-    return this.guardOps.map((op) => ({
+  /** Guard-Operatoren mit übersetztem Klarnamen. Akteur-Gates (roleIs/isInCommittee)
+   *  nur auf **manuellen** Übergängen — automatische bekommen nur Bedingungen (#28). */
+  protected guardOpOptions(automatic: boolean | undefined): SelectOption[] {
+    const ops: readonly string[] = automatic
+      ? GUARD_CONDITION_OPERATORS
+      : [...GUARD_CONDITION_OPERATORS, ...GUARD_ACTOR_OPERATORS];
+    return ops.map((op) => ({
       value: op,
       label: this.i18n.translate(`admin.flow.guardOp.${op}` as TranslationKey),
+    }));
+  }
+
+  /** Vergleichs-Operatoren des `compare`-Guards als Dropdown. */
+  protected compareOpOptions(): SelectOption[] {
+    return this.compareOps.map((op) => ({ value: op, label: op }));
+  }
+
+  /** Empfänger-Arten einer `notify`-Action als Dropdown. */
+  protected recipientKindOptions(): SelectOption[] {
+    return NOTIFY_RECIPIENT_KINDS.map((k) => ({
+      value: k,
+      label: this.i18n.translate(`admin.flow.recipientKind.${k}` as TranslationKey),
     }));
   }
 
@@ -467,25 +469,23 @@ export class FlowEditorComponent {
     return this.i18n.translate(`admin.flow.actionDesc.${type}` as TranslationKey);
   }
 
-  /** Wert-Optionen für `voteResult` (passed/rejected/tie) als Dropdown (FE1). */
-  protected readonly voteResultOptions: SelectOption[] = VOTE_RESULTS.map((v) => ({
-    value: v,
-    label: this.i18n.translate(`admin.flow.voteResult.${v}` as TranslationKey),
-  }));
-
   /**
-   * Art des Wert-Controls je Guard-Operator (FE1):
-   * - `none`  → boolesche/parameterlose Operatoren (kein Wertfeld)
-   * - `vote`  → `voteResult` → Dropdown passed/rejected/tie
-   * - `text`  → `roleIs`/`permissionIs` → Freitext mit Annotation
+   * Art des Wert-Controls je Guard-Operator (#28):
+   * - `none`      → boolesche Operatoren (deadlinePassed/budgetFitsApplication)
+   * - `role`      → roleIs/applicantRoleIs → globale-Rollen-Dropdown
+   * - `committee` → isInCommittee/applicantCommitteeIs → Gremium-Dropdown
+   * - `compare`   → typisierter Vergleich (Feld + Operator + Wert)
+   * - `text`      → budgetIs/hasField → Freitext
    */
-  protected guardValueKind(op: string): 'none' | 'vote' | 'text' {
-    if (op === 'voteResult') return 'vote';
-    if (op === 'fieldsComplete' || op === 'deadlinePassed' || op === 'manual' || !op) return 'none';
+  protected guardValueKind(op: string): 'none' | 'role' | 'committee' | 'compare' | 'text' {
+    if (op === 'deadlinePassed' || op === 'budgetFitsApplication' || !op) return 'none';
+    if (op === 'roleIs' || op === 'applicantRoleIs') return 'role';
+    if (op === 'isInCommittee' || op === 'applicantCommitteeIs') return 'committee';
+    if (op === 'compare') return 'compare';
     return 'text';
   }
 
-  /** Annotation/Hinweis für das Guard-Wertfeld je Operator (FE1). */
+  /** Annotation/Hinweis für das Guard-Wertfeld je Operator. */
   protected guardValueHint(op: string): string {
     return this.i18n.translate(`admin.flow.guardHint.${op}` as TranslationKey);
   }
@@ -581,9 +581,9 @@ export class FlowEditorComponent {
 
   protected setStateKind(key: string, kind: string): void {
     const k = (kind || 'normal') as StateKind;
-    // Beim Wechsel der Art die Config auf einen sinnvollen Default zurücksetzen.
-    const config: StateConfig =
-      k === 'decision' ? { rules: [], else: '' } : k === 'normal' ? {} : {};
+    // Beim Wechsel der Art kind-spezifische Config zurücksetzen (Deadline behalten).
+    const policy = this.stateByKey(key)?.config?.deadlinePolicyKey;
+    const config: StateConfig = policy ? { deadlinePolicyKey: policy } : {};
     this.patchState(key, { kind: k === 'normal' ? null : k, config });
   }
 
@@ -598,74 +598,11 @@ export class FlowEditorComponent {
 
   protected setStateGremium(key: string, gremiumId: string): void {
     this.patchConfig(key, { gremiumId: gremiumId || undefined });
-    if (gremiumId) this.ensureGremiumRoles(gremiumId);
-  }
-
-  /** Gremium-Rollen-Optionen eines Gremiums (#62) — lädt sie bei Bedarf nach. */
-  protected gremiumRoleOptionsFor(gremiumId: string | undefined): SelectOption[] {
-    if (!gremiumId) return [];
-    this.ensureGremiumRoles(gremiumId);
-    return this.rolesByGremium()[gremiumId] ?? [];
-  }
-
-  private ensureGremiumRoles(gremiumId: string): void {
-    if (this.rolesByGremium()[gremiumId]) return;
-    // Platzhalter setzen → kein Doppel-Load.
-    this.rolesByGremium.update((m) => ({ ...m, [gremiumId]: [] }));
-    this.api.listGremiumRoles(gremiumId).subscribe({
-      next: (roles) =>
-        this.rolesByGremium.update((m) => ({
-          ...m,
-          [gremiumId]: roles.map((r) => ({ value: r.key, label: `${r.name['de'] ?? r.key} (${r.key})` })),
-        })),
-      error: () => undefined,
-    });
-  }
-
-  protected setStateRoleKey(key: string, roleKey: string): void {
-    this.patchConfig(key, { roleKey: roleKey || undefined });
   }
 
   /** Deadline-Policy eines States setzen/entfernen (#13). */
   protected setStateDeadlinePolicy(key: string, policyKey: string): void {
     this.patchConfig(key, { deadlinePolicyKey: policyKey || undefined });
-  }
-
-  protected setDecisionElse(key: string, value: string): void {
-    this.patchConfig(key, { else: value });
-  }
-
-  protected addDecisionRule(key: string): void {
-    const rules = [...(this.stateByKey(key)?.config?.rules ?? [])];
-    rules.push({ when: { field: 'amount', op: '>=', value: 0 }, to: '' });
-    this.patchConfig(key, { rules });
-  }
-
-  protected removeDecisionRule(key: string, index: number): void {
-    const rules = (this.stateByKey(key)?.config?.rules ?? []).filter((_, i) => i !== index);
-    this.patchConfig(key, { rules });
-  }
-
-  protected setDecisionRule(
-    key: string,
-    index: number,
-    patch: Partial<DecisionRule> | { whenField?: string; whenOp?: string; whenValue?: string },
-  ): void {
-    const rules = (this.stateByKey(key)?.config?.rules ?? []).map((r, i) => {
-      if (i !== index) return r;
-      const next: DecisionRule = { ...r };
-      if ('to' in patch && patch.to !== undefined) next.to = patch.to;
-      const when: NonNullable<DecisionRule['when']> = {
-        ...(r.when ?? { field: 'amount', op: '>=', value: 0 }),
-      };
-      const p = patch as { whenField?: string; whenOp?: string; whenValue?: string };
-      if (p.whenField !== undefined) when.field = p.whenField as 'amount' | 'typeKey' | 'applicantRole';
-      if (p.whenOp !== undefined) when.op = p.whenOp;
-      if (p.whenValue !== undefined) when.value = when.field === 'amount' ? Number(p.whenValue) : p.whenValue;
-      next.when = when;
-      return next;
-    });
-    this.patchConfig(key, { rules });
   }
 
   private stateByKey(key: string): StateDef | undefined {
@@ -723,19 +660,38 @@ export class FlowEditorComponent {
     }));
   }
 
-  protected setGuard(index: number, op: string, value: string): void {
-    this.graph.update((g) => ({
-      ...g,
-      transitions: (g.transitions ?? []).map((t, idx) => {
-        if (idx !== index) return t;
-        if (!op) {
-          const next = { ...t };
-          delete next.guard;
-          return next;
-        }
-        return { ...t, guard: { [op]: coerceGuardValue(op as GuardLeafOperator, value) } };
-      }),
-    }));
+  /** Operator wählen → Guard mit sinnvollem Default initialisieren (leer = kein Guard). */
+  protected setGuardOp(index: number, op: string): void {
+    this.patchTransition(index, (t) => {
+      if (!op) {
+        const next = { ...t };
+        delete next.guard;
+        return next;
+      }
+      return { ...t, guard: this.defaultGuard(op as GuardLeafOperator) };
+    });
+  }
+
+  private defaultGuard(op: GuardLeafOperator): Record<string, unknown> {
+    if (op === 'deadlinePassed' || op === 'budgetFitsApplication') return { [op]: true };
+    if (op === 'compare') return { compare: { field: '', op: '==', value: '' } };
+    return { [op]: '' };
+  }
+
+  /** Einwertiger Guard-Wert (role/committee/budgetIs/hasField). */
+  protected setGuardValue(index: number, value: string): void {
+    this.patchTransition(index, (t) => {
+      const op = this.guardOp(t);
+      return op ? { ...t, guard: { [op]: value } } : t;
+    });
+  }
+
+  /** Boolescher Guard-Wert (deadlinePassed/budgetFitsApplication). */
+  protected setGuardBool(index: number, on: boolean): void {
+    this.patchTransition(index, (t) => {
+      const op = this.guardOp(t);
+      return op ? { ...t, guard: { [op]: on } } : t;
+    });
   }
 
   protected guardOp(t: TransitionDef): string {
@@ -745,16 +701,112 @@ export class FlowEditorComponent {
   protected guardValue(t: TransitionDef): string {
     if (!t.guard) return '';
     const v = Object.values(t.guard)[0];
-    return v == null ? '' : String(v);
+    return v == null || typeof v === 'object' ? '' : String(v);
   }
 
+  protected guardBool(t: TransitionDef): boolean {
+    return !!(t.guard && Object.values(t.guard)[0] === true);
+  }
+
+  // --- compare-Guard -------------------------------------------------------
+  private compareSpec(t: TransitionDef): { field: string; op: string; value: unknown } {
+    const c = t.guard?.['compare'];
+    return typeof c === 'object' && c !== null
+      ? (c as { field: string; op: string; value: unknown })
+      : { field: '', op: '==', value: '' };
+  }
+  protected compareField(t: TransitionDef): string {
+    return String(this.compareSpec(t).field ?? '');
+  }
+  protected compareOp(t: TransitionDef): string {
+    return String(this.compareSpec(t).op ?? '==');
+  }
+  protected compareValue(t: TransitionDef): string {
+    const v = this.compareSpec(t).value;
+    return v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v);
+  }
+  protected setCompare(index: number, patch: { field?: string; op?: string; value?: string }): void {
+    this.patchTransition(index, (t) => {
+      const cur = this.compareSpec(t);
+      const op = patch.op ?? cur.op;
+      let value: unknown = patch.value ?? cur.value;
+      // `in` erwartet eine Liste — Komma-getrennte Eingabe splitten.
+      if (op === 'in' && typeof value === 'string') {
+        value = value.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+      return {
+        ...t,
+        guard: { compare: { field: patch.field ?? cur.field, op: op as CompareOp, value } },
+      };
+    });
+  }
+
+  // --- actions -------------------------------------------------------------
   protected addAction(index: number, type: string): void {
     if (!type) return;
+    const initial: ActionDef =
+      type === 'notify'
+        ? { type: 'notify', recipients: [] }
+        : ({ type: type as ActionType } as ActionDef);
+    this.patchTransition(index, (t) => ({ ...t, actions: [...(t.actions ?? []), initial] }));
+  }
+
+  /** Einen Parameter einer Action setzen (webhookId/gremiumId/budgetId). */
+  protected setActionParam(index: number, ai: number, key: string, value: string): void {
+    this.patchTransition(index, (t) => ({
+      ...t,
+      actions: (t.actions ?? []).map((a, k) => (k === ai ? { ...a, [key]: value } : a)),
+    }));
+  }
+
+  protected actionParam(act: ActionDef, key: string): string {
+    const v = act[key];
+    return typeof v === 'string' ? v : '';
+  }
+
+  // --- notify-Empfänger ----------------------------------------------------
+  protected recipientsOf(act: ActionDef): NotifyRecipient[] {
+    return Array.isArray(act['recipients']) ? (act['recipients'] as NotifyRecipient[]) : [];
+  }
+  private patchRecipients(
+    index: number,
+    ai: number,
+    fn: (list: NotifyRecipient[]) => NotifyRecipient[],
+  ): void {
+    this.patchTransition(index, (t) => ({
+      ...t,
+      actions: (t.actions ?? []).map((a, k) =>
+        k === ai ? { ...a, recipients: fn(this.recipientsOf(a)) } : a,
+      ),
+    }));
+  }
+  protected addRecipient(index: number, ai: number): void {
+    this.patchRecipients(index, ai, (list) => [...list, { kind: 'applicant' }]);
+  }
+  protected removeRecipient(index: number, ai: number, ri: number): void {
+    this.patchRecipients(index, ai, (list) => list.filter((_, i) => i !== ri));
+  }
+  protected setRecipientKind(index: number, ai: number, ri: number, kind: string): void {
+    this.patchRecipients(index, ai, (list) =>
+      list.map((r, i) =>
+        i === ri ? { kind: kind as NotifyRecipientKind, ref: kind === 'applicant' ? undefined : (r.ref ?? '') } : r,
+      ),
+    );
+  }
+  protected setRecipientRef(index: number, ai: number, ri: number, ref: string): void {
+    this.patchRecipients(index, ai, (list) =>
+      list.map((r, i) => (i === ri ? { ...r, ref } : r)),
+    );
+  }
+  /** Braucht die Empfänger-Art einen `ref` (Gremium/Rolle/E-Mail)? */
+  protected recipientNeedsRef(kind: string): boolean {
+    return kind === 'gremium' || kind === 'role' || kind === 'email';
+  }
+
+  private patchTransition(index: number, fn: (t: TransitionDef) => TransitionDef): void {
     this.graph.update((g) => ({
       ...g,
-      transitions: (g.transitions ?? []).map((t, idx) =>
-        idx === index ? { ...t, actions: [...(t.actions ?? []), { type: type as ActionType }] } : t,
-      ),
+      transitions: (g.transitions ?? []).map((t, idx) => (idx === index ? fn(t) : t)),
     }));
   }
 
@@ -956,14 +1008,6 @@ export class FlowEditorComponent {
         this.toast.error(err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed')),
     });
   }
-}
-
-/** Guard-Wert typgerecht casten: bool-artige Operatoren → boolean, sonst string. */
-function coerceGuardValue(op: GuardLeafOperator, value: string): unknown {
-  if (op === 'fieldsComplete' || op === 'deadlinePassed' || op === 'manual') {
-    return value === 'true' || value === '1' || value === '';
-  }
-  return value;
 }
 
 function blankGraph(): FlowGraph {

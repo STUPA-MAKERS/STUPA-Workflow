@@ -19,7 +19,12 @@ function graph(overrides: Partial<FlowGraph> = {}): FlowGraph {
     ],
     transitions: [
       { from: 'draft', to: 'review', actions: [] },
-      { from: 'review', to: 'done', guard: { voteResult: 'passed' }, actions: [{ type: 'notify' }] },
+      {
+        from: 'review',
+        to: 'done',
+        guard: { compare: { field: 'amount', op: '>=', value: 0 } },
+        actions: [{ type: 'notify', recipients: [{ kind: 'applicant' }] }],
+      },
     ],
     ...overrides,
   };

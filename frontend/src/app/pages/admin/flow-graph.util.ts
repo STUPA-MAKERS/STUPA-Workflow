@@ -59,8 +59,20 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
       errors.push(`transition references unknown to-state: ${JSON.stringify(t.to)}`);
     }
     try {
-      validateGuard(t.guard);
-      for (const a of t.actions ?? []) validateAction(a);
+      // Akteur-Gates (roleIs/isInCommittee) nur auf **manuellen** Übergängen.
+      validateGuard(t.guard, !t.automatic);
+      for (const a of t.actions ?? []) {
+        validateAction(a);
+        // `addToNextSession` darf nur in einen vote-State führen (#28).
+        if (a.type === 'addToNextSession') {
+          const target = states.find((s) => s.key === t.to);
+          if ((target?.kind ?? 'normal') !== 'vote') {
+            errors.push(
+              `addToNextSession action on "${t.from}→${t.to}" must lead into a vote state`,
+            );
+          }
+        }
+      }
     } catch (err) {
       errors.push((err as Error).message);
     }
@@ -85,18 +97,6 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
       if (!s.config?.gremiumId) errors.push(`vote state "${s.key}" needs a committee (config.gremiumId)`);
       if (outBranches.join(',') !== 'fail,pass') {
         errors.push(`vote state "${s.key}" needs exactly two outgoing transitions: branch "pass" and "fail"`);
-      }
-    } else if (s.kind === 'approval') {
-      if (!s.config?.roleKey) errors.push(`approval state "${s.key}" needs a deciding role (config.roleKey)`);
-      if (outBranches.join(',') !== 'accept,reject') {
-        errors.push(`approval state "${s.key}" needs exactly two outgoing transitions: branch "accept" and "reject"`);
-      }
-    } else if (s.kind === 'decision') {
-      const rules = s.config?.rules ?? [];
-      const targets = [...rules.map((r) => r.to), s.config?.else ?? ''];
-      if (!s.config?.else) errors.push(`decision state "${s.key}" needs an else target (config.else)`);
-      for (const tgt of targets) {
-        if (tgt && !keySet.has(tgt)) errors.push(`decision state "${s.key}" routes to unknown state "${tgt}"`);
       }
     }
   }

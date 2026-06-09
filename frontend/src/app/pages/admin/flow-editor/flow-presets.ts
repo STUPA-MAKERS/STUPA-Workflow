@@ -1,6 +1,7 @@
 /**
- * Flow-Vorlagen für den Simple-Modus (T-34). Jede Vorlage ist ein gültiger
- * `FlowGraph` (genau ein Initial, erreichbar) und dient als Startpunkt.
+ * Flow-Vorlagen (T-34). Jede Vorlage ist ein gültiger `FlowGraph` (genau ein
+ * Initial, erreichbar) und dient als Startpunkt. #28-Redesign: nur normal + vote,
+ * vote-State mit pass/fail-Branches.
  */
 import type { FlowGraph } from '../admin.models';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -34,19 +35,15 @@ export const FLOW_PRESETS: readonly FlowPreset[] = [
       states: [
         { key: 'draft', label: { de: 'Entwurf', en: 'Draft' }, category: 'open', isInitial: true },
         { key: 'review', label: { de: 'Prüfung', en: 'Review' }, category: 'running' },
-        { key: 'vote', label: { de: 'Abstimmung', en: 'Vote' }, category: 'running' },
-        { key: 'decided', label: { de: 'Entschieden', en: 'Decided' }, category: 'closed', editAllowed: false },
+        { key: 'vote', label: { de: 'Abstimmung', en: 'Vote' }, category: 'running', kind: 'vote', config: { gremiumId: '' } },
+        { key: 'approved', label: { de: 'Angenommen', en: 'Approved' }, category: 'closed', editAllowed: false },
+        { key: 'rejected', label: { de: 'Abgelehnt', en: 'Rejected' }, category: 'closed', editAllowed: false },
       ],
       transitions: [
         { from: 'draft', to: 'review', label: { de: 'Einreichen', en: 'Submit' }, actions: [] },
-        { from: 'review', to: 'vote', label: { de: 'Zur Abstimmung', en: 'To vote' }, actions: [{ type: 'openVote' }] },
-        {
-          from: 'vote',
-          to: 'decided',
-          label: { de: 'Auszählen', en: 'Tally' },
-          guard: { voteResult: 'passed' },
-          actions: [{ type: 'notify' }],
-        },
+        { from: 'review', to: 'vote', label: { de: 'Zur Abstimmung', en: 'To vote' }, actions: [] },
+        { from: 'vote', to: 'approved', label: { de: 'Angenommen', en: 'Approved' }, branch: 'pass', actions: [] },
+        { from: 'vote', to: 'rejected', label: { de: 'Abgelehnt', en: 'Rejected' }, branch: 'fail', actions: [] },
       ],
     },
   },

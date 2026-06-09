@@ -19,28 +19,13 @@ import type { FormFieldDef, I18nMap, Uuid } from '@core/api/models';
 
 export type StateCategory = 'open' | 'running' | 'closed';
 
-/** State-Art im globalen Flow (#28). */
-export type StateKind = 'normal' | 'vote' | 'approval' | 'decision';
+/** State-Art im globalen Flow (#28-Redesign): nur noch normal + vote. */
+export type StateKind = 'normal' | 'vote';
 
-/** Eine Regel eines `decision`-States: Bedingung → Ziel-State-Key. */
-export interface DecisionRule {
-  when?: {
-    field: 'amount' | 'typeKey' | 'applicantRole';
-    op: string;
-    value: unknown;
-  } | null;
-  to: string;
-}
-
-/** Config eines States je nach `kind` (#28). Leeres Objekt für `normal`. */
+/** Config eines States je nach `kind`. Leeres Objekt für `normal`. */
 export interface StateConfig {
-  /** vote/approval: Gremium, das abstimmt/entscheidet. */
+  /** vote: Gremium, das abstimmt. */
   gremiumId?: string;
-  /** approval: Schlüssel der entscheidenden (Gremium-)Rolle. */
-  roleKey?: string;
-  /** decision: Regeln (erste passende gewinnt) + Fallback-Ziel. */
-  rules?: DecisionRule[];
-  else?: string;
   /**
    * Schlüssel einer benannten Deadline-Policy (#13): beim Betreten des States legt
    * der Server eine Frist an, die der `deadlinePassed`-Übergang des States feuert.
@@ -61,8 +46,8 @@ export interface StateDef {
   config?: StateConfig | null;
 }
 
-/** Ergebnis-Zweig eines vote/approval-States (#28). */
-export type TransitionBranch = 'pass' | 'fail' | 'accept' | 'reject';
+/** Ergebnis-Zweig eines vote-States (#28): pass/fail. */
+export type TransitionBranch = 'pass' | 'fail';
 
 export interface TransitionDef {
   from: string;
@@ -73,7 +58,7 @@ export interface TransitionDef {
   order?: number | null;
   /** Automatischer Übergang (#8): feuert ohne Nutzer-Aktion, sobald der Guard erfüllt ist. */
   automatic?: boolean;
-  /** Ergebnis-Zweig für vote/approval-States (#28): pass/fail bzw. accept/reject. */
+  /** Ergebnis-Zweig für vote-States (#28): pass/fail. */
   branch?: TransitionBranch | null;
 }
 
@@ -88,58 +73,72 @@ export interface FlowGraph {
   layout?: FlowLayout | null;
 }
 
-// --- Guards / Actions (shared/guards.py — Whitelist) ------------------------
+// --- Guards (shared/guards.py — Whitelist, #28-Redesign) --------------------
 
-export type GuardLeafOperator =
-  | 'roleIs'
-  | 'permissionIs'
-  | 'fieldsComplete'
-  | 'voteResult'
+/** Vergleichs-Operatoren des `compare`-Guards (typabhängig zur Laufzeit). */
+export type CompareOp = '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in';
+export const COMPARE_OPS: readonly CompareOp[] = ['==', '!=', '<', '<=', '>', '>=', 'in'] as const;
+
+/** Bedingungs-Operatoren (auf automatischen + manuellen Übergängen). */
+export type GuardConditionOp =
   | 'deadlinePassed'
-  | 'manual';
+  | 'applicantRoleIs'
+  | 'applicantCommitteeIs'
+  | 'budgetIs'
+  | 'budgetFitsApplication'
+  | 'hasField'
+  | 'compare';
+/** Akteur-Gates — nur auf **manuellen** Übergängen. */
+export type GuardActorOp = 'roleIs' | 'isInCommittee';
+export type GuardLeafOperator = GuardConditionOp | GuardActorOp;
 export type GuardCombinator = 'and' | 'or' | 'not';
 
 /** Ein einzelner Guard-Knoten (genau ein Operator, wie `validate_guard`). */
 export type Guard = Record<string, unknown>;
 
-export type ActionType =
-  | 'notify'
-  | 'webhook'
-  | 'exportPdf'
-  | 'setEditLock'
-  | 'budgetReserve'
-  | 'budgetBook'
-  | 'openVote'
-  | 'requeue';
+export const GUARD_CONDITION_OPERATORS: readonly GuardConditionOp[] = [
+  'deadlinePassed',
+  'applicantRoleIs',
+  'applicantCommitteeIs',
+  'budgetIs',
+  'budgetFitsApplication',
+  'hasField',
+  'compare',
+] as const;
+export const GUARD_ACTOR_OPERATORS: readonly GuardActorOp[] = ['roleIs', 'isInCommittee'] as const;
+export const GUARD_LEAF_OPERATORS: readonly GuardLeafOperator[] = [
+  ...GUARD_CONDITION_OPERATORS,
+  ...GUARD_ACTOR_OPERATORS,
+] as const;
+export const GUARD_COMBINATORS: readonly GuardCombinator[] = ['and', 'or', 'not'] as const;
+
+// --- Actions (#28: webhook/notify/addToNextSession/assignBudget) ------------
+
+export type ActionType = 'webhook' | 'notify' | 'addToNextSession' | 'assignBudget';
+export const ACTION_TYPES: readonly ActionType[] = [
+  'webhook',
+  'notify',
+  'addToNextSession',
+  'assignBudget',
+] as const;
+
+/** Empfänger-Art einer `notify`-Action. */
+export type NotifyRecipientKind = 'gremium' | 'role' | 'applicant' | 'email';
+export const NOTIFY_RECIPIENT_KINDS: readonly NotifyRecipientKind[] = [
+  'gremium',
+  'role',
+  'applicant',
+  'email',
+] as const;
+export interface NotifyRecipient {
+  kind: NotifyRecipientKind;
+  ref?: string;
+}
 
 export interface ActionDef {
   type: ActionType;
   [param: string]: unknown;
 }
-
-export const GUARD_LEAF_OPERATORS: readonly GuardLeafOperator[] = [
-  'roleIs',
-  'permissionIs',
-  'fieldsComplete',
-  'voteResult',
-  'deadlinePassed',
-  'manual',
-] as const;
-
-export const GUARD_COMBINATORS: readonly GuardCombinator[] = ['and', 'or', 'not'] as const;
-
-export const ACTION_TYPES: readonly ActionType[] = [
-  'notify',
-  'webhook',
-  'exportPdf',
-  'setEditLock',
-  'budgetReserve',
-  'budgetBook',
-  'openVote',
-  'requeue',
-] as const;
-
-export const VOTE_RESULTS: readonly string[] = ['passed', 'rejected', 'tie'] as const;
 
 // --- Organisation / RBAC (admin/models.py) ----------------------------------
 

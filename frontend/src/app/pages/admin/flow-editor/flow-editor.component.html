@@ -156,71 +156,8 @@
             (ngModelChange)="setStateGremium(s.key, $event)"
           />
         }
-        @if (s.kind === 'approval') {
-          <!-- Rollen-Quelle: an ein Gremium gebunden oder eine globale Rolle (#28-CR). -->
-          <label class="fe__lbl">{{ 'admin.flow.cfgRoleSource' | t }}
-            <select [ngModel]="approvalScope(s)" (ngModelChange)="setApprovalScope(s.key, $event)">
-              @for (sc of approvalScopes; track sc) {
-                <option [value]="sc">{{ scopeLabel(sc) }}</option>
-              }
-            </select>
-          </label>
-          @if (approvalScope(s) === 'gremium') {
-            <app-select
-              [label]="'admin.flow.cfgGremium' | t"
-              [placeholder]="'admin.flow.cfgGremiumPh' | t"
-              [options]="gremiumOptions()"
-              [ngModel]="s.config?.gremiumId ?? ''"
-              (ngModelChange)="setStateGremium(s.key, $event)"
-            />
-            <app-select
-              [label]="'admin.flow.cfgRole' | t"
-              [placeholder]="'admin.flow.cfgRolePh' | t"
-              [options]="gremiumRoleOptionsFor(s.config?.gremiumId)"
-              [ngModel]="s.config?.roleKey ?? ''"
-              (ngModelChange)="setStateRoleKey(s.key, $event)"
-            />
-          } @else {
-            <app-select
-              [label]="'admin.flow.cfgGlobalRole' | t"
-              [placeholder]="'admin.flow.cfgRolePh' | t"
-              [options]="globalRoleOptions()"
-              [ngModel]="s.config?.roleKey ?? ''"
-              (ngModelChange)="setStateRoleKey(s.key, $event)"
-            />
-          }
-        }
-        @if (s.kind === 'vote' || s.kind === 'approval') {
+        @if (s.kind === 'vote') {
           <p class="fe__hint">{{ 'admin.flow.branchHint' | t }}</p>
-        }
-        @if (s.kind === 'decision') {
-          <div class="fe__rules">
-            <span class="fe__lbl-text">{{ 'admin.flow.cfgRules' | t }}</span>
-            @for (rule of s.config?.rules ?? []; track $index; let i = $index) {
-              <div class="fe__rule">
-                <select [ngModel]="rule.when?.field ?? 'amount'" (ngModelChange)="setDecisionRule(s.key, i, { whenField: $event })">
-                  @for (f of decisionFields; track f) { <option [value]="f">{{ f }}</option> }
-                </select>
-                <select [ngModel]="rule.when?.op ?? '>='" (ngModelChange)="setDecisionRule(s.key, i, { whenOp: $event })">
-                  @for (o of decisionOps; track o) { <option [value]="o">{{ o }}</option> }
-                </select>
-                <input class="fe__rule-val" [ngModel]="$any(rule.when?.value) ?? ''" (ngModelChange)="setDecisionRule(s.key, i, { whenValue: $event })" [attr.placeholder]="'admin.flow.cfgValue' | t" />
-                <span class="fe__rule-arrow">→</span>
-                <select [ngModel]="rule.to" (ngModelChange)="setDecisionRule(s.key, i, { to: $event })">
-                  <option value="">—</option>
-                  @for (opt of stateOptions(); track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
-                </select>
-                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeDecisionRule(s.key, i)">✕</app-button>
-              </div>
-            }
-            <app-button variant="ghost" size="sm" (click)="addDecisionRule(s.key)">+ {{ 'admin.flow.addRule' | t }}</app-button>
-            <label class="fe__lbl">{{ 'admin.flow.cfgElse' | t }}
-              <select [ngModel]="s.config?.else ?? ''" (ngModelChange)="setDecisionElse(s.key, $event)">
-                <option value="">—</option>
-                @for (opt of stateOptions(); track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
-              </select>
-            </label>
-          </div>
         }
 
         <!-- Frist (#13): benannte Deadline-Policy referenzieren. Beim Betreten des
@@ -288,41 +225,119 @@
           </label>
         }
 
-        <!-- Guard nur bei automatischen Übergängen (FE3): er entscheidet das Auto-Feuern. -->
-        @if (sel.t.automatic) {
-          <app-select
-            [label]="'admin.flow.guard' | t"
-            [placeholder]="'admin.flow.guardNone' | t"
-            [hint]="'admin.flow.guardHelp' | t"
-            [options]="guardOpOptions()"
-            [ngModel]="guardOp(sel.t)"
-            (ngModelChange)="setGuard(sel.index, $event, guardValue(sel.t))"
-          />
-          @switch (guardValueKind(guardOp(sel.t))) {
-            @case ('vote') {
-              <app-select
-                [label]="'admin.flow.guardValue' | t"
-                [options]="voteResultOptions"
-                [ngModel]="guardValue(sel.t)"
-                (ngModelChange)="setGuard(sel.index, guardOp(sel.t), $event)"
-              />
+        <!-- Guard (#28): Bedingung des Übergangs. Akteur-Gates (roleIs/isInCommittee)
+             nur bei manuellen Übergängen; compare = typisierter Feldvergleich. -->
+        <app-select
+          [label]="'admin.flow.guard' | t"
+          [placeholder]="'admin.flow.guardNone' | t"
+          [hint]="'admin.flow.guardHelp' | t"
+          [options]="guardOpOptions(sel.t.automatic)"
+          [ngModel]="guardOp(sel.t)"
+          (ngModelChange)="setGuardOp(sel.index, $event)"
+        />
+        @switch (guardValueKind(guardOp(sel.t))) {
+          @case ('role') {
+            <app-select
+              [label]="'admin.flow.guardValue' | t"
+              [placeholder]="'admin.flow.cfgRolePh' | t"
+              [options]="globalRoleOptions()"
+              [ngModel]="guardValue(sel.t)"
+              (ngModelChange)="setGuardValue(sel.index, $event)"
+            />
+          }
+          @case ('committee') {
+            <app-select
+              [label]="'admin.flow.guardValue' | t"
+              [placeholder]="'admin.flow.cfgGremiumPh' | t"
+              [options]="gremiumOptions()"
+              [ngModel]="guardValue(sel.t)"
+              (ngModelChange)="setGuardValue(sel.index, $event)"
+            />
+          }
+          @case ('text') {
+            <label class="fe__lbl">{{ 'admin.flow.guardValue' | t }}
+              <input [ngModel]="guardValue(sel.t)" (ngModelChange)="setGuardValue(sel.index, $event)" />
+              <span class="fe__field-hint">{{ guardValueHint(guardOp(sel.t)) }}</span>
+            </label>
+          }
+          @case ('none') {
+            @if (guardOp(sel.t)) {
+              <app-checkbox [ngModel]="guardBool(sel.t)" (ngModelChange)="setGuardBool(sel.index, $event)">
+                {{ 'admin.flow.guardValue' | t }}
+              </app-checkbox>
             }
-            @case ('text') {
-              <label class="fe__lbl">{{ 'admin.flow.guardValue' | t }}
-                <input [ngModel]="guardValue(sel.t)" (ngModelChange)="setGuard(sel.index, guardOp(sel.t), $event)" />
-                <span class="fe__field-hint">{{ guardValueHint(guardOp(sel.t)) }}</span>
+          }
+          @case ('compare') {
+            <div class="fe__compare">
+              <label class="fe__lbl">{{ 'admin.flow.compareField' | t }}
+                <input [ngModel]="compareField(sel.t)" (ngModelChange)="setCompare(sel.index, { field: $event })" [attr.placeholder]="'admin.flow.compareFieldPh' | t" /></label>
+              <label class="fe__lbl">{{ 'admin.flow.compareOp' | t }}
+                <select [ngModel]="compareOp(sel.t)" (ngModelChange)="setCompare(sel.index, { op: $event })">
+                  @for (o of compareOps; track o) { <option [value]="o">{{ o }}</option> }
+                </select>
               </label>
-            }
+              <label class="fe__lbl">{{ 'admin.flow.compareValue' | t }}
+                <input [ngModel]="compareValue(sel.t)" (ngModelChange)="setCompare(sel.index, { value: $event })" /></label>
+            </div>
           }
         }
 
-        <div class="fe__actions">
-          <span class="fe__actions-label">{{ 'admin.flow.actions' | t }}:</span>
+        <!-- Actions (#28): webhook / notify / addToNextSession / assignBudget -->
+        <div class="fe__actions-block">
+          <span class="fe__actions-label">{{ 'admin.flow.actions' | t }}</span>
           @for (act of sel.t.actions ?? []; track $index; let ai = $index) {
-            <span class="fe__chip" [attr.title]="actionDesc(act.type)">
-              {{ actionLabel(act.type) }}
-              <button type="button" [attr.aria-label]="'admin.common.remove' | t" (click)="removeAction(sel.index, ai)">✕</button>
-            </span>
+            <div class="fe__action-card">
+              <div class="fe__action-head">
+                <strong>{{ actionLabel(act.type) }}</strong>
+                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeAction(sel.index, ai)">✕</app-button>
+              </div>
+              @switch (act.type) {
+                @case ('webhook') {
+                  <app-select
+                    [label]="'admin.flow.actWebhook' | t"
+                    [placeholder]="'admin.flow.actWebhookPh' | t"
+                    [options]="webhookOptions()"
+                    [ngModel]="actionParam(act, 'webhookId')"
+                    (ngModelChange)="setActionParam(sel.index, ai, 'webhookId', $event)"
+                  />
+                }
+                @case ('addToNextSession') {
+                  <app-select
+                    [label]="'admin.flow.cfgGremium' | t"
+                    [placeholder]="'admin.flow.cfgGremiumPh' | t"
+                    [options]="gremiumOptions()"
+                    [ngModel]="actionParam(act, 'gremiumId')"
+                    (ngModelChange)="setActionParam(sel.index, ai, 'gremiumId', $event)"
+                  />
+                  <p class="fe__field-hint">{{ 'admin.flow.actSessionHint' | t }}</p>
+                }
+                @case ('assignBudget') {
+                  <label class="fe__lbl">{{ 'admin.flow.actBudget' | t }}
+                    <input [ngModel]="actionParam(act, 'budgetId')" (ngModelChange)="setActionParam(sel.index, ai, 'budgetId', $event)" [attr.placeholder]="'admin.flow.actBudgetPh' | t" /></label>
+                }
+                @case ('notify') {
+                  <span class="fe__lbl-text">{{ 'admin.flow.actRecipients' | t }}</span>
+                  @for (r of recipientsOf(act); track $index; let ri = $index) {
+                    <div class="fe__recipient">
+                      <select [ngModel]="r.kind" (ngModelChange)="setRecipientKind(sel.index, ai, ri, $event)">
+                        @for (opt of recipientKindOptions(); track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
+                      </select>
+                      @if (recipientNeedsRef(r.kind)) {
+                        @if (r.kind === 'gremium') {
+                          <app-select [options]="gremiumOptions()" [placeholder]="'admin.flow.cfgGremiumPh' | t" [ngModel]="r.ref ?? ''" (ngModelChange)="setRecipientRef(sel.index, ai, ri, $event)" />
+                        } @else if (r.kind === 'role') {
+                          <app-select [options]="globalRoleOptions()" [placeholder]="'admin.flow.cfgRolePh' | t" [ngModel]="r.ref ?? ''" (ngModelChange)="setRecipientRef(sel.index, ai, ri, $event)" />
+                        } @else {
+                          <input [ngModel]="r.ref ?? ''" (ngModelChange)="setRecipientRef(sel.index, ai, ri, $event)" [attr.placeholder]="'admin.flow.actEmailPh' | t" />
+                        }
+                      }
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeRecipient(sel.index, ai, ri)">✕</app-button>
+                    </div>
+                  }
+                  <app-button variant="ghost" size="sm" (click)="addRecipient(sel.index, ai)">+ {{ 'admin.flow.addRecipient' | t }}</app-button>
+                }
+              }
+            </div>
           }
           <select #asel (change)="addAction(sel.index, asel.value); asel.value = ''">
             <option value="">{{ 'admin.flow.addAction' | t }}</option>
@@ -331,13 +346,6 @@
             }
           </select>
         </div>
-        @if ((sel.t.actions ?? []).length) {
-          <ul class="fe__action-descs">
-            @for (act of sel.t.actions ?? []; track $index) {
-              <li><strong>{{ actionLabel(act.type) }}</strong> — {{ actionDesc(act.type) }}</li>
-            }
-          </ul>
-        }
         <app-button variant="danger" size="sm" (click)="removeSelectedTransition()">{{ 'admin.flow.removeTransition' | t }}</app-button>
       } @else {
         <p class="fe__panel-empty">{{ 'admin.flow.selectHint' | t }}</p>

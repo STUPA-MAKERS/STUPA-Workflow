@@ -361,7 +361,7 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
       label: { de: 'Finanz-Freigabe', en: 'Finance approval' },
       category: 'pending',
       editAllowed: false,
-      kind: 'approval',
+      kind: 'vote',
     },
     gremiumId: null,
     budgetPotId: null,

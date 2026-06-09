@@ -14,7 +14,8 @@ async function setup() {
   const listGremiumRoles = jest.fn(() => of([{ id: 'gr1', key: 'vorsitz', name: { de: 'Vorsitz' } }]));
   const listRoles = jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
   const listDeadlinePolicies = jest.fn(() => of([{ id: 'dp1', key: 'semester', label: { de: 'Semesterfrist' }, kind: 'absolute' }]));
-  const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles, listDeadlinePolicies };
+  const listWebhooks = jest.fn(() => of([{ id: 'w1', name: 'Buchhaltung', url: 'https://h.test', events: [], active: true }]));
+  const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles, listDeadlinePolicies, listWebhooks };
   const view = await render(FlowEditorComponent, {
     providers: [{ provide: AdminApiService, useValue: api }],
   });
@@ -62,16 +63,14 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(container.querySelectorAll('.fe__node-text')).toHaveLength(2);
   });
 
-  it('exposes the guard control only for an automatic transition', async () => {
+  it('exposes the guard control for a selected transition (auto + manual)', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     buildValid(c);
     c.selectEdge(0);
     fixture.detectChanges();
-    expect(screen.queryByRole('combobox', { name: 'Bedingung (Guard)' })).not.toBeInTheDocument();
-    c.setTransitionAutomatic(0, true);
-    fixture.detectChanges();
+    // Guard ist auf manuellen und automatischen Übergängen verfügbar (#28).
     expect(screen.getByRole('combobox', { name: 'Bedingung (Guard)' })).toBeInTheDocument();
   });
 
@@ -90,11 +89,14 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.setStateEditAllowed('a', false);
 
     c.selectEdge(0);
-    c.setGuard(0, 'roleIs', 'x');
+    c.setGuardOp(0, 'roleIs');
+    c.setGuardValue(0, 'x');
     expect(c.guardOp(c.graph().transitions[0])).toBe('roleIs');
     expect(c.guardValue(c.graph().transitions[0])).toBe('x');
-    c.setGuard(0, 'manual', 'true');
-    c.setGuard(0, '', '');
+    c.setGuardOp(0, 'compare');
+    c.setCompare(0, { field: 'amount', op: '>', value: '100' });
+    expect(c.compareField(c.graph().transitions[0])).toBe('amount');
+    c.setGuardOp(0, '');
     expect(c.graph().transitions[0].guard).toBeUndefined();
 
     c.setTransitionAutomatic(0, true);
