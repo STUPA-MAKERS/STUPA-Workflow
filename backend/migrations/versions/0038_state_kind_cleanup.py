@@ -6,9 +6,10 @@ Create Date: 2026-06-09 12:00:00
 
 approval/decision-State-Arten entfallen (durch manuelle roleIs-Übergänge bzw.
 automatische Guard-Übergänge abgedeckt). Pre-Alpha-Cutover: bestehende
-approval/decision-States werden auf ``normal`` zurückgesetzt, danach die
-CheckConstraint ``state_kind`` auf ``('normal','vote')`` verengt. Idempotent.
-``down_revision`` = ``0037_deadline_policy``.
+approval/decision-States werden auf ``normal`` zurückgesetzt, alte
+approval-Branches (``accept``/``reject``) auf ``NULL`` gesetzt (nur noch ``vote``
+nutzt ``pass``/``fail``), danach die CheckConstraint ``state_kind`` auf
+``('normal','vote')`` verengt. Idempotent. ``down_revision`` = ``0037_deadline_policy``.
 """
 
 from __future__ import annotations
@@ -34,6 +35,10 @@ def upgrade() -> None:
     # Cutover: approval/decision → normal (Alt-Konfiguration verwerfen).
     bind.execute(
         sa.text("UPDATE state SET kind = 'normal' WHERE kind IN ('approval','decision')")
+    )
+    # Alte approval-Branches (accept/reject) auf NULL — nur noch vote nutzt pass/fail.
+    bind.execute(
+        sa.text("UPDATE transition SET branch = NULL WHERE branch IN ('accept','reject')")
     )
     bind.execute(sa.text(f"ALTER TABLE state DROP CONSTRAINT IF EXISTS {_DB_NAME}"))
     bind.execute(
