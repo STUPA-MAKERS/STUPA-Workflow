@@ -5,7 +5,14 @@ import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { ApplicationListItem, Uuid } from '@core/api/models';
-import { BadgeComponent, CellDirective, type ColumnDef, DataTableComponent } from '@shared/ui';
+import {
+  BadgeComponent,
+  ButtonComponent,
+  CellDirective,
+  type ColumnDef,
+  DataTableComponent,
+  ToastService,
+} from '@shared/ui';
 import { stateBadgeVariant } from '../applications/applications.util';
 
 /**
@@ -17,7 +24,7 @@ import { stateBadgeVariant } from '../applications/applications.util';
   selector: 'app-tasks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, TranslatePipe, BadgeComponent, DataTableComponent, CellDirective],
+  imports: [DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, DataTableComponent, CellDirective],
   template: `
     <header class="tasks__head">
       <h1 class="tasks__title">{{ 'tasks.title' | t }}</h1>
@@ -40,6 +47,16 @@ import { stateBadgeVariant } from '../applications/applications.util';
         </ng-template>
         <ng-template appCell="amount" let-r>{{ $any(r).amount ? ($any(r).amount + ' ' + ($any(r).currency ?? '')) : '—' }}</ng-template>
         <ng-template appCell="createdAt" let-r>{{ $any(r).createdAt | date: 'mediumDate' }}</ng-template>
+        <ng-template appCell="actions" let-r>
+          <span class="tasks__actions" (click)="$event.stopPropagation()">
+            @if ($any(r).state?.kind === 'approval') {
+              <app-button variant="primary" size="sm" [loading]="deciding() === $any(r).id" (click)="decide($any(r).id, 'accept')">{{ 'tasks.accept' | t }}</app-button>
+              <app-button variant="danger" size="sm" [loading]="deciding() === $any(r).id" (click)="decide($any(r).id, 'reject')">{{ 'tasks.reject' | t }}</app-button>
+            } @else {
+              <app-button variant="secondary" size="sm" (click)="open($any(r).id)">{{ 'tasks.open' | t }}</app-button>
+            }
+          </span>
+        </ng-template>
       </app-data-table>
     }
   `,
@@ -49,6 +66,7 @@ import { stateBadgeVariant } from '../applications/applications.util';
       .tasks__title { margin: 0; }
       .tasks__sub { color: var(--color-text-muted); font-size: var(--fs-sm); margin: var(--space-1) 0 0; }
       .tasks__muted { color: var(--color-text-muted); }
+      .tasks__actions { display: inline-flex; gap: var(--space-2); justify-content: flex-end; }
     `,
   ],
 })
@@ -61,11 +79,15 @@ export class TasksComponent {
   protected readonly loading = signal(true);
   protected readonly stateVariant = stateBadgeVariant;
 
+  private readonly toast = inject(ToastService);
+  protected readonly deciding = signal<Uuid | null>(null);
+
   protected readonly columns = signal<ColumnDef[]>([
     { key: 'title', label: this.i18n.translate('tasks.col.title') },
     { key: 'state', label: this.i18n.translate('tasks.col.state') },
     { key: 'amount', label: this.i18n.translate('tasks.col.amount'), align: 'end', width: '10rem' },
     { key: 'createdAt', label: this.i18n.translate('tasks.col.created'), width: '10rem' },
+    { key: 'actions', label: this.i18n.translate('tasks.col.actions'), align: 'end', width: '14rem' },
   ]);
 
   /** Antragstitel (System-Titelfeld) mit Fallback. */
@@ -74,6 +96,10 @@ export class TasksComponent {
   }
 
   constructor() {
+    this.reload();
+  }
+
+  private reload(): void {
     this.api.listTasks().subscribe({
       next: (t) => {
         this.tasks.set(t);
@@ -88,5 +114,29 @@ export class TasksComponent {
 
   protected open(id: Uuid): void {
     void this.router.navigate(['/applications', id]);
+  }
+
+  /** Approval-Task inline entscheiden (#28). Bei Erfolg verschwindet die Aufgabe. */
+  protected decide(id: Uuid, decision: 'accept' | 'reject'): void {
+    if (this.deciding()) return;
+    this.deciding.set(id);
+    this.api.submitApproval(id, decision).subscribe({
+      next: () => {
+        this.deciding.set(null);
+        this.toast.success(this.i18n.translate('tasks.decided'));
+        this.reload();
+      },
+      error: (err: { status?: number }) => {
+        this.deciding.set(null);
+        const key =
+          err.status === 403
+            ? 'tasks.forbidden'
+            : err.status === 409
+              ? 'tasks.conflict'
+              : 'tasks.error';
+        this.toast.error(this.i18n.translate(key));
+        this.reload();
+      },
+    });
   }
 }
