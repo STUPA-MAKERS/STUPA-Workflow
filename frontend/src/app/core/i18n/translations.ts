@@ -107,6 +107,7 @@ export const de = {
   'apply.positions.positionValue': 'Positionswert',
   'apply.positions.total': 'Gesamtbetrag',
   'apply.positions.remove': 'Entfernen',
+  'apply.positions.minOffersHint': 'Mindestanzahl an Vergleichsangeboten erreicht.',
   'apply.positions.invalid':
     'Jede Position braucht eine Bezeichnung, genügend Vergleichsangebote (mit Wert > 0) und genau ein bevorzugtes Angebot.',
   'apply.nav.back': 'Zurück',
@@ -1192,6 +1193,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.positionValue': 'Position value',
   'apply.positions.total': 'Total amount',
   'apply.positions.remove': 'Remove',
+  'apply.positions.minOffersHint': 'Minimum number of comparison offers reached.',
   'apply.positions.invalid':
     'Each position needs a label, enough comparison offers (value > 0) and exactly one preferred offer.',
   'apply.nav.back': 'Back',

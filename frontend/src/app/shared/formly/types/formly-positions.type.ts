@@ -66,7 +66,8 @@ interface Position {
                       [attr.placeholder]="t('apply.positions.offer')" [attr.aria-label]="t('apply.positions.offer')" />
                   </td>
                   <td class="pos__num">
-                    <input type="number" min="0" step="0.01" [value]="o.value ?? ''"
+                    <input type="text" inputmode="decimal" class="pos__money" [value]="offerValueText(pi, oi)"
+                      (focus)="beginEditValue(pi, oi)" (blur)="endEditValue()"
                       (input)="setOfferValue(pi, oi, $any($event.target).value)"
                       [attr.aria-label]="t('apply.positions.value')" />
                   </td>
@@ -75,7 +76,10 @@ interface Position {
                       (change)="setPreferred(pi, oi)" [attr.aria-label]="t('apply.positions.preferred')" />
                   </td>
                   <td>
-                    <button type="button" class="pos__icon" (click)="removeOffer(pi, oi)" [attr.aria-label]="t('apply.positions.remove')">✕</button>
+                    <button type="button" class="pos__icon" (click)="removeOffer(pi, oi)"
+                      [disabled]="p.offers.length <= minOffers"
+                      [attr.title]="p.offers.length <= minOffers ? t('apply.positions.minOffersHint') : null"
+                      [attr.aria-label]="t('apply.positions.remove')">✕</button>
                   </td>
                 </tr>
               }
@@ -138,7 +142,9 @@ interface Position {
       .pos input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
       .pos__pref input[type='radio'] { width: 1.15rem; height: 1.15rem; min-height: 0; accent-color: var(--color-primary); cursor: pointer; }
       .pos__icon { background: transparent; border: 0; cursor: pointer; color: var(--color-text-muted); font-size: var(--fs-md); line-height: 1; padding: var(--space-1); }
-      .pos__icon:hover { color: var(--color-danger); }
+      .pos__icon:hover:not(:disabled) { color: var(--color-danger); }
+      .pos__icon:disabled { opacity: 0.35; cursor: not-allowed; }
+      .pos__money { font-variant-numeric: tabular-nums; }
       .pos__add { align-self: flex-start; background: transparent; border: var(--border-width) dashed var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); cursor: pointer; color: var(--color-primary); font: inherit; font-weight: var(--fw-medium); }
       .pos__add:hover { background: var(--color-surface); }
       .pos__add--sm { border-style: none; padding: var(--space-1) 0; }
@@ -262,7 +268,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   setOfferValue(pi: number, oi: number, raw: string): void {
-    const value = raw === '' ? null : Number(raw);
+    const value = this.parseNum(raw);
     this.commit(
       this.positions.map((p, i) =>
         i === pi
@@ -270,6 +276,49 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
           : p,
       ),
     );
+  }
+
+  /** Welche Wert-Zelle gerade bearbeitet wird (dann Rohwert statt formatiert). */
+  protected editing: { pi: number; oi: number } | null = null;
+
+  protected beginEditValue(pi: number, oi: number): void {
+    this.editing = { pi, oi };
+  }
+  protected endEditValue(): void {
+    this.editing = null;
+  }
+
+  /** Anzeigetext der Wert-Eingabe: beim Tippen roh, sonst auf 2 Nachkommastellen
+   *  lokalisiert formatiert (1.234,56) — ohne Währungssymbol (Spalte sagt €). */
+  protected offerValueText(pi: number, oi: number): string {
+    const v = this.positions[pi]?.offers[oi]?.value ?? null;
+    if (v === null) return '';
+    if (this.editing && this.editing.pi === pi && this.editing.oi === oi) {
+      return String(v);
+    }
+    return new Intl.NumberFormat(this.i18n.locale(), {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(v);
+  }
+
+  /** Lokalisierte/freie Geldeingabe robust nach `number` parsen (akzeptiert „1.234,56"
+   *  und „1234.56"); leer/ungültig → `null`. */
+  private parseNum(raw: string): number | null {
+    const s = raw.trim();
+    if (!s) return null;
+    let cleaned = s.replace(/[^\d.,-]/g, '');
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      // Letztes Trennzeichen ist das Dezimaltrennzeichen.
+      cleaned =
+        cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')
+          ? cleaned.replace(/\./g, '').replace(',', '.')
+          : cleaned.replace(/,/g, '');
+    } else if (cleaned.includes(',')) {
+      cleaned = cleaned.replace(',', '.');
+    }
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
   }
 
   setPreferred(pi: number, oi: number): void {
