@@ -4,7 +4,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
 import {
-  BadgeComponent,
   ButtonComponent,
   CardComponent,
   CellDirective,
@@ -13,11 +12,12 @@ import {
   DialogComponent,
   IconComponent,
   RowDetailDirective,
-  SelectComponent,
   type SelectOption,
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
+import { AdminApiService } from '../admin/admin-api.service';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
+import { BudgetYearTreeComponent, type BudgetYearSelection } from './budget-year-tree.component';
 
 /** Eine Baumzeile (Knoten + Tiefe für die Einrückung). */
 interface Row {
@@ -38,21 +38,30 @@ interface Row {
   selector: 'app-budget-tree',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, SelectComponent, BadgeComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, BudgetYearTreeComponent],
   templateUrl: './budget-tree.component.html',
   styleUrl: './budget-tree.component.scss',
 })
 export class BudgetTreeComponent {
   private readonly api = inject(BudgetTreeApi);
+  private readonly adminApi = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
   readonly tree = signal<BudgetTreeNode[]>([]);
   readonly fiscalYears = signal<FiscalYear[]>([]);
+  /** HHJ je Top-Budget (für den linken Navigations-Baum). */
+  readonly fiscalYearsByBudget = signal<Record<Uuid, FiscalYear[]>>({});
   readonly selectedTopId = signal('');
   readonly selectedFyId = signal('');
   readonly loading = signal(true);
   readonly loadError = signal(false);
+
+  /** Top-Budgets (Wurzeln) für den linken Baum. */
+  readonly tops = computed(() => this.tree().filter((n) => n.parentId === null));
+
+  /** Flow-State-Keys (globaler Flow) für die accepted/denied-Konfiguration. */
+  readonly stateOptions = signal<SelectOption[]>([]);
 
   /** Top-Budget anlegen (kein Gremium — Budgets sind gremium-unabhängig). */
   readonly newTop = signal<{ key: string; name: string }>({ key: '', name: '' });
@@ -72,13 +81,6 @@ export class BudgetTreeComponent {
     startDate: '',
     endDate: '',
   });
-
-  readonly topOptions = computed<SelectOption[]>(() =>
-    this.tree().map((n) => ({ value: n.id, label: `${n.key} – ${n.name}` })),
-  );
-  readonly fyOptions = computed<SelectOption[]>(() =>
-    this.fiscalYears().map((fy) => ({ value: fy.id, label: fy.label })),
-  );
 
   private readonly selectedTop = computed<BudgetTreeNode | null>(
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
@@ -108,6 +110,7 @@ export class BudgetTreeComponent {
     { key: 'allocated', label: this.i18n.translate('budget.tree.col.allocated'), align: 'end' },
     { key: 'committed', label: this.i18n.translate('budget.tree.col.committed'), align: 'end' },
     { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
+    { key: 'color', label: this.i18n.translate('budget.tree.col.color'), width: '4rem' },
     { key: 'actions', label: this.i18n.translate('budget.tree.col.actions'), align: 'end' },
   ]);
   readonly rowId = (r: unknown): string => (r as Row).node.id;
@@ -115,6 +118,28 @@ export class BudgetTreeComponent {
 
   constructor() {
     this.reload();
+    // Globaler Flow → State-Keys für die accepted/denied-Konfiguration (still degr.).
+    this.adminApi.getGlobalFlow().subscribe({
+      next: (graph) =>
+        this.stateOptions.set(
+          (graph?.states ?? []).map((s) => ({
+            value: s.key,
+            label: `${s.label['de'] ?? s.key} (${s.key})`,
+          })),
+        ),
+      error: () => this.stateOptions.set([]),
+    });
+  }
+
+  /** Aktuell gewähltes Top-Budget (für Farbe/State-Config). */
+  private readonly currentTop = computed(() => this.selectedTop());
+  readonly acceptedKeys = computed(() => new Set(this.currentTop()?.acceptedStateKeys ?? []));
+  readonly deniedKeys = computed(() => new Set(this.currentTop()?.deniedStateKeys ?? []));
+  isAccepted(key: string): boolean {
+    return this.acceptedKeys().has(key);
+  }
+  isDenied(key: string): boolean {
+    return this.deniedKeys().has(key);
   }
 
   // --- Anzeige-Helfer -------------------------------------------------------
@@ -139,8 +164,22 @@ export class BudgetTreeComponent {
         const keep = tops.some((t) => t.id === this.selectedTopId());
         const topId = keep ? this.selectedTopId() : (tops[0]?.id ?? '');
         this.selectedTopId.set(topId);
-        if (topId) this.loadFiscalYears(topId);
-        else this.fiscalYears.set([]);
+        if (!topId) this.fiscalYears.set([]);
+        // HHJ aller Top-Budgets für den linken Baum (fehlertolerant); für das
+        // gewählte Budget zugleich die rechte HHJ-Liste setzen.
+        for (const top of tops) {
+          this.api.listFiscalYears(top.id as Uuid).subscribe({
+            next: (fys) => {
+              this.fiscalYearsByBudget.update((m) => ({ ...m, [top.id]: fys }));
+              if (top.id === topId) {
+                this.fiscalYears.set(fys);
+                if (!fys.some((fy) => fy.id === this.selectedFyId()))
+                  this.selectedFyId.set(fys[0]?.id ?? '');
+              }
+            },
+            error: () => undefined,
+          });
+        }
         this.loading.set(false);
       },
       error: () => {
@@ -165,6 +204,50 @@ export class BudgetTreeComponent {
     this.selectedTopId.set(id);
     this.selectedFyId.set('');
     this.loadFiscalYears(id);
+  }
+
+  /** Jahr im linken Baum gewählt → Budget + HHJ setzen. */
+  onYearPicked(sel: BudgetYearSelection): void {
+    this.selectedTopId.set(sel.budgetId);
+    const fys = this.fiscalYearsByBudget()[sel.budgetId] ?? [];
+    this.fiscalYears.set(fys);
+    this.selectedFyId.set(sel.fiscalYearId);
+  }
+
+  /** Farbe einer Kostenstelle setzen/löschen (leer = automatisch). */
+  saveColor(node: BudgetTreeNode, color: string): void {
+    this.api.updateNode(node.id, { color: color || '' }).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.colorSaved'));
+        this.reload();
+      },
+      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
+    });
+  }
+
+  /** Einen State-Key im accepted/denied-Set des Top-Budgets umschalten (#budget). */
+  toggleState(kind: 'accepted' | 'denied', key: string): void {
+    const top = this.currentTop();
+    if (!top) return;
+    const accepted = new Set(this.acceptedKeys());
+    const denied = new Set(this.deniedKeys());
+    const target = kind === 'accepted' ? accepted : denied;
+    const other = kind === 'accepted' ? denied : accepted;
+    if (target.has(key)) {
+      target.delete(key);
+    } else {
+      target.add(key);
+      other.delete(key); // ein State ist nicht gleichzeitig accepted UND denied
+    }
+    this.api
+      .updateNode(top.id, {
+        acceptedStateKeys: [...accepted],
+        deniedStateKeys: [...denied],
+      })
+      .subscribe({
+        next: () => this.reload(),
+        error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
+      });
   }
 
   // --- Knoten anlegen/löschen ----------------------------------------------

@@ -37,6 +37,59 @@
   flex: 1 1 14rem;
 }
 
+/* Links Budget→Jahr-Baum, rechts Editor. */
+.bt__layout {
+  display: grid;
+  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.bt__nav {
+  position: sticky;
+  top: var(--space-4);
+  min-width: 0;
+}
+.bt__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+@media (max-width: 48rem) {
+  .bt__layout {
+    grid-template-columns: 1fr;
+  }
+  .bt__nav {
+    position: static;
+  }
+}
+
+.bt__states {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.bt__states th,
+.bt__states td {
+  text-align: start;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.bt__states th:not(:first-child),
+.bt__states td:not(:first-child) {
+  text-align: center;
+  width: 6rem;
+}
+.bt__color {
+  width: 2rem;
+  height: 1.6rem;
+  padding: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
 .bt__form {
   display: flex;
   flex-wrap: wrap;

@@ -49,7 +49,13 @@ async function setup() {
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
-      { provide: AdminApiService, useValue: { listGremienOptions: () => of([{ id: 'g-1', name: 'StuPa' }]) } },
+      {
+        provide: AdminApiService,
+        useValue: {
+          listGremienOptions: () => of([{ id: 'g-1', name: 'StuPa' }]),
+          getGlobalFlow: () => of(null),
+        },
+      },
     ],
   });
   const http = TestBed.inject(HttpTestingController);

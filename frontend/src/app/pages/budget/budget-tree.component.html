@@ -16,81 +16,115 @@
   </div>
 </header>
 
-<!-- Budget + Haushaltsjahr wählen (HHJ gehören zum gewählten Budget) -->
-<div class="bt__bar">
-  <app-select
-    class="bt__bar-field"
-    [label]="'budget.tree.budget' | t"
-    [placeholder]="'budget.tree.budgetPlaceholder' | t"
-    [options]="topOptions()"
-    [ngModel]="selectedTopId()"
-    (ngModelChange)="selectTop($event)"
-  />
-  <app-select
-    class="bt__bar-field"
-    [label]="'budget.tree.fiscalYear' | t"
-    [placeholder]="'budget.tree.noFiscalYear' | t"
-    [options]="fyOptions()"
-    [ngModel]="selectedFyId()"
-    (ngModelChange)="selectedFyId.set($event)"
-  />
-</div>
-
 @if (loading()) {
   <p class="bt__status" aria-live="polite">{{ 'budget.tree.loading' | t }}</p>
 } @else if (loadError()) {
   <p class="bt__status bt__status--error" role="alert">{{ 'budget.tree.error' | t }}</p>
 } @else if (!tree().length) {
   <p class="bt__status">{{ 'budget.tree.empty' | t }}</p>
-} @else if (selectedTopId()) {
-  <!-- Haushaltsjahre INNERHALB des gewählten Budgets (Anlegen via Kopf-Button) -->
-  <app-card [heading]="'budget.tree.fiscalYear' | t">
-    @if (fiscalYears().length) {
-      <ul class="bt__fy-list">
-        @for (fy of fiscalYears(); track fy.id) {
-          <li><strong>{{ fy.label }}</strong> <span class="bt__muted">{{ fy.startDate }} – {{ fy.endDate }}</span></li>
-        }
-      </ul>
-    } @else {
-      <p class="bt__muted">{{ 'budget.tree.fyEmpty' | t }}</p>
-    }
-  </app-card>
+} @else {
+  <div class="bt__layout">
+    <!-- Links: Budget → Haushaltsjahr -->
+    <aside class="bt__nav">
+      <app-budget-year-tree
+        [tops]="tops()"
+        [fiscalYears]="fiscalYearsByBudget()"
+        [selectedBudgetId]="selectedTopId()"
+        [selectedFyId]="selectedFyId()"
+        (budgetPicked)="selectTop($event)"
+        (yearPicked)="onYearPicked($event)"
+      />
+    </aside>
 
-  <!-- Kostenstellen-Baum des gewählten Budgets -->
-  <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
-    <ng-template appCell="node" let-row>
-      <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
-        <span class="bt__path">{{ $any(row).node.pathKey }}</span>
-        <span class="bt__name">{{ $any(row).node.name }}</span>
-      </span>
-    </ng-template>
-    <ng-template appCell="allocated" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.allocated, $any(row).node.currency) : '—' }}</ng-template>
-    <ng-template appCell="committed" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.committed, $any(row).node.currency) : '—' }}</ng-template>
-    <ng-template appCell="available" let-row>
-      @if (alloc($any(row).node); as a) {
-        <span [class.bt__neg]="(+a.available) < 0">{{ money(a.available, $any(row).node.currency) }}</span>
-      } @else { — }
-    </ng-template>
-    <ng-template appCell="actions" let-row>
-      <span class="bt__col-actions">
-        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!selectedFyId()" [ariaLabel]="'budget.tree.setLimit' | t" (click)="openLimit($any(row).node)"><app-icon name="edit" /></app-button>
-        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.addChild' | t" (click)="startAddChild($any(row).node)"><app-icon name="add" /></app-button>
-        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.delete' | t" (click)="deleteNode($any(row).node)"><app-icon name="delete" /></app-button>
-      </span>
-    </ng-template>
+    <main class="bt__main">
+      @if (selectedTopId()) {
+        <!-- Haushaltsjahre INNERHALB des gewählten Budgets -->
+        <app-card [heading]="'budget.tree.fiscalYear' | t">
+          @if (fiscalYears().length) {
+            <ul class="bt__fy-list">
+              @for (fy of fiscalYears(); track fy.id) {
+                <li><strong>{{ fy.label }}</strong> <span class="bt__muted">{{ fy.startDate }} – {{ fy.endDate }}</span></li>
+              }
+            </ul>
+          } @else {
+            <p class="bt__muted">{{ 'budget.tree.fyEmpty' | t }}</p>
+          }
+        </app-card>
 
-    <ng-template appRowDetail let-row>
-      <div class="bt__child-form">
-        <span class="bt__child-hint">{{ 'budget.tree.addChildUnder' | t }}: {{ $any(row).node.pathKey }}</span>
-        <label class="bt__lbl">{{ 'budget.tree.key' | t }}
-          <input [ngModel]="childDraft().key" (ngModelChange)="patchChild('key', $event)" [name]="'ck-' + $any(row).node.id" [placeholder]="'budget.tree.keyChildPlaceholder' | t" /></label>
-        <label class="bt__lbl">{{ 'budget.tree.name' | t }}
-          <input [ngModel]="childDraft().name" (ngModelChange)="patchChild('name', $event)" [name]="'cn-' + $any(row).node.id" /></label>
-        <app-button size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()" (click)="addChild($any(row).node)">{{ 'budget.tree.add' | t }}</app-button>
-        <app-button variant="ghost" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
-      </div>
-    </ng-template>
-  </app-data-table>
+        <!-- Accepted/denied Flow-States des Top-Budgets (Beantragt/Gebunden-Logik) -->
+        <app-card [heading]="'budget.tree.stateConfig' | t">
+          <p class="bt__muted">{{ 'budget.tree.stateConfigHint' | t }}</p>
+          @if (stateOptions().length) {
+            <table class="bt__states">
+              <thead>
+                <tr>
+                  <th>{{ 'budget.tree.stateCol' | t }}</th>
+                  <th>{{ 'budget.tree.accepted' | t }}</th>
+                  <th>{{ 'budget.tree.denied' | t }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of stateOptions(); track s.value) {
+                  <tr>
+                    <td>{{ s.label }}</td>
+                    <td><input type="checkbox" [checked]="isAccepted(s.value)" (change)="toggleState('accepted', s.value)" [attr.aria-label]="'budget.tree.accepted' | t" /></td>
+                    <td><input type="checkbox" [checked]="isDenied(s.value)" (change)="toggleState('denied', s.value)" [attr.aria-label]="'budget.tree.denied' | t" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <p class="bt__muted">{{ 'budget.tree.noStates' | t }}</p>
+          }
+        </app-card>
+
+        <!-- Kostenstellen-Baum des gewählten Budgets -->
+        <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
+          <ng-template appCell="node" let-row>
+            <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
+              <span class="bt__path">{{ $any(row).node.pathKey }}</span>
+              <span class="bt__name">{{ $any(row).node.name }}</span>
+            </span>
+          </ng-template>
+          <ng-template appCell="allocated" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.allocated, $any(row).node.currency) : '—' }}</ng-template>
+          <ng-template appCell="committed" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.committed, $any(row).node.currency) : '—' }}</ng-template>
+          <ng-template appCell="available" let-row>
+            @if (alloc($any(row).node); as a) {
+              <span [class.bt__neg]="(+a.available) < 0">{{ money(a.available, $any(row).node.currency) }}</span>
+            } @else { — }
+          </ng-template>
+          <ng-template appCell="color" let-row>
+            <input
+              type="color"
+              class="bt__color"
+              [value]="$any(row).node.color || '#5fb37a'"
+              (change)="saveColor($any(row).node, $any($event.target).value)"
+              [attr.aria-label]="'budget.tree.col.color' | t"
+            />
+          </ng-template>
+          <ng-template appCell="actions" let-row>
+            <span class="bt__col-actions">
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!selectedFyId()" [ariaLabel]="'budget.tree.setLimit' | t" (click)="openLimit($any(row).node)"><app-icon name="edit" /></app-button>
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.addChild' | t" (click)="startAddChild($any(row).node)"><app-icon name="add" /></app-button>
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.delete' | t" (click)="deleteNode($any(row).node)"><app-icon name="delete" /></app-button>
+            </span>
+          </ng-template>
+
+          <ng-template appRowDetail let-row>
+            <div class="bt__child-form">
+              <span class="bt__child-hint">{{ 'budget.tree.addChildUnder' | t }}: {{ $any(row).node.pathKey }}</span>
+              <label class="bt__lbl">{{ 'budget.tree.key' | t }}
+                <input [ngModel]="childDraft().key" (ngModelChange)="patchChild('key', $event)" [name]="'ck-' + $any(row).node.id" [placeholder]="'budget.tree.keyChildPlaceholder' | t" /></label>
+              <label class="bt__lbl">{{ 'budget.tree.name' | t }}
+                <input [ngModel]="childDraft().name" (ngModelChange)="patchChild('name', $event)" [name]="'cn-' + $any(row).node.id" /></label>
+              <app-button size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()" (click)="addChild($any(row).node)">{{ 'budget.tree.add' | t }}</app-button>
+              <app-button variant="ghost" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
+            </div>
+          </ng-template>
+        </app-data-table>
+      }
+    </main>
+  </div>
 }
 
 <!-- Limit (Zuteilung) je Kostenstelle setzen — Dialog pro Zeile -->
