@@ -846,12 +846,21 @@ const AUTOSAVE_DELAY_MS = 1000;
         font-size: var(--fs-sm);
       }
       .mtg__tocEmpty {
-        padding: var(--space-2);
+        padding: var(--space-4) var(--space-2);
+        text-align: center;
+        border: var(--border-width) dashed var(--color-border);
+        border-radius: var(--radius-md);
+        font-size: var(--fs-sm);
       }
       .mtg__tocAdd {
         display: flex;
         gap: var(--space-2);
         align-items: center;
+      }
+      .mtg__tocAdd > app-select,
+      .mtg__tocAdd > .mtg__input {
+        flex: 1;
+        min-width: 0;
       }
       .mtg__topEditor {
         display: flex;
@@ -871,7 +880,14 @@ const AUTOSAVE_DELAY_MS = 1000;
         font-size: var(--fs-md);
       }
       .mtg__topEmpty {
-        padding: var(--space-5) 0;
+        display: grid;
+        place-items: center;
+        min-height: 12rem;
+        margin: 0;
+        padding: var(--space-5);
+        text-align: center;
+        border: var(--border-width) dashed var(--color-border);
+        border-radius: var(--radius-md);
       }
       .mtg__att {
         list-style: none;
