@@ -13,7 +13,8 @@ export type IconName =
   | 'user'
   | 'chevron-down'
   | 'power'
-  | 'filter';
+  | 'filter'
+  | 'check';
 
 /**
  * Inline-SVG-Icon-Set (#80). Saubere, konsistente `currentColor`-Icons (folgen
@@ -88,6 +89,9 @@ export type IconName =
         }
         @case ('filter') {
           <path d="M3 4h18l-7 8v6l-4 2v-8z" />
+        }
+        @case ('check') {
+          <path d="M20 6 9 17l-5-5" />
         }
       }
     </svg>

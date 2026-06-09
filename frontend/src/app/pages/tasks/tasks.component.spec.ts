@@ -61,9 +61,10 @@ describe('TasksComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Keine Berechtigung für diese Entscheidung.');
   });
 
-  it('offers Open instead of decide buttons on a vote task', async () => {
+  it('shows no decide buttons on a vote task (row click opens detail)', async () => {
     await setup([task('v1', 'vote')]);
-    expect(screen.getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
+    expect(screen.getByText('Mein Antrag')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Annehmen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ablehnen' })).not.toBeInTheDocument();
   });
 });

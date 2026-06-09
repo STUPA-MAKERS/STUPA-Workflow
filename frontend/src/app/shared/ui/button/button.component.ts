@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 /** Basis-Button des UI-Kits. Clean/minimal, CD-Tokens, a11y-Fokus. */
@@ -110,6 +110,16 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
         filter: brightness(1.08);
       }
       .btn--danger:active:not(:disabled) {
+        filter: brightness(0.94);
+      }
+      .btn--success {
+        background: var(--color-success);
+        color: var(--color-text-inverse);
+      }
+      .btn--success:hover:not(:disabled) {
+        filter: brightness(1.08);
+      }
+      .btn--success:active:not(:disabled) {
         filter: brightness(0.94);
       }
       .btn__spinner {

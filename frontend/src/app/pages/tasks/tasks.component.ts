@@ -11,6 +11,7 @@ import {
   CellDirective,
   type ColumnDef,
   DataTableComponent,
+  IconComponent,
   ToastService,
 } from '@shared/ui';
 import { stateBadgeVariant } from '../applications/applications.util';
@@ -24,7 +25,7 @@ import { stateBadgeVariant } from '../applications/applications.util';
   selector: 'app-tasks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, DataTableComponent, CellDirective],
+  imports: [DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, DataTableComponent, CellDirective, IconComponent],
   template: `
     <header class="tasks__head">
       <h1 class="tasks__title">{{ 'tasks.title' | t }}</h1>
@@ -48,14 +49,26 @@ import { stateBadgeVariant } from '../applications/applications.util';
         <ng-template appCell="amount" let-r>{{ $any(r).amount ? ($any(r).amount + ' ' + ($any(r).currency ?? '')) : '—' }}</ng-template>
         <ng-template appCell="createdAt" let-r>{{ $any(r).createdAt | date: 'mediumDate' }}</ng-template>
         <ng-template appCell="actions" let-r>
-          <span class="tasks__actions" (click)="$event.stopPropagation()">
-            @if ($any(r).state?.kind === 'approval') {
-              <app-button variant="primary" size="sm" [loading]="deciding() === $any(r).id" (click)="decide($any(r).id, 'accept')">{{ 'tasks.accept' | t }}</app-button>
-              <app-button variant="danger" size="sm" [loading]="deciding() === $any(r).id" (click)="decide($any(r).id, 'reject')">{{ 'tasks.reject' | t }}</app-button>
-            } @else {
-              <app-button variant="secondary" size="sm" (click)="open($any(r).id)">{{ 'tasks.open' | t }}</app-button>
-            }
-          </span>
+          @if ($any(r).state?.kind === 'approval') {
+            <span class="tasks__actions" (click)="$event.stopPropagation()">
+              <app-button
+                variant="success"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'tasks.accept' | t"
+                [loading]="deciding() === $any(r).id"
+                (click)="decide($any(r).id, 'accept')"
+              ><app-icon name="check" [size]="16" /></app-button>
+              <app-button
+                variant="danger"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'tasks.reject' | t"
+                [loading]="deciding() === $any(r).id"
+                (click)="decide($any(r).id, 'reject')"
+              ><app-icon name="remove" [size]="16" /></app-button>
+            </span>
+          }
         </ng-template>
       </app-data-table>
     }
@@ -87,7 +100,7 @@ export class TasksComponent {
     { key: 'state', label: this.i18n.translate('tasks.col.state') },
     { key: 'amount', label: this.i18n.translate('tasks.col.amount'), align: 'end', width: '10rem' },
     { key: 'createdAt', label: this.i18n.translate('tasks.col.created'), width: '10rem' },
-    { key: 'actions', label: this.i18n.translate('tasks.col.actions'), align: 'end', width: '14rem' },
+    { key: 'actions', label: this.i18n.translate('tasks.col.actions'), align: 'end', width: '7rem' },
   ]);
 
   /** Antragstitel (System-Titelfeld) mit Fallback. */

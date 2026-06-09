@@ -132,7 +132,7 @@ export const routes: Routes = [
       {
         // Kostenstellen-Baum in der Verwaltung (#9) — ersetzt die flache Töpfe-Liste.
         path: 'admin/budget-pots',
-        data: { title: 'budget.tree.title', permission: 'budget.manage' },
+        data: { title: 'budget.tree.title', permission: 'budget.manage', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
@@ -146,7 +146,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/users',
-        data: { title: 'admin.users.title', permission: 'admin.roles' },
+        data: { title: 'admin.users.title', permission: 'admin.roles', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/users/users.component').then((m) => m.UsersComponent),
@@ -154,28 +154,28 @@ export const routes: Routes = [
       {
         // Rollen-Rechte aus dem Benutzer-Screen herausgelöst (#12).
         path: 'admin/roles',
-        data: { title: 'admin.roles.title', permission: 'admin.roles' },
+        data: { title: 'admin.roles.title', permission: 'admin.roles', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/roles/roles.component').then((m) => m.AdminRolesComponent),
       },
       {
         path: 'admin/forms',
-        data: { title: 'admin.forms.listTitle', permission: 'form.configure' },
+        data: { title: 'admin.forms.listTitle', permission: 'form.configure', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/forms/forms-list.component').then((m) => m.FormsListComponent),
       },
       {
         path: 'admin/forms/:id',
-        data: { title: 'admin.forms.edit', permission: 'form.configure', parent: ['admin/forms'] },
+        data: { title: 'admin.forms.edit', permission: 'form.configure', parent: ['admin', 'admin/forms'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
       },
       {
         path: 'admin/flow',
-        data: { title: 'admin.flow.title', permission: 'flow.configure' },
+        data: { title: 'admin.flow.title', permission: 'flow.configure', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/flow-editor/flow-editor.component').then(
@@ -184,7 +184,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/gremien',
-        data: { title: 'admin.gremien.title', permission: 'admin.config' },
+        data: { title: 'admin.gremien.title', permission: 'admin.config', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/gremien/gremien.component').then((m) => m.AdminGremienComponent),
@@ -192,7 +192,7 @@ export const routes: Routes = [
       {
         // Mitglieder-Unterseite je Gremium (#18).
         path: 'admin/gremien/:id/members',
-        data: { title: 'admin.gremien.membersOf', permission: 'admin.config', parent: ['admin/gremien'] },
+        data: { title: 'admin.gremien.membersOf', permission: 'admin.config', parent: ['admin', 'admin/gremien'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/gremien/gremium-members.component').then(
@@ -201,7 +201,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/branding',
-        data: { title: 'admin.brand.title', permission: 'admin.config' },
+        data: { title: 'admin.brand.title', permission: 'admin.config', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/branding/branding-editor.component').then(
@@ -210,14 +210,14 @@ export const routes: Routes = [
       },
       {
         path: 'admin/webhooks',
-        data: { title: 'admin.webhook.title', permission: 'webhook.manage' },
+        data: { title: 'admin.webhook.title', permission: 'webhook.manage', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/config/webhooks.component').then((m) => m.WebhooksComponent),
       },
       {
         path: 'admin/notifications',
-        data: { title: 'admin.notif.title', permission: 'notification.manage' },
+        data: { title: 'admin.notif.title', permission: 'notification.manage', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/config/notification-rules.component').then(
@@ -226,7 +226,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/gremien/:id/roles',
-        data: { title: 'admin.gremiumRoles.title', permission: 'admin.roles', parent: ['admin/gremien'] },
+        data: { title: 'admin.gremiumRoles.title', permission: 'admin.roles', parent: ['admin', 'admin/gremien'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/gremium-roles/gremium-roles.component').then(
@@ -235,14 +235,14 @@ export const routes: Routes = [
       },
       {
         path: 'admin/audit',
-        data: { title: 'admin.audit.title', permission: 'audit.read' },
+        data: { title: 'admin.audit.title', permission: 'audit.read', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/audit/audit-log.component').then((m) => m.AuditLogComponent),
       },
       {
         path: 'admin/delegations',
-        data: { title: 'admin.deleg.title', permission: 'admin.roles' },
+        data: { title: 'admin.deleg.title', permission: 'admin.roles', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/delegations/delegations.component').then(
