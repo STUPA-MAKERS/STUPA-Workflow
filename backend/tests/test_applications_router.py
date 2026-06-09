@@ -75,12 +75,17 @@ class _FakeService:
         self.created_actor = actor
         return _FakeApp(uuid4()), str(payload.applicant_email)
 
-    async def get(self, application_id, *, include_pii):  # noqa: ANN001
+    async def get(  # noqa: ANN001
+        self, application_id, *, include_pii, requester_sub=None, requester_can_manage=False
+    ):
         self.last_include_pii = include_pii
         return _out(application_id, with_pii=include_pii)
 
     async def patch(self, application_id, data, *, changed_by):  # noqa: ANN001
         return _out(application_id, with_pii=False)
+
+    async def delete(self, application_id):  # noqa: ANN001
+        self.deleted = application_id
 
     async def timeline(self, application_id):  # noqa: ANN001
         return [
@@ -285,6 +290,23 @@ def test_patch_application_applicant_view_forbidden(app: FastAPI, client: TestCl
     app_id = uuid4()
     _as_applicant(app, app_id, "view")
     r = client.patch(f"/api/applications/{app_id}", json={"data": {}})
+    assert r.status_code == 403
+
+
+def test_delete_application_manager(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    app_id = uuid4()
+    _as_principal(app, "application.manage")
+    r = client.delete(f"/api/applications/{app_id}")
+    assert r.status_code == 204
+    assert fake_service.deleted == app_id
+
+
+def test_delete_application_applicant_view_forbidden(app: FastAPI, client: TestClient) -> None:
+    app_id = uuid4()
+    _as_applicant(app, app_id, "view")
+    r = client.delete(f"/api/applications/{app_id}")
     assert r.status_code == 403
 
 

@@ -64,6 +64,10 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     currency: Mapped[str | None] = mapped_column(CHAR(3), nullable=True)
     data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     lang: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # OIDC-``sub`` der/des erstellenden Principals (eingeloggte Antragstellung, #24).
+    # ``None`` bei anonymer Einreichung. Erlaubt Lesen/Bearbeiten/Löschen des eigenen
+    # Antrags ohne ``application.manage``.
+    created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index(

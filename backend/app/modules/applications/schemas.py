@@ -91,6 +91,8 @@ class ApplicationOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     applicant: ApplicantOut | None = None
+    # Darf der/die Anfragende bearbeiten/löschen (Verwalter:in oder Ersteller:in, #24)?
+    can_edit: bool = Field(default=False, alias="canEdit")
 
 
 class ApplicationPatch(_CamelModel):

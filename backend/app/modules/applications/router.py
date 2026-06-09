@@ -212,8 +212,14 @@ async def get_application(
     access: Annotated[Access, Depends(require_app_read)],
 ) -> ApplicationOut:
     """Antrag lesen. PII/interne Sicht nur für Principals."""
+    principal = access.principal
     return await service.get(
-        access.application_id, include_pii=access.can_see_internal
+        access.application_id,
+        include_pii=access.can_see_internal,
+        requester_sub=principal.sub if principal is not None else None,
+        requester_can_manage=principal.has("application.manage")
+        if principal is not None
+        else False,
     )
 
 
@@ -231,6 +237,19 @@ async def patch_application(
     return await service.patch(
         access.application_id, payload.data, changed_by=access.actor
     )
+
+
+@router.delete(
+    "/applications/{application_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_application(
+    service: ServiceDep,
+    access: Annotated[Access, Depends(require_app_edit)],
+) -> None:
+    """Antrag löschen — Verwalter:in (``application.manage``) oder Ersteller:in (#24)."""
+    await service.delete(access.application_id)
 
 
 @router.get(

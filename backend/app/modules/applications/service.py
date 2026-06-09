@@ -184,7 +184,7 @@ class ApplicationsService:
         return fields
 
     async def _to_out(
-        self, app: Application, *, include_pii: bool
+        self, app: Application, *, include_pii: bool, can_edit: bool = False
     ) -> ApplicationOut:
         state = await self._get_state(app.current_state_id)
         version = await self._current_version(app.id)
@@ -215,6 +215,7 @@ class ApplicationsService:
             createdAt=app.created_at,
             updatedAt=app.updated_at,
             applicant=applicant_out,
+            canEdit=can_edit,
         )
 
     # ------------------------------------------------------------------ create
@@ -269,6 +270,8 @@ class ApplicationsService:
             currency=currency,
             data=clean,
             lang=payload.lang,
+            # Eingeloggte Antragstellung (#24): Ersteller:in merken (anonym → None).
+            created_by=actor if actor != "applicant" else None,
         )
         self.session.add(app)
         await self.session.flush()
@@ -336,9 +339,19 @@ class ApplicationsService:
         return state
 
     # ------------------------------------------------------------------- read
-    async def get(self, application_id: UUID, *, include_pii: bool) -> ApplicationOut:
+    async def get(
+        self,
+        application_id: UUID,
+        *,
+        include_pii: bool,
+        requester_sub: str | None = None,
+        requester_can_manage: bool = False,
+    ) -> ApplicationOut:
         app = await self._get_app(application_id)
-        return await self._to_out(app, include_pii=include_pii)
+        can_edit = requester_can_manage or (
+            requester_sub is not None and app.created_by == requester_sub
+        )
+        return await self._to_out(app, include_pii=include_pii, can_edit=can_edit)
 
     # ------------------------------------------------------------------ patch
     async def patch(
@@ -384,6 +397,13 @@ class ApplicationsService:
         # vor dem Serialisieren explizit nachladen (sonst Lazy-IO außerhalb await).
         await self.session.refresh(app)
         return await self._to_out(app, include_pii=False)
+
+    # ----------------------------------------------------------------- delete
+    async def delete(self, application_id: UUID) -> None:
+        """Antrag löschen (mit abhängigen PII/Versionen/Events/Budget via Cascade)."""
+        app = await self._get_app(application_id)
+        await self.session.delete(app)
+        await self.session.commit()
 
     # --------------------------------------------------------------- timeline
     async def timeline(self, application_id: UUID) -> list[TimelineEventOut]:

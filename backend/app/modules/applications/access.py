@@ -17,8 +17,11 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_applicant, get_current_principal
+from app.deps import DbSession, get_current_applicant, get_current_principal
+from app.modules.applications.models import Application
 from app.modules.auth.principal import Applicant, ApplicantScope, Principal
 from app.shared.errors import ForbiddenError, UnauthorizedError
 
@@ -74,26 +77,57 @@ def resolve_access(
     raise UnauthorizedError("Authentication required.")
 
 
+async def _is_creator(db: AsyncSession, application_id: UUID, principal: Principal) -> bool:
+    """Ist dieser Principal der/die eingeloggte Ersteller:in des Antrags (#24)?"""
+    created_by = await db.scalar(
+        select(Application.created_by).where(Application.id == application_id)
+    )
+    return created_by is not None and created_by == principal.sub
+
+
+async def _resolve_with_creator(
+    db: AsyncSession,
+    application_id: UUID,
+    principal: Principal | None,
+    applicant: Applicant | None,
+    *,
+    perm: str,
+    scope: ApplicantScope,
+) -> Access:
+    """Wie :func:`resolve_access`, lässt aber den eingeloggten Ersteller (created_by ==
+    principal.sub) auch ohne ``perm`` zu — für den eigenen Antrag (#24)."""
+    try:
+        return resolve_access(application_id, principal, applicant, perm=perm, scope=scope)
+    except ForbiddenError:
+        if principal is not None and await _is_creator(db, application_id, principal):
+            return Access(application_id, principal, None)
+        raise
+
+
 async def require_app_read(
     application_id: UUID,
+    db: DbSession,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Access:
-    """Lesezugriff: Principal mit ``application.read`` oder ``view``-Antragsteller."""
-    return resolve_access(
-        application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
+    """Lesezugriff: Principal mit ``application.read``, ``view``-Antragsteller oder
+    eingeloggte:r Ersteller:in des eigenen Antrags (#24)."""
+    return await _resolve_with_creator(
+        db, application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
     )
 
 
 async def require_app_edit(
     application_id: UUID,
+    db: DbSession,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Access:
-    """Schreibzugriff: Principal mit ``application.manage`` oder ``edit``-Antragsteller.
+    """Schreibzugriff: Principal mit ``application.manage``, ``edit``-Antragsteller oder
+    eingeloggte:r Ersteller:in des eigenen Antrags (#24).
 
     Der Edit-Lock (``state.editAllowed``) wird **zusätzlich** im Service geprüft (409),
     unabhängig von der Identität."""
-    return resolve_access(
-        application_id, principal, applicant, perm=MANAGE_PERMISSION, scope="edit"
+    return await _resolve_with_creator(
+        db, application_id, principal, applicant, perm=MANAGE_PERMISSION, scope="edit"
     )
