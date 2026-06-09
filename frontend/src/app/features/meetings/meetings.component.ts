@@ -1481,7 +1481,6 @@ const AUTOSAVE_DELAY_MS = 1000;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: var(--color-primary);
-        background: var(--color-surface);
       }
       .mtg__tlNoUp {
         padding-left: var(--space-6);

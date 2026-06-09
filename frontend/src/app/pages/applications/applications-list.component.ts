@@ -1,13 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  type ElementRef,
   computed,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -15,7 +18,6 @@ import type {
   ApplicationListItem,
   ApplicationListQuery,
   ApplicationType,
-  Page,
   Uuid,
 } from '@core/api/models';
 import { ButtonComponent } from '@shared/ui/button/button.component';
@@ -158,28 +160,23 @@ import { downloadBlob } from '@shared/download.util';
         (sortChange)="onSort($event)"
       />
 
-      @if (total() > limit) {
-        <nav class="apps__pager" [attr.aria-label]="'applications.list.title' | t">
-          <app-button
-            variant="secondary"
-            size="sm"
-            [disabled]="!hasPrev()"
-            (click)="prev()"
-          >
-            ← {{ 'applications.list.prev' | t }}
-          </app-button>
-          <span class="apps__pageInfo">
-            {{ 'applications.list.page' | t: { page: pageNumber(), pages: pageCount() } }}
-          </span>
-          <app-button
-            variant="secondary"
-            size="sm"
-            [disabled]="!hasNext()"
-            (click)="next()"
-          >
-            {{ 'applications.list.next' | t }} →
-          </app-button>
-        </nav>
+      <!-- Infinite-Scroll: Sentinel nur solange weitere Seiten existieren (#27). -->
+      @if (hasMore()) {
+        <div #sentinel class="apps__sentinel" aria-hidden="true"></div>
+        <div class="apps__more">
+          @if (loadingMore()) {
+            <span class="apps__status" aria-live="polite">{{ 'applications.list.loadingMore' | t }}</span>
+          } @else {
+            <app-button variant="secondary" size="sm" (click)="loadMore()">
+              {{ 'applications.list.loadMore' | t }}
+            </app-button>
+          }
+        </div>
+      }
+      @if (total() > 0) {
+        <p class="apps__count" aria-live="polite">
+          {{ 'applications.list.count' | t: { count: items().length, total: total() } }}
+        </p>
       }
     }
     </div>
@@ -355,16 +352,21 @@ import { downloadBlob } from '@shared/download.util';
         color: var(--color-text-muted);
         flex: 0 0 auto;
       }
-      .apps__pager {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: var(--space-4);
-        margin-top: var(--space-5);
+      /* Infinite-Scroll-Trigger: unsichtbar, sitzt vor dem Listenende, damit der
+         Observer (rootMargin 400px) frühzeitig nachlädt. */
+      .apps__sentinel {
+        height: 1px;
       }
-      .apps__pageInfo {
+      .apps__more {
+        display: flex;
+        justify-content: center;
+        margin-top: var(--space-4);
+      }
+      .apps__count {
+        text-align: center;
         color: var(--color-text-muted);
         font-size: var(--fs-sm);
+        margin-top: var(--space-3);
       }
     `,
   ],
@@ -382,9 +384,19 @@ export class ApplicationsListComponent {
 
   readonly limit = 20;
 
+  /** Erst-Ladevorgang (Filter-/Sortier-Wechsel) — blendet die ganze Liste aus. */
   readonly loading = signal(true);
+  /** Nachladen weiterer Seiten beim Scrollen (inkrementell, Liste bleibt sichtbar). */
+  readonly loadingMore = signal(false);
   readonly error = signal(false);
-  private readonly result = signal<Page<ApplicationListItem> | null>(null);
+  /** Akkumulierte Anträge über alle bisher geladenen Seiten (Infinite-Scroll). */
+  readonly items = signal<ApplicationListItem[]>([]);
+  readonly total = signal(0);
+  /** Offset der **nächsten** zu ladenden Seite. */
+  private nextOffset = 0;
+  /** `gremium`/`topf` haben keine sichtbaren Controls — aus der URL gespiegelt. */
+  private gremium = '';
+  private topf = '';
   readonly types = signal<ApplicationType[]>([]);
 
   /** Sichtbare Filter-Controls (gespiegelt aus den Query-Params). */
@@ -428,13 +440,11 @@ export class ApplicationsListComponent {
     [...this.seenStates()].map(([value, label]) => ({ value, label })),
   );
 
-  readonly items = computed(() => this.result()?.items ?? []);
-  readonly total = computed(() => this.result()?.total ?? 0);
-  private readonly offset = computed(() => this.result()?.offset ?? 0);
-  readonly pageCount = computed(() => Math.max(1, Math.ceil(this.total() / this.limit)));
-  readonly pageNumber = computed(() => Math.floor(this.offset() / this.limit) + 1);
-  readonly hasPrev = computed(() => this.offset() > 0);
-  readonly hasNext = computed(() => this.offset() + this.limit < this.total());
+  /** Noch ungeladene Anträge vorhanden? Steuert Sentinel + „Mehr laden". */
+  readonly hasMore = computed(() => this.items().length < this.total());
+
+  /** Sentinel am Listenende — sein Sichtbarwerden löst das Nachladen aus. */
+  readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   private readonly typesById = computed(
     () => new Map(this.types().map((t) => [t.id, t.name])),
@@ -469,6 +479,9 @@ export class ApplicationsListComponent {
       error: () => this.budgetTree.set([]),
     });
 
+    // Filter/Sortierung leben in den Query-Params: jede Änderung setzt die Liste
+    // zurück und lädt Seite 0 neu. Der Offset liegt **nicht** mehr in der URL
+    // (Infinite-Scroll), sondern wird intern hochgezählt.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.q.set(pm.get('q') ?? '');
       this.typeId.set(pm.get('type') ?? '');
@@ -478,9 +491,29 @@ export class ApplicationsListComponent {
       this.createdFrom.set(pm.get('createdFrom') ?? '');
       this.createdTo.set(pm.get('createdTo') ?? '');
       this.budgetId.set(pm.get('budget') ?? '');
+      this.gremium = pm.get('gremium') ?? '';
+      this.topf = pm.get('topf') ?? '';
       this.sortField.set(pm.get('sort') === 'amount' ? 'amount' : 'createdAt');
       this.sortOrder.set(pm.get('order') === 'asc' ? 'asc' : 'desc');
-      this.load(pm);
+      this.reload();
+    });
+
+    // True-Lazy-Infinite-Scroll: ein IntersectionObserver am Sentinel lädt die
+    // nächste Seite, sobald das Listenende in Sichtweite kommt (rootMargin als
+    // Prefetch). Der Effect re-bindet, sobald der Sentinel (nur bei hasMore)
+    // erscheint/verschwindet.
+    effect((onCleanup) => {
+      const el = this.sentinel()?.nativeElement;
+      // Kein Observer ohne DOM-API (SSR/Tests) — der „Mehr laden"-Button bleibt Fallback.
+      if (!el || typeof IntersectionObserver === 'undefined') return;
+      const obs = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) this.loadMore();
+        },
+        { rootMargin: '400px' },
+      );
+      obs.observe(el);
+      onCleanup(() => obs.disconnect());
     });
   }
 
@@ -578,12 +611,11 @@ export class ApplicationsListComponent {
     this.navigate({ sort: sort.field, order: sort.order, offset: null });
   }
 
-  prev(): void {
-    this.navigate({ offset: Math.max(0, this.offset() - this.limit) || null });
-  }
-
-  next(): void {
-    this.navigate({ offset: this.offset() + this.limit });
+  /** Nächste Seite anhängen (Sentinel sichtbar oder „Mehr laden"-Button). */
+  loadMore(): void {
+    if (this.loadingMore() || this.loading() || !this.hasMore()) return;
+    this.loadingMore.set(true);
+    this.fetch(false);
   }
 
   private navigate(queryParams: Record<string, string | number | null>): void {
@@ -594,47 +626,55 @@ export class ApplicationsListComponent {
     });
   }
 
-  private load(pm: ParamMap): void {
-    const query: ApplicationListQuery = {
-      limit: this.limit,
-      offset: Number(pm.get('offset') ?? 0) || 0,
-    };
-    const q = pm.get('q');
-    const type = pm.get('type');
-    const state = pm.get('state');
-    const gremium = pm.get('gremium');
-    const topf = pm.get('topf');
-    const budget = pm.get('budget');
-    const amountMin = pm.get('amountMin');
-    const amountMax = pm.get('amountMax');
-    const createdFrom = pm.get('createdFrom');
-    const createdTo = pm.get('createdTo');
-    const sort = pm.get('sort');
-    const order = pm.get('order');
-    if (q) query.q = q;
-    if (type) query.type = type;
-    if (state) query.state = state;
-    if (gremium) query.gremium = gremium;
-    if (topf) query.topf = topf;
-    if (budget) query.budget = budget;
-    if (amountMin) query.amountMin = Number(amountMin);
-    if (amountMax) query.amountMax = Number(amountMax);
-    if (createdFrom) query.createdFrom = createdFrom;
-    if (createdTo) query.createdTo = createdTo;
-    if (sort === 'amount' || sort === 'createdAt') query.sort = sort;
-    if (order === 'asc' || order === 'desc') query.order = order;
-
+  /** Liste zurücksetzen (Filter-/Sortier-Wechsel) und Seite 0 neu laden. */
+  private reload(): void {
+    this.nextOffset = 0;
+    this.items.set([]);
+    this.total.set(0);
+    this.loadingMore.set(false);
     this.loading.set(true);
     this.error.set(false);
-    this.api.listApplications(query).subscribe({
+    this.fetch(true);
+  }
+
+  /** Query aus dem aktuellen Filter-Zustand für einen gegebenen Offset bauen. */
+  private buildQuery(offset: number): ApplicationListQuery {
+    const query: ApplicationListQuery = { limit: this.limit, offset };
+    if (this.q().trim()) query.q = this.q().trim();
+    if (this.typeId()) query.type = this.typeId();
+    if (this.state()) query.state = this.state();
+    if (this.gremium) query.gremium = this.gremium;
+    if (this.topf) query.topf = this.topf;
+    if (this.budgetId()) query.budget = this.budgetId();
+    if (this.amountMin().trim()) query.amountMin = Number(this.amountMin());
+    if (this.amountMax().trim()) query.amountMax = Number(this.amountMax());
+    if (this.createdFrom().trim()) query.createdFrom = this.createdFrom();
+    if (this.createdTo().trim()) query.createdTo = this.createdTo();
+    query.sort = this.sortField();
+    query.order = this.sortOrder();
+    return query;
+  }
+
+  /**
+   * Eine Seite holen. ``initial`` ersetzt die Liste (und zeigt bei Fehler den
+   * Vollfehler), sonst wird angehängt (Fehler beim Nachladen bleibt still — die
+   * bereits geladene Liste bleibt nutzbar).
+   */
+  private fetch(initial: boolean): void {
+    this.api.listApplications(this.buildQuery(this.nextOffset)).subscribe({
       next: (page) => {
-        this.result.set(page);
+        this.total.set(page.total);
+        this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
+        // Über die tatsächliche Trefferzahl hochzählen (letzte Seite < limit).
+        this.nextOffset = page.offset + page.items.length;
         this.collectStates(page.items);
         this.loading.set(false);
+        this.loadingMore.set(false);
       },
       error: () => {
-        this.error.set(true);
+        if (initial) this.error.set(true);
         this.loading.set(false);
+        this.loadingMore.set(false);
       },
     });
   }

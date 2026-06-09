@@ -47,6 +47,8 @@ const ITEM: ApplicationListItemWire = {
   updatedAt: '2026-05-30T09:00:00Z',
 };
 
+const ITEM2: ApplicationListItemWire = { ...ITEM, id: 'app-2', title: 'Zweiter Antrag' };
+
 async function setup() {
   const view = await render(ApplicationsListComponent, {
     providers: [
@@ -151,34 +153,37 @@ describe('ApplicationsListComponent', () => {
     http.verify();
   });
 
-  it('serialises offset-based paging into the list query', async () => {
+  it('requests the first page and shows the count + "load more" when more exist', async () => {
     const { http, detectChanges } = await setup();
     flushTypes(http);
-    // 50 total over a page size of 20 → pager visible, next page advances offset
+    // 50 total, only 1 loaded so far → infinite-scroll fallback button visible.
     const req = http.expectOne((r) => r.url === '/api/applications');
     expect(req.request.params.get('limit')).toBe('20');
     expect(req.request.params.get('offset')).toBe('0');
     req.flush(listPage([ITEM], 50));
     detectChanges();
 
-    expect(screen.getByText('Seite 1 von 3')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '← Zurück' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Weiter →' })).toBeEnabled();
+    expect(screen.getByText('1 von 50')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mehr laden' })).toBeEnabled();
     http.verify();
   });
 
-  it('advances the offset by the page size on "next"', async () => {
-    const { http, detectChanges, router } = await setup();
+  it('appends the next page on "load more" (infinite scroll)', async () => {
+    const { http, detectChanges } = await setup();
     flushTypes(http);
     http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM], 50));
     detectChanges();
 
-    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    await userEvent.click(screen.getByRole('button', { name: 'Weiter →' }));
-    expect(navigate).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({ queryParams: expect.objectContaining({ offset: 20 }) }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Mehr laden' }));
+    // Nächster Offset = bisher geladene Trefferzahl (hier 1), Filter bleiben erhalten.
+    const more = http.expectOne((r) => r.url === '/api/applications');
+    expect(more.request.params.get('offset')).toBe('1');
+    more.flush(listPage([ITEM2], 50));
+    detectChanges();
+
+    expect(screen.getByRole('link', { name: /Mein Antrag/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Zweiter Antrag/ })).toBeInTheDocument();
+    expect(screen.getByText('2 von 50')).toBeInTheDocument();
     http.verify();
   });
 
