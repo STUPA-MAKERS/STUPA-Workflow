@@ -2,6 +2,8 @@
 
 Branch: `feat/admin-ux-flow-editor-fixes`
 
+**Status (2026-06-10):** Done — #1, #2, #5, #6, #8, #10. Open — #3, #4, #7, #9, #11.
+
 **How to use this file**
 - Each task is a `- [ ]` checkbox. Tick it when done.
 - Subtasks under each task can be copied straight into your todo list.
@@ -14,27 +16,27 @@ Branch: `feat/admin-ux-flow-editor-fixes`
 ## 1. Admin dashboard restyle
 Target: `frontend/src/app/pages/admin/admin-home.component.ts` (the `/admin` landing).
 
-- [ ] Shorten each tile description to one short line
-- [ ] Add a fitting large icon to the left of each tile title
-- [ ] Make tiles look intuitive / modern (icon-left layout, consistent card sizing)
-- [ ] Remove the "active forms" section at the bottom (the form-overview table)
-- [ ] Update tile description i18n keys (de + en)
+- [x] Shorten each tile description to one short line
+- [x] Add a fitting large icon to the left of each tile title
+- [x] Make tiles look intuitive / modern (icon-left layout, consistent card sizing)
+- [x] Remove the "active forms" section at the bottom (the form-overview table)
+- [x] Update tile description i18n keys (de + en)
 
 ---
 
 ## 2. Excel export — budget + applications
 Two separate global permissions, real `.xlsx` output (openpyxl). Default grants: `budget.export` → finance + manager, `application.export` → manager. Exports honour the currently active filters; budget export covers the whole tree filtered by current year/selection.
 
-- [ ] Add global permissions `budget.export` and `application.export`
-  - [ ] Add both to `ALL_PERMISSIONS` and to admin role in `backend/migrations/versions/0003_seed_roles.py` (or new migration)
-  - [ ] Grant `budget.export` to finance + manager, `application.export` to manager
-- [ ] Backend: add `openpyxl` dependency
-- [ ] Backend: `GET /api/budget/export.xlsx` (respects current budget filters), gated by `budget.export`
-- [ ] Backend: `GET /api/applications/export.xlsx` (respects current list filters), gated by `application.export`
-- [ ] Frontend: export button on budget tab (`budget-dashboard.component.ts`), visible only with `budget.export`
-- [ ] Frontend: export button on applications list (`applications-list.component.ts`), visible only with `application.export`
-- [ ] Exports honour active filters/search (budget tree node, year; app state/gremium/type/budget/q)
-- [ ] i18n for buttons + permission labels (de + en)
+- [x] Add global permissions `budget.export` and `application.export`
+  - [x] Add both to `ALL_PERMISSIONS` and to admin role in `backend/migrations/versions/0003_seed_roles.py` (or new migration)
+  - [x] Grant `budget.export` to finance + manager, `application.export` to manager
+- [x] Backend: add `openpyxl` dependency
+- [x] Backend: `GET /api/budget/export.xlsx` (respects current budget filters), gated by `budget.export`
+- [x] Backend: `GET /api/applications/export.xlsx` (respects current list filters), gated by `application.export`
+- [x] Frontend: export button on budget tab (`budget-dashboard.component.ts`), visible only with `budget.export`
+- [x] Frontend: export button on applications list (`applications-list.component.ts`), visible only with `application.export`
+- [x] Exports honour active filters/search (budget tree node, year; app state/gremium/type/budget/q)
+- [x] i18n for buttons + permission labels (de + en)
 
 ---
 
@@ -72,23 +74,23 @@ Target: `frontend/src/app/pages/applications/applications-detail.component.ts`.
 ## 5. /admin/users table fixes
 Target: `frontend/src/app/pages/admin/users/users.component.ts`.
 
-- [ ] Make the **name** column wider
-- [ ] Remove the **oidc-subject** column
-- [ ] Roles column shows **global roles only** (exclude gremium-scoped)
-- [ ] "Add role" expand view: remove the extra heading (e.g. "Rolle zuweisen: Test User")
-- [ ] "Assign" button: same height as the date-selectors / dropdown on the left
-- [ ] "Suchen" button: same height as its input
-- [ ] i18n if any text changes (de + en)
+- [x] Make the **name** column wider
+- [x] Remove the **oidc-subject** column
+- [x] Roles column shows **global roles only** (exclude gremium-scoped)
+- [x] "Add role" expand view: remove the extra heading (e.g. "Rolle zuweisen: Test User")
+- [x] "Assign" button: same height as the date-selectors / dropdown on the left
+- [x] "Suchen" button: same height as its input
+- [x] i18n if any text changes (de + en)
 
 ---
 
 ## 6. Webhooks — no global triggers required
 Target: `webhooks.component.ts`, `backend/app/modules/admin/models.py` (Webhook), webhook service/router.
 
-- [ ] Allow creating a webhook with an empty `events`/triggers list (triggers come from the flow-graph)
-- [ ] Backend: make events optional / allow empty array; validation no longer requires ≥1 trigger
-- [ ] Frontend: triggers field optional in create/edit form
-- [ ] i18n (de + en)
+- [x] Allow creating a webhook with an empty `events`/triggers list (triggers come from the flow-graph)
+- [x] Backend: make events optional / allow empty array; validation no longer requires ≥1 trigger
+- [x] Frontend: triggers field optional in create/edit form
+- [x] i18n (de + en)
 
 ---
 
@@ -113,12 +115,12 @@ Target: `frontend/src/app/pages/admin/audit/audit-log.component.ts`, `backend/ap
 ## 8. Remove Notifications page (superseded by flow-graph)
 Notify is now a flow-graph action. Remove the standalone rules system and the `notification.manage` permission.
 
-- [ ] Frontend: remove `notification-rules.component.ts` + spec, route, nav entry
-- [ ] Backend: remove `backend/app/modules/notifications/` rules CRUD (router/models/service/schemas) — keep only what the flow-graph `notify` action needs (mail send/templating/queue)
-- [ ] Drop `notification.manage` permission from seeds + frontend permission constants
-- [ ] Migration to drop notification-rule tables
-- [ ] Remove related tests
-- [ ] i18n cleanup (de + en)
+- [x] Frontend: remove `notification-rules.component.ts` + spec, route, nav entry
+- [x] Backend: remove `backend/app/modules/notifications/` rules CRUD (router/models/service/schemas) — keep only what the flow-graph `notify` action needs (mail send/templating/queue)
+- [x] Drop `notification.manage` permission from seeds + frontend permission constants
+- [x] Migration to drop notification-rule tables
+- [x] Remove related tests
+- [x] i18n cleanup (de + en)
 
 ---
 
@@ -137,11 +139,11 @@ Target: `branding-editor.component.ts`, `backend/app/modules/admin/branding.py` 
 ## 10. Remove Nextcloud export entirely
 PDF generation stays (local download); only the Nextcloud upload path leaves.
 
-- [ ] Backend: remove `backend/app/modules/pdf/nextcloud.py` and all references in `pdf/service.py`, `pdf/models.py`
-- [ ] Remove Nextcloud config from `backend/app/settings.py` (credentials/endpoint)
-- [ ] Remove `backend/tests/test_pdf_nextcloud.py` and any Nextcloud assertions elsewhere
-- [ ] Remove any frontend buttons/UI referencing Nextcloud export
-- [ ] i18n cleanup (de + en)
+- [x] Backend: remove `backend/app/modules/pdf/nextcloud.py` and all references in `pdf/service.py`, `pdf/models.py`
+- [x] Remove Nextcloud config from `backend/app/settings.py` (credentials/endpoint)
+- [x] Remove `backend/tests/test_pdf_nextcloud.py` and any Nextcloud assertions elsewhere
+- [x] Remove any frontend buttons/UI referencing Nextcloud export
+- [x] i18n cleanup (de + en)
 
 ---
 
