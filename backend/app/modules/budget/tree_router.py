@@ -34,7 +34,9 @@ from app.modules.budget.tree_schemas import (
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
     ExpenseCreate,
+    ExpenseKind,
     ExpenseOut,
+    ExpenseUpdate,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
@@ -42,6 +44,7 @@ from app.modules.budget.tree_schemas import (
 )
 from app.modules.budget.tree_service import BudgetTreeService
 from app.shared.errors import ProblemDetail
+from app.shared.paging import Page
 
 router = APIRouter(tags=["budget"])
 
@@ -211,8 +214,69 @@ async def create_budget_expense(
     responses=_errors(401, 403, 404),
 )
 async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
-    """Gebuchte Ausgabe löschen (#25)."""
+    """Gebuchte Ausgabe/Einnahme löschen (#25)."""
     await service.delete_expense(expense_id)
+
+
+# --------------------------------------------------- expenses (flat, #25 tab)
+@router.post(
+    "/expenses",
+    response_model=ExpenseOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def book_expense(
+    payload: ExpenseCreate,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.manage"))],
+) -> ExpenseOut:
+    """Ausgabe/Einnahme buchen (#25): eigenständig (``budgetId``) oder an einen Antrag
+    gebunden (``applicationId`` — erbt Kostenstelle + HHJ, ersetzt dessen Bindung)."""
+    return await service.book_expense(payload, actor=principal.sub)
+
+
+@router.get(
+    "/expenses",
+    response_model=Page[ExpenseOut],
+    dependencies=[Depends(require_principal("budget.view"))],
+    responses=_errors(401, 403, 404),
+)
+async def list_expenses(
+    service: ServiceDep,
+    budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
+    fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
+    kind: Annotated[ExpenseKind | None, Query()] = None,
+    application_id: Annotated[UUID | None, Query(alias="applicationId")] = None,
+    q: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[ExpenseOut]:
+    """Buchungen gefiltert + offset-paginiert (#25). ``budget`` schließt den
+    Unterbaum ein; ``kind`` = ``expense``/``income``; ``q`` = Beschreibungssuche."""
+    return await service.list_expenses_paged(
+        budget_id=budget_id,
+        fiscal_year_id=fiscal_year_id,
+        kind=kind,
+        application_id=application_id,
+        q=q,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.patch(
+    "/budget-expenses/{expense_id}",
+    response_model=ExpenseOut,
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def update_budget_expense(
+    expense_id: UUID,
+    payload: ExpenseUpdate,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.manage"))],
+) -> ExpenseOut:
+    """Betrag/Beschreibung einer Buchung ändern (#25)."""
+    return await service.update_expense(expense_id, payload)
 
 
 # ---------------------------------------------------------------- fiscal years

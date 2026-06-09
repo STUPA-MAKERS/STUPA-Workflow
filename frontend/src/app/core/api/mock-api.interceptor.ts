@@ -587,6 +587,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (p.endsWith('/budget/stats')) return ok(MOCK_BUDGET_STATS);
     if (p.endsWith('/budget-pots')) return ok([...MOCK_BUDGET_POTS]);
+    // Ausgaben/Einnahmen (#25): leere Seite (Tree-Mock fehlt ohnehin) — kein Konsolen-404.
+    if (p.endsWith('/expenses')) return ok({ items: [], total: 0, limit: 20, offset: 0 });
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);

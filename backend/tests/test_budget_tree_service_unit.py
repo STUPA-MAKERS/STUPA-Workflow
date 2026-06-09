@@ -430,10 +430,10 @@ async def test_get_tree_assembles() -> None:
     sess = fake_session(
         result(top),                                            # nodes
         result(alloc),                                          # allocations
-        result(                                                 # app rows (path, fy, amount, state)
-            ("VS", fy_id, Decimal("250"), "approved"),          # → committed
-            ("VS", fy_id, Decimal("120"), "submitted"),         # → requested (in-flight)
-            ("VS", fy_id, Decimal("999"), "rejected"),          # → excluded
+        result(                                                 # app rows (id, path, fy, amount, state)
+            (uuid.uuid4(), "VS", fy_id, Decimal("250"), "approved"),    # → bound
+            (uuid.uuid4(), "VS", fy_id, Decimal("120"), "submitted"),   # → requested (in-flight)
+            (uuid.uuid4(), "VS", fy_id, Decimal("999"), "rejected"),    # → excluded
         ),
         result(),                                               # expense rows (none)
     )
@@ -442,14 +442,16 @@ async def test_get_tree_assembles() -> None:
     assert len(tree) == 1
     view = tree[0].by_fiscal_year[0]
     assert view.allocated == Decimal("1000")
-    assert view.committed == Decimal("250")    # nur 'approved'
+    assert view.bound == Decimal("250")        # nur 'approved'
+    assert view.expended == Decimal("0")
+    assert view.committed == Decimal("250")    # bound + expended
     assert view.requested == Decimal("120")    # 'submitted', nicht 'rejected'
     assert view.available == Decimal("750")
 
 
 # ------------------------------------------------------------------- expenses
 async def test_get_tree_rolls_up_standalone_expenses() -> None:
-    """Eigenständige Ausgaben (#25) zählen wie Anträge als gebundener Verbrauch."""
+    """Eigenständige Ausgaben (#25) zählen als **ausgegeben** (expended), nicht gebunden."""
     g = uuid.uuid4()
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=g, key="VS")
@@ -457,13 +459,54 @@ async def test_get_tree_rolls_up_standalone_expenses() -> None:
     sess = fake_session(
         result(top),                            # nodes
         result(alloc),                          # allocations
-        result(),                               # committed application rows (none)
-        result(("VS", fy_id, Decimal("60"))),   # standalone expense rows (#25)
+        result(),                               # application rows (none)
+        result(("VS", fy_id, Decimal("60"), "expense", None)),  # standalone expense (#25)
     )
     svc = BudgetTreeService(sess)
     view = (await svc.get_tree())[0].by_fiscal_year[0]
-    assert view.committed == Decimal("60")
+    assert view.bound == Decimal("0")
+    assert view.expended == Decimal("60")
+    assert view.committed == Decimal("60")     # bound + expended
     assert view.available == Decimal("940")
+
+
+async def test_get_tree_income_increases_available() -> None:
+    """Einnahmen (#25) erhöhen das verfügbare Budget (available)."""
+    fy_id = uuid.uuid4()
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
+    sess = fake_session(
+        result(top),
+        result(alloc),
+        result(),                               # application rows (none)
+        result(("VS", fy_id, Decimal("200"), "income", None)),  # income booking
+    )
+    svc = BudgetTreeService(sess)
+    view = (await svc.get_tree())[0].by_fiscal_year[0]
+    assert view.income == Decimal("200")
+    assert view.expended == Decimal("0")
+    assert view.available == Decimal("1200")   # 1000 − 0 − 0 + 200
+
+
+async def test_get_tree_linked_expense_replaces_bound() -> None:
+    """Eine an einen Antrag gebundene Ausgabe ersetzt dessen Bindung anteilig (#25)."""
+    fy_id = uuid.uuid4()
+    app_id = uuid.uuid4()
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    top.accepted_state_keys = ["approved"]
+    alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
+    sess = fake_session(
+        result(top),
+        result(alloc),
+        result((app_id, "VS", fy_id, Decimal("250"), "approved")),   # approved app
+        result(("VS", fy_id, Decimal("100"), "expense", app_id)),    # 100 spent on it
+    )
+    svc = BudgetTreeService(sess)
+    view = (await svc.get_tree())[0].by_fiscal_year[0]
+    assert view.bound == Decimal("150")        # 250 − 100 noch gebunden
+    assert view.expended == Decimal("100")
+    assert view.committed == Decimal("250")    # bound + expended = ursprüngliche Bindung
+    assert view.available == Decimal("750")    # 1000 − 150 − 100
 
 
 async def test_resolve_expense_fiscal_year_explicit_ok() -> None:

@@ -125,12 +125,19 @@ class BudgetAllocation(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
-    """Eigenständige Ausgabe gegen eine Kostenstelle + HHJ (#25), **ohne** Antrag.
+    """Tatsächliche **Ausgabe oder Einnahme** gegen eine Kostenstelle + HHJ (#25).
 
-    Direkte Buchung (z. B. Barauslage, Rechnung) auf einen Budget-Knoten. Zählt —
-    wie genehmigte Anträge — als **gebundener Verbrauch** und fließt im Roll-up
-    (``tree_rules.rollup_committed``) über das ``path_key``-Präfix zu allen Vorfahren
-    rauf. ``fiscal_year_id`` muss zum Top-Level des Knotens gehören (Service-Check).
+    Direkte Buchung (z. B. Barauslage, Rechnung, Sponsoring) auf einen Budget-Knoten.
+
+    * ``kind='expense'`` zählt als **ausgegeben** (expended) und mindert das Budget.
+    * ``kind='income'`` zählt als **Einnahme** und erhöht das verfügbare Budget.
+    * ``application_id`` (optional, **nicht** unique → mehrere Teil-Ausgaben je Antrag):
+      eine an einen Antrag gebundene Ausgabe **ersetzt** dessen gebundenen (committed)
+      Betrag anteilig (``bound(app) = max(0, amount − Σ gebundene Ausgaben)``).
+      Kostenstelle + HHJ werden vom Antrag geerbt (Service-Invariante). Einnahmen sind
+      stets eigenständig (``application_id`` null).
+
+    ``fiscal_year_id`` muss zum Top-Level des Knotens gehören (Service-Check).
     """
 
     __tablename__ = "budget_expense"
@@ -141,6 +148,14 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     fiscal_year_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("fiscal_year.id", ondelete="CASCADE")
     )
+    # Gebuchte Buchung gegen **einen** Antrag (ersetzt dessen Bindung anteilig) oder
+    # eigenständig (``None``). ``SET NULL`` beim Löschen des Antrags → die Buchung bleibt
+    # als eigenständige Ausgabe erhalten.
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application.id", ondelete="SET NULL"), nullable=True
+    )
+    # 'expense' (ausgegeben) | 'income' (Einnahme).
+    kind: Mapped[str] = mapped_column(Text, server_default="expense")
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     description: Mapped[str] = mapped_column(Text)
@@ -149,8 +164,12 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     __table_args__ = (
         CheckConstraint("amount > 0", name="budget_expense_amount_positive"),
         CheckConstraint("currency = 'EUR'", name="budget_expense_currency_eur"),
+        CheckConstraint(
+            "kind IN ('expense', 'income')", name="budget_expense_kind_valid"
+        ),
         Index("ix_budget_expense_budget_id", "budget_id"),
         Index("ix_budget_expense_fiscal_year_id", "fiscal_year_id"),
+        Index("ix_budget_expense_application_id", "application_id"),
     )
 
 
