@@ -83,7 +83,6 @@ export class ShellComponent {
 
   private readonly nav: NavItem[] = [
     { path: '/dashboard', labelKey: 'nav.dashboard', permissions: [] },
-    { path: '/my/gremien', labelKey: 'nav.myGremien', permissions: [] },
     { path: '/applications', labelKey: 'nav.applications', permissions: ['application.read'] },
     { path: '/tasks', labelKey: 'nav.tasks', permissions: ['application.read'] },
     { path: '/meetings', labelKey: 'nav.meetings', permissions: ['meeting.manage', 'protocol.write'] },
