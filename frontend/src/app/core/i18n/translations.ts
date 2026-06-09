@@ -1112,7 +1112,7 @@ export const de = {
   'budget.status.unknownGremium': 'Ohne Gremium',
   'budget.status.unknownState': 'Ohne Status',
 
-  'admin.home.users': 'Benutzer & Rollen',
+  'admin.home.users': 'Benutzer',
   'admin.home.usersDesc': 'Benutzer & Rollenzuweisungen verwalten.',
   'admin.home.gremien': 'Gremien',
   'admin.home.gremienDesc': 'Gremien anlegen und bearbeiten.',
@@ -2329,7 +2329,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.status.unknownGremium': 'No body',
   'budget.status.unknownState': 'No status',
 
-  'admin.home.users': 'Users & Roles',
+  'admin.home.users': 'Users',
   'admin.home.usersDesc': 'Manage users & role assignments.',
   'admin.home.gremien': 'Committees',
   'admin.home.gremienDesc': 'Create and edit committees.',

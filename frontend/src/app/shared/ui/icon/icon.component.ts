@@ -16,6 +16,7 @@ export type IconName =
   | 'filter'
   | 'check'
   | 'building'
+  | 'parliament'
   | 'euro'
   | 'form'
   | 'flow'
@@ -109,9 +110,14 @@ export type IconName =
           <path d="M14 9h4a1 1 0 0 1 1 1v11" />
           <path d="M8 7h2M8 11h2M8 15h2" />
         }
+        @case ('parliament') {
+          <path d="M12 3 21 8H3z" />
+          <path d="M3 11h18M3 21h18" />
+          <path d="M5 11v10M9 11v10M12 11v10M15 11v10M19 11v10" />
+        }
         @case ('euro') {
-          <path d="M16.5 5.5a6.5 6.5 0 1 0 0 13" />
-          <path d="M4 10.5h9M4 13.5h7" />
+          <path d="M15.5 7.5A5.5 5.5 0 1 0 15.5 16.5" />
+          <path d="M5 11h8M5 14h6" />
         }
         @case ('form') {
           <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
@@ -130,11 +136,10 @@ export type IconName =
           <circle cx="16.5" cy="11" r="1" />
         }
         @case ('webhook') {
-          <path d="M15.5 13.5 12 8a3 3 0 1 1 3-3" />
-          <path d="M8.5 13.5 12 8" />
-          <path d="M9.5 14a3 3 0 1 0 2.5 4.5h6" />
-          <circle cx="18.5" cy="18.5" r="2.5" />
-          <circle cx="6.5" cy="5.5" r="2.5" />
+          <circle cx="6" cy="6" r="2.5" />
+          <circle cx="18" cy="6" r="2.5" />
+          <circle cx="12" cy="18" r="2.5" />
+          <path d="M8.5 6h7M7.6 8 11 15.6M16.4 8 13 15.6" />
         }
         @case ('bell') {
           <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
