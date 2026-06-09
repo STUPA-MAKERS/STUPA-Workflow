@@ -216,15 +216,6 @@ export const routes: Routes = [
           import('./pages/admin/config/webhooks.component').then((m) => m.WebhooksComponent),
       },
       {
-        path: 'admin/notifications',
-        data: { title: 'admin.notif.title', permission: 'notification.manage', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/config/notification-rules.component').then(
-            (m) => m.NotificationRulesComponent,
-          ),
-      },
-      {
         path: 'admin/gremien/:id/roles',
         data: { title: 'admin.gremiumRoles.title', permission: 'admin.roles', parent: ['admin', 'admin/gremien'] },
         canActivate: [authGuard],

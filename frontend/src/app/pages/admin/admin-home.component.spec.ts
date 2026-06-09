@@ -14,7 +14,7 @@ describe('AdminHomeComponent', () => {
   it('shows a navigation tile per admin area', async () => {
     await setup();
     expect(screen.getByRole('heading', { name: 'Verwaltung', level: 1 })).toBeInTheDocument();
-    for (const name of ['Formular-Builder', 'Flow-Editor', 'Branding & Texte', 'Webhooks', 'Benachrichtigungen']) {
+    for (const name of ['Formular-Builder', 'Flow-Editor', 'Branding & Texte', 'Webhooks']) {
       expect(screen.getByRole('link', { name: new RegExp(name) })).toBeInTheDocument();
     }
   });

@@ -45,8 +45,6 @@ from app.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("app.deadlines")
 
-DEADLINE_APPROACHING_EVENT = "deadline_approaching"
-
 
 async def on_startup(ctx: dict[str, Any]) -> None:
     ctx["settings"] = load_settings()
@@ -139,8 +137,8 @@ async def _remind_one(
                 )
             )
         notifier = NotificationService(session, queue=queue, settings=settings)
-        await notifier.dispatch_event(
-            DEADLINE_APPROACHING_EVENT,
+        await notifier.handle_notify_action(
+            {"templateKey": "deadline_approaching", "recipients": [{"kind": "applicant"}]},
             application_id=deadline.application_id,
             application_type_id=type_id,
             context={
@@ -148,6 +146,7 @@ async def _remind_one(
                 "kind": deadline.kind,
                 "dueAt": deadline.due_at.isoformat(),
             },
+            lang=None,
             idempotency_base=f"deadline:{deadline.id}",
         )
         await svc.mark_reminded(deadline, now)

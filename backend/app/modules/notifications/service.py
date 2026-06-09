@@ -1,10 +1,8 @@
-"""Notifications-Service (T-18): Regel-/Template-CRUD, Event-Dispatch, `notify`.
+"""Notifications-Service (T-18): Template-CRUD, `notify`-Action, Magic-Link.
 
 Bündelt die Bausteine (Resolver, Templating, Queue) an DB + Settings:
 
-* CRUD für `notification_rule` / `mail_template` (+ Vorschau).
-* :meth:`dispatch_event` — je Event passende, **aktive** Regeln auswerten,
-  Empfänger auflösen, Template rendern, Mail **idempotent** in die Queue legen.
+* CRUD für `mail_template` (+ Vorschau).
 * :meth:`handle_notify_action` — Flow-Action-Handler `notify` (T-14 ruft hier auf).
 * :meth:`send_magic_link` — ersetzt den T-10-Platzhalter-Deliver (echte Mail).
 
@@ -22,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
-from app.modules.notifications.models import MailTemplate, NotificationRule
+from app.modules.notifications.models import MailTemplate
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.schemas import (
@@ -31,10 +29,6 @@ from app.modules.notifications.schemas import (
     MailTemplateCreate,
     MailTemplateOut,
     MailTemplateUpdate,
-    NotificationRuleCreate,
-    NotificationRuleOut,
-    NotificationRuleUpdate,
-    RecipientSpec,
 )
 from app.modules.notifications.templating import RenderedMail, TemplateRenderError, render_mail
 from app.settings import Settings, get_settings
@@ -73,46 +67,6 @@ class NotificationService:
         self.queue = queue
         self.settings = settings or get_settings()
         self.resolver = RecipientResolver(session)
-
-    # ----------------------------------------------------------------- rules #
-    async def create_rule(self, payload: NotificationRuleCreate) -> NotificationRuleOut:
-        rule = NotificationRule(
-            event=payload.event,
-            recipients=[r.model_dump(exclude_none=True) for r in payload.recipients],
-            template_key=payload.template_key,
-            application_type_id=payload.application_type_id,
-            enabled=payload.enabled,
-        )
-        self.session.add(rule)
-        await self.session.commit()
-        return _rule_out(rule)
-
-    async def list_rules(self) -> list[NotificationRuleOut]:
-        rows = (
-            await self.session.scalars(
-                select(NotificationRule).order_by(NotificationRule.created_at)
-            )
-        ).all()
-        return [_rule_out(r) for r in rows]
-
-    async def update_rule(
-        self, rule_id: uuid.UUID, payload: NotificationRuleUpdate
-    ) -> NotificationRuleOut:
-        rule = await self.session.get(NotificationRule, rule_id)
-        if rule is None:
-            raise NotFoundError(f"notification rule {rule_id} not found")
-        if payload.event is not None:
-            rule.event = payload.event
-        if payload.recipients is not None:
-            rule.recipients = [r.model_dump(exclude_none=True) for r in payload.recipients]
-        if payload.template_key is not None:
-            rule.template_key = payload.template_key
-        if payload.application_type_id is not None:
-            rule.application_type_id = payload.application_type_id
-        if payload.enabled is not None:
-            rule.enabled = payload.enabled
-        await self.session.commit()
-        return _rule_out(rule)
 
     # ------------------------------------------------------------- templates #
     async def create_template(self, payload: MailTemplateCreate) -> MailTemplateOut:
@@ -174,53 +128,6 @@ class NotificationService:
         )
 
     # -------------------------------------------------------------- dispatch #
-    async def dispatch_event(
-        self,
-        event: str,
-        *,
-        application_id: uuid.UUID | None = None,
-        application_type_id: uuid.UUID | None = None,
-        context: dict[str, Any] | None = None,
-        lang: str | None = None,
-        idempotency_base: str | None = None,
-    ) -> int:
-        """Aktive Regeln zum Event auswerten + Mails enqueuen. Gibt Anzahl Mails."""
-        stmt = select(NotificationRule).where(
-            NotificationRule.event == event,
-            NotificationRule.enabled.is_(True),
-        )
-        rules = (await self.session.scalars(stmt)).all()
-        sent = 0
-        for rule in rules:
-            # type-gefilterte Regel feuert nur für den passenden Antragstyp.
-            if (
-                rule.application_type_id is not None
-                and rule.application_type_id != application_type_id
-            ):
-                continue
-            tpl = await self._get_template_by_key(rule.template_key)
-            if tpl is None:
-                logger.warning(
-                    "notification rule %s references missing template %r",
-                    rule.id,
-                    rule.template_key,
-                )
-                continue
-            recipients = await self.resolver.resolve(
-                _as_specs(rule.recipients), application_id=application_id
-            )
-            ok = await self._render_and_enqueue(
-                tpl,
-                recipients,
-                context=context or {},
-                lang=lang,
-                idempotency_parts=_idem_parts(
-                    idempotency_base, event, str(application_id or ""), str(rule.id)
-                ),
-            )
-            sent += int(ok)
-        return sent
-
     async def handle_notify_action(
         self,
         action: dict[str, Any],
@@ -233,23 +140,11 @@ class NotificationService:
     ) -> int:
         """Flow-Action-Handler `notify` (T-14 dispatch).
 
-        Zwei Modi:
-        * ``{"type":"notify","event":"status_changed"}`` → regelbasiert (dispatch_event).
-        * ``{"type":"notify","templateKey":"...","recipients":[...]}`` → ad-hoc.
+        Ad-hoc-Modus: ``{"type":"notify","templateKey":"...","recipients":[...]}``.
         """
-        event = action.get("event")
-        if event:
-            return await self.dispatch_event(
-                str(event),
-                application_id=application_id,
-                application_type_id=application_type_id,
-                context=context,
-                lang=lang,
-                idempotency_base=idempotency_base,
-            )
         template_key = action.get("templateKey") or action.get("template_key")
         if not template_key:
-            logger.warning("notify action without 'event' or 'templateKey' — skipped")
+            logger.warning("notify action without 'templateKey' — skipped")
             return 0
         tpl = await self._get_template_by_key(str(template_key))
         if tpl is None:
@@ -356,17 +251,6 @@ def _idem_parts(base: str | None, *parts: str) -> tuple[str, ...]:
 def _as_specs(raw: list[Any]) -> list[dict[str, Any]]:
     """Recipient-Rohdaten (JSONB-Liste) → Liste von Dicts (defensiv)."""
     return [r for r in raw if isinstance(r, dict)]
-
-
-def _rule_out(rule: NotificationRule) -> NotificationRuleOut:
-    return NotificationRuleOut(
-        id=rule.id,
-        event=rule.event,
-        recipients=[RecipientSpec.model_validate(r) for r in rule.recipients],
-        template_key=rule.template_key,
-        application_type_id=rule.application_type_id,
-        enabled=rule.enabled,
-    )
 
 
 def _template_out(tpl: MailTemplate) -> MailTemplateOut:

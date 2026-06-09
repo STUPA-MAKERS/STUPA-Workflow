@@ -35,7 +35,7 @@ from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
 from app.modules.notifications.mail import CapturingMailSender
-from app.modules.notifications.models import MailTemplate, NotificationRule
+from app.modules.notifications.models import MailTemplate
 from app.modules.notifications.queue import DirectMailQueue
 from app.modules.voting.models import Ballot, Vote
 from app.settings import load_settings
@@ -242,15 +242,9 @@ async def test_reminder_sent_exactly_once(
         app_type, states = await _seed_flow(s)
         app = await _make_app(s, app_type, states["active"])
         s.add(MailTemplate(
-            key="deadline_soon",
+            key="deadline_approaching",
             subject_i18n={"de": "Frist bald"},
             body_i18n={"de": "Frist {{ deadlineId }} läuft ab."},
-        ))
-        s.add(NotificationRule(
-            event="deadline_approaching",
-            recipients=[{"kind": "applicant"}],
-            template_key="deadline_soon",
-            enabled=True,
         ))
         await s.commit()
         await DeadlineService(s).create(

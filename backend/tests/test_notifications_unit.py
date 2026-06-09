@@ -14,11 +14,7 @@ from app.modules.notifications.mail import (
     compute_idempotency_key,
 )
 from app.modules.notifications.queue import ArqMailQueue, DirectMailQueue
-from app.modules.notifications.schemas import (
-    MailTemplateOut,
-    NotificationRuleCreate,
-    RecipientSpec,
-)
+from app.modules.notifications.schemas import MailTemplateOut
 from app.modules.notifications.templating import TemplateRenderError, render_mail
 from app.settings import load_settings
 
@@ -219,28 +215,6 @@ async def test_direct_queue_without_key_always_sends() -> None:
 
 
 # --------------------------------------------------------------------------- schemas
-def test_recipient_spec_requires_ref_for_group() -> None:
-    with pytest.raises(ValueError, match="requires 'ref'"):
-        RecipientSpec(kind="group")
-    assert RecipientSpec(kind="applicant").ref is None
-    assert RecipientSpec(kind="role", ref="manager").ref == "manager"
-
-
-def test_rule_create_rejects_unknown_event() -> None:
-    with pytest.raises(ValueError, match="unknown event"):
-        NotificationRuleCreate(event="nope", templateKey="t")
-
-
-def test_rule_create_accepts_known_event_camel_alias() -> None:
-    rule = NotificationRuleCreate(
-        event="status_changed",
-        templateKey="status_update",
-        recipients=[{"kind": "applicant"}],  # type: ignore[list-item]
-    )
-    assert rule.template_key == "status_update"
-    assert rule.recipients[0].kind == "applicant"
-
-
 def test_template_out_serializes_camel() -> None:
     from uuid import uuid4
 

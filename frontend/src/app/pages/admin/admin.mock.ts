@@ -11,7 +11,6 @@ import type {
   FormDraft,
   FormOverviewItem,
   Gremium,
-  NotificationRule,
   Role,
   WebhookConfig,
 } from './admin.models';
@@ -34,7 +33,6 @@ export const MOCK_PERMISSIONS: string[] = [
   'budget.view',
   'budget.export',
   'application.export',
-  'notification.manage',
   'webhook.manage',
   'audit.read',
   'admin.config',
@@ -160,16 +158,6 @@ export const MOCK_WEBHOOKS: WebhookConfig[] = [
     url: 'https://hooks.example.org/matrix',
     events: ['application_created', 'status_changed'],
     active: true,
-  },
-];
-
-export const MOCK_NOTIFICATION_RULES: NotificationRule[] = [
-  {
-    id: 'nr-1',
-    event: 'status_changed',
-    recipients: [{ kind: 'applicant' }],
-    templateKey: 'status_changed_applicant',
-    enabled: true,
   },
 ];
 

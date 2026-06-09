@@ -331,14 +331,6 @@ export interface Recipient {
   ref?: string | null;
 }
 
-export interface NotificationRule {
-  id: Uuid;
-  event: EventName;
-  recipients: Recipient[];
-  templateKey: string;
-  enabled: boolean;
-}
-
 export interface WebhookConfig {
   id: Uuid;
   name: string;

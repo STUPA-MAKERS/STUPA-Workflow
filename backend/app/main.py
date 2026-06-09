@@ -46,7 +46,6 @@ from app.modules.livevote.router import router as livevote_router
 from app.modules.livevote.service import BrokerPublisher
 from app.modules.notifications.action_dispatcher import build_notify_dispatcher
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
-from app.modules.notifications.router import router as notifications_router
 from app.modules.flow.extras_dispatcher import build_flow_extras_dispatcher
 from app.modules.pdf.action_dispatcher import ChainActionDispatcher
 from app.modules.pdf.router import router as pdf_router
@@ -78,7 +77,6 @@ api_router.include_router(protocol_router)
 api_router.include_router(budget_router)
 api_router.include_router(budget_tree_router)
 api_router.include_router(antiabuse_router)
-api_router.include_router(notifications_router)
 api_router.include_router(files_router)
 api_router.include_router(pdf_router)
 api_router.include_router(audit_router)

@@ -36,7 +36,6 @@ import {
   type DeadlinePolicy,
   type GremiumRole,
   type GremiumUpdateBody,
-  type NotificationRule,
   type Role,
   type RoleAssignment,
   type RoleAssignmentInput,
@@ -49,7 +48,6 @@ import {
   MOCK_FORM_DRAFTS,
   MOCK_FORMS,
   MOCK_GREMIEN,
-  MOCK_NOTIFICATION_RULES,
   MOCK_PERMISSIONS,
   MOCK_PRINCIPALS,
   MOCK_ROLES,
@@ -88,7 +86,6 @@ export class AdminApiService {
     gremiumRoles: [] as GremiumRole[],
     deadlinePolicies: [] as DeadlinePolicy[],
     webhooks: structuredCopy(MOCK_WEBHOOKS),
-    rules: structuredCopy(MOCK_NOTIFICATION_RULES),
     roles: structuredCopy(MOCK_ROLES),
     principals: structuredCopy(MOCK_PRINCIPALS),
     site: <SiteConfig>{
@@ -530,19 +527,6 @@ export class AdminApiService {
     if (opts.action) params = params.set('action', opts.action);
     if (opts.actor) params = params.set('actor', opts.actor);
     return this.http.get<Page<AuditEntry>>(`${this.base}/admin/audit`, { params });
-  }
-
-  // --- Notification-Regeln -------------------------------------------------
-  listNotificationRules(): Observable<NotificationRule[]> {
-    if (this.mock) return of(structuredCopy(this.store.rules));
-    return this.http.get<NotificationRule[]>(`${this.base}/admin/notification-rules`);
-  }
-
-  saveNotificationRule(rule: NotificationRule): Observable<NotificationRule> {
-    if (this.mock) return of(this.upsert(this.store.rules, rule, 'nr'));
-    return rule.id
-      ? this.http.patch<NotificationRule>(`${this.base}/admin/notification-rules/${rule.id}`, rule)
-      : this.http.post<NotificationRule>(`${this.base}/admin/notification-rules`, rule);
   }
 
   // --- Branding / Site-Config (#21 — Mock-Contract) ------------------------

@@ -51,14 +51,6 @@ describe('AdminApiService — mock mode', () => {
     expect(edited.name).toBe('Geändert');
     expect((await firstValueFrom(s.listRoles())).length).toBeGreaterThan(0);
 
-    const rules = await firstValueFrom(s.listNotificationRules());
-    const created = await firstValueFrom(
-      s.saveNotificationRule({ id: '', event: 'vote_opened', recipients: [{ kind: 'applicant' }], templateKey: 't', enabled: true }),
-    );
-    expect(created.id).toBeTruthy();
-    // update existing → upsert update branch
-    const updated = await firstValueFrom(s.saveNotificationRule({ ...rules[0], templateKey: 'changed' }));
-    expect(updated.templateKey).toBe('changed');
     // update existing webhook → upsert update branch
     const hooks = await firstValueFrom(s.listWebhooks());
     const wh = await firstValueFrom(s.saveWebhook({ ...hooks[0], name: 'renamed' }));
@@ -158,13 +150,6 @@ describe('AdminApiService — real mode (contract)', () => {
     http.expectOne('/api/admin/gremien').flush([]);
     s.listRoles().subscribe();
     http.expectOne('/api/admin/roles').flush([]);
-    s.listNotificationRules().subscribe();
-    http.expectOne('/api/admin/notification-rules').flush([]);
-
-    s.saveNotificationRule({ id: '', event: 'vote_opened', recipients: [{ kind: 'applicant' }], templateKey: 't', enabled: true }).subscribe();
-    expect(http.expectOne('/api/admin/notification-rules').request.method).toBe('POST');
-    s.saveNotificationRule({ id: 'nr-2', event: 'vote_opened', recipients: [{ kind: 'applicant' }], templateKey: 't', enabled: true }).subscribe();
-    expect(http.expectOne('/api/admin/notification-rules/nr-2').request.method).toBe('PATCH');
 
     s.getSiteConfig().subscribe();
     http.expectOne('/api/admin/site-config').flush({});

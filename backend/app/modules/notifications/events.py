@@ -1,7 +1,7 @@
-"""Stabile Event-Liste für Notifications + Webhooks (api.md §6).
+"""Stabile Event-Liste für Webhooks (api.md §6).
 
-Single Source of Truth: Regeln (`notification_rule.event`), der DB-`CHECK` und die
-Schema-Validierung referenzieren diese Menge. Neue Events hier ergänzen.
+Single Source of Truth für die Event-Whitelist (Webhook-Abos, Schema-Validierung).
+Neue Events hier ergänzen.
 """
 
 from __future__ import annotations

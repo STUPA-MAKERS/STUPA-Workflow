@@ -114,7 +114,6 @@ export class AdminHomeComponent {
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc', icon: 'flow' },
     { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc', icon: 'palette' },
     { link: 'webhooks', title: 'admin.home.webhooks', desc: 'admin.home.webhooksDesc', icon: 'webhook' },
-    { link: 'notifications', title: 'admin.home.notifications', desc: 'admin.home.notificationsDesc', icon: 'bell' },
     { link: 'audit', title: 'admin.audit.title', desc: 'admin.audit.desc', icon: 'audit' },
     { link: 'deadlines', title: 'admin.deadlines.title', desc: 'admin.deadlines.subtitle', icon: 'clock' },
   ];

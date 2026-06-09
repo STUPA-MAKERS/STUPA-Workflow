@@ -538,8 +538,6 @@ export const de = {
   'admin.home.brandingDesc': 'Logos, Fußzeile und Freitexte pflegen.',
   'admin.home.webhooks': 'Webhooks',
   'admin.home.webhooksDesc': 'Ausgehende Ereignis-Hooks verwalten.',
-  'admin.home.notifications': 'Benachrichtigungen',
-  'admin.home.notificationsDesc': 'Benachrichtigungsregeln pflegen.',
   'admin.home.budgetPots': 'Budget-Töpfe',
   'admin.home.budgetPotsDesc': 'Budgets & Kostenstellen (Baum) je Gremium pflegen.',
   'budget.tree.title': 'Budgets & Kostenstellen',
@@ -956,20 +954,9 @@ export const de = {
   'admin.deleg.yes': 'Ja',
   'admin.deleg.no': 'Nein',
 
-  'admin.notif.title': 'Benachrichtigungsregeln',
-  'admin.notif.desc':
-    'Lege fest, wer bei welchem Ereignis benachrichtigt wird. Empfänger sind Antragsteller:in, eine Rolle oder ein Gremium.',
-  'admin.notif.event': 'Ereignis',
-  'admin.notif.template': 'Vorlagen-Schlüssel',
-  'admin.notif.recipients': 'Empfänger',
-  'admin.notif.enabled': 'Aktiv',
-  'admin.notif.add': 'Regel hinzufügen',
-  'admin.notif.none': 'Keine Regeln konfiguriert.',
   'admin.notif.rcpt.applicant': 'Antragsteller',
   'admin.notif.rcpt.role': 'Rolle',
   'admin.notif.rcpt.group': 'Gruppe',
-  'admin.notif.refRole': 'Rolle wählen',
-  'admin.notif.refGroup': 'Gremium wählen',
 
   // Überblick aktiver Formulare (#75)
   'admin.forms.overviewTitle': 'Aktive Formulare',
@@ -1770,8 +1757,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.home.brandingDesc': 'Manage logos, footer and free texts.',
   'admin.home.webhooks': 'Webhooks',
   'admin.home.webhooksDesc': 'Manage outgoing event hooks.',
-  'admin.home.notifications': 'Notifications',
-  'admin.home.notificationsDesc': 'Manage notification rules.',
   'admin.home.budgetPots': 'Budget pots',
   'admin.home.budgetPotsDesc': 'Maintain budgets & cost centres (tree) per committee.',
   'budget.tree.title': 'Budgets & cost centres',
@@ -2185,20 +2170,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.deleg.yes': 'Yes',
   'admin.deleg.no': 'No',
 
-  'admin.notif.title': 'Notification rules',
-  'admin.notif.desc':
-    'Decide who gets notified for which event. Recipients are the applicant, a role or a body.',
-  'admin.notif.event': 'Event',
-  'admin.notif.template': 'Template key',
-  'admin.notif.recipients': 'Recipients',
-  'admin.notif.enabled': 'Enabled',
-  'admin.notif.add': 'Add rule',
-  'admin.notif.none': 'No rules configured.',
   'admin.notif.rcpt.applicant': 'Applicant',
   'admin.notif.rcpt.role': 'Role',
   'admin.notif.rcpt.group': 'Group',
-  'admin.notif.refRole': 'Choose role',
-  'admin.notif.refGroup': 'Choose body',
 
   // Active forms overview (#75)
   'admin.forms.overviewTitle': 'Active forms',

@@ -108,8 +108,8 @@ class _NotifyFake:
 
     def __init__(self, *_a: Any, **_k: Any) -> None: ...
 
-    async def dispatch_event(self, event: str, **_kw: Any) -> int:
-        _NotifyFake.events.append(event)
+    async def handle_notify_action(self, action: dict[str, Any], **_kw: Any) -> int:
+        _NotifyFake.events.append(action.get("templateKey", ""))
         return 1
 
 
@@ -302,11 +302,11 @@ async def test_reminder_failure_does_not_abort_cycle(
     calls = {"n": 0}
 
     class _RaiseOnce(_NotifyFake):
-        async def dispatch_event(self, event: str, **kw: Any) -> int:
+        async def handle_notify_action(self, action: dict[str, Any], **kw: Any) -> int:
             calls["n"] += 1
             if calls["n"] == 1:
                 raise RuntimeError("broken template")
-            return await super().dispatch_event(event, **kw)
+            return await super().handle_notify_action(action, **kw)
 
     monkeypatch.setattr(wd, "NotificationService", _RaiseOnce)
     bad, good = _deadline(), _deadline()
