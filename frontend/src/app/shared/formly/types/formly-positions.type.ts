@@ -55,7 +55,7 @@ interface Position {
                 <th>{{ t('apply.positions.offer') }}</th>
                 <th class="pos__num">{{ t('apply.positions.value') }}</th>
                 <th class="pos__pref">{{ t('apply.positions.preferred') }}</th>
-                <th></th>
+                <th class="pos__actcol"></th>
               </tr>
             </thead>
             <tbody>
@@ -96,32 +96,54 @@ interface Position {
   `,
   styles: [
     `
-      .pos { display: flex; flex-direction: column; gap: var(--space-3); border: none; padding: 0; margin: 0; }
-      .pos__legend { font-size: var(--fs-sm); font-weight: var(--fw-medium); padding: 0; }
-      .pos__req { color: var(--color-danger); }
-      .pos__hint { font-size: var(--fs-xs); color: var(--color-text-muted); margin: 0; }
-      .pos__card {
-        display: flex; flex-direction: column; gap: var(--space-2);
-        padding: var(--space-3); border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md); background: var(--color-surface);
+      /* Eigenständiger, abgesetzter Block — klar vom restlichen Formular getrennt. */
+      .pos {
+        display: flex; flex-direction: column; gap: var(--space-4);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface-sunken, var(--color-surface));
+        padding: var(--space-4);
+        margin: 0;
       }
-      .pos__card-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-      .pos__title { flex: 1; min-width: 10rem; font-weight: var(--fw-medium); }
-      .pos__value { font-size: var(--fs-sm); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+      .pos__legend { float: left; width: 100%; font-size: var(--fs-md); font-weight: var(--fw-semibold); padding: 0; margin-bottom: var(--space-1); }
+      .pos__req { color: var(--color-danger); margin-left: var(--space-1); }
+      .pos__hint { font-size: var(--fs-sm); color: var(--color-text-muted); margin: 0; }
+      .pos__card {
+        display: flex; flex-direction: column; gap: var(--space-3);
+        padding: var(--space-4); border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md); background: var(--color-bg-elevated, var(--color-surface));
+      }
+      .pos__card-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+      .pos__title { flex: 1; min-width: 12rem; font-weight: var(--fw-medium); }
+      .pos__value { font-size: var(--fs-sm); color: var(--color-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
       .pos__offers { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
-      .pos__offers th { text-align: start; font-size: var(--fs-xs); color: var(--color-text-muted); font-weight: var(--fw-semibold); padding: var(--space-1) var(--space-2); }
-      .pos__offers td { padding: var(--space-1) var(--space-2); }
-      .pos__num { text-align: end; }
+      .pos__offers th { text-align: start; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); font-weight: var(--fw-semibold); padding: 0 var(--space-2) var(--space-2); }
+      .pos__offers td { padding: var(--space-1) var(--space-2); vertical-align: middle; }
+      .pos__num { text-align: end; width: 9rem; }
       .pos__num input { text-align: end; }
-      .pos__pref { text-align: center; }
-      .pos input { padding: var(--space-1) var(--space-2); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg); color: inherit; width: 100%; }
-      .pos__pref input, .pos input[type='radio'] { width: auto; }
-      .pos__icon { background: transparent; border: 0; cursor: pointer; color: var(--color-text-muted); font-size: var(--fs-md); }
+      .pos__pref { text-align: center; width: 5rem; }
+      .pos__actcol { width: 2.5rem; }
+      /* Eingaben einheitlich zur restlichen App (Höhe/Polster/Radius). */
+      .pos input {
+        padding: var(--space-2) var(--space-3);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-bg); color: inherit; width: 100%;
+        min-height: 2.25rem; font: inherit;
+      }
+      .pos input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+      /* Keine Browser-Spin-Buttons an Zahleneingaben (inkonsistent zum Rest). */
+      .pos input[type='number'] { appearance: textfield; -moz-appearance: textfield; }
+      .pos input[type='number']::-webkit-outer-spin-button,
+      .pos input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      .pos__pref input[type='radio'] { width: 1.15rem; height: 1.15rem; min-height: 0; accent-color: var(--color-primary); cursor: pointer; }
+      .pos__icon { background: transparent; border: 0; cursor: pointer; color: var(--color-text-muted); font-size: var(--fs-md); line-height: 1; padding: var(--space-1); }
       .pos__icon:hover { color: var(--color-danger); }
-      .pos__add { align-self: flex-start; background: transparent; border: var(--border-width) dashed var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); cursor: pointer; color: var(--color-primary); font: inherit; }
+      .pos__add { align-self: flex-start; background: transparent; border: var(--border-width) dashed var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); cursor: pointer; color: var(--color-primary); font: inherit; font-weight: var(--fw-medium); }
+      .pos__add:hover { background: var(--color-surface); }
       .pos__add--sm { border-style: none; padding: var(--space-1) 0; }
-      .pos__total { margin: 0; font-variant-numeric: tabular-nums; }
-      .pos__error { font-size: var(--fs-xs); color: var(--color-danger); margin: 0; }
+      .pos__total { margin: 0; font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
+      .pos__error { font-size: var(--fs-sm); color: var(--color-danger); margin: 0; }
     `,
   ],
 })
