@@ -767,7 +767,12 @@ class BudgetTreeService:
             elif state_key in denied:
                 continue  # ausgeschlossen
             else:
-                requested_rows.append((fy, path, amount))
+                # Auch beantragte (in-flight) Anträge anteilig um bereits gebuchte
+                # Ausgaben mindern — die Ausgabe zählt als ausgegeben, nicht doppelt (#25).
+                spent = spent_per_app.get(app_id, _ZERO)
+                remaining = (amount or _ZERO) - spent
+                if remaining > _ZERO:
+                    requested_rows.append((fy, path, remaining))
 
         expended_rows = [
             (fy, path, amount)

@@ -292,15 +292,11 @@ interface DetailPosition {
               <article
                 class="det__msg"
                 [class.det__msg--own]="comment.authorKind !== 'applicant'"
-                [class.det__msg--internal]="!comment.isPublic"
               >
                 <span class="det__avatar" aria-hidden="true">{{ initial(authorName(comment)) }}</span>
                 <div class="det__msgBody">
                   <div class="det__msgTop">
                     <span class="det__msgAuthor">{{ authorName(comment) }}</span>
-                    @if (!comment.isPublic) {
-                      <span class="det__intern"><app-icon name="filter" [size]="10" /> {{ 'applications.comments.internal' | t }}</span>
-                    }
                     <time class="det__msgTime" [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
                   </div>
                   <div class="det__bubble">{{ comment.body }}</div>
@@ -312,12 +308,6 @@ interface DetailPosition {
           </div>
 
           <form class="det__composer" (submit)="submitComment($event)">
-            @if (canManage()) {
-              <div class="det__visToggle" role="group" [attr.aria-label]="'applications.comments.visibility' | t">
-                <button type="button" [class.is-active]="visibility() === 'public'" (click)="visibility.set('public')">{{ 'applications.comments.public' | t }}</button>
-                <button type="button" [class.is-active]="visibility() === 'internal'" (click)="visibility.set('internal')">{{ 'applications.comments.internal' | t }}</button>
-              </div>
-            }
             <div class="det__composerRow">
               <textarea
                 class="det__composerInput"

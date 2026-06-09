@@ -703,6 +703,22 @@ class ApplicationsService:
         return items
 
     # --------------------------------------------------------------- comments
+    async def _author_names(self, subs: set[str]) -> dict[str, str]:
+        """Kommentar-Autor (``principal.sub``) → Klarname (display_name/email/sub)."""
+        from app.modules.auth.models import Principal as PrincipalRow
+
+        wanted = {s for s in subs if s}
+        if not wanted:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(
+                    PrincipalRow.sub, PrincipalRow.display_name, PrincipalRow.email
+                ).where(PrincipalRow.sub.in_(wanted))
+            )
+        ).all()
+        return {sub: (dn or em or sub) for sub, dn, em in rows}
+
     async def add_comment(
         self,
         application_id: UUID,
@@ -722,9 +738,10 @@ class ApplicationsService:
         )
         self.session.add(comment)
         await self.session.commit()
+        names = await self._author_names({author} if author else set())
         return CommentOut(
             id=comment.id,
-            author=comment.author,
+            author=names.get(author, author) if author else None,
             authorKind=author_kind,  # type: ignore[arg-type] — gegen CHECK validiert
             body=comment.body,
             visibility=visibility,  # type: ignore[arg-type]
@@ -739,10 +756,11 @@ class ApplicationsService:
         if not include_internal:
             stmt = stmt.where(Comment.visibility == "public")
         rows = (await self.session.scalars(stmt.order_by(Comment.at))).all()
+        names = await self._author_names({c.author for c in rows if c.author})
         return [
             CommentOut(
                 id=c.id,
-                author=c.author,
+                author=names.get(c.author, c.author) if c.author else None,
                 authorKind=c.author_kind,  # type: ignore[arg-type]
                 body=c.body,
                 visibility=c.visibility,  # type: ignore[arg-type]
