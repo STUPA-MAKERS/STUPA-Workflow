@@ -1,10 +1,9 @@
-import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { ApplicationListItem, Uuid } from '@core/api/models';
+import type { ApplicationListItem, ApplicationType, Uuid } from '@core/api/models';
 import {
   BadgeComponent,
   CellDirective,
@@ -21,7 +20,7 @@ import {
   selector: 'app-tasks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, TranslatePipe, BadgeComponent, DataTableComponent, CellDirective],
+  imports: [TranslatePipe, BadgeComponent, DataTableComponent, CellDirective],
   template: `
     <header class="tasks__head">
       <h1 class="tasks__title">{{ 'tasks.title' | t }}</h1>
@@ -39,11 +38,14 @@ import {
         (rowClick)="open($any($event).id)"
       >
         <ng-template appCell="title" let-r>{{ titleOf($any(r)) }}</ng-template>
+        <ng-template appCell="type" let-r>{{ typeName($any(r).typeId) }}</ng-template>
         <ng-template appCell="state" let-r>
           <app-badge [color]="$any(r).state?.color">{{ $any(r).state?.label }}</app-badge>
         </ng-template>
         <ng-template appCell="amount" let-r>{{ $any(r).amount ? ($any(r).amount + ' ' + ($any(r).currency ?? '')) : '—' }}</ng-template>
-        <ng-template appCell="createdAt" let-r>{{ $any(r).createdAt | date: 'mediumDate' }}</ng-template>
+        <ng-template appCell="waiting" let-r>
+          <span class="tasks__muted" [attr.title]="$any(r).createdAt">{{ waitingSince($any(r).createdAt) }}</span>
+        </ng-template>
       </app-data-table>
     }
   `,
@@ -64,12 +66,17 @@ export class TasksComponent {
 
   protected readonly tasks = signal<ApplicationListItem[]>([]);
   protected readonly loading = signal(true);
+  private readonly types = signal<ApplicationType[]>([]);
+  private readonly typesById = computed(
+    () => new Map(this.types().map((t) => [t.id, t.name])),
+  );
 
-  protected readonly columns = signal<ColumnDef[]>([
+  protected readonly columns = computed<ColumnDef[]>(() => [
     { key: 'title', label: this.i18n.translate('tasks.col.title') },
+    { key: 'type', label: this.i18n.translate('tasks.col.type') },
     { key: 'state', label: this.i18n.translate('tasks.col.state') },
     { key: 'amount', label: this.i18n.translate('tasks.col.amount'), align: 'end', width: '10rem' },
-    { key: 'createdAt', label: this.i18n.translate('tasks.col.created'), width: '10rem' },
+    { key: 'waiting', label: this.i18n.translate('tasks.col.waiting'), align: 'end', width: '10rem' },
   ]);
 
   /** Antragstitel (System-Titelfeld) mit Fallback. */
@@ -77,7 +84,29 @@ export class TasksComponent {
     return item.title?.trim() || this.i18n.translate('applications.list.untitled');
   }
 
+  /** Antragstyp-Name (über die geladenen Typen aufgelöst). */
+  protected typeName(typeId: Uuid): string {
+    return this.typesById().get(typeId) ?? '—';
+  }
+
+  /**
+   * Wartezeit als relative Angabe (z. B. „vor 5 Tagen") — für die Aufgaben-Queue
+   * zählt das Alter, nicht das genaue Datum. Auf Basis von ``createdAt``.
+   */
+  protected waitingSince(createdAt: string | null): string {
+    if (!createdAt) return '—';
+    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000);
+    const rtf = new Intl.RelativeTimeFormat(this.i18n.locale() === 'en' ? 'en' : 'de', {
+      numeric: 'auto',
+    });
+    return days <= 0 ? rtf.format(0, 'day') : rtf.format(-days, 'day');
+  }
+
   constructor() {
+    this.api.applicationTypes().subscribe({
+      next: (t) => this.types.set(t),
+      error: () => this.types.set([]),
+    });
     this.reload();
   }
 

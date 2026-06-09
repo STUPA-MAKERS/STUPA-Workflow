@@ -22,7 +22,8 @@ function task(id: string, kind: string, title = 'Mein Antrag'): ApplicationListI
 
 async function setup(items: ApplicationListItem[]) {
   const listTasks = jest.fn(() => of(items));
-  const api = { listTasks };
+  const applicationTypes = jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }]));
+  const api = { listTasks, applicationTypes };
   const view = await render(TasksComponent, {
     providers: [provideRouter([]), { provide: ApiClient, useValue: api }],
   });
@@ -32,10 +33,14 @@ async function setup(items: ApplicationListItem[]) {
 describe('TasksComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('lists vote tasks awaiting the user', async () => {
+  it('lists vote tasks awaiting the user with type and waiting age', async () => {
     await setup([task('v1', 'vote')]);
     expect(screen.getByText('Mein Antrag')).toBeInTheDocument();
     expect(screen.getByText('Abstimmung')).toBeInTheDocument();
+    // Typ-Spalte (über die geladenen Typen aufgelöst).
+    expect(await screen.findByText('Finanzantrag')).toBeInTheDocument();
+    // „Wartet seit"-Spalte zeigt eine relative Angabe (vor … Tagen).
+    expect(screen.getByText(/Tag(en)?/)).toBeInTheDocument();
   });
 
   it('shows no inline decision buttons (acting happens in the detail view)', async () => {

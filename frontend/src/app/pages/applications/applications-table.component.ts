@@ -44,6 +44,7 @@ export interface SortState {
         <thead>
           <tr>
             <th scope="col">{{ 'applications.list.col.title' | t }}</th>
+            <th scope="col">{{ 'applications.list.col.type' | t }}</th>
             <th scope="col">{{ 'applications.list.col.state' | t }}</th>
             <th scope="col" class="atbl__num" [attr.aria-sort]="ariaSort('amount')">
               @if (sort()) {
@@ -67,12 +68,15 @@ export interface SortState {
               <td>
                 <a class="atbl__rowLink" [routerLink]="['/applications', row.id]">
                   <span class="atbl__rowTitle">{{ row.title }}</span>
-                  @if (row.typeLabel) {
-                    <span class="atbl__rowType">{{ row.typeLabel }}</span>
-                  } @else {
-                    <span class="atbl__rowHint">{{ 'applications.list.open' | t }}</span>
-                  }
+                  <span class="atbl__rowHint">{{ 'applications.list.open' | t }}</span>
                 </a>
+              </td>
+              <td>
+                @if (row.typeLabel) {
+                  {{ row.typeLabel }}
+                } @else {
+                  —
+                }
               </td>
               <td>
                 @if (row.stateLabel) {
@@ -92,7 +96,7 @@ export interface SortState {
             </tr>
           } @empty {
             <tr>
-              <td class="atbl__empty" colspan="4">{{ emptyText() }}</td>
+              <td class="atbl__empty" colspan="5">{{ emptyText() }}</td>
             </tr>
           }
         </tbody>
