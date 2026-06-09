@@ -90,7 +90,7 @@
           <text [attr.x]="NODE_W / 2" [attr.y]="NODE_H / 2 + 5" text-anchor="middle" class="fe__node-text">{{ n.label }}</text>
           <!-- Ausgangs-Punkt(e): ziehen erstellt einen Übergang; Branch-Knoten
                (vote/approval) zeigen je einen beschrifteten Punkt pro Ausgang. -->
-          @for (d of n.dots; track d.branch ?? 'out') {
+          @for (d of n.dots; track d.id) {
             <g>
               <circle
                 [attr.cx]="NODE_W"
@@ -98,11 +98,12 @@
                 r="7"
                 class="fe__connector"
                 [class.fe__connector--branch]="d.branch"
-                [attr.aria-label]="d.branch || ('admin.flow.connectHint' | t)"
+                [class.fe__connector--guard]="d.label && !d.branch"
+                [attr.aria-label]="d.label || ('admin.flow.connectHint' | t)"
                 (pointerdown)="onConnectPointerDown($event, n.key, d.branch)"
               />
-              @if (d.branch) {
-                <text [attr.x]="NODE_W + 11" [attr.y]="d.cy + 4" class="fe__dot-label">{{ d.branch }}</text>
+              @if (d.label) {
+                <text [attr.x]="NODE_W + 11" [attr.y]="d.cy + 4" class="fe__dot-label">{{ d.label }}</text>
               }
             </g>
           }
@@ -219,6 +220,23 @@
                 @for (opt of stateOptions(); track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
               </select>
             </label>
+          </div>
+        }
+
+        <!-- Guard-Priorität: ein Ausgangs-Punkt je Guard; Reihenfolge = Auswertung
+             (erster passender Guard gewinnt). Nur sinnvoll ab zwei Gruppen (#8). -->
+        @if ((s.kind ?? 'normal') === 'normal' && guardGroupsFor(s.key).length > 1) {
+          <div class="fe__guards">
+            <span class="fe__lbl-text">{{ 'admin.flow.guardPriority' | t }}</span>
+            @for (g of guardGroupsFor(s.key); track g.sig; let first = $first; let last = $last; let i = $index) {
+              <div class="fe__guard-row">
+                <span class="fe__guard-rank">{{ i + 1 }}</span>
+                <span class="fe__guard-name">{{ guardGroupLabel(g) }}</span>
+                <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="first" [ariaLabel]="'admin.flow.moveUp' | t" (click)="moveGuardUp(s.key, g.sig)">↑</app-button>
+                <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="'admin.flow.moveDown' | t" (click)="moveGuardDown(s.key, g.sig)">↓</app-button>
+              </div>
+            }
+            <span class="fe__hint">{{ 'admin.flow.guardPriorityHint' | t }}</span>
           </div>
         }
 

@@ -47,6 +47,21 @@ type Selection =
   | { kind: 'transition'; index: number }
   | null;
 
+/**
+ * Eine Gruppe ausgehender Übergänge eines Knotens mit identischem Guard (#8). Pro
+ * unterschiedlichem Guard ein Ausgangs-Punkt; die Reihenfolge der Gruppen ist die
+ * Auswertungs-/Prioritätsreihenfolge (erster passender Guard gewinnt).
+ */
+interface GuardGroup {
+  /** Stabile Signatur des Guards (`''` = kein Guard / Catch-all). */
+  sig: string;
+  guard: TransitionDef['guard'] | null;
+  op: string;
+  value: string;
+  /** Indizes der zugehörigen Übergänge im `transitions`-Array. */
+  indices: number[];
+}
+
 const NODE_W = 150;
 const NODE_H = 52;
 const MARGIN = 40;
@@ -183,8 +198,25 @@ export class FlowEditorComponent {
   protected readonly nodes = computed(() => {
     const pos = this.positions();
     const sel = this.selection();
+    const transitions = this.graph().transitions ?? [];
     return this.graph().states.map((s) => {
-      const dots = this.branchDotsFor(s.kind);
+      const branches = this.branchDotsFor(s.kind);
+      // vote/approval: ein beschrifteter Punkt je Branch (pass/fail bzw. accept/
+      // reject). Sonst: ein Punkt je unterschiedlichem Guard (+ Default-Punkt zum
+      // Aufziehen neuer, guard-loser Kanten).
+      const dots = branches.length
+        ? branches.map((b, i) => ({
+            id: b,
+            branch: b as string | null,
+            cy: this.dotY(i, branches.length),
+            label: b,
+          }))
+        : this.outDots(s.key, transitions).map((gp, i, arr) => ({
+            id: gp.sig || 'out',
+            branch: null as string | null,
+            cy: this.dotY(i, arr.length),
+            label: gp.sig ? this.guardGroupLabel(gp) : '',
+          }));
       return {
         key: s.key,
         label: this.label(s),
@@ -194,11 +226,7 @@ export class FlowEditorComponent {
         selected: sel?.kind === 'state' && sel.key === s.key,
         x: pos[s.key]?.x ?? 0,
         y: pos[s.key]?.y ?? 0,
-        // Ausgangs-Punkte: für vote/approval ein Punkt je Branch (pass/fail bzw.
-        // accept/reject), sonst ein einzelner Standard-Punkt.
-        dots: dots.length
-          ? dots.map((b, i) => ({ branch: b, cy: this.dotY(i, dots.length) }))
-          : [{ branch: null as string | null, cy: NODE_H / 2 }],
+        dots,
       };
     });
   });
@@ -207,6 +235,76 @@ export class FlowEditorComponent {
     if (kind === 'vote') return ['pass', 'fail'];
     if (kind === 'approval') return ['accept', 'reject'];
     return [];
+  }
+
+  /** Ausgehende Übergänge nach Guard gruppieren, in Array-(=Prioritäts-)Reihenfolge. */
+  private groupsOf(transitions: readonly TransitionDef[], fromKey: string): GuardGroup[] {
+    const bySig = new Map<string, GuardGroup>();
+    const order: GuardGroup[] = [];
+    transitions.forEach((t, index) => {
+      if (t.from !== fromKey) return;
+      const sig = t.guard ? JSON.stringify(t.guard) : '';
+      let g = bySig.get(sig);
+      if (!g) {
+        g = {
+          sig,
+          guard: t.guard ?? null,
+          op: t.guard ? Object.keys(t.guard)[0] : '',
+          value: t.guard ? String(Object.values(t.guard)[0] ?? '') : '',
+          indices: [],
+        };
+        bySig.set(sig, g);
+        order.push(g);
+      }
+      g.indices.push(index);
+    });
+    return order;
+  }
+
+  /** Ausgangs-Punkte eines normalen Knotens: je Guard-Gruppe einer, plus ein
+   *  Default-Punkt (Catch-all) zum Zeichnen neuer Kanten, falls keiner existiert. */
+  private outDots(fromKey: string, transitions: readonly TransitionDef[]): GuardGroup[] {
+    const groups = this.groupsOf(transitions, fromKey);
+    if (!groups.some((g) => g.sig === '')) {
+      groups.push({ sig: '', guard: null, op: '', value: '', indices: [] });
+    }
+    return groups;
+  }
+
+  /** Guard-Gruppen eines Knotens für die Prioritäts-Liste im Inspektor (#8). */
+  protected guardGroupsFor(fromKey: string): GuardGroup[] {
+    return this.groupsOf(this.graph().transitions ?? [], fromKey);
+  }
+
+  /** Klarname einer Guard-Gruppe (Operator + Wert; leer = Catch-all). */
+  protected guardGroupLabel(g: GuardGroup): string {
+    if (!g.sig) return this.i18n.translate('admin.flow.guardDefault');
+    const opLabel = this.i18n.translate(`admin.flow.guardOp.${g.op}` as TranslationKey);
+    return g.value ? `${opLabel}: ${g.value}` : opLabel;
+  }
+
+  /** Guard-Gruppe im Prioritäts-Stack nach oben/unten schieben (#8). Schreibt die
+   *  `order`-Felder neu, sodass die Array-Reihenfolge der Auswertung entspricht. */
+  protected moveGuardUp(fromKey: string, sig: string): void {
+    this.reorderGuard(fromKey, sig, -1);
+  }
+  protected moveGuardDown(fromKey: string, sig: string): void {
+    this.reorderGuard(fromKey, sig, 1);
+  }
+
+  private reorderGuard(fromKey: string, sig: string, dir: -1 | 1): void {
+    this.graph.update((g) => {
+      const all = g.transitions ?? [];
+      const groups = this.groupsOf(all, fromKey);
+      const gi = groups.findIndex((x) => x.sig === sig);
+      const ni = gi + dir;
+      if (gi < 0 || ni < 0 || ni >= groups.length) return g;
+      [groups[gi], groups[ni]] = [groups[ni], groups[gi]];
+      const outgoing = groups.flatMap((grp) => grp.indices.map((i) => all[i]));
+      const others = all.filter((t) => t.from !== fromKey);
+      const next = [...others, ...outgoing].map((t, i) => ({ ...t, order: i }));
+      return { ...g, transitions: next };
+    });
   }
 
   private dotY(i: number, n: number): number {
@@ -220,16 +318,17 @@ export class FlowEditorComponent {
   protected readonly edges = computed(() => {
     const pos = this.positions();
     const sel = this.selection();
+    const transitions = this.graph().transitions ?? [];
     const kindOf = new Map(this.graph().states.map((s) => [s.key, s.kind] as const));
-    return (this.graph().transitions ?? [])
+    return transitions
       .map((t, index) => ({ t, index }))
       .filter(({ t }) => pos[t.from] && pos[t.to])
       .map(({ t, index }) => {
         const a = pos[t.from];
         const b = pos[t.to];
         const x1 = a.x + NODE_W;
-        // Start am Branch-Punkt (pass/fail …), nicht in der Knotenmitte (#8).
-        const y1 = a.y + this.branchDotY(kindOf.get(t.from), t.branch);
+        // Start am Ausgangs-Punkt: Branch (pass/fail …) bzw. dem Guard-Punkt (#8).
+        const y1 = a.y + this.outDotYFor(t.from, kindOf.get(t.from), t, transitions);
         const x2 = b.x;
         const y2 = b.y + NODE_H / 2;
         return {
@@ -253,6 +352,21 @@ export class FlowEditorComponent {
     const dots = this.branchDotsFor(kind);
     const i = branch ? dots.indexOf(branch) : -1;
     return i >= 0 ? this.dotY(i, dots.length) : NODE_H / 2;
+  }
+
+  /** Y-Offset des Ausgangs-Punkts: Branch-Punkt (vote/approval) bzw. der zum Guard
+   *  des Übergangs gehörende Punkt (normale Knoten, #8). */
+  private outDotYFor(
+    fromKey: string,
+    kind: string | null | undefined,
+    t: TransitionDef,
+    transitions: readonly TransitionDef[],
+  ): number {
+    if (this.branchDotsFor(kind).length) return this.branchDotY(kind, t.branch);
+    const dots = this.outDots(fromKey, transitions);
+    const sig = t.guard ? JSON.stringify(t.guard) : '';
+    const i = dots.findIndex((g) => g.sig === sig);
+    return this.dotY(i < 0 ? dots.length - 1 : i, dots.length);
   }
 
   /** Glatte (kubische Bézier) horizontale Kante zwischen zwei Punkten. */

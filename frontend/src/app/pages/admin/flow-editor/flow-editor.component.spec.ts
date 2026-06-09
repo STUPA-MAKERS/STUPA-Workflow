@@ -120,6 +120,40 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().states).toHaveLength(1);
   });
 
+  it('groups outgoing transitions per distinct guard and reorders priority', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addState();
+    c.addState();
+    c.setStateKey('state', 'a');
+    c.setStateKey('state2', 'b');
+    c.setInitial('a');
+    // Zwei guarded + ein guard-loser Übergang von a → unterschiedliche Guards.
+    c.graph.update((g: FlowGraph) => ({
+      ...g,
+      transitions: [
+        { from: 'a', to: 'b', guard: { roleIs: 'x' }, automatic: true, actions: [] },
+        { from: 'a', to: 'b', guard: { roleIs: 'y' }, automatic: true, actions: [] },
+        { from: 'a', to: 'b', actions: [] },
+      ],
+    }));
+
+    // Drei unterschiedliche Guards (x, y, kein Guard) → drei Gruppen.
+    const groups = c.guardGroupsFor('a');
+    expect(groups.map((gp: { value: string }) => gp.value)).toEqual(['x', 'y', '']);
+    // Default-Knoten zeigt einen Ausgangs-Punkt je Gruppe.
+    const nodeA = c.nodes().find((n: { key: string }) => n.key === 'a');
+    expect(nodeA.dots).toHaveLength(3);
+
+    // Priorität: y vor x schieben → Reihenfolge dreht sich.
+    c.moveGuardUp('a', JSON.stringify({ roleIs: 'y' }));
+    const after = c.guardGroupsFor('a');
+    expect(after.map((gp: { value: string }) => gp.value)).toEqual(['y', 'x', '']);
+    // order-Felder spiegeln die Array-Reihenfolge (Auswertungspriorität).
+    expect(c.graph().transitions.map((t: { order?: number }) => t.order)).toEqual([0, 1, 2]);
+  });
+
   it('saves nothing and warns when the graph is invalid', async () => {
     const { fixture, createGlobalFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
