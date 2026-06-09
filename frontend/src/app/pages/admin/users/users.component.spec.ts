@@ -100,9 +100,9 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(api.revokeRole).toHaveBeenCalledWith('a-1');
   });
 
-  it('renders the principals as a table', async () => {
+  it('renders the principals as a table without the oidc-subject column', async () => {
     await setup();
     expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'OIDC-Subject' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'OIDC-Subject' })).not.toBeInTheDocument();
   });
 });

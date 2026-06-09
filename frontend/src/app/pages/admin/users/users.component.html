@@ -29,13 +29,12 @@
         }
       </ng-template>
       <ng-template appCell="email" let-p><span class="users__muted">{{ $any(p).email || '—' }}</span></ng-template>
-      <ng-template appCell="subject" let-p><span class="users__muted users__mono">{{ $any(p).sub }}</span></ng-template>
       <ng-template appCell="roles" let-p>
         <div class="users__roles">
-          @if ($any(p).assignments.length === 0) {
+          @if (globalAssignments($any(p)).length === 0) {
             <span class="users__muted">{{ 'admin.users.noRoles' | t }}</span>
           }
-          @for (a of $any(p).assignments; track a.id) {
+          @for (a of globalAssignments($any(p)); track a.id) {
             <span class="users__tag">
               <app-badge variant="primary">
                 <span class="users__tag-label">{{ roleLabel(a.roleId) | capitalize }}</span>
@@ -71,7 +70,6 @@
 
       <ng-template appRowDetail let-p>
         <fieldset class="users__assign">
-          <legend>{{ 'admin.users.assignTitle' | t }}: {{ userLabel($any(p)) }}</legend>
           <app-select
             class="users__lbl"
             [label]="'admin.users.role' | t"

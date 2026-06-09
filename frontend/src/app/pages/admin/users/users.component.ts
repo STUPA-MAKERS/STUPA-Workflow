@@ -91,13 +91,17 @@ export class UsersComponent {
   );
 
   protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.users.col.name') },
+    { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '22rem' },
     { key: 'email', label: this.i18n.translate('admin.users.col.email') },
-    { key: 'subject', label: this.i18n.translate('admin.users.col.subject') },
     { key: 'roles', label: this.i18n.translate('admin.users.col.roles') },
     { key: 'lastLogin', label: this.i18n.translate('admin.users.col.lastLogin') },
     { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
   ]);
+
+  /** Nur globale Rollen (ohne Gremium-Scope) in der Rollen-Spalte zeigen. */
+  protected globalAssignments(p: AdminPrincipal): RoleAssignment[] {
+    return p.assignments.filter((a) => !a.gremiumId);
+  }
   protected readonly rowId = (p: unknown): string => (p as AdminPrincipal).id;
   /** Detail-Zeile (Zuweisen-Form) für aufgeklappte Principals. */
   protected readonly rowExpanded = (p: unknown): boolean => this.isExpanded((p as AdminPrincipal).id);

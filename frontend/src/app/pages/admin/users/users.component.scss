@@ -42,6 +42,11 @@
   outline-offset: 1px;
 }
 
+/* Suchen-Button auf Eingabe-Höhe (Task #5). */
+.users__search app-button button.btn {
+  height: var(--control-height);
+}
+
 .users__empty {
   color: var(--color-text-muted);
 }
@@ -171,12 +176,6 @@
   border: 0;
 }
 
-.users__assign legend {
-  flex-basis: 100%;
-  font-weight: var(--fw-semibold);
-  margin-bottom: var(--space-2);
-}
-
 .users__assign app-checkbox {
   min-height: var(--control-height);
   justify-content: center;
@@ -184,6 +183,11 @@
 
 .users__assign app-button {
   align-self: end;
+}
+
+/* Zuweisen-Button auf Höhe der Selects/Datepicker links (Task #5). */
+.users__assign app-button button.btn {
+  height: var(--control-height);
 }
 
 .users__lbl {
