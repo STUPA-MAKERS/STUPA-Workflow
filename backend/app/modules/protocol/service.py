@@ -91,19 +91,30 @@ class ProtocolService:
             raise NotFoundError(f"protocol {protocol_id} not found")
         return protocol
 
-    def _pdf_url(self, protocol: Protocol) -> str | None:
-        """Kurzlebige, signierte Ergebnis-URL (nie ein direkter Bucket-Link)."""
-        if (
-            protocol.pdf_storage_key is not None
-            and self.storage is not None
-            and self.settings is not None
-        ):
-            return self.storage.presigned_get_url(
-                protocol.pdf_storage_key,
-                expires_seconds=self.settings.pdf_url_ttl_seconds,
-                download_name=f"protokoll-{protocol.meeting_id}.pdf",
-            )
+    def _pdf_path(self, protocol: Protocol) -> str | None:
+        """App-relativer PDF-Pfad (über nginx /api/ erreichbar, nie ein Bucket-Link).
+
+        MinIO liegt im ``internal``-Netz ohne Port-Publish; eine S3v4-signierte URL
+        bindet den (internen) Host in die Signatur → vom Browser unerreichbar. Statt
+        dessen streamt der ``/pdf``-Endpunkt die Bytes server-seitig aus dem Storage."""
+        if protocol.pdf_storage_key is not None and self.storage is not None:
+            return f"/api/protocols/{protocol.id}/pdf"
         return None
+
+    async def get_pdf_bytes(self, protocol_id: UUID) -> bytes:
+        """PDF-Bytes des Protokolls aus dem Storage holen (für den ``/pdf``-Stream).
+
+        404, wenn das Protokoll fehlt, noch kein PDF gerendert wurde oder Storage »aus«
+        ist. Transiente Storage-Fehler → 503 (wiederholbar)."""
+        protocol = await self._get(protocol_id)
+        if protocol.pdf_storage_key is None or self.storage is None:
+            raise NotFoundError(f"protocol {protocol_id} has no PDF")
+        try:
+            return await self.storage.get(protocol.pdf_storage_key)
+        except StorageError as exc:
+            raise ServiceUnavailableError(
+                "Protocol PDF temporarily unavailable."
+            ) from exc
 
     def _to_out(self, protocol: Protocol) -> ProtocolOut:
         return ProtocolOut(
@@ -111,7 +122,7 @@ class ProtocolService:
             meetingId=protocol.meeting_id,
             markdown=protocol.markdown,
             status=protocol.status,  # type: ignore[arg-type]
-            pdfUrl=self._pdf_url(protocol),
+            pdfUrl=self._pdf_path(protocol),
             sentAt=protocol.sent_at,
         )
 
@@ -345,7 +356,9 @@ class ProtocolService:
         recipients = await self._recipients(protocol.gremium_id)
         if not recipients:
             return
-        pdf_url = self._pdf_url(protocol)
+        pdf_path = self._pdf_path(protocol)
+        base = self.settings.public_base_url.rstrip("/") if self.settings else ""
+        pdf_url = f"{base}{pdf_path}" if pdf_path else None
         link = f"\n\nPDF: {pdf_url}" if pdf_url else ""
         await self.mail_queue.enqueue(
             MailMessage(

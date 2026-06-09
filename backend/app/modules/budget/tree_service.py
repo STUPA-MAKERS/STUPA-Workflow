@@ -625,6 +625,10 @@ class BudgetTreeService:
         q: str | None = None,
         amount_min: Decimal | None = None,
         amount_max: Decimal | None = None,
+        created_from: str | None = None,
+        created_to: str | None = None,
+        sort: str | None = None,
+        order: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> Page[ExpenseOut]:
@@ -654,6 +658,14 @@ class BudgetTreeService:
             filters.append(BudgetExpense.amount >= amount_min)
         if amount_max is not None:
             filters.append(BudgetExpense.amount <= amount_max)
+        if created_from:
+            filters.append(func.date(BudgetExpense.created_at) >= created_from)
+        if created_to:
+            filters.append(func.date(BudgetExpense.created_at) <= created_to)
+
+        # Sortier-Spalte (whitelist) + Richtung; Default: neueste zuerst.
+        sort_col = BudgetExpense.amount if sort == "amount" else BudgetExpense.created_at
+        ordering = sort_col.asc() if order == "asc" else sort_col.desc()
 
         total = await self.session.scalar(
             select(func.count()).select_from(BudgetExpense).where(*filters)
@@ -664,7 +676,7 @@ class BudgetTreeService:
                 .join(Budget, Budget.id == BudgetExpense.budget_id)
                 .outerjoin(Application, Application.id == BudgetExpense.application_id)
                 .where(*filters)
-                .order_by(BudgetExpense.created_at.desc())
+                .order_by(ordering, BudgetExpense.created_at.desc())
                 .limit(limit)
                 .offset(offset)
             )

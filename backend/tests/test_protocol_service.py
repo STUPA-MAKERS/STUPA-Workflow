@@ -346,3 +346,36 @@ async def test_finalize_deduplicates_recipients_across_lists() -> None:
         session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=mail
     ).finalize(PID, now=NOW)
     assert mail.sent[0].to == ("a@x", "b@x", "c@x")
+
+
+# ----------------------------------------------------------------- pdf streaming
+async def test_pdf_url_is_app_relative_path_not_bucket_link() -> None:
+    """`pdfUrl` zeigt auf den App-Stream (`/api/...`), nie auf eine Bucket-/MinIO-URL."""
+    proto = _protocol(pdf_storage_key=protocol_storage_key(PID))
+    session = FakeSession(results=[result(proto)])
+    out = await _service(session, storage=FakeStorage()).update_markdown(PID, "x")
+    assert out.pdf_url == f"/api/protocols/{PID}/pdf"
+    assert "minio" not in (out.pdf_url or "")
+
+
+async def test_get_pdf_bytes_streams_from_storage() -> None:
+    proto = _protocol(pdf_storage_key=protocol_storage_key(PID))
+    storage = FakeStorage()
+    storage.blobs[protocol_storage_key(PID)] = b"%PDF-1.4 stream"
+    session = FakeSession(results=[result(proto)])
+    data = await _service(session, storage=storage).get_pdf_bytes(PID)
+    assert data == b"%PDF-1.4 stream"
+
+
+async def test_get_pdf_bytes_404_without_pdf() -> None:
+    proto = _protocol(pdf_storage_key=None)
+    session = FakeSession(results=[result(proto)])
+    with pytest.raises(NotFoundError):
+        await _service(session, storage=FakeStorage()).get_pdf_bytes(PID)
+
+
+async def test_get_pdf_bytes_404_without_storage() -> None:
+    proto = _protocol(pdf_storage_key=protocol_storage_key(PID))
+    session = FakeSession(results=[result(proto)])
+    with pytest.raises(NotFoundError):
+        await _service(session, storage=None).get_pdf_bytes(PID)

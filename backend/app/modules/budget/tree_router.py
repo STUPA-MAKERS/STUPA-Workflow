@@ -18,7 +18,7 @@ Disjunktheit) → 422; Löschen mit Kindern/Zuteilungen → 409.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -251,12 +251,16 @@ async def list_expenses(
     q: Annotated[str | None, Query()] = None,
     amount_min: Annotated[Decimal | None, Query(alias="amountMin", ge=0)] = None,
     amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
+    created_from: Annotated[str | None, Query(alias="createdFrom")] = None,
+    created_to: Annotated[str | None, Query(alias="createdTo")] = None,
+    sort: Annotated[Literal["createdAt", "amount"] | None, Query()] = None,
+    order: Annotated[Literal["asc", "desc"] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[ExpenseOut]:
-    """Buchungen gefiltert + offset-paginiert (#25). ``budget`` schließt den
+    """Buchungen gefiltert + sortiert + offset-paginiert (#25). ``budget`` schließt den
     Unterbaum ein; ``kind`` = ``expense``/``income``; ``q`` = Beschreibungssuche;
-    ``amountMin``/``amountMax`` = Betragsbereich."""
+    ``amountMin``/``amountMax`` = Betragsbereich; ``sort``/``order`` = Spalten-Sortierung."""
     return await service.list_expenses_paged(
         budget_id=budget_id,
         fiscal_year_id=fiscal_year_id,
@@ -265,6 +269,10 @@ async def list_expenses(
         q=q,
         amount_min=amount_min,
         amount_max=amount_max,
+        created_from=created_from,
+        created_to=created_to,
+        sort="amount" if sort == "amount" else "createdAt",
+        order=order,
         limit=limit,
         offset=offset,
     )

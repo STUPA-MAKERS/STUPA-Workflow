@@ -72,9 +72,14 @@ class FakeStorage:
     def __init__(self, *, url: str = "https://minio.local/signed") -> None:
         self.url = url
         self.puts: list[tuple[str, int, str]] = []
+        self.blobs: dict[str, bytes] = {}
 
     async def put(self, key: str, data: bytes, content_type: str) -> None:
         self.puts.append((key, len(data), content_type))
+        self.blobs[key] = data
+
+    async def get(self, key: str) -> bytes:
+        return self.blobs[key]
 
     def presigned_get_url(
         self, key: str, *, expires_seconds: int, download_name: str | None = None

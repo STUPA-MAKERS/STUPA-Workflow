@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from app.deps import DbSession, SettingsDep, require_principal
 from app.modules.auth.principal import Principal
@@ -116,3 +116,24 @@ async def finalize_protocol(
 ) -> ProtocolOut:
     """→ PDF (pytex) → MinIO → Mail an MAIL_LIST(gremium); ``status=final``."""
     return await service.finalize(protocol_id, now=datetime.now(UTC))
+
+
+@router.get(
+    "/protocols/{protocol_id}/pdf",
+    responses=_errors(401, 403, 404, 503),
+    response_class=Response,
+)
+async def get_protocol_pdf(
+    protocol_id: UUID, service: ServiceDep, _principal: WriterDep
+) -> Response:
+    """PDF des Protokolls inline streamen (MinIO liegt intern, kein Browser-Zugriff).
+
+    Server-seitiger Storage-Fetch statt presigned URL: MinIO ist nur im ``internal``-
+    Docker-Netz erreichbar, eine S3v4-signierte URL bindet den internen Host → vom
+    Browser unerreichbar. Über nginx ``/api/`` ist dieser Endpunkt erreichbar."""
+    data = await service.get_pdf_bytes(protocol_id)
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline; filename=protokoll.pdf"},
+    )

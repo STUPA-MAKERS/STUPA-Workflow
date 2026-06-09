@@ -73,6 +73,10 @@ export interface ExpenseQuery {
   q?: string;
   amountMin?: number;
   amountMax?: number;
+  createdFrom?: string;
+  createdTo?: string;
+  sort?: 'createdAt' | 'amount';
+  order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }

@@ -67,11 +67,6 @@ import {
         }
       </div>
       <div class="exp__filters">
-        <div class="exp__kinds" role="tablist" [attr.aria-label]="'expenses.filter.kind' | t">
-          <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
-          <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
-          <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
-        </div>
         <input
           class="exp__search"
           type="search"
@@ -80,30 +75,44 @@ import {
           (ngModelChange)="onSearch($event)"
           [attr.aria-label]="'expenses.search' | t"
         />
-        <div class="exp__amountFilter">
-          <input
-            class="exp__input exp__amountInput"
-            type="number"
-            min="0"
-            step="0.01"
-            [placeholder]="'expenses.filter.amountMin' | t"
-            [attr.aria-label]="'expenses.filter.amountMin' | t"
-            [ngModel]="amountMin()"
-            (ngModelChange)="onAmountFilter('min', $event)"
-          />
-          <span aria-hidden="true">–</span>
-          <input
-            class="exp__input exp__amountInput"
-            type="number"
-            min="0"
-            step="0.01"
-            [placeholder]="'expenses.filter.amountMax' | t"
-            [attr.aria-label]="'expenses.filter.amountMax' | t"
-            [ngModel]="amountMax()"
-            (ngModelChange)="onAmountFilter('max', $event)"
-          />
-        </div>
+        <app-button variant="secondary" size="sm" (click)="filtersOpen.set(!filtersOpen())">
+          <span class="exp__filterBtn"><app-icon name="filter" [size]="14" /> {{ 'expenses.filters' | t }}
+            @if (activeFilterCount()) { <span class="exp__filterCount">{{ activeFilterCount() }}</span> }
+          </span>
+        </app-button>
       </div>
+
+      @if (filtersOpen()) {
+        <div class="exp__filterMenu">
+          <div class="exp__filterGroup">
+            <span class="exp__filterLabel">{{ 'expenses.filter.kind' | t }}</span>
+            <div class="exp__kinds">
+              <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
+              <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+              <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
+            </div>
+          </div>
+          <div class="exp__filterGroup">
+            <span class="exp__filterLabel">{{ 'expenses.filter.amountRange' | t }}</span>
+            <div class="exp__amountFilter">
+              <input class="exp__input exp__amountInput" type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMin' | t" [attr.aria-label]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
+              <span aria-hidden="true">–</span>
+              <input class="exp__input exp__amountInput" type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMax' | t" [attr.aria-label]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
+            </div>
+          </div>
+          <div class="exp__filterGroup">
+            <span class="exp__filterLabel">{{ 'expenses.filter.dateRange' | t }}</span>
+            <div class="exp__amountFilter">
+              <input class="exp__input" type="date" [attr.aria-label]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
+              <span aria-hidden="true">–</span>
+              <input class="exp__input" type="date" [attr.aria-label]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
+            </div>
+          </div>
+          @if (activeFilterCount()) {
+            <app-button variant="ghost" size="sm" (click)="resetFilters()">{{ 'expenses.filter.reset' | t }}</app-button>
+          }
+        </div>
+      }
     </header>
 
     <div class="exp__layout">
@@ -123,38 +132,51 @@ import {
         } @else if (!items().length) {
           <p class="exp__status">{{ 'expenses.empty' | t }}</p>
         } @else {
-          <ul class="exp__list">
-            @for (e of items(); track e.id) {
-              <li class="exp__row" [class.exp__row--income]="e.kind === 'income'">
-                <span class="exp__date">{{ e.createdAt | ldate: 'mediumDate' }}</span>
-                <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">
-                  {{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}
-                </app-badge>
-                <div class="exp__desc">
-                  <span class="exp__descText">{{ e.description }}</span>
-                  <span class="exp__meta">
-                    <span class="exp__cc">{{ e.pathKey }}</span>
-                    @if (e.applicationId) {
-                      · <a class="exp__appLink" [routerLink]="['/applications', e.applicationId]" (click)="$event.stopPropagation()">{{ e.applicationTitle || ('expenses.linkedApplication' | t) }}</a>
+          <div class="exp__tableWrap">
+            <table class="exp__table">
+              <thead>
+                <tr>
+                  <th scope="col" [attr.aria-sort]="ariaSort('createdAt')">
+                    <button type="button" class="exp__sort" (click)="onSort('createdAt')">{{ 'expenses.col.date' | t }}{{ sortInd('createdAt') }}</button>
+                  </th>
+                  <th scope="col">{{ 'expenses.col.kind' | t }}</th>
+                  <th scope="col">{{ 'expenses.col.description' | t }}</th>
+                  <th scope="col">{{ 'expenses.col.costCentre' | t }}</th>
+                  <th scope="col">{{ 'expenses.col.application' | t }}</th>
+                  <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
+                    <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'expenses.col.amount' | t }}{{ sortInd('amount') }}</button>
+                  </th>
+                  @if (canManage()) { <th scope="col" class="exp__num"></th> }
+                </tr>
+              </thead>
+              <tbody>
+                @for (e of items(); track e.id) {
+                  <tr [class.exp__tr--income]="e.kind === 'income'">
+                    <td class="exp__cellDate">{{ e.createdAt | ldate: 'mediumDate' }}</td>
+                    <td>
+                      <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
+                    </td>
+                    <td class="exp__cellDesc">{{ e.description }}</td>
+                    <td class="exp__mono">{{ e.pathKey }}</td>
+                    <td>
+                      @if (e.applicationId) {
+                        <a class="exp__appLink" [routerLink]="['/applications', e.applicationId]">{{ e.applicationTitle || ('expenses.linkedApplication' | t) }}</a>
+                      } @else { — }
+                    </td>
+                    <td class="exp__num exp__amount" [class.exp__amount--income]="e.kind === 'income'">{{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}</td>
+                    @if (canManage()) {
+                      <td class="exp__num">
+                        <span class="exp__actions">
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(e)"><app-icon name="edit" /></app-button>
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(e)"><app-icon name="delete" /></app-button>
+                        </span>
+                      </td>
                     }
-                  </span>
-                </div>
-                <span class="exp__amount" [class.exp__amount--income]="e.kind === 'income'">
-                  {{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}
-                </span>
-                @if (canManage()) {
-                  <span class="exp__actions">
-                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(e)">
-                      <app-icon name="edit" />
-                    </app-button>
-                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(e)">
-                      <app-icon name="delete" />
-                    </app-button>
-                  </span>
+                  </tr>
                 }
-              </li>
-            }
-          </ul>
+              </tbody>
+            </table>
+          </div>
           @if (hasMore()) {
             <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
             <div class="exp__more">
@@ -312,6 +334,128 @@ import {
       .exp__sentinel { height: 1px; }
       .exp__more { display: flex; justify-content: center; margin-top: var(--space-4); }
       .exp__count { text-align: center; color: var(--color-text-muted); font-size: var(--fs-sm); margin-top: var(--space-3); }
+      /* --- Tabelle (#25) --- */
+      .exp__tableWrap {
+        overflow-x: auto;
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+      }
+      .exp__table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--fs-sm);
+      }
+      .exp__table th,
+      .exp__table td {
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-width) solid var(--color-border);
+        text-align: start;
+        vertical-align: middle;
+      }
+      .exp__table tbody tr:last-child td {
+        border-bottom: none;
+      }
+      .exp__table tbody tr:hover {
+        background: var(--color-surface-sunken);
+      }
+      .exp__table th {
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-semibold);
+        white-space: nowrap;
+      }
+      .exp__sort {
+        background: transparent;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-semibold);
+      }
+      .exp__sort:hover {
+        color: var(--color-primary);
+      }
+      .exp__num {
+        text-align: end;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .exp__cellDate {
+        color: var(--color-text-muted);
+        white-space: nowrap;
+      }
+      .exp__cellDesc {
+        font-weight: var(--fw-medium);
+        min-width: 12rem;
+      }
+      .exp__mono {
+        font-variant-numeric: tabular-nums;
+        color: var(--color-text-muted);
+      }
+      .exp__amount {
+        font-weight: var(--fw-semibold);
+      }
+      .exp__amount--income {
+        color: var(--color-success, #2e7d32);
+      }
+      .exp__appLink {
+        color: var(--color-primary);
+        text-decoration: none;
+      }
+      .exp__appLink:hover {
+        text-decoration: underline;
+      }
+      .exp__actions {
+        display: inline-flex;
+        gap: var(--space-1);
+        justify-content: flex-end;
+      }
+      /* --- Filter-Menü (#25) --- */
+      .exp__filterBtn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+      }
+      .exp__filterCount {
+        display: inline-grid;
+        place-items: center;
+        min-width: 1.1rem;
+        height: 1.1rem;
+        padding: 0 4px;
+        border-radius: var(--radius-pill);
+        background: var(--color-primary);
+        color: var(--color-on-primary, #fff);
+        font-size: var(--fs-xs);
+      }
+      .exp__filterMenu {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: var(--space-4);
+        margin-top: var(--space-3);
+        padding: var(--space-4);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+      }
+      .exp__filterGroup {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      .exp__filterLabel {
+        font-size: var(--fs-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-text-muted);
+      }
       .exp__form { display: flex; flex-direction: column; gap: var(--space-2); }
       .exp__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); margin-top: var(--space-2); }
       .exp__hint { font-size: var(--fs-sm); color: var(--color-text-muted); margin: 0; }
@@ -391,8 +535,25 @@ export class ExpensesComponent {
   readonly q = signal('');
   readonly amountMin = signal('');
   readonly amountMax = signal('');
+  readonly createdFrom = signal('');
+  readonly createdTo = signal('');
   readonly budgetId = signal('');
+  readonly filtersOpen = signal(false);
+  readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
+  readonly sortOrder = signal<'asc' | 'desc'>('desc');
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Zahl aktiver Filter (für den Indikator am Filter-Button). */
+  readonly activeFilterCount = computed(
+    () =>
+      [
+        this.kind(),
+        this.amountMin().trim(),
+        this.amountMax().trim(),
+        this.createdFrom(),
+        this.createdTo(),
+      ].filter((v) => String(v ?? '').trim() !== '').length,
+  );
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
@@ -476,6 +637,41 @@ export class ExpensesComponent {
     this.debouncedReload();
   }
 
+  onDateFilter(which: 'from' | 'to', value: string): void {
+    (which === 'from' ? this.createdFrom : this.createdTo).set(value);
+    this.debouncedReload();
+  }
+
+  resetFilters(): void {
+    this.kind.set('');
+    this.amountMin.set('');
+    this.amountMax.set('');
+    this.createdFrom.set('');
+    this.createdTo.set('');
+    this.reload();
+  }
+
+  /** Spalten-Sortierung umschalten (gleiche Spalte → Richtung kippen). */
+  onSort(field: 'createdAt' | 'amount'): void {
+    if (this.sortField() === field) {
+      this.sortOrder.update((o) => (o === 'desc' ? 'asc' : 'desc'));
+    } else {
+      this.sortField.set(field);
+      this.sortOrder.set('desc');
+    }
+    this.reload();
+  }
+
+  sortInd(field: 'createdAt' | 'amount'): string {
+    if (this.sortField() !== field) return '';
+    return this.sortOrder() === 'asc' ? ' ↑' : ' ↓';
+  }
+
+  ariaSort(field: 'createdAt' | 'amount'): 'ascending' | 'descending' | 'none' {
+    if (this.sortField() !== field) return 'none';
+    return this.sortOrder() === 'asc' ? 'ascending' : 'descending';
+  }
+
   private debouncedReload(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => this.reload(), 250);
@@ -503,6 +699,10 @@ export class ExpensesComponent {
         q: this.q().trim() || undefined,
         amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,
         amountMax: this.amountMax().trim() ? Number(this.amountMax()) : undefined,
+        createdFrom: this.createdFrom() || undefined,
+        createdTo: this.createdTo() || undefined,
+        sort: this.sortField(),
+        order: this.sortOrder(),
         limit: this.PAGE,
         offset: this.nextOffset,
       })
