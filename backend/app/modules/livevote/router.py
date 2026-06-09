@@ -16,6 +16,7 @@ Auth ist fail-closed: REST 401/403 via ``require_principal``; WS schließt mit
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -44,10 +45,13 @@ from app.modules.livevote.schemas import (
     MeetingCreate,
     MeetingOut,
     MeetingPatch,
+    MeetingVoteOpenBody,
 )
 from app.modules.livevote.service import BrokerPublisher, MeetingService
+from app.modules.voting.schemas import VoteCreate
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
+from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
 
 router = APIRouter(tags=["livevote"])
@@ -103,6 +107,10 @@ def get_agenda_service(session: DbSession) -> AgendaService:
     return AgendaService(session)
 
 
+def get_voting_service(session: DbSession) -> VotingService:
+    return VotingService(session)
+
+
 def get_voting_service_ws(session: DbSession) -> VotingService:
     """Voting-Service für den WS-Cast-Pfad (eigene Session, Flow-Dispatch default)."""
     return VotingService(session)
@@ -120,6 +128,8 @@ async def get_ws_principal(
 ServiceDep = Annotated[MeetingService, Depends(get_meeting_service)]
 AttendanceDep = Annotated[AttendanceService, Depends(get_attendance_service)]
 AgendaDep = Annotated[AgendaService, Depends(get_agenda_service)]
+VotingDep = Annotated[VotingService, Depends(get_voting_service)]
+BrokerRestDep = Annotated[MeetingBroker, Depends(get_broker_rest)]
 ManagerDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -241,6 +251,45 @@ async def list_agenda(
 ) -> list[AgendaItemOut]:
     """Tagesordnung der Sitzung (zugewiesene Anträge, geordnet)."""
     return await agenda.list(meeting_id)
+
+
+@router.post(
+    "/meetings/{meeting_id}/votes",
+    response_model=MeetingOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def open_meeting_vote(
+    meeting_id: UUID,
+    payload: MeetingVoteOpenBody,
+    service: ServiceDep,
+    voting: VotingDep,
+    broker: BrokerRestDep,
+    principal: ManagerDep,
+) -> MeetingOut:
+    """Abstimmung für einen Antrag in dieser Sitzung anlegen + sofort öffnen (Live-Vote).
+
+    Nur Sitzungsleitung/Admin. ``eligibleGroup`` = Gremium der Sitzung; die
+    Beschlussfrage (``question``) erscheint im Protokoll. Broadcastet ``vote_opened``."""
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_control:
+        raise ForbiddenError("only the committee lead may open a vote")
+    config = VoteConfig.model_validate(
+        {
+            "options": payload.options,
+            "majorityRule": payload.majority_rule,
+            "secret": payload.secret,
+        }
+    )
+    create = VoteCreate(
+        config=config,
+        eligibleGroup=str(meeting.gremium_id),
+        question=payload.question,
+        eligibleCount=payload.eligible_count,
+    )
+    vote = await voting.create(payload.application_id, create, meeting_id=meeting_id)
+    opened = await voting.open(vote.id, now=datetime.now(UTC))
+    await BrokerPublisher(broker).vote_opened(opened)
+    return await service.get(meeting_id, principal)
 
 
 @router.get(

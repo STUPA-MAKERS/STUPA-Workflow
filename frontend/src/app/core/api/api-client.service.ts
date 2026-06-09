@@ -397,6 +397,25 @@ export class ApiClient {
     );
   }
 
+  /**
+   * POST /meetings/{id}/votes — Live-Abstimmung für einen Antrag anlegen + öffnen,
+   * mit Beschlussfrage (fürs Protokoll). Antwort = aktualisierte Sitzung (#Meetings).
+   */
+  openMeetingVote(
+    meetingId: Uuid,
+    body: {
+      applicationId: Uuid;
+      question?: string | null;
+      options: string[];
+      majorityRule?: 'simple' | 'absolute' | 'two_thirds';
+      secret?: boolean;
+    },
+  ): Observable<Meeting> {
+    return this.http
+      .post<MeetingOutWire>(`${this.base}/meetings/${meetingId}/votes`, body)
+      .pipe(map(mapMeeting));
+  }
+
   /** POST /votes/{id}/open — Vote öffnen (auch live; P(vote.manage)). */
   openVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/open`, {});

@@ -570,6 +570,28 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'POST') {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
+    // Live-Abstimmung für einen Antrag öffnen (Beschlussfrage).
+    if (/\/meetings\/[^/]+\/votes$/.test(p)) {
+      const body = req.body as { applicationId?: string; question?: string | null } | null;
+      MOCK_MEETING = {
+        ...MOCK_MEETING,
+        votes: [
+          ...MOCK_MEETING.votes,
+          {
+            id: `v-mock-${MOCK_MEETING.votes.length + 1}`,
+            applicationId: body?.applicationId ?? '',
+            title: null,
+            question: body?.question ?? null,
+            status: 'open',
+            result: null,
+            counts: null,
+            leading: null,
+            closesAt: null,
+          },
+        ],
+      };
+      return ok(MOCK_MEETING);
+    }
     // Antrag auf die Tagesordnung setzen.
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) {
       const body = req.body as { applicationId?: string; title?: string } | null;

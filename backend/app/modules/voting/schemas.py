@@ -22,6 +22,8 @@ class VoteCreate(_CamelModel):
 
     config: VoteConfig
     eligible_group: str = Field(alias="eligibleGroup", min_length=1)
+    # Beschlussfrage (»Worüber wird abgestimmt?«) — fürs Protokoll (#Meetings).
+    question: str | None = None
     # Maßgebliche Zahl der Stimmberechtigten (Beschlussfähigkeits-Basis aus dem
     # Roster der Gruppe/des Gremiums) — **Nenner** des Prozent-Quorums. NICHT aus
     # eingeloggten Usern abgeleitet (das wäre fail-open). Pflicht für Prozent-Quorum;
@@ -67,6 +69,7 @@ class VoteOut(_CamelModel):
     application_id: UUID = Field(alias="applicationId")
     # Sitzung, an die der Vote hängt (Live-Vote, T-16); None bei reinem Async-Vote.
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
+    question: str | None = None
     eligible_group: str = Field(alias="eligibleGroup")
     config: VoteConfig
     status: Literal["draft", "open", "closed"]

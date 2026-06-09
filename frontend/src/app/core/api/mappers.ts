@@ -219,6 +219,7 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     id: wire.id,
     applicationId: wire.applicationId,
     title: wire.title ?? null,
+    question: wire.question ?? null,
     status: wire.status,
     result: wire.result ?? null,
     counts: wire.counts ?? null,

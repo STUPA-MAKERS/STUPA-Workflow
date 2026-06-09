@@ -52,6 +52,9 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
     )
     eligible_group: Mapped[str] = mapped_column(Text)
+    # Beschluss-/Abstimmungsfrage (Live-Vote): »Worüber wird abgestimmt?« — wird im
+    # Protokoll am Abstimmungs-Snippet ausgewiesen. NULL = keine explizite Frage.
+    question: Mapped[str | None] = mapped_column(Text, nullable=True)
     config: Mapped[dict] = mapped_column(JSONB)
     # Maßgebliche Zahl der Stimmberechtigten (Roster der Gruppe/des Gremiums) — Nenner
     # des Prozent-Quorums. NULL = unbekannt → Prozent-Quorum fail-closed (nie erfüllt).

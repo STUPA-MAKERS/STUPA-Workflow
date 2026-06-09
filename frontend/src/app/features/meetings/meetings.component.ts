@@ -176,7 +176,7 @@ const AUTOSAVE_DELAY_MS = 1000;
               @for (vote of m.votes; track vote.id) {
                 <li class="mtg__vote" [class.mtg__vote--active]="vote.applicationId === m.activeApplicationId">
                   <div class="mtg__voteHead">
-                    <span class="mtg__voteTitle">{{ vote.title || vote.applicationId }}</span>
+                    <span class="mtg__voteTitle">{{ vote.question || vote.title || vote.applicationId }}</span>
                     <app-badge [variant]="voteVariant(vote.status)">
                       {{ voteStatusKey(vote.status) | t }}
                     </app-badge>
@@ -278,6 +278,11 @@ const AUTOSAVE_DELAY_MS = 1000;
                   @if (item.stateLabel) {
                     <app-badge variant="info">{{ resolveLabel(item.stateLabel) }}</app-badge>
                   }
+                  @if (m.canControl && item.applicationId) {
+                    <app-button variant="secondary" size="sm" (click)="openVoteDialog(item)">
+                      {{ 'meetings.vote.openFor' | t }}
+                    </app-button>
+                  }
                   @if (m.canControl) {
                     <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="removeFromAgenda(item.id)">
                       <app-icon name="delete" />
@@ -291,6 +296,45 @@ const AUTOSAVE_DELAY_MS = 1000;
           }
         </app-card>
       }
+
+      <!-- Abstimmung für einen Antrag öffnen (Live-Vote mit Beschlussfrage, #Meetings) -->
+      <app-dialog
+        [open]="voteDialogOpen()"
+        [title]="'meetings.vote.dialogTitle' | t"
+        [closeLabel]="'action.cancel' | t"
+        (closed)="closeVoteDialog()"
+      >
+        <form class="mtg__voteForm" (submit)="$event.preventDefault(); submitVote()">
+          <label class="mtg__paneLabel" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
+          <input
+            id="mtg-vq"
+            class="mtg__input"
+            [ngModel]="voteQuestion()"
+            (ngModelChange)="voteQuestion.set($event)"
+            name="vq"
+            [placeholder]="'meetings.vote.questionPlaceholder' | t"
+          />
+          <label class="mtg__paneLabel" for="mtg-vo">{{ 'meetings.vote.options' | t }}</label>
+          <textarea
+            id="mtg-vo"
+            class="mtg__textarea"
+            rows="4"
+            [ngModel]="voteOptions()"
+            (ngModelChange)="voteOptions.set($event)"
+            name="vo"
+          ></textarea>
+          <label class="mtg__voteSecret">
+            <input type="checkbox" [checked]="voteSecret()" (change)="voteSecret.set($any($event.target).checked)" />
+            {{ 'meetings.vote.secret' | t }}
+          </label>
+        </form>
+        <div dialog-footer class="mtg__dialogFoot">
+          <app-button variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
+          <app-button [disabled]="voteOptionList().length < 2 || openingVote()" [loading]="openingVote()" (click)="submitVote()">
+            {{ 'meetings.vote.openSubmit' | t }}
+          </app-button>
+        </div>
+      </app-dialog>
 
       <!-- Protokoll-Editor -->
       @if (canWrite()) {
@@ -885,6 +929,18 @@ const AUTOSAVE_DELAY_MS = 1000;
         color: var(--color-primary);
         text-decoration: underline;
       }
+      .mtg__voteForm {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        max-width: 30rem;
+      }
+      .mtg__voteSecret {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-size: var(--fs-sm);
+      }
       .mtg__createForm {
         display: flex;
         flex-direction: column;
@@ -948,6 +1004,20 @@ export class MeetingsComponent implements OnDestroy {
   readonly savingAgenda = signal(false);
   readonly agendaPick = signal<string>('');
   readonly agendaFreetext = signal<string>('');
+
+  /** Live-Abstimmung öffnen (#Meetings): Dialog-Zustand + Beschlussfrage/Optionen. */
+  readonly voteDialogOpen = signal(false);
+  private readonly voteItem = signal<AgendaItem | null>(null);
+  readonly voteQuestion = signal<string>('');
+  readonly voteOptions = signal<string>('Ja\nNein\nEnthaltung');
+  readonly voteSecret = signal(false);
+  readonly openingVote = signal(false);
+  readonly voteOptionList = computed(() =>
+    this.voteOptions()
+      .split(/[\n,]/)
+      .map((o) => o.trim())
+      .filter((o) => o.length > 0),
+  );
   readonly assignableOptions = computed<SelectOption[]>(() =>
     this.assignable().map((a) => ({ value: a.applicationId, label: a.title || a.applicationId })),
   );
@@ -1376,6 +1446,47 @@ export class MeetingsComponent implements OnDestroy {
   /** TOP aus einem Tagesordnungspunkt in das Protokoll-Markdown einfügen (#58). */
   insertTop(item: AgendaItem, index: number): void {
     this.insertSnippet(topSnippet(index + 1, item.title, item.applicationId));
+  }
+
+  // --- Live-Abstimmung öffnen (#Meetings) ----------------------------------
+  openVoteDialog(item: AgendaItem): void {
+    if (!item.applicationId) return;
+    this.voteItem.set(item);
+    this.voteQuestion.set(item.title ?? '');
+    this.voteOptions.set('Ja\nNein\nEnthaltung');
+    this.voteSecret.set(false);
+    this.voteDialogOpen.set(true);
+  }
+
+  closeVoteDialog(): void {
+    this.voteDialogOpen.set(false);
+  }
+
+  submitVote(): void {
+    const m = this.meeting();
+    const item = this.voteItem();
+    const options = this.voteOptionList();
+    if (!m || !item?.applicationId || options.length < 2 || this.openingVote()) return;
+    this.openingVote.set(true);
+    this.api
+      .openMeetingVote(m.id, {
+        applicationId: item.applicationId,
+        question: this.voteQuestion().trim() || null,
+        options,
+        secret: this.voteSecret(),
+      })
+      .subscribe({
+        next: (updated) => {
+          this.openingVote.set(false);
+          this.voteDialogOpen.set(false);
+          this.meeting.set(updated);
+          this.toast.success(this.i18n.translate('meetings.toast.voteOpened'));
+        },
+        error: () => {
+          this.openingVote.set(false);
+          this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        },
+      });
   }
 
   /** i18n-Map (z. B. State-Label) für die aktuelle Sprache auflösen. */

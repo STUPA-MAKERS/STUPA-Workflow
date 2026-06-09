@@ -71,13 +71,19 @@ def build_protocol_document(doc: ProtocolDoc) -> str:
 
 
 def build_vote_snippet(
-    title: str, result: str | None, counts: dict[str, int] | None
+    title: str,
+    result: str | None,
+    counts: dict[str, int] | None,
+    question: str | None = None,
 ) -> str:
-    """Eine Abstimmung als Markdown-Snippet (Titel + Ergebnis + Stimmen).
+    """Eine Abstimmung als Markdown-Snippet (Titel + Beschlussfrage + Ergebnis + Stimmen).
 
     Wird beim Einbetten an den Protokoll-Body angehängt; bleibt damit Teil des vom
     Protokollanten editierbaren Markdowns. Alle Werte werden Markdown-escaped."""
     lines = [f"### {_md_escape(title)}", ""]
+    if question and question.strip():
+        lines.append(f"**Beschlussfrage:** {_md_escape(question.strip())}")
+        lines.append("")
     lines.append(f"- **Ergebnis:** {_md_escape(result) if result else '—'}")
     if counts:
         rendered = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())

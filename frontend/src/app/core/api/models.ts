@@ -632,6 +632,8 @@ export interface MeetingVoteOutWire {
   applicationId: Uuid;
   /** Antrags-Titel (vom Backend mitgeliefert; sonst aus dem Antrag aufzulösen). */
   title?: string | null;
+  /** Beschlussfrage der (Live-)Abstimmung — fürs Protokoll (#Meetings). */
+  question?: string | null;
   status: MeetingVoteStatus;
   /** Endergebnis (z. B. `accepted`/`rejected`), erst nach `closed`. */
   result?: string | null;
@@ -706,6 +708,7 @@ export interface MeetingVote {
   id: Uuid;
   applicationId: Uuid;
   title: string | null;
+  question: string | null;
   status: MeetingVoteStatus;
   result: string | null;
   counts: Record<string, number> | null;

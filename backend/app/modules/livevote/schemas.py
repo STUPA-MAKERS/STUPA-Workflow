@@ -54,6 +54,16 @@ class MeetingPatch(_CamelModel):
         return self
 
 
+class MeetingVoteOut(_CamelModel):
+    """Eine an die Sitzung gebundene Abstimmung (für die Sitzungssteuerung)."""
+
+    id: UUID
+    application_id: UUID = Field(alias="applicationId")
+    question: str | None = None
+    status: Literal["draft", "open", "closed"]
+    result: str | None = None
+
+
 class MeetingOut(_CamelModel):
     """Sitzungs-State (``GET /api/meetings/{id}``)."""
 
@@ -69,6 +79,8 @@ class MeetingOut(_CamelModel):
     # Darf der anfragende Principal die Sitzung steuern? True für Admin oder wer im
     # Gremium die Sitzungsleitung (Vorstand/Schriftführung) innehat (#Meetings).
     can_control: bool = Field(default=False, alias="canControl")
+    # An die Sitzung gebundene Abstimmungen (Sitzungssteuerung).
+    votes: list[MeetingVoteOut] = Field(default_factory=list)
 
 
 AttendanceStatus = Literal["present", "excused", "absent"]
@@ -110,6 +122,23 @@ class AssignableApplicationOut(_CamelModel):
     application_id: UUID = Field(alias="applicationId")
     title: str | None = None
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
+
+
+class MeetingVoteOpenBody(_CamelModel):
+    """``POST /meetings/{id}/votes`` — Abstimmung für einen Antrag öffnen (Live-Vote).
+
+    Bindet eine neue Abstimmung an die Sitzung und öffnet sie sofort. ``question``
+    (Beschlussfrage) wandert ins Protokoll-Snippet.
+    """
+
+    application_id: UUID = Field(alias="applicationId")
+    question: str | None = None
+    options: list[str] = Field(min_length=2)
+    majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
+        default="simple", alias="majorityRule"
+    )
+    secret: bool = False
+    eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
 
 
 class AgendaAddBody(_CamelModel):

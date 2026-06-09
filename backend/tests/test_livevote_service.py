@@ -164,12 +164,24 @@ async def test_publisher_meeting_state() -> None:
 # --------------------------------------------------------------------------- #
 # MeetingService gegen Fake-Session
 # --------------------------------------------------------------------------- #
+class _Scalars:
+    def __init__(self, rows: list) -> None:
+        self._rows = rows
+
+    def all(self) -> list:
+        return self._rows
+
+
 class _Result:
     def __init__(self, value: object) -> None:
         self._value = value
 
     def scalar_one_or_none(self) -> object:
         return self._value
+
+    def scalars(self) -> _Scalars:
+        # ``_votes_for`` (Meeting-Votes) erwartet ``.scalars().all()`` — leer reicht.
+        return _Scalars([])
 
 
 class _FakeSession:

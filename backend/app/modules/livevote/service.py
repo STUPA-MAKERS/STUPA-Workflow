@@ -32,7 +32,12 @@ from app.modules.livevote.events import (
     VoteTallyEvent,
 )
 from app.modules.livevote.models import Meeting
-from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
+from app.modules.livevote.schemas import (
+    MeetingCreate,
+    MeetingOut,
+    MeetingPatch,
+    MeetingVoteOut,
+)
 from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed, VoteOut
@@ -99,6 +104,7 @@ class MeetingService:
         meeting: Meeting,
         protocol_id: UUID | None = None,
         can_control: bool = False,
+        votes: list[MeetingVoteOut] | None = None,
     ) -> MeetingOut:
         return MeetingOut(
             id=meeting.id,
@@ -111,7 +117,34 @@ class MeetingService:
             protocolId=protocol_id,
             createdAt=meeting.created_at,
             canControl=can_control,
+            votes=votes or [],
         )
+
+    async def _votes_for(self, meeting_ids: list[UUID]) -> dict[UUID, list[MeetingVoteOut]]:
+        """An die Sitzung(en) gebundene Abstimmungen, je ``meeting_id`` gebündelt."""
+        if not meeting_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(Vote)
+                .where(Vote.meeting_id.in_(meeting_ids))
+                .order_by(Vote.created_at)
+            )
+        ).scalars().all()
+        out: dict[UUID, list[MeetingVoteOut]] = {}
+        for v in rows:
+            if v.meeting_id is None:
+                continue
+            out.setdefault(v.meeting_id, []).append(
+                MeetingVoteOut(
+                    id=v.id,
+                    applicationId=v.application_id,
+                    question=v.question,
+                    status=v.status,  # type: ignore[arg-type]
+                    result=v.result,
+                )
+            )
+        return out
 
     # -------------------------------------------------- Sitzungsleitung (#Meetings)
     async def _led_gremium_ids(self, sub: str) -> set[UUID]:
@@ -170,7 +203,8 @@ class MeetingService:
             if principal is not None
             else False
         )
-        return self._to_out(meeting, await self._protocol_id(meeting.id), can)
+        votes = (await self._votes_for([meeting.id])).get(meeting.id, [])
+        return self._to_out(meeting, await self._protocol_id(meeting.id), can, votes)
 
     async def list(
         self, principal: Principal, gremium_id: UUID | None = None
@@ -200,8 +234,14 @@ class MeetingService:
             if "admin" in principal.roles
             else await self._led_gremium_ids(principal.sub)
         )
+        votes_by_meeting = await self._votes_for([m.id for m in meetings])
         return [
-            self._to_out(m, proto_by_meeting.get(m.id), m.gremium_id in led)
+            self._to_out(
+                m,
+                proto_by_meeting.get(m.id),
+                m.gremium_id in led,
+                votes_by_meeting.get(m.id, []),
+            )
             for m in meetings
         ]
 
@@ -240,7 +280,8 @@ class MeetingService:
             meeting.start_time = payload.start_time
         await self.session.flush()
         await self.session.commit()
-        out = self._to_out(meeting, can_control=True)
+        votes = (await self._votes_for([meeting.id])).get(meeting.id, [])
+        out = self._to_out(meeting, can_control=True, votes=votes)
         if self.publisher is not None:
             await self.publisher.meeting_state(out)
         return out

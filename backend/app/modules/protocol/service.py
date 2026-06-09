@@ -223,6 +223,7 @@ class ProtocolService:
                     _vote_title(view.application_id),
                     view.tally.result,
                     view.tally.counts,
+                    question=view.question,
                 )
             )
 

@@ -112,6 +112,7 @@ class VotingService:
             id=vote.id,
             applicationId=vote.application_id,
             meetingId=vote.meeting_id,
+            question=getattr(vote, "question", None),
             eligibleGroup=vote.eligible_group,
             config=config,
             status=vote.status,  # type: ignore[arg-type]
@@ -123,12 +124,22 @@ class VotingService:
         )
 
     # --------------------------------------------------------------- create
-    async def create(self, application_id: UUID, payload: VoteCreate) -> VoteOut:
-        """Abstimmung (``draft``) anlegen. 404, wenn der Antrag fehlt."""
+    async def create(
+        self,
+        application_id: UUID,
+        payload: VoteCreate,
+        *,
+        meeting_id: UUID | None = None,
+    ) -> VoteOut:
+        """Abstimmung (``draft``) anlegen. 404, wenn der Antrag fehlt.
+
+        ``meeting_id`` bindet die Abstimmung an eine Sitzung (Live-Vote, T-16)."""
         await self._get_application(application_id)
         vote = Vote(
             application_id=application_id,
+            meeting_id=meeting_id,
             eligible_group=payload.eligible_group,
+            question=payload.question,
             config=payload.config.model_dump(by_alias=True),
             eligible_count=payload.eligible_count,
             opens_state_id=payload.opens_state_id,
