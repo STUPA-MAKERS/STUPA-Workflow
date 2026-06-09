@@ -165,7 +165,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                   @if (vote.status === 'open' && canVote()) {
                     <div class="mtg__voteActions">
                       @for (opt of voteOptionsFor(vote); track opt) {
-                        <app-button size="sm" variant="secondary" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}</app-button>
+                        <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
                       }
                     </div>
                   }
@@ -341,7 +341,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                       @if (vote.status === 'open' && canVote()) {
                         <div class="mtg__voteActions">
                           @for (opt of voteOptionsFor(vote); track opt) {
-                            <app-button size="sm" variant="secondary" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}</app-button>
+                            <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
                           }
                         </div>
                       }
@@ -443,7 +443,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                 @if (vote.status === 'open' && canVote()) {
                   <div class="mtg__voteActions">
                     @for (opt of voteOptionsFor(vote); track opt) {
-                      <app-button size="sm" variant="secondary" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}</app-button>
+                      <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
                     }
                   </div>
                 }
@@ -855,6 +855,15 @@ const AUTOSAVE_DELAY_MS = 1000;
         display: flex;
         gap: var(--space-2);
         flex-wrap: wrap;
+        /* Stimm-Buttons bleiben beim Scrollen erreichbar (#Meetings). */
+        position: sticky;
+        bottom: 0;
+        z-index: 1;
+        margin-top: var(--space-2);
+        padding: var(--space-2);
+        background: var(--color-surface);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
       }
       .mtg__protoMeta {
         display: flex;
@@ -1858,6 +1867,11 @@ export class MeetingsComponent implements OnDestroy {
   /** Casting-Status je Vote (für Mitglied/Protokollant-Stimmabgabe). */
   readonly casting = signal<Uuid | null>(null);
   readonly deletingVote = signal<Uuid | null>(null);
+  /** Eigene Stimmwahl je Vote (lokal, fürs Hervorheben der gewählten Option). */
+  private readonly myChoices = signal<Record<string, string>>({});
+  myChoice(voteId: Uuid): string | null {
+    return this.myChoices()[voteId] ?? null;
+  }
 
   /** Votes eines TOP (gruppiert über agendaItemId). */
   votesForTop(topId: Uuid): MeetingVote[] {
@@ -2499,6 +2513,7 @@ export class MeetingsComponent implements OnDestroy {
     this.api.castBallot(voteId, choice).subscribe({
       next: () => {
         this.casting.set(null);
+        this.myChoices.update((m) => ({ ...m, [voteId]: choice }));
         this.toast.success(this.i18n.translate('meetings.toast.voteCast'));
       },
       error: () => {
