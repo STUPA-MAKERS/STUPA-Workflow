@@ -38,7 +38,9 @@ from app.modules.livevote.events import ErrorEvent
 from app.modules.livevote.locks import InMemoryLocker, Locker
 from app.modules.livevote.schemas import (
     AgendaAddBody,
+    AgendaBodyBody,
     AgendaItemOut,
+    AgendaReorderBody,
     AssignableApplicationOut,
     AttendanceOut,
     AttendanceSetBody,
@@ -340,6 +342,45 @@ async def remove_agenda_item(
     if not meeting.can_control:
         raise ForbiddenError("only the committee lead may edit the agenda")
     return await agenda.remove(meeting_id, item_id)
+
+
+@router.put(
+    "/meetings/{meeting_id}/agenda/order",
+    response_model=list[AgendaItemOut],
+    responses=_errors(401, 403, 404, 422),
+)
+async def reorder_agenda(
+    meeting_id: UUID,
+    payload: AgendaReorderBody,
+    agenda: AgendaDep,
+    service: ServiceDep,
+    principal: ManagerDep,
+) -> list[AgendaItemOut]:
+    """TOPs umsortieren (Drag&Drop) — nur Sitzungsleitung/Admin."""
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_control:
+        raise ForbiddenError("only the committee lead may edit the agenda")
+    return await agenda.reorder(meeting_id, payload.item_ids)
+
+
+@router.patch(
+    "/meetings/{meeting_id}/agenda/{item_id}",
+    response_model=list[AgendaItemOut],
+    responses=_errors(401, 403, 404, 422),
+)
+async def set_agenda_body(
+    meeting_id: UUID,
+    item_id: UUID,
+    payload: AgendaBodyBody,
+    agenda: AgendaDep,
+    service: ServiceDep,
+    principal: ManagerDep,
+) -> list[AgendaItemOut]:
+    """Markdown-Text eines TOP setzen (pro-TOP-Editor) — nur Sitzungsleitung/Admin."""
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_control:
+        raise ForbiddenError("only the committee lead may edit the agenda")
+    return await agenda.set_body(meeting_id, item_id, payload.body)
 
 
 # --------------------------------------------------------------------------- #

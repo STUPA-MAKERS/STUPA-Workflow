@@ -106,6 +106,8 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     )
     # Freitext-Titel eines TOP ohne Antrag (z. B. »Verschiedenes«).
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Markdown-Text dieses TOP (pro-TOP-Editor); fließt ins finale Protokoll.
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")
 
     __table_args__ = (

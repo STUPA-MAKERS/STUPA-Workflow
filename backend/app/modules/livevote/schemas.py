@@ -111,6 +111,8 @@ class AgendaItemOut(_CamelModel):
     id: UUID
     application_id: UUID | None = Field(default=None, alias="applicationId")
     title: str | None = None
+    # Markdown-Text dieses TOP (pro-TOP-Editor).
+    body: str | None = None
     position: int = 0
     # Aktueller Status des Antrags (i18n-Label), z. B. zum Anzeigen in der Liste.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
@@ -155,3 +157,15 @@ class AgendaAddBody(_CamelModel):
         if (self.application_id is None) == (self.title is None):
             raise ValueError("exactly one of applicationId or title is required")
         return self
+
+
+class AgendaBodyBody(_CamelModel):
+    """``PATCH …/agenda/{itemId}`` — Markdown-Text eines TOP setzen."""
+
+    body: str = ""
+
+
+class AgendaReorderBody(_CamelModel):
+    """``PUT …/agenda/order`` — TOPs in der gelieferten Reihenfolge anordnen."""
+
+    item_ids: list[UUID] = Field(alias="itemIds")

@@ -99,11 +99,55 @@ class AgendaService:
                     id=r.id,
                     applicationId=r.application_id,
                     title=title,
+                    body=r.body,
                     position=r.position,
                     stateLabel=state.label_i18n if state is not None else None,
                 )
             )
         return out
+
+    async def set_body(
+        self, meeting_id: UUID, item_id: UUID, body: str
+    ) -> list[AgendaItemOut]:
+        """Markdown-Text eines TOP setzen (pro-TOP-Editor)."""
+        row = (
+            await self.session.execute(
+                select(MeetingAgendaItem).where(
+                    MeetingAgendaItem.meeting_id == meeting_id,
+                    MeetingAgendaItem.id == item_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise NotFoundError(f"agenda item {item_id} not found")
+        row.body = body
+        await self.session.flush()
+        await self.session.commit()
+        return await self.list(meeting_id)
+
+    async def reorder(
+        self, meeting_id: UUID, item_ids: list[UUID]
+    ) -> list[AgendaItemOut]:
+        """TOPs in der gelieferten Reihenfolge anordnen (Drag&Drop)."""
+        rows = {
+            r.id: r
+            for r in (
+                await self.session.scalars(
+                    select(MeetingAgendaItem).where(
+                        MeetingAgendaItem.meeting_id == meeting_id
+                    )
+                )
+            ).all()
+        }
+        position = 0
+        for item_id in item_ids:
+            row = rows.get(item_id)
+            if row is not None:
+                row.position = position
+                position += 1
+        await self.session.flush()
+        await self.session.commit()
+        return await self.list(meeting_id)
 
     async def assignable(self, meeting_id: UUID) -> list[AssignableApplicationOut]:
         meeting = await self._meeting(meeting_id)
