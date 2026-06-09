@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any
+from datetime import date
+from decimal import Decimal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
@@ -189,14 +191,26 @@ async def list_applications(
     type_id: Annotated[UUID | None, Query(alias="type")] = None,
     budget_pot_id: Annotated[UUID | None, Query(alias="topf")] = None,
     q: Annotated[str | None, Query()] = None,
+    amount_min: Annotated[Decimal | None, Query(alias="amountMin", ge=0)] = None,
+    amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
+    created_from: Annotated[date | None, Query(alias="createdFrom")] = None,
+    created_to: Annotated[date | None, Query(alias="createdTo")] = None,
+    sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
+    order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Page[ApplicationListItem]:
-    """Antragsliste (Filter: state/gremium/type/topf/q; Offset-Paging)."""
+    """Antragsliste (Filter: state/gremium/type/topf/q/Betrag/Datum; Sortierung; Paging)."""
     return await service.list_applications(
         state_id=state_id,
         gremium_id=gremium_id,
         type_id=type_id,
         budget_pot_id=budget_pot_id,
         q=q,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        created_from=created_from,
+        created_to=created_to,
+        sort=sort,
+        order=order,
         limit=page.limit,
         offset=page.offset,
     )

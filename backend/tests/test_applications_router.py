@@ -352,6 +352,32 @@ def test_list_applications_filters_passed(
     assert fake_service.list_kwargs["limit"] == 10
 
 
+def test_list_applications_amount_date_sort_passed(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    from datetime import date
+    from decimal import Decimal
+
+    _as_principal(app, "application.read")
+    r = client.get(
+        "/api/applications"
+        "?amountMin=100&amountMax=500&createdFrom=2026-01-01&createdTo=2026-02-01"
+        "&sort=amount&order=asc"
+    )
+    assert r.status_code == 200
+    kw = fake_service.list_kwargs
+    assert kw["amount_min"] == Decimal("100") and kw["amount_max"] == Decimal("500")
+    assert kw["created_from"] == date(2026, 1, 1) and kw["created_to"] == date(2026, 2, 1)
+    assert kw["sort"] == "amount" and kw["order"] == "asc"
+
+
+def test_list_applications_rejects_bad_sort_422(
+    app: FastAPI, client: TestClient
+) -> None:
+    _as_principal(app, "application.read")
+    assert client.get("/api/applications?sort=bogus").status_code == 422
+
+
 def test_list_applications_requires_auth(client: TestClient) -> None:
     assert client.get("/api/applications").status_code == 401
 

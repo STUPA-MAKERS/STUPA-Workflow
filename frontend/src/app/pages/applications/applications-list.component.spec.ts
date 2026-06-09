@@ -185,7 +185,47 @@ describe('ApplicationsListComponent', () => {
     expect(navigate).toHaveBeenCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { q: null, type: null, state: null, gremium: null, topf: null, offset: null },
+        queryParams: {
+          q: null, type: null, state: null, gremium: null, topf: null,
+          amountMin: null, amountMax: null, createdFrom: null, createdTo: null, offset: null,
+        },
+      }),
+    );
+    http.verify();
+  });
+
+  it('sorts by amount when the Amount header is clicked', async () => {
+    const { http, detectChanges, router } = await setup();
+    flushTypes(http);
+    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+    detectChanges();
+
+    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    await userEvent.click(screen.getByRole('button', { name: /Betrag/ }));
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: expect.objectContaining({ sort: 'amount', order: 'desc', offset: null }),
+      }),
+    );
+    http.verify();
+  });
+
+  it('sends amount range and date filters on submit', async () => {
+    const { http, detectChanges, router } = await setup();
+    flushTypes(http);
+    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+    detectChanges();
+
+    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    await userEvent.type(screen.getByLabelText('Min'), '100');
+    await userEvent.type(screen.getByLabelText('Max'), '500');
+    await userEvent.click(screen.getByRole('button', { name: 'Filtern' }));
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: expect.objectContaining({ amountMin: 100, amountMax: 500, offset: null }),
       }),
     );
     http.verify();

@@ -19,7 +19,7 @@ Form-/Topf-Felder kommen aus T-11: laufende Anträge validieren gegen ihre **gep
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -460,10 +460,16 @@ class ApplicationsService:
         type_id: UUID | None = None,
         budget_pot_id: UUID | None = None,
         q: str | None = None,
+        amount_min: Decimal | None = None,
+        amount_max: Decimal | None = None,
+        created_from: date | None = None,
+        created_to: date | None = None,
+        sort: str = "createdAt",
+        order: str = "desc",
         limit: int,
         offset: int,
     ) -> Page[ApplicationListItem]:
-        """Gefilterte, gepagte Antragsliste (api.md ``GET /applications``)."""
+        """Gefilterte, gepagte, sortierte Antragsliste (api.md ``GET /applications``)."""
         filters = []
         if state_id is not None:
             filters.append(Application.current_state_id == state_id)
@@ -475,6 +481,19 @@ class ApplicationsService:
             filters.append(Application.budget_pot_id == budget_pot_id)
         if q:
             filters.append(cast(Application.data, Text).ilike(f"%{q}%"))
+        if amount_min is not None:
+            filters.append(Application.amount >= amount_min)
+        if amount_max is not None:
+            filters.append(Application.amount <= amount_max)
+        if created_from is not None:
+            filters.append(Application.created_at >= datetime.combine(created_from, time.min, UTC))
+        if created_to is not None:
+            # ``created_to`` inklusiv → bis Ende des Tages (< Folgetag 00:00 UTC).
+            end = datetime.combine(created_to + timedelta(days=1), time.min, UTC)
+            filters.append(Application.created_at < end)
+
+        sort_col = Application.amount if sort == "amount" else Application.created_at
+        ordering = (sort_col.asc() if order == "asc" else sort_col.desc()).nulls_last()
 
         total = await self.session.scalar(
             select(func.count()).select_from(Application).where(*filters)
@@ -483,7 +502,7 @@ class ApplicationsService:
             await self.session.scalars(
                 select(Application)
                 .where(*filters)
-                .order_by(Application.created_at.desc())
+                .order_by(ordering)
                 .limit(limit)
                 .offset(offset)
             )

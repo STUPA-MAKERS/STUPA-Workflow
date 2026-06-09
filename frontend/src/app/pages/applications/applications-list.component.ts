@@ -87,6 +87,22 @@ import { stateBadgeVariant } from './applications.util';
                   (ngModelChange)="state.set($event)"
                 />
               </div>
+              <div class="field">
+                <span class="field__label">{{ 'applications.list.filter.amount' | t }}</span>
+                <div class="apps__range">
+                  <input type="number" min="0" step="1" class="field__control" [placeholder]="'applications.list.filter.min' | t" [attr.aria-label]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" name="amountMin" />
+                  <span class="apps__rangeSep">–</span>
+                  <input type="number" min="0" step="1" class="field__control" [placeholder]="'applications.list.filter.max' | t" [attr.aria-label]="'applications.list.filter.max' | t" [ngModel]="amountMax()" (ngModelChange)="amountMax.set($event)" name="amountMax" />
+                </div>
+              </div>
+              <div class="field">
+                <span class="field__label">{{ 'applications.list.filter.date' | t }}</span>
+                <div class="apps__range">
+                  <input type="date" class="field__control" [attr.aria-label]="'applications.list.filter.from' | t" [ngModel]="createdFrom()" (ngModelChange)="createdFrom.set($event)" name="createdFrom" />
+                  <span class="apps__rangeSep">–</span>
+                  <input type="date" class="field__control" [attr.aria-label]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
+                </div>
+              </div>
               <div class="apps__filterActions">
                 <app-button type="submit" size="sm">{{ 'applications.list.filter.apply' | t }}</app-button>
                 <app-button type="button" variant="ghost" size="sm" (click)="reset()">
@@ -116,8 +132,12 @@ import { stateBadgeVariant } from './applications.util';
               <th scope="col">{{ 'applications.list.col.title' | t }}</th>
               <th scope="col">{{ 'applications.list.col.type' | t }}</th>
               <th scope="col">{{ 'applications.list.col.state' | t }}</th>
-              <th scope="col" class="apps__num">{{ 'applications.list.col.amount' | t }}</th>
-              <th scope="col">{{ 'applications.list.col.created' | t }}</th>
+              <th scope="col" class="apps__num" [attr.aria-sort]="ariaSort('amount')">
+                <button type="button" class="apps__sort" (click)="sortBy('amount')">{{ 'applications.list.col.amount' | t }}{{ sortIndicator('amount') }}</button>
+              </th>
+              <th scope="col" [attr.aria-sort]="ariaSort('createdAt')">
+                <button type="button" class="apps__sort" (click)="sortBy('createdAt')">{{ 'applications.list.col.created' | t }}{{ sortIndicator('createdAt') }}</button>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -298,6 +318,29 @@ import { stateBadgeVariant } from './applications.util';
         text-align: end;
         font-variant-numeric: tabular-nums;
       }
+      .apps__range {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+      .apps__rangeSep {
+        color: var(--color-text-muted);
+      }
+      .apps__sort {
+        background: transparent;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-semibold);
+      }
+      .apps__sort:hover {
+        color: var(--color-primary);
+      }
       .apps__table tbody tr:hover {
         background: var(--color-surface-sunken);
       }
@@ -353,10 +396,26 @@ export class ApplicationsListComponent {
   readonly typeId = signal('');
   readonly state = signal('');
 
+  readonly amountMin = signal('');
+  readonly amountMax = signal('');
+  readonly createdFrom = signal('');
+  readonly createdTo = signal('');
+  readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
+  readonly sortOrder = signal<'asc' | 'desc'>('desc');
+
   /** Filter-Popout offen? + Zahl aktiver Filter (für den Indikator). */
   readonly filtersOpen = signal(false);
   readonly activeFilterCount = computed(
-    () => [this.q(), this.typeId(), this.state()].filter((v) => v.trim() !== '').length,
+    () =>
+      [
+        this.q(),
+        this.typeId(),
+        this.state(),
+        this.amountMin(),
+        this.amountMax(),
+        this.createdFrom(),
+        this.createdTo(),
+      ].filter((v) => String(v ?? '').trim() !== '').length,
   );
 
   /**
@@ -394,6 +453,12 @@ export class ApplicationsListComponent {
       this.q.set(pm.get('q') ?? '');
       this.typeId.set(pm.get('type') ?? '');
       this.state.set(pm.get('state') ?? '');
+      this.amountMin.set(pm.get('amountMin') ?? '');
+      this.amountMax.set(pm.get('amountMax') ?? '');
+      this.createdFrom.set(pm.get('createdFrom') ?? '');
+      this.createdTo.set(pm.get('createdTo') ?? '');
+      this.sortField.set(pm.get('sort') === 'amount' ? 'amount' : 'createdAt');
+      this.sortOrder.set(pm.get('order') === 'asc' ? 'asc' : 'desc');
       this.load(pm);
     });
   }
@@ -437,6 +502,10 @@ export class ApplicationsListComponent {
       q: this.q() || null,
       type: this.typeId() || null,
       state: this.state() || null,
+      amountMin: this.amountMin() || null,
+      amountMax: this.amountMax() || null,
+      createdFrom: this.createdFrom() || null,
+      createdTo: this.createdTo() || null,
       offset: null,
     });
   }
@@ -445,8 +514,31 @@ export class ApplicationsListComponent {
     this.q.set('');
     this.typeId.set('');
     this.state.set('');
+    this.amountMin.set('');
+    this.amountMax.set('');
+    this.createdFrom.set('');
+    this.createdTo.set('');
     this.filtersOpen.set(false);
-    this.navigate({ q: null, type: null, state: null, gremium: null, topf: null, offset: null });
+    this.navigate({
+      q: null, type: null, state: null, gremium: null, topf: null,
+      amountMin: null, amountMax: null, createdFrom: null, createdTo: null, offset: null,
+    });
+  }
+
+  /** Spalte sortieren: gleiche Spalte → Richtung toggeln, sonst neue Spalte (Default desc). */
+  sortBy(field: 'createdAt' | 'amount'): void {
+    const order = this.sortField() === field && this.sortOrder() === 'desc' ? 'asc' : 'desc';
+    this.navigate({ sort: field, order, offset: null });
+  }
+
+  sortIndicator(field: 'createdAt' | 'amount'): string {
+    if (this.sortField() !== field) return '';
+    return this.sortOrder() === 'asc' ? ' ↑' : ' ↓';
+  }
+
+  ariaSort(field: 'createdAt' | 'amount'): 'ascending' | 'descending' | 'none' {
+    if (this.sortField() !== field) return 'none';
+    return this.sortOrder() === 'asc' ? 'ascending' : 'descending';
   }
 
   prev(): void {
@@ -475,11 +567,23 @@ export class ApplicationsListComponent {
     const state = pm.get('state');
     const gremium = pm.get('gremium');
     const topf = pm.get('topf');
+    const amountMin = pm.get('amountMin');
+    const amountMax = pm.get('amountMax');
+    const createdFrom = pm.get('createdFrom');
+    const createdTo = pm.get('createdTo');
+    const sort = pm.get('sort');
+    const order = pm.get('order');
     if (q) query.q = q;
     if (type) query.type = type;
     if (state) query.state = state;
     if (gremium) query.gremium = gremium;
     if (topf) query.topf = topf;
+    if (amountMin) query.amountMin = Number(amountMin);
+    if (amountMax) query.amountMax = Number(amountMax);
+    if (createdFrom) query.createdFrom = createdFrom;
+    if (createdTo) query.createdTo = createdTo;
+    if (sort === 'amount' || sort === 'createdAt') query.sort = sort;
+    if (order === 'asc' || order === 'desc') query.order = order;
 
     this.loading.set(true);
     this.error.set(false);
