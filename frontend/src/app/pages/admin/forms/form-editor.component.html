@@ -27,41 +27,45 @@
         @if (resolved(description())) {
           <p class="fe__pv-desc">{{ resolved(description()) }}</p>
         }
-        @if (fields().length === 0) {
+        @if (groups().length === 0) {
           <p class="fe__status">{{ 'admin.forms.empty' | t }}</p>
         }
-        @for (field of fields(); track $index) {
-          @if (field.type === 'section') {
-            <h3 class="fe__pv-section">{{ resolved(field.label) || ('admin.forms.untitledSection' | t) }}</h3>
-          } @else {
-          <div class="fe__pv-field">
-            <label class="fe__pv-label">
-              {{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}
-              @if (field.required) { <span class="fe__req" aria-hidden="true">*</span> }
-            </label>
-            @if (resolved(field.help)) { <p class="fe__pv-help">{{ resolved(field.help) }}</p> }
-            @switch (field.type) {
-              @case ('textarea') { <textarea class="fe__pv-control" rows="3" disabled></textarea> }
-              @case ('checkbox') { <input type="checkbox" disabled /> }
-              @case ('select') {
-                <select class="fe__pv-control" disabled>
-                  @for (o of field.options ?? []; track $index) { <option>{{ resolved(o.label) || o.value }}</option> }
-                </select>
-              }
-              @case ('multiselect') {
-                <select class="fe__pv-control" multiple disabled>
-                  @for (o of field.options ?? []; track $index) { <option>{{ resolved(o.label) || o.value }}</option> }
-                </select>
-              }
-              @case ('date') { <input class="fe__pv-control" type="date" disabled /> }
-              @case ('number') { <input class="fe__pv-control" type="number" disabled /> }
-              @case ('currency') { <input class="fe__pv-control" type="number" inputmode="decimal" disabled /> }
-              @case ('file') { <input class="fe__pv-control" type="file" disabled /> }
-              @case ('markdown') { <p class="fe__pv-md">{{ resolved(field.label) }}</p> }
-              @default { <input class="fe__pv-control" type="text" disabled /> }
+        @for (group of groups(); track $index; let gi = $index) {
+          <section class="fe__pv-group">
+            @if (resolved({ de: group.titleDe, en: group.titleEn })) {
+              <h3 class="fe__pv-section">{{ resolved({ de: group.titleDe, en: group.titleEn }) }}</h3>
             }
-          </div>
-          }
+            @for (field of group.fields; track $index; let qi = $index) {
+              @if (qi > 0) { <hr class="fe__divider" aria-hidden="true" /> }
+              <div class="fe__pv-field">
+                <label class="fe__pv-label">
+                  {{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}
+                  @if (field.required) { <span class="fe__req" aria-hidden="true">*</span> }
+                </label>
+                @if (resolved(field.help)) { <p class="fe__pv-help">{{ resolved(field.help) }}</p> }
+                @switch (field.type) {
+                  @case ('textarea') { <textarea class="fe__pv-control" rows="3" disabled></textarea> }
+                  @case ('checkbox') { <input type="checkbox" disabled /> }
+                  @case ('select') {
+                    <select class="fe__pv-control" disabled>
+                      @for (o of field.options ?? []; track $index) { <option>{{ resolved(o.label) || o.value }}</option> }
+                    </select>
+                  }
+                  @case ('multiselect') {
+                    <select class="fe__pv-control" multiple disabled>
+                      @for (o of field.options ?? []; track $index) { <option>{{ resolved(o.label) || o.value }}</option> }
+                    </select>
+                  }
+                  @case ('date') { <input class="fe__pv-control" type="date" disabled /> }
+                  @case ('number') { <input class="fe__pv-control" type="number" disabled /> }
+                  @case ('currency') { <input class="fe__pv-control" type="number" inputmode="decimal" disabled /> }
+                  @case ('file') { <input class="fe__pv-control" type="file" disabled /> }
+                  @case ('markdown') { <p class="fe__pv-md">{{ resolved(field.label) }}</p> }
+                  @default { <input class="fe__pv-control" type="text" disabled /> }
+                }
+              </div>
+            }
+          </section>
         }
       </article>
     } @else {
@@ -86,162 +90,185 @@
         >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
       </article>
 
-      @if (fields().length === 0) {
+      @if (groups().length === 0) {
         <p class="fe__status">{{ 'admin.forms.empty' | t }}</p>
       }
 
-      <ol class="fe__list">
-        @for (field of fields(); track $index; let fi = $index) {
-          <li class="fe__card" [class.fe__card--section]="field.type === 'section'" draggable="true" (dragstart)="onDragStart(fi)" (dragover)="onDragOver($event)" (drop)="onDrop(fi)">
-            <div class="fe__card-head">
-              <span class="fe__drag" [attr.title]="'admin.forms.drag' | t" aria-hidden="true">⠿</span>
-              <app-select
-                class="fe__type"
-                [ariaLabel]="'admin.common.type' | t"
-                [options]="fieldTypeOptions"
-                [ngModel]="field.type"
-                (ngModelChange)="onTypeChange(fi, $event)"
-              />
+      <!-- ============================ GRUPPEN ============================ -->
+      <div class="fe__groups">
+        @for (group of groups(); track $index; let gi = $index) {
+          <section class="fe__group" draggable="true" (dragstart)="onDragStart(gi)" (dragover)="onDragOver($event)" (drop)="onDrop(gi)">
+            <header class="fe__group-head">
+              <span class="fe__drag" [attr.title]="'admin.form.dragGroup' | t" aria-hidden="true">⠿</span>
+              <span class="fe__group-badge">{{ 'admin.form.groupStep' | t: { n: gi + 1 } }}</span>
               <span class="fe__spacer"></span>
-              @if (field.type !== 'section') {
-                <app-checkbox [ngModel]="field.required" (ngModelChange)="touch()">{{ 'admin.common.required' | t }}</app-checkbox>
-              }
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveUp' | t" (click)="move(fi, -1)">↑</app-button>
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveDown' | t" (click)="move(fi, 1)">↓</app-button>
-              @if (field.type !== 'section') {
-                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.advanced' | t" [attr.title]="'admin.forms.advanced' | t" (click)="toggleExpanded(fi)">⋯</app-button>
-              }
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.duplicate' | t" [attr.title]="'admin.forms.duplicate' | t" (click)="duplicateQuestion(fi)"><app-icon name="add" /></app-button>
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" (click)="removeQuestion(fi)"><app-icon name="delete" /></app-button>
-            </div>
-
-            @if (field.type === 'section') {
-              <p class="fe__section-hint">{{ 'admin.forms.sectionHint' | t }}</p>
-            } @else {
-              <label class="fe__lbl fe__key">{{ 'admin.common.key' | t }}
-                <input [(ngModel)]="field.key" (ngModelChange)="touch()" autocomplete="off" spellcheck="false" /></label>
-            }
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.form.moveGroupUp' | t" [attr.title]="'admin.form.moveGroupUp' | t" (click)="moveGroup(gi, -1)">↑</app-button>
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.form.moveGroupDown' | t" [attr.title]="'admin.form.moveGroupDown' | t" (click)="moveGroup(gi, 1)">↓</app-button>
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.form.deleteGroup' | t" [attr.title]="'admin.form.deleteGroup' | t" (click)="removeGroup(gi)"><app-icon name="delete" /></app-button>
+            </header>
 
             <div class="fe__row">
-              <label class="fe__lbl">{{ (field.type === 'section' ? 'admin.forms.sectionTitleDe' : 'admin.common.labelDe') | t }}
-                <input [(ngModel)]="field.label['de']" (ngModelChange)="touch()" [attr.placeholder]="'admin.forms.questionPlaceholder' | t" /></label>
-              <label class="fe__lbl">{{ (field.type === 'section' ? 'admin.forms.sectionTitleEn' : 'admin.common.labelEn') | t }}
-                <input [(ngModel)]="field.label['en']" (ngModelChange)="touch()" /></label>
+              <label class="fe__lbl">{{ 'admin.form.groupTitleDe' | t }}
+                <input [ngModel]="group.titleDe" (ngModelChange)="setGroupTitle(gi, 'de', $event)" [attr.placeholder]="'admin.form.groupTitlePlaceholder' | t" /></label>
+              <label class="fe__lbl">{{ 'admin.form.groupTitleEn' | t }}
+                <input [ngModel]="group.titleEn" (ngModelChange)="setGroupTitle(gi, 'en', $event)" /></label>
             </div>
-            @if (field.type !== 'section') {
-              <div class="fe__row">
-                <label class="fe__lbl">{{ 'admin.forms.helpDe' | t }}
-                  <input [ngModel]="field.help && field.help['de']" (ngModelChange)="field.help = { de: $event, en: (field.help && field.help['en']) || '' }; touch()" /></label>
-                <label class="fe__lbl">{{ 'admin.forms.helpEn' | t }}
-                  <input [ngModel]="field.help && field.help['en']" (ngModelChange)="field.help = { de: (field.help && field.help['de']) || '', en: $event }; touch()" /></label>
-              </div>
+
+            @if (group.fields.length === 0) {
+              <p class="fe__group-empty">{{ 'admin.form.groupEmpty' | t }}</p>
             }
 
-            @if (isChoice(field.type)) {
-              <fieldset class="fe__sub">
-                <legend>{{ 'admin.form.options' | t }}</legend>
-                @for (opt of field.options ?? []; track $index; let oi = $index) {
-                  <div class="fe__opt">
-                    <input [attr.aria-label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" placeholder="value" />
-                    <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="opt.label['de']" (ngModelChange)="touch()" placeholder="DE" />
-                    <input [attr.aria-label]="'admin.common.labelEn' | t" [(ngModel)]="opt.label['en']" (ngModelChange)="touch()" placeholder="EN" />
-                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeOption(fi, oi)">✕</app-button>
+            <ol class="fe__list">
+              @for (field of group.fields; track $index; let qi = $index) {
+                <li class="fe__card" draggable="false">
+                  <div class="fe__card-head">
+                    <app-select
+                      class="fe__type"
+                      [ariaLabel]="'admin.common.type' | t"
+                      [options]="fieldTypeOptions"
+                      [ngModel]="field.type"
+                      (ngModelChange)="onTypeChange({ gi: gi, qi: qi }, $event)"
+                    />
+                    <span class="fe__spacer"></span>
+                    <app-checkbox [ngModel]="field.required" (ngModelChange)="touch()">{{ 'admin.common.required' | t }}</app-checkbox>
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveUp' | t" (click)="moveQuestion({ gi: gi, qi: qi }, -1)">↑</app-button>
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveDown' | t" (click)="moveQuestion({ gi: gi, qi: qi }, 1)">↓</app-button>
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.advanced' | t" [attr.title]="'admin.forms.advanced' | t" (click)="toggleExpanded({ gi: gi, qi: qi })">⋯</app-button>
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.duplicate' | t" [attr.title]="'admin.forms.duplicate' | t" (click)="duplicateQuestion({ gi: gi, qi: qi })"><app-icon name="add" /></app-button>
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" (click)="removeQuestion({ gi: gi, qi: qi })"><app-icon name="delete" /></app-button>
                   </div>
-                }
-                <app-button variant="ghost" size="sm" (click)="addOption(fi)">{{ 'admin.form.addOption' | t }}</app-button>
-              </fieldset>
-            }
 
-            @if (isPositions(field.type)) {
-              <fieldset class="fe__sub">
-                <legend>{{ 'admin.form.positions' | t }}</legend>
-                <p class="fe__hint">{{ 'admin.form.positionsHint' | t }}</p>
-                <div class="fe__row">
-                  <label class="fe__lbl">{{ 'admin.form.minOffers' | t }}
-                    <input type="number" min="1" [ngModel]="field.validation?.minOffers" (ngModelChange)="setVal(fi, 'minOffers', $event)" placeholder="3" /></label>
-                  <label class="fe__lbl">{{ 'admin.form.minPositions' | t }}
-                    <input type="number" min="1" [ngModel]="field.validation?.minPositions" (ngModelChange)="setVal(fi, 'minPositions', $event)" placeholder="1" /></label>
-                </div>
-              </fieldset>
-            }
+                  <label class="fe__lbl fe__key">{{ 'admin.common.key' | t }}
+                    <input [(ngModel)]="field.key" (ngModelChange)="touch()" autocomplete="off" spellcheck="false" /></label>
 
-            @if (isExpanded(fi)) {
-              <div class="fe__advanced">
-                <div class="fe__toggles">
-                  <app-checkbox [(ngModel)]="field.isPII" (ngModelChange)="touch()">{{ 'admin.form.isPII' | t }}</app-checkbox>
-                  @if (isNumeric(field.type)) {
-                    <app-checkbox [ngModel]="field.isPromoted" (ngModelChange)="onPromotedToggle(fi, $event)">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
-                    @if (field.isPromoted) {
-                      <app-select
-                        class="fe__lbl"
-                        [label]="'admin.form.promoteTarget' | t"
-                        [options]="promoteTargetOptions"
-                        [ngModel]="field.promoteTarget"
-                        (ngModelChange)="field.promoteTarget = $event; touch()"
-                      />
-                    }
-                  } @else if (isPositions(field.type)) {
-                    <span class="fe__note">↳ {{ 'admin.form.autoPromoted' | t }}</span>
+                  <div class="fe__row">
+                    <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
+                      <input [(ngModel)]="field.label['de']" (ngModelChange)="touch()" [attr.placeholder]="'admin.forms.questionPlaceholder' | t" /></label>
+                    <label class="fe__lbl">{{ 'admin.common.labelEn' | t }}
+                      <input [(ngModel)]="field.label['en']" (ngModelChange)="touch()" /></label>
+                  </div>
+                  <div class="fe__row">
+                    <label class="fe__lbl">{{ 'admin.forms.helpDe' | t }}
+                      <input [ngModel]="field.help && field.help['de']" (ngModelChange)="field.help = { de: $event, en: (field.help && field.help['en']) || '' }; touch()" /></label>
+                    <label class="fe__lbl">{{ 'admin.forms.helpEn' | t }}
+                      <input [ngModel]="field.help && field.help['en']" (ngModelChange)="field.help = { de: (field.help && field.help['de']) || '', en: $event }; touch()" /></label>
+                  </div>
+
+                  @if (isChoice(field.type)) {
+                    <fieldset class="fe__sub">
+                      <legend>{{ 'admin.form.options' | t }}</legend>
+                      @for (opt of field.options ?? []; track $index; let oi = $index) {
+                        <div class="fe__opt">
+                          <input [attr.aria-label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" placeholder="value" />
+                          <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="opt.label['de']" (ngModelChange)="touch()" placeholder="DE" />
+                          <input [attr.aria-label]="'admin.common.labelEn' | t" [(ngModel)]="opt.label['en']" (ngModelChange)="touch()" placeholder="EN" />
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeOption({ gi: gi, qi: qi }, oi)">✕</app-button>
+                        </div>
+                      }
+                      <app-button variant="ghost" size="sm" (click)="addOption({ gi: gi, qi: qi })">{{ 'admin.form.addOption' | t }}</app-button>
+                    </fieldset>
+                  }
+
+                  @if (isPositions(field.type)) {
+                    <fieldset class="fe__sub">
+                      <legend>{{ 'admin.form.positions' | t }}</legend>
+                      <p class="fe__hint">{{ 'admin.form.positionsHint' | t }}</p>
+                      <div class="fe__row">
+                        <label class="fe__lbl">{{ 'admin.form.minOffers' | t }}
+                          <input type="number" min="1" [ngModel]="field.validation?.minOffers" (ngModelChange)="setVal({ gi: gi, qi: qi }, 'minOffers', $event)" placeholder="3" /></label>
+                        <label class="fe__lbl">{{ 'admin.form.minPositions' | t }}
+                          <input type="number" min="1" [ngModel]="field.validation?.minPositions" (ngModelChange)="setVal({ gi: gi, qi: qi }, 'minPositions', $event)" placeholder="1" /></label>
+                      </div>
+                    </fieldset>
+                  }
+
+                  @if (isExpanded({ gi: gi, qi: qi })) {
+                    <div class="fe__advanced">
+                      <div class="fe__toggles">
+                        <app-checkbox [(ngModel)]="field.isPII" (ngModelChange)="touch()">{{ 'admin.form.isPII' | t }}</app-checkbox>
+                        @if (isNumeric(field.type)) {
+                          <app-checkbox [ngModel]="field.isPromoted" (ngModelChange)="onPromotedToggle({ gi: gi, qi: qi }, $event)">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
+                          @if (field.isPromoted) {
+                            <app-select
+                              class="fe__lbl"
+                              [label]="'admin.form.promoteTarget' | t"
+                              [options]="promoteTargetOptions"
+                              [ngModel]="field.promoteTarget"
+                              (ngModelChange)="field.promoteTarget = $event; touch()"
+                            />
+                          }
+                        } @else if (isPositions(field.type)) {
+                          <span class="fe__note">↳ {{ 'admin.form.autoPromoted' | t }}</span>
+                        }
+                      </div>
+
+                      <!-- Validierung nur für Feldtypen, für die sie greift. -->
+                      @if (isNumeric(field.type) || isText(field.type)) {
+                        <fieldset class="fe__sub">
+                          <legend>{{ 'admin.form.validation' | t }}</legend>
+                          @if (isNumeric(field.type)) {
+                            <div class="fe__row">
+                              <label class="fe__lbl">{{ 'admin.form.min' | t }}
+                                <input type="number" [ngModel]="field.validation?.min" (ngModelChange)="setVal({ gi: gi, qi: qi }, 'min', $event)" /></label>
+                              <label class="fe__lbl">{{ 'admin.form.max' | t }}
+                                <input type="number" [ngModel]="field.validation?.max" (ngModelChange)="setVal({ gi: gi, qi: qi }, 'max', $event)" /></label>
+                            </div>
+                          }
+                          @if (isText(field.type)) {
+                            <div class="fe__row">
+                              <label class="fe__lbl">{{ 'admin.form.minLen' | t }}
+                                <input type="number" [ngModel]="field.validation?.minLen" (ngModelChange)="setVal({ gi: gi, qi: qi }, 'minLen', $event)" /></label>
+                              <label class="fe__lbl">{{ 'admin.form.maxLen' | t }}
+                                <input type="number" [ngModel]="field.validation?.maxLen" (ngModelChange)="setVal({ gi: gi, qi: qi }, 'maxLen', $event)" /></label>
+                            </div>
+                            <label class="fe__lbl">{{ 'admin.form.pattern' | t }}
+                              <input [ngModel]="field.validation?.pattern" (ngModelChange)="setVal({ gi: gi, qi: qi }, 'pattern', $event)" /></label>
+                          }
+                        </fieldset>
+                      }
+
+                      <label class="fe__lbl">{{ 'admin.form.visibleIf' | t }}
+                        <textarea rows="2" [ngModel]="logicRaw(gi, qi, 'visibleIf', field.visibleIf)" (ngModelChange)="onLogicInput({ gi: gi, qi: qi }, 'visibleIf', $event)" placeholder='{"==":[{"var":"x"},1]}'></textarea></label>
+                      @if (field.type === 'computed') {
+                        <label class="fe__lbl">{{ 'admin.form.compute' | t }}
+                          <textarea rows="2" [ngModel]="logicRaw(gi, qi, 'compute', field.compute)" (ngModelChange)="onLogicInput({ gi: gi, qi: qi }, 'compute', $event)" placeholder='{"+":[{"var":"a"},{"var":"b"}]}'></textarea></label>
+                      }
+                    </div>
+                  }
+
+                  @if (errorsFor(gi, qi).length > 0) {
+                    <ul class="fe__errors" role="alert">
+                      @for (err of errorsFor(gi, qi); track err) { <li>{{ err }}</li> }
+                    </ul>
+                  }
+                </li>
+              }
+            </ol>
+
+            <!-- »Frage hinzufügen« je Gruppe mit Typ-Menü (NC-Forms). -->
+            <div class="fe__add">
+              <app-button variant="secondary" size="sm" (click)="typeMenuGroup.set(typeMenuGroup() === gi ? null : gi)">
+                + {{ 'admin.forms.addQuestion' | t }}
+              </app-button>
+              @if (typeMenuGroup() === gi) {
+                <div class="fe__menu" role="menu">
+                  @for (type of typeMenu; track type) {
+                    <button type="button" class="fe__menu-item" role="menuitem" (click)="addQuestion(gi, type)">
+                      {{ typeLabel(type) }}
+                    </button>
                   }
                 </div>
-
-                <!-- Validierung nur für Feldtypen, für die sie greift. -->
-                @if (isNumeric(field.type) || isText(field.type)) {
-                  <fieldset class="fe__sub">
-                    <legend>{{ 'admin.form.validation' | t }}</legend>
-                    @if (isNumeric(field.type)) {
-                      <div class="fe__row">
-                        <label class="fe__lbl">{{ 'admin.form.min' | t }}
-                          <input type="number" [ngModel]="field.validation?.min" (ngModelChange)="setVal(fi, 'min', $event)" /></label>
-                        <label class="fe__lbl">{{ 'admin.form.max' | t }}
-                          <input type="number" [ngModel]="field.validation?.max" (ngModelChange)="setVal(fi, 'max', $event)" /></label>
-                      </div>
-                    }
-                    @if (isText(field.type)) {
-                      <div class="fe__row">
-                        <label class="fe__lbl">{{ 'admin.form.minLen' | t }}
-                          <input type="number" [ngModel]="field.validation?.minLen" (ngModelChange)="setVal(fi, 'minLen', $event)" /></label>
-                        <label class="fe__lbl">{{ 'admin.form.maxLen' | t }}
-                          <input type="number" [ngModel]="field.validation?.maxLen" (ngModelChange)="setVal(fi, 'maxLen', $event)" /></label>
-                      </div>
-                      <label class="fe__lbl">{{ 'admin.form.pattern' | t }}
-                        <input [ngModel]="field.validation?.pattern" (ngModelChange)="setVal(fi, 'pattern', $event)" /></label>
-                    }
-                  </fieldset>
-                }
-
-                <label class="fe__lbl">{{ 'admin.form.visibleIf' | t }}
-                  <textarea rows="2" [ngModel]="logicRaw(fi, 'visibleIf', field.visibleIf)" (ngModelChange)="onLogicInput(fi, 'visibleIf', $event)" placeholder='{"==":[{"var":"x"},1]}'></textarea></label>
-                @if (field.type === 'computed') {
-                  <label class="fe__lbl">{{ 'admin.form.compute' | t }}
-                    <textarea rows="2" [ngModel]="logicRaw(fi, 'compute', field.compute)" (ngModelChange)="onLogicInput(fi, 'compute', $event)" placeholder='{"+":[{"var":"a"},{"var":"b"}]}'></textarea></label>
-                }
-              </div>
-            }
-
-            @if (fieldErrors()[fi].length > 0) {
-              <ul class="fe__errors" role="alert">
-                @for (err of fieldErrors()[fi]; track err) { <li>{{ err }}</li> }
-              </ul>
-            }
-          </li>
+              }
+            </div>
+          </section>
         }
-      </ol>
+      </div>
 
-      <!-- »Frage hinzufügen« mit Typ-Menü (NC-Forms). -->
-      <div class="fe__add">
-        <app-button variant="secondary" (click)="typeMenuOpen.set(!typeMenuOpen())">
-          + {{ 'admin.forms.addQuestion' | t }}
+      <!-- »+ Gruppe« — eine neue Gruppe (= neuer Wizard-Schritt) anhängen. -->
+      <div class="fe__add-group">
+        <app-button variant="secondary" (click)="addGroup()">
+          + {{ 'admin.form.addGroup' | t }}
         </app-button>
-        @if (typeMenuOpen()) {
-          <div class="fe__menu" role="menu">
-            @for (type of typeMenu; track type) {
-              <button type="button" class="fe__menu-item" role="menuitem" (click)="addQuestion(type)">
-                {{ typeLabel(type) }}
-              </button>
-            }
-          </div>
-        }
       </div>
     }
   }

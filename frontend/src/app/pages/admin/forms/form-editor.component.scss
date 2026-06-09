@@ -53,13 +53,57 @@
   border-radius: var(--radius-lg);
 }
 
+/* --- Gruppen-Container (= Wizard-Schritte) --- */
+.fe__groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.fe__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-top: 3px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.fe__group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fe__group-badge {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: var(--fw-bold);
+  color: var(--color-primary);
+}
+
+.fe__group-empty,
+.fe__group-hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.fe__add-group {
+  align-self: flex-start;
+}
+
 .fe__list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
 .fe__card {
@@ -291,19 +335,28 @@
   max-width: 28rem;
 }
 
-/* Abschnitts-Marker (mehrstufige Formulare): optisch als Trenner abgesetzt. */
-.fe__card--section {
-  border-left: 3px solid var(--color-primary);
-  background: var(--color-surface-sunken, var(--color-surface));
+/* Gruppen-Überschrift in der Vorschau (= Schritt-Titel). */
+.fe__pv-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
-.fe__section-hint {
-  margin: 0;
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
+.fe__pv-group + .fe__pv-group {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: var(--border-width) solid var(--color-border);
 }
 .fe__pv-section {
-  margin: var(--space-4) 0 var(--space-2);
+  margin: 0 0 var(--space-2);
   padding-bottom: var(--space-1);
   border-bottom: var(--border-width) solid var(--color-border);
   font-size: var(--fs-lg);
+}
+
+/* Dünner Trenner + großzügiger Abstand zwischen jeder Frage (Builder-Vorschau). */
+.fe__divider {
+  height: 0;
+  margin: var(--space-3) 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
 }

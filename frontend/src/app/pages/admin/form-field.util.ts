@@ -159,3 +159,75 @@ export function blankField(type: FieldType = 'text', key = ''): FormFieldDef {
 export function blankOption(): { value: string; label: { de: string; en: string } } {
   return { value: '', label: { de: '', en: '' } };
 }
+
+/**
+ * Frage-Gruppe im Editor: ein betitelter Container, der genau einem Wizard-Schritt
+ * (= einer effektiven Form-Sektion) entspricht. Der Titel ist die Schritt-Überschrift.
+ * `fields` enthält **nur** Frage-Felder (keine `section`-Marker — die sind das
+ * Serialisierungs-Primitiv und werden beim Ein-/Auspacken erzeugt bzw. konsumiert).
+ */
+export interface QuestionGroup {
+  titleDe: string;
+  titleEn: string;
+  fields: FormFieldDef[];
+}
+
+/**
+ * Flache `fields[]` (Backend-Format) → Gruppen, indem an jedem `section`-Marker
+ * getrennt wird. Felder **vor** dem ersten Marker bilden eine implizite erste Gruppe
+ * (Default-Titel leer). Ohne Marker entsteht genau eine Gruppe mit leerem Titel.
+ * Spiegelt `validation._split_sections` (Backend), damit Editor und effektive Form
+ * dieselbe Schritt-Aufteilung sehen.
+ */
+export function groupsFromFields(fields: FormFieldDef[]): QuestionGroup[] {
+  const groups: QuestionGroup[] = [];
+  let current: QuestionGroup = { titleDe: '', titleEn: '', fields: [] };
+  let opened = false;
+  for (const f of fields) {
+    if (f.type === 'section') {
+      // Marker schließt die laufende Gruppe (sofern sie schon Inhalt/Marker hatte)
+      // und eröffnet eine neue mit dem Marker-Titel.
+      if (opened || current.fields.length > 0) {
+        groups.push(current);
+      }
+      current = {
+        titleDe: f.label?.['de'] ?? '',
+        titleEn: f.label?.['en'] ?? '',
+        fields: [],
+      };
+      opened = true;
+      continue;
+    }
+    current.fields.push(f);
+  }
+  groups.push(current);
+  return groups;
+}
+
+/**
+ * Gruppen → flache `fields[]` (Backend-Format). Jede Gruppe wird zu einem führenden
+ * `section`-Marker (auto-Key `section_N`) gefolgt von ihren Frage-Feldern. Eine
+ * **implizite erste Gruppe ohne Titel** wird **ohne** Marker serialisiert (sie ist
+ * der Standard-`main`-Abschnitt) — so bleibt eine markerlose Form exakt erhalten
+ * (Round-Trip). Jede weitere Gruppe sowie eine erste Gruppe **mit** Titel erhält
+ * einen Marker. Eine leere Gruppe (nur Titel) serialisiert zu nur ihrem Marker.
+ */
+export function groupsToFields(groups: QuestionGroup[]): FormFieldDef[] {
+  const out: FormFieldDef[] = [];
+  let n = 0;
+  groups.forEach((g, gi) => {
+    const hasTitle = !!(g.titleDe || g.titleEn);
+    // Erste Gruppe ohne Titel: kein Marker (impliziter main-Abschnitt).
+    const needsMarker = gi > 0 || hasTitle;
+    if (needsMarker) {
+      n += 1;
+      out.push({
+        key: `section_${n}`,
+        type: 'section',
+        label: { de: g.titleDe, en: g.titleEn },
+      });
+    }
+    out.push(...g.fields);
+  });
+  return out;
+}

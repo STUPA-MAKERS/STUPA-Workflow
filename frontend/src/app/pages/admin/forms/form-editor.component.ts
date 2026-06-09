@@ -20,24 +20,38 @@ import { AdminApiService } from '../admin-api.service';
 import {
   FIELD_TYPES,
   PROMOTE_TARGETS,
+  type QuestionGroup,
   blankField,
   blankOption,
   duplicateKeys,
+  groupsFromFields,
+  groupsToFields,
   normalizeFormField,
   validateFormField,
 } from '../form-field.util';
 
-/** Sichtbare Reihenfolge der Frage-Typen im »Frage hinzufügen«-Menü. */
-const TYPE_MENU: readonly FieldType[] = FIELD_TYPES;
+/**
+ * Sichtbare Reihenfolge der Frage-Typen im »Frage hinzufügen«-Menü. `section` ist
+ * **kein** wählbarer Typ mehr — Abschnitte werden über Gruppen-Container modelliert
+ * (der Marker bleibt nur das Serialisierungs-Primitiv).
+ */
+const TYPE_MENU: readonly FieldType[] = FIELD_TYPES.filter((t) => t !== 'section');
+
+/** Stabile Adresse einer Frage: Gruppen-Index + Frage-Index innerhalb der Gruppe. */
+interface QPos {
+  gi: number;
+  qi: number;
+}
 
 /**
- * Formular-Editor im **Nextcloud-Forms-Stil** (#13). Eine Unterseite je Antragstyp
- * (`/admin/forms/:id`): Titel + mehrsprachige Markdown-Beschreibung, darunter die
- * Fragen als Karten. »+ Frage hinzufügen« öffnet ein Typ-Menü; jede Karte trägt
- * Titel/Beschreibung (DE/EN), Pflicht-Schalter, Auswahloptionen und — eingeklappt
- * unter ⋯ — Schlüssel, PII/Kennzahl und Validierung/JsonLogic. Per Drag oder den
- * Pfeilen umsortierbar. Der »Vorschau«-Modus zeigt das Formular wie beim Ausfüllen.
- * Speichern legt eine neue Form-Version an (Felder serverseitig validiert).
+ * Formular-Editor im **Nextcloud-Forms-Stil** (#13), umgebaut auf explizite
+ * **Frage-Gruppen**: jede Gruppe ist ein betitelter Container (= ein Wizard-Schritt),
+ * der Gruppen-Titel ist die Schritt-Überschrift. Innerhalb einer Gruppe liegen die
+ * Frage-Karten (Titel/Hilfe DE/EN, Pflicht, Optionen, ⋯-Panel …). Gruppen lassen
+ * sich umsortieren/hinzufügen/löschen; Fragen innerhalb einer Gruppe verschieben.
+ * Beim Speichern werden die Gruppen zurück in die flache `fields[]`-Liste serialisiert
+ * (führender `section`-Marker je Gruppe), sodass Backend + Apply-Wizard unverändert
+ * je Gruppe einen Schritt rendern.
  */
 @Component({
   selector: 'app-form-editor',
@@ -65,19 +79,20 @@ export class FormEditorComponent {
   protected readonly description = signal<I18nMap>({ de: '', en: '' });
   /** »Mit Budget«: erlaubt die Topf-Auswahl beim Antrag (application_type.has_budget). */
   protected readonly hasBudget = signal(false);
-  protected readonly fields = signal<FormFieldDef[]>([]);
+  /** Editor-Zustand: Fragen, gruppiert in betitelte Container (= Wizard-Schritte). */
+  protected readonly groups = signal<QuestionGroup[]>([]);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   /** Editieren vs. Vorschau (View/Edit-Toggle, NC-Forms). */
   protected readonly preview = signal(false);
-  /** Welche Karten ihre erweiterten Optionen (⋯) zeigen. */
-  protected readonly expanded = signal<Record<number, boolean>>({});
-  /** Offen: das »Frage hinzufügen«-Typ-Menü. */
-  protected readonly typeMenuOpen = signal(false);
-  /** Roh-Editierstrings der JsonLogic-Felder (Index → {visibleIf, compute}). */
-  private readonly rawLogic = signal<Record<number, { visibleIf?: string; compute?: string }>>({});
-  /** Aktuell gezogene Karte (Drag-Reorder). */
-  private dragIndex: number | null = null;
+  /** Welche Karten ihre erweiterten Optionen (⋯) zeigen — Schlüssel = "gi:qi". */
+  protected readonly expanded = signal<Record<string, boolean>>({});
+  /** Offen: das »Frage hinzufügen«-Typ-Menü je Gruppe (Gruppen-Index oder null). */
+  protected readonly typeMenuGroup = signal<number | null>(null);
+  /** Roh-Editierstrings der JsonLogic-Felder ("gi:qi" → {visibleIf, compute}). */
+  private readonly rawLogic = signal<Record<string, { visibleIf?: string; compute?: string }>>({});
+  /** Aktuell gezogene Gruppe (Drag-Reorder ganzer Gruppen). */
+  private dragGroup: number | null = null;
 
   /** Ursprünglicher Typ-Stand — nur bei Änderung wird der Typ gepatcht. */
   private originalTitle: I18nMap = { de: '', en: '' };
@@ -85,7 +100,7 @@ export class FormEditorComponent {
 
   protected readonly fieldTypes = FIELD_TYPES;
   protected readonly typeMenu = TYPE_MENU;
-  protected readonly fieldTypeOptions: SelectOption[] = FIELD_TYPES.map((t) => ({
+  protected readonly fieldTypeOptions: SelectOption[] = TYPE_MENU.map((t) => ({
     value: t,
     label: this.i18n.translate(`admin.form.type.${t}` as TranslationKey),
   }));
@@ -95,15 +110,25 @@ export class FormEditorComponent {
     label: this.i18n.translate(`admin.form.metric.${v}` as TranslationKey),
   }));
 
-  protected readonly duplicates = computed(() => duplicateKeys(this.fields()));
-  protected readonly fieldErrors = computed(() =>
-    this.fields().map((f) => validateFormField(f).errors),
-  );
+  /** Flache Sicht der Frage-Felder (ohne Marker) — für Key-/Validierungs-Prüfungen. */
+  private readonly flatQuestions = computed(() => this.groups().flatMap((g) => g.fields));
+
+  protected readonly duplicates = computed(() => duplicateKeys(this.flatQuestions()));
+  /** Validierungsfehler je Frage, indexiert über "gi:qi". */
+  protected readonly fieldErrors = computed(() => {
+    const map: Record<string, string[]> = {};
+    this.groups().forEach((g, gi) =>
+      g.fields.forEach((f, qi) => {
+        map[`${gi}:${qi}`] = validateFormField(f).errors;
+      }),
+    );
+    return map;
+  });
   protected readonly formValid = computed(
     () =>
-      this.fields().length > 0 &&
+      this.flatQuestions().length > 0 &&
       this.duplicates().length === 0 &&
-      this.fieldErrors().every((e) => e.length === 0),
+      Object.values(this.fieldErrors()).every((e) => e.length === 0),
   );
 
   constructor() {
@@ -130,7 +155,10 @@ export class FormEditorComponent {
     });
     this.api.getFormDraft(id).subscribe({
       next: (draft) => {
-        this.fields.set(draft.fields.map((f) => ({ ...f, label: { ...f.label } })));
+        // Flache Felder in Gruppen entpacken (Split an `section`-Markern).
+        this.groups.set(
+          groupsFromFields(draft.fields.map((f) => ({ ...f, label: { ...f.label } }))),
+        );
         const d = draft.description ?? {};
         this.description.set({ de: d['de'] ?? '', en: d['en'] ?? '' });
         this.loading.set(false);
@@ -155,56 +183,38 @@ export class FormEditorComponent {
     this.description.update((d) => ({ ...d, [lang]: value }));
   }
 
-  /** PII-/Kennzahl-Schalter: beim Aktivieren von »In Kennzahl übernehmen« eine
-   *  gültige Ziel-Kennzahl vorbelegen (Pflicht laut Validierung). */
-  protected onPromotedToggle(i: number, checked: boolean): void {
-    this.fields.update((list) =>
-      list.map((f, idx) => {
-        if (idx !== i) return f;
-        const next = { ...f, isPromoted: checked };
-        if (checked && !next.promoteTarget) next.promoteTarget = PROMOTE_TARGETS[0];
-        if (!checked) delete next.promoteTarget;
-        return next;
-      }),
-    );
+  // --- group helpers -------------------------------------------------------
+  /** Eine Gruppe in-place mutieren und das Signal anstoßen. */
+  private patchGroup(gi: number, fn: (g: QuestionGroup) => QuestionGroup): void {
+    this.groups.update((list) => list.map((g, i) => (i === gi ? fn(g) : g)));
   }
 
-  // --- question mutations --------------------------------------------------
-  protected addQuestion(type: FieldType): void {
-    this.fields.update((list) => {
-      // Abschnitts-Marker brauchen keinen sprechenden Key → automatisch vergeben.
-      const key = type === 'section' ? this.uniqueSectionKey(list) : '';
-      return [...list, blankField(type, key)];
-    });
-    this.typeMenuOpen.set(false);
+  /** Eine Frage in-place mutieren. */
+  private patchQuestion(pos: QPos, fn: (f: FormFieldDef) => FormFieldDef): void {
+    this.patchGroup(pos.gi, (g) => ({
+      ...g,
+      fields: g.fields.map((f, i) => (i === pos.qi ? fn(f) : f)),
+    }));
   }
 
-  /** Eindeutigen `section_N`-Key für einen neuen Abschnitts-Marker. */
-  private uniqueSectionKey(list: FormFieldDef[]): string {
-    const used = new Set(list.map((f) => f.key));
-    let i = 1;
-    while (used.has(`section_${i}`)) i++;
-    return `section_${i}`;
+  protected setGroupTitle(gi: number, lang: 'de' | 'en', value: string): void {
+    this.patchGroup(gi, (g) => ({ ...g, [lang === 'de' ? 'titleDe' : 'titleEn']: value }));
   }
 
-  protected removeQuestion(i: number): void {
-    this.fields.update((list) => list.filter((_, idx) => idx !== i));
+  protected addGroup(): void {
+    this.groups.update((list) => [...list, { titleDe: '', titleEn: '', fields: [] }]);
   }
 
-  protected duplicateQuestion(i: number): void {
-    this.fields.update((list) => {
-      const copy: FormFieldDef = structuredClone(list[i]);
-      copy.key = copy.key ? `${copy.key}_copy` : '';
-      return [...list.slice(0, i + 1), copy, ...list.slice(i + 1)];
-    });
+  protected removeGroup(gi: number): void {
+    this.groups.update((list) => list.filter((_, i) => i !== gi));
   }
 
-  protected move(i: number, dir: -1 | 1): void {
-    this.reorder(i, i + dir);
+  protected moveGroup(gi: number, dir: -1 | 1): void {
+    this.reorderGroup(gi, gi + dir);
   }
 
-  private reorder(from: number, to: number): void {
-    this.fields.update((list) => {
+  private reorderGroup(from: number, to: number): void {
+    this.groups.update((list) => {
       if (to < 0 || to >= list.length || from === to) return list;
       const next = [...list];
       const [moved] = next.splice(from, 1);
@@ -213,23 +223,63 @@ export class FormEditorComponent {
     });
   }
 
-  protected onTypeChange(i: number, type: FieldType): void {
-    this.fields.update((list) => list.map((f, idx) => (idx === i ? this.adaptToType(f, type) : f)));
+  // --- question mutations --------------------------------------------------
+  protected addQuestion(gi: number, type: FieldType): void {
+    this.patchGroup(gi, (g) => ({ ...g, fields: [...g.fields, blankField(type, '')] }));
+    this.typeMenuGroup.set(null);
+  }
+
+  protected removeQuestion(pos: QPos): void {
+    this.patchGroup(pos.gi, (g) => ({
+      ...g,
+      fields: g.fields.filter((_, i) => i !== pos.qi),
+    }));
+  }
+
+  protected duplicateQuestion(pos: QPos): void {
+    this.patchGroup(pos.gi, (g) => {
+      const copy: FormFieldDef = structuredClone(g.fields[pos.qi]);
+      copy.key = copy.key ? `${copy.key}_copy` : '';
+      return {
+        ...g,
+        fields: [...g.fields.slice(0, pos.qi + 1), copy, ...g.fields.slice(pos.qi + 1)],
+      };
+    });
+  }
+
+  /** Frage innerhalb ihrer Gruppe verschieben; an den Rändern in die Nachbargruppe. */
+  protected moveQuestion(pos: QPos, dir: -1 | 1): void {
+    const groups = this.groups();
+    const group = groups[pos.gi];
+    if (!group) return;
+    const target = pos.qi + dir;
+    if (target >= 0 && target < group.fields.length) {
+      this.patchGroup(pos.gi, (g) => {
+        const next = [...g.fields];
+        const [moved] = next.splice(pos.qi, 1);
+        next.splice(target, 0, moved);
+        return { ...g, fields: next };
+      });
+      return;
+    }
+    // An den Rand gestoßen → in die Nachbargruppe übergeben (falls vorhanden).
+    const ngi = pos.gi + dir;
+    if (ngi < 0 || ngi >= groups.length) return;
+    this.groups.update((list) => {
+      const next = list.map((g) => ({ ...g, fields: [...g.fields] }));
+      const [moved] = next[pos.gi].fields.splice(pos.qi, 1);
+      if (dir === -1) next[ngi].fields.push(moved);
+      else next[ngi].fields.unshift(moved);
+      return next;
+    });
+  }
+
+  protected onTypeChange(pos: QPos, type: FieldType): void {
+    this.patchQuestion(pos, (f) => this.adaptToType(f, type));
   }
 
   private adaptToType(field: FormFieldDef, type: FieldType): FormFieldDef {
     const next: FormFieldDef = { ...field, type };
-    // Abschnitts-Marker tragen nur einen Titel — alles Feld-Spezifische entfernen.
-    if (type === 'section') {
-      delete next.options;
-      delete next.compute;
-      delete next.validation;
-      delete next.isPromoted;
-      delete next.promoteTarget;
-      delete next.required;
-      if (!next.key) next.key = this.uniqueSectionKey(this.fields());
-      return next;
-    }
     if ((type === 'select' || type === 'multiselect') && !next.options?.length) {
       next.options = [blankOption()];
     }
@@ -242,31 +292,43 @@ export class FormEditorComponent {
     return next;
   }
 
-  protected addOption(i: number): void {
-    this.fields.update((list) =>
-      list.map((f, idx) => (idx === i ? { ...f, options: [...(f.options ?? []), blankOption()] } : f)),
-    );
+  /** PII-/Kennzahl-Schalter: beim Aktivieren eine gültige Ziel-Kennzahl vorbelegen. */
+  protected onPromotedToggle(pos: QPos, checked: boolean): void {
+    this.patchQuestion(pos, (f) => {
+      const next = { ...f, isPromoted: checked };
+      if (checked && !next.promoteTarget) next.promoteTarget = PROMOTE_TARGETS[0];
+      if (!checked) delete next.promoteTarget;
+      return next;
+    });
   }
 
-  protected removeOption(i: number, oi: number): void {
-    this.fields.update((list) =>
-      list.map((f, idx) =>
-        idx === i ? { ...f, options: (f.options ?? []).filter((_, k) => k !== oi) } : f,
-      ),
-    );
+  protected addOption(pos: QPos): void {
+    this.patchQuestion(pos, (f) => ({ ...f, options: [...(f.options ?? []), blankOption()] }));
+  }
+
+  protected removeOption(pos: QPos, oi: number): void {
+    this.patchQuestion(pos, (f) => ({
+      ...f,
+      options: (f.options ?? []).filter((_, k) => k !== oi),
+    }));
   }
 
   /** Mutationen anstoßen, damit Computed-Signale (Validierung) neu rechnen. */
   protected touch(): void {
-    this.fields.update((list) => [...list]);
+    this.groups.update((list) => [...list]);
   }
 
-  protected toggleExpanded(i: number): void {
-    this.expanded.update((m) => ({ ...m, [i]: !m[i] }));
+  protected toggleExpanded(pos: QPos): void {
+    const k = `${pos.gi}:${pos.qi}`;
+    this.expanded.update((m) => ({ ...m, [k]: !m[k] }));
   }
 
-  protected isExpanded(i: number): boolean {
-    return !!this.expanded()[i];
+  protected isExpanded(pos: QPos): boolean {
+    return !!this.expanded()[`${pos.gi}:${pos.qi}`];
+  }
+
+  protected errorsFor(gi: number, qi: number): string[] {
+    return this.fieldErrors()[`${gi}:${qi}`] ?? [];
   }
 
   protected isChoice(type: FieldType): boolean {
@@ -287,60 +349,60 @@ export class FormEditorComponent {
     return type === 'text' || type === 'textarea';
   }
 
-  // --- drag reorder --------------------------------------------------------
-  protected onDragStart(i: number): void {
-    this.dragIndex = i;
+  // --- drag reorder (groups) -----------------------------------------------
+  protected onDragStart(gi: number): void {
+    this.dragGroup = gi;
   }
 
   protected onDragOver(event: DragEvent): void {
     event.preventDefault();
   }
 
-  protected onDrop(i: number): void {
-    if (this.dragIndex !== null && this.dragIndex !== i) this.reorder(this.dragIndex, i);
-    this.dragIndex = null;
+  protected onDrop(gi: number): void {
+    if (this.dragGroup !== null && this.dragGroup !== gi) this.reorderGroup(this.dragGroup, gi);
+    this.dragGroup = null;
   }
 
-  // --- validation field setters (mirror form-builder) ----------------------
+  // --- validation field setters --------------------------------------------
   protected setVal(
-    i: number,
+    pos: QPos,
     key: 'min' | 'max' | 'minLen' | 'maxLen' | 'pattern' | 'minOffers' | 'minPositions',
     value: string,
   ): void {
     const numeric = key !== 'pattern';
-    this.fields.update((list) =>
-      list.map((f, idx) => {
-        if (idx !== i) return f;
-        const validation: Record<string, unknown> = { ...(f.validation ?? {}) };
-        if (value === '') delete validation[key];
-        else validation[key] = numeric ? Number(value) : value;
-        return { ...f, validation: validation as FormFieldDef['validation'] };
-      }),
-    );
+    this.patchQuestion(pos, (f) => {
+      const validation: Record<string, unknown> = { ...(f.validation ?? {}) };
+      if (value === '') delete validation[key];
+      else validation[key] = numeric ? Number(value) : value;
+      return { ...f, validation: validation as FormFieldDef['validation'] };
+    });
   }
 
-  protected onLogicInput(i: number, kind: 'visibleIf' | 'compute', raw: string): void {
-    this.rawLogic.update((m) => ({ ...m, [i]: { ...m[i], [kind]: raw } }));
+  protected onLogicInput(pos: QPos, kind: 'visibleIf' | 'compute', raw: string): void {
+    const k = `${pos.gi}:${pos.qi}`;
+    this.rawLogic.update((m) => ({ ...m, [k]: { ...m[k], [kind]: raw } }));
     const trimmed = raw.trim();
-    this.fields.update((list) =>
-      list.map((f, idx) => {
-        if (idx !== i) return f;
-        if (trimmed === '') {
-          const next = { ...f };
-          delete next[kind];
-          return next;
-        }
-        try {
-          return { ...f, [kind]: JSON.parse(trimmed) as Record<string, unknown> };
-        } catch {
-          return f;
-        }
-      }),
-    );
+    this.patchQuestion(pos, (f) => {
+      if (trimmed === '') {
+        const next = { ...f };
+        delete next[kind];
+        return next;
+      }
+      try {
+        return { ...f, [kind]: JSON.parse(trimmed) as Record<string, unknown> };
+      } catch {
+        return f;
+      }
+    });
   }
 
-  protected logicRaw(i: number, kind: 'visibleIf' | 'compute', current?: Record<string, unknown>): string {
-    const raw = this.rawLogic()[i]?.[kind];
+  protected logicRaw(
+    gi: number,
+    qi: number,
+    kind: 'visibleIf' | 'compute',
+    current?: Record<string, unknown>,
+  ): string {
+    const raw = this.rawLogic()[`${gi}:${qi}`]?.[kind];
     if (raw !== undefined) return raw;
     return current ? JSON.stringify(current) : '';
   }
@@ -360,7 +422,9 @@ export class FormEditorComponent {
       this.toast.error(this.i18n.translate('admin.common.invalid'));
       return;
     }
-    const normalized = this.fields().map(normalizeFormField);
+    // Gruppen → flache Felder (Marker je Gruppe), dann normalisieren wie bisher.
+    const flat = groupsToFields(this.groups());
+    const normalized = flat.map(normalizeFormField);
     const description: I18nMap = { ...this.description() };
     this.saving.set(true);
 

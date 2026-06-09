@@ -72,11 +72,18 @@
 
 :host ::ng-deep formly-form {
   display: grid;
-  gap: var(--space-5);
+  /* Großzügiger vertikaler Abstand zwischen den Fragen eines Schritts. */
+  gap: var(--space-6);
 }
 
 :host ::ng-deep formly-field {
   display: block;
+}
+
+/* Dünner Trenner zwischen aufeinanderfolgenden Fragen eines Schritts. */
+:host ::ng-deep formly-field + formly-field {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
 }
 
 .summary {

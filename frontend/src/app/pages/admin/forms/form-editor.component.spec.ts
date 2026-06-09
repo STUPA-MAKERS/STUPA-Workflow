@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import type { FormFieldDef, I18nMap } from '@core/api/models';
 import { AdminApiService } from '../admin-api.service';
 import type { ApplicationTypeFull, FormDraft } from '../admin.models';
+import { groupsFromFields, groupsToFields } from '../form-field.util';
 import { FormEditorComponent } from './form-editor.component';
 
 const TYPE: ApplicationTypeFull = {
@@ -46,15 +47,56 @@ describe('FormEditorComponent', () => {
     expect(screen.getByDisplayValue('Titel')).toBeInTheDocument();
   });
 
-  it('adds a question through the type menu', async () => {
-    const { fixture } = await setup(draft([]));
-    expect(screen.getByText('Noch keine Fragen. Füge unten die erste hinzu.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '+ Frage hinzufügen' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Langtext' }));
+  it('loads a markerless form as a single untitled group', async () => {
+    const { fixture } = await setup(
+      draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(c.fields()).toHaveLength(1);
-    expect(c.fields()[0].type).toBe('textarea');
+    expect(c.groups()).toHaveLength(1);
+    expect(c.groups()[0].titleDe).toBe('');
+    expect(c.groups()[0].fields).toHaveLength(1);
+  });
+
+  it('splits a form with section markers into titled groups', async () => {
+    const { fixture } = await setup(
+      draft([
+        { key: 'q1', type: 'text', label: { de: 'A', en: '' } },
+        { key: 'section_1', type: 'section', label: { de: 'Zweiter Schritt', en: 'Second' } },
+        { key: 'q2', type: 'text', label: { de: 'B', en: '' } },
+      ]),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.groups()).toHaveLength(2);
+    expect(c.groups()[0].titleDe).toBe('');
+    expect(c.groups()[1].titleDe).toBe('Zweiter Schritt');
+    expect(c.groups()[1].fields[0].key).toBe('q2');
+  });
+
+  it('adds a question through a group type menu', async () => {
+    const { fixture } = await setup(draft([]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    // Empty form loads as a single empty group.
+    expect(c.groups()).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: '+ Frage hinzufügen' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Langtext' }));
+    expect(c.groups()[0].fields).toHaveLength(1);
+    expect(c.groups()[0].fields[0].type).toBe('textarea');
+  });
+
+  it('adds and reorders groups', async () => {
+    const { fixture } = await setup(
+      draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addGroup();
+    expect(c.groups()).toHaveLength(2);
+    c.setGroupTitle(1, 'de', 'Schritt 2');
+    c.moveGroup(1, -1);
+    expect(c.groups()[0].titleDe).toBe('Schritt 2');
   });
 
   it('saves a normalized form version with the description', async () => {
@@ -65,18 +107,39 @@ describe('FormEditorComponent', () => {
     expect(createFormVersion).toHaveBeenCalledTimes(1);
     const [typeId, fields, description] = createFormVersion.mock.calls[0];
     expect(typeId).toBe('f1');
+    // Markerless single group → serializes back to exactly the original flat fields.
     expect(fields).toEqual([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]);
     expect(description).toEqual({ de: 'Hallo', en: '' });
+  });
+
+  it('serializes a multi-group form back to section markers', async () => {
+    const { fixture, createFormVersion } = await setup(
+      draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addGroup();
+    c.setGroupTitle(1, 'de', 'Budget');
+    c.addQuestion(1, 'currency');
+    c.groups()[1].fields[0].key = 'amount';
+    c.groups()[1].fields[0].label.de = 'Betrag';
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const fields = createFormVersion.mock.calls[0][1] as FormFieldDef[];
+    expect(fields).toEqual([
+      { key: 'title', type: 'text', label: { de: 'Titel', en: '' } },
+      { key: 'section_1', type: 'section', label: { de: 'Budget', en: '' } },
+      { key: 'amount', type: 'currency', label: { de: 'Betrag', en: '' } },
+    ]);
   });
 
   it('writes the question label back into the model (regression: label stayed empty)', async () => {
     const { fixture } = await setup(draft([{ key: 'sum', type: 'text', label: { de: '', en: '' } }]));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(c.fieldErrors()[0]).toContain('label (de) is required');
+    expect(c.errorsFor(0, 0)).toContain('label (de) is required');
     await userEvent.type(screen.getByLabelText('Bezeichnung (DE)'), 'Summe');
-    expect(c.fields()[0].label.de).toBe('Summe');
-    expect(c.fieldErrors()[0]).not.toContain('label (de) is required');
+    expect(c.groups()[0].fields[0].label.de).toBe('Summe');
+    expect(c.errorsFor(0, 0)).not.toContain('label (de) is required');
   });
 
   it('toggles "Mit Budget" and persists it on the type (#24/budget)', async () => {
@@ -100,10 +163,10 @@ describe('FormEditorComponent', () => {
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.onPromotedToggle(0, true);
-    expect(c.fields()[0].promoteTarget).toBe('amount');
-    c.onPromotedToggle(0, false);
-    expect(c.fields()[0].promoteTarget).toBeUndefined();
+    c.onPromotedToggle({ gi: 0, qi: 0 }, true);
+    expect(c.groups()[0].fields[0].promoteTarget).toBe('amount');
+    c.onPromotedToggle({ gi: 0, qi: 0 }, false);
+    expect(c.groups()[0].fields[0].promoteTarget).toBeUndefined();
   });
 
   it('switches to preview mode', async () => {
@@ -111,5 +174,35 @@ describe('FormEditorComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
     const preview = screen.getByText('Titel', { selector: '.fe__pv-label' });
     expect(within(preview).getByText('*')).toBeInTheDocument();
+  });
+});
+
+describe('group serialize/deserialize round-trip', () => {
+  it('preserves a markerless flat form exactly', () => {
+    const flat: FormFieldDef[] = [
+      { key: 'title', type: 'text', label: { de: 'Titel', en: '' } },
+      { key: 'amount', type: 'currency', label: { de: 'Betrag', en: '' } },
+    ];
+    expect(groupsToFields(groupsFromFields(flat))).toEqual(flat);
+  });
+
+  it('preserves a multi-section flat form (section keys re-numbered to section_N)', () => {
+    const flat: FormFieldDef[] = [
+      { key: 'title', type: 'text', label: { de: 'Titel', en: '' } },
+      { key: 'section_1', type: 'section', label: { de: 'Budget', en: 'Budget' } },
+      { key: 'amount', type: 'currency', label: { de: 'Betrag', en: '' } },
+    ];
+    expect(groupsToFields(groupsFromFields(flat))).toEqual(flat);
+  });
+
+  it('keeps a leading section marker as the first group title', () => {
+    const flat: FormFieldDef[] = [
+      { key: 'section_1', type: 'section', label: { de: 'Erster', en: 'First' } },
+      { key: 'q1', type: 'text', label: { de: 'A', en: '' } },
+    ];
+    const groups = groupsFromFields(flat);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].titleDe).toBe('Erster');
+    expect(groupsToFields(groups)).toEqual(flat);
   });
 });
