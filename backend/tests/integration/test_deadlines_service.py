@@ -110,10 +110,10 @@ async def _seed_flow(session: AsyncSession) -> tuple[ApplicationType, dict[str, 
                    guard={"deadlinePassed": True}, actions=[], order=0),
         Transition(flow_version_id=flow.id, from_state_id=states["voting"].id,
                    to_state_id=states["approved"].id, label_i18n={},
-                   guard={"voteResult": "passed"}, actions=[], order=0),
+                   branch="pass", actions=[], order=0),
         Transition(flow_version_id=flow.id, from_state_id=states["voting"].id,
                    to_state_id=states["rejected"].id, label_i18n={},
-                   guard={"voteResult": "rejected"}, actions=[], order=1),
+                   branch="fail", actions=[], order=1),
     ])
     app_type.active_flow_version_id = flow.id
     await session.commit()

@@ -93,16 +93,15 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
     }
     session.add_all(list(states.values()))
     await session.flush()
+    # #28: vote-State hat zwei feste Ausgänge (pass/fail); close() feuert den Branch.
+    # passed → pass → approved; rejected/tie → fail → rejected (fail-closed).
     session.add_all([
         Transition(flow_version_id=flow.id, from_state_id=states["voting"].id,
                    to_state_id=states["approved"].id, label_i18n={},
-                   guard={"voteResult": "passed"}, actions=[], order=0),
+                   branch="pass", actions=[], order=0),
         Transition(flow_version_id=flow.id, from_state_id=states["voting"].id,
                    to_state_id=states["rejected"].id, label_i18n={},
-                   guard={"voteResult": "rejected"}, actions=[], order=1),
-        Transition(flow_version_id=flow.id, from_state_id=states["voting"].id,
-                   to_state_id=states["review"].id, label_i18n={},
-                   guard={"voteResult": "tie"}, actions=[], order=2),
+                   branch="fail", actions=[], order=1),
     ])
     app_type.active_flow_version_id = flow.id
     await session.commit()
@@ -253,7 +252,7 @@ async def test_percent_quorum_denominator_is_roster_not_voters(
     [
         (["yes", "yes", "no"], "rejected", "passed", "approved"),
         (["no", "no", "yes"], "rejected", "rejected", "rejected"),
-        (["yes", "no"], "tie", "tie", "review"),
+        (["yes", "no"], "tie", "tie", "rejected"),  # tie → fail-closed → rejected
     ],
 )
 async def test_close_branches_to_flow(

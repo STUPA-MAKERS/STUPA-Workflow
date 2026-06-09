@@ -120,31 +120,26 @@ async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State
         Transition(
             flow_version_id=flow.id, from_state_id=states["draft"].id,
             to_state_id=states["review"].id, label_i18n={"de": "Einreichen"},
-            guard={"and": [{"fieldsComplete": True}, {"roleIs": "reviewer"}]},
-            actions=[{"type": "notify", "group": "gremium"},
-                     {"type": "setEditLock", "locked": False}],
+            guard={"and": [{"hasField": "title"}, {"roleIs": "reviewer"}]},
+            actions=[{"type": "notify", "recipients": [{"kind": "applicant"}]}],
             order=0,
         ),
         Transition(
             flow_version_id=flow.id, from_state_id=states["review"].id,
             to_state_id=states["voting"].id, label_i18n={"de": "Zur Abstimmung"},
             guard={"roleIs": "treasurer"},  # mgr ist NICHT treasurer → blockiert
-            actions=[{"type": "openVote"}], order=0,
+            actions=[], order=0,
         ),
+        # vote-Ausgänge (#28): pass/fail-Branches, von fire_branch beim Vote-Close gefeuert.
         Transition(
             flow_version_id=flow.id, from_state_id=states["voting"].id,
             to_state_id=states["approved"].id, label_i18n={"de": "Bewilligen"},
-            guard={"voteResult": "passed"}, actions=[{"type": "budgetBook"}], order=0,
+            branch="pass", actions=[{"type": "assignBudget", "budgetId": "b-1"}], order=0,
         ),
         Transition(
             flow_version_id=flow.id, from_state_id=states["voting"].id,
             to_state_id=states["rejected"].id, label_i18n={"de": "Ablehnen"},
-            guard={"voteResult": "rejected"}, order=1,
-        ),
-        Transition(
-            flow_version_id=flow.id, from_state_id=states["voting"].id,
-            to_state_id=states["review"].id, label_i18n={"de": "Zurück"},
-            guard={"voteResult": "tie"}, order=2,
+            branch="fail", order=1,
         ),
     ]
     session.add_all(transitions)
@@ -198,7 +193,7 @@ async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -
         app.id, transition.id, _manager(), note="ok"
     )
     assert res.new_state_id == states["review"].id
-    assert res.dispatched_actions == ["notify"]  # setEditLock inline
+    assert res.dispatched_actions == ["notify"]
     assert rec.actions[0].type == "notify"
     assert rec.actions[0].idempotency_key.endswith(":0:notify")
 
@@ -256,7 +251,7 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
             )
         )
     ).scalar_one()
-    res = await flow.fire(app.id, t_approved.id, _manager(), vote_result="passed")
+    res = await flow.fire(app.id, t_approved.id, _manager())
     assert res.new_state_id == states["approved"].id
 
     # Folge des Übergangs: T-12 patch sperrt jetzt mit 409.
@@ -293,14 +288,14 @@ async def test_fire_guard_failed_409(session: AsyncSession) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# ergebnis-abhängige Verzweigung (voteResult)
+# ergebnis-abhängige Verzweigung (#28: pass/fail-Branch via fire_branch)
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
-    ("vote_result", "target"),
-    [("passed", "approved"), ("rejected", "rejected"), ("tie", "review")],
+    ("branch", "target"),
+    [("pass", "approved"), ("fail", "rejected")],
 )
-async def test_fire_vote_result_branches(
-    session: AsyncSession, vote_result: str, target: str
+async def test_fire_branch_routes_to_target(
+    session: AsyncSession, branch: str, target: str
 ) -> None:
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
@@ -311,17 +306,8 @@ async def test_fire_vote_result_branches(
     await session.commit()
 
     flow = FlowService(session)
-    target_state = states[target]
-    transition = (
-        await session.execute(
-            select(Transition).where(
-                Transition.from_state_id == states["voting"].id,
-                Transition.to_state_id == target_state.id,
-            )
-        )
-    ).scalar_one()
-    res = await flow.fire(app.id, transition.id, _manager(), vote_result=vote_result)
-    assert res.new_state_id == target_state.id
+    res = await flow.fire_branch(app.id, branch, _manager())
+    assert res.new_state_id == states[target].id
 
 
 # --------------------------------------------------------------------------- #

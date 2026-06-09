@@ -97,7 +97,7 @@ def _graph(*, with_action: bool = True) -> dict:
                 "from": "draft",
                 "to": "review",
                 "label": {"de": "Einreichen"},
-                "guard": {"fieldsComplete": True},
+                "guard": {"hasField": "title"},
                 "actions": ([{"type": "notify", "event": "status_changed"}] if with_action else []),
             }
         ],
@@ -129,7 +129,7 @@ async def test_create_flow_version_persists_graph_and_activates(session: AsyncSe
     by_key = {s.id: s.key for s in states}
     assert by_key[trans[0].from_state_id] == "draft"
     assert by_key[trans[0].to_state_id] == "review"
-    assert trans[0].guard == {"fieldsComplete": True}
+    assert trans[0].guard == {"hasField": "title"}
 
     refreshed = await session.get(ApplicationType, app_type.id)
     assert refreshed is not None and refreshed.active_flow_version_id == out.id
