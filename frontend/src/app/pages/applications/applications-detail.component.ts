@@ -7,8 +7,9 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { FormGroup, FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -22,9 +23,11 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
+import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applications.util';
@@ -46,11 +49,13 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    FormlyForm,
     DatePipe,
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
     CardComponent,
+    DialogComponent,
     AttachmentsPanelComponent,
   ],
   template: `
@@ -64,7 +69,17 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
       </p>
     } @else if (app(); as application) {
       <header class="det__head">
-        <h1 class="det__title">{{ title() }}</h1>
+        <div class="det__titleRow">
+          <h1 class="det__title">{{ title() }}</h1>
+          @if (application.canEdit && !editing()) {
+            <div class="det__ownerActions">
+              @if (application.state?.editAllowed) {
+                <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
+              }
+              <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
+            </div>
+          }
+        </div>
         <div class="det__meta">
           @if (application.state) {
             <app-badge [variant]="stateVariant(application.state.category)">
@@ -91,10 +106,16 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
                 @if (application.applicant.anonymized) {
                   {{ 'applications.detail.anonymized' | t }}
                 } @else {
-                  {{ application.applicant.name || application.applicant.email || ('applications.detail.notProvided' | t) }}
+                  {{ application.applicant.name || ('applications.detail.notProvided' | t) }}
                 }
               </dd>
             </div>
+            @if (!application.applicant.anonymized && application.applicant.email) {
+              <div>
+                <dt>{{ 'applications.detail.email' | t }}</dt>
+                <dd><a [attr.href]="'mailto:' + application.applicant.email">{{ application.applicant.email }}</a></dd>
+              </div>
+            }
           }
           <div>
             <dt>{{ 'applications.detail.amount' | t }}</dt>
@@ -103,9 +124,15 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
         </dl>
       </header>
 
-      <!-- Antragsdaten -->
+      <!-- Antragsdaten (Ansicht oder Inline-Bearbeitung der Ersteller:in/Verwalter:in) -->
       <app-card [heading]="'applications.detail.data.title' | t">
-        @if (dataEntries(application).length) {
+        @if (editing()) {
+          <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
+          <div class="det__editActions">
+            <app-button variant="ghost" size="sm" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
+            <app-button size="sm" [disabled]="editForm.invalid" [loading]="savingEdit()" (click)="saveEdit()">{{ 'applications.detail.save' | t }}</app-button>
+          </div>
+        } @else if (dataEntries(application).length) {
           <dl class="det__data">
             @for (entry of dataEntries(application); track entry.key) {
               <div class="det__dataRow">
@@ -250,6 +277,19 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
       <!-- Anhänge (T-13-Contract): Upload + signierte Download-URLs + Scan-Status -->
       <app-attachments-panel [applicationId]="application.id" [canUpload]="canManage()" />
     }
+
+    <app-dialog
+      [open]="confirmDelete()"
+      [title]="'applications.detail.deleteTitle' | t"
+      [closeLabel]="'applications.detail.cancel' | t"
+      (closed)="confirmDelete.set(false)"
+    >
+      <p>{{ 'applications.detail.deleteConfirm' | t }}</p>
+      <div dialog-footer>
+        <app-button variant="ghost" size="sm" (click)="confirmDelete.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+        <app-button variant="danger" size="sm" [loading]="deleting()" (click)="doDelete()">{{ 'applications.detail.delete' | t }}</app-button>
+      </div>
+    </app-dialog>
   `,
   styles: [
     `
@@ -269,6 +309,26 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
         display: flex;
         flex-direction: column;
         gap: var(--space-3);
+      }
+      .det__titleRow {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: var(--space-4);
+        flex-wrap: wrap;
+      }
+      .det__title {
+        margin: 0;
+      }
+      .det__ownerActions {
+        display: flex;
+        gap: var(--space-2);
+      }
+      .det__editActions {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-2);
+        margin-top: var(--space-3);
       }
       .det__meta {
         display: flex;
@@ -448,6 +508,16 @@ export class ApplicationsDetailComponent {
 
   readonly approving = signal(false);
 
+  // Inline-Bearbeitung (Ersteller:in/Verwalter:in, #24) + Löschen.
+  readonly editing = signal(false);
+  readonly editFields = signal<FormlyFieldConfig[]>([]);
+  readonly savingEdit = signal(false);
+  editForm = new FormGroup({});
+  editModel: Record<string, unknown> = {};
+  readonly confirmDelete = signal(false);
+  readonly deleting = signal(false);
+
+  private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
   readonly stateVariant = stateBadgeVariant;
   readonly fmt = formatFieldValue;
@@ -476,6 +546,8 @@ export class ApplicationsDetailComponent {
     this.formFields.set([]);
     this.newComment.set('');
     this.visibility.set('public');
+    this.editing.set(false);
+    this.confirmDelete.set(false);
     this.notFound.set(false);
     this.error.set(false);
 
@@ -594,6 +666,55 @@ export class ApplicationsDetailComponent {
   isEmptyDiff(version: ApplicationVersion): boolean {
     const d = version.diff;
     return !!d && !d.added.length && !d.removed.length && !d.changed.length;
+  }
+
+  // --- edit / delete (#24) -------------------------------------------------
+  startEdit(app: Application): void {
+    const lang = this.i18n.locale();
+    this.editFields.set(toFormlyFields(this.formFields(), lang, { has_budget: true }));
+    this.editModel = structuredClone(app.data);
+    this.editForm = new FormGroup({});
+    this.editing.set(true);
+  }
+
+  cancelEdit(): void {
+    this.editing.set(false);
+  }
+
+  saveEdit(): void {
+    if (this.editForm.invalid || this.savingEdit()) return;
+    this.savingEdit.set(true);
+    this.api.updateApplication(this.id, { ...this.editModel }).subscribe({
+      next: () => {
+        this.savingEdit.set(false);
+        this.editing.set(false);
+        this.toast.success(this.i18n.translate('applications.detail.saved'));
+        this.refresh();
+      },
+      error: (err: { status?: number }) => {
+        this.savingEdit.set(false);
+        const key =
+          err.status === 409 ? 'applications.detail.locked' : 'applications.detail.saveFailed';
+        this.toast.error(this.i18n.translate(key));
+      },
+    });
+  }
+
+  doDelete(): void {
+    if (this.deleting()) return;
+    this.deleting.set(true);
+    this.api.deleteApplication(this.id).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.confirmDelete.set(false);
+        this.toast.success(this.i18n.translate('applications.detail.deleted'));
+        void this.router.navigate(['/applications']);
+      },
+      error: () => {
+        this.deleting.set(false);
+        this.toast.error(this.i18n.translate('applications.detail.deleteFailed'));
+      },
+    });
   }
 
   submitComment(event: Event): void {

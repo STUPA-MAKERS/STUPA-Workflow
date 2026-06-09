@@ -116,6 +116,7 @@ export interface ApplicationOutWire {
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   applicant?: ApplicantOutWire | null;
+  canEdit?: boolean;
 }
 
 /** `ApplicationListItem` — Listen-Eintrag (kein `data`/`applicant`). */
@@ -337,6 +338,8 @@ export interface Application {
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   applicant: Applicant | null;
+  /** Darf der/die Anfragende bearbeiten/löschen (Verwalter:in oder Ersteller:in, #24)? */
+  canEdit: boolean;
 }
 
 export interface ApplicationListItem {

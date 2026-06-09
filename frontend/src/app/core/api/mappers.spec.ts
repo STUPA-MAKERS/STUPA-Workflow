@@ -101,6 +101,7 @@ describe('mapApplication', () => {
       createdAt: '2026-06-05T10:00:00Z',
       updatedAt: '2026-06-06T10:00:00Z',
       applicant: { email: 'a@b.de', name: 'Max', anonymized: false },
+      canEdit: false,
     });
   });
 

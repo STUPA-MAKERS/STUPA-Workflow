@@ -192,6 +192,11 @@ export class ApiClient {
       .pipe(map((wire) => mapApplication(wire, lang)));
   }
 
+  /** DELETE /applications/{id} — Verwalter:in oder Ersteller:in (#24). */
+  deleteApplication(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/applications/${id}`);
+  }
+
   timeline(id: Uuid): Observable<TimelineEntry[]> {
     const lang = this.i18n.locale();
     return this.http
