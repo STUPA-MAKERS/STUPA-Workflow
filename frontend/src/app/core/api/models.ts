@@ -74,6 +74,8 @@ export interface ApplicationListQuery {
   gremium?: Uuid;
   type?: Uuid;
   topf?: Uuid;
+  /** Kostenstelle (Budget-Baum) inkl. Unterbaum. */
+  budget?: Uuid;
   q?: string;
   amountMin?: number;
   amountMax?: number;
@@ -114,6 +116,7 @@ export interface ApplicationOutWire {
   state?: StateOutWire | null;
   gremiumId?: Uuid | null;
   budgetPotId?: Uuid | null;
+  budgetId?: Uuid | null;
   amount?: string | null;
   currency?: string | null;
   data: Record<string, unknown>;
@@ -340,6 +343,7 @@ export interface Application {
   state: ApplicationState | null;
   gremiumId: Uuid | null;
   budgetPotId: Uuid | null;
+  budgetId: Uuid | null;
   amount: string | null;
   currency: string | null;
   data: Record<string, unknown>;

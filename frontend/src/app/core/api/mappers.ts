@@ -88,6 +88,7 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     state: mapState(wire.state, lang),
     gremiumId: wire.gremiumId ?? null,
     budgetPotId: wire.budgetPotId ?? null,
+    budgetId: wire.budgetId ?? null,
     amount: wire.amount ?? null,
     currency: wire.currency ?? null,
     data: wire.data ?? {},

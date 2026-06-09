@@ -65,6 +65,11 @@ function flushTypes(http: HttpTestingController) {
   http.expectOne('/api/application-types').flush(TYPES);
 }
 
+/** Beim ersten Öffnen des Filter-Popouts wird der Kostenstellen-Baum geladen (#17). */
+function flushBudgets(http: HttpTestingController) {
+  for (const req of http.match((r) => r.url === '/api/budgets')) req.flush([]);
+}
+
 describe('ApplicationsListComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
@@ -93,6 +98,7 @@ describe('ApplicationsListComponent', () => {
     http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
     detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    flushBudgets(http);
 
     // The status filter is a dropdown (not free text); option label = state name,
     // option value = the backend state UUID (sent filter value unchanged).
@@ -129,6 +135,7 @@ describe('ApplicationsListComponent', () => {
 
     const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    flushBudgets(http);
     await userEvent.type(screen.getByLabelText('Suche'), 'Beamer');
     await userEvent.click(screen.getByRole('button', { name: 'Filtern' }));
 
@@ -181,12 +188,13 @@ describe('ApplicationsListComponent', () => {
 
     const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    flushBudgets(http);
     await userEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
     expect(navigate).toHaveBeenCalledWith(
       [],
       expect.objectContaining({
         queryParams: {
-          q: null, type: null, state: null, gremium: null, topf: null,
+          q: null, type: null, state: null, gremium: null, topf: null, budget: null,
           amountMin: null, amountMax: null, createdFrom: null, createdTo: null, offset: null,
         },
       }),
@@ -219,6 +227,7 @@ describe('ApplicationsListComponent', () => {
 
     const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    flushBudgets(http);
     await userEvent.type(screen.getByLabelText('Min'), '100');
     await userEvent.type(screen.getByLabelText('Max'), '500');
     await userEvent.click(screen.getByRole('button', { name: 'Filtern' }));

@@ -83,6 +83,7 @@ class ApplicationOut(_CamelModel):
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")
+    budget_id: UUID | None = Field(default=None, alias="budgetId")
     amount: Decimal | None = None
     currency: str | None = None
     data: dict[str, Any]

@@ -119,4 +119,30 @@ export class BudgetTreeApi {
       params,
     });
   }
+
+  /** Antrag einer Kostenstelle zuordnen (#17); ``budgetId=null`` löst die Zuordnung. */
+  assignBudget(
+    applicationId: Uuid,
+    budgetId: Uuid | null,
+  ): Observable<{ applicationId: Uuid; budgetId: Uuid | null; fiscalYearId: Uuid | null }> {
+    return this.http.post<{ applicationId: Uuid; budgetId: Uuid | null; fiscalYearId: Uuid | null }>(
+      `${this.base}/applications/${applicationId}/assign-budget`,
+      { budgetId },
+    );
+  }
+}
+
+/** Baum (rekursiv) → flache Optionsliste (pre-order, „pathKey – name"). */
+export function flattenBudgetOptions(
+  nodes: BudgetTreeNode[],
+): { value: Uuid; label: string }[] {
+  const out: { value: Uuid; label: string }[] = [];
+  const walk = (ns: BudgetTreeNode[]): void => {
+    for (const n of ns) {
+      out.push({ value: n.id, label: `${n.pathKey} – ${n.name}` });
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return out;
 }

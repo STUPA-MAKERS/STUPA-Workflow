@@ -113,12 +113,20 @@ function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
   http.expectOne(url('', id)).flush({ ...appWire(), id });
   http.expectOne(url('/versions', id)).flush(VERSIONS);
   http.expectOne(url('/comments', id)).flush(COMMENTS);
+  // Verwalter:innen laden zusätzlich den Kostenstellen-Baum (#17) — tolerant leeren.
+  for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
+    req.flush([]);
+  }
   if (form) flushForm(http);
 }
 
 // Das Anhänge-Panel lädt beim Rendern bestehende Anhänge — tolerant leeren (falls vorhanden).
 function flushAttachments(http: HttpTestingController) {
   for (const req of http.match((r) => r.method === 'GET' && /\/attachments$/.test(r.url))) {
+    req.flush([]);
+  }
+  // Verwalter:innen laden zusätzlich den Kostenstellen-Baum (#17) — tolerant leeren.
+  for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
     req.flush([]);
   }
 }

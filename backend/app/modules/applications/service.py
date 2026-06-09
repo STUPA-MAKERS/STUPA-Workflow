@@ -24,7 +24,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Text, cast, func, select
+from sqlalchemy import Text, cast, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import ApplicationType, GremiumMembership
@@ -47,6 +47,7 @@ from app.modules.applications.schemas import (
     VersionOut,
 )
 from app.modules.budget.models import BudgetField
+from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.service import FormsService
 from app.modules.forms.validation import (
@@ -207,6 +208,7 @@ class ApplicationsService:
             state=_state_out(state),
             gremiumId=app.gremium_id,
             budgetPotId=app.budget_pot_id,
+            budgetId=app.budget_id,
             amount=app.amount,
             currency=app.currency,
             data=app.data,
@@ -466,6 +468,7 @@ class ApplicationsService:
         gremium_id: UUID | None = None,
         type_id: UUID | None = None,
         budget_pot_id: UUID | None = None,
+        budget_id: UUID | None = None,
         q: str | None = None,
         amount_min: Decimal | None = None,
         amount_max: Decimal | None = None,
@@ -486,6 +489,22 @@ class ApplicationsService:
             filters.append(Application.type_id == type_id)
         if budget_pot_id is not None:
             filters.append(Application.budget_pot_id == budget_pot_id)
+        if budget_id is not None:
+            # Kostenstelle inkl. Unterbaum: über das ``path_key``-Präfix (Knoten selbst
+            # + alle Nachfahren ``<path>-…``). Unbekannte Kostenstelle → leere Liste.
+            node_path = await self.session.scalar(
+                select(Budget.path_key).where(Budget.id == budget_id)
+            )
+            if node_path is None:
+                filters.append(false())
+            else:
+                descendants = select(Budget.id).where(
+                    or_(
+                        Budget.path_key == node_path,
+                        Budget.path_key.like(f"{node_path}-%"),
+                    )
+                )
+                filters.append(Application.budget_id.in_(descendants))
         if q:
             filters.append(cast(Application.data, Text).ilike(f"%{q}%"))
         if amount_min is not None:

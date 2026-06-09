@@ -29,7 +29,9 @@ import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
+import { SelectComponent, type SelectOption } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
+import { BudgetTreeApi, flattenBudgetOptions } from '../budget/budget-tree.api';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applications.util';
 
@@ -68,6 +70,7 @@ interface DetailPosition {
     ButtonComponent,
     CardComponent,
     DialogComponent,
+    SelectComponent,
     AttachmentsPanelComponent,
   ],
   template: `
@@ -203,6 +206,31 @@ interface DetailPosition {
                 {{ t.label || ('applications.transitions.fallback' | t) }}
               </app-button>
             }
+          </div>
+        </app-card>
+      }
+
+      <!-- Kostenstelle (#17): manuell zuordnen/lösen (nur Verwalter:in). -->
+      @if (canManage()) {
+        <app-card [heading]="'applications.budget.title' | t">
+          <p class="det__muted">{{ 'applications.budget.lead' | t }}</p>
+          <div class="det__budget">
+            <app-select
+              class="det__budgetSelect"
+              [label]="'applications.budget.field' | t"
+              [placeholder]="'applications.budget.none' | t"
+              [options]="budgetOptions()"
+              [ngModel]="budgetChoice()"
+              (ngModelChange)="budgetChoice.set($event)"
+            />
+            <app-button
+              size="sm"
+              [loading]="assigningBudget()"
+              [disabled]="budgetChoice() === (application.budgetId ?? '')"
+              (click)="assignBudget()"
+            >
+              {{ 'applications.budget.save' | t }}
+            </app-button>
           </div>
         </app-card>
       }
@@ -493,6 +521,17 @@ interface DetailPosition {
         gap: var(--space-2);
         margin-top: var(--space-3);
       }
+      .det__budget {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: var(--space-3);
+        margin-top: var(--space-3);
+      }
+      .det__budgetSelect {
+        flex: 1 1 18rem;
+        min-width: 0;
+      }
       .det__history {
         display: flex;
         flex-direction: column;
@@ -595,6 +634,7 @@ interface DetailPosition {
 })
 export class ApplicationsDetailComponent {
   private readonly api = inject(ApiClient);
+  private readonly budgetApi = inject(BudgetTreeApi);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -618,6 +658,11 @@ export class ApplicationsDetailComponent {
   readonly transitions = signal<Transition[]>([]);
   readonly firing = signal<Uuid | null>(null);
   readonly canTransition = computed(() => this.auth.can('application.transition'));
+
+  /** Kostenstellen-Zuordnung (#17): Optionen, Auswahl, laufende Zuweisung. */
+  protected readonly budgetOptions = signal<SelectOption[]>([]);
+  protected readonly budgetChoice = signal('');
+  protected readonly assigningBudget = signal(false);
 
   /** Ablehnende Übergänge (Ablehnen/Zurückweisen/…) automatisch rot darstellen. */
   protected transitionVariant(t: Transition): 'primary' | 'danger' {
@@ -707,6 +752,37 @@ export class ApplicationsDetailComponent {
         error: () => this.transitions.set([]),
       });
     }
+    // Kostenstellen-Zuordnung (#17): Baum laden + aktuelle Auswahl vorbelegen.
+    if (this.canManage()) {
+      this.budgetChoice.set(this.app()?.budgetId ?? '');
+      this.budgetApi.tree().subscribe({
+        next: (tree) => this.budgetOptions.set(flattenBudgetOptions(tree)),
+        error: () => this.budgetOptions.set([]),
+      });
+    }
+  }
+
+  /** Kostenstelle zuordnen/lösen (#17): POST /assign-budget → Antrag neu laden. */
+  assignBudget(): void {
+    if (this.assigningBudget()) return;
+    this.assigningBudget.set(true);
+    this.budgetApi.assignBudget(this.id, this.budgetChoice() || null).subscribe({
+      next: () => {
+        this.assigningBudget.set(false);
+        this.toast.success(this.i18n.translate('applications.actions.success'));
+        this.refresh();
+      },
+      error: (err: { status?: number }) => {
+        this.assigningBudget.set(false);
+        const key =
+          err.status === 422
+            ? 'applications.budget.invalid'
+            : err.status === 403
+              ? 'applications.transitions.forbidden'
+              : 'applications.actions.error';
+        this.toast.error(this.i18n.translate(key));
+      },
+    });
   }
 
   /** Antragsdaten als Label/Wert-Zeilen: Feld-Definition → Label + typisierter Wert;

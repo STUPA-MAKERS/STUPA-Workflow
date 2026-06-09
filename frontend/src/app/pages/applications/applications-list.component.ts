@@ -22,6 +22,7 @@ import type {
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { IconComponent, SelectComponent, type SelectOption } from '@shared/ui';
+import { BudgetTreeApi, flattenBudgetOptions } from '../budget/budget-tree.api';
 import { stateBadgeVariant } from './applications.util';
 
 /**
@@ -46,12 +47,14 @@ import { stateBadgeVariant } from './applications.util';
         </div>
         <!-- Filter in einem Popout (#20): Button mit Icon + Aktiv-Indikator. -->
         <div class="apps__filterWrap">
-          <app-button variant="secondary" size="sm" (click)="filtersOpen.set(!filtersOpen())">
-            <app-icon name="filter" />
-            {{ 'applications.list.filter.button' | t }}
-            @if (activeFilterCount() > 0) {
-              <span class="apps__filterCount" aria-hidden="true">{{ activeFilterCount() }}</span>
-            }
+          <app-button variant="secondary" size="sm" (click)="toggleFilters()">
+            <span class="apps__filterBtn">
+              <app-icon name="filter" [size]="16" />
+              {{ 'applications.list.filter.button' | t }}
+              @if (activeFilterCount() > 0) {
+                <span class="apps__filterCount" aria-hidden="true">{{ activeFilterCount() }}</span>
+              }
+            </span>
           </app-button>
           @if (filtersOpen()) {
             <form class="apps__filterPanel" (submit)="applyFilters($event)" role="search">
@@ -103,6 +106,19 @@ import { stateBadgeVariant } from './applications.util';
                   <input type="date" class="field__control" [attr.aria-label]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
                 </div>
               </div>
+              @if (budgetOptions().length) {
+                <div class="field">
+                  <app-select
+                    id="apps-budget"
+                    name="budget"
+                    [label]="'applications.list.filter.budget' | t"
+                    [placeholder]="'applications.list.filter.all' | t"
+                    [options]="budgetOptions()"
+                    [ngModel]="budgetId()"
+                    (ngModelChange)="budgetId.set($event)"
+                  />
+                </div>
+              }
               <div class="apps__filterActions">
                 <app-button type="submit" size="sm">{{ 'applications.list.filter.apply' | t }}</app-button>
                 <app-button type="button" variant="ghost" size="sm" (click)="reset()">
@@ -124,9 +140,6 @@ import { stateBadgeVariant } from './applications.util';
     } @else {
       <div class="apps__tableWrap">
         <table class="apps__table">
-          <caption class="apps__caption">
-            {{ 'applications.list.count' | t: { count: items().length, total: total() } }}
-          </caption>
           <thead>
             <tr>
               <th scope="col">{{ 'applications.list.col.title' | t }}</th>
@@ -216,6 +229,11 @@ import { stateBadgeVariant } from './applications.util';
       .apps__filterWrap {
         position: relative;
       }
+      .apps__filterBtn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
       .apps__filterCount {
         display: inline-flex;
         align-items: center;
@@ -303,11 +321,6 @@ import { stateBadgeVariant } from './applications.util';
       .apps__table tbody tr:last-child td {
         border-bottom: none;
       }
-      .apps__caption {
-        text-align: start;
-        padding-bottom: var(--space-3);
-        color: var(--color-text-muted);
-      }
       .apps__table th,
       .apps__table td {
         padding: var(--space-3) var(--space-4);
@@ -331,8 +344,26 @@ import { stateBadgeVariant } from './applications.util';
         align-items: center;
         gap: var(--space-2);
       }
+      /* Min/Max + Datumsfelder teilen die Breite gleichmäßig und laufen nicht
+         über den Panel-Rand (kein horizontaler Scroll, keine Clipping). */
+      .apps__range .field__control {
+        flex: 1 1 0;
+        min-width: 0;
+        width: 100%;
+      }
+      /* Zahlen-Spinner ausblenden — wirkt im schmalen Popout unruhig. */
+      .apps__range input[type='number'] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+      .apps__range input[type='number']::-webkit-outer-spin-button,
+      .apps__range input[type='number']::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
       .apps__rangeSep {
         color: var(--color-text-muted);
+        flex: 0 0 auto;
       }
       .apps__sort {
         background: transparent;
@@ -388,6 +419,7 @@ import { stateBadgeVariant } from './applications.util';
 })
 export class ApplicationsListComponent {
   private readonly api = inject(ApiClient);
+  private readonly budgetApi = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -408,6 +440,9 @@ export class ApplicationsListComponent {
   readonly amountMax = signal('');
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
+  readonly budgetId = signal('');
+  /** Kostenstellen (Baum → flach) als Filter-Optionen. */
+  readonly budgetOptions = signal<SelectOption[]>([]);
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
@@ -423,6 +458,7 @@ export class ApplicationsListComponent {
         this.amountMax(),
         this.createdFrom(),
         this.createdTo(),
+        this.budgetId(),
       ].filter((v) => String(v ?? '').trim() !== '').length,
   );
 
@@ -465,10 +501,25 @@ export class ApplicationsListComponent {
       this.amountMax.set(pm.get('amountMax') ?? '');
       this.createdFrom.set(pm.get('createdFrom') ?? '');
       this.createdTo.set(pm.get('createdTo') ?? '');
+      this.budgetId.set(pm.get('budget') ?? '');
       this.sortField.set(pm.get('sort') === 'amount' ? 'amount' : 'createdAt');
       this.sortOrder.set(pm.get('order') === 'asc' ? 'asc' : 'desc');
       this.load(pm);
     });
+  }
+
+  /** Filter-Popout auf/zu; den Kostenstellen-Baum erst beim ersten Öffnen laden. */
+  private budgetsLoaded = false;
+  toggleFilters(): void {
+    const open = !this.filtersOpen();
+    this.filtersOpen.set(open);
+    if (open && !this.budgetsLoaded) {
+      this.budgetsLoaded = true;
+      this.budgetApi.tree().subscribe({
+        next: (tree) => this.budgetOptions.set(flattenBudgetOptions(tree)),
+        error: () => this.budgetOptions.set([]),
+      });
+    }
   }
 
   typeName(typeId: Uuid): string {
@@ -514,6 +565,7 @@ export class ApplicationsListComponent {
       amountMax: this.amountMax() || null,
       createdFrom: this.createdFrom() || null,
       createdTo: this.createdTo() || null,
+      budget: this.budgetId() || null,
       offset: null,
     });
   }
@@ -526,9 +578,10 @@ export class ApplicationsListComponent {
     this.amountMax.set('');
     this.createdFrom.set('');
     this.createdTo.set('');
+    this.budgetId.set('');
     this.filtersOpen.set(false);
     this.navigate({
-      q: null, type: null, state: null, gremium: null, topf: null,
+      q: null, type: null, state: null, gremium: null, topf: null, budget: null,
       amountMin: null, amountMax: null, createdFrom: null, createdTo: null, offset: null,
     });
   }
@@ -575,6 +628,7 @@ export class ApplicationsListComponent {
     const state = pm.get('state');
     const gremium = pm.get('gremium');
     const topf = pm.get('topf');
+    const budget = pm.get('budget');
     const amountMin = pm.get('amountMin');
     const amountMax = pm.get('amountMax');
     const createdFrom = pm.get('createdFrom');
@@ -586,6 +640,7 @@ export class ApplicationsListComponent {
     if (state) query.state = state;
     if (gremium) query.gremium = gremium;
     if (topf) query.topf = topf;
+    if (budget) query.budget = budget;
     if (amountMin) query.amountMin = Number(amountMin);
     if (amountMax) query.amountMax = Number(amountMax);
     if (createdFrom) query.createdFrom = createdFrom;
