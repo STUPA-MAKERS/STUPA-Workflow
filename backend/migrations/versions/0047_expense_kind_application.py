@@ -38,8 +38,12 @@ def upgrade() -> None:
                 "kind", sa.Text(), nullable=False, server_default="expense"
             ),
         )
+    # ``budget_expense`` wird in 0030 aus dem Live-Modell (``Base.metadata``) erzeugt,
+    # auf einer frischen DB existiert die CHECK also schon. Der Inspector liefert den
+    # **konventions-präfixierten** Namen (``ck_<table>_<name>``), darum hier exakt so
+    # prüfen — sonst Doppel-Anlage ("constraint already exists").
     constraints = {c["name"] for c in insp.get_check_constraints("budget_expense")}
-    if "budget_expense_kind_valid" not in constraints:
+    if "ck_budget_expense_budget_expense_kind_valid" not in constraints:
         op.create_check_constraint(
             "budget_expense_kind_valid",
             "budget_expense",
@@ -74,9 +78,11 @@ def downgrade() -> None:
     if "application_id" in cols:
         op.drop_column("budget_expense", "application_id")
     constraints = {c["name"] for c in insp.get_check_constraints("budget_expense")}
-    if "budget_expense_kind_valid" in constraints:
+    if "ck_budget_expense_budget_expense_kind_valid" in constraints:
         op.drop_constraint(
-            "budget_expense_kind_valid", "budget_expense", type_="check"
+            "ck_budget_expense_budget_expense_kind_valid",
+            "budget_expense",
+            type_="check",
         )
     if "kind" in cols:
         op.drop_column("budget_expense", "kind")

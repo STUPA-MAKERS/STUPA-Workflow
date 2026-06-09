@@ -1,13 +1,14 @@
 """gremium: add quorum_percent (#committee-quorum)
 
-Revision ID: 0047_gremium_quorum
-Revises: 0046_state_color
+Revision ID: 0048_gremium_quorum
+Revises: 0047_expense_kind_application
 Create Date: 2026-06-09 19:00:00
 
 Ein Gremium bekommt ein optionales Default-Quorum (``quorum_percent``, 0–100 % der
 Stimmberechtigten, die teilnehmen müssen). NULL = kein Default. Es dient als Vorbelegung
 des Quorums von Abstimmungen, die für dieses Gremium geöffnet werden. Idempotent
-(Inspector-Check). ``down_revision`` = ``0046_state_color``.
+(Inspector-Check). Hinter ``0047_expense_kind_application`` linearisiert (war zuvor ein
+zweiter Kopf neben ihm auf ``0046_state_color``).
 """
 
 from __future__ import annotations
@@ -17,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0047_gremium_quorum"
-down_revision: str | None = "0046_state_color"
+revision: str = "0048_gremium_quorum"
+down_revision: str | None = "0047_expense_kind_application"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

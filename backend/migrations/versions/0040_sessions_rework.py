@@ -37,17 +37,28 @@ _ALL_PERMS = '["session.manage","vote.manage","vote.cast","protocol.write"]'
 _MEMBER_PERMS = '["vote.cast"]'
 
 
+def _has_column(table: str, column: str) -> bool:
+    insp = sa.inspect(op.get_bind())
+    return any(c["name"] == column for c in insp.get_columns(table))
+
+
+def _has_fk(table: str, name: str) -> bool:
+    insp = sa.inspect(op.get_bind())
+    return any(fk["name"] == name for fk in insp.get_foreign_keys(table))
+
+
 def upgrade() -> None:
-    # 1. permissions-Spalte
-    op.add_column(
-        "gremium_role",
-        sa.Column(
-            "permissions",
-            postgresql.JSONB(),
-            nullable=False,
-            server_default="[]",
-        ),
-    )
+    # 1. permissions-Spalte (idempotent: nur anlegen, wenn noch nicht vorhanden)
+    if not _has_column("gremium_role", "permissions"):
+        op.add_column(
+            "gremium_role",
+            sa.Column(
+                "permissions",
+                postgresql.JSONB(),
+                nullable=False,
+                server_default="[]",
+            ),
+        )
 
     # 2. Pflichtrolle ``manager`` in jedes Gremium (idempotent)
     op.execute(
@@ -90,18 +101,20 @@ def upgrade() -> None:
     op.execute("DELETE FROM gremium_role WHERE key = 'schriftfuehrung'")
 
     # 5. meeting.protokollant_id
-    op.add_column(
-        "meeting",
-        sa.Column("protokollant_id", sa.Uuid(), nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_meeting_protokollant",
-        "meeting",
-        "principal",
-        ["protokollant_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
+    if not _has_column("meeting", "protokollant_id"):
+        op.add_column(
+            "meeting",
+            sa.Column("protokollant_id", sa.Uuid(), nullable=True),
+        )
+    if not _has_fk("meeting", "fk_meeting_protokollant"):
+        op.create_foreign_key(
+            "fk_meeting_protokollant",
+            "meeting",
+            "principal",
+            ["protokollant_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
 
     # 6. vote.application_id nullable
     op.alter_column(
@@ -109,18 +122,20 @@ def upgrade() -> None:
     )
 
     # 7. vote.agenda_item_id
-    op.add_column(
-        "vote",
-        sa.Column("agenda_item_id", sa.Uuid(), nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_vote_agenda_item",
-        "vote",
-        "meeting_agenda_item",
-        ["agenda_item_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
+    if not _has_column("vote", "agenda_item_id"):
+        op.add_column(
+            "vote",
+            sa.Column("agenda_item_id", sa.Uuid(), nullable=True),
+        )
+    if not _has_fk("vote", "fk_vote_agenda_item"):
+        op.create_foreign_key(
+            "fk_vote_agenda_item",
+            "vote",
+            "meeting_agenda_item",
+            ["agenda_item_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
 
 
 def downgrade() -> None:
