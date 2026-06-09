@@ -353,6 +353,21 @@ export interface GremiumRole {
   forced?: boolean;
 }
 
+/** Art einer benannten Frist-Policy. */
+export type DeadlineKind = 'absolute' | 'relative_submitted' | 'relative_changed';
+
+/** Benannte Frist-Policy (Registry, vom Flow per `key` referenziert). */
+export interface DeadlinePolicy {
+  id: Uuid;
+  key: string;
+  label: I18nMap;
+  kind: DeadlineKind;
+  /** Nur bei `absolute`: fixes Datum (pro Semester pflegbar), ISO-String. */
+  absoluteAt?: string | null;
+  /** Nur bei den relativen Varianten: Tage Versatz. */
+  offsetDays?: number | null;
+}
+
 /** Zeitbegrenzte Gremium-Zugehörigkeit (#42, Amtszeit). */
 export interface GremiumMembership {
   id: Uuid;

@@ -250,6 +250,15 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/deadlines',
+        data: { title: 'admin.deadlines.title', permission: 'admin.config', parent: ['admin'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/deadlines/deadlines.component').then(
+            (m) => m.AdminDeadlinesComponent,
+          ),
+      },
+      {
         path: 'forbidden',
         data: { title: 'forbidden.heading' },
         loadComponent: () =>

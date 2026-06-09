@@ -19,7 +19,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.deadlines.models import Deadline
+from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.voting.models import Vote
 
 
@@ -153,6 +153,111 @@ class DeadlineService:
     async def mark_reminded(self, deadline: Deadline, now: datetime) -> None:
         """Erinnerung als versandt markieren (``reminded_at=now``) + committen."""
         deadline.reminded_at = now
+        await self.session.commit()
+
+
+def resolve_due_at(
+    policy: DeadlinePolicy,
+    *,
+    submitted_at: datetime | None = None,
+    changed_at: datetime | None = None,
+) -> datetime | None:
+    """Konkrete Frist aus einer Policy + Antrags-Zeitpunkten ableiten (pure).
+
+    ``absolute`` → das hinterlegte Datum; ``relative_submitted`` → Einreichung +
+    ``offset_days``; ``relative_changed`` → letzte Änderung + ``offset_days``.
+    Fehlt der nötige Bezugswert (z. B. kein ``submitted_at``), → ``None``."""
+    if policy.kind == "absolute":
+        return policy.absolute_at
+    days = policy.offset_days or 0
+    if policy.kind == "relative_submitted":
+        return submitted_at + timedelta(days=days) if submitted_at else None
+    if policy.kind == "relative_changed":
+        return changed_at + timedelta(days=days) if changed_at else None
+    return None
+
+
+class DeadlinePolicyError(Exception):
+    """Verletzte Policy-Invariante (z. B. doppelter Key) → 409/422 im Router."""
+
+
+class DeadlinePolicyService:
+    """CRUD der benannten Frist-Policies (Registry, admin-gepflegt)."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def list(self) -> list[DeadlinePolicy]:
+        rows = (
+            await self.session.execute(
+                select(DeadlinePolicy).order_by(DeadlinePolicy.key)
+            )
+        ).scalars().all()
+        return list(rows)
+
+    async def get(self, policy_id: UUID) -> DeadlinePolicy | None:
+        return await self.session.get(DeadlinePolicy, policy_id)
+
+    async def get_by_key(self, key: str) -> DeadlinePolicy | None:
+        return (
+            await self.session.execute(
+                select(DeadlinePolicy).where(DeadlinePolicy.key == key)
+            )
+        ).scalar_one_or_none()
+
+    async def create(
+        self,
+        *,
+        key: str,
+        label: dict,
+        kind: str,
+        absolute_at: datetime | None,
+        offset_days: int | None,
+    ) -> DeadlinePolicy:
+        if await self.get_by_key(key):
+            raise DeadlinePolicyError(f"deadline policy key already exists: {key!r}")
+        policy = DeadlinePolicy(
+            key=key,
+            label=label,
+            kind=kind,
+            absolute_at=absolute_at if kind == "absolute" else None,
+            offset_days=offset_days if kind != "absolute" else None,
+        )
+        self.session.add(policy)
+        await self.session.flush()
+        await self.session.commit()
+        await self.session.refresh(policy)
+        return policy
+
+    async def update(
+        self,
+        policy: DeadlinePolicy,
+        *,
+        label: dict | None = None,
+        kind: str | None = None,
+        absolute_at: datetime | None = None,
+        offset_days: int | None = None,
+    ) -> DeadlinePolicy:
+        if label is not None:
+            policy.label = label
+        if kind is not None:
+            policy.kind = kind
+        # Wert-Felder passend zum (ggf. neuen) kind setzen; das jeweils andere leeren.
+        effective_kind = kind if kind is not None else policy.kind
+        if effective_kind == "absolute":
+            if absolute_at is not None:
+                policy.absolute_at = absolute_at
+            policy.offset_days = None
+        else:
+            if offset_days is not None:
+                policy.offset_days = offset_days
+            policy.absolute_at = None
+        await self.session.commit()
+        await self.session.refresh(policy)
+        return policy
+
+    async def delete(self, policy: DeadlinePolicy) -> None:
+        await self.session.delete(policy)
         await self.session.commit()
 
 

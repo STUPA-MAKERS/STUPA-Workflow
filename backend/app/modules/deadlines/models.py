@@ -22,7 +22,16 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Text, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -65,5 +74,44 @@ class Deadline(UUIDPkMixin, Base):
             "ix_deadline_reminder",
             "due_at",
             postgresql_where=text("reminded_at IS NULL"),
+        ),
+    )
+
+
+class DeadlinePolicy(UUIDPkMixin, Base):
+    """Benannte Frist-**Policy** (Registry), die der Flow per ``key`` referenziert.
+
+    Entkoppelt die konkrete Frist von der Flow-Definition: eine Policy lässt sich
+    z. B. pro Semester aktualisieren (``absolute``-Datum), **ohne** den Flow neu zu
+    versionieren. Zwei relative Varianten leiten die Frist aus dem Antrag ab:
+
+    * ``absolute``            — fixes ``due_at`` = ``absolute_at`` (pro Semester editierbar).
+    * ``relative_submitted``  — Einreichung (``application.created_at``) + ``offset_days``.
+    * ``relative_changed``    — letzte Änderung (``application.updated_at``) + ``offset_days``.
+    """
+
+    __tablename__ = "deadline_policy"
+
+    # Stabiler Referenz-Schlüssel (vom Flow benutzt); eindeutig.
+    key: Mapped[str] = mapped_column(Text, unique=True)
+    label: Mapped[dict] = mapped_column(JSONB)  # I18nMap (de/en …)
+    kind: Mapped[str] = mapped_column(Text)
+    # Nur bei ``absolute`` gesetzt (pro Semester nachpflegbar).
+    absolute_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Nur bei den relativen Varianten gesetzt (Tage Versatz).
+    offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('absolute','relative_submitted','relative_changed')",
+            name="deadline_policy_kind",
         ),
     )

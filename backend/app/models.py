@@ -40,7 +40,7 @@ from app.modules.budget.tree_models import (
     BudgetExpense,
     FiscalYear,
 )
-from app.modules.deadlines.models import Deadline
+from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.files.models import Attachment
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
@@ -68,6 +68,7 @@ __all__ = [
     "FiscalYear",
     "Comment",
     "Deadline",
+    "DeadlinePolicy",
     "FlowVersion",
     "FormField",
     "FormVersion",

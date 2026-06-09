@@ -33,6 +33,7 @@ import {
   type Gremium,
   type GremiumCreateBody,
   type GremiumMembership,
+  type DeadlinePolicy,
   type GremiumRole,
   type GremiumUpdateBody,
   type NotificationRule,
@@ -85,6 +86,7 @@ export class AdminApiService {
     appTypes: structuredCopy(MOCK_APP_TYPES),
     formDrafts: structuredCopy(MOCK_FORM_DRAFTS) as Record<string, FormDraft>,
     gremiumRoles: [] as GremiumRole[],
+    deadlinePolicies: [] as DeadlinePolicy[],
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     rules: structuredCopy(MOCK_NOTIFICATION_RULES),
     roles: structuredCopy(MOCK_ROLES),
@@ -456,6 +458,38 @@ export class AdminApiService {
       return of(void 0);
     }
     return this.http.delete<void>(`${this.base}/admin/gremium-roles/${id}`);
+  }
+
+  // --- Deadline-Policies (benannte Fristen, Registry) ----------------------
+  listDeadlinePolicies(): Observable<DeadlinePolicy[]> {
+    if (this.mock) return of(structuredCopy(this.store.deadlinePolicies));
+    return this.http.get<DeadlinePolicy[]>(`${this.base}/admin/deadline-policies`);
+  }
+
+  createDeadlinePolicy(body: Omit<DeadlinePolicy, 'id'>): Observable<DeadlinePolicy> {
+    if (this.mock) {
+      const row = { id: `dp-${this.store.deadlinePolicies.length + 1}`, ...body };
+      this.store.deadlinePolicies = [...this.store.deadlinePolicies, row];
+      return of(structuredCopy(row));
+    }
+    return this.http.post<DeadlinePolicy>(`${this.base}/admin/deadline-policies`, body);
+  }
+
+  updateDeadlinePolicy(id: Uuid, body: Partial<Omit<DeadlinePolicy, 'id' | 'key'>>): Observable<DeadlinePolicy> {
+    if (this.mock) {
+      const row = this.store.deadlinePolicies.find((r) => r.id === id);
+      if (row) Object.assign(row, body);
+      return of(structuredCopy(row ?? ({ id, key: '', label: {}, kind: 'absolute' } as DeadlinePolicy)));
+    }
+    return this.http.patch<DeadlinePolicy>(`${this.base}/admin/deadline-policies/${id}`, body);
+  }
+
+  deleteDeadlinePolicy(id: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.deadlinePolicies = this.store.deadlinePolicies.filter((r) => r.id !== id);
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/deadline-policies/${id}`);
   }
 
   listGremiumMemberships(gremiumId: Uuid): Observable<GremiumMembership[]> {

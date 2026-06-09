@@ -231,6 +231,7 @@ export class AdminHomeComponent {
     { link: 'webhooks', title: 'admin.home.webhooks', desc: 'admin.home.webhooksDesc' },
     { link: 'notifications', title: 'admin.home.notifications', desc: 'admin.home.notificationsDesc' },
     { link: 'audit', title: 'admin.audit.title', desc: 'admin.audit.desc' },
+    { link: 'deadlines', title: 'admin.deadlines.title', desc: 'admin.deadlines.subtitle' },
   ];
 
   constructor() {
