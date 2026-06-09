@@ -93,7 +93,7 @@ def test_create_protocol_requires_auth_401(client: TestClient) -> None:
 
 
 def test_create_protocol_forbidden_without_perm(app: FastAPI, client: TestClient) -> None:
-    _writer(app, "meeting.manage")  # falsche Permission
+    _writer(app, "vote.cast")  # falsche Permission
     assert client.post(f"/api/meetings/{MEETING_ID}/protocol").status_code == 403
 
 
@@ -114,7 +114,7 @@ def test_finalize_requires_auth_401(client: TestClient) -> None:
 def test_create_or_load_protocol(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    _writer(app, "protocol.write")
+    _writer(app, "meeting.manage")
     r = client.post(f"/api/meetings/{MEETING_ID}/protocol")
     assert r.status_code == 200
     assert r.json()["meetingId"] == str(MEETING_ID)
@@ -122,7 +122,7 @@ def test_create_or_load_protocol(
 
 
 def test_update_protocol(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
-    _writer(app, "protocol.write")
+    _writer(app, "meeting.manage")
     r = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": "# Neu"})
     assert r.status_code == 200
     assert r.json()["markdown"] == "# Neu"
@@ -130,12 +130,12 @@ def test_update_protocol(app: FastAPI, client: TestClient, fake_service: _FakeSe
 
 
 def test_update_protocol_rejects_empty_body_422(app: FastAPI, client: TestClient) -> None:
-    _writer(app, "protocol.write")
+    _writer(app, "meeting.manage")
     assert client.patch(f"/api/protocols/{PROTOCOL_ID}", json={}).status_code == 422
 
 
 def test_embed_votes(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
-    _writer(app, "protocol.write")
+    _writer(app, "meeting.manage")
     body = {"voteIds": [str(VOTE_ID), str(uuid4())]}
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/votes", json=body)
     assert r.status_code == 200
@@ -143,13 +143,13 @@ def test_embed_votes(app: FastAPI, client: TestClient, fake_service: _FakeServic
 
 
 def test_embed_votes_rejects_empty_list_422(app: FastAPI, client: TestClient) -> None:
-    _writer(app, "protocol.write")
+    _writer(app, "meeting.manage")
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/votes", json={"voteIds": []})
     assert r.status_code == 422
 
 
 def test_finalize_protocol(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
-    _writer(app, "protocol.write")
+    _writer(app, "meeting.manage")
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
     assert r.status_code == 200
     body = r.json()

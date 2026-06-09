@@ -341,14 +341,14 @@ class _FakeFlow:
         _FakeFlow.branch_calls.append(branch)
         return _FakeFlow.branch
 
-    async def available_transitions(self, application_id, principal, *, vote_result=None):  # noqa: ANN001
-        _FakeFlow.calls.append(vote_result)
+    async def available_transitions(self, application_id, principal, *, deadline_passed=False):  # noqa: ANN001
+        _FakeFlow.calls.append("called")
         return self._available
 
-    async def fire(self, application_id, transition_id, principal, *, vote_result=None):  # noqa: ANN001
+    async def fire_branch(self, application_id, branch, principal, *, note=None):  # noqa: ANN001
         if _FakeFlow.fire_raises is not None:
             raise _FakeFlow.fire_raises
-        self.fired = {"transition_id": transition_id, "vote_result": vote_result}
+        self.fired = {"branch": branch, "note": note}
         return TransitionResult(
             newStateId=_FakeFlow.new_state, statusEventId=uuid4(), dispatchedActions=[]
         )
@@ -367,18 +367,18 @@ def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
 
 
 async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None:
-    transition = TransitionOut(
+    branch_t = TransitionOut(
         id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={}
     )
-    _patch_flow.available = [transition]
+    _patch_flow.branch = branch_t
     vote = _vote()
     db = fake_session(result(vote), result("yes", "yes", "yes", "no"))
     out = await VotingService(db).close(vote.id, _voter())
     assert out.result == "passed"
     assert out.tally.result == "passed"
-    assert out.fired_transition_id == transition.id
+    assert out.fired_transition_id == branch_t.id
     assert out.new_state_id == _patch_flow.new_state
-    assert _patch_flow.calls == ["passed"]
+    assert _patch_flow.branch_calls == ["pass"]
 
 
 async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) -> None:
@@ -413,10 +413,10 @@ async def test_close_atomic_fire_failure_does_not_commit(
 ) -> None:
     """`fire`-Fehler beim Schließen ⇒ KEIN Commit → Vote bleibt offen/wiederholbar
     (kein »zu, aber Branch nie gefeuert«). Der Vote-Close ist mit `fire` atomar."""
-    transition = TransitionOut(
+    branch_t = TransitionOut(
         id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={}
     )
-    _patch_flow.available = [transition]
+    _patch_flow.branch = branch_t
     _patch_flow.fire_raises = ConflictError("guard", code="guard_failed")
     vote = _vote()
     db = fake_session(result(vote), result("yes", "yes"))

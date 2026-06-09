@@ -59,36 +59,51 @@ async def test_ignores_non_webhook_actions() -> None:
     assert session.added == []
 
 
-async def test_webhook_action_without_event_skipped() -> None:
+async def test_webhook_action_without_webhook_id_skipped() -> None:
     session = FakeSession()
     queue = FakeWebhookQueue()
     await _disp(session, queue).dispatch([_action("webhook")])
     assert queue.enqueued == []
+    assert session.added == []
 
 
-async def test_webhook_action_dispatches_event() -> None:
-    hook = _hook()
-    session = FakeSession(scalars=[[hook], []])
+async def test_webhook_action_missing_hook_skipped() -> None:
+    # webhookId zeigt auf keinen vorhandenen Webhook → still übersprungen.
+    session = FakeSession(scalars=[[]])
     queue = FakeWebhookQueue()
     await _disp(session, queue).dispatch(
-        [_action("webhook", event="status_changed", payload={"k": "v"})]
+        [_action("webhook", webhookId=str(uuid.uuid4()))]
     )
+    assert queue.enqueued == []
+    assert session.added == []
+
+
+async def test_webhook_action_delivers_to_referenced_hook() -> None:
+    hook = _hook()
+    session = FakeSession(scalars=[[]])  # _existing_keys → keine Dedup
+    session.store[hook.id] = hook
+    queue = FakeWebhookQueue()
+    action = _action("webhook", webhookId=str(hook.id))
+    await _disp(session, queue).dispatch([action])
     assert len(queue.enqueued) == 1
     delivery = session.added[0]
-    assert delivery.event == "status_changed"
-    assert delivery.payload["k"] == "v"
-    assert delivery.payload["event"] == "status_changed"
+    assert delivery.webhook_id == hook.id
+    assert delivery.event == "application.transition"
+    assert delivery.payload["event"] == "application.transition"
+    assert delivery.payload["applicationId"] == str(action.application_id)
+    assert delivery.payload["transitionId"] == str(action.transition_id)
     assert delivery.idempotency_key == "app:evt:0:webhook:" + str(hook.id)
 
 
-async def test_webhook_action_without_payload() -> None:
+async def test_webhook_action_inactive_hook_skipped() -> None:
     hook = _hook()
-    session = FakeSession(scalars=[[hook], []])
+    hook.active = False
+    session = FakeSession()
+    session.store[hook.id] = hook
     queue = FakeWebhookQueue()
-    await _disp(session, queue).dispatch([_action("webhook", event="status_changed")])
-    delivery = session.added[0]
-    # Ohne `payload`-Param trägt der Body nur die Defaults (event + applicationId).
-    assert set(delivery.payload) == {"event", "applicationId"}
+    await _disp(session, queue).dispatch([_action("webhook", webhookId=str(hook.id))])
+    assert queue.enqueued == []
+    assert session.added == []
 
 
 def test_build_webhook_dispatcher_without_pool() -> None:

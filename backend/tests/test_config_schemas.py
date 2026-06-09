@@ -115,10 +115,14 @@ def _valid_graph_dict() -> dict:
             {
                 "from": "draft",
                 "to": "review",
-                "guard": {"and": [{"fieldsComplete": True}, {"roleIs": "applicant"}]},
-                "actions": [{"type": "notify", "group": "gremium"}, {"type": "setEditLock"}],
+                "guard": {"and": [{"hasField": "title"}, {"roleIs": "applicant"}]},
+                "actions": [{"type": "notify", "recipients": [{"kind": "applicant"}]}],
             },
-            {"from": "review", "to": "approved", "guard": {"voteResult": "passed"}},
+            {
+                "from": "review",
+                "to": "approved",
+                "guard": {"compare": {"field": "amount", "op": ">=", "value": 0}},
+            },
         ],
     }
 
@@ -170,20 +174,31 @@ def test_vote_state_requires_two_branches() -> None:
         validate_flow_graph(FlowGraph.model_validate(g))
 
 
-def test_decision_state_unknown_target_rejected() -> None:
-    g = _vote_graph_dict()
-    g["states"][1] = {
-        "key": "voting", "label": {"de": "Weiche"}, "category": "running",
-        "kind": "decision",
-        "config": {"rules": [{"when": {"amountGte": 100}, "to": "nope"}], "else": "passed"},
-    }
-    g["transitions"] = [
-        {"from": "draft", "to": "voting"},
-        {"from": "voting", "to": "passed"},
-        {"from": "voting", "to": "failed"},
-    ]
-    with pytest.raises(FlowValidationError):
+def test_actor_gate_rejected_on_automatic_transition() -> None:
+    # roleIs/isInCommittee sind Akteur-Gates → nur auf manuellen Übergängen.
+    g = _valid_graph_dict()
+    g["transitions"][0]["automatic"] = True
+    g["transitions"][0]["guard"] = {"roleIs": "applicant"}
+    with pytest.raises(FlowValidationError, match="manual"):
         validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_add_to_next_session_requires_vote_target() -> None:
+    # Die Action darf nur auf einem Übergang **in einen vote-State** stehen.
+    g = _vote_graph_dict()
+    g["transitions"][1]["actions"] = [
+        {"type": "addToNextSession", "gremiumId": "g-1"}
+    ]  # voting -> passed (kein vote-State)
+    with pytest.raises(FlowValidationError, match="vote state"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_add_to_next_session_into_vote_ok() -> None:
+    g = _vote_graph_dict()
+    g["transitions"][0]["actions"] = [
+        {"type": "addToNextSession", "gremiumId": "g-1"}
+    ]  # draft -> voting (vote-State)
+    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
 
 
 def test_flow_no_initial() -> None:

@@ -88,7 +88,7 @@ def test_list_transitions_missing_perm_403(app: FastAPI, client: TestClient) -> 
 
 
 def test_list_transitions_ok(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "application.manage")
+    _as_principal(app, "application.transition")
     r = client.get(f"/api/applications/{uuid4()}/transitions")
     assert r.status_code == 200
     assert len(r.json()) == 1
@@ -107,7 +107,7 @@ def test_fire_requires_auth_401(client: TestClient) -> None:
 def test_fire_ok_passes_note(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    _as_principal(app, "application.manage")
+    _as_principal(app, "application.transition")
     app_id, transition_id = uuid4(), uuid4()
     r = client.post(
         f"/api/applications/{app_id}/transition",
@@ -122,7 +122,7 @@ def test_fire_ok_passes_note(
 
 
 def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "application.manage")
+    _as_principal(app, "application.transition")
     r = client.post(
         f"/api/applications/{uuid4()}/transition", json={"transitionId": "not-a-uuid"}
     )

@@ -19,6 +19,7 @@ from app.modules.flow import service as flow_service
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.service import FlowService
 from app.shared.errors import ConflictError, NotFoundError
+from app.shared.guards import GuardContext
 from tests.flow_fakes import fake_session, result
 
 
@@ -31,13 +32,25 @@ class _Recorder:
 
 
 @pytest.fixture(autouse=True)
-def _complete(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``fields_complete`` per Default True (Guard-Signale gezielt je Test gesetzt)."""
+def _ctx(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``build_context`` ohne DB: liefert die Akteur-Rollen aus dem Principal (Guard-
+    Signale je Test über die Guards selbst gesetzt)."""
 
-    async def _fc(_session: object, _app: object) -> bool:
-        return True
+    async def _bc(
+        _session: object,
+        _app: object,
+        principal: Principal,
+        *,
+        manual: bool,
+        deadline_passed: bool = False,
+    ) -> GuardContext:
+        return GuardContext(
+            manual=manual,
+            roles=frozenset(principal.roles) if manual else frozenset(),
+            deadline_passed=deadline_passed,
+        )
 
-    monkeypatch.setattr(flow_context, "fields_complete", _fc)
+    monkeypatch.setattr(flow_context, "build_context", _bc)
 
 
 def _principal(**over: object) -> Principal:
@@ -78,6 +91,7 @@ def _transition(
         label_i18n={"de": "Einreichen"},
         guard=guard,
         actions=actions if actions is not None else [],
+        automatic=False,
     )
 
 
@@ -124,11 +138,8 @@ async def test_fire_commits_status_event_and_dispatches() -> None:
         flow_id=flow_id,
         from_id=draft,
         to_id=review,
-        guard={"and": [{"roleIs": "chair"}, {"fieldsComplete": True}]},
-        actions=[
-            {"type": "notify", "group": "gremium"},
-            {"type": "setEditLock", "locked": True},
-        ],
+        guard={"and": [{"roleIs": "chair"}, {"deadlinePassed": False}]},
+        actions=[{"type": "notify", "recipients": [{"kind": "applicant"}]}],
     )
     rec = _Recorder()
     db = fake_session(result(app), result(transition), result(rowcount=1))
@@ -137,7 +148,7 @@ async def test_fire_commits_status_event_and_dispatches() -> None:
     res = await svc.fire(app.id, transition.id, _principal(), note="los")
 
     assert res.new_state_id == review
-    assert res.dispatched_actions == ["notify"]  # setEditLock inline
+    assert res.dispatched_actions == ["notify"]
     assert db.committed == 1
     event = db.added[0]
     assert event.from_state_id == draft
