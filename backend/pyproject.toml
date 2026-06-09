@@ -38,6 +38,9 @@ dependencies = [
     # Live-Vote (T-16): Redis-PubSub-Fan-out + Cast-Lock (redis.asyncio) — bislang
     # transitiv über arq, jetzt direkt genutzt (Broker/Locker), daher explizit.
     "redis>=5.0",
+    # Excel-Export (TASKS #2): Budget-Baum + Anträge als .xlsx (filter-aware).
+    # Lazy importiert (nur auf dem Export-Pfad), reines Python-Paket.
+    "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]

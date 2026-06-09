@@ -7,11 +7,15 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
   BadgeComponent,
+  ButtonComponent,
   CellDirective,
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
+  IconComponent,
 } from '@shared/ui';
+import { AuthService } from '@core/auth/auth.service';
+import { downloadBlob } from '@shared/download.util';
 import {
   BudgetTreeApi,
   type BudgetApplication,
@@ -55,9 +59,11 @@ interface UsageRow {
     RouterLink,
     TranslatePipe,
     BadgeComponent,
+    ButtonComponent,
     DialogComponent,
     DataTableComponent,
     CellDirective,
+    IconComponent,
     BudgetYearTreeComponent,
     BudgetPieComponent,
   ],
@@ -69,6 +75,10 @@ export class BudgetDashboardComponent {
   private readonly i18n = inject(I18nService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+
+  readonly canExport = computed(() => this.auth.can('budget.export'));
+  readonly exporting = signal(false);
 
   readonly loading = signal(true);
   readonly error = signal(false);
@@ -316,6 +326,24 @@ export class BudgetDashboardComponent {
       next: (apps) => this.applications.set(apps),
       error: () => this.applications.set([]),
     });
+  }
+
+  // --- Export ---------------------------------------------------------------
+  onExport(): void {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    this.api
+      .exportXlsx({
+        node: this.selectedKsId() || undefined,
+        fiscalYear: this.selectedFyId() || undefined,
+      })
+      .subscribe({
+        next: (blob) => {
+          downloadBlob(blob, 'budget.xlsx');
+          this.exporting.set(false);
+        },
+        error: () => this.exporting.set(false),
+      });
   }
 
   // --- Popover --------------------------------------------------------------

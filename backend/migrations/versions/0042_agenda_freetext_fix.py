@@ -9,7 +9,8 @@ Freitext-TOP-Modelländerungen) entstand, fehlt die ``title``-Spalte und ihr
 ``application_id`` ist fälschlich ``NOT NULL`` — Freitext-TOPs (ohne Antrag) lassen
 sich dort nicht anlegen (NOT-NULL-Verletzung). Migration 0033 übersprang die Tabelle
 idempotent, wenn sie bereits existierte, und reparierte das nie. Hier nachgezogen,
-idempotent über den Inspector. ``down_revision`` = ``0040_sessions_rework``.
+idempotent über den Inspector. ``down_revision`` = ``0041_budget_color_states``
+(nach 0040 von zwei 0041-Köpfen abgezweigt → hier zu 0042 linearisiert).
 """
 
 from __future__ import annotations
@@ -19,8 +20,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0041_agenda_freetext_fix"
-down_revision: str | None = "0040_sessions_rework"
+revision: str = "0042_agenda_freetext_fix"
+down_revision: str | None = "0041_budget_color_states"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

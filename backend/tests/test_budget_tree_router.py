@@ -122,6 +122,10 @@ class _FakeService:
     async def delete_expense(self, expense_id: uuid.UUID) -> None:
         self.calls["delete_expense"] = expense_id
 
+    async def fiscal_year_label_map(self) -> dict[uuid.UUID, str]:
+        self.calls["fy_labels"] = True
+        return {_FYID: "2026"}
+
 
 def _fy_out() -> FiscalYearOut:
     return FiscalYearOut(
@@ -264,6 +268,36 @@ def test_forbidden_without_permission(fake: _FakeService) -> None:
     app.dependency_overrides[get_current_applicant] = lambda: None
     resp = TestClient(app).get("/api/budgets")
     assert resp.status_code == 403
+
+
+_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def test_budget_export_requires_permission(fake: _FakeService) -> None:
+    app = create_app()
+    app.dependency_overrides[get_budget_tree_service] = lambda: fake
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="x", permissions={"budget.view"}
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
+    resp = TestClient(app).get("/api/budget/export.xlsx")
+    assert resp.status_code == 403
+
+
+def test_budget_export_xlsx(fake: _FakeService) -> None:
+    app = create_app()
+    app.dependency_overrides[get_budget_tree_service] = lambda: fake
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="fin", permissions={"budget.export"}
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
+    resp = TestClient(app).get("/api/budget/export.xlsx", params={"gremium": str(_GID)})
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith(_XLSX)
+    assert "budget.xlsx" in resp.headers["content-disposition"]
+    assert resp.content[:2] == b"PK"  # xlsx = zip container
+    assert fake.calls["tree"] == _GID
+    assert fake.calls["fy_labels"] is True
 
 
 def test_get_budget_tree_service_factory() -> None:

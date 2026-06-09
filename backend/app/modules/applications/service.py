@@ -27,7 +27,7 @@ from uuid import UUID
 from sqlalchemy import Text, cast, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import ApplicationType, GremiumMembership
+from app.modules.admin.models import ApplicationType, Gremium, GremiumMembership
 from app.modules.applications.diff import DataDiff, compute_diff, is_empty_diff
 from app.modules.applications.models import (
     Applicant,
@@ -551,6 +551,25 @@ class ApplicationsService:
                 )
             )
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def name_maps(
+        self, locale: str = "de"
+    ) -> tuple[dict[UUID, str], dict[UUID, str]]:
+        """``(type_names, gremium_names)`` für den Antrags-Export (xlsx)."""
+        type_rows = (
+            await self.session.execute(
+                select(ApplicationType.id, ApplicationType.name_i18n)
+            )
+        ).all()
+        type_names = {
+            tid: (n or {}).get(locale) or (n or {}).get("de") or (n or {}).get("en") or ""
+            for tid, n in type_rows
+        }
+        gremium_rows = (
+            await self.session.execute(select(Gremium.id, Gremium.name))
+        ).all()
+        gremium_names = {gid: name for gid, name in gremium_rows}
+        return type_names, gremium_names
 
     async def _in_gremium(self, sub: str, gremium_id: UUID) -> bool:
         """``True`` wenn ``sub`` aktuell (gültige Amtszeit) Mitglied im Gremium ist (#64)."""

@@ -243,6 +243,13 @@ class BudgetTreeService:
         await self._require_top_level(budget_id)
         return [_fy_out(f) for f in await self._fiscal_years_of(budget_id)]
 
+    async def fiscal_year_label_map(self) -> dict[UUID, str]:
+        """``fiscal_year_id`` → Label über alle Top-Budgets (für den Export)."""
+        rows = (
+            await self.session.execute(select(FiscalYear.id, FiscalYear.label))
+        ).all()
+        return {fid: label for fid, label in rows}
+
     async def list_applications(
         self, budget_id: UUID, fiscal_year_id: UUID | None = None
     ) -> list[BudgetApplicationOut]:

@@ -27,7 +27,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 
 from app.db import get_sessionmaker
 from app.deps import (
@@ -215,6 +215,56 @@ async def list_applications(
         order=order,
         limit=page.limit,
         offset=page.offset,
+    )
+
+
+@router.get(
+    "/applications/export.xlsx",
+    dependencies=[Depends(require_principal("application.export"))],
+    responses=_errors(401, 403),
+)
+async def export_applications_xlsx(
+    service: ServiceDep,
+    state_id: Annotated[UUID | None, Query(alias="state")] = None,
+    gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
+    type_id: Annotated[UUID | None, Query(alias="type")] = None,
+    budget_pot_id: Annotated[UUID | None, Query(alias="topf")] = None,
+    budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
+    q: Annotated[str | None, Query()] = None,
+    amount_min: Annotated[Decimal | None, Query(alias="amountMin", ge=0)] = None,
+    amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
+    created_from: Annotated[date | None, Query(alias="createdFrom")] = None,
+    created_to: Annotated[date | None, Query(alias="createdTo")] = None,
+    sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
+    order: Annotated[Literal["asc", "desc"], Query()] = "desc",
+) -> Response:
+    """Antragsliste als ``.xlsx`` (P(``application.export``)), Filter wie ``GET /applications``."""
+    from app.shared.xlsx import XLSX_MEDIA_TYPE, build_applications_workbook
+
+    page = await service.list_applications(
+        state_id=state_id,
+        gremium_id=gremium_id,
+        type_id=type_id,
+        budget_pot_id=budget_pot_id,
+        budget_id=budget_id,
+        q=q,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        created_from=created_from,
+        created_to=created_to,
+        sort=sort,
+        order=order,
+        limit=100_000,
+        offset=0,
+    )
+    type_names, gremium_names = await service.name_maps()
+    data = build_applications_workbook(
+        page.items, type_names=type_names, gremium_names=gremium_names
+    )
+    return Response(
+        content=data,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": 'attachment; filename="applications.xlsx"'},
     )
 
 

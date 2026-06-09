@@ -232,6 +232,7 @@ export const de = {
   'applications.list.next': 'Weiter',
   'applications.list.open': 'Antrag öffnen',
   'applications.list.untitled': 'Ohne Titel',
+  'applications.list.export': 'Export (Excel)',
   'applications.detail.back': 'Zur Liste',
   'applications.detail.crumb': 'Antrag',
   'applications.detail.loading': 'Antrag wird geladen …',
@@ -1023,6 +1024,7 @@ export const de = {
   // Budget-Statistik-Dashboard (T-35)
   'budget.title': 'Budget-Statistik',
   'budget.subtitle': 'Auslastung der Kostenstellen und Anträge je Budget/HHJ.',
+  'budget.export': 'Export (Excel)',
   'budget.loading': 'Statistik wird geladen …',
   'budget.error': 'Die Budget-Statistik konnte nicht geladen werden.',
   'budget.filter.budget': 'Budget',
@@ -1465,6 +1467,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.list.next': 'Next',
   'applications.list.open': 'Open application',
   'applications.list.untitled': 'Untitled',
+  'applications.list.export': 'Export (Excel)',
   'applications.detail.back': 'Back to list',
   'applications.detail.crumb': 'Application',
   'applications.detail.loading': 'Loading application …',
@@ -2248,6 +2251,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   // Budget statistics dashboard (T-35)
   'budget.title': 'Budget statistics',
   'budget.subtitle': 'Cost-centre utilisation and applications per budget/fiscal year.',
+  'budget.export': 'Export (Excel)',
   'budget.loading': 'Loading statistics …',
   'budget.error': 'The budget statistics could not be loaded.',
   'budget.filter.budget': 'Budget',

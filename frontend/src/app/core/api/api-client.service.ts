@@ -147,6 +147,17 @@ export class ApiClient {
       );
   }
 
+  /** GET /applications/export.xlsx — gefilterte Antragsliste als Excel (P(`application.export`)). */
+  exportApplicationsXlsx(query: ApplicationListQuery = {}): Observable<Blob> {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== null && key !== 'limit' && key !== 'offset') {
+        params = params.set(key, String(value));
+      }
+    }
+    return this.http.get(`${this.base}/applications/export.xlsx`, { params, responseType: 'blob' });
+  }
+
   /** GET /applications/tasks — offene Entscheidungen für die eigene Rolle (#64). */
   listTasks(): Observable<ApplicationListItem[]> {
     const lang = this.i18n.locale();

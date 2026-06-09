@@ -141,6 +141,15 @@ export class BudgetTreeApi {
     });
   }
 
+  /** Budget-Baum als ``.xlsx`` (P(``budget.export``)), gefiltert wie das Dashboard. */
+  exportXlsx(opts: { node?: string; fiscalYear?: string; gremium?: string } = {}): Observable<Blob> {
+    const params: Record<string, string> = {};
+    if (opts.node) params['node'] = opts.node;
+    if (opts.fiscalYear) params['fiscalYear'] = opts.fiscalYear;
+    if (opts.gremium) params['gremium'] = opts.gremium;
+    return this.http.get(`${this.base}/budget/export.xlsx`, { params, responseType: 'blob' });
+  }
+
   /** Antrag einer Kostenstelle zuordnen (#17); ``budgetId=null`` löst die Zuordnung. */
   assignBudget(
     applicationId: Uuid,

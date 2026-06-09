@@ -32,6 +32,8 @@ export const MOCK_PERMISSIONS: string[] = [
   'protocol.write',
   'budget.manage',
   'budget.view',
+  'budget.export',
+  'application.export',
   'notification.manage',
   'webhook.manage',
   'audit.read',

@@ -24,6 +24,8 @@ import { ButtonComponent } from '@shared/ui/button/button.component';
 import { IconComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { BudgetTreeApi, flattenBudgetOptions } from '../budget/budget-tree.api';
 import { stateBadgeVariant } from './applications.util';
+import { AuthService } from '@core/auth/auth.service';
+import { downloadBlob } from '@shared/download.util';
 
 /**
  * Antrags-Liste (T-31, overview §4): Filter/Suche (`state/gremium/type/topf/q`)
@@ -46,7 +48,16 @@ import { stateBadgeVariant } from './applications.util';
           <p class="apps__subtitle">{{ 'applications.list.subtitle' | t }}</p>
         </div>
         <!-- Filter in einem Popout (#20): Button mit Icon + Aktiv-Indikator. -->
-        <div class="apps__filterWrap">
+        <div class="apps__headActions">
+          @if (canExport()) {
+            <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
+              <span class="apps__filterBtn">
+                <app-icon name="export" [size]="16" />
+                {{ 'applications.list.export' | t }}
+              </span>
+            </app-button>
+          }
+          <div class="apps__filterWrap">
           <app-button variant="secondary" size="sm" (click)="toggleFilters()">
             <span class="apps__filterBtn">
               <app-icon name="filter" [size]="16" />
@@ -127,6 +138,7 @@ import { stateBadgeVariant } from './applications.util';
               </div>
             </form>
           }
+          </div>
         </div>
       </div>
     </header>
@@ -225,6 +237,11 @@ import { stateBadgeVariant } from './applications.util';
       }
       .apps__subtitle {
         color: var(--color-text-muted);
+      }
+      .apps__headActions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
       }
       .apps__filterWrap {
         position: relative;
@@ -423,6 +440,10 @@ export class ApplicationsListComponent {
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly auth = inject(AuthService);
+
+  readonly canExport = computed(() => this.auth.can('application.export'));
+  readonly exporting = signal(false);
 
   readonly limit = 20;
 
@@ -552,6 +573,31 @@ export class ApplicationsListComponent {
       style: 'currency',
       currency: item.currency ?? 'EUR',
     }).format(value);
+  }
+
+  /** Aktuelle Liste (Filter aus den Query-Params) als Excel exportieren. */
+  onExport(): void {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    const pm = this.route.snapshot.queryParamMap;
+    const query: ApplicationListQuery = {};
+    const str = (k: keyof ApplicationListQuery, p = k as string): void => {
+      const v = pm.get(p);
+      if (v) (query[k] as unknown) = v;
+    };
+    str('q'); str('type'); str('state'); str('gremium'); str('topf'); str('budget');
+    str('createdFrom'); str('createdTo');
+    const min = pm.get('amountMin'); if (min) query.amountMin = Number(min);
+    const max = pm.get('amountMax'); if (max) query.amountMax = Number(max);
+    const sort = pm.get('sort'); if (sort === 'amount' || sort === 'createdAt') query.sort = sort;
+    const order = pm.get('order'); if (order === 'asc' || order === 'desc') query.order = order;
+    this.api.exportApplicationsXlsx(query).subscribe({
+      next: (blob) => {
+        downloadBlob(blob, 'applications.xlsx');
+        this.exporting.set(false);
+      },
+      error: () => this.exporting.set(false),
+    });
   }
 
   applyFilters(event: Event): void {

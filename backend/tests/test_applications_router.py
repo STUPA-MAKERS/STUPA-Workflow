@@ -104,6 +104,10 @@ class _FakeService:
         )
         return Page(items=[item], total=1, limit=kwargs["limit"], offset=kwargs["offset"])
 
+    async def name_maps(self, locale="de"):  # noqa: ANN001
+        self.name_maps_called = True
+        return {}, {}
+
     async def add_comment(self, application_id, *, author, author_kind, body, visibility):  # noqa: ANN001
         self.comment_args = {
             "author": author,
@@ -380,6 +384,29 @@ def test_list_applications_rejects_bad_sort_422(
 
 def test_list_applications_requires_auth(client: TestClient) -> None:
     assert client.get("/api/applications").status_code == 401
+
+
+_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def test_applications_export_requires_permission(app: FastAPI, client: TestClient) -> None:
+    _as_principal(app, "application.read")
+    assert client.get("/api/applications/export.xlsx").status_code == 403
+
+
+def test_applications_export_xlsx(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.export")
+    gremium = uuid4()
+    r = client.get(f"/api/applications/export.xlsx?gremium={gremium}&q=foo")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith(_XLSX)
+    assert "applications.xlsx" in r.headers["content-disposition"]
+    assert r.content[:2] == b"PK"
+    assert fake_service.list_kwargs["gremium_id"] == gremium
+    assert fake_service.list_kwargs["q"] == "foo"
+    assert fake_service.name_maps_called is True
 
 
 # --------------------------------------------------------------------------- #

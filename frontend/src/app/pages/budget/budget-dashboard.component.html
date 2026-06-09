@@ -1,6 +1,14 @@
 <header class="bd__head">
-  <h1 class="bd__title">{{ 'budget.title' | t }}</h1>
-  <p class="bd__subtitle">{{ 'budget.subtitle' | t }}</p>
+  <div class="bd__head-text">
+    <h1 class="bd__title">{{ 'budget.title' | t }}</h1>
+    <p class="bd__subtitle">{{ 'budget.subtitle' | t }}</p>
+  </div>
+  @if (canExport()) {
+    <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
+      <app-icon name="export" [size]="16" />
+      {{ 'budget.export' | t }}
+    </app-button>
+  }
 </header>
 
 @if (loading()) {

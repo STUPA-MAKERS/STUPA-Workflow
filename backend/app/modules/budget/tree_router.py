@@ -20,7 +20,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.deps import DbSession, Principal, require_principal
 from app.modules.budget.tree_schemas import (
@@ -72,6 +72,51 @@ async def list_budget_tree(
 ) -> list[BudgetTreeNodeOut]:
     """Kostenstellen-Baum (mit ``pathKey``, allocated/committed/available je HHJ)."""
     return await service.get_tree(gremium_id=gremium_id)
+
+
+def _find_subtree(
+    roots: list[BudgetTreeNodeOut], node_id: UUID
+) -> BudgetTreeNodeOut | None:
+    for node in roots:
+        if node.id == node_id:
+            return node
+        found = _find_subtree(node.children, node_id)
+        if found is not None:
+            return found
+    return None
+
+
+@router.get(
+    "/budget/export.xlsx",
+    dependencies=[Depends(require_principal("budget.export"))],
+    responses=_errors(401, 403),
+)
+async def export_budget_xlsx(
+    service: ServiceDep,
+    gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
+    node_id: Annotated[UUID | None, Query(alias="node")] = None,
+    fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
+) -> Response:
+    """Budget-Baum als ``.xlsx`` (P(``budget.export``)), gefiltert wie das Dashboard.
+
+    ``gremium`` / ``node`` (Teilbaum-Auswahl) / ``fiscalYear`` spiegeln die aktiven
+    Dashboard-Filter; ``node`` exportiert nur diesen Knoten samt Unterbaum.
+    """
+    from app.shared.xlsx import XLSX_MEDIA_TYPE, build_budget_workbook
+
+    roots = await service.get_tree(gremium_id=gremium_id)
+    if node_id is not None:
+        sub = _find_subtree(roots, node_id)
+        roots = [sub] if sub is not None else []
+    labels = await service.fiscal_year_label_map()
+    data = build_budget_workbook(
+        roots, fiscal_year_labels=labels, fiscal_year_id=fiscal_year_id
+    )
+    return Response(
+        content=data,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": 'attachment; filename="budget.xlsx"'},
+    )
 
 
 @router.post(
