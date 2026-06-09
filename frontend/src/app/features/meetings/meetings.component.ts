@@ -158,6 +158,9 @@ const AUTOSAVE_DELAY_MS = 1000;
                     <span class="mtg__voteTitle">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
                     <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
                     @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
+                    @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
+                      <span class="mtg__quorumNote">{{ 'vote.failedQuorum' | t }}</span>
+                    }
                   </div>
                   @if (vote.status === 'open' && canVote()) {
                     <div class="mtg__voteActions">
@@ -318,6 +321,9 @@ const AUTOSAVE_DELAY_MS = 1000;
                         <span class="mtg__voteTitle">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
                         <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
                         @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
+                        @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
+                          <span class="mtg__quorumNote">{{ 'vote.failedQuorum' | t }}</span>
+                        }
                       </div>
                       @if (vote.counts) {
                         <dl class="mtg__tally">
@@ -422,6 +428,9 @@ const AUTOSAVE_DELAY_MS = 1000;
                     <app-badge variant="primary">{{ 'meetings.vote.active' | t }}</app-badge>
                   }
                   @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
+                  @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
+                    <span class="mtg__quorumNote">{{ 'vote.failedQuorum' | t }}</span>
+                  }
                 </div>
                 @if (vote.counts) {
                   <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
@@ -812,6 +821,11 @@ const AUTOSAVE_DELAY_MS = 1000;
       .mtg__voteTitle {
         font-weight: var(--fw-medium);
         margin-right: auto;
+      }
+      .mtg__quorumNote {
+        font-size: var(--fs-xs);
+        color: var(--color-danger);
+        font-weight: var(--fw-medium);
       }
       .mtg__tally {
         display: flex;
@@ -2534,6 +2548,7 @@ export class MeetingsComponent implements OnDestroy {
                 counts: null,
                 leading: null,
                 closesAt: msg.closesAt,
+                failedReason: null,
               },
             ],
           });
@@ -2543,7 +2558,12 @@ export class MeetingsComponent implements OnDestroy {
         this.patchVote(msg.voteId, { counts: msg.counts, leading: msg.leading });
         break;
       case 'vote_closed':
-        this.patchVote(msg.voteId, { status: 'closed', result: msg.result, counts: msg.counts });
+        this.patchVote(msg.voteId, {
+          status: 'closed',
+          result: msg.result,
+          counts: msg.counts,
+          failedReason: msg.failedReason ?? null,
+        });
         break;
       default:
         break;

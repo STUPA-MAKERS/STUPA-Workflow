@@ -52,6 +52,17 @@ NO = "no"
 ABSTAIN = "abstain"
 
 VoteResult = Literal["passed", "rejected", "tie"]
+FailedReason = Literal["quorum", "majority"]
+
+
+def failed_reason(result: VoteResult, quorum_met: bool) -> FailedReason | None:
+    """Warum scheiterte die Abstimmung? ``quorum`` (verfehlt) vor ``majority``.
+
+    Nur für ein **abgelehntes** Ergebnis aussagekräftig; ``passed``/``tie`` ⇒ ``None``.
+    Verfehltes Quorum ist immer ``rejected`` (fail-closed) → es hat Vorrang."""
+    if result != "rejected":
+        return None
+    return "quorum" if not quorum_met else "majority"
 
 
 @dataclass(frozen=True, slots=True)

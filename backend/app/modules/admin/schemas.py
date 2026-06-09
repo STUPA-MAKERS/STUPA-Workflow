@@ -35,6 +35,10 @@ class GremiumOut(_CamelModel):
     cd_variant: str = Field(serialization_alias="cdVariant")
     default_lang: str = Field(serialization_alias="defaultLang")
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
+    # Default-Quorum in % der Stimmberechtigten (0–100); None = keiner.
+    quorum_percent: int | None = Field(
+        default=None, serialization_alias="quorumPercent"
+    )
 
 
 class GremiumCreate(_CamelModel):
@@ -43,6 +47,9 @@ class GremiumCreate(_CamelModel):
     cd_variant: str = Field(default="stupa", alias="cdVariant")
     default_lang: str = Field(default="de", alias="defaultLang")
     allow_vote_delegation: bool = Field(default=False, alias="allowVoteDelegation")
+    quorum_percent: int | None = Field(
+        default=None, alias="quorumPercent", ge=0, le=100
+    )
 
 
 class GremiumUpdate(_CamelModel):
@@ -51,6 +58,9 @@ class GremiumUpdate(_CamelModel):
     cd_variant: str | None = Field(default=None, alias="cdVariant")
     default_lang: str | None = Field(default=None, alias="defaultLang")
     allow_vote_delegation: bool | None = Field(default=None, alias="allowVoteDelegation")
+    quorum_percent: int | None = Field(
+        default=None, alias="quorumPercent", ge=0, le=100
+    )
 
 
 # --------------------------------------------------------------------------- #

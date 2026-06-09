@@ -31,10 +31,18 @@ interface GremiumForm {
   cdVariant: string;
   defaultLang: string;
   allowVoteDelegation: boolean;
+  /** Default-Quorum in % der Stimmberechtigten; null = keins. */
+  quorumPercent: number | null;
 }
 
 function emptyForm(): GremiumForm {
-  return { name: '', cdVariant: 'stupa', defaultLang: 'de', allowVoteDelegation: false };
+  return {
+    name: '',
+    cdVariant: 'stupa',
+    defaultLang: 'de',
+    allowVoteDelegation: false,
+    quorumPercent: null,
+  };
 }
 
 /**
@@ -130,6 +138,21 @@ function emptyForm(): GremiumForm {
           [hint]="'admin.gremien.delegationHint' | t"
           name="delegation"
         >{{ 'admin.gremien.delegation' | t }}</app-checkbox>
+        <div class="field">
+          <label class="field__label" for="grem-quorum">{{ 'admin.gremien.quorum' | t }}</label>
+          <input
+            id="grem-quorum"
+            class="field__control"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            name="quorumPercent"
+            [ngModel]="form().quorumPercent"
+            (ngModelChange)="patchQuorum($event)"
+          />
+          <p class="field__hint">{{ 'admin.gremien.quorumHint' | t }}</p>
+        </div>
       </form>
       <div dialog-footer class="grem__dialog-foot">
         <app-button variant="ghost" (click)="closeDialog()">{{ 'admin.gremien.cancel' | t }}</app-button>
@@ -321,6 +344,18 @@ export class AdminGremienComponent {
     this.form.update((f) => ({ ...f, [key]: value }));
   }
 
+  /** Quorum-Eingabe: leer → null (kein Default), sonst auf 0–100 geklemmt. */
+  patchQuorum(value: number | string | null): void {
+    let next: number | null;
+    if (value === null || value === '' || value === undefined) {
+      next = null;
+    } else {
+      const n = Math.round(Number(value));
+      next = Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null;
+    }
+    this.form.update((f) => ({ ...f, quorumPercent: next }));
+  }
+
   openCreate(): void {
     this.editingId.set(null);
     this.form.set(emptyForm());
@@ -334,6 +369,7 @@ export class AdminGremienComponent {
       cdVariant: g.cdVariant,
       defaultLang: g.defaultLang,
       allowVoteDelegation: g.allowVoteDelegation,
+      quorumPercent: g.quorumPercent ?? null,
     });
     this.dialogOpen.set(true);
   }
@@ -354,6 +390,7 @@ export class AdminGremienComponent {
         cdVariant: f.cdVariant,
         defaultLang: f.defaultLang,
         allowVoteDelegation: f.allowVoteDelegation,
+        quorumPercent: f.quorumPercent,
       };
       this.api.updateGremium(id, body).subscribe({
         next: () => this.onSaved('admin.gremien.toast.updated'),
@@ -366,6 +403,7 @@ export class AdminGremienComponent {
         cdVariant: f.cdVariant,
         defaultLang: f.defaultLang,
         allowVoteDelegation: f.allowVoteDelegation,
+        quorumPercent: f.quorumPercent,
       };
       this.api.createGremium(body).subscribe({
         next: () => this.onSaved('admin.gremien.toast.created'),

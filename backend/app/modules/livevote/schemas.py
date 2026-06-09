@@ -68,6 +68,11 @@ class MeetingVoteOut(_CamelModel):
     options: list[str] = Field(default_factory=list)
     status: Literal["draft", "open", "closed"]
     result: str | None = None
+    # Grund einer Ablehnung (nach Close): ``quorum`` = Quorum verfehlt, ``majority`` =
+    # Mehrheit verfehlt. ``None`` solange offen oder bei ``passed``/``tie``.
+    failed_reason: Literal["quorum", "majority"] | None = Field(
+        default=None, alias="failedReason"
+    )
 
 
 class MeetingOut(_CamelModel):
@@ -171,6 +176,10 @@ class MeetingVoteOpenBody(_CamelModel):
     )
     secret: bool = False
     eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
+    # Explizites Prozent-Quorum (0–100). ``None`` ⇒ Default des Gremiums (falls gesetzt).
+    quorum_percent: int | None = Field(
+        default=None, alias="quorumPercent", ge=0, le=100
+    )
 
     @model_validator(mode="after")
     def _min_options(self) -> MeetingVoteOpenBody:

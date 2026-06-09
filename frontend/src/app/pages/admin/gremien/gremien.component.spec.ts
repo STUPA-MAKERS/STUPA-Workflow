@@ -58,6 +58,7 @@ describe('AdminGremienComponent (#18)', () => {
       cdVariant: 'stupa',
       defaultLang: 'de',
       allowVoteDelegation: false,
+      quorumPercent: null,
     });
     post.flush({ ...GREMIUM, id: 'g-2', name: 'AStA Vorstand', slug: 'asta-vorstand' });
     http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);
@@ -80,6 +81,7 @@ describe('AdminGremienComponent (#18)', () => {
       cdVariant: 'stupa',
       defaultLang: 'en',
       allowVoteDelegation: false,
+      quorumPercent: null,
     });
     patch.flush({ ...GREMIUM, name: 'StuPa 2026', defaultLang: 'en' });
     http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);

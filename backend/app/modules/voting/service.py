@@ -294,7 +294,14 @@ class VotingService:
         counts = await self._aggregate(vote, config)
         tally_out = self._tally_out(config, counts, vote.eligible_count or 0)
         if vote.status == "closed" and vote.result is not None:
-            tally_out = tally_out.model_copy(update={"result": vote.result})
+            tally_out = tally_out.model_copy(
+                update={
+                    "result": vote.result,
+                    "failed_reason": tally_mod.failed_reason(
+                        vote.result, tally_out.quorum_met
+                    ),
+                }
+            )
         return self._to_out(vote, config, tally_out)
 
     # ----------------------------------------------------------------- close
@@ -349,6 +356,7 @@ class VotingService:
             quorumMet=outcome.quorum_met,
             leading=outcome.leading,
             result=outcome.result,
+            failedReason=tally_mod.failed_reason(outcome.result, outcome.quorum_met),
         )
         return VoteClosed(
             id=vote.id,

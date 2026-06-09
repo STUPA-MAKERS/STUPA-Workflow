@@ -117,6 +117,11 @@ class VoteClosedEvent(_CamelModel):
     vote_id: UUID = Field(alias="voteId")
     result: Literal["passed", "rejected", "tie"]
     counts: dict[str, int]
+    # Warum scheiterte die Abstimmung (nur bei ``rejected``): ``quorum`` = Quorum
+    # verfehlt, ``majority`` = Mehrheit verfehlt. ``None`` bei ``passed``/``tie``.
+    failed_reason: Literal["quorum", "majority"] | None = Field(
+        default=None, alias="failedReason"
+    )
 
 
 class ErrorEvent(_CamelModel):

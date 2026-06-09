@@ -147,6 +147,8 @@ export interface Gremium {
   cdVariant: string;
   defaultLang: string;
   allowVoteDelegation: boolean;
+  /** Default-Quorum (% der Stimmberechtigten, die teilnehmen müssen); null = keins. */
+  quorumPercent?: number | null;
 }
 
 /** Body für `POST /admin/gremien` (`GremiumCreate`). */
@@ -156,6 +158,7 @@ export interface GremiumCreateBody {
   cdVariant: string;
   defaultLang: string;
   allowVoteDelegation?: boolean;
+  quorumPercent?: number | null;
 }
 
 /** Body für `PATCH /admin/gremien/{id}` (`GremiumUpdate`) — alle Felder optional. */
@@ -165,6 +168,7 @@ export interface GremiumUpdateBody {
   cdVariant?: string;
   defaultLang?: string;
   allowVoteDelegation?: boolean;
+  quorumPercent?: number | null;
 }
 
 /** CD-Varianten (pytex) als Dropdown statt Freitext (#18). */

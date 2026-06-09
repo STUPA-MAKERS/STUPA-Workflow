@@ -40,6 +40,9 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     default_lang: Mapped[str] = mapped_column(Text, server_default="de")
     # Stimm-Delegation in diesem Gremium erlaubt (#14, pro Gremium statt pro Zuweisung).
     allow_vote_delegation: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    # Default-Quorum (% der Stimmberechtigten, die teilnehmen müssen) für Abstimmungen
+    # dieses Gremiums; NULL = kein Default. 0–100.
+    quorum_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class GremiumRole(UUIDPkMixin, Base):

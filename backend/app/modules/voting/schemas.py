@@ -60,6 +60,12 @@ class TallyOut(_CamelModel):
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
     result: Literal["passed", "rejected", "tie"] | None = None
+    # Warum scheiterte die Abstimmung? ``quorum`` = Quorum verfehlt (fail-closed),
+    # ``majority`` = Quorum erreicht, aber Mehrheit verfehlt. ``None`` solange offen
+    # oder bei ``passed``/``tie``.
+    failed_reason: Literal["quorum", "majority"] | None = Field(
+        default=None, alias="failedReason"
+    )
 
 
 class VoteOut(_CamelModel):

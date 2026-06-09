@@ -230,6 +230,7 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     counts: wire.counts ?? null,
     leading: wire.leading ?? null,
     closesAt: wire.closesAt ?? null,
+    failedReason: wire.failedReason ?? null,
   };
 }
 

@@ -120,6 +120,57 @@ def test_scrub_diff_removes_pii_keys() -> None:
     }
 
 
+class _Result:
+    def __init__(self, rows: list[Any]) -> None:
+        self._rows = rows
+
+    def all(self) -> list[Any]:
+        return self._rows
+
+
+class _ColorSession:
+    """AsyncSession-Stub für die Farb-Auflösung: ``execute`` liefert (key, color)-Rows."""
+
+    def __init__(self, rows: list[tuple[str, str | None]]) -> None:
+        self._rows = rows
+
+    async def execute(self, _stmt: Any) -> _Result:  # noqa: ANN401
+        return _Result(list(self._rows))
+
+
+def test_resolve_state_colors_overrides_stored_color() -> None:
+    """Bug-Fix: alte State-Zeile mit ``color=None`` → Farbe aus aktivem globalem Flow."""
+    svc = ApplicationsService(_ColorSession([("approved", "#2ecc71")]))  # type: ignore[arg-type]
+    # gespeicherte State-Zeile (alte FlowVersion) hat keine Farbe
+    stored = _Obj(
+        id=uuid4(),
+        key="approved",
+        label_i18n={"de": "Angenommen"},
+        color=None,
+        edit_allowed=False,
+        kind="normal",
+    )
+    out = asyncio.run(svc._state_out_resolved(stored))  # type: ignore[arg-type]
+    assert out is not None
+    assert out.color == "#2ecc71"
+
+
+def test_resolve_state_colors_falls_back_to_stored() -> None:
+    """Kein Eintrag im globalen Flow für diesen Key → gespeicherte Farbe bleibt."""
+    svc = ApplicationsService(_ColorSession([("other", "#111111")]))  # type: ignore[arg-type]
+    stored = _Obj(
+        id=uuid4(),
+        key="draft",
+        label_i18n={"de": "Entwurf"},
+        color="#abcdef",
+        edit_allowed=True,
+        kind="normal",
+    )
+    out = asyncio.run(svc._state_out_resolved(stored))  # type: ignore[arg-type]
+    assert out is not None
+    assert out.color == "#abcdef"
+
+
 def test_state_out_none() -> None:
     assert _state_out(None) is None
 

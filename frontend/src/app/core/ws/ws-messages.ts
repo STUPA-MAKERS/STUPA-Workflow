@@ -28,6 +28,8 @@ export interface VoteClosedMsg {
   voteId: string;
   result: string;
   counts: Record<string, number>;
+  /** Grund einer Ablehnung: `quorum` = Quorum verfehlt, `majority` = Mehrheit verfehlt. */
+  failedReason?: 'quorum' | 'majority' | null;
 }
 export interface ErrorMsg {
   type: 'error';

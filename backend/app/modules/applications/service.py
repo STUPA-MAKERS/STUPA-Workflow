@@ -91,14 +91,20 @@ def _title_of(data: dict[str, Any] | None) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
-def _state_out(state: State | None) -> StateOut | None:
+def _state_out(
+    state: State | None, color_override: str | None = None
+) -> StateOut | None:
     if state is None:
         return None
     return StateOut(
         id=state.id,
         key=state.key,
         label=state.label_i18n,
-        color=state.color,
+        # Bug-Fix: bestehende Anträge zeigen auf alte State-Zeilen (color=NULL),
+        # nachdem der globale Flow neu gespeichert wurde. Die Farbe wird daher aus
+        # dem aktiven globalen Flow (gleicher State-``key``) aufgelöst und nur als
+        # Fallback aus der gespeicherten Zeile genommen.
+        color=color_override if color_override is not None else state.color,
         editAllowed=state.edit_allowed,
         kind=state.kind,
     )
@@ -153,6 +159,40 @@ class ApplicationsService:
             return None
         return await self.session.get(State, state_id)
 
+    async def _resolve_state_colors(self) -> dict[str, str | None]:
+        """``{state_key: color}`` aus dem **aktiven globalen** Flow (einmal/Request).
+
+        Editieren des globalen Flows legt eine NEUE FlowVersion mit NEUEN State-Zeilen
+        an; bestehende Anträge zeigen weiter auf alte States (``color=NULL``). Die
+        Status-Farbe wird daher aus dem aktiven globalen Flow per State-``key``
+        aufgelöst — Fallback bleibt die gespeicherte ``state.color`` (siehe
+        :func:`_state_out`). Pro Service-Instanz (Request) gecached."""
+        cached = getattr(self, "_state_color_map", None)
+        if cached is not None:
+            return cached
+        rows = (
+            await self.session.execute(
+                select(State.key, State.color)
+                .join(FlowVersion, FlowVersion.id == State.flow_version_id)
+                .where(
+                    FlowVersion.application_type_id.is_(None),
+                    FlowVersion.active.is_(True),
+                )
+            )
+        ).all()
+        color_map: dict[str, str | None] = {
+            key: color for key, color in rows if color is not None
+        }
+        self._state_color_map: dict[str, str | None] = color_map
+        return color_map
+
+    async def _state_out_resolved(self, state: State | None) -> StateOut | None:
+        """:func:`_state_out` mit aufgelöster Farbe aus dem aktiven globalen Flow."""
+        if state is None:
+            return None
+        colors = await self._resolve_state_colors()
+        return _state_out(state, colors.get(state.key))
+
     async def _current_version(self, application_id: UUID) -> int:
         version = await self.session.scalar(
             select(func.max(SubmissionVersion.version)).where(
@@ -205,7 +245,7 @@ class ApplicationsService:
         return ApplicationOut(
             id=app.id,
             typeId=app.type_id,
-            state=_state_out(state),
+            state=await self._state_out_resolved(state),
             gremiumId=app.gremium_id,
             budgetPotId=app.budget_pot_id,
             budgetId=app.budget_id,
@@ -431,7 +471,7 @@ class ApplicationsService:
                 TimelineEventOut(
                     fromStateId=ev.from_state_id,
                     toStateId=ev.to_state_id,
-                    toState=_state_out(to_state),
+                    toState=await self._state_out_resolved(to_state),
                     actor=ev.actor,
                     at=ev.at,
                     note=ev.note,
@@ -541,7 +581,7 @@ class ApplicationsService:
                     id=app.id,
                     typeId=app.type_id,
                     title=_title_of(app.data),
-                    state=_state_out(state),
+                    state=await self._state_out_resolved(state),
                     gremiumId=app.gremium_id,
                     budgetPotId=app.budget_pot_id,
                     amount=app.amount,
@@ -651,7 +691,7 @@ class ApplicationsService:
                         id=app.id,
                         typeId=app.type_id,
                         title=_title_of(app.data),
-                        state=_state_out(s),
+                        state=await self._state_out_resolved(s),
                         gremiumId=app.gremium_id,
                         budgetPotId=app.budget_pot_id,
                         amount=app.amount,

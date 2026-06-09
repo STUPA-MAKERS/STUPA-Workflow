@@ -654,7 +654,11 @@ export interface MeetingVoteOutWire {
   counts?: Record<string, number> | null;
   leading?: string | null;
   closesAt?: IsoDateTime | null;
+  /** Grund einer Ablehnung: `quorum` = Quorum verfehlt, `majority` = Mehrheit verfehlt. */
+  failedReason?: 'quorum' | 'majority' | null;
 }
+
+// (failedReason auf MeetingVoteOutWire ergänzt — Backend liefert den Grund nach Close.)
 
 /** `MeetingOut` — Sitzungs-State + Votes (GET /meetings/{id}). */
 export interface MeetingOutWire {
@@ -748,6 +752,8 @@ export interface MeetingVote {
   counts: Record<string, number> | null;
   leading: string | null;
   closesAt: IsoDateTime | null;
+  /** Grund einer Ablehnung: `quorum` = Quorum verfehlt, `majority` = Mehrheit verfehlt. */
+  failedReason: 'quorum' | 'majority' | null;
 }
 
 /** Sitzung (FE-View). */

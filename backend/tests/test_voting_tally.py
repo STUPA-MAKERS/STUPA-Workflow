@@ -10,6 +10,7 @@ from app.modules.voting.tally import (
     NO,
     YES,
     Outcome,
+    failed_reason,
     leading,
     result,
     tally,
@@ -189,3 +190,16 @@ def test_outcome_reports_leading_on_quorum_miss() -> None:
         _config(quorum={"type": "count", "value": 99}), {YES: 3, NO: 1}, eligible=10
     )
     assert out == Outcome(result="rejected", quorum_met=False, leading=YES)
+
+
+def test_failed_reason_quorum_when_quorum_missed() -> None:
+    assert failed_reason("rejected", quorum_met=False) == "quorum"
+
+
+def test_failed_reason_majority_when_quorum_met_but_rejected() -> None:
+    assert failed_reason("rejected", quorum_met=True) == "majority"
+
+
+def test_failed_reason_none_when_passed_or_tie() -> None:
+    assert failed_reason("passed", quorum_met=True) is None
+    assert failed_reason("tie", quorum_met=False) is None

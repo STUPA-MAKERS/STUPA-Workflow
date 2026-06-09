@@ -51,6 +51,7 @@ from app.modules.livevote.schemas import (
 from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed, VoteOut
+from app.shared.config_schemas import VoteConfig
 from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError
 
 
@@ -131,7 +132,10 @@ class BrokerPublisher:
         if vote.meeting_id is None:
             return
         event = VoteClosedEvent(
-            voteId=vote.id, result=vote.result, counts=vote.tally.counts
+            voteId=vote.id,
+            result=vote.result,
+            counts=vote.tally.counts,
+            failedReason=vote.tally.failed_reason,
         )
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
@@ -192,6 +196,11 @@ class MeetingService:
                 .order_by(Vote.created_at)
             )
         ).scalars().all()
+        # Ablehnungs-Grund (Quorum/Mehrheit) nur für geschlossene Votes rekonstruieren
+        # (Reload-Pfad; der Live-Pfad trägt ihn schon in ``vote_closed``). Counts werden
+        # gebündelt geladen, nicht je Vote (kein N+1).
+        closed = [v for v in rows if v.status == "closed" and v.result is not None]
+        reasons = await self._failed_reasons(closed)
         out: dict[UUID, list[MeetingVoteOut]] = {}
         for v in rows:
             if v.meeting_id is None:
@@ -207,8 +216,54 @@ class MeetingService:
                     options=list(opts),
                     status=v.status,  # type: ignore[arg-type]
                     result=v.result,
+                    failedReason=reasons.get(v.id),
                 )
             )
+        return out
+
+    async def _failed_reasons(
+        self, votes: list[Vote]
+    ) -> dict[UUID, Literal["quorum", "majority"] | None]:
+        """``{vote_id: failedReason}`` für geschlossene Votes (Reload-Rekonstruktion).
+
+        Lädt Stimmen gebündelt (offen: ``ballot``, geheim: ``secret_ballot``) und wendet
+        die reine Tally-Logik an. ``passed``/``tie`` ⇒ ``None``."""
+        from app.modules.voting import tally as tally_mod
+        from app.modules.voting.models import Ballot, SecretBallot
+
+        if not votes:
+            return {}
+        ids = [v.id for v in votes]
+        open_rows = (
+            await self.session.execute(
+                select(Ballot.vote_id, Ballot.choice).where(Ballot.vote_id.in_(ids))
+            )
+        ).all()
+        secret_rows = (
+            await self.session.execute(
+                select(SecretBallot.vote_id, SecretBallot.choice).where(
+                    SecretBallot.vote_id.in_(ids)
+                )
+            )
+        ).all()
+        open_by_vote: dict[UUID, list[str | None]] = {}
+        for vid, choice in open_rows:
+            open_by_vote.setdefault(vid, []).append(choice)
+        secret_by_vote: dict[UUID, list[str | None]] = {}
+        for vid, choice in secret_rows:
+            secret_by_vote.setdefault(vid, []).append(choice)
+
+        out: dict[UUID, Literal["quorum", "majority"] | None] = {}
+        for v in votes:
+            config = VoteConfig.model_validate(v.config)
+            choices = (
+                secret_by_vote.get(v.id, [])
+                if config.secret
+                else open_by_vote.get(v.id, [])
+            )
+            counts = tally_mod.tally(config.options, choices)
+            outcome = tally_mod.result(config, counts, v.eligible_count or 0)
+            out[v.id] = tally_mod.failed_reason(outcome.result, outcome.quorum_met)
         return out
 
     # -------------------------------------------------- Berechtigungen (#Sessions)
@@ -592,6 +647,14 @@ class MeetingService:
                 select(Vote.id).where(Vote.agenda_item_id == item_id).limit(1)
             )
         ).first() is not None
+
+    async def gremium_quorum_percent(self, gremium_id: UUID) -> int | None:
+        """Default-Quorum (% der Stimmberechtigten) dieses Gremiums oder ``None``."""
+        return (
+            await self.session.execute(
+                select(Gremium.quorum_percent).where(Gremium.id == gremium_id)
+            )
+        ).scalar_one_or_none()
 
     async def vote_eligible_count(self, gremium_id: UUID) -> int:
         """Roster-Größe fürs Quorum: aktive Mitglieder mit ``vote.cast``-Rolle."""

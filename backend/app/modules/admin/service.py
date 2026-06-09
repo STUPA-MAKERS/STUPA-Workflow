@@ -108,6 +108,7 @@ class ConfigService:
             cd_variant=payload.cd_variant,
             default_lang=payload.default_lang,
             allow_vote_delegation=payload.allow_vote_delegation,
+            quorum_percent=payload.quorum_percent,
         )
         self.session.add(row)
         await self.session.flush()
@@ -135,6 +136,10 @@ class ConfigService:
             row.default_lang = payload.default_lang
         if payload.allow_vote_delegation is not None:
             row.allow_vote_delegation = payload.allow_vote_delegation
+        # ``quorumPercent`` ist explizit löschbar (→ NULL): per ``model_fields_set``
+        # unterscheiden wir „nicht gesendet" von „auf null gesetzt".
+        if "quorum_percent" in payload.model_fields_set:
+            row.quorum_percent = payload.quorum_percent
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id)
         await self.session.commit()
         return _gremium_out(row)
@@ -787,6 +792,7 @@ def _gremium_out(row: Gremium) -> GremiumOut:
         cd_variant=row.cd_variant,
         default_lang=row.default_lang,
         allow_vote_delegation=row.allow_vote_delegation,
+        quorum_percent=row.quorum_percent,
     )
 
 

@@ -325,13 +325,22 @@ async def open_meeting_vote(
     item = await agenda.item(meeting_id, payload.agenda_item_id)
     if item.application_id is not None and await service.agenda_item_has_vote(item.id):
         raise ConflictError("this application TOP already has a decision vote")
-    config = VoteConfig.model_validate(
-        {
-            "options": payload.options,
-            "majorityRule": payload.majority_rule,
-            "secret": payload.secret,
-        }
-    )
+    config_data: dict[str, object] = {
+        "options": payload.options,
+        "majorityRule": payload.majority_rule,
+        "secret": payload.secret,
+    }
+    # Quorum-Default aus dem Gremium: wenn der Aufrufer keins angibt, übernimmt der
+    # Vote das per-Gremium konfigurierte Prozent-Quorum (% der Stimmberechtigten, die
+    # teilnehmen müssen). Explizit gesetzte Quoren bleiben unberührt (hier gibt es
+    # bisher keine — der Open-Body kennt kein Quorum-Feld, daher reiner Default).
+    if payload.quorum_percent is not None:
+        config_data["quorum"] = {"type": "percent", "value": payload.quorum_percent}
+    else:
+        default_quorum = await service.gremium_quorum_percent(meeting.gremium_id)
+        if default_quorum is not None:
+            config_data["quorum"] = {"type": "percent", "value": default_quorum}
+    config = VoteConfig.model_validate(config_data)
     eligible = payload.eligible_count
     if eligible is None:
         eligible = await service.vote_eligible_count(meeting.gremium_id)
