@@ -10,7 +10,9 @@ export { DateRangeComponent } from './datepicker/date-range.component';
 export type { DateRange } from './datepicker/date-range.component';
 export { IconComponent } from './icon/icon.component';
 export type { IconName } from './icon/icon.component';
-export { MarkdownEditorComponent } from './markdown-editor/markdown-editor.component';
+// MarkdownEditorComponent bewusst NICHT hier re-exportieren: es zieht Tiptap (~hunderte
+// kB) — über den Barrel landete das im Initial-Bundle. Direkt aus dem Pfad importieren,
+// damit es im Lazy-Chunk des Konsumenten (Meetings) bleibt.
 export { CardComponent } from './card/card.component';
 export { BadgeComponent } from './badge/badge.component';
 export type { BadgeVariant } from './badge/badge.component';

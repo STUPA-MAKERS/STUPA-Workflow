@@ -40,10 +40,10 @@ import {
   DatepickerComponent,
   DialogComponent,
   IconComponent,
-  MarkdownEditorComponent,
   SelectComponent,
   type SelectOption,
 } from '@shared/ui';
+import { MarkdownEditorComponent } from '@shared/ui/markdown-editor/markdown-editor.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
 
