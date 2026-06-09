@@ -84,7 +84,6 @@ export class FlowEditorComponent {
 
   /** State-Arten (#28) + Branch-/Decision-Auswahllisten. */
   protected readonly stateKinds: StateKind[] = ['normal', 'vote', 'approval', 'decision'];
-  protected readonly branches: TransitionBranch[] = ['pass', 'fail', 'accept', 'reject'];
   protected readonly decisionFields = ['amount', 'typeKey', 'applicantRole'];
   protected readonly decisionOps = ['==', '!=', '>', '>=', '<', '<=', 'in', 'has'];
   /** Gremien + globale Rollen für vote/approval-Config (#28/#42). */
@@ -149,6 +148,15 @@ export class FlowEditorComponent {
           ),
         error: () => undefined,
       });
+  }
+
+  /** Gültige Ergebnis-Zweige je Quell-State-Art (#28): vote→pass/fail, approval→
+   *  accept/reject, sonst keine. So bietet das Branch-Dropdown nur Sinnvolles. */
+  protected branchesFor(fromKey: string): TransitionBranch[] {
+    const kind = this.stateByKey(fromKey)?.kind;
+    if (kind === 'vote') return ['pass', 'fail'];
+    if (kind === 'approval') return ['accept', 'reject'];
+    return [];
   }
 
   /** Rollen-Quelle eines approval-States: `gremium`, wenn ein gremiumId-Feld gesetzt ist. */

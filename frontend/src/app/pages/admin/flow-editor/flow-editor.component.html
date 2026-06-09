@@ -247,15 +247,17 @@
           </app-checkbox>
         </div>
 
-        <!-- Ergebnis-Zweig für vote/approval-States (#28): pass/fail bzw. accept/reject. -->
-        <label class="fe__lbl">{{ 'admin.flow.branch' | t }}
-          <select [ngModel]="sel.t.branch ?? ''" (ngModelChange)="setTransitionBranch(sel.index, $event)">
-            <option value="">{{ 'admin.flow.branchNone' | t }}</option>
-            @for (b of branches; track b) {
-              <option [value]="b">{{ b }}</option>
-            }
-          </select>
-        </label>
+        <!-- Ergebnis-Zweig nur für vote/approval-Quell-States (#28): pass/fail bzw. accept/reject. -->
+        @if (branchesFor(sel.t.from).length) {
+          <label class="fe__lbl">{{ 'admin.flow.branch' | t }}
+            <select [ngModel]="sel.t.branch ?? ''" (ngModelChange)="setTransitionBranch(sel.index, $event)">
+              <option value="">{{ 'admin.flow.branchNone' | t }}</option>
+              @for (b of branchesFor(sel.t.from); track b) {
+                <option [value]="b">{{ b }}</option>
+              }
+            </select>
+          </label>
+        }
 
         <!-- Guard nur bei automatischen Übergängen (FE3): er entscheidet das Auto-Feuern. -->
         @if (sel.t.automatic) {
