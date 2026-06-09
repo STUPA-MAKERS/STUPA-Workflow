@@ -123,19 +123,23 @@ const AUTOSAVE_DELAY_MS = 1000;
       @if (beamerMode()) {
         <section class="mtg__beamer" [attr.aria-label]="'meetings.beamer.heading' | t">
           @if (beamerVote(); as bv) {
+            <app-badge [variant]="voteVariant(bv.status)">{{ voteStatusKey(bv.status) | t }}</app-badge>
             <h2 class="mtg__beamerQ">{{ bv.question || bv.title || ('meetings.vote.untitled' | t) }}</h2>
             <dl class="mtg__beamerTally">
               @for (entry of countEntries(bv); track entry.key) {
-                <div [class.mtg__tally--leading]="entry.key === bv.leading">
-                  <dt>{{ entry.key }}</dt>
+                <div class="mtg__beamerOpt" [class.mtg__beamerOpt--lead]="entry.key === bv.leading">
                   <dd>{{ entry.value }}</dd>
+                  <dt>{{ entry.key }}</dt>
                 </div>
               }
             </dl>
-            <app-badge [variant]="voteVariant(bv.status)">{{ voteStatusKey(bv.status) | t }}</app-badge>
-            @if (bv.result) { <app-badge [variant]="voteResultVariant(bv.result)">{{ voteResultKey(bv.result) | t }}</app-badge> }
+            @if (bv.result) {
+              <span class="mtg__beamerResult">
+                <app-badge [variant]="voteResultVariant(bv.result)">{{ voteResultKey(bv.result) | t }}</app-badge>
+              </span>
+            }
           } @else {
-            <p class="mtg__muted">{{ 'meetings.beamer.idle' | t }}</p>
+            <p class="mtg__beamerIdle">{{ 'meetings.beamer.idle' | t }}</p>
           }
         </section>
       }
@@ -1309,27 +1313,58 @@ const AUTOSAVE_DELAY_MS = 1000;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: var(--space-5);
-        padding: var(--space-7) var(--space-4);
+        gap: var(--space-6);
+        padding: clamp(var(--space-6), 6vw, var(--space-8)) var(--space-4);
         text-align: center;
       }
       .mtg__beamerQ {
-        font-size: var(--fs-2xl, 2rem);
+        font-size: clamp(1.75rem, 4vw, 3rem);
+        font-weight: var(--fw-bold, 700);
         margin: 0;
+        max-width: 24ch;
       }
       .mtg__beamerTally {
         display: flex;
-        gap: var(--space-6);
-        font-size: var(--fs-xl, 1.5rem);
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: var(--space-4);
+        margin: 0;
       }
-      .mtg__beamerTally > div {
+      .mtg__beamerOpt {
         display: flex;
         flex-direction: column;
         gap: var(--space-1);
+        min-width: 7rem;
+        padding: var(--space-4) var(--space-5);
+        background: var(--color-surface);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-lg);
       }
-      .mtg__beamerTally dd {
+      .mtg__beamerOpt dd {
         margin: 0;
+        font-size: clamp(2rem, 5vw, 3.5rem);
         font-weight: var(--fw-bold, 700);
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+      .mtg__beamerOpt dt {
+        color: var(--color-text-muted);
+        font-size: var(--fs-md);
+      }
+      .mtg__beamerOpt--lead {
+        border-color: var(--color-success);
+        background: color-mix(in srgb, var(--color-success) 14%, var(--color-surface));
+      }
+      .mtg__beamerOpt--lead dt {
+        color: var(--color-success);
+      }
+      .mtg__beamerResult {
+        font-size: var(--fs-lg);
+      }
+      .mtg__beamerIdle {
+        color: var(--color-text-muted);
+        font-size: var(--fs-lg);
+        padding: var(--space-8) 0;
       }
       .mtg__toolbar {
         display: flex;
