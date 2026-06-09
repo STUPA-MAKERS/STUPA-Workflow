@@ -192,10 +192,15 @@ describe('MeetingsComponent', () => {
     ]);
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
 
-    // Danger-Aktion: erst Bestätigungs-Dialog, dann bestätigen.
-    await userEvent.click(await screen.findByRole('button', { name: /Finalisieren/i }));
+    // Danger-Aktion: Sitzung schließen → Bestätigungs-Dialog → bestätigen.
+    await userEvent.click(await screen.findByRole('button', { name: /Sitzung schließen/ }));
     await userEvent.click(await screen.findByRole('button', { name: /Abschließen & finalisieren/i }));
-    // Erst werden die TOP-Texte zum Protokoll-Markdown zusammengesetzt (PATCH) …
+    // Schließen setzt zuerst den Sitzungsstatus (PATCH) …
+    const closeReq = http.expectOne('/api/meetings/m-1');
+    expect(closeReq.request.method).toBe('PATCH');
+    expect(closeReq.request.body).toEqual({ status: 'closed' });
+    closeReq.flush({ ...MEETING, status: 'closed' });
+    // … dann werden die TOP-Texte zum Protokoll-Markdown zusammengesetzt (PATCH) …
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
     expect(saveReq.request.body.markdown).toContain('## TOP 1: Begrüßung');
@@ -266,8 +271,15 @@ describe('MeetingsComponent', () => {
 
   it('closes the session via PATCH status', async () => {
     const { http } = await setup();
-    flushLoad(http);
-    await userEvent.click(await screen.findByRole('button', { name: 'Sitzung schließen' }));
+    // Protokoll bereits final → Schließen löst nur den Status-PATCH aus (kein Finalisieren).
+    http.expectOne('/api/meetings/m-1').flush(MEETING);
+    http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final' });
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+    // Danger-Aktion: erst Bestätigungs-Dialog, dann bestätigen.
+    await userEvent.click(await screen.findByRole('button', { name: /Sitzung schließen/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Abschließen & finalisieren/i }));
     const req = http.expectOne('/api/meetings/m-1');
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ status: 'closed' });

@@ -190,10 +190,13 @@ const AUTOSAVE_DELAY_MS = 1000;
       <div class="mtg__toolbar" role="toolbar" [attr.aria-label]="'meetings.control.title' | t">
         @if (m.canControl) {
           <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live'" [ariaLabel]="'meetings.control.open' | t" [title]="'meetings.control.open' | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'closed'" [ariaLabel]="'meetings.control.closeSession' | t" [title]="'meetings.control.closeSession' | t" (click)="setStatus('closed')"><app-icon name="stop" /></app-button>
+          @if (m.status !== 'closed') {
+            <app-button variant="danger" size="sm" [loading]="finalizing()" (click)="closeConfirmOpen.set(true)">
+              <span class="mtg__btnIcon"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeSession' | t }}</span>
+            </app-button>
+          }
         }
         <span class="mtg__toolbarSpacer"></span>
-        <app-button variant="ghost" size="sm" (click)="beamerMode.set(true)">{{ 'meetings.beamer.enter' | t }}</app-button>
         @if (m.canManage) {
           <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="openSettings(m)"><app-icon name="edit" /></app-button>
           <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="askDeleteMeeting(m)"><app-icon name="delete" /></app-button>
@@ -355,17 +358,12 @@ const AUTOSAVE_DELAY_MS = 1000;
               }
             </div>
 
-            <!-- Danger-Zone: Protokoll finalisieren + Sitzung abschließen (mit Bestätigung). -->
-            <div class="mtg__protoActions mtg__danger">
-              @if (!proto.isFinal) {
-                @if (canWrite()) {
-                  <app-button variant="danger" size="sm" [disabled]="savingTop() || !agenda().length" [loading]="finalizing()" (click)="finalizeConfirmOpen.set(true)">
-                    {{ 'meetings.protocol.finalize' | t }}
-                  </app-button>
-                  @if (savingTop()) { <span class="mtg__muted mtg__hint">{{ 'meetings.protocol.saving' | t }}</span> }
-                }
-              } @else {
+            <!-- Finalisieren passiert implizit beim Schließen der Sitzung (#Meetings). -->
+            <div class="mtg__protoActions">
+              @if (proto.isFinal) {
                 <p class="mtg__muted">{{ 'meetings.protocol.finalizedHint' | t }}</p>
+              } @else if (canWrite()) {
+                <p class="mtg__muted">{{ 'meetings.protocol.finalizeOnClose' | t }}</p>
               }
             </div>
           }
@@ -512,18 +510,18 @@ const AUTOSAVE_DELAY_MS = 1000;
         </div>
       </app-dialog>
 
-      <!-- Finalisieren-Bestätigung (Danger) -->
+      <!-- Sitzung schließen (unwiderruflich, finalisiert das Protokoll). -->
       <app-dialog
-        [open]="finalizeConfirmOpen()"
-        [title]="'meetings.finalizeConfirm.title' | t"
+        [open]="closeConfirmOpen()"
+        [title]="'meetings.closeConfirm.title' | t"
         [closeLabel]="'action.cancel' | t"
-        (closed)="finalizeConfirmOpen.set(false)"
+        (closed)="closeConfirmOpen.set(false)"
       >
-        <p>{{ 'meetings.finalizeConfirm.body' | t }}</p>
+        <p>{{ 'meetings.closeConfirm.body' | t }}</p>
         <div dialog-footer class="mtg__dialogFoot">
-          <app-button variant="ghost" (click)="finalizeConfirmOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-          <app-button variant="danger" [loading]="finalizing()" (click)="finalizeConfirmOpen.set(false); finalize()">
-            {{ 'meetings.finalizeConfirm.confirm' | t }}
+          <app-button variant="ghost" (click)="closeConfirmOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+          <app-button variant="danger" [loading]="finalizing()" (click)="closeConfirmOpen.set(false); closeMeeting()">
+            {{ 'meetings.closeConfirm.confirm' | t }}
           </app-button>
         </div>
       </app-dialog>
@@ -1847,8 +1845,8 @@ export class MeetingsComponent implements OnDestroy {
   /** Löschen-Bestätigung (Toolbar ODER Listen-Zeile). */
   readonly confirmDeleteMeeting = signal<Meeting | null>(null);
   readonly deletingMeeting = signal(false);
-  /** Bestätigungs-Dialog fürs Finalisieren (Danger). */
-  readonly finalizeConfirmOpen = signal(false);
+  /** Bestätigungs-Dialog fürs (unwiderrufliche) Schließen der Sitzung. */
+  readonly closeConfirmOpen = signal(false);
   /** Casting-Status je Vote (für Mitglied/Protokollant-Stimmabgabe). */
   readonly casting = signal<Uuid | null>(null);
 
@@ -2015,6 +2013,23 @@ export class MeetingsComponent implements OnDestroy {
     if (!m) return;
     this.api.patchMeeting(m.id, { status }).subscribe({
       next: (updated) => this.meeting.set(updated),
+      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+    });
+  }
+
+  /** Sitzung unwiderruflich schließen → Status closed + Protokoll finalisieren. */
+  closeMeeting(): void {
+    const m = this.meeting();
+    if (!m || this.finalizing()) return;
+    this.api.patchMeeting(m.id, { status: 'closed' }).subscribe({
+      next: (updated) => {
+        this.meeting.set(updated);
+        const proto = this.protocol();
+        // Finalisieren passiert implizit: PDF rendern + an MAIL_LIST versenden.
+        if (proto && !proto.isFinal) {
+          this.finalize();
+        }
+      },
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
     });
   }

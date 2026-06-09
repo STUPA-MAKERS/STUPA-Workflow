@@ -7,7 +7,7 @@ und ohne DB getestet.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -23,7 +23,7 @@ from app.modules.deadlines.service import resolve_due_at
 # --------------------------------------------------------------------------- #
 # resolve_due_at (pur)
 # --------------------------------------------------------------------------- #
-_NOW = datetime(2026, 6, 9, 12, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 6, 9, 12, 0, tzinfo=UTC)
 
 
 def _policy(kind: str, **kw: object) -> DeadlinePolicy:
@@ -58,7 +58,9 @@ class _FakeService:
         self.created: dict | None = None
 
     async def list(self) -> list[DeadlinePolicy]:
-        p = DeadlinePolicy(key="semester", label={"de": "Semester"}, kind="absolute", absolute_at=_NOW)
+        p = DeadlinePolicy(
+            key="semester", label={"de": "Semester"}, kind="absolute", absolute_at=_NOW
+        )
         p.id = uuid4()
         return [p]
 
@@ -115,7 +117,12 @@ def test_create_relative_policy(
     _as_admin(app)
     res = app_client.post(
         "/api/admin/deadline-policies",
-        json={"key": "edit_window", "label": {"de": "Frist"}, "kind": "relative_changed", "offsetDays": 7},
+        json={
+            "key": "edit_window",
+            "label": {"de": "Frist"},
+            "kind": "relative_changed",
+            "offsetDays": 7,
+        },
     )
     assert res.status_code == 201
     assert res.json()["kind"] == "relative_changed"
@@ -126,7 +133,10 @@ def test_create_relative_policy(
 # Flow-Enforcement: schedule_state_deadline + guard scanner
 # --------------------------------------------------------------------------- #
 from types import SimpleNamespace  # noqa: E402
+from typing import cast  # noqa: E402
 
+from app.modules.applications.models import Application  # noqa: E402
+from app.modules.flow.models import State  # noqa: E402
 from app.modules.flow.service import (  # noqa: E402
     FlowService,
     _guard_fires_on_deadline,
@@ -154,7 +164,7 @@ async def test_schedule_state_deadline_creates_row_for_policy() -> None:
     app = SimpleNamespace(id=uuid4(), flow_version_id=flow_id, created_at=_NOW, updated_at=_NOW)
     state = SimpleNamespace(id=state_id, config={"deadlinePolicyKey": "k"})
 
-    await FlowService(session).schedule_state_deadline(app, state)
+    await FlowService(session).schedule_state_deadline(cast(Application, app), cast(State, state))
 
     created = [o for o in session.added if getattr(o, "kind", None) == "flow_deadline"]
     assert len(created) == 1
@@ -167,5 +177,5 @@ async def test_schedule_state_deadline_noop_without_policy_key() -> None:
     session = fake_session()
     app = SimpleNamespace(id=uuid4(), flow_version_id=uuid4(), created_at=_NOW, updated_at=_NOW)
     state = SimpleNamespace(id=uuid4(), config={})
-    await FlowService(session).schedule_state_deadline(app, state)
+    await FlowService(session).schedule_state_deadline(cast(Application, app), cast(State, state))
     assert session.added == []

@@ -29,6 +29,10 @@ JOB_ID = uuid4()
 class _FakeSession:
     async def commit(self) -> None: ...
 
+    async def scalar(self, *_a: object, **_k: object) -> None:
+        # created_by-Lookup (#24): kein Treffer → kein Ersteller-Bonus, 403 bleibt.
+        return None
+
 
 class _FakeService:
     def __init__(self) -> None:

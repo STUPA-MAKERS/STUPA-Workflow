@@ -24,16 +24,22 @@ def _dt(s: str) -> datetime:
 
 
 def test_overlap_basic_true() -> None:
-    assert intervals_overlap(_dt("2026-01-01"), _dt("2026-06-01"), _dt("2026-03-01"), _dt("2026-09-01"))
+    assert intervals_overlap(
+        _dt("2026-01-01"), _dt("2026-06-01"), _dt("2026-03-01"), _dt("2026-09-01")
+    )
 
 
 def test_adjacent_intervals_do_not_overlap() -> None:
     # [Jan, Jun) und [Jun, Dec) grenzen an → kein Overlap (halboffen).
-    assert not intervals_overlap(_dt("2026-01-01"), _dt("2026-06-01"), _dt("2026-06-01"), _dt("2026-12-01"))
+    assert not intervals_overlap(
+        _dt("2026-01-01"), _dt("2026-06-01"), _dt("2026-06-01"), _dt("2026-12-01")
+    )
 
 
 def test_disjoint_intervals_do_not_overlap() -> None:
-    assert not intervals_overlap(_dt("2026-01-01"), _dt("2026-03-01"), _dt("2026-06-01"), _dt("2026-09-01"))
+    assert not intervals_overlap(
+        _dt("2026-01-01"), _dt("2026-03-01"), _dt("2026-06-01"), _dt("2026-09-01")
+    )
 
 
 def test_open_ended_overlaps_everything_after() -> None:

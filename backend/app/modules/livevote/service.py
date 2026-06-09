@@ -472,7 +472,7 @@ class MeetingService:
         next_cursor = (
             _encode_cursor(rows[-1][1], rows[-1][0].id) if has_more and rows else None
         )
-        return MeetingPage(items=items, next_cursor=next_cursor)
+        return MeetingPage(items=items, nextCursor=next_cursor)
 
     async def _decorate(
         self, meetings: list[Meeting], principal: Principal
@@ -498,13 +498,14 @@ class MeetingService:
         # ``meeting.manage`` kurzschließt sämtliche Gremium-Queries.
         all_gids = {m.gremium_id for m in meetings}
         # Gremium-Namen gebündelt (Timeline zeigt Zugehörigkeit, #104).
-        gremium_names = dict(
-            (
+        gremium_names = {
+            gid: name
+            for gid, name in (
                 await self.session.execute(
                     select(Gremium.id, Gremium.name).where(Gremium.id.in_(all_gids))
                 )
             ).all()
-        )
+        }
         if "admin" in principal.roles or principal.has("meeting.manage"):
             manage_ids = write_ids = votes_mgmt_ids = vote_ids = all_gids
             my_id: UUID | None = None

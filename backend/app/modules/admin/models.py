@@ -10,6 +10,7 @@ Admin-CRUD der einzige Konsument ist (`webhook.manage`).
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
@@ -86,10 +87,10 @@ class GremiumMembership(UUIDPkMixin, Base):
     gremium_role_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium_role.id", ondelete="RESTRICT")
     )
-    valid_from: Mapped[object | None] = mapped_column(
+    valid_from: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    valid_until: Mapped[object | None] = mapped_column(
+    valid_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 

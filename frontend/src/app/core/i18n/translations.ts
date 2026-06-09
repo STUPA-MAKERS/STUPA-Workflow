@@ -425,6 +425,8 @@ export const de = {
   'meetings.protocol.selectTop': 'Wähle links einen TOP, um seinen Text zu bearbeiten.',
   'meetings.protocol.saveFirst': 'Automatisches Speichern läuft – dann finalisieren.',
   'meetings.protocol.finalizedHint': 'Das Protokoll ist final und wurde versandt.',
+  'meetings.protocol.finalizeOnClose':
+    'Das Protokoll wird beim Abschließen der Sitzung automatisch finalisiert und versandt.',
   'meetings.create.title': 'Sitzung anlegen',
   'meetings.create.lead': 'Lege eine neue Sitzung an, um Anträge und Abstimmungen zu steuern.',
   'meetings.create.name': 'Titel',
@@ -475,10 +477,10 @@ export const de = {
   'meetings.follow.title': 'Live-Sitzung',
   'meetings.follow.lead': 'Folge der Sitzung live und stimme bei offenen Fragen ab.',
   'meetings.follow.noTops': 'Es sind noch keine Tagesordnungspunkte vorhanden.',
-  'meetings.finalizeConfirm.title': 'Sitzung abschließen?',
-  'meetings.finalizeConfirm.body':
+  'meetings.closeConfirm.title': 'Sitzung abschließen?',
+  'meetings.closeConfirm.body':
     'Das Protokoll wird finalisiert, als PDF erzeugt und versandt. Diese Aktion kann nicht rückgängig gemacht werden.',
-  'meetings.finalizeConfirm.confirm': 'Abschließen & finalisieren',
+  'meetings.closeConfirm.confirm': 'Abschließen & finalisieren',
 
   'notFound.heading': 'Seite nicht gefunden',
   'notFound.body': 'Die angeforderte Seite existiert nicht.',
@@ -1674,6 +1676,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.protocol.selectTop': 'Select an item on the left to edit its text.',
   'meetings.protocol.saveFirst': 'Auto-save in progress – then finalize.',
   'meetings.protocol.finalizedHint': 'The minutes are final and have been sent.',
+  'meetings.protocol.finalizeOnClose':
+    'The minutes are finalized and sent automatically when the session is closed.',
   'meetings.create.title': 'Create meeting',
   'meetings.create.lead': 'Create a new meeting to steer applications and votes.',
   'meetings.create.name': 'Title',
@@ -1724,10 +1728,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.follow.title': 'Live session',
   'meetings.follow.lead': 'Follow the session live and vote on open questions.',
   'meetings.follow.noTops': 'No agenda items yet.',
-  'meetings.finalizeConfirm.title': 'Close the session?',
-  'meetings.finalizeConfirm.body':
+  'meetings.closeConfirm.title': 'Close the session?',
+  'meetings.closeConfirm.body':
     'The minutes will be finalized, rendered as a PDF and sent. This action cannot be undone.',
-  'meetings.finalizeConfirm.confirm': 'Close & finalize',
+  'meetings.closeConfirm.confirm': 'Close & finalize',
 
   'notFound.heading': 'Page not found',
   'notFound.body': 'The requested page does not exist.',

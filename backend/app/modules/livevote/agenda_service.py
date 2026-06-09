@@ -105,7 +105,11 @@ class AgendaService:
         out: list[AgendaItemOut] = []
         for r in rows:
             app = apps.get(r.application_id) if r.application_id is not None else None
-            state = states.get(app.current_state_id) if app is not None else None
+            state = (
+                states.get(app.current_state_id)
+                if app is not None and app.current_state_id is not None
+                else None
+            )
             # Antrag-TOP: Titel/Status aus dem Antrag; Freitext-TOP: ``title``-Spalte.
             title = _title_of(app.data) if app is not None else r.title
             out.append(
@@ -199,7 +203,11 @@ class AgendaService:
         for app in apps:
             if app.id in existing:
                 continue
-            state = vote_states.get(app.current_state_id)
+            state = (
+                vote_states.get(app.current_state_id)
+                if app.current_state_id is not None
+                else None
+            )
             out.append(
                 AssignableApplicationOut(
                     applicationId=app.id,

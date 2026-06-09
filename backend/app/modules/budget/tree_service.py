@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.applications.service import _title_of
-from app.modules.flow.models import State
 from app.modules.budget import tree_rules
 from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree_models import (
@@ -44,6 +43,7 @@ from app.modules.budget.tree_schemas import (
     FiscalYearUpdate,
     MoveFiscalYearRequest,
 )
+from app.modules.flow.models import State
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 _ZERO = Decimal("0")

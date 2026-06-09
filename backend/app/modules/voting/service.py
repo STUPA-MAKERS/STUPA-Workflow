@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import func, literal_column, select
@@ -298,7 +299,7 @@ class VotingService:
                 update={
                     "result": vote.result,
                     "failed_reason": tally_mod.failed_reason(
-                        vote.result, tally_out.quorum_met
+                        cast(tally_mod.VoteResult, vote.result), tally_out.quorum_met
                     ),
                 }
             )

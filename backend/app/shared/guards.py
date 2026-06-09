@@ -61,6 +61,13 @@ ACTION_TYPES: frozenset[str] = frozenset(
     {"webhook", "notify", "addToNextSession", "assignBudget"}
 )
 
+# Pflicht-String-Feld je Aktionstyp (``notify`` wird separat geprüft).
+_ACTION_REQUIRED_FIELD: dict[str, str] = {
+    "webhook": "webhookId",
+    "addToNextSession": "gremiumId",
+    "assignBudget": "budgetId",
+}
+
 # Gültige ``notify``-Empfänger-Arten.
 NOTIFY_RECIPIENT_KINDS: frozenset[str] = frozenset(
     {"gremium", "role", "applicant", "email"}
@@ -324,17 +331,13 @@ def validate_action(action: dict[str, Any]) -> None:
         raise GuardError("action is missing 'type'")
     if action_type not in ACTION_TYPES:
         raise GuardError(f"unknown action type: {action_type!r}")
-    if action_type == "webhook":
-        if not isinstance(action.get("webhookId"), str) or not action["webhookId"]:
-            raise GuardError("webhook action requires 'webhookId'")
-    elif action_type == "notify":
+    if action_type == "notify":
         _validate_notify_recipients(action.get("recipients"))
-    elif action_type == "addToNextSession":
-        if not isinstance(action.get("gremiumId"), str) or not action["gremiumId"]:
-            raise GuardError("addToNextSession action requires 'gremiumId'")
-    elif action_type == "assignBudget":
-        if not isinstance(action.get("budgetId"), str) or not action["budgetId"]:
-            raise GuardError("assignBudget action requires 'budgetId'")
+        return
+    # Übrige Aktionen verlangen je genau ein nicht-leeres String-Feld.
+    field = _ACTION_REQUIRED_FIELD[action_type]
+    if not isinstance(action.get(field), str) or not action[field]:
+        raise GuardError(f"{action_type} action requires '{field}'")
 
 
 def _validate_notify_recipients(recipients: Any) -> None:
