@@ -364,39 +364,44 @@ const AUTOSAVE_DELAY_MS = 1000;
         <!-- RECHTS: Anwesenheit -->
         <aside class="mtg__side mtg__side--right" [attr.aria-label]="'meetings.attendance.title' | t">
           <h2 class="mtg__sideH">{{ 'meetings.attendance.title' | t }}</h2>
-          <ul class="mtg__att">
-            @for (a of attendance(); track a.principalId) {
-              <li class="mtg__attRow">
-                <span class="mtg__attName">
-                  {{ a.displayName || a.email || a.principalId }}
-                  @if (a.isSelf) { <span class="mtg__attYou">{{ 'meetings.attendance.you' | t }}</span> }
-                </span>
-                @if (m.canControl || a.isSelf) {
-                  <span class="mtg__attBtns" role="group" [attr.aria-label]="'meetings.attendance.title' | t">
-                    @for (s of attendanceStatuses; track s) {
-                      <app-button
-                        [iconOnly]="true"
-                        [ariaLabel]="attendanceKey(s) | t"
-                        [title]="attendanceKey(s) | t"
-                        [variant]="a.status === s ? attBtnVariant(s) : 'ghost'"
-                        size="sm"
-                        [disabled]="savingAttendance()"
-                        (click)="setAttendance(a, s)"
-                      >
-                        <app-icon [name]="attendanceIcon(s)" />
-                      </app-button>
+          <table class="mtg__attTable">
+            <tbody>
+              @for (a of attendance(); track a.principalId) {
+                <tr class="mtg__attRow">
+                  <td class="mtg__attName">
+                    {{ a.displayName || a.email || a.principalId }}
+                    @if (a.isSelf) { <span class="mtg__attYou">{{ 'meetings.attendance.you' | t }}</span> }
+                  </td>
+                  <td class="mtg__attStatus">
+                    @if (m.canControl || a.isSelf) {
+                      <span class="mtg__attBtns" role="group" [attr.aria-label]="'meetings.attendance.title' | t">
+                        @for (s of attendanceStatuses; track s) {
+                          <button
+                            type="button"
+                            [class]="'mtg__attBtn mtg__attBtn--' + s"
+                            [class.mtg__attBtn--on]="a.status === s"
+                            [attr.aria-pressed]="a.status === s"
+                            [attr.aria-label]="attendanceKey(s) | t"
+                            [title]="attendanceKey(s) | t"
+                            [disabled]="savingAttendance()"
+                            (click)="setAttendance(a, s)"
+                          >
+                            <app-icon [name]="attendanceIcon(s)" [size]="13" />
+                          </button>
+                        }
+                      </span>
+                    } @else {
+                      <app-badge [variant]="a.status ? attBadgeVariant(a.status) : 'neutral'">
+                        {{ (a.status ? attendanceKey(a.status) : 'meetings.attendance.unknown') | t }}
+                      </app-badge>
                     }
-                  </span>
-                } @else {
-                  <app-badge [variant]="a.status ? attBadgeVariant(a.status) : 'neutral'">
-                    {{ (a.status ? attendanceKey(a.status) : 'meetings.attendance.unknown') | t }}
-                  </app-badge>
-                }
-              </li>
-            } @empty {
-              <li class="mtg__muted mtg__tocEmpty">{{ 'meetings.attendance.empty' | t }}</li>
-            }
-          </ul>
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="2" class="mtg__muted mtg__tocEmpty">{{ 'meetings.attendance.empty' | t }}</td></tr>
+              }
+            </tbody>
+          </table>
         </aside>
       </div>
 
@@ -1090,39 +1095,71 @@ const AUTOSAVE_DELAY_MS = 1000;
         border: var(--border-width) dashed var(--color-border);
         border-radius: var(--radius-md);
       }
-      .mtg__att {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
+      .mtg__attTable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--fs-sm);
       }
-      .mtg__attRow {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--space-2);
-        padding: var(--space-1) var(--space-2);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
-        flex-wrap: wrap;
+      .mtg__attRow td {
+        padding: var(--space-1) var(--space-1);
+        border-bottom: var(--border-width) solid var(--color-border);
+        vertical-align: middle;
+      }
+      .mtg__attRow:last-child td {
+        border-bottom: none;
       }
       .mtg__attName {
         font-weight: var(--fw-medium);
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-2);
+        width: 100%;
       }
       .mtg__attYou {
         font-size: var(--fs-xs);
         font-weight: var(--fw-normal);
         color: var(--color-text-muted);
+        margin-left: var(--space-1);
+      }
+      .mtg__attStatus {
+        text-align: end;
+        white-space: nowrap;
       }
       .mtg__attBtns {
         display: inline-flex;
-        gap: var(--space-1);
-        flex-wrap: wrap;
+        gap: 3px;
+      }
+      .mtg__attBtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        padding: 0;
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--color-text-muted);
+        cursor: pointer;
+      }
+      .mtg__attBtn:hover:not(:disabled) {
+        background: var(--color-surface-sunken);
+      }
+      .mtg__attBtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .mtg__attBtn--on.mtg__attBtn--present {
+        background: var(--color-success);
+        border-color: var(--color-success);
+        color: #fff;
+      }
+      .mtg__attBtn--on.mtg__attBtn--excused {
+        background: var(--color-warning);
+        border-color: var(--color-warning);
+        color: #1a1a1a;
+      }
+      .mtg__attBtn--on.mtg__attBtn--absent {
+        background: var(--color-danger);
+        border-color: var(--color-danger);
+        color: #fff;
       }
       .mtg__agendaAdd {
         display: flex;
@@ -2084,9 +2121,9 @@ export class MeetingsComponent implements OnDestroy {
     return status === 'present' ? 'primary' : status === 'excused' ? 'secondary' : 'danger';
   }
 
-  /** Kompaktes Icon je Anwesenheits-Status: anwesend check, entschuldigt clock, abwesend remove. */
+  /** Kompaktes Icon je Anwesenheits-Status: anwesend check, entschuldigt halb, abwesend remove. */
   attendanceIcon(status: AttendanceStatus): IconName {
-    return status === 'present' ? 'check' : status === 'excused' ? 'clock' : 'remove';
+    return status === 'present' ? 'check' : status === 'excused' ? 'half' : 'remove';
   }
 
   attBadgeVariant(status: AttendanceStatus): BadgeVariant {

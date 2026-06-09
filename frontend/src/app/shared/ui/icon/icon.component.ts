@@ -28,7 +28,8 @@ export type IconName =
   | 'clock'
   | 'export'
   | 'play'
-  | 'stop';
+  | 'stop'
+  | 'half';
 
 /** Icon-Name → Font-Awesome-Solid-Klasse (#80, FA-Migration). */
 const FA: Record<IconName, string> = {
@@ -60,6 +61,7 @@ const FA: Record<IconName, string> = {
   export: 'fa-file-export',
   play: 'fa-play',
   stop: 'fa-stop',
+  half: 'fa-circle-half-stroke',
 };
 
 /**
