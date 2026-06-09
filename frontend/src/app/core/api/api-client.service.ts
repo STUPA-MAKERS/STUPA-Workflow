@@ -397,6 +397,21 @@ export class ApiClient {
     );
   }
 
+  /** PATCH /meetings/{id}/agenda/{itemId} — Markdown-Text eines TOP setzen. */
+  setAgendaBody(meetingId: Uuid, itemId: Uuid, body: string): Observable<AgendaItem[]> {
+    return this.http.patch<AgendaItem[]>(
+      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
+      { body },
+    );
+  }
+
+  /** PUT /meetings/{id}/agenda/order — TOPs in der gelieferten Reihenfolge anordnen. */
+  reorderAgenda(meetingId: Uuid, itemIds: Uuid[]): Observable<AgendaItem[]> {
+    return this.http.put<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/order`, {
+      itemIds,
+    });
+  }
+
   /**
    * POST /meetings/{id}/votes — Live-Abstimmung für einen Antrag anlegen + öffnen,
    * mit Beschlussfrage (fürs Protokoll). Antwort = aktualisierte Sitzung (#Meetings).

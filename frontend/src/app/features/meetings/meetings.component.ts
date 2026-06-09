@@ -40,18 +40,12 @@ import {
   DatepickerComponent,
   DialogComponent,
   IconComponent,
+  MarkdownEditorComponent,
   SelectComponent,
   type SelectOption,
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
-import {
-  antragSnippet,
-  insertAt,
-  renderMarkdown,
-  topSnippet,
-  voteSnippet,
-} from './meetings.util';
 
 /** Wartezeit nach der letzten Eingabe, bevor das Protokoll automatisch gespeichert wird (#56). */
 const AUTOSAVE_DELAY_MS = 1000;
@@ -86,6 +80,7 @@ const AUTOSAVE_DELAY_MS = 1000;
     CellDirective,
     DialogComponent,
     IconComponent,
+    MarkdownEditorComponent,
     DatePipe,
   ],
   template: `
@@ -230,73 +225,6 @@ const AUTOSAVE_DELAY_MS = 1000;
         </app-card>
       }
 
-      <!-- Tagesordnung: Anträge in Abstimmung dieser Sitzung zuordnen (#10) -->
-      @if (canManage() || agenda().length) {
-        <app-card [heading]="'meetings.agenda.title' | t">
-          <p class="mtg__lead">{{ 'meetings.agenda.lead' | t }}</p>
-          @if (m.canControl) {
-            <div class="mtg__agendaAdd">
-              <app-select
-                [placeholder]="'meetings.agenda.addPlaceholder' | t"
-                [options]="assignableOptions()"
-                [ngModel]="agendaPick()"
-                (ngModelChange)="agendaPick.set($event)"
-              />
-              <app-button size="sm" [disabled]="!agendaPick() || savingAgenda()" (click)="addToAgenda()">
-                {{ 'meetings.agenda.add' | t }}
-              </app-button>
-            </div>
-            @if (!assignableOptions().length) {
-              <p class="mtg__muted mtg__hint">{{ 'meetings.agenda.noneAssignable' | t }}</p>
-            }
-            <div class="mtg__agendaAdd">
-              <input
-                class="mtg__input"
-                [placeholder]="'meetings.agenda.freetextPlaceholder' | t"
-                [ngModel]="agendaFreetext()"
-                (ngModelChange)="agendaFreetext.set($event)"
-                (keyup.enter)="addFreetext()"
-                name="agendaFreetext"
-              />
-              <app-button variant="secondary" size="sm" [disabled]="!agendaFreetext().trim() || savingAgenda()" (click)="addFreetext()">
-                {{ 'meetings.agenda.addFreetext' | t }}
-              </app-button>
-            </div>
-          }
-          @if (agenda().length) {
-            <ol class="mtg__agenda">
-              @for (item of agenda(); track item.id; let i = $index) {
-                <li class="mtg__agendaRow">
-                  <span class="mtg__agendaTop">{{ 'meetings.agenda.top' | t: { n: i + 1 } }}</span>
-                  @if (item.applicationId) {
-                    <a class="mtg__agendaTitle" [routerLink]="['/applications', item.applicationId]">
-                      {{ item.title || item.applicationId }}
-                    </a>
-                  } @else {
-                    <span class="mtg__agendaTitle">{{ item.title }}</span>
-                  }
-                  @if (item.stateLabel) {
-                    <app-badge variant="info">{{ resolveLabel(item.stateLabel) }}</app-badge>
-                  }
-                  @if (m.canControl && item.applicationId) {
-                    <app-button variant="secondary" size="sm" (click)="openVoteDialog(item)">
-                      {{ 'meetings.vote.openFor' | t }}
-                    </app-button>
-                  }
-                  @if (m.canControl) {
-                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="removeFromAgenda(item.id)">
-                      <app-icon name="delete" />
-                    </app-button>
-                  }
-                </li>
-              }
-            </ol>
-          } @else {
-            <p class="mtg__muted">{{ 'meetings.agenda.empty' | t }}</p>
-          }
-        </app-card>
-      }
-
       <!-- Abstimmung für einen Antrag öffnen (Live-Vote mit Beschlussfrage, #Meetings) -->
       <app-dialog
         [open]="voteDialogOpen()"
@@ -336,100 +264,105 @@ const AUTOSAVE_DELAY_MS = 1000;
         </div>
       </app-dialog>
 
-      <!-- Protokoll-Editor -->
-      @if (canWrite()) {
+      <!-- Protokoll & Tagesordnung: TOPs links (sortierbar), pro-TOP-Editor rechts (#58) -->
+      @if (canWrite() || canManage()) {
         <app-card [heading]="'meetings.protocol.title' | t">
           @if (!protocol()) {
             <p class="mtg__muted">{{ 'meetings.protocol.none' | t }}</p>
-            <app-button size="sm" [loading]="loadingProtocol()" (click)="loadProtocol()">
-              {{ 'meetings.protocol.create' | t }}
-            </app-button>
+            @if (canWrite()) {
+              <app-button size="sm" [loading]="loadingProtocol()" (click)="loadProtocol()">
+                {{ 'meetings.protocol.create' | t }}
+              </app-button>
+            }
           } @else if (protocol(); as proto) {
             <div class="mtg__protoMeta">
               <app-badge [variant]="proto.isFinal ? 'success' : 'neutral'">
                 {{ (proto.isFinal ? 'meetings.protocol.final' : 'meetings.protocol.draft') | t }}
               </app-badge>
               @if (proto.pdfUrl) {
-                <a class="mtg__pdf" [href]="proto.pdfUrl" target="_blank" rel="noopener">
-                  {{ 'meetings.protocol.pdf' | t }}
-                </a>
+                <a class="mtg__pdf" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
               }
+              <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+                @switch (saveState()) {
+                  @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+                  @case ('saved') { ✓ {{ 'meetings.protocol.saved' | t }} }
+                  @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+                  @default {}
+                }
+              </span>
             </div>
 
-            <!-- Snippet-Werkzeugleiste -->
-            @if (!proto.isFinal && m.votes.length) {
-              <div class="mtg__snippets" role="group" [attr.aria-label]="'meetings.protocol.snippets' | t">
-                <span class="mtg__snippetsLabel">{{ 'meetings.protocol.snippets' | t }}</span>
-                @for (vote of m.votes; track vote.id) {
-                  <app-button variant="ghost" size="sm" (click)="insertAntrag(vote)">
-                    + {{ 'meetings.protocol.snippetAntrag' | t }}: {{ vote.title || vote.applicationId }}
-                  </app-button>
-                  <app-button variant="ghost" size="sm" (click)="insertVote(vote)">
-                    + {{ 'meetings.protocol.snippetVote' | t }}: {{ vote.title || vote.applicationId }}
-                  </app-button>
+            <div class="mtg__tops">
+              <!-- Links: TOP-Inhaltsverzeichnis (drag-sortierbar) -->
+              <aside class="mtg__toc" [attr.aria-label]="'meetings.agenda.title' | t">
+                <ol class="mtg__tocList">
+                  @for (item of agenda(); track item.id; let i = $index) {
+                    <li
+                      class="mtg__tocItem"
+                      [class.mtg__tocItem--sel]="selectedTopId() === item.id"
+                      [attr.draggable]="m.canControl && !proto.isFinal"
+                      (dragstart)="onTopDragStart(i)"
+                      (dragover)="onTopDragOver($event)"
+                      (drop)="onTopDrop(i)"
+                      (click)="selectTop(item.id)"
+                    >
+                      @if (m.canControl && !proto.isFinal) {
+                        <span class="mtg__tocGrip" aria-hidden="true">⠿</span>
+                      }
+                      <span class="mtg__tocNum">{{ i + 1 }}</span>
+                      <span class="mtg__tocTitle">{{ item.title || ('meetings.agenda.untitled' | t) }}</span>
+                      @if (m.canControl && item.applicationId) {
+                        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.openFor' | t" [attr.title]="'meetings.vote.openFor' | t" (click)="$event.stopPropagation(); openVoteDialog(item)"><app-icon name="roles" /></app-button>
+                      }
+                      @if (m.canControl && !proto.isFinal) {
+                        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); removeFromAgenda(item.id)"><app-icon name="delete" /></app-button>
+                      }
+                    </li>
+                  } @empty {
+                    <li class="mtg__muted mtg__tocEmpty">{{ 'meetings.agenda.empty' | t }}</li>
+                  }
+                </ol>
+                @if (m.canControl && !proto.isFinal) {
+                  <div class="mtg__tocAdd">
+                    <app-select [placeholder]="'meetings.agenda.addPlaceholder' | t" [options]="assignableOptions()" [ngModel]="agendaPick()" (ngModelChange)="agendaPick.set($event)" />
+                    <app-button size="sm" [disabled]="!agendaPick() || savingAgenda()" (click)="addToAgenda()">{{ 'meetings.agenda.add' | t }}</app-button>
+                  </div>
+                  <div class="mtg__tocAdd">
+                    <input class="mtg__input" [placeholder]="'meetings.agenda.freetextPlaceholder' | t" [ngModel]="agendaFreetext()" (ngModelChange)="agendaFreetext.set($event)" (keyup.enter)="addFreetext()" name="agendaFreetext" />
+                    <app-button variant="secondary" size="sm" [disabled]="!agendaFreetext().trim() || savingAgenda()" (click)="addFreetext()">{{ 'meetings.agenda.addFreetext' | t }}</app-button>
+                  </div>
                 }
-              </div>
-            }
+              </aside>
 
-            <!-- TOPs aus der Tagesordnung einfügen (#58) -->
-            @if (!proto.isFinal && agenda().length) {
-              <div class="mtg__snippets" role="group" [attr.aria-label]="'meetings.protocol.tops' | t">
-                <span class="mtg__snippetsLabel">{{ 'meetings.protocol.tops' | t }}</span>
-                @for (item of agenda(); track item.applicationId; let i = $index) {
-                  <app-button variant="ghost" size="sm" (click)="insertTop(item, i)">
-                    + {{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || item.applicationId }}
-                  </app-button>
+              <!-- Rechts: Markdown-Editor des gewählten TOP (WYSIWYG, kein separater Preview) -->
+              <div class="mtg__topEditor">
+                @if (selectedTop(); as top) {
+                  <div class="mtg__topHead">
+                    <h3 class="mtg__topTitle">{{ 'meetings.agenda.top' | t: { n: selectedIndex() + 1 } }}: {{ top.title || ('meetings.agenda.untitled' | t) }}</h3>
+                    @if (top.applicationId) {
+                      <a class="mtg__pdf" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
+                    }
+                  </div>
+                  <app-markdown-editor
+                    [docKey]="top.id"
+                    [value]="top.body ?? ''"
+                    [disabled]="proto.isFinal || !m.canControl"
+                    [placeholder]="'meetings.protocol.placeholder' | t"
+                    (valueChange)="onTopBodyChange(top.id, $event)"
+                  />
+                } @else {
+                  <p class="mtg__muted mtg__topEmpty">{{ 'meetings.protocol.selectTop' | t }}</p>
                 }
-              </div>
-            }
-
-            <div class="mtg__editor">
-              <div class="mtg__pane">
-                <label class="mtg__paneLabel" [for]="'mtg-md'">{{ 'meetings.protocol.markdown' | t }}</label>
-                <textarea
-                  id="mtg-md"
-                  class="mtg__textarea"
-                  rows="16"
-                  [disabled]="proto.isFinal"
-                  [placeholder]="'meetings.protocol.placeholder' | t"
-                  [ngModel]="markdown()"
-                  (ngModelChange)="onMarkdownChange($event)"
-                  (keyup)="onCaret($event)"
-                  (click)="onCaret($event)"
-                  (select)="onCaret($event)"
-                  name="markdown"
-                ></textarea>
-              </div>
-              <div class="mtg__pane">
-                <span class="mtg__paneLabel">{{ 'meetings.protocol.preview' | t }}</span>
-                <div class="mtg__preview" aria-live="polite" [innerHTML]="previewHtml()"></div>
               </div>
             </div>
 
             <div class="mtg__protoActions">
               @if (!proto.isFinal) {
-                <!-- Auto-Speichern (#56): kein manueller Save-Button, Status-Anzeige. -->
-                <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
-                  @switch (saveState()) {
-                    @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
-                    @case ('saved') { ✓ {{ 'meetings.protocol.saved' | t }} }
-                    @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
-                    @default {
-                      @if (dirty()) { {{ 'meetings.protocol.unsaved' | t }} }
-                    }
-                  }
-                </span>
-                <app-button
-                  variant="primary"
-                  size="sm"
-                  [disabled]="dirty() || saveState() === 'saving'"
-                  [loading]="finalizing()"
-                  (click)="finalize()"
-                >
-                  {{ 'meetings.protocol.finalize' | t }}
-                </app-button>
-                @if (dirty() || saveState() === 'saving') {
-                  <span class="mtg__muted mtg__hint">{{ 'meetings.protocol.saveFirst' | t }}</span>
+                @if (canWrite()) {
+                  <app-button variant="primary" size="sm" [disabled]="savingTop() || !agenda().length" [loading]="finalizing()" (click)="finalize()">
+                    {{ 'meetings.protocol.finalize' | t }}
+                  </app-button>
+                  @if (savingTop()) { <span class="mtg__muted mtg__hint">{{ 'meetings.protocol.saving' | t }}</span> }
                 }
               } @else {
                 <p class="mtg__muted">{{ 'meetings.protocol.finalizedHint' | t }}</p>
@@ -855,6 +788,91 @@ const AUTOSAVE_DELAY_MS = 1000;
       .mtg__saveState[data-state='error'] {
         color: var(--color-danger);
       }
+      .mtg__tops {
+        display: grid;
+        grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
+        gap: var(--space-4);
+        align-items: start;
+      }
+      @media (max-width: 52rem) {
+        .mtg__tops {
+          grid-template-columns: 1fr;
+        }
+      }
+      .mtg__toc {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      .mtg__tocList {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+      }
+      .mtg__tocItem {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+      }
+      .mtg__tocItem:hover {
+        background: var(--color-surface-sunken);
+      }
+      .mtg__tocItem--sel {
+        border-color: var(--color-primary);
+        background: var(--color-primary-subtle);
+      }
+      .mtg__tocGrip {
+        cursor: grab;
+        color: var(--color-text-muted);
+      }
+      .mtg__tocNum {
+        font-family: var(--font-mono, monospace);
+        font-size: var(--fs-xs);
+        color: var(--color-text-muted);
+      }
+      .mtg__tocTitle {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--fs-sm);
+      }
+      .mtg__tocEmpty {
+        padding: var(--space-2);
+      }
+      .mtg__tocAdd {
+        display: flex;
+        gap: var(--space-2);
+        align-items: center;
+      }
+      .mtg__topEditor {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        min-width: 0;
+      }
+      .mtg__topHead {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+      }
+      .mtg__topTitle {
+        margin: 0;
+        font-size: var(--fs-md);
+      }
+      .mtg__topEmpty {
+        padding: var(--space-5) 0;
+      }
       .mtg__att {
         list-style: none;
         margin: 0;
@@ -1026,15 +1044,15 @@ export class MeetingsComponent implements OnDestroy {
   readonly meetings = signal<Meeting[]>([]);
   readonly loadingList = signal(false);
 
-  readonly markdown = signal('');
-  readonly dirty = signal(false);
-  private caret: number | null = null;
-
   readonly loadingProtocol = signal(false);
   readonly saving = signal(false);
-  /** Auto-Speichern-Status des Protokolls (#56). */
+  /** Auto-Speichern-Status des aktuellen TOP-Texts (#56/#58). */
   readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Aktuell im rechten Editor gewählter TOP. */
+  readonly selectedTopId = signal<Uuid | null>(null);
+  readonly savingTop = signal(false);
+  private bodyTimer: ReturnType<typeof setTimeout> | null = null;
+  private dragTopIndex: number | null = null;
   readonly finalizing = signal(false);
   readonly creating = signal(false);
   readonly newTitle = signal('');
@@ -1067,7 +1085,14 @@ export class MeetingsComponent implements OnDestroy {
 
   readonly canManage = computed(() => this.auth.can('meeting.manage'));
   readonly canWrite = computed(() => this.auth.can('protocol.write'));
-  readonly previewHtml = computed(() => renderMarkdown(this.markdown()));
+
+  /** Aktuell gewählter TOP (rechter Editor) + sein 0-basierter Index. */
+  readonly selectedTop = computed<AgendaItem | null>(
+    () => this.agenda().find((a) => a.id === this.selectedTopId()) ?? null,
+  );
+  readonly selectedIndex = computed(() =>
+    this.agenda().findIndex((a) => a.id === this.selectedTopId()),
+  );
 
   private channel: MeetingChannel | null = null;
 
@@ -1096,7 +1121,7 @@ export class MeetingsComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.channel?.close();
-    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
+    if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
   }
 
   // --- laden / anlegen -----------------------------------------------------
@@ -1225,7 +1250,7 @@ export class MeetingsComponent implements OnDestroy {
     });
   }
 
-  // --- Protokoll-Editor ----------------------------------------------------
+  // --- Protokoll: TOPs links, pro-TOP-Editor rechts (#58) ------------------
   loadProtocol(): void {
     const m = this.meeting();
     if (!m || this.loadingProtocol()) return;
@@ -1234,8 +1259,6 @@ export class MeetingsComponent implements OnDestroy {
       next: (proto) => {
         this.loadingProtocol.set(false);
         this.protocol.set(proto);
-        this.markdown.set(proto.markdown);
-        this.dirty.set(false);
       },
       error: () => {
         this.loadingProtocol.set(false);
@@ -1244,71 +1267,93 @@ export class MeetingsComponent implements OnDestroy {
     });
   }
 
-  onMarkdownChange(value: string): void {
-    this.markdown.set(value);
-    this.dirty.set(true);
-    this.scheduleAutosave();
+  selectTop(id: Uuid): void {
+    this.selectedTopId.set(id);
   }
 
-  onCaret(event: Event): void {
-    const target = event.target as HTMLTextAreaElement;
-    this.caret = typeof target.selectionStart === 'number' ? target.selectionStart : null;
-  }
-
-  insertAntrag(vote: MeetingVote): void {
-    this.insertSnippet(antragSnippet(vote.applicationId, vote.title));
-  }
-
-  insertVote(vote: MeetingVote): void {
-    this.insertSnippet(voteSnippet(vote));
-  }
-
-  private insertSnippet(snippet: string): void {
-    const next = insertAt(this.markdown(), snippet, this.caret);
-    this.markdown.set(next);
-    this.dirty.set(true);
-    this.scheduleAutosave();
-  }
-
-  /** Debounced Auto-Speichern (#56): nach kurzer Tipp-Pause an den Server. */
-  private scheduleAutosave(): void {
-    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
+  /** Markdown-Text eines TOP debounced an den Server (PATCH …/agenda/{id}). */
+  onTopBodyChange(itemId: Uuid, body: string): void {
+    const m = this.meeting();
+    if (!m) return;
+    if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
     this.saveState.set('idle');
-    this.saveTimer = setTimeout(() => {
-      this.saveTimer = null;
-      this.autosave();
+    this.bodyTimer = setTimeout(() => {
+      this.bodyTimer = null;
+      this.savingTop.set(true);
+      this.saveState.set('saving');
+      this.api.setAgendaBody(m.id, itemId, body).subscribe({
+        next: (rows) => {
+          this.savingTop.set(false);
+          this.agenda.set(rows);
+          this.saveState.set('saved');
+        },
+        error: () => {
+          this.savingTop.set(false);
+          this.saveState.set('error');
+        },
+      });
     }, AUTOSAVE_DELAY_MS);
   }
 
-  private autosave(): void {
-    const proto = this.protocol();
-    if (!proto || proto.isFinal || !this.dirty() || this.saving()) return;
-    const pending = this.markdown();
-    this.saving.set(true);
-    this.saveState.set('saving');
-    this.api.updateProtocol(proto.id, pending).subscribe({
-      next: (updated) => {
-        this.saving.set(false);
-        this.protocol.set(updated);
-        // Nur als gespeichert markieren, wenn der Editor seither nicht weiter
-        // verändert wurde (sonst läuft bereits der nächste Autosave-Timer).
-        if (this.markdown() === pending) {
-          this.dirty.set(false);
-          this.saveState.set('saved');
-        }
-      },
+  // --- TOP-Reihenfolge (Drag&Drop) -----------------------------------------
+  onTopDragStart(index: number): void {
+    this.dragTopIndex = index;
+  }
+
+  onTopDragOver(event: DragEvent): void {
+    if (this.dragTopIndex !== null) event.preventDefault();
+  }
+
+  onTopDrop(index: number): void {
+    const from = this.dragTopIndex;
+    this.dragTopIndex = null;
+    const m = this.meeting();
+    if (from === null || from === index || !m) return;
+    const items = [...this.agenda()];
+    const [moved] = items.splice(from, 1);
+    items.splice(index, 0, moved);
+    this.agenda.set(items); // optimistisch
+    this.api.reorderAgenda(m.id, items.map((i) => i.id)).subscribe({
+      next: (rows) => this.agenda.set(rows),
       error: () => {
-        this.saving.set(false);
-        this.saveState.set('error');
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        if (m) this.loadAgenda(m.id);
       },
     });
   }
 
+  /** Protokoll-Markdown aus den geordneten TOPs zusammensetzen (#58). */
+  private assembleMarkdown(): string {
+    return this.agenda()
+      .map((t, i) => {
+        const heading = `## TOP ${i + 1}: ${t.title ?? ''}`.trimEnd();
+        const ref = t.applicationId ? `\n\n:::antrag{#${t.applicationId}}\n:::` : '';
+        const body = t.body?.trim() ? `\n\n${t.body.trim()}` : '';
+        return `${heading}${ref}${body}`;
+      })
+      .join('\n\n');
+  }
+
   finalize(): void {
     const proto = this.protocol();
-    if (!proto || this.finalizing() || this.dirty()) return;
+    if (!proto || this.finalizing() || this.savingTop()) return;
     this.finalizing.set(true);
-    this.api.finalizeProtocol(proto.id).subscribe({
+    // Erst die TOP-Texte zum Protokoll-Markdown zusammensetzen + speichern,
+    // dann finalisieren/rendern.
+    this.api.updateProtocol(proto.id, this.assembleMarkdown()).subscribe({
+      next: (saved) => {
+        this.protocol.set(saved);
+        this.doFinalize(saved.id);
+      },
+      error: () => {
+        this.finalizing.set(false);
+        this.toast.error(this.i18n.translate('meetings.toast.saveFailed'));
+      },
+    });
+  }
+
+  private doFinalize(protocolId: Uuid): void {
+    this.api.finalizeProtocol(protocolId).subscribe({
       next: (updated) => {
         this.finalizing.set(false);
         this.protocol.set(updated);
@@ -1376,7 +1421,14 @@ export class MeetingsComponent implements OnDestroy {
   // --- Tagesordnung (#10/#58) ----------------------------------------------
   private loadAgenda(meetingId: Uuid): void {
     this.api.listAgenda(meetingId).subscribe({
-      next: (rows) => this.agenda.set(rows),
+      next: (rows) => {
+        this.agenda.set(rows);
+        // Bleibt der gewählte TOP gültig? Sonst den ersten wählen.
+        const sel = this.selectedTopId();
+        if (!sel || !rows.some((r) => r.id === sel)) {
+          this.selectedTopId.set(rows[0]?.id ?? null);
+        }
+      },
       error: () => this.agenda.set([]),
     });
     if (this.canManage()) this.refreshAssignable(meetingId);
@@ -1443,10 +1495,6 @@ export class MeetingsComponent implements OnDestroy {
     });
   }
 
-  /** TOP aus einem Tagesordnungspunkt in das Protokoll-Markdown einfügen (#58). */
-  insertTop(item: AgendaItem, index: number): void {
-    this.insertSnippet(topSnippet(index + 1, item.title, item.applicationId));
-  }
 
   // --- Live-Abstimmung öffnen (#Meetings) ----------------------------------
   openVoteDialog(item: AgendaItem): void {

@@ -10,6 +10,7 @@ export { DateRangeComponent } from './datepicker/date-range.component';
 export type { DateRange } from './datepicker/date-range.component';
 export { IconComponent } from './icon/icon.component';
 export type { IconName } from './icon/icon.component';
+export { MarkdownEditorComponent } from './markdown-editor/markdown-editor.component';
 export { CardComponent } from './card/card.component';
 export { BadgeComponent } from './badge/badge.component';
 export type { BadgeVariant } from './badge/badge.component';

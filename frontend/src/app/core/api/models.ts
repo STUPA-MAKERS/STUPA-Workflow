@@ -165,6 +165,8 @@ export interface AgendaItem {
   /** `null` bei einem Freitext-TOP (ohne Antrag). */
   applicationId: Uuid | null;
   title: string | null;
+  /** Markdown-Text dieses TOP (pro-TOP-Editor, #58). */
+  body?: string | null;
   position: number;
   stateLabel?: I18nMap | null;
 }

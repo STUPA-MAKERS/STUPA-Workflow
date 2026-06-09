@@ -472,6 +472,7 @@ interface MockAgendaItem {
   id: string;
   applicationId: string | null;
   title: string | null;
+  body?: string | null;
   position: number;
   stateLabel?: Record<string, string> | null;
 }
@@ -552,6 +553,13 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PUT') {
+    // TOPs umsortieren (…/agenda/order).
+    if (/\/meetings\/[^/]+\/agenda\/order$/.test(p)) {
+      const ids = (req.body as { itemIds?: string[] } | null)?.itemIds ?? [];
+      const byId = new Map(MOCK_AGENDA.map((a) => [a.id, a]));
+      MOCK_AGENDA = ids.map((id, i) => ({ ...(byId.get(id) as MockAgendaItem), position: i }));
+      return ok([...MOCK_AGENDA]);
+    }
     // Anwesenheit setzen (…/attendance/me oder …/attendance/{principalId}).
     const att = /\/meetings\/[^/]+\/attendance\/([^/]+)$/.exec(p);
     if (att) {
@@ -715,6 +723,16 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       startTime: body.startTime !== undefined ? body.startTime : MOCK_MEETING.startTime,
     };
     return ok(MOCK_MEETING);
+  }
+
+  if (req.method === 'PATCH') {
+    // Markdown-Text eines TOP setzen (…/agenda/{itemId}).
+    const body = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
+    if (body) {
+      const text = (req.body as { body?: string } | null)?.body ?? '';
+      MOCK_AGENDA = MOCK_AGENDA.map((a) => (a.id === body[1] ? { ...a, body: text } : a));
+      return ok([...MOCK_AGENDA]);
+    }
   }
 
   if (req.method === 'PATCH' && /\/protocols\/[^/]+$/.test(p)) {

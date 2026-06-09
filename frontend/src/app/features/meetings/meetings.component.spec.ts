@@ -4,7 +4,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { render, screen, waitFor } from '@testing-library/angular';
+import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject } from 'rxjs';
 import { of } from 'rxjs';
@@ -173,45 +173,28 @@ describe('MeetingsComponent', () => {
     req.flush({ ...MEETING, activeApplicationId: 'app-2' });
   });
 
-  it('updates the live preview as the markdown changes', async () => {
-    const { http, fixture } = await setup();
-    flushLoad(http);
-    const textarea = (await screen.findByLabelText('Markdown')) as HTMLTextAreaElement;
-    await userEvent.clear(textarea);
-    await userEvent.type(textarea, '## Hallo');
-    fixture.detectChanges();
-    const preview = document.querySelector('.mtg__preview');
-    expect(preview?.querySelector('h2')?.textContent).toBe('Hallo');
-  });
-
-  it('auto-saves the protocol and then finalizes it', async () => {
+  it('assembles the TOPs and finalizes the protocol (#58)', async () => {
     const { http } = await setup();
-    flushLoad(http);
-    const textarea = (await screen.findByLabelText('Markdown')) as HTMLTextAreaElement;
-    await userEvent.type(textarea, ' geändert');
+    http.expectOne('/api/meetings/m-1').flush(MEETING);
+    http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([
+      { id: 't-1', applicationId: null, title: 'Begrüßung', body: 'Eröffnet.', position: 0 },
+    ]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
 
-    // Auto-Speichern (#56): debounced PATCH ohne manuellen Save-Button.
-    const saveReq = await waitFor(() => http.expectOne('/api/protocols/p-1'), {
-      timeout: 2500,
-    });
+    await userEvent.click(await screen.findByRole('button', { name: /Finalisieren/i }));
+    // Erst werden die TOP-Texte zum Protokoll-Markdown zusammengesetzt (PATCH) …
+    const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
-    saveReq.flush({ ...PROTOCOL, markdown: '# Protokoll geändert' });
-
-    await userEvent.click(screen.getByRole('button', { name: /Finalisieren/i }));
+    expect(saveReq.request.body.markdown).toContain('## TOP 1: Begrüßung');
+    saveReq.flush(PROTOCOL);
+    // … danach finalisiert/gerendert.
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
-    finReq.flush({
-      ...PROTOCOL,
-      status: 'final',
-      pdfUrl: 'https://example/p.pdf',
-      sentAt: '2026-06-12T19:00:00Z',
-    });
+    finReq.flush({ ...PROTOCOL, status: 'final', pdfUrl: 'https://example/p.pdf' });
 
     expect(await screen.findByText('Final')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /PDF/i })).toHaveAttribute(
-      'href',
-      'https://example/p.pdf',
-    );
   });
 
   it('applies live vote_tally updates from the WebSocket', async () => {
@@ -291,23 +274,15 @@ describe('MeetingsComponent', () => {
   it('creates the protocol on demand when none exists yet', async () => {
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, protocolId: null });
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
     const createBtn = await screen.findByRole('button', { name: 'Protokoll anlegen' });
     await userEvent.click(createBtn);
     const req = http.expectOne('/api/meetings/m-1/protocol');
     expect(req.request.method).toBe('POST');
     req.flush(PROTOCOL);
-    expect(await screen.findByLabelText('Markdown')).toBeInTheDocument();
-  });
-
-  it('inserts an application snippet at the cursor', async () => {
-    const { http } = await setup();
-    flushLoad(http);
-    const textarea = (await screen.findByLabelText('Markdown')) as HTMLTextAreaElement;
-    const before = textarea.value;
-    await userEvent.click(screen.getAllByRole('button', { name: /\+ Antrag/i })[0]);
-    expect((screen.getByLabelText('Markdown') as HTMLTextAreaElement).value.length).toBeGreaterThan(
-      before.length,
-    );
-    expect((screen.getByLabelText('Markdown') as HTMLTextAreaElement).value).toContain(':::antrag');
+    // Ohne TOP zeigt der Editor den Hinweis (kein einzelnes Markdown-Feld mehr).
+    expect(await screen.findByText(/Wähle links einen TOP/i)).toBeInTheDocument();
   });
 });
