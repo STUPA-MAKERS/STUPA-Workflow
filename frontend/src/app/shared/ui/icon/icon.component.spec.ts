@@ -2,23 +2,24 @@ import { render } from '@testing-library/angular';
 import { IconComponent } from './icon.component';
 
 describe('IconComponent', () => {
-  it('renders a decorative svg that inherits currentColor', async () => {
+  it('renders a decorative Font Awesome solid glyph', async () => {
     const { container } = await render(`<app-icon name="sun" />`, { imports: [IconComponent] });
-    const svg = container.querySelector('svg');
-    expect(svg).toBeTruthy();
-    expect(svg).toHaveAttribute('aria-hidden', 'true');
-    expect(svg).toHaveAttribute('stroke', 'currentColor');
+    const i = container.querySelector('i');
+    expect(i).toBeTruthy();
+    expect(i).toHaveAttribute('aria-hidden', 'true');
+    expect(i).toHaveClass('fa-solid');
+    expect(i).toHaveClass('fa-sun');
   });
 
-  it('renders the moon glyph (single path) for the moon icon', async () => {
-    const { container } = await render(`<app-icon name="moon" />`, { imports: [IconComponent] });
-    expect(container.querySelectorAll('svg path').length).toBe(1);
+  it('maps the icon name to its FA class', async () => {
+    const { container } = await render(`<app-icon name="webhook" />`, { imports: [IconComponent] });
+    expect(container.querySelector('i')).toHaveClass('fa-globe');
   });
 
-  it('honours the size input', async () => {
+  it('honours the size input (font-size)', async () => {
     const { container } = await render(`<app-icon name="sun" [size]="32" />`, {
       imports: [IconComponent],
     });
-    expect(container.querySelector('svg')).toHaveAttribute('width', '32');
+    expect((container.querySelector('i') as HTMLElement).style.fontSize).toBe('32px');
   });
 });
