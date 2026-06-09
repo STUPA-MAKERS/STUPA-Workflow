@@ -1122,10 +1122,9 @@ export const de = {
   'budget.status.unknownState': 'Ohne Status',
 
   'admin.home.users': 'Benutzer & Rollen',
-  'admin.home.usersDesc': 'Benutzer suchen, Rollen zuweisen/entziehen, Rechte pflegen.',
+  'admin.home.usersDesc': 'Benutzer & Rollenzuweisungen verwalten.',
   'admin.home.gremien': 'Gremien',
-  'admin.home.gremienDesc':
-    'Gremien anlegen und bearbeiten (Stammdaten für Sitzungen, Budgets, Antragstypen).',
+  'admin.home.gremienDesc': 'Gremien anlegen und bearbeiten.',
   'admin.gremien.title': 'Gremien',
   'admin.gremien.subtitle':
     'Gremien als Stammdaten anlegen und pflegen — überall als Pflichtfeld referenziert.',
@@ -2347,10 +2346,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.status.unknownState': 'No status',
 
   'admin.home.users': 'Users & Roles',
-  'admin.home.usersDesc': 'Search users, assign/revoke roles, manage permissions.',
+  'admin.home.usersDesc': 'Manage users & role assignments.',
   'admin.home.gremien': 'Committees',
-  'admin.home.gremienDesc':
-    'Create and edit committees (master data for meetings, budgets, application types).',
+  'admin.home.gremienDesc': 'Create and edit committees.',
   'admin.gremien.title': 'Committees',
   'admin.gremien.subtitle':
     'Create and maintain committees as master data — referenced as a required field everywhere.',
