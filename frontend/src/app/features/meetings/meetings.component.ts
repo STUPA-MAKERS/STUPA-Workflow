@@ -327,6 +327,9 @@ const AUTOSAVE_DELAY_MS = 1000;
                         @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
                           <span class="mtg__quorumNote">{{ 'vote.failedQuorum' | t }}</span>
                         }
+                        @if (m.canManageVotes && !proto.isFinal) {
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="deleteVote(vote.id)"><app-icon name="delete" /></app-button>
+                        }
                       </div>
                       @if (vote.counts) {
                         <dl class="mtg__tally">
@@ -1854,6 +1857,7 @@ export class MeetingsComponent implements OnDestroy {
   readonly closeConfirmOpen = signal(false);
   /** Casting-Status je Vote (für Mitglied/Protokollant-Stimmabgabe). */
   readonly casting = signal<Uuid | null>(null);
+  readonly deletingVote = signal<Uuid | null>(null);
 
   /** Votes eines TOP (gruppiert über agendaItemId). */
   votesForTop(topId: Uuid): MeetingVote[] {
@@ -2499,6 +2503,24 @@ export class MeetingsComponent implements OnDestroy {
       },
       error: () => {
         this.casting.set(null);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
+    });
+  }
+
+  /** Beschlussfrage (inkl. Stimmen) löschen — nur Vote-Verwalter. */
+  deleteVote(voteId: Uuid): void {
+    const m = this.meeting();
+    if (!m || this.deletingVote()) return;
+    this.deletingVote.set(voteId);
+    this.api.deleteMeetingVote(m.id, voteId).subscribe({
+      next: (updated) => {
+        this.deletingVote.set(null);
+        this.meeting.set(updated);
+        this.toast.success(this.i18n.translate('meetings.toast.voteDeleted'));
+      },
+      error: () => {
+        this.deletingVote.set(null);
         this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
       },
     });

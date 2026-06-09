@@ -196,17 +196,17 @@ class MeetingService:
                 .order_by(Vote.created_at)
             )
         ).scalars().all()
-        # Ablehnungs-Grund (Quorum/Mehrheit) nur für geschlossene Votes rekonstruieren
-        # (Reload-Pfad; der Live-Pfad trägt ihn schon in ``vote_closed``). Counts werden
-        # gebündelt geladen, nicht je Vote (kein N+1).
-        closed = [v for v in rows if v.status == "closed" and v.result is not None]
-        reasons = await self._failed_reasons(closed)
+        # Stimmenstand (counts/leading) + Ablehnungs-Grund je Vote aus den Ballots
+        # rekonstruieren (Reload-Pfad; der Live-WS-Pfad trägt sie schon mit). Gebündelt
+        # geladen (kein N+1).
+        tallies = await self._vote_tallies(rows)
         out: dict[UUID, list[MeetingVoteOut]] = {}
         for v in rows:
             if v.meeting_id is None:
                 continue
             cfg = v.config if isinstance(v.config, dict) else {}
             opts = cfg.get("options") or []
+            counts, leading, reason = tallies.get(v.id, (None, None, None))
             out.setdefault(v.meeting_id, []).append(
                 MeetingVoteOut(
                     id=v.id,
@@ -216,18 +216,23 @@ class MeetingService:
                     options=list(opts),
                     status=v.status,  # type: ignore[arg-type]
                     result=v.result,
-                    failedReason=reasons.get(v.id),
+                    counts=counts,
+                    leading=leading,
+                    failedReason=reason,
                 )
             )
         return out
 
-    async def _failed_reasons(
+    async def _vote_tallies(
         self, votes: list[Vote]
-    ) -> dict[UUID, Literal["quorum", "majority"] | None]:
-        """``{vote_id: failedReason}`` für geschlossene Votes (Reload-Rekonstruktion).
+    ) -> dict[
+        UUID,
+        tuple[dict[str, int] | None, str | None, Literal["quorum", "majority"] | None],
+    ]:
+        """``{vote_id: (counts, leading, failedReason)}`` aus den Ballots (Reload).
 
         Lädt Stimmen gebündelt (offen: ``ballot``, geheim: ``secret_ballot``) und wendet
-        die reine Tally-Logik an. ``passed``/``tie`` ⇒ ``None``."""
+        die reine Tally-Logik an. ``failedReason`` nur für geschlossene, abgelehnte Votes."""
         from app.modules.voting import tally as tally_mod
         from app.modules.voting.models import Ballot, SecretBallot
 
@@ -253,7 +258,10 @@ class MeetingService:
         for vid, choice in secret_rows:
             secret_by_vote.setdefault(vid, []).append(choice)
 
-        out: dict[UUID, Literal["quorum", "majority"] | None] = {}
+        out: dict[
+            UUID,
+            tuple[dict[str, int] | None, str | None, Literal["quorum", "majority"] | None],
+        ] = {}
         for v in votes:
             config = VoteConfig.model_validate(v.config)
             choices = (
@@ -263,7 +271,10 @@ class MeetingService:
             )
             counts = tally_mod.tally(config.options, choices)
             outcome = tally_mod.result(config, counts, v.eligible_count or 0)
-            out[v.id] = tally_mod.failed_reason(outcome.result, outcome.quorum_met)
+            reason: Literal["quorum", "majority"] | None = None
+            if v.status == "closed" and v.result is not None:
+                reason = tally_mod.failed_reason(outcome.result, outcome.quorum_met)
+            out[v.id] = (dict(counts), outcome.leading, reason)
         return out
 
     # -------------------------------------------------- Berechtigungen (#Sessions)

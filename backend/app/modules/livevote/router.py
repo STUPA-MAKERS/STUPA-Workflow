@@ -358,6 +358,26 @@ async def open_meeting_vote(
     return await service.get(meeting_id, principal)
 
 
+@router.delete(
+    "/meetings/{meeting_id}/votes/{vote_id}",
+    response_model=MeetingOut,
+    responses=_errors(401, 403, 404),
+)
+async def delete_meeting_vote(
+    meeting_id: UUID,
+    vote_id: UUID,
+    service: ServiceDep,
+    voting: VotingDep,
+    principal: ReaderDep,
+) -> MeetingOut:
+    """Eine Beschlussfrage löschen (Stimmen inklusive). Verwalter/Protokollant/``vote.manage``."""
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_manage_votes:
+        raise ForbiddenError("not allowed to delete a vote in this meeting")
+    await voting.delete(vote_id, meeting_id=meeting_id)
+    return await service.get(meeting_id, principal)
+
+
 @router.get(
     "/meetings/{meeting_id}/agenda/assignable",
     response_model=list[AssignableApplicationOut],

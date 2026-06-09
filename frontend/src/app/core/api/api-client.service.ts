@@ -476,6 +476,13 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
+  /** DELETE /meetings/{id}/votes/{voteId} — Beschlussfrage (inkl. Stimmen) löschen. */
+  deleteMeetingVote(meetingId: Uuid, voteId: Uuid): Observable<Meeting> {
+    return this.http
+      .delete<MeetingOutWire>(`${this.base}/meetings/${meetingId}/votes/${voteId}`)
+      .pipe(map(mapMeeting));
+  }
+
   /** POST /votes/{id}/open — Vote öffnen (auch live; P(vote.manage)). */
   openVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/open`, {});

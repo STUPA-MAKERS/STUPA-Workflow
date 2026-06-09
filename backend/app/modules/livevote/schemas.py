@@ -68,6 +68,10 @@ class MeetingVoteOut(_CamelModel):
     options: list[str] = Field(default_factory=list)
     status: Literal["draft", "open", "closed"]
     result: str | None = None
+    # Aktueller Stimmenstand (Option → Anzahl) + führende Option — bleibt nach einem
+    # Reload erhalten (vorher nur über den Live-WS-Pfad sichtbar).
+    counts: dict[str, int] | None = None
+    leading: str | None = None
     # Grund einer Ablehnung (nach Close): ``quorum`` = Quorum verfehlt, ``majority`` =
     # Mehrheit verfehlt. ``None`` solange offen oder bei ``passed``/``tie``.
     failed_reason: Literal["quorum", "majority"] | None = Field(

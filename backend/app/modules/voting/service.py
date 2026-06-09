@@ -65,6 +65,17 @@ class VotingService:
             raise NotFoundError(f"vote {vote_id} not found")
         return vote
 
+    async def delete(self, vote_id: UUID, *, meeting_id: UUID) -> None:
+        """Eine an die Sitzung gebundene Abstimmung löschen (Ballots cascaden via FK).
+
+        Nur Votes dieser Sitzung; der Aufrufer (Router) prüft die Berechtigung."""
+        vote = await self._get_vote(vote_id)
+        if vote.meeting_id != meeting_id:
+            raise NotFoundError(f"vote {vote_id} not found in this meeting")
+        await self.session.delete(vote)
+        await self.session.flush()
+        await self.session.commit()
+
     async def _get_application(self, application_id: UUID) -> Application:
         app = (
             await self.session.execute(
