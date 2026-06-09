@@ -22,7 +22,11 @@ import type {
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { IconComponent, SelectComponent, type SelectOption } from '@shared/ui';
-import { BudgetTreeApi, flattenBudgetOptions } from '../budget/budget-tree.api';
+import {
+  BudgetTreeApi,
+  type BudgetTreeRow,
+  flattenBudgetTreeRows,
+} from '../budget/budget-tree.api';
 import { stateBadgeVariant } from './applications.util';
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
@@ -41,6 +45,28 @@ import { downloadBlob } from '@shared/download.util';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, FormsModule, DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, IconComponent, SelectComponent],
   template: `
+    <div class="apps__layout">
+    <aside class="apps__tree" [attr.aria-label]="'applications.list.filter.budget' | t">
+      <button
+        type="button"
+        class="apps__treeNode apps__treeNode--root"
+        [class.apps__treeNode--active]="!budgetId()"
+        (click)="selectBudgetNode('')"
+      >{{ 'applications.list.filter.all' | t }}</button>
+      @for (n of budgetRows(); track n.id) {
+        <button
+          type="button"
+          class="apps__treeNode"
+          [class.apps__treeNode--active]="budgetId() === n.id"
+          [style.paddingLeft.rem]="0.75 + n.depth * 0.9"
+          (click)="selectBudgetNode(n.id)"
+        >
+          <span class="apps__treeKey">{{ n.key }}</span>
+          <span class="apps__treeName">{{ n.name }}</span>
+        </button>
+      }
+    </aside>
+    <div class="apps__main">
     <header class="apps__head">
       <div class="apps__headRow">
         <div>
@@ -117,19 +143,6 @@ import { downloadBlob } from '@shared/download.util';
                   <input type="date" class="field__control" [attr.aria-label]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
                 </div>
               </div>
-              @if (budgetOptions().length) {
-                <div class="field">
-                  <app-select
-                    id="apps-budget"
-                    name="budget"
-                    [label]="'applications.list.filter.budget' | t"
-                    [placeholder]="'applications.list.filter.all' | t"
-                    [options]="budgetOptions()"
-                    [ngModel]="budgetId()"
-                    (ngModelChange)="budgetId.set($event)"
-                  />
-                </div>
-              }
               <div class="apps__filterActions">
                 <app-button type="submit" size="sm">{{ 'applications.list.filter.apply' | t }}</app-button>
                 <app-button type="button" variant="ghost" size="sm" (click)="reset()">
@@ -222,9 +235,85 @@ import { downloadBlob } from '@shared/download.util';
         </nav>
       }
     }
+    </div>
+    </div>
   `,
   styles: [
     `
+      .apps__layout {
+        display: grid;
+        grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+        gap: var(--space-5);
+        align-items: start;
+      }
+      .apps__main {
+        min-width: 0;
+      }
+      .apps__tree {
+        position: sticky;
+        top: var(--space-4);
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        padding: var(--space-2);
+        background: var(--color-surface);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-lg);
+        max-height: calc(100vh - 8rem);
+        overflow-y: auto;
+      }
+      .apps__treeNode {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-2);
+        width: 100%;
+        text-align: start;
+        border: 0;
+        background: transparent;
+        color: var(--color-text);
+        font: inherit;
+        cursor: pointer;
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius-md);
+      }
+      .apps__treeNode:hover {
+        background: var(--color-surface-sunken);
+      }
+      .apps__treeNode--active {
+        background: var(--color-primary-subtle, var(--color-surface-sunken));
+        color: var(--color-primary);
+        font-weight: var(--fw-medium);
+      }
+      .apps__treeNode--root {
+        font-weight: var(--fw-semibold);
+        margin-bottom: var(--space-1);
+      }
+      .apps__treeKey {
+        font-variant-numeric: tabular-nums;
+        font-size: var(--fs-xs);
+        color: var(--color-text-muted);
+        flex: none;
+      }
+      .apps__treeNode--active .apps__treeKey {
+        color: inherit;
+      }
+      .apps__treeName {
+        font-size: var(--fs-sm);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      @media (max-width: 50rem) {
+        .apps__layout {
+          grid-template-columns: 1fr;
+        }
+        .apps__tree {
+          position: static;
+          flex-direction: row;
+          flex-wrap: wrap;
+          max-height: none;
+        }
+      }
       .apps__head {
         margin-bottom: var(--space-5);
       }
@@ -462,8 +551,8 @@ export class ApplicationsListComponent {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
-  /** Kostenstellen (Baum → flach) als Filter-Optionen. */
-  readonly budgetOptions = signal<SelectOption[]>([]);
+  /** Kostenstellen-Baum (eingerückt) für den linken Tree-Picker. */
+  readonly budgetRows = signal<BudgetTreeRow[]>([]);
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
@@ -479,7 +568,6 @@ export class ApplicationsListComponent {
         this.amountMax(),
         this.createdFrom(),
         this.createdTo(),
-        this.budgetId(),
       ].filter((v) => String(v ?? '').trim() !== '').length,
   );
 
@@ -513,6 +601,11 @@ export class ApplicationsListComponent {
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),
     });
+    // Kostenstellen-Baum für den linken Filter-Picker (eager).
+    this.budgetApi.tree().subscribe({
+      next: (tree) => this.budgetRows.set(flattenBudgetTreeRows(tree)),
+      error: () => this.budgetRows.set([]),
+    });
 
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.q.set(pm.get('q') ?? '');
@@ -529,18 +622,14 @@ export class ApplicationsListComponent {
     });
   }
 
-  /** Filter-Popout auf/zu; den Kostenstellen-Baum erst beim ersten Öffnen laden. */
-  private budgetsLoaded = false;
   toggleFilters(): void {
-    const open = !this.filtersOpen();
-    this.filtersOpen.set(open);
-    if (open && !this.budgetsLoaded) {
-      this.budgetsLoaded = true;
-      this.budgetApi.tree().subscribe({
-        next: (tree) => this.budgetOptions.set(flattenBudgetOptions(tree)),
-        error: () => this.budgetOptions.set([]),
-      });
-    }
+    this.filtersOpen.update((v) => !v);
+  }
+
+  /** Kostenstelle im linken Baum wählen (``''`` = Alle); filtert die Liste. */
+  selectBudgetNode(id: string): void {
+    this.budgetId.set(id);
+    this.navigate({ budget: id || null, offset: null });
   }
 
   typeName(typeId: Uuid): string {

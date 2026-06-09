@@ -176,3 +176,24 @@ export function flattenBudgetOptions(
   walk(nodes);
   return out;
 }
+
+/** Eine eingerückte Baumzeile (für Tree-Picker ohne echtes Tree-Widget). */
+export interface BudgetTreeRow {
+  id: Uuid;
+  key: string;
+  name: string;
+  depth: number;
+}
+
+/** Baum (rekursiv) → eingerückte Flachliste (pre-order) mit Tiefe je Knoten. */
+export function flattenBudgetTreeRows(nodes: BudgetTreeNode[]): BudgetTreeRow[] {
+  const out: BudgetTreeRow[] = [];
+  const walk = (ns: BudgetTreeNode[], depth: number): void => {
+    for (const n of ns) {
+      out.push({ id: n.id, key: n.key, name: n.name, depth });
+      if (n.children?.length) walk(n.children, depth + 1);
+    }
+  };
+  walk(nodes, 0);
+  return out;
+}

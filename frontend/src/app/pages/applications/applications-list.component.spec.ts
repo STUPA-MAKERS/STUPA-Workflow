@@ -58,6 +58,8 @@ async function setup() {
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   const router = view.fixture.debugElement.injector.get(Router);
+  // Der Kostenstellen-Baum (linker Filter) wird im Konstruktor eager geladen.
+  flushBudgets(http);
   return { ...view, http, router };
 }
 
@@ -65,7 +67,7 @@ function flushTypes(http: HttpTestingController) {
   http.expectOne('/api/application-types').flush(TYPES);
 }
 
-/** Beim ersten Öffnen des Filter-Popouts wird der Kostenstellen-Baum geladen (#17). */
+/** Kostenstellen-Baum (linker Filter-Picker) — eager im Konstruktor geladen. */
 function flushBudgets(http: HttpTestingController) {
   for (const req of http.match((r) => r.url === '/api/budgets')) req.flush([]);
 }
