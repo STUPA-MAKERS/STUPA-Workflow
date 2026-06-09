@@ -40,6 +40,8 @@ interface Position {
           <div class="pos__card-head">
             <input
               class="pos__title"
+              [class.pos__invalid]="titleInvalid(p)"
+              [attr.aria-invalid]="titleInvalid(p) ? 'true' : null"
               [value]="p.label"
               (input)="setPositionLabel(pi, $any($event.target).value)"
               [attr.placeholder]="t('apply.positions.label')"
@@ -63,10 +65,12 @@ interface Position {
                 <tr>
                   <td>
                     <input [value]="o.label" (input)="setOfferLabel(pi, oi, $any($event.target).value)"
+                      [class.pos__invalid]="offerLabelInvalid(o)" [attr.aria-invalid]="offerLabelInvalid(o) ? 'true' : null"
                       [attr.placeholder]="t('apply.positions.offer')" [attr.aria-label]="t('apply.positions.offer')" />
                   </td>
                   <td class="pos__num">
                     <input type="text" inputmode="decimal" class="pos__money" [value]="offerValueText(pi, oi)"
+                      [class.pos__invalid]="offerValueInvalid(o)" [attr.aria-invalid]="offerValueInvalid(o) ? 'true' : null"
                       (focus)="beginEditValue(pi, oi)" (blur)="endEditValue()"
                       (input)="setOfferValue(pi, oi, $any($event.target).value)"
                       [attr.aria-label]="t('apply.positions.value')" />
@@ -86,16 +90,18 @@ interface Position {
             </tbody>
           </table>
           <button type="button" class="pos__add pos__add--sm" (click)="addOffer(pi)">+ {{ t('apply.positions.addOffer') }}</button>
+          @if (cardError(p); as msg) {
+            <p class="pos__field-error" role="alert">{{ msg }}</p>
+          }
         </div>
       }
 
       <button type="button" class="pos__add" (click)="addPosition()">+ {{ t('apply.positions.add') }}</button>
+      @if (showError && positions.length < minPositions) {
+        <p class="pos__field-error" role="alert">{{ t('apply.positions.errMinPositions') }}</p>
+      }
 
       <p class="pos__total"><strong>{{ t('apply.positions.total') }}: {{ fmt(total()) }}</strong></p>
-
-      @if (showError && errorText) {
-        <p class="pos__error" role="alert">{{ errorText }}</p>
-      }
     </fieldset>
   `,
   styles: [
@@ -145,6 +151,9 @@ interface Position {
       .pos__icon:hover:not(:disabled) { color: var(--color-danger); }
       .pos__icon:disabled { opacity: 0.35; cursor: not-allowed; }
       .pos__money { font-variant-numeric: tabular-nums; }
+      .pos input.pos__invalid { border-color: var(--color-danger); }
+      .pos input.pos__invalid:focus-visible { outline-color: var(--color-danger); }
+      .pos__field-error { font-size: var(--fs-xs); color: var(--color-danger); margin: 0; }
       .pos__add { align-self: flex-start; background: transparent; border: var(--border-width) dashed var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); cursor: pointer; color: var(--color-primary); font: inherit; font-weight: var(--fw-medium); }
       .pos__add:hover { background: var(--color-surface); }
       .pos__add--sm { border-style: none; padding: var(--space-1) 0; }
@@ -184,6 +193,29 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
 
   get errorText(): string {
     return this.t('apply.positions.invalid');
+  }
+
+  // --- Inline-Validierung je Feld (#5): betroffenes Feld rot, Meldung am Ort. ---
+  protected titleInvalid(p: Position): boolean {
+    return this.showError && !p.label.trim();
+  }
+  protected offerLabelInvalid(o: Offer): boolean {
+    return this.showError && !o.label.trim();
+  }
+  protected offerValueInvalid(o: Offer): boolean {
+    return this.showError && (o.value === null || o.value <= 0);
+  }
+
+  /** Konkrete, knappe Fehlermeldung je Positionskarte (oder '' wenn gültig). */
+  protected cardError(p: Position): string {
+    if (!this.showError) return '';
+    if (p.offers.length < this.minOffers) return this.t('apply.positions.errMinOffers');
+    if (p.offers.filter((o) => o.preferred).length !== 1) return this.t('apply.positions.errPreferred');
+    if (!p.label.trim()) return this.t('apply.positions.errLabel');
+    if (p.offers.some((o) => !o.label.trim() || o.value === null || o.value <= 0)) {
+      return this.t('apply.positions.errOffers');
+    }
+    return '';
   }
 
   protected fmt(value: number): string {

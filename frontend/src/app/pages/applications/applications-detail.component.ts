@@ -32,6 +32,17 @@ import { ToastService } from '@shared/ui/toast/toast.service';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applications.util';
 
+/** Vergleichsangebot bzw. Kostenposition für die strukturierte Detailanzeige (#1). */
+interface DetailOffer {
+  label?: string;
+  value?: number | null;
+  preferred?: boolean;
+}
+interface DetailPosition {
+  label: string;
+  offers: DetailOffer[];
+}
+
 /**
  * Antrags-Detail (T-31, overview §4): Felder, Versions-Historie/Diff, Kommentare
  * (intern/öffentlich) und RBAC-gegatete Statuswechsel-Aktionen mit Bestätigung
@@ -132,15 +143,43 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
             <app-button variant="ghost" size="sm" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
             <app-button size="sm" [disabled]="editForm.invalid" [loading]="savingEdit()" (click)="saveEdit()">{{ 'applications.detail.save' | t }}</app-button>
           </div>
-        } @else if (dataEntries(application).length) {
-          <dl class="det__data">
-            @for (entry of dataEntries(application); track entry.key) {
-              <div class="det__dataRow">
-                <dt>{{ entry.label }}</dt>
-                <dd>{{ entry.value }}</dd>
-              </div>
-            }
-          </dl>
+        } @else if (dataEntries(application).length || positionEntries(application).length) {
+          @if (dataEntries(application).length) {
+            <dl class="det__data">
+              @for (entry of dataEntries(application); track entry.key) {
+                <div class="det__dataRow">
+                  <dt>{{ entry.label }}</dt>
+                  <dd>{{ entry.value }}</dd>
+                </div>
+              }
+            </dl>
+          }
+          <!-- Kostenpositionen mit Vergleichsangeboten (#1) -->
+          @for (pf of positionEntries(application); track pf.key) {
+            <section class="det__positions">
+              <h3 class="det__positions-h">{{ pf.label }}</h3>
+              @for (p of pf.positions; track $index) {
+                <div class="det__pos">
+                  <div class="det__pos-head">
+                    <strong>{{ p.label || ('applications.detail.positionUntitled' | t) }}</strong>
+                    <span class="det__pos-val">{{ money(positionValue(p)) }}</span>
+                  </div>
+                  <ul class="det__offers">
+                    @for (o of p.offers; track $index) {
+                      <li class="det__offer" [class.det__offer--pref]="o.preferred">
+                        <span class="det__offer-label">{{ o.label || '—' }}</span>
+                        <span class="det__offer-val">{{ money(o.value) }}</span>
+                        @if (o.preferred) {
+                          <app-badge variant="success">{{ 'apply.positions.preferred' | t }}</app-badge>
+                        }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+              <p class="det__pos-total"><strong>{{ 'apply.positions.total' | t }}: {{ money(positionsTotal(pf.positions)) }}</strong></p>
+            </section>
+          }
         } @else {
           <p class="det__muted">{{ 'applications.detail.data.empty' | t }}</p>
         }
@@ -380,6 +419,69 @@ import { applicationTitle, formatFieldValue, stateBadgeVariant } from './applica
       .det__muted {
         color: var(--color-text-muted);
       }
+      /* Edit-Formular: Formly-Felder vertikal Luft geben (Image #5: Spacing). */
+      formly-form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+      }
+      /* Kostenpositionen-Block (#1) */
+      .det__positions {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        margin-top: var(--space-4);
+      }
+      .det__positions-h {
+        margin: 0;
+        font-size: var(--fs-md);
+      }
+      .det__pos {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        padding: var(--space-3);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+      }
+      .det__pos-head {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-3);
+      }
+      .det__pos-val {
+        font-variant-numeric: tabular-nums;
+      }
+      .det__offers {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+      }
+      .det__offer {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        font-size: var(--fs-sm);
+      }
+      .det__offer-label {
+        flex: 1;
+        min-width: 0;
+      }
+      .det__offer-val {
+        font-variant-numeric: tabular-nums;
+        color: var(--color-text-muted);
+      }
+      .det__offer--pref .det__offer-val {
+        color: var(--color-text);
+        font-weight: var(--fw-medium);
+      }
+      .det__pos-total {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+      }
       .det__actions {
         display: flex;
         flex-wrap: wrap;
@@ -593,6 +695,8 @@ export class ApplicationsDetailComponent {
 
     const pushField = (f: FormFieldDef): void => {
       if (f.type === 'markdown' || f.type === 'computed') return;
+      // Kostenpositionen werden als eigener Block (Positionen + Angebote) gezeigt.
+      if (f.type === 'positions') return;
       if (f.key === 'title') return;
       if (!(f.key in app.data)) return;
       seen.add(f.key);
@@ -635,6 +739,47 @@ export class ApplicationsDetailComponent {
       }
     }
     return formatFieldValue(value);
+  }
+
+  /** Kostenpositionen-Felder (falls vorhanden) als strukturierter Block für die
+   *  Detailansicht: je Position die Vergleichsangebote inkl. bevorzugtem (#1). */
+  positionEntries(app: Application): {
+    key: string;
+    label: string;
+    positions: DetailPosition[];
+  }[] {
+    const lang = this.i18n.locale();
+    const out: { key: string; label: string; positions: DetailPosition[] }[] = [];
+    for (const f of this.formFields()) {
+      if (f.type !== 'positions' || !(f.key in app.data)) continue;
+      const raw = app.data[f.key];
+      if (!Array.isArray(raw)) continue;
+      const positions = (raw as DetailPosition[]).map((p) => ({
+        label: p.label ?? '',
+        offers: Array.isArray(p.offers) ? p.offers : [],
+      }));
+      out.push({ key: f.key, label: resolveI18n(f.label, lang), positions });
+    }
+    return out;
+  }
+
+  /** Wert eines Vergleichsangebots / einer Position als Währung. */
+  money(value: number | null | undefined): string {
+    const n = Number(value ?? 0);
+    return new Intl.NumberFormat(this.i18n.locale(), {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(Number.isFinite(n) ? n : 0);
+  }
+
+  /** Positionswert = Wert des bevorzugten Angebots. */
+  positionValue(p: DetailPosition): number {
+    return p.offers.find((o) => o.preferred)?.value ?? 0;
+  }
+
+  /** Σ über alle Positionswerte. */
+  positionsTotal(positions: DetailPosition[]): number {
+    return positions.reduce((s, p) => s + this.positionValue(p), 0);
   }
 
   /** Kostenpositionen kompakt: Anzahl Positionen + Σ der bevorzugten Werte. */
