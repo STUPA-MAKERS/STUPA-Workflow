@@ -195,9 +195,14 @@ class AgendaAddBody(_CamelModel):
 
 
 class AgendaBodyBody(_CamelModel):
-    """``PATCH …/agenda/{itemId}`` — Markdown-Text eines TOP setzen."""
+    """``PATCH …/agenda/{itemId}`` — Markdown-Text und/oder Titel eines TOP setzen.
 
-    body: str = ""
+    ``title`` benennt nur **Freitext-TOPs** um (Antrag-TOPs erben den Titel vom
+    Antrag); ``body`` setzt den Markdown-Text. Beide sind optional.
+    """
+
+    body: str | None = None
+    title: str | None = Field(default=None, min_length=1)
 
 
 class AgendaReorderBody(_CamelModel):

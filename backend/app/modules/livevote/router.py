@@ -431,11 +431,13 @@ async def set_agenda_body(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AgendaItemOut]:
-    """Markdown-Text eines TOP setzen (pro-TOP-Editor) — nur Sitzungsleitung/Admin."""
+    """Markdown-Text/Titel eines TOP setzen (pro-TOP-Editor) — nur Sitzungsleitung/Admin."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    return await agenda.set_body(meeting_id, item_id, payload.body)
+    return await agenda.set_body(
+        meeting_id, item_id, body=payload.body, title=payload.title
+    )
 
 
 # --------------------------------------------------------------------------- #

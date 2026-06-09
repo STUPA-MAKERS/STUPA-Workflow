@@ -365,11 +365,22 @@ class MeetingService:
         # Naiver „Jetzt"-Zeitstempel — vergleichbar mit dem (datums-basierten) Sort-Key.
         now_ts = datetime.now(UTC).replace(tzinfo=None)
         cur = _decode_cursor(cursor)
+        # Bucket status-bewusst (nicht rein zeitlich): ``live`` ist immer „anstehend"
+        # (eine seit heute Vormittag laufende Sitzung darf nicht in die Vergangenheit
+        # rutschen), ``closed`` immer „vergangen", ``planned`` entscheidet das Datum.
+        is_upcoming = or_(
+            Meeting.status == "live",
+            and_(Meeting.status == "planned", sort_ts >= now_ts),
+        )
+        is_past = and_(
+            Meeting.status != "live",
+            or_(Meeting.status == "closed", sort_ts < now_ts),
+        )
         stmt = select(Meeting, sort_ts)
         if gremium_id is not None:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
         if direction == "upcoming":
-            stmt = stmt.where(sort_ts >= now_ts)
+            stmt = stmt.where(is_upcoming)
             if cur is not None:
                 cts, cid = cur
                 stmt = stmt.where(
@@ -377,7 +388,7 @@ class MeetingService:
                 )
             stmt = stmt.order_by(sort_ts.asc(), Meeting.id.asc())
         else:
-            stmt = stmt.where(sort_ts < now_ts)
+            stmt = stmt.where(is_past)
             if cur is not None:
                 cts, cid = cur
                 stmt = stmt.where(

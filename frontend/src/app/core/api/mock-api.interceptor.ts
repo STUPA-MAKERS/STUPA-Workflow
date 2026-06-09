@@ -21,6 +21,7 @@ import type {
   EffectiveForm,
   MagicLinkVerifyResult,
   MeetingOutWire,
+  MeetingPageWire,
   Page,
   Principal,
   ProtocolOutWire,
@@ -588,6 +589,14 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
+    if (p.endsWith('/meetings/timeline')) {
+      const direction = req.params.get('direction') ?? 'upcoming';
+      const page: MeetingPageWire = {
+        items: direction === 'upcoming' ? [MOCK_MEETING] : [],
+        nextCursor: null,
+      };
+      return ok(page);
+    }
     if (p.endsWith('/meetings')) return ok([MOCK_MEETING]);
     if (/\/meetings\/[^/]+\/attendance$/.test(p)) return ok([...MOCK_ATTENDANCE]);
     if (/\/meetings\/[^/]+\/agenda\/assignable$/.test(p)) {

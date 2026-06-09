@@ -121,9 +121,17 @@ class AgendaService:
         return out
 
     async def set_body(
-        self, meeting_id: UUID, item_id: UUID, body: str
+        self,
+        meeting_id: UUID,
+        item_id: UUID,
+        body: str | None = None,
+        title: str | None = None,
     ) -> list[AgendaItemOut]:
-        """Markdown-Text eines TOP setzen (pro-TOP-Editor)."""
+        """Markdown-Text und/oder Titel eines TOP setzen (pro-TOP-Editor).
+
+        ``body`` setzt (falls geliefert) den Markdown-Text; ``title`` benennt nur
+        **Freitext-TOPs** um (Antrag-TOPs erben den Titel vom Antrag).
+        """
         row = (
             await self.session.execute(
                 select(MeetingAgendaItem).where(
@@ -134,7 +142,10 @@ class AgendaService:
         ).scalar_one_or_none()
         if row is None:
             raise NotFoundError(f"agenda item {item_id} not found")
-        row.body = body
+        if body is not None:
+            row.body = body
+        if title is not None and row.application_id is None:
+            row.title = title.strip()
         await self.session.flush()
         await self.session.commit()
         return await self.list(meeting_id)

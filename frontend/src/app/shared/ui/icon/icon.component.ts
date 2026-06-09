@@ -26,7 +26,9 @@ export type IconName =
   | 'bell'
   | 'audit'
   | 'clock'
-  | 'export';
+  | 'export'
+  | 'play'
+  | 'stop';
 
 /** Icon-Name → Font-Awesome-Solid-Klasse (#80, FA-Migration). */
 const FA: Record<IconName, string> = {
@@ -56,6 +58,8 @@ const FA: Record<IconName, string> = {
   audit: 'fa-clipboard-check',
   clock: 'fa-clock',
   export: 'fa-file-export',
+  play: 'fa-play',
+  stop: 'fa-stop',
 };
 
 /**

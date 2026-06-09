@@ -442,6 +442,14 @@ export class ApiClient {
     );
   }
 
+  /** PATCH /meetings/{id}/agenda/{itemId} — Freitext-TOP umbenennen (Titel setzen). */
+  renameAgendaItem(meetingId: Uuid, itemId: Uuid, title: string): Observable<AgendaItem[]> {
+    return this.http.patch<AgendaItem[]>(
+      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
+      { title },
+    );
+  }
+
   /** PUT /meetings/{id}/agenda/order — TOPs in der gelieferten Reihenfolge anordnen. */
   reorderAgenda(meetingId: Uuid, itemIds: Uuid[]): Observable<AgendaItem[]> {
     return this.http.put<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/order`, {

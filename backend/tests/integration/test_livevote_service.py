@@ -27,7 +27,8 @@ from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormVersion
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker
-from app.modules.livevote.models import Meeting
+from app.modules.livevote.agenda_service import AgendaService
+from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.schemas import MeetingCreate, MeetingPatch
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
 from app.modules.voting.models import Ballot, Vote
@@ -97,12 +98,17 @@ async def test_list_timeline_keyset_pagination(session: AsyncSession) -> None:
     gremium, _ = await _gremium_and_application(session)
     svc = MeetingService(session)
     principal = Principal(sub="adm", roles=["admin"])
+    async def mk(title: str, day: _date | None = None) -> None:
+        await svc.create(
+            MeetingCreate(gremiumId=gremium.id, title=title, date=day), principal
+        )
+
     # Heute ist 2026 ⇒ 2020/2021 vergangen, 2030/2031 zukünftig, undatiert = Zukunftsende.
-    await svc.create(MeetingCreate(gremiumId=gremium.id, title="past-2020", date=_date(2020, 1, 1)), principal)
-    await svc.create(MeetingCreate(gremiumId=gremium.id, title="past-2021", date=_date(2021, 6, 15)), principal)
-    await svc.create(MeetingCreate(gremiumId=gremium.id, title="fut-2030", date=_date(2030, 1, 1)), principal)
-    await svc.create(MeetingCreate(gremiumId=gremium.id, title="fut-2031", date=_date(2031, 1, 1)), principal)
-    await svc.create(MeetingCreate(gremiumId=gremium.id, title="undated"), principal)
+    await mk("past-2020", _date(2020, 1, 1))
+    await mk("past-2021", _date(2021, 6, 15))
+    await mk("fut-2030", _date(2030, 1, 1))
+    await mk("fut-2031", _date(2031, 1, 1))
+    await mk("undated")
 
     # --- upcoming: frühestes zuerst, undatiert zuletzt; paginiert über den Cursor. ---
     up: list[str] = []
@@ -292,3 +298,38 @@ async def test_broker_publisher_roundtrip_over_redis(redis_url: str) -> None:
         assert "voter" not in msg
     finally:
         await client.aclose()
+
+
+async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) -> None:
+    """``set_body(title=…)`` benennt Freitext-TOPs um, lässt Antrag-TOPs unberührt."""
+    gremium, application = await _gremium_and_application(session)
+    meeting = Meeting(gremium_id=gremium.id, title="GV", status="planned")
+    session.add(meeting)
+    await session.flush()
+    free = MeetingAgendaItem(
+        meeting_id=meeting.id, application_id=None, title="Freitext", position=0
+    )
+    backed = MeetingAgendaItem(
+        meeting_id=meeting.id, application_id=application.id, position=1
+    )
+    session.add_all([free, backed])
+    await session.commit()
+
+    svc = AgendaService(session)
+
+    # Freitext-TOP umbenennen + Body setzen.
+    items = await svc.set_body(meeting.id, free.id, body="hello", title="Neuer Titel")
+    by_id = {i.id: i for i in items}
+    assert by_id[free.id].title == "Neuer Titel"
+    assert by_id[free.id].body == "hello"
+
+    # Antrag-TOP: title wird ignoriert (Titel erbt vom Antrag), aber body greift.
+    items = await svc.set_body(meeting.id, backed.id, body="x", title="HACK")
+    refreshed = await session.get(MeetingAgendaItem, backed.id)
+    assert refreshed is not None and refreshed.title is None
+
+    # body=None lässt den vorhandenen Body unberührt, benennt aber um.
+    items = await svc.set_body(meeting.id, free.id, title="Wieder anders")
+    by_id = {i.id: i for i in items}
+    assert by_id[free.id].title == "Wieder anders"
+    assert by_id[free.id].body == "hello"

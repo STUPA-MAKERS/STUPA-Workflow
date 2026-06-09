@@ -114,10 +114,15 @@ async function setup(
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   // Gremien-Dropdown (#68) lädt beim Start `/gremien` (nur mit meeting.manage).
   http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush(opts.gremien ?? []));
-  // Übersichts-Route lädt die Sitzungs-Liste (#104) — exakt `/api/meetings`.
+  // Übersichts-Route lädt die Timeline (#104) — je eine Cursor-Seite past/upcoming.
+  const isPast = (m: MeetingOutWire) => m.status === 'closed';
   http
-    .match((r) => r.url.endsWith('/meetings') && r.method === 'GET')
-    .forEach((req) => req.flush(opts.meetings ?? []));
+    .match((r) => r.url.endsWith('/meetings/timeline') && r.method === 'GET')
+    .forEach((req) => {
+      const past = req.request.params.get('direction') === 'past';
+      const items = (opts.meetings ?? []).filter((m) => (past ? isPast(m) : !isPast(m)));
+      req.flush({ items, nextCursor: null });
+    });
   return { ...view, http, ws, navigate };
 }
 
@@ -254,7 +259,8 @@ describe('MeetingsComponent', () => {
       meetings: [{ ...MEETING, title: 'Vergangene Sitzung', status: 'closed' }],
     });
     expect(await screen.findByText('Vergangene Sitzung')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    // Die Timeline-Karte selbst ist die Öffnen-Affordanz (role=button, aria „Öffnen: …").
+    await userEvent.click(screen.getByRole('button', { name: /Öffnen/ }));
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
   });
 

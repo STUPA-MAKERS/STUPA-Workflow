@@ -14,6 +14,7 @@ import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
@@ -40,6 +41,7 @@ import {
   DatepickerComponent,
   DialogComponent,
   IconComponent,
+  type IconName,
   SelectComponent,
   type SelectOption,
 } from '@shared/ui';
@@ -180,8 +182,8 @@ const AUTOSAVE_DELAY_MS = 1000;
       <!-- Toolbar oberhalb des Bodies: Steuerung + Einstellungen + Löschen (Icon-Buttons). -->
       <div class="mtg__toolbar" role="toolbar" [attr.aria-label]="'meetings.control.title' | t">
         @if (m.canControl) {
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live'" [ariaLabel]="'meetings.control.open' | t" [title]="'meetings.control.open' | t" (click)="setStatus('live')"><app-icon name="power" /></app-button>
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'closed'" [ariaLabel]="'meetings.control.closeSession' | t" [title]="'meetings.control.closeSession' | t" (click)="setStatus('closed')"><app-icon name="check" /></app-button>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live'" [ariaLabel]="'meetings.control.open' | t" [title]="'meetings.control.open' | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'closed'" [ariaLabel]="'meetings.control.closeSession' | t" [title]="'meetings.control.closeSession' | t" (click)="setStatus('closed')"><app-icon name="stop" /></app-button>
         }
         <span class="mtg__toolbarSpacer"></span>
         <app-button variant="ghost" size="sm" (click)="beamerMode.set(true)">{{ 'meetings.beamer.enter' | t }}</app-button>
@@ -211,9 +213,28 @@ const AUTOSAVE_DELAY_MS = 1000;
                   <span class="mtg__tocGrip" aria-hidden="true">⠿</span>
                 }
                 <span class="mtg__tocNum">{{ i + 1 }}</span>
-                <span class="mtg__tocTitle">{{ item.title || ('meetings.agenda.untitled' | t) }}</span>
+                @if (renamingTopId() === item.id) {
+                  <input
+                    class="mtg__input mtg__tocRename"
+                    [ngModel]="renameDraft()"
+                    (ngModelChange)="renameDraft.set($event)"
+                    (click)="$event.stopPropagation()"
+                    (keyup.enter)="renameTop(item)"
+                    (keyup.escape)="cancelRename()"
+                    (blur)="renameTop(item)"
+                    [placeholder]="'meetings.agenda.renamePlaceholder' | t"
+                    [attr.aria-label]="'meetings.agenda.rename' | t"
+                    name="renameTop"
+                    autofocus
+                  />
+                } @else {
+                  <span class="mtg__tocTitle">{{ item.title || ('meetings.agenda.untitled' | t) }}</span>
+                }
                 @if (votesForTop(item.id).length) {
                   <span class="mtg__tocNum" [attr.aria-label]="'meetings.vote.count' | t">⚖ {{ votesForTop(item.id).length }}</span>
+                }
+                @if (m.canWrite && !protocol()?.isFinal && !item.applicationId && renamingTopId() !== item.id) {
+                  <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.agenda.rename' | t" [title]="'meetings.agenda.rename' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); startRename(item)"><app-icon name="edit" /></app-button>
                 }
                 @if (m.canWrite && !protocol()?.isFinal) {
                   <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); removeFromAgenda(item.id)"><app-icon name="delete" /></app-button>
@@ -224,13 +245,20 @@ const AUTOSAVE_DELAY_MS = 1000;
             }
           </ol>
           @if (m.canWrite && !protocol()?.isFinal) {
-            <div class="mtg__tocAdd">
-              <app-select [placeholder]="'meetings.agenda.addPlaceholder' | t" [options]="assignableOptions()" [ngModel]="agendaPick()" (ngModelChange)="agendaPick.set($event)" />
-              <app-button size="sm" [disabled]="!agendaPick() || savingAgenda()" (click)="addToAgenda()">{{ 'meetings.agenda.add' | t }}</app-button>
+            <div class="mtg__tocAddBlock">
+              <p class="mtg__tocAddH">{{ 'meetings.agenda.assignHeading' | t }}</p>
+              <div class="mtg__tocAdd">
+                <app-select [placeholder]="'meetings.agenda.addPlaceholder' | t" [options]="assignableOptions()" [ngModel]="agendaPick()" (ngModelChange)="agendaPick.set($event)" />
+                <app-button size="sm" [disabled]="!agendaPick() || savingAgenda()" (click)="addToAgenda()">{{ 'meetings.agenda.add' | t }}</app-button>
+              </div>
             </div>
-            <div class="mtg__tocAdd">
-              <input class="mtg__input" [placeholder]="'meetings.agenda.freetextPlaceholder' | t" [ngModel]="agendaFreetext()" (ngModelChange)="agendaFreetext.set($event)" (keyup.enter)="addFreetext()" name="agendaFreetext" />
-              <app-button variant="secondary" size="sm" [disabled]="!agendaFreetext().trim() || savingAgenda()" (click)="addFreetext()">{{ 'meetings.agenda.addFreetext' | t }}</app-button>
+            <hr class="mtg__tocDiv" />
+            <div class="mtg__tocAddBlock">
+              <p class="mtg__tocAddH">{{ 'meetings.agenda.freetextHeading' | t }}</p>
+              <div class="mtg__tocAdd">
+                <input class="mtg__input" [placeholder]="'meetings.agenda.freetextPlaceholder' | t" [ngModel]="agendaFreetext()" (ngModelChange)="agendaFreetext.set($event)" (keyup.enter)="addFreetext()" name="agendaFreetext" />
+                <app-button variant="secondary" size="sm" [disabled]="!agendaFreetext().trim() || savingAgenda()" (click)="addFreetext()">{{ 'meetings.agenda.addFreetext' | t }}</app-button>
+              </div>
             </div>
           }
         </aside>
@@ -347,12 +375,15 @@ const AUTOSAVE_DELAY_MS = 1000;
                   <span class="mtg__attBtns" role="group" [attr.aria-label]="'meetings.attendance.title' | t">
                     @for (s of attendanceStatuses; track s) {
                       <app-button
+                        [iconOnly]="true"
+                        [ariaLabel]="attendanceKey(s) | t"
+                        [title]="attendanceKey(s) | t"
                         [variant]="a.status === s ? attBtnVariant(s) : 'ghost'"
                         size="sm"
                         [disabled]="savingAttendance()"
                         (click)="setAttendance(a, s)"
                       >
-                        {{ attendanceKey(s) | t }}
+                        <app-icon [name]="attendanceIcon(s)" />
                       </app-button>
                     }
                   </span>
@@ -469,26 +500,31 @@ const AUTOSAVE_DELAY_MS = 1000;
           </header>
           @if (loadingList()) {
             <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
-          } @else if (!meetings().length) {
+          } @else if (timelineEmpty()) {
             <p class="mtg__muted">{{ 'meetings.list.empty' | t }}</p>
           } @else {
-            <!-- Timeline (#104): Vergangenes oben (lazy beim Hochscrollen), Anstehendes unten. -->
+            <!-- Timeline (#104): Vergangenes oben (serverseitig lazy beim Hochscrollen),
+                 Anstehendes unten (lazy beim Runterscrollen). -->
             <div class="mtg__timeline" #tlScroll (scroll)="onTimelineScroll(tlScroll)">
               @if (hasMorePast()) {
-                <button type="button" class="mtg__tlMore" (click)="loadMorePast(tlScroll)">
-                  <app-icon name="chevron-up" /> {{ 'meetings.list.loadPast' | t }}
+                <button type="button" class="mtg__tlMore" [disabled]="loadingPast()" (click)="loadMorePast(tlScroll)">
+                  <app-icon name="chevron-up" />
+                  {{ (loadingPast() ? 'meetings.list.loading' : 'meetings.list.loadPast') | t }}
                 </button>
               }
-              @for (m of pastVisible(); track m.id) {
+              @for (m of pastItems(); track m.id) {
                 <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: true }" />
               }
               <div class="mtg__tlNow" #nowMarker>
                 <span class="mtg__tlNowLabel">{{ 'meetings.list.now' | t }}</span>
               </div>
-              @for (m of upcomingSessions(); track m.id) {
+              @for (m of upcomingItems(); track m.id) {
                 <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
               } @empty {
                 <p class="mtg__muted mtg__tlNoUp">{{ 'meetings.list.noUpcoming' | t }}</p>
+              }
+              @if (loadingUpcoming()) {
+                <p class="mtg__muted mtg__tlNoUp" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
               }
             </div>
 
@@ -652,6 +688,9 @@ const AUTOSAVE_DELAY_MS = 1000;
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
+        width: 100%;
+        max-width: var(--layout-max-width);
+        margin-inline: auto;
       }
       .mtg__meta {
         display: flex;
@@ -944,16 +983,17 @@ const AUTOSAVE_DELAY_MS = 1000;
         padding: 0;
         display: flex;
         flex-direction: column;
-        gap: var(--space-1);
+        gap: var(--space-2);
       }
       .mtg__tocItem {
         display: flex;
         align-items: center;
         gap: var(--space-2);
-        padding: var(--space-2);
+        padding: var(--space-3);
         border: var(--border-width) solid var(--color-border);
         border-radius: var(--radius-md);
         cursor: pointer;
+        min-width: 0;
       }
       .mtg__tocItem:hover {
         background: var(--color-surface-sunken);
@@ -979,6 +1019,12 @@ const AUTOSAVE_DELAY_MS = 1000;
         white-space: nowrap;
         font-size: var(--fs-sm);
       }
+      .mtg__tocRename {
+        flex: 1;
+        min-width: 0;
+        padding: var(--space-1) var(--space-2);
+        font-size: var(--fs-sm);
+      }
       .mtg__tocEmpty {
         padding: var(--space-4) var(--space-2);
         text-align: center;
@@ -986,15 +1032,36 @@ const AUTOSAVE_DELAY_MS = 1000;
         border-radius: var(--radius-md);
         font-size: var(--fs-sm);
       }
+      .mtg__tocAddBlock {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      .mtg__tocAddH {
+        margin: 0;
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-semibold);
+        color: var(--color-text-muted);
+      }
+      .mtg__tocDiv {
+        border: 0;
+        border-top: var(--border-width) solid var(--color-border);
+        margin: var(--space-2) 0;
+        width: 100%;
+      }
       .mtg__tocAdd {
         display: flex;
+        flex-direction: column;
         gap: var(--space-2);
-        align-items: center;
+        align-items: stretch;
       }
       .mtg__tocAdd > app-select,
       .mtg__tocAdd > .mtg__input {
-        flex: 1;
+        width: 100%;
         min-width: 0;
+      }
+      .mtg__tocAdd > app-button {
+        align-self: stretch;
       }
       .mtg__topEditor {
         display: flex;
@@ -1035,8 +1102,8 @@ const AUTOSAVE_DELAY_MS = 1000;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: var(--space-3);
-        padding: var(--space-2) var(--space-3);
+        gap: var(--space-2);
+        padding: var(--space-1) var(--space-2);
         border: var(--border-width) solid var(--color-border);
         border-radius: var(--radius-md);
         flex-wrap: wrap;
@@ -1197,35 +1264,69 @@ const AUTOSAVE_DELAY_MS = 1000;
         border-radius: var(--radius-md);
         background: var(--color-surface);
         flex-wrap: wrap;
+        width: 100%;
+        max-width: var(--layout-max-width);
+        margin-inline: auto;
       }
       .mtg__toolbarSpacer {
         margin-left: auto;
       }
+      /* Breakout-Grid: Tagesordnung im linken Rand, Anwesenheit im rechten Rand,
+         Protokoll-Body zentriert auf Body-Breite (analog Budget-Dashboard). */
       .mtg__shell {
         display: grid;
-        grid-template-columns: minmax(0, 16rem) minmax(0, 1fr) minmax(0, 16rem);
-        gap: var(--space-4);
+        grid-template-columns:
+          minmax(13rem, 1fr)
+          minmax(0, var(--layout-max-width))
+          minmax(13rem, 1fr);
+        gap: var(--space-5);
         align-items: start;
-      }
-      @media (max-width: 64rem) {
-        .mtg__shell {
-          grid-template-columns: 1fr;
-        }
       }
       .mtg__side {
         display: flex;
         flex-direction: column;
-        gap: var(--space-2);
-        padding: var(--space-3);
+        gap: var(--space-3);
+        padding: var(--space-4);
         border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-lg);
         background: var(--color-surface);
         position: sticky;
         top: var(--space-4);
+        max-height: calc(100vh - var(--space-6));
+        overflow-y: auto;
+        width: 100%;
       }
-      @media (max-width: 64rem) {
+      .mtg__side--left {
+        justify-self: end;
+        max-width: 18rem;
+      }
+      .mtg__side--right {
+        justify-self: start;
+        max-width: 18rem;
+      }
+      /* Schmaler: Anwesenheit unter den Body, Tagesordnung bleibt links. */
+      @media (max-width: 60rem) {
+        .mtg__shell {
+          grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
+        }
+        .mtg__side--left {
+          justify-self: stretch;
+          max-width: none;
+        }
+        .mtg__side--right {
+          grid-column: 1 / -1;
+          justify-self: stretch;
+          max-width: none;
+          position: static;
+        }
+      }
+      @media (max-width: 40rem) {
+        .mtg__shell {
+          grid-template-columns: 1fr;
+        }
         .mtg__side {
           position: static;
+          max-width: none;
         }
       }
       .mtg__sideH {
@@ -1237,6 +1338,17 @@ const AUTOSAVE_DELAY_MS = 1000;
         flex-direction: column;
         gap: var(--space-3);
         min-width: 0;
+      }
+      /* Pro-TOP-Editor: deutlich höhere Schreibfläche (#Sessions). Der Editor
+         kapselt seine Styles, daher ::ng-deep auf Host + ProseMirror-Fläche. */
+      .mtg__main app-markdown-editor {
+        display: block;
+      }
+      .mtg__main app-markdown-editor ::ng-deep .mde__host {
+        min-height: 24rem;
+      }
+      .mtg__main app-markdown-editor ::ng-deep .mde__host .ProseMirror {
+        min-height: 22rem;
       }
       .mtg__rowActions {
         display: inline-flex;
@@ -1407,6 +1519,9 @@ export class MeetingsComponent implements OnDestroy {
   readonly savingAgenda = signal(false);
   readonly agendaPick = signal<string>('');
   readonly agendaFreetext = signal<string>('');
+  /** Inline-Umbenennen eines Freitext-TOP: aktiver TOP + Eingabe-Entwurf (#Sessions). */
+  readonly renamingTopId = signal<Uuid | null>(null);
+  readonly renameDraft = signal<string>('');
 
   /** Live-Abstimmung öffnen (#Meetings): Dialog-Zustand + Beschlussfrage/Optionen. */
   readonly voteDialogOpen = signal(false);
@@ -1425,8 +1540,7 @@ export class MeetingsComponent implements OnDestroy {
     this.assignable().map((a) => ({ value: a.applicationId, label: a.title || a.applicationId })),
   );
 
-  /** Sitzungs-Liste (#104) — gezeigt, solange keine einzelne Sitzung geladen ist. */
-  readonly meetings = signal<Meeting[]>([]);
+  /** Initiales Laden der Übersicht-Timeline (erste Seite beider Richtungen). */
   readonly loadingList = signal(false);
 
   readonly loadingProtocol = signal(false);
@@ -1456,83 +1570,99 @@ export class MeetingsComponent implements OnDestroy {
   /** Sitzung-anlegen-Dialog offen (#27). */
   readonly createOpen = signal(false);
 
-  // --- Timeline (#104) -----------------------------------------------------
-  /** Wie viele Vergangenheits-Sitzungen pro Nachlade-Schritt sichtbar werden. */
-  private readonly PAST_CHUNK = 12;
-  /** Aktuell sichtbares Vergangenheits-Fenster (wächst beim Hochscrollen). */
-  readonly pastWindow = signal(this.PAST_CHUNK);
+  // --- Timeline (#104) — server-seitiges Keyset-Lazy-Loading ----------------
+  /** Seitengröße je Nachlade-Schritt (beide Richtungen). */
+  private readonly PAGE = 15;
+
+  /** Anstehende Sitzungen, chronologisch vorwärts (frühestes oben). */
+  readonly upcomingItems = signal<Meeting[]>([]);
+  /** Vergangene Sitzungen, chronologisch (ältestes oben, jüngstes am „jetzt"). */
+  readonly pastItems = signal<Meeting[]>([]);
+  /** Cursor der jeweils nächsten Seite (``null`` ⇒ Richtung erschöpft). */
+  private upcomingCursor: string | null = null;
+  private pastCursor: string | null = null;
+  readonly upcomingHasMore = signal(false);
+  readonly pastHasMore = signal(false);
+  readonly loadingUpcoming = signal(false);
+  readonly loadingPast = signal(false);
   private didInitialScroll = false;
-  private loadingMore = false;
 
   readonly timelineScroll = viewChild<ElementRef<HTMLElement>>('tlScroll');
   readonly nowMarker = viewChild<ElementRef<HTMLElement>>('nowMarker');
 
-  /** Vergangen: geschlossen, oder geplant mit Datum vor heute. Live nie. */
-  private isPast(m: Meeting): boolean {
-    if (m.status === 'live') return false;
-    if (m.status === 'closed') return true;
-    return !!m.date && m.date < this.todayIso();
-  }
-
-  /** Lokales Heute als `YYYY-MM-DD` (Vergleichsschlüssel für `date`). */
-  private todayIso(): string {
-    const d = new Date();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${d.getFullYear()}-${mm}-${dd}`;
-  }
-
-  /** Sortierschlüssel aus Datum+Uhrzeit; ohne Datum ⇒ leer (ans Ende). */
-  private dateKey(m: Meeting): string {
-    return m.date ? `${m.date} ${m.startTime ?? ''}` : '';
-  }
-
-  /** Anstehend (unten): live zuerst, dann nach Datum aufsteigend; ohne Datum ans Ende. */
-  readonly upcomingSessions = computed<Meeting[]>(() =>
-    this.meetings()
-      .filter((m) => !this.isPast(m))
-      .sort((a, b) => {
-        if (a.status === 'live' && b.status !== 'live') return -1;
-        if (b.status === 'live' && a.status !== 'live') return 1;
-        const ak = this.dateKey(a);
-        const bk = this.dateKey(b);
-        if (!ak) return 1;
-        if (!bk) return -1;
-        return ak < bk ? -1 : ak > bk ? 1 : 0;
-      }),
+  /** „Frühere Sitzungen laden"-Affordanz (oben). */
+  readonly hasMorePast = computed(() => this.pastHasMore());
+  /** Übersicht leer (nach dem Laden keine Sitzung in beiden Richtungen). */
+  readonly timelineEmpty = computed(
+    () => !this.upcomingItems().length && !this.pastItems().length,
   );
 
-  /** Vergangene Sitzungen, neueste zuerst — Basis für das „ab jetzt"-Fenster. */
-  private readonly pastDesc = computed<Meeting[]>(() =>
-    this.meetings()
-      .filter((m) => this.isPast(m))
-      .sort((a, b) => (this.dateKey(a) < this.dateKey(b) ? 1 : -1)),
-  );
-
-  readonly hasMorePast = computed(() => this.pastDesc().length > this.pastWindow());
-
-  /** Sichtbares Vergangenheits-Fenster, chronologisch (ältestes oben, neuestes am „jetzt"). */
-  readonly pastVisible = computed<Meeting[]>(() =>
-    this.pastDesc().slice(0, this.pastWindow()).reverse(),
-  );
-
-  /** Hochscrollen nahe dem oberen Rand lädt ein weiteres Vergangenheits-Fenster. */
+  /**
+   * Scroll-getriebenes Nachladen: nahe dem oberen Rand ⇒ ältere Vergangenheit,
+   * nahe dem unteren Rand ⇒ weitere Zukunft. Beide serverseitig per Cursor.
+   */
   onTimelineScroll(el: HTMLElement): void {
-    if (el.scrollTop <= 80 && this.hasMorePast() && !this.loadingMore) {
-      this.loadMorePast(el);
-    }
+    if (el.scrollTop <= 80) this.loadMorePast(el);
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreUpcoming();
   }
 
-  /** Fenster vergrößern und Scroll-Position über die neu eingefügte Höhe halten. */
+  /** Nächste Vergangenheits-Seite laden + Scroll-Position über die neue Höhe halten. */
   loadMorePast(el: HTMLElement): void {
-    if (this.loadingMore || !this.hasMorePast()) return;
-    this.loadingMore = true;
+    if (this.loadingPast() || !this.pastHasMore() || this.pastCursor === null) return;
+    this.loadingPast.set(true);
     const prevHeight = el.scrollHeight;
-    this.pastWindow.update((n) => n + this.PAST_CHUNK);
-    requestAnimationFrame(() => {
-      el.scrollTop += el.scrollHeight - prevHeight;
-      this.loadingMore = false;
-    });
+    this.api
+      .listMeetingsTimeline({ direction: 'past', cursor: this.pastCursor, limit: this.PAGE })
+      .subscribe({
+        next: (page) => {
+          this.loadingPast.set(false);
+          // Seite ist neueste-zuerst ⇒ umgedreht oben anfügen (älteste bleiben oben).
+          this.pastItems.update((cur) => [...[...page.items].reverse(), ...cur]);
+          this.pastCursor = page.nextCursor;
+          this.pastHasMore.set(page.nextCursor !== null);
+          requestAnimationFrame(() => {
+            el.scrollTop += el.scrollHeight - prevHeight;
+          });
+        },
+        error: () => this.loadingPast.set(false),
+      });
+  }
+
+  /** Nächste Zukunfts-Seite laden + unten anfügen. */
+  loadMoreUpcoming(): void {
+    if (this.loadingUpcoming() || !this.upcomingHasMore() || this.upcomingCursor === null)
+      return;
+    this.loadingUpcoming.set(true);
+    this.api
+      .listMeetingsTimeline({
+        direction: 'upcoming',
+        cursor: this.upcomingCursor,
+        limit: this.PAGE,
+      })
+      .subscribe({
+        next: (page) => {
+          this.loadingUpcoming.set(false);
+          this.upcomingItems.update((cur) => [...cur, ...page.items]);
+          this.upcomingCursor = page.nextCursor;
+          this.upcomingHasMore.set(page.nextCursor !== null);
+        },
+        error: () => this.loadingUpcoming.set(false),
+      });
+  }
+
+  /** Eine geänderte Sitzung in beiden Richtungen ersetzen (Settings-Save). */
+  private replaceInTimeline(updated: Meeting): void {
+    const repl = (list: Meeting[]): Meeting[] =>
+      list.map((x) => (x.id === updated.id ? updated : x));
+    this.upcomingItems.update(repl);
+    this.pastItems.update(repl);
+  }
+
+  /** Eine gelöschte Sitzung aus beiden Richtungen entfernen. */
+  private removeFromTimeline(id: Uuid): void {
+    const rm = (list: Meeting[]): Meeting[] => list.filter((x) => x.id !== id);
+    this.upcomingItems.update(rm);
+    this.pastItems.update(rm);
   }
 
   openCreate(): void {
@@ -1618,7 +1748,9 @@ export class MeetingsComponent implements OnDestroy {
     effect(() => {
       const marker = this.nowMarker()?.nativeElement;
       const scroller = this.timelineScroll()?.nativeElement;
-      this.meetings(); // Abhängigkeit: neu positionieren, wenn Liste eintrifft
+      // Abhängigkeiten: neu positionieren, sobald beide Richtungen eingetroffen sind.
+      this.pastItems();
+      this.upcomingItems();
       if (marker && scroller && !this.didInitialScroll && !this.loadingList()) {
         this.didInitialScroll = true;
         requestAnimationFrame(() => {
@@ -1669,20 +1801,38 @@ export class MeetingsComponent implements OnDestroy {
     this.loadAgenda(m.id);
   }
 
-  /** Sitzungs-Liste laden (#104 — Wiederauffindbarkeit). */
+  /**
+   * Timeline initial laden (#104): erste Zukunfts- **und** Vergangenheits-Seite
+   * parallel, danach wird einmalig auf „jetzt" gescrollt (Effect oben).
+   */
   private loadList(): void {
     if (!this.canManage() && !this.canWrite()) return;
     this.didInitialScroll = false;
-    this.pastWindow.set(this.PAST_CHUNK);
+    this.upcomingItems.set([]);
+    this.pastItems.set([]);
+    this.upcomingCursor = null;
+    this.pastCursor = null;
+    this.upcomingHasMore.set(false);
+    this.pastHasMore.set(false);
     this.loadingList.set(true);
-    this.api.listMeetings().subscribe({
-      next: (list) => {
+    forkJoin({
+      upcoming: this.api.listMeetingsTimeline({ direction: 'upcoming', limit: this.PAGE }),
+      past: this.api.listMeetingsTimeline({ direction: 'past', limit: this.PAGE }),
+    }).subscribe({
+      next: ({ upcoming, past }) => {
         this.loadingList.set(false);
-        this.meetings.set(list);
+        this.upcomingItems.set(upcoming.items);
+        this.upcomingCursor = upcoming.nextCursor;
+        this.upcomingHasMore.set(upcoming.nextCursor !== null);
+        // „past" kommt neueste-zuerst ⇒ umdrehen: ältestes oben, jüngstes am „jetzt".
+        this.pastItems.set([...past.items].reverse());
+        this.pastCursor = past.nextCursor;
+        this.pastHasMore.set(past.nextCursor !== null);
       },
       error: () => {
         this.loadingList.set(false);
-        this.meetings.set([]);
+        this.upcomingItems.set([]);
+        this.pastItems.set([]);
       },
     });
   }
@@ -1935,6 +2085,11 @@ export class MeetingsComponent implements OnDestroy {
     return status === 'present' ? 'primary' : status === 'excused' ? 'secondary' : 'danger';
   }
 
+  /** Kompaktes Icon je Anwesenheits-Status: anwesend check, entschuldigt clock, abwesend remove. */
+  attendanceIcon(status: AttendanceStatus): IconName {
+    return status === 'present' ? 'check' : status === 'excused' ? 'clock' : 'remove';
+  }
+
   attBadgeVariant(status: AttendanceStatus): BadgeVariant {
     return status === 'present' ? 'success' : status === 'excused' ? 'warning' : 'danger';
   }
@@ -2008,6 +2163,44 @@ export class MeetingsComponent implements OnDestroy {
         this.savingAgenda.set(false);
         this.agenda.set(rows);
         this.refreshAssignable(m.id);
+      },
+      error: () => {
+        this.savingAgenda.set(false);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
+    });
+  }
+
+  /** Inline-Umbenennen eines Freitext-TOP starten (nur ohne Antrags-Bindung). */
+  startRename(item: AgendaItem): void {
+    if (item.applicationId) return;
+    this.renamingTopId.set(item.id);
+    this.renameDraft.set(item.title ?? '');
+  }
+
+  cancelRename(): void {
+    this.renamingTopId.set(null);
+    this.renameDraft.set('');
+  }
+
+  /** Neuen Titel eines Freitext-TOP speichern (PATCH …/agenda/{id} { title }). */
+  renameTop(item: AgendaItem): void {
+    // Bereits abgebrochen/umgeschaltet? Nichts tun (verhindert doppelten Blur-Save).
+    if (this.renamingTopId() !== item.id) return;
+    const m = this.meeting();
+    const title = this.renameDraft().trim();
+    // Leer oder unverändert ⇒ nur schließen, kein Request.
+    if (!m || item.applicationId || !title || title === (item.title ?? '')) {
+      this.cancelRename();
+      return;
+    }
+    this.renamingTopId.set(null);
+    this.savingAgenda.set(true);
+    this.api.renameAgendaItem(m.id, item.id, title).subscribe({
+      next: (rows) => {
+        this.savingAgenda.set(false);
+        this.agenda.set(rows);
+        this.renameDraft.set('');
       },
       error: () => {
         this.savingAgenda.set(false);
@@ -2101,7 +2294,7 @@ export class MeetingsComponent implements OnDestroy {
           this.savingSettings.set(false);
           this.settingsMeeting.set(null);
           if (this.meeting()?.id === updated.id) this.meeting.set(updated);
-          this.meetings.update((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+          this.replaceInTimeline(updated);
           this.toast.success(this.i18n.translate('meetings.toast.settingsSaved'));
         },
         error: () => {
@@ -2123,7 +2316,7 @@ export class MeetingsComponent implements OnDestroy {
       next: () => {
         this.deletingMeeting.set(false);
         this.confirmDeleteMeeting.set(null);
-        this.meetings.update((list) => list.filter((x) => x.id !== m.id));
+        this.removeFromTimeline(m.id);
         this.toast.success(this.i18n.translate('meetings.toast.deleted'));
         // Aus der Detailansicht zurück zur Übersicht.
         if (this.meeting()?.id === m.id) void this.router.navigate(['/meetings']);
