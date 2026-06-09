@@ -2,4 +2,4 @@
 # pytex pinned exactly for a reproducible image; the web layer floats on minors.
 fastapi>=0.115
 uvicorn[standard]>=0.34
-pytex-preprocessor==1.0.5
+pytex-preprocessor==1.0.6
