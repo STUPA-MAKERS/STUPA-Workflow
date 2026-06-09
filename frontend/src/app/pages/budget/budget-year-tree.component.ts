@@ -94,26 +94,40 @@ export interface BudgetYearSelection {
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      /* Gepunktete, hellgrüne, kompakte Verbindungslinien zu den Jahren. */
+      /* Gepunktete, hellgrüne, kompakte Verbindungslinien zu den Jahren — echter
+         Baum: die letzte Zeile beendet die Senkrechte (kein Stray-Down-Line). */
       .byt__years {
         list-style: none;
         margin: 0 0 var(--space-1) 0;
-        padding: 0 0 0 calc(var(--space-2) + 4px);
-        border-left: 1px dotted var(--color-success, #5fb37a);
+        padding: 0 0 0 calc(var(--space-3) + 4px);
         margin-left: calc(var(--space-2) + 4px);
+      }
+      .byt__years > li {
+        position: relative;
+      }
+      .byt__years > li::before {
+        content: '';
+        position: absolute;
+        left: calc(-1 * (var(--space-2) + 1px));
+        top: 0;
+        bottom: 0;
+        border-left: 1px dotted var(--color-success, #5fb37a);
+      }
+      .byt__years > li:last-child::before {
+        bottom: auto;
+        height: 0.75em;
+      }
+      .byt__years > li::after {
+        content: '';
+        position: absolute;
+        left: calc(-1 * (var(--space-2) + 1px));
+        top: 0.75em;
+        width: var(--space-2);
+        border-top: 1px dotted var(--color-success, #5fb37a);
       }
       .byt__node--year {
         color: var(--color-text-muted);
         font-size: var(--fs-xs);
-        position: relative;
-      }
-      .byt__node--year::before {
-        content: '';
-        position: absolute;
-        left: calc(-1 * (var(--space-2) + 4px));
-        top: 50%;
-        width: var(--space-2);
-        border-top: 1px dotted var(--color-success, #5fb37a);
       }
       .byt__node--active {
         background: color-mix(in srgb, var(--color-success, #5fb37a) 22%, transparent);

@@ -132,10 +132,9 @@
             }
           </select>
         </label>
-        <label class="fe__chk">
-          <input type="radio" name="flow-initial" [checked]="s.isInitial" (change)="setInitial(s.key)" />
+        <app-checkbox [ngModel]="s.isInitial" (ngModelChange)="$event && setInitial(s.key)">
           {{ 'admin.flow.initial' | t }}
-        </label>
+        </app-checkbox>
         <app-checkbox [ngModel]="s.editAllowed !== false" (ngModelChange)="setStateEditAllowed(s.key, $event)">
           {{ 'admin.flow.editAllowed' | t }}
         </app-checkbox>
