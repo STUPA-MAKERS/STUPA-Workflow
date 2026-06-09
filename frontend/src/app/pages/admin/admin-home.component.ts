@@ -53,9 +53,11 @@ interface AdminTile {
       .admin-home__grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-        /* alle Kacheln gleich hoch — auch über Zeilen hinweg (#43). */
-        grid-auto-rows: 1fr;
-        gap: var(--space-5);
+        /* Kacheln auf Inhalt schrumpfen (kein vertikales Strecken) — pro Zeile
+           gleich hoch durch Grid-Default-Stretch. */
+        grid-auto-rows: auto;
+        align-content: start;
+        gap: var(--space-4);
       }
       .admin-home__tile {
         display: flex;

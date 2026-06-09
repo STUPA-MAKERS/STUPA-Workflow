@@ -62,57 +62,90 @@ def build_budget_workbook(
     fiscal_year_labels: dict[Any, str],
     fiscal_year_id: Any | None = None,
 ) -> bytes:
-    """Budget-Baum (eine Zeile je Knoten×HHJ) als ``.xlsx``-Bytes.
+    """Budget-Baum als ``.xlsx``-Bytes — **ein Blatt je Haushaltsjahr**.
 
     ``roots`` ist bereits auf die sichtbare Auswahl (Gremium/Teilbaum) reduziert;
-    ``fiscal_year_id`` filtert optional auf ein einzelnes HHJ.
+    ``fiscal_year_id`` filtert optional auf ein einzelnes HHJ (= nur dessen Blatt).
     """
     from openpyxl import Workbook
 
     headers = [
         "Kostenstelle",
         "Schlüssel",
-        "Haushaltsjahr",
         "Zugeteilt",
         "Gebunden",
         "Beantragt",
         "Verfügbar",
         "Währung",
     ]
+    nodes = list(_iter_nodes(roots))
+
+    # HHJ in Baum-Reihenfolge sammeln (stabil), optional auf eines gefiltert.
+    fy_order: list[Any] = []
+    for _depth, node in nodes:
+        for alloc in node.by_fiscal_year:
+            if fiscal_year_id is not None and alloc.fiscal_year_id != fiscal_year_id:
+                continue
+            if alloc.fiscal_year_id not in fy_order:
+                fy_order.append(alloc.fiscal_year_id)
+
     wb = Workbook()
-    ws = wb.active
-    assert ws is not None  # noqa: S101 - openpyxl liefert immer ein aktives Sheet
-    ws.title = "Budget"
-    _header_row(ws, headers)
+    # Standardblatt entfernen; pro HHJ ein eigenes anlegen.
+    default_ws = wb.active
+    if default_ws is not None:
+        wb.remove(default_ws)
 
-    for depth, node in _iter_nodes(roots):
-        indented = ("    " * depth) + node.name
-        allocations = [
-            a
-            for a in node.by_fiscal_year
-            if fiscal_year_id is None or a.fiscal_year_id == fiscal_year_id
-        ]
-        if not allocations:
-            ws.append([indented, node.path_key, "", None, None, None, None, node.currency])
-            continue
-        for alloc in allocations:
-            ws.append(
-                [
-                    indented,
-                    node.path_key,
-                    fiscal_year_labels.get(alloc.fiscal_year_id, ""),
-                    _num(alloc.allocated),
-                    _num(alloc.committed),
-                    _num(alloc.requested),
-                    _num(alloc.available),
-                    node.currency,
-                ]
+    if not fy_order:
+        ws = wb.create_sheet(title="Budget")
+        _header_row(ws, headers)
+        _autosize(ws, headers)
+        buf = BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+    used_titles: set[str] = set()
+    for fy in fy_order:
+        label = fiscal_year_labels.get(fy, "HHJ")
+        ws = wb.create_sheet(title=_sheet_title(label, used_titles))
+        _header_row(ws, headers)
+        for depth, node in nodes:
+            indented = ("    " * depth) + node.name
+            alloc = next(
+                (a for a in node.by_fiscal_year if a.fiscal_year_id == fy), None
             )
+            if alloc is None:
+                ws.append([indented, node.path_key, None, None, None, None, node.currency])
+            else:
+                ws.append(
+                    [
+                        indented,
+                        node.path_key,
+                        _num(alloc.allocated),
+                        _num(alloc.committed),
+                        _num(alloc.requested),
+                        _num(alloc.available),
+                        node.currency,
+                    ]
+                )
+        _autosize(ws, headers)
 
-    _autosize(ws, headers)
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def _sheet_title(label: str, used: set[str]) -> str:
+    """Excel-konformer, eindeutiger Blattname (≤31 Zeichen, ohne ``[]:*?/\\``)."""
+    safe = "".join("_" if c in '[]:*?/\\' else c for c in label).strip() or "HHJ"
+    safe = safe[:31]
+    base = safe
+    n = 2
+    while safe in used:
+        suffix = f" ({n})"
+        safe = base[: 31 - len(suffix)] + suffix
+        n += 1
+    used.add(safe)
+    return safe
 
 
 def build_applications_workbook(

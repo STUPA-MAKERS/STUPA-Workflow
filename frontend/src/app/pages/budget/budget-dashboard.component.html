@@ -5,8 +5,10 @@
   </div>
   @if (canExport()) {
     <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
-      <app-icon name="export" [size]="16" />
-      {{ 'budget.export' | t }}
+      <span class="bd__exportBtn">
+        <app-icon name="export" [size]="16" />
+        {{ 'budget.export' | t }}
+      </span>
     </app-button>
   }
 </header>

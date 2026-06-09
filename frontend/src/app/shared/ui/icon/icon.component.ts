@@ -104,43 +104,55 @@ export type IconName =
           <path d="M20 6 9 17l-5-5" />
         }
         @case ('building') {
-          <path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2" />
+          <path d="M3 21h18" />
+          <path d="M5 21V4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v17" />
+          <path d="M14 9h4a1 1 0 0 1 1 1v11" />
+          <path d="M8 7h2M8 11h2M8 15h2" />
         }
         @case ('euro') {
-          <path d="M17 5a7 7 0 1 0 0 14M4 10h9M4 14h7" />
+          <path d="M16.5 5.5a6.5 6.5 0 1 0 0 13" />
+          <path d="M4 10.5h9M4 13.5h7" />
         }
         @case ('form') {
-          <path d="M5 3h11l4 4v14a0 0 0 0 1 0 0H5a0 0 0 0 1 0 0z" />
-          <path d="M15 3v5h5M8 13h8M8 17h6" />
+          <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+          <path d="M14 3v6h6" />
+          <path d="M8 13h8M8 17h5" />
         }
         @case ('flow') {
-          <circle cx="6" cy="6" r="3" />
-          <circle cx="6" cy="18" r="3" />
-          <circle cx="18" cy="12" r="3" />
-          <path d="M9 6h3a3 3 0 0 1 3 3v0M9 18h3a3 3 0 0 0 3-3v0" />
+          <rect x="3" y="4" width="6" height="5" rx="1" />
+          <rect x="15" y="15" width="6" height="5" rx="1" />
+          <path d="M6 9v4a2 2 0 0 0 2 2h7" />
         }
         @case ('palette') {
-          <path d="M12 3a9 9 0 1 0 0 18 2 2 0 0 0 2-2 2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-8z" />
-          <circle cx="7.5" cy="10.5" r="1" />
-          <circle cx="12" cy="7.5" r="1" />
-          <circle cx="16.5" cy="10.5" r="1" />
+          <path d="M12 3a9 9 0 1 0 0 18 1.5 1.5 0 0 0 1.5-1.5 1.5 1.5 0 0 1 1.5-1.5h1.8a3.2 3.2 0 0 0 3.2-3.2A8.6 8.6 0 0 0 12 3z" />
+          <circle cx="7.5" cy="11" r="1" />
+          <circle cx="12" cy="8" r="1" />
+          <circle cx="16.5" cy="11" r="1" />
         }
         @case ('webhook') {
-          <path d="M9 7a3 3 0 1 1 4.2 2.7L16 15M15 17a3 3 0 1 1-2.5-3l3-5M9 17a3 3 0 1 0 3 3M9 17H5.5" />
+          <path d="M15.5 13.5 12 8a3 3 0 1 1 3-3" />
+          <path d="M8.5 13.5 12 8" />
+          <path d="M9.5 14a3 3 0 1 0 2.5 4.5h6" />
+          <circle cx="18.5" cy="18.5" r="2.5" />
+          <circle cx="6.5" cy="5.5" r="2.5" />
         }
         @case ('bell') {
-          <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
+          <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.7 21a2 2 0 0 1-3.4 0" />
         }
         @case ('audit') {
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <path d="M14 2v6h6M9 13l2 2 4-4" />
+          <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+          <path d="M14 3v6h6" />
+          <path d="M8.5 14.5 10.5 16.5 15 12" />
         }
         @case ('clock') {
           <circle cx="12" cy="12" r="9" />
-          <path d="M12 7v5l3 2" />
+          <path d="M12 7.5V12l3 2" />
         }
         @case ('export') {
-          <path d="M12 3v12M8 7l4-4 4 4M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+          <path d="M12 15V3" />
+          <path d="M8 7l4-4 4 4" />
+          <path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
         }
       }
     </svg>
