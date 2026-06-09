@@ -75,20 +75,7 @@
 
       <section class="bd__apps" aria-labelledby="bd-apps-h">
         <h2 id="bd-apps-h" class="bd__panel-h">{{ 'budget.apps.heading' | t }}</h2>
-        @if (applications().length === 0) {
-          <p class="bd__status">{{ 'budget.apps.empty' | t }}</p>
-        } @else {
-          <app-data-table [columns]="appColumns()" [rows]="applications()" [rowKey]="appRowId" [boxed]="false" [clickable]="true" (rowClick)="openApp($any($event))">
-            <ng-template appCell="title" let-a>{{ titleOf($any(a)) }}</ng-template>
-            <ng-template appCell="ks" let-a><span class="bd__mono">{{ $any(a).pathKey }}</span></ng-template>
-            <ng-template appCell="stage" let-a>
-              @if ($any(a).stage) {
-                <app-badge variant="neutral">{{ stageLabel($any(a).stage) }}</app-badge>
-              } @else { — }
-            </ng-template>
-            <ng-template appCell="amount" let-a>{{ $any(a).amount ? money($any(a).amount, $any(a).currency ?? 'EUR') : '—' }}</ng-template>
-          </app-data-table>
-        }
+        <app-applications-table [rows]="appRows()" [emptyText]="'budget.apps.empty' | t" />
       </section>
     </main>
 
@@ -99,23 +86,3 @@
     </aside>
   </div>
 }
-
-<!-- Antrag-Popover -->
-<app-dialog
-  [open]="!!dialogApp()"
-  [title]="'budget.apps.dialogTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="closeDialog()"
->
-  @if (dialogApp(); as app) {
-    <dl class="bd__dl">
-      <div><dt>{{ 'budget.apps.col.title' | t }}</dt><dd>{{ titleOf(app) }}</dd></div>
-      <div><dt>{{ 'budget.apps.col.ks' | t }}</dt><dd class="bd__mono">{{ app.pathKey }}</dd></div>
-      <div><dt>{{ 'budget.apps.col.stage' | t }}</dt><dd>{{ stageLabel(app.stage) }}</dd></div>
-      <div><dt>{{ 'budget.apps.col.amount' | t }}</dt><dd>{{ app.amount ? money(app.amount, app.currency ?? 'EUR') : '—' }}</dd></div>
-    </dl>
-  }
-  <a dialog-footer class="bd__open" [routerLink]="['/applications', dialogApp()?.applicationId]" (click)="closeDialog()">
-    {{ 'budget.apps.openFull' | t }} →
-  </a>
-</app-dialog>

@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -8,7 +7,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -19,12 +18,15 @@ import type {
   Page,
   Uuid,
 } from '@core/api/models';
-import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { IconComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
-import { stateBadgeVariant } from './applications.util';
+import {
+  ApplicationsTableComponent,
+  type ApplicationRow,
+  type SortState,
+} from './applications-table.component';
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
 
@@ -40,7 +42,7 @@ import { downloadBlob } from '@shared/download.util';
   selector: 'app-applications-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, FormsModule, DatePipe, TranslatePipe, BadgeComponent, ButtonComponent, IconComponent, SelectComponent, CostCentreTreeComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, IconComponent, SelectComponent, CostCentreTreeComponent, ApplicationsTableComponent],
   template: `
     <header class="apps__head">
       <div class="apps__headRow">
@@ -149,53 +151,12 @@ import { downloadBlob } from '@shared/download.util';
         {{ 'applications.list.error' | t }}
       </p>
     } @else {
-      <div class="apps__tableWrap">
-        <table class="apps__table">
-          <thead>
-            <tr>
-              <th scope="col">{{ 'applications.list.col.title' | t }}</th>
-              <th scope="col">{{ 'applications.list.col.type' | t }}</th>
-              <th scope="col">{{ 'applications.list.col.state' | t }}</th>
-              <th scope="col" class="apps__num" [attr.aria-sort]="ariaSort('amount')">
-                <button type="button" class="apps__sort" (click)="sortBy('amount')">{{ 'applications.list.col.amount' | t }}{{ sortIndicator('amount') }}</button>
-              </th>
-              <th scope="col" [attr.aria-sort]="ariaSort('createdAt')">
-                <button type="button" class="apps__sort" (click)="sortBy('createdAt')">{{ 'applications.list.col.created' | t }}{{ sortIndicator('createdAt') }}</button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (item of items(); track item.id) {
-              <tr>
-                <td>
-                  <a class="apps__rowLink" [routerLink]="['/applications', item.id]">
-                    {{ titleOf(item) }}
-                    <span class="apps__rowHint">{{ 'applications.list.open' | t }}</span>
-                  </a>
-                </td>
-                <td>{{ typeName(item.typeId) }}</td>
-                <td>
-                  @if (item.state) {
-                    <app-badge [variant]="stateVariant(item.state.category)">
-                      {{ item.state.label }}
-                    </app-badge>
-                  } @else {
-                    —
-                  }
-                </td>
-                <td class="apps__num">{{ amount(item) }}</td>
-                <td>
-                  <time [attr.datetime]="item.createdAt">{{ item.createdAt | date: 'mediumDate' }}</time>
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td class="apps__empty" colspan="5">{{ 'applications.list.empty' | t }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
+      <app-applications-table
+        [rows]="tableRows()"
+        [sort]="sortState()"
+        [emptyText]="'applications.list.empty' | t"
+        (sortChange)="onSort($event)"
+      />
 
       @if (total() > limit) {
         <nav class="apps__pager" [attr.aria-label]="'applications.list.title' | t">
@@ -368,38 +329,6 @@ import { downloadBlob } from '@shared/download.util';
       .apps__status--error {
         color: var(--color-danger);
       }
-      .apps__tableWrap {
-        overflow-x: auto;
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-lg);
-        background: var(--color-surface);
-      }
-      .apps__table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: var(--fs-sm);
-      }
-      .apps__table tbody tr:last-child td {
-        border-bottom: none;
-      }
-      .apps__table th,
-      .apps__table td {
-        padding: var(--space-3) var(--space-4);
-        border-bottom: var(--border-width) solid var(--color-border);
-        text-align: start;
-        vertical-align: middle;
-      }
-      .apps__table th {
-        font-weight: var(--fw-semibold);
-        color: var(--color-text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        font-size: var(--fs-xs);
-      }
-      .apps__num {
-        text-align: end;
-        font-variant-numeric: tabular-nums;
-      }
       .apps__range {
         display: flex;
         align-items: center;
@@ -425,44 +354,6 @@ import { downloadBlob } from '@shared/download.util';
       .apps__rangeSep {
         color: var(--color-text-muted);
         flex: 0 0 auto;
-      }
-      .apps__sort {
-        background: transparent;
-        border: 0;
-        padding: 0;
-        cursor: pointer;
-        font: inherit;
-        color: inherit;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        font-size: var(--fs-xs);
-        font-weight: var(--fw-semibold);
-      }
-      .apps__sort:hover {
-        color: var(--color-primary);
-      }
-      .apps__table tbody tr:hover {
-        background: var(--color-surface-sunken);
-      }
-      .apps__rowLink {
-        display: inline-flex;
-        flex-direction: column;
-        color: var(--color-primary);
-        font-weight: var(--fw-medium);
-        text-decoration: none;
-      }
-      .apps__rowLink:hover {
-        text-decoration: underline;
-      }
-      .apps__rowHint {
-        font-size: var(--fs-xs);
-        color: var(--color-text-muted);
-        font-weight: var(--fw-normal);
-      }
-      .apps__empty {
-        text-align: center;
-        color: var(--color-text-muted);
-        padding: var(--space-6);
       }
       .apps__pager {
         display: flex;
@@ -549,7 +440,23 @@ export class ApplicationsListComponent {
     () => new Map(this.types().map((t) => [t.id, t.name])),
   );
 
-  readonly stateVariant = stateBadgeVariant;
+  /** Antrags-Zeilen für die geteilte Tabelle. */
+  readonly tableRows = computed<ApplicationRow[]>(() =>
+    this.items().map((item) => ({
+      id: item.id,
+      title: this.titleOf(item),
+      typeLabel: this.typeName(item.typeId),
+      stateLabel: item.state?.label ?? null,
+      stateCategory: item.state?.category ?? null,
+      amount: item.amount ?? null,
+      currency: item.currency ?? null,
+      createdAt: item.createdAt ?? null,
+    })),
+  );
+  readonly sortState = computed<SortState>(() => ({
+    field: this.sortField(),
+    order: this.sortOrder(),
+  }));
 
   constructor() {
     this.api.applicationTypes().subscribe({
@@ -609,16 +516,6 @@ export class ApplicationsListComponent {
     if (changed) this.seenStates.set(next);
   }
 
-  amount(item: ApplicationListItem): string {
-    if (item.amount === null) return this.i18n.translate('applications.detail.notProvided');
-    const value = Number(item.amount);
-    if (Number.isNaN(value)) return item.amount;
-    return new Intl.NumberFormat(this.i18n.locale(), {
-      style: 'currency',
-      currency: item.currency ?? 'EUR',
-    }).format(value);
-  }
-
   /** Aktuelle Liste (Filter aus den Query-Params) als Excel exportieren. */
   onExport(): void {
     if (this.exporting()) return;
@@ -676,20 +573,9 @@ export class ApplicationsListComponent {
     });
   }
 
-  /** Spalte sortieren: gleiche Spalte → Richtung toggeln, sonst neue Spalte (Default desc). */
-  sortBy(field: 'createdAt' | 'amount'): void {
-    const order = this.sortField() === field && this.sortOrder() === 'desc' ? 'asc' : 'desc';
-    this.navigate({ sort: field, order, offset: null });
-  }
-
-  sortIndicator(field: 'createdAt' | 'amount'): string {
-    if (this.sortField() !== field) return '';
-    return this.sortOrder() === 'asc' ? ' ↑' : ' ↓';
-  }
-
-  ariaSort(field: 'createdAt' | 'amount'): 'ascending' | 'descending' | 'none' {
-    if (this.sortField() !== field) return 'none';
-    return this.sortOrder() === 'asc' ? 'ascending' : 'descending';
+  /** Sortier-Event der geteilten Tabelle → in die Query-Params. */
+  onSort(sort: SortState): void {
+    this.navigate({ sort: sort.field, order: sort.order, offset: null });
   }
 
   prev(): void {

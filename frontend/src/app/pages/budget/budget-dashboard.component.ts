@@ -1,21 +1,23 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
-  BadgeComponent,
   ButtonComponent,
   CellDirective,
   type ColumnDef,
   DataTableComponent,
-  DialogComponent,
   IconComponent,
 } from '@shared/ui';
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
+import {
+  ApplicationsTableComponent,
+  type ApplicationRow,
+} from '../applications/applications-table.component';
 import {
   BudgetTreeApi,
   type BudgetApplication,
@@ -56,16 +58,14 @@ interface UsageRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
-    RouterLink,
     TranslatePipe,
-    BadgeComponent,
     ButtonComponent,
-    DialogComponent,
     DataTableComponent,
     CellDirective,
     IconComponent,
     BudgetYearTreeComponent,
     BudgetPieComponent,
+    ApplicationsTableComponent,
   ],
   templateUrl: './budget-dashboard.component.html',
   styleUrl: './budget-dashboard.component.scss',
@@ -90,7 +90,6 @@ export class BudgetDashboardComponent {
   readonly selectedBudgetId = signal('');
   readonly selectedKsId = signal('');
   readonly selectedFyId = signal('');
-  readonly dialogApp = signal<BudgetApplication | null>(null);
 
   /** Top-Budgets (Wurzeln) für den linken Baum. */
   readonly tops = computed(() => this.tree().filter((n) => n.parentId === null));
@@ -164,19 +163,25 @@ export class BudgetDashboardComponent {
     { key: 'committed', label: this.i18n.translate('budget.tree.col.committed'), align: 'end' },
     { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
   ]);
-  readonly appColumns = computed<ColumnDef[]>(() => [
-    { key: 'title', label: this.i18n.translate('budget.apps.col.title') },
-    { key: 'ks', label: this.i18n.translate('budget.apps.col.ks') },
-    { key: 'stage', label: this.i18n.translate('budget.apps.col.stage') },
-    { key: 'amount', label: this.i18n.translate('budget.apps.col.amount'), align: 'end' },
-  ]);
+  /** Antrags-Zeilen für die geteilte Tabelle (Optik wie ``/applications``). */
+  readonly appRows = computed<ApplicationRow[]>(() =>
+    this.applications().map((a) => ({
+      id: a.applicationId,
+      title: this.titleOf(a),
+      typeLabel: a.pathKey,
+      stateLabel: a.stage ? this.stageLabel(a.stage) : null,
+      stateCategory: null,
+      amount: a.amount,
+      currency: a.currency,
+      createdAt: a.createdAt,
+    })),
+  );
 
   /** Antragstitel mit Fallback (kurze Id), wenn kein Titel gesetzt ist. */
   titleOf(app: BudgetApplication): string {
     return app.title?.trim() || `${this.shortId(app.applicationId)}…`;
   }
   readonly usageRowId = (r: unknown): string => (r as UsageRow).node.id;
-  readonly appRowId = (a: unknown): string => (a as BudgetApplication).applicationId;
 
   // --- Pie-Daten: direkte Unter-Kostenstellen + Eigenanteil ------------------
   private color(node: BudgetTreeNode, idx: number): string {
@@ -344,13 +349,5 @@ export class BudgetDashboardComponent {
         },
         error: () => this.exporting.set(false),
       });
-  }
-
-  // --- Popover --------------------------------------------------------------
-  openApp(app: BudgetApplication): void {
-    this.dialogApp.set(app);
-  }
-  closeDialog(): void {
-    this.dialogApp.set(null);
   }
 }

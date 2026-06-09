@@ -444,7 +444,8 @@ export const de = {
   'meetings.toast.deleted': 'Sitzung gelöscht.',
   'meetings.settings.title': 'Sitzung bearbeiten',
   'meetings.delete.title': 'Sitzung löschen',
-  'meetings.delete.body': '„{name}" wird mit Protokoll, Tagesordnung und Anwesenheit gelöscht. Das kann nicht rückgängig gemacht werden.',
+  'meetings.delete.body':
+    '„{name}" wird mit Protokoll, Tagesordnung und Anwesenheit gelöscht. Das kann nicht rückgängig gemacht werden.',
   'meetings.delete.confirm': 'Endgültig löschen',
   'meetings.attendance.empty': 'Noch keine Mitglieder erfasst.',
   'meetings.vote.untitled': 'Beschlussfrage',
@@ -902,8 +903,7 @@ export const de = {
   'admin.gremiumPerm.protocol.write': 'Protokoll führen',
 
   'admin.audit.title': 'Audit-Log',
-  'admin.audit.desc':
-    'Revisionssicheres, fortlaufendes Protokoll aller sicherheitsrelevanten Aktionen.',
+  'admin.audit.desc': 'Fortlaufendes Protokoll aller sicherheitsrelevanten Aktionen.',
   'admin.audit.empty': 'Keine Audit-Einträge.',
   'admin.audit.error': 'Audit-Log konnte nicht geladen werden.',
   'admin.audit.loadMore': 'Mehr laden',
@@ -913,8 +913,7 @@ export const de = {
   'admin.audit.col.target': 'Ziel',
 
   'admin.deadlines.title': 'Fristen',
-  'admin.deadlines.subtitle':
-    'Benannte Fristen, die der Flow referenziert. Absolute Daten lassen sich z. B. pro Semester pflegen, ohne den Flow zu ändern; relative Fristen leiten sich aus Einreichung bzw. letzter Änderung ab.',
+  'admin.deadlines.subtitle': 'Fristen, die der Flow referenziert.',
   'admin.deadlines.add': 'Frist hinzufügen',
   'admin.deadlines.empty': 'Noch keine Fristen angelegt.',
   'admin.deadlines.kind': 'Art',
@@ -1666,7 +1665,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.toast.deleted': 'Meeting deleted.',
   'meetings.settings.title': 'Edit meeting',
   'meetings.delete.title': 'Delete meeting',
-  'meetings.delete.body': '“{name}” will be deleted along with its minutes, agenda and attendance. This cannot be undone.',
+  'meetings.delete.body':
+    '“{name}” will be deleted along with its minutes, agenda and attendance. This cannot be undone.',
   'meetings.delete.confirm': 'Delete permanently',
   'meetings.attendance.empty': 'No members recorded yet.',
   'meetings.vote.untitled': 'Decision question',

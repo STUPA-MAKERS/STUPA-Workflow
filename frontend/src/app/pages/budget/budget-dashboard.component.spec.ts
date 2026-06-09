@@ -92,13 +92,15 @@ describe('BudgetDashboardComponent (#17)', () => {
     expect(c.breadcrumbs().map((n: { key: string }) => n.key)).toEqual(['VS', '800']);
   });
 
-  it('opens an application in a popover dialog', async () => {
+  it('maps budget applications into shared-table rows linking to the detail page', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.openApp(APPS[0]);
-    fixture.detectChanges();
-    expect(c.dialogApp()).toEqual(APPS[0]);
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    const rows = c.appRows();
+    expect(rows.length).toBe(APPS.length);
+    expect(rows[0].id).toBe(APPS[0].applicationId);
+    // Deep-Link in die Antragsdetailseite (gleiche Optik wie /applications).
+    const link = screen.getAllByRole('link')[0] as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toContain('/applications/');
   });
 });
