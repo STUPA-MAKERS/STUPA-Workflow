@@ -312,15 +312,9 @@ class VotingService:
         flow = FlowService(self.session, self.dispatcher)
         # Global-Flow (#28): ein ``vote``-State hat zwei feste Ausgänge mit
         # ``branch`` ``pass``/``fail``. ``passed`` → pass, sonst (``rejected``/``tie``)
-        # fail-closed → fail. Existiert kein Branch-Ausgang (Alt-Flow vor Cutover),
-        # fällt close() auf den Guard-basierten ``voteResult``-Pfad zurück.
+        # fail-closed → fail.
         branch_name = "pass" if outcome.result == "passed" else "fail"
         branch = await flow.branch_transition(vote.application_id, branch_name)
-        if branch is None:
-            available = await flow.available_transitions(
-                vote.application_id, principal, vote_result=outcome.result
-            )
-            branch = available[0] if available else None
 
         # Vote-Zustand vormerken — NICHT separat committen: `fire` schreibt ihn
         # atomar mit Transition + status_event; ohne Branch committen wir hier.
@@ -330,8 +324,8 @@ class VotingService:
 
         new_state_id: UUID | None = None
         if branch is not None:
-            fired = await flow.fire(
-                vote.application_id, branch.id, principal, vote_result=outcome.result
+            fired = await flow.fire_branch(
+                vote.application_id, branch_name, principal, note=f"vote:{outcome.result}"
             )
             new_state_id = fired.new_state_id
         else:

@@ -1,49 +1,47 @@
 """Flow-/Status-Engine (T-14, flows §3/§9, data-model §5.2).
 
-Zwei Operationen:
+Operationen:
 
-* :meth:`FlowService.available_transitions` — Übergänge ab dem aktuellen State, deren
-  Guard für den Principal ``True`` ergibt (Guards serverseitig, T-05; RBAC fail-closed).
-* :meth:`FlowService.fire` — einen Übergang **atomar** ausführen: ``from == current``
-  prüfen, Guard auswerten (false → 409), in **einer** Transaktion State wechseln +
-  ``status_event`` schreiben (optimistisches Locking über die ``from``-State-Bedingung
-  → konkurrierende Transition → 409), danach Worker-Actions dispatchen.
+* :meth:`FlowService.available_transitions` — manuelle Übergänge ab dem aktuellen
+  State, deren Guard für den Akteur ``True`` ergibt (Guards serverseitig, T-05;
+  Akteur-Gates fail-closed). Basis der Trigger-UI in der Antrags-Detailansicht.
+* :meth:`FlowService.fire` — einen Übergang **atomar** ausführen.
+* :meth:`FlowService.auto_advance` — den ersten **automatischen** Übergang feuern,
+  dessen Guard erfüllt ist (vom Worker/Cron zyklisch, ``manual=False``).
+* :meth:`FlowService.fire_branch` — den ``pass``/``fail``-Ausgang eines ``vote``-
+  States feuern (vom Voting-Modul beim Schließen).
 
 Edit-Lock: ergibt sich aus ``state.edit_allowed`` des Ziel-States — T-12 ``patch``
-prüft das und liefert 409 (``setEditLock`` wird daher inline behandelt, nicht dispatcht).
+prüft das und liefert 409 (inline behandelt, nicht dispatcht).
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import ApplicationType, GremiumMembership, GremiumRole
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
-from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.flow import context as flow_context
-from app.modules.flow.dispatch import (
-    ActionDispatcher,
-    NullActionDispatcher,
-    build_dispatched_actions,
-)
 from app.modules.deadlines.models import Deadline
 from app.modules.deadlines.service import (
     DeadlinePolicyService,
     DeadlineService,
     resolve_due_at,
 )
+from app.modules.flow import context as flow_context
+from app.modules.flow.dispatch import (
+    ActionDispatcher,
+    NullActionDispatcher,
+    build_dispatched_actions,
+)
 from app.modules.flow.models import State, Transition
-from app.modules.flow.routing import DecisionFacts, evaluate_decision
 from app.modules.flow.schemas import TransitionOut, TransitionResult
-from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
+from app.shared.errors import ConflictError, NotFoundError
 from app.shared.guards import eval_guard
 
 
@@ -98,25 +96,6 @@ class FlowService:
         return (
             await self.session.execute(select(State).where(State.id == state_id))
         ).scalar_one_or_none()
-
-    async def _decision_facts(self, app: Application) -> DecisionFacts:
-        """Fakten für ``decision``-Routing: Betrag, Typ-Key, Antragsteller-Rollen.
-
-        ``amount`` kommt direkt vom Antrag; ``type_key`` aus dem Antragstyp; die
-        Antragsteller-Rollen werden (sofern beim Anlegen hinterlegt) aus
-        ``data['_applicantRoles']`` gelesen (für intern angelegte Anträge, #24)."""
-        type_key: str | None = None
-        if app.type_id is not None:
-            app_type = (
-                await self.session.execute(
-                    select(ApplicationType).where(ApplicationType.id == app.type_id)
-                )
-            ).scalar_one_or_none()
-            if app_type is not None:
-                type_key = app_type.key
-        raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
-        roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
-        return DecisionFacts(amount=app.amount, type_key=type_key, applicant_roles=roles)
 
     async def _outgoing(self, app: Application) -> list[Transition]:
         return list(
@@ -192,22 +171,19 @@ class FlowService:
         application_id: UUID,
         principal: Principal,
         *,
-        vote_result: str | None = None,
         deadline_passed: bool = False,
     ) -> list[TransitionOut]:
-        """Verfügbare Übergänge (Guards geprüft) für den aktuellen State + Principal."""
+        """Verfügbare **manuelle** Übergänge (Guards geprüft) für den Akteur.
+
+        Automatische Übergänge werden ausgeblendet — sie feuert der Worker, nicht der
+        Nutzer. Akteur-Gates (``roleIs``/``isInCommittee``) im Guard entscheiden, ob
+        der Principal den Übergang sieht."""
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return []
-        complete = await flow_context.fields_complete(self.session, app)
-        ctx = flow_context.build_context(
-            principal,
-            fields_complete=complete,
-            vote_result=vote_result,
-            deadline_passed=deadline_passed,
-            manual=True,
+        ctx = await flow_context.build_context(
+            self.session, app, principal, manual=True, deadline_passed=deadline_passed
         )
-        transitions = await self._outgoing(app)
         return [
             TransitionOut(
                 id=t.id,
@@ -215,8 +191,8 @@ class FlowService:
                 toStateId=t.to_state_id,
                 label=t.label_i18n,
             )
-            for t in transitions
-            if eval_guard(t.guard, ctx)
+            for t in await self._outgoing(app)
+            if not t.automatic and eval_guard(t.guard, ctx)
         ]
 
     # --------------------------------------------------------- auto_advance
@@ -225,30 +201,18 @@ class FlowService:
         application_id: UUID,
         principal: Principal,
         *,
-        vote_result: str | None = None,
         deadline_passed: bool = False,
     ) -> TransitionResult | None:
         """Ersten **automatischen** Übergang feuern, dessen Guard erfüllt ist (#8).
 
-        Vom Worker zyklisch aufgerufen (``manual=False``). Gibt das Ergebnis zurück,
-        falls ein Übergang gefeuert wurde, sonst ``None``. Idempotent über das
-        optimistische Locking in :meth:`fire` (konkurrierender Lauf → ``ConflictError``).
-        """
+        Vom Worker/Cron zyklisch aufgerufen (``manual=False``). Gibt das Ergebnis
+        zurück, falls ein Übergang gefeuert wurde, sonst ``None``. Idempotent über das
+        optimistische Locking in :meth:`fire`."""
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return None
-        # Decision-State (#28): kein Guard-Scan, sondern Fakten-Routing — feuert
-        # automatisch den Übergang zum aufgelösten Ziel.
-        state = await self._load_state(app.current_state_id)
-        if state is not None and state.kind == "decision":
-            return await self.route_decision(application_id, principal, app=app, state=state)
-        complete = await flow_context.fields_complete(self.session, app)
-        ctx = flow_context.build_context(
-            principal,
-            fields_complete=complete,
-            vote_result=vote_result,
-            deadline_passed=deadline_passed,
-            manual=False,
+        ctx = await flow_context.build_context(
+            self.session, app, principal, manual=False, deadline_passed=deadline_passed
         )
         for t in await self._outgoing(app):
             if t.automatic and eval_guard(t.guard, ctx):
@@ -257,55 +221,10 @@ class FlowService:
                     t.id,
                     principal,
                     note="auto",
-                    vote_result=vote_result,
                     deadline_passed=deadline_passed,
                     manual=False,
                 )
         return None
-
-    # --------------------------------------------------------- decision routing
-    async def route_decision(
-        self,
-        application_id: UUID,
-        principal: Principal,
-        *,
-        app: Application | None = None,
-        state: State | None = None,
-    ) -> TransitionResult | None:
-        """``decision``-State auflösen + den Übergang zum Ziel-State feuern (#28).
-
-        Wertet ``config.rules`` gegen die Antrags-Fakten aus (erste passende Regel,
-        sonst ``config.else``), sucht unter den ausgehenden Übergängen den, dessen
-        Ziel-State-Key dem aufgelösten Key entspricht, und feuert ihn (``manual=False``).
-        Gibt ``None``, wenn der aktuelle State kein ``decision`` ist."""
-        if app is None:
-            app = await self._load_app(application_id)
-        if app.current_state_id is None:
-            return None
-        if state is None:
-            state = await self._load_state(app.current_state_id)
-        if state is None or state.kind != "decision":
-            return None
-
-        rules = state.config.get("rules") if isinstance(state.config, dict) else None
-        fallback = state.config.get("else") if isinstance(state.config, dict) else None
-        if not isinstance(rules, list) or not isinstance(fallback, str):
-            raise ConflictError(
-                f"decision state {state.key!r} is misconfigured", code="conflict"
-            )
-        facts = await self._decision_facts(app)
-        target_key = evaluate_decision(rules, fallback, facts)
-
-        for t in await self._outgoing(app):
-            to_state = await self._load_state(t.to_state_id)
-            if to_state is not None and to_state.key == target_key:
-                return await self.fire(
-                    application_id, t.id, principal, note="decision", manual=False
-                )
-        raise ConflictError(
-            f"decision state {state.key!r} has no transition to {target_key!r}",
-            code="conflict",
-        )
 
     # ----------------------------------------------------------- branch firing
     async def branch_transition(
@@ -313,8 +232,8 @@ class FlowService:
     ) -> Transition | None:
         """Ausgehenden Übergang des aktuellen States mit ``branch`` finden (#28).
 
-        ``branch`` ist ``pass``/``fail`` (vote) bzw. ``accept``/``reject`` (approval);
-        ``None``, wenn der aktuelle State keinen solchen Branch-Ausgang hat."""
+        ``branch`` ist ``pass``/``fail`` eines ``vote``-States; ``None``, wenn der
+        aktuelle State keinen solchen Branch-Ausgang hat."""
         app = await self._load_app(application_id)
         for t in await self._outgoing(app):
             if t.branch == branch:
@@ -329,9 +248,8 @@ class FlowService:
         *,
         note: str | None = None,
     ) -> TransitionResult:
-        """Den Übergang des aktuellen vote/approval-States mit ``branch`` feuern (#28).
+        """Den ``pass``/``fail``-Übergang des aktuellen ``vote``-States feuern (#28).
 
-        ``branch`` ist ``pass``/``fail`` (vote) bzw. ``accept``/``reject`` (approval).
         404, wenn kein passender Branch-Übergang existiert."""
         t = await self.branch_transition(application_id, branch)
         if t is None:
@@ -342,73 +260,6 @@ class FlowService:
             application_id, t.id, principal, note=note or branch, manual=False
         )
 
-    # --------------------------------------------------------- approval states
-    async def _has_gremium_role(
-        self, sub: str, role_key: str, gremium_id: UUID
-    ) -> bool:
-        """``True`` wenn ``sub`` aktuell die Gremium-Rolle ``role_key`` im Gremium hält
-        (#28/#62). Wertet das tz-aware Amtszeit-Fenster der Mitgliedschaft aus —
-        gegen die **gremium-eigenen** Rollen (``gremium_membership``/``gremium_role``)."""
-        now = datetime.now(UTC)
-        row = (
-            await self.session.execute(
-                select(GremiumMembership.id)
-                .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
-                .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
-                .where(
-                    PrincipalRow.sub == sub,
-                    GremiumRole.key == role_key,
-                    GremiumMembership.gremium_id == gremium_id,
-                    (GremiumMembership.valid_from.is_(None))
-                    | (GremiumMembership.valid_from <= now),
-                    (GremiumMembership.valid_until.is_(None))
-                    | (GremiumMembership.valid_until > now),
-                )
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        return row is not None
-
-    async def submit_approval(
-        self, application_id: UUID, decision: str, principal: Principal
-    ) -> TransitionResult:
-        """Approval-State entscheiden: ``accept``/``reject`` feuert den Branch (#28).
-
-        Der aktuelle State muss ``kind == 'approval'`` sein; nur ein Principal mit der
-        konfigurierten Rolle (``config.roleKey``) im Gremium (``config.gremiumId``) —
-        oder ein Admin (#15) — darf entscheiden (403 sonst)."""
-        if decision not in ("accept", "reject"):
-            raise ConflictError(f"invalid approval decision {decision!r}", code="conflict")
-        app = await self._load_app(application_id)
-        if app.current_state_id is None:
-            raise ConflictError("application has no current state", code="conflict")
-        state = await self._load_state(app.current_state_id)
-        if state is None or state.kind != "approval":
-            raise ConflictError(
-                "current state is not an approval state", code="conflict"
-            )
-        cfg = state.config if isinstance(state.config, dict) else {}
-        role_key = cfg.get("roleKey")
-        gremium_id = cfg.get("gremiumId")
-        if not isinstance(role_key, str):
-            raise ConflictError(
-                f"approval state {state.key!r} is misconfigured", code="conflict"
-            )
-        # Globale Rolle (kein gremiumId) → Principal-Rolle; sonst Gremium-Rolle (#28).
-        if isinstance(gremium_id, str) and gremium_id:
-            authorized = "admin" in principal.roles or await self._has_gremium_role(
-                principal.sub, role_key, UUID(gremium_id)
-            )
-            scope = "in the configured gremium"
-        else:
-            authorized = role_key in principal.roles or "admin" in principal.roles
-            scope = "globally"
-        if not authorized:
-            raise ForbiddenError(f"requires role {role_key!r} {scope}")
-        return await self.fire_branch(
-            application_id, decision, principal, note=f"approval:{decision}"
-        )
-
     # ------------------------------------------------------------------- fire
     async def fire(
         self,
@@ -417,7 +268,6 @@ class FlowService:
         principal: Principal,
         *,
         note: str | None = None,
-        vote_result: str | None = None,
         deadline_passed: bool = False,
         manual: bool = True,
     ) -> TransitionResult:
@@ -433,13 +283,8 @@ class FlowService:
                 code="conflict",
             )
 
-        complete = await flow_context.fields_complete(self.session, app)
-        ctx = flow_context.build_context(
-            principal,
-            fields_complete=complete,
-            vote_result=vote_result,
-            deadline_passed=deadline_passed,
-            manual=manual,
+        ctx = await flow_context.build_context(
+            self.session, app, principal, manual=manual, deadline_passed=deadline_passed
         )
         if not eval_guard(transition.guard, ctx):
             raise ConflictError("Transition guard not satisfied.", code="guard_failed")

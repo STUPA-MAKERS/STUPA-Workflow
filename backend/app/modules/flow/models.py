@@ -72,14 +72,12 @@ class State(UUIDPkMixin, Base):
     category: Mapped[str] = mapped_column(Text)
     edit_allowed: Mapped[bool] = mapped_column(Boolean, server_default="true")
     is_initial: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Global-Flow-Redesign (#28): State-Art + Konfiguration.
-    #  * ``normal``   — gewöhnlicher Status (Übergänge wie bisher).
-    #  * ``vote``     — ein Gremium stimmt ab; ``config={gremiumId,...}``; 2 Ausgänge
-    #                   (branch ``pass``/``fail``).
-    #  * ``approval`` — Rolle X in Gremium Y nimmt an/ab; ``config={roleKey,gremiumId}``;
-    #                   2 Ausgänge (branch ``accept``/``reject``).
-    #  * ``decision`` — Auto-Routing nach Betrag/Typ/Antragsteller-Rolle;
-    #                   ``config={rules:[{when,to}],else}``.
+    # Global-Flow-Redesign (#28, Cleanup): nur noch zwei State-Arten.
+    #  * ``normal`` — gewöhnlicher Status; manuelle/automatische Übergänge per Guard.
+    #  * ``vote``   — ein Gremium stimmt ab; ``config={gremiumId,...}``; 2 Ausgänge
+    #                 (branch ``pass``/``fail``). (approval/decision entfernt — durch
+    #                 manuelle ``roleIs``-Übergänge bzw. automatische Guard-Übergänge
+    #                 abgedeckt.)
     kind: Mapped[str] = mapped_column(Text, server_default="normal")
     config: Mapped[dict] = mapped_column(JSONB, server_default="{}")
 
@@ -88,9 +86,7 @@ class State(UUIDPkMixin, Base):
         CheckConstraint(
             "category IN ('open','running','closed')", name="state_category"
         ),
-        CheckConstraint(
-            "kind IN ('normal','vote','approval','decision')", name="state_kind"
-        ),
+        CheckConstraint("kind IN ('normal','vote')", name="state_kind"),
         Index(
             "uq_state_one_initial_per_flow",
             "flow_version_id",

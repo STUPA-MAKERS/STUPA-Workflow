@@ -1,6 +1,7 @@
 """Protokoll-API-Router (T-22, api.md »protocol«, flows §7).
 
-Vier Endpunkte, **alle** ``P(protocol.write)`` (serverseitige RBAC, fail-closed):
+Vier Endpunkte, **alle** ``P(meeting.manage)`` (serverseitige RBAC, fail-closed;
+#28-Redesign: ``protocol.write`` in ``meeting.manage`` zusammengeführt):
 
 * ``POST  /api/meetings/{id}/protocol`` — Protokoll anlegen **oder** laden (idempotent).
 * ``PATCH /api/protocols/{id}``          — Markdown-Body aktualisieren (Entwurf).
@@ -32,7 +33,7 @@ from app.shared.errors import ProblemDetail
 
 router = APIRouter(tags=["protocol"])
 
-WRITE_PERMISSION = "protocol.write"
+WRITE_PERMISSION = "meeting.manage"
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 

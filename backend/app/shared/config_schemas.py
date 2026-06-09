@@ -137,8 +137,8 @@ class FormFieldDef(_CamelModel):
 # --------------------------------------------------------------------------- #
 # 5.2 Flow-Graph
 # --------------------------------------------------------------------------- #
-StateKind = Literal["normal", "vote", "approval", "decision"]
-TransitionBranch = Literal["pass", "fail", "accept", "reject"]
+StateKind = Literal["normal", "vote"]
+TransitionBranch = Literal["pass", "fail"]
 
 
 class StateDef(_CamelModel):
@@ -195,15 +195,26 @@ def validate_flow_graph(graph: FlowGraph) -> None:
     if len(initials) > 1:
         raise FlowValidationError(f"flow graph has multiple initial states: {initials}")
 
+    kind_by_key = {s.key: s.kind for s in states}
     for t in graph.transitions:
         if t.from_ not in key_set:
             raise FlowValidationError(f"transition references unknown from-state: {t.from_!r}")
         if t.to not in key_set:
             raise FlowValidationError(f"transition references unknown to-state: {t.to!r}")
         try:
-            validate_guard(t.guard)
+            # Akteur-Gates (roleIs/isInCommittee) nur auf **manuellen** Übergängen.
+            validate_guard(t.guard, allow_actor_ops=not t.automatic)
             for action in t.actions:
                 validate_action(action)
+                # ``addToNextSession`` darf nur in einen ``vote``-State führen (#28).
+                if (
+                    action.get("type") == "addToNextSession"
+                    and kind_by_key.get(t.to) != "vote"
+                ):
+                    raise GuardError(
+                        "addToNextSession action is only valid on a transition into a "
+                        "vote state"
+                    )
         except GuardError as exc:
             raise FlowValidationError(str(exc)) from exc
 
@@ -212,11 +223,9 @@ def validate_flow_graph(graph: FlowGraph) -> None:
 
 
 def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
-    """vote/approval/decision-States strukturell prüfen (#28).
+    """``vote``-States strukturell prüfen (#28-Redesign — nur noch normal + vote).
 
-    * ``vote``     — ``config.gremiumId`` Pflicht; genau 2 Ausgänge ``pass``/``fail``.
-    * ``approval`` — ``config.roleKey`` + ``config.gremiumId``; 2 Ausgänge ``accept``/``reject``.
-    * ``decision`` — ``config.rules`` (Liste ``{when,to}``) + ``config.else``; Ziele gültig.
+    ``vote`` — ``config.gremiumId`` Pflicht; genau 2 Ausgänge ``pass``/``fail``.
     """
     outgoing: dict[str, list[TransitionDef]] = {k: [] for k in key_set}
     for t in graph.transitions:
@@ -233,36 +242,6 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                     f"vote state {s.key!r} needs exactly two outgoing transitions "
                     "with branch 'pass' and 'fail'"
                 )
-        elif s.kind == "approval":
-            # ``roleKey`` Pflicht; ``gremiumId`` OPTIONAL: fehlt es, entscheidet eine
-            # **globale** Rolle (#28-CR), sonst die Gremium-Rolle im Gremium.
-            if not isinstance(s.config.get("roleKey"), str):
-                raise FlowValidationError(
-                    f"approval state {s.key!r} requires config.roleKey"
-                )
-            gid = s.config.get("gremiumId")
-            if gid is not None and not isinstance(gid, str):
-                raise FlowValidationError(
-                    f"approval state {s.key!r} config.gremiumId must be a string"
-                )
-            if branches != ["accept", "reject"]:
-                raise FlowValidationError(
-                    f"approval state {s.key!r} needs exactly two outgoing transitions "
-                    "with branch 'accept' and 'reject'"
-                )
-        elif s.kind == "decision":
-            rules = s.config.get("rules")
-            fallback = s.config.get("else")
-            if not isinstance(rules, list) or not isinstance(fallback, str):
-                raise FlowValidationError(
-                    f"decision state {s.key!r} requires config.rules (list) and config.else"
-                )
-            for rule in [*rules, {"to": fallback}]:
-                target = rule.get("to") if isinstance(rule, dict) else None
-                if not isinstance(target, str) or target not in key_set:
-                    raise FlowValidationError(
-                        f"decision state {s.key!r} routes to unknown state {target!r}"
-                    )
 
 
 def _assert_all_reachable(

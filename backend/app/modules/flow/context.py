@@ -2,109 +2,140 @@
 
 ``eval_guard`` (T-05) ist eine **reine** Funktion über einem
 :class:`~app.shared.guards.GuardContext`. Dieses Modul füllt den Kontext aus dem
-Antrag + Principal + abgeleiteten Signalen:
+Antrag + auslösendem Principal + abgeleiteten Fakten (#28-Redesign):
 
-* ``roles``/``permissions`` — aus dem :class:`Principal` (RBAC, fail-closed).
-* ``fields_complete`` — Antwortdaten gegen die **gepinnte** Form validiert (T-11/T-12).
-* ``vote_result`` — vom Aufrufer (T-15 ``voting.close`` → ``flow.fire``); default ``None``.
-* ``deadline_passed`` — vom Aufrufer (T-44 Cron); default ``False``.
-* ``manual`` — ob der Übergang manuell ausgelöst wird (Default ``True`` für die API).
+* **Akteur** (``roles``/``actor_committees``) — globale Rollen + Gremium-
+  Mitgliedschaften des auslösenden Principals (nur für manuelle Übergänge relevant).
+* **Antragsteller** (``applicant_roles``/``applicant_committees``) — aus
+  ``data['_applicantRoles']`` bzw. den Mitgliedschaften des erstellenden Principals.
+* **Budget** (``budget_id``/``budget_fits``) — zugeordnete Kostenstelle + ob der
+  Betrag in den verfügbaren Rest (Allocation − Ausgaben) passt.
+* **Felder** (``field_values``/``field_types``) — Formularfeldwerte aus ``data`` +
+  Built-in ``amount`` (currency) samt abgeleiteten Typen für ``compare``/``hasField``.
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import ApplicationType
+from app.modules.admin.models import GremiumMembership
 from app.modules.applications.models import Application
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.budget.models import BudgetField
+from app.modules.budget.tree_models import BudgetAllocation, BudgetExpense
 from app.modules.forms.models import FormField
-from app.modules.forms.validation import AnswerValidationError, validate_answers
-from app.shared.config_schemas import FormFieldDef
 from app.shared.guards import GuardContext
 
-
-def _field_from_row(row: FormField) -> FormFieldDef:
-    """``form_field``-Zeile → ``FormFieldDef`` (camelCase-Eingabe wie im forms-Modul)."""
-    return FormFieldDef.model_validate(
-        {
-            "key": row.key,
-            "type": row.type,
-            "label": row.label_i18n,
-            "help": row.help_i18n,
-            "required": row.required,
-            "validation": row.validation or None,
-            "visibleIf": row.visible_if,
-            "compute": row.compute,
-            "options": row.options,
-            "isPII": row.is_pii,
-            "isPromoted": row.is_promoted,
-            "promoteTarget": row.promote_target,
-        }
-    )
+# Formularfeld-Typ → ``compare``-Wert-Typ (guards.COMPARE_TYPES).
+_FIELD_TYPE_MAP: dict[str, str] = {
+    "number": "number",
+    "currency": "currency",
+    "date": "date",
+    "checkbox": "bool",
+    "boolean": "bool",
+}
 
 
-async def _pinned_fields(session: AsyncSession, app: Application) -> list[FormFieldDef]:
-    """Felder der **gepinnten** Form-Version des Antrags (+ Topf-Felder)."""
+def _compare_type(field_type: str) -> str:
+    """Formularfeld-Typ auf einen ``compare``-Wert-Typ abbilden (Default ``text``)."""
+    return _FIELD_TYPE_MAP.get(field_type, "text")
+
+
+async def _committees_for_sub(session: AsyncSession, sub: str | None) -> frozenset[str]:
+    """Gremium-IDs, in denen ``sub`` aktuell (Amtszeit-Fenster) Mitglied ist."""
+    if not sub:
+        return frozenset()
+    now = datetime.now(UTC)
     rows = (
         await session.execute(
-            select(FormField)
-            .where(FormField.form_version_id == app.form_version_id)
-            .order_by(FormField.order)
+            select(GremiumMembership.gremium_id)
+            .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
+            .where(
+                PrincipalRow.sub == sub,
+                (GremiumMembership.valid_from.is_(None))
+                | (GremiumMembership.valid_from <= now),
+                (GremiumMembership.valid_until.is_(None))
+                | (GremiumMembership.valid_until > now),
+            )
         )
     ).scalars().all()
-    fields = [_field_from_row(r) for r in rows]
-    if app.budget_pot_id is not None:
-        pot_rows = (
-            await session.execute(
-                select(BudgetField)
-                .where(BudgetField.budget_pot_id == app.budget_pot_id)
-                .order_by(BudgetField.order)
-            )
-        ).scalars().all()
-        fields.extend(FormFieldDef.model_validate(r.field) for r in pot_rows)
-    return fields
+    return frozenset(str(g) for g in rows)
 
 
-async def fields_complete(session: AsyncSession, app: Application) -> bool:
-    """``True`` wenn die aktuellen Antwortdaten die gepinnte Form vollständig erfüllen.
+async def _budget_fits(session: AsyncSession, app: Application) -> bool:
+    """``True`` wenn der Antragsbetrag in den freien Rest der Kostenstelle passt.
 
-    ``has_budget``-Kontext kommt aus dem **Typ** (nicht aus ``budget_pot_id``) —
-    konsistent zu T-12 ``patch`` (sonst flippt ``visibleIf: has_budget``)."""
-    fields = await _pinned_fields(session, app)
-    app_type = (
-        await session.execute(
-            select(ApplicationType).where(ApplicationType.id == app.type_id)
-        )
-    ).scalar_one_or_none()
-    context: dict[str, Any] = {
-        "has_budget": app_type.has_budget if app_type is not None else False
-    }
-    try:
-        validate_answers(fields, app.data, context)
-    except AnswerValidationError:
+    Verfügbar = Allocation des Knotens im Haushaltsjahr − Σ direkter Ausgaben
+    (``budget_expense``) auf diesem Knoten/HHJ. Ohne Budget/HHJ/Betrag ⇒ ``False``
+    (fail-closed)."""
+    if app.budget_id is None or app.fiscal_year_id is None or app.amount is None:
         return False
-    return True
+    allocated = await session.scalar(
+        select(BudgetAllocation.allocated).where(
+            BudgetAllocation.budget_id == app.budget_id,
+            BudgetAllocation.fiscal_year_id == app.fiscal_year_id,
+        )
+    )
+    spent = await session.scalar(
+        select(func.coalesce(func.sum(BudgetExpense.amount), Decimal("0"))).where(
+            BudgetExpense.budget_id == app.budget_id,
+            BudgetExpense.fiscal_year_id == app.fiscal_year_id,
+        )
+    )
+    available = (allocated or Decimal("0")) - (spent or Decimal("0"))
+    return app.amount <= available
 
 
-def build_context(
+async def _field_types(session: AsyncSession, app: Application) -> dict[str, str]:
+    """``{feldKey: compareTyp}`` der gepinnten Form + Built-in ``amount`` (currency)."""
+    rows = (
+        await session.execute(
+            select(FormField.key, FormField.type).where(
+                FormField.form_version_id == app.form_version_id
+            )
+        )
+    ).all()
+    types = {key: _compare_type(ftype) for key, ftype in rows}
+    types["amount"] = "currency"
+    return types
+
+
+async def build_context(
+    session: AsyncSession,
+    app: Application,
     principal: Principal,
     *,
-    fields_complete: bool,
-    vote_result: str | None,
-    deadline_passed: bool,
     manual: bool,
+    deadline_passed: bool = False,
 ) -> GuardContext:
-    """Reinen :class:`GuardContext` aus Principal + Signalen bauen (kein I/O)."""
+    """Vollständigen :class:`GuardContext` aus DB + Principal bauen (I/O)."""
+    # Akteur (nur manuelle Übergänge nutzen die Akteur-Gates).
+    actor_committees = (
+        await _committees_for_sub(session, principal.sub) if manual else frozenset()
+    )
+    # Antragsteller.
+    raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
+    applicant_roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
+    applicant_committees = await _committees_for_sub(session, app.created_by)
+    # Felder (Built-in amount + Formulardaten).
+    field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}
+    field_values["amount"] = app.amount
+    field_types = await _field_types(session, app)
+
     return GuardContext(
-        roles=frozenset(principal.roles),
-        permissions=frozenset(principal.permissions),
-        fields_complete=fields_complete,
-        vote_result=vote_result,
-        deadline_passed=deadline_passed,
         manual=manual,
+        deadline_passed=deadline_passed,
+        roles=frozenset(principal.roles) if manual else frozenset(),
+        actor_committees=actor_committees,
+        applicant_roles=applicant_roles,
+        applicant_committees=applicant_committees,
+        budget_id=str(app.budget_id) if app.budget_id is not None else None,
+        budget_fits=await _budget_fits(session, app),
+        field_values=field_values,
+        field_types=field_types,
     )

@@ -12,21 +12,21 @@ Bestands-Guards/Routen erzwungenen Keys (``flow.configure``/``form.configure``,
 from __future__ import annotations
 
 # Reihenfolge nach Bereich gruppiert (stabil → deterministischer Contract).
+# #28-Redesign: ``application.update`` (→ ``application.manage``) sowie
+# ``protocol.manage``/``protocol.write`` (→ ``meeting.manage``) entfallen;
+# ``application.transition`` gatet das Feuern manueller Flow-Übergänge.
 PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read",
     "application.create",
-    "application.update",
     "application.transition",
     "application.manage",
     "form.configure",
     "flow.configure",
-    "vote.manage",
     "vote.cast",
+    "vote.manage",
     "meeting.manage",
-    "protocol.manage",
-    "protocol.write",
-    "budget.manage",
     "budget.view",
+    "budget.manage",
     "notification.manage",
     "webhook.manage",
     "audit.read",

@@ -552,14 +552,12 @@ class ApplicationsService:
         return row is not None
 
     async def list_tasks(self, principal: Any) -> list[ApplicationListItem]:
-        """Offene Entscheidungen für die eigene Rolle (#64): Anträge in vote/approval-
-        States, in denen der Principal handeln darf (Gremium-Rolle/-Mitgliedschaft oder
-        globale Rolle; Admin sieht alle)."""
-        from app.modules.flow.service import FlowService
-
+        """Offene Entscheidungen für die eigene Rolle (#64): Anträge in ``vote``-
+        States, in denen der Principal handeln darf (Gremium-Mitgliedschaft; Admin
+        sieht alle)."""
         states = (
             await self.session.scalars(
-                select(State).where(State.kind.in_(["vote", "approval"]))
+                select(State).where(State.kind == "vote")
             )
         ).all()
         by_id = {s.id: s for s in states}
@@ -572,7 +570,6 @@ class ApplicationsService:
                 .order_by(Application.created_at.desc())
             )
         ).all()
-        flow = FlowService(self.session)
         is_admin = "admin" in principal.roles
         items: list[ApplicationListItem] = []
         for app in apps:
@@ -581,15 +578,7 @@ class ApplicationsService:
                 continue
             cfg = s.config if isinstance(s.config, dict) else {}
             ok = is_admin
-            if not ok and s.kind == "approval":
-                role_key = cfg.get("roleKey")
-                gid = cfg.get("gremiumId")
-                if isinstance(role_key, str):
-                    if isinstance(gid, str) and gid:
-                        ok = await flow._has_gremium_role(principal.sub, role_key, UUID(gid))
-                    else:
-                        ok = role_key in principal.roles
-            elif not ok and s.kind == "vote":
+            if not ok and s.kind == "vote":
                 gid = cfg.get("gremiumId")
                 ok = isinstance(gid, str) and bool(gid) and await self._in_gremium(
                     principal.sub, UUID(gid)
