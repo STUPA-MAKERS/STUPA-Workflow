@@ -75,8 +75,9 @@ describe('BudgetDashboardComponent (#17)', () => {
   it('shows the cost-centre subtree with bars and the applications panel', async () => {
     await setup();
     expect(screen.getAllByText('VS').length).toBeGreaterThan(0);
-    expect(screen.getByText('VS-Mittel')).toBeInTheDocument();
-    // Pfad VS-800 erscheint im Baum (links) und in der Anträge-Tabelle (rechts).
+    // Budget-Name erscheint im linken Baum + als Wurzel-Zeile der Auslastungstabelle.
+    expect(screen.getAllByText('VS-Mittel').length).toBeGreaterThan(0);
+    // Pfad VS-800 erscheint in der Auslastungstabelle (links) und in der Anträge-Tabelle (rechts).
     expect(screen.getAllByText('VS-800').length).toBeGreaterThan(1);
   });
 

@@ -4,11 +4,13 @@ import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
 
-/** Verfügbar vs. gebunden eines Knotens in einem Haushaltsjahr (Geld als String). */
+/** Verfügbar/gebunden/beantragt eines Knotens in einem Haushaltsjahr (Geld als String). */
 export interface BudgetAllocationView {
   fiscalYearId: Uuid;
   allocated: string;
   committed: string;
+  /** Beantragt (in-flight Anträge, weder accepted noch denied). */
+  requested: string;
   available: string;
 }
 
@@ -22,6 +24,11 @@ export interface BudgetTreeNode {
   name: string;
   currency: string;
   active: boolean;
+  /** Anzeigefarbe (Pie/Baum); null = automatisch. */
+  color: string | null;
+  /** Nur am Top-Level: Flow-State-Keys, die als angenommen/abgelehnt gelten. */
+  acceptedStateKeys: string[];
+  deniedStateKeys: string[];
   byFiscalYear: BudgetAllocationView[];
   children: BudgetTreeNode[];
 }
@@ -35,6 +42,9 @@ export interface BudgetNode {
   name: string;
   currency: string;
   active: boolean;
+  color?: string | null;
+  acceptedStateKeys?: string[];
+  deniedStateKeys?: string[];
 }
 
 export interface FiscalYear {
@@ -52,6 +62,16 @@ export interface BudgetNodeCreate {
   parentId?: Uuid | null;
   gremiumId?: Uuid | null;
   currency?: string;
+  color?: string | null;
+}
+
+/** Teil-Update eines Knotens (alle Felder optional; ``color:""`` löscht die Farbe). */
+export interface BudgetNodeUpdate {
+  name?: string;
+  active?: boolean;
+  color?: string | null;
+  acceptedStateKeys?: string[];
+  deniedStateKeys?: string[];
 }
 
 export interface FiscalYearCreate {
@@ -92,7 +112,7 @@ export class BudgetTreeApi {
     return this.http.post<BudgetNode>(`${this.base}/budgets`, body);
   }
 
-  updateNode(id: Uuid, body: { name?: string; active?: boolean }): Observable<BudgetNode> {
+  updateNode(id: Uuid, body: BudgetNodeUpdate): Observable<BudgetNode> {
     return this.http.patch<BudgetNode>(`${this.base}/budgets/${id}`, body);
   }
 
