@@ -129,7 +129,7 @@ const AUTOSAVE_DELAY_MS = 1000;
               @for (entry of countEntries(bv); track entry.key) {
                 <div class="mtg__beamerOpt" [class.mtg__beamerOpt--lead]="entry.key === bv.leading">
                   <dd>{{ entry.value }}</dd>
-                  <dt>{{ entry.key }}</dt>
+                  <dt>{{ voteOptionLabel(entry.key) }}</dt>
                 </div>
               }
             </dl>
@@ -165,14 +165,14 @@ const AUTOSAVE_DELAY_MS = 1000;
                   @if (vote.status === 'open' && canVote()) {
                     <div class="mtg__voteActions">
                       @for (opt of voteOptionsFor(vote); track opt) {
-                        <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
+                        <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ voteOptionLabel(opt) }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
                       }
                     </div>
                   }
                   @if (vote.counts && vote.status === 'closed') {
                     <dl class="mtg__tally">
                       @for (entry of countEntries(vote); track entry.key) {
-                        <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ entry.key }}</dt><dd>{{ entry.value }}</dd></div>
+                        <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ voteOptionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
                       }
                     </dl>
                   }
@@ -334,14 +334,14 @@ const AUTOSAVE_DELAY_MS = 1000;
                       @if (vote.counts) {
                         <dl class="mtg__tally">
                           @for (entry of countEntries(vote); track entry.key) {
-                            <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ entry.key }}</dt><dd>{{ entry.value }}</dd></div>
+                            <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ voteOptionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
                           }
                         </dl>
                       }
                       @if (vote.status === 'open' && canVote()) {
                         <div class="mtg__voteActions">
                           @for (opt of voteOptionsFor(vote); track opt) {
-                            <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
+                            <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ voteOptionLabel(opt) }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
                           }
                         </div>
                       }
@@ -436,14 +436,14 @@ const AUTOSAVE_DELAY_MS = 1000;
                 @if (vote.counts) {
                   <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
                     @for (entry of countEntries(vote); track entry.key) {
-                      <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ entry.key }}</dt><dd>{{ entry.value }}</dd></div>
+                      <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ voteOptionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
                     }
                   </dl>
                 }
                 @if (vote.status === 'open' && canVote()) {
                   <div class="mtg__voteActions">
                     @for (opt of voteOptionsFor(vote); track opt) {
-                      <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ opt }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
+                      <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ voteOptionLabel(opt) }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
                     }
                   </div>
                 }
@@ -476,30 +476,12 @@ const AUTOSAVE_DELAY_MS = 1000;
           <label class="mtg__paneLabel" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
           <input id="mtg-vq" class="mtg__input" [ngModel]="voteQuestion()" (ngModelChange)="voteQuestion.set($event)" name="vq" [placeholder]="'meetings.vote.questionPlaceholder' | t" />
           <span class="mtg__paneLabel">{{ 'meetings.vote.options' | t }}</span>
-          <div class="mtg__voteOpts">
-            @for (opt of voteOptions(); track $index) {
-              <div class="mtg__voteOptRow">
-                <input
-                  class="mtg__input"
-                  [ngModel]="opt"
-                  (ngModelChange)="setVoteOption($index, $event)"
-                  [name]="'vo-' + $index"
-                  [attr.aria-label]="('meetings.vote.option' | t) + ' ' + ($index + 1)"
-                  [placeholder]="('meetings.vote.option' | t) + ' ' + ($index + 1)"
-                />
-                <app-button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  [iconOnly]="true"
-                  [ariaLabel]="'admin.common.remove' | t"
-                  [disabled]="voteOptions().length <= 2"
-                  (click)="removeVoteOption($index)"
-                ><app-icon name="remove" /></app-button>
-              </div>
+          <div class="mtg__voteFixed">
+            @for (opt of FIXED_VOTE_OPTIONS; track opt) {
+              <app-badge variant="neutral">{{ voteOptionLabel(opt) }}</app-badge>
             }
-            <app-button type="button" variant="ghost" size="sm" (click)="addVoteOption()">+ {{ 'meetings.vote.addOption' | t }}</app-button>
           </div>
+          <p class="mtg__muted mtg__hint">{{ 'meetings.vote.optionsFixedHint' | t }}</p>
           <label class="mtg__voteSecret">
             <input type="checkbox" [checked]="voteSecret()" (change)="voteSecret.set($any($event.target).checked)" />
             {{ 'meetings.vote.secret' | t }}
@@ -507,7 +489,7 @@ const AUTOSAVE_DELAY_MS = 1000;
         </form>
         <div dialog-footer class="mtg__dialogFoot">
           <app-button variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
-          <app-button [disabled]="voteOptionList().length < 2 || openingVote()" [loading]="openingVote()" (click)="submitVote()">
+          <app-button [disabled]="openingVote()" [loading]="openingVote()" (click)="submitVote()">
             {{ 'meetings.vote.openSubmit' | t }}
           </app-button>
         </div>
@@ -1267,18 +1249,10 @@ const AUTOSAVE_DELAY_MS = 1000;
         gap: var(--space-2);
         font-size: var(--fs-sm);
       }
-      .mtg__voteOpts {
+      .mtg__voteFixed {
         display: flex;
-        flex-direction: column;
+        flex-wrap: wrap;
         gap: var(--space-2);
-      }
-      .mtg__voteOptRow {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-      }
-      .mtg__voteOptRow .mtg__input {
-        flex: 1 1 auto;
       }
       .mtg__createForm {
         display: flex;
@@ -1673,23 +1647,15 @@ export class MeetingsComponent implements OnDestroy {
   readonly voteDialogOpen = signal(false);
   private readonly voteItem = signal<AgendaItem | null>(null);
   readonly voteQuestion = signal<string>('');
-  /** Strukturierte Optionszeilen (statt Freitext mit Zeilenumbruch). */
-  readonly voteOptions = signal<string[]>(['Ja', 'Nein', 'Enthaltung']);
+  /** Feste Stimm-Optionen (kanonische Keys) — Pass/Fail braucht yes/no/abstain. */
+  readonly FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
   readonly voteSecret = signal(false);
   readonly openingVote = signal(false);
-  readonly voteOptionList = computed(() =>
-    this.voteOptions()
-      .map((o) => o.trim())
-      .filter((o) => o.length > 0),
-  );
-  setVoteOption(i: number, value: string): void {
-    this.voteOptions.update((opts) => opts.map((o, idx) => (idx === i ? value : o)));
-  }
-  addVoteOption(): void {
-    this.voteOptions.update((opts) => [...opts, '']);
-  }
-  removeVoteOption(i: number): void {
-    this.voteOptions.update((opts) => opts.filter((_, idx) => idx !== i));
+  /** Anzeige-Label einer Stimm-Option (yes→Ja …); unbekannte roh. */
+  voteOptionLabel(opt: string): string {
+    const key = `vote.option.${opt}` as TranslationKey;
+    const label = this.i18n.translate(key);
+    return label === key ? opt : label;
   }
   readonly assignableOptions = computed<SelectOption[]>(() =>
     this.assignable().map((a) => ({ value: a.applicationId, label: a.title || a.applicationId })),
@@ -2397,7 +2363,6 @@ export class MeetingsComponent implements OnDestroy {
   openVoteDialog(item: AgendaItem): void {
     this.voteItem.set(item);
     this.voteQuestion.set(item.title ?? '');
-    this.voteOptions.set(['Ja', 'Nein', 'Enthaltung']);
     this.voteSecret.set(false);
     this.voteDialogOpen.set(true);
   }
@@ -2409,8 +2374,8 @@ export class MeetingsComponent implements OnDestroy {
   submitVote(): void {
     const m = this.meeting();
     const item = this.voteItem();
-    const options = this.voteOptionList();
-    if (!m || !item || options.length < 2 || this.openingVote()) return;
+    const options = [...this.FIXED_VOTE_OPTIONS];
+    if (!m || !item || this.openingVote()) return;
     this.openingVote.set(true);
     this.api
       .openMeetingVote(m.id, {
