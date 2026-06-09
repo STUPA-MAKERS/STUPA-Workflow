@@ -10,7 +10,7 @@ Zwei Verantwortungen, bewusst getrennt:
   Abstimmungsergebnis aus der DB in einen reinen :class:`ApplicationDoc` — den der
   Worker an :mod:`app.modules.pdf.markdown` (DB-frei, unit-getestet) übergibt.
 
-Der Render-Pipeline-Code (pytex → MinIO → Nextcloud) liegt in :mod:`app.modules.pdf.render`,
+Der Render-Pipeline-Code (pytex → MinIO) liegt in :mod:`app.modules.pdf.render`,
 damit die Infra-Abhängigkeiten nur worker-seitig injiziert werden.
 """
 
@@ -102,7 +102,6 @@ class PdfService:
             status=job.status,
             applicationId=job.application_id,
             resultUrl=result_url,
-            nextcloudPath=job.nextcloud_path,
             error=job.error,
         )
 

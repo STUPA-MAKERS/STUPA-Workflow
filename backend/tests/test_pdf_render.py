@@ -1,8 +1,8 @@
-"""Unit-Tests RenderPipeline (T-20): Markdown→pytex→MinIO→Nextcloud + Fehlerpfade.
+"""Unit-Tests RenderPipeline (T-20): Markdown→pytex→MinIO + Fehlerpfade.
 
 ``PdfService.load_application_doc`` + ``build_application_markdown`` werden gestubbt
-(DB-frei); getestet wird die Orchestrierung: Statuswechsel, Ablage, optionaler
-Nextcloud-Export, transiente vs. dauerhafte Fehler.
+(DB-frei); getestet wird die Orchestrierung: Statuswechsel, Ablage,
+transiente vs. dauerhafte Fehler.
 """
 
 from __future__ import annotations
@@ -13,11 +13,10 @@ import pytest
 
 from app.modules.pdf import render as render_mod
 from app.modules.pdf.models import RenderJob
-from app.modules.pdf.nextcloud import NextcloudError
 from app.modules.pdf.pytex_client import PytexError
 from app.modules.pdf.render import RenderPipeline, RenderRetry
 from tests.files_fakes import FakeStorage
-from tests.pdf_fakes import FakeNextcloud, FakePdfSession, FakePytex, FakeSessionmaker
+from tests.pdf_fakes import FakePdfSession, FakePytex, FakeSessionmaker
 
 
 class _DocStub:
@@ -51,7 +50,6 @@ def _pipeline(
     *,
     storage: object | None = None,
     pytex: FakePytex | None = None,
-    nextcloud: object | None = None,
 ) -> tuple[RenderPipeline, FakePdfSession]:
     store = {job.id: job} if job is not None else {}
     session = FakePdfSession(store=store)
@@ -59,7 +57,6 @@ def _pipeline(
         sessionmaker=FakeSessionmaker(session),  # type: ignore[arg-type]
         pytex=pytex or FakePytex(),  # type: ignore[arg-type]
         storage=storage,  # type: ignore[arg-type]
-        nextcloud=nextcloud,  # type: ignore[arg-type]
     )
     return pipe, session
 
@@ -76,15 +73,6 @@ async def test_run_success_stores_pdf_and_marks_done() -> None:
     assert job.finished_at is not None
     assert storage.put_calls == [expected_key]
     assert storage.objects[expected_key][1] == "application/pdf"
-
-
-async def test_run_success_with_nextcloud_records_path() -> None:
-    job = _job()
-    nc = FakeNextcloud()
-    pipe, _ = _pipeline(job, storage=FakeStorage(), nextcloud=nc)
-    await pipe.run(job.id)
-    assert job.nextcloud_path is not None
-    assert len(nc.uploads) == 1
 
 
 async def test_run_skipped_when_no_storage() -> None:
@@ -134,14 +122,6 @@ async def test_run_storage_error_raises_retry() -> None:
 
     job = _job()
     pipe, _ = _pipeline(job, storage=FailingStorage())
-    with pytest.raises(RenderRetry):
-        await pipe.run(job.id)
-
-
-async def test_run_nextcloud_error_raises_retry() -> None:
-    job = _job()
-    nc = FakeNextcloud(error=NextcloudError("down"))
-    pipe, _ = _pipeline(job, storage=FakeStorage(), nextcloud=nc)
     with pytest.raises(RenderRetry):
         await pipe.run(job.id)
 

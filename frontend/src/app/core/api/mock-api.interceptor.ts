@@ -723,7 +723,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       MOCK_PROTOCOL = {
         ...MOCK_PROTOCOL,
         status: 'final',
-        pdfUrl: 'https://nextcloud.example/s/protokoll-12-06.pdf',
+        pdfUrl: 'https://files.example/s/protokoll-12-06.pdf',
         sentAt: '2026-06-12T19:30:00Z',
       };
       return ok(MOCK_PROTOCOL);

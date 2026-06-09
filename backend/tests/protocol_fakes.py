@@ -3,8 +3,8 @@
 ``FakeSession`` kombiniert beide vom :class:`~app.modules.protocol.service.ProtocolService`
 genutzten Zugriffsmuster: ``get(model, id)`` aus einem Store + ``execute(stmt)`` aus
 einer **geordneten** Ergebnis-Queue (wie :mod:`tests.flow_fakes`). ``FakeStorage``/
-``FakeMailQueue`` protokollieren Put/Enqueue; ``FakePytex``/``FakeNextcloud`` werden
-aus :mod:`tests.pdf_fakes` wiederverwendet.
+``FakeMailQueue`` protokollieren Put/Enqueue; ``FakePytex`` wird aus
+:mod:`tests.pdf_fakes` wiederverwendet.
 """
 
 from __future__ import annotations

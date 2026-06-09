@@ -46,7 +46,6 @@ class RenderJob(UUIDPkMixin, TimestampMixin, Base):
     )
     status: Mapped[str] = mapped_column(Text, server_default="pending")
     storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
-    nextcloud_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(

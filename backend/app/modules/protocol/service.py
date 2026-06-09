@@ -7,11 +7,11 @@ An eine ``AsyncSession`` gebundener Service für den Protokoll-Lebenszyklus:
 * :meth:`update_markdown` — Editor-Body aktualisieren (nur im Entwurf).
 * :meth:`embed_votes` — Abstimmungen als Markdown-Snippets anhängen + ``protocol_vote_ref``
   schreiben (idempotent: schon referenzierte Votes werden übersprungen).
-* :meth:`finalize` — Markdown → pytex → PDF → MinIO → (Nextcloud) → Mail an
+* :meth:`finalize` — Markdown → pytex → PDF → MinIO → Mail an
   MAIL_LIST(gremium); ``status='final'`` + ``sent_at``.
 
-**Wiederverwendung T-20** (keine Duplikation): pytex-Client, Object-Storage,
-Nextcloud-Exporter und die Mail-Queue/-``MailMessage`` stammen unverändert aus
+**Wiederverwendung T-20** (keine Duplikation): pytex-Client, Object-Storage
+und die Mail-Queue/-``MailMessage`` stammen unverändert aus
 :mod:`app.modules.pdf` / :mod:`app.modules.notifications`. Der Render läuft hier
 **synchron** im Request (das FE T-33 erwartet ``ProtocolOut`` mit ``pdfUrl`` direkt
 aus der ``finalize``-Antwort, nicht den 202-Job-Pfad).
@@ -37,7 +37,6 @@ from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.queue import MailQueue
-from app.modules.pdf.nextcloud import NextcloudError, NextcloudExporter
 from app.modules.pdf.pytex_client import PytexClient, PytexError
 from app.modules.protocol.markdown import (
     ProtocolDoc,
@@ -72,14 +71,12 @@ class ProtocolService:
         *,
         storage: ObjectStorage | None = None,
         pytex: PytexClient | None = None,
-        nextcloud: NextcloudExporter | None = None,
         mail_queue: MailQueue | None = None,
         settings: Settings | None = None,
     ) -> None:
         self.session = session
         self.storage = storage
         self.pytex = pytex
-        self.nextcloud = nextcloud
         self.mail_queue = mail_queue
         self.settings = settings
 
@@ -237,7 +234,7 @@ class ProtocolService:
 
     # -------------------------------------------------------------- finalize
     async def finalize(self, protocol_id: UUID, *, now: datetime) -> ProtocolOut:
-        """Markdown → PDF → MinIO/Nextcloud → Mail an MAIL_LIST(gremium); ``final``.
+        """Markdown → PDF → MinIO → Mail an MAIL_LIST(gremium); ``final``.
 
         Idempotent: ein bereits finalisiertes Protokoll wird unverändert (mit frisch
         signierter URL) zurückgegeben — kein zweiter Render, kein Doppelversand."""
@@ -312,7 +309,7 @@ class ProtocolService:
         return "\n\n".join(blocks) + "\n"
 
     async def _render(self, protocol: Protocol, markdown: str) -> None:
-        """pytex → PDF → MinIO → (Nextcloud). Ohne Storage »aus« (DEV); Backend-Fehler → 503."""
+        """pytex → PDF → MinIO. Ohne Storage »aus« (DEV); Backend-Fehler → 503."""
         # Storage ist der bewusste An/Aus-Schalter (T-20-Konvention): fehlt er, läuft
         # finalize ohne PDF weiter (Demo/Contract-CI ohne MinIO).
         if self.storage is None or self.pytex is None:
@@ -323,10 +320,6 @@ class ProtocolService:
             key = protocol_storage_key(protocol.id)
             await self.storage.put(key, pdf, "application/pdf")
             protocol.pdf_storage_key = key
-            if self.nextcloud is not None:
-                protocol.nextcloud_path = await self.nextcloud.put_pdf(
-                    f"protokoll-{protocol.id}.pdf", pdf
-                )
         except PytexError as exc:
             # 4xx = dauerhafter Eingabe-/Compile-Fehler (z. B. ungültiges LaTeX im
             # Protokoll-Markdown): kein Retry, dem Nutzer den (gescrubbten) Grund
@@ -338,7 +331,7 @@ class ProtocolService:
             raise ServiceUnavailableError(
                 "Protocol rendering temporarily unavailable."
             ) from exc
-        except (StorageError, NextcloudError) as exc:
+        except StorageError as exc:
             # Vorhandenes Backend transient nicht erreichbar → 503, Entwurf bleibt
             # erhalten (Session-Rollback), Aufruf wiederholbar. Kein Pfad-Leak.
             raise ServiceUnavailableError(

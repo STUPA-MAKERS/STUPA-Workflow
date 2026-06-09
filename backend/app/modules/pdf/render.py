@@ -1,13 +1,13 @@
-"""Render-Pipeline (T-20, flows §6) — Markdown → pytex → MinIO → Nextcloud.
+"""Render-Pipeline (T-20, flows §6) — Markdown → pytex → MinIO.
 
 Worker-seitige Orchestrierung eines ``render_job``: Status auf ``running`` setzen, das
 Antrags-Dokument laden (DB), Markdown bauen (DB-frei), pytex ``/render`` rufen, das PDF
-in MinIO ablegen (``storage_key``) und es **optional** per Nextcloud-WebDAV spiegeln,
-dann ``done``. Die Infra-Abhängigkeiten (pytex/Storage/Nextcloud) werden injiziert —
-fehlt MinIO, bleibt der Job ``pending`` (DEV/Contract-CI, kein Crash).
+in MinIO ablegen (``storage_key``), dann ``done``. Die Infra-Abhängigkeiten
+(pytex/Storage) werden injiziert — fehlt MinIO, bleibt der Job ``pending``
+(DEV/Contract-CI, kein Crash).
 
 Fehler-Disziplin (security.md §2): ``error`` trägt nur eine **pfadfreie Kurzkennung**.
-Transiente Fehler (pytex 5xx/Transport, Storage, Nextcloud) → :class:`RenderRetry`
+Transiente Fehler (pytex 5xx/Transport, Storage) → :class:`RenderRetry`
 (Worker-Retry); dauerhafte (pytex 4xx) → Job sofort ``failed``.
 """
 
@@ -23,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.pdf.markdown import build_application_markdown
 from app.modules.pdf.models import RenderJob
-from app.modules.pdf.nextcloud import NextcloudError, NextcloudExporter
 from app.modules.pdf.pytex_client import PytexClient, PytexError
 from app.modules.pdf.service import PdfService
 
@@ -47,7 +46,6 @@ class RenderPipeline:
     sessionmaker: async_sessionmaker[AsyncSession]
     pytex: PytexClient
     storage: ObjectStorage | None
-    nextcloud: NextcloudExporter | None
 
     async def run(self, job_id: UUID) -> str:
         """Job rendern. Rückgabe: done/failed/skipped/gone. Transient → ``RenderRetry``."""
@@ -79,12 +77,10 @@ class RenderPipeline:
             key = _storage_key(job.application_id, job.id)
             try:
                 await self.storage.put(key, pdf, "application/pdf")
-                nextcloud_path = await self._export_nextcloud(job, pdf)
-            except (StorageError, NextcloudError) as exc:
+            except StorageError as exc:
                 raise RenderRetry(str(exc)) from exc
 
             job.storage_key = key
-            job.nextcloud_path = nextcloud_path
             job.status = "done"
             job.error = None
             job.touch_finished(datetime.now(UTC))
@@ -96,12 +92,6 @@ class RenderPipeline:
         doc = await PdfService(session).load_application_doc(job.application_id)
         markdown = build_application_markdown(doc)
         return await self.pytex.render_pdf(markdown, variant=doc.variant)
-
-    async def _export_nextcloud(self, job: RenderJob, pdf: bytes) -> str | None:
-        if self.nextcloud is None:
-            return None
-        filename = f"antrag-{job.application_id}-{job.id}.pdf"
-        return await self.nextcloud.put_pdf(filename, pdf)
 
     async def _fail(self, session: AsyncSession, job: RenderJob, code: str) -> str:
         """Job dauerhaft auf ``failed`` setzen (pfadfreie Kurzkennung)."""

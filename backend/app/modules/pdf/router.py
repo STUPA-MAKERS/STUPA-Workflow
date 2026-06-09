@@ -1,8 +1,8 @@
 """pdf-API-Router (T-20, api.md »pdf«).
 
 * ``POST /api/applications/{id}/pdf`` — A/P; legt einen Render-Job an, enqueued ihn
-  (Worker rendert) → **202** + ``JobOut`` (``status=pending``). Ablage MinIO + optional
-  Nextcloud erfolgt async (flows §6).
+  (Worker rendert) → **202** + ``JobOut`` (``status=pending``). Ablage in MinIO erfolgt
+  async (flows §6).
 * ``GET  /api/jobs/{id}``           — A/P; Job-Status + (bei ``done``) signierte
   Ergebnis-URL. Zugriff via Principal **oder** Antragsteller des zugehörigen Antrags.
 

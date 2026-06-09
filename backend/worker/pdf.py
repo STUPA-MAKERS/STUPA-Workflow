@@ -1,8 +1,8 @@
 """arq-Worker-Task: Antrags-PDF rendern (T-20, flows §6).
 
-``render_pdf`` baut die :class:`RenderPipeline` (pytex + MinIO + optional Nextcloud) aus
-den in ``ctx`` hinterlegten Deps und rendert einen ``render_job`` end-to-end. Transiente
-Fehler (pytex 5xx/Transport, Storage, Nextcloud) → ``arq.Retry`` mit linearem Backoff bis
+``render_pdf`` baut die :class:`RenderPipeline` (pytex + MinIO) aus den in ``ctx``
+hinterlegten Deps und rendert einen ``render_job`` end-to-end. Transiente
+Fehler (pytex 5xx/Transport, Storage) → ``arq.Retry`` mit linearem Backoff bis
 ``pdf_max_tries``; danach wird der Job dauerhaft ``failed`` markiert (kein Endlos-Requeue).
 Idempotenz trägt der ``_job_id`` (= ``render:<id>``) beim Enqueue **und** der Job-Status
 (ein ``done`` Job wird nicht erneut gerendert).
@@ -19,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
 from app.modules.files.storage import build_object_storage
-from app.modules.pdf.nextcloud import build_nextcloud_exporter
 from app.modules.pdf.pytex_client import build_pytex_client
 from app.modules.pdf.render import RenderPipeline, RenderRetry
 from app.settings import Settings, load_settings
@@ -32,7 +31,6 @@ async def on_startup(ctx: dict[str, Any]) -> None:
     ctx["settings"] = settings
     ctx["pytex_client"] = build_pytex_client(settings)
     ctx["object_storage"] = build_object_storage(settings)
-    ctx["nextcloud_exporter"] = build_nextcloud_exporter(settings)
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
@@ -46,7 +44,6 @@ def _pipeline(ctx: dict[str, Any]) -> RenderPipeline:
         sessionmaker=_sessionmaker(ctx),
         pytex=ctx["pytex_client"],
         storage=ctx.get("object_storage"),
-        nextcloud=ctx.get("nextcloud_exporter"),
     )
 
 

@@ -41,7 +41,6 @@ def _ctx(
         "settings": load_settings(pdf_max_tries=3, pdf_retry_backoff_seconds=10),
         "pytex_client": pytex,
         "object_storage": storage,
-        "nextcloud_exporter": None,
         "pdf_sessionmaker": FakeSessionmaker(session),
         "job_try": job_try,
     }

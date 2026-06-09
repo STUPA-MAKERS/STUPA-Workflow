@@ -1,10 +1,9 @@
-"""Test-Fakes für pdf-Unit-Tests (kein echtes pytex/MinIO/Nextcloud/Redis/DB).
+"""Test-Fakes für pdf-Unit-Tests (kein echtes pytex/MinIO/Redis/DB).
 
 ``FakePdfSession`` bedient die vom ``PdfService``/``RenderPipeline`` genutzten
 DB-Methoden (``get``/``scalar``/``add``/``flush``/``commit``) über einen In-Memory-Store;
-``FakeSessionmaker`` reicht sie als async-Context-Manager. ``FakePytex``/``FakeNextcloud``
-liefern feste Ergebnisse bzw. werfen konfigurierte Fehler; ``FakeRenderQueue`` sammelt
-enqueued Job-Ids.
+``FakeSessionmaker`` reicht sie als async-Context-Manager. ``FakePytex`` liefert feste
+Ergebnisse bzw. wirft konfigurierte Fehler; ``FakeRenderQueue`` sammelt enqueued Job-Ids.
 """
 
 from __future__ import annotations
@@ -76,20 +75,6 @@ class FakePytex:
         if self.error is not None:
             raise self.error
         return self.pdf
-
-
-class FakeNextcloud:
-    """Nextcloud-Exporter-Fake: protokolliert Uploads oder wirft einen Fehler."""
-
-    def __init__(self, *, error: Exception | None = None) -> None:
-        self.error = error
-        self.uploads: list[tuple[str, int]] = []
-
-    async def put_pdf(self, filename: str, data: bytes) -> str:
-        if self.error is not None:
-            raise self.error
-        self.uploads.append((filename, len(data)))
-        return f"Antraege/{filename}"
 
 
 class FakeRenderQueue:

@@ -168,7 +168,7 @@ def test_get_protocol_service_wires_state_infra() -> None:
     service = get_protocol_service(_FakeSession(), request, get_settings())  # type: ignore[arg-type]
     assert service.storage == "STORE"
     assert isinstance(service.mail_queue, ArqMailQueue)
-    assert service.pytex is not None and service.nextcloud is None  # NC ohne Settings aus
+    assert service.pytex is not None
 
 
 def test_mail_queue_none_without_pool() -> None:

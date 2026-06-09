@@ -3,7 +3,7 @@
 * :class:`Protocol` — ein Sitzungsprotokoll, **1:1** an eine ``meeting`` gebunden
   (UNIQUE ``meeting_id`` → ``POST /meetings/{id}/protocol`` ist idempotent: anlegen
   **oder** laden). ``markdown`` ist das versionierte Editor-Backing; ``finalize``
-  setzt ``status='final'`` + ``pdf_storage_key``/``nextcloud_path``/``sent_at``.
+  setzt ``status='final'`` + ``pdf_storage_key``/``sent_at``.
 * :class:`ProtocolVoteRef` — eingebettete Abstimmung (``POST /protocols/{id}/votes``).
   UNIQUE(protocol_id, vote_id) macht das Einbetten idempotent (kein Doppel-Snippet).
 
@@ -46,7 +46,6 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     )
     markdown: Mapped[str] = mapped_column(Text, server_default="")
     pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
-    nextcloud_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     author: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="draft")
     sent_at: Mapped[datetime | None] = mapped_column(

@@ -20,7 +20,7 @@ from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService, protocol_storage_key
 from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError, ServiceUnavailableError
-from tests.pdf_fakes import FakeNextcloud, FakePytex
+from tests.pdf_fakes import FakePytex
 from tests.protocol_fakes import FakeMailQueue, FakeSession, FakeStorage, result
 
 NOW = datetime(2026, 6, 12, 19, 0, tzinfo=UTC)
@@ -243,7 +243,6 @@ async def test_finalize_renders_stores_and_mails() -> None:
     proto = _protocol()
     storage = FakeStorage()
     pytex = FakePytex(pdf=b"%PDF-1.4 ok")
-    nextcloud = FakeNextcloud()
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
@@ -251,13 +250,12 @@ async def test_finalize_renders_stores_and_mails() -> None:
         results=[result(proto), result(), result(["a@x.de", "b@x.de"])],
     )
     out = await _service(
-        session, storage=storage, pytex=pytex, nextcloud=nextcloud, mail_queue=mail
+        session, storage=storage, pytex=pytex, mail_queue=mail
     ).finalize(PID, now=NOW)
 
     assert out.status == "final"
     assert out.sent_at == NOW
     assert proto.pdf_storage_key == protocol_storage_key(PID)
-    assert proto.nextcloud_path is not None
     assert storage.puts and storage.puts[0][2] == "application/pdf"
     assert pytex.calls and pytex.calls[0][1] == "protocol-stupa"
     assert out.pdf_url is not None

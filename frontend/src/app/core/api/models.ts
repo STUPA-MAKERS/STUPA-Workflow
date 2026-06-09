@@ -687,7 +687,7 @@ export interface ProtocolOutWire {
   meetingId: Uuid;
   markdown: string;
   status: 'draft' | 'final';
-  /** Ergebnis-Link nach `finalize` (PDF in MinIO/Nextcloud). */
+  /** Ergebnis-Link nach `finalize` (PDF in MinIO). */
   pdfUrl?: string | null;
   sentAt?: IsoDateTime | null;
 }

@@ -6,10 +6,10 @@ Vier Endpunkte, **alle** ``P(meeting.manage)`` (serverseitige RBAC, fail-closed;
 * ``POST  /api/meetings/{id}/protocol`` — Protokoll anlegen **oder** laden (idempotent).
 * ``PATCH /api/protocols/{id}``          — Markdown-Body aktualisieren (Entwurf).
 * ``POST  /api/protocols/{id}/votes``    — Abstimmungen als Snippets einbetten.
-* ``POST  /api/protocols/{id}/finalize`` — → PDF (pytex) → MinIO/Nextcloud → MAIL_LIST.
+* ``POST  /api/protocols/{id}/finalize`` — → PDF (pytex) → MinIO → MAIL_LIST.
 
 Der Service wird mit der **T-20-Render-Infrastruktur** verdrahtet (Object-Storage +
-arq-Mail-Pool aus dem App-State; pytex-Client + Nextcloud-Exporter aus den Settings) —
+arq-Mail-Pool aus dem App-State; pytex-Client aus den Settings) —
 keine Duplikation. Fehler werden als ``ProblemDetail`` (problem+json) deklariert.
 """
 
@@ -25,7 +25,6 @@ from app.deps import DbSession, SettingsDep, require_principal
 from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
-from app.modules.pdf.nextcloud import build_nextcloud_exporter
 from app.modules.pdf.pytex_client import build_pytex_client
 from app.modules.protocol.schemas import ProtocolOut, ProtocolPatch, ProtocolVotesBody
 from app.modules.protocol.service import ProtocolService
@@ -50,13 +49,12 @@ def _mail_queue(request: Request) -> MailQueue | None:
 def get_protocol_service(
     session: DbSession, request: Request, settings: SettingsDep
 ) -> ProtocolService:
-    """Service mit T-20-Render-Infra verdrahten (Storage/Mail aus State, pytex/NC aus Settings)."""
+    """Service mit T-20-Render-Infra verdrahten (Storage/Mail aus State, pytex aus Settings)."""
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
     return ProtocolService(
         session,
         storage=storage,
         pytex=build_pytex_client(settings),
-        nextcloud=build_nextcloud_exporter(settings),
         mail_queue=_mail_queue(request),
         settings=settings,
     )
@@ -116,5 +114,5 @@ async def embed_votes(
 async def finalize_protocol(
     protocol_id: UUID, service: ServiceDep, _principal: WriterDep
 ) -> ProtocolOut:
-    """→ PDF (pytex) → MinIO/Nextcloud → Mail an MAIL_LIST(gremium); ``status=final``."""
+    """→ PDF (pytex) → MinIO → Mail an MAIL_LIST(gremium); ``status=final``."""
     return await service.finalize(protocol_id, now=datetime.now(UTC))

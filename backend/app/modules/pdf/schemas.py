@@ -20,5 +20,4 @@ class JobOut(BaseModel):
     status: str
     applicationId: UUID | None = None
     resultUrl: str | None = None  # signierte MinIO-URL, nur bei status="done"
-    nextcloudPath: str | None = None
     error: str | None = None
