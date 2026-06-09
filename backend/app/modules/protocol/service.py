@@ -50,7 +50,12 @@ from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
 from app.modules.voting.service import VotingService
 from app.settings import Settings
-from app.shared.errors import ConflictError, NotFoundError, ServiceUnavailableError
+from app.shared.errors import (
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+    ServiceUnavailableError,
+)
 
 
 def protocol_storage_key(protocol_id: UUID) -> str:
@@ -279,7 +284,18 @@ class ProtocolService:
                 protocol.nextcloud_path = await self.nextcloud.put_pdf(
                     f"protokoll-{protocol.id}.pdf", pdf
                 )
-        except (PytexError, StorageError, NextcloudError) as exc:
+        except PytexError as exc:
+            # 4xx = dauerhafter Eingabe-/Compile-Fehler (z. B. ungültiges LaTeX im
+            # Protokoll-Markdown): kein Retry, dem Nutzer den (gescrubbten) Grund
+            # zeigen statt eines irreführenden 503. 5xx/Transport bleibt transient.
+            if not exc.retryable:
+                raise BadRequestError(
+                    f"Protocol could not be rendered: {exc}", code="render_failed"
+                ) from exc
+            raise ServiceUnavailableError(
+                "Protocol rendering temporarily unavailable."
+            ) from exc
+        except (StorageError, NextcloudError) as exc:
             # Vorhandenes Backend transient nicht erreichbar → 503, Entwurf bleibt
             # erhalten (Session-Rollback), Aufruf wiederholbar. Kein Pfad-Leak.
             raise ServiceUnavailableError(

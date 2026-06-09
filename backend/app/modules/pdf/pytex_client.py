@@ -21,6 +21,18 @@ from app.settings import Settings
 
 # pytex erkennt PDF am Content-Type; ein anderer Body wäre ein Vertragsbruch.
 _PDF_CONTENT_TYPE = "application/pdf"
+_MAX_ERROR_DETAIL = 300
+
+
+def _error_detail(response: httpx.Response) -> str:
+    """Gescrubbten ``{"error": …}``-Grund aus der pytex-Fehlerantwort ziehen (gekürzt)."""
+    try:
+        body = response.json()
+        detail = body.get("error") if isinstance(body, dict) else None
+    except ValueError:
+        detail = response.text
+    detail = (detail or "").strip() or "no detail"
+    return detail[:_MAX_ERROR_DETAIL]
 
 
 class PytexError(RuntimeError):
@@ -66,11 +78,13 @@ class PytexClient:
             ) from exc
 
         if response.status_code != httpx.codes.OK:
-            # 4xx = dauerhafter Eingabe-/Policy-Fehler, 5xx = transient. Detail-String
-            # kommt vom (bereits gescrubbten) pytex-Body; defensiv weiter gekürzt.
+            # 4xx = dauerhafter Eingabe-/Policy-Fehler, 5xx = transient. Der
+            # (bereits von pytex gescrubbte) ``{"error": …}``-Body trägt den Grund
+            # (z. B. LaTeX-Compile-Fehler) — defensiv gekürzt mitnehmen, damit das
+            # Server-Log/422 die Ursache zeigt statt eines opaken 503.
             retryable = response.status_code >= 500
             raise PytexError(
-                f"pytex render failed (status {response.status_code})",
+                f"pytex render failed (status {response.status_code}): {_error_detail(response)}",
                 status=response.status_code,
                 retryable=retryable,
             )

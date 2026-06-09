@@ -156,10 +156,20 @@ class MeetingService:
             )
         ).scalar_one_or_none()
 
-    async def get(self, meeting_id: UUID, principal: Principal) -> MeetingOut:
-        """Sitzungs-State (404, falls unbekannt)."""
+    async def get(
+        self, meeting_id: UUID, principal: Principal | None = None
+    ) -> MeetingOut:
+        """Sitzungs-State (404, falls unbekannt).
+
+        ``principal`` optional: der WS-Pfad (Reconnect-State) braucht ``canControl``
+        nicht und ruft ohne Principal auf.
+        """
         meeting = await self._get(meeting_id)
-        can = await self.can_control(meeting.gremium_id, principal)
+        can = (
+            await self.can_control(meeting.gremium_id, principal)
+            if principal is not None
+            else False
+        )
         return self._to_out(meeting, await self._protocol_id(meeting.id), can)
 
     async def list(

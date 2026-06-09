@@ -1089,11 +1089,23 @@ export class MeetingsComponent implements OnDestroy {
         this.protocol.set(updated);
         this.toast.success(this.i18n.translate('meetings.toast.finalized'));
       },
-      error: () => {
+      error: (err: unknown) => {
         this.finalizing.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.finalizeFailed'));
+        // Render-/Compile-Fehler (400) tragen einen konkreten Grund — anzeigen.
+        const detail = this.errorDetail(err);
+        this.toast.error(
+          detail
+            ? `${this.i18n.translate('meetings.toast.finalizeFailed')}: ${detail}`
+            : this.i18n.translate('meetings.toast.finalizeFailed'),
+        );
       },
     });
+  }
+
+  /** Konkrete `problem+json`-`detail`-Meldung aus einem HTTP-Fehler (oder leer). */
+  private errorDetail(err: unknown): string {
+    const body = (err as { error?: { detail?: string } } | null)?.error;
+    return typeof body?.detail === 'string' ? body.detail : '';
   }
 
   // --- Anwesenheit (#Meetings/#55/#56) -------------------------------------
