@@ -1,10 +1,12 @@
 """Empfänger-Resolver: Regel-`recipients` → konkrete Mail-Adressen (DB).
 
-Empfängertypen (data-model §5.4):
+Empfängertypen (data-model §5.4 + #28-Flow-Actions):
 
-* ``{"kind":"group","ref":"stupa"}``  — Principals mit OIDC-Gruppe `ref`.
-* ``{"kind":"role","ref":"manager"}`` — Principals mit aktiver Rollen-Zuweisung `ref`.
-* ``{"kind":"applicant"}``            — Antragsteller-Mail des auslösenden Antrags.
+* ``{"kind":"group","ref":"stupa"}``    — Principals mit OIDC-Gruppe `ref`.
+* ``{"kind":"role","ref":"manager"}``   — Principals mit aktiver Rollen-Zuweisung `ref`.
+* ``{"kind":"gremium","ref":"<id>"}``   — aktuelle Mitglieder des Gremiums `ref`.
+* ``{"kind":"applicant"}``              — Antragsteller-Mail des auslösenden Antrags.
+* ``{"kind":"email","ref":"a@b.c"}``    — feste, frei eingetragene Adresse.
 
 Ergebnis ist dedupliziert + sortiert; leere/anonymisierte Adressen fallen raus.
 Anonymisierte Applicants (email NULL) → kein Versand (DSGVO).
@@ -20,6 +22,7 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.models import GremiumMembership
 from app.modules.applications.models import Applicant
 from app.modules.auth.models import Principal, Role, RoleAssignment
 
@@ -47,12 +50,16 @@ class RecipientResolver:
                 out.update(await self._emails_for_group(str(ref)))
             elif kind == "role" and ref:
                 out.update(await self._emails_for_role(str(ref), now))
+            elif kind == "gremium" and ref:
+                out.update(await self._emails_for_gremium(str(ref), now))
             elif kind == "applicant" and application_id is not None:
                 email = await self._applicant_email(application_id)
                 if email:
                     out.add(email)
+            elif kind == "email" and ref:
+                out.add(str(ref).strip())
             # Unbekannte/unvollständige Spec → still ignorieren (Regel bleibt gültig).
-        return sorted(out)
+        return sorted(e for e in out if e)
 
     async def _emails_for_group(self, group: str) -> list[str]:
         rows = (
@@ -77,6 +84,31 @@ class RecipientResolver:
                 or_(
                     RoleAssignment.valid_until.is_(None),
                     RoleAssignment.valid_until >= now,
+                ),
+            )
+        )
+        rows = (await self.session.scalars(stmt)).all()
+        return [e for e in rows if e]
+
+    async def _emails_for_gremium(self, gremium_ref: str, now: datetime) -> list[str]:
+        """Mail-Adressen der aktuell (Amtszeit-Fenster) aktiven Gremium-Mitglieder."""
+        try:
+            gremium_id = uuid.UUID(gremium_ref)
+        except (ValueError, AttributeError):
+            return []
+        stmt = (
+            select(Principal.email)
+            .join(GremiumMembership, GremiumMembership.principal_id == Principal.id)
+            .where(
+                GremiumMembership.gremium_id == gremium_id,
+                Principal.email.is_not(None),
+                or_(
+                    GremiumMembership.valid_from.is_(None),
+                    GremiumMembership.valid_from <= now,
+                ),
+                or_(
+                    GremiumMembership.valid_until.is_(None),
+                    GremiumMembership.valid_until > now,
                 ),
             )
         )

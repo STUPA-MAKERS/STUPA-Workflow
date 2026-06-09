@@ -132,6 +132,49 @@ class WebhookService:
                 await self.queue.enqueue(delivery.id)
         return len(created)
 
+    async def dispatch_to_webhook(
+        self,
+        webhook_id: UUID,
+        *,
+        event: str,
+        payload: dict[str, object] | None = None,
+        idempotency_base: str | None = None,
+    ) -> int:
+        """Eine Delivery an **genau einen** (aktiven) Webhook anlegen + enqueuen (#28).
+
+        Flow-Action ``webhook`` referenziert einen unter ``/admin/webhooks`` gepflegten
+        Webhook per Id. Fehlt/inaktiv ⇒ ``0`` (still übersprungen). Dedup über
+        ``(webhook_id, idempotency_key)``."""
+        hook = await self.session.get(Webhook, webhook_id)
+        if hook is None or not hook.active:
+            logger.warning(
+                "webhook %s missing/inactive — flow action skipped", webhook_id
+            )
+            return 0
+        key = f"{idempotency_base}:{hook.id}" if idempotency_base else None
+        if key is not None and key in await self._existing_keys(event, idempotency_base):
+            logger.info("webhook delivery deduped (event=%s hook=%s)", event, hook.id)
+            return 0
+        delivery = WebhookDelivery(
+            webhook_id=hook.id,
+            event=event,
+            payload=dict(payload or {}),
+            status="pending",
+            attempts=0,
+            idempotency_key=key,
+        )
+        try:
+            async with self.session.begin_nested():
+                self.session.add(delivery)
+                await self.session.flush()
+        except IntegrityError:
+            logger.info("webhook delivery race-deduped (event=%s hook=%s)", event, hook.id)
+            return 0
+        await self.session.commit()
+        if self.queue is not None:
+            await self.queue.enqueue(delivery.id)
+        return 1
+
     async def _existing_keys(self, event: str, base: str | None) -> set[str]:
         """Bereits vergebene Idempotenz-Keys für dieses Event (Dedup-Vorprüfung)."""
         if base is None:

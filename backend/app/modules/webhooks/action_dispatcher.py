@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -29,6 +30,9 @@ from app.modules.webhooks.service import WebhookService
 from app.settings import Settings, get_settings
 
 logger = logging.getLogger("app.webhooks")
+
+# Domain-Event einer Flow-getriebenen Webhook-Auslieferung (#28).
+_TRANSITION_EVENT = "application.transition"
 
 
 @dataclass(slots=True)
@@ -46,24 +50,31 @@ class WebhookActionDispatcher:
             await self._dispatch_webhook(action)
 
     async def _dispatch_webhook(self, action: DispatchedAction) -> None:
-        event = action.params.get("event")
-        if not event:
+        webhook_id = action.params.get("webhookId")
+        if not webhook_id:
             logger.warning(
-                "webhook action without 'event' (key=%s) — skipped",
+                "webhook action without 'webhookId' (key=%s) — skipped",
                 action.idempotency_key,
             )
             return
+        try:
+            target = UUID(str(webhook_id))
+        except ValueError:
+            logger.warning(
+                "webhook action with invalid webhookId %r — skipped", webhook_id
+            )
+            return
         payload: dict[str, object] = {
-            "event": str(event),
+            "event": _TRANSITION_EVENT,
             "applicationId": str(action.application_id),
+            "transitionId": str(action.transition_id),
+            "statusEventId": str(action.status_event_id),
         }
-        extra = action.params.get("payload")
-        if isinstance(extra, dict):
-            payload.update(extra)
         async with self.sessionmaker() as session:
             service = WebhookService(session, self.settings, queue=self.queue)
-            await service.dispatch_event(
-                str(event),
+            await service.dispatch_to_webhook(
+                target,
+                event=_TRANSITION_EVENT,
                 payload=payload,
                 idempotency_base=action.idempotency_key,
             )

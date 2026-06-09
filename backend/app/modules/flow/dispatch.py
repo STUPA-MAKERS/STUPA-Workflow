@@ -25,16 +25,13 @@ from uuid import UUID
 
 logger = logging.getLogger("app.flow.dispatch")
 
-# Worker-Actions (an den Worker dispatcht). `setEditLock` fehlt bewusst (inline).
+# Worker-Actions (an den Worker dispatcht). #28-Redesign: nur noch diese vier.
 WORKER_ACTION_TYPES: frozenset[str] = frozenset(
     {
         "notify",
         "webhook",
-        "exportPdf",
-        "budgetReserve",
-        "budgetBook",
-        "openVote",
-        "requeue",
+        "addToNextSession",
+        "assignBudget",
     }
 )
 
