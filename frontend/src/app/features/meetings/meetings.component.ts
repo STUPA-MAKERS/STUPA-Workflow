@@ -88,7 +88,12 @@ const AUTOSAVE_DELAY_MS = 1000;
   ],
   template: `
     <header class="mtg__head">
-      <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
+      <div class="mtg__headRow">
+        <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
+        @if (!meeting() && canManage()) {
+          <app-button size="sm" (click)="openCreate()">{{ 'meetings.list.new' | t }}</app-button>
+        }
+      </div>
       @if (meeting(); as m) {
         <div class="mtg__meta">
           <span class="mtg__name">{{ m.title }}</span>
@@ -516,13 +521,6 @@ const AUTOSAVE_DELAY_MS = 1000;
       <!-- Übersicht: vorhandene Sitzungen (#104) als geteilte Tabelle (#27) -->
       @if (canManage() || canWrite()) {
         <section class="mtg__listSection">
-          <header class="mtg__listHead">
-            <h2 class="mtg__listH">{{ 'meetings.list.title' | t }}</h2>
-            <!-- Anlegen nur für Sitzungsleitung (#35) — über Dialog (#27). -->
-            @if (canManage()) {
-              <app-button size="sm" (click)="openCreate()">{{ 'meetings.list.new' | t }}</app-button>
-            }
-          </header>
           @if (loadingList()) {
             <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
           } @else if (timelineEmpty()) {
@@ -717,8 +715,13 @@ const AUTOSAVE_DELAY_MS = 1000;
         flex-direction: column;
         gap: var(--space-2);
         width: 100%;
-        max-width: var(--layout-max-width);
-        margin-inline: auto;
+      }
+      .mtg__headRow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-4);
+        flex-wrap: wrap;
       }
       .mtg__meta {
         display: flex;

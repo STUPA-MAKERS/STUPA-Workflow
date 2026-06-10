@@ -23,8 +23,8 @@ import {
   type BudgetApplication,
   type BudgetTreeNode,
   type FiscalYear,
-  simplifyPathKey,
 } from './budget-tree.api';
+import { SimplifyPathPipe } from '@shared/budget-path';
 import {
   BudgetYearTreeComponent,
   type BudgetYearSelection,
@@ -66,6 +66,7 @@ interface UsageRow {
   imports: [
     FormsModule,
     TranslatePipe,
+    SimplifyPathPipe,
     ButtonComponent,
     DataTableComponent,
     CellDirective,
@@ -78,7 +79,6 @@ interface UsageRow {
   styleUrl: './budget-dashboard.component.scss',
 })
 export class BudgetDashboardComponent {
-  protected readonly simplifyPath = simplifyPathKey;
   private readonly api = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
   private readonly route = inject(ActivatedRoute);

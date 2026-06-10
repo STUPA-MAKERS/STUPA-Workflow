@@ -39,8 +39,8 @@ import {
   type ExpenseKind,
   type FiscalYear,
   flattenBudgetOptions,
-  simplifyPathKey,
 } from '../budget/budget-tree.api';
+import { SimplifyPathPipe } from '@shared/budget-path';
 
 /**
  * Ausgaben/Einnahmen-Tab (#25): tatsächliche Buchungen sehen/anlegen/verwalten.
@@ -59,6 +59,7 @@ import {
     RouterLink,
     LocalizedDatePipe,
     TranslatePipe,
+    SimplifyPathPipe,
     BadgeComponent,
     ButtonComponent,
     CurrencyInputComponent,
@@ -161,7 +162,7 @@ import {
                       <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
                     </td>
                     <td class="exp__cellDesc">{{ e.description }}</td>
-                    <td class="exp__mono">{{ e.pathKey ? simplifyPath(e.pathKey) : '—' }}</td>
+                    <td class="exp__mono">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
                     <td>
                       @if (e.applicationId) {
                         <a class="exp__appLink" [routerLink]="['/applications', e.applicationId]">{{ e.applicationTitle || ('expenses.linkedApplication' | t) }}</a>
@@ -409,7 +410,7 @@ import {
       }
       .exp__table th,
       .exp__table td {
-        padding: var(--space-3) var(--space-4);
+        padding: var(--space-2) var(--space-4);
         border-bottom: var(--border-width) solid var(--color-border);
         text-align: start;
         vertical-align: middle;
@@ -541,7 +542,6 @@ export class ExpensesComponent {
   private readonly toast = inject(ToastService);
 
   readonly canManage = computed(() => this.auth.can('budget.manage'));
-  readonly simplifyPath = simplifyPathKey;
 
   private readonly PAGE = 20;
   readonly budgetTree = signal<BudgetTreeNode[]>([]);

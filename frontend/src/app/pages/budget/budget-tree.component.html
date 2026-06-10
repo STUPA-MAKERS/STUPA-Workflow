@@ -43,7 +43,7 @@
         <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
           <ng-template appCell="node" let-row>
             <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
-              <span class="bt__path">{{ simplifyPath($any(row).node.pathKey) }}</span>
+              <span class="bt__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
               <span class="bt__name">{{ $any(row).node.name }}</span>
               @if ($any(row).node.fullyBound) {
                 <span class="bt__tag" [title]="'budget.tree.fullyBoundHint' | t">{{ 'budget.tree.fullyBoundBadge' | t }}</span>
@@ -77,7 +77,7 @@
 
           <ng-template appRowDetail let-row>
             <div class="bt__child-form">
-              <span class="bt__child-hint">{{ 'budget.tree.addChildUnder' | t }}: {{ $any(row).node.pathKey }}</span>
+              <span class="bt__child-hint">{{ 'budget.tree.addChildUnder' | t }}: {{ $any(row).node.pathKey | simplifyPath }}</span>
               <label class="bt__lbl">{{ 'budget.tree.key' | t }}
                 <input [ngModel]="childDraft().key" (ngModelChange)="patchChild('key', $event)" [name]="'ck-' + $any(row).node.id" [placeholder]="'budget.tree.keyChildPlaceholder' | t" /></label>
               <label class="bt__lbl">{{ 'budget.tree.name' | t }}
@@ -103,7 +103,7 @@
 >
   @if (limitNode(); as node) {
     <div class="bt__limit">
-      <p class="bt__muted">{{ node.pathKey }} – {{ node.name }}</p>
+      <p class="bt__muted">{{ node.pathKey | simplifyPath }} – {{ node.name }}</p>
       <label class="bt__lbl">{{ 'budget.tree.limitFor' | t }}
         <app-currency-input name="limit" [ngModel]="limitValue()" (ngModelChange)="limitValue.set($event)" [ariaLabel]="'budget.tree.limitFor' | t" /></label>
       <label class="bt__check">
@@ -128,7 +128,7 @@
 >
   @if (editNode(); as node) {
     <form id="bt-edit-form" class="bt__form bt__form--dialog" (submit)="$event.preventDefault(); saveEditNode()">
-      <p class="bt__muted bt__form-full">{{ node.pathKey }}</p>
+      <p class="bt__muted bt__form-full">{{ node.pathKey | simplifyPath }}</p>
       <label class="bt__lbl">{{ 'budget.tree.key' | t }}
         <input [ngModel]="editKey()" (ngModelChange)="editKey.set($event)" name="editKey" /></label>
       <label class="bt__lbl">{{ 'budget.tree.name' | t }}

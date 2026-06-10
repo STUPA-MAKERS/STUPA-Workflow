@@ -57,6 +57,16 @@ from app.shared.paging import Page
 _ZERO = Decimal("0")
 
 
+def _natural_path_key(path_key: str) -> tuple:
+    """Natürliche Sortierung des Pfads: numerische Segmente als Zahl (``VSM-10``
+    nach ``VSM-9``), nicht-numerische als String. Tupel-Vergleich ist typrein, da
+    sich numerische ``(0, int)`` und String-Segmente ``(1, str)`` an Position 0
+    unterscheiden. Präfix-Pfade (Eltern) sortieren vor ihren Erweiterungen."""
+    return tuple(
+        (0, int(s)) if s.isdigit() else (1, s) for s in path_key.split("-")
+    )
+
+
 def _node_out(b: Budget) -> BudgetNodeOut:
     return BudgetNodeOut(
         id=b.id,
@@ -889,11 +899,12 @@ class BudgetTreeService:
         **gebunden** (committed), wenn sein aktueller Flow-State-Key in den
         ``accepted_state_keys`` des Top-Budgets liegt; als **beantragt** (requested),
         wenn er weder accepted noch denied ist; denied wird ausgeschlossen."""
-        nodes = (
-            await self.session.execute(
-                select(Budget).order_by(Budget.path_key)
-            )
-        ).scalars().all()
+        nodes = list(
+            (await self.session.execute(select(Budget))).scalars().all()
+        )
+        # Natürliche Reihenfolge (VSM-10 nach VSM-9 statt lexikografisch); Eltern vor
+        # Kindern bleibt erhalten → build_forest erbt die Geschwister-Reihenfolge.
+        nodes.sort(key=lambda b: _natural_path_key(b.path_key))
         allocs = (
             await self.session.execute(select(BudgetAllocation))
         ).scalars().all()

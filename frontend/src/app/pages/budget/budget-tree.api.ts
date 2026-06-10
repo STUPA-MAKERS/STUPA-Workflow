@@ -326,30 +326,19 @@ export class BudgetTreeApi {
   }
 }
 
-/**
- * Pfad-Schlüssel zur Anzeige vereinfachen: numerische Präfix-Ketten einklappen.
- * Ist ein Segment Präfix des nächsten (8→81→810), bleibt nur das längste übrig.
- * Das Top-Level-Segment bleibt immer erhalten. ``VSM-8-81-810-330 → VSM-810-330``.
- */
-export function simplifyPathKey(pathKey: string): string {
-  const seg = pathKey.split('-');
-  const out: string[] = [];
-  for (let i = 0; i < seg.length; i++) {
-    const next = seg[i + 1];
-    if (i > 0 && next && next.length > seg[i].length && next.startsWith(seg[i])) continue;
-    out.push(seg[i]);
-  }
-  return out.join('-');
-}
+// Geteilte Pfad-Vereinfachung (#path-display) liegt in @shared/budget-path; lokal
+// importiert (für flattenBudgetOptions) + re-exportiert für Bestands-Importe.
+import { simplifyPathKey } from '@shared/budget-path';
+export { simplifyPathKey };
 
-/** Baum (rekursiv) → flache Optionsliste (pre-order, „pathKey – name"). */
+/** Baum (rekursiv) → flache Optionsliste (pre-order, „pathKey – name", vereinfacht). */
 export function flattenBudgetOptions(
   nodes: BudgetTreeNode[],
 ): { value: Uuid; label: string }[] {
   const out: { value: Uuid; label: string }[] = [];
   const walk = (ns: BudgetTreeNode[]): void => {
     for (const n of ns) {
-      out.push({ value: n.id, label: `${n.pathKey} – ${n.name}` });
+      out.push({ value: n.id, label: `${simplifyPathKey(n.pathKey)} – ${n.name}` });
       if (n.children?.length) walk(n.children);
     }
   };

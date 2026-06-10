@@ -55,7 +55,7 @@
         <app-data-table [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
           <ng-template appCell="node" let-row>
             <button type="button" class="bd__ks" [style.paddingLeft.rem]="$any(row).depth * 1.25" (click)="drillInto($any(row).node)">
-              <span class="bd__path">{{ simplifyPath($any(row).node.pathKey) }}</span>
+              <span class="bd__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
               <span class="bd__name">{{ $any(row).node.name }}</span>
             </button>
           </ng-template>
