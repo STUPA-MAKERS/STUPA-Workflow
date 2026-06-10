@@ -196,6 +196,16 @@ export class AdminApiService {
     return this.http.patch<Role>(`${this.base}/admin/roles/${roleId}`, { permissions });
   }
 
+  /** Rolle umbenennen — Anzeigename (`label`), Key bleibt unverändert. */
+  renameRole(roleId: Uuid, label: I18nMap): Observable<Role> {
+    if (this.mock) {
+      const idx = this.store.roles.findIndex((r) => r.id === roleId);
+      if (idx >= 0) this.store.roles[idx] = { ...this.store.roles[idx], label: { ...label } };
+      return of(structuredCopy(this.store.roles[idx]));
+    }
+    return this.http.patch<Role>(`${this.base}/admin/roles/${roleId}`, { label });
+  }
+
   /** Globale Rolle anlegen (#21) — POST /admin/roles (`RoleCreate`). */
   createRole(body: { key: string; label: I18nMap; permissions?: string[] }): Observable<Role> {
     if (this.mock) {
