@@ -84,6 +84,7 @@ def _transition(
     to_id: object,
     guard: object = None,
     actions: list | None = None,
+    branch: str | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
@@ -95,6 +96,7 @@ def _transition(
         guard=guard,
         actions=actions if actions is not None else [],
         automatic=False,
+        branch=branch,
     )
 
 
@@ -116,6 +118,17 @@ async def test_available_filters_by_guard_and_order() -> None:
     out = await svc.available_transitions(app.id, _principal())
     assert [t.id for t in out] == [t_ok.id]
     assert out[0].label == {"de": "Einreichen"}
+
+
+async def test_available_excludes_result_branches() -> None:
+    # Vote/Approval-Ergebnis-Branches (branch gesetzt) sind nie manuell feuerbar.
+    flow_id, draft = uuid4(), uuid4()
+    app = _app(draft, flow_id)
+    passed = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4(), branch="pass")
+    failed = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4(), branch="fail")
+    db = fake_session(result(app), result(passed, failed))
+    out = await FlowService(db).available_transitions(app.id, _principal())
+    assert out == []
 
 
 async def test_applicant_transitions_only_actor_is_applicant_gated() -> None:

@@ -176,8 +176,10 @@ class FlowService:
         """Verfügbare **manuelle** Übergänge (Guards geprüft) für den Akteur.
 
         Automatische Übergänge werden ausgeblendet — sie feuert der Worker, nicht der
-        Nutzer. Akteur-Gates (``roleIs``/``isInCommittee``) im Guard entscheiden, ob
-        der Principal den Übergang sieht."""
+        Nutzer. **Ergebnis-Branches** (``branch`` gesetzt, z. B. die pass/fail-Ausgänge
+        eines vote/approval-States) ebenfalls: sie entscheidet allein die Abstimmung
+        (``close_vote``), nie eine manuelle Aktion (#vote-branch). Akteur-Gates im Guard
+        verfeinern die Sichtbarkeit der übrigen Übergänge."""
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return []
@@ -193,7 +195,7 @@ class FlowService:
                 color=t.color,
             )
             for t in await self._outgoing(app)
-            if not t.automatic and eval_guard(t.guard, ctx)
+            if not t.automatic and not t.branch and eval_guard(t.guard, ctx)
         ]
 
     # ------------------------------------------------- applicant transitions
