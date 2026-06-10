@@ -1855,9 +1855,16 @@ export class MeetingsComponent implements OnDestroy {
   readonly canManageVotes = computed(() => this.meeting()?.canManageVotes ?? false);
   readonly canVote = computed(() => this.meeting()?.canVote ?? false);
   readonly canWriteGlobal = computed(() => this.auth.can('protocol.write'));
-  /** Übersicht ohne Detail-Route + ohne Verwalter-Recht ⇒ keine Berechtigung. */
+  /** Mitglied irgendeines Gremiums → darf die (gefilterte) Sitzungsübersicht sehen. */
+  readonly inAnyCommittee = computed(() => this.auth.gremien().length > 0);
+  /** Übersicht ohne Detail-Route, ohne Verwalter-/Schreibrecht **und** ohne
+   *  Gremium-Mitgliedschaft ⇒ keine Berechtigung (#sessions). */
   readonly showForbidden = computed(
-    () => !this.detailMode() && !this.canManageAny() && !this.canWriteGlobal(),
+    () =>
+      !this.detailMode() &&
+      !this.canManageAny() &&
+      !this.canWriteGlobal() &&
+      !this.inAnyCommittee(),
   );
   /** Mitglied ohne Schreib-/Verwaltungsrecht → reine Live-Verfolgung. */
   readonly isFollower = computed(() => {
