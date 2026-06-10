@@ -168,7 +168,20 @@ export class ShellComponent {
   }
 
   setLocale(value: string): void {
-    this.i18n.setLocale(value as Locale);
+    const locale = value as Locale;
+    if (locale === this.i18n.locale()) return;
+    this.i18n.setLocale(locale);
+    // Server-gelieferte i18n-Werte (State-/Typ-/Transition-Labels, Formularfelder)
+    // werden beim Laden in der damaligen Sprache aufgelöst und aktualisieren sich
+    // sonst nicht. Aktuelle Ansicht neu laden → durchgängiger Sprachwechsel (#i18n).
+    this.reloadForLocale();
+  }
+
+  /** Seiten-Reload nach Sprachwechsel (in Tests überschreib-/spionierbar). */
+  protected reloadForLocale(): void {
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
   }
 
   login(): void {

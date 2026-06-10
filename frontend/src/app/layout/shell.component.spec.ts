@@ -100,14 +100,22 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
-  it('switches locale through the language selector and reflects it in the control', async () => {
+  it('switches locale through the language selector and reloads the view', async () => {
+    // Sprachwechsel lädt neu (server-i18n in neuer Sprache) — in jsdom gestubbt.
+    const reload = jest
+      .spyOn(
+        ShellComponent.prototype as unknown as { reloadForLocale: () => void },
+        'reloadForLocale',
+      )
+      .mockImplementation(() => {});
     const { fixture, http } = await setup();
     const i18n = fixture.debugElement.injector.get(I18nService);
     const select = screen.getByRole('combobox') as HTMLSelectElement;
     expect(select.value).toBe('de');
     await userEvent.selectOptions(select, 'en');
     expect(i18n.locale()).toBe('en');
-    expect(select.value).toBe('en');
+    expect(reload).toHaveBeenCalled();
+    reload.mockRestore();
     http.verify();
   });
 
