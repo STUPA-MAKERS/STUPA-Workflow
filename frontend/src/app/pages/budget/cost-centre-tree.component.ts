@@ -64,6 +64,14 @@ import { PALETTE } from './budget-year-tree.component';
   `,
   styles: [
     `
+      /* Selbst begrenzen (statt nur auf den Sidebar-Container zu hoffen): der Host
+         ist ohne display sonst inline → tall Inhalt entkommt dem overflow:auto des
+         Eltern. Block + 75vh + interner Scroll → Baum bleibt schwebend, nicht zu hoch. */
+      :host {
+        display: block;
+        max-height: 75vh;
+        overflow-y: auto;
+      }
       .cct {
         display: flex;
         flex-direction: column;
