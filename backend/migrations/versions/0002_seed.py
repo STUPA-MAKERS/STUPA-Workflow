@@ -243,10 +243,7 @@ def _node_id(path_key: str) -> str:
 # Nummern unter demselben Eltern +1 (Hilfskräfte 123→124); gestrichene Ressorts
 # (134 Internationalität, 136 Demokratie/Politische Bildung) ausgelassen.
 _VSM_TREE: list = [
-    ("1", "Beiträge", [
-        ("100", "Beiträge SoSe 2026 (Schätzwert)", []),
-        ("101", "Beiträge WS 2026/2027 (Schätzwert)", []),
-    ]),
+    ("1", "Beiträge", []),
     ("2", "Einnahmen aus wirtschaftlicher Betätigung", [
         ("100", "Wirtschaftliche Betätigung", []),
         ("200", "BgA Campusfest", []),
