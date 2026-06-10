@@ -196,8 +196,8 @@ async def test_embed_votes_appends_snippet_and_ref() -> None:
         ],
     )
     out = await _service(session).embed_votes(PID, [VID])
-    assert "### Abstimmung" in out.markdown
-    assert "**Ergebnis:** passed" in out.markdown
+    assert "> [!abstimmung]" in out.markdown
+    assert "> Ergebnis: passed" in out.markdown
     assert "yes: 2, no: 1" in out.markdown
     assert session.committed == 1
 

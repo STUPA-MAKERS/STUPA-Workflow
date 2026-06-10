@@ -22,8 +22,9 @@ Für andere ``cd_variant`` bleibt die Variante ``None`` → pytex erkennt sie au
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date as _date
+from datetime import time as _time
 
 from app.modules.pdf.markdown import _md_escape, _yaml_scalar
 
@@ -43,20 +44,44 @@ class ProtocolDoc:
     """Alle Kopf-Daten eines Protokolls (vom Service aus der DB befüllt)."""
 
     title: str
-    gremium_slug: str | None
+    gremium_name: str | None
     cd_variant: str | None
     date: _date | None
     markdown: str
+    # Zusätzliche Titelseiten-/Header-Daten (#protocol-metadata, pytex-Protokoll-Header).
+    start_time: _time | None = None
+    protokollant: str | None = None
+    present: list[str] = field(default_factory=list)
+    absent: list[str] = field(default_factory=list)
+    datalines: list[str] = field(default_factory=list)
+
+
+def _yaml_list(key: str, items: list[str]) -> list[str]:
+    """YAML-Block-Liste (leere Liste ⇒ nichts) — Werte werden quotiert/escaped."""
+    if not items:
+        return []
+    return [f"{key}:", *(f"  - {_yaml_scalar(i)}" for i in items)]
 
 
 def _frontmatter(doc: ProtocolDoc) -> list[str]:
     lines = ["---", f"title: {_yaml_scalar(doc.title)}", "typ: protokoll"]
-    if doc.gremium_slug:
-        lines.append(f"gremium: {_yaml_scalar(doc.gremium_slug)}")
+    if doc.gremium_name:
+        lines.append(f"gremium: {_yaml_scalar(doc.gremium_name)}")
     if doc.cd_variant:
         lines.append(f"cd: {_yaml_scalar(doc.cd_variant)}")
     if doc.date is not None:
+        # ``datum`` füllt den Protokoll-Header (Datum + Uhrzeit), ``date`` die
+        # Report-Titelseite.
+        datum = doc.date.isoformat()
+        if doc.start_time is not None:
+            datum = f"{datum} {doc.start_time.strftime('%H:%M')}"
+        lines.append(f"datum: {_yaml_scalar(datum)}")
         lines.append(f"date: {_yaml_scalar(doc.date.isoformat())}")
+    if doc.protokollant:
+        lines.append(f"protokoll: {_yaml_scalar(doc.protokollant)}")
+    lines += _yaml_list("anwesend", doc.present)
+    lines += _yaml_list("abwesend", doc.absent)
+    lines += _yaml_list("datalines", doc.datalines)
     lines.append("---")
     return lines
 

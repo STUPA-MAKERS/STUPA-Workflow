@@ -49,6 +49,11 @@ class FakeSession:
         self.committed = 0
 
     async def execute(self, _stmt: Any) -> FakeResult:
+        # Der Header-Meta-Pfad (#protocol-metadata) fragt die Anwesenheit ab; ohne
+        # positionsbasiertes Ergebnis liefern wir leer, statt einen anderen Treffer
+        # zu verschieben.
+        if "meeting_attendance" in str(_stmt).lower():
+            return FakeResult()
         return self._results.pop(0) if self._results else FakeResult()
 
     async def scalars(self, _stmt: Any) -> FakeResult:

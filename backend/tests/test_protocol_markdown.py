@@ -15,7 +15,7 @@ from app.modules.protocol.markdown import (
 def _doc(**kw: object) -> ProtocolDoc:
     base: dict[str, object] = {
         "title": "StuPa-Sitzung",
-        "gremium_slug": "stupa",
+        "gremium_name": "StuPa",
         "cd_variant": "stupa",
         "date": date(2026, 6, 12),
         "markdown": "# TOP 1\n\nText.",
@@ -41,7 +41,7 @@ def test_document_has_protocol_frontmatter_then_body() -> None:
     assert md.startswith("---\n")
     assert 'title: "StuPa-Sitzung"' in md
     assert "typ: protokoll" in md
-    assert 'gremium: "stupa"' in md
+    assert 'gremium: "StuPa"' in md
     assert 'date: "2026-06-12"' in md
     # Editor-Body bleibt verbatim, nach dem Frontmatter.
     assert md.rstrip().endswith("# TOP 1\n\nText.")
@@ -49,7 +49,7 @@ def test_document_has_protocol_frontmatter_then_body() -> None:
 
 def test_document_without_optional_fields() -> None:
     md = build_protocol_document(
-        _doc(gremium_slug=None, cd_variant=None, date=None, markdown="")
+        _doc(gremium_name=None, cd_variant=None, date=None, markdown="")
     )
     assert "gremium:" not in md
     assert "date:" not in md

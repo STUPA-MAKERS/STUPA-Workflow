@@ -33,8 +33,9 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium, MailList
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.files.storage import ObjectStorage, StorageError
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.queue import MailQueue
@@ -272,15 +273,47 @@ class ProtocolService:
         # wird das Protokoll aus ihren Markdown-Bodies + Beschluss-Snippets montiert;
         # andernfalls Fallback auf das frei editierte ``protocol.markdown`` (Bestand).
         assembled = await self._assemble_from_agenda(protocol.meeting_id)
+        protokollant, present, absent = await self._header_meta(meeting)
         return build_protocol_document(
             ProtocolDoc(
                 title=title,
-                gremium_slug=gremium.slug if gremium is not None else None,
+                gremium_name=getattr(gremium, "name", None) if gremium is not None else None,
                 cd_variant=protocol.cd_variant,
                 date=meeting.date if meeting is not None else None,
+                start_time=getattr(meeting, "start_time", None) if meeting is not None else None,
+                protokollant=protokollant,
+                present=present,
+                absent=absent,
                 markdown=assembled or protocol.markdown,
             )
         )
+
+    async def _header_meta(
+        self, meeting: Meeting | None
+    ) -> tuple[str | None, list[str], list[str]]:
+        """Protokollant + Anwesenheits-Listen (Name oder Sub) für den Protokoll-Header."""
+        if meeting is None:
+            return None, [], []
+        protokollant: str | None = None
+        if getattr(meeting, "protokollant_id", None) is not None:
+            protokollant = await self.session.scalar(
+                select(PrincipalRow.display_name).where(
+                    PrincipalRow.id == meeting.protokollant_id
+                )
+            )
+        rows = (
+            await self.session.execute(
+                select(
+                    MeetingAttendance.status, PrincipalRow.display_name, PrincipalRow.sub
+                )
+                .join(PrincipalRow, PrincipalRow.id == MeetingAttendance.principal_id)
+                .where(MeetingAttendance.meeting_id == meeting.id)
+                .order_by(PrincipalRow.display_name)
+            )
+        ).all()
+        present = [name or sub for status, name, sub in rows if status == "present"]
+        absent = [name or sub for status, name, sub in rows if status == "absent"]
+        return protokollant, present, absent
 
     async def _assemble_from_agenda(self, meeting_id: UUID) -> str:
         """Protokoll-Markdown aus den TOP-Bodies + ihren Beschluss-Abstimmungen bauen."""
