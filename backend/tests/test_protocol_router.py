@@ -27,10 +27,25 @@ VOTE_ID = uuid4()
 class _FakeSession:
     async def commit(self) -> None: ...
 
+    async def rollback(self) -> None: ...
+
+
+class _FakePool:
+    """arq-Pool-Fake: protokolliert enqueue_job-Aufrufe."""
+
+    def __init__(self) -> None:
+        self.jobs: list[tuple[str, str]] = []
+
+    async def enqueue_job(self, name: str, *args: str, **_kw: object) -> object:
+        self.jobs.append((name, args[0]))
+        return object()
+
 
 class _FakeService:
-    def __init__(self) -> None:
+    def __init__(self, *, status: str = "draft") -> None:
         self.calls: list[str] = []
+        self.status = status
+        self.session = _FakeSession()
 
     def _out(self, *, status: str = "draft", markdown: str = "# md") -> ProtocolOut:
         return ProtocolOut(
@@ -54,9 +69,21 @@ class _FakeService:
         self.calls.append(f"embed:{protocol_id}:{len(vote_ids)}")
         return self._out()
 
+    async def start_finalize(self, protocol_id: UUID) -> tuple[ProtocolOut, bool]:
+        self.calls.append(f"start_finalize:{protocol_id}")
+        if self.status in ("rendering", "final"):
+            return self._out(status=self.status), False
+        self.status = "rendering"
+        return self._out(status="rendering"), True
+
     async def finalize(self, protocol_id: UUID, *, now: datetime) -> ProtocolOut:
         self.calls.append(f"finalize:{protocol_id}")
+        self.status = "final"
         return self._out(status="final")
+
+    async def revert_to_draft(self, protocol_id: UUID) -> None:
+        self.calls.append(f"revert:{protocol_id}")
+        self.status = "draft"
 
 
 @pytest.fixture
@@ -148,7 +175,10 @@ def test_embed_votes_rejects_empty_list_422(app: FastAPI, client: TestClient) ->
     assert r.status_code == 422
 
 
-def test_finalize_protocol(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
+def test_finalize_protocol_sync_fallback_without_pool(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """Ohne Redis (kein ``arq_pool``) rendert finalize synchron — Alt-Verhalten."""
     _writer(app, "meeting.manage")
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
     assert r.status_code == 200
@@ -156,7 +186,39 @@ def test_finalize_protocol(app: FastAPI, client: TestClient, fake_service: _Fake
     assert body["status"] == "final"
     assert body["pdfUrl"] == "https://minio.local/p"
     assert body["sentAt"] is not None
-    assert fake_service.calls == [f"finalize:{PROTOCOL_ID}"]
+    assert fake_service.calls == [
+        f"start_finalize:{PROTOCOL_ID}",
+        f"finalize:{PROTOCOL_ID}",
+    ]
+
+
+def test_finalize_protocol_enqueues_with_pool(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """Mit Redis: ``rendering`` zurückgeben + ``render_protocol``-Job enqueuen."""
+    _writer(app, "meeting.manage")
+    pool = _FakePool()
+    app.state.arq_pool = pool
+    r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
+    assert r.status_code == 200
+    assert r.json()["status"] == "rendering"
+    assert pool.jobs == [("render_protocol", str(PROTOCOL_ID))]
+    assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]  # kein Sync-Render
+
+
+def test_finalize_protocol_idempotent_while_rendering(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """Ein zweites finalize während des Renders enqueued nicht erneut."""
+    _writer(app, "meeting.manage")
+    fake_service.status = "rendering"
+    pool = _FakePool()
+    app.state.arq_pool = pool
+    r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
+    assert r.status_code == 200
+    assert r.json()["status"] == "rendering"
+    assert pool.jobs == []
+    assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]
 
 
 # ------------------------------------------------------------- service wiring

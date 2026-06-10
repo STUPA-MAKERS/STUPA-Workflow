@@ -1,8 +1,8 @@
 """API-Schemata des Protokoll-Moduls (T-22, api.md »protocol«).
 
 Wire-Form ist camelCase (T-12 ``_CamelModel``); das FE (T-33/#51) ist exakt gegen
-``ProtocolOut`` gebaut: ``markdown`` + ``status`` (draft/final) + ``pdfUrl``/``sentAt``
-nach ``finalize``.
+``ProtocolOut`` gebaut: ``markdown`` + ``status`` (draft/rendering/final) +
+``pdfUrl``/``sentAt`` nach ``finalize`` (``rendering`` = Worker rendert im Hintergrund).
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ class ProtocolOut(_CamelModel):
     id: UUID
     meeting_id: UUID = Field(alias="meetingId")
     markdown: str
-    status: Literal["draft", "final"]
+    status: Literal["draft", "rendering", "final"]
     # Ergebnis-Link nach ``finalize`` (kurzlebige, signierte MinIO-URL; nie ein
     # direkter Bucket-Link — security.md §6). NULL solange Entwurf / ohne Storage.
     pdf_url: str | None = Field(default=None, alias="pdfUrl")

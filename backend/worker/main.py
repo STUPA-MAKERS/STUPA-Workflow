@@ -29,6 +29,7 @@ from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
 from worker.pdf import on_startup as pdf_on_startup
 from worker.pdf import render_pdf
+from worker.protocol import render_protocol
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
 from worker.webhook import deliver_webhook
@@ -87,6 +88,7 @@ class WorkerSettings:
         send_mail,
         scan_attachment,
         render_pdf,
+        render_protocol,
         deliver_webhook,
         process_deadlines,
     ]

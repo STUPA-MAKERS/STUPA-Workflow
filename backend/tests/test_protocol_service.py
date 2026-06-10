@@ -400,3 +400,72 @@ async def test_get_pdf_bytes_404_without_storage() -> None:
     session = FakeSession(results=[result(proto)])
     with pytest.raises(NotFoundError):
         await _service(session, storage=None).get_pdf_bytes(PID)
+
+
+# --------------------------------------------------- start_finalize / revert (async)
+async def test_start_finalize_marks_rendering_and_requests_enqueue() -> None:
+    proto = _protocol()
+    session = FakeSession(results=[result(proto)])
+    out, needs_render = await _service(session).start_finalize(PID)
+    assert needs_render is True
+    assert out.status == "rendering" and proto.status == "rendering"
+    assert session.committed == 1  # Status-Flip ist committed, bevor enqueued wird
+
+
+async def test_start_finalize_idempotent_while_rendering() -> None:
+    proto = _protocol(status="rendering")
+    session = FakeSession(results=[result(proto)])
+    out, needs_render = await _service(session).start_finalize(PID)
+    assert needs_render is False
+    assert out.status == "rendering"
+    assert session.committed == 0  # kein Doppel-Enqueue, kein Schreibzugriff
+
+
+async def test_start_finalize_idempotent_when_final() -> None:
+    proto = _protocol(status="final", pdf_storage_key=protocol_storage_key(PID))
+    session = FakeSession(results=[result(proto)])
+    out, needs_render = await _service(session).start_finalize(PID)
+    assert needs_render is False
+    assert out.status == "final"
+
+
+async def test_revert_to_draft_resets_rendering() -> None:
+    proto = _protocol(status="rendering")
+    session = FakeSession(results=[result(proto)])
+    await _service(session).revert_to_draft(PID)
+    assert proto.status == "draft"
+    assert session.committed == 1
+
+
+async def test_revert_to_draft_keeps_final_untouched() -> None:
+    proto = _protocol(status="final")
+    session = FakeSession(results=[result(proto)])
+    await _service(session).revert_to_draft(PID)
+    assert proto.status == "final"
+    assert session.committed == 0
+
+
+async def test_update_markdown_while_rendering_conflict() -> None:
+    """Während des Hintergrund-Renders ist der Inhalt eingefroren (409)."""
+    session = FakeSession(results=[result(_protocol(status="rendering"))])
+    with pytest.raises(ConflictError):
+        await _service(session).update_markdown(PID, "# Neu")
+
+
+async def test_embed_votes_while_rendering_conflict() -> None:
+    session = FakeSession(results=[result(_protocol(status="rendering"))])
+    with pytest.raises(ConflictError):
+        await _service(session).embed_votes(PID, [VID])
+
+
+async def test_finalize_from_rendering_completes() -> None:
+    """Der Worker-Pfad: Status ``rendering`` rendert durch bis ``final``."""
+    proto = _protocol(status="rendering")
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium()},
+        results=[result(proto), result(), result(["a@x.de"])],
+    )
+    out = await _service(
+        session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=FakeMailQueue()
+    ).finalize(PID, now=NOW)
+    assert out.status == "final"

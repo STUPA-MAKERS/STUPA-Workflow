@@ -24,8 +24,10 @@ from fastapi import APIRouter, Depends, Request, Response
 from app.deps import DbSession, SettingsDep, require_principal
 from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage
+from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.pdf.pytex_client import build_pytex_client
+from app.modules.protocol.queue import protocol_render_queue_from_pool
 from app.modules.protocol.schemas import ProtocolOut, ProtocolPatch, ProtocolVotesBody
 from app.modules.protocol.service import ProtocolService
 from app.shared.errors import ProblemDetail
@@ -112,10 +114,38 @@ async def embed_votes(
     responses=_errors(401, 403, 404, 503),
 )
 async def finalize_protocol(
-    protocol_id: UUID, service: ServiceDep, _principal: WriterDep
+    protocol_id: UUID, service: ServiceDep, request: Request, principal: WriterDep
 ) -> ProtocolOut:
-    """→ PDF (pytex) → MinIO → Mail an MAIL_LIST(gremium); ``status=final``."""
-    return await service.finalize(protocol_id, now=datetime.now(UTC))
+    """Finalisierung anstoßen: ``status=rendering`` + ``render_protocol``-Worker-Job.
+
+    Nicht-blockierend (der pytex-Render läuft im arq-Worker); der Worker setzt
+    ``final`` + versendet die Mail, bei dauerhaftem Fehler fällt das Protokoll auf
+    ``draft`` zurück. Ohne Redis (DEV/Contract-CI) rendert der Request synchron als
+    Fallback — nie in ``rendering`` hängen. Idempotent: ``rendering``/``final``
+    wird unverändert zurückgegeben (kein Doppel-Render/-Versand)."""
+    out, needs_render = await service.start_finalize(protocol_id)
+    if not needs_render:
+        return out
+    pool = getattr(request.app.state, "arq_pool", None)
+    queue = protocol_render_queue_from_pool(pool)
+    if queue is None:
+        # Sync-Fallback ohne Redis: Fehler → Rollback auf ``draft`` (re-finalisierbar),
+        # dann den Fehler unverändert als problem+json durchreichen (Alt-Verhalten).
+        try:
+            return await service.finalize(protocol_id, now=datetime.now(UTC))
+        except Exception:
+            await service.session.rollback()
+            await service.revert_to_draft(protocol_id)
+            raise
+    await queue.enqueue(protocol_id)
+    # Follower sofort informieren (»Wird gerendert«-Tag): meeting_state-Broadcast;
+    # der Worker broadcastet erneut, wenn final/zurückgerollt.
+    broker = getattr(request.app.state, "broker", None)
+    if broker is not None:
+        await MeetingService(service.session, BrokerPublisher(broker)).broadcast_state(
+            out.meeting_id, principal
+        )
+    return out
 
 
 @router.get(

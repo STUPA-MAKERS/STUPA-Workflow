@@ -246,11 +246,39 @@ class ProtocolService:
         return self._to_out(protocol)
 
     # -------------------------------------------------------------- finalize
+    async def start_finalize(self, protocol_id: UUID) -> tuple[ProtocolOut, bool]:
+        """Finalisierung anstoßen: ``draft → rendering`` (committed, nicht-blockierend).
+
+        Der Aufrufer (Router) enqueued anschließend den ``render_protocol``-Worker-Job.
+        Idempotent: ein bereits ``rendering``/``final`` Protokoll wird unverändert
+        zurückgegeben — das zweite Tupel-Element ``False`` heißt »nichts enqueuen«
+        (kein Doppel-Render, kein Doppelversand)."""
+        protocol = await self._get(protocol_id)
+        if protocol.status in ("rendering", "final"):
+            return self._to_out(protocol), False
+        protocol.status = "rendering"
+        await self.session.flush()
+        await self.session.commit()
+        return self._to_out(protocol), True
+
+    async def revert_to_draft(self, protocol_id: UUID) -> None:
+        """``rendering → draft`` nach dauerhaftem Render-/Versand-Fehler.
+
+        Das Protokoll bleibt damit re-finalisierbar und hängt **nie** in
+        ``rendering`` fest; ein bereits finales Protokoll bleibt unangetastet."""
+        protocol = await self._get(protocol_id)
+        if protocol.status == "rendering":
+            protocol.status = "draft"
+            await self.session.flush()
+            await self.session.commit()
+
     async def finalize(self, protocol_id: UUID, *, now: datetime) -> ProtocolOut:
         """Markdown → PDF → MinIO → Mail an MAIL_LIST(gremium); ``final``.
 
-        Idempotent: ein bereits finalisiertes Protokoll wird unverändert (mit frisch
-        signierter URL) zurückgegeben — kein zweiter Render, kein Doppelversand."""
+        Läuft im Worker (``render_protocol``, Status ``rendering``) **oder** synchron
+        als Fallback ohne Redis (Status noch ``draft``). Idempotent: ein bereits
+        finalisiertes Protokoll wird unverändert (mit frisch signierter URL)
+        zurückgegeben — kein zweiter Render, kein Doppelversand."""
         protocol = await self._get(protocol_id)
         if protocol.status == "final":
             return self._to_out(protocol)
@@ -438,6 +466,12 @@ class ProtocolService:
         if protocol.status == "final":
             raise ConflictError(
                 "Protocol is finalized and read-only.", code="conflict"
+            )
+        if protocol.status == "rendering":
+            # Während des Hintergrund-Renders ist der Inhalt eingefroren — sonst
+            # würde das PDF einen anderen Stand zeigen als der Editor.
+            raise ConflictError(
+                "Protocol is being rendered and is read-only.", code="conflict"
             )
 
     async def _get_vote(self, vote_id: UUID) -> Vote:

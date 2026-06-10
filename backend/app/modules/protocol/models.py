@@ -29,8 +29,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
 
-# Erlaubter Lebenszyklus (data-model §1: draft → final).
-PROTOCOL_STATUSES = ("draft", "final")
+# Erlaubter Lebenszyklus (data-model §1: draft → rendering → final).
+# ``rendering`` = finalize angestoßen, der Worker rendert das PDF im Hintergrund;
+# schlägt der Render dauerhaft fehl, fällt das Protokoll auf ``draft`` zurück.
+PROTOCOL_STATUSES = ("draft", "rendering", "final")
 
 
 class Protocol(UUIDPkMixin, TimestampMixin, Base):
@@ -55,7 +57,9 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     cd_variant: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        CheckConstraint("status IN ('draft','final')", name="protocol_status"),
+        CheckConstraint(
+            "status IN ('draft','rendering','final')", name="protocol_status"
+        ),
         # 1:1 Sitzung ↔ Protokoll: garantiert die Idempotenz von POST .../protocol.
         UniqueConstraint("meeting_id", name="uq_protocol_meeting"),
         Index("ix_protocol_gremium_id", "gremium_id"),
