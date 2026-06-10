@@ -33,6 +33,23 @@ def test_is_in_committee() -> None:
     assert eval_guard({"isInCommittee": "g-2"}, ctx) is False
 
 
+def test_actor_is_applicant() -> None:
+    applicant = GuardContext(actor_is_applicant=True)
+    other = GuardContext(actor_is_applicant=False)
+    assert eval_guard({"actorIsApplicant": True}, applicant) is True
+    assert eval_guard({"actorIsApplicant": True}, other) is False
+    # Negiertes Gate: ``false`` ⇒ Akteur darf NICHT der/die Antragsteller:in sein.
+    assert eval_guard({"actorIsApplicant": False}, other) is True
+    assert eval_guard({"actorIsApplicant": False}, applicant) is False
+
+
+def test_actor_is_applicant_is_actor_gate() -> None:
+    # Nur auf manuellen Übergängen erlaubt (wie roleIs/isInCommittee).
+    validate_guard({"actorIsApplicant": True}, allow_actor_ops=True)
+    with pytest.raises(GuardError):
+        validate_guard({"actorIsApplicant": True}, allow_actor_ops=False)
+
+
 # --- Antragsteller ----------------------------------------------------------
 def test_applicant_role_and_committee() -> None:
     ctx = GuardContext(
@@ -202,6 +219,6 @@ def test_whitelists_exact() -> None:
     assert {
         "deadlinePassed", "applicantRoleIs", "applicantCommitteeIs", "budgetIs",
         "budgetFitsApplication", "hasField", "compare", "roleIs", "isInCommittee",
-        "and", "or", "not",
+        "actorIsApplicant", "and", "or", "not",
     } == GUARD_OPERATORS
     assert {"webhook", "notify", "addToNextSession", "assignBudget"} == ACTION_TYPES

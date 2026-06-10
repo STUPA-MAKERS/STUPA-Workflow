@@ -89,7 +89,7 @@ export type GuardConditionOp =
   | 'hasField'
   | 'compare';
 /** Akteur-Gates — nur auf **manuellen** Übergängen. */
-export type GuardActorOp = 'roleIs' | 'isInCommittee';
+export type GuardActorOp = 'roleIs' | 'isInCommittee' | 'actorIsApplicant';
 export type GuardLeafOperator = GuardConditionOp | GuardActorOp;
 export type GuardCombinator = 'and' | 'or' | 'not';
 
@@ -105,7 +105,11 @@ export const GUARD_CONDITION_OPERATORS: readonly GuardConditionOp[] = [
   'hasField',
   'compare',
 ] as const;
-export const GUARD_ACTOR_OPERATORS: readonly GuardActorOp[] = ['roleIs', 'isInCommittee'] as const;
+export const GUARD_ACTOR_OPERATORS: readonly GuardActorOp[] = [
+  'roleIs',
+  'isInCommittee',
+  'actorIsApplicant',
+] as const;
 export const GUARD_LEAF_OPERATORS: readonly GuardLeafOperator[] = [
   ...GUARD_CONDITION_OPERATORS,
   ...GUARD_ACTOR_OPERATORS,

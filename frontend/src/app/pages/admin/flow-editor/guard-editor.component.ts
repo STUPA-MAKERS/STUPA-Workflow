@@ -267,7 +267,8 @@ export class GuardEditorComponent {
   }
 
   private kindForOp(op: string): ValueKind {
-    if (op === 'deadlinePassed' || op === 'budgetFitsApplication' || !op) return 'none';
+    if (op === 'deadlinePassed' || op === 'budgetFitsApplication' || op === 'actorIsApplicant' || !op)
+      return 'none';
     if (op === 'roleIs' || op === 'applicantRoleIs') return 'role';
     if (op === 'isInCommittee' || op === 'applicantCommitteeIs') return 'committee';
     if (op === 'compare') return 'compare';
@@ -275,7 +276,8 @@ export class GuardEditorComponent {
   }
 
   private defaultLeaf(op: GuardLeafOperator): Guard {
-    if (op === 'deadlinePassed' || op === 'budgetFitsApplication') return { [op]: true };
+    if (op === 'deadlinePassed' || op === 'budgetFitsApplication' || op === 'actorIsApplicant')
+      return { [op]: true };
     if (op === 'compare') return { compare: { field: '', op: '==', value: '' } };
     return { [op]: '' };
   }

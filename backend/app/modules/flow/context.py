@@ -133,6 +133,10 @@ async def build_context(
     raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
     applicant_roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
     applicant_committees = await _committees_for_sub(session, app.created_by)
+    # Akteur ist Antragsteller:in: eingeloggte:r Ersteller:in löst selbst aus (#guard).
+    actor_is_applicant = (
+        manual and app.created_by is not None and principal.sub == app.created_by
+    )
     # Felder (Built-in amount + Formulardaten).
     field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}
     field_values["amount"] = app.amount
@@ -141,6 +145,7 @@ async def build_context(
     return GuardContext(
         manual=manual,
         deadline_passed=deadline_passed,
+        actor_is_applicant=actor_is_applicant,
         roles=frozenset(principal.roles) if manual else frozenset(),
         actor_committees=actor_committees,
         applicant_roles=applicant_roles,

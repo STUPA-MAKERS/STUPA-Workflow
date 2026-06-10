@@ -42,7 +42,10 @@ GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
     }
 )
 # Akteur-Gates — nur auf **manuellen** Übergängen zulässig.
-GUARD_ACTOR_OPERATORS: frozenset[str] = frozenset({"roleIs", "isInCommittee"})
+# ``actorIsApplicant``: der auslösende Akteur ist der/die Antragsteller:in (#guard).
+GUARD_ACTOR_OPERATORS: frozenset[str] = frozenset(
+    {"roleIs", "isInCommittee", "actorIsApplicant"}
+)
 GUARD_LEAF_OPERATORS: frozenset[str] = GUARD_CONDITION_OPERATORS | GUARD_ACTOR_OPERATORS
 GUARD_COMBINATORS: frozenset[str] = frozenset({"and", "or", "not"})
 GUARD_OPERATORS: frozenset[str] = GUARD_LEAF_OPERATORS | GUARD_COMBINATORS
@@ -87,6 +90,8 @@ class GuardContext:
 
     manual: bool = True
     deadline_passed: bool = False
+    # Akteur ist der/die Antragsteller:in (eingeloggte:r Ersteller:in oder Magic-Link).
+    actor_is_applicant: bool = False
     roles: frozenset[str] = frozenset()
     actor_committees: frozenset[str] = frozenset()
     applicant_roles: frozenset[str] = frozenset()
@@ -212,6 +217,9 @@ def _eval_leaf(op: str, value: Any, ctx: GuardContext) -> bool:
         return value in ctx.roles
     if op == "isInCommittee":
         return str(value) in ctx.actor_committees
+    if op == "actorIsApplicant":
+        # Boolesches Gate: ``true`` ⇒ Akteur muss Antragsteller:in sein, ``false`` ⇒ nicht.
+        return ctx.actor_is_applicant == bool(value)
     # --- Antragsteller --------------------------------------------------------
     if op == "applicantRoleIs":
         return value in ctx.applicant_roles
