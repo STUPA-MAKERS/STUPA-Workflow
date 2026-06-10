@@ -232,64 +232,7 @@
           </label>
         }
 
-        <!-- Guard (#28): Bedingung des Übergangs. Akteur-Gates (roleIs/isInCommittee)
-             nur bei manuellen Übergängen; compare = typisierter Feldvergleich. -->
-        <app-select
-          [label]="'admin.flow.guard' | t"
-          [placeholder]="'admin.flow.guardNone' | t"
-          [hint]="'admin.flow.guardHelp' | t"
-          [options]="guardOpOptions(sel.t.automatic)"
-          [ngModel]="guardOp(sel.t)"
-          (ngModelChange)="setGuardOp(sel.index, $event)"
-        />
-        @switch (guardValueKind(guardOp(sel.t))) {
-          @case ('role') {
-            <app-select
-              [label]="'admin.flow.guardValue' | t"
-              [placeholder]="'admin.flow.cfgRolePh' | t"
-              [options]="globalRoleOptions()"
-              [ngModel]="guardValue(sel.t)"
-              (ngModelChange)="setGuardValue(sel.index, $event)"
-            />
-          }
-          @case ('committee') {
-            <app-select
-              [label]="'admin.flow.guardValue' | t"
-              [placeholder]="'admin.flow.cfgGremiumPh' | t"
-              [options]="gremiumOptions()"
-              [ngModel]="guardValue(sel.t)"
-              (ngModelChange)="setGuardValue(sel.index, $event)"
-            />
-          }
-          @case ('text') {
-            <label class="fe__lbl">{{ 'admin.flow.guardValue' | t }}
-              <input [ngModel]="guardValue(sel.t)" (ngModelChange)="setGuardValue(sel.index, $event)" />
-              <span class="fe__field-hint">{{ guardValueHint(guardOp(sel.t)) }}</span>
-            </label>
-          }
-          @case ('none') {
-            @if (guardOp(sel.t)) {
-              <app-checkbox [ngModel]="guardBool(sel.t)" (ngModelChange)="setGuardBool(sel.index, $event)">
-                {{ 'admin.flow.guardValue' | t }}
-              </app-checkbox>
-            }
-          }
-          @case ('compare') {
-            <div class="fe__compare">
-              <label class="fe__lbl">{{ 'admin.flow.compareField' | t }}
-                <input [ngModel]="compareField(sel.t)" (ngModelChange)="setCompare(sel.index, { field: $event })" [attr.placeholder]="'admin.flow.compareFieldPh' | t" /></label>
-              <label class="fe__lbl">{{ 'admin.flow.compareOp' | t }}
-                <select [ngModel]="compareOp(sel.t)" (ngModelChange)="setCompare(sel.index, { op: $event })">
-                  @for (o of compareOps; track o) { <option [value]="o">{{ o }}</option> }
-                </select>
-              </label>
-              <label class="fe__lbl">{{ 'admin.flow.compareValue' | t }}
-                <input [ngModel]="compareValue(sel.t)" (ngModelChange)="setCompare(sel.index, { value: $event })" /></label>
-            </div>
-          }
-        }
-
-        <!-- Aktionen-Einstellungen liegen in eigener Pane unterhalb des Graphen (#flow). -->
+        <!-- Bedingung (Guard) + Aktionen liegen in eigener Pane unterhalb des Graphen (#28). -->
         <app-button variant="danger" size="sm" (click)="removeSelectedTransition()">{{ 'admin.flow.removeTransition' | t }}</app-button>
       } @else {
         <p class="fe__panel-empty">{{ 'admin.flow.selectHint' | t }}</p>
@@ -299,19 +242,36 @@
 
   <!-- Aktionen des gewählten Übergangs: eigene Pane unterhalb des Graphen (#flow). -->
   @if (selectedTransition(); as sel) {
-    <section class="fe__actionsPane" [attr.aria-label]="'admin.flow.actions' | t">
+    <section class="fe__actionsPane" [attr.aria-label]="'admin.flow.transitionInspector' | t">
       <header class="fe__actionsPane-head">
         <div class="fe__actionsPane-title">
-          <h2 class="fe__panel-h">{{ 'admin.flow.actions' | t }}</h2>
+          <h2 class="fe__panel-h">{{ 'admin.flow.transitionInspector' | t }}</h2>
           <span class="fe__actionsPane-sub">{{ sel.t.label?.['de'] || sel.t.label?.['en'] || (sel.t.from + ' → ' + sel.t.to) }}</span>
         </div>
+      </header>
+
+      <!-- Bedingung (#28): boolescher Guard-Baum (und/oder/nicht + Blatt-Operatoren). -->
+      <div class="fe__paneSection">
+        <h3 class="fe__subH">{{ 'admin.flow.guard' | t }}</h3>
+        <p class="fe__hint">{{ 'admin.flow.guardHelp' | t }}</p>
+        <app-guard-editor
+          [guard]="sel.t.guard ?? null"
+          [roleOptions]="globalRoleOptions()"
+          [gremiumOptions]="gremiumOptions()"
+          [automatic]="!!sel.t.automatic"
+          (guardChange)="setGuard(sel.index, $event)"
+        />
+      </div>
+
+      <div class="fe__paneSection-head">
+        <h3 class="fe__subH">{{ 'admin.flow.actions' | t }}</h3>
         <select class="fe__actionsPane-add" #asel (change)="addAction(sel.index, asel.value); asel.value = ''">
           <option value="">{{ 'admin.flow.addAction' | t }}</option>
           @for (opt of actionOptions(); track opt.value) {
             <option [value]="opt.value">{{ opt.label }}</option>
           }
         </select>
-      </header>
+      </div>
 
       @if ((sel.t.actions ?? []).length) {
         <div class="fe__actions-grid">

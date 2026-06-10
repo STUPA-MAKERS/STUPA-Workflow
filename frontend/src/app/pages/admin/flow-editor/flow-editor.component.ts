@@ -15,6 +15,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ButtonComponent, CheckboxComponent, SelectComponent, type SelectOption } from '@shared/ui';
+import { GuardEditorComponent } from './guard-editor.component';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import { AdminOptionsService } from '../admin-options.service';
@@ -25,6 +26,7 @@ import {
   COMPARE_OPS,
   type CompareOp,
   type FlowGraph,
+  type Guard,
   GUARD_ACTOR_OPERATORS,
   GUARD_CONDITION_OPERATORS,
   type GuardLeafOperator,
@@ -86,7 +88,14 @@ const MARGIN = 40;
   selector: 'app-flow-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, SelectComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    CheckboxComponent,
+    SelectComponent,
+    GuardEditorComponent,
+  ],
   templateUrl: './flow-editor.component.html',
   styleUrl: './flow-editor.component.scss',
 })
@@ -693,6 +702,18 @@ export class FlowEditorComponent {
         idx === index ? { ...t, automatic: on } : t,
       ),
     }));
+  }
+
+  /** Ganzen Guard-Baum eines Übergangs setzen (rekursiver Editor, #28). */
+  protected setGuard(index: number, guard: Guard | null): void {
+    this.patchTransition(index, (t) => {
+      if (!guard) {
+        const next = { ...t };
+        delete next.guard;
+        return next;
+      }
+      return { ...t, guard };
+    });
   }
 
   /** Operator wählen → Guard mit sinnvollem Default initialisieren (leer = kein Guard). */

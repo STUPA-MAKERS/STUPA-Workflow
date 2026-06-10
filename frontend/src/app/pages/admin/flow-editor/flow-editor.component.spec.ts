@@ -70,8 +70,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     buildValid(c);
     c.selectEdge(0);
     fixture.detectChanges();
-    // Guard ist auf manuellen und automatischen Übergängen verfügbar (#28).
-    expect(screen.getByRole('combobox', { name: 'Bedingung (Guard)' })).toBeInTheDocument();
+    // Guard-Editor (Bedingung) erscheint in der Pane unter dem Graphen (#28).
+    expect(screen.getByRole('heading', { name: 'Bedingung (Guard)' })).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox').length).toBeGreaterThan(0);
   });
 
   it('exercises state/transition/guard/action/automatic mutators', async () => {
