@@ -113,6 +113,9 @@
                 </dl>
               }
             </app-card>
+
+            <!-- Anhänge: gleiches Panel wie intern; Upload/Löschen bei edit-Scope. -->
+            <app-attachments-panel [applicationId]="app.id" [canUpload]="canEdit()" />
           </div>
 
           <!-- RECHTS: Kommentare als Chat — identisch zur internen Detailansicht (#det).

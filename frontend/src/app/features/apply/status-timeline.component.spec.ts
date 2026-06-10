@@ -95,6 +95,7 @@ function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
     getApplication: () => of(o.application ?? app(true)),
     timeline: () => of(TIMELINE),
     comments: () => of(COMMENTS),
+    listAttachments: () => of([]),
     applicantTransitions: (o.applicantTransitions ?? (() => of([]))) as ApiClient['applicantTransitions'],
     fireApplicantTransition: (o.fireApplicant ??
       jest.fn(() =>

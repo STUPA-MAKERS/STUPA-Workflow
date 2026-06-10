@@ -63,6 +63,9 @@ class _FakeService:
     async def signed_url(self, attachment_id: UUID) -> SignedUrlOut:
         return SignedUrlOut(url="https://minio.local/k", expiresIn=300)
 
+    async def delete(self, attachment_id: UUID, *, actor: str) -> None:
+        self.deleted = attachment_id
+
     async def list_for_application(self, application_id: UUID) -> list[AttachmentOut]:
         self.listed = application_id
         return [
@@ -229,3 +232,25 @@ def test_endpoints_declare_problem_responses(app: FastAPI) -> None:
     get = spec["paths"]["/api/attachments/{attachment_id}"]["get"]["responses"]
     for code in ("401", "404", "409", "410"):
         assert code in get, f"get missing {code}"
+
+
+# --------------------------------------------------------------------------- delete
+def test_delete_requires_auth_401(client: TestClient) -> None:
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 401
+
+
+def test_delete_forbidden_without_manage_404(app: FastAPI, client: TestClient) -> None:
+    # Principal ohne application.manage und kein Ersteller (No-Creator-Stub) → 404.
+    _as(app)
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 404
+
+
+def test_delete_ok_with_manage(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as(app, "application.manage")
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 204
+    assert fake_service.deleted == ATT_ID

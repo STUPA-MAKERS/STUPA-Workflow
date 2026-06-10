@@ -18,8 +18,10 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.applications.access import (
+    MANAGE_PERMISSION,
     READ_PERMISSION,
     Access,
+    _resolve_with_creator,
     require_app_edit,
     require_app_read,
     resolve_access,
@@ -153,3 +155,34 @@ async def get_attachment_url(
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc
     return await service.signed_url(attachment_id)
+
+
+@router.delete(
+    "/attachments/{attachment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=_errors(401, 403, 404),
+)
+async def delete_attachment(
+    attachment_id: UUID,
+    service: ServiceDep,
+    db: DbSession,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> None:
+    """Anhang löschen — Principal (``application.manage``)/Antragsteller (edit-Scope)/
+    eingeloggte:r Ersteller:in. Cross-Tenant → 404 (kein Existenz-Orakel)."""
+    if principal is None and applicant is None:
+        raise UnauthorizedError("Authentication required.")
+    attachment = await service.get_attachment(attachment_id)
+    try:
+        access = await _resolve_with_creator(
+            db,
+            attachment.application_id,
+            principal,
+            applicant,
+            perm=MANAGE_PERMISSION,
+            scope="edit",
+        )
+    except ForbiddenError as exc:
+        raise NotFoundError(f"attachment {attachment_id} not found") from exc
+    await service.delete(attachment_id, actor=access.actor)

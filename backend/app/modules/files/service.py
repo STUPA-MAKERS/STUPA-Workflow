@@ -183,6 +183,30 @@ class FilesService:
             raise ServiceUnavailableError("Could not sign download URL.") from exc
         return SignedUrlOut(url=url, expiresIn=self.settings.attachment_url_ttl_seconds)
 
+    async def delete(self, attachment_id: uuid.UUID, *, actor: str) -> None:
+        """Anhang löschen: DB-Zeile + Storage-Objekt entfernen (+ Audit). 404 fehlt.
+
+        Zugriff prüft der Router (A/P, edit-Scope); das Storage-Objekt wird
+        best-effort entfernt (fehlt es bereits, gilt die Löschung trotzdem)."""
+        attachment = await self.get_attachment(attachment_id)
+        application_id = attachment.application_id
+        storage_key = attachment.storage_key
+        await self.session.delete(attachment)
+        if self.storage is not None and storage_key is not None:
+            try:
+                await self.storage.remove(storage_key)
+            except StorageError:
+                logger.warning("could not remove object for deleted attachment %s", attachment_id)
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.ATTACHMENT_DELETE,
+            target_type="attachment",
+            target_id=str(attachment_id),
+            data={"application_id": str(application_id)},
+        )
+        await self.session.commit()
+
     # ------------------------------------------------------------ scan result #
     async def finalize_scan(
         self,

@@ -25,6 +25,7 @@ import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { IconComponent } from '@shared/ui/icon/icon.component';
+import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
@@ -53,6 +54,7 @@ interface ReadonlyRow {
     CardComponent,
     ButtonComponent,
     IconComponent,
+    AttachmentsPanelComponent,
     TranslatePipe,
   ],
   templateUrl: './status-timeline.component.html',

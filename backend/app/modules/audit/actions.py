@@ -27,3 +27,4 @@ class AuditAction(StrEnum):
     ANONYMIZATION = "anonymization"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
+    ATTACHMENT_DELETE = "attachment_delete"

@@ -53,12 +53,9 @@ async function uploadFile(name = 'plan.pdf') {
 describe('AttachmentsPanelComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('shows the empty + session hint and no upload control without permission', async () => {
+  it('shows the empty state and no upload control without permission', async () => {
     await setup(false);
     expect(screen.getByText('Noch keine Anhänge hochgeladen.')).toBeInTheDocument();
-    expect(
-      screen.getByText('Es werden nur in dieser Sitzung hochgeladene Anhänge angezeigt.'),
-    ).toBeInTheDocument();
     expect(screen.queryByLabelText('Datei hochladen')).not.toBeInTheDocument();
   });
 
@@ -77,6 +74,24 @@ describe('AttachmentsPanelComponent', () => {
     expect(screen.getByText('2.0 KB')).toBeInTheDocument();
     expect(screen.getByText('In Prüfung')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Herunterladen' })).toBeDisabled();
+    expect(success).toHaveBeenCalled();
+    http.verify();
+  });
+
+  it('deletes an attachment via DELETE and drops it from the list', async () => {
+    const { http, detectChanges, toast } = await setup();
+    const success = jest.spyOn(toast, 'success');
+    await uploadFile();
+    http.expectOne(uploadUrl).flush(wire(), { status: 201, statusText: 'Created' });
+    detectChanges();
+    expect(screen.getByText('plan.pdf')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Anhang löschen' }));
+    const del = http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/att-1');
+    del.flush(null, { status: 204, statusText: 'No Content' });
+    detectChanges();
+
+    expect(screen.queryByText('plan.pdf')).not.toBeInTheDocument();
     expect(success).toHaveBeenCalled();
     http.verify();
   });

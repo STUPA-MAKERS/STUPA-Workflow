@@ -316,6 +316,11 @@ export class ApiClient {
       .pipe(map(mapSignedUrl));
   }
 
+  /** DELETE /attachments/{id} — Anhang löschen (Principal/Antragsteller/Ersteller:in). */
+  deleteAttachment(attachmentId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/attachments/${attachmentId}`);
+  }
+
   // --- voting (api.md »voting«) --------------------------------------------
   /**
    * GET /votes/{id} — Vote-State + Tally. `VoteOut` ist ein `_CamelModel`

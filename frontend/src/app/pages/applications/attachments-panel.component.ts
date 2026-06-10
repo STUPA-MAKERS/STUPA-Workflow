@@ -77,15 +77,31 @@ import { formatBytes, scanBadgeVariant } from './applications.util';
                   {{ scanLabel(att.scanState) | t }}
                 </app-badge>
               </div>
-              <app-button
-                variant="secondary"
-                size="sm"
-                [disabled]="att.scanState !== 'clean' || downloadingId() === att.id"
-                [loading]="downloadingId() === att.id"
-                (click)="download(att)"
-              >
-                {{ 'applications.attachments.download' | t }}
-              </app-button>
+              <div class="att__actions">
+                <app-button
+                  variant="secondary"
+                  size="sm"
+                  [disabled]="att.scanState !== 'clean' || downloadingId() === att.id"
+                  [loading]="downloadingId() === att.id"
+                  (click)="download(att)"
+                >
+                  {{ 'applications.attachments.download' | t }}
+                </app-button>
+                @if (canUpload()) {
+                  <app-button
+                    variant="ghost"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'applications.attachments.delete' | t"
+                    [title]="'applications.attachments.delete' | t"
+                    [disabled]="removingId() === att.id"
+                    [loading]="removingId() === att.id"
+                    (click)="remove(att)"
+                  >
+                    ✕
+                  </app-button>
+                }
+              </div>
             </li>
           }
         </ul>
@@ -145,6 +161,11 @@ import { formatBytes, scanBadgeVariant } from './applications.util';
         flex-wrap: wrap;
         min-width: 0;
       }
+      .att__actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
       .att__name {
         font-weight: var(--fw-medium);
         word-break: break-word;
@@ -176,6 +197,7 @@ export class AttachmentsPanelComponent {
   readonly attachments = signal<Attachment[]>([]);
   readonly uploading = signal(false);
   readonly downloadingId = signal<Uuid | null>(null);
+  readonly removingId = signal<Uuid | null>(null);
 
   readonly scanVariant = scanBadgeVariant;
 
@@ -262,6 +284,22 @@ export class AttachmentsPanelComponent {
         } else {
           this.toast.error(this.i18n.translate('applications.attachments.download.error'));
         }
+      },
+    });
+  }
+
+  remove(att: Attachment): void {
+    if (this.removingId()) return;
+    this.removingId.set(att.id);
+    this.api.deleteAttachment(att.id).subscribe({
+      next: () => {
+        this.attachments.update((list) => list.filter((a) => a.id !== att.id));
+        this.removingId.set(null);
+        this.toast.success(this.i18n.translate('applications.attachments.deleted'));
+      },
+      error: () => {
+        this.removingId.set(null);
+        this.toast.error(this.i18n.translate('applications.attachments.deleteError'));
       },
     });
   }
