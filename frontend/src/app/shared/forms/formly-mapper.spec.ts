@@ -25,7 +25,7 @@ describe('toFormlyFields', () => {
     expect(cfg.props?.required).toBe(true);
   });
 
-  it('maps currency to a numeric input and copies validation bounds', () => {
+  it('maps currency to a currency input and copies validation bounds', () => {
     const fields: FormFieldDef[] = [
       {
         key: 'amount',
@@ -35,7 +35,7 @@ describe('toFormlyFields', () => {
       },
     ];
     const [cfg] = toFormlyFields(fields, 'de');
-    expect(cfg.props?.type).toBe('number');
+    expect(cfg.props?.type).toBe('currency');
     expect(cfg.props?.min).toBe(0);
     expect(cfg.props?.max).toBe(100);
     expect(cfg.props?.['minLength']).toBe(1);

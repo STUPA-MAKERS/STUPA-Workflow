@@ -25,28 +25,69 @@ import { I18nService } from '@core/i18n/i18n.service';
     { provide: NG_VALUE_ACCESSOR, useExisting: CurrencyInputComponent, multi: true },
   ],
   template: `
-    <span class="cur" [class.cur--disabled]="disabled()">
-      <input
-        class="cur__input"
-        type="text"
-        inputmode="decimal"
-        [value]="text()"
-        [disabled]="disabled()"
-        [attr.placeholder]="placeholder()"
-        [attr.aria-label]="ariaLabel() || null"
-        [attr.name]="name() || null"
-        (focus)="onFocus()"
-        (input)="onInput($any($event.target).value)"
-        (blur)="onBlur()"
-      />
-      <span class="cur__symbol" aria-hidden="true">€</span>
-    </span>
+    <div class="field">
+      @if (label()) {
+        <label class="field__label">
+          {{ label() }}
+          @if (required()) {
+            <span class="field__req" aria-hidden="true">*</span>
+          }
+        </label>
+      }
+      <span class="cur" [class.cur--disabled]="disabled()">
+        <input
+          class="cur__input"
+          type="text"
+          inputmode="decimal"
+          [value]="text()"
+          [disabled]="disabled()"
+          [attr.placeholder]="placeholder()"
+          [attr.aria-label]="ariaLabel() || label() || null"
+          [attr.aria-invalid]="error() ? 'true' : null"
+          [attr.name]="name() || null"
+          (focus)="onFocus()"
+          (input)="onInput($any($event.target).value)"
+          (blur)="onBlur()"
+        />
+        <span class="cur__symbol" aria-hidden="true">€</span>
+      </span>
+      @if (hint() && !error()) {
+        <p class="field__hint">{{ hint() }}</p>
+      }
+      @if (error()) {
+        <p class="field__error" role="alert">{{ error() }}</p>
+      }
+    </div>
   `,
   styles: [
     `
       :host {
         display: block;
         width: 100%;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+      }
+      .field__label {
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-medium);
+        color: var(--color-text-muted);
+      }
+      .field__req {
+        color: var(--color-danger);
+        margin-inline-start: 2px;
+      }
+      .field__hint {
+        font-size: var(--fs-xs);
+        color: var(--color-text-muted);
+        margin: 0;
+      }
+      .field__error {
+        font-size: var(--fs-xs);
+        color: var(--color-danger);
+        margin: 0;
       }
       .cur {
         display: inline-flex;
@@ -94,6 +135,12 @@ export class CurrencyInputComponent implements ControlValueAccessor {
   readonly placeholder = input('');
   readonly ariaLabel = input('');
   readonly name = input('');
+  /** Optionales Feld-Label; gesetzt → volle Feld-Optik (Label/Hint/Error),
+   *  leer → blankes Control (für eigene Label-Wrapper, z. B. Filter/Dialoge). */
+  readonly label = input('');
+  readonly hint = input('');
+  readonly error = input('');
+  readonly required = input(false);
 
   /** Sichtbarer Text (formatiert oder beim Tippen roh). */
   protected readonly text = signal('');

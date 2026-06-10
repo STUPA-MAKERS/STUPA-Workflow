@@ -7,7 +7,8 @@ import { resolveI18n } from './i18n-text';
 const INPUT_HTML_TYPE: Partial<Record<FieldType, string>> = {
   text: 'text',
   number: 'number',
-  currency: 'number',
+  // 'currency' → eigener Branch im FormlyInputType (app-currency-input mit €/Format).
+  currency: 'currency',
   date: 'date',
   file: 'text', // Datei-Upload (Attachment-Referenz) — voller Upload folgt mit T-13.
 };
