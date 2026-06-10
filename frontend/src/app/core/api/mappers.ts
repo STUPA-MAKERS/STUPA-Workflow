@@ -15,15 +15,6 @@ import type {
   Applicant,
   ApplicantOutWire,
   Application,
-  BudgetPotInfo,
-  BudgetPotOutWire,
-  BudgetStats,
-  BudgetStatsOutWire,
-  PotUsage,
-  PotUsageOutWire,
-  StatusBucket,
-  StatusBucketOutWire,
-  Uuid,
   ApplicationCreateBody,
   ApplicationCreated,
   ApplicationCreatedWire,
@@ -275,84 +266,6 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
     pdfUrl: wire.pdfUrl ?? null,
     sentAt: wire.sentAt ?? null,
   };
-}
-
-// --- Budget (T-17/T-35, api.md »budget«) ----------------------------------- //
-
-/**
- * Geld-String (`Decimal` → JSON-String, numeric(12,2)) in eine `number` für
- * Anzeige/Charts wandeln. `null`/leer → `null`; unparsebar → `0` (defensiv,
- * statt `NaN` ins UI durchzulassen).
- */
-function money(value: string | null | undefined): number {
-  if (value === null || value === undefined || value === '') return 0;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function moneyOrNull(value: string | null | undefined): number | null {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-export function mapBudgetPotInfo(wire: BudgetPotOutWire): BudgetPotInfo {
-  return {
-    id: wire.id,
-    gremiumId: wire.gremiumId,
-    name: wire.name,
-    total: moneyOrNull(wire.total),
-    currency: wire.currency,
-    period: wire.period ?? null,
-    active: wire.active,
-  };
-}
-
-/**
- * Topf-Auslastung in die View-Form bringen. `names` (id → Anzeigename, aus
- * /budget-pots) ist optional — fehlt der Name (nur `budget.view`), fällt die
- * Anzeige auf eine gekürzte ID zurück, statt nichts zu zeigen.
- */
-export function mapPotUsage(
-  wire: PotUsageOutWire,
-  names?: ReadonlyMap<Uuid, string>,
-): PotUsage {
-  return {
-    budgetPotId: wire.budgetPotId,
-    name: names?.get(wire.budgetPotId) ?? shortId(wire.budgetPotId),
-    period: wire.period ?? null,
-    total: moneyOrNull(wire.total),
-    currency: wire.currency,
-    requested: money(wire.requested),
-    reserved: money(wire.reserved),
-    approved: money(wire.approved),
-    paid: money(wire.paid),
-    committed: money(wire.committed),
-    available: moneyOrNull(wire.available),
-  };
-}
-
-export function mapStatusBucket(wire: StatusBucketOutWire): StatusBucket {
-  return {
-    gremiumId: wire.gremiumId ?? null,
-    stateId: wire.stateId ?? null,
-    count: wire.count,
-  };
-}
-
-export function mapBudgetStats(
-  wire: BudgetStatsOutWire,
-  names?: ReadonlyMap<Uuid, string>,
-): BudgetStats {
-  return {
-    pots: (wire.pots ?? []).map((p) => mapPotUsage(p, names)),
-    statusDistribution: (wire.statusDistribution ?? []).map(mapStatusBucket),
-  };
-}
-
-/** UUID auf ein kurzes, im UI brauchbares Label kürzen (`1234abcd…`). */
-function shortId(id: Uuid): string {
-  return id.length > 8 ? `${id.slice(0, 8)}…` : id;
 }
 
 /** FE-Eingabe → camelCase-Request-Body für `POST /applications`. */

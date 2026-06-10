@@ -30,7 +30,6 @@ from app.modules.application_types.router import router as application_types_rou
 from app.modules.applications.router import router as applications_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
-from app.modules.budget.router import router as budget_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.deadlines.router import router as deadline_policies_router
 from app.modules.delegations.router import router as delegations_router
@@ -74,7 +73,6 @@ api_router.include_router(flow_router)
 api_router.include_router(voting_router)
 api_router.include_router(livevote_router)
 api_router.include_router(protocol_router)
-api_router.include_router(budget_router)
 api_router.include_router(budget_tree_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(files_router)

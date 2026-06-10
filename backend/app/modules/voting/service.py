@@ -345,6 +345,15 @@ class VotingService:
             if vote.application_id is not None
             else None
         )
+        # Antragsgebundener Vote OHNE passenden Branch-Übergang (fehlkonfigurierter
+        # Flow / Vote auf einem Nicht-``vote``-State): fail-closed statt still schließen,
+        # sonst stünde das Ergebnis fest, der Antrag bliebe aber ewig im Vor-Vote-State.
+        if vote.application_id is not None and branch is None:
+            raise ConflictError(
+                f"no '{branch_name}' branch transition for the vote's current state; "
+                "flow is misconfigured.",
+                code="conflict",
+            )
 
         # Vote-Zustand vormerken — NICHT separat committen: `fire` schreibt ihn
         # atomar mit Transition + status_event; ohne Branch committen wir hier.

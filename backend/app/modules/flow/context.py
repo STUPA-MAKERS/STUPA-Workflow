@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership
@@ -70,9 +70,10 @@ async def _committees_for_sub(session: AsyncSession, sub: str | None) -> frozens
 async def _budget_fits(session: AsyncSession, app: Application) -> bool:
     """``True`` wenn der Antragsbetrag in den freien Rest der Kostenstelle passt.
 
-    Verfügbar = Allocation des Knotens im Haushaltsjahr − Σ direkter Ausgaben
-    (``budget_expense``) auf diesem Knoten/HHJ. Ohne Budget/HHJ/Betrag ⇒ ``False``
-    (fail-closed)."""
+    Verfügbar = Allocation des Knotens im Haushaltsjahr − Σ Ausgaben
+    (``kind='expense'``) + Σ Einnahmen (``kind='income'``) auf diesem Knoten/HHJ —
+    gleiche Richtung wie ``tree_rules.node_available``. Ohne Budget/HHJ/Betrag ⇒
+    ``False`` (fail-closed)."""
     if app.budget_id is None or app.fiscal_year_id is None or app.amount is None:
         return False
     allocated = await session.scalar(
@@ -81,13 +82,23 @@ async def _budget_fits(session: AsyncSession, app: Application) -> bool:
             BudgetAllocation.fiscal_year_id == app.fiscal_year_id,
         )
     )
-    spent = await session.scalar(
-        select(func.coalesce(func.sum(BudgetExpense.amount), Decimal("0"))).where(
+    flow = await session.scalar(
+        select(
+            func.coalesce(
+                func.sum(
+                    case(
+                        (BudgetExpense.kind == "income", BudgetExpense.amount),
+                        else_=-BudgetExpense.amount,
+                    )
+                ),
+                Decimal("0"),
+            )
+        ).where(
             BudgetExpense.budget_id == app.budget_id,
             BudgetExpense.fiscal_year_id == app.fiscal_year_id,
         )
     )
-    available = (allocated or Decimal("0")) - (spent or Decimal("0"))
+    available = (allocated or Decimal("0")) + (flow or Decimal("0"))
     return app.amount <= available
 
 

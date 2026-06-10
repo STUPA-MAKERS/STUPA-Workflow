@@ -15,8 +15,6 @@ import type {
   ApplicationTypeListItemWire,
   AttachmentOutWire,
   BallotResult,
-  BudgetPotOutWire,
-  BudgetStatsOutWire,
   CommentOutWire,
   EffectiveForm,
   MagicLinkVerifyResult,
@@ -73,85 +71,6 @@ const MOCK_PRINCIPAL: Principal = {
   gremien: [
     { id: 'g0000000-0000-0000-0000-000000000001', name: 'Studierendenparlament', slug: 'stupa' },
     { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss', slug: 'haushalt' },
-  ],
-};
-
-// --- Budget (T-17/T-35) — Töpfe + Rollup-Statistik -------------------------- //
-const MOCK_GREMIUM_ID = 'b0000000-0000-0000-0000-00000000c001';
-
-const MOCK_BUDGET_POTS: BudgetPotOutWire[] = [
-  {
-    id: 'b0000000-0000-0000-0000-0000000000a1',
-    gremiumId: MOCK_GREMIUM_ID,
-    name: 'Veranstaltungen',
-    total: '10000.00',
-    currency: 'EUR',
-    period: '2026',
-    active: true,
-  },
-  {
-    id: 'b0000000-0000-0000-0000-0000000000a2',
-    gremiumId: MOCK_GREMIUM_ID,
-    name: 'Anschaffungen',
-    total: '5000.00',
-    currency: 'EUR',
-    period: '2026',
-    active: true,
-  },
-  {
-    id: 'b0000000-0000-0000-0000-0000000000a3',
-    gremiumId: MOCK_GREMIUM_ID,
-    name: 'Härtefonds',
-    total: null,
-    currency: 'EUR',
-    period: '2026',
-    active: true,
-  },
-];
-
-const MOCK_BUDGET_STATS: BudgetStatsOutWire = {
-  pots: [
-    {
-      budgetPotId: MOCK_BUDGET_POTS[0].id,
-      period: '2026',
-      total: '10000.00',
-      currency: 'EUR',
-      requested: '4200.00',
-      reserved: '1500.00',
-      approved: '3000.00',
-      paid: '2000.00',
-      committed: '6500.00',
-      available: '3500.00',
-    },
-    {
-      budgetPotId: MOCK_BUDGET_POTS[1].id,
-      period: '2026',
-      total: '5000.00',
-      currency: 'EUR',
-      requested: '900.00',
-      reserved: '500.00',
-      approved: '750.00',
-      paid: '250.00',
-      committed: '1500.00',
-      available: '3500.00',
-    },
-    {
-      budgetPotId: MOCK_BUDGET_POTS[2].id,
-      period: '2026',
-      total: null,
-      currency: 'EUR',
-      requested: '600.00',
-      reserved: '0.00',
-      approved: '300.00',
-      paid: '300.00',
-      committed: '600.00',
-      available: null,
-    },
-  ],
-  statusDistribution: [
-    { gremiumId: MOCK_GREMIUM_ID, stateId: '51110000-0000-0000-0000-000000000001', count: 7 },
-    { gremiumId: MOCK_GREMIUM_ID, stateId: '52220000-0000-0000-0000-000000000002', count: 4 },
-    { gremiumId: MOCK_GREMIUM_ID, stateId: '53330000-0000-0000-0000-000000000004', count: 2 },
   ],
 };
 
@@ -585,8 +504,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       return ok(signed);
     }
-    if (p.endsWith('/budget/stats')) return ok(MOCK_BUDGET_STATS);
-    if (p.endsWith('/budget-pots')) return ok([...MOCK_BUDGET_POTS]);
     // Ausgaben/Einnahmen (#25): leere Seite (Tree-Mock fehlt ohnehin) — kein Konsolen-404.
     if (p.endsWith('/expenses')) return ok({ items: [], total: 0, limit: 20, offset: 0 });
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);

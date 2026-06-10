@@ -395,17 +395,33 @@ async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) ->
     assert _patch_flow.calls == []  # Guard-Pfad NICHT benutzt
 
 
-async def test_close_no_matching_branch_just_closes(
+async def test_close_application_vote_without_branch_raises_conflict(
     _patch_flow: type[_FakeFlow],
 ) -> None:
+    """Antragsgebundener Vote ohne passenden Branch-Übergang ⇒ fail-closed (409),
+    NICHT still schließen — sonst stünde das Ergebnis fest, der Antrag bliebe aber
+    ewig im Vor-Vote-State (Vote-Ergebnis und Flow-State driften auseinander)."""
     _patch_flow.available = []  # kein passender Übergang
-    vote = _vote()
+    vote = _vote()  # application_id gesetzt
+    db = fake_session(result(vote), result("no", "no", "yes"))
+    with pytest.raises(ConflictError):
+        await VotingService(db).close(vote.id, _voter())
+    assert db.committed == 0  # kein stiller Teil-Commit
+
+
+async def test_close_generic_vote_without_application_just_closes(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """Generische Beschlussfrage (ohne Antrag) feuert KEINEN Branch — sie hält nur
+    das Ergebnis fürs Protokoll und committet den Schluss selbst."""
+    _patch_flow.available = []
+    vote = _vote(application_id=None)
     db = fake_session(result(vote), result("no", "no", "yes"))
     out = await VotingService(db).close(vote.id, _voter())
     assert out.result == "rejected"
     assert out.fired_transition_id is None
     assert out.new_state_id is None
-    assert db.committed == 1  # ohne Branch committet close den Schluss selbst
+    assert db.committed == 1
 
 
 async def test_close_atomic_fire_failure_does_not_commit(
