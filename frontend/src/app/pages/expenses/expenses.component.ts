@@ -531,6 +531,48 @@ import { SimplifyPathPipe } from '@shared/budget-path';
         .exp__tree { position: static; max-height: none; }
         .exp__row { grid-template-columns: 1fr auto; }
       }
+      /* Mobil (≤768px): Suche in voller Breite, Tabellenzeilen als Karten (rein CSS). */
+      @media (max-width: 768px) {
+        .exp__search { flex: 1 1 100%; min-width: 0; }
+        .exp__tableWrap {
+          overflow-x: visible;
+          border: none;
+          border-radius: 0;
+          background: transparent;
+        }
+        .exp__table,
+        .exp__table tbody { display: block; }
+        .exp__table thead { display: none; }
+        .exp__table tbody tr {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: var(--space-1) var(--space-3);
+          padding: var(--space-3) var(--space-4);
+          margin-bottom: var(--space-3);
+          background: var(--color-surface);
+          border: var(--border-width) solid var(--color-border);
+          border-radius: var(--radius-lg);
+        }
+        .exp__table tbody tr:last-child { margin-bottom: 0; }
+        .exp__table th,
+        .exp__table td {
+          padding: 0;
+          border-bottom: none;
+        }
+        /* Beschreibung als volle erste Zeile der Karte. */
+        .exp__cellDesc {
+          flex: 1 1 100%;
+          min-width: 0;
+          order: -1;
+        }
+        /* Betrag (+ Aktionen) rechtsbündig in der Meta-Zeile. */
+        .exp__amount { margin-left: auto; }
+        .exp__empty {
+          flex: 1 1 100%;
+          padding: var(--space-6) !important;
+        }
+      }
     `,
   ],
 })

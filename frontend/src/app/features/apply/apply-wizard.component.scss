@@ -151,3 +151,21 @@
     justify-content: space-between;
   }
 }
+
+/* Mobil: „Weiter/Absenden" als volle Tap-Fläche (≥2.5rem), Optionen gut tippbar. */
+@media (max-width: 40rem) {
+  .wizard__nav-right app-button {
+    display: flex;
+    flex: 1 1 auto;
+  }
+  .wizard__nav-right ::ng-deep .btn {
+    width: 100%;
+    min-height: 2.5rem;
+  }
+  .wizard__nav-left ::ng-deep .btn {
+    min-height: 2.5rem;
+  }
+  .type-option {
+    min-height: 2.75rem;
+  }
+}

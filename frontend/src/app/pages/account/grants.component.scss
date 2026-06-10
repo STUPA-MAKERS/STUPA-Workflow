@@ -142,3 +142,20 @@
   background: transparent;
   color: var(--color-danger);
 }
+
+/* Mobil (≤768px): Tabelle horizontal scrollbar, lange Befehle umbrechen. */
+@media (max-width: 768px) {
+  .grants__table {
+    display: block;
+    overflow-x: auto;
+  }
+  .grants__list-head {
+    flex-wrap: wrap;
+  }
+  .mcp__steps code {
+    word-break: break-all;
+  }
+  .btn {
+    min-height: 2.5rem;
+  }
+}

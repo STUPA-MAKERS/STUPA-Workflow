@@ -123,3 +123,17 @@ textarea {
   margin-inline: auto;
   padding-inline: var(--layout-gutter);
 }
+
+// Mobile-Baseline (≤768px): engerer Seitenrand, kompaktere Headings.
+// Desktop bleibt unverändert — alle Mobile-Regeln sind additiv per max-width.
+@media (max-width: 768px) {
+  .container {
+    padding-inline: var(--space-4);
+  }
+  h1 {
+    font-size: var(--fs-2xl);
+  }
+  h2 {
+    font-size: var(--fs-xl);
+  }
+}

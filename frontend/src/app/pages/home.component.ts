@@ -70,6 +70,17 @@ import { CardComponent } from '@shared/ui/card/card.component';
         grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
         gap: var(--space-5);
       }
+      /* Mobil (≤768px): kompakterer Hero, CTA als volle Tap-Fläche. */
+      @media (max-width: 768px) {
+        .hero {
+          padding-block: var(--space-6) var(--space-6);
+        }
+        .hero__cta {
+          width: 100%;
+          justify-content: center;
+          min-height: 2.5rem;
+        }
+      }
     `,
   ],
 })

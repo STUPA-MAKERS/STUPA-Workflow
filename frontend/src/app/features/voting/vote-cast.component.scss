@@ -84,3 +84,21 @@
     grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
   }
 }
+
+// --- Mobil (≤48rem): Optionen gestapelt in voller Breite, bequeme
+// Touch-Ziele; rein additiv, Desktop bleibt unverändert ----------------------
+@media (max-width: 48rem) {
+  .vote__options {
+    grid-template-columns: 1fr;
+  }
+
+  .vote__option ::ng-deep .btn {
+    min-height: 3.25rem;
+  }
+
+  .vote__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+}

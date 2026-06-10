@@ -268,6 +268,12 @@ interface Member {
         display: flex;
         gap: var(--space-3);
       }
+      /* Mobil (≤768px): Amtszeit-Datepicker untereinander statt nebeneinander. */
+      @media (max-width: 768px) {
+        .gm__term {
+          flex-direction: column;
+        }
+      }
     `,
   ],
 })

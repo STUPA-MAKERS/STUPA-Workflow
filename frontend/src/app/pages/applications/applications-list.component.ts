@@ -261,6 +261,12 @@ import { downloadBlob } from '@shared/download.util';
         font-size: var(--fs-sm);
         margin-top: var(--space-3);
       }
+      /* Mobil (≤768px): Kopf-Aktionen dürfen umbrechen. */
+      @media (max-width: 768px) {
+        .apps__headActions {
+          flex-wrap: wrap;
+        }
+      }
     `,
   ],
 })

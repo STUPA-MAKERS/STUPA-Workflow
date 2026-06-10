@@ -19,6 +19,8 @@ export const de = {
 
   'nav.main': 'Hauptnavigation',
   'nav.footer': 'Fußzeile',
+  'nav.menuOpen': 'Menü öffnen',
+  'nav.menuClose': 'Menü schließen',
   'nav.dashboard': 'Dashboard',
   'nav.myGremien': 'Meine Gremien',
   'myGremien.title': 'Meine Gremien',
@@ -1505,6 +1507,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'nav.main': 'Main navigation',
   'nav.footer': 'Footer',
+  'nav.menuOpen': 'Open menu',
+  'nav.menuClose': 'Close menu',
   'nav.dashboard': 'Dashboard',
   'nav.myGremien': 'My committees',
   'myGremien.title': 'My committees',

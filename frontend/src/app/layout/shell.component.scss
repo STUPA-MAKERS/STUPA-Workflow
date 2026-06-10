@@ -263,6 +263,11 @@
   width: 100%;
   padding-block: var(--space-8);
 }
+@media (max-width: 768px) {
+  .main {
+    padding-block: var(--space-5);
+  }
+}
 
 /* Volle Breite (Route-Data `wide`) — Inhalte mit zwei Sidebars (z. B. Budget). */
 .main--wide {
@@ -300,8 +305,95 @@
   color: var(--color-text);
 }
 
+/* Hamburger (Mobile-Nav): nur unterhalb des Nav-Breakpoints sichtbar. */
+.menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.menu-btn:hover {
+  background: var(--color-surface-sunken);
+}
+.menu-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Mobile-Nav-Drawer: schiebt unterhalb des Headers von links ein. Liegt über
+   Seiteninhalt + Sticky-Elementen, aber unter Dialogen/Toasts. */
+.mobile-nav__backdrop {
+  position: fixed;
+  inset: var(--layout-header-height) 0 0 0;
+  z-index: calc(var(--z-dialog) - 20);
+  border: 0;
+  background: rgba(0, 18, 10, 0.4);
+  cursor: default;
+}
+.mobile-nav {
+  position: fixed;
+  top: var(--layout-header-height);
+  bottom: 0;
+  left: 0;
+  z-index: calc(var(--z-dialog) - 10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: min(80vw, 18rem);
+  padding: var(--space-3);
+  overflow-y: auto;
+  background: var(--color-bg-elevated);
+  border-right: var(--border-width) solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  animation: mobile-nav-in var(--motion-base) var(--ease-standard);
+}
+@keyframes mobile-nav-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.mobile-nav__link {
+  padding: var(--space-3);
+  font-size: var(--fs-md, 1rem);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+}
+.mobile-nav__link:hover {
+  color: var(--color-text);
+  background: var(--color-surface-sunken);
+}
+.mobile-nav__link.is-active {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
 @media (max-width: 720px) {
   .header__nav {
+    display: none;
+  }
+  .menu-btn {
+    display: inline-flex;
+  }
+}
+
+/* Drawer ist ein reines Mobile-Muster — oberhalb des Breakpoints nie sichtbar
+   (auch wenn er beim Verkleinern offen war). */
+@media (min-width: 720.02px) {
+  .mobile-nav,
+  .mobile-nav__backdrop {
     display: none;
   }
 }

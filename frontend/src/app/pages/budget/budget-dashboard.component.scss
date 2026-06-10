@@ -368,3 +368,76 @@
 .bd__open:hover {
   text-decoration: underline;
 }
+
+/* --- Mobil (≤768px = 48rem): eine Spalte — Picker (einklappbar) → Inhalt →
+   Charts. Desktop bleibt unberührt: der Toggle existiert dort nur versteckt. --- */
+.bd__nav-toggle {
+  display: none;
+}
+
+@media (max-width: 48rem) {
+  .bd__layout {
+    grid-template-columns: 1fr;
+  }
+  .bd__nav {
+    position: static;
+    justify-self: stretch;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+  }
+  /* Toggle: zeigt das gewählte Budget/HHJ, klappt den Baum auf/zu. */
+  .bd__nav-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--space-2) var(--space-3);
+    font: inherit;
+    font-weight: var(--fw-medium);
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+  .bd__nav-toggle-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bd__nav-body {
+    display: none;
+    padding-top: var(--space-3);
+  }
+  .bd__nav-body--open {
+    display: block;
+  }
+  /* Charts unter dem Inhalt: nebeneinander solange Platz, sonst umbrechen —
+     nichts ragt aus dem 375px-Viewport heraus. */
+  .bd__charts {
+    position: static;
+    justify-self: stretch;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+  }
+  .bd__charts app-budget-pie {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  /* Kostenstellen-Zeile darf umbrechen statt zu überlaufen. */
+  .bd__ks {
+    flex-wrap: wrap;
+  }
+  .bd__name {
+    max-width: 100%;
+    white-space: normal;
+  }
+}

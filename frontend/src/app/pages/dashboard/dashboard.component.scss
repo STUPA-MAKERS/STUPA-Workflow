@@ -290,3 +290,23 @@
   margin-top: auto;
   align-self: start;
 }
+
+/* Mobil (≤768px): Listenzeilen dürfen umbrechen, CTA kompakter. */
+@media (max-width: 768px) {
+  .dash__cta {
+    padding: var(--space-4) var(--space-5);
+  }
+  .dash__row {
+    flex-wrap: wrap;
+  }
+  .dash__row-link {
+    flex: 1 1 100%;
+  }
+  .dash__row-meta {
+    flex-wrap: wrap;
+  }
+  /* Schnellzugriff-Kacheln einspaltig — volle Tap-Flächen. */
+  .dash__grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -298,3 +298,17 @@ input[type='file']::file-selector-button:hover {
   justify-content: flex-end;
   gap: var(--space-3);
 }
+
+/* Mobil (≤768px): Vorschau nicht mehr sticky (stapelt unter dem Editor);
+   Link-/Spalten-Inputs volle Breite, damit bei 375px nichts überläuft. */
+@media (max-width: 768px) {
+  .br__preview {
+    position: static;
+  }
+
+  .br__col-head input,
+  .br__link input {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}

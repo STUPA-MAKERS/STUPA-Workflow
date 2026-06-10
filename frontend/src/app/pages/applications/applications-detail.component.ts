@@ -868,6 +868,31 @@ interface DetailPosition {
       formly-form formly-field + formly-field {
         margin-top: var(--space-4);
       }
+
+      /* --- Mobil (≤768px): Ränder in voller Breite stapeln, Zeilen einspaltig --- */
+      @media (max-width: 768px) {
+        .det__meta {
+          flex-wrap: wrap;
+        }
+        .det__ownerActions {
+          flex-wrap: wrap;
+        }
+        .det__rail--left,
+        .det__rail--right {
+          max-width: none;
+          justify-self: stretch;
+        }
+        .det__dataRow {
+          grid-template-columns: 1fr;
+          gap: var(--space-1);
+        }
+        .det__diff li {
+          word-break: break-word;
+        }
+        .det__chat {
+          max-height: 70vh;
+        }
+      }
       formly-form formly-group > formly-field + formly-field {
         margin-top: var(--space-3);
       }

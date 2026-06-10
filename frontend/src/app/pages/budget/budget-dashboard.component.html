@@ -24,16 +24,28 @@
   </section>
 } @else {
   <div class="bd__layout">
-    <!-- Links: Budget → Haushaltsjahr -->
+    <!-- Links: Budget → Haushaltsjahr. Mobil (≤768px) einklappbar: Toggle nur dort
+         sichtbar (CSS), Desktop zeigt den Baum unverändert immer. -->
     <aside class="bd__nav">
-      <app-budget-year-tree
-        [tops]="tops()"
-        [fiscalYears]="fiscalYearsByBudget()"
-        [selectedBudgetId]="selectedBudgetId()"
-        [selectedFyId]="selectedFyId()"
-        (budgetPicked)="selectBudget($event)"
-        (yearPicked)="onYearPicked($event)"
-      />
+      <button
+        type="button"
+        class="bd__nav-toggle"
+        [attr.aria-expanded]="navOpen()"
+        (click)="toggleNav()"
+      >
+        <span class="bd__nav-toggle-label">{{ navToggleLabel() }}</span>
+        <app-icon [name]="navOpen() ? 'chevron-up' : 'chevron-down'" [size]="14" />
+      </button>
+      <div class="bd__nav-body" [class.bd__nav-body--open]="navOpen()">
+        <app-budget-year-tree
+          [tops]="tops()"
+          [fiscalYears]="fiscalYearsByBudget()"
+          [selectedBudgetId]="selectedBudgetId()"
+          [selectedFyId]="selectedFyId()"
+          (budgetPicked)="selectBudget($event)"
+          (yearPicked)="onYearPicked($event)"
+        />
+      </div>
     </aside>
 
     <!-- Mitte: Breadcrumbs (ab Tiefe > 0) + Auslastung + Anträge -->

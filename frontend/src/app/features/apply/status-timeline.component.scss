@@ -198,3 +198,21 @@
     gap: var(--space-1);
   }
 }
+
+/* Mobil: Aktions-Buttons als volle Tap-Flächen (≥2.5rem). */
+@media (max-width: 40rem) {
+  .status__actions,
+  .comment-form__actions {
+    justify-content: stretch;
+  }
+  .status__actions app-button,
+  .comment-form__actions app-button {
+    display: flex;
+    flex: 1 1 auto;
+  }
+  .status__actions ::ng-deep .btn,
+  .comment-form__actions ::ng-deep .btn {
+    width: 100%;
+    min-height: 2.5rem;
+  }
+}

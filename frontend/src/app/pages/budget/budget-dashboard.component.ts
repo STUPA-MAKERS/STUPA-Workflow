@@ -99,6 +99,24 @@ export class BudgetDashboardComponent {
   readonly selectedKsId = signal('');
   readonly selectedFyId = signal('');
 
+  /** Mobil (≤768px): linker Baum-Picker einklappbar — Desktop ignoriert das Flag,
+   *  dort blendet CSS den Toggle aus und zeigt den Baum immer. */
+  readonly navOpen = signal(false);
+
+  /** Label des Mobil-Toggles: gewähltes Budget + HHJ, sonst generischer Titel. */
+  readonly navToggleLabel = computed(() => {
+    const budget = this.nodeById().get(this.selectedBudgetId());
+    if (!budget) return this.i18n.translate('budget.tree.navTitle');
+    const fy = (this.fiscalYearsByBudget()[this.selectedBudgetId()] ?? []).find(
+      (f) => f.id === this.selectedFyId(),
+    );
+    return fy ? `${budget.name} · ${fy.display}` : budget.name;
+  });
+
+  toggleNav(): void {
+    this.navOpen.update((v) => !v);
+  }
+
   /** Top-Budgets (Wurzeln) für den linken Baum. */
   readonly tops = computed(() => this.tree().filter((n) => n.parentId === null));
 
@@ -342,6 +360,8 @@ export class BudgetDashboardComponent {
     this.selectedBudgetId.set(sel.budgetId);
     this.selectedKsId.set(sel.budgetId);
     this.selectedFyId.set(sel.fiscalYearId);
+    // Mobil: nach der Jahr-Wahl den Picker wieder einklappen (Desktop egal).
+    this.navOpen.set(false);
     this.syncUrl();
     this.reloadApplications();
   }

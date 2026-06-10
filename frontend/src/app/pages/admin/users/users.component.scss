@@ -196,3 +196,15 @@
   gap: var(--space-1);
   font-size: var(--fs-sm);
 }
+
+/* Mobil (≤768px): Zuweisen-Zeile gestapelt — jedes Control volle Breite,
+   damit Selects/Datepicker bei 375px erreichbar und tippbar bleiben. */
+@media (max-width: 768px) {
+  .users__assign > * {
+    flex: 1 1 100%;
+  }
+
+  .users__assign app-button {
+    align-self: stretch;
+  }
+}

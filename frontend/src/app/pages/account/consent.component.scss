@@ -155,3 +155,22 @@
   border-color: transparent;
   background: transparent;
 }
+
+/* Mobil (≤768px): Aktionen gestapelt in voller Breite, größere Tap-Flächen. */
+@media (max-width: 768px) {
+  .consent__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .consent__actions .btn {
+    justify-content: center;
+    min-height: 2.75rem;
+  }
+  .chip {
+    min-height: 2.5rem;
+    padding-inline: var(--space-4);
+  }
+  .scope label {
+    padding: var(--space-3);
+  }
+}

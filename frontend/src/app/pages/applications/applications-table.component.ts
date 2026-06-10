@@ -176,6 +176,63 @@ export interface SortState {
         color: var(--color-text-muted);
         padding: var(--space-6);
       }
+      /* Mobil (≤768px): Zeilen als Karten stapeln (rein CSS, kein Markup-Diff). */
+      @media (max-width: 768px) {
+        .atbl__wrap {
+          overflow-x: visible;
+          border: none;
+          border-radius: 0;
+          background: transparent;
+        }
+        .atbl,
+        .atbl tbody {
+          display: block;
+        }
+        .atbl thead {
+          display: none;
+        }
+        .atbl tbody tr {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: var(--space-1) var(--space-3);
+          padding: var(--space-3) var(--space-4);
+          margin-bottom: var(--space-3);
+          background: var(--color-surface);
+          border: var(--border-width) solid var(--color-border);
+          border-radius: var(--radius-lg);
+        }
+        .atbl tbody tr:last-child {
+          margin-bottom: 0;
+        }
+        .atbl td {
+          padding: 0;
+          border-bottom: none;
+        }
+        .atbl tbody tr:last-child td {
+          border-bottom: none;
+        }
+        /* Titel als volle erste Zeile der Karte. */
+        .atbl td:first-child {
+          flex: 1 1 100%;
+          min-width: 0;
+        }
+        /* Typ + Datum als gedämpfte Meta-Angaben. */
+        .atbl td:nth-child(2),
+        .atbl td:last-child {
+          color: var(--color-text-muted);
+          font-size: var(--fs-xs);
+        }
+        /* Betrag rechtsbündig in der Meta-Zeile. */
+        .atbl__num {
+          margin-left: auto;
+          font-weight: var(--fw-medium);
+        }
+        .atbl__empty {
+          flex: 1 1 100%;
+          padding: var(--space-6);
+        }
+      }
     `,
   ],
 })

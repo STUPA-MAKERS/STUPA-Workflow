@@ -155,3 +155,15 @@ select {
 textarea {
   padding: var(--space-2) var(--space-3);
 }
+
+/* Mobil (≤768px): Formular-Grid einspaltig; »wide«-Felder dürfen keine
+   implizite zweite Spalte erzwingen (sonst horizontaler Overflow bei 375px). */
+@media (max-width: 768px) {
+  .cfg__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cfg__lbl--wide {
+    grid-column: auto;
+  }
+}

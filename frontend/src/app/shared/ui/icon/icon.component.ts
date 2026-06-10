@@ -30,7 +30,8 @@ export type IconName =
   | 'play'
   | 'stop'
   | 'half'
-  | 'send';
+  | 'send'
+  | 'menu';
 
 /** Icon-Name → Font-Awesome-Solid-Klasse (#80, FA-Migration). */
 const FA: Record<IconName, string> = {
@@ -64,6 +65,7 @@ const FA: Record<IconName, string> = {
   stop: 'fa-stop',
   half: 'fa-circle-half-stroke',
   send: 'fa-paper-plane',
+  menu: 'fa-bars',
 };
 
 /**

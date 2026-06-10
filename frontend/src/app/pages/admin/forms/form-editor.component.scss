@@ -376,3 +376,24 @@
   border: 0;
   border-top: 1px solid var(--color-border);
 }
+
+/* Mobil (≤768px): Kopf-Toolbar umbrechen, Options-Zeilen (value/DE/EN/✕)
+   einspaltig stapeln, Typ-Select volle Kartenbreite — Basis-Nutzbarkeit bei 375px. */
+@media (max-width: 768px) {
+  .fe__head-tools {
+    flex-wrap: wrap;
+  }
+
+  .fe__opt {
+    grid-template-columns: 1fr;
+  }
+
+  .fe__type {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .fe__pv-control {
+    max-width: 100%;
+  }
+}

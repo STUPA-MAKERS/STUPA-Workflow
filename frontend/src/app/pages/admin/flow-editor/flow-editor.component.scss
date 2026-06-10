@@ -574,3 +574,20 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Mobil (≤768px): Inspektor nicht mehr sticky (stapelt unter dem Canvas);
+   Aktions-Dropdown volle Breite, Canvas etwas flacher für Hochformat-Phones. */
+@media (max-width: 768px) {
+  .fe__panel {
+    position: static;
+  }
+
+  .fe__actionsPane-add {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .fe__canvas-wrap {
+    height: 22rem;
+  }
+}

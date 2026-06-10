@@ -1610,6 +1610,59 @@ const AUTOSAVE_DELAY_MS = 1000;
       .mtg__tlNoUp {
         padding-left: var(--space-6);
       }
+      /* --- Mobil (≤48rem): 3-Spalten-Shell vertikal gestapelt — aktiver TOP
+         zuerst, dann Anwesenheit/Abstimmungen, dann Tagesordnung; Sticky-Panes
+         lösen sich, Touch-Ziele werden bequemer. Nur additiv, Desktop bleibt. */
+      @media (max-width: 48rem) {
+        .mtg__shell {
+          grid-template-columns: 1fr;
+          gap: var(--space-4);
+        }
+        .mtg__main {
+          order: 1;
+        }
+        .mtg__side--right {
+          order: 2;
+        }
+        .mtg__side--left {
+          order: 3;
+        }
+        .mtg__side,
+        .mtg__side--left,
+        .mtg__side--right {
+          position: static;
+          max-height: none;
+          max-width: none;
+          justify-self: stretch;
+          overflow-y: visible;
+        }
+        /* Editor kompakter, damit Anwesenheit/Agenda ohne Mammut-Scroll folgen. */
+        .mtg__main app-markdown-editor ::ng-deep .mde__host {
+          min-height: 16rem;
+        }
+        .mtg__main app-markdown-editor ::ng-deep .mde__host .ProseMirror {
+          min-height: 14rem;
+        }
+        /* Stimm-Buttons: volle Breite + bequeme Touch-Ziele (≥2.75rem). */
+        .mtg__voteActions app-button {
+          flex: 1 1 auto;
+        }
+        .mtg__voteActions app-button ::ng-deep .btn {
+          width: 100%;
+          min-height: 2.75rem;
+        }
+        /* Anwesenheits-Toggles: größere Touch-Ziele. */
+        .mtg__attBtn {
+          width: 2.75rem;
+          height: 2.75rem;
+        }
+        /* Markdown-Tabellen im Protokoll scrollen horizontal statt überzulaufen. */
+        .mtg__preview table {
+          display: block;
+          max-width: 100%;
+          overflow-x: auto;
+        }
+      }
     `,
   ],
 })

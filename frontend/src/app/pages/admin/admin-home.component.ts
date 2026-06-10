@@ -103,6 +103,12 @@ interface AdminTile {
         color: var(--color-text-muted);
         font-size: var(--fs-sm);
       }
+      /* Mobil (≤768px): Kacheln einspaltig — verhindert Quetschen schmaler Tracks. */
+      @media (max-width: 768px) {
+        .admin-home__grid {
+          grid-template-columns: 1fr;
+        }
+      }
     `,
   ],
 })

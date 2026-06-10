@@ -86,3 +86,12 @@
   min-height: 4rem;
   font-size: var(--fs-lg);
 }
+
+// --- Mobil (≤48rem): Beamer-Link als bequemes Touch-Ziel; rein additiv ------
+@media (max-width: 48rem) {
+  .live__beamer {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+}

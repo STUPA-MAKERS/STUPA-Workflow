@@ -52,7 +52,7 @@ export interface ColumnDef {
           @for (row of rows; track trackRow(row, $index); let i = $index) {
             <tr [class.dt__row--clickable]="clickable" (click)="onRow(row)" [attr.tabindex]="clickable ? 0 : null" (keydown.enter)="onRow(row)">
               @for (col of columns; track col.key) {
-                <td [style.text-align]="col.align ?? 'start'">
+                <td [style.text-align]="col.align ?? 'start'" [attr.data-label]="col.label">
                   @if (cellFor(col.key); as tpl) {
                     <ng-container [ngTemplateOutlet]="tpl" [ngTemplateOutletContext]="{ $implicit: row, index: i }" />
                   } @else {
@@ -129,6 +129,58 @@ export interface ColumnDef {
         text-align: center;
         color: var(--color-text-muted);
         padding: var(--space-6) !important;
+      }
+
+      /* Mobile (≤768px): Zeilen als gestapelte Karten — je Zelle Label/Wert-
+         Paar aus der Spalten-Definition. Desktop-Tabelle bleibt unverändert. */
+      @media (max-width: 768px) {
+        .dt__table,
+        .dt__table tbody {
+          display: block;
+          width: 100%;
+        }
+        .dt__table thead {
+          display: none;
+        }
+        .dt__table tbody tr {
+          display: block;
+          height: auto;
+          padding: var(--space-3) var(--space-4);
+          border-bottom: var(--border-width) solid var(--color-border);
+        }
+        .dt__table tbody tr:last-child {
+          border-bottom: 0;
+        }
+        .dt__table td {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: var(--space-4);
+          padding: var(--space-1) 0;
+          border-bottom: 0;
+          text-align: end !important;
+        }
+        .dt__table td[data-label]::before {
+          content: attr(data-label);
+          flex: none;
+          font-size: var(--fs-xs);
+          font-weight: var(--fw-semibold);
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--color-text-muted);
+        }
+        .dt__table td[data-label='']::before {
+          content: none;
+        }
+        .dt__detail-row,
+        .dt__detail-row > td,
+        .dt__empty {
+          display: block;
+          text-align: start !important;
+        }
+        .dt__detail-row {
+          padding: 0;
+        }
       }
     `,
   ],

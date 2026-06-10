@@ -109,6 +109,31 @@ let nextId = 0;
       .dialog__footer:empty {
         display: none;
       }
+
+      /* Mobile (≤768px): Dialog als Sheet — volle Breite, am unteren Rand,
+         mehr nutzbare Höhe. Desktop unverändert. */
+      @media (max-width: 768px) {
+        .dialog__backdrop {
+          align-items: flex-end;
+          padding: 0;
+        }
+        .dialog {
+          max-width: none;
+          max-height: 92dvh;
+          border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+          border-bottom: 0;
+        }
+        .dialog__header {
+          padding: var(--space-4) var(--space-4) var(--space-2);
+        }
+        .dialog__body {
+          padding: 0 var(--space-4);
+        }
+        .dialog__footer {
+          padding: var(--space-4);
+          flex-wrap: wrap;
+        }
+      }
     `,
   ],
 })

@@ -1,5 +1,12 @@
 import { UpperCasePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  HostListener,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   ActivatedRoute,
@@ -109,6 +116,7 @@ export class ShellComponent {
           r = r.firstChild;
         }
         this.wide.set(wide);
+        this.closeMobileNav();
       });
   }
 
@@ -150,6 +158,26 @@ export class ShellComponent {
 
   login(): void {
     this.auth.login();
+  }
+
+  /**
+   * Mobile-Navigation (Hamburger-Drawer): ersetzt unterhalb von 720px die
+   * Header-Nav. Schließt bei Navigation, Backdrop-Klick und ESC.
+   */
+  readonly mobileNavOpen = signal(false);
+
+  toggleMobileNav(): void {
+    this.mobileNavOpen.update((v) => !v);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.closeMobileNav();
+    this.closeAccountMenu();
+  }
+
+  closeMobileNav(): void {
+    this.mobileNavOpen.set(false);
   }
 
   /** Konto-Popout (#51): Aktionen wie Abmelden liegen nur hier, nicht direkt im Header. */

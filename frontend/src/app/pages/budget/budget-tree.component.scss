@@ -341,3 +341,54 @@
   display: flex;
   gap: var(--space-3);
 }
+
+/* --- Mobil (≤768px = 48rem): eine Spalte, Zeilen dürfen umbrechen, Aktionen
+   bleiben tappbar (min. 2.5rem). Desktop bleibt unberührt. --- */
+@media (max-width: 48rem) {
+  .bt__layout {
+    grid-template-columns: 1fr;
+  }
+  .bt__head {
+    max-width: none;
+  }
+  .bt__nav {
+    position: static;
+    justify-self: stretch;
+    max-width: none;
+    max-height: none;
+    overflow-y: visible;
+  }
+  /* Knoten-Zelle: Pfad + Name dürfen umbrechen statt abzuschneiden. */
+  .bt__node {
+    flex-wrap: wrap;
+  }
+  .bt__name {
+    max-width: 100%;
+    white-space: normal;
+  }
+  /* Aktions-Buttons: ausreichende Trefferfläche (min. 2.5rem), umbruchfähig. */
+  .bt__col-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    white-space: normal;
+  }
+  .bt__col-actions app-button {
+    display: inline-grid;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+  /* Kind-Formular: Felder volle Breite, gestapelt. */
+  .bt__child-form .bt__lbl {
+    flex: 1 1 100%;
+  }
+  .bt__child-form .bt__lbl input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  /* Flow-State-Tabelle im Dialog: feste Spaltenbreiten lockern (375px-Viewport). */
+  .bt__states th:not(:first-child),
+  .bt__states td:not(:first-child) {
+    width: auto;
+  }
+}
