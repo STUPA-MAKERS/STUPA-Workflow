@@ -52,7 +52,12 @@ from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed, VoteOut
 from app.shared.config_schemas import VoteConfig
-from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError
+from app.shared.errors import (
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+)
 
 
 def meeting_channel(meeting_id: UUID) -> str:
@@ -629,6 +634,15 @@ class MeetingService:
             raise ForbiddenError("only a session manager may plan this meeting")
         if wants_write and not await self.can_write(meeting, principal):
             raise ForbiddenError("not allowed to control this meeting")
+
+        # »closed« ist terminal: eine geschlossene Sitzung lässt sich nicht
+        # wieder öffnen (kein closed→live/planned). Erneutes »closed« ist ein No-op.
+        if (
+            meeting.status == "closed"
+            and payload.status is not None
+            and payload.status != "closed"
+        ):
+            raise ConflictError("a closed session cannot be re-opened")
 
         if payload.status is not None:
             meeting.status = payload.status

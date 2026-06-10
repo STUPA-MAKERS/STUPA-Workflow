@@ -194,13 +194,13 @@ const AUTOSAVE_DELAY_MS = 1000;
       @if (!beamerMode() && !isFollower()) {
       <!-- Toolbar oberhalb des Bodies: Steuerung + Einstellungen + Löschen (Icon-Buttons). -->
       <div class="mtg__toolbar" role="toolbar" [attr.aria-label]="'meetings.control.title' | t">
-        @if (m.canControl) {
+        <!-- »closed« ist terminal: nach dem Schließen entfallen alle Steuer-Buttons,
+             eine geschlossene Sitzung lässt sich nicht wieder öffnen. -->
+        @if (m.canControl && m.status !== 'closed') {
           <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live'" [ariaLabel]="'meetings.control.open' | t" [title]="'meetings.control.open' | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
-          @if (m.status !== 'closed') {
-            <app-button variant="danger" size="sm" [loading]="finalizing()" [title]="'meetings.control.closeSession' | t" (click)="closeConfirmOpen.set(true)">
-              <span class="mtg__btnIcon"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeShort' | t }}</span>
-            </app-button>
-          }
+          <app-button variant="danger" size="sm" [loading]="finalizing()" [title]="'meetings.control.closeSession' | t" (click)="closeConfirmOpen.set(true)">
+            <span class="mtg__btnIcon"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeShort' | t }}</span>
+          </app-button>
         }
         <span class="mtg__toolbarSpacer"></span>
         @if (m.canManage) {
@@ -2004,6 +2004,8 @@ export class MeetingsComponent implements OnDestroy {
   setStatus(status: 'live' | 'closed'): void {
     const m = this.meeting();
     if (!m) return;
+    // »closed« ist terminal — keine Wiedereröffnung (der Server lehnt es ohnehin ab).
+    if (m.status === 'closed') return;
     this.api.patchMeeting(m.id, { status }).subscribe({
       next: (updated) => this.meeting.set(updated),
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),

@@ -19,7 +19,7 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService, meetin
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import TallyOut, VoteClosed, VoteOut
 from app.shared.config_schemas import VoteConfig
-from app.shared.errors import NotFoundError
+from app.shared.errors import ConflictError, NotFoundError
 
 
 class _CaptureBroker:
@@ -261,6 +261,23 @@ async def test_service_patch_without_publisher_is_silent() -> None:
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     out = await svc.patch(meeting.id, MeetingPatch(status="closed"), _principal())
     assert out.status == "closed"
+
+
+@pytest.mark.asyncio
+async def test_service_patch_closed_session_cannot_reopen() -> None:
+    """»closed« ist terminal: ein Wieder-Öffnen (closed→live/planned) wird abgelehnt."""
+    meeting = Meeting(gremium_id=uuid4(), title="GV")
+    meeting.id = uuid4()
+    meeting.status = "closed"
+    meeting.date = None
+    meeting.active_application_id = None
+    meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
+    svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
+    for target in ("live", "planned"):
+        with pytest.raises(ConflictError):
+            await svc.patch(meeting.id, MeetingPatch(status=target), _principal())
+    # Status bleibt unverändert geschlossen.
+    assert meeting.status == "closed"
 
 
 @pytest.mark.asyncio
