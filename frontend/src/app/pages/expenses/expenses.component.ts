@@ -123,14 +123,27 @@ import { SimplifyPathPipe } from '@shared/budget-path';
     </header>
 
     <div class="exp__layout">
+      <!-- Mobil (≤768px) einklappbar: Toggle nur dort sichtbar, Desktop zeigt
+           den Baum unverändert immer (wie der Budget-Tab-Picker). -->
       <aside class="exp__tree">
-        <app-cost-centre-tree
-          [nodes]="budgetTree()"
-          [selectedId]="budgetId()"
-          [allLabel]="'expenses.filter.allCostCentres' | t"
-          [ariaLabel]="'expenses.filter.costCentre' | t"
-          (picked)="selectBudget($event)"
-        />
+        <button
+          type="button"
+          class="exp__treeToggle"
+          [attr.aria-expanded]="treeOpen()"
+          (click)="treeOpen.set(!treeOpen())"
+        >
+          {{ 'expenses.filter.costCentre' | t }}
+          <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="14" />
+        </button>
+        <div class="exp__treeBody" [class.exp__treeBody--open]="treeOpen()">
+          <app-cost-centre-tree
+            [nodes]="budgetTree()"
+            [selectedId]="budgetId()"
+            [allLabel]="'expenses.filter.allCostCentres' | t"
+            [ariaLabel]="'expenses.filter.costCentre' | t"
+            (picked)="selectBudget($event); treeOpen.set(false)"
+          />
+        </div>
       </aside>
 
       <div class="exp__main">
@@ -531,6 +544,43 @@ import { SimplifyPathPipe } from '@shared/budget-path';
         .exp__tree { position: static; max-height: none; }
         .exp__row { grid-template-columns: 1fr auto; }
       }
+      /* Mobil (≤768px): Baum hinter einklappbarem Toggle (Standard: zu),
+         eine Spalte. Desktop unverändert — Toggle existiert dort nur versteckt. */
+      .exp__treeToggle {
+        display: none;
+      }
+      @media (max-width: 768px) {
+        .exp__layout { grid-template-columns: 1fr; }
+        .exp__tree {
+          position: static;
+          max-height: none;
+          max-width: none;
+          justify-self: stretch;
+        }
+        .exp__treeToggle {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: var(--space-2);
+          width: 100%;
+          min-height: 2.5rem;
+          padding: var(--space-2) var(--space-3);
+          font: inherit;
+          font-weight: var(--fw-medium);
+          color: var(--color-text);
+          background: var(--color-surface);
+          border: var(--border-width) solid var(--color-border);
+          border-radius: var(--radius-md);
+          cursor: pointer;
+        }
+        .exp__treeBody {
+          display: none;
+          padding-top: var(--space-3);
+        }
+        .exp__treeBody--open {
+          display: block;
+        }
+      }
       /* Mobil (≤768px): Suche in voller Breite, Tabellenzeilen als Karten (rein CSS). */
       @media (max-width: 768px) {
         .exp__search { flex: 1 1 100%; min-width: 0; }
@@ -601,6 +651,8 @@ export class ExpensesComponent {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
+  /** Mobil: Baum hinter einklappbarem Toggle (Desktop immer sichtbar). */
+  readonly treeOpen = signal(false);
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
   private searchTimer: ReturnType<typeof setTimeout> | null = null;

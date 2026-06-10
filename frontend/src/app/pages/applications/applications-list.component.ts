@@ -123,14 +123,27 @@ import { downloadBlob } from '@shared/download.util';
     </header>
 
     <div class="apps__layout">
+    <!-- Mobil (≤768px) einklappbar: Toggle nur dort sichtbar, Desktop zeigt
+         den Baum unverändert immer (wie der Budget-Tab-Picker). -->
     <aside class="apps__tree">
-      <app-cost-centre-tree
-        [nodes]="budgetTree()"
-        [selectedId]="budgetId()"
-        [allLabel]="'applications.list.filter.all' | t"
-        [ariaLabel]="'applications.list.filter.budget' | t"
-        (picked)="selectBudgetNode($event)"
-      />
+      <button
+        type="button"
+        class="apps__treeToggle"
+        [attr.aria-expanded]="treeOpen()"
+        (click)="treeOpen.set(!treeOpen())"
+      >
+        {{ 'applications.list.filter.budget' | t }}
+        <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="14" />
+      </button>
+      <div class="apps__treeBody" [class.apps__treeBody--open]="treeOpen()">
+        <app-cost-centre-tree
+          [nodes]="budgetTree()"
+          [selectedId]="budgetId()"
+          [allLabel]="'applications.list.filter.all' | t"
+          [ariaLabel]="'applications.list.filter.budget' | t"
+          (picked)="selectBudgetNode($event); treeOpen.set(false)"
+        />
+      </div>
     </aside>
     <div class="apps__main">
     @if (loading()) {
@@ -216,6 +229,45 @@ import { downloadBlob } from '@shared/download.util';
         .apps__tree {
           position: static;
           max-height: none;
+        }
+      }
+      /* Mobil (≤768px): Baum hinter einklappbarem Toggle (Standard: zu),
+         eine Spalte. Desktop unverändert — Toggle existiert dort nur versteckt. */
+      .apps__treeToggle {
+        display: none;
+      }
+      @media (max-width: 48rem) {
+        .apps__layout {
+          grid-template-columns: 1fr;
+        }
+        .apps__tree {
+          position: static;
+          max-height: none;
+          max-width: none;
+          justify-self: stretch;
+        }
+        .apps__treeToggle {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: var(--space-2);
+          width: 100%;
+          min-height: 2.5rem;
+          padding: var(--space-2) var(--space-3);
+          font: inherit;
+          font-weight: var(--fw-medium);
+          color: var(--color-text);
+          background: var(--color-surface);
+          border: var(--border-width) solid var(--color-border);
+          border-radius: var(--radius-md);
+          cursor: pointer;
+        }
+        .apps__treeBody {
+          display: none;
+          padding-top: var(--space-3);
+        }
+        .apps__treeBody--open {
+          display: block;
         }
       }
       .apps__headRow {
@@ -310,6 +362,8 @@ export class ApplicationsListComponent {
   readonly budgetId = signal('');
   /** Kostenstellen-Baum für den linken Tree-Picker (gleiche Optik wie Budget-Tab). */
   readonly budgetTree = signal<BudgetTreeNode[]>([]);
+  /** Mobil: Baum hinter einklappbarem Toggle (Desktop immer sichtbar). */
+  readonly treeOpen = signal(false);
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
