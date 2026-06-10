@@ -85,9 +85,14 @@ export class StatusTimelineComponent {
   );
 
   constructor() {
-    const params = this.route.snapshot.queryParamMap;
-    const token = params.get('t');
-    const appId = params.get('app') ?? params.get('id');
+    const snap = this.route.snapshot;
+    const query = snap.queryParamMap;
+    // Magic-Link-Ziel ist /antrag/{id}#t={token}: Token steht im **Fragment**
+    // (kein Referer-/Log-Leak, security.md §1), die App-ID im Pfad. Query-Form
+    // (?t=&app=) bleibt als Fallback erhalten.
+    const fragmentParams = new URLSearchParams(snap.fragment ?? '');
+    const token = fragmentParams.get('t') ?? query.get('t');
+    const appId = snap.paramMap.get('id') ?? query.get('app') ?? query.get('id');
 
     if (token) {
       // Magic-Link-Token gegen die HttpOnly-Applicant-Cookie eintauschen.
@@ -126,9 +131,16 @@ export class StatusTimelineComponent {
     if (typeof window === 'undefined' || typeof history === 'undefined') return;
     try {
       const url = new URL(window.location.href);
-      if (!url.searchParams.has('t')) return;
-      url.searchParams.delete('t');
-      if (appId && !url.searchParams.has('app')) url.searchParams.set('app', appId);
+      const frag = new URLSearchParams(url.hash.replace(/^#/, ''));
+      if (!url.searchParams.has('t') && !frag.has('t')) return;
+      url.searchParams.delete('t'); // Query-Form
+      frag.delete('t'); // Fragment-Form (/antrag/:id#t=…)
+      url.hash = frag.toString() ? `#${frag.toString()}` : '';
+      // App-ID für einen Reload erhalten. Der Pfad /antrag/:id trägt sie bereits;
+      // nur für die ?app=-Form ergänzen.
+      if (appId && !url.pathname.includes(appId) && !url.searchParams.has('app')) {
+        url.searchParams.set('app', appId);
+      }
       history.replaceState(history.state, '', url.toString());
     } catch {
       /* History-API nicht verfügbar — unkritisch */

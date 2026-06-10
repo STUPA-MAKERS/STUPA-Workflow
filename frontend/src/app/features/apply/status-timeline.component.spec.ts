@@ -105,7 +105,16 @@ async function setup(api: Partial<ApiClient>, params: Record<string, string>) {
       provideRouter([]),
       provideFormly(),
       { provide: ApiClient, useValue: api },
-      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(params) } } },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: {
+            queryParamMap: convertToParamMap(params),
+            paramMap: convertToParamMap({}),
+            fragment: null,
+          },
+        },
+      },
     ],
   });
 }
@@ -123,6 +132,28 @@ describe('StatusTimelineComponent', () => {
     expect(screen.getAllByText('Eingereicht').length).toBeGreaterThan(1);
     // editierbar → Bearbeitungs-Formular sichtbar
     expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
+  });
+
+  it('reads the token from the fragment and the id from the path (/antrag/:id#t=)', async () => {
+    await render(StatusTimelineComponent, {
+      providers: [
+        provideRouter([]),
+        provideFormly(),
+        { provide: ApiClient, useValue: fakeApi() },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: convertToParamMap({}),
+              paramMap: convertToParamMap({ id: 'app-1' }),
+              fragment: 't=tok',
+            },
+          },
+        },
+      ],
+    });
+    // Token aus dem Fragment → Verify → Status sichtbar (kein 404, keine Query nötig).
+    expect(await screen.findByText('Bitte ergänzen.')).toBeInTheDocument();
   });
 
   it('renders formatted read-only data and a lock badge when the status is not editable', async () => {

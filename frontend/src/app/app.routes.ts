@@ -40,6 +40,16 @@ export const routes: Routes = [
           ),
       },
       {
+        // Magic-Link-Ziel (#1): {public_base_url}/antrag/{id}#t={token}. Öffentlich
+        // (Applicant-Token statt Login); die Komponente löst Fragment + :id auf.
+        path: 'antrag/:id',
+        data: { title: 'status.heading' },
+        loadComponent: () =>
+          import('./features/apply/status-timeline.component').then(
+            (m) => m.StatusTimelineComponent,
+          ),
+      },
+      {
         path: 'dashboard',
         data: { title: 'nav.dashboard' },
         canActivate: [authGuard],
