@@ -269,6 +269,14 @@ export const routes: Routes = [
           ),
       },
       {
+        // Konto → API-Zugang (#MCP): eigene OAuth-Grants verwalten + MCP-Paket laden.
+        path: 'account/grants',
+        data: { title: 'account.grants.title' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/account/grants.component').then((m) => m.AccountGrantsComponent),
+      },
+      {
         path: 'forbidden',
         data: { title: 'forbidden.heading' },
         loadComponent: () =>

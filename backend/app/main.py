@@ -29,6 +29,9 @@ from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
 from app.modules.applications.router import router as applications_router
 from app.modules.audit.router import router as audit_router
+from app.modules.auth.mcp_router import router as mcp_router
+from app.modules.auth.oauth_router import router as oauth_router
+from app.modules.auth.oauth_router import well_known_router as oauth_well_known_router
 from app.modules.auth.router import router as auth_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.deadlines.router import router as deadline_policies_router
@@ -66,6 +69,11 @@ def health() -> dict[str, str]:
 # Fachmodul-Router (einmalig auf Modulebene gemountet → keine Doppel-Registrierung
 # bei mehrfachem `create_app()` in Tests).
 api_router.include_router(auth_router)
+api_router.include_router(oauth_router)
+api_router.include_router(mcp_router)
+# Discovery auch unter /api spiegeln (RFC-Standard ist Root; /api ist aber immer
+# durch den Edge-Proxy erreichbar → robuste Fallback-Discovery für MCP-Clients).
+api_router.include_router(oauth_well_known_router)
 api_router.include_router(forms_router)
 api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
@@ -179,6 +187,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.dependency_overrides[get_action_dispatcher] = _flow_action_dispatcher
 
     app.include_router(api_router)
+    # OAuth-Discovery (RFC 8414/9728) am Root, NICHT unter /api (Well-Known-Konvention).
+    app.include_router(oauth_well_known_router)
     use_problem_json_contract(app)
     return app
 

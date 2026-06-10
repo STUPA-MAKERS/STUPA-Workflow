@@ -95,6 +95,18 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 12
     cookie_secure: bool = True
 
+    # — OAuth2-AS für native/MCP-Clients (browser-grant + PKCE, RFC 7636) —
+    # Öffentlicher Client (kein Secret); nur Loopback-Redirects erlaubt. Token sind
+    # opak + scoped (siehe app.modules.auth.oauth). Aktiv nur, wenn OIDC konfiguriert.
+    oauth_mcp_client_id: str = "antragsplattform-mcp"
+    oauth_tx_cookie_name: str = "ap_oauth_tx"
+    oauth_code_ttl_seconds: int = 300  # Authorization-Code: 5 min
+    oauth_access_ttl_seconds: int = 3600  # Access-Token: 1 h
+    oauth_refresh_ttl_seconds: int = 60 * 60 * 24 * 30  # Refresh-Token: 30 d
+    # Quellverzeichnis des MCP-Pakets für den Self-Service-Download; None → relativ
+    # zur Repo-Wurzel (`<repo>/mcp`). In Containern ohne Quellbaum → 404.
+    mcp_package_dir: str | None = None
+
     # — Magic-Link-Laufzeiten (security.md §1) —
     magic_link_edit_ttl_days: int = 7
     magic_link_action_ttl_minutes: int = 15

@@ -118,9 +118,13 @@ async def callback(
     # mit verify_magic_link/logout).
     await db.commit()
 
-    response = RedirectResponse(
-        settings.public_base_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT
-    )
+    # Läuft gerade ein OAuth-AS-Login (MCP, ap_oauth_tx gesetzt), nach dem
+    # Code-Mint-Schritt weiterleiten statt auf die App-Startseite (same-origin,
+    # kein Open-Redirect).
+    dest = settings.public_base_url
+    if request.cookies.get(settings.oauth_tx_cookie_name):
+        dest = settings.public_base_url.rstrip("/") + "/api/oauth/finish"
+    response = RedirectResponse(dest, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     response.set_cookie(
         settings.session_cookie_name,
         cookie,

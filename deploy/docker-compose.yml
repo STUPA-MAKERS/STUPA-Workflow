@@ -65,6 +65,13 @@ services:
       dockerfile: Dockerfile
     <<: *restart
     env_file: .env
+    # MCP-Quellpaket read-only mounten, damit der Self-Service-Download
+    # (GET /api/mcp/package) das `mcp/`-Verzeichnis findet (Build-Context ist nur
+    # ../backend, daher liegt es nicht im Image). MCP_PACKAGE_DIR zeigt darauf.
+    volumes:
+      - ../mcp:/opt/mcp:ro
+    environment:
+      MCP_PACKAGE_DIR: /opt/mcp
     depends_on:
       migrate:
         condition: service_completed_successfully

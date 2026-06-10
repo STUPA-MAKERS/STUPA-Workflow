@@ -1,0 +1,9 @@
+# Injected at download time (pins a downloaded package to its source platform).
+antragsplattform_mcp/_baked.py
+# Build / env artifacts
+__pycache__/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/

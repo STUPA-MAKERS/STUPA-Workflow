@@ -20,6 +20,8 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  McpSetup,
+  OAuthGrant,
   Application,
   ApplicationComment,
   ApplicationCreated,
@@ -521,6 +523,32 @@ export class ApiClient {
     return this.http
       .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/finalize`, {})
       .pipe(map(mapProtocol));
+  }
+
+  // --- OAuth-Grants + MCP-Setup (#MCP, Self-Service) -----------------------
+  /** GET /oauth/grants — eigene aktive Agent-/MCP-Grants. */
+  listGrants(): Observable<OAuthGrant[]> {
+    return this.http.get<OAuthGrant[]>(`${this.base}/oauth/grants`);
+  }
+
+  /** DELETE /oauth/grants/{id} — einen eigenen Grant widerrufen. */
+  revokeGrant(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/oauth/grants/${id}`);
+  }
+
+  /** DELETE /oauth/grants — alle eigenen Grants widerrufen (Not-Aus). */
+  revokeAllGrants(): Observable<void> {
+    return this.http.delete<void>(`${this.base}/oauth/grants`);
+  }
+
+  /** GET /mcp/config — fertiger mcpServers-Schnipsel für diese Plattform (P(`mcp.use`)). */
+  mcpConfig(): Observable<McpSetup> {
+    return this.http.get<McpSetup>(`${this.base}/mcp/config`);
+  }
+
+  /** GET /mcp/package — MCP-Quellpaket als .tar.gz (P(`mcp.use`)). */
+  downloadMcpPackage(): Observable<Blob> {
+    return this.http.get(`${this.base}/mcp/package`, { responseType: 'blob' });
   }
 
 }

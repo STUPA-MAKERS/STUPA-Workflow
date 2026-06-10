@@ -811,3 +811,27 @@ export interface Protocol {
   pdfUrl: string | null;
   sentAt: IsoDateTime | null;
 }
+
+// =========================================================================== //
+// OAuth-Grants + MCP-Setup (#MCP) — Self-Service über das Konto-Popout.          //
+// =========================================================================== //
+
+/** Ein aktiver OAuth-Grant (Agent/MCP-Token) des eingeloggten Nutzers. */
+export interface OAuthGrant {
+  id: string;
+  clientId: string;
+  scope: string;
+  createdAt: IsoDateTime | null;
+  accessExpiresAt: IsoDateTime;
+  refreshExpiresAt: IsoDateTime | null;
+}
+
+/** Fertiger MCP-Setup-Schnipsel + Metadaten (GET /mcp/config). */
+export interface McpSetup {
+  mcpServers: Record<string, unknown>;
+  baseUrl: string;
+  clientId: string;
+  scopesSupported: string[];
+  install: string;
+  note: string;
+}

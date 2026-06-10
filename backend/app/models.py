@@ -33,6 +33,7 @@ from app.modules.auth.models import (
     RoleAssignment,
     RolePermission,
 )
+from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
 from app.modules.budget.tree_models import (
     Account,
@@ -82,6 +83,8 @@ __all__ = [
     "Meeting",
     "MeetingAgendaItem",
     "MeetingAttendance",
+    "OAuthAuthorizationCode",
+    "OAuthToken",
     "Principal",
     "Protocol",
     "ProtocolVoteRef",

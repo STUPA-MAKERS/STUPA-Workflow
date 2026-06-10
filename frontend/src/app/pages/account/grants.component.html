@@ -1,0 +1,80 @@
+<section class="grants">
+  <header class="grants__head">
+    <h1>{{ 'account.grants.title' | t }}</h1>
+    <p class="grants__intro">{{ 'account.grants.intro' | t }}</p>
+  </header>
+
+  @if (canUseMcp()) {
+    <section class="card mcp">
+      <h2>{{ 'account.mcp.title' | t }}</h2>
+      <p>{{ 'account.mcp.intro' | t }}</p>
+      <div class="mcp__actions">
+        <button type="button" class="btn btn--primary" (click)="downloadPackage()">
+          <app-icon name="export" [size]="16" />
+          {{ 'account.mcp.download' | t }}
+        </button>
+      </div>
+      @if (setup(); as s) {
+        <ol class="mcp__steps">
+          <li>{{ 'account.mcp.step1' | t }}</li>
+          <li><code>{{ s.install }}</code></li>
+          <li>{{ 'account.mcp.step3' | t }}</li>
+        </ol>
+        <div class="mcp__config">
+          <div class="mcp__config-head">
+            <span>{{ 'account.mcp.config' | t }}</span>
+            <button type="button" class="btn btn--ghost" (click)="copySetup()">
+              {{ 'action.copy' | t }}
+            </button>
+          </div>
+          <pre><code>{{ setupJson() }}</code></pre>
+          <p class="mcp__hint">{{ 'account.mcp.wired' | t }}: <code>{{ s.baseUrl }}</code></p>
+        </div>
+      }
+    </section>
+  }
+
+  <section class="card">
+    <div class="grants__list-head">
+      <h2>{{ 'account.grants.active' | t }}</h2>
+      @if (grants().length > 0) {
+        <button type="button" class="btn btn--danger-ghost" (click)="revokeAll()">
+          {{ 'account.grants.revokeAll' | t }}
+        </button>
+      }
+    </div>
+
+    @if (loading()) {
+      <p class="grants__muted">{{ 'common.loading' | t }}</p>
+    } @else if (error()) {
+      <p class="grants__error">{{ 'account.grants.error' | t }}</p>
+    } @else if (grants().length === 0) {
+      <p class="grants__muted">{{ 'account.grants.empty' | t }}</p>
+    } @else {
+      <table class="grants__table">
+        <thead>
+          <tr>
+            <th>{{ 'account.grants.scope' | t }}</th>
+            <th>{{ 'account.grants.created' | t }}</th>
+            <th>{{ 'account.grants.expires' | t }}</th>
+            <th class="grants__col-action"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (g of grants(); track g.id) {
+            <tr>
+              <td><code class="grants__scope">{{ g.scope }}</code></td>
+              <td>{{ g.createdAt }}</td>
+              <td>{{ g.accessExpiresAt }}</td>
+              <td class="grants__col-action">
+                <button type="button" class="btn btn--danger-ghost" (click)="revoke(g.id)">
+                  {{ 'account.grants.revoke' | t }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+</section>

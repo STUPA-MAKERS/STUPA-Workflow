@@ -1,0 +1,20 @@
+[project]
+name = "antragsplattform-mcp"
+version = "0.1.0"
+description = "MCP server exposing the antragsplattform API to agents via browser-grant OAuth."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.2.0",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+antragsplattform-mcp = "antragsplattform_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["antragsplattform_mcp"]

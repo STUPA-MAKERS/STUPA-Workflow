@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.modules.auth import rbac, sessions
+from app.modules.auth import oauth, oauth_service, rbac, sessions
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Applicant, ApplicantScope, Principal
 from app.settings import Settings, get_settings
@@ -54,16 +54,55 @@ def _bearer_token(request: Request, settings: Settings) -> str | None:
     return request.cookies.get(settings.applicant_cookie_name)
 
 
+def _principal_bearer_token(request: Request) -> str | None:
+    """`Authorization: Bearer apat_…` → OAuth-Access-Token (sonst `None`).
+
+    Nur das `apat_`-Präfix gilt als Principal-Token; signierte Applicant-Bearer
+    (Magic-Link) werden hier ignoriert und vom Applicant-Pfad behandelt.
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth[7:]
+    return token if oauth.is_access_token(token) else None
+
+
+async def _principal_from_access_token(
+    db: AsyncSession, token: str, now: datetime
+) -> Principal | None:
+    """OAuth-Access-Token → scoped Principal (oder `None`, wenn ungültig/abgelaufen)."""
+    resolved = await oauth_service.resolve_access_token(db, token=token, now=now)
+    if resolved is None:
+        return None
+    principal_id, scope = resolved
+    row = (
+        await db.execute(select(PrincipalRow).where(PrincipalRow.id == principal_id))
+    ).scalar_one_or_none()
+    if row is None or row.active is False:
+        return None
+    principal = await rbac.resolve_principal(db, row, now)
+    principal.scope_permissions = oauth.scope_permissions(oauth.parse_scope(scope))
+    return principal
+
+
 async def get_current_principal(
     request: Request,
     db: DbSession,
     settings: SettingsDep,
 ) -> Principal | None:
-    """Session-Cookie → Principal (oder `None`, wenn keine/ungültige Session)."""
+    """Auth → Principal: OAuth-Bearer-Token (MCP) ODER Session-Cookie (Browser).
+
+    Reihenfolge: ein `Authorization: Bearer apat_…`-Token (OAuth-Access-Token) wird
+    zuerst aufgelöst und kappt die Permissions auf den Token-Scope; sonst fällt es auf
+    das Session-Cookie zurück. `None`, wenn nichts Gültiges vorliegt.
+    """
+    now = datetime.now(UTC)
+    bearer = _principal_bearer_token(request)
+    if bearer is not None:
+        return await _principal_from_access_token(db, bearer, now)
     cookie = request.cookies.get(settings.session_cookie_name)
     if not cookie:
         return None
-    now = datetime.now(UTC)
     session = await sessions.load_principal_session(
         db,
         secret=settings.session_secret,

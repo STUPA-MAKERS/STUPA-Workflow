@@ -36,6 +36,17 @@
           @if (accountMenuOpen()) {
             <button type="button" class="account__backdrop" aria-hidden="true" tabindex="-1" (click)="closeAccountMenu()"></button>
             <div class="account__menu" role="menu">
+              @if (auth.canAny('mcp.use')) {
+                <a
+                  class="account__menu-item"
+                  role="menuitem"
+                  routerLink="/account/grants"
+                  (click)="closeAccountMenu()"
+                >
+                  <app-icon name="webhook" [size]="16" />
+                  {{ 'account.menu.apiAccess' | t }}
+                </a>
+              }
               <button type="button" class="account__menu-item" role="menuitem" (click)="logout()">
                 <app-icon name="power" [size]="16" />
                 {{ 'action.logout' | t }}

@@ -34,4 +34,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "audit.read",
     "admin.config",
     "admin.roles",
+    # MCP/Agent-Zugang: erlaubt das Ausstellen von OAuth-Token für API-Agenten
+    # (#MCP). Admin hat es ohnehin (Bypass); explizit zuweisbar für Nicht-Admins.
+    "mcp.use",
 )

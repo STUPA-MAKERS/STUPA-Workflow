@@ -27,6 +27,7 @@ from app.modules.auth.models import AuthSession
 
 _APPLICANT_SALT = "applicant-session"
 _OIDC_TX_SALT = "oidc-tx"
+_OAUTH_TX_SALT = "oauth-tx"
 _SID_SALT = "principal-sid"
 _SID_BYTES = 32
 
@@ -73,6 +74,33 @@ def load_oidc_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None
     if not isinstance(data, dict) or not {"state", "verifier", "nonce"} <= set(data):
         return None
     return {k: str(data[k]) for k in ("state", "verifier", "nonce")}
+
+
+# --------------------------------------------------------------------------- #
+# OAuth-AS-Transaktions-Cookie (MCP-Login: authorize-Request über den OIDC-Hop)
+# --------------------------------------------------------------------------- #
+_OAUTH_TX_FIELDS = ("client_id", "redirect_uri", "code_challenge", "scope", "state")
+
+
+def issue_oauth_tx(secret: str, data: dict[str, str]) -> str:
+    """Authorize-Request (client_id/redirect_uri/challenge/scope/state) signiert ablegen."""
+    return _serializer(secret, _OAUTH_TX_SALT).dumps(
+        {k: data.get(k, "") for k in _OAUTH_TX_FIELDS}
+    )
+
+
+def load_oauth_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None:
+    try:
+        data = _serializer(secret, _OAUTH_TX_SALT).loads(value, max_age=max_age)
+    except (BadSignature, SignatureExpired):
+        return None
+    if not isinstance(data, dict) or not {
+        "client_id",
+        "redirect_uri",
+        "code_challenge",
+    } <= set(data):
+        return None
+    return {k: str(data.get(k, "")) for k in _OAUTH_TX_FIELDS}
 
 
 # --------------------------------------------------------------------------- #
