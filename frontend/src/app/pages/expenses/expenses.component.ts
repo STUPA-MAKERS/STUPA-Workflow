@@ -18,6 +18,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  CurrencyInputComponent,
   DialogComponent,
   FilterBarComponent,
   FilterFieldComponent,
@@ -56,6 +57,7 @@ import {
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
+    CurrencyInputComponent,
     DialogComponent,
     FilterBarComponent,
     FilterFieldComponent,
@@ -91,8 +93,8 @@ import {
           </app-filter-field>
           <app-filter-field [label]="'expenses.filter.amountRange' | t">
             <app-filter-range>
-              <input start type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMin' | t" [attr.aria-label]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
-              <input end type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMax' | t" [attr.aria-label]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
+              <app-currency-input start [placeholder]="'expenses.filter.amountMin' | t" [ariaLabel]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
+              <app-currency-input end [placeholder]="'expenses.filter.amountMax' | t" [ariaLabel]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
             </app-filter-range>
           </app-filter-field>
           <app-filter-field [label]="'expenses.filter.dateRange' | t">
@@ -194,7 +196,7 @@ import {
         <input id="exp-desc" class="exp__input" [ngModel]="newDescription()" (ngModelChange)="newDescription.set($event)" name="description" [placeholder]="'expenses.field.descriptionPlaceholder' | t" />
 
         <label class="exp__label" for="exp-amount">{{ 'expenses.field.amount' | t }}</label>
-        <input id="exp-amount" class="exp__input" type="number" min="0" step="0.01" [ngModel]="newAmount()" (ngModelChange)="newAmount.set($event)" name="amount" placeholder="0.00" />
+        <app-currency-input name="amount" [ngModel]="newAmount()" (ngModelChange)="newAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
 
         @if (newKind() === 'expense') {
           <label class="exp__label" for="exp-app">{{ 'expenses.field.linkApplication' | t }}</label>
@@ -255,7 +257,7 @@ import {
         <label class="exp__label" for="exp-edesc">{{ 'expenses.field.description' | t }}</label>
         <input id="exp-edesc" class="exp__input" [ngModel]="editDescription()" (ngModelChange)="editDescription.set($event)" name="edesc" />
         <label class="exp__label" for="exp-eamount">{{ 'expenses.field.amount' | t }}</label>
-        <input id="exp-eamount" class="exp__input" type="number" min="0" step="0.01" [ngModel]="editAmount()" (ngModelChange)="editAmount.set($event)" name="eamount" />
+        <app-currency-input name="eamount" [ngModel]="editAmount()" (ngModelChange)="editAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
       </form>
       <div dialog-footer class="exp__dialogFoot">
         <app-button variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>

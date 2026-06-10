@@ -25,6 +25,7 @@ export { DataTableComponent } from './data-table/data-table.component';
 export type { ColumnDef } from './data-table/data-table.component';
 export { CellDirective } from './data-table/cell.directive';
 export { RowDetailDirective } from './data-table/row-detail.directive';
+export { CurrencyInputComponent } from './currency-input/currency-input.component';
 export { FilterBarComponent } from './filter/filter-bar.component';
 export { FilterFieldComponent } from './filter/filter-field.component';
 export { FilterRangeComponent } from './filter/filter-range.component';

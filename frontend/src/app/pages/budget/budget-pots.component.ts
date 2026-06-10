@@ -18,7 +18,7 @@ import type {
 } from '@core/api/models';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
-import { SelectComponent, type SelectOption } from '@shared/ui';
+import { CurrencyInputComponent, SelectComponent, type SelectOption } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminOptionsService } from '../admin/admin-options.service';
 
@@ -58,7 +58,7 @@ function buildPeriodOptions(): SelectOption[] {
   selector: 'app-budget-pots',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, SelectComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, SelectComponent, CurrencyInputComponent],
   template: `
     <header class="pots__head">
       <h1 class="pots__title">{{ 'budget.pots.title' | t }}</h1>
@@ -91,12 +91,10 @@ function buildPeriodOptions(): SelectOption[] {
           </div>
           <div class="field">
             <label class="field__label" for="pot-total">{{ 'budget.pots.total' | t }}</label>
-            <input
-              id="pot-total"
-              class="field__control"
+            <app-currency-input
               name="total"
-              inputmode="decimal"
               [placeholder]="'budget.pots.totalPlaceholder' | t"
+              [ariaLabel]="'budget.pots.total' | t"
               [ngModel]="form().total"
               (ngModelChange)="patch('total', $event)"
             />

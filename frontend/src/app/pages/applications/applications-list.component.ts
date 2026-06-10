@@ -22,6 +22,7 @@ import type {
 } from '@core/api/models';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import {
+  CurrencyInputComponent,
   FilterBarComponent,
   FilterFieldComponent,
   FilterRangeComponent,
@@ -51,7 +52,7 @@ import { downloadBlob } from '@shared/download.util';
   selector: 'app-applications-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, IconComponent, SelectComponent, FilterBarComponent, FilterFieldComponent, FilterRangeComponent, CostCentreTreeComponent, ApplicationsTableComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, IconComponent, SelectComponent, CurrencyInputComponent, FilterBarComponent, FilterFieldComponent, FilterRangeComponent, CostCentreTreeComponent, ApplicationsTableComponent],
   template: `
     <header class="apps__head">
       <div class="apps__headRow">
@@ -105,8 +106,8 @@ import { downloadBlob } from '@shared/download.util';
             />
             <app-filter-field [label]="'applications.list.filter.amount' | t">
               <app-filter-range>
-                <input start type="number" min="0" step="1" [placeholder]="'applications.list.filter.min' | t" [attr.aria-label]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" name="amountMin" />
-                <input end type="number" min="0" step="1" [placeholder]="'applications.list.filter.max' | t" [attr.aria-label]="'applications.list.filter.max' | t" [ngModel]="amountMax()" (ngModelChange)="amountMax.set($event)" name="amountMax" />
+                <app-currency-input start name="amountMin" [placeholder]="'applications.list.filter.min' | t" [ariaLabel]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" />
+                <app-currency-input end name="amountMax" [placeholder]="'applications.list.filter.max' | t" [ariaLabel]="'applications.list.filter.max' | t" [ngModel]="amountMax()" (ngModelChange)="amountMax.set($event)" />
               </app-filter-range>
             </app-filter-field>
             <app-filter-field [label]="'applications.list.filter.date' | t">
@@ -465,8 +466,8 @@ export class ApplicationsListComponent {
       q: this.q() || null,
       type: this.typeId() || null,
       state: this.state() || null,
-      amountMin: this.amountMin() || null,
-      amountMax: this.amountMax() || null,
+      amountMin: this.amountMin() ? Number(this.amountMin()) : null,
+      amountMax: this.amountMax() ? Number(this.amountMax()) : null,
       createdFrom: this.createdFrom() || null,
       createdTo: this.createdTo() || null,
       budget: this.budgetId() || null,

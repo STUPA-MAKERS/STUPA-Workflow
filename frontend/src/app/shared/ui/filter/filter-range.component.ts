@@ -34,7 +34,12 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
         color: var(--color-text-muted);
         flex: 0 0 auto;
       }
-      :host ::ng-deep input,
+      /* app-currency-input als Flex-Item behandeln (bringt eigenes Styling mit). */
+      :host ::ng-deep app-currency-input {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+      :host ::ng-deep input:not(.cur__input),
       :host ::ng-deep select {
         width: 100%;
         min-width: 0;

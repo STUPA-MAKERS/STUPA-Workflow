@@ -29,8 +29,9 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
         font-weight: var(--fw-medium);
         color: var(--color-text-muted);
       }
-      /* Projizierte native Controls einheitlich stylen. */
-      :host ::ng-deep input:not([type='checkbox']):not([type='radio']),
+      /* Projizierte native Controls einheitlich stylen (app-currency-input bringt
+         eigenes Styling mit → ausnehmen). */
+      :host ::ng-deep input:not([type='checkbox']):not([type='radio']):not(.cur__input),
       :host ::ng-deep select {
         width: 100%;
         height: var(--control-height);
