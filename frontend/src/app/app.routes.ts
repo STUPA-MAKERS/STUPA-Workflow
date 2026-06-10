@@ -113,7 +113,12 @@ export const routes: Routes = [
       },
       {
         path: 'meetings',
-        data: { title: 'nav.meetings', permission: ['meeting.manage', 'protocol.write'] },
+        // Gremium-Mitglieder erreichen ihre Sitzungen auch ohne manage/protocol.write.
+        data: {
+          title: 'nav.meetings',
+          permission: ['meeting.manage', 'protocol.write'],
+          allowCommitteeMember: true,
+        },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/meetings/meetings.component').then((m) => m.MeetingsComponent),
@@ -123,6 +128,7 @@ export const routes: Routes = [
         data: {
           title: 'nav.meetings',
           permission: ['meeting.manage', 'protocol.write'],
+          allowCommitteeMember: true,
           wide: true,
         },
         canActivate: [authGuard],

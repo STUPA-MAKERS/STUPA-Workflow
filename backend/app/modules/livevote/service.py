@@ -352,6 +352,16 @@ class MeetingService:
             return True
         return gremium_id in await gremium_member_ids(self.session, principal.sub)
 
+    async def _visible_gremium_ids(self, principal: Principal) -> set[UUID] | None:
+        """Gremien, deren Sitzungen der Principal sehen darf — ``None`` = **alle**.
+
+        Admin/``meeting.manage`` sehen alles; sonst nur die Gremien, in denen der
+        Principal Mitglied ist (beliebige Rolle). So sieht ein fremder Nutzer keine
+        Sitzungen, ein Gremium-Mitglied aber die seines Gremiums (#sessions)."""
+        if "admin" in principal.roles or principal.has("meeting.manage"):
+            return None
+        return await gremium_member_ids(self.session, principal.sub)
+
     async def _get(self, meeting_id: UUID) -> Meeting:
         meeting = (
             await self.session.execute(select(Meeting).where(Meeting.id == meeting_id))
@@ -427,6 +437,9 @@ class MeetingService:
         stmt = select(Meeting).order_by(Meeting.created_at.desc())
         if gremium_id is not None:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
+        visible = await self._visible_gremium_ids(principal)
+        if visible is not None:
+            stmt = stmt.where(Meeting.gremium_id.in_(visible))
         meetings = list((await self.session.execute(stmt)).scalars().all())
         return await self._decorate(meetings, principal)
 
@@ -464,6 +477,9 @@ class MeetingService:
         stmt = select(Meeting, sort_ts)
         if gremium_id is not None:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
+        visible = await self._visible_gremium_ids(principal)
+        if visible is not None:
+            stmt = stmt.where(Meeting.gremium_id.in_(visible))
         if direction == "upcoming":
             stmt = stmt.where(is_upcoming)
             if cur is not None:
