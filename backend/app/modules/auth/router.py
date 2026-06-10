@@ -7,7 +7,6 @@ ausschließlich HttpOnly+Secure+SameSite=Lax-Cookies.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -19,8 +18,6 @@ from app.db import get_sessionmaker
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.admin.models import Gremium
 from app.modules.auth import oidc, service, sessions
-from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.auth.models import RoleAssignment
 from app.modules.auth.oidc import OidcError
 from app.modules.auth.schemas import (
     GremiumRef,
@@ -176,26 +173,26 @@ async def me(
 
 
 async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
-    """Gremien, in denen ``sub`` per **gültiger** Rollenzuweisung Mitglied ist (#5).
+    """Gremien, in denen ``sub`` **Mitglied** ist (gültige ``gremium_membership``, #5).
 
-    Filtert das tz-aware Gültigkeitsfenster (``valid_from``/``valid_until``) und
-    dedupliziert, sodass jedes Gremium genau einmal erscheint. Magic-Link-
-    Applicants (kein Principal-Row) bekommen eine leere Liste.
+    Nutzt dieselbe Quelle wie die serverseitige Sichtbarkeits-/Steuerungslogik
+    (``gremium_member_ids`` → ``GremiumMembership``), damit Frontend-Gating (Sitzungen-
+    Tab/-Zugriff) und Server-Filter übereinstimmen. (Die globale ``role_assignment``-
+    Mitgliedsrolle hat ``gremium_id = NULL`` und ist **keine** Gremium-Mitgliedschaft.)
+    Magic-Link-Applicants (kein Principal-Row) bekommen eine leere Liste.
     """
-    now = datetime.now(UTC)
-    stmt = (
-        select(Gremium.id, Gremium.name, Gremium.slug)
-        .join(RoleAssignment, RoleAssignment.gremium_id == Gremium.id)
-        .join(PrincipalRow, PrincipalRow.id == RoleAssignment.principal_id)
-        .where(
-            PrincipalRow.sub == sub,
-            (RoleAssignment.valid_from.is_(None)) | (RoleAssignment.valid_from <= now),
-            (RoleAssignment.valid_until.is_(None)) | (RoleAssignment.valid_until > now),
+    from app.modules.admin.gremium_roles import gremium_member_ids
+
+    ids = await gremium_member_ids(db, sub)
+    if not ids:
+        return []
+    rows = (
+        await db.execute(
+            select(Gremium.id, Gremium.name, Gremium.slug)
+            .where(Gremium.id.in_(ids))
+            .order_by(Gremium.name)
         )
-        .distinct()
-        .order_by(Gremium.name)
-    )
-    rows = (await db.execute(stmt)).all()
+    ).all()
     return [GremiumRef(id=r.id, name=r.name, slug=r.slug) for r in rows]
 
 
