@@ -76,16 +76,19 @@ def build_vote_snippet(
     counts: dict[str, int] | None,
     question: str | None = None,
 ) -> str:
-    """Eine Abstimmung als Markdown-Snippet (Titel + Beschlussfrage + Ergebnis + Stimmen).
+    """Eine Abstimmung als pytex-Protokoll-Callout (``> [!abstimmung]``) → eingebaute
+    Vote-Tally-Box im PDF (statt einer Aufzählung). Die Stimmen-Zeile (``yes/no/abstain``
+    bzw. ``ja/nein/enthaltung``) erkennt pytex und rendert die Zähl-Box; die übrigen
+    Zeilen (Beschlussfrage/Ergebnis) bleiben Box-Text. Alle Werte werden escaped.
 
-    Wird beim Einbetten an den Protokoll-Body angehängt; bleibt damit Teil des vom
-    Protokollanten editierbaren Markdowns. Alle Werte werden Markdown-escaped."""
-    lines = [f"### {_md_escape(title)}", ""]
-    if question and question.strip():
-        lines.append(f"**Beschlussfrage:** {_md_escape(question.strip())}")
-        lines.append("")
-    lines.append(f"- **Ergebnis:** {_md_escape(result) if result else '—'}")
+    Bleibt Teil des editierbaren Markdowns (Blockquote-Callout)."""
+    head = question.strip() if question and question.strip() else title
+    lines = [f"> [!abstimmung] {_md_escape(head)}"]
+    if result:
+        lines.append(f"> Ergebnis: {_md_escape(result)}")
     if counts:
-        rendered = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())
-        lines.append(f"- **Stimmen:** {rendered}")
+        # pytex erkennt die Tally-Zeile an ≥2 von ja/nein/enthaltung (yes/no/abstain) —
+        # die Antrags-Optionen tragen genau diese Schlüssel.
+        tally = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())
+        lines.append(f"> {tally}")
     return "\n".join(lines)

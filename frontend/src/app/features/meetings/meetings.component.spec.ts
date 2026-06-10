@@ -204,7 +204,8 @@ describe('MeetingsComponent', () => {
     // Erst werden die TOP-Texte zum Protokoll-Markdown zusammengesetzt (PATCH) …
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
-    expect(saveReq.request.body.markdown).toContain('## TOP 1: Begrüßung');
+    // Top-level `#` ohne „TOP n:"-Präfix — pytex nummeriert die TOPs selbst (#pdf).
+    expect(saveReq.request.body.markdown).toContain('# Begrüßung');
     saveReq.flush(PROTOCOL);
     // … danach finalisiert/gerendert.
     const finReq = http.expectOne('/api/protocols/p-1/finalize');

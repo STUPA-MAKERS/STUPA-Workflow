@@ -67,22 +67,22 @@ def test_frontmatter_injection_is_quoted() -> None:
 
 
 # ------------------------------------------------------------- vote snippet
-def test_vote_snippet_embeds_title_result_counts() -> None:
+def test_vote_snippet_renders_abstimmung_callout_with_tally() -> None:
     snippet = build_vote_snippet("Antrag A", "passed", {"yes": 5, "no": 2, "abstain": 1})
-    assert "### Antrag A" in snippet
-    assert "**Ergebnis:** passed" in snippet
-    assert "**Stimmen:** yes: 5, no: 2, abstain: 1" in snippet
+    # pytex-Protokoll-Callout → eingebaute Vote-Box; Tally-Zeile (yes/no/abstain).
+    assert snippet.startswith("> [!abstimmung] Antrag A")
+    assert "> Ergebnis: passed" in snippet
+    assert "> yes: 5, no: 2, abstain: 1" in snippet
 
 
-def test_vote_snippet_without_result_or_counts() -> None:
-    snippet = build_vote_snippet("Antrag B", None, None)
-    assert "### Antrag B" in snippet
-    assert "**Ergebnis:** —" in snippet
-    assert "Stimmen" not in snippet
+def test_vote_snippet_question_overrides_title_and_omits_empty_tally() -> None:
+    snippet = build_vote_snippet("Antrag B", None, None, question="Soll X?")
+    assert snippet.startswith("> [!abstimmung] Soll X?")
+    assert "Ergebnis" not in snippet
+    assert "yes:" not in snippet
 
 
 def test_vote_snippet_escapes_newlines() -> None:
     snippet = build_vote_snippet("Zeile1\nZeile2", "passed", None)
-    assert "\n" in snippet  # Snippet selbst ist mehrzeilig …
-    # … aber der escapte Titel bleibt einzeilig (kein Markdown-Bruch).
-    assert "### Zeile1 Zeile2" in snippet
+    # Titel bleibt einzeilig (kein Markdown-Bruch im Callout-Marker).
+    assert "> [!abstimmung] Zeile1 Zeile2" in snippet

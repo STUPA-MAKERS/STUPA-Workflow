@@ -2274,7 +2274,11 @@ export class MeetingsComponent implements OnDestroy {
   private assembleMarkdown(): string {
     return this.agenda()
       .map((t, i) => {
-        const heading = `## TOP ${i + 1}: ${t.title ?? ''}`.trimEnd();
+        // Top-level `#` → pytex' Protokoll-Variante nummeriert es selbst als „TOP n"
+        // (\thesection). Daher KEIN manuelles „TOP n:"-Präfix und kein `##` (das würde
+        // als „0.n" nummeriert + „TOP n:" doppelt). Frontmatter-`title` verhindert, dass
+        // das erste `#` als Titelseite verbraucht wird.
+        const heading = `# ${t.title?.trim() || 'Tagesordnungspunkt'}`;
         const ref = t.applicationId ? `\n\n:::antrag{#${t.applicationId}}\n:::` : '';
         const body = t.body?.trim() ? `\n\n${t.body.trim()}` : '';
         return `${heading}${ref}${body}`;
