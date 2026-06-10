@@ -1126,7 +1126,11 @@ export class FlowEditorComponent {
   }
 
   // --- save ----------------------------------------------------------------
+  /** Speichern läuft — gegen Doppel-Klick (sonst zwei Flow-Versionen aus einem Klick). */
+  protected readonly saving = signal(false);
+
   protected save(): void {
+    if (this.saving()) return;
     const v = this.validation();
     if (!v.valid) {
       // Konkrete Meldung statt generisch (z. B. „vote-State braucht pass+fail").
@@ -1134,10 +1138,16 @@ export class FlowEditorComponent {
       return;
     }
     const graph = normalizeFlowGraph(autoLayout(this.graph()));
+    this.saving.set(true);
     this.api.createGlobalFlowVersion(graph).subscribe({
-      next: () => this.toast.success(this.i18n.translate('admin.common.saved')),
-      error: (err: { error?: { detail?: string } }) =>
-        this.toast.error(err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed')),
+      next: () => {
+        this.saving.set(false);
+        this.toast.success(this.i18n.translate('admin.common.saved'));
+      },
+      error: (err: { error?: { detail?: string } }) => {
+        this.saving.set(false);
+        this.toast.error(err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed'));
+      },
     });
   }
 }

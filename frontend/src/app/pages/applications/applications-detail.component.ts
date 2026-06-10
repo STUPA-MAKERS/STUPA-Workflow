@@ -975,8 +975,14 @@ export class ApplicationsDetailComponent {
     });
   }
 
+  /** Lauf-Nummer der Ladevorgänge: verspätete Antworten eines früheren Antrags
+   *  (schneller Wechsel zwischen Detailseiten) dürfen den aktuellen nicht
+   *  überschreiben — jede Antwort prüft, ob sie noch zum letzten Ladelauf gehört. */
+  private loadSeq = 0;
+
   private loadApplication(id: Uuid): void {
     this.id = id;
+    const seq = ++this.loadSeq;
     // Zustand für die (ggf. neue) id zurücksetzen, damit nichts Altes durchblitzt.
     this.app.set(null);
     this.versions.set([]);
@@ -997,17 +1003,23 @@ export class ApplicationsDetailComponent {
     this.loading.set(true);
     this.api.getApplication(id).subscribe({
       next: (app) => {
+        if (seq !== this.loadSeq) return;
         this.app.set(app);
         this.loading.set(false);
         this.loadAux();
         // Effektive Form aus der **gepinnten** Version des Antrags (nicht der aktiven) —
         // so passen Labels/Edit-Felder zu den Daten, gegen die der Server validiert.
         this.api.applicationForm(app.id).subscribe({
-          next: (eff) => this.formFields.set(eff.sections.flatMap((s) => s.fields)),
-          error: () => this.formFields.set([]),
+          next: (eff) => {
+            if (seq === this.loadSeq) this.formFields.set(eff.sections.flatMap((s) => s.fields));
+          },
+          error: () => {
+            if (seq === this.loadSeq) this.formFields.set([]);
+          },
         });
       },
       error: (err: { status?: number }) => {
+        if (seq !== this.loadSeq) return;
         this.loading.set(false);
         if (err.status === 404) this.notFound.set(true);
         else this.error.set(true);
@@ -1018,20 +1030,39 @@ export class ApplicationsDetailComponent {
   /** Versionen/Kommentare/verfügbare Übergänge nachladen — Fehler degradieren still
    *  zu leer. Übergänge nur mit der nötigen Permission (Server filtert zusätzlich). */
   private loadAux(): void {
-    this.api.versions(this.id).subscribe({ next: (v) => this.versions.set(v), error: () => {} });
-    this.api.comments(this.id).subscribe({ next: (c) => this.comments.set(c), error: () => {} });
+    const seq = this.loadSeq;
+    this.api.versions(this.id).subscribe({
+      next: (v) => {
+        if (seq === this.loadSeq) this.versions.set(v);
+      },
+      error: () => {},
+    });
+    this.api.comments(this.id).subscribe({
+      next: (c) => {
+        if (seq === this.loadSeq) this.comments.set(c);
+      },
+      error: () => {},
+    });
     if (this.canTransition()) {
       this.api.transitions(this.id).subscribe({
-        next: (t) => this.transitions.set(t),
-        error: () => this.transitions.set([]),
+        next: (t) => {
+          if (seq === this.loadSeq) this.transitions.set(t);
+        },
+        error: () => {
+          if (seq === this.loadSeq) this.transitions.set([]);
+        },
       });
     }
     // Kostenstellen-Zuordnung (#17): Baum laden (Badge-Label + Dialog-Picker).
     if (this.canManage()) {
       this.budgetChoice.set(this.app()?.budgetId ?? '');
       this.budgetApi.tree().subscribe({
-        next: (tree) => this.budgetTree.set(tree),
-        error: () => this.budgetTree.set([]),
+        next: (tree) => {
+          if (seq === this.loadSeq) this.budgetTree.set(tree);
+        },
+        error: () => {
+          if (seq === this.loadSeq) this.budgetTree.set([]);
+        },
       });
     }
   }
@@ -1302,8 +1333,10 @@ export class ApplicationsDetailComponent {
 
   /** Antrag + abhängige Sektionen nach einem Übergang neu laden. */
   private refresh(): void {
+    const seq = this.loadSeq;
     this.api.getApplication(this.id).subscribe({
       next: (app) => {
+        if (seq !== this.loadSeq) return;
         this.app.set(app);
         this.loadAux();
       },

@@ -226,6 +226,10 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
             return False
         flow = FlowService(session, dispatcher)
         fired = False
+        # Marker VOR dem Feuern vormerken: `fire` committet ihn atomar mit dem
+        # State-Wechsel — kein Fenster, in dem ein zweiter Worker die schon
+        # gefeuerte Frist erneut greifen kann (das Row-Lock fällt mit dem Commit).
+        deadline.action_on_pass = None
         try:
             await flow.fire(
                 application_id,
@@ -242,7 +246,8 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
             logger.info("deadline %s transition not applied: %s", deadline_id, exc)
         except NotFoundError as exc:
             logger.warning("deadline %s references missing app/transition: %s", deadline_id, exc)
-        # `fire` committet selbst; danach Marker in einer frischen Transaktion setzen.
+        # Fehlerpfade (kein Commit durch `fire` bzw. Rollback) — Marker hier
+        # persistieren; nach erfolgreichem `fire` ist das ein No-op.
         await svc.consume_action(deadline)
     return fired
 

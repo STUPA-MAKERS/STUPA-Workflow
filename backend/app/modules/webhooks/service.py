@@ -219,10 +219,14 @@ class WebhookService:
                 allowlist=self.settings.webhook_host_allowlist,
                 resolver=resolver,
             )
-        except SsrfError as exc:
+        except SsrfError:
             # Sicherheits-Block ist **permanent** — kein Retry (Ziel ändert sich nicht).
+            # Bewusst ohne Fehlerdetail: die Meldung enthält Host/aufgelöste IP und
+            # würde interne Netz-Topologie in die Logs tragen.
             logger.warning(
-                "webhook delivery %s blocked by ssrf guard: %s", delivery_id, exc
+                "webhook delivery %s (webhook=%s) blocked by ssrf guard",
+                delivery_id,
+                delivery.webhook_id,
             )
             return await self._finish(delivery, "dead", moment, response_code=None)
 

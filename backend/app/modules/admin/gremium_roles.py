@@ -302,6 +302,10 @@ class GremiumRoleService:
             raise NotFoundError(f"gremium role {payload.gremium_role_id} not found")
         if role.gremium_id != gremium_id:
             raise ConflictError("gremium role does not belong to this gremium")
+        # Unbekannte principal_id sauber als 404 — sonst platzt erst der FK beim
+        # Commit (IntegrityError → 500).
+        if await self.session.get(PrincipalRow, payload.principal_id) is None:
+            raise NotFoundError(f"principal {payload.principal_id} not found")
         new_from = _parse_dt(payload.valid_from)
         new_until = _parse_dt(payload.valid_until)
         if new_from is not None and new_until is not None and new_from >= new_until:

@@ -359,6 +359,8 @@
     <span class="fe__status" [class.fe__status--ok]="validation().valid">
       {{ (validation().valid ? 'admin.common.valid' : 'admin.common.errors') | t }}
     </span>
-    <app-button [disabled]="!validation().valid" (click)="save()">{{ 'admin.flow.save' | t }}</app-button>
+    <app-button [disabled]="!validation().valid" [loading]="saving()" (click)="save()">{{
+      'admin.flow.save' | t
+    }}</app-button>
   </footer>
 </section>

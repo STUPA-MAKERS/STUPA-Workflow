@@ -15,7 +15,7 @@ import pytest
 from app.modules.admin.gremium_roles import GremiumRoleService, intervals_overlap
 from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.admin.schemas import GremiumMembershipCreate
-from app.shared.errors import ConflictError
+from app.shared.errors import ConflictError, NotFoundError
 from tests.auth_fakes import fake_session, result
 
 
@@ -66,12 +66,21 @@ def _membership(pid, gid, frm, until) -> GremiumMembership:
 async def test_create_membership_rejects_overlap() -> None:
     pid, gid = uuid4(), uuid4()
     existing = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-12-31"))
-    # gets: GremiumRole lookup; scalars: existing memberships query
-    db = fake_session(result(existing), gets=[_role(gid)])
+    # gets: GremiumRole lookup, Principal-Existenz; scalars: existing memberships
+    db = fake_session(result(existing), gets=[_role(gid), object()])
     payload = GremiumMembershipCreate(
         principalId=pid, gremiumRoleId=uuid4(), validFrom="2026-06-01", validUntil="2026-09-01"
     )
     with pytest.raises(ConflictError):
+        await GremiumRoleService(db).create_membership(gid, payload, "admin")
+
+
+async def test_create_membership_unknown_principal_404() -> None:
+    # Unbekannte principal_id -> 404 statt FK-IntegrityError beim Commit.
+    gid = uuid4()
+    db = fake_session(gets=[_role(gid)])  # zweiter get (Principal) -> None
+    payload = GremiumMembershipCreate(principalId=uuid4(), gremiumRoleId=uuid4())
+    with pytest.raises(NotFoundError):
         await GremiumRoleService(db).create_membership(gid, payload, "admin")
 
 
@@ -82,7 +91,7 @@ async def test_create_membership_allows_consecutive_term() -> None:
         result(existing),  # existing memberships
         result(),  # audit advisory lock
         result(),  # audit prev-hash
-        gets=[_role(gid)],
+        gets=[_role(gid), object()],  # Rolle + Principal-Existenz
     )
 
     async def _flush_assign() -> None:  # DB würde die PK setzen; Fake tut es nicht.

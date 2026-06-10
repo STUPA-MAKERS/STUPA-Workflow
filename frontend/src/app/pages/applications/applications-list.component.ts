@@ -345,6 +345,8 @@ export class ApplicationsListComponent {
   readonly total = signal(0);
   /** Offset der **nächsten** zu ladenden Seite. */
   private nextOffset = 0;
+  /** Lauf-Nummer der Fetches: verspätete Antworten alter Filter werden verworfen. */
+  private fetchSeq = 0;
   /** `gremium`/`topf` haben keine sichtbaren Controls — aus der URL gespiegelt. */
   private gremium = '';
   private topf = '';
@@ -606,8 +608,12 @@ export class ApplicationsListComponent {
    * bereits geladene Liste bleibt nutzbar).
    */
   private fetch(initial: boolean): void {
+    // Lauf-Nummer gegen Out-of-order-Antworten: bei schnellen Filterwechseln darf
+    // eine verspätete Seite des alten Filters die aktuelle Liste nicht überschreiben.
+    const seq = ++this.fetchSeq;
     this.api.listApplications(this.buildQuery(this.nextOffset)).subscribe({
       next: (page) => {
+        if (seq !== this.fetchSeq) return;
         this.total.set(page.total);
         this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
         // Über die tatsächliche Trefferzahl hochzählen (letzte Seite < limit).
@@ -617,6 +623,7 @@ export class ApplicationsListComponent {
         this.loadingMore.set(false);
       },
       error: () => {
+        if (seq !== this.fetchSeq) return;
         if (initial) this.error.set(true);
         this.loading.set(false);
         this.loadingMore.set(false);

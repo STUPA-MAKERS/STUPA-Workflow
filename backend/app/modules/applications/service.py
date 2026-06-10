@@ -25,6 +25,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import Text, cast, false, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import ApplicationType, Gremium, GremiumMembership
@@ -458,7 +459,15 @@ class ApplicationsService:
         )
         app.data = clean
         app.amount, app.currency = _amount_currency(fields, clean)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            # Konkurrierender PATCH hat dieselbe Versionsnummer geschrieben
+            # (UNIQUE(application_id, version)) — 409 statt 500; Client wiederholt.
+            await self.session.rollback()
+            raise ConflictError(
+                "Concurrent update detected; please retry.", code="conflict"
+            ) from exc
         # `updated_at` (server-seitiges onupdate) ist nach dem UPDATE expired →
         # vor dem Serialisieren explizit nachladen (sonst Lazy-IO außerhalb await).
         await self.session.refresh(app)

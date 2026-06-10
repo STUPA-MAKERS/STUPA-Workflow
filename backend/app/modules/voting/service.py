@@ -57,10 +57,14 @@ class VotingService:
         self.dispatcher: ActionDispatcher = dispatcher or NullActionDispatcher()
 
     # ----------------------------------------------------------------- helpers
-    async def _get_vote(self, vote_id: UUID) -> Vote:
-        vote = (
-            await self.session.execute(select(Vote).where(Vote.id == vote_id))
-        ).scalar_one_or_none()
+    async def _get_vote(self, vote_id: UUID, *, for_update: bool = False) -> Vote:
+        """Vote laden; ``for_update`` sperrt die Zeile (cast/close-Serialisierung):
+        ohne Lock kann eine Last-Sekunden-Stimme zwischen Auszählung und
+        ``status=closed`` committen und fehlt dann im festgeschriebenen Ergebnis."""
+        stmt = select(Vote).where(Vote.id == vote_id)
+        if for_update:
+            stmt = stmt.with_for_update()
+        vote = (await self.session.execute(stmt)).scalar_one_or_none()
         if vote is None:
             raise NotFoundError(f"vote {vote_id} not found")
         return vote
@@ -244,7 +248,9 @@ class VotingService:
     ) -> BallotAccepted:
         """Stimme abgeben. 409 (geschlossen/Doppel), 403 (nicht stimmberechtigt),
         422 (unbekannte Option)."""
-        vote = await self._get_vote(vote_id)
+        # Row-Lock serialisiert gegen close(): Status-Check und Ballot-Insert liegen
+        # in derselben Transaktion — keine Stimme landet nach der Auszählung.
+        vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
             raise ConflictError("vote is not open.", code="conflict")
         if vote.closes_at is not None and now >= vote.closes_at:
@@ -363,7 +369,9 @@ class VotingService:
         committet die vorgemerkten Vote-Änderungen mit). Schlägt ``fire`` fehl
         (Guard/Race), rollt die Session-Dependency alles zurück → der Vote bleibt
         **offen und wiederholbar** statt »zu, aber Branch nie gefeuert« (stuck)."""
-        vote = await self._get_vote(vote_id)
+        # Row-Lock serialisiert gegen cast(): keine Last-Sekunden-Stimme zwischen
+        # Auszählung und ``status=closed``.
+        vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
             raise ConflictError(
                 f"vote is {vote.status}, cannot close.", code="conflict"
