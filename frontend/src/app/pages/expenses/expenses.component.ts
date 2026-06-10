@@ -19,6 +19,9 @@ import {
   BadgeComponent,
   ButtonComponent,
   DialogComponent,
+  FilterBarComponent,
+  FilterFieldComponent,
+  FilterRangeComponent,
   IconComponent,
   SelectComponent,
   type SelectOption,
@@ -54,6 +57,9 @@ import {
     BadgeComponent,
     ButtonComponent,
     DialogComponent,
+    FilterBarComponent,
+    FilterFieldComponent,
+    FilterRangeComponent,
     IconComponent,
     SelectComponent,
     CostCentreTreeComponent,
@@ -75,44 +81,27 @@ import {
           (ngModelChange)="onSearch($event)"
           [attr.aria-label]="'expenses.search' | t"
         />
-        <div class="exp__filterWrap">
-          <app-button variant="secondary" size="sm" (click)="filtersOpen.set(!filtersOpen())">
-            <span class="exp__filterBtn"><app-icon name="filter" [size]="14" /> {{ 'expenses.filters' | t }}
-              @if (activeFilterCount()) { <span class="exp__filterCount">{{ activeFilterCount() }}</span> }
-            </span>
-          </app-button>
-          @if (filtersOpen()) {
-            <div class="exp__filterMenu">
-              <div class="exp__filterGroup">
-                <span class="exp__filterLabel">{{ 'expenses.filter.kind' | t }}</span>
-                <div class="exp__kinds">
-                  <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
-                  <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
-                  <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
-                </div>
-              </div>
-              <div class="exp__filterGroup">
-                <span class="exp__filterLabel">{{ 'expenses.filter.amountRange' | t }}</span>
-                <div class="exp__amountFilter">
-                  <input class="exp__input exp__amountInput" type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMin' | t" [attr.aria-label]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
-                  <span aria-hidden="true">–</span>
-                  <input class="exp__input exp__amountInput" type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMax' | t" [attr.aria-label]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
-                </div>
-              </div>
-              <div class="exp__filterGroup">
-                <span class="exp__filterLabel">{{ 'expenses.filter.dateRange' | t }}</span>
-                <div class="exp__amountFilter">
-                  <input class="exp__input" type="date" [attr.aria-label]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
-                  <span aria-hidden="true">–</span>
-                  <input class="exp__input" type="date" [attr.aria-label]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
-                </div>
-              </div>
-              @if (activeFilterCount()) {
-                <app-button variant="ghost" size="sm" (click)="resetFilters()">{{ 'expenses.filter.reset' | t }}</app-button>
-              }
+        <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+          <app-filter-field [label]="'expenses.filter.kind' | t">
+            <div class="exp__kinds">
+              <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
+              <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+              <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
             </div>
-          }
-        </div>
+          </app-filter-field>
+          <app-filter-field [label]="'expenses.filter.amountRange' | t">
+            <app-filter-range>
+              <input start type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMin' | t" [attr.aria-label]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
+              <input end type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMax' | t" [attr.aria-label]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
+            </app-filter-range>
+          </app-filter-field>
+          <app-filter-field [label]="'expenses.filter.dateRange' | t">
+            <app-filter-range>
+              <input start type="date" [attr.aria-label]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
+              <input end type="date" [attr.aria-label]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
+            </app-filter-range>
+          </app-filter-field>
+        </app-filter-bar>
       </div>
     </header>
 
@@ -419,54 +408,6 @@ import {
         gap: var(--space-1);
         justify-content: flex-end;
       }
-      /* --- Filter-Menü (#25) --- */
-      .exp__filterBtn {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-1);
-      }
-      .exp__filterCount {
-        display: inline-grid;
-        place-items: center;
-        min-width: 1.1rem;
-        height: 1.1rem;
-        padding: 0 4px;
-        border-radius: var(--radius-pill);
-        background: var(--color-primary);
-        color: var(--color-on-primary, #fff);
-        font-size: var(--fs-xs);
-      }
-      .exp__filterWrap {
-        position: relative;
-      }
-      .exp__filterMenu {
-        position: absolute;
-        right: 0;
-        z-index: var(--z-dropdown, 50);
-        margin-top: var(--space-2);
-        width: min(22rem, 90vw);
-        max-height: 80vh;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-4);
-        padding: var(--space-4);
-        background: var(--color-bg-elevated, var(--color-surface));
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-lg);
-      }
-      .exp__filterGroup {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-      }
-      .exp__filterLabel {
-        font-size: var(--fs-xs);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: var(--color-text-muted);
-      }
       .exp__form { display: flex; flex-direction: column; gap: var(--space-2); }
       .exp__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); margin-top: var(--space-2); }
       .exp__hint { font-size: var(--fs-sm); color: var(--color-text-muted); margin: 0; }
@@ -514,8 +455,6 @@ import {
       }
       .exp__pickedText { font-weight: var(--fw-medium); }
       /* Betrags-Filter (von/bis) */
-      .exp__amountFilter { display: inline-flex; align-items: center; gap: var(--space-1); }
-      .exp__amountInput { width: 6rem; }
       @media (max-width: 720px) {
         .exp__layout { grid-template-columns: 1fr; }
         .exp__tree { position: static; max-height: none; }
@@ -549,7 +488,6 @@ export class ExpensesComponent {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
-  readonly filtersOpen = signal(false);
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
   private searchTimer: ReturnType<typeof setTimeout> | null = null;

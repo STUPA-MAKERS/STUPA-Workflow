@@ -11,6 +11,11 @@ export const de = {
   'app.title': 'STUPA Antragsplattform',
   'app.skipToContent': 'Zum Inhalt springen',
 
+  // Generische Filter-Leiste (app-filter-bar) — überall gleich.
+  'filter.button': 'Filter',
+  'filter.apply': 'Anwenden',
+  'filter.reset': 'Zurücksetzen',
+
   'nav.main': 'Hauptnavigation',
   'nav.footer': 'Fußzeile',
   'nav.dashboard': 'Dashboard',
@@ -1392,6 +1397,9 @@ export const de = {
 export const en: Partial<Record<TranslationKey, string>> = {
   'app.title': 'STUPA Application Platform',
   'app.skipToContent': 'Skip to content',
+  'filter.button': 'Filter',
+  'filter.apply': 'Apply',
+  'filter.reset': 'Reset',
 
   'nav.main': 'Main navigation',
   'nav.footer': 'Footer',

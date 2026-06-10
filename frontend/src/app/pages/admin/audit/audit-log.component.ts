@@ -12,7 +12,12 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
-import { BadgeComponent, ButtonComponent } from '@shared/ui';
+import {
+  BadgeComponent,
+  ButtonComponent,
+  FilterBarComponent,
+  FilterFieldComponent,
+} from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditActor, AuditEntry } from '../admin.models';
 
@@ -57,7 +62,14 @@ const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
   selector: 'app-audit-log',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, LocalizedDatePipe, ButtonComponent, BadgeComponent],
+  imports: [
+    TranslatePipe,
+    LocalizedDatePipe,
+    ButtonComponent,
+    BadgeComponent,
+    FilterBarComponent,
+    FilterFieldComponent,
+  ],
   template: `
     <section class="audit">
       <header class="audit__head">
@@ -65,45 +77,31 @@ const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
           <h1>{{ 'admin.audit.title' | t }}</h1>
           <p class="audit__desc">{{ 'admin.audit.desc' | t }}</p>
         </div>
+        <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+          <app-filter-field [label]="'admin.audit.filter.action' | t">
+            <select [value]="action()" (change)="setAction($any($event.target).value)">
+              <option value="">{{ 'admin.audit.filter.allActions' | t }}</option>
+              @for (a of actionOptions(); track a) {
+                <option [value]="a">{{ actionLabel(a) }}</option>
+              }
+            </select>
+          </app-filter-field>
+          <app-filter-field [label]="'admin.audit.filter.actor' | t">
+            <select [value]="actor()" (change)="setActor($any($event.target).value)">
+              <option value="">{{ 'admin.audit.filter.allActors' | t }}</option>
+              @for (a of actors(); track a.sub) {
+                <option [value]="a.sub">{{ a.name || a.sub }}</option>
+              }
+            </select>
+          </app-filter-field>
+          <app-filter-field [label]="'admin.audit.filter.since' | t">
+            <input type="date" [value]="since()" (change)="setSince($any($event.target).value)" />
+          </app-filter-field>
+          <app-filter-field [label]="'admin.audit.filter.until' | t">
+            <input type="date" [value]="until()" (change)="setUntil($any($event.target).value)" />
+          </app-filter-field>
+        </app-filter-bar>
       </header>
-
-      <div class="audit__filters" role="search">
-        <label class="audit__filter">
-          <span>{{ 'admin.audit.filter.action' | t }}</span>
-          <select [value]="action()" (change)="setAction($any($event.target).value)">
-            <option value="">{{ 'admin.audit.filter.allActions' | t }}</option>
-            @for (a of actionOptions(); track a) {
-              <option [value]="a">{{ actionLabel(a) }}</option>
-            }
-          </select>
-        </label>
-
-        <label class="audit__filter">
-          <span>{{ 'admin.audit.filter.actor' | t }}</span>
-          <select [value]="actor()" (change)="setActor($any($event.target).value)">
-            <option value="">{{ 'admin.audit.filter.allActors' | t }}</option>
-            @for (a of actors(); track a.sub) {
-              <option [value]="a.sub">{{ a.name || a.sub }}</option>
-            }
-          </select>
-        </label>
-
-        <label class="audit__filter">
-          <span>{{ 'admin.audit.filter.since' | t }}</span>
-          <input type="date" [value]="since()" (change)="setSince($any($event.target).value)" />
-        </label>
-
-        <label class="audit__filter">
-          <span>{{ 'admin.audit.filter.until' | t }}</span>
-          <input type="date" [value]="until()" (change)="setUntil($any($event.target).value)" />
-        </label>
-
-        @if (hasFilters()) {
-          <app-button variant="ghost" size="sm" (click)="resetFilters()">
-            {{ 'admin.audit.filter.reset' | t }}
-          </app-button>
-        }
-      </div>
 
       @if (loadError()) {
         <p class="audit__status audit__status--error" role="alert">{{ 'admin.audit.error' | t }}</p>
@@ -152,6 +150,13 @@ const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
         flex-direction: column;
         gap: var(--space-4);
       }
+      .audit__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+      }
       .audit__head h1 {
         margin: 0;
       }
@@ -159,30 +164,6 @@ const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
         color: var(--color-text-muted);
         font-size: var(--fs-sm);
         margin: var(--space-1) 0 0;
-      }
-      .audit__filters {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-3);
-        align-items: flex-end;
-      }
-      .audit__filter {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        font-size: var(--fs-xs);
-        color: var(--color-text-muted);
-      }
-      .audit__filter select,
-      .audit__filter input {
-        font: inherit;
-        font-size: var(--fs-sm);
-        padding: 4px var(--space-2);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-sm);
-        background: var(--color-surface);
-        color: var(--color-text);
-        min-width: 11rem;
       }
       .audit__list {
         list-style: none;
@@ -276,8 +257,12 @@ export class AuditLogComponent {
   protected readonly until = signal('');
 
   protected readonly actionOptions = computed(() => [...AUDIT_ACTIONS]);
-  protected readonly hasFilters = computed(
-    () => !!this.action() || !!this.actor() || !!this.since() || !!this.until(),
+  protected readonly activeFilterCount = computed(
+    () =>
+      (this.action() ? 1 : 0) +
+      (this.actor() ? 1 : 0) +
+      (this.since() ? 1 : 0) +
+      (this.until() ? 1 : 0),
   );
 
   private readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');

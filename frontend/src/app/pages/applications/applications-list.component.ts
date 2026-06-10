@@ -21,7 +21,14 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { ButtonComponent } from '@shared/ui/button/button.component';
-import { IconComponent, SelectComponent, type SelectOption } from '@shared/ui';
+import {
+  FilterBarComponent,
+  FilterFieldComponent,
+  FilterRangeComponent,
+  IconComponent,
+  SelectComponent,
+  type SelectOption,
+} from '@shared/ui';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import {
@@ -44,7 +51,7 @@ import { downloadBlob } from '@shared/download.util';
   selector: 'app-applications-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, IconComponent, SelectComponent, CostCentreTreeComponent, ApplicationsTableComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, IconComponent, SelectComponent, FilterBarComponent, FilterFieldComponent, FilterRangeComponent, CostCentreTreeComponent, ApplicationsTableComponent],
   template: `
     <header class="apps__head">
       <div class="apps__headRow">
@@ -62,75 +69,53 @@ import { downloadBlob } from '@shared/download.util';
               </span>
             </app-button>
           }
-          <div class="apps__filterWrap">
-          <app-button variant="secondary" size="sm" (click)="toggleFilters()">
-            <span class="apps__filterBtn">
-              <app-icon name="filter" [size]="16" />
-              {{ 'applications.list.filter.button' | t }}
-              @if (activeFilterCount() > 0) {
-                <span class="apps__filterCount" aria-hidden="true">{{ activeFilterCount() }}</span>
-              }
-            </span>
-          </app-button>
-          @if (filtersOpen()) {
-            <form class="apps__filterPanel" (submit)="applyFilters($event)" role="search">
-              <div class="field">
-                <label class="field__label" [for]="'apps-q'">{{ 'applications.list.search' | t }}</label>
-                <input
-                  id="apps-q"
-                  class="field__control"
-                  type="search"
-                  [placeholder]="'applications.list.search.placeholder' | t"
-                  [ngModel]="q()"
-                  (ngModelChange)="q.set($event)"
-                  name="q"
-                />
-              </div>
-              <div class="field">
-                <label class="field__label" [for]="'apps-type'">{{ 'applications.list.filter.type' | t }}</label>
-                <select id="apps-type" class="field__control" [ngModel]="typeId()" (ngModelChange)="typeId.set($event)" name="type">
-                  <option value="">{{ 'applications.list.filter.all' | t }}</option>
-                  @for (type of types(); track type.id) {
-                    <option [value]="type.id">{{ type.name }}</option>
-                  }
-                </select>
-              </div>
-              <div class="field">
-                <app-select
-                  id="apps-state"
-                  name="state"
-                  [label]="'applications.list.filter.state' | t"
-                  [placeholder]="'applications.list.filter.all' | t"
-                  [options]="stateOptions()"
-                  [ngModel]="state()"
-                  (ngModelChange)="state.set($event)"
-                />
-              </div>
-              <div class="field">
-                <span class="field__label">{{ 'applications.list.filter.amount' | t }}</span>
-                <div class="apps__range">
-                  <input type="number" min="0" step="1" class="field__control" [placeholder]="'applications.list.filter.min' | t" [attr.aria-label]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" name="amountMin" />
-                  <span class="apps__rangeSep">–</span>
-                  <input type="number" min="0" step="1" class="field__control" [placeholder]="'applications.list.filter.max' | t" [attr.aria-label]="'applications.list.filter.max' | t" [ngModel]="amountMax()" (ngModelChange)="amountMax.set($event)" name="amountMax" />
-                </div>
-              </div>
-              <div class="field">
-                <span class="field__label">{{ 'applications.list.filter.date' | t }}</span>
-                <div class="apps__range">
-                  <input type="date" class="field__control" [attr.aria-label]="'applications.list.filter.from' | t" [ngModel]="createdFrom()" (ngModelChange)="createdFrom.set($event)" name="createdFrom" />
-                  <span class="apps__rangeSep">–</span>
-                  <input type="date" class="field__control" [attr.aria-label]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
-                </div>
-              </div>
-              <div class="apps__filterActions">
-                <app-button type="submit" size="sm">{{ 'applications.list.filter.apply' | t }}</app-button>
-                <app-button type="button" variant="ghost" size="sm" (click)="reset()">
-                  {{ 'applications.list.filter.reset' | t }}
-                </app-button>
-              </div>
-            </form>
-          }
-          </div>
+          <app-filter-bar
+            [activeCount]="activeFilterCount()"
+            [label]="'applications.list.filter.button' | t"
+            [applyLabel]="'applications.list.filter.apply' | t"
+            [resetLabel]="'applications.list.filter.reset' | t"
+            (apply)="applyFilters()"
+            (reset)="reset()"
+          >
+            <app-filter-field [label]="'applications.list.search' | t">
+              <input
+                type="search"
+                [placeholder]="'applications.list.search.placeholder' | t"
+                [ngModel]="q()"
+                (ngModelChange)="q.set($event)"
+                name="q"
+              />
+            </app-filter-field>
+            <app-filter-field [label]="'applications.list.filter.type' | t">
+              <select [ngModel]="typeId()" (ngModelChange)="typeId.set($event)" name="type">
+                <option value="">{{ 'applications.list.filter.all' | t }}</option>
+                @for (type of types(); track type.id) {
+                  <option [value]="type.id">{{ type.name }}</option>
+                }
+              </select>
+            </app-filter-field>
+            <app-select
+              id="apps-state"
+              name="state"
+              [label]="'applications.list.filter.state' | t"
+              [placeholder]="'applications.list.filter.all' | t"
+              [options]="stateOptions()"
+              [ngModel]="state()"
+              (ngModelChange)="state.set($event)"
+            />
+            <app-filter-field [label]="'applications.list.filter.amount' | t">
+              <app-filter-range>
+                <input start type="number" min="0" step="1" [placeholder]="'applications.list.filter.min' | t" [attr.aria-label]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" name="amountMin" />
+                <input end type="number" min="0" step="1" [placeholder]="'applications.list.filter.max' | t" [attr.aria-label]="'applications.list.filter.max' | t" [ngModel]="amountMax()" (ngModelChange)="amountMax.set($event)" name="amountMax" />
+              </app-filter-range>
+            </app-filter-field>
+            <app-filter-field [label]="'applications.list.filter.date' | t">
+              <app-filter-range>
+                <input start type="date" [attr.aria-label]="'applications.list.filter.from' | t" [ngModel]="createdFrom()" (ngModelChange)="createdFrom.set($event)" name="createdFrom" />
+                <input end type="date" [attr.aria-label]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
+              </app-filter-range>
+            </app-filter-field>
+          </app-filter-bar>
         </div>
       </div>
     </header>
@@ -210,7 +195,8 @@ import { downloadBlob } from '@shared/download.util';
         max-width: 16rem;
         position: sticky;
         top: calc(var(--layout-header-height) + var(--space-4));
-        max-height: calc(100vh - var(--layout-header-height) - 2 * var(--space-4));
+        /* 3/4 viewport so a tall tree scrolls internally and stays floating. */
+        max-height: 75vh;
         overflow-y: auto;
       }
       @media (max-width: 60rem) {
@@ -245,78 +231,9 @@ import { downloadBlob } from '@shared/download.util';
         align-items: center;
         gap: var(--space-2);
       }
-      .apps__filterWrap {
-        position: relative;
-      }
       .apps__filterBtn {
         display: inline-flex;
         align-items: center;
-        gap: var(--space-2);
-      }
-      .apps__filterCount {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 1.25rem;
-        height: 1.25rem;
-        padding: 0 var(--space-1);
-        margin-left: var(--space-2);
-        border-radius: 999px;
-        background: var(--color-primary);
-        color: var(--color-on-primary, #fff);
-        font-size: var(--fs-xs);
-        font-weight: var(--fw-bold);
-      }
-      .apps__filterPanel {
-        position: absolute;
-        right: 0;
-        z-index: var(--z-dropdown, 50);
-        margin-top: var(--space-2);
-        width: min(22rem, 90vw);
-        max-height: 80vh;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-4);
-        padding: var(--space-4);
-        background: var(--color-bg-elevated, var(--color-surface));
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-lg);
-      }
-      /* Im senkrechten Popout duerfen die Felder NICHT vertikal wachsen
-         (die geteilte .field-Regel hat flex 1 1 12rem fuer die alte Zeile). */
-      .apps__filterPanel .field {
-        flex: 0 0 auto;
-        min-width: 0;
-      }
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-1);
-        min-width: 12rem;
-        flex: 1 1 12rem;
-      }
-      .field__label {
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-medium);
-        color: var(--color-text-muted);
-      }
-      .field__control {
-        height: var(--control-height);
-        padding: 0 var(--space-3);
-        background: var(--color-bg);
-        color: var(--color-text);
-        border: var(--border-width) solid var(--color-border-strong);
-        border-radius: var(--radius-md);
-        font-size: var(--fs-md);
-      }
-      .field__control:focus-visible {
-        outline: 2px solid var(--color-primary);
-        outline-offset: 1px;
-      }
-      .apps__filterActions {
-        display: flex;
         gap: var(--space-2);
       }
       .apps__status {
@@ -325,32 +242,6 @@ import { downloadBlob } from '@shared/download.util';
       }
       .apps__status--error {
         color: var(--color-danger);
-      }
-      .apps__range {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-      }
-      /* Min/Max + Datumsfelder teilen die Breite gleichmäßig und laufen nicht
-         über den Panel-Rand (kein horizontaler Scroll, keine Clipping). */
-      .apps__range .field__control {
-        flex: 1 1 0;
-        min-width: 0;
-        width: 100%;
-      }
-      /* Zahlen-Spinner ausblenden — wirkt im schmalen Popout unruhig. */
-      .apps__range input[type='number'] {
-        -moz-appearance: textfield;
-        appearance: textfield;
-      }
-      .apps__range input[type='number']::-webkit-outer-spin-button,
-      .apps__range input[type='number']::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-      }
-      .apps__rangeSep {
-        color: var(--color-text-muted);
-        flex: 0 0 auto;
       }
       /* Infinite-Scroll-Trigger: unsichtbar, sitzt vor dem Listenende, damit der
          Observer (rootMargin 400px) frühzeitig nachlädt. */
@@ -414,8 +305,7 @@ export class ApplicationsListComponent {
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
-  /** Filter-Popout offen? + Zahl aktiver Filter (für den Indikator). */
-  readonly filtersOpen = signal(false);
+  /** Zahl aktiver Filter (für den Indikator). */
   readonly activeFilterCount = computed(
     () =>
       [
@@ -517,10 +407,6 @@ export class ApplicationsListComponent {
     });
   }
 
-  toggleFilters(): void {
-    this.filtersOpen.update((v) => !v);
-  }
-
   /** Kostenstelle im linken Baum wählen (``''`` = Alle); filtert die Liste. */
   selectBudgetNode(id: string): void {
     this.budgetId.set(id);
@@ -574,9 +460,7 @@ export class ApplicationsListComponent {
     });
   }
 
-  applyFilters(event: Event): void {
-    event.preventDefault();
-    this.filtersOpen.set(false);
+  applyFilters(): void {
     this.navigate({
       q: this.q() || null,
       type: this.typeId() || null,
@@ -599,7 +483,6 @@ export class ApplicationsListComponent {
     this.createdFrom.set('');
     this.createdTo.set('');
     this.budgetId.set('');
-    this.filtersOpen.set(false);
     this.navigate({
       q: null, type: null, state: null, gremium: null, topf: null, budget: null,
       amountMin: null, amountMax: null, createdFrom: null, createdTo: null, offset: null,
