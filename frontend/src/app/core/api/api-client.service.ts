@@ -263,6 +263,21 @@ export class ApiClient {
     return this.http.post<TransitionResult>(`${this.base}/applications/${id}/transition`, req);
   }
 
+  /** Übergänge, die der Magic-Link-Antragsteller feuern darf (actorIsApplicant-Gate). */
+  applicantTransitions(id: Uuid): Observable<Transition[]> {
+    const lang = this.i18n.locale();
+    return this.http
+      .get<TransitionOutWire[]>(`${this.base}/applications/${id}/applicant-transitions`)
+      .pipe(map((items) => items.map((t) => mapTransition(t, lang))));
+  }
+
+  fireApplicantTransition(id: Uuid, req: TransitionRequestBody): Observable<TransitionResult> {
+    return this.http.post<TransitionResult>(
+      `${this.base}/applications/${id}/applicant-transition`,
+      req,
+    );
+  }
+
   // --- files / attachments (T-13) ------------------------------------------
   /**
    * POST /applications/{id}/attachments — Multipart-Upload (≤10 MB, A(edit)/P).

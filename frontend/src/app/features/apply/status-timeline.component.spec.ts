@@ -85,6 +85,8 @@ interface ApiOverrides {
   application?: Application;
   update?: jest.Mock;
   addComment?: jest.Mock;
+  applicantTransitions?: Partial<ApiClient>['applicantTransitions'];
+  fireApplicant?: jest.Mock;
 }
 
 function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
@@ -93,6 +95,11 @@ function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
     getApplication: () => of(o.application ?? app(true)),
     timeline: () => of(TIMELINE),
     comments: () => of(COMMENTS),
+    applicantTransitions: (o.applicantTransitions ?? (() => of([]))) as ApiClient['applicantTransitions'],
+    fireApplicantTransition: (o.fireApplicant ??
+      jest.fn(() =>
+        of({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] }),
+      )) as unknown as ApiClient['fireApplicantTransition'],
     effectiveForm: () => of(EFF),
     updateApplication: (o.update ?? jest.fn(() => of(app(true)))) as unknown as ApiClient['updateApplication'],
     addComment: (o.addComment ?? jest.fn(() => of(COMMENTS[0]))) as unknown as ApiClient['addComment'],
@@ -132,6 +139,20 @@ describe('StatusTimelineComponent', () => {
     expect(screen.getAllByText('Eingereicht').length).toBeGreaterThan(1);
     // editierbar → Bearbeitungs-Formular sichtbar
     expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
+  });
+
+  it('renders applicant actions and fires the chosen transition', async () => {
+    const fire = jest.fn(() => of({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] }));
+    const tx = [
+      { id: 'tr-x', fromStateId: 's1', toStateId: 's2', label: 'Zurückziehen', color: null },
+    ];
+    await setup(
+      fakeApi({ applicantTransitions: () => of(tx), fireApplicant: fire }),
+      { t: 'tok', app: 'app-1' },
+    );
+    const btn = await screen.findByRole('button', { name: 'Zurückziehen' });
+    await userEvent.click(btn);
+    expect(fire).toHaveBeenCalledWith('app-1', { transitionId: 'tr-x' });
   });
 
   it('reads the token from the fragment and the id from the path (/antrag/:id#t=)', async () => {

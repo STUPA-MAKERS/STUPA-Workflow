@@ -38,92 +38,124 @@
           </div>
         </header>
 
-        <app-card [heading]="'status.history.title' | t">
-          @if (timeline().length) {
-            <ol class="timeline">
-              @for (entry of timeline(); track entry.at) {
-                <li class="timeline__item">
-                  <span class="timeline__dot" aria-hidden="true"></span>
-                  <div class="timeline__body">
-                    <p class="timeline__label">{{ entry.label }}</p>
-                    <time class="timeline__time" [attr.datetime]="entry.at">
-                      {{ entry.at | ldate: 'medium' }}
-                    </time>
-                    @if (entry.note) {
-                      <p class="timeline__note">{{ entry.note }}</p>
-                    }
-                  </div>
-                </li>
-              }
-            </ol>
-          } @else {
-            <p class="status__muted">{{ 'status.history.empty' | t }}</p>
-          }
-        </app-card>
-
-        <app-card [heading]="'status.data.title' | t">
-          @if (canEdit()) {
-            <p class="status__hint">{{ 'status.data.editHint' | t }}</p>
-            <form>
-              <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
-              <div card-footer class="status__actions">
-                <app-button [loading]="saving()" [disabled]="saving()" (click)="save()">
-                  {{ 'status.data.save' | t }}
-                </app-button>
-              </div>
-            </form>
-          } @else {
-            <p class="status__hint">{{ 'status.data.readonlyHint' | t }}</p>
-            <dl class="readonly">
-              @for (row of readonlyRows(); track row.label) {
-                <div class="readonly__row">
-                  <dt>{{ row.label }}</dt>
-                  <dd>{{ row.value }}</dd>
+        <!-- 3-Spalten wie die interne Antrags-Detailseite: Aktionen links,
+             Verlauf + Antragsdaten Mitte, Kommentare (Chat) rechts. -->
+        <div class="status__shell" [class.status__shell--actions]="actions().length">
+          <!-- LINKS: Antragsteller-Aktionen (nur wenn freigegeben, actorIsApplicant) -->
+          @if (actions().length) {
+            <aside class="status__rail status__rail--left" [attr.aria-label]="'status.actions.title' | t">
+              <app-card [heading]="'status.actions.title' | t">
+                <p class="status__hint">{{ 'status.actions.lead' | t }}</p>
+                <div class="status__actionBtns">
+                  @for (t of actions(); track t.id) {
+                    <app-button
+                      [color]="t.color"
+                      [block]="true"
+                      [loading]="firing() === t.id"
+                      [disabled]="firing() !== null && firing() !== t.id"
+                      (click)="fireAction(t)"
+                    >
+                      {{ t.label || ('status.actions.fallback' | t) }}
+                    </app-button>
+                  }
                 </div>
-              } @empty {
-                <p class="status__muted">{{ 'status.data.empty' | t }}</p>
-              }
-            </dl>
-          }
-        </app-card>
-
-        <app-card [heading]="'status.comments.title' | t">
-          @if (comments().length) {
-            <ul class="comments">
-              @for (c of comments(); track c.id) {
-                <li class="comments__item">
-                  <p class="comments__meta">
-                    {{ c.author || ('status.comments.committee' | t) }} · {{ c.at | ldate: 'short' }}
-                  </p>
-                  <p class="comments__body">{{ c.body }}</p>
-                </li>
-              }
-            </ul>
-          } @else {
-            <p class="status__muted">{{ 'status.comments.empty' | t }}</p>
+              </app-card>
+            </aside>
           }
 
-          <div class="comment-form">
-            <label class="comment-form__label" for="comment-body">{{ 'status.comments.label' | t }}</label>
-            <textarea
-              id="comment-body"
-              class="comment-form__input"
-              rows="3"
-              [formControl]="commentBody"
-              [placeholder]="'status.comments.placeholder' | t"
-            ></textarea>
-            <div class="comment-form__actions">
-              <app-button
-                size="sm"
-                [loading]="postingComment()"
-                [disabled]="commentBody.invalid || postingComment()"
-                (click)="addComment()"
-              >
-                {{ 'status.comments.send' | t }}
-              </app-button>
-            </div>
+          <!-- MITTE: Verlauf + Antragsdaten -->
+          <div class="status__main">
+            <app-card [heading]="'status.history.title' | t">
+              @if (timeline().length) {
+                <ol class="timeline">
+                  @for (entry of timeline(); track entry.at) {
+                    <li class="timeline__item">
+                      <span class="timeline__dot" aria-hidden="true"></span>
+                      <div class="timeline__body">
+                        <p class="timeline__label">{{ entry.label }}</p>
+                        <time class="timeline__time" [attr.datetime]="entry.at">
+                          {{ entry.at | ldate: 'medium' }}
+                        </time>
+                        @if (entry.note) {
+                          <p class="timeline__note">{{ entry.note }}</p>
+                        }
+                      </div>
+                    </li>
+                  }
+                </ol>
+              } @else {
+                <p class="status__muted">{{ 'status.history.empty' | t }}</p>
+              }
+            </app-card>
+
+            <app-card [heading]="'status.data.title' | t">
+              @if (canEdit()) {
+                <p class="status__hint">{{ 'status.data.editHint' | t }}</p>
+                <form>
+                  <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
+                  <div card-footer class="status__actions">
+                    <app-button [loading]="saving()" [disabled]="saving()" (click)="save()">
+                      {{ 'status.data.save' | t }}
+                    </app-button>
+                  </div>
+                </form>
+              } @else {
+                <p class="status__hint">{{ 'status.data.readonlyHint' | t }}</p>
+                <dl class="readonly">
+                  @for (row of readonlyRows(); track row.label) {
+                    <div class="readonly__row">
+                      <dt>{{ row.label }}</dt>
+                      <dd>{{ row.value }}</dd>
+                    </div>
+                  } @empty {
+                    <p class="status__muted">{{ 'status.data.empty' | t }}</p>
+                  }
+                </dl>
+              }
+            </app-card>
           </div>
-        </app-card>
+
+          <!-- RECHTS: Kommentare (Chat) -->
+          <aside class="status__rail status__rail--right" [attr.aria-label]="'status.comments.title' | t">
+            <app-card [heading]="'status.comments.title' | t">
+              @if (comments().length) {
+                <ul class="comments">
+                  @for (c of comments(); track c.id) {
+                    <li class="comments__item">
+                      <p class="comments__meta">
+                        {{ c.author || ('status.comments.committee' | t) }} · {{ c.at | ldate: 'short' }}
+                      </p>
+                      <p class="comments__body">{{ c.body }}</p>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="status__muted">{{ 'status.comments.empty' | t }}</p>
+              }
+
+              <div class="comment-form">
+                <label class="comment-form__label" for="comment-body">{{ 'status.comments.label' | t }}</label>
+                <textarea
+                  id="comment-body"
+                  class="comment-form__input"
+                  rows="3"
+                  [formControl]="commentBody"
+                  [placeholder]="'status.comments.placeholder' | t"
+                ></textarea>
+                <div class="comment-form__actions">
+                  <app-button
+                    size="sm"
+                    [loading]="postingComment()"
+                    [disabled]="commentBody.invalid || postingComment()"
+                    (click)="addComment()"
+                  >
+                    {{ 'status.comments.send' | t }}
+                  </app-button>
+                </div>
+              </div>
+            </app-card>
+          </aside>
+        </div>
       </section>
     }
   }

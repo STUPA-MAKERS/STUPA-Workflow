@@ -3,7 +3,7 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormGroup } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -15,6 +15,7 @@ import type {
   FormFieldDef,
   ProblemDetail,
   TimelineEntry,
+  Transition,
   Uuid,
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
@@ -66,6 +67,10 @@ export class StatusTimelineComponent {
   readonly timeline = signal<TimelineEntry[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
   readonly readonlyRows = signal<ReadonlyRow[]>([]);
+  /** Vom Antragsteller feuerbare Übergänge (actorIsApplicant-Gate); leer ⇒ keine Aktionen. */
+  readonly actions = signal<Transition[]>([]);
+  /** Id des gerade feuernden Übergangs (Button-Spinner / Sperre). */
+  readonly firing = signal<string | null>(null);
 
   readonly editFields = signal<FormlyFieldConfig[]>([]);
   editModel: Record<string, unknown> = {};
@@ -156,15 +161,35 @@ export class StatusTimelineComponent {
       application: this.api.getApplication(appId),
       timeline: this.api.timeline(appId),
       comments: this.api.comments(appId),
+      // Aktionen sind optional: ein Fehler darf die Statusseite nicht kippen.
+      actions: this.api.applicantTransitions(appId).pipe(catchError(() => of([]))),
     }).subscribe({
-      next: ({ application, timeline, comments }) => {
+      next: ({ application, timeline, comments, actions }) => {
         this.application.set(application);
         this.timeline.set(timeline);
         this.comments.set(comments);
+        this.actions.set(actions);
         this.loadForm(application);
       },
       error: (err: { status?: number }) => {
         this.phase.set(err.status === 410 ? 'expired' : 'error');
+      },
+    });
+  }
+
+  /** Einen Antragsteller-Übergang feuern (actorIsApplicant-Gate) und neu laden. */
+  fireAction(t: Transition): void {
+    const app = this.application();
+    if (!app || this.firing()) return;
+    this.firing.set(t.id);
+    this.api.fireApplicantTransition(app.id, { transitionId: t.id }).subscribe({
+      next: () => {
+        this.firing.set(null);
+        this.load(app.id); // Status/Verlauf/Aktionen spiegeln den neuen State.
+      },
+      error: () => {
+        this.firing.set(null);
+        this.toast.error(this.i18n.translate('status.actions.failed'));
       },
     });
   }

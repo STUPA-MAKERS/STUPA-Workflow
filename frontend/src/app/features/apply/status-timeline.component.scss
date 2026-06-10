@@ -2,12 +2,48 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  max-width: 48rem;
+  max-width: 72rem;
   margin: 0 auto;
 }
 
 .status--narrow {
   max-width: 36rem;
+}
+
+/* 3-Spalten-Shell (Aktionen | Verlauf+Daten | Kommentare) wie die interne
+   Antrags-Detailseite. Ohne Aktionen bleiben zwei Spalten (Daten | Kommentare). */
+.status__shell {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+}
+
+.status__shell--actions {
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(280px, 360px);
+}
+
+.status__main,
+.status__rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.status__actionBtns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+/* Schmale Viewports: alles untereinander (Aktionen zuerst). */
+@media (max-width: 1024px) {
+  .status__shell,
+  .status__shell--actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .status__head {
