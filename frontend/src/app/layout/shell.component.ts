@@ -89,6 +89,9 @@ export class ShellComponent {
    */
   readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
 
+  /** Logo-Klick: angemeldet → Dashboard, sonst öffentliche Startseite. */
+  readonly brandTarget = computed(() => (this.auth.isAuthenticated() ? '/dashboard' : '/'));
+
   constructor() {
     // Aktive Site-Config laden, damit die Fußzeile gepflegte rechtliche Links +
     // Copyright zeigt (#82). Fehlschlag/leer ⇒ Default-Fußzeile (Impressum/Datenschutz).

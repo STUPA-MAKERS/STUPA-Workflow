@@ -15,7 +15,7 @@
       </button>
     }
 
-    <a class="header__brand" routerLink="/" [attr.aria-label]="'app.title' | t">
+    <a class="header__brand" [routerLink]="brandTarget()" [attr.aria-label]="'app.title' | t">
       <img class="header__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     </a>
 

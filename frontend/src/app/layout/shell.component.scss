@@ -387,6 +387,10 @@
   .menu-btn {
     display: inline-flex;
   }
+  /* Ohne Nav fehlt der flex-1-Spacer — Aktionen wieder rechtsbündig. */
+  .header__actions {
+    margin-inline-start: auto;
+  }
 }
 
 /* Drawer ist ein reines Mobile-Muster — oberhalb des Breakpoints nie sichtbar
