@@ -315,6 +315,9 @@ class ApplicationsService:
             lang=payload.lang,
             # Eingeloggte Antragstellung (#24): Ersteller:in merken (anonym → None).
             created_by=actor if actor != "applicant" else None,
+            # Gast-Einreichung startet **unbestätigt** (unsichtbar bis Magic-Link-
+            # Verify, 12-h-Verwurf); eingeloggte Mail gilt sofort als bestätigt.
+            email_confirmed_at=None if actor == "applicant" else datetime.now(UTC),
         )
         self.session.add(app)
         await self.session.flush()
@@ -534,7 +537,9 @@ class ApplicationsService:
         offset: int,
     ) -> Page[ApplicationListItem]:
         """Gefilterte, gepagte, sortierte Antragsliste (api.md ``GET /applications``)."""
-        filters = []
+        # Unbestätigte Gast-Anträge sind unsichtbar, bis die E-Mail bestätigt wurde
+        # (Bestand + eingeloggte Anträge tragen ``email_confirmed_at`` → bleiben sichtbar).
+        filters = [Application.email_confirmed_at.is_not(None)]
         if state_id is not None:
             filters.append(Application.current_state_id == state_id)
         if gremium_id is not None:

@@ -27,7 +27,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
@@ -44,6 +44,9 @@ from app.settings import Settings, load_settings
 from app.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("app.deadlines")
+
+# Gast-Anträge ohne E-Mail-Bestätigung werden nach diesem Fenster verworfen (#confirm).
+_GUEST_CONFIRM_TTL = timedelta(hours=12)
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
@@ -92,7 +95,38 @@ async def process_deadlines(ctx: dict[str, Any]) -> str:
     fired = await _process_actions(ctx, settings, now)
     closed = await _process_votes(ctx, now)
     advanced = await _process_auto_transitions(ctx)
-    return f"reminders={reminded} actions={fired} votes={closed} auto={advanced}"
+    discarded = await _discard_unconfirmed(ctx, now)
+    return (
+        f"reminders={reminded} actions={fired} votes={closed} "
+        f"auto={advanced} discarded={discarded}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# 4. Verwurf unbestätigter Gast-Anträge (#confirm)
+# --------------------------------------------------------------------------- #
+async def _discard_unconfirmed(ctx: dict[str, Any], now: datetime) -> int:
+    """Gast-Anträge ohne E-Mail-Bestätigung nach 12 h hart löschen.
+
+    Nur anonyme (``created_by IS NULL``) **und** unbestätigte
+    (``email_confirmed_at IS NULL``) Anträge älter als das TTL-Fenster. FK-Abhängige
+    (Applicant/Versionen/Status-Events/Dateien …) kaskadieren; idempotent (ein zweiter
+    Lauf findet nichts mehr)."""
+    maker = _sessionmaker(ctx)
+    cutoff = now - _GUEST_CONFIRM_TTL
+    async with maker() as session:
+        result = await session.execute(
+            delete(Application).where(
+                Application.created_by.is_(None),
+                Application.email_confirmed_at.is_(None),
+                Application.created_at < cutoff,
+            )
+        )
+        await session.commit()
+    discarded = result.rowcount or 0
+    if discarded:
+        logger.info("discarded %d unconfirmed guest application(s)", discarded)
+    return discarded
 
 
 # --------------------------------------------------------------------------- #

@@ -68,6 +68,12 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     # ``None`` bei anonymer Einreichung. Erlaubt Lesen/Bearbeiten/Löschen des eigenen
     # Antrags ohne ``application.manage``.
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Zeitpunkt der E-Mail-Bestätigung (Gast-Einreichung): bis dahin ist der Antrag
+    # **unsichtbar** und wird nach 12 h verworfen. Eingeloggte Anträge sind sofort
+    # bestätigt (OIDC-Mail vertrauenswürdig); Gäste bestätigen per Magic-Link-Verify.
+    email_confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         Index(

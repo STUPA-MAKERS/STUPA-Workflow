@@ -97,7 +97,8 @@ export const de = {
   'account.scope.read.label': 'Lesen',
   'account.scope.read.desc': 'Anträge, Budgets, Sitzungen, Abstimmungen lesen.',
   'account.scope.applications_write.label': 'Anträge bearbeiten',
-  'account.scope.applications_write.desc': 'Anträge erstellen, kommentieren, Übergänge auslösen (entscheiden).',
+  'account.scope.applications_write.desc':
+    'Anträge erstellen, kommentieren, Übergänge auslösen (entscheiden).',
   'account.scope.votes_write.label': 'Abstimmungen verwalten',
   'account.scope.votes_write.desc': 'Abstimmungen anlegen/öffnen/schließen — KEIN Stimmen abgeben.',
   'account.scope.meetings_write.label': 'Sitzungen verwalten',
@@ -253,10 +254,12 @@ export const de = {
   'apply.nav.next': 'Weiter',
   'apply.autosave': 'Dein Zwischenstand wird auf diesem Gerät automatisch gespeichert.',
 
-  'apply.confirm.heading': 'Antrag eingegangen',
-  'apply.confirm.badge': 'Eingereicht',
+  'apply.confirm.heading': 'Fast geschafft – E-Mail bestätigen',
+  'apply.confirm.badge': 'Bestätigung ausstehend',
   'apply.confirm.body':
-    'Vielen Dank! Dein Antrag wurde aufgenommen. Wir haben dir eine E-Mail mit einem persönlichen Link gesendet — darüber kannst du den Status verfolgen und deinen Antrag bei Bedarf bearbeiten, ohne dich anzumelden.',
+    'Vielen Dank! Wir haben dir eine E-Mail mit einem persönlichen Link gesendet. Bestätige darüber deine Adresse – erst dann wird dein Antrag eingereicht und sichtbar. Über denselben Link verfolgst du jederzeit den Status und bearbeitest deinen Antrag, ohne dich anzumelden.',
+  'apply.confirm.expiry':
+    'Ohne Bestätigung wird dein Antrag nach 12 Stunden automatisch verworfen.',
   'apply.confirm.ref': 'Vorgangsnummer:',
   'apply.confirm.hint':
     'Keine Mail erhalten? Prüfe den Spam-Ordner. Der Link ist zeitlich begrenzt gültig.',
@@ -692,13 +695,14 @@ export const de = {
   'admin.home.webhooks': 'Webhooks',
   'admin.home.webhooksDesc': 'Ausgehende Ereignis-Hooks verwalten.',
   'admin.home.budgetPots': 'Budget-Töpfe',
-  'admin.home.budgetPotsDesc': 'Budgets & Kostenstellen (Baum) je Gremium pflegen.',
+  'admin.home.budgetPotsDesc': 'Budgets & Kostenstellen verwalten.',
   'admin.accounts.title': 'Konten',
-  'admin.accounts.desc': 'Bankkonten (Name + IBAN) pflegen — frei, nicht an Kostenstellen gebunden.',
+  'admin.accounts.desc': 'Bankkonten zum Zuweisen für Buchungen.',
   'admin.accounts.add': 'Konto anlegen',
   'admin.accounts.edit': 'Konto bearbeiten',
   'admin.accounts.delete': 'Konto löschen',
-  'admin.accounts.deleteBody': 'Konto „{name}" wirklich löschen? Buchungen bleiben erhalten (ohne Konto).',
+  'admin.accounts.deleteBody':
+    'Konto „{name}" wirklich löschen? Buchungen bleiben erhalten (ohne Konto).',
   'admin.accounts.deleteConfirm': 'Löschen',
   'admin.accounts.empty': 'Noch keine Konten.',
   'admin.accounts.name': 'Name',
@@ -776,9 +780,11 @@ export const de = {
   'budget.tree.done': 'Fertig',
   'budget.tree.save': 'Speichern',
   'budget.tree.editNode': 'Kostenstelle bearbeiten',
-  'budget.tree.editNodeHint': 'Schlüssel änderbar; der Pfad aller Unter-Kostenstellen wird automatisch angepasst.',
+  'budget.tree.editNodeHint':
+    'Schlüssel änderbar; der Pfad aller Unter-Kostenstellen wird automatisch angepasst.',
   'budget.tree.toast.saved': 'Gespeichert.',
-  'budget.tree.toast.keyFailed': 'Speichern fehlgeschlagen (Schlüssel ungültig oder bereits vergeben?).',
+  'budget.tree.toast.keyFailed':
+    'Speichern fehlgeschlagen (Schlüssel ungültig oder bereits vergeben?).',
   'budget.tree.openNav': 'Budget wählen',
   'budget.tree.navTitle': 'Budget & Haushaltsjahr',
   'budget.tree.pickHint': 'Wähle ein Budget, um seine Kostenstellen zu bearbeiten.',
@@ -796,8 +802,7 @@ export const de = {
   'budget.tree.toast.allocated': 'Zuteilung gespeichert.',
   'budget.tree.toast.stichtagSaved': 'Stichtag gespeichert.',
   'budget.tree.toast.fyCreated': 'Haushaltsjahr angelegt.',
-  'budget.tree.toast.fyFailed':
-    'Haushaltsjahr konnte nicht angelegt werden (bereits vorhanden?).',
+  'budget.tree.toast.fyFailed': 'Haushaltsjahr konnte nicht angelegt werden (bereits vorhanden?).',
   'admin.home.delegations': 'Vertretung / Delegation',
   'admin.home.delegationsDesc': 'Rechte und Stimmrechte zeitlich begrenzt delegieren.',
   'admin.home.mockNotice':
@@ -901,8 +906,7 @@ export const de = {
   'admin.flow.cfgRoleSource': 'Rollen-Quelle',
   'admin.flow.scope.gremium': 'Rolle im Gremium',
   'admin.flow.scope.global': 'Globale Rolle',
-  'admin.flow.globalNotice':
-    'Dies ist der globale Flow für ALLE Antragstypen. Welcher Weg greift, steuern Verzweigungs-/Abstimmungs-/Freigabe-States.',
+  'admin.flow.globalNotice': 'Globales Flow-Chart für alle Anträge',
   'admin.flow.branchHint':
     'Dieser State hat zwei Ausgänge — markiere die Übergänge mit Zweig „pass"/„fail" bzw. „accept"/„reject".',
   'admin.flow.cfgDeadline': 'Frist',
@@ -1584,7 +1588,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.scope.read.label': 'Read',
   'account.scope.read.desc': 'Read applications, budgets, meetings, votes.',
   'account.scope.applications_write.label': 'Edit applications',
-  'account.scope.applications_write.desc': 'Create, comment, and fire transitions (decisions) on applications.',
+  'account.scope.applications_write.desc':
+    'Create, comment, and fire transitions (decisions) on applications.',
   'account.scope.votes_write.label': 'Manage votes',
   'account.scope.votes_write.desc': 'Create/open/close votes — never cast a ballot.',
   'account.scope.meetings_write.label': 'Manage meetings',
@@ -1738,10 +1743,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.nav.next': 'Next',
   'apply.autosave': 'Your progress is saved automatically on this device.',
 
-  'apply.confirm.heading': 'Application received',
-  'apply.confirm.badge': 'Submitted',
+  'apply.confirm.heading': 'Almost done – confirm your email',
+  'apply.confirm.badge': 'Confirmation pending',
   'apply.confirm.body':
-    'Thank you! Your application has been received. We have sent you an email with a personal link — use it to track the status and edit your application if needed, without signing in.',
+    'Thank you! We have sent you an email with a personal link. Use it to confirm your address — only then is your application submitted and visible. The same link lets you track the status and edit your application anytime, without signing in.',
+  'apply.confirm.expiry':
+    'Without confirmation, your application is automatically discarded after 12 hours.',
   'apply.confirm.ref': 'Reference number:',
   'apply.confirm.hint':
     'No email received? Check your spam folder. The link is valid for a limited time.',
@@ -2178,7 +2185,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.accounts.add': 'Add account',
   'admin.accounts.edit': 'Edit account',
   'admin.accounts.delete': 'Delete account',
-  'admin.accounts.deleteBody': 'Really delete account “{name}”? Bookings are kept (without account).',
+  'admin.accounts.deleteBody':
+    'Really delete account “{name}”? Bookings are kept (without account).',
   'admin.accounts.deleteConfirm': 'Delete',
   'admin.accounts.empty': 'No accounts yet.',
   'admin.accounts.name': 'Name',
@@ -2256,7 +2264,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.done': 'Done',
   'budget.tree.save': 'Save',
   'budget.tree.editNode': 'Edit cost centre',
-  'budget.tree.editNodeHint': 'Key is editable; the path of all sub-cost-centres is updated automatically.',
+  'budget.tree.editNodeHint':
+    'Key is editable; the path of all sub-cost-centres is updated automatically.',
   'budget.tree.toast.saved': 'Saved.',
   'budget.tree.toast.keyFailed': 'Save failed (key invalid or already in use?).',
   'budget.tree.openNav': 'Choose budget',
