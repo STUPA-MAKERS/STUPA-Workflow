@@ -30,6 +30,12 @@ export const authGuard: CanActivateFn = (route) => {
       const permission = route.data['permission'] as string | string[] | undefined;
       const required = permission === undefined ? [] : ([] as string[]).concat(permission);
       if (required.length > 0 && !auth.canAny(...required)) {
+        // Gremium-Mitglieder dürfen ihre Sitzungen sehen, auch ohne meeting.manage/
+        // protocol.write (#sessions). Der Server scoped/autorisiert zusätzlich.
+        const allowCommittee = route.data['allowCommitteeMember'] === true;
+        if (allowCommittee && auth.gremien().length > 0) {
+          return true;
+        }
         toast.error(i18n.translate('rbac.forbidden'));
         return router.createUrlTree(['/forbidden']);
       }

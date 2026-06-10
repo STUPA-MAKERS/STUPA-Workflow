@@ -104,4 +104,20 @@ describe('authGuard', () => {
     expect((result as UrlTree).toString()).toBe('/forbidden');
     expect(toastSpy).toHaveBeenCalled();
   });
+
+  it('allows a committee member onto allowCommitteeMember routes without the permission', () => {
+    const inCommittee: Principal = {
+      ...MEMBER,
+      permissions: [],
+      gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }],
+    };
+    const data = { permission: ['meeting.manage', 'protocol.write'], allowCommitteeMember: true };
+    expect(run(data, inCommittee)).toBe(true);
+  });
+
+  it('still forbids allowCommitteeMember routes when the user is in no committee', () => {
+    const noCommittee: Principal = { ...MEMBER, permissions: [], gremien: [] };
+    const data = { permission: ['meeting.manage', 'protocol.write'], allowCommitteeMember: true };
+    expect(run(data, noCommittee)).toBeInstanceOf(UrlTree);
+  });
 });

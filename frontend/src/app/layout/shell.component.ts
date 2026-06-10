@@ -33,6 +33,8 @@ interface NavItem {
   labelKey: Parameters<TranslatePipe['transform']>[0];
   /** Sichtbar, wenn der Principal mind. eine dieser Permissions hat (leer = jede Session). */
   permissions: string[];
+  /** Zusätzlich sichtbar für Mitglieder **irgendeines** Gremiums (z. B. Sitzungen, #sessions). */
+  inAnyCommittee?: boolean;
   /**
    * Exakter Aktiv-Abgleich (#106): nötig, wenn der Pfad Präfix eines anderen
    * Nav-Eintrags ist (z. B. `/budget` vor `/budget/pots`) — sonst markiert die
@@ -125,9 +127,16 @@ export class ShellComponent {
 
   private readonly nav: NavItem[] = [
     { path: '/dashboard', labelKey: 'nav.dashboard', permissions: [] },
-    { path: '/applications', labelKey: 'nav.applications', permissions: ['application.read'] },
-    { path: '/tasks', labelKey: 'nav.tasks', permissions: ['application.read'] },
-    { path: '/meetings', labelKey: 'nav.meetings', permissions: ['meeting.manage', 'protocol.write'] },
+    // Ohne application.read sieht man hier die eigenen Anträge/Aufgaben (#24).
+    { path: '/applications', labelKey: 'nav.applications', permissions: [] },
+    { path: '/tasks', labelKey: 'nav.tasks', permissions: [] },
+    // Sitzungen: Verwalter/Protokollanten **oder** jedes Gremium-Mitglied (#sessions).
+    {
+      path: '/meetings',
+      labelKey: 'nav.meetings',
+      permissions: ['meeting.manage', 'protocol.write'],
+      inAnyCommittee: true,
+    },
     {
       path: '/budget',
       labelKey: 'nav.budget',
@@ -145,11 +154,14 @@ export class ShellComponent {
    * RBAC-gefilterte Navigation (UX): nur bei aktiver Session, und nur Einträge,
    * deren Permission der Principal besitzt. Server bleibt autoritativ (§2).
    */
-  readonly visibleNav = computed(() =>
-    this.auth.isAuthenticated()
-      ? this.nav.filter((item) => this.auth.canAny(...item.permissions))
-      : [],
-  );
+  readonly visibleNav = computed(() => {
+    if (!this.auth.isAuthenticated()) return [];
+    const inAnyCommittee = this.auth.gremien().length > 0;
+    return this.nav.filter(
+      (item) =>
+        this.auth.canAny(...item.permissions) || (!!item.inAnyCommittee && inAnyCommittee),
+    );
+  });
 
   toggleTheme(): void {
     this.theme.toggle();

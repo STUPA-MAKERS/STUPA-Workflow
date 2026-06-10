@@ -27,7 +27,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 
 from app.db import get_sessionmaker
 from app.deps import (
@@ -52,6 +52,8 @@ from app.modules.applications.schemas import (
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth import service as auth_service
 from app.modules.forms.schemas import EffectiveFormOut
+from app.modules.notifications.provider import mail_queue_from_pool
+from app.modules.notifications.service import NotificationService
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_application_payload_limit,
@@ -83,21 +85,30 @@ ServiceDep = Annotated[ApplicationsService, Depends(get_applications_service)]
 
 
 async def _deliver_magic_link(
-    settings: Settings, email: str, application_id: UUID
+    settings: Settings, email: str, application_id: UUID, pool: object
 ) -> None:
     """Magic-Link für den neuen Antrag in eigener Session ausstellen + versenden.
 
     Läuft als Background-Task **nach** der 201-Antwort (flows §1: ``enqueue Mail``).
-    Nutzt die getestete T-10-Logik; Scope folgt dem Initial-State (edit)."""
+    Nutzt die getestete T-10-Logik; Scope folgt dem Initial-State (edit). Der Versand
+    geht über die Mail-Queue (Worker, T-18); fehlt der arq-Pool, wird geloggt +
+    verworfen (`NotificationService`)."""
+    queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
+
+        async def deliver(recipient: str, link: str) -> None:
+            await NotificationService(
+                db, queue=queue, settings=settings
+            ).send_magic_link(email=recipient, link=link)
+
         await auth_service.request_magic_link(
-            db, settings, email=email, application_id=application_id
+            db, settings, email=email, application_id=application_id, deliver=deliver
         )
         await db.commit()
 
 
-MagicLinkSender = Callable[[Settings, str, UUID], Awaitable[None]]
+MagicLinkSender = Callable[[Settings, str, UUID, object], Awaitable[None]]
 
 
 def get_magic_link_sender() -> MagicLinkSender:
@@ -127,6 +138,7 @@ async def create_application(
     service: ServiceDep,
     settings: SettingsDep,
     background: BackgroundTasks,
+    request: Request,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     send_magic_link: Annotated[MagicLinkSender, Depends(get_magic_link_sender)],
 ) -> ApplicationCreated:
@@ -160,7 +172,8 @@ async def create_application(
     actor = principal.sub if principal else "applicant"
 
     app, email = await service.create(payload, actor=actor)
-    background.add_task(send_magic_link, settings, email, app.id)
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(send_magic_link, settings, email, app.id, pool)
     return ApplicationCreated(applicationId=app.id)
 
 
@@ -171,21 +184,22 @@ async def create_application(
 )
 async def list_tasks(
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("application.read"))],
+    principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[ApplicationListItem]:
-    """Offene Entscheidungen für die eigene Rolle (#64): Anträge in vote-States,
-    in denen der Principal handeln darf."""
+    """Offene Aufgaben des Principals (#64): Anträge in vote-States bzw. mit feuerbarem
+    Übergang — und die **eigenen** Anträge in bearbeitbarem State (auch ohne
+    ``application.read``, #24)."""
     return await service.list_tasks(principal)
 
 
 @router.get(
     "/applications",
     response_model=Page[ApplicationListItem],
-    dependencies=[Depends(require_principal("application.read"))],
     responses=_errors(401, 403),
 )
 async def list_applications(
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
     page: Annotated[PageParams, Depends()],
     state_id: Annotated[UUID | None, Query(alias="state")] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
@@ -200,7 +214,11 @@ async def list_applications(
     sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Page[ApplicationListItem]:
-    """Antragsliste (Filter: state/gremium/type/topf/q/Betrag/Datum; Sortierung; Paging)."""
+    """Antragsliste (Filter: state/gremium/type/topf/q/Betrag/Datum; Sortierung; Paging).
+
+    Ohne ``application.read`` (und ohne Admin) sieht der Principal nur die **eigenen**
+    Anträge (``created_by``), #24."""
+    can_read = "admin" in principal.roles or principal.has("application.read")
     return await service.list_applications(
         state_id=state_id,
         gremium_id=gremium_id,
@@ -214,6 +232,7 @@ async def list_applications(
         created_to=created_to,
         sort=sort,
         order=order,
+        owner_sub=None if can_read else principal.sub,
         limit=page.limit,
         offset=page.offset,
     )

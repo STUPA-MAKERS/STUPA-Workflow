@@ -30,6 +30,8 @@ NOW = datetime(2026, 6, 7, 12, 0, tzinfo=UTC)
 class FakeResult:
     def __init__(self, items: list[Any]) -> None:
         self._items = items
+        # ``rowcount`` für DELETE/UPDATE-Statements (z. B. Gast-Antrags-Verwurf).
+        self.rowcount = len(items)
 
     def scalars(self) -> FakeResult:
         return self
@@ -390,9 +392,10 @@ async def test_process_deadlines_orchestrates_all(patched: None) -> None:
         FakeSession([[vote.id]]),      # vote scan
         FakeSession([[vote]]),         # vote lock
         FakeSession([[]]),             # auto-transition scan (#8/#28) → keine Apps
+        FakeSession([[]]),             # discard unbestätigter Gast-Anträge → keine
     ]
     out = await wd.process_deadlines(_ctx(sessions))
-    assert out == "reminders=1 actions=1 votes=1 auto=0"
+    assert out == "reminders=1 actions=1 votes=1 auto=0 discarded=0"
 
 
 @freeze_time(FROZEN)

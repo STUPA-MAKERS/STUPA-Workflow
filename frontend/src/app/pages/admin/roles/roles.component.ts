@@ -74,6 +74,16 @@ interface RoleDraft {
 
         <ng-template appRowDetail let-r>
           <div class="roles__detail">
+            <!-- Umbenennen (Anzeigename, #rename): Key bleibt unveränderlich. -->
+            <div class="roles__nameEdit">
+              <label class="roles__lbl">{{ 'admin.roles.roleKey' | t }}
+                <input [value]="$any(r).key" disabled /></label>
+              <label class="roles__lbl">{{ 'admin.common.labelDe' | t }}
+                <input [ngModel]="nameDraft($any(r)).de" (ngModelChange)="patchName($any(r), 'de', $event)" [name]="$any(r).id + '-nde'" /></label>
+              <label class="roles__lbl">{{ 'admin.common.labelEn' | t }}
+                <input [ngModel]="nameDraft($any(r)).en" (ngModelChange)="patchName($any(r), 'en', $event)" [name]="$any(r).id + '-nen'" /></label>
+              <app-button size="sm" variant="secondary" (click)="renameRole($any(r))">{{ 'action.save' | t }}</app-button>
+            </div>
             @if (isLocked($any(r))) {
               <p class="roles__locked">{{ 'admin.roles.adminLocked' | t }}</p>
               <div class="roles__grid">
@@ -304,6 +314,32 @@ export class AdminRolesComponent {
 
   protected saveRole(role: Role): void {
     this.api.saveRolePermissions(role.id, role.permissions).subscribe({
+      next: (saved) => {
+        this.roles.update((list) => list.map((r) => (r.id === saved.id ? saved : r)));
+        this.toast.success(this.i18n.translate('admin.common.saved'));
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+    });
+  }
+
+  // --- Umbenennen (Anzeigename; Key unveränderlich) ------------------------
+  private readonly nameDrafts = signal<Record<string, { de: string; en: string }>>({});
+  /** Aktueller Namens-Entwurf (initial aus dem aktuellen Label). */
+  protected nameDraft(role: Role): { de: string; en: string } {
+    return (
+      this.nameDrafts()[role.id] ?? {
+        de: role.label['de'] ?? '',
+        en: role.label['en'] ?? '',
+      }
+    );
+  }
+  protected patchName(role: Role, lang: 'de' | 'en', value: string): void {
+    const cur = this.nameDraft(role);
+    this.nameDrafts.update((m) => ({ ...m, [role.id]: { ...cur, [lang]: value } }));
+  }
+  protected renameRole(role: Role): void {
+    const d = this.nameDraft(role);
+    this.api.renameRole(role.id, { de: d.de, en: d.en }).subscribe({
       next: (saved) => {
         this.roles.update((list) => list.map((r) => (r.id === saved.id ? saved : r)));
         this.toast.success(this.i18n.translate('admin.common.saved'));

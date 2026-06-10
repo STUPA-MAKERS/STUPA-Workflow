@@ -117,8 +117,14 @@ export class BudgetDashboardComponent {
     this.navOpen.update((v) => !v);
   }
 
-  /** Top-Budgets (Wurzeln) für den linken Baum. */
-  readonly tops = computed(() => this.tree().filter((n) => n.parentId === null));
+  /** Top-Budgets (Wurzeln) für den linken Baum — nur Budgets **mit** Haushaltsjahr
+   *  (#11): ohne HHJ gibt es im Budget-Tab nichts auszuwerten, also ausblenden. */
+  readonly tops = computed(() => {
+    const fy = this.fiscalYearsByBudget();
+    return this.tree().filter(
+      (n) => n.parentId === null && (fy[n.id]?.length ?? 0) > 0,
+    );
+  });
 
   private readonly nodeById = computed(() => {
     const map = new Map<string, BudgetTreeNode>();
@@ -319,10 +325,19 @@ export class BudgetDashboardComponent {
   private restored = false;
   private restoreOrDefault(tops: BudgetTreeNode[]): void {
     if (this.restored || !tops.length) return;
+    // Nur Budgets mit Haushaltsjahr sind im Budget-Tab auswählbar (#11).
+    const withFy = tops.filter(
+      (t) => (this.fiscalYearsByBudget()[t.id]?.length ?? 0) > 0,
+    );
+    if (!withFy.length) return; // noch keines mit HHJ (geladen) → später
     const qp = this.route.snapshot.queryParamMap;
-    const budgetId = qp.get('budget') && this.nodeById().get(qp.get('budget')!)
-      ? qp.get('budget')!
-      : tops[0].id;
+    const qpBudget = qp.get('budget');
+    const budgetId =
+      qpBudget &&
+      this.nodeById().get(qpBudget) &&
+      (this.fiscalYearsByBudget()[qpBudget]?.length ?? 0) > 0
+        ? qpBudget
+        : withFy[0].id;
     const fys = this.fiscalYearsByBudget()[budgetId];
     if (fys === undefined) return; // noch nicht geladen → später
     this.restored = true;

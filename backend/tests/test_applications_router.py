@@ -143,7 +143,7 @@ def app(fake_service: _FakeService, sent: list[tuple[str, UUID]]) -> FastAPI:
     application = create_app()
     application.dependency_overrides[get_applications_service] = lambda: fake_service
 
-    async def _no_mail(settings, email, application_id):  # noqa: ANN001, ANN202
+    async def _no_mail(settings, email, application_id, pool):  # noqa: ANN001, ANN202
         sent.append((email, application_id))
 
     application.dependency_overrides[get_magic_link_sender] = lambda: _no_mail
@@ -354,6 +354,18 @@ def test_list_applications_filters_passed(
     assert fake_service.list_kwargs["gremium_id"] == gremium
     assert fake_service.list_kwargs["q"] == "foo"
     assert fake_service.list_kwargs["limit"] == 10
+    # Mit application.read: keine Owner-Einschränkung (alle Anträge sichtbar).
+    assert fake_service.list_kwargs["owner_sub"] is None
+
+
+def test_list_applications_without_read_scopes_to_own(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # Ohne application.read (und ohne Admin) → nur die eigenen Anträge (#24).
+    _as_principal(app)  # authentifiziert, aber ohne Permissions
+    r = client.get("/api/applications")
+    assert r.status_code == 200
+    assert fake_service.list_kwargs["owner_sub"] == "admin"  # = principal.sub des Fakes
 
 
 def test_list_applications_amount_date_sort_passed(

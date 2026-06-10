@@ -52,7 +52,12 @@ from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed, VoteOut
 from app.shared.config_schemas import VoteConfig
-from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError
+from app.shared.errors import (
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+)
 
 
 def meeting_channel(meeting_id: UUID) -> str:
@@ -347,6 +352,16 @@ class MeetingService:
             return True
         return gremium_id in await gremium_member_ids(self.session, principal.sub)
 
+    async def _visible_gremium_ids(self, principal: Principal) -> set[UUID] | None:
+        """Gremien, deren Sitzungen der Principal sehen darf — ``None`` = **alle**.
+
+        Admin/``meeting.manage`` sehen alles; sonst nur die Gremien, in denen der
+        Principal Mitglied ist (beliebige Rolle). So sieht ein fremder Nutzer keine
+        Sitzungen, ein Gremium-Mitglied aber die seines Gremiums (#sessions)."""
+        if "admin" in principal.roles or principal.has("meeting.manage"):
+            return None
+        return await gremium_member_ids(self.session, principal.sub)
+
     async def _get(self, meeting_id: UUID) -> Meeting:
         meeting = (
             await self.session.execute(select(Meeting).where(Meeting.id == meeting_id))
@@ -422,6 +437,9 @@ class MeetingService:
         stmt = select(Meeting).order_by(Meeting.created_at.desc())
         if gremium_id is not None:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
+        visible = await self._visible_gremium_ids(principal)
+        if visible is not None:
+            stmt = stmt.where(Meeting.gremium_id.in_(visible))
         meetings = list((await self.session.execute(stmt)).scalars().all())
         return await self._decorate(meetings, principal)
 
@@ -459,6 +477,9 @@ class MeetingService:
         stmt = select(Meeting, sort_ts)
         if gremium_id is not None:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
+        visible = await self._visible_gremium_ids(principal)
+        if visible is not None:
+            stmt = stmt.where(Meeting.gremium_id.in_(visible))
         if direction == "upcoming":
             stmt = stmt.where(is_upcoming)
             if cur is not None:
@@ -629,6 +650,15 @@ class MeetingService:
             raise ForbiddenError("only a session manager may plan this meeting")
         if wants_write and not await self.can_write(meeting, principal):
             raise ForbiddenError("not allowed to control this meeting")
+
+        # »closed« ist terminal: eine geschlossene Sitzung lässt sich nicht
+        # wieder öffnen (kein closed→live/planned). Erneutes »closed« ist ein No-op.
+        if (
+            meeting.status == "closed"
+            and payload.status is not None
+            and payload.status != "closed"
+        ):
+            raise ConflictError("a closed session cannot be re-opened")
 
         if payload.status is not None:
             meeting.status = payload.status

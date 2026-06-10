@@ -147,6 +147,16 @@ async def verify_magic_link(
         ).scalar_one_or_none()
         if claimed is None:
             raise GoneError("Magic-Link already used.")
+    # E-Mail-Bestätigung: die erste erfolgreiche Verify macht eine (Gast-)Antragstellung
+    # sichtbar und schützt sie vor dem 12-h-Verwurf. Idempotent (nur solange NULL).
+    await db.execute(
+        update(Application)
+        .where(
+            Application.id == row.application_id,
+            Application.email_confirmed_at.is_(None),
+        )
+        .values(email_confirmed_at=now)
+    )
     scope: ApplicantScope = "edit" if row.scope == "edit" else "view"
     app_id = str(row.application_id)
     session_token = sessions.issue_applicant_token(settings.session_secret, app_id, scope)
