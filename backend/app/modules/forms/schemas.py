@@ -36,6 +36,16 @@ class FormVersionCreate(_CamelModel):
     description: I18nMap | None = None
 
 
+class FormActiveSet(_CamelModel):
+    """Formular eines Typs aktivieren/deaktivieren (#forms).
+
+    ``active=false`` ⇒ Typ hat keine aktive Form-Version mehr (für neue Anträge
+    gesperrt); ``active=true`` reaktiviert die **neueste** Version.
+    """
+
+    active: bool
+
+
 class FormVersionOut(_CamelModel):
     """Angelegte/aktive Form-Version."""
 

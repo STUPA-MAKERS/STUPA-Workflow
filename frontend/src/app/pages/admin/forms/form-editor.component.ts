@@ -83,6 +83,11 @@ export class FormEditorComponent {
   protected readonly groups = signal<QuestionGroup[]>([]);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
+  /** Aktuelle Form-Version ist aktiv? (für neue Anträge nutzbar, #forms) */
+  protected readonly active = signal(false);
+  /** Existiert überhaupt eine Form-Version (sonst nichts zu (de)aktivieren)? */
+  protected readonly hasVersion = signal(false);
+  protected readonly togglingActive = signal(false);
   /** Editieren vs. Vorschau (View/Edit-Toggle, NC-Forms). */
   protected readonly preview = signal(false);
   /** Welche Karten ihre erweiterten Optionen (⋯) zeigen — Schlüssel = "gi:qi". */
@@ -161,9 +166,33 @@ export class FormEditorComponent {
         );
         const d = draft.description ?? {};
         this.description.set({ de: d['de'] ?? '', en: d['en'] ?? '' });
+        this.active.set(draft.active ?? false);
+        this.hasVersion.set(!!draft.formVersionId);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  /** Formular aktivieren/deaktivieren (#forms) — deaktiviert sperrt neue Anträge. */
+  protected toggleActive(): void {
+    const id = this.typeId();
+    if (!id || this.togglingActive()) return;
+    const next = !this.active();
+    this.togglingActive.set(true);
+    this.api.setFormActive(id, next).subscribe({
+      next: (draft) => {
+        this.active.set(draft.active ?? false);
+        this.hasVersion.set(!!draft.formVersionId);
+        this.togglingActive.set(false);
+        this.toast.success(
+          this.i18n.translate(next ? 'admin.forms.activated' : 'admin.forms.deactivated'),
+        );
+      },
+      error: () => {
+        this.togglingActive.set(false);
+        this.toast.error(this.i18n.translate('admin.forms.actionFailed'));
+      },
     });
   }
 
@@ -439,6 +468,9 @@ export class FormEditorComponent {
         this.saving.set(false);
         this.originalTitle = { ...this.title() };
         this.originalHasBudget = this.hasBudget();
+        // Speichern legt eine neue, **aktive** Version an (#forms).
+        this.active.set(true);
+        this.hasVersion.set(true);
         this.toast.success(this.i18n.translate('admin.common.saved'));
       },
       error: () => {

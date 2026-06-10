@@ -226,6 +226,41 @@ class FormsService:
             description=payload.description,
         )
 
+    async def set_form_active(self, type_id: UUID, active: bool) -> FormDraftOut:
+        """Formular eines Typs aktivieren/deaktivieren (#forms).
+
+        ``active=False`` setzt ``active_form_version_id`` auf ``NULL`` (Typ für neue
+        Anträge gesperrt; laufende Anträge behalten ihre gepinnte Version). ``True``
+        reaktiviert die **neueste** Version.
+        """
+        app_type = await self._get_type(type_id)
+        await self.session.execute(
+            update(FormVersion)
+            .where(
+                FormVersion.application_type_id == type_id,
+                FormVersion.active.is_(True),
+            )
+            .values(active=False)
+        )
+        if active:
+            latest = await self.session.scalar(
+                select(FormVersion)
+                .where(FormVersion.application_type_id == type_id)
+                .order_by(FormVersion.version.desc())
+                .limit(1)
+            )
+            if latest is None:
+                raise ValidationProblem(
+                    "No form version to activate.",
+                    errors=[{"field": "active", "msg": "no form version exists"}],
+                )
+            latest.active = True
+            app_type.active_form_version_id = latest.id
+        else:
+            app_type.active_form_version_id = None
+        await self.session.commit()
+        return await self.get_form_draft(type_id)
+
     async def get_form_draft(self, type_id: UUID) -> FormDraftOut:
         """Zuletzt angelegte Form-Version eines Typs zum Bearbeiten (#13).
 

@@ -29,6 +29,22 @@
   align-items: center;
 }
 
+.fe__activeChip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+}
+
+.fe__activeChip--on {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
 .fe__status {
   color: var(--color-text-muted);
   padding: var(--space-4) 0;

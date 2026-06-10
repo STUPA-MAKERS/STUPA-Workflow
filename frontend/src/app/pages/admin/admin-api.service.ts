@@ -391,6 +391,21 @@ export class AdminApiService {
     );
   }
 
+  /** Formular eines Typs aktivieren/deaktivieren (#forms) — gibt den aktualisierten Draft zurück. */
+  setFormActive(typeId: Uuid, active: boolean): Observable<FormDraft> {
+    if (this.mock) {
+      const draft = this.store.formDrafts[typeId];
+      if (draft) draft.active = active;
+      const t = this.store.appTypes.find((x) => x.id === typeId);
+      if (t) t.activeFormVersionId = active ? (draft?.formVersionId ?? null) : null;
+      return of(draft ?? { applicationTypeId: typeId, active, fields: [] });
+    }
+    return this.http.patch<FormDraft>(
+      `${this.base}/admin/application-types/${typeId}/form-active`,
+      { active },
+    );
+  }
+
   /** POST neue Flow-Version (Graph serverseitig via `validate_flow_graph` geprüft). */
   createFlowVersion(typeId: Uuid, graph: FlowGraph): Observable<{ id: Uuid }> {
     if (this.mock) return of({ id: `flowver-${graph.states.length}` });

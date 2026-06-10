@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Query
 from app.deps import DbSession, require_principal
 from app.modules.forms.schemas import (
     EffectiveFormOut,
+    FormActiveSet,
     FormDraftOut,
     FormVersionCreate,
     FormVersionOut,
@@ -88,3 +89,19 @@ async def create_form_version(
 ) -> FormVersionOut:
     """Neue Form-Version anlegen (Definition wird serverseitig validiert)."""
     return await service.create_form_version(type_id, payload)
+
+
+@router.patch(
+    "/admin/application-types/{type_id}/form-active",
+    response_model=FormDraftOut,
+    dependencies=[Depends(require_principal("form.configure"))],
+    responses=_errors(401, 403, 404, 422),
+)
+async def set_form_active(
+    type_id: UUID,
+    payload: FormActiveSet,
+    service: ServiceDep,
+) -> FormDraftOut:
+    """Formular eines Typs aktivieren/deaktivieren (#forms). ``active=false`` sperrt
+    den Typ für neue Anträge; ``true`` reaktiviert die neueste Version."""
+    return await service.set_form_active(type_id, payload.active)

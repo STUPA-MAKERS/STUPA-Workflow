@@ -4,6 +4,14 @@
       <h1 class="fe__title">{{ resolved(title()) || ('admin.forms.untitled' | t) }}</h1>
     </div>
     <div class="fe__head-tools">
+      @if (hasVersion()) {
+        <span class="fe__activeChip" [class.fe__activeChip--on]="active()">
+          {{ (active() ? 'admin.forms.active' : 'admin.forms.inactive') | t }}
+        </span>
+        <app-button variant="ghost" size="sm" [loading]="togglingActive()" (click)="toggleActive()">
+          {{ (active() ? 'admin.forms.deactivate' : 'admin.forms.activate') | t }}
+        </app-button>
+      }
       <app-button variant="secondary" size="sm" (click)="preview.set(!preview())">
         {{ (preview() ? 'admin.forms.modeEdit' : 'admin.forms.modeView') | t }}
       </app-button>
