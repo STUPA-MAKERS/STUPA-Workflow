@@ -85,6 +85,29 @@ async def _is_creator(db: AsyncSession, application_id: UUID, principal: Princip
     return created_by is not None and created_by == principal.sub
 
 
+async def _voted_in_member_committee(
+    db: AsyncSession, application_id: UUID, principal: Principal
+) -> bool:
+    """Wurde der Antrag in einem Gremium des Principals (ab)gestimmt? (#vote-read).
+
+    Mitglieder dürfen jeden Antrag **lesen**, der in ihrem Gremium zur Abstimmung
+    stand/steht — verknüpft über ``vote → meeting.gremium_id``."""
+    from app.modules.admin.gremium_roles import gremium_member_ids
+    from app.modules.livevote.models import Meeting
+    from app.modules.voting.models import Vote
+
+    gremien = await gremium_member_ids(db, principal.sub)
+    if not gremien:
+        return False
+    row = await db.scalar(
+        select(Vote.id)
+        .join(Meeting, Meeting.id == Vote.meeting_id)
+        .where(Vote.application_id == application_id, Meeting.gremium_id.in_(gremien))
+        .limit(1)
+    )
+    return row is not None
+
+
 async def _resolve_with_creator(
     db: AsyncSession,
     application_id: UUID,
@@ -110,11 +133,19 @@ async def require_app_read(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Access:
-    """Lesezugriff: Principal mit ``application.read``, ``view``-Antragsteller oder
-    eingeloggte:r Ersteller:in des eigenen Antrags (#24)."""
-    return await _resolve_with_creator(
-        db, application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
-    )
+    """Lesezugriff: Principal mit ``application.read``, ``view``-Antragsteller,
+    eingeloggte:r Ersteller:in (#24) **oder** Gremium-Mitglied, in dessen Gremium der
+    Antrag (ab)gestimmt wurde (#vote-read, nur lesend)."""
+    try:
+        return await _resolve_with_creator(
+            db, application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
+        )
+    except ForbiddenError:
+        if principal is not None and await _voted_in_member_committee(
+            db, application_id, principal
+        ):
+            return Access(application_id, principal, None)
+        raise
 
 
 async def require_app_edit(

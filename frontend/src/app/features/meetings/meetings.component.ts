@@ -157,6 +157,9 @@ const AUTOSAVE_DELAY_MS = 1000;
           @for (item of agenda(); track item.id; let i = $index) {
             <article class="mtg__followTop">
               <h3 class="mtg__topTitle">{{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || ('meetings.agenda.untitled' | t) }}</h3>
+              @if (item.applicationId) {
+                <a class="mtg__pdf" [routerLink]="['/applications', item.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
+              }
               @if (item.body) { <div class="mtg__preview" [innerHTML]="renderBody(item.body)"></div> }
               @for (vote of votesForTop(item.id); track vote.id) {
                 <div class="mtg__vote">
