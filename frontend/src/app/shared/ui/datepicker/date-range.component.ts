@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input, signal } from '@angular/core';
-import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
+import { FormsModule, NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
+import { DatepickerComponent } from './datepicker.component';
 
 let nextId = 0;
 
@@ -20,6 +21,7 @@ export interface DateRange {
   selector: 'app-date-range',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, DatepickerComponent],
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: DateRangeComponent, multi: true }],
   template: `
     <fieldset class="dr">
@@ -28,30 +30,22 @@ export interface DateRange {
       }
       <div class="dr__row">
         <div class="dr__field">
-          <label class="dr__label" [for]="id + '-start'">{{ startLabel }}</label>
-          <input
-            class="dr__control"
-            type="date"
+          <app-datepicker
             [id]="id + '-start'"
-            [value]="start()"
-            [disabled]="disabled()"
-            [attr.max]="end() || null"
-            (input)="onStart($any($event.target).value)"
-            (blur)="onTouched()"
+            [ariaLabel]="startLabel"
+            [max]="end()"
+            [ngModel]="start()"
+            (ngModelChange)="onStart($event)"
           />
         </div>
         <span class="dr__sep" aria-hidden="true">–</span>
         <div class="dr__field">
-          <label class="dr__label" [for]="id + '-end'">{{ endLabel }}</label>
-          <input
-            class="dr__control"
-            type="date"
+          <app-datepicker
             [id]="id + '-end'"
-            [value]="end()"
-            [disabled]="disabled()"
-            [attr.min]="start() || null"
-            (input)="onEnd($any($event.target).value)"
-            (blur)="onTouched()"
+            [ariaLabel]="endLabel"
+            [min]="start()"
+            [ngModel]="end()"
+            (ngModelChange)="onEnd($event)"
           />
         </div>
       </div>

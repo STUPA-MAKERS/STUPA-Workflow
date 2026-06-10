@@ -9,6 +9,7 @@ import {
   CellDirective,
   type ColumnDef,
   DataTableComponent,
+  DatepickerComponent,
   DialogComponent,
   IconComponent,
   type SelectOption,
@@ -49,6 +50,7 @@ function emptyDraft(): PolicyDraft {
     ButtonComponent,
     DataTableComponent,
     CellDirective,
+    DatepickerComponent,
     DialogComponent,
     IconComponent,
     SelectComponent,
@@ -111,7 +113,7 @@ function emptyDraft(): PolicyDraft {
           @if (d.kind === 'absolute') {
             <label class="field">
               <span class="field__label">{{ 'admin.deadlines.date' | t }}</span>
-              <input class="field__control" type="date" [ngModel]="d.absoluteAt" (ngModelChange)="patch('absoluteAt', $event)" name="absoluteAt" />
+              <app-datepicker [ngModel]="d.absoluteAt" (ngModelChange)="patch('absoluteAt', $event)" name="absoluteAt" />
             </label>
           } @else {
             <label class="field">

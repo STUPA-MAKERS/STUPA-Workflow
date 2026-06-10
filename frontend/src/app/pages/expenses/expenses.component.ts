@@ -19,6 +19,7 @@ import {
   BadgeComponent,
   ButtonComponent,
   CurrencyInputComponent,
+  DatepickerComponent,
   DialogComponent,
   FilterBarComponent,
   FilterFieldComponent,
@@ -60,6 +61,7 @@ import {
     BadgeComponent,
     ButtonComponent,
     CurrencyInputComponent,
+    DatepickerComponent,
     DialogComponent,
     FilterBarComponent,
     FilterFieldComponent,
@@ -100,8 +102,8 @@ import {
             </app-filter-field>
             <app-filter-field [label]="'expenses.filter.dateRange' | t">
               <app-filter-range>
-                <input start type="date" [attr.aria-label]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
-                <input end type="date" [attr.aria-label]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
+                <app-datepicker start [ariaLabel]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
+                <app-datepicker end [ariaLabel]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
               </app-filter-range>
             </app-filter-field>
           </app-filter-bar>

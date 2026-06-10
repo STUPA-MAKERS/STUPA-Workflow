@@ -8,6 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -18,6 +19,7 @@ import {
   CellDirective,
   type ColumnDef,
   DataTableComponent,
+  DatepickerComponent,
   FilterBarComponent,
   FilterFieldComponent,
 } from '@shared/ui';
@@ -66,6 +68,7 @@ const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FormsModule,
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
@@ -74,6 +77,7 @@ const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
     FilterFieldComponent,
     DataTableComponent,
     CellDirective,
+    DatepickerComponent,
   ],
   template: `
     <section class="audit">
@@ -100,10 +104,10 @@ const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
             </select>
           </app-filter-field>
           <app-filter-field [label]="'admin.audit.filter.since' | t">
-            <input type="date" [value]="since()" (change)="setSince($any($event.target).value)" />
+            <app-datepicker [ngModel]="since()" (ngModelChange)="setSince($event)" />
           </app-filter-field>
           <app-filter-field [label]="'admin.audit.filter.until' | t">
-            <input type="date" [value]="until()" (change)="setUntil($any($event.target).value)" />
+            <app-datepicker [ngModel]="until()" (ngModelChange)="setUntil($event)" />
           </app-filter-field>
         </app-filter-bar>
       </header>

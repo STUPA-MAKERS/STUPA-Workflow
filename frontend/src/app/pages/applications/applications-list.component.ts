@@ -23,6 +23,7 @@ import type {
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import {
   CurrencyInputComponent,
+  DatepickerComponent,
   FilterBarComponent,
   FilterFieldComponent,
   FilterRangeComponent,
@@ -52,7 +53,7 @@ import { downloadBlob } from '@shared/download.util';
   selector: 'app-applications-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, IconComponent, SelectComponent, CurrencyInputComponent, FilterBarComponent, FilterFieldComponent, FilterRangeComponent, CostCentreTreeComponent, ApplicationsTableComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, IconComponent, SelectComponent, CurrencyInputComponent, DatepickerComponent, FilterBarComponent, FilterFieldComponent, FilterRangeComponent, CostCentreTreeComponent, ApplicationsTableComponent],
   template: `
     <header class="apps__head">
       <div class="apps__headRow">
@@ -112,8 +113,8 @@ import { downloadBlob } from '@shared/download.util';
             </app-filter-field>
             <app-filter-field [label]="'applications.list.filter.date' | t">
               <app-filter-range>
-                <input start type="date" [attr.aria-label]="'applications.list.filter.from' | t" [ngModel]="createdFrom()" (ngModelChange)="createdFrom.set($event)" name="createdFrom" />
-                <input end type="date" [attr.aria-label]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
+                <app-datepicker start [ariaLabel]="'applications.list.filter.from' | t" [ngModel]="createdFrom()" (ngModelChange)="createdFrom.set($event)" name="createdFrom" />
+                <app-datepicker end [ariaLabel]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
               </app-filter-range>
             </app-filter-field>
           </app-filter-bar>

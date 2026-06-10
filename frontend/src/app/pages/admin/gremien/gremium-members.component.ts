@@ -11,6 +11,7 @@ import {
   CellDirective,
   type ColumnDef,
   DataTableComponent,
+  DatepickerComponent,
   DialogComponent,
   IconComponent,
   SelectComponent,
@@ -44,6 +45,7 @@ interface Member {
     ButtonComponent,
     BadgeComponent,
     SelectComponent,
+    DatepickerComponent,
     DialogComponent,
     DataTableComponent,
     CellDirective,
@@ -123,9 +125,9 @@ interface Member {
         }
         <div class="gm__term">
           <label class="gm__lbl">{{ 'admin.gremien.termFrom' | t }}
-            <input class="gm__control" type="date" [ngModel]="addFrom()" (ngModelChange)="addFrom.set($event)" name="from" /></label>
+            <app-datepicker [ngModel]="addFrom()" (ngModelChange)="addFrom.set($event)" name="from" /></label>
           <label class="gm__lbl">{{ 'admin.gremien.termUntil' | t }}
-            <input class="gm__control" type="date" [ngModel]="addUntil()" (ngModelChange)="addUntil.set($event)" name="until" /></label>
+            <app-datepicker [ngModel]="addUntil()" (ngModelChange)="addUntil.set($event)" name="until" /></label>
         </div>
       </div>
       <div dialog-footer class="gm__dialog-foot">
