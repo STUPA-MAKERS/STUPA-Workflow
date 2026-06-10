@@ -158,6 +158,9 @@ export interface BudgetApplication {
   currency: string | null;
   stage: string | null;
   stateId: Uuid | null;
+  /** Aktueller Flow-State (i18n-Label-Map + Farbe) für die Status-Spalte (#17). */
+  stateLabel?: Record<string, string> | null;
+  stateColor?: string | null;
   createdAt: string;
 }
 

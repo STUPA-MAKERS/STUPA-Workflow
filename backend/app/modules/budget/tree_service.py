@@ -269,9 +269,16 @@ class BudgetTreeService:
             )
         )
         stmt = (
-            select(Application, Budget.path_key, BudgetEntry.stage)
+            select(
+                Application,
+                Budget.path_key,
+                BudgetEntry.stage,
+                State.label_i18n,
+                State.color,
+            )
             .join(Budget, Budget.id == Application.budget_id)
             .outerjoin(BudgetEntry, BudgetEntry.application_id == Application.id)
+            .outerjoin(State, State.id == Application.current_state_id)
             .where(Application.budget_id.in_(subtree))
             .order_by(Application.created_at.desc())
         )
@@ -289,9 +296,11 @@ class BudgetTreeService:
                 currency=app.currency,
                 stage=stage,
                 stateId=app.current_state_id,
+                stateLabel=state_label or None,
+                stateColor=state_color,
                 createdAt=app.created_at,
             )
-            for (app, path_key, stage) in rows
+            for (app, path_key, stage, state_label, state_color) in rows
         ]
 
     async def create_fiscal_year(

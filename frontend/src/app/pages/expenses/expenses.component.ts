@@ -75,44 +75,45 @@ import {
           (ngModelChange)="onSearch($event)"
           [attr.aria-label]="'expenses.search' | t"
         />
-        <app-button variant="secondary" size="sm" (click)="filtersOpen.set(!filtersOpen())">
-          <span class="exp__filterBtn"><app-icon name="filter" [size]="14" /> {{ 'expenses.filters' | t }}
-            @if (activeFilterCount()) { <span class="exp__filterCount">{{ activeFilterCount() }}</span> }
-          </span>
-        </app-button>
-      </div>
-
-      @if (filtersOpen()) {
-        <div class="exp__filterMenu">
-          <div class="exp__filterGroup">
-            <span class="exp__filterLabel">{{ 'expenses.filter.kind' | t }}</span>
-            <div class="exp__kinds">
-              <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
-              <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
-              <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
+        <div class="exp__filterWrap">
+          <app-button variant="secondary" size="sm" (click)="filtersOpen.set(!filtersOpen())">
+            <span class="exp__filterBtn"><app-icon name="filter" [size]="14" /> {{ 'expenses.filters' | t }}
+              @if (activeFilterCount()) { <span class="exp__filterCount">{{ activeFilterCount() }}</span> }
+            </span>
+          </app-button>
+          @if (filtersOpen()) {
+            <div class="exp__filterMenu">
+              <div class="exp__filterGroup">
+                <span class="exp__filterLabel">{{ 'expenses.filter.kind' | t }}</span>
+                <div class="exp__kinds">
+                  <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
+                  <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+                  <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
+                </div>
+              </div>
+              <div class="exp__filterGroup">
+                <span class="exp__filterLabel">{{ 'expenses.filter.amountRange' | t }}</span>
+                <div class="exp__amountFilter">
+                  <input class="exp__input exp__amountInput" type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMin' | t" [attr.aria-label]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
+                  <span aria-hidden="true">–</span>
+                  <input class="exp__input exp__amountInput" type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMax' | t" [attr.aria-label]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
+                </div>
+              </div>
+              <div class="exp__filterGroup">
+                <span class="exp__filterLabel">{{ 'expenses.filter.dateRange' | t }}</span>
+                <div class="exp__amountFilter">
+                  <input class="exp__input" type="date" [attr.aria-label]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
+                  <span aria-hidden="true">–</span>
+                  <input class="exp__input" type="date" [attr.aria-label]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
+                </div>
+              </div>
+              @if (activeFilterCount()) {
+                <app-button variant="ghost" size="sm" (click)="resetFilters()">{{ 'expenses.filter.reset' | t }}</app-button>
+              }
             </div>
-          </div>
-          <div class="exp__filterGroup">
-            <span class="exp__filterLabel">{{ 'expenses.filter.amountRange' | t }}</span>
-            <div class="exp__amountFilter">
-              <input class="exp__input exp__amountInput" type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMin' | t" [attr.aria-label]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
-              <span aria-hidden="true">–</span>
-              <input class="exp__input exp__amountInput" type="number" min="0" step="0.01" [placeholder]="'expenses.filter.amountMax' | t" [attr.aria-label]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
-            </div>
-          </div>
-          <div class="exp__filterGroup">
-            <span class="exp__filterLabel">{{ 'expenses.filter.dateRange' | t }}</span>
-            <div class="exp__amountFilter">
-              <input class="exp__input" type="date" [attr.aria-label]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
-              <span aria-hidden="true">–</span>
-              <input class="exp__input" type="date" [attr.aria-label]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
-            </div>
-          </div>
-          @if (activeFilterCount()) {
-            <app-button variant="ghost" size="sm" (click)="resetFilters()">{{ 'expenses.filter.reset' | t }}</app-button>
           }
         </div>
-      }
+      </div>
     </header>
 
     <div class="exp__layout">
@@ -434,16 +435,25 @@ import {
         color: var(--color-on-primary, #fff);
         font-size: var(--fs-xs);
       }
+      .exp__filterWrap {
+        position: relative;
+      }
       .exp__filterMenu {
+        position: absolute;
+        right: 0;
+        z-index: var(--z-dropdown, 50);
+        margin-top: var(--space-2);
+        width: min(22rem, 90vw);
+        max-height: 80vh;
+        overflow-y: auto;
         display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
+        flex-direction: column;
         gap: var(--space-4);
-        margin-top: var(--space-3);
         padding: var(--space-4);
+        background: var(--color-bg-elevated, var(--color-surface));
         border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
-        background: var(--color-surface);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
       }
       .exp__filterGroup {
         display: flex;

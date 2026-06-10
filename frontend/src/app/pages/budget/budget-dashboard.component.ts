@@ -182,8 +182,12 @@ export class BudgetDashboardComponent {
       id: a.applicationId,
       title: this.titleOf(a),
       typeLabel: a.pathKey,
-      stateLabel: a.stage ? this.stageLabel(a.stage) : null,
-      stateColor: null,
+      stateLabel: a.stateLabel
+        ? this.resolveLabel(a.stateLabel)
+        : a.stage
+          ? this.stageLabel(a.stage)
+          : null,
+      stateColor: a.stateColor ?? null,
       amount: a.amount,
       currency: a.currency,
       createdAt: a.createdAt,
@@ -193,6 +197,11 @@ export class BudgetDashboardComponent {
   /** Antragstitel mit Fallback (kurze Id), wenn kein Titel gesetzt ist. */
   titleOf(app: BudgetApplication): string {
     return app.title?.trim() || `${this.shortId(app.applicationId)}…`;
+  }
+
+  /** i18n-Label-Map in der aktiven Sprache auflösen (Fallback de/en/erstes). */
+  private resolveLabel(map: Record<string, string>): string {
+    return map[this.i18n.locale()] || map['de'] || map['en'] || Object.values(map)[0] || '';
   }
   readonly usageRowId = (r: unknown): string => (r as UsageRow).node.id;
 
@@ -234,6 +243,16 @@ export class BudgetDashboardComponent {
   barPct(row: UsageRow): number {
     if (!row.allocated) return 0;
     return Math.min(100, Math.round((row.committed / row.allocated) * 100));
+  }
+  /** Gebundener Anteil (noch nicht ausgegeben) als % der Allokation — hellgrau. */
+  boundPct(row: UsageRow): number {
+    if (!row.allocated) return 0;
+    return Math.max(0, Math.min(100, (row.bound / row.allocated) * 100));
+  }
+  /** Ausgegebener Anteil als % der Allokation — primary. */
+  expendedPct(row: UsageRow): number {
+    if (!row.allocated) return 0;
+    return Math.max(0, Math.min(100, (row.expended / row.allocated) * 100));
   }
   shortId(id: Uuid): string {
     return id.slice(0, 8);

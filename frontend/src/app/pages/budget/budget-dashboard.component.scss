@@ -292,6 +292,7 @@
   flex: 1 1 auto;
   min-width: 0;
   height: 0.7rem;
+  display: flex;
   background: var(--color-surface-sunken);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-pill);
@@ -299,8 +300,16 @@
 }
 
 .bd__seg {
-  display: block;
   height: 100%;
+  background: var(--color-primary);
+}
+
+/* Zweifarbig (#budget): hellgrau = gebunden, primary = ausgegeben. */
+.bd__seg--bound {
+  background: var(--color-border-strong, #8a8f98);
+}
+
+.bd__seg--expended {
   background: var(--color-primary);
 }
 

@@ -181,6 +181,9 @@ class BudgetApplicationOut(_CamelModel):
     currency: str | None = None
     stage: str | None = None
     state_id: UUID | None = Field(default=None, alias="stateId")
+    # Aktueller Flow-State (i18n-Label + Farbe) für die Status-Spalte (#17).
+    state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
+    state_color: str | None = Field(default=None, alias="stateColor")
     created_at: datetime = Field(alias="createdAt")
 
 
