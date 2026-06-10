@@ -131,6 +131,22 @@ async def test_available_excludes_result_branches() -> None:
     assert out == []
 
 
+async def test_fire_branch_transition_manually_409() -> None:
+    # Direkter POST mit der id eines Branch-Übergangs darf den Vote-Ausgang nicht
+    # an der Abstimmung vorbei setzen.
+    app = _app(uuid4(), uuid4())
+    transition = _transition(
+        flow_id=app.flow_version_id,
+        from_id=app.current_state_id,
+        to_id=uuid4(),
+        branch="pass",
+    )
+    db = fake_session(result(app), result(transition))
+    with pytest.raises(ConflictError):
+        await FlowService(db).fire(app.id, transition.id, _principal())
+    assert db.committed == 0
+
+
 async def test_applicant_transitions_only_actor_is_applicant_gated() -> None:
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)

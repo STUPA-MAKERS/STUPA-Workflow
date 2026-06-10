@@ -139,7 +139,11 @@ def test_guard_scanner_detects_deadline_passed_nested() -> None:
     assert _guard_fires_on_deadline({"deadlinePassed": False}) is False
     assert _guard_fires_on_deadline({"and": [{"manual": True}, {"deadlinePassed": True}]}) is True
     assert _guard_fires_on_deadline({"or": [{"roleIs": "x"}, {"manual": True}]}) is False
-    assert _guard_fires_on_deadline({"not": {"deadlinePassed": True}}) is True
+    # Negations-Polarität: not(deadlinePassed=true) feuert gerade NICHT bei Ablauf;
+    # not(deadlinePassed=false) dagegen schon. Doppelte Negation hebt sich auf.
+    assert _guard_fires_on_deadline({"not": {"deadlinePassed": True}}) is False
+    assert _guard_fires_on_deadline({"not": {"deadlinePassed": False}}) is True
+    assert _guard_fires_on_deadline({"not": {"not": {"deadlinePassed": True}}}) is True
     assert _guard_fires_on_deadline(None) is False
 
 
@@ -149,8 +153,9 @@ async def test_schedule_state_deadline_creates_row_for_policy() -> None:
     policy = _policy("relative_submitted", offset_days=10)
     policy.id = uuid4()
     transition = SimpleNamespace(id=trans_id, guard={"deadlinePassed": True})
-    # execute-Queue: (1) get_by_key→policy, (2) outgoing transitions, (3) delete
-    session = fake_session(result(policy), result(transition), result())
+    # execute-Queue: (1) delete alter Flow-Fristen, (2) get_by_key→policy,
+    # (3) outgoing transitions
+    session = fake_session(result(), result(policy), result(transition))
     app = SimpleNamespace(id=uuid4(), flow_version_id=flow_id, created_at=_NOW, updated_at=_NOW)
     state = SimpleNamespace(id=state_id, config={"deadlinePolicyKey": "k"})
 

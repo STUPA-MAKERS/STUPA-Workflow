@@ -201,6 +201,22 @@ def test_add_to_next_session_into_vote_ok() -> None:
     validate_flow_graph(FlowGraph.model_validate(g))  # no raise
 
 
+def test_flow_self_loop_rejected() -> None:
+    # from==to hebelt das optimistische Locking der Engine aus (Doppel-Feuerung).
+    g = _valid_graph_dict()
+    g["transitions"].append({"from": "review", "to": "review"})
+    with pytest.raises(FlowValidationError, match="self-loop"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_branch_on_non_vote_state_rejected() -> None:
+    # Branch-Übergänge feuert nur das Vote-Ergebnis — auf normal-States tote Kanten.
+    g = _vote_graph_dict()
+    g["transitions"].append({"from": "passed", "to": "failed", "branch": "pass"})
+    with pytest.raises(FlowValidationError, match="branch"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
 def test_flow_no_initial() -> None:
     g = _valid_graph_dict()
     g["states"][0]["isInitial"] = False

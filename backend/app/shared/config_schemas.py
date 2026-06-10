@@ -200,6 +200,13 @@ def validate_flow_graph(graph: FlowGraph) -> None:
             raise FlowValidationError(f"transition references unknown from-state: {t.from_!r}")
         if t.to not in key_set:
             raise FlowValidationError(f"transition references unknown to-state: {t.to!r}")
+        # Self-Loops sind nicht unterstützt: das optimistische Locking der Engine
+        # (``WHERE current_state_id = from_state``) kann konkurrierende Doppel-Feuerungen
+        # eines from==to-Übergangs nicht erkennen (doppelte Events/Actions).
+        if t.from_ == t.to:
+            raise FlowValidationError(
+                f"transition {t.from_!r} -> {t.to!r}: self-loops are not supported"
+            )
         try:
             # Akteur-Gates (roleIs/isInCommittee) nur auf **manuellen** Übergängen.
             validate_guard(t.guard, allow_actor_ops=not t.automatic)
@@ -241,6 +248,12 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                     f"vote state {s.key!r} needs exactly two outgoing transitions "
                     "with branch 'pass' and 'fail'"
                 )
+        elif branches:
+            # Branch-Übergänge feuert nur das Vote-Ergebnis — auf einem normal-State
+            # wären sie weder manuell noch automatisch erreichbar (tote Kanten).
+            raise FlowValidationError(
+                f"state {s.key!r} (kind={s.kind!r}) must not have branch transitions"
+            )
 
 
 def _assert_all_reachable(

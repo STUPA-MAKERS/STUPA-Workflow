@@ -44,10 +44,19 @@ class FlowExtrasActionDispatcher:
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
         for action in actions:
-            if action.type == "addToNextSession":
-                await self._add_to_next_session(action)
-            elif action.type == "assignBudget":
-                await self._assign_budget(action)
+            try:
+                if action.type == "addToNextSession":
+                    await self._add_to_next_session(action)
+                elif action.type == "assignBudget":
+                    await self._assign_budget(action)
+            except Exception:  # noqa: BLE001 — Action-Fehler dürfen den bereits
+                # committeten State-Wechsel nicht kippen (flows §9.3) und nicht die
+                # restlichen Actions des Übergangs verhindern.
+                logger.exception(
+                    "flow action %s failed (key=%s) — skipped",
+                    action.type,
+                    action.idempotency_key,
+                )
 
     # ---------------------------------------------------------- addToNextSession
     async def _add_to_next_session(self, action: DispatchedAction) -> None:

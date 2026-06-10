@@ -118,10 +118,11 @@ def test_compare_missing_field_is_false() -> None:
     assert eval_guard({"compare": {"field": "amount", "op": ">", "value": 0}}, ctx) is False
 
 
-def test_compare_wrong_op_for_type_raises() -> None:
+def test_compare_wrong_op_for_type_fails_closed() -> None:
+    # Laufzeit-Typ stammt aus der gepinnten Form-Version (Drift möglich) →
+    # unpassender Operator ist fail-closed False, keine Exception (sonst 500).
     ctx = GuardContext(field_values={"amount": 5}, field_types={"amount": "currency"})
-    with pytest.raises(GuardError, match="not allowed for type"):
-        eval_guard({"compare": {"field": "amount", "op": "in", "value": [1]}}, ctx)
+    assert eval_guard({"compare": {"field": "amount", "op": "in", "value": [1]}}, ctx) is False
 
 
 # --- Kombinatoren -----------------------------------------------------------
@@ -179,6 +180,21 @@ def test_validate_guard_rejects_unknown_and_bad_structure() -> None:
         validate_guard({"compare": {"field": "x", "op": "~="}})
     with pytest.raises(GuardError, match="requires a list value"):
         validate_guard({"compare": {"field": "x", "op": "in", "value": "notalist"}})
+
+
+def test_validate_guard_rejects_bad_leaf_value_types() -> None:
+    # Falscher Wert-Typ würde zur Laufzeit crashen (Liste unhashable in frozenset)
+    # bzw. still falsch auswerten → Speicher-Gate.
+    with pytest.raises(GuardError, match="non-empty string"):
+        validate_guard({"roleIs": ["admin"]})
+    with pytest.raises(GuardError, match="non-empty string"):
+        validate_guard({"isInCommittee": 7})
+    with pytest.raises(GuardError, match="non-empty string"):
+        validate_guard({"hasField": ""})
+    with pytest.raises(GuardError, match="boolean"):
+        validate_guard({"deadlinePassed": "yes"})
+    with pytest.raises(GuardError, match="boolean"):
+        validate_guard({"actorIsApplicant": 1})
 
 
 # --- Actions ----------------------------------------------------------------

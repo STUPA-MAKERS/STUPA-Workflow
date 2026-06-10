@@ -42,6 +42,7 @@ class FakeSession:
 
     def __init__(self, results: Iterable[FakeResult] = ()) -> None:
         self._results = list(results)
+        self.scalar_results: list[Any] = []
         self.added: list[Any] = []
         self.deleted: list[Any] = []
         self.flushed = 0
@@ -52,6 +53,13 @@ class FakeSession:
         if not self._results:
             return FakeResult()
         return self._results.pop(0)
+
+    async def scalar(self, _stmt: Any) -> Any:
+        """``session.scalar``-Ersatz (z. B. ``_deadline_passed``): eigene Queue,
+        Default ``None`` — die ``execute``-Reihenfolge der Tests bleibt unberührt."""
+        if self.scalar_results:
+            return self.scalar_results.pop(0)
+        return None
 
     def add(self, obj: Any) -> None:
         self.added.append(obj)

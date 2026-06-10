@@ -17,6 +17,7 @@ prüft das und liefert 409 (inline behandelt, nicht dispatcht).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -45,20 +46,25 @@ from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 from app.shared.guards import eval_guard, guard_requires_applicant
 
 
-def _guard_fires_on_deadline(guard: Any) -> bool:
-    """``True`` wenn der Guard (rekursiv durch ``and``/``or``/``not``) den Operator
-    ``deadlinePassed`` mit Wahrheitswert ``true`` enthält — also der Übergang, den die
-    Frist beim Ablauf feuern soll (flows §9.4)."""
+def _guard_fires_on_deadline(guard: Any, *, negated: bool = False) -> bool:
+    """``True`` wenn der Guard (rekursiv durch ``and``/``or``/``not``) bei
+    **abgelaufener** Frist feuern soll (flows §9.4) — d. h. ``deadlinePassed`` unter
+    Berücksichtigung der Negations-Polarität ``true`` verlangt:
+    ``{deadlinePassed: true}`` und ``not(deadlinePassed: false)`` zählen,
+    ``not(deadlinePassed: true)`` nicht."""
     if not isinstance(guard, dict):
         return False
     for op, value in guard.items():
         if op == "deadlinePassed":
-            return bool(value)
-        if op in ("and", "or") and isinstance(value, list):
-            if any(_guard_fires_on_deadline(g) for g in value):
+            if bool(value) != negated:
                 return True
-        elif op == "not" and _guard_fires_on_deadline(value):
-            return True
+        elif op in ("and", "or") and isinstance(value, list):
+            if any(_guard_fires_on_deadline(g, negated=negated) for g in value):
+                return True
+        elif op == "not":
+            children = value if isinstance(value, list) else [value]
+            if any(_guard_fires_on_deadline(g, negated=not negated) for g in children):
+                return True
     return False
 
 
@@ -121,49 +127,76 @@ class FlowService:
         (``absolute`` → Datum; ``relative_submitted`` → ``created_at + X``;
         ``relative_changed`` → ``updated_at + X``) und eine :class:`Deadline` mit
         ``action_on_pass`` auf den ``deadlinePassed``-Übergang dieses States angelegt.
-        Der bestehende T-44-Cron feuert sie bei Ablauf. Eventuelle frühere, noch nicht
-        gefeuerte Flow-Fristen des Antrags werden zuvor entfernt (kein Stapeln bei
-        erneutem State-Wechsel)."""
+        Der bestehende T-44-Cron feuert sie bei Ablauf. Gibt es keinen solchen Übergang,
+        wird die Frist als reiner Marker (``action_on_pass=NULL``) angelegt — Basis für
+        ``deadlinePassed`` auf **manuellen** Übergängen (:meth:`_deadline_passed`).
+
+        Flow-Fristen des verlassenen States (auch konsumierte) werden **immer** zuerst
+        entfernt — kein Stapeln, keine stale Fristen nach Wechsel in einen State ohne
+        Policy."""
+        await self.session.execute(
+            Deadline.__table__.delete().where(
+                Deadline.application_id == app.id,
+                Deadline.kind == "flow_deadline",
+            )
+        )
         cfg = state.config if isinstance(state.config, dict) else {}
         key = cfg.get("deadlinePolicyKey")
         if not isinstance(key, str) or not key:
+            await self.session.commit()
             return
         policy = await DeadlinePolicyService(self.session).get_by_key(key)
         if policy is None:
+            await self.session.commit()
             return
         due_at = resolve_due_at(
             policy, submitted_at=app.created_at, changed_at=app.updated_at
         )
         if due_at is None:
+            await self.session.commit()
             return
-        # Ziel-Übergang = der vom State ausgehende Übergang mit Guard ``deadlinePassed``.
+        # Ziel-Übergang = der vom State ausgehende Übergang, der bei abgelaufener Frist
+        # feuern soll (``deadlinePassed``-Polarität inkl. Negation); bei mehreren
+        # Kandidaten deterministisch der mit der kleinsten ``order``.
         transitions = (
             await self.session.execute(
-                select(Transition).where(
+                select(Transition)
+                .where(
                     Transition.flow_version_id == app.flow_version_id,
                     Transition.from_state_id == state.id,
                 )
+                .order_by(Transition.order)
             )
         ).scalars().all()
         target = next(
             (t for t in transitions if _guard_fires_on_deadline(t.guard)), None
         )
-        if target is None:
-            return
-        # Alte, noch nicht gefeuerte Flow-Fristen des Antrags entfernen (Idempotenz).
-        await self.session.execute(
-            Deadline.__table__.delete().where(
-                Deadline.application_id == app.id,
-                Deadline.kind == "flow_deadline",
-                Deadline.action_on_pass.isnot(None),
-            )
-        )
         await DeadlineService(self.session).create(
             kind="flow_deadline",
             due_at=due_at,
             application_id=app.id,
-            action_on_pass={"transitionId": str(target.id)},
+            action_on_pass=(
+                {"transitionId": str(target.id)} if target is not None else None
+            ),
         )
+
+    async def _deadline_passed(self, app: Application) -> bool:
+        """Echtes ``deadline_passed`` des aktuellen States aus der DB ableiten.
+
+        ``True``, wenn eine (ggf. schon konsumierte) Flow-Frist des Antrags abgelaufen
+        ist. Fristen gehören immer zum aktuellen State — beim State-Wechsel räumt
+        :meth:`schedule_state_deadline` alle alten ab. Für manuelle Pfade (Router),
+        damit ``deadlinePassed``-Guards nicht nur für den Worker funktionieren."""
+        row = await self.session.scalar(
+            select(Deadline.id)
+            .where(
+                Deadline.application_id == app.id,
+                Deadline.kind == "flow_deadline",
+                Deadline.due_at <= datetime.now(UTC),
+            )
+            .limit(1)
+        )
+        return row is not None
 
     # ------------------------------------------------------- available_transitions
     async def available_transitions(
@@ -171,7 +204,7 @@ class FlowService:
         application_id: UUID,
         principal: Principal,
         *,
-        deadline_passed: bool = False,
+        deadline_passed: bool | None = None,
     ) -> list[TransitionOut]:
         """Verfügbare **manuelle** Übergänge (Guards geprüft) für den Akteur.
 
@@ -179,10 +212,13 @@ class FlowService:
         Nutzer. **Ergebnis-Branches** (``branch`` gesetzt, z. B. die pass/fail-Ausgänge
         eines vote/approval-States) ebenfalls: sie entscheidet allein die Abstimmung
         (``close_vote``), nie eine manuelle Aktion (#vote-branch). Akteur-Gates im Guard
-        verfeinern die Sichtbarkeit der übrigen Übergänge."""
+        verfeinern die Sichtbarkeit der übrigen Übergänge.
+        ``deadline_passed=None`` ⇒ aus der DB ableiten."""
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return []
+        if deadline_passed is None:
+            deadline_passed = await self._deadline_passed(app)
         ctx = await flow_context.build_context(
             self.session, app, principal, manual=True, deadline_passed=deadline_passed
         )
@@ -223,6 +259,7 @@ class FlowService:
             )
             for t in await self._outgoing(app)
             if not t.automatic
+            and not t.branch
             and guard_requires_applicant(t.guard)
             and eval_guard(t.guard, ctx)
         ]
@@ -246,16 +283,19 @@ class FlowService:
         application_id: UUID,
         principal: Principal,
         *,
-        deadline_passed: bool = False,
+        deadline_passed: bool | None = None,
     ) -> TransitionResult | None:
         """Ersten **automatischen** Übergang feuern, dessen Guard erfüllt ist (#8).
 
         Vom Worker/Cron zyklisch aufgerufen (``manual=False``). Gibt das Ergebnis
         zurück, falls ein Übergang gefeuert wurde, sonst ``None``. Idempotent über das
-        optimistische Locking in :meth:`fire`."""
+        optimistische Locking in :meth:`fire`. ``deadline_passed=None`` ⇒ aus der DB
+        ableiten."""
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return None
+        if deadline_passed is None:
+            deadline_passed = await self._deadline_passed(app)
         ctx = await flow_context.build_context(
             self.session, app, principal, manual=False, deadline_passed=deadline_passed
         )
@@ -313,11 +353,14 @@ class FlowService:
         principal: Principal,
         *,
         note: str | None = None,
-        deadline_passed: bool = False,
+        deadline_passed: bool | None = None,
         manual: bool = True,
         as_applicant: bool = False,
     ) -> TransitionResult:
-        """Übergang feuern. 404 (Antrag/Transition), 409 (State-Konflikt/Guard/Race)."""
+        """Übergang feuern. 404 (Antrag/Transition), 409 (State-Konflikt/Guard/Race).
+
+        ``deadline_passed=None`` ⇒ aus der DB ableiten (manuelle Pfade); der
+        Deadline-Worker übergibt explizit ``True``."""
         app = await self._load_app(application_id)
         transition = await self._load_transition(transition_id)
 
@@ -328,7 +371,17 @@ class FlowService:
                 "Transition is not available from the current state.",
                 code="conflict",
             )
+        # Branch-Übergänge (pass/fail eines vote-States) feuert ausschließlich das
+        # Vote-Ergebnis (fire_branch, manual=False) — nie ein Nutzer direkt, sonst
+        # ließe sich der Vote-Ausgang an der Abstimmung vorbei setzen.
+        if manual and transition.branch is not None:
+            raise ConflictError(
+                "Branch transitions are fired by the vote outcome, not manually.",
+                code="conflict",
+            )
 
+        if deadline_passed is None:
+            deadline_passed = await self._deadline_passed(app)
         ctx = await flow_context.build_context(
             self.session, app, principal, manual=manual,
             deadline_passed=deadline_passed, as_applicant=as_applicant,

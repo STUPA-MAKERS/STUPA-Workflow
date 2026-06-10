@@ -59,6 +59,23 @@ _BOOL_OPS: frozenset[str] = frozenset({"=="})
 # Wert-Typen eines vergleichbaren Feldes (abgeleitet aus dem Formularfeld-Typ).
 COMPARE_TYPES: frozenset[str] = frozenset({"number", "currency", "date", "text", "bool"})
 
+# Leaf-Operatoren mit String-Wert (Rolle/Gremium/Budget/Feld-Key) bzw. Bool-Wert —
+# fürs Speicher-Gate (``validate_guard``): falscher Wert-Typ (z. B. Liste) würde zur
+# Laufzeit crashen (unhashable in ``in frozenset``) statt sauber zu failen.
+_STRING_VALUE_OPERATORS: frozenset[str] = frozenset(
+    {
+        "roleIs",
+        "isInCommittee",
+        "applicantRoleIs",
+        "applicantCommitteeIs",
+        "budgetIs",
+        "hasField",
+    }
+)
+_BOOL_VALUE_OPERATORS: frozenset[str] = frozenset(
+    {"deadlinePassed", "budgetFitsApplication", "actorIsApplicant"}
+)
+
 # Whitelist Action-Typen (Dispatch in der Engine, T-14).
 ACTION_TYPES: frozenset[str] = frozenset(
     {"webhook", "notify", "addToNextSession", "assignBudget"}
@@ -162,7 +179,10 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
         raise GuardError("compare.op must be a string")
     value_type = ctx.field_types.get(fld, "text")
     if op not in ops_for_type(value_type):
-        raise GuardError(f"operator {op!r} not allowed for type {value_type!r}")
+        # Laufzeit-Typ kommt aus der **gepinnten** Form-Version des Antrags und kann
+        # vom global gespeicherten Flow abweichen (Form-Drift, fehlendes Feld ⇒
+        # ``text``). Fail-closed statt Exception — sonst 500 für alle Übergänge.
+        return False
     if fld not in ctx.field_values:
         return False
     left = ctx.field_values.get(fld)
@@ -319,6 +339,10 @@ def validate_guard(
         raise GuardError(f"unknown guard operator: {op!r}")
     if op in GUARD_ACTOR_OPERATORS and not allow_actor_ops:
         raise GuardError(f"actor gate {op!r} is only allowed on manual transitions")
+    if op in _STRING_VALUE_OPERATORS and (not isinstance(value, str) or not value):
+        raise GuardError(f"{op!r} requires a non-empty string value")
+    if op in _BOOL_VALUE_OPERATORS and not isinstance(value, bool):
+        raise GuardError(f"{op!r} requires a boolean value")
     if op == "compare":
         _validate_compare(value)
 
