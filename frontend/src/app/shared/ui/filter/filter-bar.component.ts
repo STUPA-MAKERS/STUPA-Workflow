@@ -119,6 +119,26 @@ import { IconComponent } from '../icon/icon.component';
         display: flex;
         gap: var(--space-2);
       }
+
+      /* Mobil (≤768px): Popover würde links aus dem Viewport laufen (rechts am
+         Button verankert, 22rem breit) — stattdessen als Bottom-Sheet über die
+         volle Breite, wie der Dialog. Desktop unverändert. */
+      @media (max-width: 768px) {
+        .filter__panel {
+          position: fixed;
+          inset: auto 0 0 0;
+          margin-top: 0;
+          width: auto;
+          max-height: 80dvh;
+          border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+          border-bottom: 0;
+          z-index: var(--z-dialog);
+        }
+        .filter__actions app-button {
+          flex: 1 1 auto;
+          display: flex;
+        }
+      }
     `,
   ],
 })

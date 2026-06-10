@@ -440,4 +440,11 @@
     max-width: 100%;
     white-space: normal;
   }
+  /* Auslastungs-Balken: im Karten-Layout kollabiert der flex-Track sonst auf
+     Inhaltsbreite (≈0) — feste, rechtsbündige Breite gibt ihm Fläche. */
+  .bd__bar-cell {
+    flex: 1 1 auto;
+    max-width: 14rem;
+    margin-left: auto;
+  }
 }
