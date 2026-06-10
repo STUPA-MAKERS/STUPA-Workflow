@@ -114,6 +114,17 @@ describe('graph ↔ JSON round-trip', () => {
     expect(n.transitions[0]).toEqual({ from: 'draft', to: 'review' });
   });
 
+  it('keeps a transition color through normalize (#flow)', () => {
+    const g = graph({
+      transitions: [{ from: 'draft', to: 'review', color: '#16a34a' }],
+    });
+    expect(normalizeFlowGraph(g).transitions[0]).toEqual({
+      from: 'draft',
+      to: 'review',
+      color: '#16a34a',
+    });
+  });
+
   it('serialize → parse is idempotent (round-trip)', () => {
     const g = graph();
     const back = parseFlowGraph(serializeFlowGraph(g));

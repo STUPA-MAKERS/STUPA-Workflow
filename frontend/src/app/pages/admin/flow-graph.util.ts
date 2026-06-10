@@ -145,6 +145,7 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
   const transitions: TransitionDef[] = (graph.transitions ?? []).map((t) => {
     const out: TransitionDef = { from: t.from, to: t.to };
     if (t.label) out.label = t.label;
+    if (t.color) out.color = t.color; // Pfeil-/Button-Farbe (#flow) erhalten
     if (t.guard) out.guard = t.guard;
     if (t.actions && t.actions.length > 0) out.actions = t.actions;
     if (t.order != null) out.order = t.order;
