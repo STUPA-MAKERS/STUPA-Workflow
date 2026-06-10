@@ -149,6 +149,14 @@ export const routes: Routes = [
           import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
       },
       {
+        // Konten (Name + IBAN) in der Verwaltung — nicht an Kostenstellen gebunden.
+        path: 'admin/accounts',
+        data: { title: 'admin.accounts.title', permission: 'account.manage', parent: ['admin'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/accounts/accounts.component').then((m) => m.AccountsComponent),
+      },
+      {
         path: 'admin',
         data: { title: 'nav.admin', permission: 'admin.config' },
         canActivate: [authGuard],

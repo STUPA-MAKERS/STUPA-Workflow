@@ -102,10 +102,12 @@ def test_rollup_committed() -> None:
 def _node(  # noqa: ANN001
     nid, parent, gremium, key, path, name="N", currency="EUR", active=True,
     color=None, accepted=(), denied=(), fiscal_start_month=1, fiscal_start_day=1,
+    fully_bound=False,
 ):
     return (
         nid, parent, gremium, key, path, name, currency, active,
         color, list(accepted), list(denied), fiscal_start_month, fiscal_start_day,
+        fully_bound,
     )
 
 
@@ -167,6 +169,12 @@ def test_build_forest_carries_stichtag() -> None:
     nodes = [_node("t", None, uuid.uuid4(), "VS", "VS", fiscal_start_month=7, fiscal_start_day=1)]
     forest = r.build_forest(nodes, [], [])
     assert forest[0]["fiscal_start_month"] == 7 and forest[0]["fiscal_start_day"] == 1
+
+
+def test_build_forest_carries_fully_bound() -> None:
+    nodes = [_node("t", None, uuid.uuid4(), "VS", "VS", fully_bound=True)]
+    forest = r.build_forest(nodes, [], [])
+    assert forest[0]["fully_bound"] is True
 
 
 def test_build_forest_committed_only_node() -> None:

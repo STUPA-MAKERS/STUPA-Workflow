@@ -123,6 +123,7 @@ _FULL = (
     "budget.view",
     "budget.manage",
     "budget.export",
+    "account.manage",
     "application.export",
     "webhook.manage",
     "audit.read",
@@ -141,6 +142,7 @@ ROLE_PERMISSIONS = {
         "budget.view",
         "budget.manage",
         "budget.export",
+        "account.manage",
         "application.export",
     ],
     "protocol": ["application.read", "meeting.manage"],
@@ -149,6 +151,7 @@ ROLE_PERMISSIONS = {
         "budget.view",
         "budget.manage",
         "budget.export",
+        "account.manage",
     ],
 }
 

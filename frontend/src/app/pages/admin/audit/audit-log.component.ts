@@ -15,6 +15,9 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  CellDirective,
+  type ColumnDef,
+  DataTableComponent,
   FilterBarComponent,
   FilterFieldComponent,
 } from '@shared/ui';
@@ -69,6 +72,8 @@ const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
     BadgeComponent,
     FilterBarComponent,
     FilterFieldComponent,
+    DataTableComponent,
+    CellDirective,
   ],
   template: `
     <section class="audit">
@@ -107,28 +112,20 @@ const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
         <p class="audit__status audit__status--error" role="alert">{{ 'admin.audit.error' | t }}</p>
       }
 
-      <ul class="audit__list">
-        @for (e of entries(); track e.id) {
-          <li class="audit__row">
-            <span class="audit__at audit__mono">{{ e.at | ldate: 'medium' }}</span>
-            <app-badge variant="neutral">{{ actionLabel(e.action) }}</app-badge>
-            <div class="audit__body">
-              <p class="audit__msg">{{ message(e) }}</p>
-              @if (dataPairs(e).length) {
-                <div class="audit__data">
-                  @for (p of dataPairs(e); track p[0]) {
-                    <span class="audit__chip audit__mono">{{ p[0] }}: {{ p[1] }}</span>
-                  }
-                </div>
+      <app-data-table [columns]="columns()" [rows]="entries()" [rowKey]="rowId" [emptyText]="(loading() ? 'admin.audit.loading' : 'admin.audit.empty') | t">
+        <ng-template appCell="at" let-e><span class="audit__mono">{{ $any(e).at | ldate: 'medium' }}</span></ng-template>
+        <ng-template appCell="action" let-e><app-badge variant="neutral">{{ actionLabel($any(e).action) }}</app-badge></ng-template>
+        <ng-template appCell="message" let-e>{{ message($any(e)) }}</ng-template>
+        <ng-template appCell="data" let-e>
+          @if (dataPairs($any(e)).length) {
+            <div class="audit__data">
+              @for (p of dataPairs($any(e)); track p[0]) {
+                <span class="audit__chip audit__mono">{{ p[0] }}: {{ p[1] }}</span>
               }
             </div>
-          </li>
-        } @empty {
-          @if (!loading()) {
-            <li class="audit__empty">{{ 'admin.audit.empty' | t }}</li>
-          }
-        }
-      </ul>
+          } @else { — }
+        </ng-template>
+      </app-data-table>
 
       <div #sentinel class="audit__sentinel" aria-hidden="true"></div>
 
@@ -249,6 +246,14 @@ export class AuditLogComponent {
   protected readonly hasMore = signal(false);
   protected readonly loading = signal(false);
   protected readonly loadError = signal(false);
+
+  protected readonly columns = computed<ColumnDef[]>(() => [
+    { key: 'at', label: this.i18n.translate('admin.audit.col.at'), width: '12rem' },
+    { key: 'action', label: this.i18n.translate('admin.audit.col.action'), width: '12rem' },
+    { key: 'message', label: this.i18n.translate('admin.audit.col.message') },
+    { key: 'data', label: this.i18n.translate('admin.audit.col.data') },
+  ]);
+  protected readonly rowId = (r: unknown): string => String((r as AuditEntry).id);
 
   // Filter
   protected readonly action = signal('');

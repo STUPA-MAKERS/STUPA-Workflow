@@ -112,6 +112,7 @@ export class AdminHomeComponent {
     { link: 'roles', title: 'admin.home.roles', desc: 'admin.home.rolesDesc', icon: 'roles' },
     { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc', icon: 'parliament' },
     { link: 'budget-pots', title: 'budget.tree.title', desc: 'admin.home.budgetPotsDesc', icon: 'euro' },
+    { link: 'accounts', title: 'admin.accounts.title', desc: 'admin.accounts.desc', icon: 'building' },
     { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc', icon: 'form' },
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc', icon: 'flow' },
     { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc', icon: 'palette' },

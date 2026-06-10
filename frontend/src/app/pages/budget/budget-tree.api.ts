@@ -36,8 +36,34 @@ export interface Expense {
   description: string;
   applicationId: Uuid | null;
   applicationTitle: string | null;
+  accountId: Uuid | null;
+  accountName: string | null;
+  transferId: Uuid | null;
   actor: string | null;
   createdAt: string;
+}
+
+/** Konto (Name + IBAN-Freitext), nicht an Kostenstellen gebunden. */
+export interface Account {
+  id: Uuid;
+  name: string;
+  iban: string;
+  active: boolean;
+}
+
+export interface AccountBody {
+  name: string;
+  iban?: string;
+  active?: boolean;
+}
+
+/** Übertrag Kostenstelle → Kostenstelle (gleiches HHJ). */
+export interface TransferCreate {
+  fromBudgetId: Uuid;
+  toBudgetId: Uuid;
+  fiscalYearId: Uuid;
+  amount: string;
+  description: string;
 }
 
 /** Offset-Seite gebuchter Ausgaben/Einnahmen. */
@@ -56,6 +82,7 @@ export interface ExpenseCreate {
   budgetId?: Uuid | null;
   fiscalYearId?: Uuid | null;
   applicationId?: Uuid | null;
+  accountId?: Uuid | null;
 }
 
 /** Buchung ändern (Betrag/Beschreibung). */
@@ -96,6 +123,8 @@ export interface BudgetTreeNode {
   /** Nur am Top-Level: Flow-State-Keys, die als angenommen/abgelehnt gelten. */
   acceptedStateKeys: string[];
   deniedStateKeys: string[];
+  /** Ganze Kostenstelle (inkl. Unterbaum) gilt je HHJ als gebunden (committed = allocated). */
+  fullyBound: boolean;
   /** HHJ-Stichtag (Tag/Monat des Periodenstarts) — nur am Top-Level relevant. */
   fiscalStartMonth: number;
   fiscalStartDay: number;
@@ -115,6 +144,7 @@ export interface BudgetNode {
   color?: string | null;
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
+  fullyBound?: boolean;
   fiscalStartMonth?: number;
   fiscalStartDay?: number;
 }
@@ -149,6 +179,7 @@ export interface BudgetNodeUpdate {
   color?: string | null;
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
+  fullyBound?: boolean;
   fiscalStartMonth?: number;
   fiscalStartDay?: number;
 }
@@ -242,9 +273,28 @@ export class BudgetTreeApi {
     return this.http.patch<Expense>(`${this.base}/budget-expenses/${id}`, body);
   }
 
-  /** Buchung löschen (#25). */
+  /** Buchung löschen (#25). Teil eines Übertrags → beide Buchungen weg. */
   deleteExpense(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budget-expenses/${id}`);
+  }
+
+  /** Übertrag Kostenstelle → Kostenstelle (Ausgabe + Einnahme, gleiches HHJ). */
+  createTransfer(body: TransferCreate): Observable<unknown> {
+    return this.http.post(`${this.base}/budget-transfers`, body);
+  }
+
+  // ------------------------------------------------------------- accounts
+  listAccounts(): Observable<Account[]> {
+    return this.http.get<Account[]>(`${this.base}/accounts`);
+  }
+  createAccount(body: AccountBody): Observable<Account> {
+    return this.http.post<Account>(`${this.base}/accounts`, body);
+  }
+  updateAccount(id: Uuid, body: Partial<AccountBody>): Observable<Account> {
+    return this.http.patch<Account>(`${this.base}/accounts/${id}`, body);
+  }
+  deleteAccount(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/accounts/${id}`);
   }
 
   /** Budget-Baum als ``.xlsx`` (P(``budget.export``)), gefiltert wie das Dashboard. */

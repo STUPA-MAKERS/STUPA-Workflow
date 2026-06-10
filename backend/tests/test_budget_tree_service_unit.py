@@ -31,12 +31,13 @@ from tests.auth_fakes import fake_session, result
 
 def _budget(  # noqa: ANN001
     *, id=None, parent_id=None, path_key="VS", gremium_id=None, key="VS", name="N",
-    fiscal_start_month=1, fiscal_start_day=1,
+    fiscal_start_month=1, fiscal_start_day=1, fully_bound=False,
 ):
     b = Budget(
         parent_id=parent_id, gremium_id=gremium_id, key=key,
         path_key=path_key, name=name, currency="EUR", active=True,
         fiscal_start_month=fiscal_start_month, fiscal_start_day=fiscal_start_day,
+        fully_bound=fully_bound,
     )
     b.id = id or uuid.uuid4()
     return b

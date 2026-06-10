@@ -28,6 +28,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "budget.view",
     "budget.manage",
     "budget.export",
+    "account.manage",
     "application.export",
     "webhook.manage",
     "audit.read",

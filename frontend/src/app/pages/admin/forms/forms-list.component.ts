@@ -71,10 +71,8 @@ function emptyForm(): NewForm {
         <p class="fl__status" aria-live="polite">{{ 'admin.forms.overviewLoading' | t }}</p>
       } @else if (loadError()) {
         <p class="fl__status fl__status--error" role="alert">{{ 'admin.forms.overviewError' | t }}</p>
-      } @else if (!types().length) {
-        <p class="fl__status">{{ 'admin.forms.overviewEmpty' | t }}</p>
       } @else {
-        <app-data-table [columns]="columns()" [rows]="types()" [rowKey]="rowId">
+        <app-data-table [columns]="columns()" [rows]="types()" [rowKey]="rowId" [emptyText]="'admin.forms.overviewEmpty' | t">
           <ng-template appCell="name" let-t>
             <a class="fl__name" [routerLink]="['/admin/forms', $any(t).id]">{{ name($any(t)) }}</a>
           </ng-template>

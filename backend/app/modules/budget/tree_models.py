@@ -67,6 +67,10 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     # abgelehnt (→ ausgeschlossen) gelten. Alles andere zählt als »beantragt«.
     accepted_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
     denied_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    # Komplett gebunden (#budget): die gesamte Zuteilung der Kostenstelle (inkl.
+    # Unterbaum) gilt je HHJ als gebunden (committed = allocated, verfügbar 0) — echte
+    # Anträge/Ausgaben darauf werden dann nicht zusätzlich gezählt. Rollt zum Parent hoch.
+    fully_bound: Mapped[bool] = mapped_column(Boolean, server_default="false")
     # Haushaltsjahr-Stichtag (Tag/Monat des Periodenstarts) — **nur am Top-Level**
     # relevant. Default 01.01.; abweichend (z. B. 01.07.) ⇒ HHJ-Anzeige »YYYY/YY«.
     # Die HHJ tragen nur das Jahr; Start/Ende leiten sich aus diesem Stichtag ab.
@@ -170,6 +174,12 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
+    # Optionales Konto (Bankkonto, frei verwaltet; NICHT an Kostenstellen gebunden).
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("account.id", ondelete="SET NULL"), nullable=True
+    )
+    # Verknüpft die beiden Buchungen eines Übertrags (Ausgabe Quelle ↔ Einnahme Ziel).
+    transfer_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     # 'expense' (ausgegeben) | 'income' (Einnahme).
     kind: Mapped[str] = mapped_column(Text, server_default="expense")
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
@@ -186,7 +196,24 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
         Index("ix_budget_expense_budget_id", "budget_id"),
         Index("ix_budget_expense_fiscal_year_id", "fiscal_year_id"),
         Index("ix_budget_expense_application_id", "application_id"),
+        Index("ix_budget_expense_account_id", "account_id"),
+        Index("ix_budget_expense_transfer_id", "transfer_id"),
     )
 
 
-__all__ = ["Budget", "BudgetAllocation", "BudgetExpense", "FiscalYear"]
+class Account(UUIDPkMixin, CreatedAtMixin, Base):
+    """Konto (z. B. Bankkonto) — frei verwaltet, **nicht** an Kostenstellen gebunden.
+
+    Dient als optionale Referenz bei Buchungen (welches Konto bewegt wurde). ``iban``
+    ist Freitext (keine Format-/Prüfsummen-Validierung)."""
+
+    __tablename__ = "account"
+
+    name: Mapped[str] = mapped_column(Text)
+    iban: Mapped[str] = mapped_column(Text, server_default="")
+    active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+
+    __table_args__ = (Index("ix_account_name", "name"),)
+
+
+__all__ = ["Account", "Budget", "BudgetAllocation", "BudgetExpense", "FiscalYear"]

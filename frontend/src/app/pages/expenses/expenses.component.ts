@@ -29,7 +29,9 @@ import {
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
+import { downloadBlob } from '@shared/download.util';
 import {
+  type Account,
   BudgetTreeApi,
   type BudgetTreeNode,
   type Expense,
@@ -68,42 +70,51 @@ import {
   ],
   template: `
     <header class="exp__head">
-      <div class="exp__titleRow">
-        <h1 class="exp__title">{{ 'expenses.title' | t }}</h1>
-        @if (canManage()) {
-          <app-button size="sm" (click)="openCreate()">{{ 'expenses.add' | t }}</app-button>
-        }
-      </div>
-      <div class="exp__filters">
-        <input
-          class="exp__search"
-          type="search"
-          [placeholder]="'expenses.search' | t"
-          [ngModel]="q()"
-          (ngModelChange)="onSearch($event)"
-          [attr.aria-label]="'expenses.search' | t"
-        />
-        <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-          <app-filter-field [label]="'expenses.filter.kind' | t">
-            <div class="exp__kinds">
-              <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
-              <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
-              <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
-            </div>
-          </app-filter-field>
-          <app-filter-field [label]="'expenses.filter.amountRange' | t">
-            <app-filter-range>
-              <app-currency-input start [placeholder]="'expenses.filter.amountMin' | t" [ariaLabel]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
-              <app-currency-input end [placeholder]="'expenses.filter.amountMax' | t" [ariaLabel]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
-            </app-filter-range>
-          </app-filter-field>
-          <app-filter-field [label]="'expenses.filter.dateRange' | t">
-            <app-filter-range>
-              <input start type="date" [attr.aria-label]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
-              <input end type="date" [attr.aria-label]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
-            </app-filter-range>
-          </app-filter-field>
-        </app-filter-bar>
+      <div class="exp__headRow">
+        <div>
+          <h1 class="exp__title">{{ 'expenses.title' | t }}</h1>
+          <p class="exp__subtitle">{{ 'expenses.subtitle' | t }}</p>
+        </div>
+        <div class="exp__headActions">
+          <input
+            class="exp__search"
+            type="search"
+            [placeholder]="'expenses.search' | t"
+            [ngModel]="q()"
+            (ngModelChange)="onSearch($event)"
+            [attr.aria-label]="'expenses.search' | t"
+          />
+          <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+            <app-filter-field [label]="'expenses.filter.kind' | t">
+              <div class="exp__kinds">
+                <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
+                <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+                <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
+              </div>
+            </app-filter-field>
+            <app-filter-field [label]="'expenses.filter.amountRange' | t">
+              <app-filter-range>
+                <app-currency-input start [placeholder]="'expenses.filter.amountMin' | t" [ariaLabel]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
+                <app-currency-input end [placeholder]="'expenses.filter.amountMax' | t" [ariaLabel]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
+              </app-filter-range>
+            </app-filter-field>
+            <app-filter-field [label]="'expenses.filter.dateRange' | t">
+              <app-filter-range>
+                <input start type="date" [attr.aria-label]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
+                <input end type="date" [attr.aria-label]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
+              </app-filter-range>
+            </app-filter-field>
+          </app-filter-bar>
+          @if (canExport()) {
+            <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
+              <span class="exp__btnIcon"><app-icon name="export" [size]="16" /> {{ 'expenses.export' | t }}</span>
+            </app-button>
+          }
+          @if (canManage()) {
+            <app-button variant="secondary" size="sm" (click)="openTransfer()">{{ 'expenses.transfer' | t }}</app-button>
+            <app-button size="sm" (click)="openCreate()">{{ 'expenses.add' | t }}</app-button>
+          }
+        </div>
       </div>
     </header>
 
@@ -121,8 +132,6 @@ import {
       <div class="exp__main">
         @if (loading()) {
           <p class="exp__status" aria-live="polite">{{ 'expenses.loading' | t }}</p>
-        } @else if (!items().length) {
-          <p class="exp__status">{{ 'expenses.empty' | t }}</p>
         } @else {
           <div class="exp__tableWrap">
             <table class="exp__table">
@@ -165,6 +174,10 @@ import {
                       </td>
                     }
                   </tr>
+                } @empty {
+                  <tr>
+                    <td class="exp__empty" [attr.colspan]="canManage() ? 7 : 6">{{ 'expenses.empty' | t }}</td>
+                  </tr>
                 }
               </tbody>
             </table>
@@ -179,7 +192,9 @@ import {
               }
             </div>
           }
-          <p class="exp__count">{{ 'expenses.count' | t: { count: items().length, total: total() } }}</p>
+          @if (total() > 0) {
+            <p class="exp__count">{{ 'expenses.count' | t: { count: items().length, total: total() } }}</p>
+          }
         }
       </div>
     </div>
@@ -244,6 +259,10 @@ import {
             }
           }
         }
+
+        @if (accountOptions().length) {
+          <app-select name="account" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="newAccountId()" (ngModelChange)="newAccountId.set($event)" />
+        }
       </form>
       <div dialog-footer class="exp__dialogFoot">
         <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
@@ -273,14 +292,40 @@ import {
         <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'expenses.delete.confirm' | t }}</app-button>
       </div>
     </app-dialog>
+
+    <!-- Übertrag (KS → KS) -->
+    <app-dialog [open]="transferOpen()" [title]="'expenses.transferTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="transferOpen.set(false)">
+      <form id="exp-transfer" class="exp__form" (submit)="createTransfer($event)">
+        <app-select name="tfrom" [label]="'expenses.transferFrom' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="tFromId()" (ngModelChange)="onTransferFrom($event)" />
+        <app-select name="tto" [label]="'expenses.transferTo' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="tToId()" (ngModelChange)="tToId.set($event)" />
+        @if (tFromId()) {
+          @if (transferFyOptions().length) {
+            <app-select name="tfy" [label]="'expenses.field.fiscalYear' | t" [placeholder]="'expenses.field.fiscalYearPlaceholder' | t" [options]="transferFyOptions()" [required]="true" [ngModel]="tFiscalYearId()" (ngModelChange)="tFiscalYearId.set($event)" />
+          } @else {
+            <p class="exp__hint exp__hint--warn">{{ 'expenses.field.noFiscalYear' | t }}</p>
+          }
+        }
+        <label class="exp__label" for="exp-tamount">{{ 'expenses.field.amount' | t }}</label>
+        <app-currency-input name="tamount" [ngModel]="tAmount()" (ngModelChange)="tAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
+        <label class="exp__label" for="exp-tdesc">{{ 'expenses.field.description' | t }}</label>
+        <input id="exp-tdesc" class="exp__input" [ngModel]="tDescription()" (ngModelChange)="tDescription.set($event)" name="tdesc" [placeholder]="'expenses.field.descriptionPlaceholder' | t" />
+      </form>
+      <div dialog-footer class="exp__dialogFoot">
+        <app-button variant="ghost" (click)="transferOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+        <app-button [disabled]="!canSubmitTransfer()" [loading]="saving()" (click)="createTransfer($event)">{{ 'expenses.transferConfirm' | t }}</app-button>
+      </div>
+    </app-dialog>
   `,
   styles: [
     `
       :host { display: block; }
-      .exp__head { margin-bottom: var(--space-5); }
-      .exp__titleRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+      /* Kopf auf normale Body-Breite zentrieren (wie Anträge); Baum im linken Rand. */
+      .exp__head { width: 100%; max-width: var(--layout-max-width); margin: 0 auto var(--space-5); }
+      .exp__headRow { display: flex; align-items: start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
       .exp__title { margin: 0; }
-      .exp__filters { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-3); }
+      .exp__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
+      .exp__headActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+      .exp__btnIcon { display: inline-flex; align-items: center; gap: var(--space-2); }
       .exp__kinds { display: inline-flex; gap: var(--space-1); }
       .exp__search, .exp__input {
         padding: var(--space-2) var(--space-3);
@@ -290,10 +335,21 @@ import {
         color: var(--color-text);
         font: inherit;
       }
-      .exp__search { min-width: 16rem; }
-      .exp__layout { display: grid; grid-template-columns: minmax(12rem, 16rem) 1fr; gap: var(--space-5); align-items: start; }
-      /* Kostenstellen-Baum schwebt mit (sticky) und scrollt nicht weg (#25). */
+      .exp__search { min-width: 14rem; height: 2.25rem; }
+      .exp__layout {
+        display: grid;
+        grid-template-columns:
+          minmax(12rem, 1fr)
+          minmax(0, var(--layout-max-width))
+          minmax(0, 1fr);
+        gap: var(--space-5);
+        align-items: start;
+      }
+      /* Kostenstellen-Baum im linken Rand (Breakout) + sticky (wie Anträge). */
       .exp__tree {
+        justify-self: end;
+        width: 100%;
+        max-width: 16rem;
         position: sticky;
         top: calc(var(--layout-header-height) + var(--space-4));
         align-self: start;
@@ -302,6 +358,15 @@ import {
         overflow-y: auto;
       }
       .exp__main { min-width: 0; }
+      .exp__empty { text-align: center; color: var(--color-text-muted); padding: var(--space-6) !important; }
+      @media (max-width: 60rem) {
+        .exp__layout { grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr); }
+        .exp__head { max-width: none; }
+      }
+      @media (max-width: 40rem) {
+        .exp__layout { grid-template-columns: 1fr; }
+        .exp__tree { position: static; max-height: none; }
+      }
       .exp__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
       .exp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
       .exp__row {
@@ -532,6 +597,36 @@ export class ExpensesComponent {
   readonly editDescription = signal('');
   readonly confirmDelete = signal<Expense | null>(null);
 
+  // --- Export + Konten ---
+  readonly canExport = computed(() => this.auth.can('budget.export'));
+  readonly exporting = signal(false);
+  readonly accounts = signal<Account[]>([]);
+  readonly accountOptions = computed<SelectOption[]>(() =>
+    this.accounts().map((a) => ({
+      value: a.id,
+      label: a.iban ? `${a.name} (${a.iban})` : a.name,
+    })),
+  );
+  readonly newAccountId = signal('');
+
+  // --- Übertrag-Dialog ---
+  readonly transferOpen = signal(false);
+  readonly tFromId = signal('');
+  readonly tToId = signal('');
+  readonly tFiscalYearId = signal('');
+  readonly tAmount = signal('');
+  readonly tDescription = signal('');
+  readonly transferFyOptions = signal<SelectOption[]>([]);
+  readonly canSubmitTransfer = computed(
+    () =>
+      !!this.tFromId() &&
+      !!this.tToId() &&
+      this.tFromId() !== this.tToId() &&
+      !!this.tFiscalYearId() &&
+      Number(this.tAmount()) > 0 &&
+      !!this.tDescription().trim(),
+  );
+
   readonly canSubmitCreate = computed(() => {
     if (!this.newDescription().trim() || !(Number(this.newAmount()) > 0)) return false;
     // Gebunden: Kostenstelle + HHJ werden vom Antrag geerbt.
@@ -544,6 +639,10 @@ export class ExpensesComponent {
     this.api.tree().subscribe({
       next: (tree) => this.budgetTree.set(tree),
       error: () => this.budgetTree.set([]),
+    });
+    this.api.listAccounts().subscribe({
+      next: (accs) => this.accounts.set(accs.filter((a) => a.active)),
+      error: () => this.accounts.set([]),
     });
     this.reload();
 
@@ -680,11 +779,85 @@ export class ExpensesComponent {
     this.newBudgetId.set(this.budgetId() || '');
     this.newFiscalYearId.set('');
     this.newApplicationId.set('');
+    this.newAccountId.set('');
     this.appQuery.set('');
     this.appCandidates.set([]);
     this.fiscalYearOptions.set([]);
     if (this.budgetId()) this.loadFiscalYears(this.budgetId());
     this.createOpen.set(true);
+  }
+
+  // --- Export ---
+  onExport(): void {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    this.api
+      .exportXlsx({ node: this.budgetId() || undefined })
+      .subscribe({
+        next: (blob) => {
+          downloadBlob(blob, 'budget.xlsx');
+          this.exporting.set(false);
+        },
+        error: () => this.exporting.set(false),
+      });
+  }
+
+  // --- Übertrag ---
+  openTransfer(): void {
+    this.tFromId.set(this.budgetId() || '');
+    this.tToId.set('');
+    this.tFiscalYearId.set('');
+    this.tAmount.set('');
+    this.tDescription.set('');
+    this.transferFyOptions.set([]);
+    if (this.tFromId()) this.loadTransferFy(this.tFromId());
+    this.transferOpen.set(true);
+  }
+
+  onTransferFrom(id: string): void {
+    this.tFromId.set(id);
+    this.tFiscalYearId.set('');
+    this.transferFyOptions.set([]);
+    if (id) this.loadTransferFy(id);
+  }
+
+  private loadTransferFy(budgetId: string): void {
+    const top = this.findTop(this.budgetTree(), budgetId);
+    if (!top) return;
+    this.api.listFiscalYears(top.id).subscribe({
+      next: (fys: FiscalYear[]) => {
+        this.transferFyOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
+        const active = fys.filter((f) => f.active);
+        if (active.length === 1) this.tFiscalYearId.set(active[0].id);
+      },
+      error: () => this.transferFyOptions.set([]),
+    });
+  }
+
+  createTransfer(event: Event): void {
+    event.preventDefault();
+    if (!this.canSubmitTransfer() || this.saving()) return;
+    this.saving.set(true);
+    this.api
+      .createTransfer({
+        fromBudgetId: this.tFromId(),
+        toBudgetId: this.tToId(),
+        fiscalYearId: this.tFiscalYearId(),
+        amount: this.tAmount(),
+        description: this.tDescription().trim(),
+      })
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.transferOpen.set(false);
+          this.toast.success(this.i18n.translate('expenses.transferToast'));
+          this.reload();
+        },
+        error: (err) => {
+          this.saving.set(false);
+          this.toast.error(this.problemDetail(err));
+        },
+      });
   }
 
   setNewKindIncome(): void {
@@ -764,6 +937,7 @@ export class ExpensesComponent {
         applicationId: linked ? this.newApplicationId() : null,
         budgetId: linked ? null : this.newBudgetId() || null,
         fiscalYearId: linked ? null : this.newFiscalYearId() || null,
+        accountId: this.newAccountId() || null,
       })
       .subscribe({
         next: () => {

@@ -25,12 +25,17 @@ from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.deps import DbSession, Principal, require_principal
 from app.modules.budget.tree_schemas import (
+    AccountCreate,
+    AccountOut,
+    AccountUpdate,
     AllocationOut,
     AllocationSet,
     AssignBudgetOut,
     AssignBudgetRequest,
     BudgetApplicationOut,
     BudgetNodeCreate,
+    TransferCreate,
+    TransferOut,
     BudgetNodeOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
@@ -291,6 +296,67 @@ async def update_budget_expense(
 ) -> ExpenseOut:
     """Betrag/Beschreibung einer Buchung ändern (#25)."""
     return await service.update_expense(expense_id, payload)
+
+
+# ----------------------------------------------------------------- transfers
+@router.post(
+    "/budget-transfers",
+    response_model=TransferOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def create_transfer(
+    payload: TransferCreate,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.manage"))],
+) -> TransferOut:
+    """Übertrag Kostenstelle → Kostenstelle (Ausgabe + Einnahme, gleiches HHJ)."""
+    return await service.create_transfer(payload, actor=principal.sub)
+
+
+# ------------------------------------------------------------------- accounts
+@router.get(
+    "/accounts",
+    response_model=list[AccountOut],
+    dependencies=[Depends(require_principal("account.manage"))],
+    responses=_errors(401, 403),
+)
+async def list_accounts(service: ServiceDep) -> list[AccountOut]:
+    """Konten (Name + IBAN) — P(``account.manage``)."""
+    return await service.list_accounts()
+
+
+@router.post(
+    "/accounts",
+    response_model=AccountOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_principal("account.manage"))],
+    responses=_errors(400, 401, 403, 422),
+)
+async def create_account(payload: AccountCreate, service: ServiceDep) -> AccountOut:
+    return await service.create_account(payload)
+
+
+@router.patch(
+    "/accounts/{account_id}",
+    response_model=AccountOut,
+    dependencies=[Depends(require_principal("account.manage"))],
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def update_account(
+    account_id: UUID, payload: AccountUpdate, service: ServiceDep
+) -> AccountOut:
+    return await service.update_account(account_id, payload)
+
+
+@router.delete(
+    "/accounts/{account_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_principal("account.manage"))],
+    responses=_errors(401, 403, 404),
+)
+async def delete_account(account_id: UUID, service: ServiceDep) -> None:
+    await service.delete_account(account_id)
 
 
 # ---------------------------------------------------------------- fiscal years

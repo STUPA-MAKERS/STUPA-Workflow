@@ -35,6 +35,7 @@ from app.modules.auth.models import (
 )
 from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
 from app.modules.budget.tree_models import (
+    Account,
     Budget,
     BudgetAllocation,
     BudgetExpense,
@@ -59,6 +60,7 @@ __all__ = [
     "AuthSession",
     "Ballot",
     "Base",
+    "Account",
     "Budget",
     "BudgetAllocation",
     "BudgetEntry",

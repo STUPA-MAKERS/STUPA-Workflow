@@ -10,6 +10,11 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
+  /* Kopf auf normale Body-Breite zentrieren (wie Anträge); der Baum sitzt im linken
+     Rand außerhalb des Bodys (Breakout). */
+  width: 100%;
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
 }
 
 .bt__head-actions {
@@ -37,17 +42,23 @@
   flex: 1 1 14rem;
 }
 
-/* Links Budget→Jahr-Baum (persistente Sidebar), rechts Editor. */
+/* Baum im linken Rand (Breakout), Editor im zentrierten Body — wie Anträge. */
 .bt__layout {
   display: grid;
-  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+  grid-template-columns:
+    minmax(12rem, 1fr)
+    minmax(0, var(--layout-max-width))
+    minmax(0, 1fr);
   gap: var(--space-5);
   align-items: start;
 }
 .bt__nav {
-  position: sticky;
-  top: var(--space-4);
+  justify-self: end;
+  width: 100%;
+  max-width: 16rem;
   min-width: 0;
+  position: sticky;
+  top: calc(var(--layout-header-height) + var(--space-4));
   // Cap at 3/4 viewport so a tall tree scrolls internally instead of growing
   // past the fold and dragging the sticky element off-screen.
   max-height: 75vh;
@@ -62,7 +73,15 @@
 .bt__pick {
   padding: var(--space-6);
 }
-@media (max-width: 48rem) {
+@media (max-width: 60rem) {
+  .bt__layout {
+    grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+  }
+  .bt__head {
+    max-width: none;
+  }
+}
+@media (max-width: 40rem) {
   .bt__layout {
     grid-template-columns: 1fr;
   }
@@ -296,6 +315,26 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+.bt__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.bt__check-hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+.bt__tag {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-muted);
+  background: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
 }
 
 .bt__dialog-foot {

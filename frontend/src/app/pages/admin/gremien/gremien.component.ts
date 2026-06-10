@@ -81,10 +81,8 @@ function emptyForm(): GremiumForm {
         <p class="grem__status" aria-live="polite">{{ 'admin.gremien.loading' | t }}</p>
       } @else if (loadError()) {
         <p class="grem__status grem__status--error" role="alert">{{ 'admin.gremien.error' | t }}</p>
-      } @else if (!gremien().length) {
-        <p class="grem__status">{{ 'admin.gremien.empty' | t }}</p>
       } @else {
-        <app-data-table [columns]="columns()" [rows]="gremien()" [rowKey]="rowId">
+        <app-data-table [columns]="columns()" [rows]="gremien()" [rowKey]="rowId" [emptyText]="'admin.gremien.empty' | t">
           <ng-template appCell="slug" let-g><span class="grem__mono">{{ $any(g).slug }}</span></ng-template>
           <ng-template appCell="delegation" let-g>
             @if ($any(g).allowVoteDelegation) {

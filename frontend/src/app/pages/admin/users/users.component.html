@@ -18,10 +18,7 @@
     <app-button type="submit" size="sm">{{ 'admin.users.searchAction' | t }}</app-button>
   </form>
 
-  @if (principals().length === 0) {
-    <p class="users__empty">{{ 'admin.users.noResults' | t }}</p>
-  } @else {
-    <app-data-table [columns]="columns()" [rows]="principals()" [rowKey]="rowId" [isExpanded]="rowExpanded">
+  <app-data-table [columns]="columns()" [rows]="principals()" [rowKey]="rowId" [isExpanded]="rowExpanded" [emptyText]="'admin.users.noResults' | t">
       <ng-template appCell="name" let-p>
         <span class="users__name">{{ userLabel($any(p)) }}</span>
         @if ($any(p).active === false) {
@@ -99,5 +96,4 @@
         </fieldset>
       </ng-template>
     </app-data-table>
-  }
 </section>

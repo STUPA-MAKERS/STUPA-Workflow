@@ -85,6 +85,8 @@ export class BudgetTreeComponent {
   /** Limit (Zuteilung) je Knoten setzen — per Dialog pro Zeile (#22). */
   readonly limitNode = signal<BudgetTreeNode | null>(null);
   readonly limitValue = signal('');
+  /** »Komplett gebunden«-Flag der im Limit-Dialog offenen Kostenstelle (alle HHJ). */
+  readonly limitFullyBound = signal(false);
   /** Haushaltsjahr anlegen — INNERHALB des gewählten Budgets (nur das Jahr). */
   readonly newFy = signal<{ year: number }>({ year: new Date().getFullYear() });
 
@@ -370,10 +372,28 @@ export class BudgetTreeComponent {
   openLimit(node: BudgetTreeNode): void {
     this.limitNode.set(node);
     this.limitValue.set(this.alloc(node)?.allocated ?? '');
+    this.limitFullyBound.set(node.fullyBound);
   }
 
   closeLimit(): void {
     this.limitNode.set(null);
+  }
+
+  /** »Komplett gebunden« sofort umschalten (Knoten-Flag, alle HHJ) + neu laden. */
+  toggleFullyBound(checked: boolean): void {
+    const node = this.limitNode();
+    if (!node) return;
+    this.limitFullyBound.set(checked);
+    this.api.updateNode(node.id, { fullyBound: checked }).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.fullyBoundSaved'));
+        this.reload();
+      },
+      error: () => {
+        this.limitFullyBound.set(!checked);
+        this.toast.error(this.i18n.translate('budget.tree.toast.failed'));
+      },
+    });
   }
 
   saveLimit(): void {

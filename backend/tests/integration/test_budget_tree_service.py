@@ -26,9 +26,13 @@ from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Application
 from app.modules.budget.tree_models import Budget
 from app.modules.budget.tree_schemas import (
+    AccountCreate,
     AllocationSet,
     BudgetNodeCreate,
+    BudgetNodeUpdate,
+    ExpenseCreate,
     FiscalYearCreate,
+    TransferCreate,
 )
 from app.modules.budget.tree_service import BudgetTreeService
 from app.modules.flow.models import FlowVersion, State
@@ -119,6 +123,87 @@ async def test_top_down_allocation_constraint(session: AsyncSession) -> None:
     # Parent unter verteilte Kinder-Summe senken → 422
     with pytest.raises(ValidationProblem):
         await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("900")))
+
+
+async def test_fully_bound_binds_whole_allocation(session: AsyncSession) -> None:
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(
+        BudgetNodeCreate(key=f"FB{_suffix()}", name="Top", gremiumId=g.id)
+    )
+    c1 = await svc.create_node(BudgetNodeCreate(key="01", name="K1", parentId=top.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("1000")))
+    await svc.set_allocation(c1.id, fy.id, AllocationSet(allocated=Decimal("600")))
+
+    # Ohne Flag: nichts gebunden (keine Anträge) → c1 verfügbar 600.
+    tree = await svc.get_tree(gremium_id=g.id)
+    c1_view = _fy_view(_find(tree, c1.id), fy.id)
+    assert c1_view.committed == Decimal("0") and c1_view.available == Decimal("600")
+
+    # Flag setzen → ganze Zuteilung (600) gilt als gebunden, verfügbar 0; rollt zum Top.
+    await svc.update_node(c1.id, BudgetNodeUpdate(fullyBound=True))
+    tree = await svc.get_tree(gremium_id=g.id)
+    c1_view = _fy_view(_find(tree, c1.id), fy.id)
+    assert c1_view.committed == Decimal("600") and c1_view.available == Decimal("0")
+    top_view = _fy_view(_find(tree, top.id), fy.id)
+    assert top_view.committed == Decimal("600")  # gebunden rollt hoch
+    assert top_view.available == Decimal("400")  # 1000 − 600
+
+
+def _find(tree, node_id):  # noqa: ANN001
+    stack = list(tree)
+    while stack:
+        n = stack.pop()
+        if n.id == node_id:
+            return n
+        stack.extend(n.children)
+    raise AssertionError(f"node {node_id} not in tree")
+
+
+def _fy_view(node, fy_id):  # noqa: ANN001
+    return next(v for v in node.by_fiscal_year if v.fiscal_year_id == fy_id)
+
+
+async def test_account_and_transfer(session: AsyncSession) -> None:
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(
+        BudgetNodeCreate(key=f"TR{_suffix()}", name="Top", gremiumId=g.id)
+    )
+    a = await svc.create_node(BudgetNodeCreate(key="01", name="A", parentId=top.id))
+    b = await svc.create_node(BudgetNodeCreate(key="02", name="B", parentId=top.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+
+    # Konto (Name + IBAN-Freitext), nicht an Kostenstellen gebunden.
+    acc = await svc.create_account(AccountCreate(name="Giro", iban="DE-frei-text"))
+    assert acc.name == "Giro"
+    booking = await svc.book_expense(
+        ExpenseCreate(
+            budgetId=str(a.id), fiscalYearId=str(fy.id), amount=Decimal("50"),
+            description="mit Konto", accountId=str(acc.id),
+        ),
+        actor="tester",
+    )
+    assert booking.account_id == acc.id and booking.account_name == "Giro"
+
+    # Übertrag A → B (200): Ausgabe auf A + Einnahme auf B, gleiches HHJ.
+    transfer = await svc.create_transfer(
+        TransferCreate(
+            fromBudgetId=str(a.id), toBudgetId=str(b.id), fiscalYearId=str(fy.id),
+            amount=Decimal("200"), description="Umbuchung",
+        ),
+        actor="tester",
+    )
+    page = await svc.list_expenses_paged(budget_id=top.id, fiscal_year_id=fy.id)
+    by_transfer = [e for e in page.items if e.transfer_id == transfer.transfer_id]
+    assert {e.kind for e in by_transfer} == {"expense", "income"}
+    assert all(e.amount == Decimal("200") for e in by_transfer)
+
+    # Eine Seite löschen → beide Übertrags-Buchungen weg.
+    await svc.delete_expense(transfer.expense_id)
+    page = await svc.list_expenses_paged(budget_id=top.id, fiscal_year_id=fy.id)
+    assert not [e for e in page.items if e.transfer_id == transfer.transfer_id]
 
 
 async def test_committed_rollup(session: AsyncSession) -> None:

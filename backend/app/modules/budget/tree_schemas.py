@@ -46,6 +46,7 @@ class BudgetNodeUpdate(_CamelModel):
     color: str | None = None
     accepted_state_keys: list[str] | None = Field(default=None, alias="acceptedStateKeys")
     denied_state_keys: list[str] | None = Field(default=None, alias="deniedStateKeys")
+    fully_bound: bool | None = Field(default=None, alias="fullyBound")
     fiscal_start_month: int | None = Field(
         default=None, ge=1, le=12, alias="fiscalStartMonth"
     )
@@ -68,6 +69,7 @@ class BudgetNodeOut(_CamelModel):
     color: str | None = None
     accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
+    fully_bound: bool = Field(default=False, alias="fullyBound")
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
 
@@ -106,6 +108,7 @@ class BudgetTreeNodeOut(_CamelModel):
     color: str | None = None
     accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
+    fully_bound: bool = Field(default=False, alias="fullyBound")
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
     by_fiscal_year: list[AllocationView] = Field(
@@ -221,6 +224,7 @@ class ExpenseCreate(_CamelModel):
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     application_id: UUID | None = Field(default=None, alias="applicationId")
+    account_id: UUID | None = Field(default=None, alias="accountId")
 
     @model_validator(mode="after")
     def _income_not_linkable(self) -> ExpenseCreate:
@@ -256,13 +260,75 @@ class ExpenseOut(_CamelModel):
     description: str
     application_id: UUID | None = Field(default=None, alias="applicationId")
     application_title: str | None = Field(default=None, alias="applicationTitle")
+    account_id: UUID | None = Field(default=None, alias="accountId")
+    account_name: str | None = Field(default=None, alias="accountName")
+    transfer_id: UUID | None = Field(default=None, alias="transferId")
     actor: str | None = None
     created_at: datetime = Field(alias="createdAt")
+
+
+# -------------------------------------------------------------------- accounts
+class AccountCreate(_CamelModel):
+    """Konto anlegen — Name + IBAN (Freitext). Nicht an Kostenstellen gebunden."""
+
+    name: str = Field(min_length=1)
+    iban: str = Field(default="", max_length=64)
+    active: bool = True
+
+
+class AccountUpdate(_CamelModel):
+    """Konto teil-aktualisieren."""
+
+    name: str | None = Field(default=None, min_length=1)
+    iban: str | None = Field(default=None, max_length=64)
+    active: bool | None = None
+
+
+class AccountOut(_CamelModel):
+    """Konto-Stammdaten."""
+
+    id: UUID
+    name: str
+    iban: str
+    active: bool
+
+
+# ------------------------------------------------------------------- transfer
+class TransferCreate(_CamelModel):
+    """Übertrag Kostenstelle → Kostenstelle (gleiches HHJ).
+
+    Erzeugt eine Ausgabe auf ``fromBudgetId`` und eine Einnahme auf ``toBudgetId``
+    (gleicher Betrag/HHJ), verknüpft über eine ``transferId``."""
+
+    from_budget_id: UUID = Field(alias="fromBudgetId")
+    to_budget_id: UUID = Field(alias="toBudgetId")
+    fiscal_year_id: UUID = Field(alias="fiscalYearId")
+    amount: Decimal = Field(gt=0, allow_inf_nan=False)
+    description: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _distinct(self) -> TransferCreate:
+        if self.from_budget_id == self.to_budget_id:
+            raise ValueError("from and to cost centre must differ")
+        return self
+
+
+class TransferOut(_CamelModel):
+    """Ergebnis eines Übertrags (beide Buchungs-Ids)."""
+
+    transfer_id: UUID = Field(alias="transferId")
+    expense_id: UUID = Field(alias="expenseId")
+    income_id: UUID = Field(alias="incomeId")
 
 
 BudgetTreeNodeOut.model_rebuild()
 
 __all__ = [
+    "AccountCreate",
+    "AccountOut",
+    "AccountUpdate",
+    "TransferCreate",
+    "TransferOut",
     "BudgetApplicationOut",
     "AllocationOut",
     "AllocationSet",

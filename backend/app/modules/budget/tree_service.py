@@ -20,6 +20,7 @@ from app.modules.applications.service import _title_of
 from app.modules.budget import tree_rules
 from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree_models import (
+    Account,
     Budget,
     BudgetAllocation,
     BudgetExpense,
@@ -27,11 +28,16 @@ from app.modules.budget.tree_models import (
 )
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import (
+    AccountCreate,
+    AccountOut,
+    AccountUpdate,
     AllocationOut,
     AllocationSet,
     AssignBudgetOut,
     AssignBudgetRequest,
     BudgetApplicationOut,
+    TransferCreate,
+    TransferOut,
     BudgetNodeCreate,
     BudgetNodeOut,
     BudgetNodeUpdate,
@@ -64,6 +70,7 @@ def _node_out(b: Budget) -> BudgetNodeOut:
         color=b.color,
         acceptedStateKeys=list(b.accepted_state_keys or []),
         deniedStateKeys=list(b.denied_state_keys or []),
+        fullyBound=b.fully_bound,
         fiscalStartMonth=b.fiscal_start_month,
         fiscalStartDay=b.fiscal_start_day,
     )
@@ -173,6 +180,7 @@ class BudgetTreeService:
             currency=payload.currency,
             active=payload.active,
             color=payload.color,
+            fully_bound=False,
             # Stichtag nur am Top-Level fachlich relevant (Kinder bleiben beim Default).
             fiscal_start_month=payload.fiscal_start_month,
             fiscal_start_day=payload.fiscal_start_day,
@@ -555,7 +563,10 @@ class BudgetTreeService:
 
     @staticmethod
     def _expense_out(
-        e: BudgetExpense, path_key: str | None, app_title: str | None = None
+        e: BudgetExpense,
+        path_key: str | None,
+        app_title: str | None = None,
+        account_name: str | None = None,
     ) -> ExpenseOut:
         return ExpenseOut(
             id=e.id,
@@ -568,6 +579,9 @@ class BudgetTreeService:
             description=e.description,
             applicationId=e.application_id,
             applicationTitle=app_title,
+            accountId=e.account_id,
+            accountName=account_name,
+            transferId=e.transfer_id,
             actor=e.actor,
             createdAt=e.created_at,
         )
@@ -607,11 +621,13 @@ class BudgetTreeService:
                 )
             node = await self._get_node(payload.budget_id)
             fy_id = await self._resolve_expense_fiscal_year(node, payload.fiscal_year_id)
+        account_name = await self._validate_account(payload.account_id)
         expense = BudgetExpense(
             id=uuid.uuid4(),
             budget_id=node.id,
             fiscal_year_id=fy_id,
             application_id=payload.application_id,
+            account_id=payload.account_id,
             kind=payload.kind,
             amount=payload.amount,
             currency=node.currency,
@@ -620,7 +636,16 @@ class BudgetTreeService:
         )
         self.session.add(expense)
         await self.session.commit()
-        return self._expense_out(expense, node.path_key, app_title)
+        return self._expense_out(expense, node.path_key, app_title, account_name)
+
+    async def _validate_account(self, account_id: UUID | None) -> str | None:
+        """Konto prüfen (falls angegeben) → Name; sonst ``None``."""
+        if account_id is None:
+            return None
+        acc = await self.session.get(Account, account_id)
+        if acc is None:
+            raise NotFoundError(f"account {account_id} not found")
+        return acc.name
 
     async def update_expense(
         self, expense_id: UUID, payload: ExpenseUpdate
@@ -639,7 +664,12 @@ class BudgetTreeService:
         if expense.application_id is not None:
             app = await self.session.get(Application, expense.application_id)
             app_title = _title_of(app.data) if app is not None else None
-        return self._expense_out(expense, node.path_key, app_title)
+        acc_name = (
+            (await self.session.get(Account, expense.account_id)).name  # type: ignore[union-attr]
+            if expense.account_id is not None
+            else None
+        )
+        return self._expense_out(expense, node.path_key, app_title, acc_name)
 
     async def list_expenses(
         self, budget_id: UUID, fiscal_year_id: UUID | None = None
@@ -707,9 +737,10 @@ class BudgetTreeService:
         )
         rows = (
             await self.session.execute(
-                select(BudgetExpense, Budget.path_key, Application.data)
+                select(BudgetExpense, Budget.path_key, Application.data, Account.name)
                 .join(Budget, Budget.id == BudgetExpense.budget_id)
                 .outerjoin(Application, Application.id == BudgetExpense.application_id)
+                .outerjoin(Account, Account.id == BudgetExpense.account_id)
                 .where(*filters)
                 .order_by(ordering, BudgetExpense.created_at.desc())
                 .limit(limit)
@@ -717,13 +748,13 @@ class BudgetTreeService:
             )
         ).all()
         items = [
-            self._expense_out(e, path_key, _title_of(data) if data else None)
-            for (e, path_key, data) in rows
+            self._expense_out(e, path_key, _title_of(data) if data else None, acc_name)
+            for (e, path_key, data, acc_name) in rows
         ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
 
     async def delete_expense(self, expense_id: UUID) -> None:
-        """Ausgabe löschen (#25)."""
+        """Ausgabe löschen (#25). Teil eines Übertrags → beide Buchungen löschen."""
         expense = (
             await self.session.execute(
                 select(BudgetExpense).where(BudgetExpense.id == expense_id)
@@ -731,8 +762,88 @@ class BudgetTreeService:
         ).scalar_one_or_none()
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
-        await self.session.delete(expense)
+        if expense.transfer_id is not None:
+            pair = (
+                await self.session.execute(
+                    select(BudgetExpense).where(
+                        BudgetExpense.transfer_id == expense.transfer_id
+                    )
+                )
+            ).scalars().all()
+            for e in pair:
+                await self.session.delete(e)
+        else:
+            await self.session.delete(expense)
         await self.session.commit()
+
+    # --------------------------------------------------------------- accounts
+    @staticmethod
+    def _account_out(a: Account) -> AccountOut:
+        return AccountOut(id=a.id, name=a.name, iban=a.iban, active=a.active)
+
+    async def list_accounts(self) -> list[AccountOut]:
+        rows = (
+            await self.session.scalars(select(Account).order_by(Account.name))
+        ).all()
+        return [self._account_out(a) for a in rows]
+
+    async def create_account(self, payload: AccountCreate) -> AccountOut:
+        acc = Account(
+            id=uuid.uuid4(), name=payload.name, iban=payload.iban, active=payload.active
+        )
+        self.session.add(acc)
+        await self.session.commit()
+        return self._account_out(acc)
+
+    async def update_account(
+        self, account_id: UUID, payload: AccountUpdate
+    ) -> AccountOut:
+        acc = await self.session.get(Account, account_id)
+        if acc is None:
+            raise NotFoundError(f"account {account_id} not found")
+        for field, value in payload.model_dump(exclude_unset=True).items():
+            setattr(acc, field, value)
+        await self.session.commit()
+        return self._account_out(acc)
+
+    async def delete_account(self, account_id: UUID) -> None:
+        acc = await self.session.get(Account, account_id)
+        if acc is None:
+            raise NotFoundError(f"account {account_id} not found")
+        await self.session.delete(acc)  # Buchungen behalten account_id=NULL (SET NULL).
+        await self.session.commit()
+
+    # --------------------------------------------------------------- transfer
+    async def create_transfer(
+        self, payload: TransferCreate, *, actor: str
+    ) -> TransferOut:
+        """Übertrag KS→KS: Ausgabe auf Quelle + Einnahme auf Ziel (gleiches HHJ)."""
+        src = await self._get_node(payload.from_budget_id)
+        dst = await self._get_node(payload.to_budget_id)
+        # HHJ muss zum Top-Level **beider** Kostenstellen gehören (gleiches HHJ).
+        fy_src = await self._resolve_expense_fiscal_year(src, payload.fiscal_year_id)
+        fy_dst = await self._resolve_expense_fiscal_year(dst, payload.fiscal_year_id)
+        if fy_src != fy_dst:
+            raise ValidationProblem(
+                "Both cost centres must share the fiscal year.",
+                errors=[{"field": "fiscalYearId", "msg": "must match for both"}],
+            )
+        transfer_id = uuid.uuid4()
+        out_row = BudgetExpense(
+            id=uuid.uuid4(), budget_id=src.id, fiscal_year_id=fy_src,
+            transfer_id=transfer_id, kind="expense", amount=payload.amount,
+            currency=src.currency, description=payload.description, actor=actor,
+        )
+        in_row = BudgetExpense(
+            id=uuid.uuid4(), budget_id=dst.id, fiscal_year_id=fy_dst,
+            transfer_id=transfer_id, kind="income", amount=payload.amount,
+            currency=dst.currency, description=payload.description, actor=actor,
+        )
+        self.session.add_all([out_row, in_row])
+        await self.session.commit()
+        return TransferOut(
+            transferId=transfer_id, expenseId=out_row.id, incomeId=in_row.id
+        )
 
     # --------------------------------------------------------------- tree view
     async def get_tree(
@@ -801,9 +912,22 @@ class BudgetTreeService:
             if n.parent_id is None
         }
 
+        # »Komplett gebunden«: Kostenstellen, deren gesamte Zuteilung je HHJ als gebunden
+        # zählt. Echte Anträge/Ausgaben unter einem solchen Knoten (er selbst + Unterbaum)
+        # werden NICHT zusätzlich gezählt; stattdessen wird die Zuteilung als gebunden
+        # injiziert (rollt zum Parent hoch).
+        flagged_paths = sorted(n.path_key for n in nodes if n.fully_bound)
+
+        def _under_flagged(path: str) -> bool:
+            return any(
+                path == fp or path.startswith(fp + _SEP) for fp in flagged_paths
+            )
+
         bound_rows: list[tuple[object, str, Decimal | None]] = []
         requested_rows: list[tuple[object, str, Decimal | None]] = []
         for app_id, path, fy, amount, state_key in app_rows:
+            if _under_flagged(path):
+                continue  # voll gebunden → echte Anträge ignorieren
             accepted, denied = top_config.get(path.split("-")[0], (set(), set()))
             if state_key in accepted:
                 # Bindung anteilig um bereits gebundene Ausgaben mindern (#25).
@@ -824,20 +948,27 @@ class BudgetTreeService:
         expended_rows = [
             (fy, path, amount)
             for path, fy, amount, kind, _app in expense_rows
-            if kind == "expense"
+            if kind == "expense" and not _under_flagged(path)
         ]
         income_rows = [
             (fy, path, amount)
             for path, fy, amount, kind, _app in expense_rows
-            if kind == "income"
+            if kind == "income" and not _under_flagged(path)
         ]
+
+        # Synthetische Bindung: ganze Zuteilung der markierten Kostenstelle = gebunden.
+        flagged_ids = {n.id for n in nodes if n.fully_bound}
+        path_by_id = {n.id: n.path_key for n in nodes}
+        for a in allocs:
+            if a.budget_id in flagged_ids and a.allocated:
+                bound_rows.append((a.fiscal_year_id, path_by_id[a.budget_id], a.allocated))
 
         node_tuples = [
             (
                 n.id, n.parent_id, n.gremium_id, n.key, n.path_key, n.name,
                 n.currency, n.active, n.color,
                 list(n.accepted_state_keys or []), list(n.denied_state_keys or []),
-                n.fiscal_start_month, n.fiscal_start_day,
+                n.fiscal_start_month, n.fiscal_start_day, n.fully_bound,
             )
             for n in nodes
         ]

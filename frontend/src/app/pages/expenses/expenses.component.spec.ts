@@ -22,6 +22,9 @@ const EXPENSE: Expense = {
   description: 'Druckkosten Flyer',
   applicationId: null,
   applicationTitle: null,
+  accountId: null,
+  accountName: null,
+  transferId: null,
   actor: 'admin',
   createdAt: '2026-05-30T09:00:00Z',
 };
@@ -46,8 +49,9 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage } = {}) {
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // Konstruktor lädt den Kostenstellen-Baum + die erste Buchungsseite.
+  // Konstruktor lädt Kostenstellen-Baum + Konten + erste Buchungsseite.
   http.match((r) => r.url.endsWith('/budgets')).forEach((req) => req.flush([]));
+  http.match((r) => r.url.endsWith('/accounts')).forEach((req) => req.flush([]));
   http
     .match((r) => r.url.endsWith('/expenses') && r.method === 'GET')
     .forEach((req) => req.flush(opts.page ?? page([])));

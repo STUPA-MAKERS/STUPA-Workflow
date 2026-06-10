@@ -45,6 +45,9 @@
             <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
               <span class="bt__path">{{ $any(row).node.pathKey }}</span>
               <span class="bt__name">{{ $any(row).node.name }}</span>
+              @if ($any(row).node.fullyBound) {
+                <span class="bt__tag" [title]="'budget.tree.fullyBoundHint' | t">{{ 'budget.tree.fullyBoundBadge' | t }}</span>
+              }
             </span>
           </ng-template>
           <ng-template appCell="allocated" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.allocated, $any(row).node.currency) : '—' }}</ng-template>
@@ -102,6 +105,11 @@
       <p class="bt__muted">{{ node.pathKey }} – {{ node.name }}</p>
       <label class="bt__lbl">{{ 'budget.tree.limitFor' | t }}
         <app-currency-input name="limit" [ngModel]="limitValue()" (ngModelChange)="limitValue.set($event)" [ariaLabel]="'budget.tree.limitFor' | t" /></label>
+      <label class="bt__check">
+        <input type="checkbox" [checked]="limitFullyBound()" (change)="toggleFullyBound($any($event.target).checked)" />
+        <span>{{ 'budget.tree.fullyBound' | t }}</span>
+      </label>
+      <p class="bt__muted bt__check-hint">{{ 'budget.tree.fullyBoundHint' | t }}</p>
     </div>
   }
   <div dialog-footer class="bt__dialog-foot">

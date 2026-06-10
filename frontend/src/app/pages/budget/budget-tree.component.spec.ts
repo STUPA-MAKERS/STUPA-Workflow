@@ -27,6 +27,7 @@ const TREE: BudgetTreeNode[] = [
     name: 'VS-Mittel',
     currency: 'EUR',
     active: true,
+    fullyBound: false,
     fiscalStartMonth: 1,
     fiscalStartDay: 1,
     byFiscalYear: [{ fiscalYearId: 'fy-1', allocated: '1000', committed: '250', available: '750' }],

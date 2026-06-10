@@ -59,20 +59,16 @@ interface Member {
       <app-button size="sm" (click)="openAdd()">{{ 'admin.gremien.addMember' | t }}</app-button>
     </header>
 
-    @if (members().length === 0) {
-      <p class="gm__status">{{ 'admin.gremien.membersEmpty' | t }}</p>
-    } @else {
-      <app-data-table [columns]="columns()" [rows]="members()" [rowKey]="rowId">
-        <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
-        <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
-        <ng-template appCell="term" let-m><span class="gm__muted">{{ $any(m).term }}</span></ng-template>
-        <ng-template appCell="actions" let-m>
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberRemove' | t" (click)="removeMember($any(m).assignmentId)">
-            <app-icon name="delete" />
-          </app-button>
-        </ng-template>
-      </app-data-table>
-    }
+    <app-data-table [columns]="columns()" [rows]="members()" [rowKey]="rowId" [emptyText]="'admin.gremien.membersEmpty' | t">
+      <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
+      <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
+      <ng-template appCell="term" let-m><span class="gm__muted">{{ $any(m).term }}</span></ng-template>
+      <ng-template appCell="actions" let-m>
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberRemove' | t" (click)="removeMember($any(m).assignmentId)">
+          <app-icon name="delete" />
+        </app-button>
+      </ng-template>
+    </app-data-table>
 
     <!-- Mitglied hinzufügen: Dialog mit Typeahead -->
     <app-dialog
