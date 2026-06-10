@@ -131,14 +131,21 @@ const AUTOSAVE_DELAY_MS = 1000;
           @if (beamerVote(); as bv) {
             <app-badge [variant]="voteVariant(bv.status)">{{ voteStatusKey(bv.status) | t }}</app-badge>
             <h2 class="mtg__beamerQ">{{ bv.question || bv.title || ('meetings.vote.untitled' | t) }}</h2>
-            <dl class="mtg__beamerTally">
-              @for (entry of countEntries(bv); track entry.key) {
-                <div class="mtg__beamerOpt" [class.mtg__beamerOpt--lead]="entry.key === bv.leading">
-                  <dd>{{ entry.value }}</dd>
-                  <dt>{{ voteOptionLabel(entry.key) }}</dt>
-                </div>
-              }
-            </dl>
+            @if (bv.status === 'open') {
+              <p class="mtg__beamerProgress">{{ 'meetings.vote.progress' | t: { voted: bv.voted, present: bv.present } }}</p>
+            }
+            @if (bv.revealed && bv.counts) {
+              <dl class="mtg__beamerTally">
+                @for (entry of countEntries(bv); track entry.key) {
+                  <div class="mtg__beamerOpt" [class.mtg__beamerOpt--lead]="entry.key === bv.leading">
+                    <dd>{{ entry.value }}</dd>
+                    <dt>{{ voteOptionLabel(entry.key) }}</dt>
+                  </div>
+                }
+              </dl>
+            } @else if (bv.status === 'open') {
+              <p class="mtg__beamerHidden">{{ 'meetings.vote.progressHidden' | t }}</p>
+            }
             @if (bv.result) {
               <span class="mtg__beamerResult">
                 <app-badge [variant]="voteResultVariant(bv.result)">{{ voteResultKey(bv.result) | t }}</app-badge>
@@ -178,12 +185,17 @@ const AUTOSAVE_DELAY_MS = 1000;
                       }
                     </div>
                   }
-                  @if (vote.counts && vote.status === 'closed') {
+                  @if (vote.status === 'open') {
+                    <p class="mtg__voteProgress">{{ 'meetings.vote.progress' | t: { voted: vote.voted, present: vote.present } }}</p>
+                  }
+                  @if (vote.revealed && vote.counts) {
                     <dl class="mtg__tally">
                       @for (entry of countEntries(vote); track entry.key) {
                         <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ voteOptionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
                       }
                     </dl>
+                  } @else if (vote.status === 'open') {
+                    <p class="mtg__muted mtg__voteHidden">{{ 'meetings.vote.progressHidden' | t }}</p>
                   }
                 </div>
               }
@@ -382,12 +394,17 @@ const AUTOSAVE_DELAY_MS = 1000;
                           <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="deleteVote(vote.id)"><app-icon name="delete" /></app-button>
                         }
                       </div>
-                      @if (vote.counts) {
+                      @if (vote.status === 'open') {
+                        <p class="mtg__voteProgress">{{ 'meetings.vote.progress' | t: { voted: vote.voted, present: vote.present } }}</p>
+                      }
+                      @if (vote.revealed && vote.counts) {
                         <dl class="mtg__tally">
                           @for (entry of countEntries(vote); track entry.key) {
                             <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ voteOptionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
                           }
                         </dl>
+                      } @else if (vote.status === 'open') {
+                        <p class="mtg__muted mtg__voteHidden">{{ 'meetings.vote.progressHidden' | t }}</p>
                       }
                       @if (vote.status === 'open' && canVote()) {
                         <div class="mtg__voteActions">
@@ -484,12 +501,17 @@ const AUTOSAVE_DELAY_MS = 1000;
                     <span class="mtg__quorumNote">{{ 'vote.failedQuorum' | t }}</span>
                   }
                 </div>
-                @if (vote.counts) {
+                @if (vote.status === 'open') {
+                  <p class="mtg__voteProgress">{{ 'meetings.vote.progress' | t: { voted: vote.voted, present: vote.present } }}</p>
+                }
+                @if (vote.revealed && vote.counts) {
                   <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
                     @for (entry of countEntries(vote); track entry.key) {
                       <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ voteOptionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
                     }
                   </dl>
+                } @else if (vote.status === 'open') {
+                  <p class="mtg__muted mtg__voteHidden">{{ 'meetings.vote.progressHidden' | t }}</p>
                 }
                 @if (vote.status === 'open' && canVote()) {
                   <div class="mtg__voteActions">
@@ -2689,6 +2711,9 @@ export class MeetingsComponent implements OnDestroy {
                 counts: null,
                 leading: null,
                 closesAt: msg.closesAt,
+                voted: 0,
+                present: 0,
+                revealed: false,
                 failedReason: null,
               },
             ],
@@ -2696,7 +2721,13 @@ export class MeetingsComponent implements OnDestroy {
         }
         break;
       case 'vote_tally':
-        this.patchVote(msg.voteId, { counts: msg.counts, leading: msg.leading });
+        this.patchVote(msg.voteId, {
+          counts: msg.counts,
+          leading: msg.leading,
+          voted: msg.cast ?? 0,
+          present: msg.present ?? 0,
+          revealed: msg.revealed ?? true,
+        });
         break;
       case 'vote_closed':
         this.patchVote(msg.voteId, {

@@ -22,6 +22,10 @@ export interface VoteTallyMsg {
   eligible: number;
   quorumMet: boolean;
   leading: string | null;
+  /** Teilnahme-Fortschritt + Reveal-Schranke (#vote-progress). */
+  cast?: number;
+  present?: number;
+  revealed?: boolean;
 }
 export interface VoteClosedMsg {
   type: 'vote_closed';

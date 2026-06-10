@@ -658,6 +658,9 @@ export interface MeetingVoteOutWire {
   counts?: Record<string, number> | null;
   leading?: string | null;
   closesAt?: IsoDateTime | null;
+  voted?: number | null;
+  present?: number | null;
+  revealed?: boolean | null;
   /** Grund einer Ablehnung: `quorum` = Quorum verfehlt, `majority` = Mehrheit verfehlt. */
   failedReason?: 'quorum' | 'majority' | null;
 }
@@ -756,6 +759,11 @@ export interface MeetingVote {
   counts: Record<string, number> | null;
   leading: string | null;
   closesAt: IsoDateTime | null;
+  /** Teilnahme-Fortschritt: abgestimmte vs. anwesende Mitglieder. `revealed` = ob
+   *  `counts`/`leading` sichtbar sind (sonst nur Fortschritt, #vote-progress). */
+  voted: number;
+  present: number;
+  revealed: boolean;
   /** Grund einer Ablehnung: `quorum` = Quorum verfehlt, `majority` = Mehrheit verfehlt. */
   failedReason: 'quorum' | 'majority' | null;
 }

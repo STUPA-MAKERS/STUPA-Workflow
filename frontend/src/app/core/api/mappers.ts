@@ -222,6 +222,9 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     counts: wire.counts ?? null,
     leading: wire.leading ?? null,
     closesAt: wire.closesAt ?? null,
+    voted: wire.voted ?? 0,
+    present: wire.present ?? 0,
+    revealed: wire.revealed ?? true,
     failedReason: wire.failedReason ?? null,
   };
 }
