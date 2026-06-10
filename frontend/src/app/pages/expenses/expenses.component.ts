@@ -306,7 +306,8 @@ import {
         position: sticky;
         top: calc(var(--layout-header-height) + var(--space-4));
         align-self: start;
-        max-height: calc(100vh - var(--layout-header-height) - 2 * var(--space-4));
+        /* 3/4 viewport so the tree scrolls internally and clearly floats. */
+        max-height: 75vh;
         overflow-y: auto;
       }
       .exp__main { min-width: 0; }

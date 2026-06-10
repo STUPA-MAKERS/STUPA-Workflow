@@ -136,7 +136,7 @@
   width: 100%;
   max-width: 14rem;
   /* schwebt mit und scrollt nicht weg, auch bei langem Baum. */
-  max-height: calc(100vh - var(--layout-header-height) - 2 * var(--space-4));
+  max-height: 75vh;
   overflow-y: auto;
 }
 .bd__charts {
@@ -156,7 +156,7 @@
   gap: var(--space-5);
   position: sticky;
   top: calc(var(--layout-header-height) + var(--space-4));
-  max-height: calc(100vh - var(--layout-header-height) - 2 * var(--space-4));
+  max-height: 75vh;
   overflow-y: auto;
 }
 .bd__apps {
