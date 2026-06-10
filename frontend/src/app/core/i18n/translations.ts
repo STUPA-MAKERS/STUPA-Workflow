@@ -1287,8 +1287,6 @@ export const de = {
   'budget.usage.subtitle':
     'Gebundene Mittel (ausgezahlt / bewilligt / reserviert) gegen das Budget-Limit.',
   'budget.usage.empty': 'Keine Budgets für die aktuelle Auswahl.',
-  'budget.usage.incomePlus': '+Einnahmen',
-  'budget.usage.incomeHint': 'Einnahmen auf dieser Kostenstelle — erhöhen das verfügbare Budget.',
   'budget.usage.unlimited': 'ohne Limit',
   'budget.usage.overcommitted': 'Überzeichnet',
   'budget.usage.bar.label': '{name}: {committed} gebunden, {available} frei',
@@ -2704,8 +2702,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.usage.heading': 'Utilisation per budget',
   'budget.usage.subtitle': 'Committed funds (paid / approved / reserved) against the budget limit.',
   'budget.usage.empty': 'No budgets for the current selection.',
-  'budget.usage.incomePlus': '+income',
-  'budget.usage.incomeHint': 'Income on this cost centre — increases the available budget.',
   'budget.usage.unlimited': 'no limit',
   'budget.usage.overcommitted': 'Overcommitted',
   'budget.usage.bar.label': '{name}: {committed} committed, {available} available',
