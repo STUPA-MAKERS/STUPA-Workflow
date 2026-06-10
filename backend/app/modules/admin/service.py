@@ -412,6 +412,7 @@ class ConfigService:
         await self.session.flush()
 
         id_by_key: dict[str, UUID] = {}
+        initial_id: UUID | None = None
         for state in payload.graph.states:
             row = State(
                 flow_version_id=version.id,
@@ -426,6 +427,8 @@ class ConfigService:
             self.session.add(row)
             await self.session.flush()
             id_by_key[state.key] = row.id
+            if state.is_initial:
+                initial_id = row.id
         for order, trans in enumerate(payload.graph.transitions):
             self.session.add(
                 Transition(
@@ -440,6 +443,37 @@ class ConfigService:
                     branch=trans.branch,
                 )
             )
+
+        # Globaler Flow gilt für ALLE Anträge (auch laufende, #flow-global): beim
+        # Aktivieren jeden Antrag auf die neue Version umziehen — aktuellen State per
+        # KEY mappen; ein gelöschter State ⇒ zurück auf den Initial-State.
+        if payload.activate and initial_id is not None:
+            from app.modules.applications.models import Application
+
+            # Bisher genutzte States (distinct) → Key, um auf die neue Version zu mappen.
+            prev = (
+                await self.session.execute(
+                    select(Application.current_state_id, State.key)
+                    .join(State, State.id == Application.current_state_id)
+                    .distinct()
+                )
+            ).all()
+            for old_state_id, old_key in prev:
+                await self.session.execute(
+                    update(Application)
+                    .where(Application.current_state_id == old_state_id)
+                    .values(
+                        current_state_id=id_by_key.get(old_key, initial_id),
+                        flow_version_id=version.id,
+                    )
+                )
+            # Anträge ganz ohne State (Altbestand) → Initial-State der neuen Version.
+            await self.session.execute(
+                update(Application)
+                .where(Application.current_state_id.is_(None))
+                .values(current_state_id=initial_id, flow_version_id=version.id)
+            )
+
         action = (
             AuditAction.CONFIG_ACTIVATION if payload.activate else AuditAction.CONFIG_CHANGE
         )
