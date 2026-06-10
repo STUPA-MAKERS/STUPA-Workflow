@@ -48,7 +48,9 @@ export const routes: Routes = [
       },
       {
         path: 'applications',
-        data: { title: 'nav.applications', permission: 'application.read', wide: true },
+        // Kein Permission-Gate: ohne ``application.read`` sieht man die **eigenen**
+        // Anträge (Server filtert auf ``created_by``), #24.
+        data: { title: 'nav.applications', wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/applications/applications-list.component').then(
@@ -57,13 +59,16 @@ export const routes: Routes = [
       },
       {
         path: 'tasks',
-        data: { title: 'nav.tasks', permission: 'application.read' },
+        // Kein Permission-Gate: zeigt mind. die eigenen Anträge in bearbeitbarem State.
+        data: { title: 'nav.tasks' },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/tasks/tasks.component').then((m) => m.TasksComponent),
       },
       {
         path: 'applications/:id',
-        data: { title: 'applications.detail.crumb', permission: 'application.read', parent: ['applications'], wide: true },
+        // Kein Permission-Gate: Ersteller:innen erreichen den eigenen Antrag; der
+        // Server autorisiert (``application.read``/Owner/Magic-Link), #24.
+        data: { title: 'applications.detail.crumb', parent: ['applications'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/applications/applications-detail.component').then(

@@ -533,13 +533,19 @@ class ApplicationsService:
         created_to: date | None = None,
         sort: str = "createdAt",
         order: str = "desc",
+        owner_sub: str | None = None,
         limit: int,
         offset: int,
     ) -> Page[ApplicationListItem]:
-        """Gefilterte, gepagte, sortierte Antragsliste (api.md ``GET /applications``)."""
+        """Gefilterte, gepagte, sortierte Antragsliste (api.md ``GET /applications``).
+
+        ``owner_sub`` beschränkt auf die eigenen Anträge (``created_by``) — gesetzt für
+        Nutzer:innen **ohne** ``application.read``, die nur ihre eigenen sehen dürfen (#24)."""
         # Unbestätigte Gast-Anträge sind unsichtbar, bis die E-Mail bestätigt wurde
         # (Bestand + eingeloggte Anträge tragen ``email_confirmed_at`` → bleiben sichtbar).
         filters = [Application.email_confirmed_at.is_not(None)]
+        if owner_sub is not None:
+            filters.append(Application.created_by == owner_sub)
         if state_id is not None:
             filters.append(Application.current_state_id == state_id)
         if gremium_id is not None:
@@ -665,11 +671,14 @@ class ApplicationsService:
         is_admin = "admin" in principal.roles
         can_transition = is_admin or principal.has("application.transition")
 
-        # Alle offenen Anträge (mit aktuellem State) — neueste zuerst.
+        # Alle offenen (bestätigten) Anträge mit aktuellem State — neueste zuerst.
         apps = (
             await self.session.scalars(
                 select(Application)
-                .where(Application.current_state_id.is_not(None))
+                .where(
+                    Application.current_state_id.is_not(None),
+                    Application.email_confirmed_at.is_not(None),
+                )
                 .order_by(Application.created_at.desc())
             )
         ).all()
@@ -704,6 +713,10 @@ class ApplicationsService:
             if not ok and can_transition:
                 # Mind. ein feuerbarer manueller Übergang (Guards inkl. Akteur-Gates).
                 ok = len(await flow.available_transitions(app.id, principal)) > 0
+            if not ok and app.created_by == principal.sub and s.edit_allowed:
+                # Eigener Antrag in bearbeitbarem State → Aufgabe der Antragsteller:in
+                # (auch ohne ``application.read``/-``transition``, #24).
+                ok = True
             if ok:
                 items.append(
                     ApplicationListItem(

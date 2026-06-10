@@ -184,21 +184,22 @@ async def create_application(
 )
 async def list_tasks(
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("application.read"))],
+    principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[ApplicationListItem]:
-    """Offene Entscheidungen für die eigene Rolle (#64): Anträge in vote-States,
-    in denen der Principal handeln darf."""
+    """Offene Aufgaben des Principals (#64): Anträge in vote-States bzw. mit feuerbarem
+    Übergang — und die **eigenen** Anträge in bearbeitbarem State (auch ohne
+    ``application.read``, #24)."""
     return await service.list_tasks(principal)
 
 
 @router.get(
     "/applications",
     response_model=Page[ApplicationListItem],
-    dependencies=[Depends(require_principal("application.read"))],
     responses=_errors(401, 403),
 )
 async def list_applications(
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
     page: Annotated[PageParams, Depends()],
     state_id: Annotated[UUID | None, Query(alias="state")] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
@@ -213,7 +214,11 @@ async def list_applications(
     sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Page[ApplicationListItem]:
-    """Antragsliste (Filter: state/gremium/type/topf/q/Betrag/Datum; Sortierung; Paging)."""
+    """Antragsliste (Filter: state/gremium/type/topf/q/Betrag/Datum; Sortierung; Paging).
+
+    Ohne ``application.read`` (und ohne Admin) sieht der Principal nur die **eigenen**
+    Anträge (``created_by``), #24."""
+    can_read = "admin" in principal.roles or principal.has("application.read")
     return await service.list_applications(
         state_id=state_id,
         gremium_id=gremium_id,
@@ -227,6 +232,7 @@ async def list_applications(
         created_to=created_to,
         sort=sort,
         order=order,
+        owner_sub=None if can_read else principal.sub,
         limit=page.limit,
         offset=page.offset,
     )
