@@ -217,13 +217,14 @@ export class BudgetDashboardComponent {
       value: metric(c),
       color: this.color(c, i),
     }));
-    // Eigenanteil des Knotens (nicht an Kinder weiterverteilt).
+    // Eigenanteil des Knotens (nicht an Kinder weiterverteilt) — als eigenes Segment
+    // mit dem **Namen** und der **Farbe** der offenen Kostenstelle (#budget).
     const own = metric(ks) - slices.reduce((s, x) => s + x.value, 0);
     if (own > 0.005) {
       slices.push({
-        label: this.i18n.translate('budget.pie.own'),
+        label: ks.name,
         value: own,
-        color: 'var(--color-text-muted)',
+        color: ks.color ?? PALETTE[0],
       });
     }
     return slices.filter((s) => s.value > 0);
