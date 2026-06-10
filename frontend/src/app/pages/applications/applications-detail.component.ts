@@ -97,7 +97,9 @@ interface DetailPosition {
               @if (application.state?.editAllowed) {
                 <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
               }
-              <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
+              @if (isAdmin()) {
+                <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
+              }
             </div>
           }
         </div>
@@ -954,6 +956,8 @@ export class ApplicationsDetailComponent {
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
+  /** Löschen ist admin-only (irreversibel). */
+  readonly isAdmin = computed(() => this.auth.roles().includes('admin'));
   readonly fmt = formatFieldValue;
 
   private id: Uuid = '';

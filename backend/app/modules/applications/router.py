@@ -345,11 +345,14 @@ async def patch_application(
     responses=_errors(401, 403, 404),
 )
 async def delete_application(
+    application_id: UUID,
     service: ServiceDep,
-    access: Annotated[Access, Depends(require_app_edit)],
+    principal: Annotated[Principal, Depends(require_principal())],
 ) -> None:
-    """Antrag löschen — Verwalter:in (``application.manage``) oder Ersteller:in (#24)."""
-    await service.delete(access.application_id)
+    """Antrag löschen — **nur Admin** (irreversibel; Verwalter:in/Ersteller:in nicht)."""
+    if "admin" not in principal.roles:
+        raise ForbiddenError("Only an admin may delete applications.")
+    await service.delete(application_id)
 
 
 @router.get(

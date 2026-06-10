@@ -297,21 +297,31 @@ def test_patch_application_applicant_view_forbidden(app: FastAPI, client: TestCl
     assert r.status_code == 403
 
 
-def test_delete_application_manager(
+def test_delete_application_admin(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id = uuid4()
-    _as_principal(app, "application.manage")
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="a", roles=["admin"], permissions={"application.manage"}
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
     r = client.delete(f"/api/applications/{app_id}")
     assert r.status_code == 204
     assert fake_service.deleted == app_id
 
 
-def test_delete_application_applicant_view_forbidden(app: FastAPI, client: TestClient) -> None:
-    app_id = uuid4()
-    _as_applicant(app, app_id, "view")
-    r = client.delete(f"/api/applications/{app_id}")
+def test_delete_application_manager_forbidden(app: FastAPI, client: TestClient) -> None:
+    # Verwalter:in ohne Admin-Rolle darf NICHT löschen (nur Admin, #delete).
+    _as_principal(app, "application.manage")
+    r = client.delete(f"/api/applications/{uuid4()}")
     assert r.status_code == 403
+
+
+def test_delete_application_applicant_unauthorized(app: FastAPI, client: TestClient) -> None:
+    app_id = uuid4()
+    _as_applicant(app, app_id, "edit")
+    r = client.delete(f"/api/applications/{app_id}")
+    assert r.status_code == 401  # kein Principal → require_principal 401
 
 
 # --------------------------------------------------------------------------- #
