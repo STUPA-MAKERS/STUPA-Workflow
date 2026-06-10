@@ -24,6 +24,7 @@ import { isFieldVisible } from '@shared/forms/jsonlogic';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
+import { IconComponent } from '@shared/ui/icon/icon.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
@@ -51,6 +52,7 @@ interface ReadonlyRow {
     BadgeComponent,
     CardComponent,
     ButtonComponent,
+    IconComponent,
     TranslatePipe,
   ],
   templateUrl: './status-timeline.component.html',
@@ -175,6 +177,25 @@ export class StatusTimelineComponent {
         this.phase.set(err.status === 410 ? 'expired' : 'error');
       },
     });
+  }
+
+  /** Anzeigename eines Kommentars (Fallback: Antragsteller:in/Gremium) — wie intern. */
+  authorName(comment: ApplicationComment): string {
+    if (comment.author) return comment.author;
+    return this.i18n.translate(
+      comment.authorKind === 'applicant'
+        ? 'applications.comments.author.applicant'
+        : 'applications.comments.author.committee',
+    );
+  }
+
+  /** Initialen für den Chat-Avatar (wie intern). */
+  initial(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    const first = parts[0][0];
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+    return (first + last).toUpperCase();
   }
 
   /** Einen Antragsteller-Übergang feuern (actorIsApplicant-Gate) und neu laden. */
