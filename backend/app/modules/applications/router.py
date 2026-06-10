@@ -51,6 +51,7 @@ from app.modules.applications.schemas import (
 )
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth import service as auth_service
+from app.modules.forms.schemas import EffectiveFormOut
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_application_payload_limit,
@@ -287,6 +288,20 @@ async def get_application(
         if principal is not None
         else False,
     )
+
+
+@router.get(
+    "/applications/{application_id}/form",
+    response_model=EffectiveFormOut,
+    responses=_errors(401, 403, 404),
+)
+async def get_application_form(
+    service: ServiceDep,
+    access: Annotated[Access, Depends(require_app_read)],
+) -> EffectiveFormOut:
+    """Effektive Form des Antrags aus seiner **gepinnten** Version — so zeigt/bearbeitet
+    die Detailansicht denselben Stand, gegen den validiert wird (auch nach Form-Änderung)."""
+    return await service.effective_form(access.application_id)
 
 
 @router.patch(

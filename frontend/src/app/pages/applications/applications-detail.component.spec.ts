@@ -95,9 +95,9 @@ const url =
     r.url === `/api/applications/${id}${suffix}`;
 
 /** Flush the effective-form request used for data-field labels. */
-function flushForm(http: HttpTestingController) {
+function flushForm(http: HttpTestingController, id = 'app-1') {
   http
-    .expectOne((r) => r.url === '/api/application-types/t1/form')
+    .expectOne((r) => r.url === `/api/applications/${id}/form`)
     .flush({
       applicationTypeId: 't1',
       formVersionId: 'fv1',
@@ -117,7 +117,7 @@ function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
     req.flush([]);
   }
-  if (form) flushForm(http);
+  if (form) flushForm(http, id);
 }
 
 // Das Anhänge-Panel lädt beim Rendern bestehende Anhänge — tolerant leeren (falls vorhanden).
@@ -243,7 +243,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('', 'app-2')).flush({ ...appWire(), id: 'app-2' });
     http.expectOne(url('/versions', 'app-2')).flush(VERSIONS);
     http.expectOne(url('/comments', 'app-2')).flush(COMMENTS);
-    flushForm(http); // loadApplication for app-2 also fetches the effective form
+    flushForm(http, 'app-2'); // loadApplication for app-2 also fetches the effective form
     detectChanges();
 
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
@@ -256,7 +256,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
-    http.expectOne((r) => r.url === '/api/application-types/t1/form').flush({
+    http.expectOne((r) => r.url === '/api/applications/app-1/form').flush({
       applicationTypeId: 't1',
       formVersionId: 'fv1',
       sections: [

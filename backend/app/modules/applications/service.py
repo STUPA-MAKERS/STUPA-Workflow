@@ -49,6 +49,7 @@ from app.modules.applications.schemas import (
 from app.modules.budget.models import BudgetField
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import FlowVersion, State
+from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.forms.service import FormsService
 from app.modules.forms.validation import (
     AnswerValidationError,
@@ -388,6 +389,19 @@ class ApplicationsService:
         return state
 
     # ------------------------------------------------------------------- read
+    async def effective_form(self, application_id: UUID) -> EffectiveFormOut:
+        """Effektive Form des Antrags aus seiner **gepinnten** Version (+ Topf-Feldern).
+
+        So rendert/bearbeitet die Detailansicht denselben Stand, gegen den der Server
+        validiert — unabhängig davon, ob die aktive Form-Version inzwischen geändert
+        wurde (data-model §1, „laufende Anträge behalten ihre form_version_id")."""
+        app = await self._get_app(application_id)
+        return await FormsService(self.session).get_effective_form(
+            app.type_id,
+            app.budget_pot_id,
+            form_version_id=app.form_version_id,
+        )
+
     async def get(
         self,
         application_id: UUID,

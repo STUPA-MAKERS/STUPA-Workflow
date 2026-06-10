@@ -980,8 +980,9 @@ export class ApplicationsDetailComponent {
         this.app.set(app);
         this.loading.set(false);
         this.loadAux();
-        // Effektive Form für Feld-Labels/typisierte Werte (still degradieren → rohe Keys).
-        this.api.effectiveForm?.(app.typeId).subscribe({
+        // Effektive Form aus der **gepinnten** Version des Antrags (nicht der aktiven) —
+        // so passen Labels/Edit-Felder zu den Daten, gegen die der Server validiert.
+        this.api.applicationForm(app.id).subscribe({
           next: (eff) => this.formFields.set(eff.sections.flatMap((s) => s.fields)),
           error: () => this.formFields.set([]),
         });

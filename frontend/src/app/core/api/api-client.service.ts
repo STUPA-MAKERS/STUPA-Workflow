@@ -134,6 +134,15 @@ export class ApiClient {
     });
   }
 
+  /**
+   * Effektive Form eines **bestehenden** Antrags aus seiner **gepinnten** Version
+   * (forms §5.7, data-model §1). Liefert dieselben Felder, gegen die der Server
+   * validiert — auch wenn die aktive Form-Version inzwischen geändert wurde.
+   */
+  applicationForm(applicationId: Uuid): Observable<EffectiveForm> {
+    return this.http.get<EffectiveForm>(`${this.base}/applications/${applicationId}/form`);
+  }
+
   // --- applications --------------------------------------------------------
   listApplications(query: ApplicationListQuery = {}): Observable<Page<ApplicationListItem>> {
     let params = new HttpParams();

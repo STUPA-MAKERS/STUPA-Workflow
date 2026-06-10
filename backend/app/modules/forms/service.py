@@ -136,14 +136,24 @@ class FormsService:
         return [FormFieldDef.model_validate(r.field) for r in rows]
 
     async def get_effective_form(
-        self, type_id: UUID, budget_pot_id: UUID | None = None
+        self,
+        type_id: UUID,
+        budget_pot_id: UUID | None = None,
+        *,
+        form_version_id: UUID | None = None,
     ) -> EffectiveFormOut:
-        """Effektive Form-Definition liefern (api.md ``/application-types/{id}/form``)."""
+        """Effektive Form-Definition liefern (api.md ``/application-types/{id}/form``).
+
+        ``form_version_id`` überschreibt die **aktive** Version — so kann ein laufender
+        Antrag seine **gepinnte** Form rendern/bearbeiten (statt der inzwischen geänderten
+        aktiven), data-model §1.
+        """
         app_type = await self._get_type(type_id)
-        if app_type.active_form_version_id is None:
+        version_id = form_version_id or app_type.active_form_version_id
+        if version_id is None:
             raise NotFoundError(f"application type {type_id} has no active form version")
 
-        type_fields = await self._fields_of_version(app_type.active_form_version_id)
+        type_fields = await self._fields_of_version(version_id)
         pot_fields = (
             await self._pot_fields(app_type, budget_pot_id) if budget_pot_id else None
         )
@@ -151,7 +161,7 @@ class FormsService:
 
         return EffectiveFormOut(
             applicationTypeId=type_id,
-            formVersionId=app_type.active_form_version_id,
+            formVersionId=version_id,
             budgetPotId=budget_pot_id,
             sections=[
                 FormSectionOut(

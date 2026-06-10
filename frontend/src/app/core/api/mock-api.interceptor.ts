@@ -608,6 +608,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) return ok([...MOCK_AGENDA]);
     if (/\/meetings\/[^/]+$/.test(p)) return ok(MOCK_MEETING);
+    if (/\/applications\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
   }
 
