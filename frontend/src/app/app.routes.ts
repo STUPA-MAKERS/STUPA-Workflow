@@ -269,6 +269,14 @@ export const routes: Routes = [
           ),
       },
       {
+        // OAuth-Consent (#MCP): nach Login Scope + Token-Lebensdauer wählen.
+        path: 'oauth/consent',
+        data: { title: 'account.consent.title' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/account/consent.component').then((m) => m.OAuthConsentComponent),
+      },
+      {
         // Konto → API-Zugang (#MCP): eigene OAuth-Grants verwalten + MCP-Paket laden.
         path: 'account/grants',
         data: { title: 'account.grants.title' },

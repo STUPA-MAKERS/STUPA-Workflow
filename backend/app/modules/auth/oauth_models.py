@@ -32,6 +32,8 @@ class OAuthAuthorizationCode(UUIDPkMixin, CreatedAtMixin, Base):
     redirect_uri: Mapped[str] = mapped_column(Text)
     code_challenge: Mapped[str] = mapped_column(Text)  # S256, base64url
     scope: Mapped[str] = mapped_column(Text)  # Space-separierte Scope-Liste
+    # Vom Nutzer im Consent gewählte Token-Lebensdauer (Sekunden); NULL = läuft nie ab.
+    access_ttl_seconds: Mapped[int | None] = mapped_column(nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -52,7 +54,12 @@ class OAuthToken(UUIDPkMixin, CreatedAtMixin, Base):
         LargeBinary, unique=True, nullable=True
     )
     scope: Mapped[str] = mapped_column(Text)
-    access_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Gewählte Lebensdauer (Sekunden); NULL = läuft nie ab (für Refresh-Rotation gemerkt).
+    access_ttl_seconds: Mapped[int | None] = mapped_column(nullable=True)
+    # NULL = läuft nie ab.
+    access_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     refresh_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

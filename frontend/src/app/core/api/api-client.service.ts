@@ -20,6 +20,7 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  ConsentRequest,
   McpSetup,
   OAuthGrant,
   Application,
@@ -539,6 +540,20 @@ export class ApiClient {
   /** DELETE /oauth/grants — alle eigenen Grants widerrufen (Not-Aus). */
   revokeAllGrants(): Observable<void> {
     return this.http.delete<void>(`${this.base}/oauth/grants`);
+  }
+
+  /** GET /oauth/consent-request — schwebender Authorize-Request fürs Consent-FE. */
+  consentRequest(): Observable<ConsentRequest> {
+    return this.http.get<ConsentRequest>(`${this.base}/oauth/consent-request`);
+  }
+
+  /** POST /oauth/consent — Scope+Lebensdauer bestätigen/ablehnen → Redirect-URL. */
+  submitConsent(body: {
+    approve: boolean;
+    scopes: string[];
+    lifetime: string;
+  }): Observable<{ redirect: string }> {
+    return this.http.post<{ redirect: string }>(`${this.base}/oauth/consent`, body);
   }
 
   /** GET /mcp/config — fertiger mcpServers-Schnipsel für diese Plattform (P(`mcp.use`)). */

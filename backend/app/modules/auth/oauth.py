@@ -47,6 +47,37 @@ SCOPES: dict[str, frozenset[str]] = {
 # eingeloggten Nutzers gekappt — ein Nicht-Admin erhält nur seine Teilmenge.
 DEFAULT_SCOPE = " ".join(SCOPES.keys())
 
+# Wählbare Token-Lebensdauern (Consent-UI) → Access-Token-TTL in Sekunden; ``None`` =
+# läuft nie ab (jederzeit über die Grants-Seite widerrufbar). Reihenfolge = Anzeige.
+LIFETIMES: dict[str, int | None] = {
+    "1h": 3600,
+    "8h": 8 * 3600,
+    "1d": 24 * 3600,
+    "30d": 30 * 24 * 3600,
+    "90d": 90 * 24 * 3600,
+    "never": None,
+}
+DEFAULT_LIFETIME = "30d"
+
+
+def resolve_lifetime(key: str | None) -> int | None:
+    """Lifetime-Key → Access-TTL (Sekunden) oder ``None`` (nie). Unbekannt → Default."""
+    if key is None or key not in LIFETIMES:
+        key = DEFAULT_LIFETIME
+    return LIFETIMES[key]
+
+# i18n-Schlüssel-Stamm je Scope für die Consent-UI (Label/Beschreibung im FE).
+SCOPE_ORDER: tuple[str, ...] = (
+    "read",
+    "applications:write",
+    "votes:write",
+    "meetings:write",
+    "budget:write",
+    "forms:write",
+    "flows:write",
+    "admin:write",
+)
+
 _ACCESS_PREFIX = "apat_"  # antragsplattform access token
 _REFRESH_PREFIX = "aprt_"  # antragsplattform refresh token
 _TOKEN_BYTES = 32

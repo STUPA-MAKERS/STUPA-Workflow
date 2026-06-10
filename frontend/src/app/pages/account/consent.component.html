@@ -1,0 +1,75 @@
+<section class="consent">
+  @if (loading()) {
+    <p class="consent__muted">{{ 'common.loading' | t }}</p>
+  } @else if (error() && !req()) {
+    <p class="consent__error">{{ 'account.consent.error' | t }}</p>
+  } @else if (req(); as r) {
+    <div class="card consent__card">
+      <header class="consent__head">
+        <app-icon name="webhook" [size]="28" />
+        <div>
+          <h1>{{ 'account.consent.title' | t }}</h1>
+          <p class="consent__intro">{{ 'account.consent.intro' | t }}</p>
+        </div>
+      </header>
+
+      @if (!r.canUseMcp) {
+        <p class="consent__error">{{ 'account.consent.notAllowed' | t }}</p>
+      }
+
+      <h2 class="consent__label">{{ 'account.consent.scopes' | t }}</h2>
+      <ul class="consent__scopes">
+        @for (s of r.requestedScopes; track s.key) {
+          <li class="scope" [class.scope--unheld]="!s.held">
+            <label>
+              <input
+                type="checkbox"
+                [checked]="selected()[s.key]"
+                (change)="toggle(s.key)"
+              />
+              <span class="scope__text">
+                <span class="scope__name">{{ scopeLabelKey(s.key) | t }}</span>
+                <span class="scope__desc">{{ scopeDescKey(s.key) | t }}</span>
+                @if (!s.held) {
+                  <span class="scope__warn">{{ 'account.consent.notHeld' | t }}</span>
+                }
+              </span>
+            </label>
+          </li>
+        }
+      </ul>
+
+      <h2 class="consent__label">{{ 'account.consent.lifetime' | t }}</h2>
+      <div class="consent__lifetimes">
+        @for (lt of r.lifetimes; track lt) {
+          <button
+            type="button"
+            class="chip"
+            [class.chip--active]="lifetime() === lt"
+            (click)="setLifetime(lt)"
+          >
+            {{ lifetimeKey(lt) | t }}
+          </button>
+        }
+      </div>
+
+      @if (error()) {
+        <p class="consent__error">{{ 'account.consent.error' | t }}</p>
+      }
+
+      <footer class="consent__actions">
+        <button type="button" class="btn btn--ghost" [disabled]="submitting()" (click)="deny()">
+          {{ 'account.consent.deny' | t }}
+        </button>
+        <button
+          type="button"
+          class="btn btn--primary"
+          [disabled]="submitting() || !r.canUseMcp || !anySelected()"
+          (click)="approve()"
+        >
+          {{ 'account.consent.approve' | t }}
+        </button>
+      </footer>
+    </div>
+  }
+</section>

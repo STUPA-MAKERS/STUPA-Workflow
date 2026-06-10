@@ -52,7 +52,13 @@ async def _principal(session: AsyncSession) -> uuid.UUID:
     return row.id
 
 
-async def _mint_code(session: AsyncSession, pid: uuid.UUID, *, scope: str = "read") -> str:
+async def _mint_code(
+    session: AsyncSession,
+    pid: uuid.UUID,
+    *,
+    scope: str = "read",
+    access_ttl_seconds: int | None = _ACCESS_TTL,
+) -> str:
     return await oauth_service.create_authorization_code(
         session,
         principal_id=pid,
@@ -62,6 +68,7 @@ async def _mint_code(session: AsyncSession, pid: uuid.UUID, *, scope: str = "rea
         scope=scope,
         now=datetime.now(UTC),
         ttl_seconds=300,
+        access_ttl_seconds=access_ttl_seconds,
     )
 
 
@@ -194,3 +201,26 @@ async def test_expired_access_token_not_resolved(session: AsyncSession) -> None:
     assert await oauth_service.resolve_access_token(
         session, token=issued.access_token, now=later
     ) is None
+
+
+async def test_never_expiring_token_resolves_far_future(session: AsyncSession) -> None:
+    pid = await _principal(session)
+    code = await _mint_code(session, pid, access_ttl_seconds=None)  # »läuft nie ab«
+    now = datetime.now(UTC)
+    issued = await oauth_service.exchange_code(
+        session,
+        code=code,
+        code_verifier=_VERIFIER,
+        redirect_uri=_REDIRECT,
+        client_id=_CLIENT,
+        now=now,
+        access_ttl=_ACCESS_TTL,
+        refresh_ttl=_REFRESH_TTL,
+    )
+    assert issued.expires_in is None
+    # Auch Jahre später noch gültig (nur Widerruf beendet es).
+    far = now + timedelta(days=3650)
+    resolved = await oauth_service.resolve_access_token(
+        session, token=issued.access_token, now=far
+    )
+    assert resolved is not None and resolved[0] == pid

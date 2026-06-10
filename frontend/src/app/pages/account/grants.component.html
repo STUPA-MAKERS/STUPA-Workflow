@@ -65,7 +65,7 @@
             <tr>
               <td><code class="grants__scope">{{ g.scope }}</code></td>
               <td>{{ g.createdAt }}</td>
-              <td>{{ g.accessExpiresAt }}</td>
+              <td>{{ g.accessExpiresAt ?? ('account.grants.never' | t) }}</td>
               <td class="grants__col-action">
                 <button type="button" class="btn btn--danger-ghost" (click)="revoke(g.id)">
                   {{ 'account.grants.revoke' | t }}

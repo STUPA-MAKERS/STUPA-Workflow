@@ -835,3 +835,18 @@ export interface McpSetup {
   install: string;
   note: string;
 }
+
+/** Eine im Consent angefragte Scope-Zeile (held = Nutzer besitzt das Recht). */
+export interface ConsentScope {
+  key: string;
+  held: boolean;
+}
+
+/** Schwebender Authorize-Request für den Consent-Screen (#MCP). */
+export interface ConsentRequest {
+  clientId: string;
+  canUseMcp: boolean;
+  requestedScopes: ConsentScope[];
+  lifetimes: string[];
+  defaultLifetime: string;
+}

@@ -22,8 +22,9 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 from urllib.parse import urlencode, urlparse
 
-from fastapi import APIRouter, Depends, Form, Query, Request, status
+from fastapi import APIRouter, Depends, Form, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
@@ -124,53 +125,20 @@ def authorize(
 @router.get("/finish", status_code=status.HTTP_302_FOUND)
 async def finish(
     request: Request,
-    db: DbSession,
     settings: SettingsDep,
-    principal: Annotated[Principal, Depends(require_principal())],
+    _principal: Annotated[Principal, Depends(require_principal())],
 ) -> RedirectResponse:
-    """Nach OIDC-Login: Authorization-Code minten + an die Loopback-redirect_uri geben."""
+    """Nach OIDC-Login: zum in-App-Consent-Screen leiten (Scope + Lebensdauer wählen).
+
+    Es wird hier NICHT gemintet — der Nutzer bestätigt erst Scope/Lebensdauer auf
+    ``/oauth/consent``; ``POST /api/oauth/consent`` mintet dann den Code."""
     tx_cookie = request.cookies.get(settings.oauth_tx_cookie_name)
-    tx = (
-        sessions.load_oauth_tx(settings.session_secret, tx_cookie, _TX_MAX_AGE)
-        if tx_cookie
-        else None
-    )
-    if tx is None:
+    if not tx_cookie or sessions.load_oauth_tx(
+        settings.session_secret, tx_cookie, _TX_MAX_AGE
+    ) is None:
         raise BadRequestError("Invalid or expired OAuth transaction.")
-    # Agent-Zugang muss explizit erlaubt sein (Admin bypasst). Ohne `mcp.use` wird
-    # KEIN Code gemintet → kein Token (zentraler Chokepoint, #MCP).
-    if not principal.has("mcp.use"):
-        raise ForbiddenError("Missing permission: mcp.use")
-    # Principal-Row-Id über den sub auflösen (require_principal liefert nur den
-    # aufgelösten Principal; die Code-Zeile braucht die principal.id).
-    row_id = (
-        await db.execute(select(PrincipalRow.id).where(PrincipalRow.sub == principal.sub))
-    ).scalar_one_or_none()
-    if row_id is None:
-        raise BadRequestError("Principal not found.")
-
-    code = await oauth_service.create_authorization_code(
-        db,
-        principal_id=row_id,
-        client_id=tx["client_id"],
-        redirect_uri=tx["redirect_uri"],
-        code_challenge=tx["code_challenge"],
-        scope=tx["scope"],
-        now=datetime.now(UTC),
-        ttl_seconds=settings.oauth_code_ttl_seconds,
-    )
-    await db.commit()
-
-    params = {"code": code}
-    if tx["state"]:
-        params["state"] = tx["state"]
-    sep = "&" if urlparse(tx["redirect_uri"]).query else "?"
-    resp = RedirectResponse(
-        f"{tx['redirect_uri']}{sep}{urlencode(params)}",
-        status_code=status.HTTP_302_FOUND,
-    )
-    resp.delete_cookie(settings.oauth_tx_cookie_name, path="/")
-    return resp
+    dest = settings.public_base_url.rstrip("/") + "/oauth/consent"
+    return RedirectResponse(dest, status_code=status.HTTP_302_FOUND)
 
 
 def _token_error(error: str, description: str, code: int = 400) -> JSONResponse:
@@ -237,6 +205,107 @@ async def _principal_row_id(db: DbSession, principal: Principal) -> Any:
     ).scalar_one_or_none()
 
 
+def _loopback_redirect(redirect_uri: str, params: dict[str, str]) -> str:
+    sep = "&" if urlparse(redirect_uri).query else "?"
+    return f"{redirect_uri}{sep}{urlencode(params)}"
+
+
+@router.get("/consent-request")
+async def consent_request(
+    request: Request,
+    settings: SettingsDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> dict[str, Any]:
+    """Den schwebenden Authorize-Request fürs Consent-FE: Client + angefragte Scopes +
+    wählbare Lebensdauern. Markiert, welche Scopes der Nutzer tatsächlich besitzt."""
+    tx_cookie = request.cookies.get(settings.oauth_tx_cookie_name)
+    tx = (
+        sessions.load_oauth_tx(settings.session_secret, tx_cookie, _TX_MAX_AGE)
+        if tx_cookie
+        else None
+    )
+    if tx is None:
+        raise BadRequestError("Invalid or expired OAuth transaction.")
+    requested = oauth.parse_scope(tx["scope"])
+    # Welche der angefragten Scopes der Nutzer effektiv ausüben kann (nur UX-Hinweis;
+    # der Server kappt ohnehin zur Laufzeit). Admin → alle.
+    held = {
+        s
+        for s in requested
+        if any(principal.has(p) for p in oauth.SCOPES.get(s, frozenset()))
+    }
+    return {
+        "clientId": tx["client_id"],
+        "canUseMcp": principal.has("mcp.use"),
+        "requestedScopes": [
+            {"key": s, "held": s in held}
+            for s in oauth.SCOPE_ORDER
+            if s in requested
+        ],
+        "lifetimes": list(oauth.LIFETIMES.keys()),
+        "defaultLifetime": oauth.DEFAULT_LIFETIME,
+    }
+
+
+class _ConsentBody(BaseModel):
+    approve: bool
+    scopes: list[str] = []
+    lifetime: str | None = None
+
+
+@router.post("/consent")
+async def consent(
+    body: _ConsentBody,
+    request: Request,
+    response: Response,
+    db: DbSession,
+    settings: SettingsDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> dict[str, str]:
+    """Consent verarbeiten: Code mit gewähltem Scope+Lebensdauer minten (approve) bzw.
+    mit ``error=access_denied`` zur Loopback-redirect_uri zurück (deny). Gibt die
+    Redirect-URL zurück (das FE führt die Weiterleitung aus)."""
+    tx_cookie = request.cookies.get(settings.oauth_tx_cookie_name)
+    tx = (
+        sessions.load_oauth_tx(settings.session_secret, tx_cookie, _TX_MAX_AGE)
+        if tx_cookie
+        else None
+    )
+    if tx is None:
+        raise BadRequestError("Invalid or expired OAuth transaction.")
+    state = {"state": tx["state"]} if tx["state"] else {}
+    # tx ist einmalig verbraucht — Cookie in jedem Fall löschen.
+    response.delete_cookie(settings.oauth_tx_cookie_name, path="/")
+
+    if not body.approve:
+        return {"redirect": _loopback_redirect(tx["redirect_uri"], {"error": "access_denied", **state})}
+
+    if not principal.has("mcp.use"):
+        raise ForbiddenError("Missing permission: mcp.use")
+    requested = set(oauth.parse_scope(tx["scope"]))
+    # Gewählte Scopes ⊆ angefragte ∩ bekannte (keine Eskalation über den Client-Request).
+    chosen = [s for s in body.scopes if s in requested and s in oauth.SCOPES]
+    if not chosen:
+        raise BadRequestError("Select at least one valid scope.")
+    row_id = await _principal_row_id(db, principal)
+    if row_id is None:
+        raise BadRequestError("Principal not found.")
+
+    code = await oauth_service.create_authorization_code(
+        db,
+        principal_id=row_id,
+        client_id=tx["client_id"],
+        redirect_uri=tx["redirect_uri"],
+        code_challenge=tx["code_challenge"],
+        scope=" ".join(chosen),
+        now=datetime.now(UTC),
+        ttl_seconds=settings.oauth_code_ttl_seconds,
+        access_ttl_seconds=oauth.resolve_lifetime(body.lifetime),
+    )
+    await db.commit()
+    return {"redirect": _loopback_redirect(tx["redirect_uri"], {"code": code, **state})}
+
+
 @router.get("/grants")
 async def list_grants(
     db: DbSession,
@@ -259,7 +328,10 @@ async def list_grants(
             "clientId": r.client_id,
             "scope": r.scope,
             "createdAt": r.created_at.isoformat() if r.created_at else None,
-            "accessExpiresAt": r.access_expires_at.isoformat(),
+            # None = läuft nie ab.
+            "accessExpiresAt": (
+                r.access_expires_at.isoformat() if r.access_expires_at else None
+            ),
             "refreshExpiresAt": (
                 r.refresh_expires_at.isoformat() if r.refresh_expires_at else None
             ),
