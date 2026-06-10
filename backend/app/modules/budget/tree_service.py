@@ -204,12 +204,15 @@ class BudgetTreeService:
     async def update_node(
         self, budget_id: UUID, payload: BudgetNodeUpdate
     ) -> BudgetNodeOut:
-        """Name/Aktiv-Status/Stichtag ändern (Key/Parent immutabel → Pfad-Stabilität).
+        """Name/Aktiv-Status/Stichtag/**Key** ändern (Parent immutabel → Baum-Stabilität).
 
-        Ändert sich der HHJ-Stichtag eines Top-Budgets, leiten sich die Start-/End-Daten
-        aller bestehenden HHJ neu daraus ab (Jahr bleibt, Datum folgt)."""
+        Wird der ``key`` geändert, leitet sich der ``path_key`` des Knotens **und aller
+        Nachfahren** neu ab (alles referenziert ``budget_id``, nicht den Pfad). Ändert
+        sich der HHJ-Stichtag eines Top-Budgets, leiten sich die Start-/End-Daten aller
+        bestehenden HHJ neu daraus ab (Jahr bleibt, Datum folgt)."""
         node = await self._get_node(budget_id)
         provided = payload.model_dump(exclude_unset=True)
+        new_key = provided.pop("key", None)
         stichtag_changed = (
             ("fiscal_start_month" in provided
              and provided["fiscal_start_month"] != node.fiscal_start_month)
@@ -218,6 +221,8 @@ class BudgetTreeService:
         )
         for field, value in provided.items():
             setattr(node, field, value)
+        if new_key is not None and new_key != node.key:
+            await self._rename_key(node, new_key)
         if stichtag_changed and node.parent_id is None:
             for fy in await self._fiscal_years_of(budget_id):
                 fy.start_date, fy.end_date = tree_rules.fiscal_year_bounds(
@@ -225,6 +230,35 @@ class BudgetTreeService:
                 )
         await self.session.commit()
         return _node_out(node)
+
+    async def _rename_key(self, node: Budget, new_key: str) -> None:
+        """``key`` einer Kostenstelle ändern → ``path_key`` von Knoten + Nachfahren neu.
+
+        Pfad-Segment muss gültig + unter dem Parent eindeutig sein (sonst 422/409)."""
+        if not tree_rules.is_valid_key(new_key):
+            raise ValidationProblem(
+                "Invalid budget key.",
+                errors=[{"field": "key", "msg": "must be alphanumeric (no '-')"}],
+            )
+        if await self._sibling_exists(node.parent_id, new_key):
+            raise ConflictError(
+                f"budget key {new_key!r} already exists under this parent"
+            )
+        parent_path: str | None = None
+        if node.parent_id is not None:
+            parent_path = (await self._get_node(node.parent_id)).path_key
+        old_path = node.path_key
+        new_path = tree_rules.compose_path_key(parent_path, new_key)
+        # Nachfahren (Pfad-Präfix) holen, bevor der Knoten umbenannt wird.
+        descendants = (
+            await self.session.execute(
+                select(Budget).where(Budget.path_key.like(old_path + _SEP + "%"))
+            )
+        ).scalars().all()
+        node.key = new_key
+        node.path_key = new_path
+        for d in descendants:
+            d.path_key = new_path + d.path_key[len(old_path):]
 
     async def delete_node(self, budget_id: UUID) -> None:
         """Kostenstelle löschen — nur ohne Kinder/Zuteilungen (409 sonst, api.md)."""

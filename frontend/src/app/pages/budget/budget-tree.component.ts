@@ -85,6 +85,10 @@ export class BudgetTreeComponent {
   /** Limit (Zuteilung) je Knoten setzen — per Dialog pro Zeile (#22). */
   readonly limitNode = signal<BudgetTreeNode | null>(null);
   readonly limitValue = signal('');
+  /** Kostenstelle bearbeiten (Schlüssel + Name) — per Dialog pro Zeile. */
+  readonly editNode = signal<BudgetTreeNode | null>(null);
+  readonly editKey = signal('');
+  readonly editName = signal('');
   /** »Komplett gebunden«-Flag der im Limit-Dialog offenen Kostenstelle (alle HHJ). */
   readonly limitFullyBound = signal(false);
   /** Haushaltsjahr anlegen — INNERHALB des gewählten Budgets (nur das Jahr). */
@@ -370,6 +374,32 @@ export class BudgetTreeComponent {
   }
 
   // --- Limit / Zuteilung (Dialog pro Zeile) --------------------------------
+  openEditNode(node: BudgetTreeNode): void {
+    this.editNode.set(node);
+    this.editKey.set(node.key);
+    this.editName.set(node.name);
+  }
+
+  closeEditNode(): void {
+    this.editNode.set(null);
+  }
+
+  saveEditNode(): void {
+    const node = this.editNode();
+    if (!node) return;
+    const key = this.editKey().trim();
+    const name = this.editName().trim();
+    if (!key || !name) return;
+    this.api.updateNode(node.id, { key, name }).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
+        this.editNode.set(null);
+        this.reload();
+      },
+      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.keyFailed')),
+    });
+  }
+
   openLimit(node: BudgetTreeNode): void {
     this.limitNode.set(node);
     this.limitValue.set(this.alloc(node)?.allocated ?? '');

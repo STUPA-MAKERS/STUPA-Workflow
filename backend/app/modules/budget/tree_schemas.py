@@ -41,6 +41,7 @@ class BudgetNodeUpdate(_CamelModel):
     ``None`` = unverändert. ``color=""`` löscht die Farbe. ``acceptedStateKeys``/
     ``deniedStateKeys``/``fiscalStart*`` nur am Top-Level sinnvoll."""
 
+    key: str | None = Field(default=None, min_length=1)
     name: str | None = Field(default=None, min_length=1)
     active: bool | None = None
     color: str | None = None

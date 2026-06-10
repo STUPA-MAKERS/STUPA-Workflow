@@ -174,6 +174,7 @@ export interface BudgetNodeCreate {
 
 /** Teil-Update eines Knotens (alle Felder optional; ``color:""`` löscht die Farbe). */
 export interface BudgetNodeUpdate {
+  key?: string;
   name?: string;
   active?: boolean;
   color?: string | null;

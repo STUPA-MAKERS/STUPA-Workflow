@@ -165,6 +165,28 @@ def _fy_view(node, fy_id):  # noqa: ANN001
     return next(v for v in node.by_fiscal_year if v.fiscal_year_id == fy_id)
 
 
+async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> None:
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(
+        BudgetNodeCreate(key=f"RK{_suffix()}", name="Top", gremiumId=g.id)
+    )
+    mid = await svc.create_node(BudgetNodeCreate(key="800", name="Mid", parentId=top.id))
+    leaf = await svc.create_node(BudgetNodeCreate(key="04", name="Leaf", parentId=mid.id))
+    assert leaf.path_key == f"{top.path_key}-800-04"
+
+    # Mid umbenennen 800 → 810: Pfad von Mid + Leaf zieht nach.
+    out = await svc.update_node(mid.id, BudgetNodeUpdate(key="810", name="Mid"))
+    assert out.path_key == f"{top.path_key}-810"
+    leaf_row = await session.get(Budget, leaf.id)
+    assert leaf_row is not None and leaf_row.path_key == f"{top.path_key}-810-04"
+
+    # Konflikt: gleicher Key wie Geschwister → 409.
+    await svc.create_node(BudgetNodeCreate(key="900", name="Sib", parentId=top.id))
+    with pytest.raises(ConflictError):
+        await svc.update_node(mid.id, BudgetNodeUpdate(key="900"))
+
+
 async def test_account_and_transfer(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)
