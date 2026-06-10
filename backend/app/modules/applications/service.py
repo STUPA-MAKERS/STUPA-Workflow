@@ -710,13 +710,11 @@ class ApplicationsService:
                         and bool(gid)
                         and await self._in_gremium(principal.sub, UUID(gid))
                     )
-            if not ok and can_transition:
-                # Mind. ein feuerbarer manueller Übergang (Guards inkl. Akteur-Gates).
+            if not ok and (can_transition or app.created_by == principal.sub):
+                # Mind. ein verfügbarer manueller Übergang (Guards inkl. Akteur-Gates).
+                # Gilt auch für die eigene Antragstellung (#24) — ein **terminaler**
+                # State (z. B. »abgelehnt«, keine Ausgänge) ist damit **keine** Aufgabe.
                 ok = len(await flow.available_transitions(app.id, principal)) > 0
-            if not ok and app.created_by == principal.sub and s.edit_allowed:
-                # Eigener Antrag in bearbeitbarem State → Aufgabe der Antragsteller:in
-                # (auch ohne ``application.read``/-``transition``, #24).
-                ok = True
             if ok:
                 items.append(
                     ApplicationListItem(
