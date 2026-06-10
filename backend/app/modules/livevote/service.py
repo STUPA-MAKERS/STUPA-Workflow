@@ -40,7 +40,7 @@ from app.modules.livevote.events import (
     VoteOpenedEvent,
     VoteTallyEvent,
 )
-from app.modules.livevote.models import Meeting
+from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.livevote.schemas import (
     MeetingCreate,
     MeetingOut,
@@ -205,13 +205,25 @@ class MeetingService:
         # rekonstruieren (Reload-Pfad; der Live-WS-Pfad trägt sie schon mit). Gebündelt
         # geladen (kein N+1).
         tallies = await self._vote_tallies(rows)
+        present_by_meeting = await self._present_by_meeting(meeting_ids)
         out: dict[UUID, list[MeetingVoteOut]] = {}
         for v in rows:
             if v.meeting_id is None:
                 continue
             cfg = v.config if isinstance(v.config, dict) else {}
             opts = cfg.get("options") or []
+            secret = bool(cfg.get("secret"))
             counts, leading, reason = tallies.get(v.id, (None, None, None))
+            voted = sum((counts or {}).values())
+            present = present_by_meeting.get(v.meeting_id, 0)
+            # Reveal-Regel wie im VotingService: geschlossen ODER (nicht geheim UND alle
+            # Anwesenden haben abgestimmt). Sonst counts/leading verdecken (#vote-progress).
+            if v.status == "closed":
+                revealed = True
+            elif secret:
+                revealed = False
+            else:
+                revealed = present > 0 and voted >= present
             out.setdefault(v.meeting_id, []).append(
                 MeetingVoteOut(
                     id=v.id,
@@ -221,12 +233,33 @@ class MeetingService:
                     options=list(opts),
                     status=v.status,  # type: ignore[arg-type]
                     result=v.result,
-                    counts=counts,
-                    leading=leading,
+                    counts=counts if revealed else {},
+                    leading=leading if revealed else None,
+                    voted=voted,
+                    present=present,
+                    revealed=revealed,
                     failedReason=reason,
                 )
             )
         return out
+
+    async def _present_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
+        """``{meeting_id: Anzahl anwesender Mitglieder}`` (Reveal-Nenner, #vote-progress)."""
+        if not meeting_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(
+                    MeetingAttendance.meeting_id, func.count()
+                )
+                .where(
+                    MeetingAttendance.meeting_id.in_(meeting_ids),
+                    MeetingAttendance.status == "present",
+                )
+                .group_by(MeetingAttendance.meeting_id)
+            )
+        ).all()
+        return {mid: n for mid, n in rows}
 
     async def _vote_tallies(
         self, votes: list[Vote]

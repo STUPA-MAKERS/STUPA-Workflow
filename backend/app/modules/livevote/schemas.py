@@ -72,6 +72,12 @@ class MeetingVoteOut(_CamelModel):
     # Reload erhalten (vorher nur über den Live-WS-Pfad sichtbar).
     counts: dict[str, int] | None = None
     leading: str | None = None
+    # Teilnahme-Fortschritt (abgestimmte vs. anwesende Mitglieder) + ``revealed``: ob
+    # ``counts``/``leading`` sichtbar sind (geschlossen oder alle Anwesenden haben
+    # abgestimmt und nicht geheim), sonst verdeckt (#vote-progress).
+    voted: int = 0
+    present: int = 0
+    revealed: bool = True
     # Grund einer Ablehnung (nach Close): ``quorum`` = Quorum verfehlt, ``majority`` =
     # Mehrheit verfehlt. ``None`` solange offen oder bei ``passed``/``tie``.
     failed_reason: Literal["quorum", "majority"] | None = Field(
