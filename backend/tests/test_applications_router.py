@@ -143,7 +143,7 @@ def app(fake_service: _FakeService, sent: list[tuple[str, UUID]]) -> FastAPI:
     application = create_app()
     application.dependency_overrides[get_applications_service] = lambda: fake_service
 
-    async def _no_mail(settings, email, application_id):  # noqa: ANN001, ANN202
+    async def _no_mail(settings, email, application_id, pool):  # noqa: ANN001, ANN202
         sent.append((email, application_id))
 
     application.dependency_overrides[get_magic_link_sender] = lambda: _no_mail

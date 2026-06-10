@@ -27,7 +27,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 
 from app.db import get_sessionmaker
 from app.deps import (
@@ -52,6 +52,8 @@ from app.modules.applications.schemas import (
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth import service as auth_service
 from app.modules.forms.schemas import EffectiveFormOut
+from app.modules.notifications.provider import mail_queue_from_pool
+from app.modules.notifications.service import NotificationService
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_application_payload_limit,
@@ -83,21 +85,30 @@ ServiceDep = Annotated[ApplicationsService, Depends(get_applications_service)]
 
 
 async def _deliver_magic_link(
-    settings: Settings, email: str, application_id: UUID
+    settings: Settings, email: str, application_id: UUID, pool: object
 ) -> None:
     """Magic-Link für den neuen Antrag in eigener Session ausstellen + versenden.
 
     Läuft als Background-Task **nach** der 201-Antwort (flows §1: ``enqueue Mail``).
-    Nutzt die getestete T-10-Logik; Scope folgt dem Initial-State (edit)."""
+    Nutzt die getestete T-10-Logik; Scope folgt dem Initial-State (edit). Der Versand
+    geht über die Mail-Queue (Worker, T-18); fehlt der arq-Pool, wird geloggt +
+    verworfen (`NotificationService`)."""
+    queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
+
+        async def deliver(recipient: str, link: str) -> None:
+            await NotificationService(
+                db, queue=queue, settings=settings
+            ).send_magic_link(email=recipient, link=link)
+
         await auth_service.request_magic_link(
-            db, settings, email=email, application_id=application_id
+            db, settings, email=email, application_id=application_id, deliver=deliver
         )
         await db.commit()
 
 
-MagicLinkSender = Callable[[Settings, str, UUID], Awaitable[None]]
+MagicLinkSender = Callable[[Settings, str, UUID, object], Awaitable[None]]
 
 
 def get_magic_link_sender() -> MagicLinkSender:
@@ -127,6 +138,7 @@ async def create_application(
     service: ServiceDep,
     settings: SettingsDep,
     background: BackgroundTasks,
+    request: Request,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     send_magic_link: Annotated[MagicLinkSender, Depends(get_magic_link_sender)],
 ) -> ApplicationCreated:
@@ -160,7 +172,8 @@ async def create_application(
     actor = principal.sub if principal else "applicant"
 
     app, email = await service.create(payload, actor=actor)
-    background.add_task(send_magic_link, settings, email, app.id)
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(send_magic_link, settings, email, app.id, pool)
     return ApplicationCreated(applicationId=app.id)
 
 
