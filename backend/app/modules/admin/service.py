@@ -382,7 +382,7 @@ class ConfigService:
         (auch laufende) bleiben darauf gepinnt; ihr aktueller State wird per KEY auf den
         neuen Graphen gemappt — **gelöschte States ⇒ Initial-State**. Der Graph muss
         genau einen Initial-State haben (``validate_flow_graph``)."""
-        from app.modules.applications.models import Application
+        from app.modules.applications.models import Application, StatusEvent
 
         try:
             validate_flow_graph(payload.graph)
@@ -422,15 +422,6 @@ class ConfigService:
         else:
             version.active = True
             version.editor_layout = payload.graph.layout or {}
-            # Anträge von ihren States lösen (FK), damit die alten States weg können.
-            await self.session.execute(update(Application).values(current_state_id=None))
-            await self.session.execute(
-                delete(Transition).where(Transition.flow_version_id == version.id)
-            )
-            await self.session.execute(
-                delete(State).where(State.flow_version_id == version.id)
-            )
-            await self.session.flush()
         # Etwaige Alt-Versionen (global) deaktivieren — es bleibt genau eine aktiv.
         await self.session.execute(
             update(FlowVersion)
@@ -440,24 +431,54 @@ class ConfigService:
             .values(active=False)
         )
 
+        # States per KEY upserten: überlebende Keys behalten ihre id, damit die
+        # Timeline (status_event) und current_state-Referenzen gültig bleiben — nur
+        # wirklich entfernte States werden gelöscht (siehe unten).
+        existing_states = (
+            await self.session.execute(
+                select(State).where(State.flow_version_id == version.id)
+            )
+        ).scalars().all()
+        existing_by_key = {s.key: s for s in existing_states}
+        incoming_keys = {s.key for s in payload.graph.states}
+
         id_by_key: dict[str, UUID] = {}
         initial_id: UUID | None = None
         for state in payload.graph.states:
-            row = State(
-                flow_version_id=version.id,
-                key=state.key,
-                label_i18n=state.label,
-                color=state.color,
-                edit_allowed=state.edit_allowed,
-                is_initial=state.is_initial,
-                kind=state.kind,
-                config=state.config,
-            )
-            self.session.add(row)
+            row = existing_by_key.get(state.key)
+            if row is None:
+                row = State(flow_version_id=version.id, key=state.key)
+                self.session.add(row)
+            row.label_i18n = state.label
+            row.color = state.color
+            row.edit_allowed = state.edit_allowed
+            row.is_initial = state.is_initial
+            row.kind = state.kind
+            row.config = state.config
             await self.session.flush()
             id_by_key[state.key] = row.id
             if state.is_initial:
                 initial_id = row.id
+
+        removed_ids = [s.id for s in existing_states if s.key not in incoming_keys]
+
+        # Transitions komplett neu bauen. status_event.transition_id vorher lösen,
+        # sonst blockiert deren FK das Löschen (Timeline behält from/to + Notiz).
+        old_transition_ids = (
+            await self.session.execute(
+                select(Transition.id).where(Transition.flow_version_id == version.id)
+            )
+        ).scalars().all()
+        if old_transition_ids:
+            await self.session.execute(
+                update(StatusEvent)
+                .where(StatusEvent.transition_id.in_(old_transition_ids))
+                .values(transition_id=None)
+            )
+            await self.session.execute(
+                delete(Transition).where(Transition.flow_version_id == version.id)
+            )
+            await self.session.flush()
         for order, trans in enumerate(payload.graph.transitions):
             self.session.add(
                 Transition(
@@ -473,7 +494,8 @@ class ConfigService:
                 )
             )
 
-        # ALLE Anträge auf den einen Flow ziehen; gelöschter State ⇒ Initial.
+        # ALLE Anträge auf den einen Flow ziehen; gelöschter State ⇒ Initial
+        # (per KEY gemappt, deckt auch Anträge alter Versionen ab).
         for app_id, key in app_keys.items():
             await self.session.execute(
                 update(Application)
@@ -489,6 +511,23 @@ class ConfigService:
             .where(Application.current_state_id.is_(None))
             .values(current_state_id=initial_id, flow_version_id=version.id)
         )
+
+        # Entfernte States: Timeline-Referenzen auf Initial umbiegen, dann löschen.
+        # (current_state-Referenzen sind durch das Remapping oben bereits weg.)
+        if removed_ids:
+            await self.session.execute(
+                update(StatusEvent)
+                .where(StatusEvent.from_state_id.in_(removed_ids))
+                .values(from_state_id=initial_id)
+            )
+            await self.session.execute(
+                update(StatusEvent)
+                .where(StatusEvent.to_state_id.in_(removed_ids))
+                .values(to_state_id=initial_id)
+            )
+            await self.session.flush()
+            await self.session.execute(delete(State).where(State.id.in_(removed_ids)))
+            await self.session.flush()
 
         await self._audit(
             actor, AuditAction.CONFIG_ACTIVATION, "flow_version", version.id,

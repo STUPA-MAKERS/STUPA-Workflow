@@ -234,6 +234,62 @@ async def test_global_flow_is_single_and_resets_deleted_states(
     assert app.current_state_id == new_initial.id
 
 
+async def test_global_flow_save_repoints_timeline_off_deleted_state(
+    session: AsyncSession,
+) -> None:
+    """Saving a flow that drops a state must not fail on the status_event FK:
+    timeline entries pointing at the deleted state are repointed to Initial."""
+    from app.modules.applications.models import Application, StatusEvent
+    from app.modules.forms.models import FormVersion
+
+    svc = ConfigService(session)
+    g1 = await svc.create_global_flow_version(
+        FlowVersionCreate.model_validate({"graph": _global_graph()}), _ACTOR
+    )
+    accepted = (
+        await session.scalars(
+            select(State).where(State.flow_version_id == g1.id, State.key == "accepted")
+        )
+    ).one()
+
+    app_type = await _make_type(session)
+    fv = FormVersion(application_type_id=app_type.id, version=1)
+    session.add(fv)
+    await session.flush()
+    app = Application(
+        type_id=app_type.id, form_version_id=fv.id, flow_version_id=g1.id,
+        current_state_id=accepted.id, data={},
+    )
+    session.add(app)
+    await session.flush()
+    # Timeline-Eintrag auf den zu löschenden State »accepted«.
+    ev = StatusEvent(application_id=app.id, from_state_id=None, to_state_id=accepted.id)
+    session.add(ev)
+    await session.commit()
+
+    # Drop »accepted« → würde ohne Repointing am FK fk_status_event_to_state_id_state
+    # scheitern.
+    g2 = await svc.create_global_flow_version(
+        FlowVersionCreate.model_validate({"graph": _global_graph(with_accepted=False)}),
+        _ACTOR,
+    )
+
+    new_initial = (
+        await session.scalars(
+            select(State).where(
+                State.flow_version_id == g2.id, State.is_initial.is_(True)
+            )
+        )
+    ).one()
+    await session.refresh(ev)
+    assert ev.to_state_id == new_initial.id
+    # »accepted« ist wirklich weg.
+    gone = await session.scalar(
+        select(func.count()).select_from(State).where(State.id == accepted.id)
+    )
+    assert gone == 0
+
+
 async def test_create_flow_version_unknown_type_404(session: AsyncSession) -> None:
     svc = ConfigService(session)
     with pytest.raises(NotFoundError):
