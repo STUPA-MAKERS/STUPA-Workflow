@@ -52,6 +52,19 @@ _BUILTIN_MAGIC_LINK_BODY = {
     "email.\n",
 }
 
+# Default-Template einer ``notify``-Action ohne explizites ``templateKey`` (der
+# Flow-Editor speichert die Action oft nur mit Empfängern). Existiert das Template
+# nicht, greift der var-freie Builtin-Fallback (StrictUndefined-sicher).
+DEFAULT_NOTIFY_TEMPLATE_KEY = "status_update"
+_BUILTIN_NOTIFY_SUBJECT = {
+    "de": "Aktualisierung zu Ihrem Antrag",
+    "en": "Update on your application",
+}
+_BUILTIN_NOTIFY_BODY = {
+    "de": "Hallo,\n\nes gibt eine Aktualisierung zu Ihrem Antrag.\n",
+    "en": "Hello,\n\nthere is an update on your application.\n",
+}
+
 
 class NotificationService:
     """DB-gestützte Notifications-Operationen (an eine `AsyncSession` gebunden)."""
@@ -142,27 +155,45 @@ class NotificationService:
 
         Ad-hoc-Modus: ``{"type":"notify","templateKey":"...","recipients":[...]}``.
         """
-        template_key = action.get("templateKey") or action.get("template_key")
-        if not template_key:
-            logger.warning("notify action without 'templateKey' — skipped")
-            return 0
-        tpl = await self._get_template_by_key(str(template_key))
-        if tpl is None:
-            logger.warning("notify action references missing template %r", template_key)
-            return 0
+        # Ohne explizites `templateKey` (Flow-Editor speichert die Action häufig nur mit
+        # Empfängern) das Default-Template `status_update` nutzen — sonst würde jede
+        # notify-Action still verworfen (Ursache »keine Mails«).
+        template_key = (
+            action.get("templateKey")
+            or action.get("template_key")
+            or DEFAULT_NOTIFY_TEMPLATE_KEY
+        )
         recipients = await self.resolver.resolve(
             _as_specs(action.get("recipients", [])), application_id=application_id
         )
-        ok = await self._render_and_enqueue(
-            tpl,
-            recipients,
-            context=context or {},
-            lang=lang,
-            idempotency_parts=_idem_parts(
-                idempotency_base, "notify", str(application_id or ""), str(template_key)
-            ),
+        if not recipients:
+            logger.info("notify action resolved no recipients — skipped")
+            return 0
+        idem = _idem_parts(
+            idempotency_base, "notify", str(application_id or ""), str(template_key)
         )
-        return int(ok)
+        tpl = await self._get_template_by_key(str(template_key))
+        if tpl is not None:
+            ok = await self._render_and_enqueue(
+                tpl, recipients, context=context or {}, lang=lang, idempotency_parts=idem
+            )
+            return int(ok)
+        # Template fehlt in der DB → var-freier Builtin-Fallback (StrictUndefined-sicher).
+        rendered = render_mail(
+            subject_i18n=_BUILTIN_NOTIFY_SUBJECT,
+            body_i18n=_BUILTIN_NOTIFY_BODY,
+            context=context or {},
+            lang=lang or self.settings.mail_default_lang,
+            default_lang=self.settings.mail_default_lang,
+        )
+        msg = MailMessage(
+            to=tuple(recipients),
+            subject=rendered.subject,
+            text=rendered.text,
+            html=rendered.html,
+            idempotency_key=compute_idempotency_key(*idem),
+        )
+        return int(await self._enqueue(msg))
 
     async def send_magic_link(self, *, email: str, link: str) -> None:
         """Magic-Link-Mail rendern + enqueuen (ersetzt T-10-Platzhalter)."""

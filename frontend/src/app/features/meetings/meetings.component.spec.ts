@@ -304,4 +304,25 @@ describe('MeetingsComponent', () => {
     // Ohne TOP zeigt der Editor den Hinweis (kein einzelnes Markdown-Feld mehr).
     expect(await screen.findByText(/Wähle links einen TOP/i)).toBeInTheDocument();
   });
+
+  it('persists the selected protokollant via PATCH and shows the name', async () => {
+    const { http } = await setup();
+    flushLoad(http);
+    const editBtns = await screen.findAllByRole('button', { name: /Sitzung bearbeiten/i });
+    await userEvent.click(editBtns[0]);
+    // openSettings lädt das Roster erneut (Protokollant-Optionen).
+    http.expectOne('/api/meetings/m-1/attendance').flush([
+      { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false },
+    ]);
+    const select = await screen.findByLabelText(/Protokollant/i);
+    await screen.findByRole('option', { name: 'Max P' });
+    await userEvent.selectOptions(select, 'pr-1');
+    await userEvent.click(screen.getByRole('button', { name: /Speichern/i }));
+    const req = http.expectOne('/api/meetings/m-1');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body.protokollantId).toBe('pr-1');
+    req.flush({ ...MEETING, protokollantId: 'pr-1', protokollantName: 'Max P' });
+    // Name erscheint nach dem Speichern (Karte/Toolbar).
+    expect(await screen.findByText(/Max P/)).toBeInTheDocument();
+  });
 });

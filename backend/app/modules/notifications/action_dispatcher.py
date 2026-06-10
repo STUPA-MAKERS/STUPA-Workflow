@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db import get_sessionmaker
 from app.modules.applications.models import Application
 from app.modules.flow.dispatch import DispatchedAction
+from app.modules.flow.models import State
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
@@ -51,15 +52,30 @@ class NotificationActionDispatcher:
 
     async def _dispatch_notify(self, action: DispatchedAction) -> None:
         async with self.sessionmaker() as session:
-            app_type_id = await session.scalar(
-                select(Application.type_id).where(Application.id == action.application_id)
-            )
+            app_type_id, current_state_id = (
+                await session.execute(
+                    select(Application.type_id, Application.current_state_id).where(
+                        Application.id == action.application_id
+                    )
+                )
+            ).first() or (None, None)
             context: dict[str, object] = {"applicationId": str(action.application_id)}
+            raw_lang = action.params.get("lang")
+            lang = str(raw_lang) if raw_lang else None
+            # ``status`` (Label des aktuellen States) bereitstellen — das Default-/Status-
+            # Template referenziert ``{{ status }}``; ohne Wert scheitert StrictUndefined.
+            if current_state_id is not None:
+                label_i18n = await session.scalar(
+                    select(State.label_i18n).where(State.id == current_state_id)
+                )
+                if isinstance(label_i18n, dict) and label_i18n:
+                    context["status"] = (
+                        label_i18n.get(lang or self.settings.mail_default_lang)
+                        or next(iter(label_i18n.values()))
+                    )
             extra = action.params.get("context")
             if isinstance(extra, dict):
                 context.update(extra)
-            raw_lang = action.params.get("lang")
-            lang = str(raw_lang) if raw_lang else None
             service = NotificationService(
                 session, queue=self.queue, settings=self.settings
             )

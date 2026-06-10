@@ -516,6 +516,26 @@ class MeetingService:
                 )
             ).all()
         )
+        # Protokollant-Namen gebündelt (kein N+1) — sonst zeigt die Timeline/Karte
+        # keinen Protokollanten (``protokollantName`` bliebe null → „nicht gespeichert"-
+        # Eindruck), obwohl ``protokollant_id`` korrekt persistiert ist.
+        prot_ids = {m.protokollant_id for m in meetings if m.protokollant_id is not None}
+        prot_names: dict[UUID, str | None] = (
+            {
+                pid: (display_name or email)
+                for pid, display_name, email in (
+                    await self.session.execute(
+                        select(
+                            PrincipalRow.id,
+                            PrincipalRow.display_name,
+                            PrincipalRow.email,
+                        ).where(PrincipalRow.id.in_(prot_ids))
+                    )
+                ).all()
+            }
+            if prot_ids
+            else {}
+        )
         if "admin" in principal.roles or principal.has("meeting.manage"):
             manage_ids = write_ids = votes_mgmt_ids = vote_ids = all_gids
             my_id: UUID | None = None
@@ -546,6 +566,7 @@ class MeetingService:
                     can_manage_votes=(m.gremium_id in votes_mgmt_ids) or is_prot,
                     can_vote=m.gremium_id in vote_ids,
                     gremium_name=gremium_names.get(m.gremium_id),
+                    protokollant_name=prot_names.get(m.protokollant_id),
                     votes=votes_by_meeting.get(m.id, []),
                 )
             )

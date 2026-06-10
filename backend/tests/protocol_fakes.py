@@ -51,6 +51,9 @@ class FakeSession:
     async def execute(self, _stmt: Any) -> FakeResult:
         return self._results.pop(0) if self._results else FakeResult()
 
+    async def scalars(self, _stmt: Any) -> FakeResult:
+        return self._results.pop(0) if self._results else FakeResult()
+
     async def get(self, _model: type, ident: Any) -> Any:
         return self.store.get(ident)
 

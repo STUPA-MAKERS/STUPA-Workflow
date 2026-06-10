@@ -36,6 +36,7 @@ from app.modules.admin.models import Gremium, MailList
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
+from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.queue import MailQueue
 from app.modules.pdf.pytex_client import PytexClient, PytexError
 from app.modules.protocol.markdown import (
@@ -372,7 +373,12 @@ class ProtocolService:
         )
 
     async def _recipients(self, gremium_id: UUID) -> list[str]:
-        """Flache, deduplizierte Empfängerliste aus den aktiven Verteilern des Gremiums."""
+        """Flache, deduplizierte Empfängerliste des Gremiums.
+
+        Primär die aktiven **Verteiler** (``mail_list``). Existiert kein Verteiler
+        (es gibt derzeit keine Verwaltungs-UI dafür → die Tabelle ist regelmäßig leer),
+        wird auf die **E-Mail-Adressen der aktiven Gremium-Mitglieder** zurückgefallen —
+        sonst versendet ``finalize`` still gar nichts (kein Verteiler ⇒ keine Mail)."""
         lists = (
             await self.session.execute(
                 select(MailList.recipients).where(
@@ -383,6 +389,13 @@ class ProtocolService:
         seen: dict[str, None] = {}
         for recipients in lists:
             for addr in recipients or []:
+                seen.setdefault(addr, None)
+        if not seen:
+            # Fallback: aktive Mitglieder des Gremiums (Amtszeit-Fenster, email≠NULL).
+            members = await RecipientResolver(self.session).resolve(
+                [{"kind": "gremium", "ref": str(gremium_id)}]
+            )
+            for addr in members:
                 seen.setdefault(addr, None)
         return list(seen)
 

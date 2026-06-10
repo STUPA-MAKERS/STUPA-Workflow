@@ -323,6 +323,27 @@ async def test_finalize_no_recipients_skips_mail() -> None:
     assert mail.sent == []
 
 
+async def test_finalize_falls_back_to_gremium_members_without_maillist() -> None:
+    """Kein Verteiler (mail_list leer) ⇒ Versand an die aktiven Gremium-Mitglieder."""
+    proto = _protocol()
+    mail = FakeMailQueue()
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium()},
+        results=[
+            result(proto),  # _get
+            result(),  # _assemble_from_agenda (keine TOPs)
+            result(),  # _recipients: leere Verteilerliste
+            result("a@x.de", "b@x.de"),  # Fallback: Gremium-Mitglieder (scalars)
+        ],
+    )
+    out = await _service(
+        session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=mail
+    ).finalize(PID, now=NOW)
+    assert out.status == "final"
+    assert len(mail.sent) == 1
+    assert mail.sent[0].to == ("a@x.de", "b@x.de")
+
+
 async def test_finalize_without_mail_queue_skips_send() -> None:
     proto = _protocol()
     session = FakeSession(
