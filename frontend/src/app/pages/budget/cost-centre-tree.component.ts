@@ -36,7 +36,7 @@ import { PALETTE } from './budget-year-tree.component';
 
     <ng-template #branch let-list let-depth="depth">
       @for (n of list; track n.id) {
-        <div class="cct__branch">
+        <div class="cct__branch" [style.--line-color]="depth === 0 ? dotColor(n) : null">
           <button
             type="button"
             class="cct__node"
@@ -131,7 +131,7 @@ import { PALETTE } from './budget-year-tree.component';
         left: calc(var(--space-2) - var(--space-3));
         top: 0;
         bottom: 0;
-        border-left: 1px dotted var(--color-success, #5fb37a);
+        border-left: 1px dotted var(--line-color, var(--color-success, #5fb37a));
       }
       /* Erstes Kind: Linie nach oben bis zum Punkt verlängern (verbunden). */
       .cct__children > .cct__branch:first-child::before {
@@ -155,7 +155,7 @@ import { PALETTE } from './budget-year-tree.component';
         left: calc(var(--space-2) - var(--space-3));
         top: 0.8em;
         width: var(--space-3);
-        border-top: 1px dotted var(--color-success, #5fb37a);
+        border-top: 1px dotted var(--line-color, var(--color-success, #5fb37a));
       }
       .cct__node--active {
         background: color-mix(in srgb, var(--color-success, #5fb37a) 22%, transparent);

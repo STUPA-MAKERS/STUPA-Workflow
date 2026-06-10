@@ -23,7 +23,7 @@ export interface BudgetYearSelection {
   template: `
     <nav class="byt" [attr.aria-label]="'budget.tree.nav' | t">
       @for (b of tops(); track b.id) {
-        <div class="byt__budget" [class.byt__budget--sel]="b.id === selectedBudgetId()">
+        <div class="byt__budget" [class.byt__budget--sel]="b.id === selectedBudgetId()" [style.--line-color]="dotColor(b)">
           <button type="button" class="byt__node byt__node--top" (click)="pickBudget(b)">
             <span class="byt__dot" [style.background]="dotColor(b)"></span>
             <span class="byt__label">{{ b.name }}</span>
@@ -111,7 +111,7 @@ export interface BudgetYearSelection {
         left: calc(var(--space-2) - var(--space-3));
         top: 0;
         bottom: 0;
-        border-left: 1px dotted var(--color-success, #5fb37a);
+        border-left: 1px dotted var(--line-color, var(--color-success, #5fb37a));
       }
       /* Erstes Jahr: Linie nach oben bis zum Punkt verlängern (verbunden). */
       .byt__years > li:first-child::before {
@@ -132,7 +132,7 @@ export interface BudgetYearSelection {
         left: calc(var(--space-2) - var(--space-3));
         top: 0.75em;
         width: var(--space-3);
-        border-top: 1px dotted var(--color-success, #5fb37a);
+        border-top: 1px dotted var(--line-color, var(--color-success, #5fb37a));
       }
       .byt__node--year {
         color: var(--color-text-muted);
@@ -147,8 +147,9 @@ export interface BudgetYearSelection {
       .byt__empty {
         color: var(--color-text-muted);
         font-size: var(--fs-xs);
-        padding: 0 var(--space-2);
-        margin-left: var(--space-2);
+        /* Match .byt__node--year padding so the connector ::after meets the text;
+           the old extra margin-left pushed it past the dotted line (misaligned). */
+        padding: 2px var(--space-2);
       }
     `,
   ],
