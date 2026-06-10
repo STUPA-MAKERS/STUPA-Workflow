@@ -276,13 +276,13 @@ const AUTOSAVE_DELAY_MS = 1000;
               <li
                 class="mtg__tocItem"
                 [class.mtg__tocItem--sel]="selectedTopId() === item.id"
-                [attr.draggable]="m.canWrite && !protocol()?.isFinal"
+                [attr.draggable]="m.canWrite && !protocol()?.isLocked"
                 (dragstart)="onTopDragStart(i)"
                 (dragover)="onTopDragOver($event)"
                 (drop)="onTopDrop(i)"
                 (click)="selectTop(item.id)"
               >
-                @if (m.canWrite && !protocol()?.isFinal) {
+                @if (m.canWrite && !protocol()?.isLocked) {
                   <span class="mtg__tocGrip" aria-hidden="true">⠿</span>
                 }
                 <span class="mtg__tocNum">{{ i + 1 }}</span>
@@ -306,10 +306,10 @@ const AUTOSAVE_DELAY_MS = 1000;
                 @if (votesForTop(item.id).length) {
                   <span class="mtg__tocNum" [attr.aria-label]="'meetings.vote.count' | t">⚖ {{ votesForTop(item.id).length }}</span>
                 }
-                @if (m.canWrite && !protocol()?.isFinal && !item.applicationId && renamingTopId() !== item.id) {
+                @if (m.canWrite && !protocol()?.isLocked && !item.applicationId && renamingTopId() !== item.id) {
                   <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.agenda.rename' | t" [title]="'meetings.agenda.rename' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); startRename(item)"><app-icon name="edit" /></app-button>
                 }
-                @if (m.canWrite && !protocol()?.isFinal) {
+                @if (m.canWrite && !protocol()?.isLocked) {
                   <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); removeFromAgenda(item.id)"><app-icon name="delete" /></app-button>
                 }
               </li>
@@ -317,7 +317,7 @@ const AUTOSAVE_DELAY_MS = 1000;
               <li class="mtg__muted mtg__tocEmpty">{{ 'meetings.agenda.empty' | t }}</li>
             }
           </ol>
-          @if (m.canWrite && !protocol()?.isFinal) {
+          @if (m.canWrite && !protocol()?.isLocked) {
             <div class="mtg__tocAddBlock">
               <p class="mtg__tocAddH">{{ 'meetings.agenda.assignHeading' | t }}</p>
               <div class="mtg__tocAdd">
@@ -347,8 +347,8 @@ const AUTOSAVE_DELAY_MS = 1000;
             }
           } @else if (protocol(); as proto) {
             <div class="mtg__protoMeta">
-              <app-badge [variant]="proto.isFinal ? 'success' : 'neutral'">
-                {{ (proto.isFinal ? 'meetings.protocol.final' : 'meetings.protocol.draft') | t }}
+              <app-badge [variant]="proto.isFinal ? 'success' : proto.status === 'rendering' ? 'warning' : 'neutral'">
+                {{ (proto.isFinal ? 'meetings.protocol.final' : proto.status === 'rendering' ? 'meetings.protocol.rendering' : 'meetings.protocol.draft') | t }}
               </app-badge>
               @if (proto.pdfUrl) {
                 <a class="mtg__pdf" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
@@ -374,7 +374,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                 <app-markdown-editor
                   [docKey]="top.id"
                   [value]="top.body ?? ''"
-                  [disabled]="proto.isFinal || !m.canWrite"
+                  [disabled]="proto.isLocked || !m.canWrite"
                   [placeholder]="'meetings.protocol.placeholder' | t"
                   (valueChange)="onTopBodyChange(top.id, $event)"
                 />
@@ -390,7 +390,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                         @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
                           <span class="mtg__quorumNote">{{ 'vote.failedQuorum' | t }}</span>
                         }
-                        @if (m.canManageVotes && !proto.isFinal) {
+                        @if (m.canManageVotes && !proto.isLocked) {
                           <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="deleteVote(vote.id)"><app-icon name="delete" /></app-button>
                         }
                       </div>
@@ -418,7 +418,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                       }
                     </div>
                   }
-                  @if (m.canManageVotes && !proto.isFinal && canAddVote(top)) {
+                  @if (m.canManageVotes && !proto.isLocked && canAddVote(top)) {
                     <app-button size="sm" variant="secondary" (click)="openVoteDialog(top)">
                       {{ (top.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}
                     </app-button>
@@ -433,6 +433,8 @@ const AUTOSAVE_DELAY_MS = 1000;
             <div class="mtg__protoActions">
               @if (proto.isFinal) {
                 <p class="mtg__muted">{{ 'meetings.protocol.finalizedHint' | t }}</p>
+              } @else if (proto.status === 'rendering') {
+                <p class="mtg__muted">{{ 'meetings.protocol.renderingHint' | t }}</p>
               } @else if (canWrite()) {
                 <p class="mtg__muted">{{ 'meetings.protocol.finalizeOnClose' | t }}</p>
               }
@@ -1796,6 +1798,8 @@ export class MeetingsComponent implements OnDestroy {
   readonly selectedTopId = signal<Uuid | null>(null);
   readonly savingTop = signal(false);
   private bodyTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Poll-Fallback, solange der Worker das Protokoll rendert (Status »rendering«). */
+  private renderPollTimer: ReturnType<typeof setTimeout> | null = null;
   private dragTopIndex: number | null = null;
   readonly finalizing = signal(false);
   readonly creating = signal(false);
@@ -2031,6 +2035,7 @@ export class MeetingsComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.channel?.close();
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
+    if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
   }
 
   // --- laden / anlegen -----------------------------------------------------
@@ -2148,7 +2153,7 @@ export class MeetingsComponent implements OnDestroy {
         this.meeting.set(updated);
         const proto = this.protocol();
         // Finalisieren passiert implizit: PDF rendern + an MAIL_LIST versenden.
-        if (proto && !proto.isFinal) {
+        if (proto && !proto.isLocked) {
           this.finalize();
         }
       },
@@ -2207,12 +2212,46 @@ export class MeetingsComponent implements OnDestroy {
       next: (proto) => {
         this.loadingProtocol.set(false);
         this.protocol.set(proto);
+        this.watchRendering(proto);
       },
       error: () => {
         this.loadingProtocol.set(false);
         this.toast.error(this.i18n.translate('meetings.toast.protocolFailed'));
       },
     });
+  }
+
+  /** Status-Flip nach dem Hintergrund-Render anwenden (+ Toast final/fehlgeschlagen).
+
+      `rendering → draft` heißt: der Worker hat den Render aufgegeben und
+      zurückgerollt — das Protokoll ist wieder editier- und finalisierbar. */
+  private applyProtocolUpdate(updated: Protocol): void {
+    const prev = this.protocol();
+    this.protocol.set(updated);
+    if (prev?.status === 'rendering') {
+      if (updated.isFinal) {
+        this.toast.success(this.i18n.translate('meetings.toast.finalized'));
+      } else if (updated.status === 'draft') {
+        this.toast.error(this.i18n.translate('meetings.toast.finalizeFailed'));
+      }
+    }
+    this.watchRendering(updated);
+  }
+
+  /** Solange `rendering`: Protokoll zyklisch nachladen — Fallback, falls der
+      `meeting_state`-Broadcast des Workers verloren geht. */
+  private watchRendering(proto: Protocol): void {
+    if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
+    if (proto.status !== 'rendering' || !this.canWrite()) return;
+    this.renderPollTimer = setTimeout(() => {
+      this.renderPollTimer = null;
+      const m = this.meeting();
+      if (!m) return;
+      this.api.loadProtocol(m.id).subscribe({
+        next: (updated) => this.applyProtocolUpdate(updated),
+        error: () => this.watchRendering(proto),
+      });
+    }, 4000);
   }
 
   selectTop(id: Uuid): void {
@@ -2288,7 +2327,8 @@ export class MeetingsComponent implements OnDestroy {
 
   finalize(): void {
     const proto = this.protocol();
-    if (!proto || this.finalizing() || this.savingTop()) return;
+    // `isLocked` deckt auch »rendering« ab: kein zweiter Anstoß, kein 409 beim PATCH.
+    if (!proto || proto.isLocked || this.finalizing() || this.savingTop()) return;
     this.finalizing.set(true);
     // Erst die TOP-Texte zum Protokoll-Markdown zusammensetzen + speichern,
     // dann finalisieren/rendern.
@@ -2309,7 +2349,15 @@ export class MeetingsComponent implements OnDestroy {
       next: (updated) => {
         this.finalizing.set(false);
         this.protocol.set(updated);
-        this.toast.success(this.i18n.translate('meetings.toast.finalized'));
+        if (updated.isFinal) {
+          // Sync-Pfad (DEV ohne Redis): direkt final.
+          this.toast.success(this.i18n.translate('meetings.toast.finalized'));
+        } else {
+          // Async-Pfad: der Worker rendert im Hintergrund — Tag zeigt »Wird gerendert«,
+          // der Abschluss kommt per WS-Broadcast bzw. Poll-Fallback.
+          this.toast.success(this.i18n.translate('meetings.toast.renderQueued'));
+          this.watchRendering(updated);
+        }
       },
       error: (err: unknown) => {
         this.finalizing.set(false);
@@ -2693,6 +2741,14 @@ export class MeetingsComponent implements OnDestroy {
         // TOP-Texte/Tagesordnung können sich (ohne Vote) geändert haben → neu laden,
         // damit Live-Follower den aktuellen Protokoll-Stand sehen (#live-refresh).
         this.loadAgenda(m.id);
+        // Protokoll-Status kann geflippt sein (rendering → final/draft): der Worker
+        // broadcastet meeting_state nach dem Hintergrund-Render (#async-finalize).
+        if (this.canWrite() && this.protocol() && !this.protocol()!.isFinal) {
+          this.api.loadProtocol(m.id).subscribe({
+            next: (proto) => this.applyProtocolUpdate(proto),
+            error: () => {},
+          });
+        }
         break;
       case 'vote_opened':
         if (m.votes.some((v) => v.id === msg.voteId)) {

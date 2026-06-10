@@ -267,6 +267,7 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
     markdown: wire.markdown ?? '',
     status: wire.status,
     isFinal: wire.status === 'final',
+    isLocked: wire.status !== 'draft',
     pdfUrl: wire.pdfUrl ?? null,
     sentAt: wire.sentAt ?? null,
   };

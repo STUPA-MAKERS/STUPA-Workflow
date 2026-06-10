@@ -700,7 +700,8 @@ export interface ProtocolOutWire {
   id: Uuid;
   meetingId: Uuid;
   markdown: string;
-  status: 'draft' | 'final';
+  /** `rendering` = finalize angestoßen, der Worker rendert das PDF im Hintergrund. */
+  status: 'draft' | 'rendering' | 'final';
   /** Ergebnis-Link nach `finalize` (PDF in MinIO). */
   pdfUrl?: string | null;
   sentAt?: IsoDateTime | null;
@@ -813,13 +814,15 @@ export interface MeetingPage {
   nextCursor: string | null;
 }
 
-/** Protokoll (FE-View) — `isFinal` aus `status` abgeleitet. */
+/** Protokoll (FE-View) — `isFinal`/`isLocked` aus `status` abgeleitet. */
 export interface Protocol {
   id: Uuid;
   meetingId: Uuid;
   markdown: string;
-  status: 'draft' | 'final';
+  status: 'draft' | 'rendering' | 'final';
   isFinal: boolean;
+  /** Nicht editierbar: final **oder** der Worker rendert gerade (`rendering`). */
+  isLocked: boolean;
   pdfUrl: string | null;
   sentAt: IsoDateTime | null;
 }
