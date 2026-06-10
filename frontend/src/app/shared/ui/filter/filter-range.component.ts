@@ -16,24 +16,14 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="filter-range">
+    <div class="flex items-center gap-2 min-w-0">
       <ng-content select="[start]" />
-      <span class="filter-range__sep" aria-hidden="true">{{ separator() }}</span>
+      <span class="text-muted flex-none" aria-hidden="true">{{ separator() }}</span>
       <ng-content select="[end]" />
     </div>
   `,
   styles: [
     `
-      .filter-range {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        min-width: 0;
-      }
-      .filter-range__sep {
-        color: var(--color-text-muted);
-        flex: 0 0 auto;
-      }
       /* app-currency-input als Flex-Item behandeln (bringt eigenes Styling mit). */
       :host ::ng-deep app-currency-input {
         flex: 1 1 0;

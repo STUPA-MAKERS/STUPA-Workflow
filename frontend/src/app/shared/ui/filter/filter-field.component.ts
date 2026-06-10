@@ -11,24 +11,13 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <label class="filter-field">
-      <span class="filter-field__label">{{ label() }}</span>
+    <label class="flex flex-col gap-1 min-w-0">
+      <span class="text-sm font-medium text-muted">{{ label() }}</span>
       <ng-content />
     </label>
   `,
   styles: [
     `
-      .filter-field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-1);
-        min-width: 0;
-      }
-      .filter-field__label {
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-medium);
-        color: var(--color-text-muted);
-      }
       /* Projizierte native Controls einheitlich stylen (app-currency-input bringt
          eigenes Styling mit → ausnehmen). */
       :host ::ng-deep input:not([type='checkbox']):not([type='radio']):not(.cur__input),

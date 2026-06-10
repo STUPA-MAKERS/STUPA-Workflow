@@ -25,12 +25,12 @@ import { I18nService } from '@core/i18n/i18n.service';
     { provide: NG_VALUE_ACCESSOR, useExisting: CurrencyInputComponent, multi: true },
   ],
   template: `
-    <div class="field">
+    <div class="flex flex-col gap-1">
       @if (label()) {
-        <label class="field__label">
+        <label class="text-sm font-medium text-muted">
           {{ label() }}
           @if (required()) {
-            <span class="field__req" aria-hidden="true">*</span>
+            <span class="text-danger ms-[2px]" aria-hidden="true">*</span>
           }
         </label>
       }
@@ -52,10 +52,10 @@ import { I18nService } from '@core/i18n/i18n.service';
         <span class="cur__symbol" aria-hidden="true">€</span>
       </span>
       @if (hint() && !error()) {
-        <p class="field__hint">{{ hint() }}</p>
+        <p class="text-xs text-muted m-0">{{ hint() }}</p>
       }
       @if (error()) {
-        <p class="field__error" role="alert">{{ error() }}</p>
+        <p class="text-xs text-danger m-0" role="alert">{{ error() }}</p>
       }
     </div>
   `,
@@ -64,30 +64,6 @@ import { I18nService } from '@core/i18n/i18n.service';
       :host {
         display: block;
         width: 100%;
-      }
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-1);
-      }
-      .field__label {
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-medium);
-        color: var(--color-text-muted);
-      }
-      .field__req {
-        color: var(--color-danger);
-        margin-inline-start: 2px;
-      }
-      .field__hint {
-        font-size: var(--fs-xs);
-        color: var(--color-text-muted);
-        margin: 0;
-      }
-      .field__error {
-        font-size: var(--fs-xs);
-        color: var(--color-danger);
-        margin: 0;
       }
       .cur {
         display: inline-flex;

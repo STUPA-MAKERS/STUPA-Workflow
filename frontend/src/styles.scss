@@ -1,4 +1,12 @@
-// Globaler Style-Einstieg — Reihenfolge: Font → Tokens → Base.
+// Globaler Style-Einstieg — Reihenfolge: Font → Tokens → Base → Tailwind-Utilities.
 @use 'fonts';
 @use 'tokens';
 @use 'base';
+
+// Tailwind (#tailwind): additive Utilities, Preflight ist in tailwind.config.js
+// deaktiviert → kein Base-Reset, keine optische Änderung. Sass reicht die
+// unbekannten @-Regeln unverändert an PostCSS/Tailwind weiter. Utilities zuletzt,
+// damit sie nach den Base-Styles greifen.
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
