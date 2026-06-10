@@ -10,6 +10,7 @@ export type TranslationKey = keyof typeof de;
 export const de = {
   'app.title': 'STUPA Antragsplattform',
   'app.skipToContent': 'Zum Inhalt springen',
+  'app.loading': 'Wird geladen…',
 
   // Generische Filter-Leiste (app-filter-bar) — überall gleich.
   'filter.button': 'Filter',
@@ -1402,6 +1403,7 @@ export const de = {
 export const en: Partial<Record<TranslationKey, string>> = {
   'app.title': 'STUPA Application Platform',
   'app.skipToContent': 'Skip to content',
+  'app.loading': 'Loading…',
   'filter.button': 'Filter',
   'filter.apply': 'Apply',
   'filter.reset': 'Reset',

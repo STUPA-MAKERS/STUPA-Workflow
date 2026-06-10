@@ -10,6 +10,7 @@ import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from 
 import { authInterceptor } from '@core/auth/auth.interceptor';
 import { AuthService } from '@core/auth/auth.service';
 import { mockApiInterceptor } from '@core/api/mock-api.interceptor';
+import { loadingInterceptor } from '@core/loading/loading.interceptor';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { LIVE_VOTE_SOURCE } from '@core/ws/live-vote.source';
 import { MockLiveVoteSource } from '@core/ws/mock-live-vote.source';
@@ -28,8 +29,11 @@ export const appConfig: ApplicationConfig = {
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
     ),
-    // Reihenfolge: auth (Credentials/Bearer) zuerst, dann ggf. Mock-Antwort.
-    provideHttpClient(withInterceptors([authInterceptor, mockApiInterceptor])),
+    // Reihenfolge: loading (äußerste, misst volle Dauer) → auth (Credentials/Bearer)
+    // → Mock-Antwort.
+    provideHttpClient(
+      withInterceptors([loadingInterceptor, authInterceptor, mockApiInterceptor]),
+    ),
     // Live-Vote-Quelle: im Mock-Betrieb die In-Memory-Simulation, sonst die echte
     // WebSocket (WsService) gegen T-16 (api.md §4).
     {
