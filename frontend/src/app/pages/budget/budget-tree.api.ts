@@ -96,6 +96,9 @@ export interface BudgetTreeNode {
   /** Nur am Top-Level: Flow-State-Keys, die als angenommen/abgelehnt gelten. */
   acceptedStateKeys: string[];
   deniedStateKeys: string[];
+  /** HHJ-Stichtag (Tag/Monat des Periodenstarts) — nur am Top-Level relevant. */
+  fiscalStartMonth: number;
+  fiscalStartDay: number;
   byFiscalYear: BudgetAllocationView[];
   children: BudgetTreeNode[];
 }
@@ -112,12 +115,17 @@ export interface BudgetNode {
   color?: string | null;
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
+  fiscalStartMonth?: number;
+  fiscalStartDay?: number;
 }
 
 export interface FiscalYear {
   id: Uuid;
   budgetId: Uuid;
-  label: string;
+  /** Startjahr (HHJ ist über das Jahr eindeutig — kein Freitext). */
+  year: number;
+  /** Anzeige: ``YYYY`` (Stichtag 01.01.) bzw. ``YYYY/YY`` (abweichend). */
+  display: string;
   startDate: string;
   endDate: string;
   active: boolean;
@@ -130,6 +138,8 @@ export interface BudgetNodeCreate {
   gremiumId?: Uuid | null;
   currency?: string;
   color?: string | null;
+  fiscalStartMonth?: number;
+  fiscalStartDay?: number;
 }
 
 /** Teil-Update eines Knotens (alle Felder optional; ``color:""`` löscht die Farbe). */
@@ -139,12 +149,12 @@ export interface BudgetNodeUpdate {
   color?: string | null;
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
+  fiscalStartMonth?: number;
+  fiscalStartDay?: number;
 }
 
 export interface FiscalYearCreate {
-  label: string;
-  startDate: string;
-  endDate: string;
+  year: number;
 }
 
 /** Ein Antrag innerhalb einer Kostenstelle (+ Unterbaum) — Budget-Statistik (#17). */

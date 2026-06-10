@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 # Pfad-Segment: alphanumerisch (z.B. ``VS``/``800``/``04``). Trenner ``-`` ist reserviert
@@ -144,11 +144,28 @@ def pick_fiscal_year[T](active_ids: Sequence[T]) -> T | None:
     return active_ids[0] if len(active_ids) == 1 else None
 
 
+def fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[date, date]:
+    """Start/Ende eines HHJ aus Jahr + Budget-Stichtag (Tag/Monat).
+
+    ``start = Stichtag(year)``, ``end = Stichtag(year+1) − 1 Tag`` → lückenlose,
+    disjunkte Folge aufeinanderfolgender Jahre."""
+    start = date(year, start_month, start_day)
+    end = date(year + 1, start_month, start_day) - timedelta(days=1)
+    return start, end
+
+
+def fiscal_year_display(year: int, start_month: int, start_day: int) -> str:
+    """HHJ-Anzeige: ``YYYY`` bei Stichtag 01.01., sonst ``YYYY/YY`` (z. B. ``2026/27``)."""
+    if start_month == 1 and start_day == 1:
+        return str(year)
+    return f"{year}/{(year + 1) % 100:02d}"
+
+
 # Knoten-Tupel: (id, parent_id, gremium_id, key, path_key, name, currency, active,
-# color, accepted_state_keys, denied_state_keys).
+# color, accepted_state_keys, denied_state_keys, fiscal_start_month, fiscal_start_day).
 NodeTuple = tuple[
     object, object | None, object | None, str, str, str, str, bool,
-    str | None, list, list,
+    str | None, list, list, int, int,
 ]
 
 
@@ -245,7 +262,8 @@ def build_forest(
         children_of.setdefault(n[1], []).append(n)
 
     def to_dict(n: NodeTuple) -> dict:
-        nid, parent_id, n_gremium, key, path, name, currency, active, color, acc, den = n
+        (nid, parent_id, n_gremium, key, path, name, currency, active, color, acc,
+         den, fy_month, fy_day) = n
         return {
             "id": nid,
             "parent_id": parent_id,
@@ -258,6 +276,8 @@ def build_forest(
             "color": color,
             "accepted_state_keys": list(acc or []),
             "denied_state_keys": list(den or []),
+            "fiscal_start_month": fy_month,
+            "fiscal_start_day": fy_day,
             "by_fiscal_year": _views_for_node(
                 nid,
                 alloc_by_node,

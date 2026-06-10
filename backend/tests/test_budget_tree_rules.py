@@ -101,11 +101,11 @@ def test_rollup_committed() -> None:
 # --------------------------------------------------------------- build_forest
 def _node(  # noqa: ANN001
     nid, parent, gremium, key, path, name="N", currency="EUR", active=True,
-    color=None, accepted=(), denied=(),
+    color=None, accepted=(), denied=(), fiscal_start_month=1, fiscal_start_day=1,
 ):
     return (
         nid, parent, gremium, key, path, name, currency, active,
-        color, list(accepted), list(denied),
+        color, list(accepted), list(denied), fiscal_start_month, fiscal_start_day,
     )
 
 
@@ -148,6 +148,25 @@ def test_build_forest_gremium_filter() -> None:
     assert {n["id"] for n in r.build_forest(nodes, [], [])} == {"a", "b"}
     only = r.build_forest(nodes, [], [], gremium_id=g1)
     assert {n["id"] for n in only} == {"a"}
+
+
+def test_fiscal_year_bounds() -> None:
+    assert r.fiscal_year_bounds(2026, 1, 1) == (date(2026, 1, 1), date(2026, 12, 31))
+    assert r.fiscal_year_bounds(2026, 7, 1) == (date(2026, 7, 1), date(2027, 6, 30))
+
+
+def test_fiscal_year_display() -> None:
+    # Stichtag 01.01. → reines Jahr; sonst YYYY/YY (gekürztes Folgejahr).
+    assert r.fiscal_year_display(2026, 1, 1) == "2026"
+    assert r.fiscal_year_display(2026, 7, 1) == "2026/27"
+    assert r.fiscal_year_display(2099, 4, 1) == "2099/00"
+    assert r.fiscal_year_display(2026, 1, 2) == "2026/27"  # Tag ≠ 1 → kein reines Jahr
+
+
+def test_build_forest_carries_stichtag() -> None:
+    nodes = [_node("t", None, uuid.uuid4(), "VS", "VS", fiscal_start_month=7, fiscal_start_day=1)]
+    forest = r.build_forest(nodes, [], [])
+    assert forest[0]["fiscal_start_month"] == 7 and forest[0]["fiscal_start_day"] == 1
 
 
 def test_build_forest_committed_only_node() -> None:

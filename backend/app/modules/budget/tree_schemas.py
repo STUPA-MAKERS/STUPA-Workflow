@@ -19,7 +19,10 @@ from app.modules.budget.schemas import _CamelModel
 
 # --------------------------------------------------------------------- nodes
 class BudgetNodeCreate(_CamelModel):
-    """Kostenstelle anlegen. ``parentId=null`` → Top-Level (``gremiumId`` Pflicht)."""
+    """Kostenstelle anlegen. ``parentId=null`` → Top-Level (``gremiumId`` Pflicht).
+
+    ``fiscalStartMonth``/``fiscalStartDay`` = HHJ-Stichtag (nur am Top-Level relevant;
+    Default 01.01.)."""
 
     key: str = Field(min_length=1)
     name: str = Field(min_length=1)
@@ -28,19 +31,27 @@ class BudgetNodeCreate(_CamelModel):
     currency: str = Field(default="EUR", min_length=3, max_length=3)
     active: bool = True
     color: str | None = None
+    fiscal_start_month: int = Field(default=1, ge=1, le=12, alias="fiscalStartMonth")
+    fiscal_start_day: int = Field(default=1, ge=1, le=31, alias="fiscalStartDay")
 
 
 class BudgetNodeUpdate(_CamelModel):
     """Kostenstelle teil-aktualisieren (Key/Parent unveränderlich → Pfad-Stabilität).
 
     ``None`` = unverändert. ``color=""`` löscht die Farbe. ``acceptedStateKeys``/
-    ``deniedStateKeys`` nur am Top-Level sinnvoll (Beantragt/Gebunden-Klassifikation)."""
+    ``deniedStateKeys``/``fiscalStart*`` nur am Top-Level sinnvoll."""
 
     name: str | None = Field(default=None, min_length=1)
     active: bool | None = None
     color: str | None = None
     accepted_state_keys: list[str] | None = Field(default=None, alias="acceptedStateKeys")
     denied_state_keys: list[str] | None = Field(default=None, alias="deniedStateKeys")
+    fiscal_start_month: int | None = Field(
+        default=None, ge=1, le=12, alias="fiscalStartMonth"
+    )
+    fiscal_start_day: int | None = Field(
+        default=None, ge=1, le=31, alias="fiscalStartDay"
+    )
 
 
 class BudgetNodeOut(_CamelModel):
@@ -57,6 +68,8 @@ class BudgetNodeOut(_CamelModel):
     color: str | None = None
     accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
+    fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
+    fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
 
 
 class AllocationView(_CamelModel):
@@ -93,6 +106,8 @@ class BudgetTreeNodeOut(_CamelModel):
     color: str | None = None
     accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
+    fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
+    fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
     by_fiscal_year: list[AllocationView] = Field(
         default_factory=list, alias="byFiscalYear"
     )
@@ -101,29 +116,26 @@ class BudgetTreeNodeOut(_CamelModel):
 
 # ---------------------------------------------------------------- fiscal years
 class FiscalYearCreate(_CamelModel):
-    """Haushaltsjahr anlegen (Start ≠ zwingend 01.01.; disjunkt pro Top-Budget)."""
+    """Haushaltsjahr anlegen — nur das **Jahr** (Start/Ende aus Budget-Stichtag)."""
 
-    label: str = Field(min_length=1)
-    start_date: date = Field(alias="startDate")
-    end_date: date = Field(alias="endDate")
+    year: int = Field(ge=1900, le=2200)
     active: bool = True
 
 
 class FiscalYearUpdate(_CamelModel):
-    """Haushaltsjahr ändern (Disjunktheit erneut geprüft)."""
+    """Haushaltsjahr ändern (Jahr und/oder Aktiv-Status; Disjunktheit erneut geprüft)."""
 
-    label: str | None = Field(default=None, min_length=1)
-    start_date: date | None = Field(default=None, alias="startDate")
-    end_date: date | None = Field(default=None, alias="endDate")
+    year: int | None = Field(default=None, ge=1900, le=2200)
     active: bool | None = None
 
 
 class FiscalYearOut(_CamelModel):
-    """Haushaltsjahr-Stammdaten."""
+    """Haushaltsjahr-Stammdaten. ``display`` = ``YYYY`` (Stichtag 01.01.) bzw. ``YYYY/YY``."""
 
     id: UUID
     budget_id: UUID = Field(alias="budgetId")
-    label: str
+    year: int
+    display: str
     start_date: date = Field(alias="startDate")
     end_date: date = Field(alias="endDate")
     active: bool

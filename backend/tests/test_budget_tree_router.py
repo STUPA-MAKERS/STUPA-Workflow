@@ -129,8 +129,8 @@ class _FakeService:
 
 def _fy_out() -> FiscalYearOut:
     return FiscalYearOut(
-        id=_FYID, budgetId=_BID, label="HHJ 2026",
-        startDate=date(2026, 4, 1), endDate=date(2027, 3, 31), active=True,
+        id=_FYID, budgetId=_BID, year=2026, display="2026",
+        startDate=date(2026, 1, 1), endDate=date(2026, 12, 31), active=True,
     )
 
 
@@ -181,13 +181,14 @@ def test_delete_node(client: TestClient, fake: _FakeService) -> None:
 def test_list_fiscal_years(client: TestClient, fake: _FakeService) -> None:
     resp = client.get(f"/api/budgets/{_BID}/fiscal-years")
     assert resp.status_code == 200
-    assert resp.json()[0]["label"] == "HHJ 2026"
+    assert resp.json()[0]["year"] == 2026
+    assert resp.json()[0]["display"] == "2026"
 
 
 def test_create_fiscal_year(client: TestClient, fake: _FakeService) -> None:
     resp = client.post(
         f"/api/budgets/{_BID}/fiscal-years",
-        json={"label": "HHJ 2026", "startDate": "2026-04-01", "endDate": "2027-03-31"},
+        json={"year": 2026},
     )
     assert resp.status_code == 201
     assert fake.calls["create_fy"] == _BID
@@ -195,7 +196,7 @@ def test_create_fiscal_year(client: TestClient, fake: _FakeService) -> None:
 
 def test_update_fiscal_year(client: TestClient, fake: _FakeService) -> None:
     resp = client.patch(
-        f"/api/budgets/{_BID}/fiscal-years/{_FYID}", json={"label": "HHJ neu"}
+        f"/api/budgets/{_BID}/fiscal-years/{_FYID}", json={"active": False}
     )
     assert resp.status_code == 200
     assert fake.calls["update_fy"] == (_BID, _FYID)

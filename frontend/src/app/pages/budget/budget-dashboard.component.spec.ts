@@ -9,7 +9,8 @@ import type { BudgetApplication, BudgetTreeNode, FiscalYear } from './budget-tre
 const FY: FiscalYear = {
   id: 'fy-1',
   budgetId: 'b-vs',
-  label: '2026',
+  year: 2026,
+  display: '2026',
   startDate: '2026-01-01',
   endDate: '2026-12-31',
   active: true,

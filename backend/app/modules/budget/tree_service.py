@@ -64,14 +64,17 @@ def _node_out(b: Budget) -> BudgetNodeOut:
         color=b.color,
         acceptedStateKeys=list(b.accepted_state_keys or []),
         deniedStateKeys=list(b.denied_state_keys or []),
+        fiscalStartMonth=b.fiscal_start_month,
+        fiscalStartDay=b.fiscal_start_day,
     )
 
 
-def _fy_out(f: FiscalYear) -> FiscalYearOut:
+def _fy_out(f: FiscalYear, start_month: int, start_day: int) -> FiscalYearOut:
     return FiscalYearOut(
         id=f.id,
         budgetId=f.budget_id,
-        label=f.label,
+        year=f.year,
+        display=tree_rules.fiscal_year_display(f.year, start_month, start_day),
         startDate=f.start_date,
         endDate=f.end_date,
         active=f.active,
@@ -170,6 +173,9 @@ class BudgetTreeService:
             currency=payload.currency,
             active=payload.active,
             color=payload.color,
+            # Stichtag nur am Top-Level fachlich relevant (Kinder bleiben beim Default).
+            fiscal_start_month=payload.fiscal_start_month,
+            fiscal_start_day=payload.fiscal_start_day,
         )
         self.session.add(node)
         await self.session.commit()
@@ -190,11 +196,25 @@ class BudgetTreeService:
     async def update_node(
         self, budget_id: UUID, payload: BudgetNodeUpdate
     ) -> BudgetNodeOut:
-        """Name/Aktiv-Status ändern (Key/Parent immutabel → Pfad-Stabilität)."""
+        """Name/Aktiv-Status/Stichtag ändern (Key/Parent immutabel → Pfad-Stabilität).
+
+        Ändert sich der HHJ-Stichtag eines Top-Budgets, leiten sich die Start-/End-Daten
+        aller bestehenden HHJ neu daraus ab (Jahr bleibt, Datum folgt)."""
         node = await self._get_node(budget_id)
         provided = payload.model_dump(exclude_unset=True)
+        stichtag_changed = (
+            ("fiscal_start_month" in provided
+             and provided["fiscal_start_month"] != node.fiscal_start_month)
+            or ("fiscal_start_day" in provided
+                and provided["fiscal_start_day"] != node.fiscal_start_day)
+        )
         for field, value in provided.items():
             setattr(node, field, value)
+        if stichtag_changed and node.parent_id is None:
+            for fy in await self._fiscal_years_of(budget_id):
+                fy.start_date, fy.end_date = tree_rules.fiscal_year_bounds(
+                    fy.year, node.fiscal_start_month, node.fiscal_start_day
+                )
         await self.session.commit()
         return _node_out(node)
 
@@ -236,21 +256,34 @@ class BudgetTreeService:
                 await self.session.execute(
                     select(FiscalYear)
                     .where(FiscalYear.budget_id == budget_id)
-                    .order_by(FiscalYear.start_date)
+                    .order_by(FiscalYear.year)
                 )
             ).scalars().all()
         )
 
     async def list_fiscal_years(self, budget_id: UUID) -> list[FiscalYearOut]:
-        await self._require_top_level(budget_id)
-        return [_fy_out(f) for f in await self._fiscal_years_of(budget_id)]
+        top = await self._require_top_level(budget_id)
+        return [
+            _fy_out(f, top.fiscal_start_month, top.fiscal_start_day)
+            for f in await self._fiscal_years_of(budget_id)
+        ]
 
     async def fiscal_year_label_map(self) -> dict[UUID, str]:
-        """``fiscal_year_id`` → Label über alle Top-Budgets (für den Export)."""
+        """``fiscal_year_id`` → Anzeige (``YYYY``/``YYYY/YY``) über alle Top-Budgets."""
         rows = (
-            await self.session.execute(select(FiscalYear.id, FiscalYear.label))
+            await self.session.execute(
+                select(
+                    FiscalYear.id,
+                    FiscalYear.year,
+                    Budget.fiscal_start_month,
+                    Budget.fiscal_start_day,
+                ).join(Budget, Budget.id == FiscalYear.budget_id)
+            )
         ).all()
-        return {fid: label for fid, label in rows}
+        return {
+            fid: tree_rules.fiscal_year_display(year, month, day)
+            for fid, year, month, day in rows
+        }
 
     async def list_applications(
         self, budget_id: UUID, fiscal_year_id: UUID | None = None
@@ -306,61 +339,54 @@ class BudgetTreeService:
     async def create_fiscal_year(
         self, budget_id: UUID, payload: FiscalYearCreate
     ) -> FiscalYearOut:
-        """HHJ anlegen — disjunkt pro Top-Budget (R7.1f/g): 422 bei Überlappung."""
-        await self._require_top_level(budget_id)
-        if payload.end_date <= payload.start_date:
+        """HHJ (Jahr) anlegen — Start/Ende aus Budget-Stichtag; eindeutig pro Top-Budget."""
+        top = await self._require_top_level(budget_id)
+        start, end = tree_rules.fiscal_year_bounds(
+            payload.year, top.fiscal_start_month, top.fiscal_start_day
+        )
+        existing = await self._fiscal_years_of(budget_id)
+        if any(f.year == payload.year for f in existing):
             raise ValidationProblem(
-                "Fiscal year end must be after start.",
-                errors=[{"field": "endDate", "msg": "must be after startDate"}],
-            )
-        existing = [
-            (f.start_date, f.end_date) for f in await self._fiscal_years_of(budget_id)
-        ]
-        if tree_rules.overlaps_any(payload.start_date, payload.end_date, existing):
-            raise ValidationProblem(
-                "Fiscal year overlaps an existing one (must be disjoint).",
-                errors=[{"field": "startDate", "msg": "overlaps another fiscal year"}],
+                "Fiscal year already exists for this budget.",
+                errors=[{"field": "year", "msg": "fiscal year already exists"}],
             )
         fy = FiscalYear(
             id=uuid.uuid4(),
             budget_id=budget_id,
-            label=payload.label,
-            start_date=payload.start_date,
-            end_date=payload.end_date,
+            year=payload.year,
+            start_date=start,
+            end_date=end,
             active=payload.active,
         )
         self.session.add(fy)
         await self.session.commit()
-        return _fy_out(fy)
+        return _fy_out(fy, top.fiscal_start_month, top.fiscal_start_day)
 
     async def update_fiscal_year(
         self, budget_id: UUID, fiscal_year_id: UUID, payload: FiscalYearUpdate
     ) -> FiscalYearOut:
-        """HHJ ändern; Disjunktheit erneut prüfen (gegen die **anderen** HHJ)."""
-        await self._require_top_level(budget_id)
+        """HHJ ändern (Jahr und/oder Aktiv-Status); Jahr eindeutig pro Top-Budget."""
+        top = await self._require_top_level(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
         provided = payload.model_dump(exclude_unset=True)
-        new_start = provided.get("start_date", fy.start_date)
-        new_end = provided.get("end_date", fy.end_date)
-        if new_end <= new_start:
-            raise ValidationProblem(
-                "Fiscal year end must be after start.",
-                errors=[{"field": "endDate", "msg": "must be after startDate"}],
-            )
-        others = [
-            (f.start_date, f.end_date)
+        new_year = provided.get("year", fy.year)
+        if new_year != fy.year and any(
+            f.year == new_year and f.id != fiscal_year_id
             for f in await self._fiscal_years_of(budget_id)
-            if f.id != fiscal_year_id
-        ]
-        if tree_rules.overlaps_any(new_start, new_end, others):
+        ):
             raise ValidationProblem(
-                "Fiscal year overlaps an existing one (must be disjoint).",
-                errors=[{"field": "startDate", "msg": "overlaps another fiscal year"}],
+                "Fiscal year already exists for this budget.",
+                errors=[{"field": "year", "msg": "fiscal year already exists"}],
             )
-        for field, value in provided.items():
-            setattr(fy, field, value)
+        if "year" in provided:
+            fy.year = new_year
+            fy.start_date, fy.end_date = tree_rules.fiscal_year_bounds(
+                new_year, top.fiscal_start_month, top.fiscal_start_day
+            )
+        if "active" in provided:
+            fy.active = provided["active"]
         await self.session.commit()
-        return _fy_out(fy)
+        return _fy_out(fy, top.fiscal_start_month, top.fiscal_start_day)
 
     # ------------------------------------------------------------- allocation
     async def _allocation(
@@ -811,6 +837,7 @@ class BudgetTreeService:
                 n.id, n.parent_id, n.gremium_id, n.key, n.path_key, n.name,
                 n.currency, n.active, n.color,
                 list(n.accepted_state_keys or []), list(n.denied_state_keys or []),
+                n.fiscal_start_month, n.fiscal_start_day,
             )
             for n in nodes
         ]

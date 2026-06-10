@@ -10,7 +10,8 @@ import type { BudgetTreeNode, FiscalYear } from './budget-tree.api';
 const FY: FiscalYear = {
   id: 'fy-1',
   budgetId: 'b-vs',
-  label: '2026',
+  year: 2026,
+  display: '2026',
   startDate: '2026-01-01',
   endDate: '2026-12-31',
   active: true,
@@ -26,6 +27,8 @@ const TREE: BudgetTreeNode[] = [
     name: 'VS-Mittel',
     currency: 'EUR',
     active: true,
+    fiscalStartMonth: 1,
+    fiscalStartDay: 1,
     byFiscalYear: [{ fiscalYearId: 'fy-1', allocated: '1000', committed: '250', available: '750' }],
     children: [
       {
@@ -91,10 +94,11 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.topOpen()).toBe(true);
     c.patchTop('key', 'AStA');
     c.patchTop('name', 'AStA-Mittel');
+    c.patchTopStichtag('fiscalStartMonth', '7');
     c.createTop(new Event('submit'));
     const post = http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'POST');
-    expect(post.request.body).toEqual({ key: 'AStA', name: 'AStA-Mittel' });
-    post.flush({ id: 'b-asta', parentId: null, key: 'AStA', pathKey: 'AStA', name: 'AStA-Mittel', currency: 'EUR', active: true, gremiumId: null, byFiscalYear: [], children: [] });
+    expect(post.request.body).toEqual({ key: 'AStA', name: 'AStA-Mittel', fiscalStartMonth: 7, fiscalStartDay: 1 });
+    post.flush({ id: 'b-asta', parentId: null, key: 'AStA', pathKey: 'AStA', name: 'AStA-Mittel', currency: 'EUR', active: true, gremiumId: null, fiscalStartMonth: 7, fiscalStartDay: 1, byFiscalYear: [], children: [] });
     expect(c.topOpen()).toBe(false);
     // reload nach Erfolg (TREE kennt b-asta nicht → fällt auf b-vs zurück)
     http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(TREE);
@@ -107,13 +111,11 @@ describe('BudgetTreeComponent (#9)', () => {
     const c = fixture.componentInstance as any;
     c.openFy();
     expect(c.fyOpen()).toBe(true);
-    c.patchFy('label', '2027');
-    c.patchFy('startDate', '2027-01-01');
-    c.patchFy('endDate', '2027-12-31');
+    c.patchFyYear('2027');
     c.createFiscalYear(new Event('submit'));
     const post = http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years') && r.method === 'POST');
-    expect(post.request.body).toEqual({ label: '2027', startDate: '2027-01-01', endDate: '2027-12-31' });
-    post.flush({ ...FY, id: 'fy-2', label: '2027', startDate: '2027-01-01', endDate: '2027-12-31' });
+    expect(post.request.body).toEqual({ year: 2027 });
+    post.flush({ ...FY, id: 'fy-2', year: 2027, display: '2027', startDate: '2027-01-01', endDate: '2027-12-31' });
     expect(c.fyOpen()).toBe(false);
     // HHJ-Reload nach Erfolg
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);

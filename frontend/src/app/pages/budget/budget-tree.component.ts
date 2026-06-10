@@ -5,9 +5,9 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
 import {
   ButtonComponent,
-  CardComponent,
   CellDirective,
   type ColumnDef,
+  CurrencyInputComponent,
   DataTableComponent,
   DialogComponent,
   IconComponent,
@@ -38,7 +38,7 @@ interface Row {
   selector: 'app-budget-tree',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CardComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, BudgetYearTreeComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, CurrencyInputComponent, BudgetYearTreeComponent],
   templateUrl: './budget-tree.component.html',
   styleUrl: './budget-tree.component.scss',
 })
@@ -63,26 +63,32 @@ export class BudgetTreeComponent {
   /** Flow-State-Keys (globaler Flow) für die accepted/denied-Konfiguration. */
   readonly stateOptions = signal<SelectOption[]>([]);
 
-  /** Top-Budget anlegen (kein Gremium — Budgets sind gremium-unabhängig). */
-  readonly newTop = signal<{ key: string; name: string }>({ key: '', name: '' });
+  /** Top-Budget anlegen (kein Gremium — Budgets sind gremium-unabhängig).
+   *  ``fiscalStartMonth``/``fiscalStartDay`` = HHJ-Stichtag (Default 01.01.). */
+  readonly newTop = signal<{
+    key: string;
+    name: string;
+    fiscalStartMonth: number;
+    fiscalStartDay: number;
+  }>({ key: '', name: '', fiscalStartMonth: 1, fiscalStartDay: 1 });
   /** Top-Budget-Dialog (über den Kopf-Button geöffnet). */
   readonly topOpen = signal(false);
   /** Haushaltsjahr-Dialog (über den Kopf-Button geöffnet). */
   readonly fyOpen = signal(false);
+  /** Stichtag-Dialog (über den Kopf-Button, für das gewählte Top-Budget). */
+  readonly stichtagOpen = signal(false);
+  /** Status-Konfigurations-Dialog (accepted/denied States des Top-Budgets). */
+  readonly stateConfigOpen = signal(false);
   /** Unterknoten anlegen: welcher Parent ist aufgeklappt + Entwurf. */
   readonly addingChildOf = signal<Uuid | null>(null);
   readonly childDraft = signal<{ key: string; name: string }>({ key: '', name: '' });
   /** Limit (Zuteilung) je Knoten setzen — per Dialog pro Zeile (#22). */
   readonly limitNode = signal<BudgetTreeNode | null>(null);
   readonly limitValue = signal('');
-  /** Haushaltsjahr anlegen — INNERHALB des gewählten Budgets. */
-  readonly newFy = signal<{ label: string; startDate: string; endDate: string }>({
-    label: '',
-    startDate: '',
-    endDate: '',
-  });
+  /** Haushaltsjahr anlegen — INNERHALB des gewählten Budgets (nur das Jahr). */
+  readonly newFy = signal<{ year: number }>({ year: new Date().getFullYear() });
 
-  private readonly selectedTop = computed<BudgetTreeNode | null>(
+  readonly selectedTop = computed<BudgetTreeNode | null>(
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
   );
 
@@ -111,7 +117,7 @@ export class BudgetTreeComponent {
     { key: 'committed', label: this.i18n.translate('budget.tree.col.committed'), align: 'end' },
     { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
     { key: 'color', label: this.i18n.translate('budget.tree.col.color'), width: '4rem' },
-    { key: 'actions', label: this.i18n.translate('budget.tree.col.actions'), align: 'end' },
+    { key: 'actions', label: this.i18n.translate('budget.tree.col.actions'), align: 'end', width: '8.5rem' },
   ]);
   readonly rowId = (r: unknown): string => (r as Row).node.id;
   readonly childExpanded = (r: unknown): boolean => this.addingChildOf() === (r as Row).node.id;
@@ -255,8 +261,14 @@ export class BudgetTreeComponent {
     this.newTop.update((t) => ({ ...t, [key]: value }));
   }
 
+  patchTopStichtag(key: 'fiscalStartMonth' | 'fiscalStartDay', value: string): void {
+    const n = Math.trunc(Number(value)) || 1;
+    const clamped = key === 'fiscalStartMonth' ? clampRange(n, 1, 12) : clampRange(n, 1, 31);
+    this.newTop.update((t) => ({ ...t, [key]: clamped }));
+  }
+
   openTop(): void {
-    this.newTop.set({ key: '', name: '' });
+    this.newTop.set({ key: '', name: '', fiscalStartMonth: 1, fiscalStartDay: 1 });
     this.topOpen.set(true);
   }
 
@@ -268,16 +280,52 @@ export class BudgetTreeComponent {
     event.preventDefault();
     const t = this.newTop();
     if (!t.key.trim() || !t.name.trim()) return;
-    this.api.createNode({ key: t.key.trim(), name: t.name.trim() }).subscribe({
-      next: (node) => {
-        this.toast.success(this.i18n.translate('budget.tree.toast.created'));
-        this.newTop.set({ key: '', name: '' });
-        this.topOpen.set(false);
-        this.selectedTopId.set(node.id);
+    this.api
+      .createNode({
+        key: t.key.trim(),
+        name: t.name.trim(),
+        fiscalStartMonth: t.fiscalStartMonth,
+        fiscalStartDay: t.fiscalStartDay,
+      })
+      .subscribe({
+        next: (node) => {
+          this.toast.success(this.i18n.translate('budget.tree.toast.created'));
+          this.newTop.set({ key: '', name: '', fiscalStartMonth: 1, fiscalStartDay: 1 });
+          this.topOpen.set(false);
+          this.selectedTopId.set(node.id);
+          this.reload();
+        },
+        error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
+      });
+  }
+
+  /** HHJ-Stichtag des gewählten Top-Budgets ändern (leitet bestehende HHJ neu ab). */
+  saveStichtag(key: 'fiscalStartMonth' | 'fiscalStartDay', value: string): void {
+    const top = this.selectedTop();
+    if (!top) return;
+    const n = Math.trunc(Number(value)) || 1;
+    const clamped = key === 'fiscalStartMonth' ? clampRange(n, 1, 12) : clampRange(n, 1, 31);
+    this.api.updateNode(top.id, { [key]: clamped }).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.stichtagSaved'));
         this.reload();
+        this.loadFiscalYears(top.id);
       },
       error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
     });
+  }
+
+  openStichtag(): void {
+    this.stichtagOpen.set(true);
+  }
+  closeStichtag(): void {
+    this.stichtagOpen.set(false);
+  }
+  openStateConfig(): void {
+    this.stateConfigOpen.set(true);
+  }
+  closeStateConfig(): void {
+    this.stateConfigOpen.set(false);
   }
 
   startAddChild(node: BudgetTreeNode): void {
@@ -345,12 +393,13 @@ export class BudgetTreeComponent {
   }
 
   // --- Haushaltsjahre (innerhalb des Budgets) ------------------------------
-  patchFy<K extends 'label' | 'startDate' | 'endDate'>(key: K, value: string): void {
-    this.newFy.update((f) => ({ ...f, [key]: value }));
+  patchFyYear(value: string): void {
+    const year = Math.trunc(Number(value)) || new Date().getFullYear();
+    this.newFy.set({ year });
   }
 
   openFy(): void {
-    this.newFy.set({ label: '', startDate: '', endDate: '' });
+    this.newFy.set({ year: new Date().getFullYear() });
     this.fyOpen.set(true);
   }
 
@@ -362,17 +411,20 @@ export class BudgetTreeComponent {
     event.preventDefault();
     const top = this.selectedTopId();
     const f = this.newFy();
-    if (!top || !f.label.trim() || !f.startDate || !f.endDate) return;
-    this.api
-      .createFiscalYear(top as Uuid, { label: f.label.trim(), startDate: f.startDate, endDate: f.endDate })
-      .subscribe({
-        next: () => {
-          this.toast.success(this.i18n.translate('budget.tree.toast.fyCreated'));
-          this.newFy.set({ label: '', startDate: '', endDate: '' });
-          this.fyOpen.set(false);
-          this.loadFiscalYears(top);
-        },
-        error: () => this.toast.error(this.i18n.translate('budget.tree.toast.fyFailed')),
-      });
+    if (!top || !f.year) return;
+    this.api.createFiscalYear(top as Uuid, { year: f.year }).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.fyCreated'));
+        this.newFy.set({ year: new Date().getFullYear() });
+        this.fyOpen.set(false);
+        this.loadFiscalYears(top);
+      },
+      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.fyFailed')),
+    });
   }
+}
+
+/** Ganzzahl auf ``[min, max]`` begrenzen. */
+function clampRange(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
 }

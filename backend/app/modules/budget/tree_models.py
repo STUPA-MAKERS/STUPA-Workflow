@@ -28,7 +28,9 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
+    SmallInteger,
     Text,
     UniqueConstraint,
 )
@@ -65,21 +67,35 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     # abgelehnt (→ ausgeschlossen) gelten. Alles andere zählt als »beantragt«.
     accepted_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
     denied_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    # Haushaltsjahr-Stichtag (Tag/Monat des Periodenstarts) — **nur am Top-Level**
+    # relevant. Default 01.01.; abweichend (z. B. 01.07.) ⇒ HHJ-Anzeige »YYYY/YY«.
+    # Die HHJ tragen nur das Jahr; Start/Ende leiten sich aus diesem Stichtag ab.
+    fiscal_start_month: Mapped[int] = mapped_column(SmallInteger, server_default="1")
+    fiscal_start_day: Mapped[int] = mapped_column(SmallInteger, server_default="1")
 
     __table_args__ = (
         UniqueConstraint("parent_id", "key", name="uq_budget_parent_key"),
         UniqueConstraint("path_key", name="uq_budget_path_key"),
         CheckConstraint("currency = 'EUR'", name="budget_currency_eur"),
+        CheckConstraint(
+            "fiscal_start_month BETWEEN 1 AND 12", name="budget_fiscal_start_month"
+        ),
+        CheckConstraint(
+            "fiscal_start_day BETWEEN 1 AND 31", name="budget_fiscal_start_day"
+        ),
         Index("ix_budget_parent_id", "parent_id"),
         Index("ix_budget_gremium_id", "gremium_id"),
     )
 
 
 class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
-    """Haushaltsjahr (R7.1d) je **Top-Level**-Budget. Start ≠ zwingend 01.01.
+    """Haushaltsjahr (R7.1d) je **Top-Level**-Budget — identifiziert durch das **Jahr**.
 
-    Disjunkt pro Top-Budget (R7.1f): keine Überlappung der Intervalle
-    ``[start_date, end_date]`` (Service-Check, ``tree_rules.intervals_overlap``).
+    Keinen Freitext-Namen: das HHJ ist über ``year`` (Startjahr) eindeutig. Start/Ende
+    leiten sich aus dem ``fiscal_start_month``/``fiscal_start_day`` des Top-Budgets ab
+    (``start = Stichtag(year)``, ``end = Stichtag(year+1) − 1 Tag``) und werden zur
+    Disjunktheits-/Filter-Nutzung mitpersistiert. Anzeige: ``YYYY`` bei Stichtag 01.01.,
+    sonst ``YYYY/YY``.
     """
 
     __tablename__ = "fiscal_year"
@@ -87,13 +103,13 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
     budget_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("budget.id", ondelete="CASCADE")
     )
-    label: Mapped[str] = mapped_column(Text)
+    year: Mapped[int] = mapped_column(Integer)
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
     __table_args__ = (
-        UniqueConstraint("budget_id", "label", name="uq_fiscal_year_budget_label"),
+        UniqueConstraint("budget_id", "year", name="uq_fiscal_year_budget_year"),
         CheckConstraint("end_date > start_date", name="fiscal_year_dates"),
         Index("ix_fiscal_year_budget_id", "budget_id"),
     )

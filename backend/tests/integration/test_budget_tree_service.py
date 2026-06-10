@@ -78,29 +78,23 @@ async def test_path_composition_and_tree(session: AsyncSession) -> None:
     assert roots and roots[0].children[0].id == child.id
 
 
-async def test_fiscal_year_disjoint(session: AsyncSession) -> None:
+async def test_fiscal_year_unique_year(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)
     top = await svc.create_node(
-        BudgetNodeCreate(key=f"HJ{_suffix()}", name="Top", gremiumId=g.id)
-    )
-    await svc.create_fiscal_year(
-        top.id,
-        FiscalYearCreate(label="HHJ 2026", startDate=date(2026, 1, 1), endDate=date(2026, 12, 31)),
-    )
-    # Lücke erlaubt:
-    await svc.create_fiscal_year(
-        top.id,
-        FiscalYearCreate(label="HHJ 2027", startDate=date(2027, 1, 1), endDate=date(2027, 12, 31)),
-    )
-    # Überlappung verboten → 422:
-    with pytest.raises(ValidationProblem):
-        await svc.create_fiscal_year(
-            top.id,
-            FiscalYearCreate(
-                label="HHJ X", startDate=date(2026, 6, 1), endDate=date(2027, 6, 1)
-            ),
+        BudgetNodeCreate(
+            key=f"HJ{_suffix()}", name="Top", gremiumId=g.id,
+            fiscalStartMonth=7, fiscalStartDay=1,
         )
+    )
+    fy26 = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    # Stichtag 01.07. → abweichendes HHJ → Anzeige '2026/27', Periode 01.07.–30.06.
+    assert fy26.display == "2026/27"
+    assert fy26.start_date == date(2026, 7, 1) and fy26.end_date == date(2027, 6, 30)
+    await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2027))
+    # Gleiches Jahr erneut → 422 (eindeutig pro Top-Budget).
+    with pytest.raises(ValidationProblem):
+        await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
 
 
 async def test_top_down_allocation_constraint(session: AsyncSession) -> None:
@@ -113,7 +107,7 @@ async def test_top_down_allocation_constraint(session: AsyncSession) -> None:
     c2 = await svc.create_node(BudgetNodeCreate(key="02", name="K2", parentId=top.id))
     fy = await svc.create_fiscal_year(
         top.id,
-        FiscalYearCreate(label="HHJ", startDate=date(2026, 1, 1), endDate=date(2026, 12, 31)),
+        FiscalYearCreate(year=2026),
     )
     await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("1000")))
     await svc.set_allocation(c1.id, fy.id, AllocationSet(allocated=Decimal("600")))
@@ -137,7 +131,7 @@ async def test_committed_rollup(session: AsyncSession) -> None:
     leaf = await svc.create_node(BudgetNodeCreate(key="04", name="Leaf", parentId=mid.id))
     fy = await svc.create_fiscal_year(
         top.id,
-        FiscalYearCreate(label="HHJ", startDate=date(2026, 1, 1), endDate=date(2026, 12, 31)),
+        FiscalYearCreate(year=2026),
     )
 
     # Genehmigter Antrag = aktueller Flow-State in den accepted_state_keys des Top-Budgets.
@@ -149,7 +143,7 @@ async def test_committed_rollup(session: AsyncSession) -> None:
     session.add_all([fv, flv])
     await session.flush()
     state = State(
-        flow_version_id=flv.id, key="approved", label_i18n={}, category="closed"
+        flow_version_id=flv.id, key="approved", label_i18n={}, kind="normal"
     )
     session.add(state)
     await session.flush()

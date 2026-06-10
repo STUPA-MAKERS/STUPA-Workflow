@@ -29,20 +29,23 @@ from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests.auth_fakes import fake_session, result
 
 
-def _budget(*, id=None, parent_id=None, path_key="VS", gremium_id=None, key="VS", name="N"):  # noqa: ANN001
+def _budget(  # noqa: ANN001
+    *, id=None, parent_id=None, path_key="VS", gremium_id=None, key="VS", name="N",
+    fiscal_start_month=1, fiscal_start_day=1,
+):
     b = Budget(
         parent_id=parent_id, gremium_id=gremium_id, key=key,
         path_key=path_key, name=name, currency="EUR", active=True,
+        fiscal_start_month=fiscal_start_month, fiscal_start_day=fiscal_start_day,
     )
     b.id = id or uuid.uuid4()
     return b
 
 
-def _fy(  # noqa: ANN001
-    *, id=None, budget_id=None, start=date(2026, 1, 1), end=date(2026, 12, 31),
-    active=True, label="HHJ",
-):
-    f = FiscalYear(budget_id=budget_id, label=label, start_date=start, end_date=end, active=active)
+def _fy(*, id=None, budget_id=None, year=2026, active=True):  # noqa: ANN001
+    start = date(year, 1, 1)
+    end = date(year, 12, 31)
+    f = FiscalYear(budget_id=budget_id, year=year, start_date=start, end_date=end, active=active)
     f.id = id or uuid.uuid4()
     return f
 
@@ -136,6 +139,26 @@ async def test_update_node_not_found() -> None:
         await svc.update_node(uuid.uuid4(), BudgetNodeUpdate(name="x"))
 
 
+async def test_update_node_stichtag_rederives_fiscal_years() -> None:
+    # Stichtag-Wechsel am Top-Budget leitet Start/Ende bestehender HHJ neu ab.
+    top = _budget(path_key="VS", fiscal_start_month=1, fiscal_start_day=1)
+    fy = _fy(budget_id=top.id, year=2026)
+    sess = fake_session(result(top), result(fy))  # _get_node, _fiscal_years_of
+    svc = BudgetTreeService(sess)
+    out = await svc.update_node(top.id, BudgetNodeUpdate(fiscalStartMonth=7, fiscalStartDay=1))
+    assert out.fiscal_start_month == 7 and out.fiscal_start_day == 1
+    assert fy.start_date == date(2026, 7, 1) and fy.end_date == date(2027, 6, 30)
+
+
+async def test_update_node_stichtag_unchanged_skips_rederive() -> None:
+    # Gleicher Stichtag-Wert → kein HHJ-Rederive (nur Name-Update).
+    top = _budget(path_key="VS", fiscal_start_month=1, fiscal_start_day=1)
+    sess = fake_session(result(top))  # nur _get_node
+    svc = BudgetTreeService(sess)
+    out = await svc.update_node(top.id, BudgetNodeUpdate(name="Neu", fiscalStartMonth=1))
+    assert out.name == "Neu" and out.fiscal_start_month == 1
+
+
 async def test_delete_node_ok() -> None:
     node = _budget()
     sess = fake_session(result(node), result(), result())  # node, no child, no alloc
@@ -181,73 +204,67 @@ async def test_list_fiscal_years_ok() -> None:
     svc = BudgetTreeService(sess)
     out = await svc.list_fiscal_years(top.id)
     assert len(out) == 1 and out[0].budget_id == top.id
+    assert out[0].year == 2026 and out[0].display == "2026"
 
 
 async def test_create_fiscal_year_ok() -> None:
     top = _budget(path_key="VS")
     sess = fake_session(result(top), result())  # top-level, no existing fys
     svc = BudgetTreeService(sess)
-    out = await svc.create_fiscal_year(
-        top.id,
-        FiscalYearCreate(label="HHJ 2026", startDate=date(2026, 4, 1), endDate=date(2027, 3, 31)),
-    )
-    assert out.label == "HHJ 2026"
+    out = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    assert out.year == 2026 and out.display == "2026"
+    assert out.start_date == date(2026, 1, 1) and out.end_date == date(2026, 12, 31)
     assert sess.committed == 1
 
 
-async def test_create_fiscal_year_bad_dates() -> None:
-    top = _budget(path_key="VS")
-    svc = BudgetTreeService(fake_session(result(top)))
-    with pytest.raises(ValidationProblem):
-        await svc.create_fiscal_year(
-            top.id,
-            FiscalYearCreate(label="x", startDate=date(2026, 5, 1), endDate=date(2026, 5, 1)),
-        )
+async def test_create_fiscal_year_offset_stichtag_display() -> None:
+    # Stichtag 01.07. → Periode 01.07.2026–30.06.2027 → Anzeige '2026/27'.
+    top = _budget(path_key="VS", fiscal_start_month=7, fiscal_start_day=1)
+    sess = fake_session(result(top), result())
+    svc = BudgetTreeService(sess)
+    out = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    assert out.display == "2026/27"
+    assert out.start_date == date(2026, 7, 1) and out.end_date == date(2027, 6, 30)
 
 
-async def test_create_fiscal_year_overlap() -> None:
+async def test_create_fiscal_year_duplicate_year() -> None:
     top = _budget(path_key="VS")
-    existing = _fy(budget_id=top.id, start=date(2026, 1, 1), end=date(2026, 12, 31))
+    existing = _fy(budget_id=top.id, year=2026)
     sess = fake_session(result(top), result(existing))
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
-        await svc.create_fiscal_year(
-            top.id,
-            FiscalYearCreate(label="y", startDate=date(2026, 6, 1), endDate=date(2027, 6, 1)),
-        )
+        await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
 
 
-async def test_update_fiscal_year_ok_defaults() -> None:
+async def test_update_fiscal_year_active_only() -> None:
     top = _budget(path_key="VS")
-    fy = _fy(id=uuid.uuid4(), budget_id=top.id)
-    # _require_top_level(top), _get_fiscal_year(fy), _fiscal_years_of (only itself → filtered out)
-    sess = fake_session(result(top), result(fy), result(fy))
-    svc = BudgetTreeService(sess)
-    out = await svc.update_fiscal_year(top.id, fy.id, FiscalYearUpdate(label="HHJ neu"))
-    assert out.label == "HHJ neu"
-
-
-async def test_update_fiscal_year_bad_dates() -> None:
-    top = _budget(path_key="VS")
-    fy = _fy(budget_id=top.id)
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
+    # _require_top_level(top), _get_fiscal_year(fy) — kein _fiscal_years_of (Jahr unverändert).
     sess = fake_session(result(top), result(fy))
     svc = BudgetTreeService(sess)
-    with pytest.raises(ValidationProblem):
-        await svc.update_fiscal_year(
-            top.id, fy.id, FiscalYearUpdate(startDate=date(2026, 5, 1), endDate=date(2026, 4, 1))
-        )
+    out = await svc.update_fiscal_year(top.id, fy.id, FiscalYearUpdate(active=False))
+    assert out.active is False and out.year == 2026
 
 
-async def test_update_fiscal_year_overlap_with_other() -> None:
+async def test_update_fiscal_year_change_year_rederives_dates() -> None:
     top = _budget(path_key="VS")
-    fy = _fy(id=uuid.uuid4(), budget_id=top.id, start=date(2026, 1, 1), end=date(2026, 6, 30))
-    other = _fy(id=uuid.uuid4(), budget_id=top.id, start=date(2026, 7, 1), end=date(2026, 12, 31))
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id, year=2026)
+    # _require_top_level, _get_fiscal_year, _fiscal_years_of (year changed → uniqueness check).
+    sess = fake_session(result(top), result(fy), result(fy))
+    svc = BudgetTreeService(sess)
+    out = await svc.update_fiscal_year(top.id, fy.id, FiscalYearUpdate(year=2027))
+    assert out.year == 2027
+    assert out.start_date == date(2027, 1, 1) and out.end_date == date(2027, 12, 31)
+
+
+async def test_update_fiscal_year_duplicate_year() -> None:
+    top = _budget(path_key="VS")
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id, year=2026)
+    other = _fy(id=uuid.uuid4(), budget_id=top.id, year=2027)
     sess = fake_session(result(top), result(fy), result(fy, other))
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
-        await svc.update_fiscal_year(
-            top.id, fy.id, FiscalYearUpdate(endDate=date(2026, 8, 1))  # ragt in 'other'
-        )
+        await svc.update_fiscal_year(top.id, fy.id, FiscalYearUpdate(year=2027))
 
 
 # ------------------------------------------------------------------ allocation

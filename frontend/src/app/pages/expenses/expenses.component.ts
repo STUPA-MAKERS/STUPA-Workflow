@@ -737,7 +737,7 @@ export class ExpensesComponent {
       next: (fys: FiscalYear[]) => {
         // Alle HHJ anbieten (Backend lässt explizite, auch inaktive HHJ zu); ein
         // einzelnes aktives HHJ wird vorausgewählt.
-        this.fiscalYearOptions.set(fys.map((f) => ({ value: f.id, label: f.label })));
+        this.fiscalYearOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
         const active = fys.filter((f) => f.active);
         if (active.length === 1) this.newFiscalYearId.set(active[0].id);
       },

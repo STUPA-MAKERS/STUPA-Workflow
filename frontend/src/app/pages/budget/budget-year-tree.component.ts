@@ -37,7 +37,7 @@ export interface BudgetYearSelection {
                   [class.byt__node--active]="b.id === selectedBudgetId() && fy.id === selectedFyId()"
                   (click)="pickYear(b.id, fy.id)"
                 >
-                  {{ fy.label }}
+                  {{ fy.display }}
                 </button>
               </li>
             }
@@ -180,7 +180,7 @@ export class BudgetYearTreeComponent {
   moreTitle(budgetId: Uuid): string {
     return this.years(budgetId)
       .slice(this.MAX)
-      .map((y) => y.label)
+      .map((y) => y.display)
       .join(', ');
   }
 

@@ -5,13 +5,14 @@
   </div>
   <div class="bt__head-actions">
     <app-button size="sm" (click)="openTop()">{{ 'budget.tree.createTop' | t }}</app-button>
-    <app-button
-      size="sm"
-      variant="secondary"
-      [disabled]="!selectedTopId()"
-      (click)="openFy()"
-    >
+    <app-button size="sm" variant="secondary" [disabled]="!selectedTopId()" (click)="openFy()">
       {{ 'budget.tree.fyTitle' | t }}
+    </app-button>
+    <app-button size="sm" variant="secondary" [disabled]="!selectedTopId()" (click)="openStichtag()">
+      {{ 'budget.tree.stichtagTitle' | t }}
+    </app-button>
+    <app-button size="sm" variant="secondary" [disabled]="!selectedTopId()" (click)="openStateConfig()">
+      {{ 'budget.tree.stateConfig' | t }}
     </app-button>
   </div>
 </header>
@@ -24,7 +25,7 @@
   <p class="bt__status">{{ 'budget.tree.empty' | t }}</p>
 } @else {
   <div class="bt__layout">
-    <!-- Links: Budget → Haushaltsjahr -->
+    <!-- Links: Budget → Haushaltsjahr (persistente Sidebar) -->
     <aside class="bt__nav">
       <app-budget-year-tree
         [tops]="tops()"
@@ -38,46 +39,6 @@
 
     <main class="bt__main">
       @if (selectedTopId()) {
-        <!-- Haushaltsjahre INNERHALB des gewählten Budgets -->
-        <app-card [heading]="'budget.tree.fiscalYear' | t">
-          @if (fiscalYears().length) {
-            <ul class="bt__fy-list">
-              @for (fy of fiscalYears(); track fy.id) {
-                <li><strong>{{ fy.label }}</strong> <span class="bt__muted">{{ fy.startDate }} – {{ fy.endDate }}</span></li>
-              }
-            </ul>
-          } @else {
-            <p class="bt__muted">{{ 'budget.tree.fyEmpty' | t }}</p>
-          }
-        </app-card>
-
-        <!-- Accepted/denied Flow-States des Top-Budgets (Beantragt/Gebunden-Logik) -->
-        <app-card [heading]="'budget.tree.stateConfig' | t">
-          <p class="bt__muted">{{ 'budget.tree.stateConfigHint' | t }}</p>
-          @if (stateOptions().length) {
-            <table class="bt__states">
-              <thead>
-                <tr>
-                  <th>{{ 'budget.tree.stateCol' | t }}</th>
-                  <th>{{ 'budget.tree.accepted' | t }}</th>
-                  <th>{{ 'budget.tree.denied' | t }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (s of stateOptions(); track s.value) {
-                  <tr>
-                    <td>{{ s.label }}</td>
-                    <td><input type="checkbox" [checked]="isAccepted(s.value)" (change)="toggleState('accepted', s.value)" [attr.aria-label]="'budget.tree.accepted' | t" /></td>
-                    <td><input type="checkbox" [checked]="isDenied(s.value)" (change)="toggleState('denied', s.value)" [attr.aria-label]="'budget.tree.denied' | t" /></td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          } @else {
-            <p class="bt__muted">{{ 'budget.tree.noStates' | t }}</p>
-          }
-        </app-card>
-
         <!-- Kostenstellen-Baum des gewählten Budgets -->
         <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
           <ng-template appCell="node" let-row>
@@ -122,6 +83,8 @@
             </div>
           </ng-template>
         </app-data-table>
+      } @else {
+        <p class="bt__muted bt__pick">{{ 'budget.tree.pickHint' | t }}</p>
       }
     </main>
   </div>
@@ -138,7 +101,7 @@
     <div class="bt__limit">
       <p class="bt__muted">{{ node.pathKey }} – {{ node.name }}</p>
       <label class="bt__lbl">{{ 'budget.tree.limitFor' | t }}
-        <input inputmode="decimal" [ngModel]="limitValue()" (ngModelChange)="limitValue.set($event)" name="limit" /></label>
+        <app-currency-input name="limit" [ngModel]="limitValue()" (ngModelChange)="limitValue.set($event)" [ariaLabel]="'budget.tree.limitFor' | t" /></label>
     </div>
   }
   <div dialog-footer class="bt__dialog-foot">
@@ -159,6 +122,14 @@
       <input [ngModel]="newTop().key" (ngModelChange)="patchTop('key', $event)" name="topKey" [placeholder]="'budget.tree.keyTopPlaceholder' | t" /></label>
     <label class="bt__lbl">{{ 'budget.tree.name' | t }}
       <input [ngModel]="newTop().name" (ngModelChange)="patchTop('name', $event)" name="topName" /></label>
+    <span class="bt__lbl bt__form-full">{{ 'budget.tree.stichtag' | t }}</span>
+    <label class="bt__lbl bt__lbl--inline">{{ 'budget.tree.day' | t }}
+      <input type="number" min="1" max="31" class="bt__num" [ngModel]="newTop().fiscalStartDay"
+             (ngModelChange)="patchTopStichtag('fiscalStartDay', $event)" name="topStDay" /></label>
+    <label class="bt__lbl bt__lbl--inline">{{ 'budget.tree.month' | t }}
+      <input type="number" min="1" max="12" class="bt__num" [ngModel]="newTop().fiscalStartMonth"
+             (ngModelChange)="patchTopStichtag('fiscalStartMonth', $event)" name="topStMonth" /></label>
+    <p class="bt__muted bt__form-full">{{ 'budget.tree.stichtagHint' | t }}</p>
   </form>
   <div dialog-footer class="bt__dialog-foot">
     <app-button variant="ghost" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
@@ -175,15 +146,82 @@
 >
   <form id="bt-fy-form" class="bt__form bt__form--dialog" (submit)="createFiscalYear($event)">
     <p class="bt__muted bt__form-full">{{ 'budget.tree.fyTop' | t }}: <strong>{{ selectedTopLabel() }}</strong></p>
-    <label class="bt__lbl">{{ 'budget.tree.fyLabel' | t }}
-      <input [ngModel]="newFy().label" (ngModelChange)="patchFy('label', $event)" name="fyLabel" [placeholder]="'budget.tree.fyLabelPlaceholder' | t" /></label>
-    <label class="bt__lbl">{{ 'budget.tree.fyStart' | t }}
-      <input type="date" [ngModel]="newFy().startDate" (ngModelChange)="patchFy('startDate', $event)" name="fyStart" /></label>
-    <label class="bt__lbl">{{ 'budget.tree.fyEnd' | t }}
-      <input type="date" [ngModel]="newFy().endDate" (ngModelChange)="patchFy('endDate', $event)" name="fyEnd" /></label>
+    <label class="bt__lbl">{{ 'budget.tree.fyYear' | t }}
+      <input type="number" min="1900" max="2200" [ngModel]="newFy().year" (ngModelChange)="patchFyYear($event)" name="fyYear" /></label>
+    <p class="bt__muted bt__form-full">{{ 'budget.tree.fyYearHint' | t }}</p>
   </form>
   <div dialog-footer class="bt__dialog-foot">
     <app-button variant="ghost" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button [disabled]="!newFy().label.trim() || !newFy().startDate || !newFy().endDate" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
+    <app-button [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- HHJ-Stichtag des gewählten Budgets setzen (Dialog, über den Kopf-Button) -->
+<app-dialog
+  [open]="stichtagOpen()"
+  [title]="'budget.tree.stichtagTitle' | t"
+  [closeLabel]="'budget.tree.cancel' | t"
+  (closed)="closeStichtag()"
+>
+  <form id="bt-stichtag-form" class="bt__form bt__form--dialog" (submit)="$event.preventDefault()">
+    <p class="bt__muted bt__form-full">{{ 'budget.tree.fyTop' | t }}: <strong>{{ selectedTopLabel() }}</strong></p>
+    <label class="bt__lbl">{{ 'budget.tree.day' | t }}
+      <input type="number" min="1" max="31" [ngModel]="selectedTop()?.fiscalStartDay" name="stDay"
+             (change)="saveStichtag('fiscalStartDay', $any($event.target).value)" /></label>
+    <label class="bt__lbl">{{ 'budget.tree.month' | t }}
+      <input type="number" min="1" max="12" [ngModel]="selectedTop()?.fiscalStartMonth" name="stMonth"
+             (change)="saveStichtag('fiscalStartMonth', $any($event.target).value)" /></label>
+    <p class="bt__muted bt__form-full">{{ 'budget.tree.stichtagHint' | t }}</p>
+    @if (fiscalYears().length) {
+      <ul class="bt__fy-list bt__form-full">
+        @for (fy of fiscalYears(); track fy.id) {
+          <li><strong>{{ fy.display }}</strong>
+            @if (!fy.active) { <span class="bt__muted">({{ 'budget.tree.fyInactive' | t }})</span> }
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="bt__muted bt__form-full">{{ 'budget.tree.fyEmpty' | t }}</p>
+    }
+  </form>
+  <div dialog-footer class="bt__dialog-foot">
+    <app-button (click)="closeStichtag()">{{ 'budget.tree.done' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Abgeschlossene/abgelehnte Flow-States des gewählten Budgets (Dialog) -->
+<app-dialog
+  [open]="stateConfigOpen()"
+  [title]="'budget.tree.stateConfig' | t"
+  [closeLabel]="'budget.tree.cancel' | t"
+  (closed)="closeStateConfig()"
+>
+  <div class="bt__form--dialog">
+    <p class="bt__muted">{{ 'budget.tree.stateConfigHint' | t }}</p>
+    @if (stateOptions().length) {
+      <table class="bt__states">
+        <thead>
+          <tr>
+            <th>{{ 'budget.tree.stateCol' | t }}</th>
+            <th>{{ 'budget.tree.accepted' | t }}</th>
+            <th>{{ 'budget.tree.denied' | t }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of stateOptions(); track s.value) {
+            <tr>
+              <td>{{ s.label }}</td>
+              <td><input type="checkbox" [checked]="isAccepted(s.value)" (change)="toggleState('accepted', s.value)" [attr.aria-label]="'budget.tree.accepted' | t" /></td>
+              <td><input type="checkbox" [checked]="isDenied(s.value)" (change)="toggleState('denied', s.value)" [attr.aria-label]="'budget.tree.denied' | t" /></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    } @else {
+      <p class="bt__muted">{{ 'budget.tree.noStates' | t }}</p>
+    }
+  </div>
+  <div dialog-footer class="bt__dialog-foot">
+    <app-button (click)="closeStateConfig()">{{ 'budget.tree.done' | t }}</app-button>
   </div>
 </app-dialog>

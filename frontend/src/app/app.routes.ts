@@ -143,7 +143,7 @@ export const routes: Routes = [
       {
         // Kostenstellen-Baum in der Verwaltung (#9) — ersetzt die flache Töpfe-Liste.
         path: 'admin/budget-pots',
-        data: { title: 'budget.tree.title', permission: 'budget.manage', parent: ['admin'] },
+        data: { title: 'budget.tree.title', permission: 'budget.manage', parent: ['admin'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
