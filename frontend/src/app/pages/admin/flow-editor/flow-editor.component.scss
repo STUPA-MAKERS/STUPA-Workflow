@@ -218,7 +218,9 @@ select {
 }
 
 .fe__edge {
-  stroke: var(--color-text-muted);
+  // --edge-color (inline je Übergang, #flow) überschreibt den Default-Grauton;
+  // Auswahl-Regel unten gewinnt trotzdem (höhere Spezifität).
+  stroke: var(--edge-color, var(--color-text-muted));
   stroke-width: 2;
   fill: none;
   pointer-events: none;
@@ -246,15 +248,13 @@ select {
 }
 
 .fe__arrow-head {
-  fill: var(--color-text-muted);
-}
-
-.fe__edge-g--sel .fe__arrow-head {
-  fill: var(--color-primary);
+  // Pfeilspitze erbt die Linienfarbe des referenzierenden Pfads (context-stroke),
+  // damit eingefärbte Übergänge eine passende Spitze haben.
+  fill: context-stroke;
 }
 
 .fe__edge-label {
-  fill: var(--color-text-muted);
+  fill: var(--edge-color, var(--color-text-muted));
   font-size: 11px;
   pointer-events: none;
 }

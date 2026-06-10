@@ -232,6 +232,8 @@ export interface TransitionOutWire {
   fromStateId: Uuid;
   toStateId: Uuid;
   label: I18nMap;
+  /** Optionale Farbe für den Entscheidungs-Button (#flow). */
+  color?: string | null;
 }
 
 /** Eine Feld-Änderung im Versions-Diff (`FieldChange`, applications/diff.py). */
@@ -414,6 +416,8 @@ export interface Transition {
   fromStateId: Uuid;
   toStateId: Uuid;
   label: string;
+  /** Optionale Farbe für den Entscheidungs-Button (#flow); null = Default. */
+  color: string | null;
 }
 
 /** Eine geänderte Feldzelle (FE-View) — `key` aus der Diff-Map herausgezogen. */

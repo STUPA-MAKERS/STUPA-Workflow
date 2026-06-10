@@ -16,6 +16,9 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
       [attr.aria-label]="ariaLabel || null"
       [attr.title]="tooltip()"
       [class]="'btn btn--' + variant + ' btn--' + size + (iconOnly ? ' btn--icon' : '')"
+      [class.btn--custom]="!!color"
+      [style.background]="color || null"
+      [style.color]="color ? contrastColor() : null"
     >
       @if (loading) {
         <span class="btn__spinner" aria-hidden="true"></span>
@@ -129,6 +132,13 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
       .btn--success:active:not(:disabled) {
         filter: brightness(0.94);
       }
+      /* Frei wählbare Farbe (#flow): Hintergrund kommt inline, Hover/Active wie danger/success. */
+      .btn--custom:hover:not(:disabled) {
+        filter: brightness(1.08);
+      }
+      .btn--custom:active:not(:disabled) {
+        filter: brightness(0.94);
+      }
       .btn__spinner {
         width: 1em;
         height: 1em;
@@ -147,6 +157,8 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 })
 export class ButtonComponent {
   @Input() variant: ButtonVariant = 'primary';
+  /** Frei wählbare Hintergrundfarbe (Hex); überschreibt die Variante (#flow). */
+  @Input() color: string | null = null;
   @Input() size: ButtonSize = 'md';
   @Input() type: 'button' | 'submit' | 'reset' = 'button';
   @Input() disabled = false;
@@ -163,5 +175,24 @@ export class ButtonComponent {
   /** Tooltip-Text: explizit gesetzt, sonst für Icon-Buttons der `ariaLabel`. */
   protected tooltip(): string | null {
     return this.title || (this.iconOnly ? this.ariaLabel : '') || null;
+  }
+
+  /** Lesbare Textfarbe (schwarz/weiß) zur gewählten `color` per WCAG-Luminanz. */
+  protected contrastColor(): string {
+    const hex = (this.color ?? '').trim().replace('#', '');
+    const full =
+      hex.length === 3
+        ? hex
+            .split('')
+            .map((c) => c + c)
+            .join('')
+        : hex;
+    if (full.length !== 6) return '#ffffff';
+    const channel = (i: number) => {
+      const v = parseInt(full.slice(i, i + 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    const lum = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+    return lum > 0.4 ? '#111111' : '#ffffff';
   }
 }

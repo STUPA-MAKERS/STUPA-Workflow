@@ -51,6 +51,8 @@ export interface TransitionDef {
   from: string;
   to: string;
   label?: I18nMap | null;
+  /** Optionale Farbe (#flow): färbt Pfeil im Editor + Entscheidungs-Button im Antrag. */
+  color?: string | null;
   guard?: Guard | null;
   actions?: ActionDef[];
   order?: number | null;

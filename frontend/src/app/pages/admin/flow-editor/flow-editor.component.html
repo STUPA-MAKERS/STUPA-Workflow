@@ -51,7 +51,7 @@
       </defs>
 
       @for (e of edges(); track e.index) {
-        <g class="fe__edge-g" [class.fe__edge-g--sel]="e.selected" (pointerdown)="$event.stopPropagation(); selectEdge(e.index)">
+        <g class="fe__edge-g" [class.fe__edge-g--sel]="e.selected" [style.--edge-color]="e.color || null" (pointerdown)="$event.stopPropagation(); selectEdge(e.index)">
           <path [attr.d]="e.d" class="fe__edge-hit" />
           <path
             [attr.d]="e.d"
@@ -214,6 +214,20 @@
           <input [ngModel]="sel.t.label?.['de'] ?? ''" (ngModelChange)="setTransitionLabel(sel.index, 'de', $event)" /></label>
         <label class="fe__lbl">{{ 'admin.common.labelEn' | t }}
           <input [ngModel]="sel.t.label?.['en'] ?? ''" (ngModelChange)="setTransitionLabel(sel.index, 'en', $event)" /></label>
+        <label class="fe__lbl">{{ 'admin.flow.color' | t }}
+          <span class="fe__color-row">
+            <input
+              type="color"
+              [ngModel]="sel.t.color || '#3584e4'"
+              (ngModelChange)="setTransitionColor(sel.index, $event)"
+            />
+            @if (sel.t.color) {
+              <button type="button" class="fe__color-clear" (click)="setTransitionColor(sel.index, '')">
+                {{ 'admin.flow.colorClear' | t }}
+              </button>
+            }
+          </span>
+        </label>
         <div class="fe__auto" [class.fe__auto--on]="!!sel.t.automatic">
           <app-checkbox [ngModel]="!!sel.t.automatic" (ngModelChange)="setTransitionAutomatic(sel.index, $event)" [hint]="'admin.flow.automaticHint' | t">
             {{ 'admin.flow.automatic' | t }}

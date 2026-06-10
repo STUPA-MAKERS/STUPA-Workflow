@@ -394,6 +394,7 @@ export class FlowEditorComponent {
           my: (y1 + y2) / 2,
           label: t.label?.['de'] ?? '',
           automatic: !!t.automatic,
+          color: t.color ?? null,
           selected: sel?.kind === 'transition' && sel.index === index,
         };
       });
@@ -693,6 +694,11 @@ export class FlowEditorComponent {
         return { ...t, label: Object.keys(cleaned).length ? cleaned : null };
       }),
     }));
+  }
+
+  /** Farbe eines Übergangs setzen/entfernen (#flow): färbt Pfeil + Entscheidungs-Button. */
+  protected setTransitionColor(index: number, color: string): void {
+    this.patchTransition(index, (t) => ({ ...t, color: color || null }));
   }
 
   protected setTransitionAutomatic(index: number, on: boolean): void {

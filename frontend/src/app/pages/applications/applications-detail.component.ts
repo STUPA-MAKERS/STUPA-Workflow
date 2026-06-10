@@ -165,7 +165,7 @@ interface DetailPosition {
             <div class="det__transitions">
               @for (t of transitions(); track t.id) {
                 <app-button
-                  [variant]="transitionVariant(t)"
+                  [color]="t.color"
                   [block]="true"
                   [loading]="firing() === t.id"
                   [disabled]="firing() !== null && firing() !== t.id"
@@ -916,15 +916,6 @@ export class ApplicationsDetailComponent {
   protected openBudgetDialog(): void {
     this.budgetChoice.set(this.app()?.budgetId ?? '');
     this.budgetDialogOpen.set(true);
-  }
-
-  /** Ablehnende Übergänge (Ablehnen/Zurückweisen/…) automatisch rot darstellen. */
-  protected transitionVariant(t: Transition): 'primary' | 'danger' {
-    return /ablehn|abweis|zurückweis|verwerf|abbrech|widerruf|storn|deny|reject|decline|cancel/i.test(
-      t.label ?? '',
-    )
-      ? 'danger'
-      : 'primary';
   }
 
   // Inline-Bearbeitung (Ersteller:in/Verwalter:in, #24) + Löschen.

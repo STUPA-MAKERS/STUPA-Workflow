@@ -190,6 +190,7 @@ class FlowService:
                 fromStateId=t.from_state_id,
                 toStateId=t.to_state_id,
                 label=t.label_i18n,
+                color=t.color,
             )
             for t in await self._outgoing(app)
             if not t.automatic and eval_guard(t.guard, ctx)

@@ -154,6 +154,8 @@ class TransitionDef(_CamelModel):
     from_: str = Field(alias="from")
     to: str
     label: I18nMap | None = None
+    # Optionale Farbe (#flow): Pfeil im Editor + Entscheidungs-Button im Antrag.
+    color: str | None = None
     guard: dict[str, Any] | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     order: int | None = None

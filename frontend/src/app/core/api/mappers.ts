@@ -158,6 +158,7 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
     fromStateId: wire.fromStateId,
     toStateId: wire.toStateId,
     label: resolveI18n(wire.label, lang),
+    color: wire.color ?? null,
   };
 }
 

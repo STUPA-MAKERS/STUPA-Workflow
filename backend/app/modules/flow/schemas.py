@@ -22,6 +22,8 @@ class TransitionOut(_CamelModel):
     from_state_id: UUID = Field(alias="fromStateId")
     to_state_id: UUID = Field(alias="toStateId")
     label: I18nMap
+    # Optionale Farbe für den Entscheidungs-Button (#flow).
+    color: str | None = None
 
 
 class TransitionRequest(_CamelModel):

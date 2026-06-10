@@ -256,7 +256,19 @@ describe('mapTransition', () => {
       fromStateId: 's1',
       toStateId: 's2',
       label: 'Accept',
+      color: null,
     });
+  });
+
+  it('passes the transition color through (and defaults to null)', () => {
+    const wire: TransitionOutWire = {
+      id: 'tr1',
+      fromStateId: 's1',
+      toStateId: 's2',
+      label: { de: 'Annehmen' },
+      color: '#16a34a',
+    };
+    expect(mapTransition(wire, 'de').color).toBe('#16a34a');
   });
 });
 

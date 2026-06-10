@@ -105,6 +105,8 @@ class Transition(UUIDPkMixin, Base):
         ForeignKey("state.id", ondelete="CASCADE")
     )
     label_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    # Optionale Farbe (#flow): färbt Pfeil im Editor + Entscheidungs-Button im Antrag.
+    color: Mapped[str | None] = mapped_column(Text, nullable=True)
     guard: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     actions: Mapped[list] = mapped_column(JSONB, server_default="[]")
     order: Mapped[int] = mapped_column("order", Integer, server_default="0")
