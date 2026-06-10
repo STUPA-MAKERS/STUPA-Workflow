@@ -283,6 +283,45 @@ async def list_expenses(
     )
 
 
+@router.get(
+    "/expenses/export.xlsx",
+    dependencies=[Depends(require_principal("budget.export"))],
+    responses=_errors(401, 403),
+)
+async def export_expenses_xlsx(
+    service: ServiceDep,
+    budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
+    fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
+    kind: Annotated[ExpenseKind | None, Query()] = None,
+    q: Annotated[str | None, Query()] = None,
+    amount_min: Annotated[Decimal | None, Query(alias="amountMin", ge=0)] = None,
+    amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
+    created_from: Annotated[str | None, Query(alias="createdFrom")] = None,
+    created_to: Annotated[str | None, Query(alias="createdTo")] = None,
+) -> Response:
+    """Gefilterte Buchungen als ``.xlsx`` (P(``budget.export``)) — Inhalt wie die Liste."""
+    from app.shared.xlsx import XLSX_MEDIA_TYPE, build_expenses_workbook
+
+    page = await service.list_expenses_paged(
+        budget_id=budget_id,
+        fiscal_year_id=fiscal_year_id,
+        kind=kind,
+        q=q,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        created_from=created_from,
+        created_to=created_to,
+        limit=10_000,
+        offset=0,
+    )
+    data = build_expenses_workbook(page.items)
+    return Response(
+        content=data,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": 'attachment; filename="buchungen.xlsx"'},
+    )
+
+
 @router.patch(
     "/budget-expenses/{expense_id}",
     response_model=ExpenseOut,

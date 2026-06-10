@@ -51,9 +51,12 @@ export class AuthService {
     return this.ensureLoaded().pipe(map((p) => p !== null));
   }
 
-  /** Permission-Check für RBAC-Guards/Nav-Gating (UX, nicht autoritativ). */
+  /** Permission-Check für RBAC-Guards/Nav-Gating (UX, nicht autoritativ).
+   *  ``admin`` hat **alle** Rechte (wie das Backend, security.md §2). */
   can(permission: string): boolean {
-    return this._principal()?.permissions.includes(permission) ?? false;
+    const p = this._principal();
+    if (!p) return false;
+    return p.roles.includes('admin') || p.permissions.includes(permission);
   }
 
   /** `true`, wenn der Principal mindestens eine der Permissions besitzt. */

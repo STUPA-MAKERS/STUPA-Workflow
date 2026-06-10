@@ -297,6 +297,13 @@ export class BudgetTreeApi {
     return this.http.delete<void>(`${this.base}/accounts/${id}`);
   }
 
+  /** Gefilterte Buchungen als ``.xlsx`` (P(``budget.export``)) — Inhalt wie die Liste. */
+  exportExpensesXlsx(opts: Record<string, string | undefined> = {}): Observable<Blob> {
+    const params: Record<string, string> = {};
+    for (const [k, v] of Object.entries(opts)) if (v) params[k] = v;
+    return this.http.get(`${this.base}/expenses/export.xlsx`, { params, responseType: 'blob' });
+  }
+
   /** Budget-Baum als ``.xlsx`` (P(``budget.export``)), gefiltert wie das Dashboard. */
   exportXlsx(opts: { node?: string; fiscalYear?: string; gremium?: string } = {}): Observable<Blob> {
     const params: Record<string, string> = {};
@@ -316,6 +323,22 @@ export class BudgetTreeApi {
       { budgetId },
     );
   }
+}
+
+/**
+ * Pfad-Schlüssel zur Anzeige vereinfachen: numerische Präfix-Ketten einklappen.
+ * Ist ein Segment Präfix des nächsten (8→81→810), bleibt nur das längste übrig.
+ * Das Top-Level-Segment bleibt immer erhalten. ``VSM-8-81-810-330 → VSM-810-330``.
+ */
+export function simplifyPathKey(pathKey: string): string {
+  const seg = pathKey.split('-');
+  const out: string[] = [];
+  for (let i = 0; i < seg.length; i++) {
+    const next = seg[i + 1];
+    if (i > 0 && next && next.length > seg[i].length && next.startsWith(seg[i])) continue;
+    out.push(seg[i]);
+  }
+  return out.join('-');
 }
 
 /** Baum (rekursiv) → flache Optionsliste (pre-order, „pathKey – name"). */

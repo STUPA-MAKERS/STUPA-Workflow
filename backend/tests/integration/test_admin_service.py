@@ -167,6 +167,73 @@ async def test_flow_version_bump_keeps_single_active(session: AsyncSession) -> N
     assert old is not None and old.active is False
 
 
+def _global_graph(*, with_accepted: bool = True) -> dict:
+    states = [{"key": "created", "label": {"de": "Erstellt"}, "isInitial": True}]
+    if with_accepted:
+        states.append({"key": "accepted", "label": {"de": "Angenommen"}})
+    states.append({"key": "rejected", "label": {"de": "Abgelehnt"}})
+    transitions = [{"from": "created", "to": "rejected", "label": {"de": "ab"}}]
+    if with_accepted:
+        transitions.append({"from": "created", "to": "accepted", "label": {"de": "an"}})
+    return {"states": states, "transitions": transitions}
+
+
+async def test_global_flow_is_single_and_resets_deleted_states(
+    session: AsyncSession,
+) -> None:
+    from app.modules.applications.models import Application
+    from app.modules.forms.models import FormVersion
+
+    svc = ConfigService(session)
+    g1 = await svc.create_global_flow_version(
+        FlowVersionCreate.model_validate({"graph": _global_graph()}), _ACTOR
+    )
+    accepted = (
+        await session.scalars(
+            select(State).where(State.flow_version_id == g1.id, State.key == "accepted")
+        )
+    ).one()
+
+    # Antrag im (gleich zu löschenden) State »accepted« anlegen, auf den Flow gepinnt.
+    app_type = await _make_type(session)
+    fv = FormVersion(application_type_id=app_type.id, version=1)
+    session.add(fv)
+    await session.flush()
+    app = Application(
+        type_id=app_type.id, form_version_id=fv.id, flow_version_id=g1.id,
+        current_state_id=accepted.id, data={},
+    )
+    session.add(app)
+    await session.commit()
+
+    # Erneut speichern OHNE »accepted« → in-place (gleiche id), accepted gelöscht.
+    g2 = await svc.create_global_flow_version(
+        FlowVersionCreate.model_validate({"graph": _global_graph(with_accepted=False)}),
+        _ACTOR,
+    )
+    assert g2.id == g1.id  # keine neue Version, in-place
+
+    # Genau ein globaler Flow.
+    n_global = await session.scalar(
+        select(func.count())
+        .select_from(FlowVersion)
+        .where(FlowVersion.application_type_id.is_(None))
+    )
+    assert n_global == 1
+
+    # Antrag: gelöschter State ⇒ Initial-State des einen Flows.
+    new_initial = (
+        await session.scalars(
+            select(State).where(
+                State.flow_version_id == g2.id, State.is_initial.is_(True)
+            )
+        )
+    ).one()
+    await session.refresh(app)
+    assert app.flow_version_id == g2.id
+    assert app.current_state_id == new_initial.id
+
+
 async def test_create_flow_version_unknown_type_404(session: AsyncSession) -> None:
     svc = ConfigService(session)
     with pytest.raises(NotFoundError):

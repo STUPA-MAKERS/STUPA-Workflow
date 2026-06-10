@@ -80,7 +80,7 @@
             class="fe__node"
             [class.fe__node--initial]="n.isInitial"
             [class.fe__node--sel]="n.selected"
-            [attr.fill]="n.color || null"
+            [style.stroke]="n.color || null"
             (pointerdown)="onNodePointerDown($event, n.key)"
           />
           @if (n.isInitial) {

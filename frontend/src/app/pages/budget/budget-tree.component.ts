@@ -16,7 +16,7 @@ import {
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminApiService } from '../admin/admin-api.service';
-import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
+import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear, simplifyPathKey } from './budget-tree.api';
 import { BudgetYearTreeComponent, type BudgetYearSelection } from './budget-year-tree.component';
 
 /** Eine Baumzeile (Knoten + Tiefe für die Einrückung). */
@@ -122,6 +122,7 @@ export class BudgetTreeComponent {
     { key: 'actions', label: this.i18n.translate('budget.tree.col.actions'), align: 'end', width: '8.5rem' },
   ]);
   readonly rowId = (r: unknown): string => (r as Row).node.id;
+  readonly simplifyPath = simplifyPathKey;
   readonly childExpanded = (r: unknown): boolean => this.addingChildOf() === (r as Row).node.id;
 
   constructor() {

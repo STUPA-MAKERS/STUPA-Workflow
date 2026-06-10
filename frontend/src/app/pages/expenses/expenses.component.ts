@@ -39,6 +39,7 @@ import {
   type ExpenseKind,
   type FiscalYear,
   flattenBudgetOptions,
+  simplifyPathKey,
 } from '../budget/budget-tree.api';
 
 /**
@@ -160,7 +161,7 @@ import {
                       <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
                     </td>
                     <td class="exp__cellDesc">{{ e.description }}</td>
-                    <td class="exp__mono">{{ e.pathKey }}</td>
+                    <td class="exp__mono">{{ e.pathKey ? simplifyPath(e.pathKey) : '—' }}</td>
                     <td>
                       @if (e.applicationId) {
                         <a class="exp__appLink" [routerLink]="['/applications', e.applicationId]">{{ e.applicationTitle || ('expenses.linkedApplication' | t) }}</a>
@@ -540,6 +541,7 @@ export class ExpensesComponent {
   private readonly toast = inject(ToastService);
 
   readonly canManage = computed(() => this.auth.can('budget.manage'));
+  readonly simplifyPath = simplifyPathKey;
 
   private readonly PAGE = 20;
   readonly budgetTree = signal<BudgetTreeNode[]>([]);
@@ -794,10 +796,18 @@ export class ExpensesComponent {
     if (this.exporting()) return;
     this.exporting.set(true);
     this.api
-      .exportXlsx({ node: this.budgetId() || undefined })
+      .exportExpensesXlsx({
+        budget: this.budgetId() || undefined,
+        kind: this.kind() || undefined,
+        q: this.q().trim() || undefined,
+        amountMin: this.amountMin().trim() || undefined,
+        amountMax: this.amountMax().trim() || undefined,
+        createdFrom: this.createdFrom() || undefined,
+        createdTo: this.createdTo() || undefined,
+      })
       .subscribe({
         next: (blob) => {
-          downloadBlob(blob, 'budget.xlsx');
+          downloadBlob(blob, 'buchungen.xlsx');
           this.exporting.set(false);
         },
         error: () => this.exporting.set(false),

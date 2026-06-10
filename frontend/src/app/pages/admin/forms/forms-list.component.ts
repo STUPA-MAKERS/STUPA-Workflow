@@ -115,14 +115,6 @@ function emptyForm(): NewForm {
           <label class="field__label" for="fl-name-en">{{ 'admin.forms.nameEn' | t }}</label>
           <input id="fl-name-en" class="field__control" name="nameEn" [ngModel]="form().nameEn" (ngModelChange)="patch('nameEn', $event)" />
         </div>
-        <app-select
-          [label]="'admin.forms.gremium' | t"
-          [placeholder]="'admin.forms.gremiumNone' | t"
-          [options]="gremiumOptions()"
-          [ngModel]="form().gremiumId"
-          (ngModelChange)="patch('gremiumId', $event)"
-          name="gremium"
-        />
         <app-checkbox
           [ngModel]="form().hasBudget"
           (ngModelChange)="patch('hasBudget', $event)"
@@ -282,10 +274,6 @@ export class FormsListComponent {
     { key: 'actions', label: this.i18n.translate('admin.forms.edit'), align: 'end' },
   ]);
   protected readonly rowId = (t: unknown): string => (t as ApplicationTypeFull).id;
-
-  protected readonly gremiumOptions = computed<SelectOption[]>(() =>
-    this.gremien().map((g) => ({ value: g.id, label: g.name })),
-  );
 
   protected readonly keyPreview = computed(() => slugify(this.form().nameDe) || '—');
 

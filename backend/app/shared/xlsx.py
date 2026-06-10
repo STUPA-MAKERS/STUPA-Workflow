@@ -198,5 +198,39 @@ def build_applications_workbook(
     return buf.getvalue()
 
 
+def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
+    """Buchungen (Ausgaben/Einnahmen) als ``.xlsx``-Bytes (Reihenfolge/Filter wie übergeben)."""
+    from openpyxl import Workbook
+
+    kind_label = (
+        {"expense": "Ausgabe", "income": "Einnahme"}
+        if locale == "de"
+        else {"expense": "Expense", "income": "Income"}
+    )
+    headers = ["Datum", "Art", "Beschreibung", "Kostenstelle", "Antrag", "Konto", "Betrag", "Währung"]
+    wb = Workbook()
+    ws = wb.active
+    assert ws is not None  # noqa: S101 - openpyxl liefert immer ein aktives Sheet
+    ws.title = "Buchungen"
+    _header_row(ws, headers)
+    for e in items:
+        ws.append(
+            [
+                _fmt_dt(e.created_at),
+                kind_label.get(e.kind, e.kind),
+                e.description or "",
+                e.path_key or "",
+                e.application_title or "",
+                e.account_name or "",
+                _num(e.amount),
+                e.currency or "",
+            ]
+        )
+    _autosize(ws, headers)
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def _fmt_dt(value: datetime | None) -> str:
     return value.strftime("%Y-%m-%d %H:%M") if value is not None else ""

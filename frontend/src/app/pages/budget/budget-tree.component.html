@@ -43,7 +43,7 @@
         <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
           <ng-template appCell="node" let-row>
             <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
-              <span class="bt__path">{{ $any(row).node.pathKey }}</span>
+              <span class="bt__path">{{ simplifyPath($any(row).node.pathKey) }}</span>
               <span class="bt__name">{{ $any(row).node.name }}</span>
               @if ($any(row).node.fullyBound) {
                 <span class="bt__tag" [title]="'budget.tree.fullyBoundHint' | t">{{ 'budget.tree.fullyBoundBadge' | t }}</span>

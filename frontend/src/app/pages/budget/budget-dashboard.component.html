@@ -55,7 +55,7 @@
         <app-data-table [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
           <ng-template appCell="node" let-row>
             <button type="button" class="bd__ks" [style.paddingLeft.rem]="$any(row).depth * 1.25" (click)="drillInto($any(row).node)">
-              <span class="bd__path">{{ $any(row).node.pathKey }}</span>
+              <span class="bd__path">{{ simplifyPath($any(row).node.pathKey) }}</span>
               <span class="bd__name">{{ $any(row).node.name }}</span>
             </button>
           </ng-template>
@@ -71,7 +71,7 @@
           <ng-template appCell="requested" let-row><span class="bd__muted">{{ money($any(row).requested, $any(row).node.currency) }}</span></ng-template>
           <ng-template appCell="bound" let-row>{{ money($any(row).committed, $any(row).node.currency) }}</ng-template>
           <ng-template appCell="expended" let-row>
-            {{ money($any(row).expended, $any(row).node.currency) }}@if ($any(row).income > 0) {<span class="bd__muted"> (+{{ money($any(row).income, $any(row).node.currency) }})</span>}
+            {{ money($any(row).expended, $any(row).node.currency) }}@if ($any(row).income > 0) {<span class="bd__muted" [title]="'budget.usage.incomeHint' | t"> ({{ 'budget.usage.incomePlus' | t }} {{ money($any(row).income, $any(row).node.currency) }})</span>}
           </ng-template>
           <ng-template appCell="available" let-row><span [class.bd__neg]="$any(row).available < 0">{{ money($any(row).available, $any(row).node.currency) }}</span></ng-template>
         </app-data-table>

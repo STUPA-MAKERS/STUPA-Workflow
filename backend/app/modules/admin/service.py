@@ -375,10 +375,15 @@ class ConfigService:
     async def create_global_flow_version(
         self, payload: FlowVersionCreate, actor: str
     ) -> FlowVersionOut:
-        """Globalen Flow als neue Version anlegen (``application_type_id=NULL``, #28).
+        """Den **einen** globalen Flow speichern (``application_type_id=NULL``).
 
-        Wie :meth:`create_flow_version`, aber typ-frei: der globale Flow gilt für ALLE
-        Antragstypen. Beim Aktivieren wird der bisherige aktive globale Flow deaktiviert."""
+        Es gibt **genau einen** Flow — **keine Versionen**: dieselbe ``flow_version``-
+        Zeile wird in-place überschrieben (States/Transitions ersetzt). Alle Anträge
+        (auch laufende) bleiben darauf gepinnt; ihr aktueller State wird per KEY auf den
+        neuen Graphen gemappt — **gelöschte States ⇒ Initial-State**. Der Graph muss
+        genau einen Initial-State haben (``validate_flow_graph``)."""
+        from app.modules.applications.models import Application
+
         try:
             validate_flow_graph(payload.graph)
         except FlowValidationError as exc:
@@ -386,30 +391,54 @@ class ConfigService:
                 "Invalid flow graph.", errors=[{"field": "graph", "msg": str(exc)}]
             ) from exc
 
-        current = await self.session.scalar(
-            select(FlowVersion.version)
-            .where(FlowVersion.application_type_id.is_(None))
-            .order_by(FlowVersion.version.desc())
-            .limit(1)
-        )
-        next_version = (current or 0) + 1
-        if payload.activate:
-            await self.session.execute(
-                update(FlowVersion)
-                .where(
-                    FlowVersion.application_type_id.is_(None),
-                    FlowVersion.active.is_(True),
+        # Aktuellen State je Antrag (per KEY) merken, bevor die alten States fallen.
+        app_keys = {
+            app_id: key
+            for app_id, key in (
+                await self.session.execute(
+                    select(Application.id, State.key).join(
+                        State, State.id == Application.current_state_id
+                    )
                 )
-                .values(active=False)
+            ).all()
+        }
+
+        # Den einen globalen Flow wiederverwenden (oder einmalig anlegen).
+        version = (
+            await self.session.execute(
+                select(FlowVersion)
+                .where(FlowVersion.application_type_id.is_(None))
+                .order_by(FlowVersion.active.desc(), FlowVersion.version.desc())
+                .limit(1)
             )
-        version = FlowVersion(
-            application_type_id=None,
-            version=next_version,
-            active=payload.activate,
-            editor_layout=payload.graph.layout or {},
+        ).scalar_one_or_none()
+        if version is None:
+            version = FlowVersion(
+                application_type_id=None, version=1, active=True,
+                editor_layout=payload.graph.layout or {},
+            )
+            self.session.add(version)
+            await self.session.flush()
+        else:
+            version.active = True
+            version.editor_layout = payload.graph.layout or {}
+            # Anträge von ihren States lösen (FK), damit die alten States weg können.
+            await self.session.execute(update(Application).values(current_state_id=None))
+            await self.session.execute(
+                delete(Transition).where(Transition.flow_version_id == version.id)
+            )
+            await self.session.execute(
+                delete(State).where(State.flow_version_id == version.id)
+            )
+            await self.session.flush()
+        # Etwaige Alt-Versionen (global) deaktivieren — es bleibt genau eine aktiv.
+        await self.session.execute(
+            update(FlowVersion)
+            .where(
+                FlowVersion.application_type_id.is_(None), FlowVersion.id != version.id
+            )
+            .values(active=False)
         )
-        self.session.add(version)
-        await self.session.flush()
 
         id_by_key: dict[str, UUID] = {}
         initial_id: UUID | None = None
@@ -444,48 +473,33 @@ class ConfigService:
                 )
             )
 
-        # Globaler Flow gilt für ALLE Anträge (auch laufende, #flow-global): beim
-        # Aktivieren jeden Antrag auf die neue Version umziehen — aktuellen State per
-        # KEY mappen; ein gelöschter State ⇒ zurück auf den Initial-State.
-        if payload.activate and initial_id is not None:
-            from app.modules.applications.models import Application
-
-            # Bisher genutzte States (distinct) → Key, um auf die neue Version zu mappen.
-            prev = (
-                await self.session.execute(
-                    select(Application.current_state_id, State.key)
-                    .join(State, State.id == Application.current_state_id)
-                    .distinct()
-                )
-            ).all()
-            for old_state_id, old_key in prev:
-                await self.session.execute(
-                    update(Application)
-                    .where(Application.current_state_id == old_state_id)
-                    .values(
-                        current_state_id=id_by_key.get(old_key, initial_id),
-                        flow_version_id=version.id,
-                    )
-                )
-            # Anträge ganz ohne State (Altbestand) → Initial-State der neuen Version.
+        # ALLE Anträge auf den einen Flow ziehen; gelöschter State ⇒ Initial.
+        for app_id, key in app_keys.items():
             await self.session.execute(
                 update(Application)
-                .where(Application.current_state_id.is_(None))
-                .values(current_state_id=initial_id, flow_version_id=version.id)
+                .where(Application.id == app_id)
+                .values(
+                    current_state_id=id_by_key.get(key, initial_id),
+                    flow_version_id=version.id,
+                )
             )
-
-        action = (
-            AuditAction.CONFIG_ACTIVATION if payload.activate else AuditAction.CONFIG_CHANGE
+        # Anträge ohne (gemappten) State → Initial-State.
+        await self.session.execute(
+            update(Application)
+            .where(Application.current_state_id.is_(None))
+            .values(current_state_id=initial_id, flow_version_id=version.id)
         )
+
         await self._audit(
-            actor, action, "flow_version", version.id, {"version": next_version, "global": True}
+            actor, AuditAction.CONFIG_ACTIVATION, "flow_version", version.id,
+            {"global": True},
         )
         await self.session.commit()
         return FlowVersionOut(
             id=version.id,
             application_type_id=None,
-            version=next_version,
-            active=payload.activate,
+            version=version.version,
+            active=True,
         )
 
     # =================================================================== #

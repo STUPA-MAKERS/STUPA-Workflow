@@ -39,7 +39,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   it('reports an empty graph as invalid and disables save', async () => {
     await setup();
     expect(screen.getByText('flow graph has no states')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Als Flow-Version speichern' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
 
   it('builds a valid graph and saves it as a flow version', async () => {

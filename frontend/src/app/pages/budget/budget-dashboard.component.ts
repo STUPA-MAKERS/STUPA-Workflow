@@ -23,6 +23,7 @@ import {
   type BudgetApplication,
   type BudgetTreeNode,
   type FiscalYear,
+  simplifyPathKey,
 } from './budget-tree.api';
 import {
   BudgetYearTreeComponent,
@@ -77,6 +78,7 @@ interface UsageRow {
   styleUrl: './budget-dashboard.component.scss',
 })
 export class BudgetDashboardComponent {
+  protected readonly simplifyPath = simplifyPathKey;
   private readonly api = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
   private readonly route = inject(ActivatedRoute);
