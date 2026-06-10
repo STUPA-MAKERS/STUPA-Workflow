@@ -172,6 +172,14 @@ export interface ColumnDef {
         .dt__table td[data-label='']::before {
           content: none;
         }
+        /* Erste Spalte als Karten-Kopf: Label klein darüber, Wert in voller
+           Breite linksbündig — statt rechtsbündigem Label/Wert-Paar. */
+        .dt__table td:first-child {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: var(--space-1);
+          text-align: start !important;
+        }
         .dt__detail-row,
         .dt__detail-row > td,
         .dt__empty {
