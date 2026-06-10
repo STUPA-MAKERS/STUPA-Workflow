@@ -80,10 +80,14 @@ class VoteTallyEvent(_CamelModel):
     type: Literal["vote_tally"] = "vote_tally"
     vote_id: UUID = Field(alias="voteId")
     # Stimmen je Option — leer ``{}`` solange der Vote geheim **und** offen ist.
+    # Stimmen je Option — leer ``{}`` solange der Tally **verdeckt** ist (siehe ``revealed``).
     counts: dict[str, int]
-    # Abgegebene Stimmen (Teilnahme). Auch bei geheimem offenen Vote sichtbar ("N von M").
+    # Abgegebene Stimmen (Teilnahme). Immer sichtbar (auch verdeckt): "N von M anwesend".
     cast: int = 0
     eligible: int
+    # Anwesende Mitglieder (Reveal-Nenner) + ob die Choice-Counts sichtbar sind.
+    present: int = 0
+    revealed: bool = True
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
     # Geheime Abstimmung → FE blendet Live-Balken aus (showBars = !secret || isClosed).
@@ -91,21 +95,22 @@ class VoteTallyEvent(_CamelModel):
 
     @classmethod
     def from_vote(cls, vote: VoteOut) -> VoteTallyEvent:
-        """Tally-Event aus einem Vote bauen + »Counts erst bei Close«-Regel anwenden.
-
-        Geheim **und** offen ⇒ keine Choice-Counts und kein ``leading`` (sonst leakt der
-        Zwischenstand am Beamer/Mobile); nur die Teilnahme (``cast``) reist mit. Sichtbar
-        (nicht geheim) oder bereits geschlossen ⇒ volle Aggregate.
-        """
-        hide = vote.secret and vote.status == "open"
-        counts = vote.tally.counts
+        """Tally-Event aus einem Vote bauen. Die Reveal-Regel (geschlossen **oder** nicht
+        geheim **und** alle Anwesenden gestimmt) ist bereits im Service auf ``tally``
+        angewandt (``counts``/``leading`` verdeckt) — hier nur die Felder durchreichen.
+        ``cast`` kommt aus ``tally.voted`` (echte Teilnahme, auch wenn ``counts`` verdeckt).
+        ``revealed`` ist hier die Schutz-Schranke: bei ``False`` reisen **keine**
+        Choice-Counts/``leading`` mit (defensiv, falls der Service sie nicht schon leerte)."""
+        revealed = vote.tally.revealed
         return cls(
             voteId=vote.id,
-            counts={} if hide else counts,
-            cast=sum(counts.values()),
+            counts=vote.tally.counts if revealed else {},
+            cast=vote.tally.voted,
             eligible=vote.tally.eligible,
+            present=vote.tally.present,
+            revealed=revealed,
             quorumMet=vote.tally.quorum_met,
-            leading=None if hide else vote.tally.leading,
+            leading=vote.tally.leading if revealed else None,
             secret=vote.secret,
         )
 

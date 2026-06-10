@@ -45,7 +45,15 @@ def _vote_out(*, meeting_id, status: str = "open", secret: bool = False) -> Vote
         config=config,
         status=status,  # type: ignore[arg-type]
         secret=secret,
-        tally=TallyOut(counts={"yes": 3, "no": 1}, eligible=10, quorumMet=True, leading="yes"),
+        tally=TallyOut(
+            counts={"yes": 3, "no": 1},
+            eligible=10,
+            voted=4,
+            present=8,
+            revealed=status == "closed" or not secret,
+            quorumMet=True,
+            leading="yes",
+        ),
     )
 
 

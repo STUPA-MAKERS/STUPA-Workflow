@@ -57,6 +57,13 @@ class TallyOut(_CamelModel):
 
     counts: dict[str, int]
     eligible: int
+    # Teilnahme-Fortschritt (immer sichtbar, auch geheim/verdeckt): wie viele der
+    # **anwesenden** Mitglieder schon abgestimmt haben (#vote-progress).
+    voted: int = 0
+    present: int = 0
+    # ``counts``/``leading`` sind nur sichtbar, wenn ``revealed`` — d. h. geschlossen
+    # **oder** (nicht geheim **und** alle Anwesenden haben abgestimmt). Sonst verdeckt.
+    revealed: bool = True
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
     result: Literal["passed", "rejected", "tie"] | None = None

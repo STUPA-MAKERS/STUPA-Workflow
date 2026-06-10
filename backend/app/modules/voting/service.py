@@ -106,15 +106,52 @@ class VotingService:
             ).scalars().all()
         return tally_mod.tally(config.options, choices)
 
-    def _tally_out(
-        self, config: VoteConfig, counts: dict[str, int], eligible: int
+    async def _present_count(self, vote: Vote) -> int:
+        """Anzahl **anwesender** Mitglieder der Sitzung (Reveal-Nenner). 0 ohne Sitzung."""
+        if vote.meeting_id is None:
+            return 0
+        from app.modules.livevote.models import MeetingAttendance
+
+        return (
+            await self.session.scalar(
+                select(func.count())
+                .select_from(MeetingAttendance)
+                .where(
+                    MeetingAttendance.meeting_id == vote.meeting_id,
+                    MeetingAttendance.status == "present",
+                )
+            )
+        ) or 0
+
+    async def _tally_out(
+        self, vote: Vote, config: VoteConfig, counts: dict[str, int], eligible: int
     ) -> TallyOut:
+        """Tally + Teilnahme-Fortschritt. ``counts``/``leading`` sind nur sichtbar, wenn
+        ``revealed``: geschlossen **oder** (nicht geheim **und** alle Anwesenden haben
+        abgestimmt). Sitzungslose, offene, nicht-geheime Votes bleiben sofort sichtbar
+        (kein »anwesend«-Begriff). Verdeckt ⇒ nur ``voted``/``present`` reisen mit."""
+        voted = sum(counts.values())
         outcome = tally_mod.result(config, counts, eligible)
+        # Anwesenden-Nenner nur abfragen, wenn er die Reveal-Entscheidung beeinflusst
+        # (offener Vote mit Sitzung). Geschlossen/sitzungslos braucht keine Query.
+        if vote.status == "closed":
+            present, revealed = 0, True
+        elif config.secret:
+            present = await self._present_count(vote)
+            revealed = False
+        elif vote.meeting_id is None:
+            present, revealed = 0, True
+        else:
+            present = await self._present_count(vote)
+            revealed = present > 0 and voted >= present
         return TallyOut(
-            counts=counts,
+            counts=counts if revealed else {},
             eligible=eligible,
+            voted=voted,
+            present=present,
+            revealed=revealed,
             quorumMet=outcome.quorum_met,
-            leading=outcome.leading,
+            leading=outcome.leading if revealed else None,
             result=None,
         )
 
@@ -170,7 +207,9 @@ class VotingService:
         await self.session.commit()
         config = payload.config
         empty = {opt: 0 for opt in config.options}
-        return self._to_out(vote, config, self._tally_out(config, empty, vote.eligible_count or 0))
+        return self._to_out(
+            vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
+        )
 
     # ----------------------------------------------------------------- open
     async def open(self, vote_id: UUID, *, now: datetime) -> VoteOut:
@@ -191,7 +230,7 @@ class VotingService:
         await self.session.commit()
         empty = {opt: 0 for opt in config.options}
         return self._to_out(
-            vote, config, self._tally_out(config, empty, vote.eligible_count or 0)
+            vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
 
     # ----------------------------------------------------------------- cast
@@ -303,7 +342,7 @@ class VotingService:
         vote = await self._get_vote(vote_id)
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
-        tally_out = self._tally_out(config, counts, vote.eligible_count or 0)
+        tally_out = await self._tally_out(vote, config, counts, vote.eligible_count or 0)
         if vote.status == "closed" and vote.result is not None:
             tally_out = tally_out.model_copy(
                 update={

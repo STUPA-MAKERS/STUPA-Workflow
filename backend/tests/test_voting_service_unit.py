@@ -314,12 +314,15 @@ async def test_get_closed_includes_result() -> None:
     assert out.tally.result == "passed"
 
 
-async def test_get_secret_only_counts() -> None:
+async def test_get_secret_hides_counts_until_close() -> None:
+    # Geheim ⇒ keine Choice-Counts vor dem Schließen (nur Teilnahme); #vote-progress.
     vote = _vote(config=_config(secret=True))
     db = fake_session(result(vote), result("yes", "no", "yes"))
     out = await VotingService(db).get(vote.id)
     assert out.secret is True
-    assert out.tally.counts == {"yes": 2, "no": 1, "abstain": 0}
+    assert out.tally.revealed is False
+    assert out.tally.counts == {}
+    assert out.tally.voted == 3  # Teilnahme bleibt sichtbar
 
 
 # --------------------------------------------------------------------------- #

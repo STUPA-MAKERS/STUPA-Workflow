@@ -38,7 +38,15 @@ def _vote_out(*, secret: bool, status: str) -> VoteOut:
         status=status,  # type: ignore[arg-type]
         secret=secret,
         tally=TallyOut(
-            counts={"yes": 5, "no": 3}, eligible=12, quorumMet=True, leading="yes"
+            counts={"yes": 5, "no": 3},
+            eligible=12,
+            voted=8,
+            present=10,
+            # from_vote gated nur über ``revealed``; die anwesenheits-basierte
+            # Reveal-Entscheidung trifft der Service. Geschlossen oder nicht-geheim ⇒ sichtbar.
+            revealed=status == "closed" or not secret,
+            quorumMet=True,
+            leading="yes",
         ),
     )
 
