@@ -123,3 +123,10 @@ textarea {
   margin-inline: auto;
   padding-inline: var(--layout-gutter);
 }
+
+// Native Checkboxen/Radios app-weit in CD-Primärfarbe (statt Browser-Blau) —
+// damit sie überall gleich aussehen wie das app-checkbox-UI-Kit (#checkboxes).
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--color-primary);
+}
