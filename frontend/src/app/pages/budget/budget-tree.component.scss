@@ -48,6 +48,10 @@
   position: sticky;
   top: var(--space-4);
   min-width: 0;
+  // Cap at 3/4 viewport so a tall tree scrolls internally instead of growing
+  // past the fold and dragging the sticky element off-screen.
+  max-height: 75vh;
+  overflow-y: auto;
 }
 .bt__main {
   min-width: 0;
@@ -61,6 +65,8 @@
   }
   .bt__nav {
     position: static;
+    max-height: none;
+    overflow-y: visible;
   }
 }
 
