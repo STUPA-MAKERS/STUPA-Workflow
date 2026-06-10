@@ -17,6 +17,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from app.deps import DbSession, require_principal
+from app.modules.applications.access import Access, require_app_edit, require_app_read
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.schemas import (
@@ -88,4 +89,38 @@ async def fire_transition(
         payload.transition_id,
         principal,
         note=payload.note,
+    )
+
+
+# --- Antragsteller-Aktionen (#applicant-actions): Magic-Link-Zugriff (A/P) auf
+# Übergänge, die per ``actorIsApplicant``-Guard ausdrücklich freigegeben sind. ----
+@router.get(
+    "/applications/{application_id}/applicant-transitions",
+    response_model=list[TransitionOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_applicant_transitions(
+    application_id: UUID,
+    service: ServiceDep,
+    access: Annotated[Access, Depends(require_app_read)],
+) -> list[TransitionOut]:
+    """Vom Antragsteller feuerbare Übergänge (nur ``actorIsApplicant``-Gate)."""
+    return await service.available_applicant_transitions(access.application_id)
+
+
+@router.post(
+    "/applications/{application_id}/applicant-transition",
+    response_model=TransitionResult,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def fire_applicant_transition(
+    application_id: UUID,
+    payload: TransitionRequest,
+    service: ServiceDep,
+    access: Annotated[Access, Depends(require_app_edit)],
+) -> TransitionResult:
+    """Übergang als Antragsteller feuern — 403, wenn nicht per ``actorIsApplicant``
+    freigegeben (Magic-Link/Ersteller:in, ohne ``application.manage``)."""
+    return await service.fire_as_applicant(
+        access.application_id, payload.transition_id, note=payload.note
     )

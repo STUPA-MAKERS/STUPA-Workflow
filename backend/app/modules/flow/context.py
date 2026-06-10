@@ -123,8 +123,13 @@ async def build_context(
     *,
     manual: bool,
     deadline_passed: bool = False,
+    as_applicant: bool = False,
 ) -> GuardContext:
-    """Vollständigen :class:`GuardContext` aus DB + Principal bauen (I/O)."""
+    """Vollständigen :class:`GuardContext` aus DB + Principal bauen (I/O).
+
+    ``as_applicant=True`` markiert den Magic-Link-Antragsteller als Akteur
+    (``actorIsApplicant`` greift), unabhängig von ``created_by`` — der Link-Inhaber
+    *ist* die Antragsteller:in für genau diesen Antrag (#applicant-actions)."""
     # Akteur (nur manuelle Übergänge nutzen die Akteur-Gates).
     actor_committees = (
         await _committees_for_sub(session, principal.sub) if manual else frozenset()
@@ -133,9 +138,10 @@ async def build_context(
     raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
     applicant_roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
     applicant_committees = await _committees_for_sub(session, app.created_by)
-    # Akteur ist Antragsteller:in: eingeloggte:r Ersteller:in löst selbst aus (#guard).
-    actor_is_applicant = (
-        manual and app.created_by is not None and principal.sub == app.created_by
+    # Akteur ist Antragsteller:in: Magic-Link-Inhaber:in (as_applicant) **oder**
+    # eingeloggte:r Ersteller:in, die/der selbst auslöst (#guard).
+    actor_is_applicant = manual and (
+        as_applicant or (app.created_by is not None and principal.sub == app.created_by)
     )
     # Felder (Built-in amount + Formulardaten).
     field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}

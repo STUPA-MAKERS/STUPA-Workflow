@@ -272,6 +272,25 @@ def _children(op: str, value: Any) -> list[dict[str, Any]]:
     return children
 
 
+def guard_requires_applicant(guard: dict[str, Any] | None) -> bool:
+    """``True``, wenn der Guard-Baum (irgendwo) ein ``actorIsApplicant``-Gate enthält.
+
+    Damit erlauben wir genau die Übergänge, die ein Admin **bewusst** für die
+    Antragsteller:in freigegeben hat — ein Magic-Link-Applicant darf nur solche
+    feuern (#guard/#applicant-actions)."""
+    if not isinstance(guard, dict) or len(guard) != 1:
+        return False
+    op, value = next(iter(guard.items()))
+    if op == "actorIsApplicant":
+        return True
+    if op in GUARD_COMBINATORS:
+        children = value if isinstance(value, list) else [value]
+        return any(
+            guard_requires_applicant(c) for c in children if isinstance(c, dict)
+        )
+    return False
+
+
 # --------------------------------------------------------------------------- #
 # Statische Validierung (Speicher-Gate)
 # --------------------------------------------------------------------------- #

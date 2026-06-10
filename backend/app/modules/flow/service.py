@@ -41,8 +41,8 @@ from app.modules.flow.dispatch import (
 )
 from app.modules.flow.models import State, Transition
 from app.modules.flow.schemas import TransitionOut, TransitionResult
-from app.shared.errors import ConflictError, NotFoundError
-from app.shared.guards import eval_guard
+from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
+from app.shared.guards import eval_guard, guard_requires_applicant
 
 
 def _guard_fires_on_deadline(guard: Any) -> bool:
@@ -196,6 +196,48 @@ class FlowService:
             if not t.automatic and eval_guard(t.guard, ctx)
         ]
 
+    # ------------------------------------------------- applicant transitions
+    _APPLICANT = Principal(sub="applicant", roles=[], permissions=set())
+
+    async def available_applicant_transitions(
+        self, application_id: UUID
+    ) -> list[TransitionOut]:
+        """Übergänge, die der **Magic-Link-Antragsteller** feuern darf: manuell,
+        Guard erfüllt im Applicant-Kontext **und** explizit per ``actorIsApplicant``
+        freigegeben (sonst nichts — kein impliziter Antragsteller-Zugriff)."""
+        app = await self._load_app(application_id)
+        if app.current_state_id is None:
+            return []
+        ctx = await flow_context.build_context(
+            self.session, app, self._APPLICANT, manual=True, as_applicant=True
+        )
+        return [
+            TransitionOut(
+                id=t.id,
+                fromStateId=t.from_state_id,
+                toStateId=t.to_state_id,
+                label=t.label_i18n,
+                color=t.color,
+            )
+            for t in await self._outgoing(app)
+            if not t.automatic
+            and guard_requires_applicant(t.guard)
+            and eval_guard(t.guard, ctx)
+        ]
+
+    async def fire_as_applicant(
+        self, application_id: UUID, transition_id: UUID, *, note: str | None = None
+    ) -> TransitionResult:
+        """Übergang als Antragsteller feuern — nur ``actorIsApplicant``-freigegebene,
+        manuelle Übergänge (403 sonst). Umgeht damit gezielt das ``application.manage``-
+        Gate, aber **nur** für vom Admin bewusst geöffnete Übergänge."""
+        transition = await self._load_transition(transition_id)
+        if transition.automatic or not guard_requires_applicant(transition.guard):
+            raise ForbiddenError("transition is not open to the applicant")
+        return await self.fire(
+            application_id, transition_id, self._APPLICANT, note=note, as_applicant=True
+        )
+
     # --------------------------------------------------------- auto_advance
     async def auto_advance(
         self,
@@ -271,6 +313,7 @@ class FlowService:
         note: str | None = None,
         deadline_passed: bool = False,
         manual: bool = True,
+        as_applicant: bool = False,
     ) -> TransitionResult:
         """Übergang feuern. 404 (Antrag/Transition), 409 (State-Konflikt/Guard/Race)."""
         app = await self._load_app(application_id)
@@ -285,7 +328,8 @@ class FlowService:
             )
 
         ctx = await flow_context.build_context(
-            self.session, app, principal, manual=manual, deadline_passed=deadline_passed
+            self.session, app, principal, manual=manual,
+            deadline_passed=deadline_passed, as_applicant=as_applicant,
         )
         if not eval_guard(transition.guard, ctx):
             raise ConflictError("Transition guard not satisfied.", code="guard_failed")

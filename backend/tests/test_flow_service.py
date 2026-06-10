@@ -18,7 +18,7 @@ from app.modules.flow import context as flow_context
 from app.modules.flow import service as flow_service
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.service import FlowService
-from app.shared.errors import ConflictError, NotFoundError
+from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 from app.shared.guards import GuardContext
 from tests.flow_fakes import fake_session, result
 
@@ -43,11 +43,13 @@ def _ctx(monkeypatch: pytest.MonkeyPatch) -> None:
         *,
         manual: bool,
         deadline_passed: bool = False,
+        as_applicant: bool = False,
     ) -> GuardContext:
         return GuardContext(
             manual=manual,
             roles=frozenset(principal.roles) if manual else frozenset(),
             deadline_passed=deadline_passed,
+            actor_is_applicant=as_applicant,
         )
 
     monkeypatch.setattr(flow_context, "build_context", _bc)
@@ -89,6 +91,7 @@ def _transition(
         from_state_id=from_id,
         to_state_id=to_id,
         label_i18n={"de": "Einreichen"},
+        color=None,
         guard=guard,
         actions=actions if actions is not None else [],
         automatic=False,
@@ -113,6 +116,45 @@ async def test_available_filters_by_guard_and_order() -> None:
     out = await svc.available_transitions(app.id, _principal())
     assert [t.id for t in out] == [t_ok.id]
     assert out[0].label == {"de": "Einreichen"}
+
+
+async def test_applicant_transitions_only_actor_is_applicant_gated() -> None:
+    flow_id, draft = uuid4(), uuid4()
+    app = _app(draft, flow_id)
+    t_open = _transition(
+        flow_id=flow_id, from_id=draft, to_id=uuid4(), guard={"actorIsApplicant": True}
+    )
+    t_closed = _transition(
+        flow_id=flow_id, from_id=draft, to_id=uuid4(), guard={"roleIs": "chair"}
+    )
+    db = fake_session(result(app), result(t_open, t_closed))
+    out = await FlowService(db).available_applicant_transitions(app.id)
+    # Nur der actorIsApplicant-freigegebene Übergang; roleIs greift mangels Rolle nicht.
+    assert [t.id for t in out] == [t_open.id]
+
+
+async def test_fire_as_applicant_rejects_unopened_transition() -> None:
+    flow_id, draft = uuid4(), uuid4()
+    app = _app(draft, flow_id)
+    closed = _transition(
+        flow_id=flow_id, from_id=draft, to_id=uuid4(), guard={"roleIs": "chair"}
+    )
+    db = fake_session(result(closed))  # nur _load_transition wird erreicht
+    with pytest.raises(ForbiddenError):
+        await FlowService(db).fire_as_applicant(app.id, closed.id)
+
+
+async def test_fire_as_applicant_fires_opened_transition() -> None:
+    flow_id, draft, accepted = uuid4(), uuid4(), uuid4()
+    app = _app(draft, flow_id)
+    opened = _transition(
+        flow_id=flow_id, from_id=draft, to_id=accepted, guard={"actorIsApplicant": True}
+    )
+    # fire_as_applicant: _load_transition (Gate-Check) → fire: _load_app, _load_transition, update.
+    db = fake_session(result(opened), result(app), result(opened), result(rowcount=1))
+    res = await FlowService(db).fire_as_applicant(app.id, opened.id, note="ok")
+    assert res.new_state_id == accepted
+    assert db.committed == 1
 
 
 async def test_available_empty_when_no_current_state() -> None:
