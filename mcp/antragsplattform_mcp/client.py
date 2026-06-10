@@ -76,5 +76,8 @@ class ApiClient:
     async def patch(self, path: str, **kw: Any) -> Any:
         return await self.request("PATCH", path, **kw)
 
+    async def put(self, path: str, **kw: Any) -> Any:
+        return await self.request("PUT", path, **kw)
+
     async def delete(self, path: str, **kw: Any) -> Any:
         return await self.request("DELETE", path, **kw)

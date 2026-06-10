@@ -349,6 +349,32 @@ async def delete_budget(budget_id: str) -> dict:
     return await _api().delete(f"/budgets/{budget_id}")
 
 
+@mcp.tool()
+async def list_fiscal_years(budget_id: str) -> dict:
+    """List the fiscal years of a top-level budget. Requires budget.manage."""
+    return await _api().get(f"/budgets/{budget_id}/fiscal-years")
+
+
+@mcp.tool()
+async def create_fiscal_year(budget_id: str, year: int, active: bool = True) -> dict:
+    """Create a fiscal year on a top-level budget (bounds derive from the budget's
+    fiscal start day/month; overlapping years → 422). Requires budget.manage."""
+    return await _api().post(
+        f"/budgets/{budget_id}/fiscal-years", json={"year": year, "active": active}
+    )
+
+
+@mcp.tool()
+async def set_allocation(budget_id: str, fiscal_year_id: str, allocated: str) -> dict:
+    """Set the top-down allocation (Soll) of a cost centre for one fiscal year.
+    allocated = decimal string; 422 if the children's sum exceeds the parent.
+    Requires budget.manage."""
+    return await _api().put(
+        f"/budgets/{budget_id}/allocations/{fiscal_year_id}",
+        json={"allocated": allocated},
+    )
+
+
 # ============================================================ admin: catalogues
 @mcp.tool()
 async def list_permissions() -> dict:
