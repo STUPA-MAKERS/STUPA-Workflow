@@ -98,9 +98,12 @@
   margin-top: var(--space-5);
 }
 
-:host ::ng-deep formly-form {
-  display: grid;
-  gap: var(--space-5);
+/* Abstand zwischen den Formularfragen — wie im internen Antragsformular (#det). */
+:host ::ng-deep formly-form formly-field {
+  display: block;
+}
+:host ::ng-deep formly-form formly-field + formly-field {
+  margin-top: var(--space-5);
 }
 
 // --- timeline ---------------------------------------------------------------
