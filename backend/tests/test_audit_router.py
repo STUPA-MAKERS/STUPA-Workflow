@@ -13,7 +13,6 @@ from app.modules.audit.models import AuditEntry
 from app.modules.audit.router import get_audit_service
 from app.modules.audit.service import ChainVerification
 from app.modules.auth.principal import Principal
-from app.shared.paging import Page
 
 _AT = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
 
@@ -34,13 +33,24 @@ def _entry(entry_id: int, *, prev: bytes | None) -> AuditEntry:
 
 class _FakeService:
     def __init__(self) -> None:
-        self.query_kwargs: dict[str, Any] | None = None
-        self.page: Page[AuditEntry] = Page(items=[], total=0, limit=50, offset=0)
+        self.cursor_kwargs: dict[str, Any] | None = None
+        self.items: list[AuditEntry] = []
+        self.has_more = False
+        self.names: dict[str, str | None] = {}
+        self.actors: list[tuple[str, str | None]] = []
         self.verification = ChainVerification(valid=True, checked=0)
 
-    async def query(self, **kwargs: Any) -> Page[AuditEntry]:
-        self.query_kwargs = kwargs
-        return self.page
+    async def query_cursor(self, **kwargs: Any) -> tuple[list[AuditEntry], bool]:
+        self.cursor_kwargs = kwargs
+        return self.items, self.has_more
+
+    async def resolve_actor_names(
+        self, subs: list[str | None]
+    ) -> dict[str, str | None]:
+        return self.names
+
+    async def list_actors(self) -> list[tuple[str, str | None]]:
+        return self.actors
 
     async def verify_chain(self) -> ChainVerification:
         return self.verification
@@ -69,27 +79,36 @@ def test_list_requires_audit_read_permission() -> None:
     assert client.get("/api/admin/audit").status_code == 403
 
 
-def test_list_returns_entries_with_hex_hashes() -> None:
+def test_list_returns_entries_with_hex_hashes_and_cursor() -> None:
     service = _FakeService()
-    service.page = Page(
-        items=[_entry(2, prev=bytes([1]) * 32), _entry(1, prev=None)],
-        total=2,
-        limit=50,
-        offset=0,
-    )
+    service.items = [_entry(2, prev=bytes([1]) * 32), _entry(1, prev=None)]
+    service.has_more = True
+    service.names = {"admin-1": "Admin One"}
     client = _client(service, _principal("audit.read"))
     resp = client.get("/api/admin/audit")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["total"] == 2
+    assert body["hasMore"] is True
+    assert body["nextCursor"] == 1  # id of last item
     first, second = body["items"]
     assert first["hash"] == "02" * 32
     assert first["prevHash"] == "01" * 32
     assert first["targetType"] == "application"
+    assert first["actorName"] == "Admin One"  # sub resolved to Klarname
     assert second["prevHash"] is None  # Genesis
 
 
-def test_list_passes_filters_to_service() -> None:
+def test_list_no_more_has_null_cursor() -> None:
+    service = _FakeService()
+    service.items = [_entry(1, prev=None)]
+    service.has_more = False
+    client = _client(service, _principal("audit.read"))
+    body = client.get("/api/admin/audit").json()
+    assert body["hasMore"] is False
+    assert body["nextCursor"] is None
+
+
+def test_list_passes_cursor_filters_to_service() -> None:
     service = _FakeService()
     client = _client(service, _principal("audit.read"))
     resp = client.get(
@@ -97,20 +116,33 @@ def test_list_passes_filters_to_service() -> None:
         params={
             "action": "login",
             "actor": "u-1",
-            "targetType": "application",
-            "targetId": "a-1",
+            "before": 42,
             "limit": 10,
-            "offset": 5,
         },
     )
     assert resp.status_code == 200
-    assert service.query_kwargs is not None
-    assert service.query_kwargs["action"] == "login"
-    assert service.query_kwargs["actor"] == "u-1"
-    assert service.query_kwargs["target_type"] == "application"
-    assert service.query_kwargs["target_id"] == "a-1"
-    assert service.query_kwargs["limit"] == 10
-    assert service.query_kwargs["offset"] == 5
+    assert service.cursor_kwargs is not None
+    assert service.cursor_kwargs["action"] == "login"
+    assert service.cursor_kwargs["actor"] == "u-1"
+    assert service.cursor_kwargs["before"] == 42
+    assert service.cursor_kwargs["limit"] == 10
+
+
+def test_actors_endpoint_lists_distinct_actors() -> None:
+    service = _FakeService()
+    service.actors = [("u-1", "User One"), ("sys", None)]
+    client = _client(service, _principal("audit.read"))
+    resp = client.get("/api/admin/audit/actors")
+    assert resp.status_code == 200
+    assert resp.json() == [
+        {"sub": "u-1", "name": "User One"},
+        {"sub": "sys", "name": None},
+    ]
+
+
+def test_actors_requires_permission() -> None:
+    client = _client(_FakeService(), _principal())
+    assert client.get("/api/admin/audit/actors").status_code == 403
 
 
 def test_verify_endpoint_ok() -> None:

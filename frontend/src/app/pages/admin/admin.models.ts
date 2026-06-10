@@ -391,12 +391,27 @@ export interface AuditEntry {
   id: number;
   at: string;
   actor: string | null;
+  /** Klarname des Akteurs (vom Backend aufgelöst); null = System/unbekannt. */
+  actorName: string | null;
   action: string;
   targetType: string | null;
   targetId: string | null;
   data: Record<string, unknown>;
   hash: string;
   prevHash: string | null;
+}
+
+/** Cursor-gepagte Audit-Antwort (Keyset auf `id`, neueste zuerst). */
+export interface AuditPage {
+  items: AuditEntry[];
+  nextCursor: number | null;
+  hasMore: boolean;
+}
+
+/** Distinkter Akteur für den Audit-Actor-Filter. */
+export interface AuditActor {
+  sub: string;
+  name: string | null;
 }
 
 // --- Branding / Site-Config (#21 — T-34-Contract, nicht SDS) ----------------

@@ -15,10 +15,15 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query
 
 from app.deps import DbSession, require_principal
-from app.modules.audit.schemas import AuditEntryOut, ChainVerificationOut
+from app.modules.audit.schemas import (
+    AuditActorOut,
+    AuditEntryOut,
+    AuditPageOut,
+    ChainVerificationOut,
+)
 from app.modules.audit.service import AuditService
 from app.shared.errors import ProblemDetail
-from app.shared.paging import Page, PageParams
+from app.shared.paging import DEFAULT_LIMIT, MAX_LIMIT
 
 router = APIRouter(prefix="/admin/audit", tags=["audit"])
 
@@ -35,37 +40,51 @@ ServiceDep = Annotated[AuditService, Depends(get_audit_service)]
 
 @router.get(
     "",
-    response_model=Page[AuditEntryOut],
+    response_model=AuditPageOut,
     dependencies=[Depends(require_principal("audit.read"))],
     responses=_AUTH_ERRORS,
 )
 async def list_audit(
     service: ServiceDep,
-    page: Annotated[PageParams, Depends()],
     action: Annotated[str | None, Query()] = None,
     actor: Annotated[str | None, Query()] = None,
-    target_type: Annotated[str | None, Query(alias="targetType")] = None,
-    target_id: Annotated[str | None, Query(alias="targetId")] = None,
     since: Annotated[datetime | None, Query()] = None,
     until: Annotated[datetime | None, Query()] = None,
-) -> Page[AuditEntryOut]:
-    """Audit-Log lesen (Filter: action/actor/target/Zeitfenster; Offset-Paging)."""
-    result = await service.query(
+    before: Annotated[int | None, Query(ge=1)] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+) -> AuditPageOut:
+    """Audit-Log lesen — Keyset-Paging (``before``-Cursor, neueste zuerst).
+
+    Filter: ``action``/``actor``/Zeitfenster (``since``/``until``). Akteur-``sub``
+    wird auf den Klarnamen aufgelöst (``actorName``)."""
+    items, has_more = await service.query_cursor(
         action=action,
         actor=actor,
-        target_type=target_type,
-        target_id=target_id,
         since=since,
         until=until,
-        limit=page.limit,
-        offset=page.offset,
+        before=before,
+        limit=limit,
     )
-    return Page(
-        items=[AuditEntryOut.from_entry(e) for e in result.items],
-        total=result.total,
-        limit=result.limit,
-        offset=result.offset,
+    names = await service.resolve_actor_names([e.actor for e in items])
+    out = [AuditEntryOut.from_entry(e, names.get(e.actor or "")) for e in items]
+    return AuditPageOut(
+        items=out,
+        nextCursor=items[-1].id if (has_more and items) else None,
+        hasMore=has_more,
     )
+
+
+@router.get(
+    "/actors",
+    response_model=list[AuditActorOut],
+    dependencies=[Depends(require_principal("audit.read"))],
+    responses=_AUTH_ERRORS,
+)
+async def list_audit_actors(service: ServiceDep) -> list[AuditActorOut]:
+    """Distinkte Akteure des Logs (für den Actor-Filter), Klarname aufgelöst."""
+    return [
+        AuditActorOut(sub=sub, name=name) for sub, name in await service.list_actors()
+    ]
 
 
 @router.get(

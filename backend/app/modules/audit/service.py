@@ -175,6 +175,83 @@ class AuditService:
         )
         return Page(items=list(rows), total=total, limit=limit, offset=offset)
 
+    async def query_cursor(
+        self,
+        *,
+        action: str | None = None,
+        actor: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        before: int | None = None,
+        limit: int = 50,
+    ) -> tuple[list[AuditEntry], bool]:
+        """Keyset-gepagte Audit-Sicht (``id`` desc). Gibt (items, has_more) zurück.
+
+        ``before`` = Keyset-Cursor (nur Einträge mit ``id < before``). Es wird
+        ``limit + 1`` gelesen, um ``has_more`` ohne separaten COUNT zu bestimmen
+        (skaliert auf sehr lange Logs)."""
+        stmt: Select[tuple[AuditEntry]] = select(AuditEntry)
+        if action is not None:
+            stmt = stmt.where(AuditEntry.action == action)
+        if actor is not None:
+            stmt = stmt.where(AuditEntry.actor == actor)
+        if since is not None:
+            stmt = stmt.where(AuditEntry.at >= since)
+        if until is not None:
+            stmt = stmt.where(AuditEntry.at <= until)
+        if before is not None:
+            stmt = stmt.where(AuditEntry.id < before)
+
+        rows = (
+            (
+                await self.session.execute(
+                    stmt.order_by(AuditEntry.id.desc()).limit(limit + 1)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        has_more = len(rows) > limit
+        return list(rows[:limit]), has_more
+
+    async def resolve_actor_names(
+        self, subs: list[str | None]
+    ) -> dict[str, str | None]:
+        """``sub`` → Klarname (``display_name`` bevorzugt, sonst ``email``).
+
+        Batch-Auflösung über die ``principal``-Tabelle. Unbekannte/None-``sub`` fehlen
+        in der Map (Aufrufer fällt auf ``sub`` bzw. „System" zurück)."""
+        from app.modules.auth.models import Principal
+
+        wanted = {s for s in subs if s}
+        if not wanted:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(Principal.sub, Principal.display_name, Principal.email).where(
+                    Principal.sub.in_(wanted)
+                )
+            )
+        ).all()
+        return {sub: (display_name or email) for sub, display_name, email in rows}
+
+    async def list_actors(self) -> list[tuple[str, str | None]]:
+        """Distinkte Akteure (``sub``) des Logs + aufgelöster Klarname (für Filter)."""
+        subs = (
+            (
+                await self.session.execute(
+                    select(AuditEntry.actor)
+                    .where(AuditEntry.actor.is_not(None))
+                    .distinct()
+                    .order_by(AuditEntry.actor)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        names = await self.resolve_actor_names(list(subs))
+        return [(sub, names.get(sub)) for sub in subs]
+
 
 async def record(
     session: AsyncSession,

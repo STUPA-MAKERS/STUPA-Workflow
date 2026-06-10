@@ -17,14 +17,15 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map, of } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
-import type { I18nMap, Page, Uuid } from '@core/api/models';
+import type { I18nMap, Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
 import {
   type AdminPrincipal,
   type ApplicationTypeCreateBody,
   type ApplicationTypeFull,
   type ApplicationTypeUpdateBody,
-  type AuditEntry,
+  type AuditActor,
+  type AuditPage,
   type Branding,
   type FlowGraph,
   type FormDraft,
@@ -532,16 +533,32 @@ export class AdminApiService {
   }
 
   // --- Audit-Log (#45, P(audit.read)) --------------------------------------
+  /** Keyset-gepagtes Audit-Log. `before` = Cursor (id), Filter action/actor/Zeit. */
   listAuditLog(
-    opts: { limit?: number; offset?: number; action?: string; actor?: string } = {},
-  ): Observable<Page<AuditEntry>> {
+    opts: {
+      limit?: number;
+      before?: number;
+      action?: string;
+      actor?: string;
+      since?: string;
+      until?: string;
+    } = {},
+  ): Observable<AuditPage> {
     const limit = opts.limit ?? 50;
-    const offset = opts.offset ?? 0;
-    if (this.mock) return of({ items: [], total: 0, limit, offset });
-    let params = new HttpParams().set('limit', String(limit)).set('offset', String(offset));
+    if (this.mock) return of({ items: [], nextCursor: null, hasMore: false });
+    let params = new HttpParams().set('limit', String(limit));
+    if (opts.before != null) params = params.set('before', String(opts.before));
     if (opts.action) params = params.set('action', opts.action);
     if (opts.actor) params = params.set('actor', opts.actor);
-    return this.http.get<Page<AuditEntry>>(`${this.base}/admin/audit`, { params });
+    if (opts.since) params = params.set('since', opts.since);
+    if (opts.until) params = params.set('until', opts.until);
+    return this.http.get<AuditPage>(`${this.base}/admin/audit`, { params });
+  }
+
+  /** Distinkte Akteure des Audit-Logs (für den Actor-Filter). */
+  listAuditActors(): Observable<AuditActor[]> {
+    if (this.mock) return of([]);
+    return this.http.get<AuditActor[]>(`${this.base}/admin/audit/actors`);
   }
 
   // --- Branding / Site-Config (#21 — Mock-Contract) ------------------------

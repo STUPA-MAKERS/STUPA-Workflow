@@ -26,6 +26,9 @@ class AuditEntryOut(_CamelModel):
     id: int
     at: datetime
     actor: str | None
+    # Klarname des Akteurs (display_name/email, vom Router aufgelöst); None bei
+    # System-/anonymen Vorgängen oder unbekanntem ``sub``.
+    actor_name: str | None = Field(default=None, alias="actorName")
     action: str
     target_type: str | None = Field(alias="targetType")
     target_id: str | None = Field(alias="targetId")
@@ -34,12 +37,15 @@ class AuditEntryOut(_CamelModel):
     prev_hash: str | None = Field(alias="prevHash")
 
     @classmethod
-    def from_entry(cls, entry: AuditEntry) -> AuditEntryOut:
+    def from_entry(
+        cls, entry: AuditEntry, actor_name: str | None = None
+    ) -> AuditEntryOut:
         """ORM-Zeile → Out-Schema (bytea-Hashes hex-kodiert)."""
         return cls(
             id=entry.id,
             at=entry.at,
             actor=entry.actor,
+            actorName=actor_name,
             action=entry.action,
             targetType=entry.target_type,
             targetId=entry.target_id,
@@ -47,6 +53,25 @@ class AuditEntryOut(_CamelModel):
             hash=entry.hash.hex(),
             prevHash=entry.prev_hash.hex() if entry.prev_hash is not None else None,
         )
+
+
+class AuditPageOut(_CamelModel):
+    """Cursor-gepagte Audit-Sicht (Keyset auf ``id`` desc, neueste zuerst).
+
+    ``nextCursor`` = ``id`` für den nächsten Aufruf (Query ``before``), oder ``None``
+    am Ende. ``hasMore`` spiegelt dasselbe wider.
+    """
+
+    items: list[AuditEntryOut]
+    next_cursor: int | None = Field(default=None, alias="nextCursor")
+    has_more: bool = Field(default=False, alias="hasMore")
+
+
+class AuditActorOut(_CamelModel):
+    """Akteur-Auswahl (für den Actor-Filter): ``sub`` + aufgelöster Klarname."""
+
+    sub: str
+    name: str | None = None
 
 
 class ChainVerificationOut(_CamelModel):

@@ -84,6 +84,46 @@ async def test_query_filters_by_action(session: AsyncSession) -> None:
     assert page.items[0].target_id == "x"
 
 
+async def test_query_cursor_keyset_paginates(session: AsyncSession) -> None:
+    svc = AuditService(session)
+    for _ in range(5):
+        await svc.record(actor="a", action=AuditAction.LOGIN)
+    await session.commit()
+
+    first, has_more = await svc.query_cursor(limit=2)
+    assert len(first) == 2 and has_more is True
+    # neueste zuerst (id desc)
+    assert first[0].id > first[1].id
+
+    second, has_more2 = await svc.query_cursor(limit=2, before=first[-1].id)
+    assert len(second) == 2 and has_more2 is True
+    assert second[0].id < first[-1].id  # echtes Keyset, keine Überlappung
+
+    third, has_more3 = await svc.query_cursor(limit=2, before=second[-1].id)
+    assert len(third) == 1 and has_more3 is False  # Ende erreicht
+
+
+async def test_resolve_actor_names_and_list_actors(session: AsyncSession) -> None:
+    from app.modules.auth.models import Principal
+
+    session.add(Principal(sub="u-1", display_name="User One", email="u1@x.test"))
+    session.add(Principal(sub="u-2", email="u2@x.test"))  # nur email
+    svc = AuditService(session)
+    await svc.record(actor="u-1", action=AuditAction.LOGIN)
+    await svc.record(actor="u-2", action=AuditAction.LOGIN)
+    await svc.record(actor=None, action=AuditAction.EXPORT)  # System
+    await session.commit()
+
+    names = await svc.resolve_actor_names(["u-1", "u-2", "unknown", None])
+    assert names == {"u-1": "User One", "u-2": "u2@x.test"}
+
+    actors = await svc.list_actors()
+    # nur nicht-None Akteure, mit aufgelöstem Namen
+    assert ("u-1", "User One") in actors
+    assert ("u-2", "u2@x.test") in actors
+    assert all(sub is not None for sub, _ in actors)
+
+
 async def test_update_is_rejected(session: AsyncSession, engine: Engine) -> None:
     await AuditService(session).record(actor="a", action=AuditAction.LOGIN)
     await session.commit()
