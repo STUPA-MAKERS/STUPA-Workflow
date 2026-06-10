@@ -156,7 +156,9 @@ def _exchange(token_endpoint: str, data: dict) -> dict:
             pass
         raise AuthError(f"token endpoint error ({resp.status_code}): {detail}")
     tokens = resp.json()
-    tokens["expires_at"] = time.time() + int(tokens.get("expires_in", 3600)) - 60
+    expires_in = tokens.get("expires_in")
+    # ``expires_in: null`` (or absent) means a non-expiring token — only revocation ends it.
+    tokens["expires_at"] = None if expires_in is None else time.time() + int(expires_in) - 60
     return tokens
 
 
@@ -196,8 +198,11 @@ def _save(config: Config, tokens: dict) -> None:
 def ensure_access_token(config: Config, *, force_login: bool = False) -> str:
     """Return a valid access token: cached → refreshed → fresh browser login."""
     tokens = None if force_login else _load(config)
-    if tokens and tokens.get("access_token") and tokens.get("expires_at", 0) > time.time():
-        return tokens["access_token"]
+    if tokens and tokens.get("access_token"):
+        expires_at = tokens.get("expires_at", 0)
+        # ``expires_at is None`` → non-expiring token; otherwise honour the deadline.
+        if expires_at is None or expires_at > time.time():
+            return tokens["access_token"]
     if tokens and tokens.get("refresh_token"):
         try:
             return _refresh(config, tokens["refresh_token"])["access_token"]
