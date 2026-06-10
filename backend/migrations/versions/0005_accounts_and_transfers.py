@@ -32,7 +32,8 @@ _UPGRADE: tuple[str, ...] = (
     )
     """,
     "CREATE INDEX IF NOT EXISTS ix_account_name ON account (name)",
-    "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS account_id uuid REFERENCES account(id) ON DELETE SET NULL",
+    "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS account_id uuid "
+    "REFERENCES account(id) ON DELETE SET NULL",
     "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS transfer_id uuid",
     "CREATE INDEX IF NOT EXISTS ix_budget_expense_account_id ON budget_expense (account_id)",
     "CREATE INDEX IF NOT EXISTS ix_budget_expense_transfer_id ON budget_expense (transfer_id)",

@@ -37,8 +37,8 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
-from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.queue import MailQueue
+from app.modules.notifications.recipients import RecipientResolver
 from app.modules.pdf.pytex_client import PytexClient, PytexError
 from app.modules.protocol.markdown import (
     ProtocolDoc,

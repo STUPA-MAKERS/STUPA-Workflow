@@ -36,8 +36,6 @@ from app.modules.budget.tree_schemas import (
     AssignBudgetOut,
     AssignBudgetRequest,
     BudgetApplicationOut,
-    TransferCreate,
-    TransferOut,
     BudgetNodeCreate,
     BudgetNodeOut,
     BudgetNodeUpdate,
@@ -49,6 +47,8 @@ from app.modules.budget.tree_schemas import (
     FiscalYearOut,
     FiscalYearUpdate,
     MoveFiscalYearRequest,
+    TransferCreate,
+    TransferOut,
 )
 from app.modules.flow.models import State
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem

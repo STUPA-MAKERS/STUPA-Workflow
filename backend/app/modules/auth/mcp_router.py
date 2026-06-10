@@ -101,7 +101,7 @@ def mcp_package(
         baked = (
             '"""Auto-generated at download — pins this package to its source platform."""\n'
             f'BASE_URL = "{base}"\n'
-        ).encode("utf-8")
+        ).encode()
         baked_info = tarfile.TarInfo(
             "antragsplattform-mcp/antragsplattform_mcp/_baked.py"
         )

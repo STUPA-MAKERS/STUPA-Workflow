@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import CursorResult, select, update
+from sqlalchemy import CursorResult, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application, StatusEvent
@@ -135,7 +135,7 @@ class FlowService:
         entfernt — kein Stapeln, keine stale Fristen nach Wechsel in einen State ohne
         Policy."""
         await self.session.execute(
-            Deadline.__table__.delete().where(
+            delete(Deadline).where(
                 Deadline.application_id == app.id,
                 Deadline.kind == "flow_deadline",
             )

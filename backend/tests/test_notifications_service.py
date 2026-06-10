@@ -139,11 +139,14 @@ async def test_handle_notify_action_inline_mode() -> None:
     assert queue.messages[0].subject == "Status Y"
 
 
-async def test_handle_notify_action_inline_missing_template() -> None:
+async def test_handle_notify_action_inline_missing_template_falls_back() -> None:
+    # Unbekanntes Template -> var-freier Builtin-Fallback statt stillem Verwurf.
     session = FakeSession(scalars=[[]])
-    svc = _service(session, FakeQueue())
+    queue = FakeQueue()
+    svc = _service(session, queue)
     svc.resolver = FakeResolver(["a@x.de"])  # type: ignore[assignment]
-    assert await svc.handle_notify_action({"type": "notify", "templateKey": "x"}) == 0
+    assert await svc.handle_notify_action({"type": "notify", "templateKey": "x"}) == 1
+    assert len(queue.messages) == 1
 
 
 async def test_handle_notify_action_without_template() -> None:

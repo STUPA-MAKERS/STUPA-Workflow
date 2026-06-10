@@ -28,12 +28,14 @@ class FakeSession:
         *,
         scalars: list[list[Any]] | None = None,
         scalar: list[Any] | None = None,
+        executes: list[list[Any]] | None = None,
     ) -> None:
         self.added: list[Any] = []
         self.committed = 0
         self.store: dict[uuid.UUID, Any] = {}
         self._scalars = scalars or []
         self._scalar = scalar or []
+        self._executes = executes or []
 
     def add(self, obj: Any) -> None:
         if getattr(obj, "id", None) is None:
@@ -53,6 +55,10 @@ class FakeSession:
 
     async def scalar(self, _stmt: Any) -> Any:
         return self._scalar.pop(0)
+
+    async def execute(self, _stmt: Any) -> FakeResult:
+        """Row-Queries (z. B. `(type_id, state_id)` des Dispatchers) — FIFO, leer ohne Setup."""
+        return FakeResult(self._executes.pop(0)) if self._executes else FakeResult([])
 
 
 class FakeQueue:

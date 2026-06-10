@@ -54,7 +54,7 @@ async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     app_type_id = uuid.uuid4()
-    session = FakeSession(scalar=[app_type_id])
+    session = FakeSession(executes=[[(app_type_id, None)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
 
     action = _action("notify", {"event": "status_changed", "lang": "en"})
@@ -98,7 +98,7 @@ async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -
             return 1
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
-    session = FakeSession(scalar=[None])
+    session = FakeSession(executes=[[(None, None)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     action = _action("notify", {"templateKey": "t", "context": {"status": "X"}})
     await disp.dispatch([action])

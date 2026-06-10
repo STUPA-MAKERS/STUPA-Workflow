@@ -24,7 +24,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Text, cast, false, func, or_, select
+from sqlalchemy import ColumnElement, Text, cast, false, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -552,7 +552,7 @@ class ApplicationsService:
         Nutzer:innen **ohne** ``application.read``, die nur ihre eigenen sehen dürfen (#24)."""
         # Unbestätigte Gast-Anträge sind unsichtbar, bis die E-Mail bestätigt wurde
         # (Bestand + eingeloggte Anträge tragen ``email_confirmed_at`` → bleiben sichtbar).
-        filters = [Application.email_confirmed_at.is_not(None)]
+        filters: list[ColumnElement[bool]] = [Application.email_confirmed_at.is_not(None)]
         if owner_sub is not None:
             filters.append(Application.created_by == owner_sub)
         if state_id is not None:
@@ -704,7 +704,7 @@ class ApplicationsService:
 
         items: list[ApplicationListItem] = []
         for app in apps:
-            s = by_id.get(app.current_state_id)
+            s = by_id.get(app.current_state_id) if app.current_state_id else None
             if s is None:
                 continue
             ok = False

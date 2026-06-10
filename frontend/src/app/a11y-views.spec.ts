@@ -297,6 +297,8 @@ describe('Kern-Views a11y (axe)', () => {
         listGremiumRoles: jest.fn(() => of([])),
         getGlobalFlow: jest.fn(() => of(null)),
         createGlobalFlowVersion: jest.fn(() => of({ id: 'gfv1' })),
+        listWebhooks: jest.fn(() => of([])),
+        listDeadlinePolicies: jest.fn(() => of([])),
       } as unknown as Partial<AdminApiService>;
     }
 

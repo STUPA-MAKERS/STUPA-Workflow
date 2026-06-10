@@ -39,6 +39,7 @@ from app.modules.delegations.router import router as delegations_router
 from app.modules.files.router import router as files_router
 from app.modules.files.storage import build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.extras_dispatcher import build_flow_extras_dispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import router as forms_router
@@ -48,7 +49,6 @@ from app.modules.livevote.router import router as livevote_router
 from app.modules.livevote.service import BrokerPublisher
 from app.modules.notifications.action_dispatcher import build_notify_dispatcher
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
-from app.modules.flow.extras_dispatcher import build_flow_extras_dispatcher
 from app.modules.pdf.action_dispatcher import ChainActionDispatcher
 from app.modules.pdf.router import router as pdf_router
 from app.modules.protocol.router import router as protocol_router

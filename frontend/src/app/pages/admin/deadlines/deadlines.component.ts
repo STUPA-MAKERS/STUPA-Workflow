@@ -3,7 +3,6 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { Uuid } from '@core/api/models';
 import {
   ButtonComponent,
   CellDirective,

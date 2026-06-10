@@ -202,8 +202,8 @@ async def test_account_and_transfer(session: AsyncSession) -> None:
     assert acc.name == "Giro"
     booking = await svc.book_expense(
         ExpenseCreate(
-            budgetId=str(a.id), fiscalYearId=str(fy.id), amount=Decimal("50"),
-            description="mit Konto", accountId=str(acc.id),
+            budgetId=a.id, fiscalYearId=fy.id, amount=Decimal("50"),
+            description="mit Konto", accountId=acc.id,
         ),
         actor="tester",
     )
@@ -212,7 +212,7 @@ async def test_account_and_transfer(session: AsyncSession) -> None:
     # Übertrag A → B (200): Ausgabe auf A + Einnahme auf B, gleiches HHJ.
     transfer = await svc.create_transfer(
         TransferCreate(
-            fromBudgetId=str(a.id), toBudgetId=str(b.id), fiscalYearId=str(fy.id),
+            fromBudgetId=a.id, toBudgetId=b.id, fiscalYearId=fy.id,
             amount=Decimal("200"), description="Umbuchung",
         ),
         actor="tester",

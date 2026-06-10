@@ -132,15 +132,15 @@ async def exchange_code(
     row.used_at = now
     # Die im Consent gewählte Lebensdauer (``access_ttl_seconds``) ist maßgeblich —
     # ``None`` bedeutet »läuft nie ab« (NICHT Default). Refresh läuft dann ebenfalls nie ab.
-    access_ttl = row.access_ttl_seconds
+    consent_ttl = row.access_ttl_seconds
     return await _issue_tokens(
         db,
         principal_id=row.principal_id,
         client_id=client_id,
         scope=row.scope,
         now=now,
-        access_ttl=access_ttl,
-        refresh_ttl=None if access_ttl is None else refresh_ttl,
+        access_ttl=consent_ttl,
+        refresh_ttl=None if consent_ttl is None else refresh_ttl,
     )
 
 

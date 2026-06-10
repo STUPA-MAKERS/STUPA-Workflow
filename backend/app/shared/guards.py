@@ -383,9 +383,10 @@ def validate_action(action: dict[str, Any]) -> None:
     elif action_type == "addToNextSession":
         if not isinstance(action.get("gremiumId"), str) or not action["gremiumId"]:
             raise GuardError("addToNextSession action requires 'gremiumId'")
-    elif action_type == "assignBudget":
-        if not isinstance(action.get("budgetId"), str) or not action["budgetId"]:
-            raise GuardError("assignBudget action requires 'budgetId'")
+    elif action_type == "assignBudget" and (
+        not isinstance(action.get("budgetId"), str) or not action["budgetId"]
+    ):
+        raise GuardError("assignBudget action requires 'budgetId'")
 
 
 def _validate_notify_recipients(recipients: Any) -> None:

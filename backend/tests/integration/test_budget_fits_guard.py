@@ -75,7 +75,8 @@ async def test_income_raises_availability(session: AsyncSession) -> None:
     # Allocation 1000 + Einnahme 500 ⇒ verfügbar 1500. Antrag 1200 PASST.
     session.add(
         BudgetExpense(
-            budget_id=budget_id, fiscal_year_id=fy_id, kind="income", amount=Decimal("500.00"), description="Spende"
+            budget_id=budget_id, fiscal_year_id=fy_id, kind="income",
+            amount=Decimal("500.00"), description="Spende"
         )
     )
     await session.flush()
@@ -87,7 +88,8 @@ async def test_expense_lowers_availability(session: AsyncSession) -> None:
     # Allocation 1000 − Ausgabe 400 ⇒ verfügbar 600. Antrag 800 passt NICHT.
     session.add(
         BudgetExpense(
-            budget_id=budget_id, fiscal_year_id=fy_id, kind="expense", amount=Decimal("400.00"), description="Miete"
+            budget_id=budget_id, fiscal_year_id=fy_id, kind="expense",
+            amount=Decimal("400.00"), description="Miete"
         )
     )
     await session.flush()
@@ -100,10 +102,12 @@ async def test_mixed_income_and_expense_net(session: AsyncSession) -> None:
     session.add_all(
         [
             BudgetExpense(
-                budget_id=budget_id, fiscal_year_id=fy_id, kind="expense", amount=Decimal("700.00"), description="Miete"
+                budget_id=budget_id, fiscal_year_id=fy_id, kind="expense",
+                amount=Decimal("700.00"), description="Miete"
             ),
             BudgetExpense(
-                budget_id=budget_id, fiscal_year_id=fy_id, kind="income", amount=Decimal("300.00"), description="Spende"
+                budget_id=budget_id, fiscal_year_id=fy_id, kind="income",
+                amount=Decimal("300.00"), description="Spende"
             ),
         ]
     )

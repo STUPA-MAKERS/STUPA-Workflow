@@ -278,7 +278,11 @@ async def consent(
     response.delete_cookie(settings.oauth_tx_cookie_name, path="/")
 
     if not body.approve:
-        return {"redirect": _loopback_redirect(tx["redirect_uri"], {"error": "access_denied", **state})}
+        return {
+            "redirect": _loopback_redirect(
+                tx["redirect_uri"], {"error": "access_denied", **state}
+            )
+        }
 
     if not principal.has("mcp.use"):
         raise ForbiddenError("Missing permission: mcp.use")

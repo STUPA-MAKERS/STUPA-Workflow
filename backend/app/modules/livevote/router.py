@@ -24,6 +24,8 @@ from fastapi import APIRouter, Depends, Query, Request, WebSocket
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
+from app.modules.livevote.agenda_service import AgendaService
+from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.broker import InMemoryBroker, MeetingBroker
 from app.modules.livevote.connection import (
     WS_FORBIDDEN,
@@ -32,8 +34,6 @@ from app.modules.livevote.connection import (
     LiveVoteConnection,
     resolve_ws_principal,
 )
-from app.modules.livevote.agenda_service import AgendaService
-from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.events import ErrorEvent
 from app.modules.livevote.locks import InMemoryLocker, Locker
 from app.modules.livevote.schemas import (

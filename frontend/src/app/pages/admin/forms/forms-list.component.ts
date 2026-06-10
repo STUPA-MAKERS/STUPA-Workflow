@@ -15,7 +15,6 @@ import {
   DialogComponent,
   IconComponent,
   SelectComponent,
-  type SelectOption,
   ToastService,
 } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';

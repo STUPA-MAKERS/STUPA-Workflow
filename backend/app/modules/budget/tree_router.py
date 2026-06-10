@@ -34,8 +34,6 @@ from app.modules.budget.tree_schemas import (
     AssignBudgetRequest,
     BudgetApplicationOut,
     BudgetNodeCreate,
-    TransferCreate,
-    TransferOut,
     BudgetNodeOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
@@ -47,6 +45,8 @@ from app.modules.budget.tree_schemas import (
     FiscalYearOut,
     FiscalYearUpdate,
     MoveFiscalYearRequest,
+    TransferCreate,
+    TransferOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
 from app.shared.errors import ProblemDetail

@@ -24,10 +24,10 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import CursorResult, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
@@ -115,12 +115,15 @@ async def _discard_unconfirmed(ctx: dict[str, Any], now: datetime) -> int:
     maker = _sessionmaker(ctx)
     cutoff = now - _GUEST_CONFIRM_TTL
     async with maker() as session:
-        result = await session.execute(
-            delete(Application).where(
-                Application.created_by.is_(None),
-                Application.email_confirmed_at.is_(None),
-                Application.created_at < cutoff,
-            )
+        result = cast(
+            "CursorResult[Any]",
+            await session.execute(
+                delete(Application).where(
+                    Application.created_by.is_(None),
+                    Application.email_confirmed_at.is_(None),
+                    Application.created_at < cutoff,
+                )
+            ),
         )
         await session.commit()
     discarded = result.rowcount or 0

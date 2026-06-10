@@ -9,10 +9,11 @@ Modul kennt keine DB, nur Reihen → Bytes.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Iterable, Sequence
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - nur Typen
     from app.modules.applications.schemas import ApplicationListItem
@@ -49,15 +50,15 @@ def _header_row(worksheet: Any, headers: Sequence[str]) -> None:
 
 
 def _iter_nodes(
-    nodes: Iterable["BudgetTreeNodeOut"], depth: int = 0
-) -> Iterable[tuple[int, "BudgetTreeNodeOut"]]:
+    nodes: Iterable[BudgetTreeNodeOut], depth: int = 0
+) -> Iterable[tuple[int, BudgetTreeNodeOut]]:
     for node in nodes:
         yield depth, node
         yield from _iter_nodes(node.children, depth + 1)
 
 
 def build_budget_workbook(
-    roots: Sequence["BudgetTreeNodeOut"],
+    roots: Sequence[BudgetTreeNodeOut],
     *,
     fiscal_year_labels: dict[Any, str],
     fiscal_year_id: Any | None = None,
@@ -149,7 +150,7 @@ def _sheet_title(label: str, used: set[str]) -> str:
 
 
 def build_applications_workbook(
-    items: Sequence["ApplicationListItem"],
+    items: Sequence[ApplicationListItem],
     *,
     type_names: dict[Any, str],
     gremium_names: dict[Any, str],
@@ -207,7 +208,9 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
         if locale == "de"
         else {"expense": "Expense", "income": "Income"}
     )
-    headers = ["Datum", "Art", "Beschreibung", "Kostenstelle", "Antrag", "Konto", "Betrag", "Währung"]
+    headers = [
+        "Datum", "Art", "Beschreibung", "Kostenstelle", "Antrag", "Konto", "Betrag", "Währung",
+    ]
     wb = Workbook()
     ws = wb.active
     assert ws is not None  # noqa: S101 - openpyxl liefert immer ein aktives Sheet

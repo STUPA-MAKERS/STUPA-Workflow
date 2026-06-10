@@ -15,6 +15,7 @@ Beamer-Stream konstruktionsbedingt namensfrei.
 from __future__ import annotations
 
 import base64
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from datetime import date as _date
 from datetime import datetime as _datetime
@@ -262,7 +263,7 @@ class MeetingService:
         return {mid: n for mid, n in rows}
 
     async def _vote_tallies(
-        self, votes: list[Vote]
+        self, votes: Sequence[Vote]
     ) -> dict[
         UUID,
         tuple[dict[str, int] | None, str | None, Literal["quorum", "majority"] | None],
@@ -537,7 +538,7 @@ class MeetingService:
         next_cursor = (
             _encode_cursor(rows[-1][1], rows[-1][0].id) if has_more and rows else None
         )
-        return MeetingPage(items=items, next_cursor=next_cursor)
+        return MeetingPage(items=items, nextCursor=next_cursor)
 
     async def _decorate(
         self, meetings: list[Meeting], principal: Principal
@@ -563,13 +564,14 @@ class MeetingService:
         # ``meeting.manage`` kurzschließt sämtliche Gremium-Queries.
         all_gids = {m.gremium_id for m in meetings}
         # Gremium-Namen gebündelt (Timeline zeigt Zugehörigkeit, #104).
-        gremium_names = dict(
-            (
+        gremium_names: dict[UUID, str] = {
+            gid: name
+            for gid, name in (
                 await self.session.execute(
                     select(Gremium.id, Gremium.name).where(Gremium.id.in_(all_gids))
                 )
             ).all()
-        )
+        }
         # Protokollant-Namen gebündelt (kein N+1) — sonst zeigt die Timeline/Karte
         # keinen Protokollanten (``protokollantName`` bliebe null → „nicht gespeichert"-
         # Eindruck), obwohl ``protokollant_id`` korrekt persistiert ist.
@@ -620,7 +622,11 @@ class MeetingService:
                     can_manage_votes=(m.gremium_id in votes_mgmt_ids) or is_prot,
                     can_vote=m.gremium_id in vote_ids,
                     gremium_name=gremium_names.get(m.gremium_id),
-                    protokollant_name=prot_names.get(m.protokollant_id),
+                    protokollant_name=(
+                        prot_names.get(m.protokollant_id)
+                        if m.protokollant_id is not None
+                        else None
+                    ),
                     votes=votes_by_meeting.get(m.id, []),
                 )
             )

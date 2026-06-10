@@ -2312,7 +2312,7 @@ export class MeetingsComponent implements OnDestroy {
   /** Protokoll-Markdown aus den geordneten TOPs zusammensetzen (#58). */
   private assembleMarkdown(): string {
     return this.agenda()
-      .map((t, i) => {
+      .map((t) => {
         // Top-level `#` → pytex' Protokoll-Variante nummeriert es selbst als „TOP n"
         // (\thesection). Daher KEIN manuelles „TOP n:"-Präfix und kein `##` (das würde
         // als „0.n" nummeriert + „TOP n:" doppelt). Frontmatter-`title` verhindert, dass

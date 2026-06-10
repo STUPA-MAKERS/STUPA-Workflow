@@ -25,9 +25,9 @@ from app.modules.applications.models import Application
 from app.modules.auth.principal import Principal
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormVersion
+from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker
-from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.schemas import MeetingCreate, MeetingPatch
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel

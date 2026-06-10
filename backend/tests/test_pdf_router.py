@@ -29,6 +29,23 @@ JOB_ID = uuid4()
 class _FakeSession:
     async def commit(self) -> None: ...
 
+    async def scalar(self, *_a: object, **_k: object) -> None:
+        return None  # kein created_by → kein Ersteller-Zugriff
+
+    async def execute(self, *_a: object, **_k: object) -> _EmptyResult:
+        return _EmptyResult()  # keine Gremium-Mitgliedschaften (#vote-read)
+
+
+class _EmptyResult:
+    def scalars(self) -> _EmptyResult:
+        return self
+
+    def all(self) -> list[object]:
+        return []
+
+    def scalar_one_or_none(self) -> None:
+        return None
+
 
 class _FakeService:
     def __init__(self) -> None:

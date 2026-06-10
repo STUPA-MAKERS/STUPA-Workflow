@@ -14,6 +14,7 @@ Die Service-Hook :func:`record` kapselt den Standardfall für andere Module (T-1
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -215,7 +216,7 @@ class AuditService:
         return list(rows[:limit]), has_more
 
     async def resolve_actor_names(
-        self, subs: list[str | None]
+        self, subs: Sequence[str | None]
     ) -> dict[str, str | None]:
         """``sub`` → Klarname (``display_name`` bevorzugt, sonst ``email``).
 
@@ -249,8 +250,9 @@ class AuditService:
             .scalars()
             .all()
         )
-        names = await self.resolve_actor_names(list(subs))
-        return [(sub, names.get(sub)) for sub in subs]
+        actor_subs = [s for s in subs if s is not None]
+        names = await self.resolve_actor_names(actor_subs)
+        return [(sub, names.get(sub)) for sub in actor_subs]
 
 
 async def record(

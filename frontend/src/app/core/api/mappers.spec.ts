@@ -88,6 +88,7 @@ describe('mapApplication', () => {
       typeId: 't1',
       state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: '#4a90d9', editAllowed: true, kind: 'normal' },
       gremiumId: 'g1',
+      budgetId: null,
       budgetPotId: 'p1',
       amount: '250.00',
       currency: 'EUR',

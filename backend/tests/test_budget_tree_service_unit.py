@@ -448,7 +448,7 @@ async def test_get_tree_assembles() -> None:
     sess = fake_session(
         result(top),                                            # nodes
         result(alloc),                                          # allocations
-        result(                                                 # app rows (id, path, fy, amount, state)
+        result(  # app rows (id, path, fy, amount, state)
             (uuid.uuid4(), "VS", fy_id, Decimal("250"), "approved"),    # → bound
             (uuid.uuid4(), "VS", fy_id, Decimal("120"), "submitted"),   # → requested (in-flight)
             (uuid.uuid4(), "VS", fy_id, Decimal("999"), "rejected"),    # → excluded

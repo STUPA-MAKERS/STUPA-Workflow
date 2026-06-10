@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from arq import Retry
@@ -85,7 +85,9 @@ async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> No
     if meeting is None:
         return
     event = MeetingStateEvent(
-        activeApplicationId=meeting.active_application_id, status=meeting.status
+        activeApplicationId=meeting.active_application_id,
+        # Text-Spalte; Werte sind durch den Service auf die Literale beschränkt.
+        status=cast("Any", meeting.status),
     )
     try:
         await RedisBroker(redis).publish(meeting_channel(meeting.id), event.dump())

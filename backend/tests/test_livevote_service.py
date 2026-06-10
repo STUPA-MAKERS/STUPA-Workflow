@@ -191,6 +191,10 @@ class _Result:
         # ``_votes_for`` (Meeting-Votes) erwartet ``.scalars().all()`` — leer reicht.
         return _Scalars([])
 
+    def all(self) -> list[object]:
+        # Aggregat-Queries (``_present_by_meeting`` u. Ä.) erwarten ``.all()`` — leer.
+        return []
+
 
 class _FakeSession:
     def __init__(self, existing: object = None) -> None:
@@ -214,6 +218,9 @@ class _FakeSession:
 
     async def commit(self) -> None:
         self.commits += 1
+
+    async def get(self, *_a: object, **_k: object) -> None:
+        return None  # Namens-Lookups (Gremium/Protokollant) — kein Treffer reicht
 
 
 @pytest.mark.asyncio

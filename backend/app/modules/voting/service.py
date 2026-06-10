@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import func, literal_column, select
@@ -350,11 +351,13 @@ class VotingService:
         counts = await self._aggregate(vote, config)
         tally_out = await self._tally_out(vote, config, counts, vote.eligible_count or 0)
         if vote.status == "closed" and vote.result is not None:
+            # Persistiert als Text-Spalte; Werte stammen aus tally.result() → Literal.
+            stored_result = cast("tally_mod.VoteResult", vote.result)
             tally_out = tally_out.model_copy(
                 update={
-                    "result": vote.result,
+                    "result": stored_result,
                     "failed_reason": tally_mod.failed_reason(
-                        vote.result, tally_out.quorum_met
+                        stored_result, tally_out.quorum_met
                     ),
                 }
             )

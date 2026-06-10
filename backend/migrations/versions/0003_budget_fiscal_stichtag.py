@@ -68,7 +68,8 @@ _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE fiscal_year DROP COLUMN IF EXISTS label",
     """
     DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_fiscal_year_budget_year') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                       WHERE conname = 'uq_fiscal_year_budget_year') THEN
             ALTER TABLE fiscal_year ADD CONSTRAINT uq_fiscal_year_budget_year
                 UNIQUE (budget_id, year);
         END IF;
@@ -84,7 +85,8 @@ _DOWNGRADE: tuple[str, ...] = (
     "ALTER TABLE fiscal_year ALTER COLUMN label SET NOT NULL",
     """
     DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_fiscal_year_budget_label') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                       WHERE conname = 'uq_fiscal_year_budget_label') THEN
             ALTER TABLE fiscal_year ADD CONSTRAINT uq_fiscal_year_budget_label
                 UNIQUE (budget_id, label);
         END IF;
