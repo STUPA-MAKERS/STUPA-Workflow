@@ -680,6 +680,15 @@ class MeetingService:
             await self.publisher.meeting_state(out)
         return out
 
+    async def broadcast_state(self, meeting_id: UUID, principal: Principal) -> None:
+        """``meeting_state`` erneut senden, ohne State-Änderung — z. B. nach einem
+        Protokoll-/TOP-Edit, damit Live-Follower den neuen Stand nachladen (#live-refresh)."""
+        meeting = await self._get(meeting_id)
+        votes = (await self._votes_for([meeting.id])).get(meeting.id, [])
+        out = await self._emit(meeting, principal, votes=votes)
+        if self.publisher is not None:
+            await self.publisher.meeting_state(out)
+
     async def delete(self, meeting_id: UUID, principal: Principal) -> None:
         """Sitzung löschen — nur Sitzungsverwalter (``session.manage``)/Admin.
 

@@ -192,6 +192,48 @@ const AUTOSAVE_DELAY_MS = 1000;
             <p class="mtg__muted">{{ 'meetings.follow.noTops' | t }}</p>
           }
         </app-card>
+
+        <!-- Anwesenheit auch in der Live-/Follower-Ansicht (eigener Status setzbar). -->
+        <app-card [heading]="'meetings.attendance.title' | t">
+          <table class="mtg__attTable">
+            <tbody>
+              @for (a of attendance(); track a.principalId) {
+                <tr class="mtg__attRow">
+                  <td class="mtg__attName">
+                    {{ a.displayName || a.email || a.principalId }}
+                    @if (a.isSelf) { <span class="mtg__attYou">{{ 'meetings.attendance.you' | t }}</span> }
+                  </td>
+                  <td class="mtg__attStatus">
+                    @if (a.isSelf) {
+                      <span class="mtg__attBtns" role="group" [attr.aria-label]="'meetings.attendance.title' | t">
+                        @for (s of attendanceStatuses; track s) {
+                          <button
+                            type="button"
+                            [class]="'mtg__attBtn mtg__attBtn--' + s"
+                            [class.mtg__attBtn--on]="a.status === s"
+                            [attr.aria-pressed]="a.status === s"
+                            [attr.aria-label]="attendanceKey(s) | t"
+                            [title]="attendanceKey(s) | t"
+                            [disabled]="savingAttendance()"
+                            (click)="setAttendance(a, s)"
+                          >
+                            <app-icon [name]="attendanceIcon(s)" [size]="13" />
+                          </button>
+                        }
+                      </span>
+                    } @else {
+                      <app-badge [variant]="a.status ? attBadgeVariant(a.status) : 'neutral'">
+                        {{ (a.status ? attendanceKey(a.status) : 'meetings.attendance.unknown') | t }}
+                      </app-badge>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="2" class="mtg__muted mtg__tocEmpty">{{ 'meetings.attendance.empty' | t }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </app-card>
       }
 
       @if (!beamerMode() && !isFollower()) {
@@ -2622,6 +2664,9 @@ export class MeetingsComponent implements OnDestroy {
           status: (msg.status as Meeting['status']) ?? m.status,
           activeApplicationId: msg.activeApplicationId,
         });
+        // TOP-Texte/Tagesordnung können sich (ohne Vote) geändert haben → neu laden,
+        // damit Live-Follower den aktuellen Protokoll-Stand sehen (#live-refresh).
+        this.loadAgenda(m.id);
         break;
       case 'vote_opened':
         if (m.votes.some((v) => v.id === msg.voteId)) {

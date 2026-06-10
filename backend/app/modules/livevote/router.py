@@ -464,9 +464,12 @@ async def set_agenda_body(
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    return await agenda.set_body(
+    items = await agenda.set_body(
         meeting_id, item_id, body=payload.body, title=payload.title
     )
+    # Live-Follower über den geänderten TOP-Text informieren (#live-refresh).
+    await service.broadcast_state(meeting_id, principal)
+    return items
 
 
 # --------------------------------------------------------------------------- #
