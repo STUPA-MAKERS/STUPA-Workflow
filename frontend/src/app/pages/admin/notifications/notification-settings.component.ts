@@ -44,28 +44,30 @@ import type { NotificationSettings } from '../admin.models';
               {{ 'admin.notifications.enabled' | t }}
             </app-checkbox>
 
-            <label class="ns__field">
-              <span>{{ 'admin.notifications.afterDays' | t }}</span>
+            <label class="field">
+              <span class="field__label">{{ 'admin.notifications.afterDays' | t }}</span>
               <input
+                class="field__control"
                 type="number"
                 min="1"
                 [disabled]="!s.taskReminderEnabled"
                 [ngModel]="s.taskReminderAfterDays"
                 (ngModelChange)="patch({ taskReminderAfterDays: $event })"
               />
-              <span class="ns__hint">{{ 'admin.notifications.afterDaysHint' | t }}</span>
+              <span class="field__hint">{{ 'admin.notifications.afterDaysHint' | t }}</span>
             </label>
 
-            <label class="ns__field">
-              <span>{{ 'admin.notifications.repeatDays' | t }}</span>
+            <label class="field">
+              <span class="field__label">{{ 'admin.notifications.repeatDays' | t }}</span>
               <input
+                class="field__control"
                 type="number"
                 min="0"
                 [disabled]="!s.taskReminderEnabled"
                 [ngModel]="s.taskReminderRepeatDays"
                 (ngModelChange)="patch({ taskReminderRepeatDays: $event })"
               />
-              <span class="ns__hint">{{ 'admin.notifications.repeatDaysHint' | t }}</span>
+              <span class="field__hint">{{ 'admin.notifications.repeatDaysHint' | t }}</span>
             </label>
 
             <div class="ns__actions">
@@ -111,18 +113,41 @@ import type { NotificationSettings } from '../admin.models';
         flex-direction: column;
         gap: var(--space-4);
       }
-      .ns__field {
+      /* Field-Look des UI-Kits (app-input/.field__control der Config-Seiten). */
+      .field {
         display: flex;
         flex-direction: column;
-        gap: var(--space-1);
+        gap: var(--space-2);
+      }
+      .field__label {
         font-size: var(--fs-sm);
+        font-weight: var(--fw-medium);
+        color: var(--color-text);
       }
-      .ns__field input {
-        max-width: 8rem;
+      .field__control {
+        height: var(--control-height);
+        max-width: 10rem;
+        box-sizing: border-box;
+        padding: 0 var(--space-3);
+        font: inherit;
+        font-size: var(--fs-md);
+        line-height: var(--lh-normal);
+        color: var(--color-text);
+        background: var(--color-surface);
+        border: var(--border-width) solid var(--color-border-strong);
+        border-radius: var(--radius-md);
+        transition: border-color var(--motion-fast) var(--ease-standard);
       }
-      .ns__hint {
-        color: var(--color-text-muted);
+      .field__control:hover:not(:disabled) {
+        border-color: var(--color-text-muted);
+      }
+      .field__control:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .field__hint {
         font-size: var(--fs-xs);
+        color: var(--color-text-muted);
       }
       .ns__actions {
         display: flex;
