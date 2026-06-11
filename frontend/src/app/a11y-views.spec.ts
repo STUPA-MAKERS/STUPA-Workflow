@@ -27,6 +27,7 @@ import { UsersComponent } from './pages/admin/users/users.component';
 import { FlowEditorComponent } from './pages/admin/flow-editor/flow-editor.component';
 import { BrandingEditorComponent } from './pages/admin/branding/branding-editor.component';
 import { AdminApiService } from './pages/admin/admin-api.service';
+import { BudgetTreeApi } from './pages/budget/budget-tree.api';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ApiClient } from '@core/api/api-client.service';
@@ -317,7 +318,12 @@ describe('Kern-Views a11y (axe)', () => {
 
     it('flow-editor has no violations', async () => {
       const { container } = await render(FlowEditorHost, {
-        providers: [provideRouter([]), { provide: AdminApiService, useValue: fakeAdminApi() }],
+        providers: [
+          provideRouter([]),
+          { provide: AdminApiService, useValue: fakeAdminApi() },
+          // Kostenstellen-Namen für Guard-Labels (#7) — leerer Baum genügt.
+          { provide: BudgetTreeApi, useValue: { tree: () => of([]) } },
+        ],
       });
       expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
