@@ -93,6 +93,10 @@ export class StatusTimelineComponent {
     () => this.editScope() && Boolean(this.application()?.state?.editAllowed),
   );
 
+  /** Anhänge sind auch in gesperrten States nachreichbar (Belege/Rechnungen nach
+   *  der Entscheidung, #attachments-when-locked) — nur der Magic-Link-Scope zählt. */
+  readonly canUploadAttachments = computed(() => this.editScope());
+
   constructor() {
     const snap = this.route.snapshot;
     const query = snap.queryParamMap;

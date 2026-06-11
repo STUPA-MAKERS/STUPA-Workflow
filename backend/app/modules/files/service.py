@@ -30,7 +30,6 @@ from app.modules.files.queue import ScanQueue
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
 from app.modules.files.storage import ObjectStorage, StorageError
-from app.modules.flow.models import State
 from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,
@@ -94,14 +93,11 @@ class FilesService:
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
 
-        # Edit-Lock wie T-12-PATCH: in einem gesperrten State (``edit_allowed=false``,
-        # z. B. eingereicht/entschieden) sind keine neuen Anhänge erlaubt → 409.
-        if app.current_state_id is not None:
-            state = await self.session.get(State, app.current_state_id)
-            if state is not None and not state.edit_allowed:
-                raise ConflictError(
-                    "Application is locked for editing in its current state."
-                )
+        # BEWUSST kein Edit-Lock (anders als T-12-PATCH, #attachments-when-locked):
+        # Anhänge dürfen auch in gesperrten States (eingereicht/bewilligt) nachgereicht
+        # werden — z. B. Rechnungen/Belege nach der Entscheidung. Die FORMULAR-Daten
+        # bleiben über den PATCH-Lock geschützt; Zugriff sichert weiterhin die
+        # RBAC-/Applicant-Prüfung des Routers.
 
         try:
             mime = validate_upload(filename, data)

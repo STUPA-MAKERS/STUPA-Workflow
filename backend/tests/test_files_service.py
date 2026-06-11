@@ -74,7 +74,10 @@ async def test_upload_clean_path_stores_and_enqueues() -> None:
     assert session.committed == 1
 
 
-async def test_upload_locked_state_409() -> None:
+async def test_upload_allowed_in_locked_state() -> None:
+    """#attachments-when-locked: Anhänge sind auch in gesperrten States nachreichbar
+    (Belege/Rechnungen nach der Entscheidung) — nur die Formular-Daten bleiben
+    über den PATCH-Lock geschützt."""
     session = FakeSession()
     state = State()
     state.id = uuid.uuid4()
@@ -84,10 +87,10 @@ async def test_upload_locked_state_409() -> None:
     app.current_state_id = state.id
     session.add(state)
     session.add(app)
-    with pytest.raises(ConflictError):
-        await _service(session, storage=FakeStorage()).upload(
-            app.id, filename="doc.pdf", data=PDF, by="p"
-        )
+    out = await _service(session, storage=FakeStorage()).upload(
+        app.id, filename="doc.pdf", data=PDF, by="p"
+    )
+    assert out.scanned is False and out.mime == "application/pdf"
 
 
 async def test_upload_state_row_missing_proceeds() -> None:
