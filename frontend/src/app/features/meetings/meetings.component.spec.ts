@@ -215,6 +215,26 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText('Final')).toBeInTheDocument();
   });
 
+  it('retries a failed finalize via the toolbar repeat button', async () => {
+    const { http } = await setup();
+    // Sitzung schon geschlossen, Protokoll wieder Entwurf ⇒ Render fehlgeschlagen.
+    http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
+    http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Finalisieren & versenden' }),
+    );
+    // finalize() speichert erst das zusammengesetzte Markdown, dann POST /finalize.
+    http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
+    const finReq = http.expectOne('/api/protocols/p-1/finalize');
+    expect(finReq.request.method).toBe('POST');
+    finReq.flush({ ...PROTOCOL, status: 'final', pdfUrl: 'https://example/p.pdf' });
+    expect(await screen.findByText('Final')).toBeInTheDocument();
+  });
+
   it('applies live vote_tally updates from the WebSocket', async () => {
     const { http, ws, fixture } = await setup();
     flushLoad(http);

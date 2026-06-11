@@ -259,6 +259,14 @@ const AUTOSAVE_DELAY_MS = 1000;
             <span class="mtg__btnIcon"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeShort' | t }}</span>
           </app-button>
         }
+        <!-- Sitzung geschlossen, Protokoll (wieder) Entwurf: Render fehlgeschlagen/
+             zurückgerollt — expliziter Retry, sonst gäbe es keinen Weg mehr zum
+             finalen Protokoll (#async-finalize). -->
+        @if (m.status === 'closed' && canWrite() && protocol(); as proto) {
+          @if (!proto.isFinal && proto.status !== 'rendering') {
+            <app-button variant="ghost" size="sm" [iconOnly]="true" [loading]="finalizing()" [ariaLabel]="'meetings.protocol.finalize' | t" [title]="'meetings.protocol.finalize' | t" (click)="finalize()"><app-icon name="repeat" /></app-button>
+          }
+        }
         <span class="mtg__toolbarSpacer"></span>
         @if (m.canManage) {
           <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="openSettings(m)"><app-icon name="edit" /></app-button>
@@ -437,13 +445,8 @@ const AUTOSAVE_DELAY_MS = 1000;
                 <p class="mtg__muted">{{ 'meetings.protocol.renderingHint' | t }}</p>
               } @else if (canWrite()) {
                 @if (m.status === 'closed') {
-                  <!-- Sitzung schon geschlossen, Protokoll (wieder) Entwurf: der Render
-                       ist fehlgeschlagen/zurückgerollt — expliziter Retry, sonst gäbe es
-                       keinen Weg mehr zum finalen Protokoll (#async-finalize). -->
+                  <!-- Retry-Button lebt als Repeat-Icon in der Toolbar; hier nur der Hinweis. -->
                   <p class="mtg__muted">{{ 'meetings.protocol.retryHint' | t }}</p>
-                  <app-button size="sm" [loading]="finalizing()" (click)="finalize()">
-                    {{ 'meetings.protocol.finalize' | t }}
-                  </app-button>
                 } @else {
                   <p class="mtg__muted">{{ 'meetings.protocol.finalizeOnClose' | t }}</p>
                 }

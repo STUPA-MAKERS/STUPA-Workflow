@@ -31,6 +31,7 @@ export type IconName =
   | 'stop'
   | 'half'
   | 'send'
+  | 'repeat'
   | 'menu';
 
 /** Icon-Name → Font-Awesome-Solid-Klasse (#80, FA-Migration). */
@@ -65,6 +66,7 @@ const FA: Record<IconName, string> = {
   stop: 'fa-stop',
   half: 'fa-circle-half-stroke',
   send: 'fa-paper-plane',
+  repeat: 'fa-repeat',
   menu: 'fa-bars',
 };
 
