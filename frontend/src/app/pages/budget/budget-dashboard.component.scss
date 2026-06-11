@@ -30,6 +30,37 @@
   gap: var(--space-2);
 }
 
+.bd__head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Metrik-Tabs im Übersicht-Overlay (#budget-sunburst). */
+.bd__ovTabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.bd__ovTab {
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.bd__ovTab--active {
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+  border-bottom-color: var(--color-primary);
+}
+
 .bd__title {
   margin: 0;
 }

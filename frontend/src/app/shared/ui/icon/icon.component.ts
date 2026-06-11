@@ -36,7 +36,8 @@ export type IconName =
   | 'gear'
   | 'key'
   | 'handshake'
-  | 'paperclip';
+  | 'paperclip'
+  | 'chart-pie';
 
 /** Icon-Name → Font-Awesome-Solid-Klasse (#80, FA-Migration). */
 const FA: Record<IconName, string> = {
@@ -76,6 +77,7 @@ const FA: Record<IconName, string> = {
   key: 'fa-key',
   handshake: 'fa-handshake',
   paperclip: 'fa-paperclip',
+  'chart-pie': 'fa-chart-pie',
 };
 
 /**

@@ -31,6 +31,7 @@ let nextId = 0;
         <div
           #pane
           class="dialog"
+          [class.dialog--lg]="size === 'lg'"
           role="dialog"
           aria-modal="true"
           tabindex="-1"
@@ -76,6 +77,9 @@ let nextId = 0;
         display: flex;
         flex-direction: column;
         max-height: 85dvh;
+      }
+      .dialog--lg {
+        max-width: 44rem;
       }
       .dialog__header {
         display: flex;
@@ -141,6 +145,8 @@ export class DialogComponent implements OnChanges {
   @Input() open = false;
   @Input() title = '';
   @Input() closeLabel = 'Schließen';
+  /** Breite: 'md' (32rem, Default) oder 'lg' (44rem, z. B. Charts). */
+  @Input() size: 'md' | 'lg' = 'md';
   @Output() closed = new EventEmitter<void>();
 
   @ViewChild('pane') private pane?: ElementRef<HTMLElement>;

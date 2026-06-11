@@ -4,16 +4,19 @@ import {
   computed,
   inject,
   input,
+  output,
   signal,
 } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
-/** Ein Tortenstück: Beschriftung, Wert (in Währungseinheiten), Farbe. */
+/** Ein Tortenstück: Beschriftung, Wert (in Währungseinheiten), Farbe.
+ *  `id` (Kostenstellen-Id) macht das Stück klickbar (Drilldown, #budget). */
 export interface PieSlice {
   label: string;
   value: number;
   color: string;
+  id?: string;
 }
 
 interface Arc extends PieSlice {
@@ -54,6 +57,7 @@ const GROW = 7; // radiale Vergrößerung beim Hover
               [style.transform]="sliceTransform(a, i)"
               (pointerenter)="hovered.set(i)"
               (pointerleave)="hovered.set(null)"
+              (click)="onSlice(a)"
             />
           }
         </svg>
@@ -131,6 +135,8 @@ export class BudgetPieComponent {
 
   readonly title = input<string>('');
   readonly slices = input<PieSlice[]>([]);
+  /** Klick auf ein Stück mit `id` → Kostenstellen-Id (Drilldown im Tab). */
+  readonly sliceClick = output<string>();
 
   protected readonly SIZE = SIZE;
   protected readonly hovered = signal<number | null>(null);
@@ -165,6 +171,10 @@ export class BudgetPieComponent {
     const h = this.hovered();
     return h === null ? null : (this.arcs()[h] ?? null);
   });
+
+  protected onSlice(a: Arc): void {
+    if (a.id) this.sliceClick.emit(a.id);
+  }
 
   protected sliceTransform(a: Arc, i: number): string {
     return this.hovered() === i

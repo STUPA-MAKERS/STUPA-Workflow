@@ -3,14 +3,22 @@
     <h1 class="bd__title">{{ 'budget.title' | t }}</h1>
     <p class="bd__subtitle">{{ 'budget.subtitle' | t }}</p>
   </div>
-  @if (canExport()) {
-    <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
+  <div class="bd__head-actions">
+    <app-button variant="secondary" size="sm" (click)="overviewOpen.set(true)">
       <span class="bd__exportBtn">
-        <app-icon name="export" [size]="16" />
-        {{ 'budget.export' | t }}
+        <app-icon name="chart-pie" [size]="16" />
+        {{ 'budget.overview.button' | t }}
       </span>
     </app-button>
-  }
+    @if (canExport()) {
+      <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
+        <span class="bd__exportBtn">
+          <app-icon name="export" [size]="16" />
+          {{ 'budget.export' | t }}
+        </span>
+      </app-button>
+    }
+  </div>
 </header>
 
 @if (loading()) {
@@ -95,10 +103,43 @@
       </section>
     </main>
 
-    <!-- Rechts: zwei gestapelte Tortendiagramme über die direkten Unter-Kostenstellen -->
+    <!-- Rechts: gestapelte Tortendiagramme über die direkten Unter-Kostenstellen;
+         Klick auf ein Segment öffnet die Kostenstelle (#budget). -->
     <aside class="bd__charts">
-      <app-budget-pie [title]="'budget.pie.allocated' | t" [slices]="allocPie()" />
-      <app-budget-pie [title]="'budget.pie.committed' | t" [slices]="committedPie()" />
+      <app-budget-pie [title]="'budget.pie.allocated' | t" [slices]="allocPie()" (sliceClick)="selectKs($event)" />
+      <app-budget-pie [title]="'budget.pie.committed' | t" [slices]="committedPie()" (sliceClick)="selectKs($event)" />
+      <app-budget-pie [title]="'budget.pie.available' | t" [slices]="availablePie()" (sliceClick)="selectKs($event)" />
+      <app-budget-pie [title]="'budget.pie.expended' | t" [slices]="expendedPie()" (sliceClick)="selectKs($event)" />
     </aside>
   </div>
+
+  <!-- Übersicht (#budget-sunburst): Sunburst über den ganzen Unterbaum der
+       gewählten Kostenstelle; Metrik per Tab-Selector umschaltbar. -->
+  <app-dialog
+    [open]="overviewOpen()"
+    [title]="'budget.overview.title' | t"
+    size="lg"
+    (closed)="overviewOpen.set(false)"
+  >
+    <div class="bd__ovTabs" role="tablist" [attr.aria-label]="'budget.overview.title' | t">
+      @for (m of overviewMetrics; track m) {
+        <button
+          type="button"
+          role="tab"
+          class="bd__ovTab"
+          [class.bd__ovTab--active]="overviewMetric() === m"
+          [attr.aria-selected]="overviewMetric() === m"
+          (click)="overviewMetric.set(m)"
+        >
+          {{ metricLabel(m) }}
+        </button>
+      }
+    </div>
+    <app-budget-sunburst
+      [root]="overviewRoot()"
+      [fyId]="selectedFyId()"
+      [metric]="overviewMetric()"
+      (nodeClick)="onOverviewPick($event)"
+    />
+  </app-dialog>
 }

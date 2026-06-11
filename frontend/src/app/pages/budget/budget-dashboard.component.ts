@@ -30,7 +30,9 @@ import {
   type BudgetYearSelection,
 } from './budget-year-tree.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
+import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { PALETTE } from './budget-year-tree.component';
+import { DialogComponent } from '@shared/ui';
 
 /** Eine Baumzeile im Auslastungs-Teil. */
 interface UsageRow {
@@ -73,6 +75,8 @@ interface UsageRow {
     IconComponent,
     BudgetYearTreeComponent,
     BudgetPieComponent,
+    BudgetSunburstComponent,
+    DialogComponent,
     ApplicationsTableComponent,
   ],
   templateUrl: './budget-dashboard.component.html',
@@ -160,6 +164,14 @@ export class BudgetDashboardComponent {
     const a = node.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
     return a ? Number(a.committed) : 0;
   }
+  private availableOf(node: BudgetTreeNode): number {
+    const a = node.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
+    return a ? Number(a.available) : 0;
+  }
+  private expendedOf(node: BudgetTreeNode): number {
+    const a = node.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
+    return a ? Number(a.expended) : 0;
+  }
 
   /** Auslastungs-Zeilen: gewählte Kostenstelle + Unterbaum, flach. */
   readonly usageRows = computed<UsageRow[]>(() => {
@@ -242,6 +254,7 @@ export class BudgetDashboardComponent {
       label: c.name,
       value: metric(c),
       color: this.color(c, i),
+      id: c.id,
     }));
     // Eigenanteil des Knotens (nicht an Kinder weiterverteilt) — als eigenes Segment
     // mit dem **Namen** und der **Farbe** der offenen Kostenstelle (#budget).
@@ -257,6 +270,25 @@ export class BudgetDashboardComponent {
   }
   readonly allocPie = computed<PieSlice[]>(() => this.pie((n) => this.alloc(n)));
   readonly committedPie = computed<PieSlice[]>(() => this.pie((n) => this.committedOf(n)));
+  readonly availablePie = computed<PieSlice[]>(() => this.pie((n) => this.availableOf(n)));
+  readonly expendedPie = computed<PieSlice[]>(() => this.pie((n) => this.expendedOf(n)));
+
+  // --- Übersicht (Sunburst-Overlay, #budget-sunburst) -------------------------
+  readonly overviewOpen = signal(false);
+  readonly overviewMetric = signal<SunburstMetric>('allocated');
+  readonly overviewMetrics: SunburstMetric[] = ['allocated', 'available', 'expended'];
+  /** Wurzel des Sunbursts = aktuell gewählte Kostenstelle. */
+  readonly overviewRoot = computed(() => this.selectedKs());
+
+  /** Segment-Klick im Sunburst: Kostenstelle öffnen + Overlay schließen. */
+  onOverviewPick(id: string): void {
+    this.overviewOpen.set(false);
+    this.selectKs(id);
+  }
+
+  metricLabel(m: SunburstMetric): string {
+    return this.i18n.translate(`budget.overview.metric.${m}` as TranslationKey);
+  }
 
   constructor() {
     this.load();
