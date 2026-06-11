@@ -24,36 +24,26 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class FlowVersion(UUIDPkMixin, CreatedAtMixin, Base):
-    """Flow-Version je Antragstyp. Max. eine `active` pro Typ (partial unique)."""
+    """Der **globale** Flow (#28): ein Graph für ALLE Antragstypen.
+
+    Typ-gebundene Flows sind komplett entfernt (Migration 0019); welcher Pfad/
+    welches Gremium wann greift, regeln Decision-/Vote-States, nicht eine
+    Typ-Bindung. Es existiert genau eine aktive Zeile (partial unique)."""
 
     __tablename__ = "flow_version"
 
-    # Global-Flow-Redesign (#28): ein **globaler** Flow für ALLE Antragstypen.
-    # ``application_type_id`` ist daher nullable — ``NULL`` = globaler Flow. Welcher
-    # Pfad/welches Gremium wann greift, regeln Decision-/Vote-/Approval-States, nicht
-    # die Typ-Bindung. (Pre-Alpha: harter Cutover, Alt-Flows werden gedroppt.)
-    application_type_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("application_type.id", ondelete="CASCADE"), nullable=True
-    )
     version: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default="false")
     editor_layout: Mapped[dict] = mapped_column(JSONB, server_default="{}")
 
     __table_args__ = (
-        UniqueConstraint("application_type_id", "version"),
-        # Genau ein aktiver globaler Flow (``application_type_id IS NULL``).
+        UniqueConstraint("version"),
+        # Genau ein aktiver globaler Flow.
         Index(
             "uq_flow_version_one_active_global",
             "active",
             unique=True,
-            postgresql_where=text("active AND application_type_id IS NULL"),
-        ),
-        # Übergangsweise: max. ein aktiver per-Typ-Flow (Alt-Pfad bis Cutover).
-        Index(
-            "uq_flow_version_one_active_per_type",
-            "application_type_id",
-            unique=True,
-            postgresql_where=text("active AND application_type_id IS NOT NULL"),
+            postgresql_where=text("active"),
         ),
     )
 

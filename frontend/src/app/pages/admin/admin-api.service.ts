@@ -435,15 +435,6 @@ export class AdminApiService {
     );
   }
 
-  /** POST neue Flow-Version (Graph serverseitig via `validate_flow_graph` geprüft). */
-  createFlowVersion(typeId: Uuid, graph: FlowGraph): Observable<{ id: Uuid }> {
-    if (this.mock) return of({ id: `flowver-${graph.states.length}` });
-    return this.http.post<{ id: Uuid }>(
-      `${this.base}/admin/application-types/${typeId}/flow-versions`,
-      { graph },
-    );
-  }
-
   /** Aktiven globalen Flow (#28) laden — `null`, wenn noch keiner existiert. */
   getGlobalFlow(): Observable<FlowGraph | null> {
     if (this.mock) return of(null);

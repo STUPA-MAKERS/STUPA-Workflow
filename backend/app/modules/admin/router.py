@@ -365,24 +365,8 @@ async def update_application_type(
 
 
 # =========================================================================== #
-# Flow-Versionen (Graph validiert; mirror der Form-Versionen aus T-11)
+# Globaler Flow (#28: es gibt genau EINEN Flow für alle Antragstypen)
 # =========================================================================== #
-@router.post(
-    "/application-types/{type_id}/flow-versions",
-    response_model=FlowVersionOut,
-    status_code=201,
-    responses=_errors(400, 401, 403, 404, 422),
-)
-async def create_flow_version(
-    type_id: UUID,
-    payload: FlowVersionCreate,
-    service: ServiceDep,
-    principal: TypesAdmin,
-) -> FlowVersionOut:
-    """Neue Flow-Version anlegen (Graph wird serverseitig validiert)."""
-    return await service.create_flow_version(type_id, payload, principal.sub)
-
-
 @router.get(
     "/flow-versions/global",
     response_model=FlowGraph | None,

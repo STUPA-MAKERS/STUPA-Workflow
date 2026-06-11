@@ -88,7 +88,8 @@ def test_partial_unique_one_active_form_version() -> None:
 
 
 def test_partial_unique_one_active_flow_version() -> None:
-    idx = _index("flow_version", "uq_flow_version_one_active_per_type")
+    # #28-Abschluss: Typ-Flows entfernt — genau EIN aktiver globaler Flow.
+    idx = _index("flow_version", "uq_flow_version_one_active_global")
     assert idx.unique
     assert "active" in str(idx.dialect_options["postgresql"]["where"])
 
@@ -130,7 +131,8 @@ def test_role_permission_composite_pk() -> None:
 def test_versioned_unique_constraints() -> None:
     for table, cols in [
         ("form_version", {"application_type_id", "version"}),
-        ("flow_version", {"application_type_id", "version"}),
+        # #28-Abschluss: der globale Flow versioniert nur noch über ``version``.
+        ("flow_version", {"version"}),
         ("submission_version", {"application_id", "version"}),
         ("form_field", {"form_version_id", "key"}),
         ("state", {"flow_version_id", "key"}),
@@ -146,15 +148,13 @@ def test_versioned_unique_constraints() -> None:
 
 
 def test_circular_fk_uses_alter() -> None:
-    # application_type ↔ form_version/flow_version: zyklischer FK via use_alter.
+    # application_type ↔ form_version: zyklischer FK via use_alter
+    # (flow_version ist seit #28-Abschluss nicht mehr typ-gebunden).
     circular = [
         c
         for c in _table("application_type").constraints
         if isinstance(c, ForeignKeyConstraint)
         and c.elements[0].column.table.name in {"form_version", "flow_version"}
     ]
-    assert {fk.elements[0].column.table.name for fk in circular} == {
-        "form_version",
-        "flow_version",
-    }
+    assert {fk.elements[0].column.table.name for fk in circular} == {"form_version"}
     assert all(fk.use_alter for fk in circular)

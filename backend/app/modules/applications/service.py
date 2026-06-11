@@ -163,10 +163,7 @@ class ApplicationsService:
             await self.session.execute(
                 select(State.key, State.color)
                 .join(FlowVersion, FlowVersion.id == State.flow_version_id)
-                .where(
-                    FlowVersion.application_type_id.is_(None),
-                    FlowVersion.active.is_(True),
-                )
+                .where(FlowVersion.active.is_(True))
             )
         ).all()
         color_map: dict[str, str | None] = {
@@ -263,9 +260,7 @@ class ApplicationsService:
         app_type = await self.session.get(ApplicationType, payload.type_id)
         if app_type is None:
             raise NotFoundError(f"application type {payload.type_id} not found")
-        # Global-Flow-Redesign (#28): bevorzugt den aktiven GLOBALEN Flow
-        # (application_type_id IS NULL). Existiert keiner, fällt der per-Typ-Flow
-        # als Übergangslösung ein (Cutover). Fehlt beides → 404.
+        # Global-Flow-Redesign (#28): es gibt genau EINEN aktiven Flow; fehlt er → 404.
         flow_version_id = await self._resolve_flow_version_id(app_type)
 
         # Effektive Form (Typ + ggf. Topf-Felder); validiert Topf-Scoping (404).
@@ -344,25 +339,19 @@ class ApplicationsService:
         return app, str(payload.applicant_email)
 
     async def _resolve_flow_version_id(self, app_type: ApplicationType) -> UUID:
-        """Aktiven Flow für einen neuen Antrag bestimmen (#28).
+        """Aktiven (globalen) Flow für einen neuen Antrag bestimmen (#28).
 
-        Bevorzugt den **globalen** Flow (``application_type_id IS NULL`` & ``active``);
-        sonst der per-Typ-Flow (``active_flow_version_id``, Übergangslösung). Fehlt
-        beides → 404."""
+        Typ-Flows sind entfernt — es gibt nur den einen globalen Flow; fehlt er
+        (frische Installation ohne Flow-Konfiguration) → 404."""
         global_flow_id = (
             await self.session.execute(
-                select(FlowVersion.id).where(
-                    FlowVersion.application_type_id.is_(None),
-                    FlowVersion.active.is_(True),
-                )
+                select(FlowVersion.id).where(FlowVersion.active.is_(True))
             )
         ).scalar_one_or_none()
         if global_flow_id is not None:
             return global_flow_id
-        if app_type.active_flow_version_id is not None:
-            return app_type.active_flow_version_id
         raise NotFoundError(
-            f"no active flow (global or per-type) for application type {app_type.id}"
+            f"no active global flow for application type {app_type.id}"
         )
 
     async def _initial_state(self, flow_version_id: UUID) -> State:

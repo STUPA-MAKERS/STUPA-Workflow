@@ -6,8 +6,8 @@ erzwungen (Router) und Eingaben streng validiert (Flow-Graph via
 Config-Mutation schreibt einen Audit-Eintrag (security.md §4) in derselben
 Transaktion wie die Änderung.
 
-Form-Versionen besitzt weiterhin das ``forms``-Modul (T-11); Flow-Versionen werden
-hier analog angelegt (Graph → state/transition-Zeilen, max. eine ``active`` je Typ).
+Form-Versionen besitzt weiterhin das ``forms``-Modul (T-11); der **eine globale
+Flow** (Graph → state/transition-Zeilen) wird hier in-place gepflegt.
 """
 
 from __future__ import annotations
@@ -273,113 +273,15 @@ class ConfigService:
         return row
 
     # =================================================================== #
-    # Flow-Version (Graph → state/transition; max. eine active je Typ)
+    # Globaler Flow (#28: genau EIN Flow für alle Antragstypen)
     # =================================================================== #
-    async def create_flow_version(
-        self, type_id: UUID, payload: FlowVersionCreate, actor: str
-    ) -> FlowVersionOut:
-        # Graph vor DB-Zugriff strukturell prüfen → 422 (ein Initial, erreichbar,
-        # Guard-/Action-Whitelist), statt 500 (api.md §2, flows §9.5).
-        try:
-            validate_flow_graph(payload.graph)
-        except FlowValidationError as exc:
-            raise ValidationProblem(
-                "Invalid flow graph.", errors=[{"field": "graph", "msg": str(exc)}]
-            ) from exc
-        await self._get_type(type_id)
-
-        next_version = await self._next_flow_version(type_id)
-        version = FlowVersion(
-            application_type_id=type_id,
-            version=next_version,
-            active=payload.activate,
-            editor_layout=payload.graph.layout or {},
-        )
-        if payload.activate:
-            await self.session.execute(
-                update(FlowVersion)
-                .where(
-                    FlowVersion.application_type_id == type_id,
-                    FlowVersion.active.is_(True),
-                )
-                .values(active=False)
-            )
-        self.session.add(version)
-        await self.session.flush()
-
-        id_by_key: dict[str, UUID] = {}
-        for state in payload.graph.states:
-            row = State(
-                flow_version_id=version.id,
-                key=state.key,
-                label_i18n=state.label,
-                color=state.color,
-                edit_allowed=state.edit_allowed,
-                is_initial=state.is_initial,
-                kind=state.kind,
-                config=state.config,
-            )
-            self.session.add(row)
-            await self.session.flush()
-            id_by_key[state.key] = row.id
-
-        for order, trans in enumerate(payload.graph.transitions):
-            self.session.add(
-                Transition(
-                    flow_version_id=version.id,
-                    from_state_id=id_by_key[trans.from_],
-                    to_state_id=id_by_key[trans.to],
-                    label_i18n=trans.label or {},
-                    color=trans.color,
-                    guard=trans.guard,
-                    actions=trans.actions,
-                    order=trans.order if trans.order is not None else order,
-                    automatic=trans.automatic,
-                    branch=trans.branch,
-                    requires_action=trans.requires_action,
-                )
-            )
-
-        if payload.activate:
-            app_type = await self._get_type(type_id)
-            app_type.active_flow_version_id = version.id
-
-        action = (
-            AuditAction.CONFIG_ACTIVATION if payload.activate else AuditAction.CONFIG_CHANGE
-        )
-        await self._audit(
-            actor, action, "flow_version", version.id, {"version": next_version}
-        )
-        await self.session.commit()
-        return FlowVersionOut(
-            id=version.id,
-            application_type_id=type_id,
-            version=next_version,
-            active=payload.activate,
-        )
-
-    async def _next_flow_version(self, type_id: UUID) -> int:
-        current = await self.session.scalar(
-            select(FlowVersion.version)
-            .where(FlowVersion.application_type_id == type_id)
-            .order_by(FlowVersion.version.desc())
-            .limit(1)
-        )
-        return (current or 0) + 1
-
-    # ------------------------------------------------------ globaler Flow (#28)
     async def get_active_global_flow(self) -> FlowGraph | None:
-        """Graph des aktiven **globalen** Flows (``application_type_id IS NULL``).
+        """Graph des aktiven **globalen** Flows.
 
         Liefert ``None``, wenn noch kein globaler Flow existiert (Editor startet
         dann mit leerem Graphen)."""
         version = await self.session.scalar(
-            select(FlowVersion)
-            .where(
-                FlowVersion.application_type_id.is_(None),
-                FlowVersion.active.is_(True),
-            )
-            .limit(1)
+            select(FlowVersion).where(FlowVersion.active.is_(True)).limit(1)
         )
         if version is None:
             return None
@@ -432,7 +334,7 @@ class ConfigService:
     async def create_global_flow_version(
         self, payload: FlowVersionCreate, actor: str
     ) -> FlowVersionOut:
-        """Den **einen** globalen Flow speichern (``application_type_id=NULL``).
+        """Den **einen** globalen Flow speichern.
 
         Es gibt **genau einen** Flow — **keine Versionen**: dieselbe ``flow_version``-
         Zeile wird in-place überschrieben (States/Transitions ersetzt). Alle Anträge
@@ -464,14 +366,13 @@ class ConfigService:
         version = (
             await self.session.execute(
                 select(FlowVersion)
-                .where(FlowVersion.application_type_id.is_(None))
                 .order_by(FlowVersion.active.desc(), FlowVersion.version.desc())
                 .limit(1)
             )
         ).scalar_one_or_none()
         if version is None:
             version = FlowVersion(
-                application_type_id=None, version=1, active=True,
+                version=1, active=True,
                 editor_layout=payload.graph.layout or {},
             )
             self.session.add(version)
@@ -479,12 +380,10 @@ class ConfigService:
         else:
             version.active = True
             version.editor_layout = payload.graph.layout or {}
-        # Etwaige Alt-Versionen (global) deaktivieren — es bleibt genau eine aktiv.
+        # Etwaige Alt-Versionen deaktivieren — es bleibt genau eine aktiv.
         await self.session.execute(
             update(FlowVersion)
-            .where(
-                FlowVersion.application_type_id.is_(None), FlowVersion.id != version.id
-            )
+            .where(FlowVersion.id != version.id)
             .values(active=False)
         )
 
@@ -595,7 +494,6 @@ class ConfigService:
         await self.session.commit()
         return FlowVersionOut(
             id=version.id,
-            application_type_id=None,
             version=version.version,
             active=True,
         )
@@ -953,7 +851,6 @@ def _type_out(row: ApplicationType) -> ApplicationTypeOut:
         has_budget=row.has_budget,
         comparison_offers=row.comparison_offers,
         active_form_version_id=row.active_form_version_id,
-        active_flow_version_id=row.active_flow_version_id,
     )
 
 

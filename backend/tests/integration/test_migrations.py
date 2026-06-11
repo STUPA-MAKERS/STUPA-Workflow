@@ -74,13 +74,11 @@ def test_partial_unique_one_active_form_version(engine: Engine) -> None:
 
 def test_partial_unique_one_initial_state(engine: Engine) -> None:
     with engine.begin() as conn:
-        type_id = _new_type(conn)
         fv = conn.execute(
             text(
-                "INSERT INTO flow_version (application_type_id, version) "
-                "VALUES (:t, 1) RETURNING id"
+                "INSERT INTO flow_version (version) "
+                "VALUES (1) RETURNING id"
             ),
-            {"t": type_id},
         ).scalar_one()
         conn.execute(
             text(
@@ -101,13 +99,11 @@ def test_partial_unique_one_initial_state(engine: Engine) -> None:
 
 def test_state_color_column(engine: Engine) -> None:
     with engine.begin() as conn:
-        type_id = _new_type(conn)
         fv = conn.execute(
             text(
-                "INSERT INTO flow_version (application_type_id, version) "
-                "VALUES (:t, 1) RETURNING id"
+                "INSERT INTO flow_version (version) "
+                "VALUES (1) RETURNING id"
             ),
-            {"t": type_id},
         ).scalar_one()
         color = conn.execute(
             text(
@@ -140,10 +136,9 @@ def test_applicant_cascade_on_application_delete(engine: Engine) -> None:
         ).scalar_one()
         flv = conn.execute(
             text(
-                "INSERT INTO flow_version (application_type_id, version) "
-                "VALUES (:t, 1) RETURNING id"
+                "INSERT INTO flow_version (version) "
+                "VALUES (1) RETURNING id"
             ),
-            {"t": type_id},
         ).scalar_one()
         app_id = conn.execute(
             text(
@@ -178,10 +173,9 @@ def test_citext_email_case_insensitive(engine: Engine) -> None:
         ).scalar_one()
         flv = conn.execute(
             text(
-                "INSERT INTO flow_version (application_type_id, version) "
-                "VALUES (:t, 1) RETURNING id"
+                "INSERT INTO flow_version (version) "
+                "VALUES (1) RETURNING id"
             ),
-            {"t": type_id},
         ).scalar_one()
         app_id = conn.execute(
             text(

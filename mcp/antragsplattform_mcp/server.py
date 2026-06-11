@@ -214,14 +214,6 @@ async def set_global_flow(body: dict[str, Any]) -> dict:
     return await _api().post("/admin/flow-versions/global", json=body)
 
 
-@mcp.tool()
-async def create_type_flow_version(type_id: str, body: dict[str, Any]) -> dict:
-    """Create a new flow version for an application type. Requires flow.configure."""
-    return await _api().post(
-        f"/admin/application-types/{type_id}/flow-versions", json=body
-    )
-
-
 # ================================================== form editing (admin/config)
 @mcp.tool()
 async def get_latest_form_version(type_id: str) -> dict:

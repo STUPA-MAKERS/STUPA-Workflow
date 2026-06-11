@@ -163,9 +163,6 @@ class ApplicationTypeOut(_CamelModel):
     active_form_version_id: UUID | None = Field(
         serialization_alias="activeFormVersionId"
     )
-    active_flow_version_id: UUID | None = Field(
-        serialization_alias="activeFlowVersionId"
-    )
 
 
 class ApplicationTypeCreate(_CamelModel):
@@ -198,9 +195,9 @@ class FlowVersionCreate(_CamelModel):
 
 
 class FlowVersionOut(_CamelModel):
+    """Der globale Flow (#28) — Typ-Flows sind komplett entfernt."""
+
     id: UUID
-    # ``None`` für den globalen Flow (#28).
-    application_type_id: UUID | None = Field(serialization_alias="applicationTypeId")
     version: int
     active: bool
 

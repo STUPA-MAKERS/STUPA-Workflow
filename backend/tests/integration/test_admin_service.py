@@ -39,7 +39,7 @@ from app.modules.admin.service import ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal, Role
-from app.modules.flow.models import FlowVersion, State, Transition
+from app.modules.flow.models import FlowVersion, State
 from app.shared.errors import ConflictError, NotFoundError
 
 pytestmark = pytest.mark.integration
@@ -105,68 +105,6 @@ def _graph(*, with_action: bool = True) -> dict:
 
 
 # --------------------------------------------------------------- flow-versions
-async def test_create_flow_version_persists_graph_and_activates(session: AsyncSession) -> None:
-    app_type = await _make_type(session)
-    svc = ConfigService(session)
-    out = await svc.create_flow_version(
-        app_type.id, FlowVersionCreate.model_validate({"graph": _graph()}), _ACTOR
-    )
-    assert out.version == 1 and out.active is True
-
-    states = (
-        await session.scalars(select(State).where(State.flow_version_id == out.id))
-    ).all()
-    assert {s.key for s in states} == {"draft", "review"}
-    initial = [s for s in states if s.is_initial]
-    assert len(initial) == 1 and initial[0].key == "draft"
-
-    trans = (
-        await session.scalars(
-            select(Transition).where(Transition.flow_version_id == out.id)
-        )
-    ).all()
-    assert len(trans) == 1
-    by_key = {s.id: s.key for s in states}
-    assert by_key[trans[0].from_state_id] == "draft"
-    assert by_key[trans[0].to_state_id] == "review"
-    assert trans[0].guard == {"hasField": "title"}
-
-    refreshed = await session.get(ApplicationType, app_type.id)
-    assert refreshed is not None and refreshed.active_flow_version_id == out.id
-
-    # Audit-Eintrag (Aktivierung).
-    actions = (
-        await session.scalars(
-            select(AuditEntry.action).where(AuditEntry.target_type == "flow_version")
-        )
-    ).all()
-    assert "config_activation" in actions
-
-
-async def test_flow_version_bump_keeps_single_active(session: AsyncSession) -> None:
-    app_type = await _make_type(session)
-    svc = ConfigService(session)
-    v1 = await svc.create_flow_version(
-        app_type.id, FlowVersionCreate.model_validate({"graph": _graph()}), _ACTOR
-    )
-    v2 = await svc.create_flow_version(
-        app_type.id, FlowVersionCreate.model_validate({"graph": _graph(with_action=False)}), _ACTOR
-    )
-    assert v2.version == 2
-
-    active = (
-        await session.scalars(
-            select(FlowVersion).where(
-                FlowVersion.application_type_id == app_type.id,
-                FlowVersion.active.is_(True),
-            )
-        )
-    ).all()
-    assert len(active) == 1 and active[0].id == v2.id
-    old = await session.get(FlowVersion, v1.id)
-    assert old is not None and old.active is False
-
-
 def _global_graph(*, with_accepted: bool = True) -> dict:
     states = [{"key": "created", "label": {"de": "Erstellt"}, "isInitial": True}]
     if with_accepted:
@@ -215,9 +153,7 @@ async def test_global_flow_is_single_and_resets_deleted_states(
 
     # Genau ein globaler Flow.
     n_global = await session.scalar(
-        select(func.count())
-        .select_from(FlowVersion)
-        .where(FlowVersion.application_type_id.is_(None))
+        select(func.count()).select_from(FlowVersion)
     )
     assert n_global == 1
 
@@ -288,14 +224,6 @@ async def test_global_flow_save_repoints_timeline_off_deleted_state(
         select(func.count()).select_from(State).where(State.id == accepted.id)
     )
     assert gone == 0
-
-
-async def test_create_flow_version_unknown_type_404(session: AsyncSession) -> None:
-    svc = ConfigService(session)
-    with pytest.raises(NotFoundError):
-        await svc.create_flow_version(
-            uuid.uuid4(), FlowVersionCreate.model_validate({"graph": _graph()}), _ACTOR
-        )
 
 
 # --------------------------------------------------------------- gremium

@@ -38,7 +38,6 @@ describe('AdminApiService — mock mode', () => {
     const schemas = await firstValueFrom(s.configSchemas());
     expect(Object.keys(schemas)).toContain('FormFieldDef');
     expect((await firstValueFrom(s.createFormVersion('t', []))).id).toBeTruthy();
-    expect((await firstValueFrom(s.createFlowVersion('t', { states: [], transitions: [] }))).id).toBeTruthy();
     expect((await firstValueFrom(s.listGremien())).length).toBeGreaterThan(0);
     // #105 — Gremien anlegen/bearbeiten im Mock-Store.
     const before = (await firstValueFrom(s.listGremien())).length;
@@ -125,13 +124,6 @@ describe('AdminApiService — real mode (contract)', () => {
   it('GETs config schemas from the documented path', () => {
     s.configSchemas().subscribe();
     http.expectOne('/api/admin/config-schemas').flush({});
-  });
-
-  it('POSTs a flow version to the documented path', () => {
-    s.createFlowVersion('t1', { states: [], transitions: [] }).subscribe();
-    const req = http.expectOne('/api/admin/application-types/t1/flow-versions');
-    expect(req.request.method).toBe('POST');
-    req.flush({ id: 'fv1' });
   });
 
   it('POSTs a new webhook and PATCHes an existing one', () => {

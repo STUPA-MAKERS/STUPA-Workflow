@@ -137,10 +137,6 @@ class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("form_version.id", ondelete="SET NULL", use_alter=True),
         nullable=True,
     )
-    active_flow_version_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("flow_version.id", ondelete="SET NULL", use_alter=True),
-        nullable=True,
-    )
 
 
 class Webhook(UUIDPkMixin, CreatedAtMixin, Base):

@@ -21,8 +21,7 @@ def _new_application(conn) -> str:  # noqa: ANN001
         {"t": type_id},
     ).scalar_one()
     flv = conn.execute(
-        text("INSERT INTO flow_version (application_type_id, version) VALUES (:t,1) RETURNING id"),
-        {"t": type_id},
+        text("INSERT INTO flow_version (version) VALUES (1) RETURNING id"),
     ).scalar_one()
     return conn.execute(
         text(

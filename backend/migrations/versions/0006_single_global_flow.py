@@ -28,12 +28,27 @@ DO $$
 DECLARE
     gid uuid;
     init_id uuid;
+    has_type_col boolean;
 BEGIN
+    -- Frische Installationen (Baseline = create_all aus den AKTUELLEN Models)
+    -- kennen die Typ-Flow-Spalten seit 0019 nicht mehr — alles Spalten-abhängige
+    -- nur ausführen, wenn die Spalte (Bestands-DB) noch existiert.
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'flow_version' AND column_name = 'application_type_id'
+    ) INTO has_type_col;
+
     -- Den einen globalen Flow wählen (aktiv zuerst, sonst höchste Version).
-    SELECT id INTO gid FROM flow_version
-     WHERE application_type_id IS NULL
-     ORDER BY active DESC, version DESC
-     LIMIT 1;
+    IF has_type_col THEN
+        SELECT id INTO gid FROM flow_version
+         WHERE application_type_id IS NULL
+         ORDER BY active DESC, version DESC
+         LIMIT 1;
+    ELSE
+        SELECT id INTO gid FROM flow_version
+         ORDER BY active DESC, version DESC
+         LIMIT 1;
+    END IF;
     IF gid IS NULL THEN
         -- Kein globaler Flow: irgendeinen vorhandenen Flow zum globalen machen.
         SELECT id INTO gid FROM flow_version ORDER BY version DESC LIMIT 1;
@@ -42,7 +57,11 @@ BEGIN
         RETURN;  -- gar kein Flow vorhanden → nichts zu erzwingen.
     END IF;
 
-    UPDATE flow_version SET application_type_id = NULL, active = true WHERE id = gid;
+    IF has_type_col THEN
+        UPDATE flow_version SET application_type_id = NULL, active = true WHERE id = gid;
+    ELSE
+        UPDATE flow_version SET active = true WHERE id = gid;
+    END IF;
 
     -- Mindestens ein Initial-State.
     SELECT id INTO init_id FROM state
@@ -65,8 +84,15 @@ BEGIN
                init_id),
            flow_version_id = gid;
 
-    -- Per-Typ-Zeiger lösen, damit deren Versionen gelöscht werden können.
-    UPDATE application_type SET active_flow_version_id = NULL;
+    -- Per-Typ-Zeiger lösen, damit deren Versionen gelöscht werden können
+    -- (Spalte existiert nur noch auf Bestands-DBs, fällt mit 0019).
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'application_type'
+           AND column_name = 'active_flow_version_id'
+    ) THEN
+        UPDATE application_type SET active_flow_version_id = NULL;
+    END IF;
 
     -- Alle anderen Flows löschen (state/transition hängen per CASCADE dran).
     DELETE FROM flow_version WHERE id <> gid;

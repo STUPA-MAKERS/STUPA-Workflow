@@ -37,10 +37,9 @@ def _seed_single_use_link(engine: Engine) -> None:
         ).scalar_one()
         flv = conn.execute(
             text(
-                "INSERT INTO flow_version (application_type_id, version) "
-                "VALUES (:t,1) RETURNING id"
+                "INSERT INTO flow_version (version) "
+                "VALUES (1) RETURNING id"
             ),
-            {"t": type_id},
         ).scalar_one()
         app_id = conn.execute(
             text(

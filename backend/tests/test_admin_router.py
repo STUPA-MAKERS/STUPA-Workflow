@@ -20,7 +20,6 @@ from app.modules.admin.branding import Branding
 from app.modules.admin.router import get_config_service, get_site_config_service
 from app.modules.admin.schemas import (
     ApplicationTypeOut,
-    FlowVersionOut,
     GremiumMailRecipients,
     GremiumOut,
     GroupMappingOut,
@@ -78,7 +77,7 @@ class _FakeConfig:
             ApplicationTypeOut(
                 id=uuid4(), gremium_id=None, key="grant", name_i18n={"de": "Antrag"},
                 has_budget=False, comparison_offers=None,
-                active_form_version_id=None, active_flow_version_id=None,
+                active_form_version_id=None,
             )
         ]
 
@@ -87,21 +86,13 @@ class _FakeConfig:
             id=uuid4(), gremium_id=payload.gremium_id, key=payload.key,
             name_i18n=payload.name_i18n, has_budget=payload.has_budget,
             comparison_offers=None, active_form_version_id=None,
-            active_flow_version_id=None,
         )
 
     async def update_application_type(self, type_id, payload, actor):  # noqa: ANN001
         return ApplicationTypeOut(
             id=type_id, gremium_id=None, key="grant", name_i18n={"de": "x"},
             has_budget=True, comparison_offers=None,
-            active_form_version_id=None, active_flow_version_id=None,
-        )
-
-    async def create_flow_version(self, type_id, payload, actor):  # noqa: ANN001
-        if str(type_id).startswith("00000000"):
-            raise NotFoundError("nope")
-        return FlowVersionOut(
-            id=uuid4(), application_type_id=type_id, version=1, active=payload.activate
+            active_form_version_id=None,
         )
 
     async def list_roles(self):
@@ -365,34 +356,6 @@ def test_application_types_crud(app: FastAPI, client: TestClient) -> None:
     assert patched.status_code == 200
 
 
-# --------------------------------------------------------------------------- flow
-def test_create_flow_version_ok(app: FastAPI, client: TestClient) -> None:
-    _as_admin(app)
-    graph = {
-        "states": [{"key": "draft", "label": {"de": "Entwurf"}, "isInitial": True}],
-        "transitions": [],
-    }
-    r = client.post(
-        f"/api/admin/application-types/{uuid4()}/flow-versions", json={"graph": graph}
-    )
-    assert r.status_code == 201
-    body = r.json()
-    assert body["active"] is True and body["version"] == 1
-
-
-def test_create_flow_version_type_404(app: FastAPI, client: TestClient) -> None:
-    _as_admin(app)
-    graph = {
-        "states": [{"key": "s", "label": {"de": "S"}, "isInitial": True}],
-        "transitions": [],
-    }
-    r = client.post(
-        "/api/admin/application-types/00000000-0000-0000-0000-000000000000/flow-versions",
-        json={"graph": graph},
-    )
-    assert r.status_code == 404
-
-
 # --------------------------------------------------------------------------- rbac
 def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
@@ -555,7 +518,6 @@ def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
         ("/api/admin/gremien/{gremium_id}", "patch"),
         ("/api/admin/application-types", "post"),
         ("/api/admin/application-types/{type_id}", "patch"),
-        ("/api/admin/application-types/{type_id}/flow-versions", "post"),
         ("/api/admin/roles", "post"),
         ("/api/admin/roles/{role_id}", "patch"),
         ("/api/admin/role-assignments", "post"),

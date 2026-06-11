@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from uuid import uuid4
 
 import pytest
 
@@ -28,7 +27,7 @@ def test_create_flow_version_no_initial_is_422_before_db() -> None:
         {"states": [{"key": "draft", "label": {"de": "E"}, "isInitial": False}], "transitions": []}
     )
     with pytest.raises(ValidationProblem) as ei:
-        asyncio.run(_svc().create_flow_version(uuid4(), FlowVersionCreate(graph=graph), "admin"))
+        asyncio.run(_svc().create_global_flow_version(FlowVersionCreate(graph=graph), "admin"))
     assert ei.value.status == 422
     assert ei.value.errors is not None
     assert ei.value.errors[0].field == "graph"
@@ -45,7 +44,7 @@ def test_create_flow_version_unreachable_state_is_422() -> None:
         }
     )
     with pytest.raises(ValidationProblem):
-        asyncio.run(_svc().create_flow_version(uuid4(), FlowVersionCreate(graph=graph), "admin"))
+        asyncio.run(_svc().create_global_flow_version(FlowVersionCreate(graph=graph), "admin"))
 
 
 def test_create_flow_version_unknown_guard_operator_is_422() -> None:
@@ -56,7 +55,7 @@ def test_create_flow_version_unknown_guard_operator_is_422() -> None:
         }
     )
     with pytest.raises(ValidationProblem):
-        asyncio.run(_svc().create_flow_version(uuid4(), FlowVersionCreate(graph=graph), "admin"))
+        asyncio.run(_svc().create_global_flow_version(FlowVersionCreate(graph=graph), "admin"))
 
 
 def test_parse_dt_normalizes_to_aware_utc_and_none() -> None:

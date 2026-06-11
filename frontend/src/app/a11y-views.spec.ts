@@ -292,7 +292,6 @@ describe('Kern-Views a11y (axe)', () => {
         assignRole: jest.fn(() => of({ id: 'a-new' })),
         revokeRole: jest.fn(() => of(void 0)),
         saveRolePermissions: jest.fn(() => of(role)),
-        createFlowVersion: jest.fn(() => of({ id: 'fv1' })),
         listApplicationTypes: jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }])),
         listGremiumRoles: jest.fn(() => of([])),
         getGlobalFlow: jest.fn(() => of(null)),
