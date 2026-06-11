@@ -1,8 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
@@ -99,13 +96,15 @@ describe('AttachmentsPanelComponent', () => {
   it('enables download for a scanned (clean) attachment and opens the signed URL', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
-    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    http
+      .expectOne(uploadUrl)
+      .flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
     detectChanges();
 
     const open = jest
       .spyOn(fixture.componentInstance as unknown as { openUrl: (u: string) => void }, 'openUrl')
       .mockImplementation(() => {});
-    expect(screen.getByText('Bereit')).toBeInTheDocument();
+    expect(screen.getByText('Gescannt')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
 
     const req = http.expectOne(dlUrl('att-1'));
@@ -118,7 +117,9 @@ describe('AttachmentsPanelComponent', () => {
   it('marks an attachment quarantined and toasts on a 409 download', async () => {
     const { http, detectChanges, toast } = await setup();
     await uploadFile();
-    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    http
+      .expectOne(uploadUrl)
+      .flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
     detectChanges();
     const error = jest.spyOn(toast, 'error');
 
@@ -140,7 +141,9 @@ describe('AttachmentsPanelComponent', () => {
   it('toasts an expired-link message on a 410 download', async () => {
     const { http, detectChanges, toast } = await setup();
     await uploadFile();
-    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    http
+      .expectOne(uploadUrl)
+      .flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
     detectChanges();
     const error = jest.spyOn(toast, 'error');
 
