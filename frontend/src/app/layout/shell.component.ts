@@ -150,7 +150,7 @@ export class ShellComponent {
     {
       path: '/admin',
       labelKey: 'nav.admin',
-      permissions: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'webhook.manage', 'audit.read'],
+      permissions: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.notifications', 'webhook.manage', 'audit.read'],
     },
   ];
 

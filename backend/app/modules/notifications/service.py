@@ -26,7 +26,11 @@ from app.modules.notifications.layout import (
     text_to_html,
 )
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
-from app.modules.notifications.models import MailTemplate, NotificationPreference
+from app.modules.notifications.models import (
+    MailTemplate,
+    NotificationPreference,
+    NotificationSettings,
+)
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.schemas import (
@@ -150,6 +154,52 @@ class NotificationService:
             html=rendered.html,
             lang=rendered.lang,
         )
+
+    # -------------------------------------------------------------- settings #
+    async def get_notification_settings(self) -> NotificationSettings:
+        """Plattform-Config lesen (Single-Row, fehlende Zeile → Defaults anlegen)."""
+        row = await self.session.get(NotificationSettings, 1)
+        if row is None:
+            row = NotificationSettings(id=1)
+            self.session.add(row)
+            await self.session.commit()
+            await self.session.refresh(row)
+        return row
+
+    async def update_notification_settings(
+        self,
+        *,
+        actor: str,
+        task_reminder_enabled: bool | None = None,
+        task_reminder_after_days: int | None = None,
+        task_reminder_repeat_days: int | None = None,
+    ) -> NotificationSettings:
+        """Plattform-Config ändern (Teil-Update) + Audit (CONFIG_CHANGE)."""
+        from app.modules.audit.actions import AuditAction
+        from app.modules.audit.service import record as audit_record
+
+        row = await self.get_notification_settings()
+        if task_reminder_enabled is not None:
+            row.task_reminder_enabled = task_reminder_enabled
+        if task_reminder_after_days is not None:
+            row.task_reminder_after_days = task_reminder_after_days
+        if task_reminder_repeat_days is not None:
+            row.task_reminder_repeat_days = task_reminder_repeat_days
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.CONFIG_CHANGE,
+            target_type="notification_settings",
+            target_id="1",
+            data={
+                "taskReminderEnabled": row.task_reminder_enabled,
+                "taskReminderAfterDays": row.task_reminder_after_days,
+                "taskReminderRepeatDays": row.task_reminder_repeat_days,
+            },
+        )
+        await self.session.commit()
+        await self.session.refresh(row)
+        return row
 
     # ----------------------------------------------------------- preferences #
     async def get_preferences(self, principal_sub: str) -> list[tuple[str, bool]]:

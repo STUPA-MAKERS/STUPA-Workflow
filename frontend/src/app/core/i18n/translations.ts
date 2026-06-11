@@ -1214,6 +1214,22 @@ export const de = {
   'admin.audit.msg.attachment_delete': '{actor} hat einen Anhang gelöscht ({target}).',
   'admin.audit.msg.unknown': '{actor}: {action} ({target}).',
 
+  'admin.notifications.title': 'Benachrichtigungen',
+  'admin.notifications.intro': 'Plattformweite Einstellungen für E-Mail-Benachrichtigungen.',
+  'admin.notifications.taskReminder': 'Aufgaben-Erinnerungen',
+  'admin.notifications.taskReminderDesc':
+    'Erinnert Handlungsberechtigte per Mail, wenn ein Antrag zu lange ohne Aktion in einem Schritt steht. Einzelne Nutzer:innen können die Art „Aufgaben-Erinnerungen“ in ihren Konto-Einstellungen abwählen.',
+  'admin.notifications.enabled': 'Aktiviert',
+  'admin.notifications.afterDays': 'Erinnern nach (Tagen)',
+  'admin.notifications.afterDaysHint':
+    'Tage ohne Statuswechsel, bis die erste Erinnerung verschickt wird (mind. 1).',
+  'admin.notifications.repeatDays': 'Wiederholen alle (Tage)',
+  'admin.notifications.repeatDaysHint':
+    '0 = nur einmal je Aufenthalt im Schritt; sonst alle N Tage erneut erinnern.',
+  'admin.notifications.saved': 'Einstellungen gespeichert.',
+  'admin.notifications.error': 'Einstellungen konnten nicht geladen werden.',
+  'admin.notifications.saveError': 'Speichern fehlgeschlagen — bitte erneut versuchen.',
+
   'admin.deadlines.title': 'Fristen',
   'admin.deadlines.subtitle': 'Fristen, die der Flow referenziert.',
   'admin.deadlines.add': 'Frist hinzufügen',
@@ -2752,6 +2768,22 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.attachment_quarantine': '{actor} quarantined an attachment ({target}).',
   'admin.audit.msg.attachment_delete': '{actor} deleted an attachment ({target}).',
   'admin.audit.msg.unknown': '{actor}: {action} ({target}).',
+
+  'admin.notifications.title': 'Notifications',
+  'admin.notifications.intro': 'Platform-wide settings for email notifications.',
+  'admin.notifications.taskReminder': 'Task reminders',
+  'admin.notifications.taskReminderDesc':
+    'Reminds people who can act when an application sits in a step without action for too long. Individual users can opt out of the “task reminders” kind in their account settings.',
+  'admin.notifications.enabled': 'Enabled',
+  'admin.notifications.afterDays': 'Remind after (days)',
+  'admin.notifications.afterDaysHint':
+    'Days without a status change until the first reminder is sent (min. 1).',
+  'admin.notifications.repeatDays': 'Repeat every (days)',
+  'admin.notifications.repeatDaysHint':
+    '0 = only once per stay in the step; otherwise remind again every N days.',
+  'admin.notifications.saved': 'Settings saved.',
+  'admin.notifications.error': 'Settings could not be loaded.',
+  'admin.notifications.saveError': 'Saving failed — please try again.',
 
   'admin.deadlines.title': 'Deadlines',
   'admin.deadlines.subtitle':

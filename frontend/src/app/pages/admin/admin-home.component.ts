@@ -125,5 +125,6 @@ export class AdminHomeComponent {
     { link: 'webhooks', title: 'admin.home.webhooks', desc: 'admin.home.webhooksDesc', icon: 'webhook' },
     { link: 'audit', title: 'admin.audit.title', desc: 'admin.audit.desc', icon: 'audit' },
     { link: 'deadlines', title: 'admin.deadlines.title', desc: 'admin.deadlines.subtitle', icon: 'clock' },
+    { link: 'notifications', title: 'admin.notifications.title', desc: 'admin.notifications.intro', icon: 'bell' },
   ];
 }

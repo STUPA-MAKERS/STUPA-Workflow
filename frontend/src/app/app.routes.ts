@@ -182,7 +182,7 @@ export const routes: Routes = [
         data: {
           title: 'nav.admin',
           // #6: jede Bereichs-Admin-Rolle erreicht die Admin-Übersicht.
-          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'webhook.manage', 'audit.read'],
+          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.notifications', 'webhook.manage', 'audit.read'],
         },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -291,6 +291,20 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/admin/deadlines/deadlines.component').then(
             (m) => m.AdminDeadlinesComponent,
+          ),
+      },
+      {
+        // Plattform-Benachrichtigungen (#task-reminder): Aufgaben-Erinnerungen.
+        path: 'admin/notifications',
+        data: {
+          title: 'admin.notifications.title',
+          permission: 'admin.notifications',
+          parent: ['admin'],
+        },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/notifications/notification-settings.component').then(
+            (m) => m.NotificationSettingsComponent,
           ),
       },
       {

@@ -46,6 +46,9 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.gremien",
     "admin.types",
     "admin.roles",
+    # Plattform-Benachrichtigungs-Config (#task-reminder): Erinnerungs-Schwellen,
+    # künftig Mail-Templates. Migration 0017 verteilt es an admin.site-Inhaber.
+    "admin.notifications",
     # MCP/Agent-Zugang: erlaubt das Ausstellen von OAuth-Token für API-Agenten
     # (#MCP). Admin hat es ohnehin (Bypass); explizit zuweisbar für Nicht-Admins.
     "mcp.use",

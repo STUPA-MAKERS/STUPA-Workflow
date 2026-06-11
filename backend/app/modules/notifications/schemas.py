@@ -76,3 +76,26 @@ class NotificationPreferencesUpdate(_CamelModel):
     """Bulk-Update der eigenen Benachrichtigungs-Schalter."""
 
     preferences: list[NotificationPreferenceOut]
+
+
+class NotificationSettingsOut(_CamelModel):
+    """Plattformweite Benachrichtigungs-Config (#task-reminder, Single-Row)."""
+
+    task_reminder_enabled: bool = Field(alias="taskReminderEnabled")
+    task_reminder_after_days: int = Field(alias="taskReminderAfterDays", ge=1)
+    # 0 = nur einmal je State-Aufenthalt erinnern.
+    task_reminder_repeat_days: int = Field(alias="taskReminderRepeatDays", ge=0)
+
+
+class NotificationSettingsUpdate(_CamelModel):
+    """Teil-Update der Plattform-Config (nur gesetzte Felder ändern)."""
+
+    task_reminder_enabled: bool | None = Field(
+        default=None, alias="taskReminderEnabled"
+    )
+    task_reminder_after_days: int | None = Field(
+        default=None, alias="taskReminderAfterDays", ge=1
+    )
+    task_reminder_repeat_days: int | None = Field(
+        default=None, alias="taskReminderRepeatDays", ge=0
+    )

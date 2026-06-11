@@ -425,6 +425,15 @@ export interface AuditActor {
   name: string | null;
 }
 
+/** Plattform-Benachrichtigungs-Config (#task-reminder, P admin.notifications). */
+export interface NotificationSettings {
+  taskReminderEnabled: boolean;
+  /** Tage ohne Statuswechsel, bis erinnert wird (≥ 1). */
+  taskReminderAfterDays: number;
+  /** Danach alle N Tage erneut; 0 = nur einmal je State-Aufenthalt. */
+  taskReminderRepeatDays: number;
+}
+
 // --- Branding / Site-Config (#21 — T-34-Contract, nicht SDS) ----------------
 
 export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon';

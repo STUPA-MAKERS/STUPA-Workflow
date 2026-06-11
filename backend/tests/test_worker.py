@@ -20,8 +20,9 @@ def test_worker_settings_registers_tasks() -> None:
     assert refresh_budget_stats in WorkerSettings.functions
     assert process_deadlines in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    # Nächtlicher Budget-Rollup + minütlicher Deadline-Scan (T-44).
-    assert len(WorkerSettings.cron_jobs) == 2
+    # Nächtlicher Budget-Rollup + minütlicher Deadline-Scan (T-44) +
+    # stündliche Aufgaben-Erinnerungen (#task-reminder).
+    assert len(WorkerSettings.cron_jobs) == 3
 
 
 class _SessionCM:

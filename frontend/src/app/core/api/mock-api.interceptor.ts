@@ -61,6 +61,7 @@ const MOCK_PRINCIPAL: Principal = {
     'admin.site',
     'admin.gremien',
     'admin.types',
+    'admin.notifications',
     'admin.roles',
     'form.configure',
     'flow.configure',

@@ -40,6 +40,7 @@ export const MOCK_PERMISSIONS: string[] = [
   'admin.site',
   'admin.gremien',
   'admin.types',
+  'admin.notifications',
   'admin.roles',
 ];
 

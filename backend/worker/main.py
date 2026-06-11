@@ -32,6 +32,7 @@ from worker.pdf import render_pdf
 from worker.protocol import render_protocol
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
+from worker.task_reminders import process_task_reminders
 from worker.webhook import deliver_webhook
 from worker.webhook import on_startup as webhook_on_startup
 
@@ -91,11 +92,15 @@ class WorkerSettings:
         render_protocol,
         deliver_webhook,
         process_deadlines,
+        process_task_reminders,
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
         # Fristen/Votes minütlich scannen (flows §9.4, T-44) — idempotent + SKIP LOCKED.
         cron(process_deadlines, second=0),
+        # Aufgaben-Erinnerungen stündlich (#task-reminder) — Schwellen in Tagen,
+        # Doppelversand über task_reminder_log ausgeschlossen.
+        cron(process_task_reminders, minute=10),
     ]
     on_startup = _on_startup
     on_shutdown = _shutdown

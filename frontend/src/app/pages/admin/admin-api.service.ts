@@ -25,6 +25,7 @@ import {
   type ApplicationTypeFull,
   type ApplicationTypeUpdateBody,
   type AuditActor,
+  type NotificationSettings,
   type AuditPage,
   type Branding,
   type FlowGraph,
@@ -586,6 +587,23 @@ export class AdminApiService {
   listAuditActors(): Observable<AuditActor[]> {
     if (this.mock) return of([]);
     return this.http.get<AuditActor[]>(`${this.base}/admin/audit/actors`);
+  }
+
+  // --- Benachrichtigungs-Config (#task-reminder, P(admin.notifications)) ----
+  getNotificationSettings(): Observable<NotificationSettings> {
+    if (this.mock) {
+      return of({ taskReminderEnabled: true, taskReminderAfterDays: 5, taskReminderRepeatDays: 7 });
+    }
+    return this.http.get<NotificationSettings>(`${this.base}/admin/notification-settings`);
+  }
+
+  putNotificationSettings(
+    settings: Partial<NotificationSettings>,
+  ): Observable<NotificationSettings> {
+    return this.http.put<NotificationSettings>(
+      `${this.base}/admin/notification-settings`,
+      settings,
+    );
   }
 
   // --- Branding / Site-Config (#21 — Mock-Contract) ------------------------
