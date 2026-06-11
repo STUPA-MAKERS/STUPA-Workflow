@@ -334,10 +334,17 @@ export class FlowEditorComponent {
     return this.groupsOf(this.graph().transitions ?? [], fromKey);
   }
 
-  /** Klarname einer Guard-Gruppe (Operator + Wert; leer = Catch-all). */
+  /** Klarname einer Guard-Gruppe (Operator + Wert; leer = Catch-all).
+   *  Verschachtelte Operatoren (and/or/not) tragen Objekt-Listen als Wert — dafür
+   *  nur Operator + Anzahl der Teilbedingungen zeigen, statt »[object Object]«. */
   protected guardGroupLabel(g: GuardGroup): string {
     if (!g.sig) return this.i18n.translate('admin.flow.guardDefault');
     const opLabel = this.i18n.translate(`admin.flow.guardOp.${g.op}` as TranslationKey);
+    if (g.op === 'and' || g.op === 'or' || g.op === 'not') {
+      const children = (g.guard as Record<string, unknown> | null)?.[g.op];
+      const n = Array.isArray(children) ? children.length : 1;
+      return `${opLabel} (${n})`;
+    }
     return g.value ? `${opLabel}: ${g.value}` : opLabel;
   }
 

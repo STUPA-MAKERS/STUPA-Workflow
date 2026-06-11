@@ -296,6 +296,14 @@ class FlowService:
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return None
+        # Fail-closed (#vote-bypass): einen vote-State entscheidet nur die Abstimmung
+        # (oder ein manueller Abbruch) — automatische Ausgänge werden hier NIE gefeuert,
+        # auch wenn ein (Alt-)Flow sie noch enthält; der Graph-Validator lehnt sie beim
+        # Speichern inzwischen ab. Sonst wäre der Antrag »sofort angenommen«, ohne dass
+        # je abgestimmt wurde.
+        state = await self._load_state(app.current_state_id)
+        if state is not None and state.kind == "vote":
+            return None
         if deadline_passed is None:
             deadline_passed = await self._deadline_passed(app)
         ctx = await flow_context.build_context(

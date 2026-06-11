@@ -174,6 +174,22 @@ def test_vote_state_requires_two_branches() -> None:
         validate_flow_graph(FlowGraph.model_validate(g))
 
 
+def test_vote_state_rejects_automatic_exit() -> None:
+    """#vote-bypass: ein automatischer Nicht-Branch-Ausgang würde den Antrag am
+    Vote vorbei sofort weiterschieben — fail-closed beim Speichern ablehnen."""
+    g = _vote_graph_dict()
+    g["transitions"].append({"from": "voting", "to": "passed", "automatic": True})
+    with pytest.raises(FlowValidationError, match="automatic"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_vote_state_allows_manual_exit() -> None:
+    """Manueller Ausgang (»Wahl abbrechen«, #abort-vote) bleibt erlaubt."""
+    g = _vote_graph_dict()
+    g["transitions"].append({"from": "voting", "to": "failed"})
+    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+
+
 def test_actor_gate_rejected_on_automatic_transition() -> None:
     # roleIs/isInCommittee sind Akteur-Gates → nur auf manuellen Übergängen.
     g = _valid_graph_dict()

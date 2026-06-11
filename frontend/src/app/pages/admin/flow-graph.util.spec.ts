@@ -90,6 +90,31 @@ describe('validateFlowGraph', () => {
     expect(r.errors.some((e) => e.includes('unreachable states: done'))).toBe(true);
   });
 
+  it('rejects automatic exits from vote states (#vote-bypass)', () => {
+    const g = graph({
+      states: [
+        { key: 'draft', label: { de: 'Entwurf' }, isInitial: true },
+        { key: 'voting', label: { de: 'Abstimmung' }, kind: 'vote', config: { gremiumId: 'g-1' } },
+        { key: 'passed', label: { de: 'Angenommen' } },
+        { key: 'failed', label: { de: 'Abgelehnt' } },
+      ],
+      transitions: [
+        { from: 'draft', to: 'voting' },
+        { from: 'voting', to: 'passed', branch: 'pass' },
+        { from: 'voting', to: 'failed', branch: 'fail' },
+        // Automatischer Nicht-Branch-Ausgang: würde am Vote vorbei sofort feuern.
+        { from: 'voting', to: 'passed', automatic: true },
+      ],
+    });
+    const v = validateFlowGraph(g);
+    expect(v.valid).toBe(false);
+    expect(v.errors.join(' ')).toContain('must not have automatic outgoing transitions');
+    // Manueller Ausgang (Wahl abbrechen) bleibt dagegen erlaubt.
+    g.transitions = g.transitions.filter((t) => !t.automatic);
+    g.transitions.push({ from: 'voting', to: 'failed' });
+    expect(validateFlowGraph(g).valid).toBe(true);
+  });
+
   it('rejects guards/actions outside the whitelist', () => {
     const badGuard = validateFlowGraph(
       graph({ transitions: [{ from: 'draft', to: 'review', guard: { bogus: 1 } }] }),

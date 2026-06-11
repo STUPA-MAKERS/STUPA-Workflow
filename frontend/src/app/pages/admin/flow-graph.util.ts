@@ -97,6 +97,14 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
       if (outBranches.join(',') !== 'fail,pass') {
         errors.push(`vote state "${s.key}" needs exactly two outgoing transitions: branch "pass" and "fail"`);
       }
+      // Einen vote-State entscheidet nur die Abstimmung (oder ein manueller Abbruch):
+      // ein automatischer Ausgang würde sofort feuern, ohne dass je abgestimmt wurde
+      // (#vote-bypass) — spiegelt den BE-Validator.
+      if (transitions.some((t) => t.from === s.key && t.automatic && !t.branch)) {
+        errors.push(
+          `vote state "${s.key}" must not have automatic outgoing transitions — only the vote outcome (pass/fail) or a manual exit may leave it`,
+        );
+      }
     }
   }
 

@@ -251,6 +251,18 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                     f"vote state {s.key!r} needs exactly two outgoing transitions "
                     "with branch 'pass' and 'fail'"
                 )
+            # Einen vote-State entscheidet AUSSCHLIESSLICH die Abstimmung (pass/fail)
+            # bzw. ein bewusster MANUELLER Abbruch (#abort-vote). Ein automatischer
+            # Nicht-Branch-Ausgang würde vom Worker sofort gefeuert, sobald sein
+            # Guard greift — der Antrag wäre „angenommen", ohne dass je abgestimmt
+            # wurde (#vote-bypass).
+            for t in outgoing[s.key]:
+                if t.automatic and not t.branch:
+                    raise FlowValidationError(
+                        f"vote state {s.key!r} must not have automatic outgoing "
+                        "transitions — only the vote outcome (pass/fail) or a "
+                        "manual exit may leave it"
+                    )
         elif branches:
             # Branch-Übergänge feuert nur das Vote-Ergebnis — auf einem normal-State
             # wären sie weder manuell noch automatisch erreichbar (tote Kanten).

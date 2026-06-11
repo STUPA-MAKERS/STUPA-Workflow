@@ -362,3 +362,19 @@ async def test_available_transitions_carry_requires_action_flag() -> None:
         (required.id, True),
         (optional.id, False),
     ]
+
+
+async def test_auto_advance_never_fires_out_of_vote_states() -> None:
+    """#vote-bypass: auch wenn ein (Alt-)Flow eine automatische Transition aus dem
+    vote-State enthält, feuert auto_advance sie NIE — den State entscheidet die
+    Abstimmung, sonst wäre der Antrag »angenommen«, ohne dass je abgestimmt wurde."""
+    flow_id, voting = uuid4(), uuid4()
+    app = _app(voting, flow_id)
+    auto_exit = _transition(flow_id=flow_id, from_id=voting, to_id=uuid4())
+    auto_exit.automatic = True
+    vote_state = SimpleNamespace(id=voting, kind="vote", config={"gremiumId": "g"})
+    # _load_app → _load_state (vote!) → Abbruch VOR _outgoing.
+    db = fake_session(result(app), result(vote_state))
+    res = await FlowService(db).auto_advance(app.id, _principal())
+    assert res is None
+    assert db.committed == 0
