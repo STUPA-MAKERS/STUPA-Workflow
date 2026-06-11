@@ -45,9 +45,10 @@ if [[ "$answer" != [yY] ]]; then
 fi
 
 psql_run -c "DELETE FROM role_assignment ra
-             USING role r
+             USING role r, principal p
              WHERE r.id = ra.role_id
+               AND p.id = ra.principal_id
                AND r.key = 'admin'
-               AND ra.principal_id = '${PRINCIPAL_ID}';"
+               AND ${MATCH};"
 
 echo "done"
