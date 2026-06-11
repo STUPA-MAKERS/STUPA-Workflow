@@ -26,6 +26,7 @@ import {
   COMPARE_OPS,
   type CompareOp,
   type FlowGraph,
+  type FlowGroup,
   type Guard,
   GUARD_ACTOR_OPERATORS,
   GUARD_CONDITION_OPERATORS,
@@ -47,12 +48,30 @@ import {
   serializeFlowGraph,
   validateFlowGraph,
 } from '../flow-graph.util';
+import { type BudgetTreeNode, BudgetTreeApi } from '../../budget/budget-tree.api';
 
-/** Aktuelle Auswahl im Canvas: ein State (per key) oder eine Transition (per Index). */
+/** Aktuelle Auswahl im Canvas: State (per key), Transition (per Index) oder Gruppe (per id). */
 type Selection =
   | { kind: 'state'; key: string }
   | { kind: 'transition'; index: number }
+  | { kind: 'group'; id: string }
   | null;
+
+/** Bounding-Box einer Gruppe im Canvas (#flow-groups) — zugeklappt der Ersatz-Kasten,
+ *  aufgeklappt der Rahmen um die Member-Nodes (inkl. Titelleiste). */
+interface GroupBox {
+  id: string;
+  name: string;
+  collapsed: boolean;
+  color: string | null;
+  selected: boolean;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  count: number;
+  stateKeys: string[];
+}
 
 /**
  * Eine Gruppe ausgehender Übergänge eines Knotens mit identischem Guard (#8). Pro
@@ -72,6 +91,13 @@ interface GuardGroup {
 const NODE_W = 150;
 const NODE_H = 52;
 const MARGIN = 40;
+
+/** Gruppen-Geometrie (#flow-groups): Rahmen-Innenabstand, Titelleisten-Höhe,
+ *  Maße des zugeklappten Ersatz-Kastens. */
+const GROUP_PAD = 18;
+const GROUP_TITLE_H = 24;
+const GROUP_W = 180;
+const GROUP_H = 64;
 
 /**
  * Flow-Editor als **visueller Drag&Drop-Canvas** (#8, T-34, flows §9.5).
@@ -104,6 +130,7 @@ export class FlowEditorComponent {
   private readonly options = inject(AdminOptionsService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
+  private readonly budgetApi = inject(BudgetTreeApi);
 
   protected readonly canvas = viewChild<ElementRef<SVGSVGElement>>('canvas');
 
@@ -131,8 +158,12 @@ export class FlowEditorComponent {
   protected readonly canUndo = signal(false);
   protected readonly canRedo = signal(false);
 
-  /** Aktuell ausgewählter Knoten/Kante für das Inspektor-Panel. */
+  /** Aktuell ausgewählter Knoten/Kante/Gruppe für das Inspektor-Panel. */
   protected readonly selection = signal<Selection>(null);
+  /** Mehrfachauswahl (Shift-Klick) für »Gruppe erstellen« (#flow-groups). */
+  protected readonly multiSel = signal<ReadonlySet<string>>(new Set());
+  /** Kostenstellen-Namen (id → »Name (key)«) zum Auflösen von `budgetIs`-Guards (#7). */
+  private readonly budgetNameById = signal<ReadonlyMap<string, string>>(new Map());
   /** Temporäre Kante während des Aufziehens eines neuen Übergangs. */
   protected readonly tempEdge = signal<{ x1: number; y1: number; x2: number; y2: number } | null>(
     null,
@@ -142,6 +173,8 @@ export class FlowEditorComponent {
   protected readonly NODE_H = NODE_H;
 
   private drag: { key: string; dx: number; dy: number; moved: boolean } | null = null;
+  /** Gruppen-Drag (#flow-groups): verschiebt alle Member-Positionen gemeinsam. */
+  private groupDrag: { id: string; lastX: number; lastY: number; moved: boolean } | null = null;
   private connectFrom: string | null = null;
   /** Branch (pass/fail), wenn von einem Branch-Punkt gezogen wird. */
   private connectBranch: string | null = null;
@@ -198,6 +231,24 @@ export class FlowEditorComponent {
           this.webhookOptions.set(hooks.map((h) => ({ value: h.id, label: h.name || h.url }))),
         error: () => undefined,
       });
+    // Kostenstellen-Baum (#7): `budgetIs`-Guards im Canvas mit Namen statt UUID anzeigen.
+    this.budgetApi
+      .tree()
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: (roots) => {
+          const map = new Map<string, string>();
+          const walk = (nodes: BudgetTreeNode[]): void => {
+            for (const n of nodes) {
+              map.set(n.id, `${n.name} (${n.key})`);
+              if (n.children?.length) walk(n.children);
+            }
+          };
+          walk(roots);
+          this.budgetNameById.set(map);
+        },
+        error: () => undefined,
+      });
     // Benannte Deadline-Policies (#13): pro State referenzierbar per Schlüssel.
     this.api
       .listDeadlinePolicies()
@@ -246,16 +297,83 @@ export class FlowEditorComponent {
   /** Knoten-Positionen (Top-Left) aus dem Layout. */
   private readonly positions = computed(() => this.graph().layout?.positions ?? {});
 
+  // --- Gruppen (#flow-groups) — reine Darstellung, Engine unberührt ----------
+  protected readonly groups = computed(() => this.graph().layout?.groups ?? []);
+
+  /** State-Keys, die in einer **zugeklappten** Gruppe stecken (im Canvas versteckt). */
+  private readonly hiddenKeys = computed(() => {
+    const hidden = new Set<string>();
+    for (const g of this.groups()) {
+      if (g.collapsed) for (const k of g.stateKeys) hidden.add(k);
+    }
+    return hidden;
+  });
+
+  /** Gruppen-Kästen: zugeklappt der Ersatz-Kasten (mittig über der Member-BBox),
+   *  aufgeklappt der Rahmen um die Member-Nodes (+ Titelleiste oben). */
+  protected readonly groupBoxes = computed<GroupBox[]>(() => {
+    const pos = this.positions();
+    const sel = this.selection();
+    return this.groups()
+      .map((g) => {
+        const pts = g.stateKeys.map((k) => pos[k]).filter((p): p is { x: number; y: number } => !!p);
+        if (pts.length === 0) return null;
+        const minX = Math.min(...pts.map((p) => p.x));
+        const minY = Math.min(...pts.map((p) => p.y));
+        const maxX = Math.max(...pts.map((p) => p.x)) + NODE_W;
+        const maxY = Math.max(...pts.map((p) => p.y)) + NODE_H;
+        const base = {
+          id: g.id,
+          name: g.name,
+          collapsed: !!g.collapsed,
+          color: g.color ?? null,
+          selected: sel?.kind === 'group' && sel.id === g.id,
+          count: g.stateKeys.length,
+          stateKeys: g.stateKeys,
+        };
+        if (g.collapsed) {
+          // Ersatz-Kasten mittig über der (unsichtbaren) Member-BBox.
+          const cx = (minX + maxX) / 2;
+          const cy = (minY + maxY) / 2;
+          return { ...base, x: cx - GROUP_W / 2, y: cy - GROUP_H / 2, w: GROUP_W, h: GROUP_H };
+        }
+        return {
+          ...base,
+          x: minX - GROUP_PAD,
+          y: minY - GROUP_PAD - GROUP_TITLE_H,
+          w: maxX - minX + 2 * GROUP_PAD,
+          h: maxY - minY + 2 * GROUP_PAD + GROUP_TITLE_H,
+        };
+      })
+      .filter((b): b is GroupBox => b !== null);
+  });
+
+  /** Zugeklappter Gruppen-Kasten je Member-Key (für Kanten-Umleitung). */
+  private readonly collapsedBoxByKey = computed(() => {
+    const map = new Map<string, GroupBox>();
+    for (const b of this.groupBoxes()) {
+      if (b.collapsed) for (const k of b.stateKeys) map.set(k, b);
+    }
+    return map;
+  });
+
+  protected readonly selectedGroup = computed<FlowGroup | undefined>(() => {
+    const sel = this.selection();
+    return sel?.kind === 'group' ? this.groups().find((g) => g.id === sel.id) : undefined;
+  });
+
   protected readonly nodes = computed(() => {
     const pos = this.positions();
     const sel = this.selection();
+    const multi = this.multiSel();
+    const hidden = this.hiddenKeys();
     const transitions = this.graph().transitions ?? [];
-    return this.graph().states.map((s) => {
+    return this.graph().states.filter((s) => !hidden.has(s.key)).map((s) => {
       // vote: ein beschrifteter Punkt je Branch (pass/fail) PLUS die Guard-Punkte
       // für manuelle Ausgänge (z. B. »Wahl abbrechen«, #abort-vote). Normal: ein
       // Punkt je unterschiedlichem Guard (+ Default-Punkt zum Aufziehen neuer,
       // guard-loser Kanten).
-      const branches = this.branchDotsFor(s.kind);
+      const branches = this.sortedBranchDots(s.key, s.kind, transitions, pos);
       const groups = this.outDots(s.key, transitions);
       const total = branches.length + groups.length;
       const dots = [
@@ -282,6 +400,7 @@ export class FlowEditorComponent {
         color: s.color ?? null,
         isInitial: !!s.isInitial,
         selected: sel?.kind === 'state' && sel.key === s.key,
+        multi: multi.has(s.key),
         x: pos[s.key]?.x ?? 0,
         y: pos[s.key]?.y ?? 0,
         dots,
@@ -291,6 +410,31 @@ export class FlowEditorComponent {
 
   private branchDotsFor(kind: string | null | undefined): string[] {
     return kind === 'vote' ? ['pass', 'fail'] : [];
+  }
+
+  /** Branch-Punkte nach Ziel-Höhe sortieren (#flow-quirks): zeigt »pass« nach unten
+   *  und »fail« nach oben, tauschen die Punkte — die Kanten kreuzen sich sonst
+   *  direkt vor dem Knoten. Guard-Punkte bleiben in Prioritäts-Reihenfolge. */
+  private sortedBranchDots(
+    fromKey: string,
+    kind: string | null | undefined,
+    transitions: readonly TransitionDef[],
+    pos: Record<string, { x: number; y: number }>,
+  ): string[] {
+    const branches = this.branchDotsFor(kind);
+    if (branches.length < 2) return branches;
+    const avgTargetY = (branch: string): number | null => {
+      const ys = transitions
+        .filter((t) => t.from === fromKey && t.branch === branch && pos[t.to])
+        .map((t) => pos[t.to].y);
+      return ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : null;
+    };
+    return [...branches].sort((a, b) => {
+      const ya = avgTargetY(a);
+      const yb = avgTargetY(b);
+      if (ya == null || yb == null) return 0;
+      return ya - yb;
+    });
   }
 
   /** Ausgehende Übergänge nach Guard gruppieren, in Array-(=Prioritäts-)Reihenfolge.
@@ -335,17 +479,46 @@ export class FlowEditorComponent {
   }
 
   /** Klarname einer Guard-Gruppe (Operator + Wert; leer = Catch-all).
-   *  Verschachtelte Operatoren (and/or/not) tragen Objekt-Listen als Wert — dafür
-   *  nur Operator + Anzahl der Teilbedingungen zeigen, statt »[object Object]«. */
+   *  Human-readable (#7): Kombinatoren nutzen die `guardCombinator`-Keys (nicht
+   *  `guardOp.and` — den Key gibt es nicht), `compare` zeigt »feld op wert«, und
+   *  Rollen-/Gremien-/Kostenstellen-Referenzen werden zu Namen aufgelöst. */
   protected guardGroupLabel(g: GuardGroup): string {
     if (!g.sig) return this.i18n.translate('admin.flow.guardDefault');
-    const opLabel = this.i18n.translate(`admin.flow.guardOp.${g.op}` as TranslationKey);
     if (g.op === 'and' || g.op === 'or' || g.op === 'not') {
+      const opLabel = this.i18n.translate(`admin.flow.guardCombinator.${g.op}` as TranslationKey);
       const children = (g.guard as Record<string, unknown> | null)?.[g.op];
       const n = Array.isArray(children) ? children.length : 1;
       return `${opLabel} (${n})`;
     }
-    return g.value ? `${opLabel}: ${g.value}` : opLabel;
+    const opLabel = this.i18n.translate(`admin.flow.guardOp.${g.op}` as TranslationKey);
+    if (g.op === 'compare') {
+      const c = (g.guard as Record<string, unknown> | null)?.['compare'];
+      if (c && typeof c === 'object') {
+        const spec = c as { field?: unknown; op?: unknown; value?: unknown };
+        const value = Array.isArray(spec.value)
+          ? spec.value.join(', ')
+          : String(spec.value ?? '');
+        return `${String(spec.field ?? '')} ${String(spec.op ?? '==')} ${value}`.trim();
+      }
+      return opLabel;
+    }
+    const value = this.resolveGuardValue(g.op, g.value);
+    return value ? `${opLabel}: ${value}` : opLabel;
+  }
+
+  /** Guard-Wert auflösen (#7): Rollen-Key/Gremium-UUID/Kostenstellen-UUID → Klarname
+   *  aus den geladenen Katalogen; unbekannte Werte bleiben roh sichtbar. */
+  private resolveGuardValue(op: string, value: string): string {
+    if (!value) return value;
+    const kind = this.guardValueKind(op);
+    if (kind === 'role') return this.optionLabel(this.globalRoleOptions(), value);
+    if (kind === 'committee') return this.optionLabel(this.gremiumOptions(), value);
+    if (op === 'budgetIs') return this.budgetNameById().get(value) ?? value;
+    return value;
+  }
+
+  private optionLabel(options: SelectOption[], value: string): string {
+    return options.find((o) => o.value === value)?.label ?? value;
   }
 
   /** Guard-Gruppe im Prioritäts-Stack nach oben/unten schieben (#8). Schreibt die
@@ -387,17 +560,29 @@ export class FlowEditorComponent {
     const sel = this.selection();
     const transitions = this.graph().transitions ?? [];
     const kindOf = new Map(this.graph().states.map((s) => [s.key, s.kind] as const));
+    const boxByKey = this.collapsedBoxByKey();
     return transitions
       .map((t, index) => ({ t, index }))
       .filter(({ t }) => pos[t.from] && pos[t.to])
+      // Kanten komplett **innerhalb** einer zugeklappten Gruppe sind unsichtbar.
+      .filter(({ t }) => {
+        const sb = boxByKey.get(t.from);
+        const db = boxByKey.get(t.to);
+        return !(sb && db && sb.id === db.id);
+      })
       .map(({ t, index }) => {
         const a = pos[t.from];
         const b = pos[t.to];
-        const x1 = a.x + NODE_W;
+        // Endpunkt in zugeklappter Gruppe → Kante setzt am Gruppen-Kasten an.
+        const srcBox = boxByKey.get(t.from);
+        const dstBox = boxByKey.get(t.to);
+        const x1 = srcBox ? srcBox.x + srcBox.w : a.x + NODE_W;
         // Start am Ausgangs-Punkt: Branch (pass/fail …) bzw. dem Guard-Punkt (#8).
-        const y1 = a.y + this.outDotYFor(t.from, kindOf.get(t.from), t, transitions);
-        const x2 = b.x;
-        const y2 = b.y + NODE_H / 2;
+        const y1 = srcBox
+          ? srcBox.y + srcBox.h / 2
+          : a.y + this.outDotYFor(t.from, kindOf.get(t.from), t, transitions, pos);
+        const x2 = dstBox ? dstBox.x : b.x;
+        const y2 = dstBox ? dstBox.y + dstBox.h / 2 : b.y + NODE_H / 2;
         return {
           index,
           x1,
@@ -423,8 +608,9 @@ export class FlowEditorComponent {
     kind: string | null | undefined,
     t: TransitionDef,
     transitions: readonly TransitionDef[],
+    pos: Record<string, { x: number; y: number }>,
   ): number {
-    const branches = this.branchDotsFor(kind);
+    const branches = this.sortedBranchDots(fromKey, kind, transitions, pos);
     const groups = this.outDots(fromKey, transitions);
     const total = branches.length + groups.length;
     if (t.branch) {
@@ -567,14 +753,19 @@ export class FlowEditorComponent {
     this.graph.update((g) => {
       const positions = { ...(g.layout?.positions ?? {}) };
       delete positions[key];
+      // Gruppen-Mitgliedschaft mit entfernen; leere Gruppen verschwinden.
+      const groups = (g.layout?.groups ?? [])
+        .map((gr) => ({ ...gr, stateKeys: gr.stateKeys.filter((k) => k !== key) }))
+        .filter((gr) => gr.stateKeys.length > 0);
       return {
         ...g,
         states: g.states.filter((s) => s.key !== key),
         transitions: (g.transitions ?? []).filter((t) => t.from !== key && t.to !== key),
-        layout: { positions },
+        layout: { positions, ...(groups.length ? { groups } : {}) },
       };
     });
     this.selection.set(null);
+    this.multiSel.set(new Set());
   }
 
   /** Genau ein Initial: gewählten State setzen, alle anderen zurücksetzen. */
@@ -593,6 +784,11 @@ export class FlowEditorComponent {
         positions[key] = positions[oldKey];
         if (key !== oldKey) delete positions[oldKey];
       }
+      // Gruppen-Mitgliedschaft folgt der Umbenennung.
+      const groups = (g.layout?.groups ?? []).map((gr) => ({
+        ...gr,
+        stateKeys: gr.stateKeys.map((k) => (k === oldKey ? key : k)),
+      }));
       return {
         ...g,
         states: g.states.map((s) => (s.key === oldKey ? { ...s, key } : s)),
@@ -601,7 +797,7 @@ export class FlowEditorComponent {
           from: t.from === oldKey ? key : t.from,
           to: t.to === oldKey ? key : t.to,
         })),
-        layout: { positions },
+        layout: { positions, ...(groups.length ? { groups } : {}) },
       };
     });
     this.selection.set({ kind: 'state', key });
@@ -908,7 +1104,68 @@ export class FlowEditorComponent {
   }
 
   protected relayout(): void {
-    this.graph.update((g) => autoLayout({ ...g, layout: null }));
+    // Positionen neu berechnen, Gruppen behalten (#flow-groups).
+    this.graph.update((g) =>
+      autoLayout({ ...g, layout: g.layout?.groups ? { groups: g.layout.groups } : null }),
+    );
+  }
+
+  // --- Gruppen-Operationen (#flow-groups) -----------------------------------
+  /** Gruppe aus der Mehrfachauswahl erstellen; Mitglieder verlassen alte Gruppen
+   *  (ein State steckt in höchstens einer Gruppe). */
+  protected createGroupFromSelection(): void {
+    const keys = [...this.multiSel()];
+    if (keys.length < 2) return;
+    const existing = this.groups();
+    const used = new Set(existing.map((g) => g.id));
+    let n = existing.length + 1;
+    while (used.has(`grp${n}`)) n++;
+    const id = `grp${n}`;
+    const name = `${this.i18n.translate('admin.flow.group.defaultName')} ${n}`;
+    this.graph.update((g) => {
+      const keep = new Set(keys);
+      const groups = (g.layout?.groups ?? [])
+        .map((gr) => ({ ...gr, stateKeys: gr.stateKeys.filter((k) => !keep.has(k)) }))
+        .filter((gr) => gr.stateKeys.length > 0);
+      groups.push({ id, name, stateKeys: keys });
+      return { ...g, layout: { ...(g.layout ?? {}), groups } };
+    });
+    this.multiSel.set(new Set());
+    this.selection.set({ kind: 'group', id });
+  }
+
+  private patchGroup(id: string, fn: (g: FlowGroup) => FlowGroup): void {
+    this.graph.update((g) => ({
+      ...g,
+      layout: {
+        ...(g.layout ?? {}),
+        groups: (g.layout?.groups ?? []).map((gr) => (gr.id === id ? fn(gr) : gr)),
+      },
+    }));
+  }
+
+  protected renameGroup(id: string, name: string): void {
+    this.patchGroup(id, (g) => ({ ...g, name }));
+  }
+
+  protected setGroupColor(id: string, color: string): void {
+    this.patchGroup(id, (g) => ({ ...g, color: color || null }));
+  }
+
+  protected toggleGroupCollapsed(id: string): void {
+    this.patchGroup(id, (g) => ({ ...g, collapsed: !g.collapsed }));
+  }
+
+  /** Gruppe auflösen — nur die Klammer verschwindet, States bleiben unberührt. */
+  protected dissolveGroup(id: string): void {
+    this.graph.update((g) => {
+      const groups = (g.layout?.groups ?? []).filter((gr) => gr.id !== id);
+      const layout = { ...(g.layout ?? {}) };
+      if (groups.length) layout.groups = groups;
+      else delete layout.groups;
+      return { ...g, layout };
+    });
+    this.selection.set(null);
   }
 
   // --- Undo/Redo + Tastatur (#flow-shortcuts) ------------------------------
@@ -932,11 +1189,13 @@ export class FlowEditorComponent {
     this.syncHistoryFlags();
   }
 
-  /** Ausgewählten Knoten/Kante löschen (Del/Backspace). */
+  /** Ausgewählten Knoten/Kante löschen (Del/Backspace); Gruppe = nur auflösen,
+   *  die enthaltenen States bleiben (#flow-groups). */
   protected deleteSelected(): void {
     const sel = this.selection();
     if (sel?.kind === 'state') this.removeSelectedState();
     else if (sel?.kind === 'transition') this.removeSelectedTransition();
+    else if (sel?.kind === 'group') this.dissolveGroup(sel.id);
   }
 
   /**
@@ -976,12 +1235,29 @@ export class FlowEditorComponent {
   }
 
   // --- Canvas-Interaktion (Drag & Connect) ---------------------------------
-  /** Knoten greifen → verschieben **oder** (bei Klick ohne Bewegung) auswählen. */
+  /** Knoten greifen → verschieben **oder** (bei Klick ohne Bewegung) auswählen.
+   *  Shift-Klick togglet die Mehrfachauswahl für »Gruppe erstellen« (#flow-groups). */
   protected onNodePointerDown(event: PointerEvent, key: string): void {
     event.stopPropagation();
+    if (event.shiftKey) {
+      const next = new Set(this.multiSel());
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      this.multiSel.set(next);
+      return;
+    }
     const p = this.toSvg(event);
     const pos = this.positions()[key] ?? { x: 0, y: 0 };
     this.drag = { key, dx: p.x - pos.x, dy: p.y - pos.y, moved: false };
+    (event.target as Element).setPointerCapture?.(event.pointerId);
+  }
+
+  /** Gruppen-Kasten/-Titel greifen: ziehen verschiebt alle Member gemeinsam,
+   *  Klick ohne Bewegung wählt die Gruppe aus (#flow-groups). */
+  protected onGroupPointerDown(event: PointerEvent, id: string): void {
+    event.stopPropagation();
+    const p = this.toSvg(event);
+    this.groupDrag = { id, lastX: p.x, lastY: p.y, moved: false };
     (event.target as Element).setPointerCapture?.(event.pointerId);
   }
 
@@ -1011,8 +1287,36 @@ export class FlowEditorComponent {
       this.drag.moved = true;
       this.graph.update((g) => ({
         ...g,
-        layout: { positions: { ...(g.layout?.positions ?? {}), [key]: { x: nx, y: ny } } },
+        layout: {
+          ...(g.layout ?? {}),
+          positions: { ...(g.layout?.positions ?? {}), [key]: { x: nx, y: ny } },
+        },
       }));
+      return;
+    }
+    if (this.groupDrag) {
+      const p = this.toSvg(event);
+      const dx = p.x - this.groupDrag.lastX;
+      const dy = p.y - this.groupDrag.lastY;
+      this.groupDrag.lastX = p.x;
+      this.groupDrag.lastY = p.y;
+      this.groupDrag.moved = true;
+      const id = this.groupDrag.id;
+      this.graph.update((g) => {
+        const grp = (g.layout?.groups ?? []).find((x) => x.id === id);
+        if (!grp) return g;
+        const positions = { ...(g.layout?.positions ?? {}) };
+        for (const k of grp.stateKeys) {
+          const cur = positions[k];
+          if (cur) {
+            positions[k] = {
+              x: Math.max(0, Math.round(cur.x + dx)),
+              y: Math.max(0, Math.round(cur.y + dy)),
+            };
+          }
+        }
+        return { ...g, layout: { ...(g.layout ?? {}), positions } };
+      });
       return;
     }
     if (this.connectFrom) {
@@ -1040,6 +1344,11 @@ export class FlowEditorComponent {
       this.drag = null;
       return;
     }
+    if (this.groupDrag) {
+      if (!this.groupDrag.moved) this.selection.set({ kind: 'group', id: this.groupDrag.id });
+      this.groupDrag = null;
+      return;
+    }
     if (this.connectFrom) {
       const target = this.nodeAt(this.toSvg(event));
       if (target && target !== this.connectFrom) {
@@ -1064,7 +1373,10 @@ export class FlowEditorComponent {
   }
 
   protected clearSelection(): void {
-    if (!this.drag && !this.connectFrom) this.selection.set(null);
+    if (!this.drag && !this.connectFrom && !this.groupDrag) {
+      this.selection.set(null);
+      if (this.multiSel().size) this.multiSel.set(new Set());
+    }
   }
 
   // --- Zoom & Pan ----------------------------------------------------------
@@ -1139,10 +1451,14 @@ export class FlowEditorComponent {
     return { x: local.x, y: local.y };
   }
 
-  /** State, dessen Knoten-Rechteck den Punkt enthält (für Connect-Ziel). */
+  /** State, dessen Knoten-Rechteck den Punkt enthält (für Connect-Ziel).
+   *  Versteckte Member zugeklappter Gruppen sind kein Ziel — zum Verbinden in
+   *  die Gruppe erst aufklappen (#flow-groups). */
   private nodeAt(p: { x: number; y: number }): string | null {
     const pos = this.positions();
+    const hidden = this.hiddenKeys();
     for (const s of this.graph().states) {
+      if (hidden.has(s.key)) continue;
       const np = pos[s.key];
       if (np && p.x >= np.x && p.x <= np.x + NODE_W && p.y >= np.y && p.y <= np.y + NODE_H) {
         return s.key;

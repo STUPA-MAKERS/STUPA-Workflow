@@ -276,6 +276,72 @@ select {
   stroke-width: 3;
 }
 
+/* Mehrfachauswahl (Shift-Klick, #flow-groups). */
+.fe__node--multi {
+  stroke: var(--color-primary);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 3;
+}
+
+/* --- Gruppen (#flow-groups) ------------------------------------------------ */
+/* Aufgeklappt: halbtransparenter Rahmen hinter den Member-Nodes + Titelleiste. */
+.fe__group-bg {
+  fill: var(--group-color, var(--color-border));
+  fill-opacity: 0.08;
+  stroke: var(--group-color, var(--color-border-strong));
+  stroke-width: 1.5;
+  stroke-dasharray: 8 5;
+  pointer-events: none;
+}
+
+.fe__group-titlebar {
+  fill: var(--group-color, var(--color-border-strong));
+  fill-opacity: 0.18;
+  stroke: none;
+  cursor: grab;
+}
+
+.fe__group--sel .fe__group-bg {
+  stroke: var(--color-primary);
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+}
+
+.fe__group-title {
+  fill: var(--color-text);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* Zugeklappt: Ersatz-Kasten anstelle der Member-Nodes. */
+.fe__groupbox {
+  fill: var(--color-bg-elevated);
+  stroke: var(--color-border-strong);
+  stroke-width: 2;
+  stroke-dasharray: 8 5;
+  cursor: grab;
+}
+
+.fe__groupbox-g--sel .fe__groupbox {
+  stroke: var(--color-primary);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
+.fe__groupbox-name {
+  fill: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.fe__groupbox-count {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  pointer-events: none;
+}
+
 .fe__color-row {
   display: flex;
   align-items: center;

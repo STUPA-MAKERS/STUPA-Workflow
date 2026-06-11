@@ -8,6 +8,7 @@
  */
 import {
   type FlowGraph,
+  type FlowGroup,
   type StateDef,
   type TransitionDef,
 } from './admin.models';
@@ -164,9 +165,22 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
     return out;
   });
   const out: FlowGraph = { states, transitions };
-  if (graph.layout && graph.layout.positions && Object.keys(graph.layout.positions).length > 0) {
-    out.layout = { positions: { ...graph.layout.positions } };
-  }
+  const keySet2 = new Set(states.map((s) => s.key));
+  const positions = graph.layout?.positions ?? {};
+  const layout: { positions?: Record<string, { x: number; y: number }>; groups?: FlowGroup[] } = {};
+  if (Object.keys(positions).length > 0) layout.positions = { ...positions };
+  // Gruppen (#flow-groups): nur existierende States behalten, leere Gruppen weglassen.
+  const groups = (graph.layout?.groups ?? [])
+    .map((g) => ({ ...g, stateKeys: g.stateKeys.filter((k) => keySet2.has(k)) }))
+    .filter((g) => g.stateKeys.length > 0)
+    .map((g) => {
+      const out2: FlowGroup = { id: g.id, name: g.name, stateKeys: g.stateKeys };
+      if (g.collapsed) out2.collapsed = true;
+      if (g.color) out2.color = g.color;
+      return out2;
+    });
+  if (groups.length > 0) layout.groups = groups;
+  if (layout.positions || layout.groups) out.layout = layout;
   return out;
 }
 
@@ -289,7 +303,10 @@ export function autoLayout(graph: FlowGraph): FlowGraph {
       computed[k] = { x: PAD + d * COL_GAP, y: PAD + offset + row * ROW_GAP };
     });
   }
-  return { ...graph, layout: { positions: { ...computed, ...existing } } };
+  return {
+    ...graph,
+    layout: { ...(graph.layout ?? {}), positions: { ...computed, ...existing } },
+  };
 }
 
 // --- Fabriken ---------------------------------------------------------------

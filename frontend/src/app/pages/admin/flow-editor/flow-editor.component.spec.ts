@@ -2,6 +2,7 @@ import { of } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import type { FlowGraph } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
+import { BudgetTreeApi } from '../../budget/budget-tree.api';
 import { FlowEditorComponent } from './flow-editor.component';
 
 async function setup() {
@@ -16,8 +17,13 @@ async function setup() {
   const listDeadlinePolicies = jest.fn(() => of([{ id: 'dp1', key: 'semester', label: { de: 'Semesterfrist' }, kind: 'absolute' }]));
   const listWebhooks = jest.fn(() => of([{ id: 'w1', name: 'Buchhaltung', url: 'https://h.test', events: [], active: true }]));
   const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles, listDeadlinePolicies, listWebhooks };
+  // Kostenstellen (#7): Namen für `budgetIs`-Guard-Labels.
+  const budgetApi = { tree: jest.fn(() => of([])) };
   const view = await render(FlowEditorComponent, {
-    providers: [{ provide: AdminApiService, useValue: api }],
+    providers: [
+      { provide: AdminApiService, useValue: api },
+      { provide: BudgetTreeApi, useValue: budgetApi },
+    ],
   });
   return { ...view, createGlobalFlowVersion };
 }

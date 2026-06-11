@@ -65,9 +65,21 @@ export interface TransitionDef {
   requiresAction?: boolean;
 }
 
-/** Optionales Editor-Layout (Knoten-Positionen) — persistiert im Graphen. */
+/** Visuelle Node-Gruppe (#flow-groups) — reine Editor-Darstellung, die Engine
+ *  ignoriert sie. Zugeklappt ersetzt ein beschrifteter Kasten die Member-Nodes;
+ *  nur Kanten über die Gruppengrenze bleiben sichtbar. */
+export interface FlowGroup {
+  id: string;
+  name: string;
+  stateKeys: string[];
+  collapsed?: boolean;
+  color?: string | null;
+}
+
+/** Optionales Editor-Layout (Knoten-Positionen + Gruppen) — persistiert im Graphen. */
 export interface FlowLayout {
   positions?: Record<string, { x: number; y: number }>;
+  groups?: FlowGroup[];
 }
 
 export interface FlowGraph {

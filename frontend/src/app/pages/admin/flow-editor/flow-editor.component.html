@@ -10,6 +10,9 @@
     <app-button variant="ghost" size="sm" [disabled]="!canUndo()" [ariaLabel]="'admin.flow.undo' | t" (click)="undo()">↶ {{ 'admin.flow.undo' | t }}</app-button>
     <app-button variant="ghost" size="sm" [disabled]="!canRedo()" [ariaLabel]="'admin.flow.redo' | t" (click)="redo()">↷ {{ 'admin.flow.redo' | t }}</app-button>
     <app-button variant="ghost" size="sm" (click)="relayout()">{{ 'admin.flow.relayout' | t }}</app-button>
+    @if (multiSel().size >= 2) {
+      <app-button variant="ghost" size="sm" (click)="createGroupFromSelection()">⬚ {{ 'admin.flow.group.create' | t }} ({{ multiSel().size }})</app-button>
+    }
     <span class="fe__toolbar-zoom" role="group" [attr.aria-label]="'admin.flow.zoom' | t">
       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomOut' | t" (click)="zoomOut()">−</app-button>
       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomIn' | t" (click)="zoomIn()">+</app-button>
@@ -50,6 +53,28 @@
         </marker>
       </defs>
 
+      <!-- Aufgeklappte Gruppen (#flow-groups): Rahmen hinter den Member-Nodes;
+           Titelleiste greift (Drag = Gruppe verschieben, Klick = auswählen,
+           Doppelklick = zuklappen). -->
+      @for (gb of groupBoxes(); track gb.id) {
+        @if (!gb.collapsed) {
+          <g class="fe__group" [class.fe__group--sel]="gb.selected" [style.--group-color]="gb.color || null">
+            <rect [attr.x]="gb.x" [attr.y]="gb.y" [attr.width]="gb.w" [attr.height]="gb.h" rx="14" class="fe__group-bg" />
+            <rect
+              [attr.x]="gb.x"
+              [attr.y]="gb.y"
+              [attr.width]="gb.w"
+              height="24"
+              rx="12"
+              class="fe__group-titlebar"
+              (pointerdown)="onGroupPointerDown($event, gb.id)"
+              (dblclick)="toggleGroupCollapsed(gb.id)"
+            />
+            <text [attr.x]="gb.x + 12" [attr.y]="gb.y + 16" class="fe__group-title">{{ gb.name }}</text>
+          </g>
+        }
+      }
+
       @for (e of edges(); track e.index) {
         <g class="fe__edge-g" [class.fe__edge-g--sel]="e.selected" [style.--edge-color]="e.color || null" (pointerdown)="$event.stopPropagation(); selectEdge(e.index)">
           <path [attr.d]="e.d" class="fe__edge-hit" />
@@ -80,6 +105,7 @@
             class="fe__node"
             [class.fe__node--initial]="n.isInitial"
             [class.fe__node--sel]="n.selected"
+            [class.fe__node--multi]="n.multi"
             [style.stroke]="n.color || null"
             (pointerdown)="onNodePointerDown($event, n.key)"
           />
@@ -110,6 +136,28 @@
             </g>
           }
         </g>
+      }
+
+      <!-- Zugeklappte Gruppen (#flow-groups): ein Kasten ersetzt die Member-Nodes;
+           Doppelklick klappt auf. Kanten über die Gruppengrenze setzen hier an. -->
+      @for (gb of groupBoxes(); track gb.id) {
+        @if (gb.collapsed) {
+          <g class="fe__groupbox-g" [class.fe__groupbox-g--sel]="gb.selected">
+            <rect
+              [attr.x]="gb.x"
+              [attr.y]="gb.y"
+              [attr.width]="gb.w"
+              [attr.height]="gb.h"
+              rx="12"
+              class="fe__groupbox"
+              [style.stroke]="gb.color || null"
+              (pointerdown)="onGroupPointerDown($event, gb.id)"
+              (dblclick)="toggleGroupCollapsed(gb.id)"
+            />
+            <text [attr.x]="gb.x + gb.w / 2" [attr.y]="gb.y + gb.h / 2 - 3" text-anchor="middle" class="fe__groupbox-name">{{ gb.name }}</text>
+            <text [attr.x]="gb.x + gb.w / 2" [attr.y]="gb.y + gb.h / 2 + 14" text-anchor="middle" class="fe__groupbox-count">{{ gb.count }} {{ 'admin.flow.group.members' | t }}</text>
+          </g>
+        }
       }
     </svg>
     </div>
@@ -257,8 +305,33 @@
 
         <!-- Bedingung (Guard) + Aktionen liegen in eigener Pane unterhalb des Graphen (#28). -->
         <app-button variant="danger" size="sm" (click)="removeSelectedTransition()">{{ 'admin.flow.removeTransition' | t }}</app-button>
+      } @else if (selectedGroup(); as grp) {
+        <h2 class="fe__panel-h">{{ 'admin.flow.group.inspector' | t }}</h2>
+        <label class="fe__lbl">{{ 'admin.flow.group.name' | t }}
+          <input [ngModel]="grp.name" (ngModelChange)="renameGroup(grp.id, $event)" autocomplete="off" /></label>
+        <label class="fe__lbl">{{ 'admin.flow.color' | t }}
+          <span class="fe__color-row">
+            <input
+              type="color"
+              [ngModel]="grp.color || '#6b7280'"
+              (ngModelChange)="setGroupColor(grp.id, $event)"
+            />
+            @if (grp.color) {
+              <button type="button" class="fe__color-clear" (click)="setGroupColor(grp.id, '')">
+                {{ 'admin.flow.colorClear' | t }}
+              </button>
+            }
+          </span>
+        </label>
+        <p class="fe__hint">{{ grp.stateKeys.length }} {{ 'admin.flow.group.members' | t }}: {{ grp.stateKeys.join(', ') }}</p>
+        <app-button variant="ghost" size="sm" (click)="toggleGroupCollapsed(grp.id)">
+          {{ (grp.collapsed ? 'admin.flow.group.expand' : 'admin.flow.group.collapse') | t }}
+        </app-button>
+        <app-button variant="danger" size="sm" (click)="dissolveGroup(grp.id)">{{ 'admin.flow.group.dissolve' | t }}</app-button>
+        <p class="fe__hint">{{ 'admin.flow.group.dissolveHint' | t }}</p>
       } @else {
         <p class="fe__panel-empty">{{ 'admin.flow.selectHint' | t }}</p>
+        <p class="fe__hint">{{ 'admin.flow.group.multiHint' | t }}</p>
       }
     </aside>
   </div>
