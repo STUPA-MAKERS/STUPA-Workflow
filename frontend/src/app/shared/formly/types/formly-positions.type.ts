@@ -79,7 +79,7 @@ interface Position {
                     <input type="radio" [name]="'pref-' + pi" [checked]="o.preferred"
                       (change)="setPreferred(pi, oi)" [attr.aria-label]="t('apply.positions.preferred')" />
                   </td>
-                  <td>
+                  <td class="pos__actcol">
                     <button type="button" class="pos__icon" (click)="removeOffer(pi, oi)"
                       [disabled]="p.offers.length <= minOffers"
                       [attr.title]="p.offers.length <= minOffers ? t('apply.positions.minOffersHint') : null"
@@ -126,7 +126,9 @@ interface Position {
       .pos__card-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
       .pos__title { flex: 1; min-width: 12rem; font-weight: var(--fw-medium); }
       .pos__value { font-size: var(--fs-sm); color: var(--color-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .pos__offers { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+      /* table-layout: fixed — sonst erzwingt die intrinsische Mindestbreite der
+         Eingaben (Default ~20ch) eine Tabelle breiter als der Mobile-Viewport. */
+      .pos__offers { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); table-layout: fixed; }
       .pos__offers th { text-align: start; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); font-weight: var(--fw-semibold); padding: 0 var(--space-2) var(--space-2); }
       .pos__offers td { padding: var(--space-1) var(--space-2); vertical-align: middle; }
       .pos__num { text-align: end; width: 9rem; }
@@ -139,6 +141,7 @@ interface Position {
         border: var(--border-width) solid var(--color-border);
         border-radius: var(--radius-md);
         background: var(--color-bg); color: inherit; width: 100%;
+        min-width: 0; /* Eingaben dürfen unter ihre intrinsische Breite schrumpfen */
         min-height: 2.25rem; font: inherit;
       }
       .pos input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
@@ -159,6 +162,19 @@ interface Position {
       .pos__add--sm { border-style: none; padding: var(--space-1) 0; }
       .pos__total { margin: 0; font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
       .pos__error { font-size: var(--fs-sm); color: var(--color-danger); margin: 0; }
+      /* Mobile (#mobile, 768px-Konvention): schmalere Spalten + kompaktere Polster,
+         Kopfzeile entfällt (Platzhalter/aria-labels tragen die Bedeutung) — die
+         Karte bleibt damit innerhalb des Viewports statt horizontal auszubrechen. */
+      @media (max-width: 768px) {
+        .pos { padding: var(--space-3); }
+        .pos__card { padding: var(--space-3); }
+        .pos__offers thead { display: none; }
+        .pos__offers th, .pos__offers td { padding-inline: var(--space-1); }
+        .pos__num { width: 5.5rem; }
+        .pos__pref { width: 2.5rem; }
+        .pos__actcol { width: 2rem; }
+        .pos__title { min-width: 0; }
+      }
     `,
   ],
 })

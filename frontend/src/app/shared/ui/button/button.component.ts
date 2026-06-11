@@ -49,6 +49,8 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
         border-radius: var(--radius-md);
         cursor: pointer;
         white-space: nowrap;
+        max-width: 100%;
+        min-width: 0;
         transition:
           background-color var(--motion-fast) var(--ease-standard),
           color var(--motion-fast) var(--ease-standard),
@@ -138,6 +140,14 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
       }
       .btn--custom:active:not(:disabled) {
         filter: brightness(0.94);
+      }
+      /* Überlange Beschriftungen (z. B. Flow-Transition-Labels) laufen nicht aus dem
+         Button heraus, sondern werden mit … abgeschnitten. */
+      .btn__label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+        max-width: 100%;
       }
       .btn__spinner {
         width: 1em;
