@@ -215,11 +215,14 @@ async def list_applications(
     created_to: Annotated[date | None, Query(alias="createdTo")] = None,
     sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
+    # »Meine Anträge«: erzwingt den Owner-Filter auch für Principals MIT
+    # application.read (Dashboard-Karte) — sonst sähen Berechtigte dort alle.
+    mine: Annotated[bool, Query()] = False,
 ) -> Page[ApplicationListItem]:
     """Antragsliste (Filter: state/gremium/type/topf/q/Betrag/Datum; Sortierung; Paging).
 
     Ohne ``application.read`` (und ohne Admin) sieht der Principal nur die **eigenen**
-    Anträge (``created_by``), #24."""
+    Anträge (``created_by``), #24; ``mine=true`` erzwingt das auch für Berechtigte."""
     can_read = "admin" in principal.roles or principal.has("application.read")
     return await service.list_applications(
         state_id=state_id,
@@ -234,7 +237,7 @@ async def list_applications(
         created_to=created_to,
         sort=sort,
         order=order,
-        owner_sub=None if can_read else principal.sub,
+        owner_sub=principal.sub if (mine or not can_read) else None,
         limit=page.limit,
         offset=page.offset,
     )

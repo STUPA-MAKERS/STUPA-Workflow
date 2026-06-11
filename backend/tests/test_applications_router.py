@@ -410,6 +410,17 @@ def test_list_applications_without_read_scopes_to_own(
     assert fake_service.list_kwargs["owner_sub"] == "admin"  # = principal.sub des Fakes
 
 
+def test_list_applications_mine_forces_owner_filter(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # »Meine Anträge« (Dashboard): mine=true erzwingt den Owner-Filter AUCH für
+    # Principals mit application.read — sonst sähen Berechtigte fremde Anträge.
+    _as_principal(app, "application.read")
+    r = client.get("/api/applications?mine=true")
+    assert r.status_code == 200
+    assert fake_service.list_kwargs["owner_sub"] == "admin"
+
+
 def test_list_applications_amount_date_sort_passed(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:

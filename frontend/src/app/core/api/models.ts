@@ -83,6 +83,8 @@ export interface ApplicationListQuery {
   createdTo?: string;
   sort?: 'createdAt' | 'amount';
   order?: 'asc' | 'desc';
+  /** Nur eigene Anträge — erzwingt den Owner-Filter auch mit `application.read`. */
+  mine?: boolean;
   limit?: number;
   offset?: number;
 }

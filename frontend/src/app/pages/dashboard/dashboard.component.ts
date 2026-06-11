@@ -40,9 +40,11 @@ export class DashboardComponent {
   readonly auth = inject(AuthService);
   private readonly api = inject(ApiClient);
 
-  /** „Meine Anträge": lesbare/relevante Anträge des Nutzers. */
+  /** „Meine Anträge": ausschließlich die EIGENEN Anträge — `mine=true` erzwingt
+   *  den Owner-Filter auch für Principals mit `application.read` (sonst zeigte
+   *  die Karte Berechtigten alle Anträge). */
   private readonly applications = toSignal(
-    this.api.listApplications().pipe(catchError(() => of(null))),
+    this.api.listApplications({ mine: true }).pipe(catchError(() => of(null))),
     { initialValue: undefined },
   );
 
