@@ -393,6 +393,43 @@ async def get_versions(
     return await service.versions(application_id)
 
 
+async def _deliver_comment_mails(
+    settings: Settings,
+    application_id: UUID,
+    comment_id: UUID,
+    author_kind: str,
+    visibility: str,
+    body: str,
+    pool: object,
+) -> None:
+    """Kommentar-Mails (#4-1) in eigener Session — Background nach der 201-Antwort."""
+    from app.modules.notifications.comments import send_comment_notifications
+
+    queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as db:
+        await send_comment_notifications(
+            db,
+            queue=queue,
+            settings=settings,
+            application_id=application_id,
+            comment_id=comment_id,
+            author_kind=author_kind,
+            visibility=visibility,
+            body=body,
+        )
+
+
+CommentMailSender = Callable[
+    [Settings, UUID, UUID, str, str, str, object], Awaitable[None]
+]
+
+
+def get_comment_mail_sender() -> CommentMailSender:
+    """Injizierbarer Kommentar-Mail-Versender (in Tests überschreibbar)."""
+    return _deliver_comment_mails
+
+
 @router.post(
     "/applications/{application_id}/comments",
     response_model=CommentOut,
@@ -402,22 +439,41 @@ async def get_versions(
 async def add_comment(
     payload: CommentCreate,
     service: ServiceDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    send_comment_mails: Annotated[CommentMailSender, Depends(get_comment_mail_sender)],
     # Bewusst ``require_app_read`` (view-Scope genügt): Kommentieren ist Kommunikation,
     # keine Antrags-Datenmutation — ein Antragsteller darf auch im gesperrten (view-only)
     # Status noch öffentlich nachfragen. Entspricht api.md (POST comments = A(public)/P).
     access: Annotated[Access, Depends(require_app_read)],
 ) -> CommentOut:
-    """Kommentar anlegen. Antragsteller dürfen nur ``public`` schreiben (sonst 403)."""
+    """Kommentar anlegen. Antragsteller dürfen nur ``public`` schreiben (sonst 403).
+
+    Löst Kommentar-Mails aus (#4-1): Principal-Kommentar (public) → Antragsteller;
+    Antragsteller-Kommentar → alle, die am aktuellen State handeln können."""
     if payload.visibility == "internal" and not access.can_see_internal:
         raise ForbiddenError("Applicants may only post public comments.")
     author = access.principal.sub if access.principal is not None else None
-    return await service.add_comment(
+    comment = await service.add_comment(
         access.application_id,
         author=author,
         author_kind=access.author_kind,
         body=payload.body,
         visibility=payload.visibility,
     )
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(
+        send_comment_mails,
+        settings,
+        access.application_id,
+        comment.id,
+        access.author_kind,
+        payload.visibility,
+        payload.body,
+        pool,
+    )
+    return comment
 
 
 @router.get(

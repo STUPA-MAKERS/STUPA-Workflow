@@ -19,6 +19,7 @@ from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
 from app.modules.applications.router import (
     get_applications_service,
+    get_comment_mail_sender,
     get_magic_link_sender,
 )
 from app.modules.applications.schemas import (
@@ -173,7 +174,11 @@ def app(fake_service: _FakeService, sent: list[tuple[str, UUID]]) -> FastAPI:
     async def _no_mail(settings, email, application_id, pool):  # noqa: ANN001, ANN202
         sent.append((email, application_id))
 
+    async def _no_comment_mail(*args):  # noqa: ANN002, ANN202 — Background ohne DB
+        pass
+
     application.dependency_overrides[get_magic_link_sender] = lambda: _no_mail
+    application.dependency_overrides[get_comment_mail_sender] = lambda: _no_comment_mail
     return application
 
 
