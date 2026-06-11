@@ -179,56 +179,117 @@ export function parseFlowGraph(json: string): FlowGraph {
   return normalizeFlowGraph(parsed);
 }
 
-// --- Auto-Layout (BFS-Schichten) --------------------------------------------
+// --- Auto-Layout (Sugiyama-light: Schichten + Barycenter + Zentrierung) ------
 
-const COL_GAP = 220;
-const ROW_GAP = 120;
+const COL_GAP = 240;
+const ROW_GAP = 130;
 /** Linker/oberer Rand, damit Knoten nicht am Canvas-Rand kleben (#flow-pad). */
 const PAD = 40;
 
 /**
- * Fehlende Knoten-Positionen ergänzen: BFS-Schichten ab dem Initial-State
- * (Spalte = Distanz, Zeile = Reihenfolge in der Schicht). Bereits gesetzte
- * Positionen bleiben erhalten (Editor-Drag persistiert).
+ * Fehlende Knoten-Positionen ergänzen (bereits gesetzte bleiben erhalten —
+ * Editor-Drag persistiert). Layout-Algorithmus (#flow-autolayout):
+ *
+ * 1. **Schicht = längster Pfad** vom Initial-State (statt BFS): Knoten rücken
+ *    so weit nach rechts wie nötig — Kanten zeigen überwiegend vorwärts,
+ *    Rückkanten bleiben die Ausnahme statt Layout-Chaos.
+ * 2. **Barycenter-Ordnung** je Schicht (3 Vor-/Rückwärts-Sweeps): Knoten
+ *    sortieren sich neben ihre Nachbarn → deutlich weniger Kreuzungen.
+ * 3. **Vertikale Zentrierung**: kleine Schichten mittig zur höchsten Schicht
+ *    statt alle oben angeklebt.
  */
 export function autoLayout(graph: FlowGraph): FlowGraph {
-  const positions: Record<string, { x: number; y: number }> = {
+  const existing: Record<string, { x: number; y: number }> = {
     ...(graph.layout?.positions ?? {}),
   };
-  const keySet = new Set(graph.states.map((s) => s.key));
-  const adjacency = new Map<string, string[]>();
-  for (const k of keySet) adjacency.set(k, []);
+  const keys = graph.states.map((s) => s.key);
+  const keySet = new Set(keys);
+  const out = new Map<string, string[]>();
+  const incoming = new Map<string, string[]>();
+  for (const k of keySet) {
+    out.set(k, []);
+    incoming.set(k, []);
+  }
   for (const t of graph.transitions ?? []) {
-    if (keySet.has(t.from) && keySet.has(t.to)) adjacency.get(t.from)!.push(t.to);
+    if (t.from === t.to) continue; // Self-Loops sind layout-neutral.
+    if (keySet.has(t.from) && keySet.has(t.to)) {
+      out.get(t.from)!.push(t.to);
+      incoming.get(t.to)!.push(t.from);
+    }
   }
 
-  const initial = graph.states.find((s) => s.isInitial)?.key ?? graph.states[0]?.key;
+  // 1. Schichten: längster Pfad ab Initial (Bellman-artige Relaxierung, durch
+  //    die Iterationsgrenze auch bei Zyklen terminierend).
+  const initial = graph.states.find((s) => s.isInitial)?.key ?? keys[0];
   const depth = new Map<string, number>();
-  if (initial) {
-    const queue: [string, number][] = [[initial, 0]];
-    while (queue.length > 0) {
-      const [node, d] = queue.shift()!;
-      if (depth.has(node)) continue;
-      depth.set(node, d);
-      for (const next of adjacency.get(node) ?? []) queue.push([next, d + 1]);
+  if (initial) depth.set(initial, 0);
+  for (let i = 0; i < keys.length; i += 1) {
+    let changed = false;
+    for (const [from, targets] of out) {
+      const d = depth.get(from);
+      if (d === undefined) continue;
+      for (const to of targets) {
+        const candidate = d + 1;
+        if (candidate > (depth.get(to) ?? -1) && candidate <= keys.length) {
+          depth.set(to, candidate);
+          changed = true;
+        }
+      }
     }
+    if (!changed) break;
   }
   // Nicht erreichbare States hinter die tiefste Schicht hängen.
   let maxDepth = 0;
   for (const d of depth.values()) maxDepth = Math.max(maxDepth, d);
-  for (const s of graph.states) {
-    if (!depth.has(s.key)) depth.set(s.key, maxDepth + 1);
+  for (const k of keys) {
+    if (!depth.has(k)) depth.set(k, maxDepth + 1);
   }
 
-  const rowCursor = new Map<number, number>();
-  for (const s of graph.states) {
-    if (positions[s.key]) continue;
-    const d = depth.get(s.key) ?? 0;
-    const row = rowCursor.get(d) ?? 0;
-    rowCursor.set(d, row + 1);
-    positions[s.key] = { x: PAD + d * COL_GAP, y: PAD + row * ROW_GAP };
+  // 2. Schicht-Listen (Initial-Reihenfolge = State-Reihenfolge) + Barycenter.
+  const layers = new Map<number, string[]>();
+  for (const k of keys) {
+    const d = depth.get(k)!;
+    if (!layers.has(d)) layers.set(d, []);
+    layers.get(d)!.push(k);
   }
-  return { ...graph, layout: { positions } };
+  const layerDepths = [...layers.keys()].sort((a, b) => a - b);
+  const indexIn = (layer: string[], k: string): number => layer.indexOf(k);
+  const sortByBarycenter = (layer: string[], neighborsOf: (k: string) => string[]): void => {
+    const neighborLayerIndex = new Map<string, number>();
+    for (const k of layer) {
+      const ns = neighborsOf(k)
+        .map((n) => {
+          const d = depth.get(n)!;
+          return indexIn(layers.get(d)!, n);
+        })
+        .filter((i) => i >= 0);
+      neighborLayerIndex.set(
+        k,
+        ns.length > 0 ? ns.reduce((a, b) => a + b, 0) / ns.length : indexIn(layer, k),
+      );
+    }
+    layer.sort((a, b) => neighborLayerIndex.get(a)! - neighborLayerIndex.get(b)!);
+  };
+  for (let sweep = 0; sweep < 3; sweep += 1) {
+    for (const d of layerDepths) {
+      sortByBarycenter(layers.get(d)!, (k) => incoming.get(k) ?? []);
+    }
+    for (const d of [...layerDepths].reverse()) {
+      sortByBarycenter(layers.get(d)!, (k) => out.get(k) ?? []);
+    }
+  }
+
+  // 3. Positionen: Spalte = Schicht, Zeile = Ordnung; Schicht vertikal mittig.
+  const tallest = Math.max(...layerDepths.map((d) => layers.get(d)!.length), 1);
+  const computed: Record<string, { x: number; y: number }> = {};
+  for (const d of layerDepths) {
+    const layer = layers.get(d)!;
+    const offset = ((tallest - layer.length) * ROW_GAP) / 2;
+    layer.forEach((k, row) => {
+      computed[k] = { x: PAD + d * COL_GAP, y: PAD + offset + row * ROW_GAP };
+    });
+  }
+  return { ...graph, layout: { positions: { ...computed, ...existing } } };
 }
 
 // --- Fabriken ---------------------------------------------------------------

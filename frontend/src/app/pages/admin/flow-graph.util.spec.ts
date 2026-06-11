@@ -165,11 +165,40 @@ describe('graph ↔ JSON round-trip', () => {
 });
 
 describe('autoLayout', () => {
-  it('assigns BFS-layered positions and keeps existing ones', () => {
+  it('assigns layered positions and keeps existing ones', () => {
     const g = autoLayout(graph({ layout: { positions: { draft: { x: 5, y: 5 } } } }));
     expect(g.layout!.positions!['draft']).toEqual({ x: 5, y: 5 }); // preserved
     expect(g.layout!.positions!['review'].x).toBeGreaterThan(0); // column by depth
     expect(g.layout!.positions!['done'].x).toBeGreaterThan(g.layout!.positions!['review'].x);
+  });
+
+  it('layers by longest path and centers small layers (diamond)', () => {
+    const g = autoLayout({
+      states: [
+        { key: 'a', label: { de: 'A' }, isInitial: true },
+        { key: 'b', label: { de: 'B' } },
+        { key: 'c', label: { de: 'C' } },
+        { key: 'd', label: { de: 'D' } },
+      ],
+      transitions: [
+        { from: 'a', to: 'b' },
+        { from: 'a', to: 'c' },
+        { from: 'b', to: 'd' },
+        { from: 'c', to: 'd' },
+        // Abkürzung a→d: längster Pfad hält d trotzdem in Schicht 2.
+        { from: 'a', to: 'd' },
+      ],
+    });
+    const p = g.layout!.positions!;
+    // Spalten: a | b,c | d — d NICHT in Spalte 1 (längster Pfad, nicht BFS).
+    expect(p['b'].x).toBe(p['c'].x);
+    expect(p['d'].x).toBeGreaterThan(p['b'].x);
+    // b und c teilen sich die Spalte ohne Überlappung.
+    expect(p['b'].y).not.toBe(p['c'].y);
+    // Einzel-Knoten-Schichten (a, d) sind gegenüber der 2er-Schicht zentriert.
+    const mid = (p['b'].y + p['c'].y) / 2;
+    expect(p['a'].y).toBe(mid);
+    expect(p['d'].y).toBe(mid);
   });
 });
 
