@@ -32,7 +32,11 @@ export type IconName =
   | 'half'
   | 'send'
   | 'repeat'
-  | 'menu';
+  | 'menu'
+  | 'gear'
+  | 'key'
+  | 'handshake'
+  | 'paperclip';
 
 /** Icon-Name → Font-Awesome-Solid-Klasse (#80, FA-Migration). */
 const FA: Record<IconName, string> = {
@@ -68,6 +72,10 @@ const FA: Record<IconName, string> = {
   send: 'fa-paper-plane',
   repeat: 'fa-repeat',
   menu: 'fa-bars',
+  gear: 'fa-gear',
+  key: 'fa-key',
+  handshake: 'fa-handshake',
+  paperclip: 'fa-paperclip',
 };
 
 /**

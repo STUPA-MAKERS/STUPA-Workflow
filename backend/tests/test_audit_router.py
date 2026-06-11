@@ -37,6 +37,7 @@ class _FakeService:
         self.items: list[AuditEntry] = []
         self.has_more = False
         self.names: dict[str, str | None] = {}
+        self.target_labels: dict[tuple[str, str], str] = {}
         self.actors: list[tuple[str, str | None]] = []
         self.verification = ChainVerification(valid=True, checked=0)
 
@@ -48,6 +49,11 @@ class _FakeService:
         self, subs: list[str | None]
     ) -> dict[str, str | None]:
         return self.names
+
+    async def resolve_target_labels(
+        self, targets: list[tuple[str | None, str | None]]
+    ) -> dict[tuple[str, str], str]:
+        return self.target_labels
 
     async def list_actors(self) -> list[tuple[str, str | None]]:
         return self.actors

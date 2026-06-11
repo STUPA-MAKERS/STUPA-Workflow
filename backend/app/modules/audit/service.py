@@ -14,6 +14,7 @@ Die Service-Hook :func:`record` kapselt den Standardfall für andere Module (T-1
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -235,6 +236,117 @@ class AuditService:
             )
         ).all()
         return {sub: (display_name or email) for sub, display_name, email in rows}
+
+    async def resolve_target_labels(
+        self, targets: Sequence[tuple[str | None, str | None]]
+    ) -> dict[tuple[str, str], str]:
+        """``(target_type, target_id)`` → menschenlesbares Ziel-Label (Batch, #2).
+
+        Best effort für die Audit-UI: nur Typen mit Namensquelle werden aufgelöst
+        (Antragstitel, Gremium-/Rollen-/Webhook-Name, …); gelöschte Ziele oder
+        nicht-UUID-Ids fehlen in der Map — das FE fällt auf ``type:id`` zurück.
+        Keine PII über die Lesesicht hinaus: alles hier ist Principals mit
+        ``audit.read`` ohnehin über die jeweiligen Admin-Sichten zugänglich."""
+        by_type: dict[str, set[uuid.UUID]] = {}
+        for target_type, target_id in targets:
+            if not target_type or not target_id:
+                continue
+            try:
+                by_type.setdefault(target_type, set()).add(uuid.UUID(target_id))
+            except ValueError:
+                continue  # z. B. export-Dateinamen — target_id ist selbst das Label
+
+        labels: dict[tuple[str, str], str] = {}
+
+        async def fill(
+            target_type: str, stmt: Select[tuple[uuid.UUID, str | None]]
+        ) -> None:
+            for row_id, label in (await self.session.execute(stmt)).all():
+                if label:
+                    labels[(target_type, str(row_id))] = label
+
+        def i18n_label(m: object) -> str | None:
+            if not isinstance(m, dict) or not m:
+                return None
+            return m.get("de") or next(iter(m.values()), None)
+
+        if ids := by_type.get("application"):
+            from app.modules.applications.models import Application
+
+            rows = (
+                await self.session.execute(
+                    select(Application.id, Application.data).where(
+                        Application.id.in_(ids)
+                    )
+                )
+            ).all()
+            for row_id, data in rows:
+                title = (data or {}).get("title")
+                if isinstance(title, str) and title.strip():
+                    labels[("application", str(row_id))] = title.strip()
+        if ids := by_type.get("gremium"):
+            from app.modules.admin.models import Gremium
+
+            await fill(
+                "gremium", select(Gremium.id, Gremium.name).where(Gremium.id.in_(ids))
+            )
+        if ids := by_type.get("application_type"):
+            from app.modules.admin.models import ApplicationType
+
+            rows = (
+                await self.session.execute(
+                    select(ApplicationType.id, ApplicationType.name_i18n).where(
+                        ApplicationType.id.in_(ids)
+                    )
+                )
+            ).all()
+            for row_id, name_i18n in rows:
+                if label := i18n_label(name_i18n):
+                    labels[("application_type", str(row_id))] = label
+        if ids := by_type.get("role"):
+            from app.modules.auth.models import Role
+
+            rows = (
+                await self.session.execute(
+                    select(Role.id, Role.name_i18n, Role.key).where(Role.id.in_(ids))
+                )
+            ).all()
+            for row_id, name_i18n, key in rows:
+                if label := i18n_label(name_i18n) or key:
+                    labels[("role", str(row_id))] = label
+        if ids := by_type.get("principal"):
+            from app.modules.auth.models import Principal
+
+            rows = (
+                await self.session.execute(
+                    select(
+                        Principal.id, Principal.display_name, Principal.email
+                    ).where(Principal.id.in_(ids))
+                )
+            ).all()
+            for row_id, display_name, email in rows:
+                if label := display_name or email:
+                    labels[("principal", str(row_id))] = label
+        if ids := by_type.get("webhook"):
+            from app.modules.admin.models import Webhook
+
+            await fill(
+                "webhook", select(Webhook.id, Webhook.name).where(Webhook.id.in_(ids))
+            )
+        if ids := by_type.get("vote"):
+            from app.modules.voting.models import Vote
+
+            await fill("vote", select(Vote.id, Vote.question).where(Vote.id.in_(ids)))
+        if ids := by_type.get("attachment"):
+            from app.modules.files.models import Attachment
+
+            await fill(
+                "attachment",
+                select(Attachment.id, Attachment.filename).where(
+                    Attachment.id.in_(ids)
+                ),
+            )
+        return labels
 
     async def list_actors(self) -> list[tuple[str, str | None]]:
         """Distinkte Akteure (``sub``) des Logs + aufgelöster Klarname (für Filter)."""

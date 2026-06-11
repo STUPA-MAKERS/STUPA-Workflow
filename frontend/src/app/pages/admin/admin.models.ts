@@ -405,6 +405,8 @@ export interface AuditEntry {
   action: string;
   targetType: string | null;
   targetId: string | null;
+  /** Menschenlesbares Ziel-Label (Antragstitel, Rollenname, …); null = unbekannt/gelöscht. */
+  targetLabel?: string | null;
   data: Record<string, unknown>;
   hash: string;
   prevHash: string | null;

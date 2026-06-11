@@ -66,7 +66,17 @@ async def list_audit(
         limit=limit,
     )
     names = await service.resolve_actor_names([e.actor for e in items])
-    out = [AuditEntryOut.from_entry(e, names.get(e.actor or "")) for e in items]
+    labels = await service.resolve_target_labels(
+        [(e.target_type, e.target_id) for e in items]
+    )
+    out = [
+        AuditEntryOut.from_entry(
+            e,
+            names.get(e.actor or ""),
+            labels.get((e.target_type or "", e.target_id or "")),
+        )
+        for e in items
+    ]
     return AuditPageOut(
         items=out,
         nextCursor=items[-1].id if (has_more and items) else None,

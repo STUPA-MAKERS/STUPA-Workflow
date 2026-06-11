@@ -32,13 +32,19 @@ class AuditEntryOut(_CamelModel):
     action: str
     target_type: str | None = Field(alias="targetType")
     target_id: str | None = Field(alias="targetId")
+    # Menschenlesbares Ziel-Label (Antragstitel, Gremium-/Rollenname, …; #2),
+    # vom Router batch-aufgelöst; None wenn Ziel gelöscht/unbekannt.
+    target_label: str | None = Field(default=None, alias="targetLabel")
     data: dict[str, Any]
     hash: str
     prev_hash: str | None = Field(alias="prevHash")
 
     @classmethod
     def from_entry(
-        cls, entry: AuditEntry, actor_name: str | None = None
+        cls,
+        entry: AuditEntry,
+        actor_name: str | None = None,
+        target_label: str | None = None,
     ) -> AuditEntryOut:
         """ORM-Zeile → Out-Schema (bytea-Hashes hex-kodiert)."""
         return cls(
@@ -49,6 +55,7 @@ class AuditEntryOut(_CamelModel):
             action=entry.action,
             targetType=entry.target_type,
             targetId=entry.target_id,
+            targetLabel=target_label,
             data=entry.data,
             hash=entry.hash.hex(),
             prevHash=entry.prev_hash.hex() if entry.prev_hash is not None else None,

@@ -1160,6 +1160,10 @@ export const de = {
   'admin.audit.action.export': 'Export',
   'admin.audit.action.webhook_config': 'Webhook-Konfiguration',
   'admin.audit.action.attachment_quarantine': 'Anhang-Quarantäne',
+  'admin.audit.action.attachment_delete': 'Anhang gelöscht',
+  'admin.audit.today': 'Heute',
+  'admin.audit.yesterday': 'Gestern',
+  'admin.audit.openTarget': 'Ziel öffnen',
   'admin.audit.msg.login': '{actor} hat sich angemeldet.',
   'admin.audit.msg.status_change': '{actor} hat den Status von {target} geändert.',
   'admin.audit.msg.vote_cast': '{actor} hat eine Stimme abgegeben ({target}).',
@@ -1173,6 +1177,7 @@ export const de = {
   'admin.audit.msg.webhook_config': '{actor} hat einen Webhook konfiguriert ({target}).',
   'admin.audit.msg.attachment_quarantine':
     '{actor} hat einen Anhang in Quarantäne verschoben ({target}).',
+  'admin.audit.msg.attachment_delete': '{actor} hat einen Anhang gelöscht ({target}).',
   'admin.audit.msg.unknown': '{actor}: {action} ({target}).',
 
   'admin.deadlines.title': 'Fristen',
@@ -2661,6 +2666,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.action.export': 'Export',
   'admin.audit.action.webhook_config': 'Webhook configuration',
   'admin.audit.action.attachment_quarantine': 'Attachment quarantine',
+  'admin.audit.action.attachment_delete': 'Attachment deleted',
+  'admin.audit.today': 'Today',
+  'admin.audit.yesterday': 'Yesterday',
+  'admin.audit.openTarget': 'Open target',
   'admin.audit.msg.login': '{actor} signed in.',
   'admin.audit.msg.status_change': '{actor} changed the status of {target}.',
   'admin.audit.msg.vote_cast': '{actor} cast a vote ({target}).',
@@ -2673,6 +2682,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.export': '{actor} exported data ({target}).',
   'admin.audit.msg.webhook_config': '{actor} configured a webhook ({target}).',
   'admin.audit.msg.attachment_quarantine': '{actor} quarantined an attachment ({target}).',
+  'admin.audit.msg.attachment_delete': '{actor} deleted an attachment ({target}).',
   'admin.audit.msg.unknown': '{actor}: {action} ({target}).',
 
   'admin.deadlines.title': 'Deadlines',
