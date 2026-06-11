@@ -63,3 +63,16 @@ class MailPreviewOut(_CamelModel):
     text: str
     html: str | None = None
     lang: str
+
+
+class NotificationPreferenceOut(_CamelModel):
+    """Effektiver Schalter einer Benachrichtigungs-Art (#4-2)."""
+
+    kind: str
+    enabled: bool
+
+
+class NotificationPreferencesUpdate(_CamelModel):
+    """Bulk-Update der eigenen Benachrichtigungs-Schalter."""
+
+    preferences: list[NotificationPreferenceOut]

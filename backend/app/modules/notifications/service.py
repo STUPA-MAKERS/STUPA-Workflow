@@ -19,13 +19,14 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.notifications.kinds import NOTIFICATION_KINDS
 from app.modules.notifications.layout import (
     reason_text,
     render_layout,
     text_to_html,
 )
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
-from app.modules.notifications.models import MailTemplate
+from app.modules.notifications.models import MailTemplate, NotificationPreference
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.schemas import (
@@ -150,6 +151,60 @@ class NotificationService:
             lang=rendered.lang,
         )
 
+    # ----------------------------------------------------------- preferences #
+    async def get_preferences(self, principal_sub: str) -> list[tuple[str, bool]]:
+        """Effektive Schalter des Users — voller Katalog, Abweichungen gemerged."""
+        principal_id = await self._principal_id(principal_sub)
+        stored: dict[str, bool] = {}
+        if principal_id is not None:
+            rows = (
+                await self.session.execute(
+                    select(
+                        NotificationPreference.kind, NotificationPreference.enabled
+                    ).where(NotificationPreference.principal_id == principal_id)
+                )
+            ).all()
+            stored = {kind: enabled for kind, enabled in rows}
+        return [(k, stored.get(k, True)) for k in NOTIFICATION_KINDS]
+
+    async def set_preferences(
+        self, principal_sub: str, items: list[tuple[str, bool]]
+    ) -> list[tuple[str, bool]]:
+        """Bulk-Upsert der eigenen Schalter; nur Abweichungen werden gespeichert."""
+        unknown = sorted({k for k, _ in items} - set(NOTIFICATION_KINDS))
+        if unknown:
+            raise ValidationProblem(
+                "Unknown notification kinds.",
+                errors=[{"field": "preferences", "msg": f"unknown: {unknown}"}],
+            )
+        principal_id = await self._principal_id(principal_sub)
+        if principal_id is None:
+            raise NotFoundError(f"principal {principal_sub!r} not found")
+        for kind, enabled in items:
+            row = await self.session.get(
+                NotificationPreference, (principal_id, kind)
+            )
+            if enabled:
+                if row is not None:
+                    await self.session.delete(row)
+            elif row is None:
+                self.session.add(
+                    NotificationPreference(
+                        principal_id=principal_id, kind=kind, enabled=False
+                    )
+                )
+            else:
+                row.enabled = False
+        await self.session.commit()
+        return await self.get_preferences(principal_sub)
+
+    async def _principal_id(self, sub: str) -> uuid.UUID | None:
+        from app.modules.auth.models import Principal as PrincipalRow
+
+        return await self.session.scalar(
+            select(PrincipalRow.id).where(PrincipalRow.sub == sub)
+        )
+
     # -------------------------------------------------------------- dispatch #
     async def handle_notify_action(
         self,
@@ -173,8 +228,13 @@ class NotificationService:
             or action.get("template_key")
             or DEFAULT_NOTIFY_TEMPLATE_KEY
         )
+        reason = "deadline" if "deadline" in str(template_key) else "status_update"
         recipients = await self.resolver.resolve(
             _as_specs(action.get("recipients", [])), application_id=application_id
+        )
+        # Abgewählte Benachrichtigungs-Arten respektieren (#4-2).
+        recipients = await filter_recipients_by_preference(
+            self.session, recipients, reason
         )
         if not recipients:
             logger.info("notify action resolved no recipients — skipped")
@@ -185,7 +245,6 @@ class NotificationService:
         context = dict(context or {})
         context.setdefault("applicationTitle", "")
         context.setdefault("status", "")
-        reason = "deadline" if "deadline" in str(template_key) else "status_update"
         idem = _idem_parts(
             idempotency_base, "notify", str(application_id or ""), str(template_key)
         )
@@ -311,6 +370,36 @@ class NotificationService:
             return False
         await self.queue.enqueue(msg)
         return True
+
+
+async def filter_recipients_by_preference(
+    session: AsyncSession, recipients: list[str], kind: str
+) -> list[str]:
+    """Empfänger entfernen, die ``kind`` abgewählt haben (#4-2).
+
+    Abgleich über die Principal-Mail (CITEXT, case-insensitiv). Adressen ohne
+    Account (anonyme Antragsteller, Verteiler) haben keine Präferenz → bleiben.
+    Unbekannte Kinds filtern nie (fail-open beim Versand)."""
+    if not recipients or kind not in NOTIFICATION_KINDS:
+        return recipients
+    from app.modules.auth.models import Principal as PrincipalRow
+
+    disabled = (
+        await session.scalars(
+            select(PrincipalRow.email)
+            .join(
+                NotificationPreference,
+                NotificationPreference.principal_id == PrincipalRow.id,
+            )
+            .where(
+                NotificationPreference.kind == kind,
+                NotificationPreference.enabled.is_(False),
+                PrincipalRow.email.in_(recipients),
+            )
+        )
+    ).all()
+    blocked = {e.lower() for e in disabled if e}
+    return [r for r in recipients if r.lower() not in blocked]
 
 
 def _idem_parts(base: str | None, *parts: str) -> tuple[str, ...]:

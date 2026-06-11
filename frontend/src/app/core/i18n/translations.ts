@@ -60,6 +60,38 @@ export const de = {
   'action.save': 'Speichern',
   'common.loading': 'Wird geladen …',
   'account.menu.apiAccess': 'API-Zugang',
+  'account.menu.notifications': 'Benachrichtigungen',
+  'account.notifications.title': 'Benachrichtigungen',
+  'account.notifications.intro':
+    'Wähle, welche E-Mail-Benachrichtigungen du erhalten möchtest. Login-Links werden immer zugestellt.',
+  'account.notifications.error': 'Einstellungen konnten nicht geladen werden.',
+  'account.notifications.saveError': 'Speichern fehlgeschlagen — bitte erneut versuchen.',
+  'account.notifications.kind.status_update': 'Status-Updates zu Anträgen',
+  'account.notifications.hint.status_update':
+    'Wenn sich der Status eines Antrags ändert, der dich betrifft.',
+  'account.notifications.kind.comment': 'Neue Kommentare',
+  'account.notifications.hint.comment':
+    'Wenn ein Antrag kommentiert wird, der dich betrifft.',
+  'account.notifications.kind.task': 'Neue Aufgaben',
+  'account.notifications.hint.task':
+    'Wenn ein Antrag einen Schritt erreicht, in dem du handeln kannst.',
+  'account.notifications.kind.task_reminder': 'Aufgaben-Erinnerungen',
+  'account.notifications.hint.task_reminder': 'Erinnerungen an offene Aufgaben.',
+  'account.notifications.kind.meeting': 'Sitzungen',
+  'account.notifications.hint.meeting':
+    'Einladung und Tagesordnung von Sitzungen deiner Gremien.',
+  'account.notifications.kind.vote': 'Abstimmungen',
+  'account.notifications.hint.vote': 'Wenn Abstimmungen geöffnet oder geschlossen werden.',
+  'account.notifications.kind.role_change': 'Rollen-Änderungen',
+  'account.notifications.hint.role_change':
+    'Wenn dir eine Rolle zugewiesen oder entzogen wird.',
+  'account.notifications.kind.delegation': 'Delegationen',
+  'account.notifications.hint.delegation':
+    'Wenn du eine Stimm-Delegation erhältst oder sie widerrufen wird.',
+  'account.notifications.kind.protocol': 'Protokolle',
+  'account.notifications.hint.protocol': 'Wenn ein Sitzungsprotokoll finalisiert wurde.',
+  'account.notifications.kind.deadline': 'Frist-Erinnerungen',
+  'account.notifications.hint.deadline': 'Wenn eine Frist zu einem Antrag näher rückt.',
   'account.grants.title': 'API-Zugang & Agenten',
   'account.grants.intro':
     'Verwalte hier die OAuth-Zugriffe (Agenten/MCP), die in deinem Namen handeln dürfen.',
@@ -1578,6 +1610,39 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'action.cancel': 'Cancel',
   'common.loading': 'Loading …',
   'account.menu.apiAccess': 'API access',
+  'account.menu.notifications': 'Notifications',
+  'account.notifications.title': 'Notifications',
+  'account.notifications.intro':
+    'Choose which email notifications you want to receive. Login links are always delivered.',
+  'account.notifications.error': 'Settings could not be loaded.',
+  'account.notifications.saveError': 'Saving failed — please try again.',
+  'account.notifications.kind.status_update': 'Status updates on applications',
+  'account.notifications.hint.status_update':
+    'When the status of an application that concerns you changes.',
+  'account.notifications.kind.comment': 'New comments',
+  'account.notifications.hint.comment':
+    'When an application that concerns you receives a comment.',
+  'account.notifications.kind.task': 'New tasks',
+  'account.notifications.hint.task':
+    'When an application reaches a step where you can act.',
+  'account.notifications.kind.task_reminder': 'Task reminders',
+  'account.notifications.hint.task_reminder': 'Reminders about open tasks.',
+  'account.notifications.kind.meeting': 'Meetings',
+  'account.notifications.hint.meeting':
+    'Invitations and agendas of your committees’ meetings.',
+  'account.notifications.kind.vote': 'Votes',
+  'account.notifications.hint.vote': 'When votes are opened or closed.',
+  'account.notifications.kind.role_change': 'Role changes',
+  'account.notifications.hint.role_change':
+    'When a role is assigned to you or revoked.',
+  'account.notifications.kind.delegation': 'Delegations',
+  'account.notifications.hint.delegation':
+    'When you receive a vote delegation or it is revoked.',
+  'account.notifications.kind.protocol': 'Protocols',
+  'account.notifications.hint.protocol': 'When a meeting protocol is finalized.',
+  'account.notifications.kind.deadline': 'Deadline reminders',
+  'account.notifications.hint.deadline':
+    'When a deadline on an application is approaching.',
   'account.grants.title': 'API access & agents',
   'account.grants.intro':
     'Manage the OAuth grants (agents/MCP) that are allowed to act on your behalf.',

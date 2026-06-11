@@ -306,6 +306,16 @@ export const routes: Routes = [
           import('./pages/account/grants.component').then((m) => m.AccountGrantsComponent),
       },
       {
+        // Konto → Benachrichtigungen (#4-2): eigene Mail-Schalter (Opt-out).
+        path: 'account/notifications',
+        data: { title: 'account.notifications.title' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/account/notifications.component').then(
+            (m) => m.AccountNotificationsComponent,
+          ),
+      },
+      {
         path: 'forbidden',
         data: { title: 'forbidden.heading' },
         loadComponent: () =>

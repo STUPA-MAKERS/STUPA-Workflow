@@ -827,6 +827,16 @@ export interface Protocol {
 }
 
 // =========================================================================== //
+// Benachrichtigungs-Präferenzen (#4-2) — Self-Service über das Konto-Popout.    //
+// =========================================================================== //
+
+/** Schalter einer Benachrichtigungs-Art (`GET/PUT /notifications/preferences`). */
+export interface NotificationPreference {
+  kind: string;
+  enabled: boolean;
+}
+
+// =========================================================================== //
 // OAuth-Grants + MCP-Setup (#MCP) — Self-Service über das Konto-Popout.          //
 // =========================================================================== //
 

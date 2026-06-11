@@ -22,6 +22,7 @@ import {
 import type {
   ConsentRequest,
   McpSetup,
+  NotificationPreference,
   OAuthGrant,
   Application,
   ApplicationComment,
@@ -554,6 +555,21 @@ export class ApiClient {
     return this.http
       .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/finalize`, {})
       .pipe(map(mapProtocol));
+  }
+
+  // --- Benachrichtigungs-Präferenzen (#4-2, Self-Service) ------------------
+  /** GET /notifications/preferences — eigene Schalter (voller Katalog). */
+  listNotificationPreferences(): Observable<NotificationPreference[]> {
+    return this.http.get<NotificationPreference[]>(`${this.base}/notifications/preferences`);
+  }
+
+  /** PUT /notifications/preferences — eigene Schalter setzen (Bulk). */
+  setNotificationPreferences(
+    preferences: NotificationPreference[],
+  ): Observable<NotificationPreference[]> {
+    return this.http.put<NotificationPreference[]>(`${this.base}/notifications/preferences`, {
+      preferences,
+    });
   }
 
   // --- OAuth-Grants + MCP-Setup (#MCP, Self-Service) -----------------------

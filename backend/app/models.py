@@ -47,7 +47,7 @@ from app.modules.files.models import Attachment
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
-from app.modules.notifications.models import MailTemplate
+from app.modules.notifications.models import MailTemplate, NotificationPreference
 from app.modules.pdf.models import RenderJob
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
@@ -80,6 +80,7 @@ __all__ = [
     "MagicLink",
     "MailList",
     "MailTemplate",
+    "NotificationPreference",
     "Meeting",
     "MeetingAgendaItem",
     "MeetingAttendance",

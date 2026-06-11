@@ -49,6 +49,15 @@
           @if (accountMenuOpen()) {
             <button type="button" class="account__backdrop" aria-hidden="true" tabindex="-1" (click)="closeAccountMenu()"></button>
             <div class="account__menu" role="menu">
+              <a
+                class="account__menu-item"
+                role="menuitem"
+                routerLink="/account/notifications"
+                (click)="closeAccountMenu()"
+              >
+                <app-icon name="bell" [size]="16" />
+                {{ 'account.menu.notifications' | t }}
+              </a>
               @if (auth.canAny('mcp.use')) {
                 <a
                   class="account__menu-item"

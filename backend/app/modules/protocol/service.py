@@ -48,6 +48,7 @@ from app.modules.notifications.mail import (
 )
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
+from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.pytex_client import PytexClient, PytexError
 from app.modules.protocol.markdown import (
     ProtocolDoc,
@@ -480,6 +481,10 @@ class ProtocolService:
         if self.mail_queue is None:
             return
         recipients = await self._recipients(protocol.gremium_id)
+        # Abgewählte Protokoll-Mails respektieren (#4-2).
+        recipients = await filter_recipients_by_preference(
+            self.session, recipients, "protocol"
+        )
         if not recipients:
             return
         gremium_name = await self.session.scalar(

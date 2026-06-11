@@ -1,12 +1,16 @@
-"""Notifications-Tabelle: mail_template (data-model §1).
+"""Notifications-Tabellen: mail_template + notification_preference (data-model §1).
 
 `mail_template` hält i18n-Subject/Body (Jinja2) + deklarierte Platzhalter.
+`notification_preference` speichert die per-User-Abwahl einzelner
+Benachrichtigungs-Arten (#4-2): kein Eintrag = aktiviert (Opt-out-Default).
 Versandlogik/Render: Service + Worker (T-18).
 """
 
 from __future__ import annotations
 
-from sqlalchemy import Text
+import uuid
+
+from sqlalchemy import Boolean, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,3 +29,20 @@ class MailTemplate(UUIDPkMixin, CreatedAtMixin, Base):
     body_html_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     # Deklarierte Platzhalter (Doku/Vorschau): {"name": "...", "applicationId": "..."}.
     placeholders: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+
+
+class NotificationPreference(Base):
+    """Per-User-Schalter je Benachrichtigungs-Art (#4-2).
+
+    Nur **Abweichungen** vom Default werden gespeichert (alle Arten sind per
+    Default aktiv); essenzielle Mails (Magic-Link) sind nicht abschaltbar und
+    tauchen hier nie auf. ``kind`` ∈ :data:`app.modules.notifications.kinds`.
+    """
+
+    __tablename__ = "notification_preference"
+
+    principal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default="true")

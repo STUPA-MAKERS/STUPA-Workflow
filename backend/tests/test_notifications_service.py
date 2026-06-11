@@ -125,7 +125,8 @@ async def test_preview_template_not_found() -> None:
 
 # --------------------------------------------------------------------------- notify action
 async def test_handle_notify_action_inline_mode() -> None:
-    session = FakeSession(scalars=[[_template()]])
+    # Erster scalars-Call: Präferenz-Filter (#4-2, keine Abwahlen), dann Template.
+    session = FakeSession(scalars=[[], [_template()]])
     queue = FakeQueue()
     svc = _service(session, queue)
     svc.resolver = FakeResolver(["a@x.de"])  # type: ignore[assignment]
@@ -141,7 +142,7 @@ async def test_handle_notify_action_inline_mode() -> None:
 
 async def test_handle_notify_action_inline_missing_template_falls_back() -> None:
     # Unbekanntes Template -> var-freier Builtin-Fallback statt stillem Verwurf.
-    session = FakeSession(scalars=[[]])
+    session = FakeSession(scalars=[[], []])
     queue = FakeQueue()
     svc = _service(session, queue)
     svc.resolver = FakeResolver(["a@x.de"])  # type: ignore[assignment]
@@ -197,7 +198,7 @@ async def test_idempotency_base_changes_key() -> None:
     app_id = uuid.uuid4()
 
     async def run(base: str | None) -> str:
-        session = FakeSession(scalars=[[_template()]])
+        session = FakeSession(scalars=[[], [_template()]])
         queue = FakeQueue()
         svc = _service(session, queue)
         svc.resolver = FakeResolver(["a@x.de"])  # type: ignore[assignment]
