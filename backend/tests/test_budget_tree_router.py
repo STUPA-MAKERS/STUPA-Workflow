@@ -53,9 +53,35 @@ def _node_out() -> BudgetNodeOut:
     )
 
 
+class _FakeAuditResult:
+    def scalar_one_or_none(self) -> None:
+        return None
+
+
+class _FakeAuditSession:
+    """Minimal-Session für den Audit-Hook in Export-Endpunkten (kein DB-Zugriff)."""
+
+    def __init__(self) -> None:
+        self.entries: list[Any] = []
+        self.committed = False
+
+    async def execute(self, _stmt: object) -> _FakeAuditResult:
+        return _FakeAuditResult()
+
+    def add(self, obj: object) -> None:
+        self.entries.append(obj)
+
+    async def flush(self) -> None:
+        pass
+
+    async def commit(self) -> None:
+        self.committed = True
+
+
 class _FakeService:
     def __init__(self) -> None:
         self.calls: dict[str, Any] = {}
+        self.session = _FakeAuditSession()
 
     async def get_tree(self, *, gremium_id: Any = None) -> list[BudgetTreeNodeOut]:
         self.calls["tree"] = gremium_id
@@ -299,6 +325,12 @@ def test_budget_export_xlsx(fake: _FakeService) -> None:
     assert resp.content[:2] == b"PK"  # xlsx = zip container
     assert fake.calls["tree"] == _GID
     assert fake.calls["fy_labels"] is True
+    # Export wird auditiert (#1): EXPORT-Eintrag + Commit in derselben Transaktion.
+    (entry,) = fake.session.entries
+    assert entry.action == "export"
+    assert entry.actor == "fin"
+    assert entry.target_id == "budget.xlsx"
+    assert fake.session.committed is True
 
 
 def test_get_budget_tree_service_factory() -> None:

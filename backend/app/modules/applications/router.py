@@ -50,6 +50,8 @@ from app.modules.applications.schemas import (
     VersionOut,
 )
 from app.modules.applications.service import ApplicationsService
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth import service as auth_service
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.notifications.provider import mail_queue_from_pool
@@ -240,11 +242,11 @@ async def list_applications(
 
 @router.get(
     "/applications/export.xlsx",
-    dependencies=[Depends(require_principal("application.export"))],
     responses=_errors(401, 403),
 )
 async def export_applications_xlsx(
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("application.export"))],
     state_id: Annotated[UUID | None, Query(alias="state")] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
     type_id: Annotated[UUID | None, Query(alias="type")] = None,
@@ -281,6 +283,15 @@ async def export_applications_xlsx(
     data = build_applications_workbook(
         page.items, type_names=type_names, gremium_names=gremium_names
     )
+    await audit_record(
+        service.session,
+        actor=principal.sub,
+        action=AuditAction.EXPORT,
+        target_type="export",
+        target_id="applications.xlsx",
+        data={"rows": len(page.items)},
+    )
+    await service.session.commit()
     return Response(
         content=data,
         media_type=XLSX_MEDIA_TYPE,

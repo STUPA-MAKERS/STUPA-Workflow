@@ -24,6 +24,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.deps import DbSession, Principal, require_principal
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.budget.tree_schemas import (
     AccountCreate,
     AccountOut,
@@ -97,11 +99,11 @@ def _find_subtree(
 
 @router.get(
     "/budget/export.xlsx",
-    dependencies=[Depends(require_principal("budget.export"))],
     responses=_errors(401, 403),
 )
 async def export_budget_xlsx(
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.export"))],
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
     node_id: Annotated[UUID | None, Query(alias="node")] = None,
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
@@ -121,6 +123,19 @@ async def export_budget_xlsx(
     data = build_budget_workbook(
         roots, fiscal_year_labels=labels, fiscal_year_id=fiscal_year_id
     )
+    await audit_record(
+        service.session,
+        actor=principal.sub,
+        action=AuditAction.EXPORT,
+        target_type="export",
+        target_id="budget.xlsx",
+        data={
+            "gremium_id": str(gremium_id) if gremium_id else None,
+            "node_id": str(node_id) if node_id else None,
+            "fiscal_year_id": str(fiscal_year_id) if fiscal_year_id else None,
+        },
+    )
+    await service.session.commit()
     return Response(
         content=data,
         media_type=XLSX_MEDIA_TYPE,
@@ -285,11 +300,11 @@ async def list_expenses(
 
 @router.get(
     "/expenses/export.xlsx",
-    dependencies=[Depends(require_principal("budget.export"))],
     responses=_errors(401, 403),
 )
 async def export_expenses_xlsx(
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.export"))],
     budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
     kind: Annotated[ExpenseKind | None, Query()] = None,
@@ -315,6 +330,15 @@ async def export_expenses_xlsx(
         offset=0,
     )
     data = build_expenses_workbook(page.items)
+    await audit_record(
+        service.session,
+        actor=principal.sub,
+        action=AuditAction.EXPORT,
+        target_type="export",
+        target_id="buchungen.xlsx",
+        data={"rows": len(page.items)},
+    )
+    await service.session.commit()
     return Response(
         content=data,
         media_type=XLSX_MEDIA_TYPE,

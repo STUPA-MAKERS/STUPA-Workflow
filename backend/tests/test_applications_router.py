@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -63,12 +64,38 @@ def _out(app_id: UUID, *, with_pii: bool) -> ApplicationOut:
     )
 
 
+class _FakeAuditResult:
+    def scalar_one_or_none(self) -> None:
+        return None
+
+
+class _FakeAuditSession:
+    """Minimal-Session für den Audit-Hook in Export-Endpunkten (kein DB-Zugriff)."""
+
+    def __init__(self) -> None:
+        self.entries: list[Any] = []
+        self.committed = False
+
+    async def execute(self, _stmt: object) -> _FakeAuditResult:
+        return _FakeAuditResult()
+
+    def add(self, obj: object) -> None:
+        self.entries.append(obj)
+
+    async def flush(self) -> None:
+        pass
+
+    async def commit(self) -> None:
+        self.committed = True
+
+
 class _FakeService:
     def __init__(self) -> None:
         self.created: object | None = None
         self.created_actor: str | None = None
         self.last_include_pii: bool | None = None
         self.comment_args: dict[str, object] | None = None
+        self.session = _FakeAuditSession()
 
     async def create(self, payload, *, actor="applicant"):  # noqa: ANN001
         self.created = payload
@@ -429,6 +456,12 @@ def test_applications_export_xlsx(
     assert fake_service.list_kwargs["gremium_id"] == gremium
     assert fake_service.list_kwargs["q"] == "foo"
     assert fake_service.name_maps_called is True
+    # Export wird auditiert (#1): EXPORT-Eintrag + Commit in derselben Transaktion.
+    (entry,) = fake_service.session.entries
+    assert entry.action == "export"
+    assert entry.actor == "admin"
+    assert entry.target_id == "applications.xlsx"
+    assert fake_service.session.committed is True
 
 
 # --------------------------------------------------------------------------- #
