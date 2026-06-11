@@ -33,6 +33,7 @@ from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pytex_api import (
     ApiError,
+    BuildLimits,
     BuildRequest,
     CompileError,
     InputKind,
@@ -47,9 +48,23 @@ from pytex_api import (
 # App-generated docs are first-party; default to a real PDF built at full trust.
 _DEFAULT_OUTPUT = os.environ.get("PYTEX_DEFAULT_OUTPUT", "pdf").lower()
 _DEFAULT_TRUST = os.environ.get("PYTEX_DEFAULT_TRUST", "trusted").lower()
-# Hard ceiling on the body we even read, in front of the library's own 2 MiB
-# input cap; keeps a giant upload out of memory.
+# Hard ceiling on the body we even read, in front of the library's input cap;
+# keeps a giant upload out of memory. The library cap is aligned below.
 _MAX_BODY_BYTES = int(os.environ.get("PYTEX_MAX_BODY_BYTES", str(4 * 1024 * 1024)))
+# Compile wall-clock/cpu kill (seconds). The library default of 30 s is too tight
+# for the FIRST trusted build: tectonic lazily downloads its LaTeX bundle into
+# the cache volume on that run and gets killed mid-download — every retry starts
+# over and the render never succeeds. 120 s lets the warm-up complete; cached
+# builds finish in a few seconds anyway.
+_WALL_TIMEOUT_S = float(os.environ.get("PYTEX_WALL_TIMEOUT_S", "120"))
+_CPU_TIMEOUT_S = float(os.environ.get("PYTEX_CPU_TIMEOUT_S", "120"))
+_LIMITS = BuildLimits(
+    wall_timeout_s=_WALL_TIMEOUT_S,
+    cpu_timeout_s=_CPU_TIMEOUT_S,
+    # Align the library's input cap with the HTTP body cap — otherwise bodies
+    # between 2 MiB (library default) and PYTEX_MAX_BODY_BYTES still 413.
+    max_input_bytes=_MAX_BODY_BYTES,
+)
 
 app = FastAPI(title="pytex render service", version="1.0.0")
 
@@ -134,6 +149,7 @@ async def render(
         output_kind=ok,
         trust=tl,
         variant=variant,
+        limits=_LIMITS,
     )
 
     try:

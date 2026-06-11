@@ -78,6 +78,21 @@ async def create_or_load_protocol(
     return await service.get_or_create(meeting_id, author=principal.sub)
 
 
+@router.get(
+    "/meetings/{meeting_id}/protocol",
+    response_model=ProtocolOut,
+    responses=_errors(401, 403, 404),
+)
+async def get_protocol(
+    meeting_id: UUID, service: ServiceDep, _principal: WriterDep
+) -> ProtocolOut:
+    """Protokoll der Sitzung **lesen** (404 ohne Protokoll) — Reload-/Poll-Pfad.
+
+    Der Status-Poll während des Hintergrund-Renders lief vorher über den POST und
+    schlug nach kurzer Zeit am Default-Write-Rate-Limit auf (429, #async-finalize)."""
+    return await service.get_by_meeting(meeting_id)
+
+
 @router.patch(
     "/protocols/{protocol_id}",
     response_model=ProtocolOut,

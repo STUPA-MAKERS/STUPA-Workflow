@@ -524,6 +524,16 @@ export class ApiClient {
       .pipe(map(mapProtocol));
   }
 
+  /** GET /meetings/{id}/protocol — Protokoll **lesen** (404 ohne Protokoll).
+
+      Für Reload/Status-Poll (#async-finalize): GETs unterliegen nicht dem
+      Default-Write-Rate-Limit — der 4s-Poll über den POST lief schnell in 429. */
+  getProtocol(meetingId: Uuid): Observable<Protocol> {
+    return this.http
+      .get<ProtocolOutWire>(`${this.base}/meetings/${meetingId}/protocol`)
+      .pipe(map(mapProtocol));
+  }
+
   /** PATCH /protocols/{id} — Markdown aktualisieren. */
   updateProtocol(protocolId: Uuid, markdown: string): Observable<Protocol> {
     return this.http

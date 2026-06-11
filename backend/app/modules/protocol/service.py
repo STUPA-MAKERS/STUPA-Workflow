@@ -150,6 +150,16 @@ class ProtocolService:
             "cd_variant": gremium.cd_variant if gremium is not None else None,
         }
 
+    async def get_by_meeting(self, meeting_id: UUID) -> ProtocolOut:
+        """Protokoll der Sitzung **lesen** (404 ohne Protokoll) — Reload-/Poll-Pfad.
+
+        Bewusst ohne Anlage-Seiteneffekt: das FE pollt während des Hintergrund-
+        Renders; ein GET unterliegt nicht dem Default-Write-Rate-Limit (#429)."""
+        protocol = await self._by_meeting(meeting_id)
+        if protocol is None:
+            raise NotFoundError(f"protocol for meeting {meeting_id} not found")
+        return self._to_out(protocol)
+
     async def get_or_create(
         self, meeting_id: UUID, *, author: str | None = None
     ) -> ProtocolOut:

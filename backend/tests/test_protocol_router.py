@@ -61,6 +61,10 @@ class _FakeService:
         self.calls.append(f"get_or_create:{meeting_id}:{author}")
         return self._out()
 
+    async def get_by_meeting(self, meeting_id: UUID) -> ProtocolOut:
+        self.calls.append(f"get_by_meeting:{meeting_id}")
+        return self._out(status=self.status)
+
     async def update_markdown(self, protocol_id: UUID, markdown: str) -> ProtocolOut:
         self.calls.append(f"update:{protocol_id}")
         return self._out(markdown=markdown)
@@ -146,6 +150,22 @@ def test_create_or_load_protocol(
     assert r.status_code == 200
     assert r.json()["meetingId"] == str(MEETING_ID)
     assert fake_service.calls == [f"get_or_create:{MEETING_ID}:p"]
+
+
+def test_get_protocol_read_only(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """Reload-/Poll-Pfad (#429): GET liest ohne Anlage-Seiteneffekt."""
+    _writer(app, "meeting.manage")
+    fake_service.status = "rendering"
+    r = client.get(f"/api/meetings/{MEETING_ID}/protocol")
+    assert r.status_code == 200
+    assert r.json()["status"] == "rendering"
+    assert fake_service.calls == [f"get_by_meeting:{MEETING_ID}"]
+
+
+def test_get_protocol_requires_auth_401(client: TestClient) -> None:
+    assert client.get(f"/api/meetings/{MEETING_ID}/protocol").status_code == 401
 
 
 def test_update_protocol(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:

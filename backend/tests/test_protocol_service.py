@@ -491,3 +491,18 @@ async def test_finalize_recipients_union_members_plus_maillist() -> None:
     ).finalize(PID, now=NOW)
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("member@x.de", "extra@y.de")
+
+
+async def test_get_by_meeting_reads_without_create() -> None:
+    """Reload-/Poll-Pfad (#429): liest das bestehende Protokoll, legt nie an."""
+    proto = _protocol(status="rendering")
+    session = FakeSession(results=[result(proto)])
+    out = await _service(session).get_by_meeting(MID)
+    assert out.status == "rendering"
+    assert session.added == [] and session.committed == 0
+
+
+async def test_get_by_meeting_404_without_protocol() -> None:
+    session = FakeSession(results=[result()])
+    with pytest.raises(NotFoundError):
+        await _service(session).get_by_meeting(MID)

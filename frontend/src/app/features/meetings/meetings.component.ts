@@ -2069,7 +2069,9 @@ export class MeetingsComponent implements OnDestroy {
     this.planDate.set(m.date ?? '');
     this.planTime.set(m.startTime ?? '');
     this.connectLive(m.id);
-    if (m.protocolId && this.canWrite()) this.loadProtocol();
+    // Bestehendes Protokoll per GET lesen (kein Write-Rate-Limit, #429);
+    // angelegt wird nur explizit über den Button (POST, loadProtocol).
+    if (m.protocolId && this.canWrite()) this.refreshProtocol();
     this.loadAttendance(m.id);
     this.loadAgenda(m.id);
   }
@@ -2248,6 +2250,19 @@ export class MeetingsComponent implements OnDestroy {
     });
   }
 
+  /** Bestehendes Protokoll per GET nachladen (kein Write-Rate-Limit, #429). */
+  private refreshProtocol(): void {
+    const m = this.meeting();
+    if (!m) return;
+    this.api.getProtocol(m.id).subscribe({
+      next: (proto) => {
+        this.protocol.set(proto);
+        this.watchRendering(proto);
+      },
+      error: () => {},
+    });
+  }
+
   /** Status-Flip nach dem Hintergrund-Render anwenden (+ Toast final/fehlgeschlagen).
 
       `rendering → draft` heißt: der Worker hat den Render aufgegeben und
@@ -2274,7 +2289,9 @@ export class MeetingsComponent implements OnDestroy {
       this.renderPollTimer = null;
       const m = this.meeting();
       if (!m) return;
-      this.api.loadProtocol(m.id).subscribe({
+      // GET statt POST: der Poll darf das Default-Write-Rate-Limit nicht
+      // aufbrauchen (429 nach wenigen Minuten, #429).
+      this.api.getProtocol(m.id).subscribe({
         next: (updated) => this.applyProtocolUpdate(updated),
         error: () => this.watchRendering(proto),
       });
@@ -2773,8 +2790,10 @@ export class MeetingsComponent implements OnDestroy {
         this.loadAgenda(m.id);
         // Protokoll-Status kann geflippt sein (rendering → final/draft): der Worker
         // broadcastet meeting_state nach dem Hintergrund-Render (#async-finalize).
+        // GET statt POST — Broadcast-Bursts dürfen das Write-Rate-Limit nicht
+        // aufbrauchen (#429).
         if (this.canWrite() && this.protocol() && !this.protocol()!.isFinal) {
-          this.api.loadProtocol(m.id).subscribe({
+          this.api.getProtocol(m.id).subscribe({
             next: (proto) => this.applyProtocolUpdate(proto),
             error: () => {},
           });
