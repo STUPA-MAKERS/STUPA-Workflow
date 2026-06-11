@@ -106,7 +106,9 @@ class _FakeVotingService:
         self._exc = exc
         self.casts: list[tuple[UUID, str, str]] = []
 
-    async def cast(self, vote_id: UUID, principal: Principal, choice: str, *, now) -> None:  # noqa: ANN001
+    async def cast(
+        self, vote_id: UUID, principal: Principal, choice: str, *, now, as_delegation: bool = False
+    ) -> None:  # noqa: ANN001
         if self._exc is not None:
             raise self._exc
         self.casts.append((vote_id, choice, principal.sub))

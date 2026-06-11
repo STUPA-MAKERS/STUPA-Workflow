@@ -173,7 +173,7 @@ async def test_cast_blocked_when_voting_right_delegated_403() -> None:
     # (is_delegator=True, delegate_voting=True) → eigene Stimme verboten.
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
-    db = fake_session(result(vote), result((True, True)))
+    db = fake_session(result(vote), result((True, True, _voter().sub)))
     with pytest.raises(ForbiddenError, match="delegated"):
         await VotingService(db).cast(
             vote.id, _voter(group=str(gid)), "yes", now=NOW
@@ -188,7 +188,7 @@ async def test_cast_nonvoting_delegation_does_not_block_member() -> None:
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
         result(vote),
-        result((True, False)),  # ausgehende NICHT-Stimm-Delegation
+        result((True, False, _voter().sub)),  # ausgehende NICHT-Stimm-Delegation
         result(SimpleNamespace(inserted=True)),  # ballot insert
     )
     out = await VotingService(db).cast(vote.id, _voter(group=str(gid)), "yes", now=NOW)
@@ -198,22 +198,49 @@ async def test_cast_nonvoting_delegation_does_not_block_member() -> None:
 
 async def test_cast_exercising_delegated_vote_is_audited() -> None:
     # Externer Stellvertreter: NICHT in der eligible_group, aber Empfänger einer
-    # Stimm-Delegation der Sitzung → stimmberechtigt + DELEGATION_USE-Audit.
+    # Stimm-Delegation der Sitzung → Vertretungs-Stimme (as_delegation=True) unter
+    # dem sub des/der Delegierenden + DELEGATION_USE-Audit.
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
         result(vote),
-        result((False, True)),  # eingehende Stimm-Delegation → exercised
+        result((False, True, "delegator-1")),  # eingehende Stimm-Delegation
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         result(SimpleNamespace(inserted=True)),  # ballot insert (allowChange → xmax)
     )
     out = await VotingService(db).cast(
-        vote.id, _voter(group="somewhere-else"), "yes", now=NOW
+        vote.id, _voter(group="somewhere-else"), "yes", now=NOW, as_delegation=True
     )
     assert out.status == "cast"
     assert db.committed == 1
     assert any(type(a).__name__ == "AuditEntry" for a in db.added)
+
+
+async def test_cast_own_vote_unaffected_by_incoming_delegation() -> None:
+    # Mitglied MIT eingehender Delegation: die eigene Stimme läuft normal weiter
+    # (getrennte Abgaben) — ohne as_delegation kein Audit, Ballot unter eigenem sub.
+    gid = uuid4()
+    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
+    db = fake_session(
+        result(vote),
+        result((False, True, "delegator-1")),  # eingehende Stimm-Delegation
+        result(SimpleNamespace(inserted=True)),  # ballot insert
+    )
+    out = await VotingService(db).cast(vote.id, _voter(group=str(gid)), "yes", now=NOW)
+    assert out.status == "cast"
+    assert not any(type(a).__name__ == "AuditEntry" for a in db.added)
+
+
+async def test_cast_as_delegation_without_incoming_403() -> None:
+    # Vertretungs-Stimme ohne eingehende Delegation → 403.
+    gid = uuid4()
+    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
+    db = fake_session(result(vote), result())
+    with pytest.raises(ForbiddenError, match="delegated"):
+        await VotingService(db).cast(
+            vote.id, _voter(group=str(gid)), "yes", now=NOW, as_delegation=True
+        )
 
 
 async def test_cast_vote_without_meeting_skips_delegation_check() -> None:

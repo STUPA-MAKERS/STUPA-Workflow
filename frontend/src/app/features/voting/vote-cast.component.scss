@@ -70,6 +70,21 @@
   gap: var(--space-3);
 }
 
+// Überschriften der getrennten Abgaben (eigene + Vertretung, #delegation-rework).
+.vote__castHeading {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+
+// Vertretungs-Block optisch absetzen.
+.vote__options--proxy {
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
 .vote__option {
   width: 100%;
 }

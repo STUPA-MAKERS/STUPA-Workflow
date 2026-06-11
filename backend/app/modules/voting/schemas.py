@@ -47,9 +47,13 @@ class VoteCreate(_CamelModel):
 
 
 class BallotIn(_CamelModel):
-    """``POST /votes/{id}/ballot`` — Stimme abgeben (``choice`` ∈ ``config.options``)."""
+    """``POST /votes/{id}/ballot`` — Stimme abgeben (``choice`` ∈ ``config.options``).
+
+    ``asDelegation=true`` gibt die Vertretungs-Stimme ab (#delegation-rework):
+    eigenes und delegiertes Stimmrecht sind zwei getrennte Abgaben."""
 
     choice: str = Field(min_length=1)
+    as_delegation: bool = Field(default=False, alias="asDelegation")
 
 
 class TallyOut(_CamelModel):

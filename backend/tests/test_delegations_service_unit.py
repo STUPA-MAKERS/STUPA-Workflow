@@ -137,7 +137,7 @@ async def test_check_no_meeting_is_normal_without_query() -> None:
     db = fake_session()
     assert await voting_delegation_check(db, "me", None, str(GREMIUM_ID), NOW) == (
         False,
-        False,
+        None,
     )
     assert db.statements == []
 
@@ -146,30 +146,31 @@ async def test_check_non_uuid_group_is_normal() -> None:
     db = fake_session()
     assert await voting_delegation_check(db, "me", MEETING_ID, "stupa", NOW) == (
         False,
-        False,
+        None,
     )
 
 
 async def test_check_outgoing_voting_blocked() -> None:
-    # Zeile: (is_delegator, delegate_voting)
-    db = fake_session(result((True, True)))
+    # Zeile: (is_delegator, delegate_voting, delegator_sub)
+    db = fake_session(result((True, True, "me")))
     assert await voting_delegation_check(
         db, "me", MEETING_ID, str(GREMIUM_ID), NOW
-    ) == (True, False)
+    ) == (True, None)
 
 
 async def test_check_incoming_voting_exercised() -> None:
-    db = fake_session(result((False, True)))
+    # Eingehende Stimm-Delegation → delegator_sub für die Vertretungs-Stimme.
+    db = fake_session(result((False, True, "delegator-1")))
     assert await voting_delegation_check(
         db, "me", MEETING_ID, str(GREMIUM_ID), NOW
-    ) == (False, True)
+    ) == (False, "delegator-1")
 
 
 async def test_check_nonvoting_rows_are_neutral() -> None:
-    db = fake_session(result((True, False), (False, False)))
+    db = fake_session(result((True, False, "me"), (False, False, "other")))
     assert await voting_delegation_check(
         db, "me", MEETING_ID, str(GREMIUM_ID), NOW
-    ) == (False, False)
+    ) == (False, None)
 
 
 # --------------------------------------------------------------------------- #

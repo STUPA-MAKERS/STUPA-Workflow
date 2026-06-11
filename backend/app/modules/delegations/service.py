@@ -36,6 +36,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.modules.admin.gremium_roles import gremium_ids_with_permission
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
@@ -161,8 +162,8 @@ async def voting_delegation_check(
     meeting_id: UUID | None,
     eligible_group: str,
     now: datetime,  # noqa: ARG001 — Signatur-Konsistenz; Delegationen sind sitzungsgebunden
-) -> tuple[bool, bool]:
-    """Zwei-seitiges Stimmrecht-Verdikt für ``sub`` → ``(blocked, exercised)``.
+) -> tuple[bool, str | None]:
+    """Zwei-seitiges Stimmrecht-Verdikt für ``sub`` → ``(blocked, delegator_sub)``.
 
     Sitzungsgebunden: nur ``meeting_delegation``-Zeilen **dieser** Sitzung zählen,
     und nur wenn das Vote-Gremium (``eligible_group`` = ``str(gremium_id)``) zum
@@ -170,22 +171,31 @@ async def voting_delegation_check(
 
     * ausgehende Zeile mit ``delegate_voting`` → **blocked** (Transfer: nur der
       Empfänger stimmt).
-    * eingehende Zeile mit ``delegate_voting`` → **exercised** (Nutzungs-Audit;
-      macht einen externen Empfänger stimmberechtigt).
+    * eingehende Zeile mit ``delegate_voting`` → ``delegator_sub`` = ``sub`` des/der
+      Delegierenden: der Aufrufer darf ZUSÄTZLICH zur eigenen Stimme eine
+      Vertretungs-Stimme abgeben (Ballot läuft unter ``delegator_sub`` — Transfer,
+      kein Duplikat) und ist damit auch als Externe:r stimmberechtigt.
     """
     if meeting_id is None:
-        return False, False
+        return False, None
     try:
         gremium_id = UUID(eligible_group)
     except (ValueError, TypeError):
-        return False, False
+        return False, None
     pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
+    delegator = aliased(PrincipalRow)
     rows = (
         await session.execute(
             select(
                 MeetingDelegation.delegator_principal_id == pid_subq,
                 MeetingDelegation.delegate_voting,
-            ).where(
+                delegator.sub,
+            )
+            .join(
+                delegator,
+                delegator.id == MeetingDelegation.delegator_principal_id,
+            )
+            .where(
                 MeetingDelegation.meeting_id == meeting_id,
                 MeetingDelegation.gremium_id == gremium_id,
                 or_(
@@ -195,9 +205,12 @@ async def voting_delegation_check(
             )
         )
     ).all()
-    blocked = any(is_delegator and voting for is_delegator, voting in rows)
-    exercised = any(not is_delegator and voting for is_delegator, voting in rows)
-    return blocked, exercised
+    blocked = any(is_delegator and voting for is_delegator, voting, _ in rows)
+    delegator_sub = next(
+        (d_sub for is_delegator, voting, d_sub in rows if not is_delegator and voting),
+        None,
+    )
+    return blocked, delegator_sub
 
 
 class DelegationService:

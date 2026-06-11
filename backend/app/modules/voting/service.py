@@ -246,9 +246,15 @@ class VotingService:
         choice: str,
         *,
         now: datetime,
+        as_delegation: bool = False,
     ) -> BallotAccepted:
         """Stimme abgeben. 409 (geschlossen/Doppel), 403 (nicht stimmberechtigt),
-        422 (unbekannte Option)."""
+        422 (unbekannte Option).
+
+        ``as_delegation=True`` gibt die VERTRETUNGS-Stimme ab (#delegation-rework):
+        sie läuft unter dem ``sub`` des/der Delegierenden — eigene Stimme und
+        Vertretungs-Stimme sind damit zwei getrennte Ballots (Transfer, kein
+        Duplikat; der Unique-Constraint je (Vote, Voter) schützt beide einzeln)."""
         # Row-Lock serialisiert gegen close(): Status-Check und Ballot-Insert liegen
         # in derselben Transaktion — keine Stimme landet nach der Auszählung.
         vote = await self._get_vote(vote_id, for_update=True)
@@ -256,25 +262,34 @@ class VotingService:
             raise ConflictError("vote is not open.", code="conflict")
         if vote.closes_at is not None and now >= vote.closes_at:
             raise ConflictError("voting window has closed.", code="conflict")
-        # Stimmrecht ist exklusiv (#delegation-rework): Transfer, kein Duplikat.
         # `blocked` = der Aufrufer hat sein Stimmrecht für DIESE Sitzung abgegeben.
-        # `exercised` = der Aufrufer übt ein delegiertes Stimmrecht aus → er ist auch
-        # dann stimmberechtigt, wenn er selbst nicht in der Gruppe ist (externer
-        # Stellvertreter); die Nutzung wird auditiert.
-        blocked, exercised = await voting_delegation_check(
+        # `delegator_sub` = ihm wurde ein Stimmrecht übertragen (None = keins).
+        blocked, delegator_sub = await voting_delegation_check(
             self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
         )
-        if blocked:
-            raise ForbiddenError("Voting right has been delegated to another member.")
-        if not principal.in_group(vote.eligible_group) and not exercised:
-            raise ForbiddenError("Not eligible to vote in this ballot.")
+        if as_delegation:
+            if delegator_sub is None:
+                raise ForbiddenError("No delegated voting right for this ballot.")
+            voter_sub = delegator_sub
+        else:
+            if blocked:
+                raise ForbiddenError(
+                    "Voting right has been delegated to another member."
+                )
+            # Eigene Stimme: globales ``vote.cast`` + Gruppen-Mitgliedschaft (der
+            # Router gated nur Auth, damit externe Stellvertreter durchkommen).
+            if not principal.has("vote.cast") or not principal.in_group(
+                vote.eligible_group
+            ):
+                raise ForbiddenError("Not eligible to vote in this ballot.")
+            voter_sub = principal.sub
         config = self._config(vote)
         if choice not in config.options:
             raise ValidationProblem(
                 "Unknown vote option.",
                 errors=[{"field": "choice", "msg": "not in vote options"}],
             )
-        if exercised:
+        if as_delegation:
             # Audit der Delegations-NUTZUNG; bei späterem 409 (Doppel) rollt die
             # Session-Dependency die Transaktion inkl. dieses Eintrags zurück.
             await audit_record(
@@ -286,8 +301,8 @@ class VotingService:
                 data={"eligibleGroup": vote.eligible_group},
             )
         if config.secret:
-            return await self._cast_secret(vote.id, principal.sub, choice)
-        return await self._cast_open(vote.id, principal.sub, choice, config.allow_change)
+            return await self._cast_secret(vote.id, voter_sub, choice)
+        return await self._cast_open(vote.id, voter_sub, choice, config.allow_change)
 
     async def _cast_open(
         self, vote_id: UUID, voter_sub: str, choice: str, allow_change: bool

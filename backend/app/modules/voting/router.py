@@ -129,7 +129,10 @@ async def cast_ballot(
     payload: BallotIn,
     service: ServiceDep,
     publisher: PublisherDep,
-    principal: VoterDep,
+    # Nur Auth am Gate (#delegation-rework): ein externer Stellvertreter hat kein
+    # globales ``vote.cast`` — die Autorisierung (vote.cast+Gruppe für die eigene
+    # Stimme, Delegations-Zeile für die Vertretungs-Stimme) liegt im Service.
+    principal: ReaderDep,
 ) -> BallotAccepted:
     """Stimme abgeben — 403 (nicht in Gruppe), 409 (geschlossen/Doppel), 422 (Option).
 
@@ -138,7 +141,11 @@ async def cast_ballot(
     Nur Aggregate — die Reveal-Regel verdeckt counts/leading, bis alle Anwesenden
     abgestimmt haben (``VoteTallyEvent.from_vote``)."""
     accepted = await service.cast(
-        vote_id, principal, payload.choice, now=datetime.now(UTC)
+        vote_id,
+        principal,
+        payload.choice,
+        now=datetime.now(UTC),
+        as_delegation=payload.as_delegation,
     )
     await publisher.vote_tally(await service.get(vote_id))
     return accepted

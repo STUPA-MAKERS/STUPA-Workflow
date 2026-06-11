@@ -72,7 +72,7 @@ describe('VoteCastComponent', () => {
     const yes = screen.getByRole('button', { name: 'Ja' });
     expect(yes).toBeInTheDocument();
     await userEvent.click(yes);
-    expect(castBallot).toHaveBeenCalledWith('v1', 'yes');
+    expect(castBallot).toHaveBeenCalledWith('v1', 'yes', false);
     expect(screen.getByText(/Deine Stimme: Ja/)).toBeInTheDocument();
   });
 
@@ -136,7 +136,9 @@ describe('VoteCastComponent', () => {
     expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
   });
 
-  it('shows a proxy badge and enables voting when exercising a delegation', async () => {
+  it('offers a separate proxy cast when exercising a delegation', async () => {
+    // Externe:r Stellvertreter:in ohne eigenes Stimmrecht: NUR der
+    // Vertretungs-Block ist sichtbar; die Abgabe läuft mit asDelegation=true.
     const { castBallot } = await setup({
       canVote: false,
       delegation: {
@@ -147,8 +149,30 @@ describe('VoteCastComponent', () => {
       },
     });
     expect(screen.getByText('In Vertretung')).toBeInTheDocument();
-    expect(screen.getByText(/Vertretung von Alice Beispiel/)).toBeInTheDocument();
+    expect(screen.getByText(/Als Vertretung für Alice Beispiel/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
-    expect(castBallot).toHaveBeenCalledWith('v1', 'yes');
+    expect(castBallot).toHaveBeenCalledWith('v1', 'yes', true);
+    expect(screen.getByText(/Vertretungs-Stimme: Ja/)).toBeInTheDocument();
+  });
+
+  it('shows own AND proxy cast blocks for a member with an incoming delegation', async () => {
+    const { castBallot } = await setup({
+      canVote: true,
+      delegation: {
+        blocked: false,
+        delegatedToName: null,
+        exercising: true,
+        delegatedByName: 'Alice Beispiel',
+      },
+    });
+    expect(screen.getByText('Deine Stimme')).toBeInTheDocument();
+    expect(screen.getByText(/Als Vertretung für Alice Beispiel/)).toBeInTheDocument();
+    // Zwei getrennte Options-Gruppen → zwei »Ja«-Buttons.
+    const yesButtons = screen.getAllByRole('button', { name: 'Ja' });
+    expect(yesButtons).toHaveLength(2);
+    await userEvent.click(yesButtons[0]);
+    expect(castBallot).toHaveBeenCalledWith('v1', 'yes', false);
+    await userEvent.click(yesButtons[1]);
+    expect(castBallot).toHaveBeenCalledWith('v1', 'yes', true);
   });
 });

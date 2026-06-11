@@ -338,8 +338,11 @@ export class ApiClient {
    * liefert `changed` (nur wenn `config.allowChange`). 409 = Doppel/geschlossen,
    * 403 = nicht stimmberechtigt — Components werten den Status aus.
    */
-  castBallot(id: Uuid, choice: string): Observable<BallotResult> {
-    return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, { choice });
+  castBallot(id: Uuid, choice: string, asDelegation = false): Observable<BallotResult> {
+    return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, {
+      choice,
+      asDelegation,
+    });
   }
 
   // --- meetings (Sitzungssteuerung, T-33) ----------------------------------

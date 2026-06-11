@@ -53,8 +53,15 @@ class _FakeService:
     async def get(self, vote_id):  # noqa: ANN001
         return _vote_out("open")
 
-    async def cast(self, vote_id, principal, choice, *, now):  # noqa: ANN001
-        self.cast_args = {"vote_id": vote_id, "choice": choice, "sub": principal.sub}
+    async def cast(
+        self, vote_id, principal, choice, *, now, as_delegation=False
+    ):  # noqa: ANN001
+        self.cast_args = {
+            "vote_id": vote_id,
+            "choice": choice,
+            "sub": principal.sub,
+            "as_delegation": as_delegation,
+        }
         return BallotAccepted(status="cast")
 
     async def close(self, vote_id, principal):  # noqa: ANN001
@@ -139,11 +146,16 @@ def test_ballot_requires_auth_401(client: TestClient) -> None:
     assert r.status_code == 401
 
 
-def test_ballot_missing_perm_403(app: FastAPI, client: TestClient) -> None:
+def test_ballot_gate_is_auth_only(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # #delegation-rework: das Gate prüft nur Auth — externe Stellvertreter haben
+    # kein globales vote.cast; die Autorisierung (vote.cast+Gruppe bzw.
+    # Delegations-Zeile) liegt im Service (Unit-Tests dort).
     _as_principal(app, "vote.manage")  # nicht .cast
-    assert client.post(
-        f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"}
-    ).status_code == 403
+    r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
+    assert r.status_code == 200
+    assert fake_service.cast_args is not None
 
 
 def test_ballot_ok_passes_choice(
@@ -154,7 +166,12 @@ def test_ballot_ok_passes_choice(
     r = client.post(f"/api/votes/{vote_id}/ballot", json={"choice": "yes"})
     assert r.status_code == 200
     assert r.json()["status"] == "cast"
-    assert fake_service.cast_args == {"vote_id": vote_id, "choice": "yes", "sub": "p"}
+    assert fake_service.cast_args == {
+        "vote_id": vote_id,
+        "choice": "yes",
+        "sub": "p",
+        "as_delegation": False,
+    }
 
 
 def test_ballot_rejects_empty_choice_422(app: FastAPI, client: TestClient) -> None:

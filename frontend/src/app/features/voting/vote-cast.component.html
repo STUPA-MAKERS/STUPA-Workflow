@@ -56,13 +56,9 @@
             <p class="vote__notice" role="alert">
               {{ 'voting.cast.delegation.blocked' | t: { name: deleg.delegatedToName || '?' } }}
             </p>
-          } @else if (deleg.exercising) {
-            <p class="vote__muted" role="status">
-              {{ 'voting.cast.delegation.exercising' | t: { name: deleg.delegatedByName || '?' } }}
-            </p>
           }
         }
-        @if (notEligible() && !delegation()?.blocked) {
+        @if (notEligible() && !delegation()?.blocked && !delegation()?.exercising) {
           <p class="vote__notice" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
         } @else if (isClosed()) {
           <p class="vote__muted">{{ 'voting.cast.closedHint' | t }}</p>
@@ -71,6 +67,9 @@
         }
 
         @if (isOpen() && !notEligible()) {
+          @if (delegation()?.exercising) {
+            <h2 class="vote__castHeading">{{ 'voting.cast.delegation.ownHeading' | t }}</h2>
+          }
           <div class="vote__options" role="group" [attr.aria-label]="'voting.cast.heading' | t">
             @for (option of options(); track option) {
               <app-button
@@ -88,6 +87,40 @@
           @if (myChoice(); as choice) {
             <p class="vote__choice" role="status">
               {{ 'voting.cast.yourChoice' | t: { choice: optionLabel(choice) } }}
+              @if (!allowChange()) {
+                — {{ 'voting.cast.locked' | t }}
+              }
+            </p>
+          }
+        }
+
+        @if (isOpen() && delegation()?.exercising) {
+          <!-- Vertretungs-Stimme (#delegation-rework): GETRENNTE Abgabe unter dem
+               Stimmrecht des/der Delegierenden — darf von der eigenen abweichen. -->
+          <h2 class="vote__castHeading">
+            {{ 'voting.cast.delegation.proxyHeading' | t: { name: delegation()?.delegatedByName || '?' } }}
+          </h2>
+          <div
+            class="vote__options vote__options--proxy"
+            role="group"
+            [attr.aria-label]="'voting.cast.delegation.proxyHeading' | t: { name: delegation()?.delegatedByName || '?' }"
+          >
+            @for (option of options(); track option) {
+              <app-button
+                class="vote__option"
+                size="lg"
+                [variant]="proxyChoice() === option ? 'primary' : 'secondary'"
+                [disabled]="submitting() || (proxyChoice() !== null && !allowChange() && proxyChoice() !== option)"
+                (click)="cast(option, true)"
+              >
+                {{ optionLabel(option) }}
+              </app-button>
+            }
+          </div>
+
+          @if (proxyChoice(); as choice) {
+            <p class="vote__choice" role="status">
+              {{ 'voting.cast.delegation.proxyChoice' | t: { choice: optionLabel(choice) } }}
               @if (!allowChange()) {
                 — {{ 'voting.cast.locked' | t }}
               }

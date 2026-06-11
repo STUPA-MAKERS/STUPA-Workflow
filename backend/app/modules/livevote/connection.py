@@ -153,14 +153,20 @@ class LiveVoteConnection:
         except ValidationError:
             await self._send_error("invalid_message")
             return
-        lock_key = f"vote:{msg.vote_id}:cast:{self.principal.sub}"
+        # Eigene und Vertretungs-Abgabe getrennt locken (zwei legitime Casts).
+        suffix = ":proxy" if msg.as_delegation else ""
+        lock_key = f"vote:{msg.vote_id}:cast:{self.principal.sub}{suffix}"
         async with self.locker.acquire(lock_key) as acquired:
             if not acquired:
                 await self._send_error("locked")
                 return
             try:
                 await self.voting.cast(
-                    msg.vote_id, self.principal, msg.choice, now=datetime.now(UTC)
+                    msg.vote_id,
+                    self.principal,
+                    msg.choice,
+                    now=datetime.now(UTC),
+                    as_delegation=msg.as_delegation,
                 )
             except ForbiddenError:
                 await self.voting.session.rollback()

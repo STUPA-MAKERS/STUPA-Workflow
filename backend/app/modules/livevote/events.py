@@ -148,11 +148,15 @@ class ErrorEvent(_CamelModel):
 # Client → Server
 # --------------------------------------------------------------------------- #
 class CastMessage(_CamelModel):
-    """Stimmabgabe über den WS (serverseitig: group + unique + open + Lock)."""
+    """Stimmabgabe über den WS (serverseitig: group + unique + open + Lock).
+
+    ``asDelegation=true`` = Vertretungs-Stimme (#delegation-rework) — eigene und
+    delegierte Stimme sind zwei getrennte Abgaben."""
 
     type: Literal["cast"]
     vote_id: UUID = Field(alias="voteId")
     choice: str = Field(min_length=1)
+    as_delegation: bool = Field(default=False, alias="asDelegation")
 
 
 class SubscribeMessage(_CamelModel):

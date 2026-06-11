@@ -53,42 +53,56 @@ import { ToastService } from '@shared/ui/toast/toast.service';
     @if (visible()) {
       <app-card [heading]="'delegation.card.title' | t">
         @if (ctx(); as c) {
-          @if (c.myDelegation; as d) {
-            <p class="dlg__row">
-              {{ 'delegation.card.outgoing' | t: { name: d.delegateName || d.delegateId } }}
-              @if (d.delegateVoting) {
-                <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
-              }
-              @if (d.viaPool) {
-                <app-badge variant="neutral">{{ 'delegation.card.poolBadge' | t }}</app-badge>
-              }
-            </p>
-            @if (d.revocable) {
-              <app-button variant="ghost" size="sm" [loading]="busy()" (click)="revoke(d)">
-                {{ 'delegation.card.revoke' | t }}
-              </app-button>
+          <div class="dlg__sections">
+            @if (c.myDelegation; as d) {
+              <div class="dlg__section">
+                <p class="dlg__row">
+                  {{ 'delegation.card.outgoing' | t: { name: d.delegateName || d.delegateId } }}
+                  @if (d.delegateVoting) {
+                    <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+                  }
+                  @if (d.viaPool) {
+                    <app-badge variant="neutral">{{ 'delegation.card.poolBadge' | t }}</app-badge>
+                  }
+                </p>
+                @if (d.revocable) {
+                  <div class="dlg__actions">
+                    <app-button variant="ghost" size="sm" [loading]="busy()" (click)="revoke(d)">
+                      {{ 'delegation.card.revoke' | t }}
+                    </app-button>
+                  </div>
+                }
+              </div>
+            } @else if (canCreate()) {
+              <div class="dlg__section">
+                <p class="dlg__muted">{{ 'delegation.card.lead' | t }}</p>
+                @if (c.deadline && !c.deadlinePassed) {
+                  <p class="dlg__muted">
+                    {{ 'delegation.card.deadline' | t: { date: (c.deadline | ldate: 'short') } }}
+                  </p>
+                }
+                <div class="dlg__actions">
+                  <app-button size="sm" (click)="openDialog()">
+                    {{ 'delegation.card.setup' | t }}
+                  </app-button>
+                </div>
+              </div>
+            } @else if (c.canDelegate && c.deadlinePassed && !c.meetingStarted) {
+              <p class="dlg__muted">{{ 'delegation.card.deadlinePassed' | t }}</p>
             }
-          } @else if (canCreate()) {
-            <p class="dlg__muted">{{ 'delegation.card.lead' | t }}</p>
-            @if (c.deadline && !c.deadlinePassed) {
-              <p class="dlg__muted">
-                {{ 'delegation.card.deadline' | t: { date: (c.deadline | ldate: 'short') } }}
-              </p>
+            @if (c.incoming.length > 0) {
+              <div class="dlg__section dlg__section--incoming">
+                @for (d of c.incoming; track d.id) {
+                  <p class="dlg__row dlg__incoming">
+                    {{ 'delegation.card.incoming' | t: { name: d.delegatorName || d.delegatorId } }}
+                    @if (d.delegateVoting) {
+                      <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+                    }
+                  </p>
+                }
+              </div>
             }
-            <app-button size="sm" (click)="openDialog()">
-              {{ 'delegation.card.setup' | t }}
-            </app-button>
-          } @else if (c.canDelegate && c.deadlinePassed && !c.meetingStarted) {
-            <p class="dlg__muted">{{ 'delegation.card.deadlinePassed' | t }}</p>
-          }
-          @for (d of c.incoming; track d.id) {
-            <p class="dlg__row">
-              {{ 'delegation.card.incoming' | t: { name: d.delegatorName || d.delegatorId } }}
-              @if (d.delegateVoting) {
-                <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
-              }
-            </p>
-          }
+          </div>
         }
       </app-card>
 
@@ -150,17 +164,39 @@ import { ToastService } from '@shared/ui/toast/toast.service';
   `,
   styles: [
     `
+      .dlg__sections {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+      }
+      .dlg__section {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      /* »Du vertrittst …«-Zeilen vom Einrichten-Block absetzen. */
+      .dlg__section--incoming {
+        border-top: var(--border-width) solid var(--color-border);
+        padding-top: var(--space-3);
+      }
       .dlg__row {
         display: flex;
         align-items: center;
         gap: var(--space-2);
         flex-wrap: wrap;
-        margin: 0 0 var(--space-2);
+        margin: 0;
+      }
+      .dlg__incoming {
+        font-size: var(--fs-sm);
       }
       .dlg__muted {
         color: var(--color-text-muted);
         font-size: var(--fs-sm);
-        margin: 0 0 var(--space-2);
+        margin: 0;
+      }
+      .dlg__actions {
+        display: flex;
+        margin-top: var(--space-1);
       }
       .dlg__foot {
         display: flex;

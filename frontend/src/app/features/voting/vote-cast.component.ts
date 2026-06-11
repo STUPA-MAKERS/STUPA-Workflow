@@ -42,6 +42,8 @@ export class VoteCastComponent {
   readonly phase = signal<Phase>('loading');
   readonly vote = signal<Vote | null>(null);
   readonly myChoice = signal<string | null>(null);
+  /** Eigene Wahl der VERTRETUNGS-Stimme (#delegation-rework, getrennte Abgabe). */
+  readonly proxyChoice = signal<string | null>(null);
   readonly submitting = signal(false);
   readonly notEligible = signal(false);
   /** Delegations-Sicht (#delegation-rework): Stimmrecht abgegeben / in Vertretung. */
@@ -79,12 +81,13 @@ export class VoteCastComponent {
     // Stimmrecht-UX: fehlt die Permission, Hinweis zeigen (Server bleibt autoritativ).
     this.notEligible.set(!this.auth.can('vote.cast'));
     // Delegations-Status (#delegation-rework): erklärt ein 403 (Stimmrecht abgegeben)
-    // bzw. zeigt »in Vertretung«; ein Empfänger ist auch ohne vote.cast stimmberechtigt.
+    // bzw. schaltet den separaten Vertretungs-Block frei. WICHTIG: `exercising`
+    // macht NICHT die eigene Stimme frei (externe Stellvertreter dürfen nur die
+    // Vertretungs-Stimme abgeben) — die zwei Abgaben sind getrennt.
     this.delegations.voteStatus(id).subscribe({
       next: (status) => {
         this.delegation.set(status);
         if (status.blocked) this.notEligible.set(true);
-        if (status.exercising) this.notEligible.set(false);
       },
       error: () => {},
     });
@@ -110,16 +113,22 @@ export class VoteCastComponent {
     return label === key ? option : label;
   }
 
-  cast(choice: string): void {
+  cast(choice: string, asDelegation = false): void {
     const vote = this.vote();
-    if (!vote || this.submitting() || !this.isOpen() || this.notEligible()) return;
-    if (this.locked()) return;
-    if (this.myChoice() === choice && !this.allowChange()) return;
+    if (!vote || this.submitting() || !this.isOpen()) return;
+    if (asDelegation) {
+      if (!this.delegation()?.exercising) return;
+      if (this.proxyChoice() !== null && !this.allowChange()) return;
+    } else {
+      if (this.notEligible() || this.locked()) return;
+      if (this.myChoice() === choice && !this.allowChange()) return;
+    }
 
     this.submitting.set(true);
-    this.api.castBallot(vote.id, choice).subscribe({
+    this.api.castBallot(vote.id, choice, asDelegation).subscribe({
       next: (res) => {
-        this.myChoice.set(choice);
+        if (asDelegation) this.proxyChoice.set(choice);
+        else this.myChoice.set(choice);
         this.submitting.set(false);
         this.toast.success(
           this.i18n.translate(
@@ -132,7 +141,7 @@ export class VoteCastComponent {
       error: (err: { status?: number; error?: ProblemDetail }) => {
         this.submitting.set(false);
         if (err.status === 403) {
-          this.notEligible.set(true);
+          if (!asDelegation) this.notEligible.set(true);
           this.toast.error(this.i18n.translate('voting.cast.notEligible'));
         } else if (err.status === 409) {
           this.toast.error(this.i18n.translate('voting.cast.toast.conflict'));

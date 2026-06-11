@@ -326,7 +326,7 @@ describe('ApiClient', () => {
     });
     const req = http.expectOne('/api/votes/v1/ballot');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ choice: 'yes' });
+    expect(req.request.body).toEqual({ choice: 'yes', asDelegation: false });
     req.flush({ status: 'cast' });
   });
 });
