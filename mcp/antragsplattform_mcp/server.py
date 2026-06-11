@@ -39,11 +39,19 @@ no such tool and the server refuses it. Voting is reserved for humans.
 TYPICAL FLOWS:
 - Decide on an application: `list_applications` → `get_application` → `list_transitions`
   (shows the firable transition ids) → `fire_transition(application_id, transition_id, note)`.
+  `list_tasks` shows the applications the logged-in user can currently act on; transitions
+  carry `requiresAction` (false = optional action that does not count as an open task).
 - Create an application: `list_application_types` → `create_application(type_id, data={...})`
   where `data` are the form-field values for that type's form.
 - Edit a flow/form: `get_global_flow`/`get_latest_form_version` to read the current shape,
   then `set_global_flow`/`create_form_version` with the same shape modified.
 - Run a meeting: `create_meeting` → `add_agenda_item` → `create_meeting_vote` → `close_vote`.
+  A vote becomes `cancelled` (no result) when its application leaves the vote state via a
+  manual transition (e.g. an aborted election).
+- Minutes (Protokoll): `get_or_create_protocol(meeting_id)` → `update_protocol(markdown)` →
+  `finalize_protocol`. Finalize is ASYNC: it returns `status: "rendering"` and a worker
+  renders the PDF + mails it; re-fetch until `status` is `final` (success) or back at
+  `draft` (render failed — fix the content and finalize again).
 - Budget: `list_budgets` (tree), `update_budget` (name/key/color), `book_expense`.
 
 CONVENTIONS: ids are UUID strings. Money amounts are decimal strings ("1500.00"). Request
@@ -167,8 +175,16 @@ async def comment_application(
 
 # ============================================ flow decisions on applications
 @mcp.tool()
+async def list_tasks() -> dict:
+    """List the logged-in user's open tasks: applications in vote states of their
+    committees, or with at least one firable transition that requires action."""
+    return await _api().get("/applications/tasks")
+
+
+@mcp.tool()
 async def list_transitions(application_id: str) -> dict:
-    """List the flow transitions currently firable on an application (for this user)."""
+    """List the flow transitions currently firable on an application (for this user).
+    Each carries `requiresAction` — false marks an optional action (no open task)."""
     return await _api().get(f"/applications/{application_id}/transitions")
 
 
@@ -299,6 +315,40 @@ async def add_agenda_item(meeting_id: str, body: dict[str, Any]) -> dict:
 async def create_meeting_vote(meeting_id: str, body: dict[str, Any]) -> dict:
     """Open a vote within a meeting (generic TOP or application-bound). Requires vote.manage."""
     return await _api().post(f"/meetings/{meeting_id}/votes", json=body)
+
+
+# ===================================================== protocol (minutes)
+@mcp.tool()
+async def get_or_create_protocol(meeting_id: str) -> dict:
+    """Create OR load the meeting's protocol (idempotent, 1:1 per meeting).
+    Requires meeting.manage."""
+    return await _api().post(f"/meetings/{meeting_id}/protocol")
+
+
+@mcp.tool()
+async def update_protocol(protocol_id: str, markdown: str) -> dict:
+    """Update the protocol's markdown body. 409 while it is final or rendering.
+    Requires meeting.manage."""
+    return await _api().patch(f"/protocols/{protocol_id}", json={"markdown": markdown})
+
+
+@mcp.tool()
+async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
+    """Append closed votes as markdown snippets to the protocol (idempotent per vote).
+    Requires meeting.manage."""
+    return await _api().post(
+        f"/protocols/{protocol_id}/votes", json={"voteIds": vote_ids}
+    )
+
+
+@mcp.tool()
+async def finalize_protocol(protocol_id: str) -> dict:
+    """Finalize the protocol: ASYNC — returns `status: "rendering"` while a worker
+    renders the PDF and mails it to the committee. Re-fetch via
+    `get_or_create_protocol(meeting_id)` until `status` is `final`; a fall back to
+    `draft` means the render failed (fix content, finalize again). Idempotent:
+    rendering/final protocols are returned unchanged. Requires meeting.manage."""
+    return await _api().post(f"/protocols/{protocol_id}/finalize")
 
 
 # ============================================================ budget (manage)
