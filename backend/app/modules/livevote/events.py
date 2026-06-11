@@ -53,6 +53,14 @@ class MeetingStateEvent(_CamelModel):
     status: Literal["planned", "live", "closed"]
 
 
+class ViewersEvent(_CamelModel):
+    """Wer hat die Sitzungs-Seite gerade offen (#live-viewers) — Anzeigenamen,
+    dedupliziert je Nutzer. Geht an den Voter-Kanal (nicht an den Beamer)."""
+
+    type: Literal["viewers"] = "viewers"
+    viewers: list[str]
+
+
 class VoteOpenedEvent(_CamelModel):
     """Abstimmung geöffnet — UI schaltet frei."""
 

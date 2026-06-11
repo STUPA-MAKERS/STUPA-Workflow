@@ -496,6 +496,23 @@ const AUTOSAVE_DELAY_MS = 1000;
               }
             </tbody>
           </table>
+
+          <!-- Live-Zuschauer (#live-viewers): wer hat die Sitzungs-Seite gerade
+               offen — nur für Protokollant/Leitung (canWrite). -->
+          @if (m.canWrite) {
+            <section class="mtg__viewers" [attr.aria-label]="'meetings.viewers.title' | t">
+              <h2 class="mtg__sideH">
+                {{ 'meetings.viewers.title' | t }} ({{ viewers().length }})
+              </h2>
+              <ul class="mtg__viewerList" aria-live="polite">
+                @for (name of viewers(); track name) {
+                  <li class="mtg__viewer"><span class="mtg__viewerDot" aria-hidden="true"></span>{{ name }}</li>
+                } @empty {
+                  <li class="mtg__muted">{{ 'meetings.viewers.empty' | t }}</li>
+                }
+              </ul>
+            </section>
+          }
         </aside>
       </div>
 
@@ -600,8 +617,9 @@ const AUTOSAVE_DELAY_MS = 1000;
       </app-dialog>
       } <!-- /@if (!beamerMode() && !isFollower()) -->
     } @else {
-      <!-- Übersicht: vorhandene Sitzungen (#104) als geteilte Tabelle (#27) -->
-      @if (canManage() || canWrite()) {
+      <!-- Übersicht: vorhandene Sitzungen (#104). Auch reine Gremium-Mitglieder
+           sehen ihre (serverseitig gefilterte) Timeline (#sessions-visibility). -->
+      @if (canManageAny() || canWriteGlobal() || inAnyCommittee()) {
         <section class="mtg__listSection">
           @if (loadingList()) {
             <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
@@ -1217,6 +1235,10 @@ const AUTOSAVE_DELAY_MS = 1000;
         border: var(--border-width) dashed var(--color-border);
         border-radius: var(--radius-md);
       }
+      .mtg__viewers { margin-top: var(--space-5); }
+      .mtg__viewerList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-sm); }
+      .mtg__viewer { display: flex; align-items: center; gap: var(--space-2); }
+      .mtg__viewerDot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--color-success); flex: none; }
       .mtg__attTable {
         width: 100%;
         border-collapse: collapse;
@@ -1769,6 +1791,8 @@ export class MeetingsComponent implements OnDestroy {
 
   /** Anwesenheits-Roster der Sitzung (#Meetings/#55/#56). */
   readonly attendance = signal<Attendance[]>([]);
+  /** Live-Zuschauer der Sitzungs-Seite (#live-viewers, via WS `viewers`). */
+  readonly viewers = signal<string[]>([]);
   readonly savingAttendance = signal(false);
   readonly attendanceStatuses: readonly AttendanceStatus[] = ['present', 'excused', 'absent'];
 
@@ -2084,7 +2108,10 @@ export class MeetingsComponent implements OnDestroy {
    * parallel, danach wird einmalig auf „jetzt" gescrollt (Effect oben).
    */
   private loadList(): void {
-    if (!this.canManage() && !this.canWrite()) return;
+    // Auch reine Gremium-Mitglieder sehen die (serverseitig auf ihre Gremien
+    // gefilterte) Timeline — das alte canManage/canWrite-Gate ließ Mitglieder
+    // ohne Schreibrecht vor einer leeren Seite stehen (#sessions-visibility).
+    if (!this.canManageAny() && !this.canWriteGlobal() && !this.inAnyCommittee()) return;
     this.didInitialScroll = false;
     this.upcomingItems.set([]);
     this.pastItems.set([]);
@@ -2768,6 +2795,7 @@ export class MeetingsComponent implements OnDestroy {
 
   // --- Live (WebSocket) ----------------------------------------------------
   private connectLive(meetingId: Uuid): void {
+    this.viewers.set([]); // Stand der vorigen Sitzung verwerfen (#live-viewers)
     // Im Mock-Betrieb (FE-Dev/Harness) gibt es keinen WS-Server → kein Live-Kanal,
     // sonst scheitert der Handshake und verrauscht die Konsole.
     if (this.useMock) return;
@@ -2848,6 +2876,10 @@ export class MeetingsComponent implements OnDestroy {
           counts: msg.counts,
           failedReason: msg.failedReason ?? null,
         });
+        break;
+      case 'viewers':
+        // Wer hat die Sitzungs-Seite gerade offen (#live-viewers).
+        this.viewers.set(msg.viewers);
         break;
       default:
         break;

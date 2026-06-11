@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -35,14 +36,18 @@ from app.modules.livevote.events import (
     CastMessage,
     ErrorEvent,
     MeetingStateEvent,
+    ViewersEvent,
     VoteOpenedEvent,
     VoteTallyEvent,
 )
 from app.modules.livevote.locks import Locker
+from app.modules.livevote.presence import PRESENCE
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
 from app.modules.voting.service import VotingService
 from app.settings import Settings
 from app.shared.errors import AppError, ForbiddenError
+
+logger = logging.getLogger("app.livevote")
 
 # Events, die der read-only Beamer-Stream durchlässt (api.md §4).
 _BEAMER_EVENTS = frozenset(
@@ -202,6 +207,23 @@ class LiveVoteConnection:
         channel = meeting_channel(self.meeting_id)
         async with self.broker.subscribe(channel) as subscription:
             await self._send_state()
+            # Presence (#live-viewers): Voter-Verbindungen registrieren und den
+            # Stand broadcasten — der eigene Broadcast liefert dem frischen Client
+            # zugleich den Initial-Snapshot (Abo besteht bereits). Beamer zählen
+            # nicht (Anzeige, keine Person); ihr Event-Filter blendet `viewers` aus.
+            connection_id: str | None = None
+            if not self.beamer:
+                name = (
+                    self.principal.display_name
+                    or self.principal.email
+                    or self.principal.sub
+                )
+                connection_id, names = PRESENCE.join(
+                    self.meeting_id, self.principal.sub, name
+                )
+                await self.broker.publish(
+                    channel, ViewersEvent(viewers=names).dump()
+                )
             pump = asyncio.create_task(self._pump(subscription))
             receive = asyncio.create_task(self._receive())
             try:
@@ -211,3 +233,11 @@ class LiveVoteConnection:
             finally:
                 pump.cancel()
                 receive.cancel()
+                if connection_id is not None:
+                    names = PRESENCE.leave(self.meeting_id, connection_id)
+                    try:
+                        await self.broker.publish(
+                            channel, ViewersEvent(viewers=names).dump()
+                        )
+                    except Exception:  # noqa: BLE001 — Abgang darf den Close nicht stören
+                        logger.debug("viewers broadcast on leave failed", exc_info=True)

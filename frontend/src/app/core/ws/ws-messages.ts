@@ -39,12 +39,18 @@ export interface ErrorMsg {
   type: 'error';
   code: string;
 }
+/** Wer hat die Sitzungs-Seite gerade offen (#live-viewers) — Anzeigenamen. */
+export interface ViewersMsg {
+  type: 'viewers';
+  viewers: string[];
+}
 
 export type ServerMessage =
   | MeetingStateMsg
   | VoteOpenedMsg
   | VoteTallyMsg
   | VoteClosedMsg
+  | ViewersMsg
   | ErrorMsg;
 
 export type ClientMessage =

@@ -145,6 +145,15 @@ def _voter(groups: set[str] | None = None) -> Principal:
     return Principal(sub="p", permissions={"vote.cast"}, groups=members)
 
 
+def _recv(ws) -> dict:  # noqa: ANN001 — Starlette-Test-WS
+    """Nächstes Event, Presence-Frames übersprungen (#live-viewers): der
+    ``viewers``-Broadcast feuert beim Connect/Disconnect asynchron dazwischen."""
+    msg = ws.receive_json()
+    while isinstance(msg, dict) and msg.get("type") == "viewers":
+        msg = ws.receive_json()
+    return msg
+
+
 def _url(meeting: MeetingOut) -> str:
     return f"/api/ws/meetings/{meeting.id}"
 
@@ -174,7 +183,7 @@ def test_not_in_group_gets_not_eligible_error() -> None:
     app, _, _ = _build(meeting=meeting, principal=_voter(groups=set()))
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        assert ws.receive_json() == {"type": "error", "code": "not_eligible"}
+        assert _recv(ws) == {"type": "error", "code": "not_eligible"}
 
 
 # --------------------------------------------------------------------------- #
@@ -185,7 +194,7 @@ def test_connect_sends_meeting_state() -> None:
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        state = ws.receive_json()
+        state = _recv(ws)
     assert state["type"] == "meeting_state"
     assert state["status"] == "live"
 
@@ -200,13 +209,13 @@ def test_subscribe_resends_state_with_open_vote() -> None:
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
         # Connect liefert bereits den vollständigen State (open vote).
-        assert ws.receive_json()["type"] == "meeting_state"
-        assert ws.receive_json()["type"] == "vote_opened"
-        assert ws.receive_json()["type"] == "vote_tally"
+        assert _recv(ws)["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "vote_opened"
+        assert _recv(ws)["type"] == "vote_tally"
         ws.send_json({"type": "subscribe"})
-        assert ws.receive_json()["type"] == "meeting_state"
-        assert ws.receive_json()["type"] == "vote_opened"
-        assert ws.receive_json()["type"] == "vote_tally"
+        assert _recv(ws)["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "vote_opened"
+        assert _recv(ws)["type"] == "vote_tally"
 
 
 def test_cast_records_vote_and_broadcasts_tally() -> None:
@@ -215,9 +224,9 @@ def test_cast_records_vote_and_broadcasts_tally() -> None:
     app, voting, _ = _build(meeting=meeting, principal=_voter(), vote_out=vote_out)
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        assert ws.receive_json()["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "meeting_state"
         ws.send_json({"type": "cast", "voteId": str(vote_out.id), "choice": "yes"})
-        tally = ws.receive_json()
+        tally = _recv(ws)
     assert tally["type"] == "vote_tally"
     assert tally["counts"] == {"yes": 1, "no": 0}
     assert voting.casts == [(vote_out.id, "yes", "p")]
@@ -238,9 +247,9 @@ def test_cast_errors_map_to_error_event(exc: Exception, expected: str) -> None:
     )
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        assert ws.receive_json()["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "meeting_state"
         ws.send_json({"type": "cast", "voteId": str(vote_out.id), "choice": "yes"})
-        assert ws.receive_json() == {"type": "error", "code": expected}
+        assert _recv(ws) == {"type": "error", "code": expected}
 
 
 def test_cast_when_locked_reports_locked() -> None:
@@ -248,9 +257,9 @@ def test_cast_when_locked_reports_locked() -> None:
     app, _, _ = _build(meeting=meeting, principal=_voter(), locker=_BusyLocker())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        assert ws.receive_json()["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "meeting_state"
         ws.send_json({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
-        assert ws.receive_json() == {"type": "error", "code": "locked"}
+        assert _recv(ws) == {"type": "error", "code": "locked"}
 
 
 def test_invalid_cast_message_reports_invalid() -> None:
@@ -258,9 +267,9 @@ def test_invalid_cast_message_reports_invalid() -> None:
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        assert ws.receive_json()["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "meeting_state"
         ws.send_json({"type": "cast"})  # voteId/choice fehlen
-        assert ws.receive_json() == {"type": "error", "code": "invalid_message"}
+        assert _recv(ws) == {"type": "error", "code": "invalid_message"}
 
 
 def test_unknown_message_type_reports_error() -> None:
@@ -268,9 +277,9 @@ def test_unknown_message_type_reports_error() -> None:
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        assert ws.receive_json()["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "meeting_state"
         ws.send_json({"type": "weird"})
-        assert ws.receive_json() == {"type": "error", "code": "unknown_type"}
+        assert _recv(ws) == {"type": "error", "code": "unknown_type"}
 
 
 def test_malformed_json_frame_does_not_crash_connection() -> None:
@@ -278,12 +287,12 @@ def test_malformed_json_frame_does_not_crash_connection() -> None:
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        assert ws.receive_json()["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "meeting_state"
         ws.send_text("not-json{")  # kaputter Frame → error statt Crash
-        assert ws.receive_json() == {"type": "error", "code": "invalid_message"}
+        assert _recv(ws) == {"type": "error", "code": "invalid_message"}
         # Verbindung lebt weiter: gültige Folge-Nachricht wird normal bedient.
         ws.send_json({"type": "subscribe"})
-        assert ws.receive_json()["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "meeting_state"
 
 
 # --------------------------------------------------------------------------- #
@@ -298,7 +307,7 @@ def test_beamer_requires_manage_permission() -> None:
     app, _, _ = _build(meeting=meeting, principal=_voter(groups=set()))
     client = TestClient(app)
     with client.websocket_connect(_url(meeting) + "/beamer") as ws:
-        assert ws.receive_json() == {"type": "error", "code": "not_eligible"}
+        assert _recv(ws) == {"type": "error", "code": "not_eligible"}
 
 
 def test_beamer_receives_state_but_cannot_cast() -> None:
@@ -306,9 +315,9 @@ def test_beamer_receives_state_but_cannot_cast() -> None:
     app, voting, _ = _build(meeting=meeting, principal=_beamer())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting) + "/beamer") as ws:
-        assert ws.receive_json()["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "meeting_state"
         ws.send_json({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
-        assert ws.receive_json() == {"type": "error", "code": "read_only"}
+        assert _recv(ws) == {"type": "error", "code": "read_only"}
     assert voting.casts == []
 
 
@@ -388,7 +397,7 @@ def test_handshake_with_valid_cookie_opens_socket() -> None:
     name, value = _signed_cookie()
     client.cookies.set(name, value)
     with client.websocket_connect(_url(meeting)) as ws:
-        state = ws.receive_json()
+        state = _recv(ws)
     assert state["type"] == "meeting_state"
     assert state["status"] == "live"
 
@@ -405,7 +414,7 @@ def test_handshake_with_naive_assignment_does_not_403() -> None:
     name, value = _signed_cookie()
     client.cookies.set(name, value)
     with client.websocket_connect(_url(meeting)) as ws:
-        assert ws.receive_json()["type"] == "meeting_state"
+        assert _recv(ws)["type"] == "meeting_state"
 
 
 def test_handshake_without_cookie_is_rejected() -> None:
