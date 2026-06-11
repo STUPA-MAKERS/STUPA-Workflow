@@ -64,10 +64,19 @@ RUN chmod +x /usr/local/bin/inkscape
 # volume from it — at RUNTIME the container then needs NO internet; tectonic would
 # otherwise lazily fetch packages per document and die behind an egress block
 # ("error sending request … operation timed out").
+# Retried: the warm-up downloads the bundle, LaTeX packages AND the matching
+# biber release — on a flaky build network a single timeout (e.g. the biber
+# fetch) failed the whole build. Every retry resumes from the already-cached
+# parts, so three attempts ride out transient timeouts.
 COPY warmup.py ./
 RUN set -eux; \
     mkdir -p /cache-seed; \
-    XDG_CACHE_HOME=/cache-seed python warmup.py; \
+    ok=0; \
+    for i in 1 2 3; do \
+        if XDG_CACHE_HOME=/cache-seed python warmup.py; then ok=1; break; fi; \
+        echo "warmup attempt $i failed; retrying in 15s"; sleep 15; \
+    done; \
+    [ "$ok" = "1" ]; \
     rm -rf /tmp/pytex-api-* || true
 
 COPY entrypoint.sh /usr/local/bin/pytex-entrypoint
