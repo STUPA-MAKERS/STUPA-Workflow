@@ -77,7 +77,7 @@
                           {{ entry.at | ldate: 'medium' }}
                         </time>
                         @if (entry.note) {
-                          <p class="timeline__note">{{ entry.note }}</p>
+                          <p class="timeline__note">{{ noteText(entry.note) }}</p>
                         }
                       </div>
                     </li>

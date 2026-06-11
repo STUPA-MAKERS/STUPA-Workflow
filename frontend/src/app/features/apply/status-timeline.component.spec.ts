@@ -87,13 +87,15 @@ interface ApiOverrides {
   addComment?: jest.Mock;
   applicantTransitions?: Partial<ApiClient>['applicantTransitions'];
   fireApplicant?: jest.Mock;
+  timeline?: TimelineEntry[];
+  effectiveForm?: EffectiveForm;
 }
 
 function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
   return {
     verifyMagicLink: o.verify ?? (() => of({ application_id: 'app-1', scope: 'edit' as const })),
     getApplication: () => of(o.application ?? app(true)),
-    timeline: () => of(TIMELINE),
+    timeline: () => of(o.timeline ?? TIMELINE),
     comments: () => of(COMMENTS),
     listAttachments: () => of([]),
     applicantTransitions: (o.applicantTransitions ?? (() => of([]))) as ApiClient['applicantTransitions'],
@@ -101,7 +103,7 @@ function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
       jest.fn(() =>
         of({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] }),
       )) as unknown as ApiClient['fireApplicantTransition'],
-    effectiveForm: () => of(EFF),
+    effectiveForm: () => of(o.effectiveForm ?? EFF),
     updateApplication: (o.update ?? jest.fn(() => of(app(true)))) as unknown as ApiClient['updateApplication'],
     addComment: (o.addComment ?? jest.fn(() => of(COMMENTS[0]))) as unknown as ApiClient['addComment'],
   };
@@ -187,6 +189,43 @@ describe('StatusTimelineComponent', () => {
     expect(screen.getByText('Ja')).toBeInTheDocument(); // checkbox → boolean
     expect(screen.getByText('Alpha')).toBeInTheDocument(); // multiselect → Array
     expect(screen.queryByRole('button', { name: /Änderungen speichern/ })).not.toBeInTheDocument();
+  });
+
+  it('renders cost positions as a compact sum instead of [object Object]', async () => {
+    const eff: EffectiveForm = {
+      ...EFF,
+      sections: [
+        {
+          key: 'main',
+          label: { de: 'Antrag' },
+          fields: [
+            { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
+            { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
+          ],
+        },
+      ],
+    };
+    const locked = app(false, {
+      title: 'Sommerfest',
+      kosten: [
+        { label: 'Zelt', offers: [{ value: 120, preferred: true }, { value: 150 }] },
+        { label: 'Musik', offers: [{ value: 80, preferred: true }] },
+      ],
+    });
+    await setup(fakeApi({ application: locked, effectiveForm: eff }), { t: 'tok', app: 'app-1' });
+    expect(await screen.findByText('Kostenaufstellung')).toBeInTheDocument();
+    expect(screen.getByText(/2 ×.*200/)).toBeInTheDocument();
+    expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
+  });
+
+  it('translates machine vote notes in the timeline', async () => {
+    const timeline: TimelineEntry[] = [
+      ...TIMELINE,
+      { toStateId: 's2', toState: null, label: 'Genehmigt', actor: null, at: '2026-06-11T10:37:00Z', note: 'vote:passed' },
+    ];
+    await setup(fakeApi({ timeline }), { t: 'tok', app: 'app-1' });
+    expect(await screen.findByText('Abstimmungsergebnis: Angenommen')).toBeInTheDocument();
+    expect(screen.queryByText('vote:passed')).not.toBeInTheDocument();
   });
 
   it('saves edited data via PATCH', async () => {

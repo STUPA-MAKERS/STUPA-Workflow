@@ -259,10 +259,46 @@ export class StatusTimelineComponent {
 
   private formatValue(field: FormFieldDef, value: unknown, lang: string): string {
     if (value === null || value === undefined || value === '') return '';
+    if (field.type === 'positions') return this.formatPositions(value);
     if (Array.isArray(value)) return value.map((v) => this.optionLabel(field, v, lang)).join(', ');
     if (typeof value === 'boolean')
       return this.i18n.translate(value ? 'common.yes' : 'common.no');
     return this.optionLabel(field, value, lang);
+  }
+
+  /** Kostenpositionen kompakt (wie interne Detailseite): Anzahl + Σ der bevorzugten Angebote. */
+  private formatPositions(value: unknown): string {
+    if (!Array.isArray(value)) return '';
+    let total = 0;
+    for (const p of value as { offers?: { value?: number | null; preferred?: boolean }[] }[]) {
+      const pref = (p.offers ?? []).find((o) => o.preferred);
+      total += pref?.value ?? 0;
+    }
+    const sum = new Intl.NumberFormat(this.i18n.locale(), {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(total);
+    return `${value.length} × ${this.i18n.translate('applications.detail.positionsTotal')}: ${sum}`;
+  }
+
+  /**
+   * Maschinen-Notizen der Timeline lesbar machen: automatische Übergänge aus
+   * Abstimmungen tragen `vote:<result>` (voting/service.py) — als übersetztes
+   * Ergebnis anzeigen statt roh.
+   */
+  noteText(note: string): string {
+    const resultKeys = {
+      'vote:passed': 'vote.result.passed',
+      'vote:rejected': 'vote.result.rejected',
+      'vote:tie': 'vote.result.tie',
+    } as const;
+    const key = resultKeys[note as keyof typeof resultKeys];
+    if (key) {
+      return this.i18n.translate('status.history.voteNote', {
+        result: this.i18n.translate(key),
+      });
+    }
+    return note;
   }
 
   private optionLabel(field: FormFieldDef, value: unknown, lang: string): string {
