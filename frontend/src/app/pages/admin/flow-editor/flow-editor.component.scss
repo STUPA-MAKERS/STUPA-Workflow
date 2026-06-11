@@ -284,49 +284,53 @@ select {
 }
 
 /* --- Gruppen (#flow-groups) ------------------------------------------------ */
-/* Aufgeklappt: halbtransparenter Rahmen hinter den Member-Nodes + Titelleiste. */
-.fe__group-bg {
-  fill: var(--group-color, var(--color-border));
-  fill-opacity: 0.08;
-  stroke: var(--group-color, var(--color-border-strong));
-  stroke-width: 1.5;
-  stroke-dasharray: 8 5;
-  pointer-events: none;
+/* Breadcrumbs der Drill-Down-Navigation. */
+.fe__crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
 }
 
-.fe__group-titlebar {
-  fill: var(--group-color, var(--color-border-strong));
-  fill-opacity: 0.18;
-  stroke: none;
-  cursor: grab;
+.fe__crumb {
+  padding: 0.15rem 0.45rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.fe__crumb:hover {
+  background: var(--color-surface-sunken);
 }
 
-.fe__group--sel .fe__group-bg {
-  stroke: var(--color-primary);
-  stroke-width: 2.5;
-  stroke-dasharray: none;
-}
-
-.fe__group-title {
-  fill: var(--color-text);
-  font-size: 12px;
+.fe__crumb--current {
+  color: var(--color-text);
   font-weight: 600;
-  pointer-events: none;
+  cursor: default;
+}
+.fe__crumb--current:hover {
+  background: none;
 }
 
-/* Zugeklappt: Ersatz-Kasten anstelle der Member-Nodes. */
+.fe__crumb-sep {
+  color: var(--color-text-muted);
+}
+
+/* Gruppen-Kasten: ein Knoten je Gruppe; Klick öffnet (Drill-Down). */
 .fe__groupbox {
   fill: var(--color-bg-elevated);
   stroke: var(--color-border-strong);
   stroke-width: 2;
   stroke-dasharray: 8 5;
-  cursor: grab;
+  cursor: pointer;
 }
 
-.fe__groupbox-g--sel .fe__groupbox {
+.fe__groupbox-g--multi .fe__groupbox {
   stroke: var(--color-primary);
-  stroke-width: 3;
-  stroke-dasharray: none;
+  stroke-width: 2.5;
 }
 
 .fe__groupbox-name {
@@ -339,6 +343,38 @@ select {
 .fe__groupbox-count {
   fill: var(--color-text-muted);
   font-size: 11px;
+  pointer-events: none;
+}
+
+/* Ausgangs-Punkte am Gruppen-Kasten (nur Anzeige, fester Abstand). */
+.fe__groupbox-dot {
+  fill: var(--color-border-strong);
+  stroke: var(--color-bg-elevated);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+/* Proxy-Knoten im Drill-Down: externe Quellen/Ziele; Klick springt hin. */
+.fe__proxy {
+  fill: var(--color-surface-sunken);
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  cursor: pointer;
+}
+
+.fe__proxy--group {
+  stroke-dasharray: 8 5;
+  stroke-width: 2;
+}
+
+.fe__proxy-g:hover .fe__proxy {
+  stroke: var(--color-primary);
+}
+
+.fe__proxy-text {
+  fill: var(--color-text-muted);
+  font-size: 12px;
   pointer-events: none;
 }
 

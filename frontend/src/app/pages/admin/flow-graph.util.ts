@@ -169,13 +169,20 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
   const positions = graph.layout?.positions ?? {};
   const layout: { positions?: Record<string, { x: number; y: number }>; groups?: FlowGroup[] } = {};
   if (Object.keys(positions).length > 0) layout.positions = { ...positions };
-  // Gruppen (#flow-groups): nur existierende States behalten, leere Gruppen weglassen.
+  // Gruppen (#flow-groups): nur existierende States/Gruppen referenzieren; eine
+  // Gruppe ohne States UND ohne Unter-Gruppen verschwindet. Legacy-`collapsed`
+  // wird wegnormalisiert (Inhalt öffnet sich heute per Drill-Down).
+  const allGroupIds = new Set((graph.layout?.groups ?? []).map((g) => g.id));
   const groups = (graph.layout?.groups ?? [])
-    .map((g) => ({ ...g, stateKeys: g.stateKeys.filter((k) => keySet2.has(k)) }))
-    .filter((g) => g.stateKeys.length > 0)
+    .map((g) => ({
+      ...g,
+      stateKeys: g.stateKeys.filter((k) => keySet2.has(k)),
+      groupIds: (g.groupIds ?? []).filter((id) => id !== g.id && allGroupIds.has(id)),
+    }))
+    .filter((g) => g.stateKeys.length > 0 || g.groupIds.length > 0)
     .map((g) => {
       const out2: FlowGroup = { id: g.id, name: g.name, stateKeys: g.stateKeys };
-      if (g.collapsed) out2.collapsed = true;
+      if (g.groupIds.length) out2.groupIds = g.groupIds;
       if (g.color) out2.color = g.color;
       return out2;
     });
@@ -307,6 +314,24 @@ export function autoLayout(graph: FlowGraph): FlowGraph {
     ...graph,
     layout: { ...(graph.layout ?? {}), positions: { ...computed, ...existing } },
   };
+}
+
+/**
+ * Kondensiertes Auto-Layout (#flow-groups): beliebige Entitäten (sichtbare
+ * States + Gruppen-Kästen einer Drill-Down-Ebene) als Knoten eines virtuellen
+ * Graphen anordnen — eine Gruppe verhält sich beim Auto-Arrange wie EIN Knoten.
+ * Liefert frische Positionen je Entitäts-Id (bestehende werden ignoriert).
+ */
+export function layoutEntities(
+  entities: ReadonlyArray<{ id: string; isInitial?: boolean }>,
+  edges: ReadonlyArray<readonly [string, string]>,
+): Record<string, { x: number; y: number }> {
+  const fake: FlowGraph = {
+    states: entities.map((e) => ({ key: e.id, label: {}, isInitial: !!e.isInitial })),
+    transitions: edges.map(([from, to]) => ({ from, to })),
+    layout: null,
+  };
+  return autoLayout(fake).layout?.positions ?? {};
 }
 
 // --- Fabriken ---------------------------------------------------------------

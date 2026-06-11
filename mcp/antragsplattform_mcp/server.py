@@ -359,16 +359,18 @@ async def flow_set_positions(positions: dict[str, dict[str, int]]) -> dict:
 @mcp.tool()
 async def flow_set_group(group: S.FlowGroupDef) -> dict:
     """ATOMIC: create or update a visual node group (upsert by group.id) in
-    layout.groups. Groups are editor-only: a collapsed group renders as one labelled
-    box; the flow engine ignores them. A state belongs to at most one group — adding
-    it here removes it from others. Requires admin.types."""
+    layout.groups. Groups are editor-only: each renders as ONE labelled box whose
+    content opens by drill-down; the flow engine ignores them. Groups NEST via
+    groupIds (cycles rejected). A state/sub-group belongs to at most one parent —
+    adding it here removes it from others. Requires admin.types."""
     graph = graphops.upsert_group(await _flow_graph(), dump_create(group))
     return await _save_flow(graph)
 
 
 @mcp.tool()
 async def flow_delete_group(group_id: str) -> dict:
-    """ATOMIC: delete a visual node group (states stay untouched). Requires admin.types."""
+    """ATOMIC: delete a visual node group (states stay untouched; its sub-groups
+    move up one level). Requires admin.types."""
     graph = graphops.delete_group(await _flow_graph(), group_id)
     return await _save_flow(graph)
 

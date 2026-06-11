@@ -82,7 +82,7 @@ def remove_state(graph: Graph, key: str) -> Graph:
         {**grp, "stateKeys": [k for k in grp.get("stateKeys", []) if k != key]}
         for grp in (_layout(g).get("groups") or [])
     ]
-    groups = [grp for grp in groups if grp["stateKeys"]]
+    groups = [grp for grp in groups if grp["stateKeys"] or _group_children(grp)]
     if groups:
         _layout(g)["groups"] = groups
     else:
@@ -137,27 +137,64 @@ def merge_positions(graph: Graph, positions: dict[str, dict[str, int]]) -> Graph
     return g
 
 
+def _group_children(grp: dict[str, Any]) -> list[str]:
+    return list(grp.get("groupIds") or [])
+
+
+def _assert_acyclic(groups: list[dict[str, Any]]) -> None:
+    children = {grp.get("id"): _group_children(grp) for grp in groups}
+    state: dict[str, int] = {}  # 0=visiting, 1=done
+
+    def visit(gid: str) -> None:
+        if state.get(gid) == 1:
+            return
+        if state.get(gid) == 0:
+            raise ValueError(f"group nesting cycle involving {gid!r}")
+        state[gid] = 0
+        for child in children.get(gid, []):
+            visit(child)
+        state[gid] = 1
+
+    for gid in children:
+        if gid is not None:
+            visit(gid)
+
+
 def upsert_group(graph: Graph, group: dict[str, Any]) -> Graph:
     g = deepcopy(graph)
     keys = {s.get("key") for s in _states(g)}
     unknown = sorted(set(group.get("stateKeys", [])) - keys)
     if unknown:
         raise ValueError(f"unknown state keys in group: {unknown}")
-    if not group.get("stateKeys"):
-        raise ValueError("group needs at least one state key")
     groups: list[dict[str, Any]] = _layout(g).setdefault("groups", [])
-    # A state lives in at most one group — joining removes it elsewhere.
+    group_ids = {grp.get("id") for grp in groups} | {group["id"]}
+    children = set(group.get("groupIds") or [])
+    if group["id"] in children:
+        raise ValueError("group cannot contain itself")
+    unknown_groups = sorted(children - group_ids)
+    if unknown_groups:
+        raise ValueError(f"unknown group ids in groupIds: {unknown_groups}")
+    if not group.get("stateKeys") and not children:
+        raise ValueError("group needs at least one state key or sub-group")
+    # A state/group lives in at most one parent — joining removes it elsewhere.
     member = set(group["stateKeys"])
     for grp in groups:
         if grp.get("id") != group["id"]:
             grp["stateKeys"] = [k for k in grp.get("stateKeys", []) if k not in member]
-    groups[:] = [grp for grp in groups if grp.get("id") == group["id"] or grp["stateKeys"]]
+            if children:
+                grp["groupIds"] = [c for c in _group_children(grp) if c not in children]
+    groups[:] = [
+        grp
+        for grp in groups
+        if grp.get("id") == group["id"] or grp["stateKeys"] or _group_children(grp)
+    ]
     for i, grp in enumerate(groups):
         if grp.get("id") == group["id"]:
             groups[i] = group
             break
     else:
         groups.append(group)
+    _assert_acyclic(groups)
     return g
 
 
@@ -166,7 +203,16 @@ def delete_group(graph: Graph, group_id: str) -> Graph:
     groups = _layout(g).get("groups") or []
     if not any(grp.get("id") == group_id for grp in groups):
         raise ValueError(f"unknown group id: {group_id!r}")
-    remaining = [grp for grp in groups if grp.get("id") != group_id]
+    # Kinder der gelöschten Gruppe rücken auf die oberste Ebene (Referenz weg).
+    remaining = [
+        {**grp, "groupIds": [c for c in _group_children(grp) if c != group_id]}
+        for grp in groups
+        if grp.get("id") != group_id
+    ]
+    remaining = [
+        {k: v for k, v in grp.items() if not (k == "groupIds" and not v)}
+        for grp in remaining
+    ]
     if remaining:
         _layout(g)["groups"] = remaining
     else:

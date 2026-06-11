@@ -66,13 +66,16 @@ export interface TransitionDef {
 }
 
 /** Visuelle Node-Gruppe (#flow-groups) — reine Editor-Darstellung, die Engine
- *  ignoriert sie. Zugeklappt ersetzt ein beschrifteter Kasten die Member-Nodes;
- *  nur Kanten über die Gruppengrenze bleiben sichtbar. */
+ *  ignoriert sie. Im Canvas ist eine Gruppe immer EIN beschrifteter Kasten;
+ *  ihr Inhalt öffnet sich per Drill-Down (Breadcrumbs). Gruppen sind
+ *  schachtelbar über `groupIds`; ein State/eine Gruppe steckt in höchstens
+ *  einem Parent. */
 export interface FlowGroup {
   id: string;
   name: string;
   stateKeys: string[];
-  collapsed?: boolean;
+  /** Direkt enthaltene Unter-Gruppen (Schachtelung). */
+  groupIds?: string[];
   color?: string | null;
 }
 

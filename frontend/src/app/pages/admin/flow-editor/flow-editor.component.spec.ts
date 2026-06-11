@@ -227,4 +227,70 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.save();
     expect(createGlobalFlowVersion).not.toHaveBeenCalled();
   });
+
+  // Gruppen (#flow-groups): Kasten auf der Ebene, Drill-Down mit Proxies,
+  // Auflösen hebt den Inhalt eine Ebene hoch.
+  it('groups render as one box; drill-down shows members + proxies', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c); // a (initial) → b
+    c.addState();
+    c.setStateKey('state', 'c');
+    c.graph.update((g: FlowGraph) => ({
+      ...g,
+      transitions: [...(g.transitions ?? []), { from: 'b', to: 'c', actions: [] }],
+    }));
+    c.multiSel.set(new Set(['b', 'c']));
+    c.createGroupFromSelection();
+
+    // Oberste Ebene: nur a sichtbar + ein Gruppen-Kasten; Kante a→b endet am Kasten.
+    expect(c.nodes().map((n: { key: string }) => n.key)).toEqual(['a']);
+    expect(c.groupBoxes()).toHaveLength(1);
+    const groupId = c.groupBoxes()[0].id as string;
+    expect(c.edges()).toHaveLength(1); // b→c ist intern unsichtbar
+
+    // Drill-Down: Member sichtbar, externer Ursprung a als Proxy links.
+    c.openGroup(groupId);
+    expect(c.breadcrumbs().map((g: { id: string }) => g.id)).toEqual([groupId]);
+    expect(
+      c.nodes().map((n: { key: string }) => n.key).sort(),
+    ).toEqual(['b', 'c']);
+    expect(c.proxies().left.map((p: { pid: string }) => p.pid)).toEqual(['state:a']);
+
+    // Auflösen: Inhalt zurück auf die oberste Ebene.
+    c.dissolveCurrentGroup();
+    expect(c.currentGroupId()).toBeNull();
+    expect(c.groupBoxes()).toHaveLength(0);
+    expect(c.nodes()).toHaveLength(3);
+  });
+
+  it('nested groups: child group becomes a box inside the parent level', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    c.addState();
+    c.setStateKey('state', 'c');
+    c.multiSel.set(new Set(['b', 'c']));
+    c.createGroupFromSelection();
+    const inner = c.groupBoxes()[0].id as string;
+    c.multiSel.set(new Set(['a']));
+    c.multiSelGroups.set(new Set([inner]));
+    c.createGroupFromSelection();
+
+    // Oberste Ebene: alles steckt in EINER (äußeren) Gruppe.
+    expect(c.nodes()).toHaveLength(0);
+    expect(c.groupBoxes()).toHaveLength(1);
+    const outer = c.groupBoxes()[0].id as string;
+    expect(outer).not.toBe(inner);
+    expect(c.groupBoxes()[0].count).toBe(3); // a + b + c (transitiv)
+
+    // In der äußeren Ebene: a als Node + innere Gruppe als Kasten.
+    c.openGroup(outer);
+    expect(c.nodes().map((n: { key: string }) => n.key)).toEqual(['a']);
+    expect(c.groupBoxes().map((b: { id: string }) => b.id)).toEqual([inner]);
+    c.openGroup(inner);
+    expect(c.breadcrumbs().map((g: { id: string }) => g.id)).toEqual([outer, inner]);
+  });
 });

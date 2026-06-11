@@ -96,12 +96,15 @@ class TransitionDefPatch(WireModel):
 
 class FlowGroupDef(WireModel):
     """Visual node group (editor-only, stored in ``layout.groups``; the engine
-    ignores it)."""
+    ignores it). Groups are NESTABLE via ``groupIds``; the editor renders each
+    group as one box whose content opens by drill-down."""
 
     id: str
     name: str
     stateKeys: list[str]
-    collapsed: bool = False
+    groupIds: list[str] | None = Field(
+        default=None, description="Ids of directly contained sub-groups (nesting)"
+    )
     color: str | None = None
 
 
