@@ -45,11 +45,14 @@ class FakeSession:
         self.scalar_results: list[Any] = []
         self.added: list[Any] = []
         self.deleted: list[Any] = []
+        # Alle ``execute``-Statements (z. B. um das Vote-Storno-UPDATE zu prüfen).
+        self.statements: list[Any] = []
         self.flushed = 0
         self.committed = 0
         self.rolled_back = 0
 
-    async def execute(self, _stmt: Any) -> FakeResult:
+    async def execute(self, stmt: Any) -> FakeResult:
+        self.statements.append(stmt)
         if not self._results:
             return FakeResult()
         return self._results.pop(0)

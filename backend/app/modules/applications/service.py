@@ -720,10 +720,15 @@ class ApplicationsService:
                         and await self._in_gremium(principal.sub, UUID(gid))
                     )
             if not ok and (can_transition or app.created_by == principal.sub):
-                # Mind. ein verfügbarer manueller Übergang (Guards inkl. Akteur-Gates).
-                # Gilt auch für die eigene Antragstellung (#24) — ein **terminaler**
-                # State (z. B. »abgelehnt«, keine Ausgänge) ist damit **keine** Aufgabe.
-                ok = len(await flow.available_transitions(app.id, principal)) > 0
+                # Mind. ein verfügbarer manueller Übergang (Guards inkl. Akteur-Gates),
+                # der als Aufgabe zählt (#requires-action) — rein optionale Aktionen
+                # (requiresAction=false) erzeugen keine Pseudo-Aufgabe. Gilt auch für
+                # die eigene Antragstellung (#24) — ein **terminaler** State (z. B.
+                # »abgelehnt«, keine Ausgänge) ist damit **keine** Aufgabe.
+                ok = any(
+                    t.requires_action
+                    for t in await flow.available_transitions(app.id, principal)
+                )
             if ok:
                 items.append(
                     ApplicationListItem(

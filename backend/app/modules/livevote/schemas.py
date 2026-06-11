@@ -66,7 +66,8 @@ class MeetingVoteOut(_CamelModel):
     question: str | None = None
     # Optionen (für die Stimmabgabe im FE).
     options: list[str] = Field(default_factory=list)
-    status: Literal["draft", "open", "closed"]
+    # ``cancelled``: Antrag hat den vote-State manuell verlassen (Wahl abgebrochen).
+    status: Literal["draft", "open", "closed", "cancelled"]
     result: str | None = None
     # Aktueller Stimmenstand (Option → Anzahl) + führende Option — bleibt nach einem
     # Reload erhalten (vorher nur über den Live-WS-Pfad sichtbar).

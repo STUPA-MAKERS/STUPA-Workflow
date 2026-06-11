@@ -151,6 +151,8 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
     if (t.order != null) out.order = t.order;
     if (t.automatic) out.automatic = true;
     if (t.branch) out.branch = t.branch; // Ergebnis-Zweig (#28)
+    // Default `true` wird weggelassen — nur das explizite Opt-out persistieren.
+    if (t.requiresAction === false) out.requiresAction = false;
     return out;
   });
   const out: FlowGraph = { states, transitions };

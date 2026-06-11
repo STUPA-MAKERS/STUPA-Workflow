@@ -569,7 +569,8 @@ export interface MagicLinkVerifyResult {
 // --- Voting (api.md »voting«, §4; config_schemas.VoteConfig — T-15) -----------
 
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
-export type VoteStatus = 'draft' | 'open' | 'closed';
+/** `cancelled` — Antrag hat den vote-State manuell verlassen (Wahl abgebrochen). */
+export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 export type VoteResult = 'passed' | 'rejected' | 'tie';
 
 /** Beschlussfähigkeits-Schwelle (config_schemas.Quorum). */
@@ -637,7 +638,8 @@ export interface BallotResult {
 /** Sitzungs-Status (api.md §4 `meeting_state.status`); BE-Enum: `planned|live|closed`. */
 export type MeetingStatus = 'planned' | 'live' | 'closed';
 /** Status eines Votes innerhalb einer Sitzung. */
-export type MeetingVoteStatus = 'pending' | 'open' | 'closed';
+/** `cancelled` — Antrag hat den vote-State manuell verlassen (Wahl abgebrochen). */
+export type MeetingVoteStatus = 'pending' | 'open' | 'closed' | 'cancelled';
 
 /** `MeetingVoteOut` — Vote-Zusammenfassung im Sitzungs-State (GET /meetings/{id}). */
 export interface MeetingVoteOutWire {

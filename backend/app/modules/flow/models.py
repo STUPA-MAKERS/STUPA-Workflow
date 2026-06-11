@@ -116,6 +116,9 @@ class Transition(UUIDPkMixin, Base):
     # Ergebnis-Zweig (#28): für die 2 Ausgänge von vote/approval-States —
     # ``pass``/``fail`` bzw. ``accept``/``reject`` (sonst ``NULL``).
     branch: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # »Erfordert Aktion« (#requires-action): zählt der feuerbare Übergang als offene
+    # Aufgabe (Tasks-Tab)? ``false`` = optionale Aktion, erzeugt keine Aufgabe.
+    requires_action: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
     __table_args__ = (Index("ix_transition_flow_version_id_from_state_id",
                             "flow_version_id", "from_state_id"),)

@@ -283,6 +283,7 @@ class ConfigService:
                     order=trans.order if trans.order is not None else order,
                     automatic=trans.automatic,
                     branch=trans.branch,
+                    requires_action=trans.requires_action,
                 )
             )
 
@@ -367,6 +368,7 @@ class ConfigService:
                         "order": t.order,
                         "automatic": t.automatic,
                         "branch": t.branch,
+                        "requiresAction": t.requires_action,
                     }
                     for t in transitions
                 ],
@@ -494,6 +496,7 @@ class ConfigService:
                     order=trans.order if trans.order is not None else order,
                     automatic=trans.automatic,
                     branch=trans.branch,
+                    requires_action=trans.requires_action,
                 )
             )
 

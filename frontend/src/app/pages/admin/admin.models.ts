@@ -60,6 +60,9 @@ export interface TransitionDef {
   automatic?: boolean;
   /** Ergebnis-Zweig für vote-States (#28): pass/fail. */
   branch?: TransitionBranch | null;
+  /** »Erfordert Aktion« (#requires-action): zählt als offene Aufgabe im Tasks-Tab.
+   *  Fehlt ⇒ `true`; `false` = rein optionale Aktion. */
+  requiresAction?: boolean;
 }
 
 /** Optionales Editor-Layout (Knoten-Positionen) — persistiert im Graphen. */

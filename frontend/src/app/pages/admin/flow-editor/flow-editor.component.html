@@ -233,6 +233,15 @@
             {{ 'admin.flow.automatic' | t }}
           </app-checkbox>
         </div>
+        <!-- »Erfordert Aktion« (#requires-action): nur für manuelle Übergänge sinnvoll —
+             automatische feuert der Worker, sie erzeugen ohnehin keine Aufgabe. -->
+        @if (!sel.t.automatic) {
+          <div class="fe__auto">
+            <app-checkbox [ngModel]="sel.t.requiresAction !== false" (ngModelChange)="setTransitionRequiresAction(sel.index, $event)" [hint]="'admin.flow.requiresActionHint' | t">
+              {{ 'admin.flow.requiresAction' | t }}
+            </app-checkbox>
+          </div>
+        }
 
         <!-- Ergebnis-Zweig nur für vote/approval-Quell-States (#28): pass/fail bzw. accept/reject. -->
         @if (branchesFor(sel.t.from).length) {

@@ -85,6 +85,7 @@ def _transition(
     guard: object = None,
     actions: list | None = None,
     branch: str | None = None,
+    requires_action: bool = True,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
@@ -97,6 +98,7 @@ def _transition(
         actions=actions if actions is not None else [],
         automatic=False,
         branch=branch,
+        requires_action=requires_action,
     )
 
 
@@ -302,3 +304,61 @@ async def test_fire_default_dispatcher_when_none() -> None:
     res = await flow_service.FlowService(db).fire(app.id, transition.id, _principal())
     assert res.new_state_id == to
     assert res.dispatched_actions == []
+
+
+# --------------------------------------------------------------------------- #
+# fire — Vote-Storno bei Nicht-Branch-Ausgang (#abort-vote)
+# --------------------------------------------------------------------------- #
+def _vote_cancel_updates(db) -> list:
+    """Alle ``UPDATE vote``-Statements der Session (Storno offener Abstimmungen)."""
+    return [
+        s
+        for s in db.statements
+        if getattr(getattr(s, "table", None), "name", None) == "vote"
+    ]
+
+
+async def test_fire_manual_exit_cancels_open_votes() -> None:
+    """Manueller Ausgang (z. B. »Wahl abbrechen« aus einem vote-State): offene
+    Abstimmungen des Antrags werden in derselben Transaktion storniert."""
+    flow_id, voting, aborted = uuid4(), uuid4(), uuid4()
+    app = _app(voting, flow_id)
+    abort = _transition(flow_id=flow_id, from_id=voting, to_id=aborted)
+    db = fake_session(result(app), result(abort), result(rowcount=1))
+    res = await FlowService(db, _Recorder()).fire(app.id, abort.id, _principal())
+    assert res.new_state_id == aborted
+    updates = _vote_cancel_updates(db)
+    assert len(updates) == 1
+    compiled = str(updates[0])
+    assert "status" in compiled and "application_id" in compiled
+
+
+async def test_fire_branch_exit_does_not_cancel_votes() -> None:
+    """Der Vote-Ergebnis-Branch storniert nichts — close() hat den Vote bereits
+    geschlossen (sonst würde der frisch geschlossene Vote überschrieben)."""
+    flow_id, voting = uuid4(), uuid4()
+    app = _app(voting, flow_id)
+    passed = _transition(
+        flow_id=flow_id, from_id=voting, to_id=uuid4(), branch="pass"
+    )
+    db = fake_session(result(app), result(passed), result(rowcount=1))
+    await FlowService(db, _Recorder()).fire(
+        app.id, passed.id, _principal(), manual=False
+    )
+    assert _vote_cancel_updates(db) == []
+
+
+async def test_available_transitions_carry_requires_action_flag() -> None:
+    """#requires-action: das Flag reist bis in ``TransitionOut`` (Tasks-Tab-Filter)."""
+    flow_id, draft = uuid4(), uuid4()
+    app = _app(draft, flow_id)
+    required = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
+    optional = _transition(
+        flow_id=flow_id, from_id=draft, to_id=uuid4(), requires_action=False
+    )
+    db = fake_session(result(app), result(required, optional))
+    out = await FlowService(db).available_transitions(app.id, _principal())
+    assert [(t.id, t.requires_action) for t in out] == [
+        (required.id, True),
+        (optional.id, False),
+    ]

@@ -163,6 +163,9 @@ class TransitionDef(_CamelModel):
     automatic: bool = False
     # Ergebnis-Zweig (#28) für vote/approval-States: pass/fail bzw. accept/reject.
     branch: TransitionBranch | None = None
+    # »Erfordert Aktion« (#requires-action): zählt der feuerbare Übergang als offene
+    # Aufgabe des Akteurs (Tasks-Tab)? ``False`` = rein optionale Aktion.
+    requires_action: bool = Field(default=True, alias="requiresAction")
 
 
 class FlowGraph(_CamelModel):

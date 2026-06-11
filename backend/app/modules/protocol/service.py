@@ -364,7 +364,12 @@ class ProtocolService:
             votes = (
                 await self.session.execute(
                     select(Vote)
-                    .where(Vote.agenda_item_id == item.id)
+                    .where(
+                        Vote.agenda_item_id == item.id,
+                        # Stornierte Abstimmungen (Wahl abgebrochen) haben kein
+                        # Ergebnis — keine leere Tally-Box im Protokoll.
+                        Vote.status != "cancelled",
+                    )
                     .order_by(Vote.created_at)
                 )
             ).scalars().all()

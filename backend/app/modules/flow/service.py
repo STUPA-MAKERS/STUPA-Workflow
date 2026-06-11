@@ -229,6 +229,7 @@ class FlowService:
                 toStateId=t.to_state_id,
                 label=t.label_i18n,
                 color=t.color,
+                requiresAction=t.requires_action,
             )
             for t in await self._outgoing(app)
             if not t.automatic and not t.branch and eval_guard(t.guard, ctx)
@@ -256,6 +257,7 @@ class FlowService:
                 toStateId=t.to_state_id,
                 label=t.label_i18n,
                 color=t.color,
+                requiresAction=t.requires_action,
             )
             for t in await self._outgoing(app)
             if not t.automatic
@@ -345,6 +347,18 @@ class FlowService:
             application_id, t.id, principal, note=note or branch, manual=False
         )
 
+    async def _cancel_open_votes(self, application_id: UUID) -> None:
+        """Offene Abstimmungen des Antrags stornieren (``open → cancelled``)."""
+        # Lokaler Import: ``voting.service`` importiert den FlowService — ein
+        # Modul-Level-Import hier wäre ein Zyklus.
+        from app.modules.voting.models import Vote
+
+        await self.session.execute(
+            update(Vote)
+            .where(Vote.application_id == application_id, Vote.status == "open")
+            .values(status="cancelled")
+        )
+
     # ------------------------------------------------------------------- fire
     async def fire(
         self,
@@ -423,6 +437,15 @@ class FlowService:
         self.session.add(event)
         await self.session.flush()
         status_event_id = event.id
+
+        # Nicht-Branch-Ausgang (manuell »Wahl abbrechen« oder automatischer
+        # Deadline-Exit aus einem vote-State, #abort-vote): offene Abstimmungen des
+        # Antrags werden in derselben Transaktion storniert — sonst bliebe der Vote
+        # offen und sein close() fände im neuen State keinen Branch mehr (409, für
+        # immer offen). Vote-Ergebnis-Branches stornieren nichts: close() hat den
+        # Vote dort bereits geschlossen.
+        if transition.branch is None:
+            await self._cancel_open_votes(app.id)
 
         # Audit-Trail (T-23, security.md §4): Statuswechsel append-only protokollieren,
         # **in derselben Transaktion** wie der State-Wechsel (atomar). Nur id-Referenzen

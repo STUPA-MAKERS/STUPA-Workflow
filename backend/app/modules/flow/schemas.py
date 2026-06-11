@@ -24,6 +24,8 @@ class TransitionOut(_CamelModel):
     label: I18nMap
     # Optionale Farbe für den Entscheidungs-Button (#flow).
     color: str | None = None
+    # »Erfordert Aktion« (#requires-action): zählt als offene Aufgabe im Tasks-Tab.
+    requires_action: bool = Field(default=True, alias="requiresAction")
 
 
 class TransitionRequest(_CamelModel):

@@ -83,8 +83,10 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
     __table_args__ = (
+        # ``cancelled``: Antrag hat den vote-State manuell verlassen (z. B. »Wahl
+        # abbrechen«) — die Abstimmung ist storniert, ohne Ergebnis (#abort-vote).
         CheckConstraint(
-            "status IN ('draft','open','closed')", name="vote_status"
+            "status IN ('draft','open','closed','cancelled')", name="vote_status"
         ),
         CheckConstraint(
             "result IS NULL OR result IN ('passed','rejected','tie')",

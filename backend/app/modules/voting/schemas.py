@@ -87,7 +87,8 @@ class VoteOut(_CamelModel):
     question: str | None = None
     eligible_group: str = Field(alias="eligibleGroup")
     config: VoteConfig
-    status: Literal["draft", "open", "closed"]
+    # ``cancelled``: Antrag hat den vote-State manuell verlassen (Wahl abgebrochen).
+    status: Literal["draft", "open", "closed", "cancelled"]
     opens_at: datetime | None = Field(default=None, alias="opensAt")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     result: Literal["passed", "rejected", "tie"] | None = None

@@ -465,7 +465,7 @@ export const de = {
   'applications.attachments.deleted': 'Anhang gelöscht.',
   'applications.attachments.deleteError': 'Anhang konnte nicht gelöscht werden.',
   'applications.attachments.scan.scanning': 'In Prüfung',
-  'applications.attachments.scan.clean': 'Bereit',
+  'applications.attachments.scan.clean': 'Gescannt',
   'applications.attachments.scan.quarantined': 'Quarantäne',
   'applications.attachments.error.tooLarge': 'Datei zu groß (max. 10 MB).',
   'applications.attachments.error.type': 'Dateityp nicht erlaubt.',
@@ -534,10 +534,12 @@ export const de = {
   'meetings.voteStatus.pending': 'Geplant',
   'meetings.voteStatus.open': 'Offen',
   'meetings.voteStatus.closed': 'Geschlossen',
+  'meetings.voteStatus.cancelled': 'Abgebrochen',
   'meetings.vote.active': 'Aktiver Antrag',
   'meetings.vote.tally': 'Zwischenstand',
   'meetings.vote.progress': '{voted} von {present} Anwesenden haben abgestimmt',
-  'meetings.vote.progressHidden': 'Zwischenstand sichtbar, sobald alle Anwesenden abgestimmt haben.',
+  'meetings.vote.progressHidden':
+    'Zwischenstand sichtbar, sobald alle Anwesenden abgestimmt haben.',
   'meetings.vote.setActive': 'Aktiv setzen',
   'meetings.vote.openFor': 'Abstimmung öffnen',
   'meetings.vote.dialogTitle': 'Abstimmung öffnen',
@@ -573,7 +575,10 @@ export const de = {
   'meetings.protocol.selectTop': 'Wähle links einen TOP, um seinen Text zu bearbeiten.',
   'meetings.protocol.saveFirst': 'Automatisches Speichern läuft – dann finalisieren.',
   'meetings.protocol.finalizedHint': 'Das Protokoll ist final und wurde versandt.',
-  'meetings.protocol.renderingHint': 'Das PDF wird im Hintergrund gerendert und anschließend versandt.',
+  'meetings.protocol.renderingHint':
+    'Das PDF wird im Hintergrund gerendert und anschließend versandt.',
+  'meetings.protocol.retryHint':
+    'Die Finalisierung ist fehlgeschlagen — Inhalt prüfen und erneut versuchen.',
   'meetings.create.title': 'Sitzung anlegen',
   'meetings.create.lead': 'Lege eine neue Sitzung an, um Anträge und Abstimmungen zu steuern.',
   'meetings.create.name': 'Titel',
@@ -968,6 +973,9 @@ export const de = {
   'admin.flow.removeTransition': 'Übergang löschen',
   'admin.flow.automatic': 'Automatischer Übergang',
   'admin.flow.automaticHint': 'Feuert ohne Nutzer-Aktion, sobald der Guard erfüllt ist.',
+  'admin.flow.requiresAction': 'Erfordert Aktion',
+  'admin.flow.requiresActionHint':
+    'Zählt als offene Aufgabe im Aufgaben-Tab. Deaktivieren für rein optionale Aktionen.',
   'admin.flow.selectHint': 'Wähle einen Status oder Übergang im Diagramm zum Bearbeiten.',
   'admin.flow.glossary':
     '„Akteur" = die Person, die den Übergang auslöst. „Guard" = Bedingung, die erfüllt sein muss. „Aktionen" laufen nach dem Übergang (z. B. Benachrichtigen).',
@@ -2034,6 +2042,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.voteStatus.pending': 'Planned',
   'meetings.voteStatus.open': 'Open',
   'meetings.voteStatus.closed': 'Closed',
+  'meetings.voteStatus.cancelled': 'Cancelled',
   'meetings.vote.active': 'Active application',
   'meetings.vote.tally': 'Current tally',
   'meetings.vote.progress': '{voted} of {present} present have voted',
@@ -2073,6 +2082,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.protocol.saveFirst': 'Auto-save in progress – then finalize.',
   'meetings.protocol.finalizedHint': 'The minutes are final and have been sent.',
   'meetings.protocol.renderingHint': 'The PDF is rendered in the background and sent afterwards.',
+  'meetings.protocol.retryHint': 'Finalizing failed — review the content and try again.',
   'meetings.create.title': 'Create meeting',
   'meetings.create.lead': 'Create a new meeting to steer applications and votes.',
   'meetings.create.name': 'Title',
@@ -2467,6 +2477,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.removeTransition': 'Delete transition',
   'admin.flow.automatic': 'Automatic transition',
   'admin.flow.automaticHint': 'Fires without user action as soon as the guard is satisfied.',
+  'admin.flow.requiresAction': 'Requires action',
+  'admin.flow.requiresActionHint':
+    'Counts as an open task in the tasks tab. Disable for purely optional actions.',
   'admin.flow.selectHint': 'Select a state or transition in the diagram to edit it.',
   'admin.flow.glossary':
     '"Actor" = the person triggering the transition. "Guard" = a condition that must hold. "Actions" run after the transition (e.g. notify).',
