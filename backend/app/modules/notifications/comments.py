@@ -18,15 +18,15 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application
 from app.modules.flow.models import State
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.queue import MailQueue
+from app.modules.notifications.recipients import actionable_principal_emails
 from app.modules.notifications.service import (
     NotificationService,
     filter_recipients_by_preference,
@@ -127,7 +127,7 @@ async def send_comment_notifications(
         template_key = APPLICANT_TEMPLATE_KEY
         builtin = (_BUILTIN_APPLICANT_SUBJECT, _BUILTIN_APPLICANT_BODY)
     else:
-        recipients = await _actionable_principal_emails(
+        recipients = await actionable_principal_emails(
             session, state=state, gremium_id=gremium_id
         )
         template_key = TEAM_TEMPLATE_KEY
@@ -169,60 +169,3 @@ async def send_comment_notifications(
         idempotency_key=compute_idempotency_key(*idem),
     )
     return int(await service._enqueue(msg))  # noqa: SLF001
-
-
-async def _actionable_principal_emails(
-    session: AsyncSession,
-    *,
-    state: State | None,
-    gremium_id: uuid.UUID | None,
-) -> list[str]:
-    """Adressen aller, die am aktuellen State handeln können (Task-Semantik #64).
-
-    ``vote``-State → Mitglieder des abstimmenden Gremiums (``config.gremiumId``);
-    sonst Principals mit aktiver Rollenzuweisung, deren Rolle
-    ``application.transition`` trägt (global oder im Antrags-Gremium) — die
-    ``admin``-Rolle zählt immer (Admin-Bypass hat alle Rechte)."""
-    from app.modules.auth.models import Principal as PrincipalRow
-    from app.modules.auth.models import Role, RoleAssignment, RolePermission
-    from app.modules.notifications.recipients import RecipientResolver
-
-    if state is not None and state.kind == "vote":
-        cfg = state.config if isinstance(state.config, dict) else {}
-        gid = cfg.get("gremiumId")
-        if isinstance(gid, str) and gid:
-            return await RecipientResolver(session).resolve(
-                [{"kind": "gremium", "ref": gid}]
-            )
-        return []
-
-    now = datetime.now(UTC)
-    stmt = (
-        select(PrincipalRow.email)
-        .join(RoleAssignment, RoleAssignment.principal_id == PrincipalRow.id)
-        .join(Role, Role.id == RoleAssignment.role_id)
-        .outerjoin(RolePermission, RolePermission.role_id == Role.id)
-        .where(
-            PrincipalRow.email.is_not(None),
-            PrincipalRow.active.is_(True),
-            or_(
-                RoleAssignment.valid_from.is_(None),
-                RoleAssignment.valid_from <= now,
-            ),
-            or_(
-                RoleAssignment.valid_until.is_(None),
-                RoleAssignment.valid_until > now,
-            ),
-            or_(
-                RoleAssignment.gremium_id.is_(None),
-                RoleAssignment.gremium_id == gremium_id,
-            ),
-            or_(
-                RolePermission.permission == "application.transition",
-                Role.key == "admin",
-            ),
-        )
-        .distinct()
-    )
-    rows = (await session.scalars(stmt)).all()
-    return sorted({e for e in rows if e})

@@ -12,6 +12,7 @@ from app.modules.flow.dispatch import (
     DispatchedAction,
     NullActionDispatcher,
     build_dispatched_actions,
+    build_implicit_notifications,
 )
 
 
@@ -88,3 +89,32 @@ async def test_null_dispatcher_empty_is_noop(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(dispatch_mod, "logger", spy)
     await NullActionDispatcher().dispatch([])
     assert spy.messages == []
+
+
+# --------------------------------------------------------------------------- #
+# Implizite Auto-Mails je Statuswechsel (#4-3)
+# --------------------------------------------------------------------------- #
+def test_implicit_adds_applicant_notify_and_task() -> None:
+    app_id, t_id, e_id = uuid4(), uuid4(), uuid4()
+    implicit = build_implicit_notifications(
+        [{"type": "webhook", "url": "https://x"}],
+        application_id=app_id,
+        transition_id=t_id,
+        status_event_id=e_id,
+    )
+    assert [a.type for a in implicit] == ["notify", "taskNotify"]
+    notify = implicit[0]
+    assert notify.params["recipients"] == [{"kind": "applicant"}]
+    assert notify.params["templateKey"] == "status_update"
+    assert notify.idempotency_key == f"{app_id}:{e_id}:auto:applicant"
+    assert implicit[1].idempotency_key == f"{app_id}:{e_id}:auto:task"
+
+
+def test_implicit_skips_applicant_when_explicitly_notified() -> None:
+    implicit = build_implicit_notifications(
+        [{"type": "notify", "recipients": [{"kind": "applicant"}]}],
+        application_id=uuid4(),
+        transition_id=uuid4(),
+        status_event_id=uuid4(),
+    )
+    assert [a.type for a in implicit] == ["taskNotify"]

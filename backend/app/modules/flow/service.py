@@ -39,6 +39,7 @@ from app.modules.flow.dispatch import (
     ActionDispatcher,
     NullActionDispatcher,
     build_dispatched_actions,
+    build_implicit_notifications,
 )
 from app.modules.flow.models import State, Transition
 from app.modules.flow.schemas import TransitionOut, TransitionResult
@@ -483,6 +484,14 @@ class FlowService:
 
         # --- Nach Commit: Worker-Actions dispatchen (idempotent, retrybar). --------
         dispatched = build_dispatched_actions(
+            transition.actions,
+            application_id=app.id,
+            transition_id=transition.id,
+            status_event_id=status_event_id,
+        )
+        # Implizite Auto-Mails (#4-3): Status-Update an den Antragsteller +
+        # Task-Mail an Handlungsberechtigte des neuen States.
+        dispatched += build_implicit_notifications(
             transition.actions,
             application_id=app.id,
             transition_id=transition.id,

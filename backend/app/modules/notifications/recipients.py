@@ -8,8 +8,11 @@ Empfängertypen (data-model §5.4 + #28-Flow-Actions):
 * ``{"kind":"applicant"}``              — Antragsteller-Mail des auslösenden Antrags.
 * ``{"kind":"email","ref":"a@b.c"}``    — feste, frei eingetragene Adresse.
 
-Ergebnis ist dedupliziert + sortiert; leere/anonymisierte Adressen fallen raus.
-Anonymisierte Applicants (email NULL) → kein Versand (DSGVO).
+Ergebnis ist dedupliziert + sortiert; leere Adressen fallen raus.
+
+Zusätzlich: :func:`actionable_principal_emails` — Adressen aller, die am
+aktuellen State eines Antrags handeln können (Task-Semantik #64; von
+Kommentar-/Task-Mails #4-1/#4-3 genutzt).
 """
 
 from __future__ import annotations
@@ -24,7 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership
 from app.modules.applications.models import Applicant
-from app.modules.auth.models import Principal, Role, RoleAssignment
+from app.modules.auth.models import Principal, Role, RoleAssignment, RolePermission
+from app.modules.flow.models import State
 
 
 @dataclass(slots=True)
@@ -121,3 +125,56 @@ class RecipientResolver:
                 Applicant.application_id == application_id,
             )
         )
+
+
+async def actionable_principal_emails(
+    session: AsyncSession,
+    *,
+    state: State | None,
+    gremium_id: uuid.UUID | None,
+) -> list[str]:
+    """Adressen aller, die am aktuellen State handeln können (Task-Semantik #64).
+
+    ``vote``-State → Mitglieder des abstimmenden Gremiums (``config.gremiumId``);
+    sonst Principals mit aktiver Rollenzuweisung, deren Rolle
+    ``application.transition`` trägt (global oder im Antrags-Gremium) — die
+    ``admin``-Rolle zählt immer (Admin-Bypass hat alle Rechte)."""
+    if state is not None and state.kind == "vote":
+        cfg = state.config if isinstance(state.config, dict) else {}
+        gid = cfg.get("gremiumId")
+        if isinstance(gid, str) and gid:
+            return await RecipientResolver(session).resolve(
+                [{"kind": "gremium", "ref": gid}]
+            )
+        return []
+
+    now = datetime.now(UTC)
+    stmt = (
+        select(Principal.email)
+        .join(RoleAssignment, RoleAssignment.principal_id == Principal.id)
+        .join(Role, Role.id == RoleAssignment.role_id)
+        .outerjoin(RolePermission, RolePermission.role_id == Role.id)
+        .where(
+            Principal.email.is_not(None),
+            Principal.active.is_(True),
+            or_(
+                RoleAssignment.valid_from.is_(None),
+                RoleAssignment.valid_from <= now,
+            ),
+            or_(
+                RoleAssignment.valid_until.is_(None),
+                RoleAssignment.valid_until > now,
+            ),
+            or_(
+                RoleAssignment.gremium_id.is_(None),
+                RoleAssignment.gremium_id == gremium_id,
+            ),
+            or_(
+                RolePermission.permission == "application.transition",
+                Role.key == "admin",
+            ),
+        )
+        .distinct()
+    )
+    rows = (await session.scalars(stmt)).all()
+    return sorted({e for e in rows if e})

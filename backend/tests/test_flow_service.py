@@ -221,7 +221,9 @@ async def test_fire_commits_status_event_and_dispatches() -> None:
     res = await svc.fire(app.id, transition.id, _principal(), note="los")
 
     assert res.new_state_id == review
-    assert res.dispatched_actions == ["notify"]
+    # Explizite notify-Action + implizite Task-Mail (#4-3); die implizite
+    # Applicant-Mail entfällt (explizite Action adressiert ihn bereits).
+    assert res.dispatched_actions == ["notify", "taskNotify"]
     assert db.committed == 1
     event = db.added[0]
     assert event.from_state_id == draft
@@ -303,7 +305,8 @@ async def test_fire_default_dispatcher_when_none() -> None:
     db = fake_session(result(app), result(transition), result(rowcount=1))
     res = await flow_service.FlowService(db).fire(app.id, transition.id, _principal())
     assert res.new_state_id == to
-    assert res.dispatched_actions == []
+    # Ohne explizite Actions bleiben die impliziten Auto-Mails (#4-3).
+    assert res.dispatched_actions == ["notify", "taskNotify"]
 
 
 # --------------------------------------------------------------------------- #

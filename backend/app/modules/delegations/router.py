@@ -12,11 +12,16 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.delegations.schemas import DelegationCreate, DelegationOut
 from app.modules.delegations.service import DelegationService
+from app.modules.notifications.auto import (
+    AutoMailer,
+    assignment_mail_info,
+    get_auto_mailer,
+)
 from app.shared.errors import ProblemDetail
 
 router = APIRouter(prefix="/delegations", tags=["delegations"])
@@ -33,6 +38,7 @@ def get_delegation_service(session: DbSession, settings: SettingsDep) -> Delegat
 
 
 ServiceDep = Annotated[DelegationService, Depends(get_delegation_service)]
+AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 # Auth genügt (jedes Mitglied darf eigene Rechte delegieren); Rollen-Besitz prüft der Service.
 Member = Annotated[Principal, Depends(require_principal())]
 
@@ -49,9 +55,22 @@ async def list_delegations(service: ServiceDep, principal: Member) -> list[Deleg
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def create_delegation(
-    payload: DelegationCreate, service: ServiceDep, principal: Member
+    payload: DelegationCreate,
+    service: ServiceDep,
+    principal: Member,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: AutoMailerDep,
 ) -> DelegationOut:
-    return await service.create(payload, principal)
+    out = await service.create(payload, principal)
+    # Delegat informieren (#4-3, Art delegation, abwählbar #4-2).
+    info = await assignment_mail_info(getattr(service, "session", None), out.id)
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(
+        mailer.assignment_changed, settings, info, granted=True, pool=pool
+    )
+    return out
 
 
 @router.delete(
@@ -60,7 +79,19 @@ async def create_delegation(
     responses=_errors(401, 403, 404),
 )
 async def revoke_delegation(
-    delegation_id: UUID, service: ServiceDep, principal: Member
+    delegation_id: UUID,
+    service: ServiceDep,
+    principal: Member,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: AutoMailerDep,
 ) -> Response:
+    # Mail-Daten VOR dem Widerruf einsammeln (#4-3) — danach ist die Zeile weg.
+    info = await assignment_mail_info(getattr(service, "session", None), delegation_id)
     await service.revoke(delegation_id, principal)
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(
+        mailer.assignment_changed, settings, info, granted=False, pool=pool
+    )
     return Response(status_code=204)

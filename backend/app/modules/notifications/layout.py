@@ -45,6 +45,36 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because a deadline on an "
         "application that concerns you is approaching.",
     },
+    "task": {
+        "de": "Sie erhalten diese E-Mail, weil ein Antrag einen Schritt "
+        "erreicht hat, in dem Sie handeln können.",
+        "en": "You are receiving this email because an application reached "
+        "a step where you can act.",
+    },
+    "meeting": {
+        "de": "Sie erhalten diese E-Mail, weil eine Sitzung eines Ihrer "
+        "Gremien angesetzt oder geändert wurde.",
+        "en": "You are receiving this email because a meeting of one of "
+        "your committees was scheduled or changed.",
+    },
+    "vote": {
+        "de": "Sie erhalten diese E-Mail, weil eine Abstimmung geöffnet "
+        "oder geschlossen wurde, die Sie betrifft.",
+        "en": "You are receiving this email because a vote that concerns "
+        "you was opened or closed.",
+    },
+    "role_change": {
+        "de": "Sie erhalten diese E-Mail, weil sich Ihre Rollen auf der "
+        "Plattform geändert haben.",
+        "en": "You are receiving this email because your roles on the "
+        "platform changed.",
+    },
+    "delegation": {
+        "de": "Sie erhalten diese E-Mail, weil eine Stimm-Delegation "
+        "erteilt oder widerrufen wurde, die Sie betrifft.",
+        "en": "You are receiving this email because a vote delegation that "
+        "concerns you was granted or revoked.",
+    },
     "generic": {
         "de": "Sie erhalten diese E-Mail von der Antragsplattform.",
         "en": "You are receiving this email from the application platform.",

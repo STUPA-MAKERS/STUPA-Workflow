@@ -83,6 +83,58 @@ def build_dispatched_actions(
     return dispatched
 
 
+def build_implicit_notifications(
+    actions: Sequence[dict[str, Any]],
+    *,
+    application_id: UUID,
+    transition_id: UUID,
+    status_event_id: UUID,
+) -> list[DispatchedAction]:
+    """Implizite Auto-Mails je Statuswechsel (#4-3), zusätzlich zu den
+    konfigurierten Flow-Actions:
+
+    * ``notify`` an den Antragsteller (Status-Update) — entfällt, wenn der
+      Übergang bereits eine explizite ``notify``-Action mit Applicant-Empfänger
+      trägt (kein Doppelversand).
+    * ``taskNotify`` an alle, die am neuen State handeln können (Task-Mail);
+      der Handler löst die Empfänger zur Versandzeit auf.
+
+    Abwahl einzelner Arten regelt die Empfänger-Filterung (#4-2)."""
+    applicant_covered = any(
+        action.get("type") == "notify"
+        and any(
+            isinstance(r, dict) and r.get("kind") == "applicant"
+            for r in action.get("recipients", [])
+        )
+        for action in actions
+    )
+    implicit: list[DispatchedAction] = []
+    if not applicant_covered:
+        implicit.append(
+            DispatchedAction(
+                type="notify",
+                application_id=application_id,
+                transition_id=transition_id,
+                status_event_id=status_event_id,
+                idempotency_key=f"{application_id}:{status_event_id}:auto:applicant",
+                params={
+                    "templateKey": "status_update",
+                    "recipients": [{"kind": "applicant"}],
+                },
+            )
+        )
+    implicit.append(
+        DispatchedAction(
+            type="taskNotify",
+            application_id=application_id,
+            transition_id=transition_id,
+            status_event_id=status_event_id,
+            idempotency_key=f"{application_id}:{status_event_id}:auto:task",
+        )
+    )
+    return implicit
+
+
 @runtime_checkable
 class ActionDispatcher(Protocol):
     """Worker-Dispatch-Schnittstelle (konkrete Queue-Anbindung in T-18/19/20/17/15)."""

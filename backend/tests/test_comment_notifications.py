@@ -95,7 +95,7 @@ async def test_applicant_comment_mails_actionable_team(
     async def fake_actionable(session: Any, *, state: Any, gremium_id: Any) -> list[str]:
         return ["team@x.de", "vorstand@x.de"]
 
-    monkeypatch.setattr(mod, "_actionable_principal_emails", fake_actionable)
+    monkeypatch.setattr(mod, "actionable_principal_emails", fake_actionable)
     session = FakeSession(executes=[_app_row()], scalars=[[]])
     sent = await send_comment_notifications(
         session,

@@ -112,3 +112,41 @@ def test_build_notify_dispatcher_uses_settings() -> None:
     disp = mod.build_notify_dispatcher(None)
     assert isinstance(disp, NotificationActionDispatcher)
     assert disp.queue is None
+
+
+async def test_dispatch_task_notify_sends_kind_mail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`taskNotify` (#4-3): Empfänger zur Versandzeit, Versand via send_kind_mail."""
+    captured: dict[str, object] = {}
+
+    class FakeService:
+        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+            pass
+
+        async def send_kind_mail(self, recipients, **kw):  # noqa: ANN001, ANN003
+            captured["recipients"] = recipients
+            captured["kw"] = kw
+            return True
+
+    async def fake_actionable(session, *, state, gremium_id):  # noqa: ANN001
+        return ["team@x.de"]
+
+    import app.modules.notifications.recipients as recipients_mod
+
+    monkeypatch.setattr(mod, "NotificationService", FakeService)
+    monkeypatch.setattr(
+        recipients_mod, "actionable_principal_emails", fake_actionable
+    )
+    session = FakeSession(
+        executes=[[({"title": "Beamer"}, uuid.uuid4(), None)]],
+        scalar=[None],  # State-Lookup — kein Treffer nötig
+    )
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch([_action("taskNotify")])
+
+    assert captured["recipients"] == ["team@x.de"]
+    kw = captured["kw"]
+    assert kw["kind"] == "task"  # type: ignore[index]
+    assert kw["template_key"] == "task_new"  # type: ignore[index]
+    assert kw["context"]["applicationTitle"] == "Beamer"  # type: ignore[index]

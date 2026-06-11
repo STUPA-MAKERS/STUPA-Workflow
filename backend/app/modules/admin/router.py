@@ -20,9 +20,9 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 
-from app.deps import DbSession, Principal, require_principal
+from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.admin.branding import Branding
 from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.schemas import (
@@ -59,6 +59,11 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
+from app.modules.notifications.auto import (
+    AutoMailer,
+    assignment_mail_info,
+    get_auto_mailer,
+)
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ProblemDetail
 
@@ -93,6 +98,8 @@ SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
 GremiumRoleServiceDep = Annotated[
     GremiumRoleService, Depends(get_gremium_role_service)
 ]
+
+AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 
 # Permission-Gates (Principal-Objekt injiziert für den Audit-actor).
 ConfigAdmin = Annotated[Principal, Depends(require_principal("admin.config"))]
@@ -484,9 +491,22 @@ async def list_role_assignments(service: ServiceDep) -> list[RoleAssignmentOut]:
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def create_role_assignment(
-    payload: RoleAssignmentCreate, service: ServiceDep, principal: RolesAdmin
+    payload: RoleAssignmentCreate,
+    service: ServiceDep,
+    principal: RolesAdmin,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: AutoMailerDep,
 ) -> RoleAssignmentOut:
-    return await service.create_role_assignment(payload, principal.sub)
+    out = await service.create_role_assignment(payload, principal.sub)
+    # Betroffene:n informieren (#4-3, Art role_change/delegation, abwählbar #4-2).
+    info = await assignment_mail_info(getattr(service, "session", None), out.id)
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(
+        mailer.assignment_changed, settings, info, granted=True, pool=pool
+    )
+    return out
 
 
 @router.patch(
@@ -509,10 +529,22 @@ async def update_role_assignment(
     responses=_errors(401, 403, 404),
 )
 async def delete_role_assignment(
-    assignment_id: UUID, service: ServiceDep, principal: RolesAdmin
+    assignment_id: UUID,
+    service: ServiceDep,
+    principal: RolesAdmin,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: AutoMailerDep,
 ) -> Response:
     """Rolle entziehen (#72): Zuweisung löschen (idempotent → 204; unbekannt → 404)."""
+    # Mail-Daten VOR dem Löschen einsammeln (#4-3) — danach ist die Zeile weg.
+    info = await assignment_mail_info(getattr(service, "session", None), assignment_id)
     await service.delete_role_assignment(assignment_id, principal.sub)
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(
+        mailer.assignment_changed, settings, info, granted=False, pool=pool
+    )
     return Response(status_code=204)
 
 

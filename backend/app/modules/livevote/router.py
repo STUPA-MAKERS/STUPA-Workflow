@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, WebSocket
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, WebSocket
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
@@ -51,6 +51,7 @@ from app.modules.livevote.schemas import (
     MeetingVoteOpenBody,
 )
 from app.modules.livevote.service import BrokerPublisher, MeetingService
+from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.modules.voting.schemas import VoteCreate
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
@@ -141,6 +142,7 @@ BrokerRestDep = Annotated[MeetingBroker, Depends(get_broker_rest)]
 ManagerDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 BrokerWsDep = Annotated[MeetingBroker, Depends(get_broker_ws)]
 LockerWsDep = Annotated[Locker, Depends(get_locker_ws)]
 MeetingServiceWsDep = Annotated[MeetingService, Depends(get_meeting_service_ws)]
@@ -155,14 +157,23 @@ WsPrincipalDep = Annotated[Principal | None, Depends(get_ws_principal)]
     "/meetings", response_model=MeetingOut, responses=_errors(400, 401, 403, 422)
 )
 async def create_meeting(
-    payload: MeetingCreate, service: ServiceDep, principal: ReaderDep
+    payload: MeetingCreate,
+    service: ServiceDep,
+    principal: ReaderDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: AutoMailerDep,
 ) -> MeetingOut:
     """Sitzung (``planned``) anlegen — Sitzungsverwalter (``session.manage``)/Admin.
 
     Die RBAC ist gremium-genau (Vorstand/Manager des Gremiums oder globale
     ``meeting.manage``); der Service wirft 403, wenn der Principal das Gremium nicht
-    verwalten darf."""
-    return await service.create(payload, principal)
+    verwalten darf. Gremium-Mitglieder erhalten eine Sitzungs-Mail (#4-3)."""
+    meeting = await service.create(payload, principal)
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(mailer.meeting_created, settings, meeting.id, pool)
+    return meeting
 
 
 @router.get("/meetings", response_model=list[MeetingOut], responses=_errors(401, 403))

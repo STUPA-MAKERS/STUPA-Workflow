@@ -41,14 +41,16 @@ class NotificationActionDispatcher:
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
         for action in actions:
-            if action.type != "notify":
+            if action.type == "notify":
+                await self._dispatch_notify(action)
+            elif action.type == "taskNotify":
+                await self._dispatch_task(action)
+            else:
                 logger.info(
                     "flow action not handled by notify-dispatcher (type=%s key=%s)",
                     action.type,
                     action.idempotency_key,
                 )
-                continue
-            await self._dispatch_notify(action)
 
     async def _dispatch_notify(self, action: DispatchedAction) -> None:
         async with self.sessionmaker() as session:
@@ -96,6 +98,82 @@ class NotificationActionDispatcher:
                 lang=lang,
                 idempotency_base=action.idempotency_key,
             )
+
+
+    async def _dispatch_task(self, action: DispatchedAction) -> None:
+        """Task-Mail (#4-3): Antrag hat einen State erreicht, in dem die Empfänger
+        handeln können — Empfänger werden zur Versandzeit aufgelöst (Task-Semantik)."""
+        from app.modules.notifications.recipients import actionable_principal_emails
+
+        async with self.sessionmaker() as session:
+            row = (
+                await session.execute(
+                    select(
+                        Application.data,
+                        Application.current_state_id,
+                        Application.gremium_id,
+                    ).where(Application.id == action.application_id)
+                )
+            ).first()
+            if row is None:
+                return
+            data, state_id, gremium_id = row
+            state = (
+                await session.scalar(select(State).where(State.id == state_id))
+                if state_id is not None
+                else None
+            )
+            recipients = await actionable_principal_emails(
+                session, state=state, gremium_id=gremium_id
+            )
+            if not recipients:
+                return
+            title = (data or {}).get("title")
+            status_label = ""
+            if (
+                state is not None
+                and isinstance(state.label_i18n, dict)
+                and state.label_i18n
+            ):
+                status_label = state.label_i18n.get(
+                    self.settings.mail_default_lang
+                ) or next(iter(state.label_i18n.values()))
+            service = NotificationService(
+                session, queue=self.queue, settings=self.settings
+            )
+            await service.send_kind_mail(
+                recipients,
+                kind="task",
+                template_key="task_new",
+                builtin_subject=_BUILTIN_TASK_SUBJECT,
+                builtin_body=_BUILTIN_TASK_BODY,
+                context={
+                    "applicationId": str(action.application_id),
+                    "applicationTitle": title.strip()
+                    if isinstance(title, str)
+                    else "",
+                    "status": status_label,
+                },
+                idempotency_parts=(action.idempotency_key, "task_new"),
+            )
+
+
+_BUILTIN_TASK_SUBJECT = {
+    "de": "Neue Aufgabe: Antrag"
+    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
+    "en": "New task: application"
+    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
+}
+_BUILTIN_TASK_BODY = {
+    "de": "Hallo,\n\nder Antrag"
+    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} hat einen "
+    "Schritt erreicht, in dem du handeln kannst"
+    "{% if status %} (Status: {{ status }}){% endif %}.\n",
+    "en": "Hello,\n\nthe application"
+    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %} reached a '
+    "step where you can act"
+    "{% if status %} (status: {{ status }}){% endif %}.\n",
+}
 
 
 def build_notify_dispatcher(pool: object) -> NotificationActionDispatcher:

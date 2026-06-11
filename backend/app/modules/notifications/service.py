@@ -205,6 +205,57 @@ class NotificationService:
             select(PrincipalRow.id).where(PrincipalRow.sub == sub)
         )
 
+    async def send_kind_mail(
+        self,
+        recipients: list[str],
+        *,
+        kind: str,
+        template_key: str,
+        builtin_subject: dict[str, str],
+        builtin_body: dict[str, str],
+        context: dict[str, Any],
+        idempotency_parts: tuple[str, ...],
+        lang: str | None = None,
+    ) -> bool:
+        """Generischer Versand einer Benachrichtigungs-Art (#4-3).
+
+        Filtert abgewählte Empfänger (#4-2), bevorzugt das DB-Template
+        ``template_key`` (Builtin-Fallback) und hüllt die Mail ins Layout."""
+        recipients = await filter_recipients_by_preference(
+            self.session, recipients, kind
+        )
+        if not recipients:
+            return False
+        tpl = await self._get_template_by_key(template_key)
+        if tpl is not None:
+            return await self._render_and_enqueue(
+                tpl,
+                recipients,
+                context=context,
+                lang=lang,
+                idempotency_parts=idempotency_parts,
+                reason=kind,
+            )
+        try:
+            rendered = render_mail(
+                subject_i18n=builtin_subject,
+                body_i18n=builtin_body,
+                context=context,
+                lang=lang or self.settings.mail_default_lang,
+                default_lang=self.settings.mail_default_lang,
+            )
+        except TemplateRenderError as exc:  # defensiv — Builtins decken ihre Vars
+            logger.warning("builtin template %r render failed: %s", template_key, exc)
+            return False
+        msg = MailMessage(
+            to=tuple(recipients),
+            subject=rendered.subject,
+            text=rendered.text,
+            html=self._layout_html(rendered, kind),
+            idempotency_key=compute_idempotency_key(*idempotency_parts),
+        )
+        return await self._enqueue(msg)
+
     # -------------------------------------------------------------- dispatch #
     async def handle_notify_action(
         self,
