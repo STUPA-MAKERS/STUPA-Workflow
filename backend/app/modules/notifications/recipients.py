@@ -119,6 +119,5 @@ class RecipientResolver:
         return await self.session.scalar(
             select(Applicant.email).where(
                 Applicant.application_id == application_id,
-                Applicant.anonymized_at.is_(None),
             )
         )

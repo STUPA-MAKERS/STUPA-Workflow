@@ -44,9 +44,6 @@ export const AUDIT_ACTIONS = [
   'delegation_revoke',
   'delegation_use',
   'export',
-  'pii_access',
-  'pii_deletion',
-  'anonymization',
   'webhook_config',
   'attachment_quarantine',
 ] as const;

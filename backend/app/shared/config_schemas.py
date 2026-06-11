@@ -107,7 +107,6 @@ class FormFieldDef(_CamelModel):
     options: list[FieldOption] | None = None
     visible_if: dict[str, Any] | None = Field(default=None, alias="visibleIf")
     compute: dict[str, Any] | None = None
-    is_pii: bool = Field(default=False, alias="isPII")
     is_promoted: bool = Field(default=False, alias="isPromoted")
     promote_target: str | None = Field(default=None, alias="promoteTarget")
 

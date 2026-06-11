@@ -93,8 +93,7 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
 
 
 class Applicant(UUIDPkMixin, Base):
-    """Ausgelagerte PII (1:1 zum Antrag). Anonymisieren = email/name → NULL +
-    `anonymized_at` setzen (Antrag bleibt)."""
+    """Ausgelagerte PII (1:1 zum Antrag), nur für Berechtigte sichtbar."""
 
     __tablename__ = "applicant"
 
@@ -103,9 +102,6 @@ class Applicant(UUIDPkMixin, Base):
     )
     email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    anonymized_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
 
 
 class SubmissionVersion(UUIDPkMixin, Base):

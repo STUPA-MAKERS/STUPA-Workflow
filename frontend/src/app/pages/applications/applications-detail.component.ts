@@ -136,15 +136,9 @@ interface DetailPosition {
           @if (application.applicant) {
             <div>
               <dt>{{ 'applications.detail.applicant' | t }}</dt>
-              <dd>
-                @if (application.applicant.anonymized) {
-                  {{ 'applications.detail.anonymized' | t }}
-                } @else {
-                  {{ application.applicant.name || ('applications.detail.notProvided' | t) }}
-                }
-              </dd>
+              <dd>{{ application.applicant.name || ('applications.detail.notProvided' | t) }}</dd>
             </div>
-            @if (!application.applicant.anonymized && application.applicant.email) {
+            @if (application.applicant.email) {
               <div>
                 <dt>{{ 'applications.detail.email' | t }}</dt>
                 <dd><a [attr.href]="'mailto:' + application.applicant.email">{{ application.applicant.email }}</a></dd>

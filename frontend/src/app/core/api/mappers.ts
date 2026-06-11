@@ -70,7 +70,6 @@ function mapApplicant(wire: ApplicantOutWire | null | undefined): Applicant | nu
   return {
     email: wire.email ?? null,
     name: wire.name ?? null,
-    anonymized: wire.anonymized ?? false,
   };
 }
 

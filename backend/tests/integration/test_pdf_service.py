@@ -43,7 +43,7 @@ def _fields() -> list[FormFieldDef]:
     return [
         FormFieldDef(key="title", type="text", label={"de": "Titel"}, required=True),
         FormFieldDef.model_validate(
-            {"key": "note", "type": "text", "label": {"de": "Notiz"}, "isPII": True}
+            {"key": "note", "type": "text", "label": {"de": "Notiz"}}
         ),
     ]
 

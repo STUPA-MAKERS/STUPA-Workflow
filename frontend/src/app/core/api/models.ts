@@ -107,7 +107,6 @@ export interface StateOutWire {
 export interface ApplicantOutWire {
   email?: string | null;
   name?: string | null;
-  anonymized: boolean;
 }
 
 /** `ApplicationOut` — Antrag-Detail. */
@@ -338,7 +337,6 @@ export interface ApplicationState {
 export interface Applicant {
   email: string | null;
   name: string | null;
-  anonymized: boolean;
 }
 
 export interface Application {
@@ -533,7 +531,6 @@ export interface FormFieldDef {
   options?: FieldOption[];
   visibleIf?: Record<string, unknown>;
   compute?: Record<string, unknown>;
-  isPII?: boolean;
   isPromoted?: boolean;
   promoteTarget?: string;
 }

@@ -150,8 +150,6 @@ def build_application_markdown(doc: ApplicationDoc) -> str:
     out.append("## Antragsdaten")
     out.append("")
     for f in doc.fields:
-        if f.is_pii:
-            continue  # PII bleibt im `applicant`-Record, nicht im Gremium-PDF.
         label = resolve_i18n(f.label, lang, default) or f.key
         value = _format_value(doc.data.get(f.key))
         out.append(f"- **{_md_escape(label)}:** {_md_escape(value)}")

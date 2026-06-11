@@ -10,8 +10,6 @@ Deckt flows §1/§2 und data-model §1/§2 ab:
 * :meth:`timeline` / :meth:`versions` — Status-Verlauf bzw. Versionshistorie + Diff.
 * :meth:`list_applications` — gefilterte, gepagte Liste (Principal-only).
 * :meth:`add_comment` / :meth:`list_comments` — interne/öffentliche Kommentare (RBAC).
-* :meth:`anonymize` — PII leeren (Mail/Name → NULL, ``anonymized_at``), Antrag bleibt;
-  PII-markierte ``data``-Felder werden mit-geleert (data-model §1, R14.3).
 
 Form-/Topf-Felder kommen aus T-11: laufende Anträge validieren gegen ihre **gepinnte**
 ``form_version`` (data-model §4), nicht gegen die aktuell aktive.
@@ -78,7 +76,6 @@ def _field_from_row(row: Any) -> FormFieldDef:  # noqa: ANN401 — form_field-Ze
             "visibleIf": row.visible_if,
             "compute": row.compute,
             "options": row.options,
-            "isPII": row.is_pii,
             "isPromoted": row.is_promoted,
             "promoteTarget": row.promote_target,
         }
@@ -119,16 +116,6 @@ def _whitelist(fields: list[FormFieldDef], data: dict[str, Any]) -> dict[str, An
     sonst beliebige, GIN-indizierte Junk-Blobs ablegen (DoS-/Amplification-Fläche)."""
     known = {f.key for f in fields}
     return {k: v for k, v in data.items() if k in known}
-
-
-def _scrub_diff(diff: dict[str, Any], pii_keys: set[str]) -> dict[str, Any]:
-    """PII-Feld-Keys aus einem gespeicherten ``DataDiff`` entfernen (added/removed/changed).
-
-    Diff-Werte enthalten alte/neue Klartext-Feldwerte → beim Anonymisieren mit-leeren."""
-    return {
-        bucket: {k: v for k, v in (entries or {}).items() if k not in pii_keys}
-        for bucket, entries in diff.items()
-    }
 
 
 def _amount_currency(
@@ -242,7 +229,6 @@ class ApplicationsService:
                 applicant_out = ApplicantOut(
                     email=applicant.email,
                     name=applicant.name,
-                    anonymized=applicant.anonymized_at is not None,
                 )
         return ApplicationOut(
             id=app.id,
@@ -814,41 +800,3 @@ class ApplicationsService:
             )
             for c in rows
         ]
-
-    # ------------------------------------------------------------- anonymize
-    async def anonymize(self, application_id: UUID) -> None:
-        """PII leeren (Mail/Name → NULL, ``anonymized_at`` setzen), Antrag bleibt.
-
-        Zusätzlich werden ``isPII``-markierte ``data``-Felder geleert (data-model §1)."""
-        app = await self._get_app(application_id)
-        applicant = (
-            await self.session.execute(
-                select(Applicant).where(Applicant.application_id == application_id)
-            )
-        ).scalar_one_or_none()
-        if applicant is not None:
-            applicant.email = None
-            applicant.name = None
-            applicant.anonymized_at = datetime.now(UTC)
-
-        fields = await self._pinned_fields(app)
-        pii_keys = {f.key for f in fields if f.is_pii}
-        if pii_keys:
-            app.data = {k: v for k, v in app.data.items() if k not in pii_keys}
-            # PII steckt auch in jeder gespeicherten Version + deren Diff (DSGVO Art. 17):
-            # alle submission_version-Zeilen mit-scrubben, sonst leakt versions()/Timeline
-            # den alten Klartext-Snapshot (HIGH #2).
-            versions = (
-                await self.session.scalars(
-                    select(SubmissionVersion).where(
-                        SubmissionVersion.application_id == application_id
-                    )
-                )
-            ).all()
-            for v in versions:
-                v.data = {k: val for k, val in v.data.items() if k not in pii_keys}
-                if v.diff is not None:
-                    v.diff = _scrub_diff(v.diff, pii_keys)
-        await self.session.commit()
-        # onupdate-Spalten nach dem UPDATE expired → nachladen (vermeidet Lazy-IO).
-        await self.session.refresh(app)

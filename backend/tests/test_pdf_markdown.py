@@ -19,9 +19,9 @@ from app.modules.pdf.markdown import (
 from app.shared.config_schemas import FormFieldDef
 
 
-def _field(key: str, label: str, *, is_pii: bool = False) -> FormFieldDef:
+def _field(key: str, label: str) -> FormFieldDef:
     return FormFieldDef.model_validate(
-        {"key": key, "type": "text", "label": {"de": label}, "isPII": is_pii}
+        {"key": key, "type": "text", "label": {"de": label}}
     )
 
 
@@ -60,16 +60,6 @@ def test_fields_rendered_with_labels_and_values() -> None:
     assert "## Antragsdaten" in md
     assert "- **Titel:** Projekt X" in md
     assert "- **Betrag:** 1200" in md
-
-
-def test_pii_field_excluded_from_pdf() -> None:
-    doc = _doc(
-        fields=[_field("title", "Titel"), _field("ssn", "SV-Nummer", is_pii=True)],
-        data={"title": "P", "ssn": "secret-123"},
-    )
-    md = build_application_markdown(doc)
-    assert "secret-123" not in md
-    assert "SV-Nummer" not in md
 
 
 def test_applicant_name_in_heading_and_title() -> None:

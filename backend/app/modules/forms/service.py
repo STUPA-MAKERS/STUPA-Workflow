@@ -50,7 +50,6 @@ def _row_to_field_def(row: FormField) -> FormFieldDef:
             "visibleIf": row.visible_if,
             "compute": row.compute,
             "options": row.options,
-            "isPII": row.is_pii,
             "isPromoted": row.is_promoted,
             "promoteTarget": row.promote_target,
         }
@@ -78,7 +77,6 @@ def _field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
             else None
         ),
         "order": order,
-        "is_pii": field.is_pii,
         "is_promoted": field.is_promoted,
         "promote_target": field.promote_target,
     }

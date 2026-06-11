@@ -79,7 +79,7 @@ describe('mapApplication', () => {
     lang: 'de',
     createdAt: '2026-06-05T10:00:00Z',
     updatedAt: '2026-06-06T10:00:00Z',
-    applicant: { email: 'a@b.de', name: 'Max', anonymized: false },
+    applicant: { email: 'a@b.de', name: 'Max' },
   };
 
   it('maps every camelCase field into the view model 1:1', () => {
@@ -99,7 +99,7 @@ describe('mapApplication', () => {
       lang: 'de',
       createdAt: '2026-06-05T10:00:00Z',
       updatedAt: '2026-06-06T10:00:00Z',
-      applicant: { email: 'a@b.de', name: 'Max', anonymized: false },
+      applicant: { email: 'a@b.de', name: 'Max' },
       canEdit: false,
     });
   });

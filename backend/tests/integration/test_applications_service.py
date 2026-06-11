@@ -53,7 +53,7 @@ def _fields() -> list[FormFieldDef]:
             }
         ),
         FormFieldDef.model_validate(
-            {"key": "note", "type": "text", "label": {"de": "Notiz"}, "isPII": True}
+            {"key": "note", "type": "text", "label": {"de": "Notiz"}}
         ),
     ]
 
@@ -271,26 +271,6 @@ async def test_comment_visibility(session: AsyncSession) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# anonymize
-# --------------------------------------------------------------------------- #
-async def test_anonymize_clears_pii_keeps_application(session: AsyncSession) -> None:
-    app_type, _, _ = await _seed_type(session)
-    svc = ApplicationsService(session)
-    app, _ = await svc.create(_create_payload(app_type.id))
-
-    await svc.anonymize(app.id)
-
-    out = await svc.get(app.id, include_pii=True)
-    assert out is not None  # Antrag bleibt
-    assert out.data.get("note") is None  # PII-Feld geleert
-    assert out.data["title"] == "Mein Antrag"  # Nicht-PII bleibt
-    assert out.applicant is not None
-    assert out.applicant.email is None
-    assert out.applicant.name is None
-    assert out.applicant.anonymized is True
-
-
-# --------------------------------------------------------------------------- #
 # HIGH #1 — unbekannte Keys werden verworfen (nicht persistiert)
 # --------------------------------------------------------------------------- #
 async def test_create_drops_unknown_keys(session: AsyncSession) -> None:
@@ -324,28 +304,6 @@ async def test_patch_drops_unknown_keys(session: AsyncSession) -> None:
     v2 = (await svc.versions(app.id))[1]
     assert "evil" not in v2.data
     assert "evil" not in (v2.diff or {}).get("added", {})
-
-
-# --------------------------------------------------------------------------- #
-# HIGH #2 — anonymize scrubbt auch Versionshistorie + Diff
-# --------------------------------------------------------------------------- #
-async def test_anonymize_scrubs_version_history(session: AsyncSession) -> None:
-    app_type, _, _ = await _seed_type(session)
-    svc = ApplicationsService(session)
-    app, _ = await svc.create(_create_payload(app_type.id))  # note="geheim" in v1
-    await svc.patch(
-        app.id, {"title": "T", "cost": "100.00", "note": "geheim2"}, changed_by="applicant"
-    )
-
-    await svc.anonymize(app.id)
-
-    versions = await svc.versions(app.id)
-    assert len(versions) == 2
-    for v in versions:
-        assert "note" not in v.data  # PII aus jedem Snapshot
-        if v.diff is not None:
-            for bucket in ("added", "removed", "changed"):
-                assert "note" not in v.diff.get(bucket, {})
 
 
 # --------------------------------------------------------------------------- #

@@ -124,7 +124,6 @@ export function normalizeFormField(field: FormFieldDef): FormFieldDef {
   if (field.options && field.options.length > 0) out.options = field.options;
   if (field.visibleIf) out.visibleIf = field.visibleIf;
   if (field.compute) out.compute = field.compute;
-  if (field.isPII) out.isPII = true;
   // Nur numerische Felder dürfen `isPromoted` tragen (Backend lehnt sonst ab, 422).
   // `positions` promotet automatisch in `amount` — ohne Flag.
   if (field.isPromoted && (field.type === 'number' || field.type === 'currency')) {

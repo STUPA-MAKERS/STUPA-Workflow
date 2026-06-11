@@ -36,7 +36,6 @@ def test_form_field_camel_alias_roundtrip() -> None:
         "label": {"de": "Betrag"},
         "isPromoted": True,
         "promoteTarget": "amount",
-        "isPII": False,
         "visibleIf": {"==": [{"var": "has_budget"}, True]},
     }
     f = FormFieldDef.model_validate(raw)
