@@ -193,3 +193,80 @@ def test_citext_email_case_insensitive(engine: Engine) -> None:
             text("SELECT count(*) FROM applicant WHERE email = 'foo@bar.de'")
         ).scalar_one()
     assert hit == 1
+
+
+def test_drop_type_flows_repairs_legacy_duplicates(engine: Engine) -> None:
+    """0019 auf Bestands-Daten (Per-Typ-Ära): mehrere aktive Flows und doppelte
+    Versionsnummern werden repariert, statt am partial unique Index zu scheitern;
+    der globale Flow (application_type_id IS NULL) bleibt der aktive."""
+    import importlib.util
+    from pathlib import Path
+
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "migrations"
+        / "versions"
+        / "0019_drop_type_flows.py"
+    )
+    spec = importlib.util.spec_from_file_location("mig_0019", path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    with engine.begin() as conn:
+        # Bestands-Schema nachstellen: neue Invarianten weg, Alt-Spalte zurück.
+        conn.execute(text("DROP INDEX IF EXISTS uq_flow_version_one_active_global"))
+        conn.execute(
+            text(
+                "ALTER TABLE flow_version "
+                "DROP CONSTRAINT IF EXISTS flow_version_version_key"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE flow_version "
+                "DROP CONSTRAINT IF EXISTS uq_flow_version_version"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE flow_version "
+                "ADD COLUMN IF NOT EXISTS application_type_id uuid"
+            )
+        )
+        type_id = _new_type(conn)
+        conn.execute(
+            text(
+                "INSERT INTO flow_version (version, active, application_type_id) "
+                "VALUES (1, true, :t), (2, false, NULL)"
+            ),
+            {"t": type_id},
+        )
+        global_id = conn.execute(
+            text(
+                "INSERT INTO flow_version (version, active, application_type_id) "
+                "VALUES (1, true, NULL) RETURNING id"
+            )
+        ).scalar_one()
+
+    with engine.begin() as conn:
+        for stmt in mod._UPGRADE:  # noqa: SLF001
+            conn.execute(text(stmt))
+
+    with engine.connect() as conn:
+        actives = conn.execute(
+            text("SELECT id FROM flow_version WHERE active")
+        ).scalars().all()
+        versions = sorted(
+            conn.execute(text("SELECT version FROM flow_version")).scalars()
+        )
+        has_type_col = conn.execute(
+            text(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = 'flow_version' "
+                "AND column_name = 'application_type_id')"
+            )
+        ).scalar_one()
+    assert actives == [global_id]
+    assert versions == [1, 2, 3]
+    assert has_type_col is False

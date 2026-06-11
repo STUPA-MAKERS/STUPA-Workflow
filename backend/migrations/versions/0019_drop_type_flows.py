@@ -89,11 +89,14 @@ _UPGRADE: tuple[str, ...] = (
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_flow_version_one_active_global "
         "ON flow_version (active) WHERE active"
     ),
+    # Beide möglichen Namen droppen (Bestands-DB: Postgres-Default-Name;
+    # frische DB: Namenskonvention der Models), dann kanonisch neu anlegen.
     "ALTER TABLE flow_version DROP CONSTRAINT IF EXISTS flow_version_version_key",
+    "ALTER TABLE flow_version DROP CONSTRAINT IF EXISTS uq_flow_version_version",
     _RENUMBER,
     (
         "ALTER TABLE flow_version "
-        "ADD CONSTRAINT flow_version_version_key UNIQUE (version)"
+        "ADD CONSTRAINT uq_flow_version_version UNIQUE (version)"
     ),
 )
 
