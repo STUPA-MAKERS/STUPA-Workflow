@@ -1,6 +1,7 @@
 import {
   type ApplicationConfig,
   inject,
+  isDevMode,
   provideAppInitializer,
   provideBrowserGlobalErrorListeners,
   provideZoneChangeDetection,
@@ -17,8 +18,10 @@ import { MockLiveVoteSource } from '@core/ws/mock-live-vote.source';
 import { WsService } from '@core/ws/ws.service';
 import { ThemeService } from '@core/theme/theme.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { SwUpdateService } from '@core/pwa/sw-update.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { routes } from './app.routes';
+import { provideServiceWorker } from '@angular/service-worker';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -45,6 +48,13 @@ export const appConfig: ApplicationConfig = {
       inject(ThemeService).init();
       inject(I18nService); // initialisiert document.lang über Konstruktor-Default
       inject(AuthService).ensureLoaded().subscribe();
+      inject(SwUpdateService).init(); // PWA-Update-Hinweis (#5)
+    }),
+    // PWA (#5): Service worker nur im Prod-Build (ngsw-config.json cached App-Shell
+    // + Assets; /api wird nicht gecacht). Registrierung erst wenn die App stabil ist.
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
     }),
   ],
 };

@@ -67,7 +67,8 @@
                   "minify": true,
                   "inlineCritical": false
                 }
-              }
+              },
+              "serviceWorker": "ngsw-config.json"
             },
             "development": {
               "optimization": false,

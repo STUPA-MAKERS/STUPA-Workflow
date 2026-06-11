@@ -36,6 +36,7 @@
     "@angular/forms": "^20.3.0",
     "@angular/platform-browser": "^20.3.0",
     "@angular/router": "^20.3.0",
+    "@angular/service-worker": "^20.3.0",
     "@fontsource/archivo": "^5.2.0",
     "@fortawesome/fontawesome-free": "^7.2.0",
     "@ngx-formly/core": "^7.0.0",

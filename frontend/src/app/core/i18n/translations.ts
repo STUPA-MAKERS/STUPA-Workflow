@@ -61,6 +61,8 @@ export const de = {
   'common.loading': 'Wird geladen …',
   'account.menu.apiAccess': 'API-Zugang',
   'account.menu.notifications': 'Benachrichtigungen',
+  'pwa.updateReady':
+    'Eine neue Version der App ist verfügbar — Seite neu laden, um sie zu nutzen.',
   'account.notifications.title': 'Benachrichtigungen',
   'account.notifications.intro':
     'Wähle, welche E-Mail-Benachrichtigungen du erhalten möchtest. Login-Links werden immer zugestellt.',
@@ -1611,6 +1613,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'common.loading': 'Loading …',
   'account.menu.apiAccess': 'API access',
   'account.menu.notifications': 'Notifications',
+  'pwa.updateReady': 'A new version of the app is available — reload the page to use it.',
   'account.notifications.title': 'Notifications',
   'account.notifications.intro':
     'Choose which email notifications you want to receive. Login links are always delivered.',
