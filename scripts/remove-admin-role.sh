@@ -24,15 +24,19 @@ psql_run() {
         -d "${POSTGRES_DB:-$(docker compose -f "$COMPOSE_FILE" exec -T postgres printenv POSTGRES_DB)}" "$@"
 }
 
+# The given UUID may be the principal.id or the OIDC sub (Keycloak user id).
+MATCH="(p.id = '${PRINCIPAL_ID}' OR p.sub = '${PRINCIPAL_ID}')"
+
 echo "== Principal =="
 psql_run -c "SELECT id, sub, email, display_name, active
-             FROM principal WHERE id = '${PRINCIPAL_ID}';"
+             FROM principal p WHERE ${MATCH};"
 
 echo "== Admin role assignments to be deleted =="
 psql_run -c "SELECT ra.id, ra.gremium_id, ra.granted_by, ra.valid_from, ra.valid_until
              FROM role_assignment ra
              JOIN role r ON r.id = ra.role_id
-             WHERE r.key = 'admin' AND ra.principal_id = '${PRINCIPAL_ID}';"
+             JOIN principal p ON p.id = ra.principal_id
+             WHERE r.key = 'admin' AND ${MATCH};"
 
 read -r -p "Delete these assignments? [y/N] " answer
 if [[ "$answer" != [yY] ]]; then
