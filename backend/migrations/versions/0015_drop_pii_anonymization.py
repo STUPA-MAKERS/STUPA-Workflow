@@ -13,8 +13,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0014_drop_pii_anonymization"
-down_revision: str | None = "0013_transition_requires_action"
+revision: str = "0015_drop_pii_anonymization"
+down_revision: str | None = "0014_meeting_delegations"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

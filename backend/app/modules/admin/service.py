@@ -109,6 +109,8 @@ class ConfigService:
             cd_variant=payload.cd_variant,
             default_lang=payload.default_lang,
             allow_vote_delegation=payload.allow_vote_delegation,
+            delegation_lead_minutes=payload.delegation_lead_minutes,
+            delegation_allow_external=payload.delegation_allow_external,
             quorum_percent=payload.quorum_percent,
         )
         self.session.add(row)
@@ -137,6 +139,10 @@ class ConfigService:
             row.default_lang = payload.default_lang
         if payload.allow_vote_delegation is not None:
             row.allow_vote_delegation = payload.allow_vote_delegation
+        if payload.delegation_lead_minutes is not None:
+            row.delegation_lead_minutes = payload.delegation_lead_minutes
+        if payload.delegation_allow_external is not None:
+            row.delegation_allow_external = payload.delegation_allow_external
         # ``quorumPercent`` ist explizit löschbar (→ NULL): per ``model_fields_set``
         # unterscheiden wir „nicht gesendet" von „auf null gesetzt".
         if "quorum_percent" in payload.model_fields_set:
@@ -932,6 +938,8 @@ def _gremium_out(row: Gremium) -> GremiumOut:
         cd_variant=row.cd_variant,
         default_lang=row.default_lang,
         allow_vote_delegation=row.allow_vote_delegation,
+        delegation_lead_minutes=row.delegation_lead_minutes,
+        delegation_allow_external=row.delegation_allow_external,
         quorum_percent=row.quorum_percent,
     )
 

@@ -21,6 +21,8 @@ class AuditAction(StrEnum):
     DELEGATION_GRANT = "delegation_grant"
     DELEGATION_REVOKE = "delegation_revoke"
     DELEGATION_USE = "delegation_use"
+    DELEGATION_SUBSTITUTE_ADD = "delegation_substitute_add"
+    DELEGATION_SUBSTITUTE_REMOVE = "delegation_substitute_remove"
     EXPORT = "export"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"

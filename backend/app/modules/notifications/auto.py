@@ -65,29 +65,35 @@ _BUILTIN_ROLE_REVOKED_BODY = {
     "revoked from you.\n",
 }
 
+# Sitzungsgebundene Vertretungen (#delegation-rework): der/die Vertreter:in
+# erhält die Mail; Kontext nennt Sitzung, Gremium und Delegierende:n.
 _BUILTIN_DELEGATION_GRANTED_SUBJECT = {
-    "de": "Delegation erhalten: {{ roleLabel }}",
-    "en": "Delegation received: {{ roleLabel }}",
+    "de": "Vertretung erhalten: {{ meetingTitle }}",
+    "en": "Proxy received: {{ meetingTitle }}",
 }
 _BUILTIN_DELEGATION_GRANTED_BODY = {
-    "de": "Hallo,\n\ndir wurde die Rolle „{{ roleLabel }}“"
-    "{% if gremiumName %} im Gremium {{ gremiumName }}{% endif %} delegiert"
-    "{% if delegatedBy %} (von {{ delegatedBy }}){% endif %}.\n",
-    "en": "Hello,\n\nthe role \"{{ roleLabel }}\""
-    "{% if gremiumName %} in committee {{ gremiumName }}{% endif %} was "
-    "delegated to you{% if delegatedBy %} (by {{ delegatedBy }}){% endif %}.\n",
+    "de": "Hallo,\n\n{% if delegatorName %}{{ delegatorName }}{% else %}ein "
+    "Mitglied{% endif %} hat dich für die Sitzung „{{ meetingTitle }}“"
+    "{% if gremiumName %} ({{ gremiumName }}){% endif %}"
+    "{% if meetingDate %} am {{ meetingDate }}{% endif %} als Vertretung "
+    "eingetragen{% if voting %} — inklusive Stimmrecht{% endif %}.\n",
+    "en": "Hello,\n\n{% if delegatorName %}{{ delegatorName }}{% else %}a "
+    "member{% endif %} registered you as proxy for the meeting "
+    '"{{ meetingTitle }}"{% if gremiumName %} ({{ gremiumName }}){% endif %}'
+    "{% if meetingDate %} on {{ meetingDate }}{% endif %}"
+    "{% if voting %} — including the voting right{% endif %}.\n",
 }
 _BUILTIN_DELEGATION_REVOKED_SUBJECT = {
-    "de": "Delegation widerrufen: {{ roleLabel }}",
-    "en": "Delegation revoked: {{ roleLabel }}",
+    "de": "Vertretung widerrufen: {{ meetingTitle }}",
+    "en": "Proxy revoked: {{ meetingTitle }}",
 }
 _BUILTIN_DELEGATION_REVOKED_BODY = {
-    "de": "Hallo,\n\ndie an dich delegierte Rolle „{{ roleLabel }}“"
-    "{% if gremiumName %} im Gremium {{ gremiumName }}{% endif %} wurde "
-    "widerrufen.\n",
-    "en": "Hello,\n\nthe role \"{{ roleLabel }}\" delegated to you"
-    "{% if gremiumName %} in committee {{ gremiumName }}{% endif %} was "
-    "revoked.\n",
+    "de": "Hallo,\n\ndeine Vertretung für die Sitzung „{{ meetingTitle }}“"
+    "{% if gremiumName %} ({{ gremiumName }}){% endif %}"
+    "{% if meetingDate %} am {{ meetingDate }}{% endif %} wurde widerrufen.\n",
+    "en": "Hello,\n\nyour proxy for the meeting \"{{ meetingTitle }}\""
+    "{% if gremiumName %} ({{ gremiumName }}){% endif %}"
+    "{% if meetingDate %} on {{ meetingDate }}{% endif %} was revoked.\n",
 }
 
 
@@ -146,6 +152,72 @@ async def assignment_mail_info(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class DelegationMailInfo:
+    """Vor dem Versand (bzw. vor dem Widerruf) eingesammelte Vertretungs-Daten
+    (#delegation-rework: sitzungsgebundene ``meeting_delegation``-Zeile)."""
+
+    delegation_id: uuid.UUID
+    email: str | None
+    meeting_title: str
+    meeting_date: str | None
+    gremium_name: str | None
+    delegator_name: str | None
+    voting: bool
+
+
+async def meeting_delegation_mail_info(
+    session: object, delegation_id: uuid.UUID
+) -> DelegationMailInfo | None:
+    """Mail-relevante Daten einer Sitzungs-Vertretung einsammeln (best effort)."""
+    from app.modules.admin.models import Gremium
+    from app.modules.auth.models import Principal
+    from app.modules.delegations.models import MeetingDelegation
+    from app.modules.livevote.models import Meeting
+
+    delegator = Principal.__table__.alias("delegator")
+    try:
+        row = (
+            await session.execute(  # type: ignore[attr-defined]
+                select(
+                    Principal.email,
+                    Meeting.title,
+                    Meeting.date,
+                    Gremium.name,
+                    delegator.c.display_name,
+                    delegator.c.email,
+                    MeetingDelegation.delegate_voting,
+                )
+                .join(
+                    Principal,
+                    Principal.id == MeetingDelegation.delegate_principal_id,
+                )
+                .join(Meeting, Meeting.id == MeetingDelegation.meeting_id)
+                .outerjoin(Gremium, Gremium.id == MeetingDelegation.gremium_id)
+                .outerjoin(
+                    delegator,
+                    delegator.c.id == MeetingDelegation.delegator_principal_id,
+                )
+                .where(MeetingDelegation.id == delegation_id)
+            )
+        ).first()
+    except Exception:  # noqa: BLE001 — Mail-Info ist best effort
+        logger.exception("delegation mail info failed (delegation=%s)", delegation_id)
+        return None
+    if row is None:
+        return None
+    email, title, date, gremium_name, d_name, d_email, voting = row
+    return DelegationMailInfo(
+        delegation_id=delegation_id,
+        email=email,
+        meeting_title=title,
+        meeting_date=date.strftime("%d.%m.%Y") if date else None,
+        gremium_name=gremium_name,
+        delegator_name=d_name or d_email,
+        voting=bool(voting),
+    )
+
+
 class AutoMailer:
     """Background-Einstiege der Auto-Mails — best effort, eigene Session."""
 
@@ -168,7 +240,20 @@ class AutoMailer:
         try:
             await self._assignment_changed(settings, info, granted=granted, pool=pool)
         except Exception:  # noqa: BLE001
-            logger.exception("role/delegation mail failed")
+            logger.exception("role mail failed")
+
+    async def delegation_changed(
+        self,
+        settings: Settings,
+        info: DelegationMailInfo | None,
+        *,
+        granted: bool,
+        pool: object,
+    ) -> None:
+        try:
+            await self._delegation_changed(settings, info, granted=granted, pool=pool)
+        except Exception:  # noqa: BLE001
+            logger.exception("delegation mail failed")
 
     # ------------------------------------------------------------ internals #
     async def _meeting_created(
@@ -221,46 +306,71 @@ class AutoMailer:
     ) -> None:
         if info is None or not info.email:
             return
-        is_delegation = info.delegated_by is not None
-        if is_delegation:
-            kind = "delegation"
-            template_key = (
-                "delegation_granted" if granted else "delegation_revoked"
-            )
-            builtin = (
-                (_BUILTIN_DELEGATION_GRANTED_SUBJECT, _BUILTIN_DELEGATION_GRANTED_BODY)
-                if granted
-                else (
-                    _BUILTIN_DELEGATION_REVOKED_SUBJECT,
-                    _BUILTIN_DELEGATION_REVOKED_BODY,
-                )
-            )
-        else:
-            kind = "role_change"
-            template_key = "role_assigned" if granted else "role_revoked"
-            builtin = (
-                (_BUILTIN_ROLE_ASSIGNED_SUBJECT, _BUILTIN_ROLE_ASSIGNED_BODY)
-                if granted
-                else (_BUILTIN_ROLE_REVOKED_SUBJECT, _BUILTIN_ROLE_REVOKED_BODY)
-            )
+        template_key = "role_assigned" if granted else "role_revoked"
+        builtin = (
+            (_BUILTIN_ROLE_ASSIGNED_SUBJECT, _BUILTIN_ROLE_ASSIGNED_BODY)
+            if granted
+            else (_BUILTIN_ROLE_REVOKED_SUBJECT, _BUILTIN_ROLE_REVOKED_BODY)
+        )
         queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
         sessionmaker = get_sessionmaker()
         async with sessionmaker() as session:
             service = NotificationService(session, queue=queue, settings=settings)
             await service.send_kind_mail(
                 [info.email],
-                kind=kind,
+                kind="role_change",
                 template_key=template_key,
                 builtin_subject=builtin[0],
                 builtin_body=builtin[1],
                 context={
                     "roleLabel": info.role_label,
                     "gremiumName": info.gremium_name or "",
-                    "delegatedBy": info.delegated_by or "",
                 },
                 idempotency_parts=(
                     template_key,
                     str(info.assignment_id),
+                ),
+            )
+
+    async def _delegation_changed(
+        self,
+        settings: Settings,
+        info: DelegationMailInfo | None,
+        *,
+        granted: bool,
+        pool: object,
+    ) -> None:
+        if info is None or not info.email:
+            return
+        template_key = "delegation_granted" if granted else "delegation_revoked"
+        builtin = (
+            (_BUILTIN_DELEGATION_GRANTED_SUBJECT, _BUILTIN_DELEGATION_GRANTED_BODY)
+            if granted
+            else (
+                _BUILTIN_DELEGATION_REVOKED_SUBJECT,
+                _BUILTIN_DELEGATION_REVOKED_BODY,
+            )
+        )
+        queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
+        sessionmaker = get_sessionmaker()
+        async with sessionmaker() as session:
+            service = NotificationService(session, queue=queue, settings=settings)
+            await service.send_kind_mail(
+                [info.email],
+                kind="delegation",
+                template_key=template_key,
+                builtin_subject=builtin[0],
+                builtin_body=builtin[1],
+                context={
+                    "meetingTitle": info.meeting_title,
+                    "meetingDate": info.meeting_date or "",
+                    "gremiumName": info.gremium_name or "",
+                    "delegatorName": info.delegator_name or "",
+                    "voting": info.voting,
+                },
+                idempotency_parts=(
+                    template_key,
+                    str(info.delegation_id),
                 ),
             )
 

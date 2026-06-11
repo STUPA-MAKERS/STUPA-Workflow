@@ -36,6 +36,12 @@ export const authGuard: CanActivateFn = (route) => {
         if (allowCommittee && auth.gremien().length > 0) {
           return true;
         }
+        // Delegations-Empfänger (#delegation-rework) können externe Nutzer ohne
+        // Permission/Gremium sein — diese Routen lassen jeden Angemeldeten durch;
+        // der Server bleibt autoritativ (Inhalt/403 kommen von dort).
+        if (route.data['allowAuthenticated'] === true) {
+          return true;
+        }
         toast.error(i18n.translate('rbac.forbidden'));
         return router.createUrlTree(['/forbidden']);
       }

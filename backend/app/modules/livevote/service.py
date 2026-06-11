@@ -34,6 +34,7 @@ from app.modules.admin.gremium_roles import (
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.livevote.broker import MeetingBroker
 from app.modules.livevote.events import (
     MeetingStateEvent,
@@ -372,12 +373,18 @@ class MeetingService:
             self.session, principal.sub, "vote.manage"
         )
 
-    async def can_vote(self, gremium_id: UUID, principal: Principal) -> bool:
-        """Stimmberechtigt: Admin ODER eine Gremium-Rolle mit ``vote.cast``."""
+    async def can_vote(self, meeting: Meeting, principal: Principal) -> bool:
+        """Stimmberechtigt: Admin, eine Gremium-Rolle mit ``vote.cast`` ODER eine
+        an den Principal gerichtete Stimm-Delegation dieser Sitzung
+        (#delegation-rework — externer Stellvertreter)."""
         if "admin" in principal.roles:
             return True
-        return gremium_id in await gremium_ids_with_permission(
+        if meeting.gremium_id in await gremium_ids_with_permission(
             self.session, principal.sub, "vote.cast"
+        ):
+            return True
+        return meeting.id in await self._delegated_meeting_ids(
+            principal.sub, voting_only=True
         )
 
     async def is_member(self, gremium_id: UUID, principal: Principal) -> bool:
@@ -385,6 +392,30 @@ class MeetingService:
         if "admin" in principal.roles:
             return True
         return gremium_id in await gremium_member_ids(self.session, principal.sub)
+
+    async def is_participant(
+        self, meeting_id: UUID, gremium_id: UUID, principal: Principal
+    ) -> bool:
+        """Mitglied **oder** Delegations-Empfänger dieser Sitzung — darf mitlesen.
+
+        Externe Stellvertreter (#delegation-rework) sind keine Gremium-Mitglieder,
+        brauchen für ihre Vertretung aber den Live-Kanal der Sitzung.
+        """
+        if await self.is_member(gremium_id, principal):
+            return True
+        return meeting_id in await self._delegated_meeting_ids(principal.sub)
+
+    async def _delegated_meeting_ids(
+        self, sub: str, *, voting_only: bool = False
+    ) -> set[UUID]:
+        """Sitzungen, für die ``sub`` eine (Stimm-)Delegation **empfängt**."""
+        pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
+        stmt = select(MeetingDelegation.meeting_id).where(
+            MeetingDelegation.delegate_principal_id == pid_subq
+        )
+        if voting_only:
+            stmt = stmt.where(MeetingDelegation.delegate_voting.is_(True))
+        return set((await self.session.execute(stmt)).scalars().all())
 
     async def _visible_gremium_ids(self, principal: Principal) -> set[UUID] | None:
         """Gremien, deren Sitzungen der Principal sehen darf — ``None`` = **alle**.
@@ -437,7 +468,7 @@ class MeetingService:
             can_manage=await self.can_manage(meeting.gremium_id, principal),
             can_write=await self.can_write(meeting, principal),
             can_manage_votes=await self.can_manage_votes(meeting, principal),
-            can_vote=await self.can_vote(meeting.gremium_id, principal),
+            can_vote=await self.can_vote(meeting, principal),
             protokollant_name=name,
             gremium_name=gremium_name,
             votes=votes,
@@ -473,7 +504,11 @@ class MeetingService:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
         visible = await self._visible_gremium_ids(principal)
         if visible is not None:
-            stmt = stmt.where(Meeting.gremium_id.in_(visible))
+            # Delegations-Empfänger sehen »ihre« Sitzungen auch ohne Mitgliedschaft.
+            delegated = await self._delegated_meeting_ids(principal.sub)
+            stmt = stmt.where(
+                or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated))
+            )
         meetings = list((await self.session.execute(stmt)).scalars().all())
         return await self._decorate(meetings, principal)
 
@@ -513,7 +548,11 @@ class MeetingService:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
         visible = await self._visible_gremium_ids(principal)
         if visible is not None:
-            stmt = stmt.where(Meeting.gremium_id.in_(visible))
+            # Delegations-Empfänger sehen »ihre« Sitzungen auch ohne Mitgliedschaft.
+            delegated = await self._delegated_meeting_ids(principal.sub)
+            stmt = stmt.where(
+                or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated))
+            )
         if direction == "upcoming":
             stmt = stmt.where(is_upcoming)
             if cur is not None:

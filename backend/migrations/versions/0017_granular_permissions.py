@@ -16,8 +16,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0016_granular_permissions"
-down_revision: str | None = "0015_notification_preferences"
+revision: str = "0017_granular_permissions"
+down_revision: str | None = "0016_notification_preferences"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

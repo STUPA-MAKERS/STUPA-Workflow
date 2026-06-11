@@ -91,6 +91,13 @@ class _FakeMeetingService:
         # Live-Mitlesen = aktives Gremium-Mitglied; im Fake über die Gruppe gespiegelt.
         return "admin" in principal.roles or principal.in_group(str(gremium_id))
 
+    async def is_participant(
+        self, _meeting_id: UUID, gremium_id: UUID, principal: Principal
+    ) -> bool:
+        # #delegation-rework: Mitglied ODER Delegations-Empfänger; der Fake kennt
+        # keine Delegationen → Mitgliedschaft genügt.
+        return await self.is_member(gremium_id, principal)
+
 
 class _FakeVotingService:
     def __init__(self, vote_out: VoteOut, exc: Exception | None = None) -> None:

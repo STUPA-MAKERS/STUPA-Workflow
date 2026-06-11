@@ -110,7 +110,7 @@ GremiumRoleServiceDep = Annotated[
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 
 # Permission-Gates (Principal-Objekt injiziert für den Audit-actor). #6:
-# ``admin.config`` ist in drei Bereichs-Rechte aufgeteilt (Migration 0016).
+# ``admin.config`` ist in drei Bereichs-Rechte aufgeteilt (Migration 0017).
 GremienAdmin = Annotated[Principal, Depends(require_principal("admin.gremien"))]
 TypesAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]

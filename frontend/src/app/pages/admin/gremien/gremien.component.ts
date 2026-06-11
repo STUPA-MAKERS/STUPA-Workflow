@@ -31,6 +31,10 @@ interface GremiumForm {
   cdVariant: string;
   defaultLang: string;
   allowVoteDelegation: boolean;
+  /** Vorlauf in Minuten vor Sitzungsbeginn für Nicht-Pool-Delegationen (#delegation-rework). */
+  delegationLeadMinutes: number;
+  /** Delegation an Externe (außerhalb Gremium/Pool) erlauben. */
+  delegationAllowExternal: boolean;
   /** Default-Quorum in % der Stimmberechtigten; null = keins. */
   quorumPercent: number | null;
   /** Zusatz-Protokoll-Empfänger, eine Adresse je Zeile (#protocol-recipients). */
@@ -43,6 +47,8 @@ function emptyForm(): GremiumForm {
     cdVariant: 'stupa',
     defaultLang: 'de',
     allowVoteDelegation: false,
+    delegationLeadMinutes: 0,
+    delegationAllowExternal: false,
     quorumPercent: null,
     mailRecipients: '',
   };
@@ -147,6 +153,28 @@ function parseRecipients(raw: string): string[] {
           [hint]="'admin.gremien.delegationHint' | t"
           name="delegation"
         >{{ 'admin.gremien.delegation' | t }}</app-checkbox>
+        @if (form().allowVoteDelegation) {
+          <div class="field">
+            <label class="field__label" for="grem-lead">{{ 'admin.gremien.delegationLead' | t }}</label>
+            <input
+              id="grem-lead"
+              class="field__control"
+              type="number"
+              min="0"
+              step="1"
+              name="delegationLeadMinutes"
+              [ngModel]="form().delegationLeadMinutes"
+              (ngModelChange)="patchLead($event)"
+            />
+            <p class="field__hint">{{ 'admin.gremien.delegationLeadHint' | t }}</p>
+          </div>
+          <app-checkbox
+            [ngModel]="form().delegationAllowExternal"
+            (ngModelChange)="patch('delegationAllowExternal', $event)"
+            [hint]="'admin.gremien.delegationExternalHint' | t"
+            name="delegationAllowExternal"
+          >{{ 'admin.gremien.delegationExternal' | t }}</app-checkbox>
+        }
         <div class="field">
           <label class="field__label" for="grem-quorum">{{ 'admin.gremien.quorum' | t }}</label>
           <input
@@ -368,6 +396,15 @@ export class AdminGremienComponent {
     this.form.update((f) => ({ ...f, [key]: value }));
   }
 
+  /** Vorlauf-Eingabe (#delegation-rework): leer/ungültig → 0, sonst ≥ 0 ganzzahlig. */
+  patchLead(value: number | string | null): void {
+    const n = Math.round(Number(value));
+    this.form.update((f) => ({
+      ...f,
+      delegationLeadMinutes: Number.isFinite(n) && n > 0 ? n : 0,
+    }));
+  }
+
   /** Quorum-Eingabe: leer → null (kein Default), sonst auf 0–100 geklemmt. */
   patchQuorum(value: number | string | null): void {
     let next: number | null;
@@ -393,6 +430,8 @@ export class AdminGremienComponent {
       cdVariant: g.cdVariant,
       defaultLang: g.defaultLang,
       allowVoteDelegation: g.allowVoteDelegation,
+      delegationLeadMinutes: g.delegationLeadMinutes ?? 0,
+      delegationAllowExternal: g.delegationAllowExternal ?? false,
       quorumPercent: g.quorumPercent ?? null,
       mailRecipients: '',
     });
@@ -421,6 +460,8 @@ export class AdminGremienComponent {
         cdVariant: f.cdVariant,
         defaultLang: f.defaultLang,
         allowVoteDelegation: f.allowVoteDelegation,
+        delegationLeadMinutes: f.delegationLeadMinutes,
+        delegationAllowExternal: f.delegationAllowExternal,
         quorumPercent: f.quorumPercent,
       };
       this.api.updateGremium(id, body).subscribe({
@@ -434,6 +475,8 @@ export class AdminGremienComponent {
         cdVariant: f.cdVariant,
         defaultLang: f.defaultLang,
         allowVoteDelegation: f.allowVoteDelegation,
+        delegationLeadMinutes: f.delegationLeadMinutes,
+        delegationAllowExternal: f.delegationAllowExternal,
         quorumPercent: f.quorumPercent,
       };
       this.api.createGremium(body).subscribe({

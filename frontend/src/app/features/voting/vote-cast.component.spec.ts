@@ -3,6 +3,7 @@ import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
+import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import type { Vote } from '@core/api/models';
 import { VoteCastComponent } from './vote-cast.component';
@@ -28,6 +29,7 @@ async function setup(opts: {
   getError?: unknown;
   castError?: unknown;
   canVote?: boolean;
+  delegation?: VoteDelegationStatus;
 }) {
   const getVote = opts.getError
     ? jest.fn(() => throwError(() => opts.getError))
@@ -37,11 +39,23 @@ async function setup(opts: {
     : jest.fn(() => of({ status: 'cast' as const }));
   const api = { getVote, castBallot };
   const auth = { can: () => opts.canVote ?? true };
+  // Delegations-Status (#delegation-rework): Default = unbeteiligt.
+  const voteStatus = jest.fn(() =>
+    of(
+      opts.delegation ?? {
+        blocked: false,
+        delegatedToName: null,
+        exercising: false,
+        delegatedByName: null,
+      },
+    ),
+  );
 
   await render(VoteCastComponent, {
     providers: [
       provideRouter([]),
       { provide: ApiClient, useValue: api },
+      { provide: DelegationsApiService, useValue: { voteStatus } },
       { provide: AuthService, useValue: auth },
       {
         provide: ActivatedRoute,
@@ -106,5 +120,35 @@ describe('VoteCastComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
     // initialer Load + Refetch nach Konflikt
     expect(getVote).toHaveBeenCalledTimes(2);
+  });
+
+  // --- Delegations-Feedback (#delegation-rework) -----------------------------
+  it('explains a delegated-away voting right instead of a bare not-eligible hint', async () => {
+    await setup({
+      delegation: {
+        blocked: true,
+        delegatedToName: 'Bob Beispiel',
+        exercising: false,
+        delegatedByName: null,
+      },
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(/Bob Beispiel/);
+    expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
+  });
+
+  it('shows a proxy badge and enables voting when exercising a delegation', async () => {
+    const { castBallot } = await setup({
+      canVote: false,
+      delegation: {
+        blocked: false,
+        delegatedToName: null,
+        exercising: true,
+        delegatedByName: 'Alice Beispiel',
+      },
+    });
+    expect(screen.getByText('In Vertretung')).toBeInTheDocument();
+    expect(screen.getByText(/Vertretung von Alice Beispiel/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
+    expect(castBallot).toHaveBeenCalledWith('v1', 'yes');
   });
 });

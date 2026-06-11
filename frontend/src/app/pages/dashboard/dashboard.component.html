@@ -45,6 +45,40 @@
   </section>
 }
 
+<!-- Vertretung/Delegation (#delegation-rework): aktive sitzungsgebundene
+     Vertretungen — ausgehend (»du wirst vertreten«) und eingehend (»du vertrittst«). -->
+@if (delegations().length) {
+  <section class="dash__panel dash__delegations" aria-labelledby="dash-deleg-h">
+    <div class="dash__panel-head">
+      <div>
+        <h2 id="dash-deleg-h" class="dash__panel-title">{{ 'delegation.dash.title' | t }}</h2>
+        <p class="dash__panel-sub">{{ 'delegation.dash.subtitle' | t }}</p>
+      </div>
+    </div>
+    <ul class="dash__list">
+      @for (d of delegations(); track d.id) {
+        <li class="dash__row">
+          <a class="dash__row-link" [routerLink]="['/meetings', d.meetingId]">
+            <span class="dash__row-title">
+              {{ (isOutgoing(d) ? 'delegation.dash.outgoing' : 'delegation.dash.incoming')
+                | t: { name: (isOutgoing(d) ? d.delegateName : d.delegatorName) || '?' } }}
+            </span>
+            <span class="dash__row-type">
+              {{ d.meetingTitle }}@if (d.meetingDate) {, {{ d.meetingDate | ldate: 'mediumDate' }}}
+            </span>
+          </a>
+          <span class="dash__row-meta">
+            @if (d.delegateVoting) {
+              <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+            }
+            <a class="dash__row-cta" [routerLink]="['/meetings', d.meetingId]">{{ 'dashboard.open' | t }} →</a>
+          </span>
+        </li>
+      }
+    </ul>
+  </section>
+}
+
 @if (canReadApplications()) {
   <div class="dash__panels">
     <!-- Offene Aufgaben: Anträge, die auf den Nutzer warten. -->

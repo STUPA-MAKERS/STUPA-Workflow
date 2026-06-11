@@ -515,14 +515,15 @@ async def _authorize(
     except NotFoundError:
         await websocket.close(code=WS_NOT_FOUND)
         return None
-    # Voter-Kanal: alle aktiven Gremium-Mitglieder dürfen live mitlesen (das STIMMRECHT
-    # ist separat über ``vote.cast``/``in_group`` gegatet); die »Beamer«-Ansicht für
-    # Mitglieder ist eine FE-Anzeige auf derselben Verbindung. Der dedizierte read-only
-    # Beamer-Kanal (unbeaufsichtigte Projektion) bleibt ``meeting.manage``-gegatet.
+    # Voter-Kanal: aktive Gremium-Mitglieder UND Delegations-Empfänger der Sitzung
+    # (#delegation-rework — externe Stellvertreter) dürfen live mitlesen (das
+    # STIMMRECHT ist separat über ``vote.cast``/Delegations-Check gegatet); die
+    # »Beamer«-Ansicht für Mitglieder ist eine FE-Anzeige auf derselben Verbindung.
+    # Der dedizierte read-only Beamer-Kanal bleibt ``meeting.manage``-gegatet.
     eligible = (
         principal.has(MANAGE_PERMISSION)
         if beamer
-        else await meetings.is_member(meeting.gremium_id, principal)
+        else await meetings.is_participant(meeting_id, meeting.gremium_id, principal)
     )
     if not eligible:
         await websocket.accept()

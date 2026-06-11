@@ -110,6 +110,10 @@ async function setup(
   http
     .match((r) => r.url.endsWith('/api/meetings') && r.method === 'GET')
     .forEach((req) => req.flush([]));
+  // Vertretungs-Karte (#delegation-rework) lädt `/delegations` — leer beantworten.
+  http
+    .match((r) => r.url.endsWith('/api/delegations') && r.method === 'GET')
+    .forEach((req) => req.flush([]));
 
   view.detectChanges();
   return { ...view, auth, http };

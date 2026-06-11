@@ -11,8 +11,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0015_notification_preferences"
-down_revision: str | None = "0014_drop_pii_anonymization"
+revision: str = "0016_notification_preferences"
+down_revision: str | None = "0015_drop_pii_anonymization"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
