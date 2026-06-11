@@ -704,7 +704,9 @@ class ApplicationsService:
 
         items: list[ApplicationListItem] = []
         for app in apps:
-            s = by_id.get(app.current_state_id) if app.current_state_id else None
+            if app.current_state_id is None:
+                continue
+            s = by_id.get(app.current_state_id)
             if s is None:
                 continue
             ok = False

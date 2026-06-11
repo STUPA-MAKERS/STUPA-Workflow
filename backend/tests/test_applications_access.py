@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.access import require_app_edit, require_app_read
 from app.modules.auth.principal import Applicant, Principal
@@ -47,6 +48,11 @@ class _FakeDb:
 def _db(created_by: str | None = None) -> Any:
     """``Any``-typisierter Fake (DbSession-kompatibel für den Typecheck)."""
     return _FakeDb(created_by)
+
+
+def _db(created_by: str | None = None) -> AsyncSession:
+    """``_FakeDb`` als ``AsyncSession`` getarnt — nur ``scalar`` wird aufgerufen."""
+    return cast(AsyncSession, _FakeDb(created_by))
 
 
 def test_read_principal_with_permission() -> None:

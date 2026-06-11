@@ -205,6 +205,10 @@ class _FakeSession:
     async def execute(self, _stmt: object) -> _Result:
         return _Result(self.existing)
 
+    async def get(self, _model: object, _pk: object) -> object | None:
+        # Gremium-Name-Lookup in ``_emit`` — für diese Tests nicht relevant.
+        return None
+
     def add(self, obj: object) -> None:
         if getattr(obj, "id", None) is None:
             obj.id = uuid4()  # type: ignore[attr-defined]
