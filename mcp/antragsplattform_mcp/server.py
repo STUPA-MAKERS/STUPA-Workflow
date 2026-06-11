@@ -456,6 +456,22 @@ async def delete_gremium(gremium_id: str) -> dict:
     return await _api().delete(f"/admin/gremien/{gremium_id}")
 
 
+@mcp.tool()
+async def get_gremium_mail_recipients(gremium_id: str) -> dict:
+    """Additional minutes (protocol) recipients of a committee — finalized minutes
+    go to the active members AND these addresses. Requires admin.config."""
+    return await _api().get(f"/admin/gremien/{gremium_id}/mail-recipients")
+
+
+@mcp.tool()
+async def set_gremium_mail_recipients(gremium_id: str, recipients: list[str]) -> dict:
+    """Replace the committee's additional minutes recipients (idempotent PUT; an
+    empty list means members-only delivery). Requires admin.config."""
+    return await _api().put(
+        f"/admin/gremien/{gremium_id}/mail-recipients", json={"recipients": recipients}
+    )
+
+
 # ============================================================ admin: roles/RBAC
 @mcp.tool()
 async def list_roles() -> dict:

@@ -1432,6 +1432,10 @@ export const de = {
   'admin.gremien.quorum': 'Quorum (%)',
   'admin.gremien.quorumHint':
     'Standard-Quorum für Abstimmungen dieses Gremiums: Anteil der Stimmberechtigten (0–100 %), der teilnehmen muss. Leer = kein Quorum.',
+  'admin.gremien.mailRecipients': 'Zusätzliche Protokoll-Empfänger',
+  'admin.gremien.mailRecipientsPlaceholder': 'listen@example.org\nvorstand@example.org',
+  'admin.gremien.mailRecipientsHint':
+    'Eine E-Mail-Adresse je Zeile. Finalisierte Protokolle gehen an die aktiven Mitglieder UND diese Adressen.',
   'admin.gremien.addMember': 'Mitglied hinzufügen',
   'admin.gremien.memberPicked': 'Gewählt',
   'admin.gremien.members': 'Mitglieder',
@@ -2932,6 +2936,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.quorum': 'Quorum (%)',
   'admin.gremien.quorumHint':
     'Default quorum for votes in this committee: share of eligible voters (0–100%) who must participate. Empty = no quorum.',
+  'admin.gremien.mailRecipients': 'Additional minutes recipients',
+  'admin.gremien.mailRecipientsPlaceholder': 'list@example.org\nboard@example.org',
+  'admin.gremien.mailRecipientsHint':
+    'One email address per line. Finalized minutes are sent to the active members AND these addresses.',
   'admin.gremien.addMember': 'Add member',
   'admin.gremien.memberPicked': 'Selected',
   'admin.gremien.members': 'Members',

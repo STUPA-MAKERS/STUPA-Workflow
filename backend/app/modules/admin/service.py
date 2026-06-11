@@ -21,7 +21,7 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.gremium_roles import GremiumRoleService
-from app.modules.admin.models import ApplicationType, Gremium, Webhook
+from app.modules.admin.models import ApplicationType, Gremium, MailList, Webhook
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
     ApplicationTypeOut,
@@ -30,6 +30,7 @@ from app.modules.admin.schemas import (
     FlowVersionOut,
     GremiumCreate,
     GremiumOut,
+    GremiumMailRecipients,
     GremiumUpdate,
     GroupMappingCreate,
     GroupMappingOut,
@@ -158,6 +159,52 @@ class ConfigService:
         return (
             await self.session.scalars(select(Gremium).where(Gremium.slug == slug))
         ).first()
+
+    # ----------------------------------- Protokoll-Verteiler (#protocol-recipients)
+    async def get_gremium_mail_recipients(
+        self, gremium_id: UUID
+    ) -> GremiumMailRecipients:
+        """Zusätzliche Protokoll-Empfänger des Gremiums (Union aller aktiven Listen)."""
+        if await self.session.get(Gremium, gremium_id) is None:
+            raise NotFoundError(f"gremium {gremium_id} not found")
+        lists = (
+            await self.session.scalars(
+                select(MailList.recipients).where(
+                    MailList.gremium_id == gremium_id, MailList.active.is_(True)
+                )
+            )
+        ).all()
+        seen: dict[str, None] = {}
+        for recipients in lists:
+            for addr in recipients or []:
+                seen.setdefault(addr, None)
+        return GremiumMailRecipients(recipients=list(seen))
+
+    async def set_gremium_mail_recipients(
+        self, gremium_id: UUID, payload: GremiumMailRecipients, actor: str
+    ) -> GremiumMailRecipients:
+        """Zusätzliche Protokoll-Empfänger ersetzen (idempotentes PUT).
+
+        Kanonisch eine ``mail_list``-Zeile (``name='protocol'``) je Gremium; alle
+        Alt-Zeilen werden ersetzt. Leere Liste ⇒ keine Zusatz-Empfänger (die
+        Mitglieder erhalten das Protokoll weiterhin)."""
+        if await self.session.get(Gremium, gremium_id) is None:
+            raise NotFoundError(f"gremium {gremium_id} not found")
+        await self.session.execute(
+            delete(MailList).where(MailList.gremium_id == gremium_id)
+        )
+        if payload.recipients:
+            self.session.add(
+                MailList(
+                    gremium_id=gremium_id,
+                    name="protocol",
+                    recipients=payload.recipients,
+                    active=True,
+                )
+            )
+        await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
+        await self.session.commit()
+        return GremiumMailRecipients(recipients=payload.recipients)
 
     # =================================================================== #
     # Application-Type

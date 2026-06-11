@@ -21,6 +21,7 @@ from app.modules.admin.router import get_config_service, get_site_config_service
 from app.modules.admin.schemas import (
     ApplicationTypeOut,
     FlowVersionOut,
+    GremiumMailRecipients,
     GremiumOut,
     GroupMappingOut,
     PrincipalOut,
@@ -58,6 +59,13 @@ class _FakeConfig:
             id=gremium_id, name=payload.name or "X", slug="stupa",
             cd_variant="stupa", default_lang="de", allow_vote_delegation=False,
         )
+
+    async def get_gremium_mail_recipients(self, gremium_id):  # noqa: ANN001
+        return GremiumMailRecipients(recipients=["list@x.de"])
+
+    async def set_gremium_mail_recipients(self, gremium_id, payload, actor):  # noqa: ANN001
+        self.mail_recipients = list(payload.recipients)
+        return payload
 
     async def list_application_types(self):
         return [
@@ -295,6 +303,32 @@ def test_update_gremium_404(app: FastAPI, client: TestClient) -> None:
         "/api/admin/gremien/00000000-0000-0000-0000-000000000000", json={"name": "x"}
     )
     assert r.status_code == 404
+
+
+def test_gremium_mail_recipients_roundtrip(app: FastAPI, client: TestClient) -> None:
+    """#protocol-recipients: GET liefert, PUT ersetzt (validierte Adressen)."""
+    _as_admin(app)
+    gid = uuid4()
+    r = client.get(f"/api/admin/gremien/{gid}/mail-recipients")
+    assert r.status_code == 200 and r.json() == {"recipients": ["list@x.de"]}
+    r = client.put(
+        f"/api/admin/gremien/{gid}/mail-recipients",
+        json={"recipients": ["a@x.de", " a@X.de ", "b@y.org"]},
+    )
+    assert r.status_code == 200
+    # Duplikate (case-insensitiv) verworfen, Reihenfolge erhalten.
+    assert r.json() == {"recipients": ["a@x.de", "b@y.org"]}
+
+
+def test_gremium_mail_recipients_rejects_implausible_address(
+    app: FastAPI, client: TestClient
+) -> None:
+    _as_admin(app)
+    r = client.put(
+        f"/api/admin/gremien/{uuid4()}/mail-recipients",
+        json={"recipients": ["not-an-email"]},
+    )
+    assert r.status_code == 422
 
 
 def test_gremien_authed_list_without_admin_perm(app: FastAPI, client: TestClient) -> None:

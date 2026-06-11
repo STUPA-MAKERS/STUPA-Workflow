@@ -78,6 +78,12 @@
 
 :host ::ng-deep formly-field {
   display: block;
+  /* Grid-Items haben min-width:auto — ein über-breites Feld (z. B. eine Tabelle)
+     würde sonst die ganze Spalte und damit ALLE Felder über den Viewport hinaus
+     aufziehen (#mobile). */
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* Dünner Trenner zwischen aufeinanderfolgenden Fragen eines Schritts. */

@@ -246,8 +246,8 @@ async def test_finalize_renders_stores_and_mails() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
-        # result() = leere Tagesordnung (Protokoll-Montage), dann die Verteiler.
-        results=[result(proto), result(), result(["a@x.de", "b@x.de"])],
+        # result() = leere Tagesordnung; dann Mitglieder (Union-Basis), Verteiler leer.
+        results=[result(proto), result(), result("a@x.de", "b@x.de"), result()],
     )
     out = await _service(
         session, storage=storage, pytex=pytex, mail_queue=mail
@@ -270,7 +270,7 @@ async def test_finalize_without_storage_degrades_but_mails() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
-        results=[result(proto), result(), result(["a@x.de"])],
+        results=[result(proto), result(), result("a@x.de"), result()],
     )
     out = await _service(session, storage=None, pytex=pytex, mail_queue=mail).finalize(
         PID, now=NOW
@@ -323,8 +323,9 @@ async def test_finalize_no_recipients_skips_mail() -> None:
     assert mail.sent == []
 
 
-async def test_finalize_falls_back_to_gremium_members_without_maillist() -> None:
-    """Kein Verteiler (mail_list leer) ⇒ Versand an die aktiven Gremium-Mitglieder."""
+async def test_finalize_members_receive_even_without_maillist() -> None:
+    """Kein Verteiler (mail_list leer) ⇒ Versand an die aktiven Gremium-Mitglieder
+    (#protocol-recipients: Mitglieder sind immer die Basis der Empfänger-Union)."""
     proto = _protocol()
     mail = FakeMailQueue()
     session = FakeSession(
@@ -332,8 +333,8 @@ async def test_finalize_falls_back_to_gremium_members_without_maillist() -> None
         results=[
             result(proto),  # _get
             result(),  # _assemble_from_agenda (keine TOPs)
+            result("a@x.de", "b@x.de"),  # Mitglieder (scalars)
             result(),  # _recipients: leere Verteilerliste
-            result("a@x.de", "b@x.de"),  # Fallback: Gremium-Mitglieder (scalars)
         ],
     )
     out = await _service(
@@ -361,7 +362,7 @@ async def test_finalize_deduplicates_recipients_across_lists() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
-        results=[result(proto), result(), result(["a@x", "b@x"], ["b@x", "c@x"])],
+        results=[result(proto), result(), result(), result(["a@x", "b@x"], ["b@x", "c@x"])],
     )
     await _service(
         session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=mail
@@ -463,9 +464,30 @@ async def test_finalize_from_rendering_completes() -> None:
     proto = _protocol(status="rendering")
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
-        results=[result(proto), result(), result(["a@x.de"])],
+        results=[result(proto), result(), result("a@x.de"), result()],
     )
     out = await _service(
         session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=FakeMailQueue()
     ).finalize(PID, now=NOW)
     assert out.status == "final"
+
+
+async def test_finalize_recipients_union_members_plus_maillist() -> None:
+    """#protocol-recipients: Zusatz-Verteiler erweitern die Mitglieder-Liste
+    (Union, dedupliziert) — sie ersetzen sie nicht."""
+    proto = _protocol()
+    mail = FakeMailQueue()
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium()},
+        results=[
+            result(proto),  # _get
+            result(),  # _assemble_from_agenda (keine TOPs)
+            result("member@x.de"),  # aktive Mitglieder
+            result(["extra@y.de", "member@x.de"]),  # Zusatz-Verteiler (mit Duplikat)
+        ],
+    )
+    await _service(
+        session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=mail
+    ).finalize(PID, now=NOW)
+    assert len(mail.sent) == 1
+    assert mail.sent[0].to == ("member@x.de", "extra@y.de")

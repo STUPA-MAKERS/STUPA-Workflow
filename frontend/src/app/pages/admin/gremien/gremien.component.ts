@@ -33,6 +33,8 @@ interface GremiumForm {
   allowVoteDelegation: boolean;
   /** Default-Quorum in % der Stimmberechtigten; null = keins. */
   quorumPercent: number | null;
+  /** Zusatz-Protokoll-Empfänger, eine Adresse je Zeile (#protocol-recipients). */
+  mailRecipients: string;
 }
 
 function emptyForm(): GremiumForm {
@@ -42,7 +44,16 @@ function emptyForm(): GremiumForm {
     defaultLang: 'de',
     allowVoteDelegation: false,
     quorumPercent: null,
+    mailRecipients: '',
   };
+}
+
+/** Textarea-Inhalt → Adressliste (Zeilen/Kommas/Semikolons als Trenner). */
+function parseRecipients(raw: string): string[] {
+  return raw
+    .split(/[\n,;]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }
 
 /**
@@ -150,6 +161,21 @@ function emptyForm(): GremiumForm {
             (ngModelChange)="patchQuorum($event)"
           />
           <p class="field__hint">{{ 'admin.gremien.quorumHint' | t }}</p>
+        </div>
+        <!-- Zusatz-Protokoll-Empfänger (#protocol-recipients): erhalten finalisierte
+             Protokolle zusätzlich zu den aktiven Mitgliedern. -->
+        <div class="field">
+          <label class="field__label" for="grem-mail">{{ 'admin.gremien.mailRecipients' | t }}</label>
+          <textarea
+            id="grem-mail"
+            class="field__control grem__mail"
+            rows="3"
+            name="mailRecipients"
+            [ngModel]="form().mailRecipients"
+            (ngModelChange)="patch('mailRecipients', $event)"
+            [placeholder]="'admin.gremien.mailRecipientsPlaceholder' | t"
+          ></textarea>
+          <p class="field__hint">{{ 'admin.gremien.mailRecipientsHint' | t }}</p>
         </div>
       </form>
       <div dialog-footer class="grem__dialog-foot">
@@ -368,8 +394,15 @@ export class AdminGremienComponent {
       defaultLang: g.defaultLang,
       allowVoteDelegation: g.allowVoteDelegation,
       quorumPercent: g.quorumPercent ?? null,
+      mailRecipients: '',
     });
     this.dialogOpen.set(true);
+    // Zusatz-Empfänger nachladen (eigener Endpunkt, #protocol-recipients).
+    this.api.getGremiumMailRecipients(g.id).subscribe({
+      next: ({ recipients }) =>
+        this.form.update((f) => ({ ...f, mailRecipients: recipients.join('\n') })),
+      error: () => {},
+    });
   }
 
   closeDialog(): void {
@@ -391,7 +424,7 @@ export class AdminGremienComponent {
         quorumPercent: f.quorumPercent,
       };
       this.api.updateGremium(id, body).subscribe({
-        next: () => this.onSaved('admin.gremien.toast.updated'),
+        next: () => this.saveRecipients(id, 'admin.gremien.toast.updated'),
         error: () => this.onSaveError(),
       });
     } else {
@@ -404,10 +437,21 @@ export class AdminGremienComponent {
         quorumPercent: f.quorumPercent,
       };
       this.api.createGremium(body).subscribe({
-        next: () => this.onSaved('admin.gremien.toast.created'),
+        next: (created) => this.saveRecipients(created.id, 'admin.gremien.toast.created'),
         error: () => this.onSaveError(),
       });
     }
+  }
+
+  /** Zusatz-Protokoll-Empfänger nach den Stammdaten speichern (#protocol-recipients). */
+  private saveRecipients(
+    id: Uuid,
+    key: 'admin.gremien.toast.created' | 'admin.gremien.toast.updated',
+  ): void {
+    this.api.setGremiumMailRecipients(id, parseRecipients(this.form().mailRecipients)).subscribe({
+      next: () => this.onSaved(key),
+      error: () => this.onSaveError(),
+    });
   }
 
   private onSaved(key: 'admin.gremien.toast.created' | 'admin.gremien.toast.updated'): void {

@@ -441,10 +441,17 @@ class ProtocolService:
     async def _recipients(self, gremium_id: UUID) -> list[str]:
         """Flache, deduplizierte Empfängerliste des Gremiums.
 
-        Primär die aktiven **Verteiler** (``mail_list``). Existiert kein Verteiler
-        (es gibt derzeit keine Verwaltungs-UI dafür → die Tabelle ist regelmäßig leer),
-        wird auf die **E-Mail-Adressen der aktiven Gremium-Mitglieder** zurückgefallen —
-        sonst versendet ``finalize`` still gar nichts (kein Verteiler ⇒ keine Mail)."""
+        **Union** aus den aktiven Gremium-Mitgliedern (Amtszeit-Fenster, email≠NULL)
+        und den konfigurierten Zusatz-Verteilern (``mail_list``, pflegbar über
+        ``PUT /admin/gremien/{id}/mail-recipients``, #protocol-recipients) — die
+        Zusatz-Adressen erhalten das Protokoll **zusätzlich**, nicht statt der
+        Mitglieder."""
+        seen: dict[str, None] = {}
+        members = await RecipientResolver(self.session).resolve(
+            [{"kind": "gremium", "ref": str(gremium_id)}]
+        )
+        for addr in members:
+            seen.setdefault(addr, None)
         lists = (
             await self.session.execute(
                 select(MailList.recipients).where(
@@ -452,16 +459,8 @@ class ProtocolService:
                 )
             )
         ).scalars().all()
-        seen: dict[str, None] = {}
         for recipients in lists:
             for addr in recipients or []:
-                seen.setdefault(addr, None)
-        if not seen:
-            # Fallback: aktive Mitglieder des Gremiums (Amtszeit-Fenster, email≠NULL).
-            members = await RecipientResolver(self.session).resolve(
-                [{"kind": "gremium", "ref": str(gremium_id)}]
-            )
-            for addr in members:
                 seen.setdefault(addr, None)
         return list(seen)
 

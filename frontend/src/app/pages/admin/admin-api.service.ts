@@ -148,6 +148,23 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/gremien/${id}`);
   }
 
+  /** GET /admin/gremien/{id}/mail-recipients — Zusatz-Protokoll-Empfänger (#protocol-recipients). */
+  getGremiumMailRecipients(id: Uuid): Observable<{ recipients: string[] }> {
+    if (this.mock) return of({ recipients: [] });
+    return this.http.get<{ recipients: string[] }>(
+      `${this.base}/admin/gremien/${id}/mail-recipients`,
+    );
+  }
+
+  /** PUT /admin/gremien/{id}/mail-recipients — Zusatz-Empfänger ersetzen (idempotent). */
+  setGremiumMailRecipients(id: Uuid, recipients: string[]): Observable<{ recipients: string[] }> {
+    if (this.mock) return of({ recipients });
+    return this.http.put<{ recipients: string[] }>(
+      `${this.base}/admin/gremien/${id}/mail-recipients`,
+      { recipients },
+    );
+  }
+
   listRoles(): Observable<Role[]> {
     if (this.mock) return of(structuredCopy(this.store.roles));
     return this.http.get<Role[]>(`${this.base}/admin/roles`);

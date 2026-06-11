@@ -63,6 +63,30 @@ class GremiumUpdate(_CamelModel):
     )
 
 
+class GremiumMailRecipients(_CamelModel):
+    """Zusätzliche Protokoll-Empfänger eines Gremiums (#protocol-recipients).
+
+    Diese Adressen erhalten finalisierte Protokolle **zusätzlich** zu den aktiven
+    Gremium-Mitgliedern. Leichte Plausibilitätsprüfung statt voller RFC-Validierung."""
+
+    recipients: list[str] = Field(default_factory=list)
+
+    @field_validator("recipients")
+    @classmethod
+    def _emails_plausible(cls, v: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for raw in v:
+            addr = raw.strip()
+            if not addr:
+                continue
+            if "@" not in addr[1:-1] or " " in addr:
+                raise ValueError(f"not a plausible email address: {addr!r}")
+            cleaned.append(addr)
+        # Reihenfolge erhalten, Duplikate (case-insensitiv) verwerfen.
+        seen: set[str] = set()
+        return [a for a in cleaned if not (a.lower() in seen or seen.add(a.lower()))]
+
+
 # --------------------------------------------------------------------------- #
 # Gremium-Rollen + Mitgliedschaften (#42)
 # --------------------------------------------------------------------------- #

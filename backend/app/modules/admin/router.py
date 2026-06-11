@@ -32,6 +32,7 @@ from app.modules.admin.schemas import (
     FlowVersionCreate,
     FlowVersionOut,
     GremiumCreate,
+    GremiumMailRecipients,
     GremiumMembershipCreate,
     GremiumMembershipOut,
     GremiumOut,
@@ -165,6 +166,34 @@ async def delete_gremium(
     gremium_id: UUID, service: ServiceDep, principal: ConfigAdmin
 ) -> None:
     await service.delete_gremium(gremium_id, principal.sub)
+
+
+@router.get(
+    "/gremien/{gremium_id}/mail-recipients",
+    response_model=GremiumMailRecipients,
+    responses=_errors(401, 403, 404),
+)
+async def get_gremium_mail_recipients(
+    gremium_id: UUID, service: ServiceDep, _principal: ConfigAdmin
+) -> GremiumMailRecipients:
+    """Zusätzliche Protokoll-Empfänger des Gremiums (#protocol-recipients)."""
+    return await service.get_gremium_mail_recipients(gremium_id)
+
+
+@router.put(
+    "/gremien/{gremium_id}/mail-recipients",
+    response_model=GremiumMailRecipients,
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def set_gremium_mail_recipients(
+    gremium_id: UUID,
+    payload: GremiumMailRecipients,
+    service: ServiceDep,
+    principal: ConfigAdmin,
+) -> GremiumMailRecipients:
+    """Zusätzliche Protokoll-Empfänger ersetzen (idempotentes PUT). Diese Adressen
+    erhalten finalisierte Protokolle zusätzlich zu den aktiven Gremium-Mitgliedern."""
+    return await service.set_gremium_mail_recipients(gremium_id, payload, principal.sub)
 
 
 # =========================================================================== #

@@ -61,18 +61,32 @@ describe('AdminGremienComponent (#18)', () => {
       quorumPercent: null,
     });
     post.flush({ ...GREMIUM, id: 'g-2', name: 'AStA Vorstand', slug: 'asta-vorstand' });
+    // Nach den Stammdaten werden die Zusatz-Protokoll-Empfänger gespeichert
+    // (#protocol-recipients) — hier leer.
+    const putMail = http.expectOne(
+      (r) => r.url.endsWith('/admin/gremien/g-2/mail-recipients') && r.method === 'PUT',
+    );
+    expect(putMail.request.body).toEqual({ recipients: [] });
+    putMail.flush({ recipients: [] });
     http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);
     http.verify();
   });
 
-  it('edits a committee via PATCH (slug stays)', async () => {
+  it('edits a committee via PATCH (slug stays) incl. extra minutes recipients', async () => {
     const { http } = await setup();
     await screen.findByText('Studierendenparlament');
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    // Beim Öffnen werden die Zusatz-Empfänger nachgeladen (#protocol-recipients).
+    http
+      .expectOne((r) => r.url.endsWith('/admin/gremien/g-1/mail-recipients') && r.method === 'GET')
+      .flush({ recipients: ['alt@x.de'] });
     const name = screen.getByLabelText('Name');
     await userEvent.clear(name);
     await userEvent.type(name, 'StuPa 2026');
     await userEvent.selectOptions(screen.getByLabelText(/Standardsprache/), 'en');
+    const mail = screen.getByLabelText('Zusätzliche Protokoll-Empfänger');
+    await userEvent.clear(mail);
+    await userEvent.type(mail, 'neu@y.org');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
 
     const patch = http.expectOne((r) => r.url.endsWith('/admin/gremien/g-1') && r.method === 'PATCH');
@@ -84,6 +98,11 @@ describe('AdminGremienComponent (#18)', () => {
       quorumPercent: null,
     });
     patch.flush({ ...GREMIUM, name: 'StuPa 2026', defaultLang: 'en' });
+    const putMail = http.expectOne(
+      (r) => r.url.endsWith('/admin/gremien/g-1/mail-recipients') && r.method === 'PUT',
+    );
+    expect(putMail.request.body).toEqual({ recipients: ['neu@y.org'] });
+    putMail.flush({ recipients: ['neu@y.org'] });
     http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);
     http.verify();
   });
