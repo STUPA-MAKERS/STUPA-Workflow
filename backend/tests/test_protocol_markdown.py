@@ -8,6 +8,7 @@ from app.modules.protocol.markdown import (
     ProtocolDoc,
     build_protocol_document,
     build_vote_snippet,
+    demote_headings,
     protocol_variant_for,
 )
 
@@ -68,21 +69,64 @@ def test_frontmatter_injection_is_quoted() -> None:
 
 # ------------------------------------------------------------- vote snippet
 def test_vote_snippet_renders_abstimmung_callout_with_tally() -> None:
-    snippet = build_vote_snippet("Antrag A", "passed", {"yes": 5, "no": 2, "abstain": 1})
-    # pytex-Protokoll-Callout → eingebaute Vote-Box; Tally-Zeile (yes/no/abstain).
-    assert snippet.startswith("> [!abstimmung] Antrag A")
-    assert "> Ergebnis: passed" in snippet
+    snippet = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
+    # pytex-Protokoll-Callout → eingebaute Vote-Box; Titel fett, Tally-Zeile
+    # (yes/no/abstain), KEINE separate »Ergebnis:«-Zeile (#pdf-format).
+    assert snippet.startswith("> [!abstimmung] **Antrag A**")
+    assert "Ergebnis" not in snippet
     assert "> yes: 5, no: 2, abstain: 1" in snippet
 
 
 def test_vote_snippet_question_overrides_title_and_omits_empty_tally() -> None:
-    snippet = build_vote_snippet("Antrag B", None, None, question="Soll X?")
-    assert snippet.startswith("> [!abstimmung] Soll X?")
-    assert "Ergebnis" not in snippet
+    snippet = build_vote_snippet("Antrag B", None, question="Soll X?")
+    assert snippet.startswith("> [!abstimmung] **Soll X?**")
     assert "yes:" not in snippet
 
 
 def test_vote_snippet_escapes_newlines() -> None:
-    snippet = build_vote_snippet("Zeile1\nZeile2", "passed", None)
+    snippet = build_vote_snippet("Zeile1\nZeile2", None)
     # Titel bleibt einzeilig (kein Markdown-Bruch im Callout-Marker).
-    assert "> [!abstimmung] Zeile1 Zeile2" in snippet
+    assert "> [!abstimmung] **Zeile1 Zeile2**" in snippet
+
+
+# ------------------------------------------------------------- pdf format
+def test_frontmatter_has_signatures_and_quorum_dataline() -> None:
+    md = build_protocol_document(_doc(quorate=True, datalines=["Ort: R 1"]))
+    block = md.split("---")[1]
+    assert "unterschriften:" in block
+    assert '- "Schriftführung"' in block and '- "Vorstand"' in block
+    # Beschlussfähigkeit als eigener Frontmatter-Key (der pytex-Wrapper rendert
+    # ihn als Titelseiten-Daten-Zeile, #protocol-quorum).
+    assert 'beschlussfaehigkeit: "Gegeben"' in block
+
+
+def test_frontmatter_quorum_not_given() -> None:
+    md = build_protocol_document(_doc(quorate=False))
+    assert 'beschlussfaehigkeit: "Nicht gegeben"' in md
+
+
+def test_frontmatter_quorum_omitted_when_unknown() -> None:
+    md = build_protocol_document(_doc())
+    assert "beschlussfaehigkeit" not in md
+
+
+def test_demote_headings_shifts_levels_and_skips_fences() -> None:
+    md = "\n".join(
+        [
+            "# A",
+            "",
+            "## B",
+            "",
+            "```",
+            "# nicht anfassen",
+            "```",
+            "",
+            "###### F",
+            "kein # heading",
+        ]
+    )
+    out = demote_headings(md)
+    assert "## A" in out and "### B" in out
+    assert "# nicht anfassen" in out  # Code-Fence unberührt
+    assert "###### F" in out  # Ebene 6 bleibt 6
+    assert "kein # heading" in out

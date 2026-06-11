@@ -25,18 +25,22 @@ Protokoll bleibt Entwurf und der Aufruf ist wiederholbar.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import Gremium, MailList
+from app.modules.admin.models import Gremium, GremiumMembership, MailList
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
-from app.modules.notifications.mail import MailMessage, compute_idempotency_key
+from app.modules.notifications.mail import (
+    MailAttachment,
+    MailMessage,
+    compute_idempotency_key,
+)
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.pdf.pytex_client import PytexClient, PytexError
@@ -44,6 +48,7 @@ from app.modules.protocol.markdown import (
     ProtocolDoc,
     build_protocol_document,
     build_vote_snippet,
+    demote_headings,
     protocol_variant_for,
 )
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
@@ -241,7 +246,6 @@ class ProtocolService:
             snippets.append(
                 build_vote_snippet(
                     _vote_title(view.application_id, view.question),
-                    view.tally.result,
                     view.tally.counts,
                     question=view.question,
                 )
@@ -294,11 +298,11 @@ class ProtocolService:
             return self._to_out(protocol)
 
         markdown = await self._build_document(protocol)
-        await self._render(protocol, markdown)
+        pdf = await self._render(protocol, markdown)
         protocol.status = "final"
         protocol.sent_at = now
         await self.session.flush()
-        await self._send(protocol)
+        await self._send(protocol, pdf)
         await self.session.commit()
         return self._to_out(protocol)
 
@@ -322,9 +326,37 @@ class ProtocolService:
                 protokollant=protokollant,
                 present=present,
                 absent=absent,
+                quorate=await self._quorate(gremium, len(present)),
                 markdown=assembled or protocol.markdown,
             )
         )
+
+    async def _quorate(self, gremium: object | None, present_count: int) -> bool | None:
+        """Beschlussfähigkeit: Anwesende vs. aktive Mitglieder (#protocol-quorum).
+
+        Schwelle = ``gremium.quorum_percent`` (falls gesetzt), sonst »mehr als die
+        Hälfte«. ``None`` ohne Gremium/Mitglieder — dann keine Aussage im PDF."""
+        gremium_id = getattr(gremium, "id", None)
+        if gremium_id is None:
+            return None
+        now = datetime.now(UTC)
+        members = (
+            await self.session.scalar(
+                select(func.count(func.distinct(GremiumMembership.principal_id))).where(
+                    GremiumMembership.gremium_id == gremium_id,
+                    (GremiumMembership.valid_from.is_(None))
+                    | (GremiumMembership.valid_from <= now),
+                    (GremiumMembership.valid_until.is_(None))
+                    | (GremiumMembership.valid_until > now),
+                )
+            )
+        ) or 0
+        if members == 0:
+            return None
+        percent = getattr(gremium, "quorum_percent", None)
+        if percent is not None:
+            return present_count * 100 >= percent * members
+        return present_count * 2 > members
 
     async def _header_meta(
         self, meeting: Meeting | None
@@ -366,11 +398,16 @@ class ProtocolService:
             return ""
         voting = VotingService(self.session)
         blocks: list[str] = []
-        for idx, item in enumerate(items, start=1):
+        for item in items:
             heading = (item.title or "Tagesordnungspunkt").strip()
-            block = [f"## TOP {idx}: {heading}"]
+            # Top-Level-``#`` OHNE »TOP n:«-Präfix: pytex nummeriert die Sections
+            # selbst als »TOP 1«, »TOP 2«, … (#pdf-format) — ``##`` würde als
+            # »TOP 0.1« nummeriert und ein eigenes Präfix doppelt erscheinen.
+            block = [f"# {heading}"]
             if item.body and item.body.strip():
-                block.append(item.body.strip())
+                # Body-Headings eine Ebene absenken: nur die TOP-Überschrift
+                # bleibt Top-Level (sonst zählte jedes ``#`` als eigener TOP).
+                block.append(demote_headings(item.body.strip()))
             votes = (
                 await self.session.execute(
                     select(Vote)
@@ -388,7 +425,6 @@ class ProtocolService:
                 block.append(
                     build_vote_snippet(
                         view.question or "Beschlussfrage",
-                        view.tally.result,
                         view.tally.counts,
                         question=view.question,
                     )
@@ -396,18 +432,21 @@ class ProtocolService:
             blocks.append("\n\n".join(block))
         return "\n\n".join(blocks) + "\n"
 
-    async def _render(self, protocol: Protocol, markdown: str) -> None:
-        """pytex → PDF → MinIO. Ohne Storage »aus« (DEV); Backend-Fehler → 503."""
+    async def _render(self, protocol: Protocol, markdown: str) -> bytes | None:
+        """pytex → PDF → MinIO; gibt die PDF-Bytes zurück (für den Mail-Anhang).
+
+        Ohne Storage »aus« (DEV) wird nicht gerendert (``None``); Backend-Fehler → 503."""
         # Storage ist der bewusste An/Aus-Schalter (T-20-Konvention): fehlt er, läuft
         # finalize ohne PDF weiter (Demo/Contract-CI ohne MinIO).
         if self.storage is None or self.pytex is None:
-            return
+            return None
         try:
             variant = protocol_variant_for(protocol.cd_variant)
             pdf = await self.pytex.render_pdf(markdown, variant=variant)
             key = protocol_storage_key(protocol.id)
             await self.storage.put(key, pdf, "application/pdf")
             protocol.pdf_storage_key = key
+            return pdf
         except PytexError as exc:
             # 4xx = dauerhafter Eingabe-/Compile-Fehler (z. B. ungültiges LaTeX im
             # Protokoll-Markdown): kein Retry, dem Nutzer den (gescrubbten) Grund
@@ -426,25 +465,35 @@ class ProtocolService:
                 "Protocol rendering temporarily unavailable."
             ) from exc
 
-    async def _send(self, protocol: Protocol) -> None:
-        """Protokoll-PDF an MAIL_LIST(gremium) — idempotenter Key, PDF-Link im Body."""
+    async def _send(self, protocol: Protocol, pdf: bytes | None) -> None:
+        """Protokoll an MAIL_LIST(gremium) — idempotenter Key, PDF als **Anhang**.
+
+        Kein Link mehr (#protocol-mail-pdf): der frühere ``/api/protocols/{id}/pdf``-
+        Link verlangt Login + ``meeting.manage`` — für Mitglieder und externe
+        Verteiler-Adressen war er schlicht kaputt ("Cannot Complete Request")."""
         if self.mail_queue is None:
             return
         recipients = await self._recipients(protocol.gremium_id)
         if not recipients:
             return
-        pdf_path = self._pdf_path(protocol)
-        base = self.settings.public_base_url.rstrip("/") if self.settings else ""
-        pdf_url = f"{base}{pdf_path}" if pdf_path else None
-        link = f"\n\nPDF: {pdf_url}" if pdf_url else ""
+        attachments: tuple[MailAttachment, ...] = ()
+        text = "Das Sitzungsprotokoll wurde finalisiert."
+        if pdf is not None:
+            attachments = (
+                MailAttachment(
+                    filename="protokoll.pdf", mime="application/pdf", content=pdf
+                ),
+            )
+            text = "Das Sitzungsprotokoll wurde finalisiert und liegt als PDF bei."
         await self.mail_queue.enqueue(
             MailMessage(
                 to=tuple(recipients),
                 subject="Sitzungsprotokoll",
-                text=f"Das Sitzungsprotokoll wurde finalisiert.{link}",
+                text=text,
                 idempotency_key=compute_idempotency_key(
                     "protocol_finalized", str(protocol.id)
                 ),
+                attachments=attachments,
             )
         )
 

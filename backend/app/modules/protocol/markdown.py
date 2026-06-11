@@ -54,6 +54,14 @@ class ProtocolDoc:
     present: list[str] = field(default_factory=list)
     absent: list[str] = field(default_factory=list)
     datalines: list[str] = field(default_factory=list)
+    # Beschlussfähigkeit (anwesende vs. aktive Mitglieder); None = keine Aussage.
+    quorate: bool | None = None
+
+
+# Unterschriften-Block (pytex ``signature_block_from_meta``): die Schriftführung
+# zieht ihren Namen aus dem ``protokoll``-Frontmatter, der Vorstand bleibt eine
+# Blanko-Linie zum handschriftlichen Unterschreiben (Vault-Konvention).
+_SIGNATURES = ["Schriftführung", "Vorstand"]
 
 
 def _yaml_list(key: str, items: list[str]) -> list[str]:
@@ -81,7 +89,14 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
         lines.append(f"protokoll: {_yaml_scalar(doc.protokollant)}")
     lines += _yaml_list("anwesend", doc.present)
     lines += _yaml_list("abwesend", doc.absent)
+    if doc.quorate is not None:
+        # Beschlussfähigkeit als Titelseiten-Daten-Zeile (#protocol-quorum) — der
+        # pytex-Wrapper registriert den Key in der Daten-Zeilen-Tabelle.
+        quorate = "Gegeben" if doc.quorate else "Nicht gegeben"
+        lines.append(f"beschlussfaehigkeit: {_yaml_scalar(quorate)}")
     lines += _yaml_list("datalines", doc.datalines)
+    # Unterschriften-Seite (pytex rendert die Signatur-Linien aus dieser Liste).
+    lines += _yaml_list("unterschriften", _SIGNATURES)
     lines.append("---")
     return lines
 
@@ -97,23 +112,42 @@ def build_protocol_document(doc: ProtocolDoc) -> str:
 
 def build_vote_snippet(
     title: str,
-    result: str | None,
     counts: dict[str, int] | None,
     question: str | None = None,
 ) -> str:
     """Eine Abstimmung als pytex-Protokoll-Callout (``> [!abstimmung]``) → eingebaute
     Vote-Tally-Box im PDF (statt einer Aufzählung). Die Stimmen-Zeile (``yes/no/abstain``
-    bzw. ``ja/nein/enthaltung``) erkennt pytex und rendert die Zähl-Box; die übrigen
-    Zeilen (Beschlussfrage/Ergebnis) bleiben Box-Text. Alle Werte werden escaped.
+    bzw. ``ja/nein/enthaltung``) erkennt pytex und rendert die Zähl-Box. Alle Werte
+    werden escaped; der Titel ist **fett** (#pdf-format). Eine separate
+    »Ergebnis: …«-Zeile entfällt — das Ergebnis liest sich aus der Zähl-Box.
 
     Bleibt Teil des editierbaren Markdowns (Blockquote-Callout)."""
     head = question.strip() if question and question.strip() else title
-    lines = [f"> [!abstimmung] {_md_escape(head)}"]
-    if result:
-        lines.append(f"> Ergebnis: {_md_escape(result)}")
+    lines = [f"> [!abstimmung] **{_md_escape(head)}**"]
     if counts:
         # pytex erkennt die Tally-Zeile an ≥2 von ja/nein/enthaltung (yes/no/abstain) —
         # die Antrags-Optionen tragen genau diese Schlüssel.
         tally = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())
         lines.append(f"> {tally}")
     return "\n".join(lines)
+
+
+def demote_headings(markdown: str) -> str:
+    """Alle ATX-Headings im TOP-Body **eine Ebene absenken** (#pdf-format).
+
+    Die TOP-Überschrift selbst ist das einzige Top-Level-``#`` (pytex nummeriert
+    sie als »TOP n«); vom Protokollanten im Body geschriebene ``#``-Headings
+    würden sonst als eigene TOPs mitnummeriert. Code-Fences bleiben unberührt;
+    Ebene 6 bleibt 6 (tiefer kennt Markdown nicht)."""
+    out: list[str] = []
+    in_fence = False
+    for line in markdown.split("\n"):
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+        elif not in_fence and stripped.startswith("#"):
+            hashes = len(stripped) - len(stripped.lstrip("#"))
+            if 1 <= hashes <= 5 and stripped[hashes : hashes + 1] in (" ", "\t"):
+                line = line.replace("#", "##", 1)
+        out.append(line)
+    return "\n".join(out)

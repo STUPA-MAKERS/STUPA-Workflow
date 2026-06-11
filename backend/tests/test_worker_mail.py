@@ -57,3 +57,43 @@ async def test_on_startup_populates_ctx() -> None:
     ctx: dict = {}
     await on_startup(ctx)
     assert "settings" in ctx and "mail_sender" in ctx
+
+
+def test_mail_message_attachment_roundtrip() -> None:
+    """#protocol-mail-pdf: Anhänge überleben die Queue (base64-Payload)."""
+    from app.modules.notifications.mail import MailAttachment, MailMessage
+
+    msg = MailMessage(
+        to=("a@x.de",),
+        subject="s",
+        text="t",
+        attachments=(
+            MailAttachment(filename="p.pdf", mime="application/pdf", content=b"%PDF-1.4 x"),
+        ),
+    )
+    again = MailMessage.from_payload(msg.to_payload())
+    assert again.attachments == msg.attachments
+
+
+def test_build_email_message_adds_attachment() -> None:
+    from app.modules.notifications.mail import (
+        MailAttachment,
+        MailMessage,
+        build_email_message,
+    )
+    from app.settings import load_settings
+
+    msg = MailMessage(
+        to=("a@x.de",),
+        subject="s",
+        text="t",
+        attachments=(
+            MailAttachment(filename="p.pdf", mime="application/pdf", content=b"%PDF-1.4 x"),
+        ),
+    )
+    email = build_email_message(msg, load_settings())
+    parts = [p for p in email.iter_attachments()]
+    assert len(parts) == 1
+    assert parts[0].get_filename() == "p.pdf"
+    assert parts[0].get_content_type() == "application/pdf"
+    assert parts[0].get_content() == b"%PDF-1.4 x"

@@ -226,7 +226,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                             [attr.aria-pressed]="a.status === s"
                             [attr.aria-label]="attendanceKey(s) | t"
                             [title]="attendanceKey(s) | t"
-                            [disabled]="savingAttendance()"
+                            [disabled]="savingAttendance() || m.status === 'closed'"
                             (click)="setAttendance(a, s)"
                           >
                             <app-icon [name]="attendanceIcon(s)" [size]="13" />
@@ -477,7 +477,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                             [attr.aria-pressed]="a.status === s"
                             [attr.aria-label]="attendanceKey(s) | t"
                             [title]="attendanceKey(s) | t"
-                            [disabled]="savingAttendance()"
+                            [disabled]="savingAttendance() || m.status === 'closed'"
                             (click)="setAttendance(a, s)"
                           >
                             <app-icon [name]="attendanceIcon(s)" [size]="13" />

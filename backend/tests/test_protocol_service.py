@@ -197,7 +197,7 @@ async def test_embed_votes_appends_snippet_and_ref() -> None:
     )
     out = await _service(session).embed_votes(PID, [VID])
     assert "> [!abstimmung]" in out.markdown
-    assert "> Ergebnis: passed" in out.markdown
+    assert "Ergebnis" not in out.markdown  # entfällt — die Zähl-Box trägt das Ergebnis
     assert "yes: 2, no: 1" in out.markdown
     assert session.committed == 1
 
@@ -261,7 +261,10 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert out.pdf_url is not None
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("a@x.de", "b@x.de")
-    assert "PDF:" in mail.sent[0].text
+    # PDF reist als Anhang mit (#protocol-mail-pdf) — der frühere Link verlangte
+    # Login + meeting.manage und war für die Empfänger wertlos.
+    assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
+    assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
 
 
 async def test_finalize_without_storage_degrades_but_mails() -> None:
@@ -279,7 +282,7 @@ async def test_finalize_without_storage_degrades_but_mails() -> None:
     assert out.pdf_url is None
     assert proto.pdf_storage_key is None
     assert pytex.calls == []  # Render übersprungen (kein Storage)
-    assert len(mail.sent) == 1 and "PDF:" not in mail.sent[0].text
+    assert len(mail.sent) == 1 and mail.sent[0].attachments == ()  # kein PDF ohne Storage
 
 
 async def test_finalize_idempotent_when_already_final() -> None:

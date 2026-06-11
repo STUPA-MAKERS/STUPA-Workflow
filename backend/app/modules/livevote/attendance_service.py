@@ -18,7 +18,7 @@ from app.modules.admin.models import GremiumMembership
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.livevote.schemas import AttendanceOut, AttendanceStatus
-from app.shared.errors import ForbiddenError, NotFoundError
+from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 
 class AttendanceService:
@@ -115,11 +115,23 @@ class AttendanceService:
         await self.session.flush()
         await self.session.commit()
 
+    @staticmethod
+    def _ensure_not_closed(meeting: Meeting) -> None:
+        """Anwesenheit ist nach dem Schließen eingefroren (#attendance-lock).
+
+        Das finalisierte Protokoll trägt die Anwesenheitslisten — nachträgliche
+        Änderungen würden PDF und System auseinanderlaufen lassen → 409."""
+        if meeting.status == "closed":
+            raise ConflictError(
+                "Attendance is read-only once the meeting is closed.", code="conflict"
+            )
+
     async def set_self(
         self, meeting_id: UUID, status: AttendanceStatus, requester_sub: str
     ) -> list[AttendanceOut]:
-        """Eigene Anwesenheit setzen (nur Gremium-Mitglieder)."""
+        """Eigene Anwesenheit setzen (nur Gremium-Mitglieder, nicht nach Schließen)."""
         meeting = await self._meeting(meeting_id)
+        self._ensure_not_closed(meeting)
         member = next(
             (
                 m
@@ -140,8 +152,9 @@ class AttendanceService:
         status: AttendanceStatus,
         requester_sub: str,
     ) -> list[AttendanceOut]:
-        """Anwesenheit eines Mitglieds durch die Sitzungsleitung setzen."""
+        """Anwesenheit eines Mitglieds durch die Sitzungsleitung setzen (nicht nach Schließen)."""
         meeting = await self._meeting(meeting_id)
+        self._ensure_not_closed(meeting)
         members = await self._current_members(meeting.gremium_id)
         if not any(m.id == principal_id for m in members):
             raise NotFoundError("principal is not a current member of this committee")

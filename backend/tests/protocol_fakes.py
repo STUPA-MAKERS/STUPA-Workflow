@@ -44,6 +44,7 @@ class FakeSession:
     ) -> None:
         self.store = store or {}
         self._results = list(results)
+        self.scalar_results: list[Any] = []
         self.added: list[Any] = []
         self.flushed = 0
         self.committed = 0
@@ -58,6 +59,13 @@ class FakeSession:
 
     async def scalars(self, _stmt: Any) -> FakeResult:
         return self._results.pop(0) if self._results else FakeResult()
+
+    async def scalar(self, _stmt: Any) -> Any:
+        """``session.scalar``-Ersatz (Protokollant-Name, Mitglieder-Count): eigene
+        Queue, Default ``None`` — die ``execute``-Reihenfolge bleibt unberührt."""
+        if self.scalar_results:
+            return self.scalar_results.pop(0)
+        return None
 
     async def get(self, _model: type, ident: Any) -> Any:
         return self.store.get(ident)

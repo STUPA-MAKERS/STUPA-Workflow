@@ -10,6 +10,7 @@ Idempotenz-Key, nie Adressen, Betreff, Body oder das SMTP-Passwort.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import logging
 from dataclasses import dataclass, field
@@ -19,6 +20,34 @@ from typing import Protocol
 from app.settings import Settings
 
 logger = logging.getLogger("app.mail")
+
+
+@dataclass(frozen=True, slots=True)
+class MailAttachment:
+    """Ein Mail-Anhang (reiner Wert; ``content`` reist base64-kodiert durch die Queue).
+
+    Eingeführt für den Protokoll-Versand (#protocol-mail-pdf): der frühere
+    PDF-Link zeigte auf einen login-/permission-pflichtigen API-Endpunkt und war
+    für die Empfänger (Mitglieder, externe Verteiler) wertlos."""
+
+    filename: str
+    mime: str
+    content: bytes
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "filename": self.filename,
+            "mime": self.mime,
+            "content": base64.b64encode(self.content).decode("ascii"),
+        }
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, object]) -> MailAttachment:
+        return cls(
+            filename=str(payload["filename"]),
+            mime=str(payload["mime"]),
+            content=base64.b64decode(str(payload["content"])),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +62,7 @@ class MailMessage:
     # Optional gesetzte Kopf-Infos; Defaults zieht der Sender aus den Settings.
     from_addr: str | None = None
     from_name: str | None = None
+    attachments: tuple[MailAttachment, ...] = ()
 
     def recipient_domains(self) -> list[str]:
         """Empfänger-Domains (für Logs ohne PII)."""
@@ -48,11 +78,13 @@ class MailMessage:
             "idempotency_key": self.idempotency_key,
             "from_addr": self.from_addr,
             "from_name": self.from_name,
+            "attachments": [a.to_payload() for a in self.attachments],
         }
 
     @classmethod
     def from_payload(cls, payload: dict[str, object]) -> MailMessage:
         """Aus dem Queue-Payload rekonstruieren (Gegenstück zu `to_payload`)."""
+        raw_attachments = payload.get("attachments") or []
         return cls(
             to=tuple(payload["to"]),  # type: ignore[arg-type]
             subject=str(payload["subject"]),
@@ -61,6 +93,10 @@ class MailMessage:
             idempotency_key=str(payload.get("idempotency_key", "")),
             from_addr=payload.get("from_addr"),  # type: ignore[arg-type]
             from_name=payload.get("from_name"),  # type: ignore[arg-type]
+            attachments=tuple(
+                MailAttachment.from_payload(a)  # type: ignore[arg-type]
+                for a in raw_attachments  # type: ignore[union-attr]
+            ),
         )
 
 
@@ -74,7 +110,7 @@ def compute_idempotency_key(*parts: str) -> str:
 
 
 def build_email_message(msg: MailMessage, settings: Settings) -> EmailMessage:
-    """`MailMessage` → RFC-5322 `EmailMessage` (Text + optional HTML-Alternative)."""
+    """`MailMessage` → RFC-5322 `EmailMessage` (Text + optional HTML + Anhänge)."""
     email = EmailMessage()
     from_addr = msg.from_addr or settings.mail_from
     from_name = msg.from_name or settings.mail_from_name
@@ -84,6 +120,14 @@ def build_email_message(msg: MailMessage, settings: Settings) -> EmailMessage:
     email.set_content(msg.text)
     if msg.html:
         email.add_alternative(msg.html, subtype="html")
+    for attachment in msg.attachments:
+        maintype, _, subtype = attachment.mime.partition("/")
+        email.add_attachment(
+            attachment.content,
+            maintype=maintype or "application",
+            subtype=subtype or "octet-stream",
+            filename=attachment.filename,
+        )
     return email
 
 

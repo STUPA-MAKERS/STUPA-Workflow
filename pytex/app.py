@@ -66,6 +66,20 @@ _LIMITS = BuildLimits(
     max_input_bytes=_MAX_BODY_BYTES,
 )
 
+# Protokoll-Titelseite: pytex 1.0.6 rendert nur seine fest verdrahteten
+# Frontmatter-Keys als Daten-Zeilen — »Beschlussfähigkeit« kennt es nicht.
+# Die Zeilen-Tabelle ist ein Modul-Tuple, das `_data_lines` zur Laufzeit liest;
+# wir erweitern sie hier (Wrapper-Patch statt Paket-Fork, #protocol-quorum).
+from pytex_markdown.protocol import document as _protocol_document  # noqa: E402
+
+if not any(
+    label == "Beschlussfähigkeit" for label, _ in _protocol_document._SCALAR_ROWS
+):
+    _protocol_document._SCALAR_ROWS = (
+        *_protocol_document._SCALAR_ROWS,
+        ("Beschlussfähigkeit", ("beschlussfaehigkeit", "beschlussfähigkeit")),
+    )
+
 app = FastAPI(title="pytex render service", version="1.0.0")
 
 # Strip absolute filesystem paths (/home/..., /tmp/pytex-api-...) out of any
