@@ -58,12 +58,28 @@ COPY app.py ./
 COPY inkscape-shim.sh /usr/local/bin/inkscape
 RUN chmod +x /usr/local/bin/inkscape
 
-# Drop privileges; the cache volume must be writable by the unprivileged user.
+# Cache warm-up AT BUILD TIME (network is available here): renders one realistic
+# document per protocol variant into /cache-seed, pulling the tectonic bundle and
+# all LaTeX packages those documents need. The entrypoint seeds the (empty) /cache
+# volume from it — at RUNTIME the container then needs NO internet; tectonic would
+# otherwise lazily fetch packages per document and die behind an egress block
+# ("error sending request … operation timed out").
+COPY warmup.py ./
+RUN set -eux; \
+    mkdir -p /cache-seed; \
+    XDG_CACHE_HOME=/cache-seed python warmup.py; \
+    rm -rf /tmp/pytex-api-* || true
+
+COPY entrypoint.sh /usr/local/bin/pytex-entrypoint
+RUN chmod +x /usr/local/bin/pytex-entrypoint
+
+# Drop privileges; the cache volume AND the seed must be readable/writable by
+# the unprivileged user (the entrypoint copies the seed into the volume).
 RUN useradd --create-home --uid 10001 pytex \
     && mkdir -p /cache \
-    && chown -R pytex:pytex /cache /app
+    && chown -R pytex:pytex /cache /cache-seed /app
 USER pytex
 
 EXPOSE 8099
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8099"]
+CMD ["pytex-entrypoint"]
