@@ -33,7 +33,7 @@ _GID = uuid.uuid4()
 _FYID = uuid.uuid4()
 _AID = uuid.uuid4()
 _EID = uuid.uuid4()
-_PERMS = ("budget.manage", "budget.view", "application.manage")
+_PERMS = ("budget.structure", "budget.book", "budget.view", "application.manage")
 
 
 def _expense_out() -> ExpenseOut:

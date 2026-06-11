@@ -30,17 +30,20 @@ SCOPES: dict[str, frozenset[str]] = {
             "budget.view",
             "budget.export",
             "audit.read",
+            "audit.verify",
         }
     ),
     "applications:write": frozenset(
         {"application.create", "application.transition", "application.manage"}
     ),
     "votes:write": frozenset({"vote.manage"}),
-    "budget:write": frozenset({"budget.manage", "account.manage"}),
-    "meetings:write": frozenset({"meeting.manage"}),
+    "budget:write": frozenset({"budget.structure", "budget.book", "account.manage"}),
+    "meetings:write": frozenset({"meeting.manage", "protocol.finalize"}),
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),
-    "admin:write": frozenset({"admin.config", "admin.roles", "webhook.manage"}),
+    "admin:write": frozenset(
+        {"admin.site", "admin.gremien", "admin.types", "admin.roles", "webhook.manage"}
+    ),
 }
 
 # Voller kuratierter Umfang (MCP-Default-Request). Serverseitig auf die Rechte des

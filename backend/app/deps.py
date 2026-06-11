@@ -155,6 +155,24 @@ def require_principal(*perms: str) -> Callable[..., Principal]:
     return dependency
 
 
+def require_any_permission(*perms: str) -> Callable[..., Principal]:
+    """401 ohne Session, 403 wenn KEINE der Permissions vorliegt (ANY-of, #6).
+
+    Für geteilte Lese-Endpunkte, die mehrere Admin-Bereiche bedienen
+    (z. B. ``/admin/config-schemas`` für Typ- UND Branding-Editoren)."""
+
+    def dependency(
+        principal: Annotated[Principal | None, Depends(get_current_principal)],
+    ) -> Principal:
+        if principal is None:
+            raise UnauthorizedError("Authentication required.")
+        if not any(principal.has(p) for p in perms):
+            raise ForbiddenError(f"Missing permission(s): one of {', '.join(perms)}")
+        return principal
+
+    return dependency
+
+
 def require_group(group: str) -> Callable[..., Principal]:
     """401 ohne Session, 403 wenn Principal nicht in der (Gremium-)Gruppe ist."""
 

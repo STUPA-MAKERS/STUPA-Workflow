@@ -48,7 +48,7 @@ const MOCK_PRINCIPAL: Principal = {
   // application.manage (T-31) für RBAC-Aktionen auf der Detail-Seite;
   // vote.manage/meeting.manage (T-32) für Beamer-/Manage-Ansichten;
   // protocol.write (T-33) für den Protokoll-Editor;
-  // admin.config/form.configure/flow.configure/webhook.manage
+  // admin.site/gremien/types + form.configure/flow.configure/webhook.manage
   // (T-34) für die Verwaltungs-UIs — alle im Mock gesetzt, damit der FE-Dev/
   // Harness-/Demo-Betrieb die gegateten Ansichten zeigt.
   permissions: [
@@ -58,14 +58,17 @@ const MOCK_PRINCIPAL: Principal = {
     'vote.manage',
     'meeting.manage',
     'protocol.write',
-    'admin.config',
+    'admin.site',
+    'admin.gremien',
+    'admin.types',
     'admin.roles',
     'form.configure',
     'flow.configure',
     'webhook.manage',
-    // budget.view/budget.manage (T-17/T-35) für das Budget-Statistik-Dashboard.
+    // budget.view/budget.structure/budget.book (T-17/T-35) für das Budget-Statistik-Dashboard.
     'budget.view',
-    'budget.manage',
+    'budget.structure',
+    'budget.book',
   ],
   groups: [],
   gremien: [

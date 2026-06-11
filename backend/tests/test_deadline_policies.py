@@ -94,7 +94,7 @@ def app_client(app: FastAPI) -> TestClient:
 
 def _as_admin(app: FastAPI) -> None:
     app.dependency_overrides[get_current_principal] = lambda: Principal(
-        sub="admin", permissions={"admin.config"}
+        sub="admin", permissions={"admin.types"}
     )
 
 

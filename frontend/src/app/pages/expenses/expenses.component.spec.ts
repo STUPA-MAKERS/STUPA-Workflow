@@ -45,7 +45,7 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage } = {}) {
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
-      { provide: AuthService, useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.manage']) },
+      { provide: AuthService, useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book']) },
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
@@ -88,7 +88,7 @@ describe('ExpensesComponent', () => {
     http.verify();
   });
 
-  it('hides add/edit controls for a viewer without budget.manage', async () => {
+  it('hides add/edit controls for a viewer without budget.book', async () => {
     await setup({ perms: ['budget.view'], page: page([EXPENSE]) });
     expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Buchung hinzufügen' })).toBeNull();

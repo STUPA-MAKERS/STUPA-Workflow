@@ -100,7 +100,8 @@ async def list_audit_actors(service: ServiceDep) -> list[AuditActorOut]:
 @router.get(
     "/verify",
     response_model=ChainVerificationOut,
-    dependencies=[Depends(require_principal("audit.read"))],
+    # #6: Ketten-Verifikation separat gegatet (audit.verify), Lesesicht bleibt audit.read.
+    dependencies=[Depends(require_principal("audit.verify"))],
     responses=_AUTH_ERRORS,
 )
 async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:

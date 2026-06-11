@@ -15,6 +15,13 @@ from __future__ import annotations
 # #28-Redesign: ``application.update`` (→ ``application.manage``) sowie
 # ``protocol.manage``/``protocol.write`` (→ ``meeting.manage``) entfallen;
 # ``application.transition`` gatet das Feuern manueller Flow-Übergänge.
+# #6-Granularität (Migration 0016 remappt Bestands-Zuweisungen):
+#   ``admin.config``  → ``admin.site`` / ``admin.gremien`` / ``admin.types``
+#   ``budget.manage`` → ``budget.structure`` (Baum/HHJ/Zuteilungen) /
+#                       ``budget.book`` (Buchungen/Umbuchungen)
+#   ``meeting.manage`` behält Sitzungen/Protokoll-Entwurf; ``protocol.finalize``
+#                       gatet das Finalisieren+Versenden separat
+#   ``audit.read``     behält die Lesesicht; ``audit.verify`` die Hash-Kette
 PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read",
     "application.create",
@@ -25,14 +32,19 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "vote.cast",
     "vote.manage",
     "meeting.manage",
+    "protocol.finalize",
     "budget.view",
-    "budget.manage",
+    "budget.structure",
+    "budget.book",
     "budget.export",
     "account.manage",
     "application.export",
     "webhook.manage",
     "audit.read",
-    "admin.config",
+    "audit.verify",
+    "admin.site",
+    "admin.gremien",
+    "admin.types",
     "admin.roles",
     # MCP/Agent-Zugang: erlaubt das Ausstellen von OAuth-Token für API-Agenten
     # (#MCP). Admin hat es ohnehin (Bypass); explizit zuweisbar für Nicht-Admins.

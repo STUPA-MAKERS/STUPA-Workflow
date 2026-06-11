@@ -5,8 +5,10 @@ RBAC (roles/role-assignments/group-mappings), webhooks, ``config-schemas`` und
 **site-config/Branding** (#21) + ein öffentlicher, auth-freier Branding-Read.
 
 RBAC ist serverseitig **autoritativ** (``require_principal`` → 401/403); das FE ist
-nur UX-Gate. Permissions je Bereich:
-``admin.config`` (Config), ``admin.roles`` (RBAC), ``webhook.manage`` (Webhooks).
+nur UX-Gate. Permissions je Bereich (#6-Granularität):
+``admin.gremien`` (Gremien), ``admin.types`` (Antragstypen/Forms/Flows),
+``admin.site`` (Branding/Site-Config), ``admin.roles`` (RBAC),
+``webhook.manage`` (Webhooks).
 Fehler werden als ``ProblemDetail`` deklariert (T-10-Hook → problem+json),
 ``400`` = malformed JSON body, ``422`` = Schema-Validierung.
 
@@ -22,7 +24,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 
-from app.deps import DbSession, Principal, SettingsDep, require_principal
+from app.deps import (
+    DbSession,
+    Principal,
+    SettingsDep,
+    require_any_permission,
+    require_principal,
+)
 from app.modules.admin.branding import Branding
 from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.schemas import (
@@ -101,14 +109,23 @@ GremiumRoleServiceDep = Annotated[
 
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 
-# Permission-Gates (Principal-Objekt injiziert für den Audit-actor).
-ConfigAdmin = Annotated[Principal, Depends(require_principal("admin.config"))]
+# Permission-Gates (Principal-Objekt injiziert für den Audit-actor). #6:
+# ``admin.config`` ist in drei Bereichs-Rechte aufgeteilt (Migration 0016).
+GremienAdmin = Annotated[Principal, Depends(require_principal("admin.gremien"))]
+TypesAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
+SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
 RolesAdmin = Annotated[Principal, Depends(require_principal("admin.roles"))]
 WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))]
 
-_CONFIG = Depends(require_principal("admin.config"))
+_GREMIEN = Depends(require_principal("admin.gremien"))
+_TYPES = Depends(require_principal("admin.types"))
+_SITE = Depends(require_principal("admin.site"))
 _ROLES = Depends(require_principal("admin.roles"))
 _WEBHOOK = Depends(require_principal("webhook.manage"))
+# Geteilte Reads, die mehrere Admin-Bereiche bedienen (ANY-of).
+_ANY_ADMIN_AREA = Depends(
+    require_any_permission("admin.site", "admin.gremien", "admin.types", "admin.roles")
+)
 
 
 # =========================================================================== #
@@ -117,7 +134,7 @@ _WEBHOOK = Depends(require_principal("webhook.manage"))
 @router.get(
     "/config-schemas",
     response_model=dict[str, dict[str, Any]],
-    dependencies=[_CONFIG],
+    dependencies=[_ANY_ADMIN_AREA],
     responses=_errors(401, 403),
 )
 async def get_config_schemas() -> dict[str, dict[str, Any]]:
@@ -131,7 +148,7 @@ async def get_config_schemas() -> dict[str, dict[str, Any]]:
 @router.get(
     "/gremien",
     response_model=list[GremiumOut],
-    dependencies=[_CONFIG],
+    dependencies=[_GREMIEN],
     responses=_errors(401, 403),
 )
 async def list_gremien(service: ServiceDep) -> list[GremiumOut]:
@@ -145,7 +162,7 @@ async def list_gremien(service: ServiceDep) -> list[GremiumOut]:
     responses=_errors(400, 401, 403, 409, 422),
 )
 async def create_gremium(
-    payload: GremiumCreate, service: ServiceDep, principal: ConfigAdmin
+    payload: GremiumCreate, service: ServiceDep, principal: GremienAdmin
 ) -> GremiumOut:
     return await service.create_gremium(payload, principal.sub)
 
@@ -159,7 +176,7 @@ async def update_gremium(
     gremium_id: UUID,
     payload: GremiumUpdate,
     service: ServiceDep,
-    principal: ConfigAdmin,
+    principal: GremienAdmin,
 ) -> GremiumOut:
     return await service.update_gremium(gremium_id, payload, principal.sub)
 
@@ -170,7 +187,7 @@ async def update_gremium(
     responses=_errors(401, 403, 404),
 )
 async def delete_gremium(
-    gremium_id: UUID, service: ServiceDep, principal: ConfigAdmin
+    gremium_id: UUID, service: ServiceDep, principal: GremienAdmin
 ) -> None:
     await service.delete_gremium(gremium_id, principal.sub)
 
@@ -181,7 +198,7 @@ async def delete_gremium(
     responses=_errors(401, 403, 404),
 )
 async def get_gremium_mail_recipients(
-    gremium_id: UUID, service: ServiceDep, _principal: ConfigAdmin
+    gremium_id: UUID, service: ServiceDep, _principal: GremienAdmin
 ) -> GremiumMailRecipients:
     """Zusätzliche Protokoll-Empfänger des Gremiums (#protocol-recipients)."""
     return await service.get_gremium_mail_recipients(gremium_id)
@@ -196,7 +213,7 @@ async def set_gremium_mail_recipients(
     gremium_id: UUID,
     payload: GremiumMailRecipients,
     service: ServiceDep,
-    principal: ConfigAdmin,
+    principal: GremienAdmin,
 ) -> GremiumMailRecipients:
     """Zusätzliche Protokoll-Empfänger ersetzen (idempotentes PUT). Diese Adressen
     erhalten finalisierte Protokolle zusätzlich zu den aktiven Gremium-Mitgliedern."""
@@ -304,7 +321,7 @@ async def list_gremien_authed(
 ) -> list[GremiumOut]:
     """Gremien als Stammdaten für jeden eingeloggten Principal (#68): Quelle der
     Gremium-Auswahl in »Sitzung anlegen«, Budget-Topf und Antragstyp. Reine
-    Lese-Stammdaten (id/Name/Variante) — Anlegen/Ändern bleibt ``admin.config``."""
+    Lese-Stammdaten (id/Name/Variante) — Anlegen/Ändern bleibt ``admin.gremien``."""
     return await service.list_gremien()
 
 
@@ -314,7 +331,7 @@ async def list_gremien_authed(
 @router.get(
     "/application-types",
     response_model=list[ApplicationTypeOut],
-    dependencies=[_CONFIG],
+    dependencies=[_TYPES],
     responses=_errors(401, 403),
 )
 async def list_application_types(service: ServiceDep) -> list[ApplicationTypeOut]:
@@ -328,7 +345,7 @@ async def list_application_types(service: ServiceDep) -> list[ApplicationTypeOut
     responses=_errors(400, 401, 403, 409, 422),
 )
 async def create_application_type(
-    payload: ApplicationTypeCreate, service: ServiceDep, principal: ConfigAdmin
+    payload: ApplicationTypeCreate, service: ServiceDep, principal: TypesAdmin
 ) -> ApplicationTypeOut:
     return await service.create_application_type(payload, principal.sub)
 
@@ -342,7 +359,7 @@ async def update_application_type(
     type_id: UUID,
     payload: ApplicationTypeUpdate,
     service: ServiceDep,
-    principal: ConfigAdmin,
+    principal: TypesAdmin,
 ) -> ApplicationTypeOut:
     return await service.update_application_type(type_id, payload, principal.sub)
 
@@ -360,7 +377,7 @@ async def create_flow_version(
     type_id: UUID,
     payload: FlowVersionCreate,
     service: ServiceDep,
-    principal: ConfigAdmin,
+    principal: TypesAdmin,
 ) -> FlowVersionOut:
     """Neue Flow-Version anlegen (Graph wird serverseitig validiert)."""
     return await service.create_flow_version(type_id, payload, principal.sub)
@@ -369,7 +386,7 @@ async def create_flow_version(
 @router.get(
     "/flow-versions/global",
     response_model=FlowGraph | None,
-    dependencies=[_CONFIG],
+    dependencies=[_TYPES],
     responses=_errors(401, 403),
 )
 async def get_global_flow(service: ServiceDep) -> FlowGraph | None:
@@ -384,7 +401,7 @@ async def get_global_flow(service: ServiceDep) -> FlowGraph | None:
     responses=_errors(400, 401, 403, 422),
 )
 async def create_global_flow(
-    payload: FlowVersionCreate, service: ServiceDep, principal: ConfigAdmin
+    payload: FlowVersionCreate, service: ServiceDep, principal: TypesAdmin
 ) -> FlowVersionOut:
     """Globalen Flow als neue Version anlegen (#28; gilt für ALLE Antragstypen)."""
     return await service.create_global_flow_version(payload, principal.sub)
@@ -432,7 +449,7 @@ async def list_permissions(service: ServiceDep) -> list[str]:
 @router.get(
     "/roles",
     response_model=list[RoleOut],
-    dependencies=[_CONFIG],
+    dependencies=[_ANY_ADMIN_AREA],
     responses=_errors(401, 403),
 )
 async def list_roles(service: ServiceDep) -> list[RoleOut]:
@@ -629,7 +646,7 @@ async def update_webhook(
 @router.get(
     "/site-config",
     response_model=SiteConfigOut,
-    dependencies=[_CONFIG],
+    dependencies=[_SITE],
     responses=_errors(401, 403),
 )
 async def get_site_config(service: SiteServiceDep) -> SiteConfigOut:
@@ -643,7 +660,7 @@ async def get_site_config(service: SiteServiceDep) -> SiteConfigOut:
     responses=_errors(400, 401, 403, 422),
 )
 async def put_site_config_draft(
-    payload: Branding, service: SiteServiceDep, principal: ConfigAdmin
+    payload: Branding, service: SiteServiceDep, principal: SiteAdmin
 ) -> SiteConfigOut:
     """Branding-Draft setzen (Bild-only-Logos, kein Inline-SVG; ungültig → 422)."""
     return await service.put_draft(payload, principal.sub)
@@ -655,7 +672,7 @@ async def put_site_config_draft(
     responses=_errors(400, 401, 403, 409),
 )
 async def activate_site_config(
-    service: SiteServiceDep, principal: ConfigAdmin
+    service: SiteServiceDep, principal: SiteAdmin
 ) -> SiteConfigOut:
     """Draft aktivieren → neue aktive Version (Versionssprung, auditiert)."""
     return await service.activate(principal.sub)

@@ -633,7 +633,7 @@ export class ExpensesComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  readonly canManage = computed(() => this.auth.can('budget.manage'));
+  readonly canManage = computed(() => this.auth.can('budget.book'));
 
   private readonly PAGE = 20;
   readonly budgetTree = signal<BudgetTreeNode[]>([]);

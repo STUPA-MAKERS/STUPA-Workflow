@@ -140,14 +140,18 @@ export class ShellComponent {
     {
       path: '/budget',
       labelKey: 'nav.budget',
-      permissions: ['budget.view', 'budget.manage'],
+      permissions: ['budget.view', 'budget.structure', 'budget.book'],
     },
     {
       path: '/expenses',
       labelKey: 'nav.expenses',
-      permissions: ['budget.view', 'budget.manage'],
+      permissions: ['budget.view', 'budget.structure', 'budget.book'],
     },
-    { path: '/admin', labelKey: 'nav.admin', permissions: ['admin.config'] },
+    {
+      path: '/admin',
+      labelKey: 'nav.admin',
+      permissions: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'webhook.manage', 'audit.read'],
+    },
   ];
 
   /**

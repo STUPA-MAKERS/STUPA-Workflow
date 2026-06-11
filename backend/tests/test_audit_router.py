@@ -154,7 +154,7 @@ def test_actors_requires_permission() -> None:
 def test_verify_endpoint_ok() -> None:
     service = _FakeService()
     service.verification = ChainVerification(valid=True, checked=3)
-    client = _client(service, _principal("audit.read"))
+    client = _client(service, _principal("audit.verify"))
     resp = client.get("/api/admin/audit/verify")
     assert resp.status_code == 200
     assert resp.json() == {"valid": True, "checked": 3, "brokenAt": None, "reason": None}
@@ -165,7 +165,7 @@ def test_verify_endpoint_reports_break() -> None:
     service.verification = ChainVerification(
         valid=False, checked=1, broken_at=2, reason="hash_mismatch"
     )
-    client = _client(service, _principal("audit.read"))
+    client = _client(service, _principal("audit.verify"))
     resp = client.get("/api/admin/audit/verify")
     body = resp.json()
     assert body["valid"] is False

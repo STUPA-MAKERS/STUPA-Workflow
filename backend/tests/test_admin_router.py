@@ -33,7 +33,13 @@ from app.modules.admin.schemas import (
 )
 from app.shared.errors import ConflictError, NotFoundError
 
-_ALL_PERMS = {"admin.config", "admin.roles", "webhook.manage"}
+_ALL_PERMS = {
+    "admin.site",
+    "admin.gremien",
+    "admin.types",
+    "admin.roles",
+    "webhook.manage",
+}
 
 
 class _FakeConfig:
@@ -102,7 +108,7 @@ class _FakeConfig:
         return [
             RoleOut(
                 id=uuid4(), key="admin", label={"de": "Admin"},
-                permissions=["admin.config"],
+                permissions=["admin.gremien"],
             )
         ]
 
@@ -265,7 +271,7 @@ def test_forbidden_without_permission(app: FastAPI, client: TestClient) -> None:
 def test_roles_write_needs_admin_roles_not_just_config(
     app: FastAPI, client: TestClient
 ) -> None:
-    _as(app, {"admin.config"})  # darf Config lesen, aber keine Rollen schreiben
+    _as(app, {"admin.types"})  # darf Config-Bereiche lesen, aber keine Rollen schreiben
     assert client.get("/api/admin/roles").status_code == 200
     r = client.post(
         "/api/admin/roles", json={"key": "x", "label": {}, "permissions": []}
@@ -274,7 +280,7 @@ def test_roles_write_needs_admin_roles_not_just_config(
 
 
 def test_webhooks_need_webhook_manage(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.config", "admin.roles"})
+    _as(app, {"admin.site", "admin.gremien", "admin.types", "admin.roles"})
     assert client.get("/api/admin/webhooks").status_code == 403
 
 
@@ -390,7 +396,7 @@ def test_create_flow_version_type_404(app: FastAPI, client: TestClient) -> None:
 # --------------------------------------------------------------------------- rbac
 def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
-    assert client.get("/api/admin/roles").json()[0]["permissions"] == ["admin.config"]
+    assert client.get("/api/admin/roles").json()[0]["permissions"] == ["admin.gremien"]
     created = client.post(
         "/api/admin/roles",
         json={"key": "r", "label": {"de": "R"}, "permissions": ["vote.cast"]},
@@ -435,7 +441,7 @@ def test_list_principals_camelcase(app: FastAPI, client: TestClient) -> None:
 
 
 def test_list_principals_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.config"})  # config darf das nicht
+    _as(app, {"admin.types"})  # Bereichs-Admin darf das nicht
     assert client.get("/api/admin/principals").status_code == 403
 
 
@@ -447,7 +453,7 @@ def test_list_permissions_catalogue(app: FastAPI, client: TestClient) -> None:
 
 
 def test_permissions_need_admin_roles(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.config"})
+    _as(app, {"admin.types"})
     assert client.get("/api/admin/permissions").status_code == 403
 
 
@@ -462,7 +468,7 @@ def test_revoke_role_assignment_204_and_404(app: FastAPI, client: TestClient) ->
 
 
 def test_revoke_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.config"})
+    _as(app, {"admin.types"})
     assert client.delete(f"/api/admin/role-assignments/{uuid4()}").status_code == 403
 
 

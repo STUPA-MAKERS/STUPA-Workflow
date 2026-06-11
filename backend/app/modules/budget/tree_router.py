@@ -3,11 +3,12 @@
 Endpunkte (alle Principal-only, fail-closed, RBAC aus T-10):
 
 * ``GET    /api/budgets``                                  — P(``budget.view``); Baum.
-* ``POST   /api/budgets``                                  — P(``budget.manage``); Knoten.
-* ``PATCH/DELETE /api/budgets/{id}``                       — P(``budget.manage``).
-* ``GET/POST /api/budgets/{topId}/fiscal-years``           — P(``budget.manage``).
-* ``PATCH  /api/budgets/{topId}/fiscal-years/{fyId}``      — P(``budget.manage``).
-* ``PUT    /api/budgets/{id}/allocations/{fyId}``          — P(``budget.manage``).
+* ``POST   /api/budgets``                                  — P(``budget.structure``); Knoten.
+* ``PATCH/DELETE /api/budgets/{id}``                       — P(``budget.structure``).
+* ``GET/POST /api/budgets/{topId}/fiscal-years``           — P(``budget.structure``).
+* ``PATCH  /api/budgets/{topId}/fiscal-years/{fyId}``      — P(``budget.structure``).
+* ``PUT    /api/budgets/{id}/allocations/{fyId}``          — P(``budget.structure``).
+* Buchungen/Umbuchungen (expenses/transfers)               — P(``budget.book``) (#6).
 * ``POST   /api/applications/{id}/assign-budget``          — P(``application.manage``).
 * ``POST   /api/applications/{id}/move-fiscal-year``       — P(``application.manage``).
 
@@ -147,7 +148,7 @@ async def export_budget_xlsx(
     "/budgets",
     response_model=BudgetNodeOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_principal("budget.manage"))],
+    dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def create_budget_node(
@@ -160,7 +161,7 @@ async def create_budget_node(
 @router.patch(
     "/budgets/{budget_id}",
     response_model=BudgetNodeOut,
-    dependencies=[Depends(require_principal("budget.manage"))],
+    dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def update_budget_node(
@@ -173,7 +174,7 @@ async def update_budget_node(
 @router.delete(
     "/budgets/{budget_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_principal("budget.manage"))],
+    dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(401, 403, 404, 409),
 )
 async def delete_budget_node(budget_id: UUID, service: ServiceDep) -> None:
@@ -222,7 +223,7 @@ async def create_budget_expense(
     budget_id: UUID,
     payload: ExpenseCreate,
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("budget.manage"))],
+    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> ExpenseOut:
     """Ausgabe ohne Antrag gegen Kostenstelle + HHJ buchen (#25)."""
     return await service.create_expense(budget_id, payload, actor=principal.sub)
@@ -231,7 +232,7 @@ async def create_budget_expense(
 @router.delete(
     "/budget-expenses/{expense_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_principal("budget.manage"))],
+    dependencies=[Depends(require_principal("budget.book"))],
     responses=_errors(401, 403, 404),
 )
 async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
@@ -249,7 +250,7 @@ async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
 async def book_expense(
     payload: ExpenseCreate,
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("budget.manage"))],
+    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> ExpenseOut:
     """Ausgabe/Einnahme buchen (#25): eigenständig (``budgetId``) oder an einen Antrag
     gebunden (``applicationId`` — erbt Kostenstelle + HHJ, ersetzt dessen Bindung)."""
@@ -355,7 +356,7 @@ async def update_budget_expense(
     expense_id: UUID,
     payload: ExpenseUpdate,
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("budget.manage"))],
+    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> ExpenseOut:
     """Betrag/Beschreibung einer Buchung ändern (#25)."""
     return await service.update_expense(expense_id, payload)
@@ -371,7 +372,7 @@ async def update_budget_expense(
 async def create_transfer(
     payload: TransferCreate,
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("budget.manage"))],
+    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> TransferOut:
     """Übertrag Kostenstelle → Kostenstelle (Ausgabe + Einnahme, gleiches HHJ)."""
     return await service.create_transfer(payload, actor=principal.sub)
@@ -426,7 +427,7 @@ async def delete_account(account_id: UUID, service: ServiceDep) -> None:
 @router.get(
     "/budgets/{budget_id}/fiscal-years",
     response_model=list[FiscalYearOut],
-    dependencies=[Depends(require_principal("budget.manage"))],
+    dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(401, 403, 404, 422),
 )
 async def list_fiscal_years(
@@ -440,7 +441,7 @@ async def list_fiscal_years(
     "/budgets/{budget_id}/fiscal-years",
     response_model=FiscalYearOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_principal("budget.manage"))],
+    dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def create_fiscal_year(
@@ -453,7 +454,7 @@ async def create_fiscal_year(
 @router.patch(
     "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}",
     response_model=FiscalYearOut,
-    dependencies=[Depends(require_principal("budget.manage"))],
+    dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def update_fiscal_year(
@@ -470,7 +471,7 @@ async def update_fiscal_year(
 @router.put(
     "/budgets/{budget_id}/allocations/{fiscal_year_id}",
     response_model=AllocationOut,
-    dependencies=[Depends(require_principal("budget.manage"))],
+    dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def set_allocation(

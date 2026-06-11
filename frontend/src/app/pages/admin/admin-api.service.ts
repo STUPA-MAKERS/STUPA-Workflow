@@ -112,7 +112,7 @@ export class AdminApiService {
   /**
    * Gremien-Stammdaten als Dropdown-Quelle (#68) — GET `/gremien` (kein
    * Admin-Recht; jeder eingeloggte Principal). Anders als {@link listGremien}
-   * (`/admin/gremien`, P `admin.config`) für »Sitzung anlegen«/Budget nutzbar,
+   * (`/admin/gremien`, P `admin.gremien`) für »Sitzung anlegen«/Budget nutzbar,
    * wo der Akteur nur `meeting.manage`/`budget.*` hat.
    */
   listGremienOptions(): Observable<Gremium[]> {
@@ -120,7 +120,7 @@ export class AdminApiService {
     return this.http.get<Gremium[]>(`${this.base}/gremien`);
   }
 
-  /** POST /admin/gremien — Gremium anlegen (P `admin.config`), #105. */
+  /** POST /admin/gremien — Gremium anlegen (P `admin.gremien`), #105. */
   createGremium(body: GremiumCreateBody): Observable<Gremium> {
     if (this.mock) {
       const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, allowVoteDelegation: false, ...body };
@@ -130,7 +130,7 @@ export class AdminApiService {
     return this.http.post<Gremium>(`${this.base}/admin/gremien`, body);
   }
 
-  /** PATCH /admin/gremien/{id} — Gremium bearbeiten (P `admin.config`), #105. */
+  /** PATCH /admin/gremien/{id} — Gremium bearbeiten (P `admin.gremien`), #105. */
   updateGremium(id: Uuid, body: GremiumUpdateBody): Observable<Gremium> {
     if (this.mock) {
       const row = this.store.gremien.find((g) => g.id === id);

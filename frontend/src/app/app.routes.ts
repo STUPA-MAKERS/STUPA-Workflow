@@ -147,7 +147,7 @@ export const routes: Routes = [
       },
       {
         path: 'budget',
-        data: { title: 'nav.budget', permission: ['budget.view', 'budget.manage'], wide: true },
+        data: { title: 'nav.budget', permission: ['budget.view', 'budget.structure', 'budget.book'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/budget/budget-dashboard.component').then(
@@ -156,7 +156,7 @@ export const routes: Routes = [
       },
       {
         path: 'expenses',
-        data: { title: 'nav.expenses', permission: ['budget.view', 'budget.manage'], wide: true },
+        data: { title: 'nav.expenses', permission: ['budget.view', 'budget.structure', 'budget.book'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/expenses/expenses.component').then((m) => m.ExpensesComponent),
@@ -164,7 +164,7 @@ export const routes: Routes = [
       {
         // Kostenstellen-Baum in der Verwaltung (#9) — ersetzt die flache Töpfe-Liste.
         path: 'admin/budget-pots',
-        data: { title: 'budget.tree.title', permission: 'budget.manage', parent: ['admin'], wide: true },
+        data: { title: 'budget.tree.title', permission: 'budget.structure', parent: ['admin'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
@@ -179,7 +179,11 @@ export const routes: Routes = [
       },
       {
         path: 'admin',
-        data: { title: 'nav.admin', permission: 'admin.config' },
+        data: {
+          title: 'nav.admin',
+          // #6: jede Bereichs-Admin-Rolle erreicht die Admin-Übersicht.
+          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'webhook.manage', 'audit.read'],
+        },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/admin-home.component').then((m) => m.AdminHomeComponent),
@@ -224,7 +228,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/gremien',
-        data: { title: 'admin.gremien.title', permission: 'admin.config', parent: ['admin'] },
+        data: { title: 'admin.gremien.title', permission: 'admin.gremien', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/gremien/gremien.component').then((m) => m.AdminGremienComponent),
@@ -232,7 +236,7 @@ export const routes: Routes = [
       {
         // Mitglieder-Unterseite je Gremium (#18).
         path: 'admin/gremien/:id/members',
-        data: { title: 'admin.gremien.membersOf', permission: 'admin.config', parent: ['admin', 'admin/gremien'] },
+        data: { title: 'admin.gremien.membersOf', permission: 'admin.gremien', parent: ['admin', 'admin/gremien'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/gremien/gremium-members.component').then(
@@ -241,7 +245,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/branding',
-        data: { title: 'admin.brand.title', permission: 'admin.config', parent: ['admin'] },
+        data: { title: 'admin.brand.title', permission: 'admin.site', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/branding/branding-editor.component').then(
@@ -282,7 +286,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/deadlines',
-        data: { title: 'admin.deadlines.title', permission: 'admin.config', parent: ['admin'] },
+        data: { title: 'admin.deadlines.title', permission: 'admin.types', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/deadlines/deadlines.component').then(

@@ -1,6 +1,6 @@
 """Admin-Router der Deadline-Policy-Registry (benannte Fristen).
 
-CRUD unter ``/admin/deadline-policies``, gegated mit ``admin.config`` (autoritativ).
+CRUD unter ``/admin/deadline-policies``, gegated mit ``admin.types`` (autoritativ, #6).
 Der Flow referenziert eine Policy über ``key``; das Datum (z. B. pro Semester) lässt
 sich hier pflegen, **ohne** den Flow neu zu versionieren.
 """
@@ -24,7 +24,8 @@ from app.shared.errors import ConflictError, NotFoundError, ProblemDetail
 router = APIRouter(prefix="/admin/deadline-policies", tags=["deadlines"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
-_CONFIG = Depends(require_principal("admin.config"))
+# Frist-Policies gehören zur Typ-/Flow-Konfiguration (#6: admin.types).
+_CONFIG = Depends(require_principal("admin.types"))
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -36,7 +37,7 @@ def get_service(session: DbSession) -> DeadlinePolicyService:
 
 
 ServiceDep = Annotated[DeadlinePolicyService, Depends(get_service)]
-ConfigAdmin = Annotated[Principal, Depends(require_principal("admin.config"))]
+ConfigAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
 
 
 @router.get("", response_model=list[DeadlinePolicyOut], dependencies=[_CONFIG])

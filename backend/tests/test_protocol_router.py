@@ -199,7 +199,7 @@ def test_finalize_protocol_sync_fallback_without_pool(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     """Ohne Redis (kein ``arq_pool``) rendert finalize synchron — Alt-Verhalten."""
-    _writer(app, "meeting.manage")
+    _writer(app, "protocol.finalize")
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
     assert r.status_code == 200
     body = r.json()
@@ -216,7 +216,7 @@ def test_finalize_protocol_enqueues_with_pool(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     """Mit Redis: ``rendering`` zurückgeben + ``render_protocol``-Job enqueuen."""
-    _writer(app, "meeting.manage")
+    _writer(app, "protocol.finalize")
     pool = _FakePool()
     app.state.arq_pool = pool
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
@@ -230,7 +230,7 @@ def test_finalize_protocol_idempotent_while_rendering(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     """Ein zweites finalize während des Renders enqueued nicht erneut."""
-    _writer(app, "meeting.manage")
+    _writer(app, "protocol.finalize")
     fake_service.status = "rendering"
     pool = _FakePool()
     app.state.arq_pool = pool

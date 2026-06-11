@@ -35,6 +35,8 @@ from app.shared.errors import ProblemDetail
 router = APIRouter(tags=["protocol"])
 
 WRITE_PERMISSION = "meeting.manage"
+# #6: Finalisieren+Versand separat gegatet — Entwurf schreiben bleibt meeting.manage.
+FINALIZE_PERMISSION = "protocol.finalize"
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
@@ -64,6 +66,7 @@ def get_protocol_service(
 
 ServiceDep = Annotated[ProtocolService, Depends(get_protocol_service)]
 WriterDep = Annotated[Principal, Depends(require_principal(WRITE_PERMISSION))]
+FinalizerDep = Annotated[Principal, Depends(require_principal(FINALIZE_PERMISSION))]
 
 
 @router.post(
@@ -129,7 +132,7 @@ async def embed_votes(
     responses=_errors(401, 403, 404, 503),
 )
 async def finalize_protocol(
-    protocol_id: UUID, service: ServiceDep, request: Request, principal: WriterDep
+    protocol_id: UUID, service: ServiceDep, request: Request, principal: FinalizerDep
 ) -> ProtocolOut:
     """Finalisierung anstoßen: ``status=rendering`` + ``render_protocol``-Worker-Job.
 
