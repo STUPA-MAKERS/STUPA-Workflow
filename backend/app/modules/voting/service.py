@@ -256,7 +256,17 @@ class VotingService:
             raise ConflictError("vote is not open.", code="conflict")
         if vote.closes_at is not None and now >= vote.closes_at:
             raise ConflictError("voting window has closed.", code="conflict")
-        if not principal.in_group(vote.eligible_group):
+        # Stimmrecht ist exklusiv (#delegation-rework): Transfer, kein Duplikat.
+        # `blocked` = der Aufrufer hat sein Stimmrecht für DIESE Sitzung abgegeben.
+        # `exercised` = der Aufrufer übt ein delegiertes Stimmrecht aus → er ist auch
+        # dann stimmberechtigt, wenn er selbst nicht in der Gruppe ist (externer
+        # Stellvertreter); die Nutzung wird auditiert.
+        blocked, exercised = await voting_delegation_check(
+            self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
+        )
+        if blocked:
+            raise ForbiddenError("Voting right has been delegated to another member.")
+        if not principal.in_group(vote.eligible_group) and not exercised:
             raise ForbiddenError("Not eligible to vote in this ballot.")
         config = self._config(vote)
         if choice not in config.options:
@@ -264,15 +274,6 @@ class VotingService:
                 "Unknown vote option.",
                 errors=[{"field": "choice", "msg": "not in vote options"}],
             )
-        # Stimmrecht ist exklusiv (T-45, security-review #95): Transfer, kein Duplikat.
-        # `blocked` = der Aufrufer hat sein Stimmrecht abgegeben ODER käme nur über eine
-        # nicht-stimmberechtigende Delegation in die Gruppe → keine Stimme.
-        # `exercised` = der Aufrufer übt ein delegiertes Stimmrecht aus → Nutzungs-Audit.
-        blocked, exercised = await voting_delegation_check(
-            self.session, principal.sub, vote.eligible_group, now
-        )
-        if blocked:
-            raise ForbiddenError("Voting right has been delegated to another member.")
         if exercised:
             # Audit der Delegations-NUTZUNG; bei späterem 409 (Doppel) rollt die
             # Session-Dependency die Transaktion inkl. dieses Eintrags zurück.

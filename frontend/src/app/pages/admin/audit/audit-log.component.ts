@@ -43,6 +43,8 @@ export const AUDIT_ACTIONS = [
   'delegation_grant',
   'delegation_revoke',
   'delegation_use',
+  'delegation_substitute_add',
+  'delegation_substitute_remove',
   'export',
   'pii_access',
   'pii_deletion',

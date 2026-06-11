@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, of } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
+import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -117,4 +118,22 @@ export class DashboardComponent {
   readonly roles = computed(() => this.auth.roles());
   /** Gremien-Zugehörigkeiten des Nutzers (Badges, #54). */
   readonly gremien = computed(() => this.auth.gremien());
+
+  // --- Vertretung/Delegation (#delegation-rework): aktive Sitzungs-Vertretungen ---
+  private readonly delegationsApi = inject(DelegationsApiService);
+  private readonly delegationsRaw = toSignal(
+    this.delegationsApi.list().pipe(catchError(() => of([] as Delegation[]))),
+    { initialValue: [] as Delegation[] },
+  );
+  /** Nur Vertretungen kommender/laufender Sitzungen (widerrufbare zuerst). */
+  readonly delegations = computed<Delegation[]>(() =>
+    this.delegationsRaw()
+      .filter((d) => d.revocable)
+      .slice(0, PREVIEW_ROWS),
+  );
+
+  /** Ausgehend = ich werde vertreten (Richtung liefert der Server). */
+  isOutgoing(d: Delegation): boolean {
+    return d.direction === 'outgoing';
+  }
 }

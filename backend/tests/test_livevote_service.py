@@ -223,9 +223,6 @@ class _FakeSession:
     async def commit(self) -> None:
         self.commits += 1
 
-    async def get(self, *_a: object, **_k: object) -> None:
-        return None  # Namens-Lookups (Gremium/Protokollant) — kein Treffer reicht
-
 
 @pytest.mark.asyncio
 async def test_service_create_sets_planned_and_commits() -> None:

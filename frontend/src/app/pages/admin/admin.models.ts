@@ -156,6 +156,10 @@ export interface Gremium {
   cdVariant: string;
   defaultLang: string;
   allowVoteDelegation: boolean;
+  /** Vorlauf (Minuten vor Sitzungsbeginn) für Nicht-Pool-Delegationen; 0 = bis Beginn. */
+  delegationLeadMinutes?: number;
+  /** Delegation an Nutzer außerhalb von Gremium & Stellvertreter-Pool erlauben. */
+  delegationAllowExternal?: boolean;
   /** Default-Quorum (% der Stimmberechtigten, die teilnehmen müssen); null = keins. */
   quorumPercent?: number | null;
 }
@@ -167,6 +171,8 @@ export interface GremiumCreateBody {
   cdVariant: string;
   defaultLang: string;
   allowVoteDelegation?: boolean;
+  delegationLeadMinutes?: number;
+  delegationAllowExternal?: boolean;
   quorumPercent?: number | null;
 }
 
@@ -177,6 +183,8 @@ export interface GremiumUpdateBody {
   cdVariant?: string;
   defaultLang?: string;
   allowVoteDelegation?: boolean;
+  delegationLeadMinutes?: number;
+  delegationAllowExternal?: boolean;
   quorumPercent?: number | null;
 }
 

@@ -1,38 +1,51 @@
-"""TDD: DelegationService (T-45) — Config-Gate, Fenster, Sicherheitskern, Audit.
+"""TDD: DelegationService (#delegation-rework) — sitzungsgebundene Vertretungen.
 
-Jede Service-Verzweigung wird über einen Ergebnis-Queue-Fake (``flow_fakes``)
-deterministisch getroffen — keine echte DB. Enthält die Eskalations-**Negativtests**
-aus security-review #95: zeitliche Klammer, Re-Delegation/Kette, Gremium-Scope,
-Doppel-Stimmrecht.
+Jede Service-Verzweigung wird über die Ergebnis-Queues des Fakes
+(``flow_fakes``: ``execute``-Queue + ``get``-Queue) deterministisch getroffen —
+keine echte DB. Abgedeckt: Feature-Gates (Gremium/Stimmrecht), Deadline (Vorlauf
+vs. Pool), Empfänger-Kreis (Mitglied/Pool/extern), Ketten-Verbot, Widerruf,
+Stimmrechts-Verdikt (:func:`voting_delegation_check`) und Stellvertreter-Pool.
 
-Query-Reihenfolge in ``create`` (für die Fake-Queue): delegate → role → me →
-direct-holdings → audit(lock,prev).
+``execute``-Reihenfolge in ``create``: me → delegate → Eligibility (membership-
+vote.cast, ggf. direct/oidc/mapping) → Pool → Mitglieder → bestehende Zeilen →
+audit(lock, prev) → Namen. ``get``-Reihenfolge: meeting → gremium.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from types import SimpleNamespace
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
-from app.modules.auth.models import RoleAssignment
 from app.modules.auth.principal import Principal
 from app.modules.delegations import service as delegations_service
-from app.modules.delegations.schemas import DelegationCreate
+from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
+from app.modules.delegations.schemas import DelegationCreate, SubstituteCreate
 from app.modules.delegations.service import (
     DelegationService,
-    _to_utc,
+    meeting_start_utc,
     voting_delegation_check,
 )
 from app.settings import load_settings
-from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
+from app.shared.errors import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationProblem,
+)
 from tests.flow_fakes import fake_session, result
 
 NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
-FUTURE = datetime(2099, 1, 1, tzinfo=UTC)
+GREMIUM_ID = uuid4()
+MEETING_ID = uuid4()
+TZ = "Europe/Berlin"
+# Der Service rechnet mit der ECHTEN Uhr (datetime.now) — Sitzungstermine daher
+# relativ zu heute, damit die Suite nicht mit der Zeit kippt.
+FUTURE_DATE = (datetime.now(UTC) + timedelta(days=30)).date()
+PAST_DATE = (datetime.now(UTC) - timedelta(days=2)).date()
 
 
 def _settings(*, voting: bool = False) -> Any:
@@ -43,351 +56,526 @@ def _actor(sub: str = "deleg", perms: set[str] | None = None) -> Principal:
     return Principal(sub=sub, roles=["member"], permissions=perms or set())
 
 
-def _payload(**over: Any) -> DelegationCreate:
-    base: dict[str, Any] = {
-        "principal_id": uuid4(),
-        "role_id": uuid4(),
-        "valid_until": FUTURE,
-        "delegate_voting": False,
-    }
-    base.update(over)
-    return DelegationCreate(**base)
+def _meeting(
+    *,
+    status: str = "planned",
+    meeting_date: date | None = None,
+    start_time: time | None = time(18, 0),
+    dated: bool = True,
+) -> SimpleNamespace:
+    if meeting_date is None and dated:
+        meeting_date = FUTURE_DATE
+    return SimpleNamespace(
+        id=MEETING_ID,
+        gremium_id=GREMIUM_ID,
+        title="Sitzung",
+        date=meeting_date,
+        start_time=start_time,
+        status=status,
+    )
+
+
+def _gremium(
+    *,
+    allow: bool = True,
+    lead: int = 0,
+    external: bool = False,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=GREMIUM_ID,
+        name="StuPa",
+        allow_vote_delegation=allow,
+        delegation_lead_minutes=lead,
+        delegation_allow_external=external,
+    )
+
+
+def _me(sub: str = "deleg") -> SimpleNamespace:
+    return SimpleNamespace(id=uuid4(), sub=sub)
 
 
 def _delegate(sub: str = "other") -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), sub=sub)
 
 
-def _role() -> SimpleNamespace:
-    return SimpleNamespace(key="member")
+def _payload(delegate_id: Any, *, voting: bool = False) -> DelegationCreate:
+    return DelegationCreate(
+        meetingId=MEETING_ID, delegateId=delegate_id, delegateVoting=voting
+    )
 
 
-def _me() -> SimpleNamespace:
-    return SimpleNamespace(id=uuid4())
+def _names(*rows: tuple[Any, str | None, str | None]):  # noqa: ANN202
+    return result(*rows)
 
 
-def _holding(
-    gremium_id: Any = None, valid_from: datetime | None = None, valid_until: datetime | None = None
-) -> tuple[Any, datetime | None, datetime | None]:
-    """Direct-holding-Zeile wie aus ``select(gremium_id, valid_from, valid_until)``."""
-    return (gremium_id, valid_from, valid_until)
+def _svc(db: Any, *, voting: bool = False) -> DelegationService:
+    return DelegationService(db, _settings(voting=voting))
 
 
 # --------------------------------------------------------------------------- #
-# helpers
+# meeting_start_utc
 # --------------------------------------------------------------------------- #
-def test_to_utc_normalizes() -> None:
-    assert _to_utc(None) is None
-    naive = datetime(2026, 6, 6, 12, 0)
-    assert _to_utc(naive) == datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
-    aware = datetime(2026, 6, 6, 14, 0, tzinfo=UTC)
-    assert _to_utc(aware) == aware
+def test_meeting_start_utc_none_without_date() -> None:
+    assert meeting_start_utc(_meeting(dated=False), TZ) is None  # type: ignore[arg-type]
 
 
-async def test_voting_delegation_check_delegator_gave_voting_blocked() -> None:
-    db = fake_session(result(("me", True)))
-    assert await voting_delegation_check(db, "me", None, NOW) == (True, False)
+def test_meeting_start_utc_converts_local_to_utc() -> None:
+    # 2026-06-20 ist Sommerzeit (CEST, UTC+2): 18:00 lokal → 16:00 UTC.
+    m = _meeting(meeting_date=date(2026, 6, 20))
+    assert meeting_start_utc(m, TZ) == datetime(2026, 6, 20, 16, 0, tzinfo=UTC)  # type: ignore[arg-type]
 
 
-async def test_voting_delegation_check_recipient_voting_exercised() -> None:
-    db = fake_session(result(("other", True)))
-    assert await voting_delegation_check(db, "me", None, NOW) == (False, True)
-
-
-async def test_voting_delegation_check_none_is_normal() -> None:
-    db = fake_session(result())
-    assert await voting_delegation_check(db, "me", None, NOW) == (False, False)
-
-
-async def test_voting_delegation_check_nonvoting_recipient_without_own_right_blocked() -> None:
-    # recipient-nonvoting + KEIN eigenes Recht (independence-probe: principal None) → blocked
-    db = fake_session(result(("other", False)), result())
-    assert await voting_delegation_check(db, "me", None, NOW) == (True, False)
-
-
-async def test_voting_delegation_check_nonvoting_recipient_with_own_right_allowed() -> None:
-    # #1 re-review: eigenes direktes Recht via OIDC-Gruppe → NICHT blocken (1 Stimme).
-    db = fake_session(
-        result(("other", False)),  # nonvoting delegation present
-        result((uuid4(), ["stupa"])),  # principal id + oidc_groups containing scope
-    )
-    assert await voting_delegation_check(db, "me", "stupa", NOW) == (False, False)
-
-
-async def test_independently_eligible_via_direct_assignment() -> None:
-    gid = str(uuid4())
-    db = fake_session(
-        result(("other", False)),  # nonvoting delegation
-        result((uuid4(), [])),  # no oidc match
-        result(SimpleNamespace(id=uuid4())),  # direct active assignment in gremium
-    )
-    assert await voting_delegation_check(db, "me", gid, NOW) == (False, False)
-
-
-async def test_independently_eligible_via_group_mapping() -> None:
-    gid = str(uuid4())
-    db = fake_session(
-        result(("other", False)),  # nonvoting delegation
-        result((uuid4(), ["g1"])),  # oidc group g1 (no direct scope match)
-        result(),  # no direct assignment
-        result(SimpleNamespace(id=uuid4())),  # group_mapping g1 → gremium
-    )
-    assert await voting_delegation_check(db, "me", gid, NOW) == (False, False)
-
-
-async def test_independently_eligible_uuid_scope_no_source_blocked() -> None:
-    gid = str(uuid4())
-    db = fake_session(
-        result(("other", False)),  # nonvoting delegation
-        result((uuid4(), [])),  # no oidc
-        result(),  # no direct assignment
-        # oidc empty → group_mapping query skipped
-    )
-    assert await voting_delegation_check(db, "me", gid, NOW) == (True, False)
-
-
-async def test_independently_eligible_nonuuid_scope_blocked() -> None:
-    db = fake_session(
-        result(("other", False)),  # nonvoting delegation
-        result((uuid4(), [])),  # no oidc match, scope not a uuid
-    )
-    assert await voting_delegation_check(db, "me", "not-a-uuid", NOW) == (True, False)
+def test_meeting_start_utc_midnight_without_time() -> None:
+    m = _meeting(meeting_date=date(2026, 6, 20), start_time=None)
+    assert meeting_start_utc(m, TZ) == datetime(2026, 6, 19, 22, 0, tzinfo=UTC)  # type: ignore[arg-type]
 
 
 # --------------------------------------------------------------------------- #
-# create — happy + audit
+# voting_delegation_check — sitzungsgebunden
 # --------------------------------------------------------------------------- #
-async def test_create_persists_and_audits() -> None:
+async def test_check_no_meeting_is_normal_without_query() -> None:
+    db = fake_session()
+    assert await voting_delegation_check(db, "me", None, str(GREMIUM_ID), NOW) == (
+        False,
+        False,
+    )
+    assert db.statements == []
+
+
+async def test_check_non_uuid_group_is_normal() -> None:
+    db = fake_session()
+    assert await voting_delegation_check(db, "me", MEETING_ID, "stupa", NOW) == (
+        False,
+        False,
+    )
+
+
+async def test_check_outgoing_voting_blocked() -> None:
+    # Zeile: (is_delegator, delegate_voting)
+    db = fake_session(result((True, True)))
+    assert await voting_delegation_check(
+        db, "me", MEETING_ID, str(GREMIUM_ID), NOW
+    ) == (True, False)
+
+
+async def test_check_incoming_voting_exercised() -> None:
+    db = fake_session(result((False, True)))
+    assert await voting_delegation_check(
+        db, "me", MEETING_ID, str(GREMIUM_ID), NOW
+    ) == (False, True)
+
+
+async def test_check_nonvoting_rows_are_neutral() -> None:
+    db = fake_session(result((True, False), (False, False)))
+    assert await voting_delegation_check(
+        db, "me", MEETING_ID, str(GREMIUM_ID), NOW
+    ) == (False, False)
+
+
+# --------------------------------------------------------------------------- #
+# create — happy paths
+# --------------------------------------------------------------------------- #
+def _happy_db(
+    *,
+    meeting: SimpleNamespace | None = None,
+    gremium: SimpleNamespace | None = None,
+    me: SimpleNamespace | None = None,
+    delegate: SimpleNamespace | None = None,
+    pool_ids: list[Any] | None = None,
+    member_ids: list[Any] | None = None,
+    existing: list[tuple[Any, Any, bool]] | None = None,
+) -> Any:
+    me = me or _me()
+    delegate = delegate or _delegate()
     db = fake_session(
-        result(_delegate()),  # delegate exists
-        result(_role()),  # role exists
-        result(_me()),  # delegator principal
-        result(_holding()),  # direct, global, unbounded holding
+        result(me),  # _principal_row(sub)
+        result(delegate),  # _principal_row(pid)
+        result(["vote.cast"]),  # Eligibility: membership mit vote.cast
+        result(*(pool_ids or [])),  # Pool-Empfänger
+        result(*(member_ids if member_ids is not None else [delegate.id])),
+        result(*(existing or [])),  # bestehende Delegationen der Sitzung
         result(),  # audit advisory lock
         result(),  # audit prev-hash
+        _names((me.id, "Me", None), (delegate.id, "Other", None)),
     )
-    out = await DelegationService(db, _settings()).create(_payload(), _actor())
-    assert out.delegated_by == "deleg"
-    assert out.granted_by == "deleg"
-    assert out.active is True
-    assert out.valid_until == FUTURE  # unbefristetes Recht → kein Clamp
+    db.get_results = [meeting or _meeting(), gremium or _gremium()]
+    db._me = me  # type: ignore[attr-defined]
+    db._delegate = delegate  # type: ignore[attr-defined]
+    return db
+
+
+async def test_create_persists_and_audits() -> None:
+    db = _happy_db()
+    out = await _svc(db).create(_payload(db._delegate.id), _actor())
+    assert out.meeting_id == MEETING_ID
+    assert out.gremium_id == GREMIUM_ID
+    assert out.direction == "outgoing"
+    assert out.revocable is True
     assert db.committed == 1
-    persisted = [a for a in db.added if isinstance(a, RoleAssignment)]
-    assert len(persisted) == 1 and persisted[0].delegated_by == "deleg"
+    persisted = [a for a in db.added if isinstance(a, MeetingDelegation)]
+    assert len(persisted) == 1
+    assert persisted[0].delegator_principal_id == db._me.id
+    assert persisted[0].via_pool is False
     assert any(type(a).__name__ == "AuditEntry" for a in db.added)
 
 
 async def test_create_voting_enabled_ok() -> None:
-    db = fake_session(
-        result(_delegate()), result(_role()), result(_me()), result(_holding()),
-        result(), result(),
-    )
-    out = await DelegationService(db, _settings(voting=True)).create(
-        _payload(delegate_voting=True), _actor()
+    db = _happy_db()
+    out = await _svc(db, voting=True).create(
+        _payload(db._delegate.id, voting=True), _actor()
     )
     assert out.delegate_voting is True
 
 
+async def test_create_pool_recipient_bypasses_lead_deadline() -> None:
+    # Vorlauf 31 Tage, Sitzung in 30 → normale Deadline vorbei; Pool geht bis Beginn.
+    delegate = _delegate()
+    db = _happy_db(
+        gremium=_gremium(lead=60 * 24 * 31),
+        delegate=delegate,
+        pool_ids=[delegate.id],
+        member_ids=[],
+    )
+    out = await _svc(db).create(_payload(delegate.id), _actor())
+    assert out.via_pool is True
+
+
+async def test_create_external_allowed_when_flag_set() -> None:
+    delegate = _delegate()
+    db = _happy_db(
+        gremium=_gremium(external=True), delegate=delegate, member_ids=[], pool_ids=[]
+    )
+    out = await _svc(db).create(_payload(delegate.id), _actor())
+    assert out.via_pool is False
+
+
 # --------------------------------------------------------------------------- #
-# create — pre-DB guards
+# create — Gates & Guards
 # --------------------------------------------------------------------------- #
-async def test_create_voting_disabled_is_422() -> None:
+async def test_create_meeting_not_found_404() -> None:
     db = fake_session()
+    db.get_results = [None]
+    with pytest.raises(NotFoundError):
+        await _svc(db).create(_payload(uuid4()), _actor())
+
+
+async def test_create_gremium_gate_403() -> None:
+    db = fake_session()
+    db.get_results = [_meeting(), _gremium(allow=False)]
+    with pytest.raises(ForbiddenError, match="not enabled"):
+        await _svc(db).create(_payload(uuid4()), _actor())
+
+
+async def test_create_voting_disabled_422() -> None:
+    db = fake_session()
+    db.get_results = [_meeting(), _gremium()]
     with pytest.raises(ValidationProblem) as ei:
-        await DelegationService(db, _settings(voting=False)).create(
-            _payload(delegate_voting=True), _actor()
-        )
+        await _svc(db, voting=False).create(_payload(uuid4(), voting=True), _actor())
     assert ei.value.status == 422
     assert db.committed == 0
 
 
-async def test_create_validuntil_before_from_is_422() -> None:
+async def test_create_meeting_started_422() -> None:
     db = fake_session()
-    with pytest.raises(ValidationProblem):
-        await DelegationService(db, _settings()).create(
-            _payload(valid_from=FUTURE, valid_until=FUTURE - timedelta(days=1)), _actor()
-        )
+    db.get_results = [_meeting(status="live"), _gremium()]
+    with pytest.raises(ValidationProblem, match="started"):
+        await _svc(db).create(_payload(uuid4()), _actor())
 
 
-async def test_create_validuntil_in_past_is_422() -> None:
-    db = fake_session()
-    with pytest.raises(ValidationProblem):
-        await DelegationService(db, _settings()).create(
-            _payload(valid_until=NOW - timedelta(days=3650)), _actor()
-        )
-
-
-# --------------------------------------------------------------------------- #
-# create — lookups
-# --------------------------------------------------------------------------- #
-async def test_create_unknown_principal_is_404() -> None:
-    db = fake_session(result())  # delegate not found
+async def test_create_unknown_delegate_404() -> None:
+    db = fake_session(result(_me()), result())  # me ok, delegate fehlt
+    db.get_results = [_meeting(), _gremium()]
     with pytest.raises(NotFoundError):
-        await DelegationService(db, _settings()).create(_payload(), _actor())
+        await _svc(db).create(_payload(uuid4()), _actor())
 
 
-async def test_create_self_delegation_is_422() -> None:
-    db = fake_session(result(_delegate(sub="deleg")))  # same sub as actor
-    with pytest.raises(ValidationProblem):
-        await DelegationService(db, _settings()).create(_payload(), _actor(sub="deleg"))
+async def test_create_self_delegation_422() -> None:
+    me = _me()
+    db = fake_session(result(me), result(me))  # delegate == me
+    db.get_results = [_meeting(), _gremium()]
+    with pytest.raises(ValidationProblem, match="yourself"):
+        await _svc(db).create(_payload(me.id), _actor())
 
 
-async def test_create_unknown_role_is_404() -> None:
-    db = fake_session(result(_delegate()), result())  # role not found
-    with pytest.raises(NotFoundError):
-        await DelegationService(db, _settings()).create(_payload(), _actor())
+async def test_create_not_voting_member_403() -> None:
+    # Eligibility-Queries alle leer: membership ohne vote.cast, kein direct,
+    # keine OIDC-Gruppen → 403 (nur die eigene Stimme ist delegierbar).
+    db = fake_session(
+        result(_me()),
+        result(_delegate()),
+        result(),  # membership perms leer
+        result(),  # direct assignment leer
+        result((None,)),  # oidc_groups: None
+    )
+    db.get_results = [_meeting(), _gremium()]
+    with pytest.raises(ForbiddenError, match="voting members"):
+        await _svc(db).create(_payload(uuid4()), _actor())
 
 
-async def test_create_delegator_principal_missing_is_403() -> None:
-    db = fake_session(result(_delegate()), result(_role()), result())  # me not found
-    with pytest.raises(ForbiddenError):
-        await DelegationService(db, _settings()).create(_payload(), _actor())
+async def test_create_external_without_flag_403() -> None:
+    delegate = _delegate()
+    db = fake_session(
+        result(_me()),
+        result(delegate),
+        result(["vote.cast"]),
+        result(),  # Pool leer
+        result(),  # Mitglieder leer → Empfänger ist extern
+    )
+    db.get_results = [_meeting(), _gremium(external=False)]
+    with pytest.raises(ForbiddenError, match="substitute"):
+        await _svc(db).create(_payload(delegate.id), _actor())
+
+
+async def test_create_after_lead_deadline_422() -> None:
+    # Sitzung in 30 Tagen, Vorlauf 31 Tage → Deadline liegt in der Vergangenheit.
+    delegate = _delegate()
+    db = fake_session(
+        result(_me()),
+        result(delegate),
+        result(["vote.cast"]),
+        result(),  # Pool leer
+        result(delegate.id),  # Mitglied
+    )
+    db.get_results = [_meeting(), _gremium(lead=60 * 24 * 31)]
+    with pytest.raises(ValidationProblem, match="deadline"):
+        await _svc(db).create(_payload(delegate.id), _actor())
+
+
+async def test_create_pool_after_meeting_start_422() -> None:
+    # Auch Pool-Delegationen enden mit Sitzungsbeginn (Sitzung gestern).
+    delegate = _delegate()
+    db = fake_session(
+        result(_me()),
+        result(delegate),
+        result(["vote.cast"]),
+        result(delegate.id),  # Pool
+        result(),  # Mitglieder leer
+    )
+    db.get_results = [
+        _meeting(meeting_date=PAST_DATE),
+        _gremium(),
+    ]
+    with pytest.raises(ValidationProblem, match="deadline"):
+        await _svc(db).create(_payload(delegate.id), _actor())
+
+
+async def test_create_double_outgoing_409() -> None:
+    db = _happy_db()
+    me, delegate = db._me, db._delegate
+    db._results[5] = result((me.id, uuid4(), False))  # bestehende eigene Zeile
+    with pytest.raises(ConflictError, match="already delegated"):
+        await _svc(db).create(_payload(delegate.id), _actor())
+
+
+async def test_create_chain_when_actor_is_recipient_422() -> None:
+    db = _happy_db()
+    me, delegate = db._me, db._delegate
+    db._results[5] = result((uuid4(), me.id, False))  # jemand delegiert an mich
+    with pytest.raises(ValidationProblem, match="delegate on"):
+        await _svc(db).create(_payload(delegate.id), _actor())
+
+
+async def test_create_chain_when_recipient_delegated_away_422() -> None:
+    db = _happy_db()
+    delegate = db._delegate
+    db._results[5] = result((delegate.id, uuid4(), False))  # Empfänger delegierte selbst
+    with pytest.raises(ValidationProblem, match="delegated their own"):
+        await _svc(db).create(_payload(delegate.id), _actor())
+
+
+async def test_create_second_voting_delegation_to_same_recipient_409() -> None:
+    db = _happy_db()
+    delegate = db._delegate
+    db._results[5] = result((uuid4(), delegate.id, True))  # trägt schon ein Stimmrecht
+    with pytest.raises(ConflictError, match="carries"):
+        await _svc(db, voting=True).create(_payload(delegate.id, voting=True), _actor())
 
 
 # --------------------------------------------------------------------------- #
-# create — ESKALATIONS-NEGATIVTESTS (security-review #95)
+# list / revoke
 # --------------------------------------------------------------------------- #
-async def test_create_re_delegation_forbidden_is_403() -> None:
-    # #2: keine direkt gehaltene (delegated_by IS NULL) Zeile → nicht delegierbar.
-    db = fake_session(result(_delegate()), result(_role()), result(_me()), result())
-    with pytest.raises(ForbiddenError, match="directly"):
-        await DelegationService(db, _settings()).create(_payload(), _actor())
+def _joined_row(
+    me_id: Any, *, outgoing: bool = True, meeting: SimpleNamespace | None = None
+) -> tuple[Any, Any, Any]:
+    d = SimpleNamespace(
+        id=uuid4(),
+        meeting_id=MEETING_ID,
+        gremium_id=GREMIUM_ID,
+        delegator_principal_id=me_id if outgoing else uuid4(),
+        delegate_principal_id=uuid4() if outgoing else me_id,
+        delegate_voting=True,
+        via_pool=False,
+        created_at=NOW,
+    )
+    return (d, meeting or _meeting(), _gremium())
 
 
-async def test_create_gremium_scope_exceeds_holdings_is_403() -> None:
-    # #4: Recht nur in Gremium G gehalten, Delegation nach H → Scope-Eskalation 403.
-    g, h = uuid4(), uuid4()
+async def test_list_maps_direction_and_names() -> None:
+    me = _me()
+    row = _joined_row(me.id, outgoing=True)
     db = fake_session(
-        result(_delegate()), result(_role()), result(_me()), result(_holding(gremium_id=g))
+        result(me),
+        result(row),
+        _names(
+            (row[0].delegator_principal_id, "Me", None),
+            (row[0].delegate_principal_id, "Other", None),
+        ),
     )
-    with pytest.raises(ForbiddenError, match="scope"):
-        await DelegationService(db, _settings()).create(
-            _payload(gremium_id=h), _actor()
-        )
-
-
-async def test_create_global_delegation_without_global_holding_is_403() -> None:
-    # #4: nur scoped gehalten → globale (gremium_id=None) Delegation unzulässig.
-    g = uuid4()
-    db = fake_session(
-        result(_delegate()), result(_role()), result(_me()), result(_holding(gremium_id=g))
-    )
-    with pytest.raises(ForbiddenError, match="scope"):
-        await DelegationService(db, _settings()).create(
-            _payload(gremium_id=None), _actor()
-        )
-
-
-async def test_create_scoped_holding_covers_same_scope_ok() -> None:
-    g = uuid4()
-    db = fake_session(
-        result(_delegate()), result(_role()), result(_me()),
-        result(_holding(gremium_id=g)), result(), result(),
-    )
-    out = await DelegationService(db, _settings()).create(
-        _payload(gremium_id=g), _actor()
-    )
-    assert out.gremium_id == g
-
-
-async def test_create_clamps_validuntil_to_own_window() -> None:
-    # #1: eigenes Recht endet bei T; Wunsch T+ → Delegation wird auf T geklemmt.
-    t = NOW + timedelta(days=10)
-    db = fake_session(
-        result(_delegate()), result(_role()), result(_me()),
-        result(_holding(valid_until=t)), result(), result(),
-    )
-    out = await DelegationService(db, _settings()).create(
-        _payload(valid_until=NOW + timedelta(days=365)), _actor()
-    )
-    assert out.valid_until == t  # geklemmt aufs eigene Fenster
-
-
-async def test_create_effective_window_elapsed_is_422() -> None:
-    # validFrom/validUntil beide in der Vergangenheit (until>from) → nach Klammer 422.
-    db = fake_session(
-        result(_delegate()), result(_role()), result(_me()), result(_holding())
-    )
-    with pytest.raises(ValidationProblem, match="elapsed"):
-        await DelegationService(db, _settings()).create(
-            _payload(
-                valid_from=NOW - timedelta(days=10), valid_until=NOW - timedelta(days=5)
-            ),
-            _actor(),
-        )
-
-
-# --------------------------------------------------------------------------- #
-# list
-# --------------------------------------------------------------------------- #
-def _row(**over: Any) -> SimpleNamespace:
-    base: dict[str, Any] = {
-        "id": uuid4(),
-        "principal_id": uuid4(),
-        "role_id": uuid4(),
-        "gremium_id": None,
-        "delegated_by": "deleg",
-        "granted_by": "deleg",
-        "valid_from": None,
-        "valid_until": FUTURE,
-        "delegate_voting": False,
-    }
-    base.update(over)
-    return SimpleNamespace(**base)
-
-
-async def test_list_own_returns_mapped() -> None:
-    db = fake_session(result(_row(), _row(valid_until=NOW - timedelta(days=1))))
-    out = await DelegationService(db, _settings()).list(_actor())
-    assert len(out) == 2
-    assert out[0].active is True
-    assert out[1].active is False
-
-
-async def test_list_admin_sees_all() -> None:
-    db = fake_session(result(_row(delegated_by="someone-else")))
-    out = await DelegationService(db, _settings()).list(_actor(perms={"admin.roles"}))
+    out = await _svc(db).list(_actor())
     assert len(out) == 1
+    assert out[0].direction == "outgoing"
+    assert out[0].delegate_name == "Other"
+    assert out[0].meeting_title == "Sitzung"
 
 
-# --------------------------------------------------------------------------- #
-# revoke
-# --------------------------------------------------------------------------- #
+async def test_list_incoming_direction() -> None:
+    me = _me()
+    row = _joined_row(me.id, outgoing=False)
+    db = fake_session(result(me), result(row), _names())
+    out = await _svc(db).list(_actor())
+    assert out[0].direction == "incoming"
+
+
+async def test_list_without_principal_row_is_empty() -> None:
+    db = fake_session(result())
+    assert await _svc(db).list(_actor()) == []
+
+
 async def test_revoke_deletes_and_audits() -> None:
-    row = SimpleNamespace(id=uuid4(), delegated_by="deleg")
-    db = fake_session(result(row), result(), result())
-    await DelegationService(db, _settings()).revoke(row.id, _actor())
+    me = _me()
+    row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=me.id)
+    db = fake_session(result(me), result(), result())
+    db.get_results = [row, _meeting()]
+    await _svc(db).revoke(row.id, _actor())
     assert db.deleted == [row]
     assert db.committed == 1
     assert any(type(a).__name__ == "AuditEntry" for a in db.added)
 
 
-async def test_revoke_not_found_is_404() -> None:
-    db = fake_session(result())
+async def test_revoke_not_found_404() -> None:
+    db = fake_session(result(_me()))
     with pytest.raises(NotFoundError):
-        await DelegationService(db, _settings()).revoke(uuid4(), _actor())
+        await _svc(db).revoke(uuid4(), _actor())
 
 
-async def test_revoke_non_delegation_row_is_404() -> None:
-    db = fake_session(result(SimpleNamespace(id=uuid4(), delegated_by=None)))
-    with pytest.raises(NotFoundError):
-        await DelegationService(db, _settings()).revoke(uuid4(), _actor())
-
-
-async def test_revoke_foreign_without_admin_is_403() -> None:
-    db = fake_session(result(SimpleNamespace(id=uuid4(), delegated_by="other")))
-    with pytest.raises(ForbiddenError):
-        await DelegationService(db, _settings()).revoke(uuid4(), _actor(sub="deleg"))
-
-
-async def test_revoke_foreign_with_admin_ok() -> None:
-    row = SimpleNamespace(id=uuid4(), delegated_by="other")
-    db = fake_session(result(row), result(), result())
-    await DelegationService(db, _settings()).revoke(
-        row.id, _actor(sub="deleg", perms={"admin.roles"})
+async def test_revoke_foreign_without_admin_403() -> None:
+    row = SimpleNamespace(
+        id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4()
     )
+    db = fake_session(result(_me()))
+    db.get_results = [row]
+    with pytest.raises(ForbiddenError):
+        await _svc(db).revoke(row.id, _actor())
+
+
+async def test_revoke_after_meeting_start_422() -> None:
+    me = _me()
+    row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=me.id)
+    db = fake_session(result(me))
+    db.get_results = [row, _meeting(status="live")]
+    with pytest.raises(ValidationProblem, match="started"):
+        await _svc(db).revoke(row.id, _actor())
+
+
+async def test_revoke_admin_bypasses_deadline() -> None:
+    row = SimpleNamespace(
+        id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4()
+    )
+    db = fake_session(result(_me()), result(), result())
+    db.get_results = [row]  # kein Meeting-Lookup nötig (Admin)
+    await _svc(db).revoke(row.id, _actor(perms={"admin.roles"}))
     assert db.deleted == [row]
+
+
+# --------------------------------------------------------------------------- #
+# Stellvertreter-Pool
+# --------------------------------------------------------------------------- #
+async def test_substitute_create_requires_manage_403() -> None:
+    db = fake_session(result())  # active_gremium_roles → leer
+    payload = SubstituteCreate(gremiumId=GREMIUM_ID, substituteId=uuid4())
+    with pytest.raises(ForbiddenError, match="session.manage"):
+        await _svc(db).substitute_create(payload, _actor())
+
+
+async def test_substitute_create_admin_persists_and_audits() -> None:
+    sub = _delegate()
+    db = fake_session(
+        result(sub),  # substitute principal
+        result(),  # Duplikats-Probe leer
+        result(),  # audit lock
+        result(),  # audit prev
+        _names((sub.id, "Sub", None)),
+    )
+    db.get_results = [_gremium()]
+    out = await _svc(db).substitute_create(
+        SubstituteCreate(gremiumId=GREMIUM_ID, substituteId=sub.id),
+        _actor(perms={"admin.roles"}),
+    )
+    assert out.substitute_id == sub.id
+    assert out.member_id is None
+    assert db.committed == 1
+    assert any(isinstance(a, DelegationSubstitute) for a in db.added)
+
+
+async def test_substitute_create_duplicate_409() -> None:
+    sub = _delegate()
+    db = fake_session(result(sub), result(SimpleNamespace(id=uuid4())))
+    db.get_results = [_gremium()]
+    with pytest.raises(ConflictError):
+        await _svc(db).substitute_create(
+            SubstituteCreate(gremiumId=GREMIUM_ID, substituteId=sub.id),
+            _actor(perms={"admin.roles"}),
+        )
+
+
+async def test_substitute_create_member_equals_substitute_422() -> None:
+    sub = _delegate()
+    db = fake_session(result(sub), result(sub))
+    db.get_results = [_gremium()]
+    with pytest.raises(ValidationProblem, match="differ"):
+        await _svc(db).substitute_create(
+            SubstituteCreate(
+                gremiumId=GREMIUM_ID, memberId=sub.id, substituteId=sub.id
+            ),
+            _actor(perms={"admin.roles"}),
+        )
+
+
+async def test_substitute_delete_not_found_404() -> None:
+    db = fake_session()
+    with pytest.raises(NotFoundError):
+        await _svc(db).substitute_delete(uuid4(), _actor(perms={"admin.roles"}))
+
+
+async def test_substitute_delete_ok() -> None:
+    row = SimpleNamespace(id=uuid4(), gremium_id=GREMIUM_ID)
+    db = fake_session(result(), result())  # audit lock + prev
+    db.get_results = [row]
+    await _svc(db).substitute_delete(row.id, _actor(perms={"admin.roles"}))
+    assert db.deleted == [row]
+
+
+async def test_substitutes_list_resolves_names() -> None:
+    row = SimpleNamespace(
+        id=uuid4(),
+        gremium_id=GREMIUM_ID,
+        member_principal_id=None,
+        substitute_principal_id=uuid4(),
+        created_at=NOW,
+    )
+    db = fake_session(
+        result(row), _names((row.substitute_principal_id, "Sub", None))
+    )
+    db.get_results = [_gremium()]
+    out = await _svc(db).substitutes_list(GREMIUM_ID, _actor())
+    assert out[0].substitute_name == "Sub"
+    assert out[0].member_id is None
 
 
 def test_module_exposes_voting_hook() -> None:
     assert hasattr(delegations_service, "voting_delegation_check")
+
+
+def test_gremium_id_constant_is_uuid() -> None:
+    assert isinstance(GREMIUM_ID, UUID)
+    _ = timedelta  # genutzt von zukünftigen Fenster-Tests; Import stabil halten

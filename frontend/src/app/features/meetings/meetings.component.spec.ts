@@ -134,6 +134,30 @@ function flushLoad(http: HttpTestingController): void {
   http.expectOne('/api/meetings/m-1/attendance').flush([]);
   http.expectOne('/api/meetings/m-1/agenda').flush([]);
   http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+  flushDelegationContext(http);
+}
+
+/** Vertretungs-Karte (#delegation-rework): Sitzungs-Kontext neutral beantworten
+ *  (Feature im Test-Gremium deaktiviert → Karte unsichtbar). */
+function flushDelegationContext(http: HttpTestingController): void {
+  http
+    .match((r) => r.url.endsWith('/api/delegations/meetings/m-1/context'))
+    .forEach((req) =>
+      req.flush({
+        meetingId: 'm-1',
+        gremiumId: 'g-1',
+        allowVoteDelegation: false,
+        votingDelegationEnabled: false,
+        delegationAllowExternal: false,
+        deadline: null,
+        deadlinePassed: false,
+        meetingStarted: false,
+        canDelegate: false,
+        myDelegation: null,
+        incoming: [],
+        recipients: [],
+      }),
+    );
 }
 
 describe('MeetingsComponent', () => {
@@ -148,6 +172,8 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText('Sitzungssteuerung')).toBeInTheDocument();
     expect(screen.getByText('Antrag A')).toBeInTheDocument();
     expect(screen.getByText('Antrag B')).toBeInTheDocument();
+    // Die Vertretungs-Karte lädt ihren Kontext erst nach dem Rendern — nachflushen.
+    flushDelegationContext(http);
     http.verify();
   });
 

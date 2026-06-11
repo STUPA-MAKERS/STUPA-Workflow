@@ -58,6 +58,8 @@ describe('AdminGremienComponent (#18)', () => {
       cdVariant: 'stupa',
       defaultLang: 'de',
       allowVoteDelegation: false,
+      delegationLeadMinutes: 0,
+      delegationAllowExternal: false,
       quorumPercent: null,
     });
     post.flush({ ...GREMIUM, id: 'g-2', name: 'AStA Vorstand', slug: 'asta-vorstand' });
@@ -95,6 +97,8 @@ describe('AdminGremienComponent (#18)', () => {
       cdVariant: 'stupa',
       defaultLang: 'en',
       allowVoteDelegation: false,
+      delegationLeadMinutes: 0,
+      delegationAllowExternal: false,
       quorumPercent: null,
     });
     patch.flush({ ...GREMIUM, name: 'StuPa 2026', defaultLang: 'en' });

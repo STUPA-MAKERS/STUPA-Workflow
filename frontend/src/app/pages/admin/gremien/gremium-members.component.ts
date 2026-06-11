@@ -18,6 +18,7 @@ import {
   type SelectOption,
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
+import { type DelegationSubstitute, DelegationsApiService } from '@core/api/delegations.service';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, Gremium, GremiumMembership, GremiumRole } from '../admin.models';
 
@@ -71,6 +72,88 @@ interface Member {
         </app-button>
       </ng-template>
     </app-data-table>
+
+    <!-- Stellvertreter-Pool (#delegation-rework): gewählte/bestimmte Vertreter, an die
+         ohne Vorlauf-Deadline (bis Sitzungsbeginn) delegiert werden darf — auch wenn
+         sie nicht selbst Mitglied sind (z. B. Fachschafts-Vertreter). -->
+    <section class="gm__pool" [attr.aria-label]="'admin.substitutes.title' | t">
+      <header class="gm__head">
+        <div>
+          <h2 class="gm__title">{{ 'admin.substitutes.title' | t }}</h2>
+          <p class="gm__subtitle">{{ 'admin.substitutes.hint' | t }}</p>
+        </div>
+        <app-button size="sm" (click)="openAddSub()">{{ 'admin.substitutes.add' | t }}</app-button>
+      </header>
+      <app-data-table
+        [columns]="subColumns()"
+        [rows]="substitutes()"
+        [rowKey]="subRowId"
+        [emptyText]="'admin.substitutes.empty' | t"
+      >
+        <ng-template appCell="substitute" let-s>{{ $any(s).substituteName || $any(s).substituteId }}</ng-template>
+        <ng-template appCell="member" let-s>
+          @if ($any(s).memberId) {
+            {{ $any(s).memberName || $any(s).memberId }}
+          } @else {
+            <span class="gm__muted">{{ 'admin.substitutes.allMembers' | t }}</span>
+          }
+        </ng-template>
+        <ng-template appCell="actions" let-s>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.substitutes.remove' | t" (click)="removeSub($any(s).id)">
+            <app-icon name="delete" />
+          </app-button>
+        </ng-template>
+      </app-data-table>
+    </section>
+
+    <!-- Stellvertreter hinzufügen: Dialog mit Typeahead (beliebige Nutzer). -->
+    <app-dialog
+      [open]="addSubOpen()"
+      [title]="'admin.substitutes.add' | t"
+      [closeLabel]="'admin.gremien.cancel' | t"
+      (closed)="addSubOpen.set(false)"
+    >
+      <div class="gm__add">
+        <div class="gm__typeahead">
+          <label class="gm__lbl" for="gm-sub-search">{{ 'admin.substitutes.search' | t }}</label>
+          <input
+            id="gm-sub-search"
+            class="gm__control"
+            autocomplete="off"
+            [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
+            [ngModel]="subQuery()"
+            (ngModelChange)="onSubSearch($event)"
+            (focus)="onSubSearch(subQuery())"
+          />
+          @if (subCandidates().length) {
+            <ul class="gm__suggest" role="listbox">
+              @for (c of subCandidates(); track c.id) {
+                <li>
+                  <button type="button" class="gm__suggest-item" [class.gm__suggest-item--sel]="subSelected()?.id === c.id" (click)="pickSub(c)">
+                    <span class="gm__suggest-name">{{ c.displayName || c.email || c.sub }}</span>
+                    @if (c.email) { <span class="gm__suggest-meta">{{ c.email }}</span> }
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+        @if (subSelected(); as s) {
+          <p class="gm__picked">{{ 'admin.gremien.memberPicked' | t }}: <strong>{{ s.displayName || s.email || s.sub }}</strong></p>
+        }
+        <app-select
+          [label]="'admin.substitutes.forMember' | t"
+          [options]="memberOptions()"
+          [ngModel]="subMemberId()"
+          (ngModelChange)="subMemberId.set($event)"
+          name="subMember"
+        />
+      </div>
+      <div dialog-footer class="gm__dialog-foot">
+        <app-button variant="ghost" (click)="addSubOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
+        <app-button [disabled]="!subSelected()" (click)="addSub()">{{ 'admin.substitutes.addAction' | t }}</app-button>
+      </div>
+    </app-dialog>
 
     <!-- Mitglied hinzufügen: Dialog mit Typeahead -->
     <app-dialog
@@ -328,6 +411,39 @@ export class GremiumMembersComponent {
     });
   });
 
+  // --- Stellvertreter-Pool (#delegation-rework) -----------------------------
+  private readonly delegationsApi = inject(DelegationsApiService);
+  readonly substitutes = signal<DelegationSubstitute[]>([]);
+  readonly addSubOpen = signal(false);
+  readonly subQuery = signal('');
+  readonly subCandidates = signal<AdminPrincipal[]>([]);
+  readonly subSelected = signal<AdminPrincipal | null>(null);
+  /** '' = gremium-weiter Stellvertreter (vertritt jedes Mitglied). */
+  readonly subMemberId = signal('');
+
+  readonly subColumns = computed<ColumnDef[]>(() => [
+    { key: 'substitute', label: this.i18n.translate('admin.substitutes.col.substitute') },
+    { key: 'member', label: this.i18n.translate('admin.substitutes.col.member') },
+    { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
+  ]);
+  readonly subRowId = (s: unknown): string => (s as DelegationSubstitute).id;
+
+  /** Empfänger-Auswahl »vertritt«: alle Mitglieder oder ein konkretes. */
+  readonly memberOptions = computed<SelectOption[]>(() => {
+    const byId = this.principalsById();
+    const seen = new Set<string>();
+    const opts: SelectOption[] = [
+      { value: '', label: this.i18n.translate('admin.substitutes.allMembers') },
+    ];
+    for (const m of this.memberships()) {
+      if (seen.has(m.principalId)) continue;
+      seen.add(m.principalId);
+      const p = byId.get(m.principalId);
+      opts.push({ value: m.principalId, label: p ? p.displayName || p.email || p.sub : m.principalId });
+    }
+    return opts;
+  });
+
   constructor() {
     this.api
       .listGremien()
@@ -339,6 +455,70 @@ export class GremiumMembersComponent {
       this.principalsById.set(new Map(p.map((x) => [x.id, x]))),
     );
     this.refresh();
+    this.refreshSubstitutes();
+  }
+
+  openAddSub(): void {
+    this.subQuery.set('');
+    this.subSelected.set(null);
+    this.subCandidates.set([]);
+    this.subMemberId.set('');
+    this.addSubOpen.set(true);
+  }
+
+  onSubSearch(q: string): void {
+    this.subQuery.set(q);
+    this.api.listPrincipals(q).subscribe({
+      next: (list) => this.subCandidates.set(list.slice(0, 8)),
+      error: () => this.subCandidates.set([]),
+    });
+  }
+
+  pickSub(c: AdminPrincipal): void {
+    this.subSelected.set(c);
+    this.subQuery.set(c.displayName || c.email || c.sub);
+    this.subCandidates.set([]);
+  }
+
+  addSub(): void {
+    const s = this.subSelected();
+    if (!s) return;
+    this.delegationsApi
+      .addSubstitute({
+        gremiumId: this.gremiumId as Uuid,
+        memberId: this.subMemberId() ? (this.subMemberId() as Uuid) : null,
+        substituteId: s.id,
+      })
+      .subscribe({
+        next: () => {
+          this.toast.success(this.i18n.translate('admin.substitutes.added'));
+          this.addSubOpen.set(false);
+          this.refreshSubstitutes();
+        },
+        error: (err: { status?: number }) =>
+          this.toast.error(
+            this.i18n.translate(
+              err.status === 409 ? 'admin.substitutes.duplicate' : 'admin.substitutes.failed',
+            ),
+          ),
+      });
+  }
+
+  removeSub(id: string): void {
+    this.delegationsApi.removeSubstitute(id as Uuid).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('admin.substitutes.removed'));
+        this.refreshSubstitutes();
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.substitutes.failed')),
+    });
+  }
+
+  private refreshSubstitutes(): void {
+    this.delegationsApi.substitutes(this.gremiumId as Uuid).subscribe({
+      next: (list) => this.substitutes.set(list),
+      error: () => this.substitutes.set([]),
+    });
   }
 
   private roleName(role: GremiumRole): string {

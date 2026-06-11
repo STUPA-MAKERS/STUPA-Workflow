@@ -45,14 +45,28 @@
             @if (secret()) {
               <app-badge variant="info">{{ 'vote.tally.secret' | t }}</app-badge>
             }
+            @if (delegation()?.exercising) {
+              <app-badge variant="info">{{ 'voting.cast.delegation.badge' | t }}</app-badge>
+            }
           </div>
         </header>
 
-        @if (notEligible()) {
+        @if (delegation(); as deleg) {
+          @if (deleg.blocked) {
+            <p class="vote__notice" role="alert">
+              {{ 'voting.cast.delegation.blocked' | t: { name: deleg.delegatedToName || '?' } }}
+            </p>
+          } @else if (deleg.exercising) {
+            <p class="vote__muted" role="status">
+              {{ 'voting.cast.delegation.exercising' | t: { name: deleg.delegatedByName || '?' } }}
+            </p>
+          }
+        }
+        @if (notEligible() && !delegation()?.blocked) {
           <p class="vote__notice" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
         } @else if (isClosed()) {
           <p class="vote__muted">{{ 'voting.cast.closedHint' | t }}</p>
-        } @else {
+        } @else if (!delegation()?.blocked) {
           <p class="vote__muted">{{ 'voting.cast.openHint' | t }}</p>
         }
 

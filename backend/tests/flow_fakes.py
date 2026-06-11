@@ -43,6 +43,9 @@ class FakeSession:
     def __init__(self, results: Iterable[FakeResult] = ()) -> None:
         self._results = list(results)
         self.scalar_results: list[Any] = []
+        # Eigene Queue für ``session.get(Model, id)`` (Delegations-Service) —
+        # unabhängig von der ``execute``-Reihenfolge. Default ``None`` (not found).
+        self.get_results: list[Any] = []
         self.added: list[Any] = []
         self.deleted: list[Any] = []
         # Alle ``execute``-Statements (z. B. um das Vote-Storno-UPDATE zu prüfen).
@@ -56,6 +59,12 @@ class FakeSession:
         if not self._results:
             return FakeResult()
         return self._results.pop(0)
+
+    async def get(self, _model: Any, _ident: Any) -> Any:
+        """``session.get``-Ersatz: liefert die ``get_results``-Queue in Reihenfolge."""
+        if self.get_results:
+            return self.get_results.pop(0)
+        return None
 
     async def scalar(self, _stmt: Any) -> Any:
         """``session.scalar``-Ersatz (z. B. ``_deadline_passed``): eigene Queue,

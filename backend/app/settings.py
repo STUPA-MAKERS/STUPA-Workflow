@@ -170,6 +170,9 @@ class Settings(BaseSettings):
     #   `delegateVoting=true` wird erst akzeptiert (sonst 422), wenn der Betreiber die
     #   Stimmrecht-Delegation bewusst freischaltet. Reine Rechte-Delegation bleibt frei.
     delegation_voting_enabled: bool = False
+    #   Lokale Zeitzone für Sitzungstermine (`meeting.date`/`start_time` sind naiv
+    #   gespeichert): Basis der Delegations-Deadline (#delegation-rework).
+    local_timezone: str = "Europe/Berlin"
 
     # --- Deadlines/Cron (T-44, flows §9.4) ---------------------------------- #
     #   Vorlauf für die `deadline_approaching`-Erinnerung: gesendet, sobald

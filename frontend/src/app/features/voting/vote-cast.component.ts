@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
+import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -32,6 +33,7 @@ type Phase = 'loading' | 'error' | 'ready';
 })
 export class VoteCastComponent {
   private readonly api = inject(ApiClient);
+  private readonly delegations = inject(DelegationsApiService);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -42,6 +44,8 @@ export class VoteCastComponent {
   readonly myChoice = signal<string | null>(null);
   readonly submitting = signal(false);
   readonly notEligible = signal(false);
+  /** Delegations-Sicht (#delegation-rework): Stimmrecht abgegeben / in Vertretung. */
+  readonly delegation = signal<VoteDelegationStatus | null>(null);
 
   readonly isOpen = computed(() => this.vote()?.status === 'open');
   readonly isClosed = computed(() => this.vote()?.status === 'closed');
@@ -74,6 +78,16 @@ export class VoteCastComponent {
     }
     // Stimmrecht-UX: fehlt die Permission, Hinweis zeigen (Server bleibt autoritativ).
     this.notEligible.set(!this.auth.can('vote.cast'));
+    // Delegations-Status (#delegation-rework): erklärt ein 403 (Stimmrecht abgegeben)
+    // bzw. zeigt »in Vertretung«; ein Empfänger ist auch ohne vote.cast stimmberechtigt.
+    this.delegations.voteStatus(id).subscribe({
+      next: (status) => {
+        this.delegation.set(status);
+        if (status.blocked) this.notEligible.set(true);
+        if (status.exercising) this.notEligible.set(false);
+      },
+      error: () => {},
+    });
     this.api.getVote(id).subscribe({
       next: (vote) => {
         this.vote.set(vote);

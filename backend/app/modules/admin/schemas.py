@@ -35,6 +35,14 @@ class GremiumOut(_CamelModel):
     cd_variant: str = Field(serialization_alias="cdVariant")
     default_lang: str = Field(serialization_alias="defaultLang")
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
+    # Vorlauf (Minuten vor Sitzungsbeginn) für Nicht-Pool-Delegationen; 0 = bis Beginn.
+    delegation_lead_minutes: int = Field(
+        default=0, serialization_alias="delegationLeadMinutes"
+    )
+    # Delegation an Nutzer außerhalb von Gremium & Stellvertreter-Pool erlauben.
+    delegation_allow_external: bool = Field(
+        default=False, serialization_alias="delegationAllowExternal"
+    )
     # Default-Quorum in % der Stimmberechtigten (0–100); None = keiner.
     quorum_percent: int | None = Field(
         default=None, serialization_alias="quorumPercent"
@@ -47,6 +55,12 @@ class GremiumCreate(_CamelModel):
     cd_variant: str = Field(default="stupa", alias="cdVariant")
     default_lang: str = Field(default="de", alias="defaultLang")
     allow_vote_delegation: bool = Field(default=False, alias="allowVoteDelegation")
+    delegation_lead_minutes: int = Field(
+        default=0, alias="delegationLeadMinutes", ge=0, le=60 * 24 * 30
+    )
+    delegation_allow_external: bool = Field(
+        default=False, alias="delegationAllowExternal"
+    )
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100
     )
@@ -58,6 +72,12 @@ class GremiumUpdate(_CamelModel):
     cd_variant: str | None = Field(default=None, alias="cdVariant")
     default_lang: str | None = Field(default=None, alias="defaultLang")
     allow_vote_delegation: bool | None = Field(default=None, alias="allowVoteDelegation")
+    delegation_lead_minutes: int | None = Field(
+        default=None, alias="delegationLeadMinutes", ge=0, le=60 * 24 * 30
+    )
+    delegation_allow_external: bool | None = Field(
+        default=None, alias="delegationAllowExternal"
+    )
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100
     )

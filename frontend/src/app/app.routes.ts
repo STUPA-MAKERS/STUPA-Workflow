@@ -116,7 +116,13 @@ export const routes: Routes = [
       },
       {
         path: 'voting/vote/:id',
-        data: { title: 'voting.cast.heading', permission: ['vote.cast', 'vote.manage'] },
+        // Delegations-Empfänger (#delegation-rework) dürfen ohne vote.cast auf die
+        // Stimmabgabe — Stimmrecht entscheidet der Server (Delegations-Check).
+        data: {
+          title: 'voting.cast.heading',
+          permission: ['vote.cast', 'vote.manage'],
+          allowAuthenticated: true,
+        },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/vote-cast.component').then((m) => m.VoteCastComponent),
@@ -135,10 +141,13 @@ export const routes: Routes = [
       },
       {
         path: 'meetings/:id',
+        // `allowAuthenticated`: Delegations-Empfänger (#delegation-rework) sind ggf.
+        // weder Mitglied noch berechtigt — die Sitzungs-Sicht scoped der Server.
         data: {
           title: 'nav.meetings',
           permission: ['meeting.manage', 'protocol.write'],
           allowCommitteeMember: true,
+          allowAuthenticated: true,
           wide: true,
         },
         canActivate: [authGuard],
