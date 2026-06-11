@@ -25,10 +25,11 @@ ARG TECTONIC_SHA256_ARM64=1f59f9fb8eb65e8ba18658fc9016767e7d3e12488ded8b8fffa342
 # Font ("Fontconfig error: Cannot load default config file"). CD-spezifische
 # Fonts (z. B. Blender für die STUPA-Variante) müssen zusätzlich bereitgestellt
 # werden — s. /usr/share/fonts (unten optional einkopieren).
+# librsvg2-bin: rsvg-convert hinter dem inkscape-Shim (SVG-Logos -> PDF, s. u.).
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-        curl ca-certificates fontconfig fonts-dejavu-core; \
+        curl ca-certificates fontconfig fonts-dejavu-core librsvg2-bin; \
     rm -rf /var/lib/apt/lists/*; \
     case "$(dpkg --print-architecture)" in \
         amd64) target="x86_64-unknown-linux-musl";  sha256="${TECTONIC_SHA256_AMD64}" ;; \
@@ -49,6 +50,13 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
 COPY app.py ./
+
+# pytex's IncludeImage shells out to `inkscape` to convert SVG logos to PDF
+# (write_inline_logos). The shim maps that exact call onto rsvg-convert so the
+# CD variants with SVG logos (z. B. protocol-asta: ASTA.svg) render without
+# pulling the full Inkscape stack into the image.
+COPY inkscape-shim.sh /usr/local/bin/inkscape
+RUN chmod +x /usr/local/bin/inkscape
 
 # Drop privileges; the cache volume must be writable by the unprivileged user.
 RUN useradd --create-home --uid 10001 pytex \
