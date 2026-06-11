@@ -295,6 +295,11 @@ class BudgetNodeUpdate(WireModel):
     acceptedStateKeys: list[str] | None = None
     deniedStateKeys: list[str] | None = None
     fullyBound: bool | None = None
+    hiddenInBudget: bool | None = Field(
+        default=None,
+        description="Hide this node (incl. subtree) in the budget tab — display only, "
+        "rollups/export unchanged",
+    )
     fiscalStartMonth: int | None = None
     fiscalStartDay: int | None = None
 

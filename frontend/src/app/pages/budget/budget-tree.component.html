@@ -133,6 +133,11 @@
         <input [ngModel]="editKey()" (ngModelChange)="editKey.set($event)" name="editKey" /></label>
       <label class="bt__lbl">{{ 'budget.tree.name' | t }}
         <input [ngModel]="editName()" (ngModelChange)="editName.set($event)" name="editName" /></label>
+      <label class="bt__check bt__form-full">
+        <input type="checkbox" [checked]="editHidden()" (change)="editHidden.set($any($event.target).checked)" />
+        <span>{{ 'budget.tree.hiddenInBudget' | t }}</span>
+      </label>
+      <p class="bt__muted bt__check-hint bt__form-full">{{ 'budget.tree.hiddenInBudgetHint' | t }}</p>
       <p class="bt__muted bt__form-full">{{ 'budget.tree.editNodeHint' | t }}</p>
     </form>
   }

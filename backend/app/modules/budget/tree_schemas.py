@@ -48,6 +48,7 @@ class BudgetNodeUpdate(_CamelModel):
     accepted_state_keys: list[str] | None = Field(default=None, alias="acceptedStateKeys")
     denied_state_keys: list[str] | None = Field(default=None, alias="deniedStateKeys")
     fully_bound: bool | None = Field(default=None, alias="fullyBound")
+    hidden_in_budget: bool | None = Field(default=None, alias="hiddenInBudget")
     fiscal_start_month: int | None = Field(
         default=None, ge=1, le=12, alias="fiscalStartMonth"
     )
@@ -71,6 +72,7 @@ class BudgetNodeOut(_CamelModel):
     accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
     fully_bound: bool = Field(default=False, alias="fullyBound")
+    hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
 
@@ -110,6 +112,7 @@ class BudgetTreeNodeOut(_CamelModel):
     accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
     fully_bound: bool = Field(default=False, alias="fullyBound")
+    hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
     by_fiscal_year: list[AllocationView] = Field(

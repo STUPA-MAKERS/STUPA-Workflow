@@ -85,7 +85,8 @@ const R_MAX = SIZE / 2 - 8;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: var(--space-2);
+        gap: var(--space-3);
+        padding: var(--space-2) var(--space-2) var(--space-5);
       }
       .sb__svg {
         width: min(480px, 100%);
@@ -204,7 +205,9 @@ export class BudgetSunburstComponent {
         const v = this.subtree(c);
         if (v <= 0) return;
         const childSpan = span * (v / nodeVal);
-        const childColor = color ?? c.color ?? PALETTE[i % PALETTE.length];
+        // Gesetzte Farbe der Kostenstelle gewinnt (wie bei den kleinen Pies);
+        // ohne eigene Farbe erbt das Segment die des Eltern-Zweigs.
+        const childColor = c.color ?? color ?? PALETTE[i % PALETTE.length];
         const r0 = R_CENTER + (depth - 1) * ringW;
         out.push({
           id: c.id,

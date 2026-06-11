@@ -163,10 +163,10 @@ def fiscal_year_display(year: int, start_month: int, start_day: int) -> str:
 
 # Knoten-Tupel: (id, parent_id, gremium_id, key, path_key, name, currency, active,
 # color, accepted_state_keys, denied_state_keys, fiscal_start_month, fiscal_start_day,
-# fully_bound).
+# fully_bound, hidden_in_budget).
 NodeTuple = tuple[
     object, object | None, object | None, str, str, str, str, bool,
-    str | None, list, list, int, int, bool,
+    str | None, list, list, int, int, bool, bool,
 ]
 
 
@@ -264,7 +264,7 @@ def build_forest(
 
     def to_dict(n: NodeTuple) -> dict:
         (nid, parent_id, n_gremium, key, path, name, currency, active, color, acc,
-         den, fy_month, fy_day, fully_bound) = n
+         den, fy_month, fy_day, fully_bound, hidden_in_budget) = n
         return {
             "id": nid,
             "parent_id": parent_id,
@@ -278,6 +278,7 @@ def build_forest(
             "accepted_state_keys": list(acc or []),
             "denied_state_keys": list(den or []),
             "fully_bound": fully_bound,
+            "hidden_in_budget": hidden_in_budget,
             "fiscal_start_month": fy_month,
             "fiscal_start_day": fy_day,
             "by_fiscal_year": _views_for_node(

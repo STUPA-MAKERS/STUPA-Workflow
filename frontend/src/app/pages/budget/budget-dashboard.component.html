@@ -121,24 +121,26 @@
     size="lg"
     (closed)="overviewOpen.set(false)"
   >
-    <div class="bd__ovTabs" role="tablist" [attr.aria-label]="'budget.overview.title' | t">
-      @for (m of overviewMetrics; track m) {
-        <button
-          type="button"
-          role="tab"
-          class="bd__ovTab"
-          [class.bd__ovTab--active]="overviewMetric() === m"
-          [attr.aria-selected]="overviewMetric() === m"
-          (click)="overviewMetric.set(m)"
-        >
-          {{ metricLabel(m) }}
-        </button>
-      }
-    </div>
+    @if (visibleOverviewMetrics().length > 1) {
+      <div class="bd__ovTabs" role="tablist" [attr.aria-label]="'budget.overview.title' | t">
+        @for (m of visibleOverviewMetrics(); track m) {
+          <button
+            type="button"
+            role="tab"
+            class="bd__ovTab"
+            [class.bd__ovTab--active]="activeOverviewMetric() === m"
+            [attr.aria-selected]="activeOverviewMetric() === m"
+            (click)="overviewMetric.set(m)"
+          >
+            {{ metricLabel(m) }}
+          </button>
+        }
+      </div>
+    }
     <app-budget-sunburst
       [root]="overviewRoot()"
       [fyId]="selectedFyId()"
-      [metric]="overviewMetric()"
+      [metric]="activeOverviewMetric()"
       (nodeClick)="onOverviewPick($event)"
     />
   </app-dialog>

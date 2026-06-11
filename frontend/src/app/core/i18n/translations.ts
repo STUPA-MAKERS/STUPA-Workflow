@@ -853,6 +853,9 @@ export const de = {
   'budget.tree.editNode': 'Kostenstelle bearbeiten',
   'budget.tree.editNodeHint':
     'Schlüssel änderbar; der Pfad aller Unter-Kostenstellen wird automatisch angepasst.',
+  'budget.tree.hiddenInBudget': 'Im Budget-Tab ausblenden',
+  'budget.tree.hiddenInBudgetHint':
+    'Nur Anzeige: Die Kostenstelle (inkl. Unterbaum) erscheint nicht im Budget-Tab; Summen, Verfügbar-Rechnung und Export bleiben unverändert.',
   'budget.tree.toast.saved': 'Gespeichert.',
   'budget.tree.toast.keyFailed':
     'Speichern fehlgeschlagen (Schlüssel ungültig oder bereits vergeben?).',
@@ -2498,6 +2501,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.editNode': 'Edit cost centre',
   'budget.tree.editNodeHint':
     'Key is editable; the path of all sub-cost-centres is updated automatically.',
+  'budget.tree.hiddenInBudget': 'Hide in budget tab',
+  'budget.tree.hiddenInBudgetHint':
+    'Display only: the cost centre (incl. its subtree) does not appear in the budget tab; totals, available calculation and export stay unchanged.',
   'budget.tree.toast.saved': 'Saved.',
   'budget.tree.toast.keyFailed': 'Save failed (key invalid or already in use?).',
   'budget.tree.openNav': 'Choose budget',

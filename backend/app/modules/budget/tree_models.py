@@ -71,6 +71,13 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     # Unterbaum) gilt je HHJ als gebunden (committed = allocated, verfügbar 0) — echte
     # Anträge/Ausgaben darauf werden dann nicht zusätzlich gezählt. Rollt zum Parent hoch.
     fully_bound: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    # Im Budget-Tab ausblenden (#budget-hide): reine Anzeige-Einstellung — Werte
+    # zählen unverändert in Eltern-Rollups/Export; nur das Dashboard filtert.
+    # Python-Default zusätzlich zum Server-Default: auch frisch konstruierte
+    # Instanzen (Tests/Service vor dem Flush) tragen sofort einen bool.
+    hidden_in_budget: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
     # Haushaltsjahr-Stichtag (Tag/Monat des Periodenstarts) — **nur am Top-Level**
     # relevant. Default 01.01.; abweichend (z. B. 01.07.) ⇒ HHJ-Anzeige »YYYY/YY«.
     # Die HHJ tragen nur das Jahr; Start/Ende leiten sich aus diesem Stichtag ab.

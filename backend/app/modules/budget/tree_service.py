@@ -81,6 +81,7 @@ def _node_out(b: Budget) -> BudgetNodeOut:
         acceptedStateKeys=list(b.accepted_state_keys or []),
         deniedStateKeys=list(b.denied_state_keys or []),
         fullyBound=b.fully_bound,
+        hiddenInBudget=bool(b.hidden_in_budget),
         fiscalStartMonth=b.fiscal_start_month,
         fiscalStartDay=b.fiscal_start_day,
     )
@@ -1014,6 +1015,7 @@ class BudgetTreeService:
                 n.currency, n.active, n.color,
                 list(n.accepted_state_keys or []), list(n.denied_state_keys or []),
                 n.fiscal_start_month, n.fiscal_start_day, n.fully_bound,
+                bool(n.hidden_in_budget),
             )
             for n in nodes
         ]

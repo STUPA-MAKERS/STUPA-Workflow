@@ -36,29 +36,36 @@
   gap: var(--space-2);
 }
 
-/* Metrik-Tabs im Übersicht-Overlay (#budget-sunburst). */
+/* Metrik-Tabs im Übersicht-Overlay (#budget-sunburst) — gleiche Optik wie die
+   Navigations-Pills im App-Header, horizontal zentriert. */
 .bd__ovTabs {
   display: flex;
+  justify-content: center;
   gap: var(--space-1);
-  margin-bottom: var(--space-3);
-  border-bottom: var(--border-width) solid var(--color-border);
+  margin-block: var(--space-2) var(--space-3);
 }
 
 .bd__ovTab {
   padding: var(--space-2) var(--space-3);
   font: inherit;
   font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   color: var(--color-text-muted);
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.bd__ovTab--active {
+.bd__ovTab:hover {
   color: var(--color-text);
-  font-weight: var(--fw-semibold);
-  border-bottom-color: var(--color-primary);
+  background: var(--color-surface-sunken);
+}
+
+.bd__ovTab--active {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
 }
 
 .bd__title {

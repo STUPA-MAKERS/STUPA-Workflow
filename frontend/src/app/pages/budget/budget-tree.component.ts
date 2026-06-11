@@ -86,10 +86,12 @@ export class BudgetTreeComponent {
   /** Limit (Zuteilung) je Knoten setzen — per Dialog pro Zeile (#22). */
   readonly limitNode = signal<BudgetTreeNode | null>(null);
   readonly limitValue = signal('');
-  /** Kostenstelle bearbeiten (Schlüssel + Name) — per Dialog pro Zeile. */
+  /** Kostenstelle bearbeiten (Schlüssel + Name + Sichtbarkeit) — per Dialog pro Zeile. */
   readonly editNode = signal<BudgetTreeNode | null>(null);
   readonly editKey = signal('');
   readonly editName = signal('');
+  /** Im Budget-Tab ausblenden (#budget-hide) — reine Anzeige-Einstellung. */
+  readonly editHidden = signal(false);
   /** »Komplett gebunden«-Flag der im Limit-Dialog offenen Kostenstelle (alle HHJ). */
   readonly limitFullyBound = signal(false);
   /** Haushaltsjahr anlegen — INNERHALB des gewählten Budgets (nur das Jahr). */
@@ -378,6 +380,7 @@ export class BudgetTreeComponent {
     this.editNode.set(node);
     this.editKey.set(node.key);
     this.editName.set(node.name);
+    this.editHidden.set(node.hiddenInBudget);
   }
 
   closeEditNode(): void {
@@ -390,7 +393,7 @@ export class BudgetTreeComponent {
     const key = this.editKey().trim();
     const name = this.editName().trim();
     if (!key || !name) return;
-    this.api.updateNode(node.id, { key, name }).subscribe({
+    this.api.updateNode(node.id, { key, name, hiddenInBudget: this.editHidden() }).subscribe({
       next: () => {
         this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
         this.editNode.set(null);

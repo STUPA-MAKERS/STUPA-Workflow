@@ -121,11 +121,22 @@ export class BudgetDashboardComponent {
     this.navOpen.update((v) => !v);
   }
 
+  /** Baum ohne ausgeblendete Kostenstellen (#budget-hide): `hiddenInBudget`
+   *  entfernt den Knoten + Unterbaum aus ALLEN Ansichten des Budget-Tabs —
+   *  reine Anzeige, die Werte stecken weiter in den Eltern-Rollups. */
+  private readonly visibleTree = computed<BudgetTreeNode[]>(() => {
+    const prune = (nodes: BudgetTreeNode[]): BudgetTreeNode[] =>
+      nodes
+        .filter((n) => !n.hiddenInBudget)
+        .map((n) => ({ ...n, children: prune(n.children) }));
+    return prune(this.tree());
+  });
+
   /** Top-Budgets (Wurzeln) für den linken Baum — nur Budgets **mit** Haushaltsjahr
    *  (#11): ohne HHJ gibt es im Budget-Tab nichts auszuwerten, also ausblenden. */
   readonly tops = computed(() => {
     const fy = this.fiscalYearsByBudget();
-    return this.tree().filter(
+    return this.visibleTree().filter(
       (n) => n.parentId === null && (fy[n.id]?.length ?? 0) > 0,
     );
   });
@@ -138,7 +149,7 @@ export class BudgetDashboardComponent {
         walk(n.children);
       }
     };
-    walk(this.tree());
+    walk(this.visibleTree());
     return map;
   });
 
@@ -280,6 +291,34 @@ export class BudgetDashboardComponent {
   /** Wurzel des Sunbursts = aktuell gewählte Kostenstelle. */
   readonly overviewRoot = computed(() => this.selectedKs());
 
+  /** Unterbaum-Summe einer Metrik (gleiche Rechnung wie im Sunburst). */
+  private metricTotal(node: BudgetTreeNode, metric: SunburstMetric): number {
+    const valueOf = (n: BudgetTreeNode): number => {
+      const a = n.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
+      return a ? Number(a[metric]) : 0;
+    };
+    const subtree = (n: BudgetTreeNode): number => {
+      const children = n.children.reduce((s, c) => s + subtree(c), 0);
+      const own = Math.max(0, valueOf(n) - n.children.reduce((s, c) => s + valueOf(c), 0));
+      return own + children;
+    };
+    return subtree(node);
+  }
+
+  /** Nur Metriken MIT Daten bekommen einen Tab (#budget-sunburst). */
+  readonly visibleOverviewMetrics = computed<SunburstMetric[]>(() => {
+    const root = this.overviewRoot();
+    if (!root) return [];
+    return this.overviewMetrics.filter((m) => this.metricTotal(root, m) > 0);
+  });
+
+  /** Gewählte Metrik, auf eine sichtbare zurückgefallen, falls ihre Daten weg sind. */
+  readonly activeOverviewMetric = computed<SunburstMetric>(() => {
+    const visible = this.visibleOverviewMetrics();
+    const current = this.overviewMetric();
+    return visible.includes(current) ? current : (visible[0] ?? 'allocated');
+  });
+
   /** Segment-Klick im Sunburst: Kostenstelle öffnen + Overlay schließen. */
   onOverviewPick(id: string): void {
     this.overviewOpen.set(false);
@@ -329,7 +368,8 @@ export class BudgetDashboardComponent {
       next: (tree) => {
         this.tree.set(tree);
         this.loading.set(false);
-        const tops = tree.filter((n) => n.parentId === null);
+        // Ausgeblendete Top-Budgets (#budget-hide) sind im Tab nicht wählbar.
+        const tops = tree.filter((n) => n.parentId === null && !n.hiddenInBudget);
         // HHJ aller Top-Budgets laden (linker Baum) — parallel, fehlertolerant.
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({

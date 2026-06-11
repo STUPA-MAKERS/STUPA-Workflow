@@ -125,6 +125,8 @@ export interface BudgetTreeNode {
   deniedStateKeys: string[];
   /** Ganze Kostenstelle (inkl. Unterbaum) gilt je HHJ als gebunden (committed = allocated). */
   fullyBound: boolean;
+  /** Im Budget-Tab ausblenden (#budget-hide) — reine Anzeige, Rollups unverändert. */
+  hiddenInBudget: boolean;
   /** HHJ-Stichtag (Tag/Monat des Periodenstarts) — nur am Top-Level relevant. */
   fiscalStartMonth: number;
   fiscalStartDay: number;
@@ -145,6 +147,7 @@ export interface BudgetNode {
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
   fullyBound?: boolean;
+  hiddenInBudget?: boolean;
   fiscalStartMonth?: number;
   fiscalStartDay?: number;
 }
@@ -181,6 +184,7 @@ export interface BudgetNodeUpdate {
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
   fullyBound?: boolean;
+  hiddenInBudget?: boolean;
   fiscalStartMonth?: number;
   fiscalStartDay?: number;
 }
