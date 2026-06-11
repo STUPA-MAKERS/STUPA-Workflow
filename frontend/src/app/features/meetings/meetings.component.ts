@@ -436,7 +436,17 @@ const AUTOSAVE_DELAY_MS = 1000;
               } @else if (proto.status === 'rendering') {
                 <p class="mtg__muted">{{ 'meetings.protocol.renderingHint' | t }}</p>
               } @else if (canWrite()) {
-                <p class="mtg__muted">{{ 'meetings.protocol.finalizeOnClose' | t }}</p>
+                @if (m.status === 'closed') {
+                  <!-- Sitzung schon geschlossen, Protokoll (wieder) Entwurf: der Render
+                       ist fehlgeschlagen/zurückgerollt — expliziter Retry, sonst gäbe es
+                       keinen Weg mehr zum finalen Protokoll (#async-finalize). -->
+                  <p class="mtg__muted">{{ 'meetings.protocol.retryHint' | t }}</p>
+                  <app-button size="sm" [loading]="finalizing()" (click)="finalize()">
+                    {{ 'meetings.protocol.finalize' | t }}
+                  </app-button>
+                } @else {
+                  <p class="mtg__muted">{{ 'meetings.protocol.finalizeOnClose' | t }}</p>
+                }
               }
             </div>
           }
@@ -2818,7 +2828,9 @@ export class MeetingsComponent implements OnDestroy {
   }
 
   voteVariant(status: MeetingVote['status']): BadgeVariant {
-    return status === 'open' ? 'success' : status === 'closed' ? 'neutral' : 'warning';
+    if (status === 'open') return 'success';
+    if (status === 'closed') return 'neutral';
+    return status === 'cancelled' ? 'danger' : 'warning';
   }
 
   /** Typsichere i18n-Keys aus dem dynamischen Status (strictTemplates). */
