@@ -12,6 +12,7 @@ Inline-CSS (Mail-Clients ignorieren <style> teils), keine externen Ressourcen.
 from __future__ import annotations
 
 import html
+import re
 
 # Auslöser-Hinweis im Footer („Sie erhalten diese E-Mail, weil …") je Mail-Art.
 _REASONS: dict[str, dict[str, str]] = {
@@ -107,12 +108,38 @@ def reason_text(kind: str, lang: str) -> str:
     return table.get(lang, table["de"])
 
 
+# URLs im (bereits escapten) Text — endet vor Whitespace/<; angehängte
+# Satzzeichen werden unten abgetrennt, damit »https://x.de/y.« klickbar bleibt.
+_URL_RE = re.compile(r"https?://[^\s<]+")
+_TRAILING_PUNCT = ".,;:!?)]"
+_LINK_STYLE = "color:#0b6e4f;word-break:break-all;"
+
+
+def _linkify(escaped: str) -> str:
+    """URLs im escapten Text in klickbare ``<a href>`` verwandeln.
+
+    Läuft NACH ``html.escape`` — ``&`` in Query-Strings steht als ``&amp;`` im
+    ``href``, was beim Klick korrekt dekodiert wird. Kein neues Injection-
+    Risiko: es wird nur bereits escapter Text in Anker gehüllt."""
+
+    def repl(match: re.Match[str]) -> str:
+        url = match.group(0)
+        tail = ""
+        while url and url[-1] in _TRAILING_PUNCT:
+            tail = url[-1] + tail
+            url = url[:-1]
+        return f'<a href="{url}" style="{_LINK_STYLE}">{url}</a>{tail}'
+
+    return _URL_RE.sub(repl, escaped)
+
+
 def text_to_html(text: str) -> str:
-    """Plain-Text-Body → einfacher HTML-Inhalt (escaped, Absätze + Umbrüche)."""
+    """Plain-Text-Body → einfacher HTML-Inhalt (escaped, Absätze + Umbrüche,
+    URLs als klickbare Links)."""
     paragraphs = [p for p in text.split("\n\n") if p.strip()]
     rendered = [
         '<p style="margin:0 0 1em;">'
-        + html.escape(p.strip()).replace("\n", "<br>")
+        + _linkify(html.escape(p.strip())).replace("\n", "<br>")
         + "</p>"
         for p in paragraphs
     ]

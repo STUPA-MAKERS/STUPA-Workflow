@@ -36,6 +36,23 @@ def test_render_layout_wraps_content_with_footer() -> None:
     assert "https://antrag.example.org/account/notifications" in out
 
 
+def test_text_to_html_makes_urls_clickable() -> None:
+    html = text_to_html(
+        "Hallo,\n\nüber diesen Link gelangen Sie zu Ihrem Antrag:\n"
+        "https://antrag.example.org/antrag/abc#t=x1&y=2\n\nDanke."
+    )
+    assert (
+        '<a href="https://antrag.example.org/antrag/abc#t=x1&amp;y=2"' in html
+    )
+    assert ">https://antrag.example.org/antrag/abc#t=x1&amp;y=2</a>" in html
+
+
+def test_text_to_html_keeps_trailing_punctuation_outside_link() -> None:
+    html = text_to_html("Siehe https://example.org/seite.")
+    assert '<a href="https://example.org/seite"' in html
+    assert "</a>." in html
+
+
 def test_reason_text_falls_back_to_generic_and_de() -> None:
     assert reason_text("nope", "de") == reason_text("generic", "de")
     assert reason_text("magic_link", "fr") == reason_text("magic_link", "de")

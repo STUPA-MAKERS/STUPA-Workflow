@@ -2,8 +2,7 @@
 FROM python:3.13-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
 
@@ -13,16 +12,27 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Deps zuerst (Layer-Cache).
+# Dependencies in eigener Layer VOR dem Quellcode: ein Code-Change invalidiert
+# damit nur den (sekundenschnellen) App-Install unten, nicht den Dep-Download.
+# Die Dep-Liste kommt direkt aus pyproject.toml (tomllib, stdlib) — keine
+# separate requirements.txt zu pflegen. Zusätzlich BuildKit-Cache-Mount für den
+# pip-Wheel-Cache: auch wenn diese Layer invalidiert (Dep-Bump), wird nichts
+# erneut heruntergeladen, was schon einmal gebaut/geladen wurde.
 COPY pyproject.toml ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))" > /tmp/requirements.txt \
+    && pip install -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
+
+# Quellcode + Alembic-Config/Migrationen (Issue #38: ohne sie kann der Container
+# kein `alembic upgrade head` ausführen → frische DB bliebe leer. env.py importiert
+# app.models/app.settings (via pip install . verfügbar), prepend_sys_path=. ⇒ /app).
 COPY app ./app
 COPY worker ./worker
-# Alembic-Config + Migrationen ins Image (Issue #38): ohne sie kann der Container
-# kein `alembic upgrade head` ausführen → frische DB bliebe leer. env.py importiert
-# app.models/app.settings (via pip install . verfügbar), prepend_sys_path=. ⇒ /app.
 COPY alembic.ini ./
 COPY migrations ./migrations
-RUN pip install .
+# Deps stecken in der Layer oben → hier nur noch das Paket selbst (schnell).
+RUN --mount=type=cache,target=/root/.cache/pip pip install --no-deps .
 
 EXPOSE 8000
 
