@@ -1,0 +1,158 @@
+"""Branded HTML-Mail-Layout (#4): ein Rahmen in Code, Inhalt aus Templates.
+
+Jede ausgehende Mail wird in dasselbe Layout gehüllt (Header mit Plattform-Name,
+Inhalts-Karte, Footer mit Auslöser-Hinweis + Link zu den Benachrichtigungs-
+Einstellungen). DB-Templates liefern nur den **inneren** Inhalt — liegt kein
+HTML-Body vor, wird der Text-Body escaped + umgebrochen übernommen, sodass auch
+text-only Templates eine ansehnliche HTML-Alternative bekommen.
+
+Inline-CSS (Mail-Clients ignorieren <style> teils), keine externen Ressourcen.
+"""
+
+from __future__ import annotations
+
+import html
+
+# Auslöser-Hinweis im Footer („Sie erhalten diese E-Mail, weil …") je Mail-Art.
+_REASONS: dict[str, dict[str, str]] = {
+    "magic_link": {
+        "de": "Sie erhalten diese E-Mail, weil für Ihre Adresse ein "
+        "Zugangslink angefordert wurde.",
+        "en": "You are receiving this email because an access link was "
+        "requested for your address.",
+    },
+    "status_update": {
+        "de": "Sie erhalten diese E-Mail, weil sich der Status eines Antrags "
+        "geändert hat, der Sie betrifft.",
+        "en": "You are receiving this email because the status of an "
+        "application that concerns you changed.",
+    },
+    "comment": {
+        "de": "Sie erhalten diese E-Mail, weil es einen neuen Kommentar zu "
+        "einem Antrag gibt, der Sie betrifft.",
+        "en": "You are receiving this email because there is a new comment "
+        "on an application that concerns you.",
+    },
+    "protocol": {
+        "de": "Sie erhalten diese E-Mail, weil ein Sitzungsprotokoll Ihres "
+        "Gremiums finalisiert wurde.",
+        "en": "You are receiving this email because a meeting protocol of "
+        "your committee was finalized.",
+    },
+    "deadline": {
+        "de": "Sie erhalten diese E-Mail, weil eine Frist zu einem Antrag "
+        "näher rückt, der Sie betrifft.",
+        "en": "You are receiving this email because a deadline on an "
+        "application that concerns you is approaching.",
+    },
+    "generic": {
+        "de": "Sie erhalten diese E-Mail von der Antragsplattform.",
+        "en": "You are receiving this email from the application platform.",
+    },
+}
+
+_SETTINGS_HINT = {
+    "de": "Benachrichtigungen verwalten",
+    "en": "Manage notifications",
+}
+
+_BODY_STYLE = (
+    "margin:0;padding:0;background:#f2f4f8;"
+    "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
+    "color:#1f2933;"
+)
+_CARD_STYLE = (
+    "background:#ffffff;border:1px solid #e0e4ea;border-radius:8px;"
+    "padding:24px 24px 28px;"
+)
+_HEAD_LINK_STYLE = (
+    "font-size:18px;font-weight:700;color:#1f2933;text-decoration:none;"
+)
+_FOOTER_STYLE = "padding:16px 16px 0;font-size:12px;line-height:1.5;color:#6b7686;"
+
+
+def reason_text(kind: str, lang: str) -> str:
+    """Footer-Hinweis für eine Mail-Art (Fallback: generischer Hinweis, DE)."""
+    table = _REASONS.get(kind, _REASONS["generic"])
+    return table.get(lang, table["de"])
+
+
+def text_to_html(text: str) -> str:
+    """Plain-Text-Body → einfacher HTML-Inhalt (escaped, Absätze + Umbrüche)."""
+    paragraphs = [p for p in text.split("\n\n") if p.strip()]
+    rendered = [
+        '<p style="margin:0 0 1em;">'
+        + html.escape(p.strip()).replace("\n", "<br>")
+        + "</p>"
+        for p in paragraphs
+    ]
+    return "\n".join(rendered)
+
+
+def render_layout(
+    *,
+    content_html: str,
+    title: str,
+    site_name: str,
+    base_url: str,
+    reason: str,
+    lang: str = "de",
+) -> str:
+    """Inneren Inhalt ins gebrandete Mail-Layout hüllen (vollständiges Dokument).
+
+    ``content_html`` MUSS bereits sicher sein (autoescaped Jinja-Render bzw.
+    :func:`text_to_html`); alle übrigen Werte werden hier escaped."""
+    esc_title = html.escape(title)
+    esc_site = html.escape(site_name)
+    esc_reason = html.escape(reason)
+    base = html.escape(base_url.rstrip("/"))
+    settings_url = f"{base}/account/notifications"
+    hint = html.escape(_SETTINGS_HINT.get(lang, _SETTINGS_HINT["de"]))
+    table_open = (
+        '<table role="presentation" width="100%" cellpadding="0" '
+        'cellspacing="0" style="background:#f2f4f8;padding:24px 0;">'
+    )
+    inner_open = (
+        '<table role="presentation" width="600" cellpadding="0" '
+        'cellspacing="0" style="max-width:600px;width:100%;">'
+    )
+    return f"""<!DOCTYPE html>
+<html lang="{html.escape(lang)}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{esc_title}</title>
+</head>
+<body style="{_BODY_STYLE}">
+  {table_open}
+    <tr><td align="center">
+      {inner_open}
+        <tr>
+          <td style="padding:0 16px 12px;">
+            <a href="{base}" style="{_HEAD_LINK_STYLE}">{esc_site}</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="{_CARD_STYLE}">
+            <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">
+              {esc_title}
+            </h1>
+            <div style="font-size:15px;line-height:1.55;">
+{content_html}
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="{_FOOTER_STYLE}">
+            <p style="margin:0 0 4px;">{esc_reason}</p>
+            <p style="margin:0;">
+              <a href="{settings_url}" style="color:#6b7686;">{hint}</a>
+              · <a href="{base}" style="color:#6b7686;">{esc_site}</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""

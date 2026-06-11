@@ -36,6 +36,11 @@ from app.modules.admin.models import Gremium, GremiumMembership, MailList
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.notifications.layout import (
+    reason_text,
+    render_layout,
+    text_to_html,
+)
 from app.modules.notifications.mail import (
     MailAttachment,
     MailMessage,
@@ -55,7 +60,7 @@ from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
 from app.modules.voting.service import VotingService
-from app.settings import Settings
+from app.settings import Settings, get_settings
 from app.shared.errors import (
     BadRequestError,
     ConflictError,
@@ -468,28 +473,59 @@ class ProtocolService:
     async def _send(self, protocol: Protocol, pdf: bytes | None) -> None:
         """Protokoll an MAIL_LIST(gremium) — idempotenter Key, PDF als **Anhang**.
 
-        Kein Link mehr (#protocol-mail-pdf): der frühere ``/api/protocols/{id}/pdf``-
-        Link verlangt Login + ``meeting.manage`` — für Mitglieder und externe
-        Verteiler-Adressen war er schlicht kaputt ("Cannot Complete Request")."""
+        Subject/Body nennen Gremium + Sitzung (#4); die HTML-Fassung nutzt das
+        gebrandete Mail-Layout. Kein Link mehr (#protocol-mail-pdf): der frühere
+        ``/api/protocols/{id}/pdf``-Link verlangt Login + ``meeting.manage`` — für
+        Mitglieder und externe Verteiler-Adressen war er schlicht kaputt."""
         if self.mail_queue is None:
             return
         recipients = await self._recipients(protocol.gremium_id)
         if not recipients:
             return
+        gremium_name = await self.session.scalar(
+            select(Gremium.name).where(Gremium.id == protocol.gremium_id)
+        )
+        meeting = await self.session.get(Meeting, protocol.meeting_id)
+        subject = "Sitzungsprotokoll"
+        if gremium_name:
+            subject += f" {gremium_name}"
+        if meeting is not None and meeting.date is not None:
+            subject += f" — {meeting.date.strftime('%d.%m.%Y')}"
+        lines = []
+        if meeting is not None:
+            lines.append(f"Sitzung: {meeting.title}")
+        if gremium_name:
+            lines.append(f"Gremium: {gremium_name}")
+        if meeting is not None and meeting.date is not None:
+            lines.append(f"Datum: {meeting.date.strftime('%d.%m.%Y')}")
+        intro = "Das Sitzungsprotokoll wurde finalisiert."
+        if pdf is not None:
+            intro = (
+                "Das Sitzungsprotokoll wurde finalisiert und liegt als PDF bei."
+            )
+        text = intro + ("\n\n" + "\n".join(lines) if lines else "") + "\n"
         attachments: tuple[MailAttachment, ...] = ()
-        text = "Das Sitzungsprotokoll wurde finalisiert."
         if pdf is not None:
             attachments = (
                 MailAttachment(
                     filename="protokoll.pdf", mime="application/pdf", content=pdf
                 ),
             )
-            text = "Das Sitzungsprotokoll wurde finalisiert und liegt als PDF bei."
+        settings = self.settings or get_settings()
+        html = render_layout(
+            content_html=text_to_html(text),
+            title=subject,
+            site_name=settings.mail_from_name,
+            base_url=settings.public_base_url,
+            reason=reason_text("protocol", "de"),
+            lang="de",
+        )
         await self.mail_queue.enqueue(
             MailMessage(
                 to=tuple(recipients),
-                subject="Sitzungsprotokoll",
+                subject=subject,
                 text=text,
+                html=html,
                 idempotency_key=compute_idempotency_key(
                     "protocol_finalized", str(protocol.id)
                 ),

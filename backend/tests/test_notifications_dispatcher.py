@@ -54,7 +54,7 @@ async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     app_type_id = uuid.uuid4()
-    session = FakeSession(executes=[[(app_type_id, None)]])
+    session = FakeSession(executes=[[(app_type_id, None, {"title": "Beamer"})]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
 
     action = _action("notify", {"event": "status_changed", "lang": "en"})
@@ -67,6 +67,7 @@ async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) ->
     assert kw["idempotency_base"] == action.idempotency_key  # type: ignore[index]
     assert kw["lang"] == "en"  # type: ignore[index]
     assert kw["context"]["applicationId"] == str(action.application_id)  # type: ignore[index]
+    assert kw["context"]["applicationTitle"] == "Beamer"  # type: ignore[index]
 
 
 async def test_dispatch_skips_non_notify(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -98,7 +99,7 @@ async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -
             return 1
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
-    session = FakeSession(executes=[[(None, None)]])
+    session = FakeSession(executes=[[(None, None, None)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     action = _action("notify", {"templateKey": "t", "context": {"status": "X"}})
     await disp.dispatch([action])

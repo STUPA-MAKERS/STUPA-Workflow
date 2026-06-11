@@ -52,14 +52,23 @@ class NotificationActionDispatcher:
 
     async def _dispatch_notify(self, action: DispatchedAction) -> None:
         async with self.sessionmaker() as session:
-            app_type_id, current_state_id = (
+            app_type_id, current_state_id, app_data = (
                 await session.execute(
-                    select(Application.type_id, Application.current_state_id).where(
-                        Application.id == action.application_id
-                    )
+                    select(
+                        Application.type_id,
+                        Application.current_state_id,
+                        Application.data,
+                    ).where(Application.id == action.application_id)
                 )
-            ).first() or (None, None)
-            context: dict[str, object] = {"applicationId": str(action.application_id)}
+            ).first() or (None, None, None)
+            # Antragstitel mitgeben (#4): Templates/Builtin nennen, WORUM es geht.
+            title = (app_data or {}).get("title")
+            context: dict[str, object] = {
+                "applicationId": str(action.application_id),
+                "applicationTitle": title.strip()
+                if isinstance(title, str)
+                else "",
+            }
             raw_lang = action.params.get("lang")
             lang = str(raw_lang) if raw_lang else None
             # ``status`` (Label des aktuellen States) bereitstellen — das Default-/Status-

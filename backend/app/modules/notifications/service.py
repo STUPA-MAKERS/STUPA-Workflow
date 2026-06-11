@@ -19,6 +19,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.notifications.layout import (
+    reason_text,
+    render_layout,
+    text_to_html,
+)
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.models import MailTemplate
 from app.modules.notifications.queue import MailQueue
@@ -60,9 +65,14 @@ _BUILTIN_NOTIFY_SUBJECT = {
     "de": "Aktualisierung zu Ihrem Antrag",
     "en": "Update on your application",
 }
+# Nennt Antragstitel + neuen Status, sofern der Dispatcher sie liefert (#4).
 _BUILTIN_NOTIFY_BODY = {
-    "de": "Hallo,\n\nes gibt eine Aktualisierung zu Ihrem Antrag.\n",
-    "en": "Hello,\n\nthere is an update on your application.\n",
+    "de": "Hallo,\n\nes gibt eine Aktualisierung zu Ihrem Antrag"
+    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}."
+    "{% if status %}\n\nNeuer Status: {{ status }}{% endif %}\n",
+    "en": "Hello,\n\nthere is an update on your application"
+    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}.'
+    "{% if status %}\n\nNew status: {{ status }}{% endif %}\n",
 }
 
 
@@ -169,20 +179,32 @@ class NotificationService:
         if not recipients:
             logger.info("notify action resolved no recipients — skipped")
             return 0
+        # Builtin-/Status-Templates referenzieren Titel + Status; nicht jeder
+        # Aufrufer (Deadline-Worker, Alt-Flows) liefert sie → leere Defaults,
+        # damit StrictUndefined nicht den Versand kippt.
+        context = dict(context or {})
+        context.setdefault("applicationTitle", "")
+        context.setdefault("status", "")
+        reason = "deadline" if "deadline" in str(template_key) else "status_update"
         idem = _idem_parts(
             idempotency_base, "notify", str(application_id or ""), str(template_key)
         )
         tpl = await self._get_template_by_key(str(template_key))
         if tpl is not None:
             ok = await self._render_and_enqueue(
-                tpl, recipients, context=context or {}, lang=lang, idempotency_parts=idem
+                tpl,
+                recipients,
+                context=context,
+                lang=lang,
+                idempotency_parts=idem,
+                reason=reason,
             )
             return int(ok)
-        # Template fehlt in der DB → var-freier Builtin-Fallback (StrictUndefined-sicher).
+        # Template fehlt in der DB → Builtin-Fallback (Defaults oben decken die Vars).
         rendered = render_mail(
             subject_i18n=_BUILTIN_NOTIFY_SUBJECT,
             body_i18n=_BUILTIN_NOTIFY_BODY,
-            context=context or {},
+            context=context,
             lang=lang or self.settings.mail_default_lang,
             default_lang=self.settings.mail_default_lang,
         )
@@ -190,7 +212,7 @@ class NotificationService:
             to=tuple(recipients),
             subject=rendered.subject,
             text=rendered.text,
-            html=rendered.html,
+            html=self._layout_html(rendered, reason),
             idempotency_key=compute_idempotency_key(*idem),
         )
         return int(await self._enqueue(msg))
@@ -212,7 +234,7 @@ class NotificationService:
             to=(email,),
             subject=rendered.subject,
             text=rendered.text,
-            html=rendered.html,
+            html=self._layout_html(rendered, "magic_link"),
             idempotency_key=compute_idempotency_key("magic_link", email, link),
         )
         await self._enqueue(msg)
@@ -237,6 +259,22 @@ class NotificationService:
             default_lang=self.settings.mail_default_lang,
         )
 
+    def _layout_html(self, rendered: RenderedMail, reason: str) -> str:
+        """HTML-Alternative im gebrandeten Layout (#4).
+
+        Template-HTML (autoescaped gerendert) wird als Inhalt übernommen; fehlt
+        es, wird der Text-Body escaped umgebrochen — jede Mail hat damit eine
+        konsistente HTML-Fassung samt Footer („warum erhalte ich das")."""
+        inner = rendered.html or text_to_html(rendered.text)
+        return render_layout(
+            content_html=inner,
+            title=rendered.subject,
+            site_name=self.settings.mail_from_name,
+            base_url=self.settings.public_base_url,
+            reason=reason_text(reason, rendered.lang),
+            lang=rendered.lang,
+        )
+
     async def _render_and_enqueue(
         self,
         tpl: MailTemplate,
@@ -245,6 +283,7 @@ class NotificationService:
         context: dict[str, Any],
         lang: str | None,
         idempotency_parts: tuple[str, ...],
+        reason: str = "generic",
     ) -> bool:
         """Rendern + enqueuen. `False`, wenn nichts versandt (keine Empfänger/Render-Fehler)."""
         if not recipients:
@@ -258,7 +297,7 @@ class NotificationService:
             to=tuple(recipients),
             subject=rendered.subject,
             text=rendered.text,
-            html=rendered.html,
+            html=self._layout_html(rendered, reason),
             idempotency_key=compute_idempotency_key(*idempotency_parts),
         )
         return await self._enqueue(msg)
