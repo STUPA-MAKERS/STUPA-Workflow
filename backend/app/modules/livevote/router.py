@@ -323,8 +323,20 @@ async def open_meeting_vote(
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
     item = await agenda.item(meeting_id, payload.agenda_item_id)
-    if item.application_id is not None and await service.agenda_item_has_vote(item.id):
-        raise ConflictError("this application TOP already has a decision vote")
+    if item.application_id is not None:
+        if await service.agenda_item_has_vote(item.id):
+            raise ConflictError("this application TOP already has a decision vote")
+        # Fail-fast statt erst beim Schließen: die Entscheidung eines Antrags-Votes
+        # feuert den pass/fail-Branch des AKTUELLEN States. Ist der Antrag nicht in
+        # einem vote-State, wäre der Vote unschließbar (409 erst beim close — die
+        # abgegebenen Stimmen wären umsonst, #abort-vote).
+        kind = await service.application_state_kind(item.application_id)
+        if kind != "vote":
+            raise ConflictError(
+                "The application is not in a vote state — move it into its "
+                "decision state before opening the vote.",
+                code="conflict",
+            )
     config_data: dict[str, object] = {
         "options": payload.options,
         "majorityRule": payload.majority_rule,

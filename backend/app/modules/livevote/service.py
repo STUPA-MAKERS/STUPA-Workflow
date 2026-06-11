@@ -758,6 +758,17 @@ class MeetingService:
             )
         ).first() is not None
 
+    async def application_state_kind(self, application_id: UUID) -> str | None:
+        """``state.kind`` des aktuellen Antrags-States (``None`` ohne Antrag/State)."""
+        from app.modules.applications.models import Application
+        from app.modules.flow.models import State
+
+        return await self.session.scalar(
+            select(State.kind)
+            .join(Application, Application.current_state_id == State.id)
+            .where(Application.id == application_id)
+        )
+
     async def gremium_quorum_percent(self, gremium_id: UUID) -> int | None:
         """Default-Quorum (% der Stimmberechtigten) dieses Gremiums oder ``None``."""
         return (

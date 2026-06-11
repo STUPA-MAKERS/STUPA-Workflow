@@ -194,3 +194,31 @@ def test_openapi_declares_voting_error_responses(client: TestClient) -> None:
     assert "application/problem+json" in ballot["responses"]["409"]["content"]
     close = spec["paths"]["/api/votes/{vote_id}/close"]["post"]
     assert {"401", "403", "404", "409"} <= set(close["responses"])
+
+
+def test_ballot_broadcasts_vote_tally(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """#vote-progress: cast broadcastet den Live-Zähler — ohne Event blieb
+    »N von M abgestimmt« bei allen Clients bis zum Reload stale."""
+    from app.modules.livevote.publisher import get_meeting_publisher
+
+    class _RecordingPublisher:
+        def __init__(self) -> None:
+            self.tallies: list[object] = []
+
+        async def vote_opened(self, vote) -> None:  # noqa: ANN001
+            return None
+
+        async def vote_tally(self, vote) -> None:  # noqa: ANN001
+            self.tallies.append(vote)
+
+        async def vote_closed(self, vote) -> None:  # noqa: ANN001
+            return None
+
+    pub = _RecordingPublisher()
+    app.dependency_overrides[get_meeting_publisher] = lambda: pub
+    _as_principal(app, "vote.cast", groups={"stupa"})
+    r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
+    assert r.status_code == 200
+    assert len(pub.tallies) == 1  # frischer Stand nach der Stimme

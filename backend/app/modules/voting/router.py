@@ -128,10 +128,20 @@ async def cast_ballot(
     vote_id: UUID,
     payload: BallotIn,
     service: ServiceDep,
+    publisher: PublisherDep,
     principal: VoterDep,
 ) -> BallotAccepted:
-    """Stimme abgeben — 403 (nicht in Gruppe), 409 (geschlossen/Doppel), 422 (Option)."""
-    return await service.cast(vote_id, principal, payload.choice, now=datetime.now(UTC))
+    """Stimme abgeben — 403 (nicht in Gruppe), 409 (geschlossen/Doppel), 422 (Option).
+
+    Broadcastet anschließend ``vote_tally`` (#vote-progress): ohne das Event blieb
+    der »N von M abgestimmt«-Zähler aller verbundenen Clients bis zum Reload stale.
+    Nur Aggregate — die Reveal-Regel verdeckt counts/leading, bis alle Anwesenden
+    abgestimmt haben (``VoteTallyEvent.from_vote``)."""
+    accepted = await service.cast(
+        vote_id, principal, payload.choice, now=datetime.now(UTC)
+    )
+    await publisher.vote_tally(await service.get(vote_id))
+    return accepted
 
 
 @router.get(

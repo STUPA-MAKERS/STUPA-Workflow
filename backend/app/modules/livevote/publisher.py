@@ -24,6 +24,8 @@ class MeetingPublisher(Protocol):
 
     async def vote_opened(self, vote: VoteOut) -> None: ...
 
+    async def vote_tally(self, vote: VoteOut) -> None: ...
+
     async def vote_closed(self, vote: VoteClosed) -> None: ...
 
 
@@ -31,6 +33,9 @@ class NullPublisher:
     """Default ohne Broker: verwirft Events (Vote-API bleibt funktionsfähig)."""
 
     async def vote_opened(self, vote: VoteOut) -> None:
+        return None
+
+    async def vote_tally(self, vote: VoteOut) -> None:
         return None
 
     async def vote_closed(self, vote: VoteClosed) -> None:

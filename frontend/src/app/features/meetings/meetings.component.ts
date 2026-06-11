@@ -2202,15 +2202,32 @@ export class MeetingsComponent implements OnDestroy {
   openVote(voteId: Uuid): void {
     this.api.openVote(voteId).subscribe({
       next: () => this.patchVote(voteId, { status: 'open' }),
-      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+      error: (err: unknown) => this.voteActionFailed(err),
     });
   }
 
   closeVote(voteId: Uuid): void {
     this.api.closeVote(voteId).subscribe({
       next: () => this.patchVote(voteId, { status: 'closed' }),
-      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+      error: (err: unknown) => this.voteActionFailed(err),
     });
+  }
+
+  /** Vote-Aktion fehlgeschlagen: konkreten Server-Grund zeigen (z. B. 409 »Antrag
+      nicht im vote-State« / »Vote storniert«) statt eines generischen Toasts, und
+      den Sitzungs-State nachladen — der Vote kann serverseitig z. B. auf
+      ``cancelled`` geflippt sein (#abort-vote). */
+  private voteActionFailed(err: unknown): void {
+    const detail = this.errorDetail(err);
+    const base = this.i18n.translate('meetings.toast.actionFailed');
+    this.toast.error(detail ? `${base}: ${detail}` : base);
+    const m = this.meeting();
+    if (m) {
+      this.api.getMeeting(m.id).subscribe({
+        next: (updated) => this.meeting.set(updated),
+        error: () => {},
+      });
+    }
   }
 
   // --- Protokoll: TOPs links, pro-TOP-Editor rechts (#58) ------------------
@@ -2586,9 +2603,12 @@ export class MeetingsComponent implements OnDestroy {
           this.meeting.set(updated);
           this.toast.success(this.i18n.translate('meetings.toast.voteOpened'));
         },
-        error: () => {
+        error: (err: unknown) => {
           this.openingVote.set(false);
-          this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+          // Konkreten Grund zeigen (z. B. 409 »Antrag nicht im vote-State«).
+          const detail = this.errorDetail(err);
+          const base = this.i18n.translate('meetings.toast.actionFailed');
+          this.toast.error(detail ? `${base}: ${detail}` : base);
         },
       });
   }
@@ -2681,9 +2701,9 @@ export class MeetingsComponent implements OnDestroy {
         this.myChoices.update((m) => ({ ...m, [voteId]: choice }));
         this.toast.success(this.i18n.translate('meetings.toast.voteCast'));
       },
-      error: () => {
+      error: (err: unknown) => {
         this.casting.set(null);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        this.voteActionFailed(err);
       },
     });
   }
