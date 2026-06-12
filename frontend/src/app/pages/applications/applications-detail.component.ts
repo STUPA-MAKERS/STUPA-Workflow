@@ -157,7 +157,6 @@ interface DetailPosition {
       <aside class="det__rail det__rail--left">
         @if (canTransition() && transitions().length) {
           <app-card [heading]="'applications.transitions.title' | t">
-            <p class="det__muted det__railLead">{{ 'applications.transitions.lead' | t }}</p>
             <div class="det__transitions">
               @for (t of transitions(); track t.id) {
                 <app-button
