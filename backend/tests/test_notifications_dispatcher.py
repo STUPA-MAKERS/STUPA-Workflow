@@ -132,12 +132,16 @@ async def test_dispatch_task_notify_sends_kind_mail(
     async def fake_actionable(session, *, state, gremium_id):  # noqa: ANN001
         return ["team@x.de"]
 
+    async def fake_state_actionable(session, state):  # noqa: ANN001
+        return True
+
     import app.modules.notifications.recipients as recipients_mod
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     monkeypatch.setattr(
         recipients_mod, "actionable_principal_emails", fake_actionable
     )
+    monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
     session = FakeSession(
         executes=[[({"title": "Beamer"}, uuid.uuid4(), None)]],
         scalar=[None],  # State-Lookup — kein Treffer nötig
@@ -150,3 +154,34 @@ async def test_dispatch_task_notify_sends_kind_mail(
     assert kw["kind"] == "task"  # type: ignore[index]
     assert kw["template_key"] == "task_new"  # type: ignore[index]
     assert kw["context"]["applicationTitle"] == "Beamer"  # type: ignore[index]
+
+
+async def test_dispatch_task_notify_skips_non_actionable_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#9: Kein actionabler Übergang am neuen State → KEINE Task-Mail."""
+    captured: dict[str, object] = {}
+
+    class FakeService:
+        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+            pass
+
+        async def send_kind_mail(self, recipients, **kw):  # noqa: ANN001, ANN003
+            captured["recipients"] = recipients
+            return True
+
+    async def fake_state_actionable(session, state):  # noqa: ANN001
+        return False
+
+    import app.modules.notifications.recipients as recipients_mod
+
+    monkeypatch.setattr(mod, "NotificationService", FakeService)
+    monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
+    session = FakeSession(
+        executes=[[({"title": "Beamer"}, uuid.uuid4(), None)]],
+        scalar=[None],
+    )
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch([_action("taskNotify")])
+
+    assert "recipients" not in captured  # Versand übersprungen

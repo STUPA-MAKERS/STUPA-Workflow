@@ -22,13 +22,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership
 from app.modules.applications.models import Applicant
 from app.modules.auth.models import Principal, Role, RoleAssignment, RolePermission
-from app.modules.flow.models import State
+from app.modules.flow.models import State, Transition
 
 
 @dataclass(slots=True)
@@ -178,3 +178,24 @@ async def actionable_principal_emails(
     )
     rows = (await session.scalars(stmt)).all()
     return sorted({e for e in rows if e})
+
+
+async def state_actionable(session: AsyncSession, state: State | None) -> bool:
+    """Aufgaben-Definition (#64, geteilt von Task-Mail #4-3 + Reminder-Worker):
+    ``vote``-State oder mindestens ein manueller Übergang mit ``requires_action``.
+    States ohne solche Übergänge sind reine Durchgangs-/Endstationen — niemand
+    "kann handeln", also weder Task-Mail noch Erinnerung (#9)."""
+    if state is None:
+        return False
+    if state.kind == "vote":
+        return True
+    count = await session.scalar(
+        select(func.count())
+        .select_from(Transition)
+        .where(
+            Transition.from_state_id == state.id,
+            Transition.automatic.is_(False),
+            Transition.requires_action.is_(True),
+        )
+    )
+    return bool(count)

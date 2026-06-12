@@ -24,9 +24,12 @@ from typing import Any
 from sqlalchemy import func, select
 
 from app.modules.applications.models import Application, StatusEvent
-from app.modules.flow.models import State, Transition
+from app.modules.flow.models import State
 from app.modules.notifications.models import TaskReminderLog
-from app.modules.notifications.recipients import actionable_principal_emails
+from app.modules.notifications.recipients import (
+    actionable_principal_emails,
+    state_actionable,
+)
 from app.modules.notifications.service import NotificationService
 from app.settings import Settings, load_settings
 
@@ -168,7 +171,7 @@ async def _due_applications(
     due: list[tuple[uuid.UUID, uuid.UUID | None, datetime, State | None]] = []
     for app_id, state_id, entered_at in rows:
         state = states.get(state_id)
-        if state is None or not await _state_actionable(session, state):
+        if state is None or not await state_actionable(session, state):
             continue
         event_id = await session.scalar(
             select(StatusEvent.id)
@@ -186,24 +189,6 @@ async def _due_applications(
             continue
         due.append((app_id, event_id, entered_at, state))
     return due
-
-
-async def _state_actionable(session: Any, state: State) -> bool:
-    """Aufgaben-Definition (#64): ``vote``-State oder feuerbarer manueller Übergang
-    mit ``requires_action`` (Guard-Feinheiten prüft die Task-Liste; hier genügt
-    die strukturelle Existenz — falsch-positive Erinnerungen sind harmlos)."""
-    if state.kind == "vote":
-        return True
-    count = await session.scalar(
-        select(func.count())
-        .select_from(Transition)
-        .where(
-            Transition.from_state_id == state.id,
-            Transition.automatic.is_(False),
-            Transition.requires_action.is_(True),
-        )
-    )
-    return bool(count)
 
 
 async def _remind_one(

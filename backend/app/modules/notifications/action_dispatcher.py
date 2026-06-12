@@ -103,7 +103,10 @@ class NotificationActionDispatcher:
     async def _dispatch_task(self, action: DispatchedAction) -> None:
         """Task-Mail (#4-3): Antrag hat einen State erreicht, in dem die Empfänger
         handeln können — Empfänger werden zur Versandzeit aufgelöst (Task-Semantik)."""
-        from app.modules.notifications.recipients import actionable_principal_emails
+        from app.modules.notifications.recipients import (
+            actionable_principal_emails,
+            state_actionable,
+        )
 
         async with self.sessionmaker() as session:
             row = (
@@ -123,6 +126,11 @@ class NotificationActionDispatcher:
                 if state_id is not None
                 else None
             )
+            # Task-Mail nur, wenn am neuen State wirklich gehandelt werden kann (#9):
+            # vote-State oder ≥1 manueller Übergang mit requiresAction — sonst ist
+            # "du kannst handeln" schlicht falsch (reiner Durchgangs-/End-State).
+            if not await state_actionable(session, state):
+                return
             recipients = await actionable_principal_emails(
                 session, state=state, gremium_id=gremium_id
             )
