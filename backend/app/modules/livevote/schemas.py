@@ -95,6 +95,8 @@ class MeetingOut(_CamelModel):
     title: str
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
+    # Automatisch beim Schließen gesetzt (#14) — »Ende« der Protokoll-Titelseite.
+    closed_at: _datetime | None = Field(default=None, alias="closedAt")
     status: MeetingStatus
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
     protocol_id: UUID | None = Field(default=None, alias="protocolId")

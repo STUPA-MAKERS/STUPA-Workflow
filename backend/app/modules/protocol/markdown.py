@@ -50,6 +50,9 @@ class ProtocolDoc:
     markdown: str
     # Zusätzliche Titelseiten-/Header-Daten (#protocol-metadata, pytex-Protokoll-Header).
     start_time: _time | None = None
+    # Sitzungsende (#14, lokale Zeit) — aus ``meeting.closed_at``; mit Start ergibt
+    # das die »Zeit: Start – Ende«-Titelseiten-Zeile (pytex ``beginn``/``ende``).
+    end_time: _time | None = None
     protokollant: str | None = None
     present: list[str] = field(default_factory=list)
     absent: list[str] = field(default_factory=list)
@@ -85,6 +88,11 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
             datum = f"{datum} {doc.start_time.strftime('%H:%M')}"
         lines.append(f"datum: {_yaml_scalar(datum)}")
         lines.append(f"date: {_yaml_scalar(doc.date.isoformat())}")
+    # Start/Ende (#14): pytex rendert daraus die »Zeit: Start – Ende«-Daten-Zeile.
+    if doc.start_time is not None:
+        lines.append(f"beginn: {_yaml_scalar(doc.start_time.strftime('%H:%M'))}")
+    if doc.end_time is not None:
+        lines.append(f"ende: {_yaml_scalar(doc.end_time.strftime('%H:%M'))}")
     if doc.protokollant:
         lines.append(f"protokoll: {_yaml_scalar(doc.protokollant)}")
     lines += _yaml_list("anwesend", doc.present)

@@ -72,13 +72,16 @@ _LIMITS = BuildLimits(
 # wir erweitern sie hier (Wrapper-Patch statt Paket-Fork, #protocol-quorum).
 from pytex_markdown.protocol import document as _protocol_document  # noqa: E402
 
-if not any(
-    label == "Beschlussfähigkeit" for label, _ in _protocol_document._SCALAR_ROWS
+for _label, _keys in (
+    # Gremium als Titelseiten-Daten-Zeile (#14) — pytex kennt den Key nicht nativ.
+    ("Gremium", ("gremium",)),
+    ("Beschlussfähigkeit", ("beschlussfaehigkeit", "beschlussfähigkeit")),
 ):
-    _protocol_document._SCALAR_ROWS = (
-        *_protocol_document._SCALAR_ROWS,
-        ("Beschlussfähigkeit", ("beschlussfaehigkeit", "beschlussfähigkeit")),
-    )
+    if not any(label == _label for label, _ in _protocol_document._SCALAR_ROWS):
+        _protocol_document._SCALAR_ROWS = (
+            *_protocol_document._SCALAR_ROWS,
+            (_label, _keys),
+        )
 
 app = FastAPI(title="pytex render service", version="1.0.0")
 

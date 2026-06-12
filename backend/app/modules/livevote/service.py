@@ -32,6 +32,8 @@ from app.modules.admin.gremium_roles import (
     gremium_member_ids,
 )
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
@@ -183,6 +185,7 @@ class MeetingService:
             title=meeting.title,
             date=meeting.date,
             startTime=meeting.start_time,
+            closedAt=meeting.closed_at,
             status=meeting.status,  # type: ignore[arg-type]
             activeApplicationId=meeting.active_application_id,
             protocolId=protocol_id,
@@ -746,6 +749,10 @@ class MeetingService:
             raise ConflictError("a closed session cannot be re-opened")
 
         if payload.status is not None:
+            # Schließ-Zeitpunkt (#14): einmalig beim Wechsel auf ``closed`` —
+            # liefert die »Ende«-Zeile der Protokoll-Titelseite.
+            if payload.status == "closed" and meeting.status != "closed":
+                meeting.closed_at = datetime.now(UTC)
             meeting.status = payload.status
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id
@@ -754,6 +761,12 @@ class MeetingService:
         if "start_time" in payload.model_fields_set:
             meeting.start_time = payload.start_time
         if "protokollant_id" in payload.model_fields_set:
+            # Nach Finalisierung ist die Schriftführung Teil des unterschriebenen
+            # Dokuments — der Protokollant ist dann gesperrt (#15).
+            if await self._protocol_final(meeting.id):
+                raise ConflictError(
+                    "protocol is finalized — the protokollant can no longer change"
+                )
             meeting.protokollant_id = await self._resolve_protokollant(
                 meeting.gremium_id, payload.protokollant_id
             )
@@ -774,14 +787,46 @@ class MeetingService:
         if self.publisher is not None:
             await self.publisher.meeting_state(out)
 
+    async def _protocol_final(self, meeting_id: UUID) -> bool:
+        """Hat die Sitzung ein FINALISIERTES Protokoll? (#15/#16)"""
+        # Lokaler Import: ``protocol`` hängt von ``livevote`` — Modul-Level wäre ein Zyklus.
+        from app.modules.protocol.models import Protocol
+
+        status = await self.session.scalar(
+            select(Protocol.status).where(Protocol.meeting_id == meeting_id)
+        )
+        return status == "final"
+
     async def delete(self, meeting_id: UUID, principal: Principal) -> None:
         """Sitzung löschen — nur Sitzungsverwalter (``session.manage``)/Admin.
+
+        Eine Sitzung mit FINALISIERTEM Protokoll (#16) verlangt zusätzlich die
+        globale Permission ``meeting.delete_finalized`` — das Protokoll ist ein
+        unterschriebenes, versandtes Dokument. Jedes Löschen wird auditiert.
 
         Kaskade: Protokoll/Tagesordnung/Anwesenheit entfallen mit; gebundene
         Abstimmungen werden via ``SET NULL`` entkoppelt (Ergebnis bleibt erhalten)."""
         meeting = await self._get(meeting_id)
         if not await self.can_manage(meeting.gremium_id, principal):
             raise ForbiddenError("not allowed to delete this meeting")
+        finalized = await self._protocol_final(meeting_id)
+        if finalized and not principal.has("meeting.delete_finalized"):
+            raise ForbiddenError(
+                "this meeting has a finalized protocol — deleting it requires "
+                "the meeting.delete_finalized permission"
+            )
+        await audit_record(
+            self.session,
+            actor=principal.sub,
+            action=AuditAction.MEETING_DELETE,
+            target_type="meeting",
+            target_id=str(meeting.id),
+            data={
+                "title": meeting.title,
+                "gremiumId": str(meeting.gremium_id),
+                "finalizedProtocol": finalized,
+            },
+        )
         await self.session.delete(meeting)
         await self.session.commit()
 

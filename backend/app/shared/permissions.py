@@ -33,6 +33,9 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "vote.manage",
     "meeting.manage",
     "protocol.finalize",
+    # Löschen von Sitzungen mit FINALISIERTEM Protokoll (#16) — bewusst getrennt
+    # von meeting.manage; jedes Löschen landet als meeting_delete im Audit-Log.
+    "meeting.delete_finalized",
     "budget.view",
     "budget.structure",
     "budget.book",

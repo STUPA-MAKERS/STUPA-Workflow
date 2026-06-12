@@ -26,6 +26,8 @@ Protokoll bleibt Entwurf und der Aufruf ist wiederholbar.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from datetime import time as _time
+from zoneinfo import ZoneInfo
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -329,6 +331,9 @@ class ProtocolService:
                 cd_variant=protocol.cd_variant,
                 date=meeting.date if meeting is not None else None,
                 start_time=getattr(meeting, "start_time", None) if meeting is not None else None,
+                end_time=self._local_end_time(
+                    getattr(meeting, "closed_at", None) if meeting is not None else None
+                ),
                 protokollant=protokollant,
                 present=present,
                 absent=absent,
@@ -336,6 +341,14 @@ class ProtocolService:
                 markdown=assembled or protocol.markdown,
             )
         )
+
+    def _local_end_time(self, closed_at: object) -> _time | None:
+        """``meeting.closed_at`` (UTC) → lokale Uhrzeit für die »Ende«-Zeile (#14)."""
+        if not isinstance(closed_at, datetime):
+            return None
+        settings = self.settings or get_settings()
+        tz = ZoneInfo(settings.local_timezone)
+        return closed_at.astimezone(tz).time().replace(second=0, microsecond=0)
 
     async def _quorate(self, gremium: object | None, present_count: int) -> bool | None:
         """Beschlussfähigkeit: Anwesende vs. aktive Mitglieder (#protocol-quorum).

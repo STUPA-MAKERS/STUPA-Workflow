@@ -587,6 +587,8 @@ export const de = {
   'meetings.vote.open': 'Abstimmung öffnen',
   'meetings.vote.close': 'Abstimmung schließen',
   'meetings.vote.cancel': 'Abstimmung abbrechen',
+  'meetings.protokollant.lockedHint':
+    'Protokoll ist finalisiert — die Schriftführung kann nicht mehr geändert werden.',
   'meetings.protocol.title': 'Protokoll',
   'meetings.protocol.none': 'Für diese Sitzung gibt es noch kein Protokoll.',
   'meetings.protocol.create': 'Protokoll anlegen',
@@ -2238,6 +2240,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.vote.open': 'Open vote',
   'meetings.vote.close': 'Close vote',
   'meetings.vote.cancel': 'Cancel vote',
+  'meetings.protokollant.lockedHint':
+    'The protocol is finalized — the minute-taker can no longer be changed.',
   'meetings.protocol.title': 'Minutes',
   'meetings.protocol.none': 'There are no minutes for this meeting yet.',
   'meetings.protocol.create': 'Create minutes',

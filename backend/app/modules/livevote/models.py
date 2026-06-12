@@ -14,11 +14,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import date as _date
+from datetime import datetime as _datetime
 from datetime import time as _time
 
 from sqlalchemy import (
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -44,6 +46,11 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     # Geplante Uhrzeit (#34) — optional, ergänzt das Datum.
     start_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
+    # Automatisch gesetzt beim Wechsel auf ``closed`` (#14) — liefert die
+    # »Ende«-Zeile der Protokoll-Titelseite. ``closed`` ist terminal.
+    closed_at: Mapped[_datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     active_application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )

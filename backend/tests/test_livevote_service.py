@@ -374,3 +374,124 @@ def test_meeting_patch_requires_at_least_one_field() -> None:
 
     with _pytest.raises(ValidationError):
         MeetingPatch()
+
+
+# ---------------------------------------------------------------- #14/#15/#16
+def _meeting(status: str = "planned") -> Meeting:
+    meeting = Meeting(gremium_id=uuid4(), title="GV")
+    meeting.id = uuid4()
+    meeting.status = status
+    meeting.date = None
+    meeting.closed_at = None
+    meeting.active_application_id = None
+    meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
+    return meeting
+
+
+@pytest.mark.asyncio
+async def test_service_patch_close_sets_closed_at() -> None:
+    """#14: Status→closed stempelt ``closed_at`` (einmalig, fürs Protokoll-Ende)."""
+    meeting = _meeting()
+    svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
+    out = await svc.patch(meeting.id, MeetingPatch(status="closed"), _principal())
+    assert out.status == "closed"
+    assert meeting.closed_at is not None
+    first = meeting.closed_at
+    # Erneutes »closed« (No-op) überschreibt den Stempel nicht.
+    await svc.patch(meeting.id, MeetingPatch(status="closed"), _principal())
+    assert meeting.closed_at == first
+
+
+@pytest.mark.asyncio
+async def test_service_patch_protokollant_locked_after_finalize(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#15: finalisiertes Protokoll ⇒ Protokollant nicht mehr änderbar (409)."""
+    meeting = _meeting()
+
+    async def _final(self, _mid):  # noqa: ANN001, ANN202
+        return True
+
+    monkeypatch.setattr(MeetingService, "_protocol_final", _final)
+    svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
+    with pytest.raises(ConflictError):
+        await svc.patch(
+            meeting.id, MeetingPatch(protokollantId=uuid4()), _principal()
+        )
+
+
+class _DeletableSession(_FakeSession):
+    def __init__(self, existing: object = None) -> None:
+        super().__init__(existing)
+        self.deleted: list[object] = []
+
+    async def delete(self, obj: object) -> None:
+        self.deleted.append(obj)
+
+
+def _audit_capture(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+    import app.modules.livevote.service as livevote_service_mod
+
+    calls: list[dict] = []
+
+    async def _record(session, **kw):  # noqa: ANN001, ANN202
+        calls.append(kw)
+
+    monkeypatch.setattr(livevote_service_mod, "audit_record", _record)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_service_delete_finalized_requires_special_permission(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#16: Sitzung mit finalisiertem Protokoll löschen ⇒ nur mit
+    ``meeting.delete_finalized``; ohne ⇒ 403 und nichts gelöscht."""
+    from app.modules.auth.principal import Principal
+    from app.shared.errors import ForbiddenError
+
+    meeting = _meeting(status="closed")
+
+    async def _final(self, _mid):  # noqa: ANN001, ANN202
+        return True
+
+    monkeypatch.setattr(MeetingService, "_protocol_final", _final)
+    calls = _audit_capture(monkeypatch)
+    session = _DeletableSession(existing=meeting)
+    svc = MeetingService(session)  # type: ignore[arg-type]
+
+    manager = Principal(sub="mgr", permissions={"meeting.manage"}, roles=["manager"])
+    with pytest.raises(ForbiddenError):
+        await svc.delete(meeting.id, manager)
+    assert session.deleted == []
+    assert calls == []
+
+    privileged = Principal(
+        sub="archiv",
+        permissions={"meeting.manage", "meeting.delete_finalized"},
+        roles=["manager"],
+    )
+    await svc.delete(meeting.id, privileged)
+    assert session.deleted == [meeting]
+    assert calls[0]["action"].value == "meeting_delete"
+    assert calls[0]["data"]["finalizedProtocol"] is True
+
+
+@pytest.mark.asyncio
+async def test_service_delete_unfinalized_is_audited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#16: auch normales Löschen landet im Audit-Log (finalizedProtocol=False)."""
+    meeting = _meeting()
+
+    async def _final(self, _mid):  # noqa: ANN001, ANN202
+        return False
+
+    monkeypatch.setattr(MeetingService, "_protocol_final", _final)
+    calls = _audit_capture(monkeypatch)
+    session = _DeletableSession(existing=meeting)
+    svc = MeetingService(session)  # type: ignore[arg-type]
+    await svc.delete(meeting.id, _principal())
+    assert session.deleted == [meeting]
+    assert calls[0]["data"]["finalizedProtocol"] is False
+    assert calls[0]["target_id"] == str(meeting.id)

@@ -24,6 +24,9 @@ class AuditAction(StrEnum):
     DELEGATION_SUBSTITUTE_ADD = "delegation_substitute_add"
     DELEGATION_SUBSTITUTE_REMOVE = "delegation_substitute_remove"
     EXPORT = "export"
+    # Sitzung gelöscht (#16) — mit ``finalizedProtocol``-Flag im Datensatz; das
+    # Löschen finalisierter Sitzungen verlangt ``meeting.delete_finalized``.
+    MEETING_DELETE = "meeting_delete"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"

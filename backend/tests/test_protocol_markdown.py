@@ -130,3 +130,20 @@ def test_demote_headings_shifts_levels_and_skips_fences() -> None:
     assert "# nicht anfassen" in out  # Code-Fence unberührt
     assert "###### F" in out  # Ebene 6 bleibt 6
     assert "kein # heading" in out
+
+
+def test_frontmatter_start_end_time_lines() -> None:
+    """#14: Start/Ende reisen als ``beginn``/``ende`` — pytex rendert daraus die
+    »Zeit: Start – Ende«-Titelseiten-Zeile."""
+    from datetime import time
+
+    md = build_protocol_document(
+        _doc(start_time=time(18, 30), end_time=time(21, 5))
+    )
+    assert 'beginn: "18:30"' in md
+    assert 'ende: "21:05"' in md
+
+
+def test_frontmatter_end_time_omitted_when_unknown() -> None:
+    md = build_protocol_document(_doc())
+    assert "ende:" not in md

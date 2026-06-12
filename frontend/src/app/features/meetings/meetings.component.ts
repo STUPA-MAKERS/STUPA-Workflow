@@ -777,13 +777,19 @@ const AUTOSAVE_DELAY_MS = 1000;
       (closed)="closeSettings()"
     >
       <form class="mtg__createForm" (submit)="$event.preventDefault(); saveSettings()">
+        <!-- Nach Finalisierung gesperrt (#15): die Schriftführung ist Teil des
+             unterschriebenen Dokuments; das Backend lehnt Änderungen mit 409 ab. -->
         <app-select
           name="setProt"
           [label]="'meetings.protokollant.label' | t"
           [options]="protokollantOptions()"
+          [disabled]="!!protocol()?.isFinal"
           [ngModel]="settingsProtokollant()"
           (ngModelChange)="settingsProtokollant.set($event)"
         />
+        @if (protocol()?.isFinal) {
+          <p class="mtg__muted">{{ 'meetings.protokollant.lockedHint' | t }}</p>
+        }
         <app-datepicker
           [label]="'meetings.create.date' | t"
           [ngModel]="settingsDate()"
@@ -2712,9 +2718,15 @@ export class MeetingsComponent implements OnDestroy {
     const m = this.settingsMeeting();
     if (!m || this.savingSettings()) return;
     this.savingSettings.set(true);
+    // Protokollant nach Finalisierung gesperrt (#15) — Feld ist disabled, der
+    // Wert wird gar nicht erst mitgesendet (Backend würde mit 409 ablehnen).
+    const protokollantLocked =
+      this.meeting()?.id === m.id && !!this.protocol()?.isFinal;
     this.api
       .patchMeeting(m.id, {
-        protokollantId: this.settingsProtokollant() || null,
+        ...(protokollantLocked
+          ? {}
+          : { protokollantId: this.settingsProtokollant() || null }),
         date: this.settingsDate().trim() || null,
         startTime: this.settingsTime().trim() || null,
       })
