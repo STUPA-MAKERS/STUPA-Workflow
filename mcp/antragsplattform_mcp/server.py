@@ -495,9 +495,18 @@ async def open_vote(vote_id: str) -> dict:
 
 @mcp.tool()
 async def close_vote(vote_id: str) -> dict:
-    """Close a vote, tally it, fire the result branch. Requires vote.manage.
+    """Close a vote, tally it, fire the result branch. 409 while the quorum is
+    not met — collect more ballots or cancel_vote. Requires vote.manage.
     (Agents manage votes but cannot cast ballots — that is human-only.)"""
     return await _api().post(f"/votes/{vote_id}/close")
+
+
+@mcp.tool()
+async def cancel_vote(vote_id: str) -> dict:
+    """Cancel an OPEN vote: status becomes cancelled, no result, no flow branch —
+    the application stays in its vote state. The way out when the quorum cannot
+    be reached (close is blocked then). Requires vote.manage."""
+    return await _api().post(f"/votes/{vote_id}/cancel")
 
 
 # ============================================================ meetings (manage)
