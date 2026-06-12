@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { SimplifyPathPipe } from '@shared/budget-path';
 import type { BudgetTreeNode } from './budget-tree.api';
 import { PALETTE } from './budget-year-tree.component';
 
@@ -67,7 +68,7 @@ const R_MAX = SIZE / 2 - 8;
         @if (hovered(); as h) {
           <div class="sb__tip" [style.left.px]="tip().x" [style.top.px]="tip().y" role="status">
             <strong>{{ h.name }}</strong>
-            <span class="sb__tip-path">{{ h.pathKey }}</span>
+            <span class="sb__tip-path">{{ h.pathKey | simplifyPath }}</span>
             <span>{{ money(h.value) }} · {{ h.percent }}%</span>
           </div>
         }
@@ -77,7 +78,7 @@ const R_MAX = SIZE / 2 - 8;
       }
     </div>
   `,
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, SimplifyPathPipe],
   styles: [
     `
       .sb {
