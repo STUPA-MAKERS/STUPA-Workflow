@@ -144,6 +144,8 @@ describe('Kern-Views a11y (axe)', () => {
       effectiveForm: () => of(EFF),
       // Anonyme Session — AuthService.ensureLoaded() im Wizard-Konstruktor (#24).
       me: (() => of(null)) as unknown as ApiClient['me'],
+      // Branding-Info unter der Typ-Auswahl (#18) — leer im Test.
+      publicSiteConfig: () => of({ version: 1, branding: null }),
     };
 
     @Component({
