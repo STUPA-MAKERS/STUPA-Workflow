@@ -63,3 +63,7 @@ class MeOut(BaseModel):
     # (``session.manage``, z. B. vorstand/manager) — Basis fürs FE-Gating
     # »Sitzung anlegen« ohne globale ``meeting.manage``-Permission.
     session_manage_gremien: list[UUID] = []
+    # Mindestens eine Kostenstelle ist einem Mitglieds-Gremium des Principals als
+    # Sichtbarkeits-Root zugeordnet (#budget-scope) — FE-Gating des Budget-Tabs
+    # ohne globale ``budget.*``-Permission.
+    has_scoped_budget_view: bool = False

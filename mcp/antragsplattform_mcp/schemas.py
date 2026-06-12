@@ -300,6 +300,11 @@ class BudgetNodeUpdate(WireModel):
         description="Hide this node (incl. subtree) in the budget tab — display only, "
         "rollups/export unchanged",
     )
+    viewGremiumId: str | None = Field(
+        default=None,
+        description="Committee whose members see this node (incl. subtree) as a "
+        "budget-tab root without global budget permissions; null clears",
+    )
     fiscalStartMonth: int | None = None
     fiscalStartDay: int | None = None
 

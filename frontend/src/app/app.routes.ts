@@ -156,7 +156,8 @@ export const routes: Routes = [
       },
       {
         path: 'budget',
-        data: { title: 'nav.budget', permission: ['budget.view', 'budget.structure', 'budget.book'], wide: true },
+        // #budget-scope: Gremien mit zugeordneter Kostenstelle sehen den Tab gescoped.
+        data: { title: 'nav.budget', permission: ['budget.view', 'budget.structure', 'budget.book'], allowScopedBudgetView: true, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/budget/budget-dashboard.component').then(

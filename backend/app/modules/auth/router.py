@@ -170,7 +170,23 @@ async def me(
         groups=sorted(principal.groups),
         gremien=await _gremien_for(db, principal.sub),
         session_manage_gremien=await _session_manage_gremien(db, principal.sub),
+        has_scoped_budget_view=await _has_scoped_budget_view(db, principal.sub),
     )
+
+
+async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
+    """Hat ein Mitglieds-Gremium des Principals eine Kostenstelle als
+    Sichtbarkeits-Root (#budget-scope)? Gating des Budget-Tabs im FE."""
+    from app.modules.admin.gremium_roles import gremium_member_ids
+    from app.modules.budget.tree_models import Budget
+
+    member = await gremium_member_ids(db, sub)
+    if not member:
+        return False
+    hit = await db.scalar(
+        select(Budget.id).where(Budget.view_gremium_id.in_(member)).limit(1)
+    )
+    return hit is not None
 
 
 async def _session_manage_gremien(db: DbSession, sub: str) -> list[UUID]:

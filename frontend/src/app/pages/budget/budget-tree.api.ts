@@ -127,6 +127,9 @@ export interface BudgetTreeNode {
   fullyBound: boolean;
   /** Im Budget-Tab ausblenden (#budget-hide) — reine Anzeige, Rollups unverändert. */
   hiddenInBudget: boolean;
+  /** Sichtbarkeits-Gremium (#budget-scope): dessen Mitglieder sehen diesen
+   *  Teilbaum im Budget-Tab als Root — ohne globale budget.*-Rechte. */
+  viewGremiumId: Uuid | null;
   /** HHJ-Stichtag (Tag/Monat des Periodenstarts) — nur am Top-Level relevant. */
   fiscalStartMonth: number;
   fiscalStartDay: number;
@@ -185,6 +188,8 @@ export interface BudgetNodeUpdate {
   deniedStateKeys?: string[];
   fullyBound?: boolean;
   hiddenInBudget?: boolean;
+  /** Sichtbarkeits-Gremium (#budget-scope); `null` löscht die Zuordnung. */
+  viewGremiumId?: Uuid | null;
   fiscalStartMonth?: number;
   fiscalStartDay?: number;
 }

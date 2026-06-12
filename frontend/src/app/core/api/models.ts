@@ -67,6 +67,8 @@ export interface Principal {
   gremien?: GremiumRef[];
   /** Gremien, die der Principal verwaltet (Gremium-Rolle mit `session.manage`). */
   session_manage_gremien?: Uuid[];
+  /** ≥1 Kostenstelle ist einem Mitglieds-Gremium zugeordnet (#budget-scope). */
+  has_scoped_budget_view?: boolean;
 }
 
 /** Antwort von POST /api/auth/logout — RP-Initiated-Logout-URL (OIDC) oder null. */

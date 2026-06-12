@@ -132,13 +132,13 @@ export class BudgetDashboardComponent {
     return prune(this.tree());
   });
 
-  /** Top-Budgets (Wurzeln) für den linken Baum — nur Budgets **mit** Haushaltsjahr
-   *  (#11): ohne HHJ gibt es im Budget-Tab nichts auszuwerten, also ausblenden. */
+  /** Wurzeln für den linken Baum — die Forest-Roots der Server-Antwort: bei
+   *  Voll-Sicht die Top-Budgets, bei Gremium-Scope (#budget-scope) die
+   *  zugeordneten (Unter-)Kostenstellen. Nur Wurzeln **mit** Haushaltsjahr (#11);
+   *  der HHJ-Endpoint löst Unter-Kostenstellen auf ihren Top-Level-Vorfahren auf. */
   readonly tops = computed(() => {
     const fy = this.fiscalYearsByBudget();
-    return this.visibleTree().filter(
-      (n) => n.parentId === null && (fy[n.id]?.length ?? 0) > 0,
-    );
+    return this.visibleTree().filter((n) => (fy[n.id]?.length ?? 0) > 0);
   });
 
   private readonly nodeById = computed(() => {
@@ -368,8 +368,9 @@ export class BudgetDashboardComponent {
       next: (tree) => {
         this.tree.set(tree);
         this.loading.set(false);
-        // Ausgeblendete Top-Budgets (#budget-hide) sind im Tab nicht wählbar.
-        const tops = tree.filter((n) => n.parentId === null && !n.hiddenInBudget);
+        // Forest-Roots (#budget-scope: ggf. Unter-Kostenstellen); ausgeblendete
+        // (#budget-hide) sind im Tab nicht wählbar.
+        const tops = tree.filter((n) => !n.hiddenInBudget);
         // HHJ aller Top-Budgets laden (linker Baum) — parallel, fehlertolerant.
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({

@@ -163,11 +163,34 @@ def fiscal_year_display(year: int, start_month: int, start_day: int) -> str:
 
 # Knoten-Tupel: (id, parent_id, gremium_id, key, path_key, name, currency, active,
 # color, accepted_state_keys, denied_state_keys, fiscal_start_month, fiscal_start_day,
-# fully_bound, hidden_in_budget).
+# fully_bound, hidden_in_budget, view_gremium_id).
 NodeTuple = tuple[
     object, object | None, object | None, str, str, str, str, bool,
-    str | None, list, list, int, int, bool, bool,
+    str | None, list, list, int, int, bool, bool, object | None,
 ]
+
+
+def scope_forest(forest: list[dict], gremium_ids: set[object]) -> list[dict]:
+    """Sichtbarkeits-Scope (#budget-scope): liefert die Teilbäume, deren Wurzel ein
+    ``view_gremium_id`` aus ``gremium_ids`` trägt — als neue Roots des Tabs.
+
+    Tiefensuche über den gebauten Forest; ein Treffer nimmt seinen GANZEN Teilbaum
+    mit (innen erneut zugeordnete Knoten werden nicht dupliziert — äußerer gewinnt).
+    """
+    if not gremium_ids:
+        return []
+    out: list[dict] = []
+
+    def walk(node: dict) -> None:
+        if node.get("view_gremium_id") in gremium_ids:
+            out.append(node)
+            return
+        for child in node.get("children", []):
+            walk(child)
+
+    for root in forest:
+        walk(root)
+    return out
 
 
 def _views_for_node(
@@ -264,7 +287,7 @@ def build_forest(
 
     def to_dict(n: NodeTuple) -> dict:
         (nid, parent_id, n_gremium, key, path, name, currency, active, color, acc,
-         den, fy_month, fy_day, fully_bound, hidden_in_budget) = n
+         den, fy_month, fy_day, fully_bound, hidden_in_budget, view_gremium_id) = n
         return {
             "id": nid,
             "parent_id": parent_id,
@@ -279,6 +302,7 @@ def build_forest(
             "denied_state_keys": list(den or []),
             "fully_bound": fully_bound,
             "hidden_in_budget": hidden_in_budget,
+            "view_gremium_id": view_gremium_id,
             "fiscal_start_month": fy_month,
             "fiscal_start_day": fy_day,
             "by_fiscal_year": _views_for_node(

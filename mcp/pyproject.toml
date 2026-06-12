@@ -1,6 +1,6 @@
 [project]
 name = "antragsplattform-mcp"
-version = "0.4.3"
+version = "0.4.4"
 description = "MCP server exposing the antragsplattform API to agents via browser-grant OAuth."
 readme = "README.md"
 requires-python = ">=3.11"

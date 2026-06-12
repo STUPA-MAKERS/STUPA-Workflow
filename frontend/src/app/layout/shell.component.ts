@@ -35,6 +35,8 @@ interface NavItem {
   permissions: string[];
   /** Zusätzlich sichtbar für Mitglieder **irgendeines** Gremiums (z. B. Sitzungen, #sessions). */
   inAnyCommittee?: boolean;
+  /** Zusätzlich sichtbar bei gescopter Budget-Sicht (#budget-scope). */
+  scopedBudgetView?: boolean;
   /**
    * Exakter Aktiv-Abgleich (#106): nötig, wenn der Pfad Präfix eines anderen
    * Nav-Eintrags ist (z. B. `/budget` vor `/budget/pots`) — sonst markiert die
@@ -141,6 +143,8 @@ export class ShellComponent {
       path: '/budget',
       labelKey: 'nav.budget',
       permissions: ['budget.view', 'budget.structure', 'budget.book'],
+      // #budget-scope: Gremien mit zugeordneter Kostenstelle sehen den Tab gescoped.
+      scopedBudgetView: true,
     },
     {
       path: '/expenses',
@@ -163,7 +167,9 @@ export class ShellComponent {
     const inAnyCommittee = this.auth.gremien().length > 0;
     return this.nav.filter(
       (item) =>
-        this.auth.canAny(...item.permissions) || (!!item.inAnyCommittee && inAnyCommittee),
+        this.auth.canAny(...item.permissions) ||
+        (!!item.inAnyCommittee && inAnyCommittee) ||
+        (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()),
     );
   });
 

@@ -83,8 +83,11 @@ class _FakeService:
         self.calls: dict[str, Any] = {}
         self.session = _FakeAuditSession()
 
-    async def get_tree(self, *, gremium_id: Any = None) -> list[BudgetTreeNodeOut]:
+    async def get_tree(
+        self, *, gremium_id: Any = None, visible_gremium_ids: Any = None
+    ) -> list[BudgetTreeNodeOut]:
         self.calls["tree"] = gremium_id
+        self.calls["scope"] = visible_gremium_ids
         return [
             BudgetTreeNodeOut(
                 id=_BID, parentId=None, gremiumId=_GID, key="VS", pathKey="VS",
@@ -288,13 +291,36 @@ def test_create_expense_forbidden_for_viewer(fake: _FakeService) -> None:
     assert resp.status_code == 403
 
 
-def test_forbidden_without_permission(fake: _FakeService) -> None:
+def test_tree_without_permission_is_gremium_scoped(
+    fake: _FakeService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#budget-scope: ohne budget.*-Permission liefert der Baum den Gremium-Scope
+    (Mitglieds-Gremien als visible_gremium_ids); ohne Mitgliedschaften leer."""
+    import app.modules.admin.gremium_roles as gr
+
+    async def _members(session, sub, now=None):  # noqa: ANN001, ANN202
+        return set()
+
+    monkeypatch.setattr(gr, "gremium_member_ids", _members)
     app = create_app()
     app.dependency_overrides[get_budget_tree_service] = lambda: fake
     app.dependency_overrides[get_current_principal] = lambda: Principal(sub="x", permissions=set())
     app.dependency_overrides[get_current_applicant] = lambda: None
     resp = TestClient(app).get("/api/budgets")
-    assert resp.status_code == 403
+    assert resp.status_code == 200
+    assert fake.calls["scope"] == set()
+
+
+def test_tree_full_view_is_unscoped(fake: _FakeService) -> None:
+    app = create_app()
+    app.dependency_overrides[get_budget_tree_service] = lambda: fake
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="x", permissions={"budget.view"}
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
+    resp = TestClient(app).get("/api/budgets")
+    assert resp.status_code == 200
+    assert fake.calls["scope"] is None
 
 
 _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

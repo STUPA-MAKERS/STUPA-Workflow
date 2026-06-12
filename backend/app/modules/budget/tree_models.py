@@ -78,6 +78,12 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     hidden_in_budget: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
+    # Sichtbarkeits-Gremium (#budget-scope): Mitglieder dieses Gremiums sehen die
+    # Kostenstelle (+ Unterbaum) im Budget-Tab als Root — ohne globale
+    # budget.*-Permission. Unabhängig vom Top-Level-``gremium_id`` (Klassifikation).
+    view_gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
+    )
     # Haushaltsjahr-Stichtag (Tag/Monat des Periodenstarts) — **nur am Top-Level**
     # relevant. Default 01.01.; abweichend (z. B. 01.07.) ⇒ HHJ-Anzeige »YYYY/YY«.
     # Die HHJ tragen nur das Jahr; Start/Ende leiten sich aus diesem Stichtag ab.

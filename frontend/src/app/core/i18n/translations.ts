@@ -860,6 +860,10 @@ export const de = {
   'budget.tree.hiddenInBudget': 'Im Budget-Tab ausblenden',
   'budget.tree.hiddenInBudgetHint':
     'Nur Anzeige: Die Kostenstelle (inkl. Unterbaum) erscheint nicht im Budget-Tab; Summen, Verfügbar-Rechnung und Export bleiben unverändert.',
+  'budget.tree.viewGremium': 'Sichtbar für Gremium',
+  'budget.tree.viewGremiumNone': '— kein Gremium —',
+  'budget.tree.viewGremiumHint':
+    'Mitglieder dieses Gremiums sehen die Kostenstelle samt Unterbaum im Budget-Tab als Wurzel — auch ohne globale Budget-Rechte.',
   'budget.tree.toast.saved': 'Gespeichert.',
   'budget.tree.toast.keyFailed':
     'Speichern fehlgeschlagen (Schlüssel ungültig oder bereits vergeben?).',
@@ -2517,6 +2521,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.hiddenInBudget': 'Hide in budget tab',
   'budget.tree.hiddenInBudgetHint':
     'Display only: the cost centre (incl. its subtree) does not appear in the budget tab; totals, available calculation and export stay unchanged.',
+  'budget.tree.viewGremium': 'Visible to committee',
+  'budget.tree.viewGremiumNone': '— no committee —',
+  'budget.tree.viewGremiumHint':
+    'Members of this committee see the cost centre and its subtree as a root in the budget tab — even without global budget permissions.',
   'budget.tree.toast.saved': 'Saved.',
   'budget.tree.toast.keyFailed': 'Save failed (key invalid or already in use?).',
   'budget.tree.openNav': 'Choose budget',

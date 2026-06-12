@@ -191,11 +191,15 @@ async def test_delete_node_not_found() -> None:
 
 
 # ------------------------------------------------------------------ fiscal years
-async def test_list_fiscal_years_not_top_level() -> None:
-    child = _budget(parent_id=uuid.uuid4(), path_key="VS-800")
-    svc = BudgetTreeService(fake_session(result(child)))
-    with pytest.raises(ValidationProblem):
-        await svc.list_fiscal_years(child.id)
+async def test_list_fiscal_years_resolves_top_ancestor() -> None:
+    """#budget-scope: Nicht-Top-Level löst auf den Top-Level-Vorfahren auf —
+    gescopte Roots sind oft Unter-Kostenstellen."""
+    top = _budget(path_key="VS")
+    child = _budget(parent_id=top.id, path_key="VS-800")
+    fy = _fy(budget_id=top.id)
+    svc = BudgetTreeService(fake_session(result(child), result(top), result(fy)))
+    out = await svc.list_fiscal_years(child.id)
+    assert len(out) == 1 and out[0].budget_id == top.id
 
 
 async def test_list_fiscal_years_ok() -> None:

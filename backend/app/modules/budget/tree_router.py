@@ -52,7 +52,7 @@ from app.modules.budget.tree_schemas import (
     TransferOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
-from app.shared.errors import ProblemDetail
+from app.shared.errors import ForbiddenError, ProblemDetail
 from app.shared.paging import Page
 
 router = APIRouter(tags=["budget"])
@@ -71,19 +71,55 @@ def get_budget_tree_service(session: DbSession) -> BudgetTreeService:
 ServiceDep = Annotated[BudgetTreeService, Depends(get_budget_tree_service)]
 
 
+
+
+# Globale Voll-Sicht auf den Budget-Tab — jede dieser Permissions zeigt ALLES;
+# ohne sie greift der Gremium-Scope (#budget-scope, view_gremium_id).
+_FULL_VIEW_PERMS = ("budget.view", "budget.structure", "budget.book")
+
+
+def _has_full_view(principal: Principal) -> bool:
+    return any(principal.has(p) for p in _FULL_VIEW_PERMS)
+
+
+async def _member_gremium_ids(service: BudgetTreeService, sub: str) -> set[UUID]:
+    from app.modules.admin.gremium_roles import gremium_member_ids
+
+    return await gremium_member_ids(service.session, sub)
+
+
+async def _require_node_view(
+    service: BudgetTreeService, principal: Principal, budget_id: UUID
+) -> None:
+    """Voll-Sicht ODER Knoten liegt in einem zugeordneten Teilbaum (#budget-scope)."""
+    if _has_full_view(principal):
+        return
+    member = await _member_gremium_ids(service, principal.sub)
+    if not await service.can_view_node(budget_id, member):
+        raise ForbiddenError("no access to this cost centre")
+
 # --------------------------------------------------------------------- nodes
 @router.get(
     "/budgets",
     response_model=list[BudgetTreeNodeOut],
-    dependencies=[Depends(require_principal("budget.view"))],
     responses=_errors(401, 403),
 )
 async def list_budget_tree(
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
 ) -> list[BudgetTreeNodeOut]:
-    """Kostenstellen-Baum (mit ``pathKey``, allocated/committed/available je HHJ)."""
-    return await service.get_tree(gremium_id=gremium_id)
+    """Kostenstellen-Baum (mit ``pathKey``, allocated/committed/available je HHJ).
+
+    Voll-Sicht mit ``budget.view``/``structure``/``book``; sonst Gremium-Scope
+    (#budget-scope): nur Teilbäume, deren ``viewGremiumId`` einem Mitglieds-Gremium
+    des Principals entspricht — als Roots. Ohne beides: leere Liste."""
+    if _has_full_view(principal):
+        return await service.get_tree(gremium_id=gremium_id)
+    member = await _member_gremium_ids(service, principal.sub)
+    return await service.get_tree(
+        gremium_id=gremium_id, visible_gremium_ids=member
+    )
 
 
 def _find_subtree(
@@ -185,15 +221,18 @@ async def delete_budget_node(budget_id: UUID, service: ServiceDep) -> None:
 @router.get(
     "/budgets/{budget_id}/applications",
     response_model=list[BudgetApplicationOut],
-    dependencies=[Depends(require_principal("budget.view"))],
     responses=_errors(401, 403, 404),
 )
 async def list_budget_applications(
     budget_id: UUID,
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
 ) -> list[BudgetApplicationOut]:
-    """Anträge dieser Kostenstelle + Unterbaum (#17), optional HHJ-gefiltert."""
+    """Anträge dieser Kostenstelle + Unterbaum (#17), optional HHJ-gefiltert.
+
+    Voll-Sicht oder Gremium-Scope auf den Knoten (#budget-scope)."""
+    await _require_node_view(service, principal, budget_id)
     return await service.list_applications(budget_id, fiscal_year_id)
 
 
@@ -201,15 +240,18 @@ async def list_budget_applications(
 @router.get(
     "/budgets/{budget_id}/expenses",
     response_model=list[ExpenseOut],
-    dependencies=[Depends(require_principal("budget.view"))],
     responses=_errors(401, 403, 404),
 )
 async def list_budget_expenses(
     budget_id: UUID,
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
 ) -> list[ExpenseOut]:
-    """Eigenständige Ausgaben dieser Kostenstelle + Unterbaum (#25), optional HHJ."""
+    """Eigenständige Ausgaben dieser Kostenstelle + Unterbaum (#25), optional HHJ.
+
+    Voll-Sicht oder Gremium-Scope auf den Knoten (#budget-scope)."""
+    await _require_node_view(service, principal, budget_id)
     return await service.list_expenses(budget_id, fiscal_year_id)
 
 
@@ -427,13 +469,17 @@ async def delete_account(account_id: UUID, service: ServiceDep) -> None:
 @router.get(
     "/budgets/{budget_id}/fiscal-years",
     response_model=list[FiscalYearOut],
-    dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(401, 403, 404, 422),
 )
 async def list_fiscal_years(
-    budget_id: UUID, service: ServiceDep
+    budget_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[FiscalYearOut]:
-    """Haushaltsjahre eines Top-Level-Budgets auflisten."""
+    """Haushaltsjahre auflisten — jeder Knoten erlaubt; Nicht-Top-Level löst auf
+    seinen Top-Level-Vorfahren auf (#budget-scope: gescopte Roots sind oft
+    Unter-Kostenstellen). Voll-Sicht oder Gremium-Scope auf den Knoten."""
+    await _require_node_view(service, principal, budget_id)
     return await service.list_fiscal_years(budget_id)
 
 

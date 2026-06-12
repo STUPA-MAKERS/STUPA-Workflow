@@ -36,6 +36,15 @@ export const authGuard: CanActivateFn = (route) => {
         if (allowCommittee && auth.gremien().length > 0) {
           return true;
         }
+        // Gremium-Scope des Budget-Tabs (#budget-scope): Mitglieder eines Gremiums
+        // mit zugeordneter Kostenstelle sehen den Tab ohne globale budget.*-Rechte;
+        // der Server liefert NUR die zugeordneten Teilbäume.
+        if (
+          route.data['allowScopedBudgetView'] === true &&
+          auth.hasScopedBudgetView()
+        ) {
+          return true;
+        }
         // Delegations-Empfänger (#delegation-rework) können externe Nutzer ohne
         // Permission/Gremium sein — diese Routen lassen jeden Angemeldeten durch;
         // der Server bleibt autoritativ (Inhalt/403 kommen von dort).

@@ -12,6 +12,7 @@ import {
   DialogComponent,
   IconComponent,
   RowDetailDirective,
+  SelectComponent,
   type SelectOption,
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
@@ -39,7 +40,7 @@ interface Row {
   selector: 'app-budget-tree',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, SimplifyPathPipe, ButtonComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, CurrencyInputComponent, BudgetYearTreeComponent],
+  imports: [FormsModule, TranslatePipe, SimplifyPathPipe, ButtonComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, CurrencyInputComponent, SelectComponent, BudgetYearTreeComponent],
   templateUrl: './budget-tree.component.html',
   styleUrl: './budget-tree.component.scss',
 })
@@ -92,6 +93,10 @@ export class BudgetTreeComponent {
   readonly editName = signal('');
   /** Im Budget-Tab ausblenden (#budget-hide) — reine Anzeige-Einstellung. */
   readonly editHidden = signal(false);
+  /** Sichtbarkeits-Gremium (#budget-scope): dessen Mitglieder sehen den Teilbaum
+   *  im Budget-Tab als Root; '' = keine Zuordnung. */
+  readonly editViewGremium = signal('');
+  readonly gremiumOptions = signal<SelectOption[]>([]);
   /** »Komplett gebunden«-Flag der im Limit-Dialog offenen Kostenstelle (alle HHJ). */
   readonly limitFullyBound = signal(false);
   /** Haushaltsjahr anlegen — INNERHALB des gewählten Budgets (nur das Jahr). */
@@ -133,6 +138,12 @@ export class BudgetTreeComponent {
 
   constructor() {
     this.reload();
+    // Gremien fürs Sichtbarkeits-Dropdown (#budget-scope) im Edit-Dialog.
+    this.adminApi.listGremienOptions().subscribe({
+      next: (list) =>
+        this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
+      error: () => this.gremiumOptions.set([]),
+    });
     // Globaler Flow → State-Keys für die accepted/denied-Konfiguration (still degr.).
     this.adminApi.getGlobalFlow().subscribe({
       next: (graph) =>
@@ -381,6 +392,7 @@ export class BudgetTreeComponent {
     this.editKey.set(node.key);
     this.editName.set(node.name);
     this.editHidden.set(node.hiddenInBudget);
+    this.editViewGremium.set(node.viewGremiumId ?? '');
   }
 
   closeEditNode(): void {
@@ -393,7 +405,14 @@ export class BudgetTreeComponent {
     const key = this.editKey().trim();
     const name = this.editName().trim();
     if (!key || !name) return;
-    this.api.updateNode(node.id, { key, name, hiddenInBudget: this.editHidden() }).subscribe({
+    this.api
+      .updateNode(node.id, {
+        key,
+        name,
+        hiddenInBudget: this.editHidden(),
+        viewGremiumId: this.editViewGremium() || null,
+      })
+      .subscribe({
       next: () => {
         this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
         this.editNode.set(null);

@@ -82,6 +82,7 @@ def _node_out(b: Budget) -> BudgetNodeOut:
         deniedStateKeys=list(b.denied_state_keys or []),
         fullyBound=b.fully_bound,
         hiddenInBudget=bool(b.hidden_in_budget),
+        viewGremiumId=b.view_gremium_id,
         fiscalStartMonth=b.fiscal_start_month,
         fiscalStartDay=b.fiscal_start_day,
     )
@@ -315,11 +316,33 @@ class BudgetTreeService:
         )
 
     async def list_fiscal_years(self, budget_id: UUID) -> list[FiscalYearOut]:
-        top = await self._require_top_level(budget_id)
+        """HHJ-Liste — für JEDEN Knoten: Nicht-Top-Level löst auf seinen Top-Level-
+        Vorfahren auf (#budget-scope: gescopte Roots sind oft Unter-Kostenstellen)."""
+        node = await self._get_node(budget_id)
+        top = node
+        while top.parent_id is not None:
+            top = await self._get_node(top.parent_id)
         return [
             _fy_out(f, top.fiscal_start_month, top.fiscal_start_day)
-            for f in await self._fiscal_years_of(budget_id)
+            for f in await self._fiscal_years_of(top.id)
         ]
+
+    async def can_view_node(
+        self, budget_id: UUID, member_gremium_ids: set[UUID]
+    ) -> bool:
+        """Knoten für ein Gremium-Mitglied sichtbar (#budget-scope)? Wahr, wenn der
+        Knoten SELBST oder ein VORFAHRE einem der Mitglieds-Gremien zugeordnet ist."""
+        if not member_gremium_ids:
+            return False
+        node = await self._get_node(budget_id)
+        segments = node.path_key.split(_SEP)
+        prefixes = [_SEP.join(segments[: i + 1]) for i in range(len(segments))]
+        rows = (
+            await self.session.execute(
+                select(Budget.view_gremium_id).where(Budget.path_key.in_(prefixes))
+            )
+        ).scalars()
+        return any(v in member_gremium_ids for v in rows if v is not None)
 
     async def fiscal_year_label_map(self) -> dict[UUID, str]:
         """``fiscal_year_id`` → Anzeige (``YYYY``/``YYYY/YY``) über alle Top-Budgets."""
@@ -892,7 +915,10 @@ class BudgetTreeService:
 
     # --------------------------------------------------------------- tree view
     async def get_tree(
-        self, *, gremium_id: UUID | None = None
+        self,
+        *,
+        gremium_id: UUID | None = None,
+        visible_gremium_ids: set[UUID] | None = None,
     ) -> list[BudgetTreeNodeOut]:
         """Kostenstellen-Baum mit allocated/committed/beantragt/available je HHJ (R7.4).
 
@@ -1015,7 +1041,7 @@ class BudgetTreeService:
                 n.currency, n.active, n.color,
                 list(n.accepted_state_keys or []), list(n.denied_state_keys or []),
                 n.fiscal_start_month, n.fiscal_start_day, n.fully_bound,
-                bool(n.hidden_in_budget),
+                bool(n.hidden_in_budget), n.view_gremium_id,
             )
             for n in nodes
         ]
@@ -1029,4 +1055,8 @@ class BudgetTreeService:
             income_rows,
             gremium_id=gremium_id,
         )
+        # Gremium-Scope (#budget-scope): ohne globale budget.*-Permission werden nur
+        # die zugeordneten Teilbäume (view_gremium_id ∈ Mitglieds-Gremien) zu Roots.
+        if visible_gremium_ids is not None:
+            forest = tree_rules.scope_forest(forest, set(visible_gremium_ids))
         return [BudgetTreeNodeOut.model_validate(d) for d in forest]

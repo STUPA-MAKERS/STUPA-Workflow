@@ -102,12 +102,12 @@ def test_rollup_committed() -> None:
 def _node(  # noqa: ANN001
     nid, parent, gremium, key, path, name="N", currency="EUR", active=True,
     color=None, accepted=(), denied=(), fiscal_start_month=1, fiscal_start_day=1,
-    fully_bound=False, hidden_in_budget=False,
+    fully_bound=False, hidden_in_budget=False, view_gremium_id=None,
 ):
     return (
         nid, parent, gremium, key, path, name, currency, active,
         color, list(accepted), list(denied), fiscal_start_month, fiscal_start_day,
-        fully_bound, hidden_in_budget,
+        fully_bound, hidden_in_budget, view_gremium_id,
     )
 
 
@@ -186,3 +186,31 @@ def test_build_forest_committed_only_node() -> None:
     assert view["allocated"] == Decimal("0")
     assert view["committed"] == Decimal("30")
     assert view["available"] == Decimal("-30")
+
+
+# --------------------------------------------------------------- scope (#budget-scope)
+def test_scope_forest_picks_assigned_subtrees_as_roots() -> None:
+    g = uuid.uuid4()
+    nodes = [
+        _node("top", None, None, "VS", "VS"),
+        _node("mid", "top", None, "800", "VS-800", view_gremium_id=g),
+        _node("leaf", "mid", None, "04", "VS-800-04"),
+        _node("other", "top", None, "900", "VS-900"),
+    ]
+    forest = r.build_forest(nodes, [], [])
+    scoped = r.scope_forest(forest, {g})
+    assert [n["id"] for n in scoped] == ["mid"]
+    assert [c["id"] for c in scoped[0]["children"]] == ["leaf"]
+
+
+def test_scope_forest_outer_assignment_wins_and_empty_scope() -> None:
+    g = uuid.uuid4()
+    nodes = [
+        _node("top", None, None, "VS", "VS", view_gremium_id=g),
+        _node("mid", "top", None, "800", "VS-800", view_gremium_id=g),
+    ]
+    forest = r.build_forest(nodes, [], [])
+    scoped = r.scope_forest(forest, {g})
+    assert [n["id"] for n in scoped] == ["top"]  # äußerer Teilbaum, keine Duplikate
+    assert r.scope_forest(forest, set()) == []
+    assert r.scope_forest(forest, {uuid.uuid4()}) == []

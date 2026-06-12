@@ -138,6 +138,19 @@
         <span>{{ 'budget.tree.hiddenInBudget' | t }}</span>
       </label>
       <p class="bt__muted bt__check-hint bt__form-full">{{ 'budget.tree.hiddenInBudgetHint' | t }}</p>
+      <!-- Sichtbarkeits-Gremium (#budget-scope): dessen Mitglieder sehen diesen
+           Teilbaum im Budget-Tab als Root — ohne globale budget.*-Rechte. -->
+      <div class="bt__form-full">
+        <app-select
+          name="editViewGremium"
+          [label]="'budget.tree.viewGremium' | t"
+          [placeholder]="'budget.tree.viewGremiumNone' | t"
+          [options]="gremiumOptions()"
+          [ngModel]="editViewGremium()"
+          (ngModelChange)="editViewGremium.set($event)"
+        />
+        <p class="bt__muted bt__check-hint">{{ 'budget.tree.viewGremiumHint' | t }}</p>
+      </div>
       <p class="bt__muted bt__form-full">{{ 'budget.tree.editNodeHint' | t }}</p>
     </form>
   }

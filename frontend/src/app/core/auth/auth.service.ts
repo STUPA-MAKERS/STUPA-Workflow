@@ -38,6 +38,11 @@ export class AuthService {
   readonly sessionManageGremien = computed(
     () => this._principal()?.session_manage_gremien ?? [],
   );
+  /** Mindestens eine Kostenstelle ist einem Mitglieds-Gremium als Sichtbarkeits-
+   *  Root zugeordnet (#budget-scope) — Budget-Tab ohne globale budget.*-Rechte. */
+  readonly hasScopedBudgetView = computed(
+    () => this._principal()?.has_scoped_budget_view === true,
+  );
 
   /**
    * Lädt den Principal genau einmal und cached das Ergebnis (`shareReplay`).

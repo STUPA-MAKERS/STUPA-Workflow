@@ -202,6 +202,7 @@ def test_me_returns_principal() -> None:
         "groups": ["stupa"],
         "gremien": [],
         "session_manage_gremien": [],
+        "has_scoped_budget_view": False,
     }
 
 
