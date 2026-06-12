@@ -184,14 +184,16 @@ class FooterColumn(_CamelModel):
 
 
 class SiteFreetexts(_CamelModel):
-    """i18n-Freitexte (Login-Hinweis, Welcome, Support, E-Mail-Footer)."""
+    """i18n-Freitexte (Login-Hinweis, Welcome, Support, E-Mail-Footer, Antrags-Info)."""
 
     login_hint: I18nMap = Field(default_factory=dict, alias="loginHint")
     welcome: I18nMap = Field(default_factory=dict)
     support: I18nMap = Field(default_factory=dict)
     email_footer: I18nMap = Field(default_factory=dict, alias="emailFooter")
+    # Info-Text unter der Antrags-(Typ-)Auswahl (#18) — Markdown, je Sprache.
+    apply_info: I18nMap = Field(default_factory=dict, alias="applyInfo")
 
-    @field_validator("login_hint", "welcome", "support", "email_footer")
+    @field_validator("login_hint", "welcome", "support", "email_footer", "apply_info")
     @classmethod
     def _cap_text(cls, v: I18nMap) -> I18nMap:
         return _cap_i18n(v, MAX_FREETEXT_CHARS)

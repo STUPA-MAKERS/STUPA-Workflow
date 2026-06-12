@@ -20,6 +20,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
+import { renderMarkdown } from '../meetings/meetings.util';
 import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { isFieldVisible } from '@shared/forms/jsonlogic';
 import { ButtonComponent } from '@shared/ui/button/button.component';
@@ -137,6 +138,13 @@ export class ApplyWizardComponent {
 
   readonly summary = computed<SummaryRow[]>(() => this.buildSummary());
 
+  /** Konfigurierter Info-Text unter der Typ-Auswahl (#18) — Markdown, je Sprache. */
+  private readonly applyInfo = signal<Record<string, string> | null>(null);
+  readonly applyInfoHtml = computed(() => {
+    const text = resolveI18n(this.applyInfo(), this.i18n.locale()).trim();
+    return text ? renderMarkdown(text) : '';
+  });
+
   constructor() {
     // Session laden (gecached), damit der Wizard Kontakt-Schritt/Altcha für
     // eingeloggte Nutzer:innen überspringt (#24). /apply ist ungeschützt.
@@ -144,6 +152,11 @@ export class ApplyWizardComponent {
     this.api.applicationTypes().subscribe({
       next: (t) => this.types.set(t.filter((x) => x.active)),
       error: () => this.toast.error(this.i18n.translate('apply.error.typesLoad')),
+    });
+    // Branding-Info unter der Antrags-Auswahl (#18) — public Endpoint, fehlertolerant.
+    this.api.publicSiteConfig().subscribe({
+      next: (cfg) => this.applyInfo.set(cfg.branding?.freetexts?.applyInfo ?? null),
+      error: () => undefined,
     });
   }
 

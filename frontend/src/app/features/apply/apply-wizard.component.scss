@@ -31,6 +31,24 @@
   font-size: var(--fs-sm);
 }
 
+/* Konfigurierter Markdown-Info-Text unter der Typ-Auswahl (#18). */
+.wizard__info {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  background: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  :first-child {
+    margin-top: 0;
+  }
+  :last-child {
+    margin-bottom: 0;
+  }
+}
+
 .type-list {
   display: grid;
   gap: var(--space-3);

@@ -32,6 +32,10 @@
         @if (loadingForm()) {
           <p class="wizard__muted" role="status">{{ 'apply.form.loading' | t }}</p>
         }
+        <!-- Konfigurierter Info-Text (#18): /admin/branding, Markdown, je Sprache. -->
+        @if (applyInfoHtml()) {
+          <div class="wizard__info" [innerHTML]="applyInfoHtml()"></div>
+        }
       }
 
       @case ('contact') {

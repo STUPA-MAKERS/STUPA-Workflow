@@ -486,6 +486,8 @@ export interface SiteFreetexts {
   welcome: I18nMap;
   support: I18nMap;
   emailFooter: I18nMap;
+  /** Info-Text unter der Antrags-(Typ-)Auswahl (#18) — Markdown, je i18n. */
+  applyInfo?: I18nMap;
 }
 
 export interface Branding {

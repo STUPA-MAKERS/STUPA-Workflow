@@ -69,6 +69,8 @@ function fakeApi(create = jest.fn(() => of({ applicationId: 'app-1' }))): Partia
     createApplication: create as unknown as ApiClient['createApplication'],
     // Anonyme Session (kein Principal) — Default-Pfad mit Kontakt-Schritt + Altcha (#24).
     me: (() => of(null)) as unknown as ApiClient['me'],
+    // Branding-Info unter der Typ-Auswahl (#18) — leer im Test-Default.
+    publicSiteConfig: () => of({ version: 1, branding: null }),
   };
 }
 

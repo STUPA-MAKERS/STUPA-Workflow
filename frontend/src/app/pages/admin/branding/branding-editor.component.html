@@ -128,6 +128,13 @@
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.emailFooter' | t) + ' (EN)'" [(ngModel)]="d.freetexts.emailFooter['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
             </div>
           </div>
+          <!-- Info-Text unter der Antrags-Auswahl (#18) — Markdown-kompatibel. -->
+          <div class="br__lbl">{{ 'admin.brand.text.applyInfo' | t }}
+            <div class="br__bi">
+              <textarea rows="4" [attr.aria-label]="('admin.brand.text.applyInfo' | t) + ' (DE)'" [(ngModel)]="applyInfo(d)['de']" (ngModelChange)="reemit()" placeholder="DE (Markdown)"></textarea>
+              <textarea rows="4" [attr.aria-label]="('admin.brand.text.applyInfo' | t) + ' (EN)'" [(ngModel)]="applyInfo(d)['en']" (ngModelChange)="reemit()" placeholder="EN (Markdown)"></textarea>
+            </div>
+          </div>
         </fieldset>
       </div>
 

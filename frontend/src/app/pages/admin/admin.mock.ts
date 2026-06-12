@@ -184,5 +184,6 @@ export const MOCK_BRANDING: Branding = {
     welcome: { de: 'Willkommen auf der Antragsplattform.', en: 'Welcome to the application platform.' },
     support: { de: 'Bei Fragen: support@example.org', en: 'Questions? support@example.org' },
     emailFooter: { de: 'Automatische Nachricht – nicht antworten.', en: 'Automated message – do not reply.' },
+    applyInfo: {},
   },
 };

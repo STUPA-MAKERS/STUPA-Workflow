@@ -58,6 +58,7 @@ import type {
   Page,
   Principal,
   Protocol,
+  PublicSiteConfig,
   ProtocolOutWire,
   ProtocolVotesBody,
   SignedUrl,
@@ -523,6 +524,11 @@ export class ApiClient {
   /** POST /votes/{id}/cancel — Vote abbrechen (#12): kein Ergebnis, kein Branch. */
   cancelVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/cancel`, {});
+  }
+
+  /** GET /site-config — öffentliche (auth-freie) aktive Branding-Config (#18). */
+  publicSiteConfig(): Observable<PublicSiteConfig> {
+    return this.http.get<PublicSiteConfig>(`${this.base}/site-config`);
   }
 
   // --- protocol (Protokoll-Editor, T-33) -----------------------------------

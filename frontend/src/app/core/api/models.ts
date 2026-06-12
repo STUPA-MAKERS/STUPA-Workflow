@@ -22,6 +22,17 @@ export type Lang = 'de' | 'en';
 /** Konfigurierbarer mehrsprachiger Text (`*_i18n`-JSONB, overview §5). */
 export type I18nMap = Record<string, string>;
 
+/** Öffentliche (auth-freie) aktive Branding-Config (#18) — bewusst lose typisiert:
+ *  das FE liest hieraus nur die Freitexte (z. B. `applyInfo`). */
+export interface PublicSiteConfig {
+  version: number;
+  branding?: {
+    freetexts?: Partial<
+      Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
+    >;
+  } | null;
+}
+
 /** Einheitliches Problem-Objekt (RFC-9457-nah, api.md §2). */
 export interface ProblemDetail {
   type: string;

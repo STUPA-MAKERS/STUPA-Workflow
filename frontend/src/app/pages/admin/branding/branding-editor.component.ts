@@ -7,6 +7,7 @@ import { resolveI18n } from '@shared/forms/i18n-text';
 import { ButtonComponent } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
+import type { I18nMap } from '@core/api/models';
 import {
   type Branding,
   type FooterColumn,
@@ -149,6 +150,12 @@ export class BrandingEditorComponent {
     this.patch((d) => {
       d.legalLinks = d.legalLinks.filter((_, idx) => idx !== i);
     });
+  }
+
+  /** Antrags-Info (#18) lazy initialisieren — Bestands-Configs kennen das Feld nicht. */
+  protected applyInfo(d: Branding): I18nMap {
+    d.freetexts.applyInfo ??= {};
+    return d.freetexts.applyInfo;
   }
 
   /** Nach In-Place-`[(ngModel)]`-Mutation das Signal neu emittieren (Vorschau). */
