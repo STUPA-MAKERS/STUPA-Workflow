@@ -520,6 +520,11 @@ export class ApiClient {
     return this.http.post<void>(`${this.base}/votes/${voteId}/close`, {});
   }
 
+  /** POST /votes/{id}/cancel — Vote abbrechen (#12): kein Ergebnis, kein Branch. */
+  cancelVote(voteId: Uuid): Observable<void> {
+    return this.http.post<void>(`${this.base}/votes/${voteId}/cancel`, {});
+  }
+
   // --- protocol (Protokoll-Editor, T-33) -----------------------------------
   /** POST /meetings/{id}/protocol — Protokoll anlegen **oder** laden (idempotent). */
   loadProtocol(meetingId: Uuid): Observable<Protocol> {

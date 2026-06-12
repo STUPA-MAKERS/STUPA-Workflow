@@ -35,6 +35,11 @@ export interface VoteClosedMsg {
   /** Grund einer Ablehnung: `quorum` = Quorum verfehlt, `majority` = Mehrheit verfehlt. */
   failedReason?: 'quorum' | 'majority' | null;
 }
+/** Abstimmung abgebrochen (#12) — kein Ergebnis, kein Branch. */
+export interface VoteCancelledMsg {
+  type: 'vote_cancelled';
+  voteId: string;
+}
 export interface ErrorMsg {
   type: 'error';
   code: string;
@@ -50,6 +55,7 @@ export type ServerMessage =
   | VoteOpenedMsg
   | VoteTallyMsg
   | VoteClosedMsg
+  | VoteCancelledMsg
   | ViewersMsg
   | ErrorMsg;
 

@@ -38,6 +38,7 @@ from app.modules.delegations.models import MeetingDelegation
 from app.modules.livevote.broker import MeetingBroker
 from app.modules.livevote.events import (
     MeetingStateEvent,
+    VoteCancelledEvent,
     VoteClosedEvent,
     VoteOpenedEvent,
     VoteTallyEvent,
@@ -144,6 +145,12 @@ class BrokerPublisher:
             counts=vote.tally.counts,
             failedReason=vote.tally.failed_reason,
         )
+        await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
+
+    async def vote_cancelled(self, vote: VoteOut) -> None:
+        if vote.meeting_id is None:
+            return
+        event = VoteCancelledEvent(voteId=vote.id)
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
 

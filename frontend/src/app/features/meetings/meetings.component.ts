@@ -428,6 +428,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                       }
                       @if (m.canManageVotes && vote.status === 'open') {
                         <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+                        <app-button variant="ghost" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
                       }
                     </div>
                   }
@@ -569,6 +570,7 @@ const AUTOSAVE_DELAY_MS = 1000;
                       <app-button variant="primary" size="sm" [disabled]="vote.status === 'closed'" (click)="openVote(vote.id)">{{ 'meetings.vote.open' | t }}</app-button>
                     } @else {
                       <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+                      <app-button variant="ghost" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
                     }
                   </div>
                 }
@@ -2249,6 +2251,15 @@ export class MeetingsComponent implements OnDestroy {
   closeVote(voteId: Uuid): void {
     this.api.closeVote(voteId).subscribe({
       next: () => this.patchVote(voteId, { status: 'closed' }),
+      error: (err: unknown) => this.voteActionFailed(err),
+    });
+  }
+
+  /** Abstimmung abbrechen (#12): open → cancelled, kein Ergebnis/Branch — der
+   *  Ausweg, wenn das Quorum nicht zustande kommt (Schließen ist dann blockiert). */
+  cancelVote(voteId: Uuid): void {
+    this.api.cancelVote(voteId).subscribe({
+      next: () => this.patchVote(voteId, { status: 'cancelled' }),
       error: (err: unknown) => this.voteActionFailed(err),
     });
   }

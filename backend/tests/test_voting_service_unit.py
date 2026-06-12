@@ -488,3 +488,42 @@ async def test_close_unknown_vote_404() -> None:
     db = fake_session(result())
     with pytest.raises(NotFoundError):
         await VotingService(db).close(uuid4(), _voter())
+
+
+async def test_close_blocked_without_quorum(_patch_flow: type[_FakeFlow]) -> None:
+    """#12: Quorum nicht erfüllt ⇒ 409 statt still »rejected« — der Vote bleibt
+    offen (mehr Stimmen sammeln oder abbrechen)."""
+    vote = _vote(
+        config=_config(quorum={"type": "percent", "value": 50}), eligible_count=10
+    )
+    db = fake_session(result(vote), result("yes", "no"))  # 2/10 → Quorum verfehlt
+    with pytest.raises(ConflictError):
+        await VotingService(db).close(vote.id, _voter())
+    assert db.committed == 0
+    assert vote.status == "open"
+
+
+# --------------------------------------------------------------------------- #
+# cancel (#12)
+# --------------------------------------------------------------------------- #
+async def test_cancel_open_vote_sets_cancelled_without_branch() -> None:
+    vote = _vote()
+    db = fake_session(result(vote), result())
+    out = await VotingService(db).cancel(vote.id)
+    assert vote.status == "cancelled"
+    assert out.status == "cancelled"
+    assert db.committed == 1
+
+
+async def test_cancel_non_open_409() -> None:
+    vote = _vote(status="draft")
+    db = fake_session(result(vote))
+    with pytest.raises(ConflictError):
+        await VotingService(db).cancel(vote.id)
+
+
+async def test_cancel_closed_409() -> None:
+    vote = _vote(status="closed")
+    db = fake_session(result(vote))
+    with pytest.raises(ConflictError):
+        await VotingService(db).cancel(vote.id)

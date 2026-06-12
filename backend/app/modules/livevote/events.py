@@ -137,6 +137,13 @@ class VoteClosedEvent(_CamelModel):
     )
 
 
+class VoteCancelledEvent(_CamelModel):
+    """Abstimmung abgebrochen (#12) — kein Ergebnis, kein Branch."""
+
+    type: Literal["vote_cancelled"] = "vote_cancelled"
+    vote_id: UUID = Field(alias="voteId")
+
+
 class ErrorEvent(_CamelModel):
     """Fehler am WS (z. B. ``not_eligible``, ``read_only``, ``not_open``)."""
 

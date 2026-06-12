@@ -90,6 +90,14 @@ export class LiveVoteSession {
         });
         break;
       }
+      case 'vote_cancelled':
+        // Abbruch (#12): laufende Abstimmung verschwindet ohne Ergebnis.
+        if (this.openVote()?.voteId === m.voteId) {
+          this.openVote.set(null);
+          this.tally.set(null);
+          this.result.set(null);
+        }
+        break;
       case 'error':
         this.errorCode.set(m.code);
         break;

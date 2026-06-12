@@ -120,6 +120,25 @@ async def close_vote(
 
 
 @router.post(
+    "/votes/{vote_id}/cancel",
+    response_model=VoteOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def cancel_vote(
+    vote_id: UUID,
+    service: ServiceDep,
+    publisher: PublisherDep,
+    _principal: ManagerDep,
+) -> VoteOut:
+    """Abstimmung abbrechen (#12): ``open`` → ``cancelled`` — kein Ergebnis, kein
+    Branch; der Antrag bleibt im ``vote``-State. Der Ausweg, wenn das Quorum nicht
+    zustande kommt (``close`` ist dann blockiert)."""
+    vote = await service.cancel(vote_id)
+    await publisher.vote_cancelled(vote)
+    return vote
+
+
+@router.post(
     "/votes/{vote_id}/ballot",
     response_model=BallotAccepted,
     responses=_errors(400, 401, 403, 404, 409, 422),

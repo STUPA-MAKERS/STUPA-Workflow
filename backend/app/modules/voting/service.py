@@ -379,6 +379,28 @@ class VotingService:
             )
         return self._to_out(vote, config, tally_out)
 
+    # ---------------------------------------------------------------- cancel
+    async def cancel(self, vote_id: UUID) -> VoteOut:
+        """``open`` → ``cancelled`` (#12): Abbruch ohne Ergebnis und ohne Branch.
+
+        Der Antrag bleibt im ``vote``-State — es kann ein neuer Vote angelegt oder
+        ein manueller Ausgang gefeuert werden. Einzige der Ausweg, wenn das Quorum
+        nicht zustande kommt (``close`` ist dann blockiert)."""
+        vote = await self._get_vote(vote_id, for_update=True)
+        if vote.status != "open":
+            raise ConflictError(
+                f"vote is {vote.status}, cannot cancel.", code="conflict"
+            )
+        vote.status = "cancelled"
+        await self.session.commit()
+        config = self._config(vote)
+        counts = await self._aggregate(vote, config)
+        return self._to_out(
+            vote,
+            config,
+            await self._tally_out(vote, config, counts, vote.eligible_count or 0),
+        )
+
     # ----------------------------------------------------------------- close
     async def close(self, vote_id: UUID, principal: Principal) -> VoteClosed:
         """``open`` → ``closed``: auszählen → Ergebnis → ``flow.fire(result_branch)``.
@@ -399,6 +421,16 @@ class VotingService:
         counts = await self._aggregate(vote, config)
         eligible = vote.eligible_count or 0
         outcome = tally_mod.result(config, counts, eligible)
+
+        # Beschlussfähigkeit (#12): ohne erfülltes Quorum gibt es kein gültiges
+        # Ergebnis — Schließen ist blockiert (409) statt still als »rejected« zu
+        # enden. Ausweg: weitere Stimmen sammeln oder die Abstimmung abbrechen.
+        if not outcome.quorum_met:
+            raise ConflictError(
+                "quorum not met — the vote cannot be closed; collect more ballots "
+                "or cancel the vote.",
+                code="conflict",
+            )
 
         # Global-Flow (#28): ein ``vote``-State hat zwei feste Ausgänge mit ``branch``
         # ``pass``/``fail``. ``passed`` → pass, sonst (``rejected``/``tie``) fail-closed
