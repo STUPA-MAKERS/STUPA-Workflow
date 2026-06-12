@@ -94,7 +94,7 @@ const AUTOSAVE_DELAY_MS = 1000;
     <header class="mtg__head">
       <div class="mtg__headRow">
         <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
-        @if (!meeting() && canManage()) {
+        @if (!meeting() && canCreate()) {
           <app-button size="sm" (click)="openCreate()">{{ 'meetings.list.new' | t }}</app-button>
         }
       </div>
@@ -1985,6 +1985,12 @@ export class MeetingsComponent implements OnDestroy {
 
   /** Globale Verwalter-Rechte — Gating der Übersicht/Anlegen (ohne geladene Sitzung). */
   readonly canManageAny = computed(() => this.auth.can('meeting.manage'));
+  /** Sitzung anlegen: globale `meeting.manage` ODER Vorstand/Manager (Gremium-Rolle
+   *  mit `session.manage`) in mindestens einem Gremium — gremium-genau wie das
+   *  Backend (`MeetingService.can_manage`). */
+  readonly canCreate = computed(
+    () => this.canManageAny() || this.auth.sessionManageGremien().length > 0,
+  );
   /** Per-Sitzung-Flags aus der geladenen Sitzung (Backend, gremium-genau). */
   readonly canManage = computed(() => this.meeting()?.canManage ?? this.canManageAny());
   readonly canWrite = computed(() => this.meeting()?.canWrite ?? false);
@@ -2094,13 +2100,23 @@ export class MeetingsComponent implements OnDestroy {
         });
       }
     });
-    // Gremien-Liste für das Anlege-Dropdown (#68) — nur wer Sitzungen verwaltet.
-    if (this.canManage()) {
+    // Gremien-Liste für das Anlege-Dropdown (#68) — nur wer Sitzungen verwalten
+    // darf. Ohne globale `meeting.manage` werden nur die SELBST verwalteten
+    // Gremien angeboten (Vorstand/Manager via Gremium-Rolle) — alles andere
+    // würde der Server beim Anlegen ohnehin mit 403 ablehnen.
+    if (this.canCreate()) {
       this.options
         .gremiumOptions()
         .pipe(takeUntilDestroyed())
         .subscribe({
-          next: (opts) => this.gremiumOptions.set(opts),
+          next: (opts) => {
+            if (this.canManageAny()) {
+              this.gremiumOptions.set(opts);
+              return;
+            }
+            const managed = new Set(this.auth.sessionManageGremien());
+            this.gremiumOptions.set(opts.filter((o) => managed.has(o.value)));
+          },
           error: () => this.gremiumOptions.set([]),
         });
     }

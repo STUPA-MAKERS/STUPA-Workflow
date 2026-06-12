@@ -201,6 +201,7 @@ def test_me_returns_principal() -> None:
         "permissions": ["application.read"],
         "groups": ["stupa"],
         "gremien": [],
+        "session_manage_gremien": [],
     }
 
 

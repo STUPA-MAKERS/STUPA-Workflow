@@ -65,6 +65,8 @@ export interface Principal {
   groups: string[];
   /** Gremien, in denen der Principal Mitglied ist (#5) — Basis für »Meine Gremien«. */
   gremien?: GremiumRef[];
+  /** Gremien, die der Principal verwaltet (Gremium-Rolle mit `session.manage`). */
+  session_manage_gremien?: Uuid[];
 }
 
 /** Antwort von POST /api/auth/logout — RP-Initiated-Logout-URL (OIDC) oder null. */

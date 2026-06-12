@@ -83,6 +83,7 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
     can: (p: string) => set.has(p),
     canAny: (...p: string[]) => p.some((x) => set.has(x)),
     gremien: (() => []) as unknown as AuthService['gremien'],
+    sessionManageGremien: (() => []) as unknown as AuthService['sessionManageGremien'],
   };
 }
 

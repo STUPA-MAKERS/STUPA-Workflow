@@ -59,3 +59,7 @@ class MeOut(BaseModel):
     # Gremien, in denen der Principal über eine (gültige) Rollenzuweisung Mitglied
     # ist — Basis der nutzerseitigen »Meine Gremien«-Ansicht (#5).
     gremien: list[GremiumRef] = []
+    # Gremien, die der Principal über seine Gremium-Rolle VERWALTET
+    # (``session.manage``, z. B. vorstand/manager) — Basis fürs FE-Gating
+    # »Sitzung anlegen« ohne globale ``meeting.manage``-Permission.
+    session_manage_gremien: list[UUID] = []

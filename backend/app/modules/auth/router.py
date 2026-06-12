@@ -169,6 +169,19 @@ async def me(
         permissions=sorted(principal.permissions),
         groups=sorted(principal.groups),
         gremien=await _gremien_for(db, principal.sub),
+        session_manage_gremien=await _session_manage_gremien(db, principal.sub),
+    )
+
+
+async def _session_manage_gremien(db: DbSession, sub: str) -> list[UUID]:
+    """Gremien, die ``sub`` über seine Gremium-Rolle verwaltet (``session.manage``).
+
+    Gleiche Quelle wie ``MeetingService.can_manage`` — FE-Gating (»Sitzung
+    anlegen«) und Server-Entscheidung bleiben deckungsgleich."""
+    from app.modules.admin.gremium_roles import gremium_ids_with_permission
+
+    return sorted(
+        await gremium_ids_with_permission(db, sub, "session.manage"), key=str
     )
 
 

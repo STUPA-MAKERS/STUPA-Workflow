@@ -32,6 +32,12 @@ export class AuthService {
   readonly roles = computed(() => this._principal()?.roles ?? []);
   /** Gremien des angemeldeten Principals (#5) — für die »Meine Gremien«-Ansicht. */
   readonly gremien = computed(() => this._principal()?.gremien ?? []);
+  /** Gremien, die der Principal über seine Gremium-Rolle VERWALTET
+   *  (`session.manage`, z. B. Vorstand/Manager) — Gating »Sitzung anlegen«
+   *  ohne globale `meeting.manage`-Permission. Reine UX, Server entscheidet. */
+  readonly sessionManageGremien = computed(
+    () => this._principal()?.session_manage_gremien ?? [],
+  );
 
   /**
    * Lädt den Principal genau einmal und cached das Ergebnis (`shareReplay`).
