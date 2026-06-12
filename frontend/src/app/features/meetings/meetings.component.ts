@@ -589,7 +589,8 @@ const AUTOSAVE_DELAY_MS = 1000;
       >
         <form class="mtg__voteForm" (submit)="$event.preventDefault(); submitVote()">
           <label class="mtg__paneLabel" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
-          <input id="mtg-vq" class="mtg__input" [ngModel]="voteQuestion()" (ngModelChange)="voteQuestion.set($event)" name="vq" [placeholder]="'meetings.vote.questionPlaceholder' | t" />
+          <!-- Mehrzeilig (#19): Beschlussfragen sind oft länger als eine Zeile. -->
+          <textarea id="mtg-vq" class="mtg__input mtg__voteQuestion" rows="4" [ngModel]="voteQuestion()" (ngModelChange)="voteQuestion.set($event)" name="vq" [placeholder]="'meetings.vote.questionPlaceholder' | t"></textarea>
           <span class="mtg__paneLabel">{{ 'meetings.vote.options' | t }}</span>
           <div class="mtg__voteFixed">
             @for (opt of FIXED_VOTE_OPTIONS; track opt) {
@@ -1024,6 +1025,12 @@ const AUTOSAVE_DELAY_MS = 1000;
       .mtg__textarea {
         resize: vertical;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        line-height: 1.5;
+      }
+      /* Abstimmungsfrage (#19): mehrzeilig, normale Schrift, vertikal resizebar. */
+      .mtg__voteQuestion {
+        resize: vertical;
+        min-height: 6rem;
         line-height: 1.5;
       }
       .mtg__textarea:focus-visible,
