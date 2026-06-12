@@ -6,6 +6,7 @@ export { CheckboxComponent } from './checkbox/checkbox.component';
 export { SelectComponent } from './select/select.component';
 export type { SelectOption } from './select/select.component';
 export { DatepickerComponent } from './datepicker/datepicker.component';
+export { TimeInputComponent } from './time-input/time-input.component';
 export { DateRangeComponent } from './datepicker/date-range.component';
 export type { DateRange } from './datepicker/date-range.component';
 export { IconComponent } from './icon/icon.component';

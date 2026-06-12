@@ -748,6 +748,13 @@ class MeetingService:
         ):
             raise ConflictError("a closed session cannot be re-opened")
 
+        # Geschlossen = eingefroren (#15): Datum/Zeit/Protokollant sind danach
+        # nicht mehr änderbar — das Protokoll referenziert diese Planungsdaten.
+        if meeting.status == "closed" and wants_manage:
+            raise ConflictError(
+                "the session is closed — its settings can no longer be changed"
+            )
+
         if payload.status is not None:
             # Schließ-Zeitpunkt (#14): einmalig beim Wechsel auf ``closed`` —
             # liefert die »Ende«-Zeile der Protokoll-Titelseite.

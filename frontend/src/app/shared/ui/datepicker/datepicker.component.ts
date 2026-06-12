@@ -4,6 +4,7 @@ import {
   type ElementRef,
   Input,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -169,6 +170,16 @@ export class DatepickerComponent implements ControlValueAccessor {
 
   private onChange: (value: string) => void = () => {};
   onTouched: () => void = () => {};
+
+  constructor() {
+    // Anzeige folgt der App-Sprache (#datepicker-locale): ein Sprachwechsel
+    // formatiert den sichtbaren Wert sofort um (TT.MM.JJJJ ↔ MM/DD/YYYY) —
+    // vorher blieb das alte Format bis zum nächsten writeValue/Commit stehen.
+    effect(() => {
+      this.i18n.locale();
+      this.display.set(this.format(this.value()));
+    });
+  }
 
   get describedBy(): string | null {
     if (this.error) return `${this.id}-error`;

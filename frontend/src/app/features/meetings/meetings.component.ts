@@ -45,6 +45,7 @@ import {
   type IconName,
   SelectComponent,
   type SelectOption,
+  TimeInputComponent,
 } from '@shared/ui';
 import { MarkdownEditorComponent } from '@shared/ui/markdown-editor/markdown-editor.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
@@ -81,6 +82,7 @@ const AUTOSAVE_DELAY_MS = 1000;
     CardComponent,
     SelectComponent,
     DatepickerComponent,
+    TimeInputComponent,
     DialogComponent,
     IconComponent,
     MarkdownEditorComponent,
@@ -747,11 +749,10 @@ const AUTOSAVE_DELAY_MS = 1000;
             (ngModelChange)="newDate.set($event)"
             name="date"
           />
-          <label class="mtg__paneLabel" for="mtg-new-time">{{ 'meetings.create.time' | t }}</label>
-          <input
+          <!-- 24h erzwungen (#time-input): natives type="time" folgt der Browser-Locale (AM/PM). -->
+          <app-time-input
             id="mtg-new-time"
-            class="mtg__input"
-            type="time"
+            [label]="'meetings.create.time' | t"
             [ngModel]="newTime()"
             (ngModelChange)="newTime.set($event)"
             name="time"
@@ -778,31 +779,35 @@ const AUTOSAVE_DELAY_MS = 1000;
       (closed)="closeSettings()"
     >
       <form class="mtg__createForm" (submit)="$event.preventDefault(); saveSettings()">
-        <!-- Nach Finalisierung gesperrt (#15): die Schriftführung ist Teil des
-             unterschriebenen Dokuments; das Backend lehnt Änderungen mit 409 ab. -->
+        <!-- Geschlossene Sitzung (#15): KOMPLETT gesperrt — nichts mehr änderbar.
+             Protokollant zusätzlich gesperrt, sobald das Protokoll finalisiert ist;
+             das Backend lehnt beides mit 409 ab. -->
         <app-select
           name="setProt"
           [label]="'meetings.protokollant.label' | t"
           [options]="protokollantOptions()"
-          [disabled]="!!protocol()?.isFinal"
+          [disabled]="settingsLocked() || protokollantLocked()"
           [ngModel]="settingsProtokollant()"
           (ngModelChange)="settingsProtokollant.set($event)"
         />
-        @if (protocol()?.isFinal) {
+        @if (!settingsLocked() && protokollantLocked()) {
           <p class="mtg__muted">{{ 'meetings.protokollant.lockedHint' | t }}</p>
         }
         <app-datepicker
           [label]="'meetings.create.date' | t"
+          [disabled]="settingsLocked()"
           [ngModel]="settingsDate()"
           (ngModelChange)="settingsDate.set($event)"
           name="setDate"
         />
-        <label class="mtg__paneLabel" for="mtg-set-time">{{ 'meetings.create.time' | t }}</label>
-        <input id="mtg-set-time" class="mtg__input" type="time" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
+        <app-time-input id="mtg-set-time" [label]="'meetings.create.time' | t" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
+        @if (settingsLocked()) {
+          <p class="mtg__muted">{{ 'meetings.settings.closedHint' | t }}</p>
+        }
       </form>
       <div dialog-footer class="mtg__dialogFoot">
         <app-button variant="ghost" (click)="closeSettings()">{{ 'action.cancel' | t }}</app-button>
-        <app-button [loading]="savingSettings()" (click)="saveSettings()">{{ 'action.save' | t }}</app-button>
+        <app-button [loading]="savingSettings()" [disabled]="settingsLocked()" (click)="saveSettings()">{{ 'action.save' | t }}</app-button>
       </div>
     </app-dialog>
 
@@ -2012,6 +2017,15 @@ export class MeetingsComponent implements OnDestroy {
   readonly settingsDate = signal<string>('');
   readonly settingsTime = signal<string>('');
   readonly savingSettings = signal(false);
+  /** Geschlossene Sitzung (#15): Einstellungen KOMPLETT gesperrt — gilt auch im
+   *  Listen-Edit (der Status reist im Meeting-Objekt mit). */
+  readonly settingsLocked = computed(() => this.settingsMeeting()?.status === 'closed');
+  /** Protokollant zusätzlich gesperrt, sobald das Protokoll finalisiert ist (#15);
+   *  Protokoll-Status ist nur in der Detail-Ansicht der offenen Sitzung bekannt. */
+  readonly protokollantLocked = computed(
+    () =>
+      this.meeting()?.id === this.settingsMeeting()?.id && !!this.protocol()?.isFinal,
+  );
   /** Protokollant-Auswahl aus dem Anwesenheits-Roster (alle Gremium-Mitglieder). */
   readonly protokollantOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('meetings.protokollant.none') },
@@ -2723,15 +2737,14 @@ export class MeetingsComponent implements OnDestroy {
   /** Protokollant + Datum/Zeit in einem Zug speichern (PATCH). */
   saveSettings(): void {
     const m = this.settingsMeeting();
-    if (!m || this.savingSettings()) return;
+    // Geschlossene Sitzung: komplett gesperrt (#15) — Backend lehnt ohnehin ab.
+    if (!m || this.savingSettings() || this.settingsLocked()) return;
     this.savingSettings.set(true);
     // Protokollant nach Finalisierung gesperrt (#15) — Feld ist disabled, der
     // Wert wird gar nicht erst mitgesendet (Backend würde mit 409 ablehnen).
-    const protokollantLocked =
-      this.meeting()?.id === m.id && !!this.protocol()?.isFinal;
     this.api
       .patchMeeting(m.id, {
-        ...(protokollantLocked
+        ...(this.protokollantLocked()
           ? {}
           : { protokollantId: this.settingsProtokollant() || null }),
         date: this.settingsDate().trim() || null,

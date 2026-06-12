@@ -495,3 +495,21 @@ async def test_service_delete_unfinalized_is_audited(
     assert session.deleted == [meeting]
     assert calls[0]["data"]["finalizedProtocol"] is False
     assert calls[0]["target_id"] == str(meeting.id)
+
+
+@pytest.mark.asyncio
+async def test_service_patch_closed_session_settings_frozen() -> None:
+    """#15: geschlossene Sitzung ⇒ Datum/Zeit/Protokollant nicht mehr änderbar."""
+    from datetime import date
+
+    meeting = _meeting(status="closed")
+    svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
+    with pytest.raises(ConflictError):
+        await svc.patch(
+            meeting.id, MeetingPatch(date=date(2026, 7, 1)), _principal()
+        )
+    with pytest.raises(ConflictError):
+        await svc.patch(
+            meeting.id, MeetingPatch(protokollantId=uuid4()), _principal()
+        )
+    assert meeting.date is None
