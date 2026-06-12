@@ -710,6 +710,45 @@ export class FlowEditorComponent {
     return value ? `${opLabel}: ${value}` : opLabel;
   }
 
+  /** Klarname des Guards EINES Übergangs (für die In/Out-Listen, #10). */
+  protected transitionGuardLabel(t: TransitionDef): string {
+    if (!t.guard) return this.i18n.translate('admin.flow.guardDefault');
+    const op = Object.keys(t.guard)[0] ?? '';
+    const v = Object.values(t.guard)[0];
+    return this.guardGroupLabel({
+      sig: JSON.stringify(t.guard),
+      guard: t.guard,
+      op,
+      value: v == null || typeof v === 'object' ? '' : String(v),
+      indices: [],
+    });
+  }
+
+  /** Eingehende/ausgehende Übergänge des selektierten States als Listen (#10);
+   *  Klick auf eine Zeile selektiert den Übergang (Inspektor + Guard-Pane). */
+  protected readonly stateTransitionLists = computed(() => {
+    const sel = this.selection();
+    if (sel?.kind !== 'state') return null;
+    const labelOf = new Map(this.graph().states.map((s) => [s.key, this.label(s)]));
+    const rows = (match: (t: TransitionDef) => boolean) =>
+      (this.graph().transitions ?? [])
+        .map((t, index) => ({ t, index }))
+        .filter(({ t }) => match(t))
+        .map(({ t, index }) => ({
+          index,
+          from: labelOf.get(t.from) ?? t.from,
+          to: labelOf.get(t.to) ?? t.to,
+          label: t.label?.['de'] || t.label?.['en'] || '',
+          guard: this.transitionGuardLabel(t),
+          automatic: !!t.automatic,
+          branch: t.branch ?? null,
+        }));
+    return {
+      incoming: rows((t) => t.to === sel.key),
+      outgoing: rows((t) => t.from === sel.key),
+    };
+  });
+
   /** Guard-Wert auflösen (#7): Rollen-Key/Gremium-UUID/Kostenstellen-UUID → Klarname
    *  aus den geladenen Katalogen; unbekannte Werte bleiben roh sichtbar. */
   private resolveGuardValue(op: string, value: string): string {

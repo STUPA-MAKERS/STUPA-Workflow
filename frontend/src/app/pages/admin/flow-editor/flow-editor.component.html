@@ -344,6 +344,35 @@
     </aside>
   </div>
 
+  <!-- Eingehende/ausgehende Übergänge des gewählten States als Listen (#10);
+       Klick auf eine Zeile selektiert den Übergang. -->
+  @if (stateTransitionLists(); as lists) {
+    <section class="fe__transLists" [attr.aria-label]="'admin.flow.list.heading' | t">
+      <div class="fe__transCol">
+        <h3 class="fe__subH">{{ 'admin.flow.list.incoming' | t }} ({{ lists.incoming.length }})</h3>
+        @for (r of lists.incoming; track r.index) {
+          <button type="button" class="fe__transRow" (click)="selectEdge(r.index)">
+            <span class="fe__transMain">@if (r.automatic) {<span aria-hidden="true">⚡ </span>}{{ r.label || (r.from + ' → ' + r.to) }}</span>
+            <span class="fe__transMeta">{{ r.from }} → {{ r.to }}@if (r.branch) { · {{ r.branch }}} · {{ r.guard }}</span>
+          </button>
+        } @empty {
+          <p class="fe__panel-empty">{{ 'admin.flow.list.empty' | t }}</p>
+        }
+      </div>
+      <div class="fe__transCol">
+        <h3 class="fe__subH">{{ 'admin.flow.list.outgoing' | t }} ({{ lists.outgoing.length }})</h3>
+        @for (r of lists.outgoing; track r.index) {
+          <button type="button" class="fe__transRow" (click)="selectEdge(r.index)">
+            <span class="fe__transMain">@if (r.automatic) {<span aria-hidden="true">⚡ </span>}{{ r.label || (r.from + ' → ' + r.to) }}</span>
+            <span class="fe__transMeta">{{ r.from }} → {{ r.to }}@if (r.branch) { · {{ r.branch }}} · {{ r.guard }}</span>
+          </button>
+        } @empty {
+          <p class="fe__panel-empty">{{ 'admin.flow.list.empty' | t }}</p>
+        }
+      </div>
+    </section>
+  }
+
   <!-- Aktionen des gewählten Übergangs: eigene Pane unterhalb des Graphen (#flow). -->
   @if (selectedTransition(); as sel) {
     <section class="fe__actionsPane" [attr.aria-label]="'admin.flow.transitionInspector' | t">
