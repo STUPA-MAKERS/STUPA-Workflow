@@ -24,8 +24,9 @@ class MeetingCreate(_CamelModel):
 
     gremium_id: UUID = Field(alias="gremiumId")
     title: str = Field(min_length=1)
-    date: _date | None = None
-    start_time: _time | None = Field(default=None, alias="startTime")
+    # Termin ist Pflicht: ohne Datum/Uhrzeit lässt sich keine Sitzung planen.
+    date: _date
+    start_time: _time = Field(alias="startTime")
     # Genau ein zugewiesener Protokollant (Mitglied des Gremiums).
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
 
@@ -143,6 +144,14 @@ class AttendanceOut(_CamelModel):
     source: Literal["self", "lead"] | None = None
     # Ist der anfragende Principal dieses Mitglied (für die Selbst-Markierung)?
     is_self: bool = Field(default=False, alias="isSelf")
+
+
+class MeetingMemberOut(_CamelModel):
+    """Aktuelles Gremium-Mitglied — Protokollant-Kandidat beim Anlegen einer Sitzung."""
+
+    principal_id: UUID = Field(alias="principalId")
+    display_name: str | None = Field(default=None, alias="displayName")
+    email: str | None = None
 
 
 class AttendanceSetBody(_CamelModel):

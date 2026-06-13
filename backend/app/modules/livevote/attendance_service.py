@@ -17,7 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.admin.models import GremiumMembership
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.models import Meeting, MeetingAttendance
-from app.modules.livevote.schemas import AttendanceOut, AttendanceStatus
+from app.modules.livevote.schemas import (
+    AttendanceOut,
+    AttendanceStatus,
+    MeetingMemberOut,
+)
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 
@@ -57,6 +61,15 @@ class AttendanceService:
             )
         ).scalars().all()
         return list(rows)
+
+    async def members(self, gremium_id: UUID) -> list[MeetingMemberOut]:
+        """Aktuelle Gremium-Mitglieder als Protokollant-Kandidaten (ohne Sitzung)."""
+        return [
+            MeetingMemberOut(
+                principalId=m.id, displayName=m.display_name, email=m.email
+            )
+            for m in await self._current_members(gremium_id)
+        ]
 
     async def roster(self, meeting_id: UUID, requester_sub: str) -> list[AttendanceOut]:
         """Mitglieder + ihre (ggf. noch leere) Anwesenheit für diese Sitzung."""

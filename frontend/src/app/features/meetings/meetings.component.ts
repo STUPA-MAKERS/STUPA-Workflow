@@ -29,6 +29,7 @@ import type {
   AttendanceStatus,
   I18nMap,
   Meeting,
+  MeetingMember,
   MeetingVote,
   Protocol,
   Uuid,
@@ -94,8 +95,23 @@ const AUTOSAVE_DELAY_MS = 1000;
     <header class="mtg__head">
       <div class="mtg__headRow">
         <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
-        @if (!meeting() && canCreate()) {
-          <app-button size="sm" (click)="openCreate()">{{ 'meetings.list.new' | t }}</app-button>
+        @if (!meeting()) {
+          <div class="mtg__headActions">
+            <!-- Gremium-Filter ohne Label, in einer Zeile + gleicher Höhe wie der Button. -->
+            @if (showOverview() && filterGremiumOptions().length > 2) {
+              <app-select
+                class="mtg__headFilter"
+                name="gremiumFilter"
+                [ariaLabel]="'meetings.list.committeeFilter' | t"
+                [options]="filterGremiumOptions()"
+                [ngModel]="gremiumFilter()"
+                (ngModelChange)="selectGremiumFilter($event)"
+              />
+            }
+            @if (canCreate()) {
+              <app-button (click)="openCreate()">{{ 'meetings.list.new' | t }}</app-button>
+            }
+          </div>
         }
       </div>
       @if (meeting(); as m) {
@@ -269,7 +285,12 @@ const AUTOSAVE_DELAY_MS = 1000;
         <!-- »closed« ist terminal: nach dem Schließen entfallen alle Steuer-Buttons,
              eine geschlossene Sitzung lässt sich nicht wieder öffnen. -->
         @if (m.canControl && m.status !== 'closed') {
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live'" [ariaLabel]="'meetings.control.open' | t" [title]="'meetings.control.open' | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
+          <!-- Start verlangt einen Protokollanten: ohne ihn ist der Button gesperrt
+               (das Protokoll entsteht beim Start und braucht eine Schriftführung). -->
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live' || !m.protokollantId" [ariaLabel]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
+          @if (m.status === 'planned' && !m.protokollantId) {
+            <span class="mtg__muted mtg__needProt">{{ 'meetings.control.needProtokollant' | t }}</span>
+          }
           <app-button variant="danger" size="sm" [loading]="finalizing()" [title]="'meetings.control.closeSession' | t" (click)="closeConfirmOpen.set(true)">
             <span class="mtg__btnIcon"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeShort' | t }}</span>
           </app-button>
@@ -362,11 +383,12 @@ const AUTOSAVE_DELAY_MS = 1000;
         <!-- MITTE: Protokoll-Body (pro-TOP-Editor + Beschlussfragen) -->
         <div class="mtg__main">
           @if (!protocol()) {
-            <p class="mtg__muted">{{ 'meetings.protocol.none' | t }}</p>
-            @if (canWrite()) {
-              <app-button size="sm" [loading]="loadingProtocol()" (click)="loadProtocol()">
-                {{ 'meetings.protocol.create' | t }}
-              </app-button>
+            <!-- Das Protokoll entsteht ausschließlich beim Start; davor kann nicht
+                 protokolliert/abgestimmt werden. Kein manueller Anlege-Button mehr. -->
+            @if (m.status === 'planned') {
+              <p class="mtg__muted mtg__beforeStart">{{ 'meetings.protocol.beforeStart' | t }}</p>
+            } @else {
+              <p class="mtg__muted">{{ 'meetings.protocol.none' | t }}</p>
             }
           } @else if (protocol(); as proto) {
             <div class="mtg__protoMeta">
@@ -658,24 +680,16 @@ const AUTOSAVE_DELAY_MS = 1000;
     } @else {
       <!-- Übersicht: vorhandene Sitzungen (#104). Auch reine Gremium-Mitglieder
            sehen ihre (serverseitig gefilterte) Timeline (#sessions-visibility). -->
-      @if (canManageAny() || canWriteGlobal() || inAnyCommittee() || inSubstitutePool()) {
+      @if (showOverview()) {
         <section class="mtg__listSection">
-          @if (filterGremiumOptions().length > 2) {
-            <div class="mtg__listToolbar">
-              <app-select
-                name="gremiumFilter"
-                [label]="'meetings.list.committeeFilter' | t"
-                [options]="filterGremiumOptions()"
-                [ngModel]="gremiumFilter()"
-                (ngModelChange)="selectGremiumFilter($event)"
-              />
-            </div>
-          }
           @if (loadingList()) {
             <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
-          } @else if (timelineEmpty()) {
-            <p class="mtg__muted">{{ 'meetings.list.empty' | t }}</p>
           } @else {
+            <!-- Auch ohne Sitzungen die Timeline mit Jetzt-Balken zeigen (#empty-timeline):
+                 der „noch keine Sitzungen"-Fall ist nur eine leere Timeline. -->
+            @if (timelineEmpty()) {
+              <p class="mtg__muted mtg__tlEmptyHint">{{ 'meetings.list.empty' | t }}</p>
+            }
             <!-- Timeline (#104): Vergangenes oben (serverseitig lazy beim Hochscrollen),
                  Anstehendes unten (lazy beim Runterscrollen). -->
             <div class="mtg__timeline" #tlScroll (scroll)="onTimelineScroll(tlScroll)">
@@ -775,13 +789,15 @@ const AUTOSAVE_DELAY_MS = 1000;
             [options]="gremiumOptions()"
             [required]="true"
             [ngModel]="newGremiumId()"
-            (ngModelChange)="newGremiumId.set($event)"
+            (ngModelChange)="onCreateGremiumChange($event)"
           />
           @if (!gremiumOptions().length) {
             <p class="mtg__muted mtg__hint">{{ 'meetings.create.noGremien' | t }}</p>
           }
+          <!-- Datum + Uhrzeit sind Pflicht: ohne Termin lässt sich keine Sitzung planen. -->
           <app-datepicker
             [label]="'meetings.create.date' | t"
+            [required]="true"
             [ngModel]="newDate()"
             (ngModelChange)="newDate.set($event)"
             name="date"
@@ -790,15 +806,25 @@ const AUTOSAVE_DELAY_MS = 1000;
           <app-time-input
             id="mtg-new-time"
             [label]="'meetings.create.time' | t"
+            [required]="true"
             [ngModel]="newTime()"
             (ngModelChange)="newTime.set($event)"
             name="time"
+          />
+          <!-- Protokollant wählbar beim Anlegen; spätestens vor dem Start Pflicht. -->
+          <app-select
+            name="newProt"
+            [label]="'meetings.protokollant.label' | t"
+            [options]="createProtokollantOptions()"
+            [disabled]="!newGremiumId()"
+            [ngModel]="newProtokollant()"
+            (ngModelChange)="newProtokollant.set($event)"
           />
         </form>
         <div dialog-footer class="mtg__dialogFoot">
           <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
           <app-button
-            [disabled]="!newTitle().trim() || !newGremiumId()"
+            [disabled]="!newTitle().trim() || !newGremiumId() || !newDate().trim() || !newTime().trim()"
             [loading]="creating()"
             (click)="create($event)"
           >
@@ -882,6 +908,17 @@ const AUTOSAVE_DELAY_MS = 1000;
         gap: var(--space-4);
         flex-wrap: wrap;
       }
+      /* Gremium-Filter + »Neue Sitzung« in einer Zeile, gleiche Höhe (md-Button ≈
+         Control-Höhe des Selects). */
+      .mtg__headActions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+      }
+      .mtg__headFilter {
+        min-width: 12rem;
+      }
       .mtg__meta {
         display: flex;
         align-items: center;
@@ -906,13 +943,6 @@ const AUTOSAVE_DELAY_MS = 1000;
         display: flex;
         flex-direction: column;
         gap: var(--space-3);
-      }
-      .mtg__listToolbar {
-        display: flex;
-        justify-content: flex-end;
-      }
-      .mtg__listToolbar app-select {
-        min-width: 14rem;
       }
       .mtg__listHead {
         display: flex;
@@ -1946,7 +1976,6 @@ export class MeetingsComponent implements OnDestroy {
   /** Initiales Laden der Übersicht-Timeline (erste Seite beider Richtungen). */
   readonly loadingList = signal(false);
 
-  readonly loadingProtocol = signal(false);
   readonly saving = signal(false);
   /** Auto-Speichern-Status des aktuellen TOP-Texts (#56/#58). */
   readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -1970,6 +1999,17 @@ export class MeetingsComponent implements OnDestroy {
   readonly savingDate = signal(false);
   /** Pflicht-Gremium für die neue Sitzung (#68); leer ⇒ Submit gesperrt. */
   readonly newGremiumId = signal('');
+  /** Protokollant der neuen Sitzung — wählbar beim Anlegen, Pflicht spätestens vor
+   *  dem Start. Kandidaten = aktuelle Mitglieder des gewählten Gremiums. */
+  readonly newProtokollant = signal('');
+  readonly createMembers = signal<MeetingMember[]>([]);
+  readonly createProtokollantOptions = computed<SelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('meetings.protokollant.none') },
+    ...this.createMembers().map((m) => ({
+      value: m.principalId,
+      label: m.displayName || m.email || m.principalId,
+    })),
+  ]);
   /** Gremien als Dropdown-Optionen (echte Liste, `/gremien`). */
   readonly gremiumOptions = signal<SelectOption[]>([]);
   /** Gremium-Filter der Übersicht (''=alle). Quelle: Mitglieds-Gremien (#meetings-filter). */
@@ -2089,7 +2129,26 @@ export class MeetingsComponent implements OnDestroy {
   }
 
   openCreate(): void {
+    this.newProtokollant.set('');
+    this.createMembers.set([]);
+    // Vorbelegtes Gremium (z. B. aus dem Übersichtsfilter): direkt Mitglieder laden.
+    if (this.newGremiumId()) this.loadCreateMembers(this.newGremiumId());
     this.createOpen.set(true);
+  }
+
+  /** Gremium im Anlegen-Dialog wechseln → Protokollant-Kandidaten neu laden. */
+  onCreateGremiumChange(gremiumId: string): void {
+    this.newGremiumId.set(gremiumId);
+    this.newProtokollant.set('');
+    this.createMembers.set([]);
+    if (gremiumId) this.loadCreateMembers(gremiumId);
+  }
+
+  private loadCreateMembers(gremiumId: string): void {
+    this.api.listMeetingMembers(gremiumId).subscribe({
+      next: (rows) => this.createMembers.set(rows),
+      error: () => this.createMembers.set([]),
+    });
   }
 
   /** Globale Verwalter-Rechte — Gating der Übersicht/Anlegen (ohne geladene Sitzung). */
@@ -2110,6 +2169,14 @@ export class MeetingsComponent implements OnDestroy {
   readonly inAnyCommittee = computed(() => this.auth.gremien().length > 0);
   /** Stellvertreter-Pool-Mitglied → darf die (gefilterte) Timeline sehen (#7). */
   readonly inSubstitutePool = computed(() => this.auth.inSubstitutePool());
+  /** Darf die (serverseitig gefilterte) Sitzungsübersicht/Timeline sehen. */
+  readonly showOverview = computed(
+    () =>
+      this.canManageAny() ||
+      this.canWriteGlobal() ||
+      this.inAnyCommittee() ||
+      this.inSubstitutePool(),
+  );
   /** Übersicht ohne Detail-Route, ohne Verwalter-/Schreibrecht, ohne Gremium-
    *  Mitgliedschaft **und** ohne Pool-Zugehörigkeit ⇒ keine Berechtigung (#sessions/#7). */
   readonly showForbidden = computed(
@@ -2368,17 +2435,28 @@ export class MeetingsComponent implements OnDestroy {
     event.preventDefault();
     const title = this.newTitle().trim();
     const gremiumId = this.newGremiumId();
-    if (!title || !gremiumId || this.creating()) return;
+    const date = this.newDate().trim();
+    const startTime = this.newTime().trim();
+    // Datum + Uhrzeit sind Pflicht (Termin der Sitzung); Submit ist sonst gesperrt.
+    if (!title || !gremiumId || !date || !startTime || this.creating()) return;
     this.creating.set(true);
-    const date = this.newDate().trim() || null;
-    const startTime = this.newTime().trim() || null;
-    this.api.createMeeting({ title, gremiumId, date, startTime }).subscribe({
+    this.api
+      .createMeeting({
+        title,
+        gremiumId,
+        date,
+        startTime,
+        protokollantId: this.newProtokollant() || null,
+      })
+      .subscribe({
       next: (m) => {
         this.creating.set(false);
         this.newTitle.set('');
         this.newGremiumId.set('');
         this.newDate.set('');
         this.newTime.set('');
+        this.newProtokollant.set('');
+        this.createMembers.set([]);
         this.createOpen.set(false);
         this.toast.success(this.i18n.translate('meetings.toast.created'));
         // Auf die Detail-Route navigieren, damit die Sitzung wiederauffindbar ist (#104).
@@ -2402,8 +2480,20 @@ export class MeetingsComponent implements OnDestroy {
     if (!m) return;
     // »closed« ist terminal — keine Wiedereröffnung (der Server lehnt es ohnehin ab).
     if (m.status === 'closed') return;
+    // Start verlangt einen Protokollanten (Schriftführung des Protokolls). Vorab
+    // prüfen, damit der 409 des Servers nicht erst nach dem Klick auftaucht.
+    if (status === 'live' && !m.protokollantId) {
+      this.toast.error(this.i18n.translate('meetings.toast.protokollantRequired'));
+      return;
+    }
     this.api.patchMeeting(m.id, { status }).subscribe({
-      next: (updated) => this.meeting.set(updated),
+      next: (updated) => {
+        this.meeting.set(updated);
+        // Protokoll entsteht beim Start (Backend) — direkt per GET nachladen.
+        if (updated.status === 'live' && updated.protocolId && this.canWrite()) {
+          this.refreshProtocol();
+        }
+      },
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
     });
   }
@@ -2494,23 +2584,6 @@ export class MeetingsComponent implements OnDestroy {
   }
 
   // --- Protokoll: TOPs links, pro-TOP-Editor rechts (#58) ------------------
-  loadProtocol(): void {
-    const m = this.meeting();
-    if (!m || this.loadingProtocol()) return;
-    this.loadingProtocol.set(true);
-    this.api.loadProtocol(m.id).subscribe({
-      next: (proto) => {
-        this.loadingProtocol.set(false);
-        this.protocol.set(proto);
-        this.watchRendering(proto);
-      },
-      error: () => {
-        this.loadingProtocol.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.protocolFailed'));
-      },
-    });
-  }
-
   /** Bestehendes Protokoll per GET nachladen (kein Write-Rate-Limit, #429). */
   private refreshProtocol(): void {
     const m = this.meeting();

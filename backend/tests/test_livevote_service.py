@@ -8,7 +8,7 @@ Integrationstest).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from uuid import uuid4
 
 import pytest
@@ -229,10 +229,25 @@ async def test_service_create_sets_planned_and_commits() -> None:
     session = _FakeSession()
     svc = MeetingService(session)  # type: ignore[arg-type]
     gid = uuid4()
-    out = await svc.create(MeetingCreate(gremiumId=gid, title="GV"), _principal())
+    # Datum + Uhrzeit sind beim Anlegen Pflicht (Termin der Sitzung).
+    out = await svc.create(
+        MeetingCreate(
+            gremiumId=gid, title="GV", date=date(2026, 6, 20), startTime=time(18, 0)
+        ),
+        _principal(),
+    )
     assert out.status == "planned"
     assert out.gremium_id == gid
     assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_meeting_create_requires_date_and_time() -> None:
+    """Ohne Datum/Uhrzeit ist ``MeetingCreate`` ungültig (Pflicht-Termin)."""
+    import pydantic
+
+    with pytest.raises(pydantic.ValidationError):
+        MeetingCreate(gremiumId=uuid4(), title="GV")
 
 
 @pytest.mark.asyncio
@@ -249,6 +264,8 @@ async def test_service_patch_applies_and_broadcasts_meeting_state() -> None:
     meeting.status = "planned"
     meeting.date = None
     meeting.active_application_id = None
+    # Start verlangt einen Protokollanten — sonst lehnt der Service mit 409 ab.
+    meeting.protokollant_id = uuid4()
     meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
     session = _FakeSession(existing=meeting)
     broker = _CaptureBroker()
@@ -264,6 +281,22 @@ async def test_service_patch_applies_and_broadcasts_meeting_state() -> None:
     [(channel, msg)] = broker.messages
     assert channel == f"meeting:{meeting.id}"
     assert msg["status"] == "live"
+
+
+@pytest.mark.asyncio
+async def test_service_patch_to_live_without_protokollant_conflicts() -> None:
+    """planned→live ohne Protokollant → 409; der Status bleibt unverändert geplant."""
+    meeting = Meeting(gremium_id=uuid4(), title="GV")
+    meeting.id = uuid4()
+    meeting.status = "planned"
+    meeting.date = None
+    meeting.active_application_id = None
+    meeting.protokollant_id = None
+    meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
+    svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
+    with pytest.raises(ConflictError):
+        await svc.patch(meeting.id, MeetingPatch(status="live"), _principal())
+    assert meeting.status == "planned"
 
 
 @pytest.mark.asyncio

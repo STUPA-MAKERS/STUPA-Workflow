@@ -780,12 +780,13 @@ class MeetingService:
                 "the session is closed — its settings can no longer be changed"
             )
 
-        if payload.status is not None:
-            # Schließ-Zeitpunkt (#14): einmalig beim Wechsel auf ``closed`` —
-            # liefert die »Ende«-Zeile der Protokoll-Titelseite.
-            if payload.status == "closed" and meeting.status != "closed":
-                meeting.closed_at = datetime.now(UTC)
-            meeting.status = payload.status
+        # Start (planned→live): das Protokoll entsteht erst beim Start der Sitzung
+        # — davor kann nicht protokolliert/abgestimmt werden. ``meeting.status`` wird
+        # erst NACH der Protokollant-Prüfung gesetzt (atomar: kein »live« ohne
+        # Protokollant, auch nicht in-memory bei einem abgewiesenen Patch).
+        going_live = (
+            payload.status == "live" and meeting.status != "live"
+        )
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id
         if "date" in payload.model_fields_set:
@@ -802,6 +803,19 @@ class MeetingService:
             meeting.protokollant_id = await self._resolve_protokollant(
                 meeting.gremium_id, payload.protokollant_id
             )
+        # Vor dem Start muss ein Protokollant feststehen — er ist die Schriftführung
+        # des beim Start angelegten Protokolls (das Protokoll selbst legt der Router
+        # nach diesem Commit an, planned→live).
+        if going_live and meeting.protokollant_id is None:
+            raise ConflictError(
+                "assign a protokollant before starting the meeting"
+            )
+        if payload.status is not None:
+            # Schließ-Zeitpunkt (#14): einmalig beim Wechsel auf ``closed`` —
+            # liefert die »Ende«-Zeile der Protokoll-Titelseite.
+            if payload.status == "closed" and meeting.status != "closed":
+                meeting.closed_at = datetime.now(UTC)
+            meeting.status = payload.status
         await self.session.flush()
         await self.session.commit()
         votes = (await self._votes_for([meeting.id])).get(meeting.id, [])

@@ -45,6 +45,7 @@ import type {
   MagicLinkVerifyResult,
   Meeting,
   MeetingCreateBody,
+  MeetingMember,
   AgendaItem,
   AltchaChallenge,
   AssignableApplication,
@@ -352,6 +353,13 @@ export class ApiClient {
     return this.http
       .post<MeetingOutWire>(`${this.base}/meetings`, body)
       .pipe(map(mapMeeting));
+  }
+
+  /** GET /gremien/{id}/meeting-members — Protokollant-Kandidaten fürs Anlegen (P(session.manage)). */
+  listMeetingMembers(gremiumId: Uuid): Observable<MeetingMember[]> {
+    return this.http.get<MeetingMember[]>(
+      `${this.base}/gremien/${gremiumId}/meeting-members`,
+    );
   }
 
   /** GET /meetings — Sitzungen auflisten (neueste zuerst), optional Gremium-gefiltert (#104). */
