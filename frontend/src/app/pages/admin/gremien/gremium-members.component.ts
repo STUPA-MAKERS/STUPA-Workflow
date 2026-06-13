@@ -449,11 +449,15 @@ export class GremiumMembersComponent {
       .listGremien()
       .pipe(takeUntilDestroyed())
       .subscribe((list) => this.gremium.set(list.find((g) => g.id === this.gremiumId) ?? null));
-    this.api.listGremiumRoles(this.gremiumId as Uuid).subscribe((r) => this.gremiumRoles.set(r));
+    this.api.listGremiumRoles(this.gremiumId as Uuid).subscribe({
+      next: (r) => this.gremiumRoles.set(r),
+      error: () => this.gremiumRoles.set([]),
+    });
     // Principal-Namen für die Anzeige (id → Principal).
-    this.api.listPrincipals('').subscribe((p) =>
-      this.principalsById.set(new Map(p.map((x) => [x.id, x]))),
-    );
+    this.api.listPrincipals('').subscribe({
+      next: (p) => this.principalsById.set(new Map(p.map((x) => [x.id, x]))),
+      error: () => this.principalsById.set(new Map()),
+    });
     this.refresh();
     this.refreshSubstitutes();
   }
@@ -598,6 +602,13 @@ export class GremiumMembersComponent {
   }
 
   private refresh(): void {
-    this.api.listGremiumMemberships(this.gremiumId as Uuid).subscribe((m) => this.memberships.set(m));
+    this.api.listGremiumMemberships(this.gremiumId as Uuid).subscribe({
+      next: (m) => this.memberships.set(m),
+      // Kein stilles Schlucken mehr (#5-3): 403/Fehler sichtbar machen statt leerer Tabelle.
+      error: () => {
+        this.memberships.set([]);
+        this.toast.error(this.i18n.translate('admin.gremien.membersLoadFailed'));
+      },
+    });
   }
 }

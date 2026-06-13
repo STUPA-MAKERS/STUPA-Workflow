@@ -17,11 +17,17 @@ from fastapi.testclient import TestClient
 from app.deps import Principal, get_current_principal
 from app.main import create_app
 from app.modules.admin.branding import Branding
-from app.modules.admin.router import get_config_service, get_site_config_service
+from app.modules.admin.router import (
+    get_config_service,
+    get_gremium_role_service,
+    get_site_config_service,
+)
 from app.modules.admin.schemas import (
     ApplicationTypeOut,
     GremiumMailRecipients,
+    GremiumMembershipOut,
     GremiumOut,
+    GremiumRoleOut,
     GroupMappingOut,
     PrincipalOut,
     PublicSiteConfigOut,
@@ -223,6 +229,26 @@ class _FakeSite:
         return PublicSiteConfigOut(version=self._version, branding=self._active)
 
 
+class _FakeGremiumRoles:
+    """Minimal-Fake für die Gremium-Rollen/Mitgliedschaften (#5-3 Gate-Tests)."""
+
+    async def list_roles(self, gremium_id):  # noqa: ANN001
+        return [
+            GremiumRoleOut(
+                id=uuid4(), gremium_id=gremium_id, key="member",
+                name={"de": "Mitglied"}, forced=True, permissions=[],
+            )
+        ]
+
+    async def list_memberships(self, gremium_id):  # noqa: ANN001
+        return [
+            GremiumMembershipOut(
+                id=uuid4(), principal_id=uuid4(), gremium_id=gremium_id,
+                gremium_role_id=uuid4(), valid_from=None, valid_until=None,
+            )
+        ]
+
+
 @pytest.fixture
 def app() -> FastAPI:
     application = create_app()
@@ -404,8 +430,33 @@ def test_list_principals_camelcase(app: FastAPI, client: TestClient) -> None:
 
 
 def test_list_principals_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.types"})  # Bereichs-Admin darf das nicht
+    _as(app, {"admin.types"})  # Bereichs-Admin (weder gremien noch roles) darf das nicht
     assert client.get("/api/admin/principals").status_code == 403
+
+
+def test_gremien_admin_can_manage_members_without_admin_roles(
+    app: FastAPI, client: TestClient
+) -> None:
+    """#5-3: Die Mitglieder-Subseite läuft unter admin.gremien. Mitgliedschaften,
+    Gremium-Rollen (Rollen-Dropdown) und Principals (Namen/Typeahead) müssen daher
+    auch ohne admin.roles lesbar sein, sonst bleibt die Tabelle leer."""
+    app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
+    _as(app, {"admin.gremien"})  # bewusst OHNE admin.roles
+    gid = uuid4()
+    assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 200
+    assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 200
+    assert client.get("/api/admin/principals").status_code == 200
+
+
+def test_members_endpoints_forbidden_for_unrelated_area(
+    app: FastAPI, client: TestClient
+) -> None:
+    """admin.types ist weder gremien noch roles → kein Zugriff auf Mitglieder-Reads."""
+    app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
+    _as(app, {"admin.types"})
+    gid = uuid4()
+    assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 403
+    assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 403
 
 
 def test_list_permissions_catalogue(app: FastAPI, client: TestClient) -> None:

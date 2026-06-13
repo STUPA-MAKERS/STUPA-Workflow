@@ -126,6 +126,11 @@ _WEBHOOK = Depends(require_principal("webhook.manage"))
 _ANY_ADMIN_AREA = Depends(
     require_any_permission("admin.site", "admin.gremien", "admin.types", "admin.roles")
 )
+# Gremium-Mitglieder-Subseite (admin.gremien) braucht lesenden Zugriff auf
+# Gremium-Rollen (Rollen-Dropdown) und Principals (Namen + Typeahead), ohne dass
+# der Gremien-Admin auch admin.roles besitzen muss (#5-3). Schreiben von Rollen
+# bleibt admin.roles.
+_GREMIEN_OR_ROLES = Depends(require_any_permission("admin.gremien", "admin.roles"))
 
 
 # =========================================================================== #
@@ -226,7 +231,7 @@ async def set_gremium_mail_recipients(
 @router.get(
     "/gremien/{gremium_id}/roles",
     response_model=list[GremiumRoleOut],
-    dependencies=[_ROLES],
+    dependencies=[_GREMIEN_OR_ROLES],
     responses=_errors(401, 403),
 )
 async def list_gremium_roles(
@@ -274,7 +279,7 @@ async def delete_gremium_role(
 @router.get(
     "/gremien/{gremium_id}/memberships",
     response_model=list[GremiumMembershipOut],
-    dependencies=[_ROLES],
+    dependencies=[_GREMIEN],
     responses=_errors(401, 403),
 )
 async def list_gremium_memberships(
@@ -293,7 +298,7 @@ async def create_gremium_membership(
     gremium_id: UUID,
     payload: GremiumMembershipCreate,
     service: GremiumRoleServiceDep,
-    principal: RolesAdmin,
+    principal: GremienAdmin,
 ) -> GremiumMembershipOut:
     return await service.create_membership(gremium_id, payload, principal.sub)
 
@@ -302,7 +307,7 @@ async def create_gremium_membership(
     "/gremium-memberships/{membership_id}", status_code=204, responses=_errors(401, 403, 404)
 )
 async def delete_gremium_membership(
-    membership_id: UUID, service: GremiumRoleServiceDep, principal: RolesAdmin
+    membership_id: UUID, service: GremiumRoleServiceDep, principal: GremienAdmin
 ) -> None:
     await service.delete_membership(membership_id, principal.sub)
 
@@ -397,7 +402,7 @@ async def create_global_flow(
 @router.get(
     "/principals",
     response_model=list[PrincipalOut],
-    dependencies=[_ROLES],
+    dependencies=[_GREMIEN_OR_ROLES],
     responses=_errors(401, 403),
 )
 async def list_principals(
