@@ -561,6 +561,7 @@ export const de = {
   'meetings.attendance.excused': 'Entschuldigt',
   'meetings.attendance.absent': 'Abwesend',
   'meetings.attendance.unknown': 'Offen',
+  'meetings.attendance.bySession': 'durch Sitzungsleitung',
   'meetings.agenda.title': 'Tagesordnung',
   'meetings.agenda.lead':
     'Anträge in Abstimmung dieser Sitzung zuordnen — Quelle der Protokoll-TOPs.',
@@ -2297,6 +2298,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.attendance.excused': 'Excused',
   'meetings.attendance.absent': 'Absent',
   'meetings.attendance.unknown': 'Open',
+  'meetings.attendance.bySession': 'set by chair',
   'meetings.agenda.title': 'Agenda',
   'meetings.agenda.lead':
     'Assign applications being voted on in this meeting — the source of the protocol TOPs.',

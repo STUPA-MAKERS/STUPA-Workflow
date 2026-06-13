@@ -246,6 +246,9 @@ const AUTOSAVE_DELAY_MS = 1000;
                       <app-badge [variant]="a.status ? attBadgeVariant(a.status) : 'neutral'">
                         {{ (a.status ? attendanceKey(a.status) : 'meetings.attendance.unknown') | t }}
                       </app-badge>
+                      @if (a.source === 'lead') {
+                        <span class="mtg__muted"> ({{ 'meetings.attendance.bySession' | t }})</span>
+                      }
                     }
                   </td>
                 </tr>
@@ -501,6 +504,9 @@ const AUTOSAVE_DELAY_MS = 1000;
                       <app-badge [variant]="a.status ? attBadgeVariant(a.status) : 'neutral'">
                         {{ (a.status ? attendanceKey(a.status) : 'meetings.attendance.unknown') | t }}
                       </app-badge>
+                      @if (a.source === 'lead') {
+                        <span class="mtg__muted"> ({{ 'meetings.attendance.bySession' | t }})</span>
+                      }
                     }
                   </td>
                 </tr>
