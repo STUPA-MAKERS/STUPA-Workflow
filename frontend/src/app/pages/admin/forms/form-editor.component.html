@@ -4,6 +4,9 @@
       <h1 class="fe__title">{{ resolved(title()) || ('admin.forms.untitled' | t) }}</h1>
     </div>
     <div class="fe__head-tools">
+      @if (formVersion()) {
+        <span class="fe__activeChip">{{ 'admin.forms.versionLabel' | t: { n: formVersion() } }}</span>
+      }
       @if (hasVersion()) {
         <span class="fe__activeChip" [class.fe__activeChip--on]="active()">
           {{ (active() ? 'admin.forms.active' : 'admin.forms.inactive') | t }}

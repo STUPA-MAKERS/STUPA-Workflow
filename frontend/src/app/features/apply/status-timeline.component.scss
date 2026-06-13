@@ -148,6 +148,12 @@
   color: var(--color-text-muted);
 }
 
+.timeline__actor {
+  margin-left: var(--space-2);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
 .timeline__note {
   margin: var(--space-1) 0 0;
   color: var(--color-text-muted);

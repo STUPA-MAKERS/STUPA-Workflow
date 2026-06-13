@@ -76,6 +76,9 @@
                         <time class="timeline__time" [attr.datetime]="entry.at">
                           {{ entry.at | ldate: 'medium' }}
                         </time>
+                        @if (entry.actor) {
+                          <span class="timeline__actor">{{ 'status.history.by' | t: { actor: entry.actor } }}</span>
+                        }
                         @if (entry.note) {
                           <p class="timeline__note">{{ noteText(entry.note) }}</p>
                         }

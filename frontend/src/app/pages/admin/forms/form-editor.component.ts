@@ -91,6 +91,8 @@ export class FormEditorComponent {
   protected readonly saving = signal(false);
   /** Aktuelle Form-Version ist aktiv? (für neue Anträge nutzbar, #forms) */
   protected readonly active = signal(false);
+  /** Aktuelle Form-Version (#5-4) — Anzeige, welche Version bearbeitet wird. */
+  protected readonly formVersion = signal<number | null>(null);
   /** Existiert überhaupt eine Form-Version (sonst nichts zu (de)aktivieren)? */
   protected readonly hasVersion = signal(false);
   protected readonly togglingActive = signal(false);
@@ -183,6 +185,7 @@ export class FormEditorComponent {
         this.description.set({ de: d['de'] ?? '', en: d['en'] ?? '' });
         this.active.set(draft.active ?? false);
         this.hasVersion.set(!!draft.formVersionId);
+        this.formVersion.set(draft.version ?? null);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
