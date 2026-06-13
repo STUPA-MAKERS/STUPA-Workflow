@@ -497,6 +497,8 @@ export class ApiClient {
       options?: string[];
       majorityRule?: 'simple' | 'absolute' | 'two_thirds';
       secret?: boolean;
+      eligibleCount?: number | null;
+      quorumPercent?: number | null;
     },
   ): Observable<Meeting> {
     return this.http

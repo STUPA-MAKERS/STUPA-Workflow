@@ -609,6 +609,21 @@ const AUTOSAVE_DELAY_MS = 1000;
             <input type="checkbox" [checked]="voteSecret()" (change)="voteSecret.set($any($event.target).checked)" />
             {{ 'meetings.vote.secret' | t }}
           </label>
+
+          <app-select
+            name="vmaj"
+            [label]="'meetings.vote.majorityRule' | t"
+            [options]="majorityRuleOptions()"
+            [ngModel]="voteMajorityRule()"
+            (ngModelChange)="voteMajorityRule.set($event)"
+          />
+          <div class="mtg__voteQuorum">
+            <label class="mtg__paneLabel" for="mtg-velig">{{ 'meetings.vote.eligibleCount' | t }}</label>
+            <input id="mtg-velig" class="mtg__input" type="number" min="0" inputmode="numeric" [ngModel]="voteEligibleCount()" (ngModelChange)="voteEligibleCount.set($event)" name="velig" [placeholder]="'meetings.vote.eligibleCountPlaceholder' | t" />
+            <label class="mtg__paneLabel" for="mtg-vquorum">{{ 'meetings.vote.quorumPercent' | t }}</label>
+            <input id="mtg-vquorum" class="mtg__input" type="number" min="0" max="100" inputmode="numeric" [ngModel]="voteQuorumPercent()" (ngModelChange)="voteQuorumPercent.set($event)" name="vquorum" [placeholder]="'meetings.vote.quorumPercentPlaceholder' | t" />
+          </div>
+          <p class="mtg__muted mtg__hint">{{ 'meetings.vote.quorumHint' | t }}</p>
         </form>
         <div dialog-footer class="mtg__dialogFoot">
           <app-button variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
@@ -1881,6 +1896,16 @@ export class MeetingsComponent implements OnDestroy {
   /** Feste Stimm-Optionen (kanonische Keys) — Pass/Fail braucht yes/no/abstain. */
   readonly FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
   readonly voteSecret = signal(false);
+  // Optionale Beschluss-Parameter beim Öffnen (#5-4): Mehrheitsregel + Quorum.
+  readonly voteMajorityRule = signal<'simple' | 'absolute' | 'two_thirds'>('simple');
+  readonly voteEligibleCount = signal<string>('');
+  readonly voteQuorumPercent = signal<string>('');
+  readonly majorityRuleOptions = computed<SelectOption[]>(() =>
+    (['simple', 'absolute', 'two_thirds'] as const).map((v) => ({
+      value: v,
+      label: this.i18n.translate(`vote.majority.${v}`),
+    })),
+  );
   readonly openingVote = signal(false);
   /** Anzeige-Label einer Stimm-Option (yes→Ja …); unbekannte roh. */
   voteOptionLabel(opt: string): string {
@@ -2739,6 +2764,9 @@ export class MeetingsComponent implements OnDestroy {
     this.voteItem.set(item);
     this.voteQuestion.set(item.title ?? '');
     this.voteSecret.set(false);
+    this.voteMajorityRule.set('simple');
+    this.voteEligibleCount.set('');
+    this.voteQuorumPercent.set('');
     this.voteDialogOpen.set(true);
   }
 
@@ -2758,6 +2786,13 @@ export class MeetingsComponent implements OnDestroy {
         question: this.voteQuestion().trim() || null,
         options,
         secret: this.voteSecret(),
+        majorityRule: this.voteMajorityRule(),
+        eligibleCount: this.voteEligibleCount().trim()
+          ? Number(this.voteEligibleCount())
+          : null,
+        quorumPercent: this.voteQuorumPercent().trim()
+          ? Number(this.voteQuorumPercent())
+          : null,
       })
       .subscribe({
         next: (updated) => {
