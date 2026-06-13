@@ -76,12 +76,14 @@ interface RoleDraft {
           <div class="roles__detail">
             <!-- Umbenennen (Anzeigename, #rename): Key bleibt unveränderlich. -->
             <div class="roles__nameEdit">
-              <label class="roles__lbl">{{ 'admin.roles.roleKey' | t }}
+              <label class="roles__lbl roles__lbl--key">{{ 'admin.roles.roleKey' | t }}
                 <input [value]="$any(r).key" disabled /></label>
               <label class="roles__lbl">{{ 'admin.common.labelDe' | t }}
                 <input [ngModel]="nameDraft($any(r)).de" (ngModelChange)="patchName($any(r), 'de', $event)" [name]="$any(r).id + '-nde'" /></label>
               <label class="roles__lbl">{{ 'admin.common.labelEn' | t }}
                 <input [ngModel]="nameDraft($any(r)).en" (ngModelChange)="patchName($any(r), 'en', $event)" [name]="$any(r).id + '-nen'" /></label>
+            </div>
+            <div class="roles__foot">
               <app-button size="sm" variant="secondary" (click)="renameRole($any(r))">{{ 'action.save' | t }}</app-button>
             </div>
             @if (isLocked($any(r))) {
@@ -183,14 +185,29 @@ interface RoleDraft {
       .roles__detail {
         display: flex;
         flex-direction: column;
-        gap: var(--space-3);
-        padding: var(--space-4);
+        gap: var(--space-4);
+        padding: var(--space-5);
+      }
+      /* Umbenennen-Zeile: Key (schmal) + DE + EN als gleichmäßige Spalten (#16). */
+      .roles__nameEdit {
+        display: grid;
+        grid-template-columns: minmax(7rem, 0.5fr) 1fr 1fr;
+        gap: var(--space-3) var(--space-4);
+        align-items: end;
+      }
+      .roles__lbl--key {
+        min-width: 0;
+      }
+      @media (max-width: 40rem) {
+        .roles__nameEdit {
+          grid-template-columns: 1fr;
+        }
       }
       .roles__grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
         align-items: center;
-        gap: var(--space-2);
+        gap: var(--space-3) var(--space-4);
         margin: 0;
         padding: 0;
         border: 0;
