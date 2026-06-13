@@ -503,6 +503,9 @@ import { SimplifyPathPipe } from '@shared/budget-path';
         font-size: var(--fs-xs);
         font-weight: var(--fw-semibold);
         white-space: nowrap;
+        /* Dunklerer, höherer Header wie die shared DataTable — #table-parity. */
+        padding: var(--space-3) var(--space-4);
+        background: var(--color-surface-sunken);
       }
       .exp__sort {
         background: transparent;

@@ -132,6 +132,8 @@ export interface SortState {
         text-transform: uppercase;
         letter-spacing: 0.04em;
         font-size: var(--fs-xs);
+        /* Dunklerer Header wie die Aufgaben-Tabelle (shared DataTable) — #table-parity. */
+        background: var(--color-surface-sunken);
       }
       .atbl__num {
         text-align: end;
