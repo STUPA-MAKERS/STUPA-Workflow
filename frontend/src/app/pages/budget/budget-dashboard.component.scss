@@ -68,6 +68,13 @@
   background: var(--color-primary-subtle);
 }
 
+/* Aktiver Tab darf beim Hover seinen Selektor-Hintergrund nicht verlieren:
+   `.bd__ovTab:hover` (Spezifität 0,2,0) schlug sonst `--active` (0,1,0). */
+.bd__ovTab--active:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
 .bd__title {
   margin: 0;
 }
