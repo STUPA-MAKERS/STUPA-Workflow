@@ -1,13 +1,15 @@
-# Frontend — Antragsplattform SPA
+# Frontend — STUPA-Workflow SPA
 
-Angular 20 (TS strict, standalone). Design-System (CD-Tokens, Dark-Mode, Web-Font,
-STUPA-Logos), `core/` (typisierter API-Client, Auth-Interceptor, i18n DE/EN, Theme,
-WS-Service), `shared/` UI-Kit + Formly-Bindung.
+Angular (TS strict, standalone components mit **separaten `.html`/`.scss`-Dateien**).
+Design-System (CD-Tokens, Dark-Mode, Web-Font, STUPA-Logos), `core/` (typisierter
+API-Client, Auth-Interceptor, i18n DE/EN, Theme, WS-Service), `shared/` UI-Kit +
+Formly-Bindung.
 
-Gebaut sind der öffentliche **Apply-Wizard** (mehrstufig, Altcha, Draft-Persistenz),
-die **Status-Timeline**, die **Confirmation**-Seite und das **Dashboard**
-(rollenabhängige Kacheln). Die Screens für Applications, Voting, Meetings, Budget und
-Admin sind aktuell gegatete Platzhalter (Roadmap T-31 ff.).
+Gebaut: der öffentliche **Apply-Wizard** (mehrstufig, Altcha, Draft-Persistenz),
+**Status-Timeline** und **Confirmation**, das rollenabhängige **Dashboard** sowie die
+Voll-Screens für **Applications**, **Voting**, **Meetings** (inkl. Live-Vote/Beamer),
+**Budget/Expenses/Invoices** und die **Admin-Konfiguration** (Forms, Flow, Gremien,
+Rollen, Branding, Mail-Templates, …). Feature-Routen sind lazy + permission-gegatet.
 
 ## Befehle
 
@@ -40,10 +42,12 @@ src/
       ui/            UI-Kit: Button/Input/Card/Table/Stepper/Dialog/Toast/Badge
       formly/        Formly-Bindung an das UI-Kit (Feldtyp `input`)
     layout/          ShellComponent (Header/Nav/Theme/Sprache/Footer/Toasts)
-    pages/           Home, Dashboard, Platzhalter (gegatete Feature-Routen), 404
-    features/apply/  Apply-Wizard, Confirmation, Status-Timeline, Altcha
+    pages/           Home, Dashboard, Applications, Voting, Budget/Expenses/Invoices,
+                     Tasks, Account, Admin (Forms/Flow/Gremien/Rollen/…), 404
+    features/        apply/ (Wizard, Confirmation, Timeline, Altcha), meetings/,
+                     voting/ (Live-Vote, Beamer)
     app.config.ts    Composition Root (Provider, Interceptor-Kette, Init)
-    app.routes.ts    Routing-Gerüst (Feature-Routen lazy → Platzhalter)
+    app.routes.ts    Routing (Feature-Routen lazy, permission-gegatet)
 ```
 
 ## Design-System

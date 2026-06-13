@@ -17,19 +17,27 @@ app/
     jsonlogic.py     JsonLogic-Evaluator für Form-visibleIf/compute
     config_schemas.py  camelCase-Basismodell (alias, extra=forbid)
   modules/
-    auth/            OIDC (PKCE) + Magic-Link, Sessions, RBAC
+    auth/            OIDC (PKCE) + Magic-Link, Sessions, RBAC, OAuth2/MCP
     forms/           versionierte Formulare, Definition-/Antwort-Validierung
     application_types/ Antragstypen (Formular-/Flow-Bindung, Budget-Flag)
     applications/    Antrags-Lifecycle, Versions-Diff, Kommentare, Anonymisierung
     flow/            Zustandsmaschine, Guards, Transition-Actions
-    voting/          Quorum/Mehrheiten/Geheimwahl, Tally
-    budget/          Töpfe, Stages, Überbuchungsschutz, Rollup-Stats
-    notifications/   Mail-Templates/Regeln, arq-Versand
+    voting/          Quorum/Mehrheiten/Geheimwahl, Tally (lesegescopt)
+    livevote/        Sitzungen, Agenda, Anwesenheit, Live-Vote über WebSocket
+    protocol/        Sitzungsprotokoll (Markdown → PDF), Vote-Snippets, Finalisierung
+    delegations/     sitzungsgebundene Delegationen + Stellvertreter-Pool
+    deadlines/       benannte Frist-Policies (vom Flow referenziert)
+    budget/          Kostenstellen-Baum, HHJ, Zuteilung, Buchungen, Rechnungen (ZUGFeRD)
+    files/           Upload, MIME-Sniff, ClamAV-Scan, MinIO/S3, signierte URLs
+    pdf/             asynchroner Antrags-PDF-Render (pytex → MinIO)
+    notifications/   Mail-Templates/Regeln, per-Nutzer-Präferenzen, arq-Versand
+    webhooks/        ausgehende Event-Webhooks (SSRF-Guard, HMAC-Signatur)
     audit/           append-only Hash-Kette + Verifikation
-    antiabuse/        Altcha-Challenge/-Verify, Rate-Limit, Payload-Cap
-    admin/           Config-Modelle (Gremium, MailList, ApplicationType)
-migrations/          Alembic (0001–0007)
-worker/              arq WorkerSettings: send_mail + nächtlicher Budget-Rollup-Cron
+    antiabuse/       Altcha-Challenge/-Verify, Rate-Limit, Payload-Cap
+    admin/           Config-CRUD (Gremien, Rollen, Antragstypen, Branding, …),
+                     eine Permission pro /admin/-Seite
+migrations/          Alembic (0001–0026)
+worker/              arq WorkerSettings: Mail/PDF/Scan-Tasks + nächtlicher Budget-Cron
 tests/
 ```
 
@@ -65,4 +73,4 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 OpenAPI unter `/openapi.json`, Swagger-UI `/docs`. Konfiguration: siehe
-[Configuration-Wiki](https://github.com/frederikbeimgraben/antragsplattform/wiki/Configuration).
+[Configuration-Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki/Configuration).
