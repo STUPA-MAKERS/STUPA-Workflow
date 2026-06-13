@@ -364,6 +364,14 @@ export class ApplicationsListComponent {
   readonly budgetId = signal('');
   /** Kostenstellen-Baum für den linken Tree-Picker (gleiche Optik wie Budget-Tab). */
   readonly budgetTree = signal<BudgetTreeNode[]>([]);
+
+  /** Im Budget-Tab ausgeblendete Kostenstellen (+ Unterbaum) aus dem Filter-Baum
+   *  entfernen — spiegelt `visibleTree` des Budget-Dashboards (#budget-hide). */
+  private pruneHidden(nodes: BudgetTreeNode[]): BudgetTreeNode[] {
+    return nodes
+      .filter((n) => !n.hiddenInBudget)
+      .map((n) => ({ ...n, children: this.pruneHidden(n.children) }));
+  }
   /** Mobil: Baum hinter einklappbarem Toggle (Desktop immer sichtbar). */
   readonly treeOpen = signal(false);
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
@@ -427,9 +435,10 @@ export class ApplicationsListComponent {
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),
     });
-    // Kostenstellen-Baum für den linken Filter-Picker (eager).
+    // Kostenstellen-Baum für den linken Filter-Picker (eager). Im Budget-Tab
+    // ausgeblendete Kostenstellen (`hiddenInBudget`) tauchen auch hier nicht auf.
     this.budgetApi.tree().subscribe({
-      next: (tree) => this.budgetTree.set(tree),
+      next: (tree) => this.budgetTree.set(this.pruneHidden(tree)),
       error: () => this.budgetTree.set([]),
     });
 
