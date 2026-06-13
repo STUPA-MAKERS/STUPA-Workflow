@@ -212,6 +212,8 @@ class BudgetApplicationOut(_CamelModel):
 
 # ------------------------------------------------------------------- expense
 ExpenseKind = Literal["expense", "income"]
+# Zahlungsmethode (#1-2): Überweisung | Bar | Lastschrift | Karte.
+PaymentMethod = Literal["ueberweisung", "bar", "lastschrift", "karte"]
 
 
 class ExpenseCreate(_CamelModel):
@@ -233,6 +235,14 @@ class ExpenseCreate(_CamelModel):
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     application_id: UUID | None = Field(default=None, alias="applicationId")
     account_id: UUID | None = Field(default=None, alias="accountId")
+    # Zusatz-Metadaten (#1-1/#1-2/#3/#4), alle optional.
+    invoice_date: date | None = Field(default=None, alias="invoiceDate")
+    payment_date: date | None = Field(default=None, alias="paymentDate")
+    correspondent: str | None = Field(default=None)
+    note: str | None = Field(default=None)
+    reference_number: str | None = Field(default=None, alias="referenceNumber")
+    payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
+    category: str | None = Field(default=None)
 
     @model_validator(mode="after")
     def _income_not_linkable(self) -> ExpenseCreate:
@@ -242,16 +252,27 @@ class ExpenseCreate(_CamelModel):
 
 
 class ExpenseUpdate(_CamelModel):
-    """Gebuchte Ausgabe/Einnahme ändern (Betrag/Beschreibung). Kostenstelle, HHJ und
-    Antragsbindung bleiben fix (Pfad-/Buchungsstabilität)."""
+    """Gebuchte Ausgabe/Einnahme ändern. Betrag, Beschreibung, Bankkonto und die
+    Zusatz-Metadaten (Daten, Empfänger/Zahler, Anmerkungen, Belegnummer,
+    Zahlungsmethode, Kategorie) sind änderbar; Kostenstelle, HHJ und Antragsbindung
+    bleiben fix (Pfad-/Buchungsstabilität). Nur gesetzte Felder werden geschrieben;
+    explizites ``null`` leert ein optionales Feld."""
 
     amount: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
     description: str | None = Field(default=None, min_length=1)
+    account_id: UUID | None = Field(default=None, alias="accountId")
+    invoice_date: date | None = Field(default=None, alias="invoiceDate")
+    payment_date: date | None = Field(default=None, alias="paymentDate")
+    correspondent: str | None = Field(default=None)
+    note: str | None = Field(default=None)
+    reference_number: str | None = Field(default=None, alias="referenceNumber")
+    payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
+    category: str | None = Field(default=None)
 
     @model_validator(mode="after")
     def _at_least_one(self) -> ExpenseUpdate:
-        if self.amount is None and self.description is None:
-            raise ValueError("at least one of 'amount' or 'description' required")
+        if not self.model_fields_set:
+            raise ValueError("at least one field required")
         return self
 
 
@@ -272,6 +293,13 @@ class ExpenseOut(_CamelModel):
     account_name: str | None = Field(default=None, alias="accountName")
     transfer_id: UUID | None = Field(default=None, alias="transferId")
     actor: str | None = None
+    invoice_date: date | None = Field(default=None, alias="invoiceDate")
+    payment_date: date | None = Field(default=None, alias="paymentDate")
+    correspondent: str | None = None
+    note: str | None = None
+    reference_number: str | None = Field(default=None, alias="referenceNumber")
+    payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
+    category: str | None = None
     created_at: datetime = Field(alias="createdAt")
 
 

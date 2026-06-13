@@ -652,6 +652,13 @@ class BudgetTreeService:
             accountName=account_name,
             transferId=e.transfer_id,
             actor=e.actor,
+            invoiceDate=e.invoice_date,
+            paymentDate=e.payment_date,
+            correspondent=e.correspondent,
+            note=e.note,
+            referenceNumber=e.reference_number,
+            paymentMethod=e.payment_method,  # type: ignore[arg-type]
+            category=e.category,
             createdAt=e.created_at,
         )
 
@@ -702,6 +709,13 @@ class BudgetTreeService:
             currency=node.currency,
             description=payload.description,
             actor=actor,
+            invoice_date=payload.invoice_date,
+            payment_date=payload.payment_date,
+            correspondent=payload.correspondent,
+            note=payload.note,
+            reference_number=payload.reference_number,
+            payment_method=payload.payment_method,
+            category=payload.category,
         )
         self.session.add(expense)
         await self.session.commit()
@@ -719,14 +733,35 @@ class BudgetTreeService:
     async def update_expense(
         self, expense_id: UUID, payload: ExpenseUpdate
     ) -> ExpenseOut:
-        """Betrag/Beschreibung einer Buchung ändern (#25). HHJ/Kostenstelle/Bindung fix."""
+        """Buchung ändern (#25): Betrag, Beschreibung, Bankkonto und Zusatz-Metadaten
+        (Daten, Empfänger/Zahler, Anmerkungen, Belegnummer, Zahlungsmethode, Kategorie).
+        HHJ/Kostenstelle/Antragsbindung bleiben fix. Nur gesetzte Felder werden
+        geschrieben; explizites ``null`` leert ein optionales Feld."""
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
-        if payload.amount is not None:
+        fields = payload.model_fields_set
+        if "amount" in fields and payload.amount is not None:
             expense.amount = payload.amount
-        if payload.description is not None:
+        if "description" in fields and payload.description is not None:
             expense.description = payload.description
+        if "account_id" in fields:
+            await self._validate_account(payload.account_id)  # 404, falls unbekannt
+            expense.account_id = payload.account_id
+        if "invoice_date" in fields:
+            expense.invoice_date = payload.invoice_date
+        if "payment_date" in fields:
+            expense.payment_date = payload.payment_date
+        if "correspondent" in fields:
+            expense.correspondent = payload.correspondent
+        if "note" in fields:
+            expense.note = payload.note
+        if "reference_number" in fields:
+            expense.reference_number = payload.reference_number
+        if "payment_method" in fields:
+            expense.payment_method = payload.payment_method
+        if "category" in fields:
+            expense.category = payload.category
         await self.session.commit()
         node = await self._get_node(expense.budget_id)
         app_title: str | None = None
@@ -798,8 +833,19 @@ class BudgetTreeService:
             filters.append(func.date(BudgetExpense.created_at) <= created_to)
 
         # Sortier-Spalte (whitelist) + Richtung; Default: neueste zuerst.
-        sort_col = BudgetExpense.amount if sort == "amount" else BudgetExpense.created_at
-        ordering = sort_col.asc() if order == "asc" else sort_col.desc()
+        sort_map = {
+            "amount": BudgetExpense.amount,
+            "invoiceDate": BudgetExpense.invoice_date,
+            "paymentDate": BudgetExpense.payment_date,
+        }
+        sort_col = sort_map.get(sort or "", BudgetExpense.created_at)
+        direction = sort_col.asc() if order == "asc" else sort_col.desc()
+        # Nullable Datums-Spalten: leere Werte unabhängig von der Richtung ans Ende.
+        ordering = (
+            direction.nulls_last()
+            if sort in ("invoiceDate", "paymentDate")
+            else direction
+        )
 
         total = await self.session.scalar(
             select(func.count()).select_from(BudgetExpense).where(*filters)

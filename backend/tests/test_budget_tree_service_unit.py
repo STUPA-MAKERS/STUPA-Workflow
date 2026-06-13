@@ -7,14 +7,19 @@ je ``execute``, s. ``tests/auth_fakes.FakeSession``).
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
 
 from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
-from app.modules.budget.tree_models import Budget, BudgetAllocation, FiscalYear
+from app.modules.budget.tree_models import (
+    Budget,
+    BudgetAllocation,
+    BudgetExpense,
+    FiscalYear,
+)
 from app.modules.budget.tree_schemas import (
     AllocationSet,
     AssignBudgetRequest,
@@ -565,3 +570,33 @@ async def test_delete_expense_not_found() -> None:
     svc = BudgetTreeService(fake_session(result()))
     with pytest.raises(NotFoundError):
         await svc.delete_expense(uuid.uuid4())
+
+
+def test_expense_out_maps_metadata_fields() -> None:
+    """#1-1/#1-2/#3/#4: Die Zusatz-Metadaten landen camelCase im Output-DTO."""
+    e = BudgetExpense(
+        id=uuid.uuid4(),
+        budget_id=uuid.uuid4(),
+        fiscal_year_id=uuid.uuid4(),
+        kind="expense",
+        amount=Decimal("10.00"),
+        currency="EUR",
+        description="x",
+        invoice_date=date(2026, 1, 2),
+        payment_date=date(2026, 1, 9),
+        correspondent="ACME GmbH",
+        note="mehrzeilige\nAnmerkung",
+        reference_number="R-2026-1",
+        payment_method="ueberweisung",
+        category="Reise",
+    )
+    e.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+    out = BudgetTreeService._expense_out(e, "VS")
+    d = out.model_dump(by_alias=True)
+    assert d["invoiceDate"] == date(2026, 1, 2)
+    assert d["paymentDate"] == date(2026, 1, 9)
+    assert d["correspondent"] == "ACME GmbH"
+    assert d["note"] == "mehrzeilige\nAnmerkung"
+    assert d["referenceNumber"] == "R-2026-1"
+    assert d["paymentMethod"] == "ueberweisung"
+    assert d["category"] == "Reise"

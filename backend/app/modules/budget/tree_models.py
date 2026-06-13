@@ -199,6 +199,20 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     description: Mapped[str] = mapped_column(Text)
     actor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Zusatz-Metadaten (#1-1/#1-2/#3/#4), alle optional:
+    # Rechnungs- und Zahldatum (fachliche Daten, unabhängig von created_at).
+    invoice_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    payment_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Empfänger/Zahler (Freitext): von wem (Einnahme) / für wen (Ausgabe).
+    correspondent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Anmerkungen (mehrzeiliger Freitext).
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Belegnummer (Rechnungs-/Belegreferenz, Freitext).
+    reference_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Zahlungsmethode: ueberweisung | bar | lastschrift | karte.
+    payment_method: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Kategorie/Tag (Freitext) zur Gruppierung jenseits der Kostenstelle.
+    category: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="budget_expense_amount_positive"),
@@ -206,11 +220,17 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
         CheckConstraint(
             "kind IN ('expense', 'income')", name="budget_expense_kind_valid"
         ),
+        CheckConstraint(
+            "payment_method IS NULL OR payment_method IN "
+            "('ueberweisung', 'bar', 'lastschrift', 'karte')",
+            name="budget_expense_payment_method_valid",
+        ),
         Index("ix_budget_expense_budget_id", "budget_id"),
         Index("ix_budget_expense_fiscal_year_id", "fiscal_year_id"),
         Index("ix_budget_expense_application_id", "application_id"),
         Index("ix_budget_expense_account_id", "account_id"),
         Index("ix_budget_expense_transfer_id", "transfer_id"),
+        Index("ix_budget_expense_invoice_date", "invoice_date"),
     )
 
 

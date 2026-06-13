@@ -320,7 +320,9 @@ async def list_expenses(
     amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
     created_from: Annotated[str | None, Query(alias="createdFrom")] = None,
     created_to: Annotated[str | None, Query(alias="createdTo")] = None,
-    sort: Annotated[Literal["createdAt", "amount"] | None, Query()] = None,
+    sort: Annotated[
+        Literal["createdAt", "amount", "invoiceDate", "paymentDate"] | None, Query()
+    ] = None,
     order: Annotated[Literal["asc", "desc"] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
