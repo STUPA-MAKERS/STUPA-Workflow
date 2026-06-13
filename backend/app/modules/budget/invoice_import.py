@@ -26,10 +26,7 @@ if TYPE_CHECKING:
 
 # CII-Namespaces (CrossIndustryInvoice 100 — ZUGFeRD 2.x / Factur-X).
 _NS_RSM = "urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
-_NS_RAM = (
-    "urn:un:unece:uncefact:data:standard:"
-    "ReusableAggregateBusinessInformationEntity:100"
-)
+_NS_RAM = "urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
 _NS_UDT = "urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"
 
 # Bekannte Dateinamen des eingebetteten CII-XML (case-insensitiv geprüft).
@@ -73,41 +70,58 @@ class ParsedInvoice:
     currency: str
 
 
+# Obergrenze für das eingebettete (dekomprimierte) CII-XML. Eine echte Rechnung
+# liegt weit darunter (< 1 MB); die Schranke begrenzt eine FlateDecode-„Zip-Bomb",
+# die in einem ansonsten winzigen PDF eingebettet ist (#sec-audit).
+_MAX_EMBEDDED_XML_BYTES = 16 * 1024 * 1024  # 16 MiB
+
+
 def _extract_cii_xml(data: bytes) -> str:
     """Eingebettetes CII-XML aus dem PDF holen — robust gegen den Dateinamen.
 
     Ersetzt pychevals ``extract_facturx_from_pdf`` (Endlosschleife bei Namen ≠
-    ``factur-x.xml``). Sucht den Anhang über die bekannten ZUGFeRD/Factur-X-
-    Namen, sonst den ersten ``*.xml``-Anhang.
+    ``factur-x.xml``). Liest die Anhang-NAMEN (billig, ohne Dekompression) und
+    dekomprimiert dann **genau einen** passenden Anhang.
 
-    :raises NotZugferdError: PDF unlesbar oder ohne eingebettetes XML.
+    Vermeidet bewusst ``dict(reader.attachments)``: das materialisiert (=
+    FlateDecode-dekomprimiert) ALLE eingebetteten Streams auf einmal — ein kleines
+    PDF mit vielen komprimierten Anhängen bläht sich so auf hunderte MB auf
+    (Speicher-Erschöpfungs-DoS, #sec-audit). pypdf kappt zudem einen einzelnen
+    Stream bei 75 MB; wir dekomprimieren ohnehin nur diesen einen Anhang und
+    refusen alles über :data:`_MAX_EMBEDDED_XML_BYTES`.
+
+    :raises NotZugferdError: PDF unlesbar, ohne eingebettetes XML oder Anhang zu groß.
     """
     from pypdf import PdfReader
 
     try:
         reader = PdfReader(io.BytesIO(data))
-        attachments: dict[str, list[bytes]] = dict(reader.attachments)
+        # `attachment_list` dekomprimiert NICHTS; `.name` ist billig (nur Name-Tree).
+        embedded = {emb.name.lower(): emb for emb in reader.attachment_list}
     except Exception as exc:  # pypdf wirft diverse Fehlertypen bei kaputten PDFs
         raise NotZugferdError(f"unreadable PDF: {exc}") from exc
 
-    if not attachments:
+    if not embedded:
         raise NotZugferdError("PDF has no embedded files")
 
-    by_lower = {name.lower(): payloads for name, payloads in attachments.items()}
-    payload: bytes | None = None
-    for known in _CII_ATTACHMENT_NAMES:
-        candidates = by_lower.get(known)
-        if candidates:
-            payload = candidates[0]
-            break
-    if payload is None:
+    chosen = next((embedded[n] for n in _CII_ATTACHMENT_NAMES if n in embedded), None)
+    if chosen is None:
         # Notnagel: irgendein .xml-Anhang (Generatoren weichen von den Namen ab).
-        for name, payloads in attachments.items():
-            if name.lower().endswith(".xml") and payloads:
-                payload = payloads[0]
-                break
-    if payload is None:
+        chosen = next((emb for name, emb in embedded.items() if name.endswith(".xml")), None)
+    if chosen is None:
         raise NotZugferdError("no embedded XML invoice found")
+
+    # Deklarierte Größe (falls vorhanden) vorab; danach die tatsächliche prüfen
+    # (die deklarierte ``/Size`` ist nicht vertrauenswürdig).
+    declared = chosen.size
+    if declared is not None and declared > _MAX_EMBEDDED_XML_BYTES:
+        raise NotZugferdError(f"embedded invoice XML too large ({declared} bytes)")
+    try:
+        payload = chosen.content  # dekomprimiert NUR diesen Anhang
+    except Exception as exc:  # noqa: BLE001 — LimitReachedError u. a. → nicht importierbar
+        raise NotZugferdError(f"unreadable embedded XML: {exc}") from exc
+    if len(payload) > _MAX_EMBEDDED_XML_BYTES:
+        raise NotZugferdError("embedded invoice XML too large")
 
     try:
         return payload.decode("utf-8")
@@ -137,9 +151,34 @@ def parse_zugferd_pdf(data: bytes) -> ParsedInvoice:
     return _map(invoice)
 
 
+# Obergrenze für Rechnungsbeträge = DB-Spalte ``Numeric(12, 2)``. Werte aus dem
+# (untrusted) XML, die das überschreiten, würden sonst beim INSERT als numeric-
+# overflow zu einem 500 führen statt sauber abgewiesen zu werden (#sec-audit).
+_MAX_INVOICE_AMOUNT = Decimal("9999999999.99")
+
+
 def _amount(money: Any | None) -> Decimal | None:
     """``Money.amount`` (Decimal) defensiv lesen — ``None`` bleibt ``None``."""
     return money.amount if money is not None else None
+
+
+def _sane_amount(value: Decimal | None) -> Decimal | None:
+    """Optionalen Betrag bereinigen: ``None``/NaN/negativ/zu groß ⇒ ``None``.
+
+    Beträge stammen aus untrusted XML; ungültige optionale Felder (net/tax) werden
+    verworfen statt den Import zu blockieren (die Bruttosumme wird separat geprüft)."""
+    if value is None or not value.is_finite() or value < 0 or value > _MAX_INVOICE_AMOUNT:
+        return None
+    return value
+
+
+def _require_sane_gross(value: Decimal) -> Decimal:
+    """Bruttosumme (Pflicht) auf gültigen Bereich prüfen — sonst nicht importierbar.
+
+    ``NotZugferdError`` ⇒ die UI bietet die manuelle Erfassung an (kein 500/DB-Fehler)."""
+    if not value.is_finite() or value < 0 or value > _MAX_INVOICE_AMOUNT:
+        raise NotZugferdError(f"invoice gross amount out of range: {value}")
+    return value
 
 
 def _map(invoice: MinimumInvoice) -> ParsedInvoice:
@@ -151,6 +190,7 @@ def _map(invoice: MinimumInvoice) -> ParsedInvoice:
     if gross is None:
         # Ohne Bruttosumme fehlt die Buchungsbasis — als nicht-importierbar werten.
         raise NotZugferdError("invoice without grand total amount")
+    gross = _require_sane_gross(gross)
 
     taxes = getattr(invoice, "tax_total_amounts", None) or []
     tax = sum((t.amount for t in taxes), Decimal("0")) if taxes else None
@@ -167,8 +207,8 @@ def _map(invoice: MinimumInvoice) -> ParsedInvoice:
         issue_date=invoice.invoice_date,
         due_date=due,
         supplier=supplier,
-        net_amount=_amount(getattr(invoice, "tax_basis_total_amount", None)),
-        tax_amount=tax,
+        net_amount=_sane_amount(_amount(getattr(invoice, "tax_basis_total_amount", None))),
+        tax_amount=_sane_amount(tax),
         gross_amount=gross,
         currency="EUR",
     )
@@ -230,29 +270,17 @@ def _parse_cii_header(xml: str | bytes) -> ParsedInvoice:
     doc = root.find(_qn(_NS_RSM, "ExchangedDocument"))
     number = _find_text(doc, _qn(_NS_RAM, "ID"))
     issue = _cii_date(
-        _find_text(
-            doc, f"{_qn(_NS_RAM, 'IssueDateTime')}/{_qn(_NS_UDT, 'DateTimeString')}"
-        )
+        _find_text(doc, f"{_qn(_NS_RAM, 'IssueDateTime')}/{_qn(_NS_UDT, 'DateTimeString')}")
     )
 
     tx = root.find(_qn(_NS_RSM, "SupplyChainTradeTransaction"))
-    agreement = (
-        tx.find(_qn(_NS_RAM, "ApplicableHeaderTradeAgreement"))
-        if tx is not None
-        else None
-    )
-    supplier = _find_text(
-        agreement, f"{_qn(_NS_RAM, 'SellerTradeParty')}/{_qn(_NS_RAM, 'Name')}"
-    )
+    agreement = tx.find(_qn(_NS_RAM, "ApplicableHeaderTradeAgreement")) if tx is not None else None
+    supplier = _find_text(agreement, f"{_qn(_NS_RAM, 'SellerTradeParty')}/{_qn(_NS_RAM, 'Name')}")
 
     settlement = (
-        tx.find(_qn(_NS_RAM, "ApplicableHeaderTradeSettlement"))
-        if tx is not None
-        else None
+        tx.find(_qn(_NS_RAM, "ApplicableHeaderTradeSettlement")) if tx is not None else None
     )
-    currency = (
-        _find_text(settlement, _qn(_NS_RAM, "InvoiceCurrencyCode")) or "EUR"
-    ).upper()
+    currency = (_find_text(settlement, _qn(_NS_RAM, "InvoiceCurrencyCode")) or "EUR").upper()
     if currency != "EUR":
         raise UnsupportedInvoiceCurrencyError(currency)
 
@@ -265,15 +293,10 @@ def _parse_cii_header(xml: str | bytes) -> ParsedInvoice:
     gross = _cii_decimal(_find_text(summation, _qn(_NS_RAM, "GrandTotalAmount")))
     if gross is None:
         raise NotZugferdError("invoice without grand total amount")
+    gross = _require_sane_gross(gross)
 
-    tax_elems = (
-        summation.findall(_qn(_NS_RAM, "TaxTotalAmount"))
-        if summation is not None
-        else []
-    )
-    tax_values = [
-        _cii_decimal(e.text) for e in tax_elems if e.text and e.text.strip()
-    ]
+    tax_elems = summation.findall(_qn(_NS_RAM, "TaxTotalAmount")) if summation is not None else []
+    tax_values = [_cii_decimal(e.text) for e in tax_elems if e.text and e.text.strip()]
     tax = sum((v for v in tax_values if v is not None), Decimal("0")) if tax_values else None
 
     due = _cii_date(
@@ -289,8 +312,8 @@ def _parse_cii_header(xml: str | bytes) -> ParsedInvoice:
         issue_date=issue,
         due_date=due,
         supplier=supplier,
-        net_amount=net,
-        tax_amount=tax,
+        net_amount=_sane_amount(net),
+        tax_amount=_sane_amount(tax),
         gross_amount=gross,
         currency="EUR",
     )

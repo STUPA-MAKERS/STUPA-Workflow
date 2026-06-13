@@ -33,6 +33,8 @@ def test_public_dns_ok() -> None:
         "fc00::1",  # ipv6 unique-local
         "fe80::1",  # ipv6 link-local
         "::ffff:10.0.0.1",  # ipv4-mapped private
+        "64:ff9b::a9fe:a9fe",  # NAT64-wrapped 169.254.169.254 (cloud metadata)
+        "64:ff9b::a00:1",  # NAT64-wrapped 10.0.0.1 (private)
     ],
 )
 def test_blocks_internal_literals(ip: str) -> None:

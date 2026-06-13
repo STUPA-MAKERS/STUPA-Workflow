@@ -34,6 +34,12 @@ COPY migrations ./migrations
 # Deps stecken in der Layer oben → hier nur noch das Paket selbst (schnell).
 RUN --mount=type=cache,target=/root/.cache/pip pip install --no-deps .
 
+# Defense-in-Depth (#sec-audit): nicht als root laufen. Zur Laufzeit ist /app nur
+# lesbar nötig (Code/Migrationen), Multipart-Uploads spoolen nach /tmp (world-writable).
+# Gilt für api, worker und den migrate-One-Shot (alembic schreibt nur in die DB).
+RUN useradd --create-home --uid 10001 appuser
+USER appuser
+
 EXPOSE 8000
 
 # Default: API. Worker überschreibt command in compose.

@@ -178,7 +178,10 @@ async def cast_ballot(
 async def get_vote(
     vote_id: UUID,
     service: ServiceDep,
-    _principal: ReaderDep,
+    principal: ReaderDep,
 ) -> VoteOut:
-    """Vote-State + aggregiertes Tally (bei ``secret`` nur ``counts``, nie Wähler)."""
-    return await service.get(vote_id)
+    """Vote-State + aggregiertes Tally (bei ``secret`` nur ``counts``, nie Wähler).
+
+    Gescopt auf den Lesekreis des Votes (#sec-audit): Sitzungs-Mitglieder/Teilnehmer
+    bzw. Lese-/Verwaltungs-Permission — 403 für Fremd-Gremien (kein Cross-Tenant-Lesen)."""
+    return await service.get_scoped(vote_id, principal)

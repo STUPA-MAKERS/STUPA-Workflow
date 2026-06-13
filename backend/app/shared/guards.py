@@ -20,7 +20,8 @@ Unbekannter Operator/Action-Typ → ``GuardError`` **beim Speichern** der Flow-V
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import operator
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -43,9 +44,7 @@ GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
 )
 # Akteur-Gates — nur auf **manuellen** Übergängen zulässig.
 # ``actorIsApplicant``: der auslösende Akteur ist der/die Antragsteller:in (#guard).
-GUARD_ACTOR_OPERATORS: frozenset[str] = frozenset(
-    {"roleIs", "isInCommittee", "actorIsApplicant"}
-)
+GUARD_ACTOR_OPERATORS: frozenset[str] = frozenset({"roleIs", "isInCommittee", "actorIsApplicant"})
 GUARD_LEAF_OPERATORS: frozenset[str] = GUARD_CONDITION_OPERATORS | GUARD_ACTOR_OPERATORS
 GUARD_COMBINATORS: frozenset[str] = frozenset({"and", "or", "not"})
 GUARD_OPERATORS: frozenset[str] = GUARD_LEAF_OPERATORS | GUARD_COMBINATORS
@@ -77,9 +76,7 @@ _BOOL_VALUE_OPERATORS: frozenset[str] = frozenset(
 )
 
 # Whitelist Action-Typen (Dispatch in der Engine, T-14).
-ACTION_TYPES: frozenset[str] = frozenset(
-    {"webhook", "notify", "addToNextSession", "assignBudget"}
-)
+ACTION_TYPES: frozenset[str] = frozenset({"webhook", "notify", "addToNextSession", "assignBudget"})
 
 # Pflicht-String-Feld je Aktionstyp (``notify`` wird separat geprüft).
 _ACTION_REQUIRED_FIELD: dict[str, str] = {
@@ -89,9 +86,7 @@ _ACTION_REQUIRED_FIELD: dict[str, str] = {
 }
 
 # Gültige ``notify``-Empfänger-Arten.
-NOTIFY_RECIPIENT_KINDS: frozenset[str] = frozenset(
-    {"gremium", "role", "applicant", "email"}
-)
+NOTIFY_RECIPIENT_KINDS: frozenset[str] = frozenset({"gremium", "role", "applicant", "email"})
 
 
 class GuardError(Exception):
@@ -219,54 +214,61 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
     return False
 
 
+# Geordnete Vergleichsoperatoren → ``operator``-Funktion (statt einer if/elif-Kette,
+# die Pythons eigene Operatoren von Hand nachbaut). Unbekannter Operator ⇒ ``False``
+# (fail-closed; ``validate_guard`` lehnt unbekannte Operatoren ohnehin beim Speichern ab).
+_ORDERED_OPS: dict[str, Callable[[Any, Any], bool]] = {
+    "==": operator.eq,
+    "!=": operator.ne,
+    "<": operator.lt,
+    "<=": operator.le,
+    ">": operator.gt,
+    ">=": operator.ge,
+}
+
+
 def _apply_ordered(op: str, left: Any, right: Any) -> bool:
-    if op == "==":
-        return left == right
-    if op == "!=":
-        return left != right
-    if op == "<":
-        return left < right
-    if op == "<=":
-        return left <= right
-    if op == ">":
-        return left > right
-    if op == ">=":
-        return left >= right
-    return False
+    fn = _ORDERED_OPS.get(op)
+    return fn(left, right) if fn is not None else False
 
 
 # --------------------------------------------------------------------------- #
 # Leaf-Evaluator
 # --------------------------------------------------------------------------- #
+def _has_field(value: Any, ctx: GuardContext) -> bool:
+    """``hasField``: Feld vorhanden **und** nicht leer (None/""/[] zählen als fehlend)."""
+    v = ctx.field_values.get(str(value))
+    return v is not None and v != "" and v != []
+
+
+# Leaf-Operator → reine Prädikatfunktion ``(value, ctx) -> bool``. Akteur-Gates greifen
+# nur manuell (automatisch sind ``roles``/``actor_committees`` leer); ``compare``-Werte
+# werden in :func:`_eval_compare` typgerecht verglichen.
+_LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
+    # Akteur-Gates
+    "roleIs": lambda value, ctx: value in ctx.roles,
+    "isInCommittee": lambda value, ctx: str(value) in ctx.actor_committees,
+    # ``true`` ⇒ Akteur muss Antragsteller:in sein, ``false`` ⇒ nicht.
+    "actorIsApplicant": lambda value, ctx: ctx.actor_is_applicant == bool(value),
+    # Antragsteller
+    "applicantRoleIs": lambda value, ctx: value in ctx.applicant_roles,
+    "applicantCommitteeIs": lambda value, ctx: str(value) in ctx.applicant_committees,
+    # Budget
+    "budgetIs": lambda value, ctx: ctx.budget_id is not None and str(value) == ctx.budget_id,
+    "budgetFitsApplication": lambda value, ctx: ctx.budget_fits == bool(value),
+    # Fristen
+    "deadlinePassed": lambda value, ctx: ctx.deadline_passed == bool(value),
+    # Felder
+    "hasField": _has_field,
+    "compare": _eval_compare,
+}
+
+
 def _eval_leaf(op: str, value: Any, ctx: GuardContext) -> bool:
-    # --- Akteur-Gates (nur manuell sinnvoll; automatisch sind die Mengen leer). --
-    if op == "roleIs":
-        return value in ctx.roles
-    if op == "isInCommittee":
-        return str(value) in ctx.actor_committees
-    if op == "actorIsApplicant":
-        # Boolesches Gate: ``true`` ⇒ Akteur muss Antragsteller:in sein, ``false`` ⇒ nicht.
-        return ctx.actor_is_applicant == bool(value)
-    # --- Antragsteller --------------------------------------------------------
-    if op == "applicantRoleIs":
-        return value in ctx.applicant_roles
-    if op == "applicantCommitteeIs":
-        return str(value) in ctx.applicant_committees
-    # --- Budget ---------------------------------------------------------------
-    if op == "budgetIs":
-        return ctx.budget_id is not None and str(value) == ctx.budget_id
-    if op == "budgetFitsApplication":
-        return ctx.budget_fits == bool(value)
-    # --- Fristen --------------------------------------------------------------
-    if op == "deadlinePassed":
-        return ctx.deadline_passed == bool(value)
-    # --- Felder ---------------------------------------------------------------
-    if op == "hasField":
-        v = ctx.field_values.get(str(value))
-        return v is not None and v != "" and v != []
-    if op == "compare":
-        return _eval_compare(value, ctx)
-    raise GuardError(f"unknown guard operator: {op!r}")  # pragma: no cover
+    evaluator = _LEAF_EVALUATORS.get(op)
+    if evaluator is None:
+        raise GuardError(f"unknown guard operator: {op!r}")  # pragma: no cover
+    return evaluator(value, ctx)
 
 
 def eval_guard(guard: dict[str, Any] | None, ctx: GuardContext) -> bool:
@@ -312,18 +314,14 @@ def guard_requires_applicant(guard: dict[str, Any] | None) -> bool:
         return True
     if op in GUARD_COMBINATORS:
         children = value if isinstance(value, list) else [value]
-        return any(
-            guard_requires_applicant(c) for c in children if isinstance(c, dict)
-        )
+        return any(guard_requires_applicant(c) for c in children if isinstance(c, dict))
     return False
 
 
 # --------------------------------------------------------------------------- #
 # Statische Validierung (Speicher-Gate)
 # --------------------------------------------------------------------------- #
-def validate_guard(
-    guard: dict[str, Any] | None, *, allow_actor_ops: bool = True
-) -> None:
+def validate_guard(guard: dict[str, Any] | None, *, allow_actor_ops: bool = True) -> None:
     """Statisch prüfen: nur Whitelist-Operatoren, korrekte Struktur (Speicher-Gate).
 
     ``allow_actor_ops=False`` (automatische Übergänge) verbietet ``roleIs``/

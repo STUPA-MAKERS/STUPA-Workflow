@@ -30,3 +30,19 @@ class AuditAction(StrEnum):
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"
+    # Budget-/Geld-Mutationen (#sec-audit): Kostenstellen-CRUD, Top-Down-Zuteilung,
+    # Buchungen/Umbuchungen, Rechnungen, Antrag→Kostenstelle/HHJ. Nur id-Referenzen
+    # und Beträge im ``data`` (keine PII) — wer wann Mittel bewegt/gelöscht hat.
+    BUDGET_NODE_CREATE = "budget_node_create"
+    BUDGET_NODE_UPDATE = "budget_node_update"
+    BUDGET_NODE_DELETE = "budget_node_delete"
+    BUDGET_ALLOCATION_SET = "budget_allocation_set"
+    BUDGET_EXPENSE_CREATE = "budget_expense_create"
+    BUDGET_EXPENSE_UPDATE = "budget_expense_update"
+    BUDGET_EXPENSE_DELETE = "budget_expense_delete"
+    BUDGET_TRANSFER_CREATE = "budget_transfer_create"
+    BUDGET_INVOICE_CREATE = "budget_invoice_create"
+    BUDGET_INVOICE_UPDATE = "budget_invoice_update"
+    BUDGET_INVOICE_DELETE = "budget_invoice_delete"
+    BUDGET_ASSIGN = "budget_assign"
+    BUDGET_MOVE_FISCAL_YEAR = "budget_move_fiscal_year"

@@ -27,6 +27,62 @@ from app.shared.jsonlogic import JsonLogicError, validate_jsonlogic
 # Feld-/State-Keys: kleinbuchstaben, snake-ähnlich (data-model §5.1).
 KEY_PATTERN = r"^[a-z][a-z0-9_]*$"
 
+# Maximale Länge eines Feld-Validierungs-Patterns (Speicher-Gate, #sec-audit ReDoS).
+# Admin-verfasste Regexes laufen zur Antwort-Laufzeit synchron gegen — teils anonyme —
+# Eingabe; die Schranke begrenzt ihre Komplexität.
+_MAX_PATTERN_LEN = 200
+
+
+def _redos_prone(pattern: str) -> bool:
+    """Konservativer ReDoS-Detektor: ``True`` bei einem **unbegrenzten** Quantor
+    (``*``/``+``/``{n,}``), dessen Rumpf selbst einen unbegrenzten Quantor enthält
+    (``(a+)+``, ``(a*)*``, ``([ab]+)+`` …) — die klassische katastrophale Backtracking-
+    Form. Best-effort über den internen ``re``-Parser; fehlt er, greift nur die
+    Längen-Schranke. Erkennt nicht jede ReDoS-Variante (z. B. ``(a|a)*``), schließt
+    aber die häufigste Klasse beim Speichern aus."""
+    try:
+        from re import _parser as sre_parse  # type: ignore[attr-defined]
+
+        tokens = sre_parse.parse(pattern)
+        maxrepeat = sre_parse.MAXREPEAT
+    except Exception:  # pragma: no cover - CPython-Interna nicht verfügbar
+        return False
+
+    def children(op_name: str, av: Any) -> tuple:
+        if op_name in ("MAX_REPEAT", "MIN_REPEAT"):
+            return (av[2],)
+        if op_name == "SUBPATTERN":
+            return (av[3],)
+        if op_name == "BRANCH":
+            return tuple(av[1])
+        return ()
+
+    def has_unbounded_repeat(toks: Any) -> bool:
+        for op, av in toks:
+            if op.name in ("MAX_REPEAT", "MIN_REPEAT") and av[1] is maxrepeat:
+                return True
+            if any(has_unbounded_repeat(c) for c in children(op.name, av)):
+                return True
+        return False
+
+    def walk(toks: Any) -> bool:
+        for op, av in toks:
+            if op.name in ("MAX_REPEAT", "MIN_REPEAT"):
+                _min, _max, body = av
+                if _max is maxrepeat and has_unbounded_repeat(body):
+                    return True
+                if walk(body):
+                    return True
+            elif any(walk(c) for c in children(op.name, av)):
+                return True
+        return False
+
+    try:
+        return walk(tokens)
+    except Exception:  # pragma: no cover - unerwartete AST-Form → nur Längen-Schranke
+        return False
+
+
 FieldType = Literal[
     "text",
     "textarea",
@@ -95,6 +151,27 @@ class FieldValidation(_CamelModel):
     # `positions`: Mindestzahl Vergleichsangebote je Position bzw. Mindestzahl Positionen.
     min_offers: int | None = Field(default=None, alias="minOffers", ge=1)
     min_positions: int | None = Field(default=None, alias="minPositions", ge=1)
+
+    @field_validator("pattern")
+    @classmethod
+    def _check_pattern(cls, v: str | None) -> str | None:
+        """Pattern beim Speichern gegen ReDoS absichern (#sec-audit): Länge begrenzen
+        und katastrophale Backtracking-Formen ablehnen — das Pattern läuft sonst synchron
+        gegen (auch anonyme) Antwort-Eingabe ohne Timeout.
+
+        Die **Kompilierbarkeit** prüfen weiterhin ``validate_definition`` (Form-Speichern)
+        und die Antwort-Laufzeit (defensives 422) — hier NICHT, damit bereits gespeicherte
+        Formulare ladbar bleiben und der Vertrag der bestehenden Schichten erhalten bleibt."""
+        if v is None:
+            return v
+        if len(v) > _MAX_PATTERN_LEN:
+            raise ValueError(f"validation pattern too long (max {_MAX_PATTERN_LEN} characters)")
+        if _redos_prone(v):
+            raise ValueError(
+                "validation pattern has nested unbounded quantifiers (ReDoS risk); "
+                "rewrite without a repeat inside a repeated group"
+            )
+        return v
 
 
 class FormFieldDef(_CamelModel):
@@ -215,13 +292,9 @@ def validate_flow_graph(graph: FlowGraph) -> None:
             for action in t.actions:
                 validate_action(action)
                 # ``addToNextSession`` darf nur in einen ``vote``-State führen (#28).
-                if (
-                    action.get("type") == "addToNextSession"
-                    and kind_by_key.get(t.to) != "vote"
-                ):
+                if action.get("type") == "addToNextSession" and kind_by_key.get(t.to) != "vote":
                     raise GuardError(
-                        "addToNextSession action is only valid on a transition into a "
-                        "vote state"
+                        "addToNextSession action is only valid on a transition into a vote state"
                     )
         except GuardError as exc:
             raise FlowValidationError(str(exc)) from exc
@@ -389,6 +462,5 @@ def _exported_models() -> dict[str, type[BaseModel]]:
 def export_json_schemas() -> dict[str, dict[str, Any]]:
     """Deterministischer JSON-Schema-Export aller Config-Modelle (by_alias)."""
     return {
-        name: model.model_json_schema(by_alias=True)
-        for name, model in _exported_models().items()
+        name: model.model_json_schema(by_alias=True) for name, model in _exported_models().items()
     }

@@ -37,12 +37,31 @@ def default_resolver(host: str) -> list[str]:  # pragma: no cover — echtes DNS
     return sorted({str(info[4][0]) for info in infos})
 
 
-def _unmap(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> (
-    ipaddress.IPv4Address | ipaddress.IPv6Address
-):
-    """IPv4-in-IPv6 (``::ffff:a.b.c.d``) auf die IPv4-Adresse zurückführen."""
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+# NAT64 well-known prefix (RFC 6052): die Ziel-IPv4 steckt in den unteren 32 Bit
+# einer ``64:ff9b::/96``-Adresse. Eine solche Adresse meldet ``is_global=True`` und
+# rutscht ohne Auspacken durch — über einen NAT64-Gateway im Worker-Egress (IPv6-
+# only/k8s/Cloud) wird sie dann zur eingebetteten IPv4 übersetzt (z. B. die Metadaten-
+# IP ``169.254.169.254`` oder RFC1918).
+_NAT64_WKP = ipaddress.IPv6Network("64:ff9b::/96")
+
+
+def _unmap(
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
+    """IPv4-in-IPv6-Einbettungen auf die eingebettete IPv4 zurückführen, damit die
+    Global-Prüfung die *tatsächliche* Zieladresse sieht.
+
+    Erfasst alle drei Einbettungen, über die sonst eine interne IPv4 als globale IPv6
+    durchrutschen könnte: ``::ffff:a.b.c.d`` (IPv4-mapped), ``2002:a.b.c.d::/16``
+    (6to4) und ``64:ff9b::a.b.c.d`` (NAT64, RFC 6052)."""
+    if not isinstance(ip, ipaddress.IPv6Address):
+        return ip
+    if ip.ipv4_mapped is not None:
         return ip.ipv4_mapped
+    if ip.sixtofour is not None:
+        return ip.sixtofour
+    if ip in _NAT64_WKP:
+        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
     return ip
 
 

@@ -19,6 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.applications.service import _title_of
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.budget import tree_rules
 from app.modules.budget.invoice_import import parse_zugferd_pdf
 from app.modules.budget.models import BudgetEntry
@@ -96,9 +98,7 @@ def _natural_path_key(path_key: str) -> tuple:
     nach ``VSM-9``), nicht-numerische als String. Tupel-Vergleich ist typrein, da
     sich numerische ``(0, int)`` und String-Segmente ``(1, str)`` an Position 0
     unterscheiden. Präfix-Pfade (Eltern) sortieren vor ihren Erweiterungen."""
-    return tuple(
-        (0, int(s)) if s.isdigit() else (1, s) for s in path_key.split("-")
-    )
+    return tuple((0, int(s)) if s.isdigit() else (1, s) for s in path_key.split("-"))
 
 
 def _node_out(b: Budget) -> BudgetNodeOut:
@@ -143,12 +143,36 @@ class BudgetTreeService:
         *,
         storage: ObjectStorage | None = None,
         settings: Settings | None = None,
+        actor: str | None = None,
     ) -> None:
         self.session = session
         # Storage/Settings nur für den Rechnungs-Import (#15) nötig; die übrigen
         # Budget-Endpunkte verdrahten sie nicht (bleiben ``None``).
         self.storage = storage
         self.settings = settings or get_settings()
+        # Principal-``sub`` für den Audit-Trail der Geld-Mutationen (#sec-audit). Der
+        # Router setzt ihn; direkte (Test-)Instanzen ohne Akteur loggen ``actor=None``.
+        self.actor = actor
+
+    async def _audit(
+        self,
+        action: AuditAction,
+        *,
+        target_type: str,
+        target_id: str,
+        data: dict | None = None,
+    ) -> None:
+        """Audit-Eintrag in der **laufenden** Transaktion (vor dem Commit der Mutation),
+        damit Mutation + Audit atomar committen. ``data`` trägt nur id-Referenzen/Beträge
+        (keine PII, security.md §4)."""
+        await audit_record(
+            self.session,
+            actor=self.actor,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            data=data or {},
+        )
 
     # --------------------------------------------------------------- low-level
     async def _get_node(self, budget_id: UUID) -> Budget:
@@ -161,9 +185,7 @@ class BudgetTreeService:
 
     async def _get_fiscal_year(self, fiscal_year_id: UUID) -> FiscalYear:
         fy = (
-            await self.session.execute(
-                select(FiscalYear).where(FiscalYear.id == fiscal_year_id)
-            )
+            await self.session.execute(select(FiscalYear).where(FiscalYear.id == fiscal_year_id))
         ).scalar_one_or_none()
         if fy is None:
             raise NotFoundError(f"fiscal year {fiscal_year_id} not found")
@@ -171,9 +193,7 @@ class BudgetTreeService:
 
     async def _get_application(self, application_id: UUID) -> Application:
         app = (
-            await self.session.execute(
-                select(Application).where(Application.id == application_id)
-            )
+            await self.session.execute(select(Application).where(Application.id == application_id))
         ).scalar_one_or_none()
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
@@ -184,9 +204,7 @@ class BudgetTreeService:
         top_path = node.path_key.split(_SEP, 1)[0]
         top = (
             await self.session.execute(
-                select(Budget).where(
-                    Budget.path_key == top_path, Budget.parent_id.is_(None)
-                )
+                select(Budget).where(Budget.path_key == top_path, Budget.parent_id.is_(None))
             )
         ).scalar_one_or_none()
         if top is None:
@@ -222,9 +240,7 @@ class BudgetTreeService:
             gremium_id = parent.gremium_id  # Kinder erben das Gremium des Parents.
 
         if await self._sibling_exists(payload.parent_id, payload.key):
-            raise ConflictError(
-                f"budget key {payload.key!r} already exists under this parent"
-            )
+            raise ConflictError(f"budget key {payload.key!r} already exists under this parent")
 
         node = Budget(
             id=uuid.uuid4(),
@@ -242,6 +258,15 @@ class BudgetTreeService:
             fiscal_start_day=payload.fiscal_start_day,
         )
         self.session.add(node)
+        await self._audit(
+            AuditAction.BUDGET_NODE_CREATE,
+            target_type="budget",
+            target_id=str(node.id),
+            data={
+                "pathKey": node.path_key,
+                "gremiumId": str(gremium_id) if gremium_id else None,
+            },
+        )
         await self.session.commit()
         return _node_out(node)
 
@@ -249,7 +274,8 @@ class BudgetTreeService:
         existing = (
             await self.session.execute(
                 select(Budget).where(
-                    Budget.parent_id.is_(parent_id) if parent_id is None
+                    Budget.parent_id.is_(parent_id)
+                    if parent_id is None
                     else Budget.parent_id == parent_id,
                     Budget.key == key,
                 )
@@ -257,9 +283,7 @@ class BudgetTreeService:
         ).scalar_one_or_none()
         return existing is not None
 
-    async def update_node(
-        self, budget_id: UUID, payload: BudgetNodeUpdate
-    ) -> BudgetNodeOut:
+    async def update_node(self, budget_id: UUID, payload: BudgetNodeUpdate) -> BudgetNodeOut:
         """Name/Aktiv-Status/Stichtag/**Key** ändern (Parent immutabel → Baum-Stabilität).
 
         Wird der ``key`` geändert, leitet sich der ``path_key`` des Knotens **und aller
@@ -270,10 +294,10 @@ class BudgetTreeService:
         provided = payload.model_dump(exclude_unset=True)
         new_key = provided.pop("key", None)
         stichtag_changed = (
-            ("fiscal_start_month" in provided
-             and provided["fiscal_start_month"] != node.fiscal_start_month)
-            or ("fiscal_start_day" in provided
-                and provided["fiscal_start_day"] != node.fiscal_start_day)
+            "fiscal_start_month" in provided
+            and provided["fiscal_start_month"] != node.fiscal_start_month
+        ) or (
+            "fiscal_start_day" in provided and provided["fiscal_start_day"] != node.fiscal_start_day
         )
         for field, value in provided.items():
             setattr(node, field, value)
@@ -284,6 +308,12 @@ class BudgetTreeService:
                 fy.start_date, fy.end_date = tree_rules.fiscal_year_bounds(
                     fy.year, node.fiscal_start_month, node.fiscal_start_day
                 )
+        await self._audit(
+            AuditAction.BUDGET_NODE_UPDATE,
+            target_type="budget",
+            target_id=str(node.id),
+            data={"fields": sorted(provided), "keyProvided": new_key is not None},
+        )
         await self.session.commit()
         return _node_out(node)
 
@@ -297,9 +327,7 @@ class BudgetTreeService:
                 errors=[{"field": "key", "msg": "must be alphanumeric (no '-')"}],
             )
         if await self._sibling_exists(node.parent_id, new_key):
-            raise ConflictError(
-                f"budget key {new_key!r} already exists under this parent"
-            )
+            raise ConflictError(f"budget key {new_key!r} already exists under this parent")
         parent_path: str | None = None
         if node.parent_id is not None:
             parent_path = (await self._get_node(node.parent_id)).path_key
@@ -307,14 +335,18 @@ class BudgetTreeService:
         new_path = tree_rules.compose_path_key(parent_path, new_key)
         # Nachfahren (Pfad-Präfix) holen, bevor der Knoten umbenannt wird.
         descendants = (
-            await self.session.execute(
-                select(Budget).where(Budget.path_key.like(old_path + _SEP + "%"))
+            (
+                await self.session.execute(
+                    select(Budget).where(Budget.path_key.like(old_path + _SEP + "%"))
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         node.key = new_key
         node.path_key = new_path
         for d in descendants:
-            d.path_key = new_path + d.path_key[len(old_path):]
+            d.path_key = new_path + d.path_key[len(old_path) :]
 
     async def delete_node(self, budget_id: UUID) -> None:
         """Kostenstelle löschen — nur ohne Kinder/Zuteilungen (409 sonst, api.md)."""
@@ -328,13 +360,17 @@ class BudgetTreeService:
             raise ConflictError("budget has child cost-centers; delete them first")
         alloc = (
             await self.session.execute(
-                select(BudgetAllocation.id)
-                .where(BudgetAllocation.budget_id == budget_id)
-                .limit(1)
+                select(BudgetAllocation.id).where(BudgetAllocation.budget_id == budget_id).limit(1)
             )
         ).scalar_one_or_none()
         if alloc is not None:
             raise ConflictError("budget has allocations; remove them first")
+        await self._audit(
+            AuditAction.BUDGET_NODE_DELETE,
+            target_type="budget",
+            target_id=str(budget_id),
+            data={"pathKey": node.path_key},
+        )
         await self.session.delete(node)
         await self.session.commit()
 
@@ -356,7 +392,9 @@ class BudgetTreeService:
                     .where(FiscalYear.budget_id == budget_id)
                     .order_by(FiscalYear.year)
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
 
     async def list_fiscal_years(self, budget_id: UUID) -> list[FiscalYearOut]:
@@ -371,9 +409,7 @@ class BudgetTreeService:
             for f in await self._fiscal_years_of(top.id)
         ]
 
-    async def can_view_node(
-        self, budget_id: UUID, member_gremium_ids: set[UUID]
-    ) -> bool:
+    async def can_view_node(self, budget_id: UUID, member_gremium_ids: set[UUID]) -> bool:
         """Knoten für ein Gremium-Mitglied sichtbar (#budget-scope)? Wahr, wenn der
         Knoten SELBST oder ein VORFAHRE einem der Mitglieds-Gremien zugeordnet ist."""
         if not member_gremium_ids:
@@ -401,8 +437,7 @@ class BudgetTreeService:
             )
         ).all()
         return {
-            fid: tree_rules.fiscal_year_display(year, month, day)
-            for fid, year, month, day in rows
+            fid: tree_rules.fiscal_year_display(year, month, day) for fid, year, month, day in rows
         }
 
     async def list_applications(
@@ -456,9 +491,7 @@ class BudgetTreeService:
             for (app, path_key, stage, state_label, state_color) in rows
         ]
 
-    async def create_fiscal_year(
-        self, budget_id: UUID, payload: FiscalYearCreate
-    ) -> FiscalYearOut:
+    async def create_fiscal_year(self, budget_id: UUID, payload: FiscalYearCreate) -> FiscalYearOut:
         """HHJ (Jahr) anlegen — Start/Ende aus Budget-Stichtag; eindeutig pro Top-Budget."""
         top = await self._require_top_level(budget_id)
         start, end = tree_rules.fiscal_year_bounds(
@@ -509,9 +542,7 @@ class BudgetTreeService:
         return _fy_out(fy, top.fiscal_start_month, top.fiscal_start_day)
 
     # ------------------------------------------------------------- allocation
-    async def _allocation(
-        self, budget_id: UUID, fiscal_year_id: UUID
-    ) -> BudgetAllocation | None:
+    async def _allocation(self, budget_id: UUID, fiscal_year_id: UUID) -> BudgetAllocation | None:
         return (
             await self.session.execute(
                 select(BudgetAllocation).where(
@@ -588,6 +619,12 @@ class BudgetTreeService:
             )
             self.session.add(alloc)
         alloc.allocated = payload.allocated
+        await self._audit(
+            AuditAction.BUDGET_ALLOCATION_SET,
+            target_type="budget_allocation",
+            target_id=str(budget_id),
+            data={"fiscalYearId": str(fiscal_year_id), "allocated": str(payload.allocated)},
+        )
         await self.session.commit()
         return AllocationOut(
             budgetId=budget_id,
@@ -607,23 +644,29 @@ class BudgetTreeService:
         if payload.budget_id is None:
             app.budget_id = None
             app.fiscal_year_id = None
-            await self.session.commit()
-            return AssignBudgetOut(
-                applicationId=app.id, budgetId=None, fiscalYearId=None
+            await self._audit(
+                AuditAction.BUDGET_ASSIGN,
+                target_type="application",
+                target_id=str(app.id),
+                data={"budgetId": None, "fiscalYearId": None},
             )
+            await self.session.commit()
+            return AssignBudgetOut(applicationId=app.id, budgetId=None, fiscalYearId=None)
 
         node = await self._get_node(payload.budget_id)
         top = await self._top_level(node)
-        active_ids = [
-            f.id for f in await self._fiscal_years_of(top.id) if f.active
-        ]
+        active_ids = [f.id for f in await self._fiscal_years_of(top.id) if f.active]
         fy_id = tree_rules.pick_fiscal_year(active_ids)
         app.budget_id = node.id
         app.fiscal_year_id = fy_id
-        await self.session.commit()
-        return AssignBudgetOut(
-            applicationId=app.id, budgetId=node.id, fiscalYearId=fy_id
+        await self._audit(
+            AuditAction.BUDGET_ASSIGN,
+            target_type="application",
+            target_id=str(app.id),
+            data={"budgetId": str(node.id), "fiscalYearId": str(fy_id) if fy_id else None},
         )
+        await self.session.commit()
+        return AssignBudgetOut(applicationId=app.id, budgetId=node.id, fiscalYearId=fy_id)
 
     async def move_fiscal_year(
         self, application_id: UUID, payload: MoveFiscalYearRequest
@@ -644,15 +687,17 @@ class BudgetTreeService:
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
         app.fiscal_year_id = fy.id
-        await self.session.commit()
-        return AssignBudgetOut(
-            applicationId=app.id, budgetId=app.budget_id, fiscalYearId=fy.id
+        await self._audit(
+            AuditAction.BUDGET_MOVE_FISCAL_YEAR,
+            target_type="application",
+            target_id=str(app.id),
+            data={"budgetId": str(app.budget_id), "fiscalYearId": str(fy.id)},
         )
+        await self.session.commit()
+        return AssignBudgetOut(applicationId=app.id, budgetId=app.budget_id, fiscalYearId=fy.id)
 
     # --------------------------------------------------------------- expenses
-    async def _resolve_expense_fiscal_year(
-        self, node: Budget, fiscal_year_id: UUID | None
-    ) -> UUID:
+    async def _resolve_expense_fiscal_year(self, node: Budget, fiscal_year_id: UUID | None) -> UUID:
         """HHJ einer Ausgabe bestimmen: explizit (muss zum Top-Budget gehören) oder
         — falls offen — das **eine** aktive HHJ des Top-Budgets (sonst 422)."""
         top = await self._top_level(node)
@@ -765,6 +810,18 @@ class BudgetTreeService:
             invoice_id=payload.invoice_id,
         )
         self.session.add(expense)
+        await self._audit(
+            AuditAction.BUDGET_EXPENSE_CREATE,
+            target_type="budget_expense",
+            target_id=str(expense.id),
+            data={
+                "budgetId": str(node.id),
+                "fiscalYearId": str(fy_id),
+                "kind": payload.kind,
+                "amount": str(payload.amount),
+                "applicationId": (str(payload.application_id) if payload.application_id else None),
+            },
+        )
         await self.session.commit()
         return self._expense_out(expense, node.path_key, app_title, account_name)
 
@@ -777,9 +834,7 @@ class BudgetTreeService:
             raise NotFoundError(f"account {account_id} not found")
         return acc.name
 
-    async def update_expense(
-        self, expense_id: UUID, payload: ExpenseUpdate
-    ) -> ExpenseOut:
+    async def update_expense(self, expense_id: UUID, payload: ExpenseUpdate) -> ExpenseOut:
         """Buchung ändern (#25): Betrag, Beschreibung, Bankkonto und Zusatz-Metadaten
         (Daten, Empfänger/Zahler, Anmerkungen, Belegnummer, Zahlungsmethode, Kategorie).
         HHJ/Kostenstelle/Antragsbindung bleiben fix. Nur gesetzte Felder werden
@@ -811,6 +866,12 @@ class BudgetTreeService:
             expense.category = payload.category
         if "invoice_id" in fields:
             expense.invoice_id = payload.invoice_id
+        await self._audit(
+            AuditAction.BUDGET_EXPENSE_UPDATE,
+            target_type="budget_expense",
+            target_id=str(expense.id),
+            data={"fields": sorted(fields), "amount": str(expense.amount)},
+        )
         await self.session.commit()
         node = await self._get_node(expense.budget_id)
         app_title: str | None = None
@@ -890,11 +951,7 @@ class BudgetTreeService:
         sort_col = sort_map.get(sort or "", BudgetExpense.created_at)
         direction = sort_col.asc() if order == "asc" else sort_col.desc()
         # Nullable Datums-Spalten: leere Werte unabhängig von der Richtung ans Ende.
-        ordering = (
-            direction.nulls_last()
-            if sort in ("invoiceDate", "paymentDate")
-            else direction
-        )
+        ordering = direction.nulls_last() if sort in ("invoiceDate", "paymentDate") else direction
 
         total = await self.session.scalar(
             select(func.count()).select_from(BudgetExpense).where(*filters)
@@ -919,9 +976,7 @@ class BudgetTreeService:
             )
         ).all()
         items = [
-            self._expense_out(
-                e, path_key, _title_of(data) if data else None, acc_name, inv_number
-            )
+            self._expense_out(e, path_key, _title_of(data) if data else None, acc_name, inv_number)
             for (e, path_key, data, acc_name, inv_number) in rows
         ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
@@ -929,20 +984,34 @@ class BudgetTreeService:
     async def delete_expense(self, expense_id: UUID) -> None:
         """Ausgabe löschen (#25). Teil eines Übertrags → beide Buchungen löschen."""
         expense = (
-            await self.session.execute(
-                select(BudgetExpense).where(BudgetExpense.id == expense_id)
-            )
+            await self.session.execute(select(BudgetExpense).where(BudgetExpense.id == expense_id))
         ).scalar_one_or_none()
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
+        await self._audit(
+            AuditAction.BUDGET_EXPENSE_DELETE,
+            target_type="budget_expense",
+            target_id=str(expense_id),
+            data={
+                "budgetId": str(expense.budget_id),
+                "kind": expense.kind,
+                "amount": str(expense.amount),
+                "priorActor": expense.actor,
+                "transferId": str(expense.transfer_id) if expense.transfer_id else None,
+            },
+        )
         if expense.transfer_id is not None:
             pair = (
-                await self.session.execute(
-                    select(BudgetExpense).where(
-                        BudgetExpense.transfer_id == expense.transfer_id
+                (
+                    await self.session.execute(
+                        select(BudgetExpense).where(
+                            BudgetExpense.transfer_id == expense.transfer_id
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for e in pair:
                 await self.session.delete(e)
         else:
@@ -955,9 +1024,7 @@ class BudgetTreeService:
         return AccountOut(id=a.id, name=a.name, iban=a.iban, active=a.active)
 
     async def list_accounts(self) -> list[AccountOut]:
-        rows = (
-            await self.session.scalars(select(Account).order_by(Account.name))
-        ).all()
+        rows = (await self.session.scalars(select(Account).order_by(Account.name))).all()
         return [self._account_out(a) for a in rows]
 
     async def list_account_options(self) -> list[AccountOption]:
@@ -970,16 +1037,12 @@ class BudgetTreeService:
         return [AccountOption(id=a.id, name=a.name) for a in rows]
 
     async def create_account(self, payload: AccountCreate) -> AccountOut:
-        acc = Account(
-            id=uuid.uuid4(), name=payload.name, iban=payload.iban, active=payload.active
-        )
+        acc = Account(id=uuid.uuid4(), name=payload.name, iban=payload.iban, active=payload.active)
         self.session.add(acc)
         await self.session.commit()
         return self._account_out(acc)
 
-    async def update_account(
-        self, account_id: UUID, payload: AccountUpdate
-    ) -> AccountOut:
+    async def update_account(self, account_id: UUID, payload: AccountUpdate) -> AccountOut:
         acc = await self.session.get(Account, account_id)
         if acc is None:
             raise NotFoundError(f"account {account_id} not found")
@@ -1050,6 +1113,13 @@ class BudgetTreeService:
             inv.file_name = payload.file_name
             inv.file_mime = payload.file_mime
         self.session.add(inv)
+        await self.session.flush()  # id für den Audit-Eintrag erzeugen
+        await self._audit(
+            AuditAction.BUDGET_INVOICE_CREATE,
+            target_type="invoice",
+            target_id=str(inv.id),
+            data={"number": inv.number, "gross": str(inv.gross_amount)},
+        )
         await self.session.commit()
         return self._invoice_out(inv)
 
@@ -1078,24 +1148,16 @@ class BudgetTreeService:
         storage_key = await self._store_invoice_file(data, mime, safe_name)
         return storage_key, safe_name, mime
 
-    async def store_invoice_file(
-        self, data: bytes, *, filename: str | None
-    ) -> InvoiceFileResult:
+    async def store_invoice_file(self, data: bytes, *, filename: str | None) -> InvoiceFileResult:
         """Beleg-PDF prüfen + ablegen (ohne ZUGFeRD-Parse) — für manuelle Belege.
 
         Erlaubt das Anhängen eines Originals an **nicht**-ZUGFeRD-Rechnungen
         (#invoices): liefert denselben ``fileToken``, den ``POST /invoices`` erwartet.
         """
-        storage_key, safe_name, mime = await self._validate_scan_store(
-            data, filename=filename
-        )
-        return InvoiceFileResult(
-            fileToken=storage_key, fileName=safe_name, fileMime=mime
-        )
+        storage_key, safe_name, mime = await self._validate_scan_store(data, filename=filename)
+        return InvoiceFileResult(fileToken=storage_key, fileName=safe_name, fileMime=mime)
 
-    async def parse_invoice_file(
-        self, data: bytes, *, filename: str | None
-    ) -> InvoiceParseResult:
+    async def parse_invoice_file(self, data: bytes, *, filename: str | None) -> InvoiceParseResult:
         """PDF prüfen (MIME + AV-Scan), ZUGFeRD parsen, Original ablegen.
 
         Reihenfolge bewusst: scannen → parsen → erst danach speichern, damit ein
@@ -1164,9 +1226,13 @@ class BudgetTreeService:
         return data, inv.file_mime or "application/pdf", inv.file_name or "beleg.pdf"
 
     async def _scan_or_raise(self, data: bytes) -> None:
-        """Synchroner AV-Scan; ohne ClamAV (DEV/Contract-CI) übersprungen."""
+        """Synchroner AV-Scan. Ohne ClamAV (DEV/Contract-CI) übersprungen — in
+        ``production`` aber **fail-closed**: kein ungescanntes Beleg-PDF ablegen,
+        wenn der Scanner fehlt (konsistent zur Files-Quarantäne, #sec-audit)."""
         scanner = build_scanner(self.settings)
         if scanner is None:
+            if self.settings.environment == "production":
+                raise ServiceUnavailableError("Virus scan unavailable.")
             return
         try:
             verdict = await scanner.scan(data)
@@ -1177,9 +1243,7 @@ class BudgetTreeService:
                 f"File rejected by virus scan: {verdict.signature or 'unknown'}"
             )
 
-    async def _store_invoice_file(
-        self, data: bytes, mime: str, safe_name: str
-    ) -> str:
+    async def _store_invoice_file(self, data: bytes, mime: str, safe_name: str) -> str:
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
         storage_key = f"invoices/{uuid.uuid4().hex}/{safe_name}"
@@ -1189,9 +1253,7 @@ class BudgetTreeService:
             raise ServiceUnavailableError("Object storage write failed.") from exc
         return storage_key
 
-    async def update_invoice(
-        self, invoice_id: UUID, payload: InvoiceUpdate
-    ) -> InvoiceOut:
+    async def update_invoice(self, invoice_id: UUID, payload: InvoiceUpdate) -> InvoiceOut:
         inv = await self.session.get(Invoice, invoice_id)
         if inv is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
@@ -1214,6 +1276,12 @@ class BudgetTreeService:
             inv.note = payload.note
         if "status" in fields and payload.status is not None:
             inv.status = payload.status
+        await self._audit(
+            AuditAction.BUDGET_INVOICE_UPDATE,
+            target_type="invoice",
+            target_id=str(invoice_id),
+            data={"fields": sorted(fields)},
+        )
         await self.session.commit()
         return self._invoice_out(inv)
 
@@ -1223,6 +1291,12 @@ class BudgetTreeService:
             raise NotFoundError(f"invoice {invoice_id} not found")
         # Buchungen behalten invoice_id=NULL (FK SET NULL).
         storage_key = inv.file_object_key
+        await self._audit(
+            AuditAction.BUDGET_INVOICE_DELETE,
+            target_type="invoice",
+            target_id=str(invoice_id),
+            data={"number": inv.number, "gross": str(inv.gross_amount)},
+        )
         await self.session.delete(inv)
         await self.session.commit()
         if storage_key is not None and self.storage is not None:
@@ -1233,9 +1307,7 @@ class BudgetTreeService:
                 logger.warning("could not remove file for deleted invoice %s", invoice_id)
 
     # --------------------------------------------------------------- transfer
-    async def create_transfer(
-        self, payload: TransferCreate, *, actor: str
-    ) -> TransferOut:
+    async def create_transfer(self, payload: TransferCreate, *, actor: str) -> TransferOut:
         """Übertrag KS→KS: Ausgabe auf Quelle + Einnahme auf Ziel (gleiches HHJ)."""
         src = await self._get_node(payload.from_budget_id)
         dst = await self._get_node(payload.to_budget_id)
@@ -1249,20 +1321,41 @@ class BudgetTreeService:
             )
         transfer_id = uuid.uuid4()
         out_row = BudgetExpense(
-            id=uuid.uuid4(), budget_id=src.id, fiscal_year_id=fy_src,
-            transfer_id=transfer_id, kind="expense", amount=payload.amount,
-            currency=src.currency, description=payload.description, actor=actor,
+            id=uuid.uuid4(),
+            budget_id=src.id,
+            fiscal_year_id=fy_src,
+            transfer_id=transfer_id,
+            kind="expense",
+            amount=payload.amount,
+            currency=src.currency,
+            description=payload.description,
+            actor=actor,
         )
         in_row = BudgetExpense(
-            id=uuid.uuid4(), budget_id=dst.id, fiscal_year_id=fy_dst,
-            transfer_id=transfer_id, kind="income", amount=payload.amount,
-            currency=dst.currency, description=payload.description, actor=actor,
+            id=uuid.uuid4(),
+            budget_id=dst.id,
+            fiscal_year_id=fy_dst,
+            transfer_id=transfer_id,
+            kind="income",
+            amount=payload.amount,
+            currency=dst.currency,
+            description=payload.description,
+            actor=actor,
         )
         self.session.add_all([out_row, in_row])
-        await self.session.commit()
-        return TransferOut(
-            transferId=transfer_id, expenseId=out_row.id, incomeId=in_row.id
+        await self._audit(
+            AuditAction.BUDGET_TRANSFER_CREATE,
+            target_type="budget_transfer",
+            target_id=str(transfer_id),
+            data={
+                "fromBudgetId": str(src.id),
+                "toBudgetId": str(dst.id),
+                "fiscalYearId": str(fy_src),
+                "amount": str(payload.amount),
+            },
         )
+        await self.session.commit()
+        return TransferOut(transferId=transfer_id, expenseId=out_row.id, incomeId=in_row.id)
 
     # --------------------------------------------------------------- tree view
     async def get_tree(
@@ -1277,15 +1370,11 @@ class BudgetTreeService:
         **gebunden** (committed), wenn sein aktueller Flow-State-Key in den
         ``accepted_state_keys`` des Top-Budgets liegt; als **beantragt** (requested),
         wenn er weder accepted noch denied ist; denied wird ausgeschlossen."""
-        nodes = list(
-            (await self.session.execute(select(Budget))).scalars().all()
-        )
+        nodes = list((await self.session.execute(select(Budget))).scalars().all())
         # Natürliche Reihenfolge (VSM-10 nach VSM-9 statt lexikografisch); Eltern vor
         # Kindern bleibt erhalten → build_forest erbt die Geschwister-Reihenfolge.
         nodes.sort(key=lambda b: _natural_path_key(b.path_key))
-        allocs = (
-            await self.session.execute(select(BudgetAllocation))
-        ).scalars().all()
+        allocs = (await self.session.execute(select(BudgetAllocation))).scalars().all()
         # Anträge mit Kostenstelle + HHJ + aktuellem Flow-State-Key.
         app_rows = (
             await self.session.execute(
@@ -1324,9 +1413,7 @@ class BudgetTreeService:
         spent_per_app: dict[object, Decimal] = {}
         for _path, _fy, amount, kind, app_id in expense_rows:
             if kind == "expense" and app_id is not None:
-                spent_per_app[app_id] = spent_per_app.get(app_id, _ZERO) + (
-                    amount or _ZERO
-                )
+                spent_per_app[app_id] = spent_per_app.get(app_id, _ZERO) + (amount or _ZERO)
 
         # Top-Budget-Config: erstes Pfad-Segment → (accepted, denied) State-Keys.
         top_config: dict[str, tuple[set[str], set[str]]] = {
@@ -1342,9 +1429,7 @@ class BudgetTreeService:
         flagged_paths = sorted(n.path_key for n in nodes if n.fully_bound)
 
         def _under_flagged(path: str) -> bool:
-            return any(
-                path == fp or path.startswith(fp + _SEP) for fp in flagged_paths
-            )
+            return any(path == fp or path.startswith(fp + _SEP) for fp in flagged_paths)
 
         bound_rows: list[tuple[object, str, Decimal | None]] = []
         requested_rows: list[tuple[object, str, Decimal | None]] = []
@@ -1388,11 +1473,22 @@ class BudgetTreeService:
 
         node_tuples = [
             (
-                n.id, n.parent_id, n.gremium_id, n.key, n.path_key, n.name,
-                n.currency, n.active, n.color,
-                list(n.accepted_state_keys or []), list(n.denied_state_keys or []),
-                n.fiscal_start_month, n.fiscal_start_day, n.fully_bound,
-                bool(n.hidden_in_budget), n.view_gremium_id,
+                n.id,
+                n.parent_id,
+                n.gremium_id,
+                n.key,
+                n.path_key,
+                n.name,
+                n.currency,
+                n.active,
+                n.color,
+                list(n.accepted_state_keys or []),
+                list(n.denied_state_keys or []),
+                n.fiscal_start_month,
+                n.fiscal_start_day,
+                n.fully_bound,
+                bool(n.hidden_in_budget),
+                n.view_gremium_id,
             )
             for n in nodes
         ]

@@ -68,10 +68,15 @@ from app.modules.budget.tree_schemas import (
     TransferOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
+from app.shared.antiabuse import body_cap
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
 from app.shared.paging import Page
 
 router = APIRouter(tags=["budget"])
+
+# Frühe (Content-Length-)Body-Schranke für Beleg-Uploads, bevor FastAPI puffert
+# (Defense-in-Depth zur nginx-Schranke + zum In-App-Größencheck, #sec-audit).
+_enforce_invoice_body = body_cap("attachment_max_bytes")
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
@@ -81,16 +86,19 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_budget_tree_service(
-    session: DbSession, request: Request, settings: SettingsDep
+    session: DbSession,
+    request: Request,
+    settings: SettingsDep,
+    principal: Annotated[Principal, Depends(require_principal())],
 ) -> BudgetTreeService:
     # Storage nur für den Rechnungs-Import (#15); die übrigen Endpunkte nutzen es nicht.
+    # ``actor`` = Principal-``sub`` für den Audit-Trail der Geld-Mutationen (#sec-audit);
+    # alle Budget-Endpunkte sind authentifiziert, daher ist der Principal hier verfügbar.
     storage = getattr(request.app.state, "object_storage", None)
-    return BudgetTreeService(session, storage=storage, settings=settings)
+    return BudgetTreeService(session, storage=storage, settings=settings, actor=principal.sub)
 
 
 ServiceDep = Annotated[BudgetTreeService, Depends(get_budget_tree_service)]
-
-
 
 
 # Globale Voll-Sicht auf den Budget-Tab — jede dieser Permissions zeigt ALLES;
@@ -118,6 +126,7 @@ async def _require_node_view(
     if not await service.can_view_node(budget_id, member):
         raise ForbiddenError("no access to this cost centre")
 
+
 # --------------------------------------------------------------------- nodes
 @router.get(
     "/budgets",
@@ -137,14 +146,10 @@ async def list_budget_tree(
     if _has_full_view(principal):
         return await service.get_tree(gremium_id=gremium_id)
     member = await _member_gremium_ids(service, principal.sub)
-    return await service.get_tree(
-        gremium_id=gremium_id, visible_gremium_ids=member
-    )
+    return await service.get_tree(gremium_id=gremium_id, visible_gremium_ids=member)
 
 
-def _find_subtree(
-    roots: list[BudgetTreeNodeOut], node_id: UUID
-) -> BudgetTreeNodeOut | None:
+def _find_subtree(roots: list[BudgetTreeNodeOut], node_id: UUID) -> BudgetTreeNodeOut | None:
     for node in roots:
         if node.id == node_id:
             return node
@@ -177,9 +182,7 @@ async def export_budget_xlsx(
         sub = _find_subtree(roots, node_id)
         roots = [sub] if sub is not None else []
     labels = await service.fiscal_year_label_map()
-    data = build_budget_workbook(
-        roots, fiscal_year_labels=labels, fiscal_year_id=fiscal_year_id
-    )
+    data = build_budget_workbook(roots, fiscal_year_labels=labels, fiscal_year_id=fiscal_year_id)
     await audit_record(
         service.session,
         actor=principal.sub,
@@ -207,9 +210,7 @@ async def export_budget_xlsx(
     dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
-async def create_budget_node(
-    payload: BudgetNodeCreate, service: ServiceDep
-) -> BudgetNodeOut:
+async def create_budget_node(payload: BudgetNodeCreate, service: ServiceDep) -> BudgetNodeOut:
     """Kostenstelle anlegen (Top-Level mit ``gremiumId``; Kinder mit ``parentId``)."""
     return await service.create_node(payload)
 
@@ -447,9 +448,7 @@ async def create_transfer(
 
 # ------------------------------------------------------------------- invoices
 # Lesen: jede Budget-Rolle; Schreiben: budget.book (#invoices).
-_INVOICE_READ = Depends(
-    require_any_permission("budget.view", "budget.structure", "budget.book")
-)
+_INVOICE_READ = Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
 
 
 @router.get(
@@ -513,6 +512,7 @@ async def delete_invoice(invoice_id: UUID, service: ServiceDep) -> None:
     "/invoices/parse",
     response_model=InvoiceParseResult,
     # Schreibrecht: Import legt das Original-PDF ab und liest dessen Daten (#15).
+    dependencies=[Depends(_enforce_invoice_body)],
     responses=_errors(401, 403, 413, 415, 422, 503),
 )
 async def parse_invoice(
@@ -544,6 +544,7 @@ async def parse_invoice(
     "/invoices/file",
     response_model=InvoiceFileResult,
     # Schreibrecht: legt das Original-PDF ab (auch für nicht-ZUGFeRD-Belege).
+    dependencies=[Depends(_enforce_invoice_body)],
     responses=_errors(401, 403, 413, 415, 503),
 )
 async def upload_invoice_file(
@@ -581,9 +582,7 @@ async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
     response_model=list[AccountOption],
     # Minimale Auswahl (id+Name, keine IBAN) für Buchungs-Dropdowns — Bucher dürfen das
     # ohne account.manage (#5-2/#2). Volle Stammdaten bleiben account.manage.
-    dependencies=[
-        Depends(require_any_permission("account.manage", "budget.book", "budget.view"))
-    ],
+    dependencies=[Depends(require_any_permission("account.manage", "budget.book", "budget.view"))],
     responses=_errors(401, 403),
 )
 async def list_account_options(service: ServiceDep) -> list[AccountOption]:

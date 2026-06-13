@@ -454,7 +454,9 @@ def test_get_budget_tree_service_factory() -> None:
         session=object(),  # type: ignore[arg-type]
         request=request,  # type: ignore[arg-type]
         settings=load_settings(),
+        principal=SimpleNamespace(sub="tester"),  # type: ignore[arg-type]
     )
     assert isinstance(svc, BudgetTreeService)
     assert svc.storage is None
+    assert svc.actor == "tester"
     assert ServiceDep is not None

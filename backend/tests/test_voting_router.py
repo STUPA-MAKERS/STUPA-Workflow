@@ -53,6 +53,10 @@ class _FakeService:
     async def get(self, vote_id):  # noqa: ANN001
         return _vote_out("open")
 
+    async def get_scoped(self, vote_id, principal):  # noqa: ANN001
+        # Scope-Gate liegt im echten Service; das Fake reicht durch wie get().
+        return await self.get(vote_id)
+
     async def cast(
         self, vote_id, principal, choice, *, now, as_delegation=False
     ):  # noqa: ANN001

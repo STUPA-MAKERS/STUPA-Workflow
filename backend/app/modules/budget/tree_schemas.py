@@ -16,6 +16,11 @@ from pydantic import Field, model_validator
 
 from app.modules.budget.schemas import _CamelModel
 
+# Obergrenze für Geldbeträge = DB-Spalte ``numeric(12, 2)``. Als ``le``-Schranke auf
+# den Eingabe-Feldern, damit ein zu großer Betrag ein sauberes 422 liefert statt eines
+# numeric-overflow-500 beim INSERT (#sec-audit).
+_MAX_AMOUNT = Decimal("9999999999.99")
+
 
 # --------------------------------------------------------------------- nodes
 class BudgetNodeCreate(_CamelModel):
@@ -51,12 +56,8 @@ class BudgetNodeUpdate(_CamelModel):
     hidden_in_budget: bool | None = Field(default=None, alias="hiddenInBudget")
     # Sichtbarkeits-Gremium (#budget-scope) — ``None`` im Payload löscht die Zuordnung.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
-    fiscal_start_month: int | None = Field(
-        default=None, ge=1, le=12, alias="fiscalStartMonth"
-    )
-    fiscal_start_day: int | None = Field(
-        default=None, ge=1, le=31, alias="fiscalStartDay"
-    )
+    fiscal_start_month: int | None = Field(default=None, ge=1, le=12, alias="fiscalStartMonth")
+    fiscal_start_day: int | None = Field(default=None, ge=1, le=31, alias="fiscalStartDay")
 
 
 class BudgetNodeOut(_CamelModel):
@@ -119,9 +120,7 @@ class BudgetTreeNodeOut(_CamelModel):
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
-    by_fiscal_year: list[AllocationView] = Field(
-        default_factory=list, alias="byFiscalYear"
-    )
+    by_fiscal_year: list[AllocationView] = Field(default_factory=list, alias="byFiscalYear")
     children: list[BudgetTreeNodeOut] = Field(default_factory=list)
 
 
@@ -318,9 +317,9 @@ class InvoiceCreate(_CamelModel):
     issue_date: date | None = Field(default=None, alias="issueDate")
     due_date: date | None = Field(default=None, alias="dueDate")
     supplier: str | None = None
-    net_amount: Decimal | None = Field(default=None, alias="netAmount", ge=0)
-    tax_amount: Decimal | None = Field(default=None, alias="taxAmount", ge=0)
-    gross_amount: Decimal = Field(alias="grossAmount", ge=0)
+    net_amount: Decimal | None = Field(default=None, alias="netAmount", ge=0, le=_MAX_AMOUNT)
+    tax_amount: Decimal | None = Field(default=None, alias="taxAmount", ge=0, le=_MAX_AMOUNT)
+    gross_amount: Decimal = Field(alias="grossAmount", ge=0, le=_MAX_AMOUNT)
     note: str | None = None
     status: InvoiceStatus = "open"
     # Optionaler Beleg aus dem ZUGFeRD-Import (#15): Handle auf das bereits in
@@ -368,9 +367,9 @@ class InvoiceUpdate(_CamelModel):
     issue_date: date | None = Field(default=None, alias="issueDate")
     due_date: date | None = Field(default=None, alias="dueDate")
     supplier: str | None = None
-    net_amount: Decimal | None = Field(default=None, alias="netAmount", ge=0)
-    tax_amount: Decimal | None = Field(default=None, alias="taxAmount", ge=0)
-    gross_amount: Decimal | None = Field(default=None, alias="grossAmount", ge=0)
+    net_amount: Decimal | None = Field(default=None, alias="netAmount", ge=0, le=_MAX_AMOUNT)
+    tax_amount: Decimal | None = Field(default=None, alias="taxAmount", ge=0, le=_MAX_AMOUNT)
+    gross_amount: Decimal | None = Field(default=None, alias="grossAmount", ge=0, le=_MAX_AMOUNT)
     note: str | None = None
     status: InvoiceStatus | None = None
 

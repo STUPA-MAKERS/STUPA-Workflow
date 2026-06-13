@@ -82,7 +82,9 @@ services:
       minio:
         condition: service_healthy
     networks:
+      # internal = Egress (OIDC) + interne Services; pytex_net = egress-loser Render-Pfad.
       - internal
+      - pytex_net
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
       interval: 15s
@@ -112,7 +114,9 @@ services:
       clamav:
         condition: service_started
     networks:
+      # internal = Egress (SMTP/WebDAV/Webhooks) + interne Services; pytex_net = Render-Pfad.
       - internal
+      - pytex_net
     healthcheck:
       test: ["CMD-SHELL", "arq --check worker.main.WorkerSettings || exit 1"]
       interval: 20s
@@ -197,7 +201,12 @@ services:
     volumes:
       - pytex_cache:/cache
     networks:
-      - internal
+      # NUR das egress-lose pytex_net (internal: true): der Render-Container braucht
+      # zur Laufzeit kein Internet (tectonic-Bundle + biber sind ins Image gebacken,
+      # entrypoint.sh seedet den Cache). Damit wird ein etwaiger Compile-Time-Read/Exec
+      # (shell-escape) nicht zum Exfiltrations-Kanal (#sec-audit). api/worker erreichen
+      # pytex weiterhin über dieses Netz.
+      - pytex_net
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8099/health')\" || exit 1"]
       interval: 15s
@@ -271,8 +280,14 @@ volumes:
 networks:
   internal:
     # Keine publizierten Host-Ports an diesen Services => kein Internet-Ingress.
-    # Egress (Internet/Intranet) bleibt erlaubt für worker/pytex/api.
+    # Egress (Internet/Intranet) bleibt erlaubt für worker/api.
     driver: bridge
+  pytex_net:
+    # Render-Pfad api/worker <-> pytex. `internal: true` => KEIN Egress: der pytex-
+    # Container kann nichts ins Internet senden (tectonic/biber/Cache sind ins Image
+    # gebacken). Schließt einen Exfiltrations-Kanal bei Compile-Time-Exec (#sec-audit).
+    driver: bridge
+    internal: true
   proxy:
     # In prod: externes NPM-Netz. Dann hier `external: true` setzen und das
     # vom Nginx Proxy Manager verwaltete Netz referenzieren.

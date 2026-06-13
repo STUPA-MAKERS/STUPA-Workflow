@@ -51,9 +51,7 @@ from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, Vali
 class VotingService:
     """An eine ``AsyncSession`` (+ optionalen Flow-Dispatcher) gebundener Service."""
 
-    def __init__(
-        self, session: AsyncSession, dispatcher: ActionDispatcher | None = None
-    ) -> None:
+    def __init__(self, session: AsyncSession, dispatcher: ActionDispatcher | None = None) -> None:
         self.session = session
         self.dispatcher: ActionDispatcher = dispatcher or NullActionDispatcher()
 
@@ -83,9 +81,7 @@ class VotingService:
 
     async def _get_application(self, application_id: UUID) -> Application:
         app = (
-            await self.session.execute(
-                select(Application).where(Application.id == application_id)
-            )
+            await self.session.execute(select(Application).where(Application.id == application_id))
         ).scalar_one_or_none()
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
@@ -99,16 +95,20 @@ class VotingService:
         """Stimmen je Option zählen — offen aus ``ballot``, geheim aus ``secret_ballot``."""
         if config.secret:
             choices: Sequence[str | None] = (
-                await self.session.execute(
-                    select(SecretBallot.choice).where(SecretBallot.vote_id == vote.id)
+                (
+                    await self.session.execute(
+                        select(SecretBallot.choice).where(SecretBallot.vote_id == vote.id)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
         else:
             choices = (
-                await self.session.execute(
-                    select(Ballot.choice).where(Ballot.vote_id == vote.id)
-                )
-            ).scalars().all()
+                (await self.session.execute(select(Ballot.choice).where(Ballot.vote_id == vote.id)))
+                .scalars()
+                .all()
+            )
         return tally_mod.tally(config.options, choices)
 
     async def _present_count(self, vote: Vote) -> int:
@@ -225,9 +225,7 @@ class VotingService:
         wäre fail-open). Fehlt er, bleibt ein Prozent-Quorum fail-closed unerfüllt."""
         vote = await self._get_vote(vote_id)
         if vote.status != "draft":
-            raise ConflictError(
-                f"vote is {vote.status}, cannot open.", code="conflict"
-            )
+            raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
         config = self._config(vote)
         vote.opens_at = now
         vote.status = "open"
@@ -273,14 +271,10 @@ class VotingService:
             voter_sub = delegator_sub
         else:
             if blocked:
-                raise ForbiddenError(
-                    "Voting right has been delegated to another member."
-                )
+                raise ForbiddenError("Voting right has been delegated to another member.")
             # Eigene Stimme: globales ``vote.cast`` + Gruppen-Mitgliedschaft (der
             # Router gated nur Auth, damit externe Stellvertreter durchkommen).
-            if not principal.has("vote.cast") or not principal.in_group(
-                vote.eligible_group
-            ):
+            if not principal.has("vote.cast") or not principal.in_group(vote.eligible_group):
                 raise ForbiddenError("Not eligible to vote in this ballot.")
             voter_sub = principal.sub
         config = self._config(vote)
@@ -340,9 +334,7 @@ class VotingService:
         await self.session.commit()
         return BallotAccepted(status="cast")
 
-    async def _cast_secret(
-        self, vote_id: UUID, voter_sub: str, choice: str
-    ) -> BallotAccepted:
+    async def _cast_secret(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
         # `voted_marker` (UNIQUE) trägt »hat abgestimmt« — der Identitäts-Anker. Nur
         # wenn er **neu** ist, wird die identitätslose Stimme geschrieben (keine
         # Verknüpfung choice↔voter; allowChange anonym nicht umsetzbar → 409).
@@ -360,8 +352,40 @@ class VotingService:
         return BallotAccepted(status="cast")
 
     # ------------------------------------------------------------------- get
+    async def assert_can_read(self, vote: Vote, principal: Principal) -> None:
+        """Lesezugriff auf einen Vote absichern (#sec-audit, Broken-Object-Level-Authz).
+
+        Sitzungs-gebundene Votes folgen der Sitzungs-Sichtbarkeit (Mitglied/Teilnehmer/
+        Delegations-Empfänger) wie ``MeetingService.assert_can_read``; sitzungslose
+        (Antrags-/Entwurfs-)Votes verlangen eine globale Lese-/Verwaltungs-Permission.
+        Ohne diese Prüfung konnte jede:r eingeloggte Nutzer:in per ``GET /api/votes/{id}``
+        das Tally **fremder** Gremien lesen — inkl. geschlossener GEHEIM-Abstimmungen."""
+        if "admin" in principal.roles:
+            return
+        if vote.meeting_id is not None:
+            from app.modules.livevote.service import MeetingService
+
+            await MeetingService(self.session).assert_can_read(vote.meeting_id, principal)
+            return
+        if (
+            principal.has("vote.manage")
+            or principal.has("application.read")
+            or principal.has("application.read_all")
+        ):
+            return
+        raise ForbiddenError("not allowed to view this vote")
+
+    async def get_scoped(self, vote_id: UUID, principal: Principal) -> VoteOut:
+        """Wie :meth:`get`, aber fail-closed gescopt auf den Lesekreis des Votes."""
+        vote = await self._get_vote(vote_id)
+        await self.assert_can_read(vote, principal)
+        return await self.get(vote_id)
+
     async def get(self, vote_id: UUID) -> VoteOut:
-        """Vote-State + aggregiertes Tally (geheim: nur counts, nie Wähler)."""
+        """Vote-State + aggregiertes Tally (geheim: nur counts, nie Wähler).
+
+        **Kein** Scope-Gate — interner Wiederverwendungs-Pfad (z. B. Tally-Broadcast
+        nach ``cast``); der öffentliche Read-Endpunkt nutzt :meth:`get_scoped`."""
         vote = await self._get_vote(vote_id)
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
@@ -372,9 +396,7 @@ class VotingService:
             tally_out = tally_out.model_copy(
                 update={
                     "result": stored_result,
-                    "failed_reason": tally_mod.failed_reason(
-                        stored_result, tally_out.quorum_met
-                    ),
+                    "failed_reason": tally_mod.failed_reason(stored_result, tally_out.quorum_met),
                 }
             )
         return self._to_out(vote, config, tally_out)
@@ -388,9 +410,7 @@ class VotingService:
         nicht zustande kommt (``close`` ist dann blockiert)."""
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError(
-                f"vote is {vote.status}, cannot cancel.", code="conflict"
-            )
+            raise ConflictError(f"vote is {vote.status}, cannot cancel.", code="conflict")
         vote.status = "cancelled"
         await self.session.commit()
         config = self._config(vote)
@@ -414,9 +434,7 @@ class VotingService:
         # Auszählung und ``status=closed``.
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError(
-                f"vote is {vote.status}, cannot close.", code="conflict"
-            )
+            raise ConflictError(f"vote is {vote.status}, cannot close.", code="conflict")
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
         eligible = vote.eligible_count or 0
