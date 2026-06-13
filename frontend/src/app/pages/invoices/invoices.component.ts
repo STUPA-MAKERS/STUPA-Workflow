@@ -18,6 +18,9 @@ import {
   CurrencyInputComponent,
   DatepickerComponent,
   DialogComponent,
+  FilterBarComponent,
+  FilterFieldComponent,
+  FilterRangeComponent,
   IconComponent,
   SelectComponent,
   type SelectOption,
@@ -53,6 +56,9 @@ import {
     CurrencyInputComponent,
     DatepickerComponent,
     DialogComponent,
+    FilterBarComponent,
+    FilterFieldComponent,
+    FilterRangeComponent,
     IconComponent,
     SelectComponent,
   ],
@@ -94,6 +100,36 @@ import {
           }
         </div>
       </header>
+
+      <!-- Filterleiste im Buchungen-Stil: Status + Brutto-, Rechnungs- und
+           Fälligkeitsdatum-Bereich. Client-seitig über visible(). -->
+      <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+        <app-filter-field [label]="'invoices.filter.status' | t">
+          <div class="inv__statusFilter">
+            <app-button [variant]="statusFilter() === '' ? 'primary' : 'ghost'" size="sm" (click)="statusFilter.set('')">{{ 'invoices.filter.all' | t }}</app-button>
+            <app-button [variant]="statusFilter() === 'open' ? 'primary' : 'ghost'" size="sm" (click)="statusFilter.set('open')">{{ 'invoices.status.open' | t }}</app-button>
+            <app-button [variant]="statusFilter() === 'paid' ? 'primary' : 'ghost'" size="sm" (click)="statusFilter.set('paid')">{{ 'invoices.status.paid' | t }}</app-button>
+          </div>
+        </app-filter-field>
+        <app-filter-field [label]="'invoices.filter.grossRange' | t">
+          <app-filter-range>
+            <app-currency-input start [placeholder]="'invoices.filter.amountMin' | t" [ariaLabel]="'invoices.filter.amountMin' | t" [ngModel]="grossMin()" (ngModelChange)="grossMin.set($event)" />
+            <app-currency-input end [placeholder]="'invoices.filter.amountMax' | t" [ariaLabel]="'invoices.filter.amountMax' | t" [ngModel]="grossMax()" (ngModelChange)="grossMax.set($event)" />
+          </app-filter-range>
+        </app-filter-field>
+        <app-filter-field [label]="'invoices.filter.issueRange' | t">
+          <app-filter-range>
+            <app-datepicker start [ariaLabel]="'invoices.filter.issueFrom' | t" [ngModel]="issueFrom()" (ngModelChange)="issueFrom.set($event)" />
+            <app-datepicker end [ariaLabel]="'invoices.filter.issueTo' | t" [ngModel]="issueTo()" (ngModelChange)="issueTo.set($event)" />
+          </app-filter-range>
+        </app-filter-field>
+        <app-filter-field [label]="'invoices.filter.dueRange' | t">
+          <app-filter-range>
+            <app-datepicker start [ariaLabel]="'invoices.filter.dueFrom' | t" [ngModel]="dueFrom()" (ngModelChange)="dueFrom.set($event)" />
+            <app-datepicker end [ariaLabel]="'invoices.filter.dueTo' | t" [ngModel]="dueTo()" (ngModelChange)="dueTo.set($event)" />
+          </app-filter-range>
+        </app-filter-field>
+      </app-filter-bar>
 
       @if (loading()) {
         <p class="inv__status" aria-live="polite">{{ 'invoices.loading' | t }}</p>
@@ -303,6 +339,7 @@ import {
       .inv__title { margin: 0; }
       .inv__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
       .inv__headActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+      .inv__statusFilter { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; }
       .inv__btnIcon { display: inline-flex; align-items: center; gap: var(--space-2); }
       .inv__fileInput { display: none; }
       .inv__search, .inv__input {
@@ -478,14 +515,74 @@ export class InvoicesComponent {
   /** Manueller Beleg-Upload im Anlegen-Dialog läuft (#invoices). */
   readonly attaching = signal(false);
 
-  /** Client-seitige Suche über Nummer/Lieferant/Notiz. */
+  /** Filter (Buchungen-Stil): Status, Brutto-Bereich, Rechnungs-/Fälligkeitsdatum. */
+  readonly statusFilter = signal<'' | InvoiceStatus>('');
+  readonly grossMin = signal('');
+  readonly grossMax = signal('');
+  readonly issueFrom = signal('');
+  readonly issueTo = signal('');
+  readonly dueFrom = signal('');
+  readonly dueTo = signal('');
+
+  /** Zahl aktiver Filter (für den Indikator am Filter-Button) — ohne die Suche. */
+  readonly activeFilterCount = computed(
+    () =>
+      [
+        this.statusFilter(),
+        this.grossMin().trim(),
+        this.grossMax().trim(),
+        this.issueFrom(),
+        this.issueTo(),
+        this.dueFrom(),
+        this.dueTo(),
+      ].filter((v) => String(v ?? '').trim() !== '').length,
+  );
+
+  /** Client-seitige Suche (Nummer/Lieferant/Notiz) + Status-/Betrags-/Datums-Filter. */
   readonly visible = computed(() => {
     const needle = this.q().trim().toLowerCase();
-    if (!needle) return this.items();
-    return this.items().filter((i) =>
-      [i.number, i.supplier, i.note].some((v) => (v ?? '').toLowerCase().includes(needle)),
-    );
+    const status = this.statusFilter();
+    const gMin = this.grossMin().trim() ? Number(this.grossMin()) : null;
+    const gMax = this.grossMax().trim() ? Number(this.grossMax()) : null;
+    const issueFrom = this.issueFrom();
+    const issueTo = this.issueTo();
+    const dueFrom = this.dueFrom();
+    const dueTo = this.dueTo();
+    return this.items().filter((i) => {
+      if (
+        needle &&
+        ![i.number, i.supplier, i.note].some((v) => (v ?? '').toLowerCase().includes(needle))
+      )
+        return false;
+      if (status && i.status !== status) return false;
+      const gross = Number(i.grossAmount);
+      if (gMin !== null && gross < gMin) return false;
+      if (gMax !== null && gross > gMax) return false;
+      if (!this.inDateRange(i.issueDate, issueFrom, issueTo)) return false;
+      if (!this.inDateRange(i.dueDate, dueFrom, dueTo)) return false;
+      return true;
+    });
   });
+
+  /** ISO-Datums (YYYY-MM-DD) vergleichen sich lexikografisch. Ohne Datum fällt eine
+   *  Zeile aus jedem gesetzten Bereich. */
+  private inDateRange(date: string | null | undefined, from: string, to: string): boolean {
+    if (!from && !to) return true;
+    if (!date) return false;
+    if (from && date < from) return false;
+    if (to && date > to) return false;
+    return true;
+  }
+
+  resetFilters(): void {
+    this.statusFilter.set('');
+    this.grossMin.set('');
+    this.grossMax.set('');
+    this.issueFrom.set('');
+    this.issueTo.set('');
+    this.dueFrom.set('');
+    this.dueTo.set('');
+  }
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
