@@ -42,6 +42,7 @@ _ALL_PERMS = {
     "admin.site",
     "admin.gremien",
     "admin.types",
+    "admin.types_delete",
     "admin.roles",
     "admin.users",
     "admin.group_mappings",
@@ -128,6 +129,9 @@ class _FakeConfig:
             comparison_offers=None,
             active_form_version_id=None,
         )
+
+    async def delete_application_type(self, type_id, actor):  # noqa: ANN001
+        return None
 
     async def list_roles(self):
         return [
@@ -451,6 +455,19 @@ def test_application_types_crud(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 201 and r.json()["hasBudget"] is False
     patched = client.patch(f"/api/admin/application-types/{uuid4()}", json={"hasBudget": True})
     assert patched.status_code == 200
+
+
+def test_application_type_delete_requires_own_permission(
+    app: FastAPI, client: TestClient
+) -> None:
+    """Löschen verlangt die eigene Permission admin.types_delete (nicht admin.types)."""
+    type_id = uuid4()
+    # admin.types allein (Anlegen/Bearbeiten) reicht NICHT zum Löschen.
+    _as(app, {"admin.types"})
+    assert client.delete(f"/api/admin/application-types/{type_id}").status_code == 403
+    # Mit der eigenen Lösch-Permission: 204.
+    _as(app, {"admin.types_delete"})
+    assert client.delete(f"/api/admin/application-types/{type_id}").status_code == 204
 
 
 # --------------------------------------------------------------------------- rbac

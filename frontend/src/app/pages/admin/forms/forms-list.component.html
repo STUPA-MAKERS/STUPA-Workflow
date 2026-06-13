@@ -32,6 +32,9 @@
       <ng-template appCell="actions" let-t>
         <span class="fl__actions">
           <a class="fl__icon-link" [routerLink]="['/admin/forms', $any(t).id]" [attr.aria-label]="'admin.forms.edit' | t" [attr.title]="'admin.forms.edit' | t"><app-icon name="edit" /></a>
+          @if (canDelete()) {
+            <app-button variant="ghost" size="sm" [iconOnly]="true" [attr.aria-label]="'admin.forms.delete' | t" [title]="'admin.forms.delete' | t" (click)="askDelete($any(t))"><app-icon name="delete" /></app-button>
+          }
         </span>
       </ng-template>
     </app-data-table>
@@ -66,6 +69,22 @@
     <app-button variant="ghost" (click)="closeDialog()">{{ 'admin.common.cancel' | t }}</app-button>
     <app-button [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
       {{ 'admin.forms.add' | t }}
+    </app-button>
+  </div>
+</app-dialog>
+
+<!-- Antragsart löschen (eigene Permission admin.types_delete). -->
+<app-dialog
+  [open]="confirmDelete() !== null"
+  [title]="'admin.forms.delete' | t"
+  [closeLabel]="'admin.common.cancel' | t"
+  (closed)="cancelDelete()"
+>
+  <p>{{ 'admin.forms.deleteConfirm' | t: { name: confirmDeleteName() } }}</p>
+  <div dialog-footer class="fl__dialog-foot">
+    <app-button variant="ghost" (click)="cancelDelete()">{{ 'admin.common.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="deleting()" (click)="confirmDeleteType()">
+      {{ 'admin.forms.delete' | t }}
     </app-button>
   </div>
 </app-dialog>

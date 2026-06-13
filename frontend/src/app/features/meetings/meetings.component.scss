@@ -16,6 +16,17 @@
   gap: var(--space-4);
   flex-wrap: wrap;
 }
+/* Gremium-Filter + »Neue Sitzung« in einer Zeile, gleiche Höhe (md-Button ≈
+   Control-Höhe des Selects). */
+.mtg__headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.mtg__headFilter {
+  min-width: 12rem;
+}
 .mtg__meta {
   display: flex;
   align-items: center;
@@ -40,13 +51,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-.mtg__listToolbar {
-  display: flex;
-  justify-content: flex-end;
-}
-.mtg__listToolbar app-select {
-  min-width: 14rem;
 }
 .mtg__listHead {
   display: flex;

@@ -170,6 +170,13 @@ export interface ApplicationCreatedWire {
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
 
 /** `AttendanceOut` — Anwesenheit eines Gremium-Mitglieds (GET/PUT …/attendance). */
+/** Aktuelles Gremium-Mitglied — Protokollant-Kandidat beim Anlegen einer Sitzung. */
+export interface MeetingMember {
+  principalId: Uuid;
+  displayName: string | null;
+  email: string | null;
+}
+
 export interface Attendance {
   principalId: Uuid;
   displayName: string | null;

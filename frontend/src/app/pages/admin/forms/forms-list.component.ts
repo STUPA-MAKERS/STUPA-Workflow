@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { I18nMap, Uuid } from '@core/api/models';
@@ -59,9 +60,15 @@ function emptyForm(): NewForm {
 })
 export class FormsListComponent {
   private readonly api = inject(AdminApiService);
+  private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+
+  /** Antragsarten löschen verlangt die eigene Permission (UX-Gate; Server autoritativ). */
+  protected readonly canDelete = computed(() => this.auth.can('admin.types_delete'));
+  protected readonly confirmDelete = signal<ApplicationTypeFull | null>(null);
+  protected readonly deleting = signal(false);
 
   protected readonly types = signal<ApplicationTypeFull[]>([]);
   protected readonly loading = signal(true);
@@ -123,6 +130,38 @@ export class FormsListComponent {
   protected openCreate(): void {
     this.form.set(emptyForm());
     this.dialogOpen.set(true);
+  }
+
+  protected confirmDeleteName(): string {
+    const t = this.confirmDelete();
+    return t ? this.name(t) : '';
+  }
+
+  protected askDelete(t: ApplicationTypeFull): void {
+    this.confirmDelete.set(t);
+  }
+
+  protected cancelDelete(): void {
+    this.confirmDelete.set(null);
+  }
+
+  protected confirmDeleteType(): void {
+    const t = this.confirmDelete();
+    if (!t || this.deleting()) return;
+    this.deleting.set(true);
+    this.api.deleteApplicationType(t.id).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.confirmDelete.set(null);
+        this.types.update((rows) => rows.filter((r) => r.id !== t.id));
+        this.toast.success(this.i18n.translate('admin.common.saved'));
+      },
+      error: () => {
+        this.deleting.set(false);
+        // 409 = noch Anträge dieser Art vorhanden; sonst generischer Fehler.
+        this.toast.error(this.i18n.translate('admin.forms.deleteFailed'));
+      },
+    });
   }
 
   protected closeDialog(): void {

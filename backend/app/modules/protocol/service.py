@@ -189,6 +189,12 @@ class ProtocolService:
         meeting = await self.session.get(Meeting, meeting_id)
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
+        # Das Protokoll entsteht ausschließlich beim Start der Sitzung (planned→live),
+        # nie manuell vorab: vor dem Start kann nicht protokolliert werden.
+        if meeting.status == "planned":
+            raise ConflictError(
+                "the meeting has not started — its minutes are created on start"
+            )
         gremium = await self.session.get(Gremium, meeting.gremium_id)
         await self.session.execute(
             pg_insert(Protocol)

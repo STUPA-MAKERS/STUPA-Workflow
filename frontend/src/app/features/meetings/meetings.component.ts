@@ -29,6 +29,7 @@ import type {
   AttendanceStatus,
   I18nMap,
   Meeting,
+  MeetingMember,
   MeetingVote,
   Protocol,
   Uuid,
@@ -136,8 +137,10 @@ export class MeetingsComponent implements OnDestroy {
   /** Feste Stimm-Optionen (kanonische Keys) — Pass/Fail braucht yes/no/abstain. */
   readonly FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
   readonly voteSecret = signal(false);
-  // Mehrheitsregel beim Öffnen wählbar; Quorum/Stimmberechtigte kommen vom Gremium.
+  // Optionale Beschluss-Parameter beim Öffnen (#5-4): Mehrheitsregel + Quorum.
   readonly voteMajorityRule = signal<'simple' | 'absolute' | 'two_thirds'>('simple');
+  readonly voteEligibleCount = signal<string>('');
+  readonly voteQuorumPercent = signal<string>('');
   readonly majorityRuleOptions = computed<SelectOption[]>(() =>
     (['simple', 'absolute', 'two_thirds'] as const).map((v) => ({
       value: v,
@@ -169,7 +172,6 @@ export class MeetingsComponent implements OnDestroy {
   /** Initiales Laden der Übersicht-Timeline (erste Seite beider Richtungen). */
   readonly loadingList = signal(false);
 
-  readonly loadingProtocol = signal(false);
   readonly saving = signal(false);
   /** Auto-Speichern-Status des aktuellen TOP-Texts (#56/#58). */
   readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -193,6 +195,17 @@ export class MeetingsComponent implements OnDestroy {
   readonly savingDate = signal(false);
   /** Pflicht-Gremium für die neue Sitzung (#68); leer ⇒ Submit gesperrt. */
   readonly newGremiumId = signal('');
+  /** Protokollant der neuen Sitzung — wählbar beim Anlegen, Pflicht spätestens vor
+   *  dem Start. Kandidaten = aktuelle Mitglieder des gewählten Gremiums. */
+  readonly newProtokollant = signal('');
+  readonly createMembers = signal<MeetingMember[]>([]);
+  readonly createProtokollantOptions = computed<SelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('meetings.protokollant.none') },
+    ...this.createMembers().map((m) => ({
+      value: m.principalId,
+      label: m.displayName || m.email || m.principalId,
+    })),
+  ]);
   /** Gremien als Dropdown-Optionen (echte Liste, `/gremien`). */
   readonly gremiumOptions = signal<SelectOption[]>([]);
   /** Gremium-Filter der Übersicht (''=alle). Quelle: Mitglieds-Gremien (#meetings-filter). */
@@ -312,7 +325,26 @@ export class MeetingsComponent implements OnDestroy {
   }
 
   openCreate(): void {
+    this.newProtokollant.set('');
+    this.createMembers.set([]);
+    // Vorbelegtes Gremium (z. B. aus dem Übersichtsfilter): direkt Mitglieder laden.
+    if (this.newGremiumId()) this.loadCreateMembers(this.newGremiumId());
     this.createOpen.set(true);
+  }
+
+  /** Gremium im Anlegen-Dialog wechseln → Protokollant-Kandidaten neu laden. */
+  onCreateGremiumChange(gremiumId: string): void {
+    this.newGremiumId.set(gremiumId);
+    this.newProtokollant.set('');
+    this.createMembers.set([]);
+    if (gremiumId) this.loadCreateMembers(gremiumId);
+  }
+
+  private loadCreateMembers(gremiumId: string): void {
+    this.api.listMeetingMembers(gremiumId).subscribe({
+      next: (rows) => this.createMembers.set(rows),
+      error: () => this.createMembers.set([]),
+    });
   }
 
   /** Globale Verwalter-Rechte — Gating der Übersicht/Anlegen (ohne geladene Sitzung). */
@@ -333,6 +365,14 @@ export class MeetingsComponent implements OnDestroy {
   readonly inAnyCommittee = computed(() => this.auth.gremien().length > 0);
   /** Stellvertreter-Pool-Mitglied → darf die (gefilterte) Timeline sehen (#7). */
   readonly inSubstitutePool = computed(() => this.auth.inSubstitutePool());
+  /** Darf die (serverseitig gefilterte) Sitzungsübersicht/Timeline sehen. */
+  readonly showOverview = computed(
+    () =>
+      this.canManageAny() ||
+      this.canWriteGlobal() ||
+      this.inAnyCommittee() ||
+      this.inSubstitutePool(),
+  );
   /** Übersicht ohne Detail-Route, ohne Verwalter-/Schreibrecht, ohne Gremium-
    *  Mitgliedschaft **und** ohne Pool-Zugehörigkeit ⇒ keine Berechtigung (#sessions/#7). */
   readonly showForbidden = computed(
@@ -591,17 +631,28 @@ export class MeetingsComponent implements OnDestroy {
     event.preventDefault();
     const title = this.newTitle().trim();
     const gremiumId = this.newGremiumId();
-    if (!title || !gremiumId || this.creating()) return;
+    const date = this.newDate().trim();
+    const startTime = this.newTime().trim();
+    // Datum + Uhrzeit sind Pflicht (Termin der Sitzung); Submit ist sonst gesperrt.
+    if (!title || !gremiumId || !date || !startTime || this.creating()) return;
     this.creating.set(true);
-    const date = this.newDate().trim() || null;
-    const startTime = this.newTime().trim() || null;
-    this.api.createMeeting({ title, gremiumId, date, startTime }).subscribe({
+    this.api
+      .createMeeting({
+        title,
+        gremiumId,
+        date,
+        startTime,
+        protokollantId: this.newProtokollant() || null,
+      })
+      .subscribe({
       next: (m) => {
         this.creating.set(false);
         this.newTitle.set('');
         this.newGremiumId.set('');
         this.newDate.set('');
         this.newTime.set('');
+        this.newProtokollant.set('');
+        this.createMembers.set([]);
         this.createOpen.set(false);
         this.toast.success(this.i18n.translate('meetings.toast.created'));
         // Auf die Detail-Route navigieren, damit die Sitzung wiederauffindbar ist (#104).
@@ -625,8 +676,20 @@ export class MeetingsComponent implements OnDestroy {
     if (!m) return;
     // »closed« ist terminal — keine Wiedereröffnung (der Server lehnt es ohnehin ab).
     if (m.status === 'closed') return;
+    // Start verlangt einen Protokollanten (Schriftführung des Protokolls). Vorab
+    // prüfen, damit der 409 des Servers nicht erst nach dem Klick auftaucht.
+    if (status === 'live' && !m.protokollantId) {
+      this.toast.error(this.i18n.translate('meetings.toast.protokollantRequired'));
+      return;
+    }
     this.api.patchMeeting(m.id, { status }).subscribe({
-      next: (updated) => this.meeting.set(updated),
+      next: (updated) => {
+        this.meeting.set(updated);
+        // Protokoll entsteht beim Start (Backend) — direkt per GET nachladen.
+        if (updated.status === 'live' && updated.protocolId && this.canWrite()) {
+          this.refreshProtocol();
+        }
+      },
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
     });
   }
@@ -717,23 +780,6 @@ export class MeetingsComponent implements OnDestroy {
   }
 
   // --- Protokoll: TOPs links, pro-TOP-Editor rechts (#58) ------------------
-  loadProtocol(): void {
-    const m = this.meeting();
-    if (!m || this.loadingProtocol()) return;
-    this.loadingProtocol.set(true);
-    this.api.loadProtocol(m.id).subscribe({
-      next: (proto) => {
-        this.loadingProtocol.set(false);
-        this.protocol.set(proto);
-        this.watchRendering(proto);
-      },
-      error: () => {
-        this.loadingProtocol.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.protocolFailed'));
-      },
-    });
-  }
-
   /** Bestehendes Protokoll per GET nachladen (kein Write-Rate-Limit, #429). */
   private refreshProtocol(): void {
     const m = this.meeting();
@@ -1078,6 +1124,8 @@ export class MeetingsComponent implements OnDestroy {
     this.voteQuestion.set(item.title ?? '');
     this.voteSecret.set(false);
     this.voteMajorityRule.set('simple');
+    this.voteEligibleCount.set('');
+    this.voteQuorumPercent.set('');
     this.voteDialogOpen.set(true);
   }
 
@@ -1098,6 +1146,12 @@ export class MeetingsComponent implements OnDestroy {
         options,
         secret: this.voteSecret(),
         majorityRule: this.voteMajorityRule(),
+        eligibleCount: this.voteEligibleCount().trim()
+          ? Number(this.voteEligibleCount())
+          : null,
+        quorumPercent: this.voteQuorumPercent().trim()
+          ? Number(this.voteQuorumPercent())
+          : null,
       })
       .subscribe({
         next: (updated) => {

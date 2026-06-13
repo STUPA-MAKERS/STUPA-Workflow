@@ -146,6 +146,18 @@ async def test_get_or_create_concurrent_insert_reselects_winner() -> None:
     assert out.markdown == "# vom Parallel-Request"
 
 
+async def test_get_or_create_blocked_before_start() -> None:
+    """Vor dem Start (``planned``) entsteht kein Protokoll — nur der Start legt es an."""
+    meeting = _real_meeting()
+    meeting.status = "planned"
+    session = FakeSession(
+        store={MID: meeting, GID: _real_gremium()}, results=[result()]
+    )
+    with pytest.raises(ConflictError):
+        await _service(session).get_or_create(MID)
+    assert session.committed == 0
+
+
 async def test_get_or_create_unknown_meeting_404() -> None:
     session = FakeSession(store={}, results=[result()])
     with pytest.raises(NotFoundError):

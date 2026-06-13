@@ -101,7 +101,11 @@
      aufziehen (#mobile). */
   min-width: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  /* `overflow-x: hidden` ließe `overflow-y` zu `auto` werden (CSS-Spec) und
+     beschnitt damit den Fokus-Rahmen oben/unten. `clip` hält die Y-Achse
+     `visible`; `overflow-clip-margin` lässt den Rahmen seitlich etwas atmen. */
+  overflow-x: clip;
+  overflow-clip-margin: var(--space-1);
 }
 
 /* Dünner Trenner zwischen aufeinanderfolgenden Fragen eines Schritts. */

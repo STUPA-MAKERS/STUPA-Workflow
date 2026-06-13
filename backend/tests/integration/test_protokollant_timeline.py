@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from datetime import date, time
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -62,7 +63,15 @@ async def test_protokollant_persists_and_shows_in_timeline(session: AsyncSession
 
     svc = MeetingService(session)
     admin = Principal(sub="adm", roles=["admin"])
-    created = await svc.create(MeetingCreate(gremiumId=gremium.id, title="GV"), admin)
+    created = await svc.create(
+        MeetingCreate(
+            gremiumId=gremium.id,
+            title="GV",
+            date=date(2026, 6, 20),
+            startTime=time(18, 0),
+        ),
+        admin,
+    )
 
     patched = await svc.patch(
         created.id,

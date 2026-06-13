@@ -1,8 +1,23 @@
 <header class="mtg__head">
   <div class="mtg__headRow">
     <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
-    @if (!meeting() && canCreate()) {
-      <app-button size="sm" (click)="openCreate()">{{ 'meetings.list.new' | t }}</app-button>
+    @if (!meeting()) {
+      <div class="mtg__headActions">
+        <!-- Gremium-Filter ohne Label, in einer Zeile + gleicher Höhe wie der Button. -->
+        @if (showOverview() && filterGremiumOptions().length > 2) {
+          <app-select
+            class="mtg__headFilter"
+            name="gremiumFilter"
+            [ariaLabel]="'meetings.list.committeeFilter' | t"
+            [options]="filterGremiumOptions()"
+            [ngModel]="gremiumFilter()"
+            (ngModelChange)="selectGremiumFilter($event)"
+          />
+        }
+        @if (canCreate()) {
+          <app-button (click)="openCreate()">{{ 'meetings.list.new' | t }}</app-button>
+        }
+      </div>
     }
   </div>
   @if (meeting(); as m) {
@@ -176,7 +191,12 @@
     <!-- »closed« ist terminal: nach dem Schließen entfallen alle Steuer-Buttons,
          eine geschlossene Sitzung lässt sich nicht wieder öffnen. -->
     @if (m.canControl && m.status !== 'closed') {
-      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live'" [ariaLabel]="'meetings.control.open' | t" [title]="'meetings.control.open' | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
+      <!-- Start verlangt einen Protokollanten: ohne ihn ist der Button gesperrt
+           (das Protokoll entsteht beim Start und braucht eine Schriftführung). -->
+      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live' || !m.protokollantId" [ariaLabel]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
+      @if (m.status === 'planned' && !m.protokollantId) {
+        <span class="mtg__muted mtg__needProt">{{ 'meetings.control.needProtokollant' | t }}</span>
+      }
       <app-button variant="danger" size="sm" [loading]="finalizing()" [title]="'meetings.control.closeSession' | t" (click)="closeConfirmOpen.set(true)">
         <span class="mtg__btnIcon"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeShort' | t }}</span>
       </app-button>
@@ -269,11 +289,12 @@
     <!-- MITTE: Protokoll-Body (pro-TOP-Editor + Beschlussfragen) -->
     <div class="mtg__main">
       @if (!protocol()) {
-        <p class="mtg__muted">{{ 'meetings.protocol.none' | t }}</p>
-        @if (canWrite()) {
-          <app-button size="sm" [loading]="loadingProtocol()" (click)="loadProtocol()">
-            {{ 'meetings.protocol.create' | t }}
-          </app-button>
+        <!-- Das Protokoll entsteht ausschließlich beim Start; davor kann nicht
+             protokolliert/abgestimmt werden. Kein manueller Anlege-Button mehr. -->
+        @if (m.status === 'planned') {
+          <p class="mtg__muted mtg__beforeStart">{{ 'meetings.protocol.beforeStart' | t }}</p>
+        } @else {
+          <p class="mtg__muted">{{ 'meetings.protocol.none' | t }}</p>
         }
       } @else if (protocol(); as proto) {
         <div class="mtg__protoMeta">
@@ -530,6 +551,13 @@
         [ngModel]="voteMajorityRule()"
         (ngModelChange)="voteMajorityRule.set($event)"
       />
+      <div class="mtg__voteQuorum">
+        <label class="mtg__paneLabel" for="mtg-velig">{{ 'meetings.vote.eligibleCount' | t }}</label>
+        <input id="mtg-velig" class="mtg__input" type="number" min="0" inputmode="numeric" [ngModel]="voteEligibleCount()" (ngModelChange)="voteEligibleCount.set($event)" name="velig" [placeholder]="'meetings.vote.eligibleCountPlaceholder' | t" />
+        <label class="mtg__paneLabel" for="mtg-vquorum">{{ 'meetings.vote.quorumPercent' | t }}</label>
+        <input id="mtg-vquorum" class="mtg__input" type="number" min="0" max="100" inputmode="numeric" [ngModel]="voteQuorumPercent()" (ngModelChange)="voteQuorumPercent.set($event)" name="vquorum" [placeholder]="'meetings.vote.quorumPercentPlaceholder' | t" />
+      </div>
+      <p class="mtg__muted mtg__hint">{{ 'meetings.vote.quorumHint' | t }}</p>
     </form>
     <div dialog-footer class="mtg__dialogFoot">
       <app-button variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
@@ -558,24 +586,16 @@
 } @else {
   <!-- Übersicht: vorhandene Sitzungen (#104). Auch reine Gremium-Mitglieder
        sehen ihre (serverseitig gefilterte) Timeline (#sessions-visibility). -->
-  @if (canManageAny() || canWriteGlobal() || inAnyCommittee() || inSubstitutePool()) {
+  @if (showOverview()) {
     <section class="mtg__listSection">
-      @if (filterGremiumOptions().length > 2) {
-        <div class="mtg__listToolbar">
-          <app-select
-            name="gremiumFilter"
-            [label]="'meetings.list.committeeFilter' | t"
-            [options]="filterGremiumOptions()"
-            [ngModel]="gremiumFilter()"
-            (ngModelChange)="selectGremiumFilter($event)"
-          />
-        </div>
-      }
       @if (loadingList()) {
         <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
-      } @else if (timelineEmpty()) {
-        <p class="mtg__muted">{{ 'meetings.list.empty' | t }}</p>
       } @else {
+        <!-- Auch ohne Sitzungen die Timeline mit Jetzt-Balken zeigen (#empty-timeline):
+             der „noch keine Sitzungen"-Fall ist nur eine leere Timeline. -->
+        @if (timelineEmpty()) {
+          <p class="mtg__muted mtg__tlEmptyHint">{{ 'meetings.list.empty' | t }}</p>
+        }
         <!-- Timeline (#104): Vergangenes oben (serverseitig lazy beim Hochscrollen),
              Anstehendes unten (lazy beim Runterscrollen). -->
         <div class="mtg__timeline" #tlScroll (scroll)="onTimelineScroll(tlScroll)">
@@ -675,13 +695,15 @@
         [options]="gremiumOptions()"
         [required]="true"
         [ngModel]="newGremiumId()"
-        (ngModelChange)="newGremiumId.set($event)"
+        (ngModelChange)="onCreateGremiumChange($event)"
       />
       @if (!gremiumOptions().length) {
         <p class="mtg__muted mtg__hint">{{ 'meetings.create.noGremien' | t }}</p>
       }
+      <!-- Datum + Uhrzeit sind Pflicht: ohne Termin lässt sich keine Sitzung planen. -->
       <app-datepicker
         [label]="'meetings.create.date' | t"
+        [required]="true"
         [ngModel]="newDate()"
         (ngModelChange)="newDate.set($event)"
         name="date"
@@ -690,15 +712,25 @@
       <app-time-input
         id="mtg-new-time"
         [label]="'meetings.create.time' | t"
+        [required]="true"
         [ngModel]="newTime()"
         (ngModelChange)="newTime.set($event)"
         name="time"
+      />
+      <!-- Protokollant wählbar beim Anlegen; spätestens vor dem Start Pflicht. -->
+      <app-select
+        name="newProt"
+        [label]="'meetings.protokollant.label' | t"
+        [options]="createProtokollantOptions()"
+        [disabled]="!newGremiumId()"
+        [ngModel]="newProtokollant()"
+        (ngModelChange)="newProtokollant.set($event)"
       />
     </form>
     <div dialog-footer class="mtg__dialogFoot">
       <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
       <app-button
-        [disabled]="!newTitle().trim() || !newGremiumId()"
+        [disabled]="!newTitle().trim() || !newGremiumId() || !newDate().trim() || !newTime().trim()"
         [loading]="creating()"
         (click)="create($event)"
       >

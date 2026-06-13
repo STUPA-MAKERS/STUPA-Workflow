@@ -45,6 +45,7 @@ from app.modules.livevote.schemas import (
     AttendanceOut,
     AttendanceSetBody,
     MeetingCreate,
+    MeetingMemberOut,
     MeetingOut,
     MeetingPage,
     MeetingPatch,
@@ -176,6 +177,25 @@ async def create_meeting(
     return meeting
 
 
+@router.get(
+    "/gremien/{gremium_id}/meeting-members",
+    response_model=list[MeetingMemberOut],
+    responses=_errors(401, 403),
+)
+async def list_meeting_members(
+    gremium_id: UUID,
+    attendance: AttendanceDep,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> list[MeetingMemberOut]:
+    """Aktuelle Gremium-Mitglieder als Protokollant-Kandidaten — wer das Gremium
+    verwalten darf (``session.manage``/Admin). Beim Anlegen einer Sitzung steht noch
+    kein Roster bereit; diese Liste füllt die Protokollant-Auswahl im Create-Dialog."""
+    if not await service.can_manage(gremium_id, principal):
+        raise ForbiddenError("not allowed to manage meetings for this committee")
+    return await attendance.members(gremium_id)
+
+
 @router.get("/meetings", response_model=list[MeetingOut], responses=_errors(401, 403))
 async def list_meetings(
     service: ServiceDep,
@@ -241,8 +261,25 @@ async def patch_meeting(
     """Steuerung/Planung → ``meeting_state``-Broadcast.
 
     Feld-genaue RBAC im Service: Status/aktiver Antrag = ``canWrite`` (Protokollant
-    oder Verwalter); Datum/Zeit/Protokollant = ``canManage`` (Sitzungsverwalter)."""
-    return await service.patch(meeting_id, payload, principal)
+    oder Verwalter); Datum/Zeit/Protokollant = ``canManage`` (Sitzungsverwalter).
+
+    Start (planned→live): nach dem atomaren Status-Wechsel legt der Router das
+    Protokoll an (idempotent). Das Protokoll entsteht ausschließlich hier — nicht
+    manuell vorab. Der Service hat zuvor sichergestellt, dass ein Protokollant
+    feststeht (sonst 409)."""
+    updated = await service.patch(meeting_id, payload, principal)
+    if payload.status == "live" and updated.status == "live":
+        # Lokaler Import: ``protocol`` hängt von ``livevote`` — Modul-Level wäre ein
+        # Zyklus. Dieselbe Session wie der Service (eine Transaktion/ein Commit).
+        from app.modules.protocol.service import ProtocolService
+
+        await ProtocolService(service.session).get_or_create(
+            meeting_id, author=principal.sub
+        )
+        # Frisch lesen, damit die Antwort die neue ``protocolId`` trägt (das FE lädt
+        # das Protokoll direkt nach dem Start darüber nach).
+        return await service.get(meeting_id, principal)
+    return updated
 
 
 # --------------------------------------------------------------------------- #
@@ -340,6 +377,12 @@ async def open_meeting_vote(
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
+    # Abstimmungen erst ab Start: vor »live« gibt es kein Protokoll, in dem das
+    # Ergebnis festgehalten würde.
+    if meeting.status != "live":
+        raise ConflictError(
+            "the meeting has not started — start it before opening a vote"
+        )
     item = await agenda.item(meeting_id, payload.agenda_item_id)
     if item.application_id is not None:
         if await service.agenda_item_has_vote(item.id):
@@ -495,6 +538,12 @@ async def set_agenda_body(
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
+    # Protokollieren (TOP-Text) erst ab Start. Reine Titel-Umbenennung (Freitext-TOP)
+    # gehört zur Planung und bleibt vor »live« erlaubt.
+    if payload.body is not None and meeting.status != "live":
+        raise ConflictError(
+            "the meeting has not started — start it before taking minutes"
+        )
     items = await agenda.set_body(
         meeting_id, item_id, body=payload.body, title=payload.title
     )

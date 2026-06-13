@@ -18,6 +18,9 @@ import {
   CurrencyInputComponent,
   DatepickerComponent,
   DialogComponent,
+  FilterBarComponent,
+  FilterFieldComponent,
+  FilterRangeComponent,
   IconComponent,
   SelectComponent,
   type SelectOption,
@@ -53,6 +56,9 @@ import {
     CurrencyInputComponent,
     DatepickerComponent,
     DialogComponent,
+    FilterBarComponent,
+    FilterFieldComponent,
+    FilterRangeComponent,
     IconComponent,
     SelectComponent,
   ],
@@ -75,14 +81,74 @@ export class InvoicesComponent {
   /** Manueller Beleg-Upload im Anlegen-Dialog läuft (#invoices). */
   readonly attaching = signal(false);
 
-  /** Client-seitige Suche über Nummer/Lieferant/Notiz. */
+  /** Filter (Buchungen-Stil): Status, Brutto-Bereich, Rechnungs-/Fälligkeitsdatum. */
+  readonly statusFilter = signal<'' | InvoiceStatus>('');
+  readonly grossMin = signal('');
+  readonly grossMax = signal('');
+  readonly issueFrom = signal('');
+  readonly issueTo = signal('');
+  readonly dueFrom = signal('');
+  readonly dueTo = signal('');
+
+  /** Zahl aktiver Filter (für den Indikator am Filter-Button) — ohne die Suche. */
+  readonly activeFilterCount = computed(
+    () =>
+      [
+        this.statusFilter(),
+        this.grossMin().trim(),
+        this.grossMax().trim(),
+        this.issueFrom(),
+        this.issueTo(),
+        this.dueFrom(),
+        this.dueTo(),
+      ].filter((v) => String(v ?? '').trim() !== '').length,
+  );
+
+  /** Client-seitige Suche (Nummer/Lieferant/Notiz) + Status-/Betrags-/Datums-Filter. */
   readonly visible = computed(() => {
     const needle = this.q().trim().toLowerCase();
-    if (!needle) return this.items();
-    return this.items().filter((i) =>
-      [i.number, i.supplier, i.note].some((v) => (v ?? '').toLowerCase().includes(needle)),
-    );
+    const status = this.statusFilter();
+    const gMin = this.grossMin().trim() ? Number(this.grossMin()) : null;
+    const gMax = this.grossMax().trim() ? Number(this.grossMax()) : null;
+    const issueFrom = this.issueFrom();
+    const issueTo = this.issueTo();
+    const dueFrom = this.dueFrom();
+    const dueTo = this.dueTo();
+    return this.items().filter((i) => {
+      if (
+        needle &&
+        ![i.number, i.supplier, i.note].some((v) => (v ?? '').toLowerCase().includes(needle))
+      )
+        return false;
+      if (status && i.status !== status) return false;
+      const gross = Number(i.grossAmount);
+      if (gMin !== null && gross < gMin) return false;
+      if (gMax !== null && gross > gMax) return false;
+      if (!this.inDateRange(i.issueDate, issueFrom, issueTo)) return false;
+      if (!this.inDateRange(i.dueDate, dueFrom, dueTo)) return false;
+      return true;
+    });
   });
+
+  /** ISO-Datums (YYYY-MM-DD) vergleichen sich lexikografisch. Ohne Datum fällt eine
+   *  Zeile aus jedem gesetzten Bereich. */
+  private inDateRange(date: string | null | undefined, from: string, to: string): boolean {
+    if (!from && !to) return true;
+    if (!date) return false;
+    if (from && date < from) return false;
+    if (to && date > to) return false;
+    return true;
+  }
+
+  resetFilters(): void {
+    this.statusFilter.set('');
+    this.grossMin.set('');
+    this.grossMax.set('');
+    this.issueFrom.set('');
+    this.issueTo.set('');
+    this.dueFrom.set('');
+    this.dueTo.set('');
+  }
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 

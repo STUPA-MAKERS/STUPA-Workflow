@@ -11,6 +11,7 @@
 .inv__title { margin: 0; }
 .inv__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
 .inv__headActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.inv__statusFilter { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; }
 .inv__btnIcon { display: inline-flex; align-items: center; gap: var(--space-2); }
 .inv__fileInput { display: none; }
 .inv__search, .inv__input {

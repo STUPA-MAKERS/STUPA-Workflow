@@ -175,7 +175,8 @@ export const routes: Routes = [
       },
       {
         path: 'invoices',
-        data: { title: 'nav.invoices', permission: ['budget.view', 'budget.structure', 'budget.book'], wide: true },
+        // Schmaler Body wie der Aufgaben-Tab: kein `wide` → Standard-Container-Breite.
+        data: { title: 'nav.invoices', permission: ['budget.view', 'budget.structure', 'budget.book'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),

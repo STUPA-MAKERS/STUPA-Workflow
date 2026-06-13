@@ -15,13 +15,20 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from datetime import date as _date
+from datetime import time as _time
 
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.admin.models import (
+    ApplicationType,
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+)
 from app.modules.applications.models import Application
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormVersion
@@ -75,19 +82,61 @@ async def _gremium_and_application(session: AsyncSession) -> tuple[Gremium, Appl
     return gremium, application
 
 
+async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
+    """Aktives Gremium-Mitglied (Protokollant-Kandidat) anlegen."""
+    p = PrincipalRow(sub=f"s-{uuid.uuid4()}", display_name="Max P", email="m@x.de")
+    session.add(p)
+    await session.flush()
+    role = GremiumRole(
+        gremium_id=gremium.id, key=f"r-{uuid.uuid4()}", name_i18n={"de": "M"}
+    )
+    session.add(role)
+    await session.flush()
+    session.add(
+        GremiumMembership(
+            principal_id=p.id,
+            gremium_id=gremium.id,
+            gremium_role_id=role.id,
+            valid_from=None,
+            valid_until=None,
+        )
+    )
+    await session.flush()
+    return p
+
+
 async def test_meeting_crud_and_patch(session: AsyncSession) -> None:
     gremium, _ = await _gremium_and_application(session)
+    member = await _member(session, gremium)
+    await session.commit()
     svc = MeetingService(session)
     # Admin ⇒ Sitzungssteuerung erlaubt (sonst bräuchte es eine Vorstands-Mitgliedschaft).
     principal = Principal(sub="adm", roles=["admin"])
+    # Datum + Uhrzeit sind beim Anlegen Pflicht.
     created = await svc.create(
-        MeetingCreate(gremiumId=gremium.id, title="GV"), principal
+        MeetingCreate(
+            gremiumId=gremium.id,
+            title="GV",
+            date=_date(2026, 6, 20),
+            startTime=_time(18, 0),
+        ),
+        principal,
     )
     assert created.status == "planned"
 
     fetched = await svc.get(created.id, principal)
     assert fetched.title == "GV"
 
+    # Start ohne Protokollant → 409 (das Protokoll braucht eine Schriftführung).
+    with pytest.raises(ConflictError):
+        await svc.patch(created.id, MeetingPatch(status="live"), principal)
+
+    # Protokollant zuweisen, dann starten.
+    await svc.patch(
+        created.id,
+        MeetingPatch.model_validate({"protokollantId": str(member.id)}),
+        principal,
+    )
     patched = await svc.patch(created.id, MeetingPatch(status="live"), principal)
     assert patched.status == "live"
     assert patched.can_control is True
@@ -98,10 +147,13 @@ async def test_list_timeline_keyset_pagination(session: AsyncSession) -> None:
     gremium, _ = await _gremium_and_application(session)
     svc = MeetingService(session)
     principal = Principal(sub="adm", roles=["admin"])
+    # Direkt-Insert: ``MeetingCreate`` verlangt jetzt einen Termin (Datum+Uhrzeit),
+    # der Timeline-Test braucht aber auch eine UNDATIERTE Sitzung (Sortier-Ende).
     async def mk(title: str, day: _date | None = None) -> None:
-        await svc.create(
-            MeetingCreate(gremiumId=gremium.id, title=title, date=day), principal
+        session.add(
+            Meeting(gremium_id=gremium.id, title=title, date=day, status="planned")
         )
+        await session.commit()
 
     # Heute ist 2026 ⇒ 2020/2021 vergangen, 2030/2031 zukünftig, undatiert = Zukunftsende.
     await mk("past-2020", _date(2020, 1, 1))

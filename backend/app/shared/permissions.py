@@ -53,7 +53,10 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.site",
     "admin.gremien",
     "admin.types",
-    # #per-page-admin (Migration 0019 remappt Bestands-Zuweisungen): die zuvor von
+    # Antragsarten LÖSCHEN — bewusst getrennt von admin.types (Anlegen/Bearbeiten);
+    # das Entfernen einer Antragsart ist destruktiv (Formular/Flow hängen dran).
+    "admin.types_delete",
+    # #per-page-admin (Migration 0026 remappt Bestands-Zuweisungen): die zuvor von
     # ``admin.roles`` mitgegatete Personen-/Zugriffsverwaltung wird je Admin-Seite
     # getrennt. ``admin.roles`` behält die Rollen-Definitions-Seite (/admin/roles);
     # die übrigen Seiten bekommen eigene Keys.
