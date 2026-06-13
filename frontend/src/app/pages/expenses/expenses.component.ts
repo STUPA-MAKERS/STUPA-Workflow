@@ -166,6 +166,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
                   <th scope="col">{{ 'expenses.col.correspondent' | t }}</th>
                   <th scope="col">{{ 'expenses.col.costCentre' | t }}</th>
                   <th scope="col">{{ 'expenses.col.application' | t }}</th>
+                  <th scope="col">{{ 'expenses.col.account' | t }}</th>
                   <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
                     <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'expenses.col.amount' | t }}{{ sortInd('amount') }}</button>
                   </th>
@@ -174,13 +175,16 @@ import { SimplifyPathPipe } from '@shared/budget-path';
               </thead>
               <tbody>
                 @for (e of items(); track e.id) {
-                  <tr [class.exp__tr--income]="e.kind === 'income'">
+                  <tr [class.exp__tr--income]="e.kind === 'income'" [attr.title]="e.actor ? ('expenses.bookedBy' | t: { actor: e.actor }) : null">
                     <td class="exp__cellDate">{{ e.invoiceDate ? (e.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
                     <td class="exp__cellDate">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</td>
                     <td>
                       <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
                     </td>
-                    <td class="exp__cellDesc">{{ e.description }}</td>
+                    <td class="exp__cellDesc">
+                      {{ e.description }}
+                      @if (e.transferId) { <app-badge variant="neutral">{{ 'expenses.transfer' | t }}</app-badge> }
+                    </td>
                     <td>{{ e.correspondent || '—' }}</td>
                     <td class="exp__mono">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
                     <td>
@@ -188,6 +192,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
                         <a class="exp__appLink" [routerLink]="['/applications', e.applicationId]">{{ e.applicationTitle || ('expenses.linkedApplication' | t) }}</a>
                       } @else { — }
                     </td>
+                    <td>{{ e.accountName || '—' }}</td>
                     <td class="exp__num exp__amount" [class.exp__amount--income]="e.kind === 'income'">{{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}</td>
                     @if (canManage()) {
                       <td class="exp__num">
@@ -200,7 +205,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
                   </tr>
                 } @empty {
                   <tr>
-                    <td class="exp__empty" [attr.colspan]="canManage() ? 9 : 8">{{ 'expenses.empty' | t }}</td>
+                    <td class="exp__empty" [attr.colspan]="canManage() ? 10 : 9">{{ 'expenses.empty' | t }}</td>
                   </tr>
                 }
               </tbody>
