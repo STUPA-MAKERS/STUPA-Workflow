@@ -9,7 +9,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0024_expense_payment_method_paypal"
+revision: str = "0024_expense_paypal"
 down_revision: str | None = "0023_expense_metadata_fields"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
