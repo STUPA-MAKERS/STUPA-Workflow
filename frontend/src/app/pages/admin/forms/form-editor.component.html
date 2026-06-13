@@ -96,6 +96,17 @@
           (ngModelChange)="hasBudget.set($event)"
           [hint]="'admin.forms.hasBudgetHint' | t"
         >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
+
+        <!-- Vergleichsangebote-Regel (#5-4) -->
+        <app-checkbox
+          [ngModel]="cmpRequired()"
+          (ngModelChange)="cmpRequired.set($event)"
+          [hint]="'admin.forms.cmpRequiredHint' | t"
+        >{{ 'admin.forms.cmpRequired' | t }}</app-checkbox>
+        @if (cmpRequired()) {
+          <label class="fe__lbl fe__lbl--narrow">{{ 'admin.forms.cmpMinCount' | t }}
+            <input type="number" min="0" [ngModel]="cmpMinCount()" (ngModelChange)="cmpMinCount.set(+$event)" /></label>
+        }
       </article>
 
       @if (groups().length === 0) {

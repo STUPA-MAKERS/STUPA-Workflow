@@ -79,6 +79,12 @@ export class FormEditorComponent {
   protected readonly description = signal<I18nMap>({ de: '', en: '' });
   /** »Mit Budget«: erlaubt die Topf-Auswahl beim Antrag (application_type.has_budget). */
   protected readonly hasBudget = signal(false);
+  /** Vergleichsangebote-Regel (#5-4): erforderlich + Mindestanzahl. */
+  protected readonly cmpRequired = signal(false);
+  protected readonly cmpMinCount = signal(2);
+  /** Vom Server geladene Zusatzfelder der Regel — beim Speichern erhalten (nicht im UI). */
+  private cmpThreshold: string | null = null;
+  private cmpAs: 'file' | 'field' | 'both' = 'file';
   /** Editor-Zustand: Fragen, gruppiert in betitelte Container (= Wizard-Schritte). */
   protected readonly groups = signal<QuestionGroup[]>([]);
   protected readonly loading = signal(true);
@@ -102,6 +108,8 @@ export class FormEditorComponent {
   /** Ursprünglicher Typ-Stand — nur bei Änderung wird der Typ gepatcht. */
   private originalTitle: I18nMap = { de: '', en: '' };
   private originalHasBudget = false;
+  private originalCmpRequired = false;
+  private originalCmpMinCount = 2;
 
   protected readonly fieldTypes = FIELD_TYPES;
   protected readonly typeMenu = TYPE_MENU;
@@ -154,6 +162,13 @@ export class FormEditorComponent {
           this.originalTitle = { ...this.title() };
           this.hasBudget.set(t.hasBudget);
           this.originalHasBudget = t.hasBudget;
+          const co = t.comparisonOffers;
+          this.cmpRequired.set(co?.required ?? false);
+          this.cmpMinCount.set(co?.minCount ?? 2);
+          this.cmpThreshold = co?.thresholdAmount ?? null;
+          this.cmpAs = co?.as ?? 'file';
+          this.originalCmpRequired = this.cmpRequired();
+          this.originalCmpMinCount = this.cmpMinCount();
         }
       },
       error: () => undefined,
@@ -441,7 +456,9 @@ export class FormEditorComponent {
     return (
       this.title()['de'] !== this.originalTitle['de'] ||
       this.title()['en'] !== this.originalTitle['en'] ||
-      this.hasBudget() !== this.originalHasBudget
+      this.hasBudget() !== this.originalHasBudget ||
+      this.cmpRequired() !== this.originalCmpRequired ||
+      this.cmpMinCount() !== this.originalCmpMinCount
     );
   }
 
@@ -459,7 +476,16 @@ export class FormEditorComponent {
 
     const save$ = this.typeChanged()
       ? this.api
-          .updateApplicationType(id, { name: { ...this.title() }, hasBudget: this.hasBudget() })
+          .updateApplicationType(id, {
+            name: { ...this.title() },
+            hasBudget: this.hasBudget(),
+            comparisonOffers: {
+              required: this.cmpRequired(),
+              minCount: this.cmpMinCount(),
+              thresholdAmount: this.cmpThreshold,
+              as: this.cmpAs,
+            },
+          })
           .pipe(switchMap(() => this.api.createFormVersion(id, normalized, description)))
       : this.api.createFormVersion(id, normalized, description);
 
@@ -468,6 +494,8 @@ export class FormEditorComponent {
         this.saving.set(false);
         this.originalTitle = { ...this.title() };
         this.originalHasBudget = this.hasBudget();
+        this.originalCmpRequired = this.cmpRequired();
+        this.originalCmpMinCount = this.cmpMinCount();
         // Speichern legt eine neue, **aktive** Version an (#forms).
         this.active.set(true);
         this.hasVersion.set(true);

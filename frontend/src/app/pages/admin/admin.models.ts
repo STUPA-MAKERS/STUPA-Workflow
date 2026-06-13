@@ -314,11 +314,20 @@ export interface ApplicationTypeAdmin {
  * Antragstyp (Formular) als Editier-Sicht des NC-Forms-Builders (#13). Spiegelt
  * `ApplicationTypeOut` der Admin-API; `name` ist die i18n-Map (Titel des Formulars).
  */
+/** Vergleichsangebote-Regel eines Antragstyps (#5-4). */
+export interface ComparisonOffers {
+  required: boolean;
+  minCount: number;
+  thresholdAmount?: string | null;
+  as?: 'file' | 'field' | 'both';
+}
+
 export interface ApplicationTypeFull {
   id: Uuid;
   name: I18nMap;
   gremiumId?: Uuid | null;
   hasBudget: boolean;
+  comparisonOffers?: ComparisonOffers | null;
   activeFormVersionId?: Uuid | null;
 }
 
@@ -335,6 +344,7 @@ export interface ApplicationTypeUpdateBody {
   name?: I18nMap;
   gremiumId?: Uuid | null;
   hasBudget?: boolean;
+  comparisonOffers?: ComparisonOffers | null;
 }
 
 /**
