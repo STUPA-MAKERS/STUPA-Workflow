@@ -533,6 +533,7 @@ export const de = {
 
   // --- meetings + Protokoll (T-33): Sitzungssteuerung + Protokoll-Editor ---
   'meetings.title': 'Sitzungen',
+  'meetings.detailCrumb': 'Sitzung',
   'meetings.loading': 'Sitzung wird geladen …',
   'meetings.error': 'Sitzung konnte nicht geladen werden.',
   'meetings.empty': 'Keine Sitzung ausgewählt.',
@@ -542,6 +543,8 @@ export const de = {
   'meetings.list.title': 'Sitzungen',
   'meetings.list.open': 'Öffnen',
   'meetings.list.empty': 'Noch keine Sitzungen angelegt.',
+  'meetings.list.committeeFilter': 'Gremium',
+  'meetings.list.allCommittees': 'Alle Gremien',
   'meetings.list.status': 'Status',
   'meetings.list.new': 'Neue Sitzung',
   'meetings.list.loading': 'Sitzungen werden geladen …',
@@ -2272,6 +2275,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   // --- meetings + protocol (T-33): session control + protocol editor ---
   'meetings.title': 'Meetings',
+  'meetings.detailCrumb': 'Meeting',
   'meetings.loading': 'Loading meeting …',
   'meetings.error': 'The meeting could not be loaded.',
   'meetings.empty': 'No meeting selected.',
@@ -2281,6 +2285,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.list.title': 'Meetings',
   'meetings.list.open': 'Open',
   'meetings.list.empty': 'No meetings created yet.',
+  'meetings.list.committeeFilter': 'Committee',
+  'meetings.list.allCommittees': 'All committees',
   'meetings.list.status': 'Status',
   'meetings.list.new': 'New meeting',
   'meetings.list.loading': 'Loading meetings …',

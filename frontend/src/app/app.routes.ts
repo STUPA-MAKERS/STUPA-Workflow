@@ -144,7 +144,9 @@ export const routes: Routes = [
         // `allowAuthenticated`: Delegations-Empfänger (#delegation-rework) sind ggf.
         // weder Mitglied noch berechtigt — die Sitzungs-Sicht scoped der Server.
         data: {
-          title: 'nav.meetings',
+          title: 'meetings.detailCrumb',
+          // Breadcrumb »Sitzungen › Sitzung« (#meeting-breadcrumb).
+          parent: ['meetings'],
           permission: ['meeting.manage', 'protocol.write'],
           allowCommitteeMember: true,
           allowAuthenticated: true,

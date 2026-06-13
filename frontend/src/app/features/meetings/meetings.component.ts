@@ -660,6 +660,17 @@ const AUTOSAVE_DELAY_MS = 1000;
            sehen ihre (serverseitig gefilterte) Timeline (#sessions-visibility). -->
       @if (canManageAny() || canWriteGlobal() || inAnyCommittee() || inSubstitutePool()) {
         <section class="mtg__listSection">
+          @if (filterGremiumOptions().length > 2) {
+            <div class="mtg__listToolbar">
+              <app-select
+                name="gremiumFilter"
+                [label]="'meetings.list.committeeFilter' | t"
+                [options]="filterGremiumOptions()"
+                [ngModel]="gremiumFilter()"
+                (ngModelChange)="selectGremiumFilter($event)"
+              />
+            </div>
+          }
           @if (loadingList()) {
             <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
           } @else if (timelineEmpty()) {
@@ -895,6 +906,13 @@ const AUTOSAVE_DELAY_MS = 1000;
         display: flex;
         flex-direction: column;
         gap: var(--space-3);
+      }
+      .mtg__listToolbar {
+        display: flex;
+        justify-content: flex-end;
+      }
+      .mtg__listToolbar app-select {
+        min-width: 14rem;
       }
       .mtg__listHead {
         display: flex;
@@ -1643,7 +1661,11 @@ const AUTOSAVE_DELAY_MS = 1000;
           transparent
         );
         position: relative;
-        max-height: min(70vh, 640px);
+        /* An die Viewport-Höhe binden statt 640px-Cap: Timeline füllt den Bildschirm
+           und scrollt intern, statt die ganze Seite wachsen zu lassen (#sitzungen-100vh).
+           Abzug ≈ Header + Breadcrumb + Seiten-H1 + Footer/Abstände. */
+        max-height: calc(100dvh - 15rem);
+        min-height: 12rem;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
@@ -1949,6 +1971,12 @@ export class MeetingsComponent implements OnDestroy {
   readonly newGremiumId = signal('');
   /** Gremien als Dropdown-Optionen (echte Liste, `/gremien`). */
   readonly gremiumOptions = signal<SelectOption[]>([]);
+  /** Gremium-Filter der Übersicht (''=alle). Quelle: Mitglieds-Gremien (#meetings-filter). */
+  readonly gremiumFilter = signal<string>('');
+  readonly filterGremiumOptions = computed<SelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('meetings.list.allCommittees') },
+    ...this.auth.gremien().map((g) => ({ value: g.id, label: g.name })),
+  ]);
   /** Sitzung-anlegen-Dialog offen (#27). */
   readonly createOpen = signal(false);
 
@@ -1988,13 +2016,24 @@ export class MeetingsComponent implements OnDestroy {
     if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreUpcoming();
   }
 
+  /** Gremium-Filter umschalten → Timeline neu laden (#meetings-filter). */
+  selectGremiumFilter(id: string): void {
+    this.gremiumFilter.set(id);
+    this.loadList();
+  }
+
   /** Nächste Vergangenheits-Seite laden + Scroll-Position über die neue Höhe halten. */
   loadMorePast(el: HTMLElement): void {
     if (this.loadingPast() || !this.pastHasMore() || this.pastCursor === null) return;
     this.loadingPast.set(true);
     const prevHeight = el.scrollHeight;
     this.api
-      .listMeetingsTimeline({ direction: 'past', cursor: this.pastCursor, limit: this.PAGE })
+      .listMeetingsTimeline({
+        direction: 'past',
+        cursor: this.pastCursor,
+        limit: this.PAGE,
+        gremiumId: this.gremiumFilter() || undefined,
+      })
       .subscribe({
         next: (page) => {
           this.loadingPast.set(false);
@@ -2020,6 +2059,7 @@ export class MeetingsComponent implements OnDestroy {
         direction: 'upcoming',
         cursor: this.upcomingCursor,
         limit: this.PAGE,
+        gremiumId: this.gremiumFilter() || undefined,
       })
       .subscribe({
         next: (page) => {
@@ -2245,8 +2285,16 @@ export class MeetingsComponent implements OnDestroy {
     this.pastHasMore.set(false);
     this.loadingList.set(true);
     forkJoin({
-      upcoming: this.api.listMeetingsTimeline({ direction: 'upcoming', limit: this.PAGE }),
-      past: this.api.listMeetingsTimeline({ direction: 'past', limit: this.PAGE }),
+      upcoming: this.api.listMeetingsTimeline({
+        direction: 'upcoming',
+        limit: this.PAGE,
+        gremiumId: this.gremiumFilter() || undefined,
+      }),
+      past: this.api.listMeetingsTimeline({
+        direction: 'past',
+        limit: this.PAGE,
+        gremiumId: this.gremiumFilter() || undefined,
+      }),
     }).subscribe({
       next: ({ upcoming, past }) => {
         this.loadingList.set(false);
