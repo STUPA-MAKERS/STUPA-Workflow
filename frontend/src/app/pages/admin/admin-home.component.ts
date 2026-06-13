@@ -136,6 +136,7 @@ export class AdminHomeComponent {
     { link: 'audit', title: 'admin.audit.title', desc: 'admin.audit.desc', icon: 'audit', permissions: ['audit.read'] },
     { link: 'deadlines', title: 'admin.deadlines.title', desc: 'admin.deadlines.subtitle', icon: 'clock', permissions: ['admin.types'] },
     { link: 'notifications', title: 'admin.notifications.title', desc: 'admin.notifications.intro', icon: 'bell', permissions: ['admin.notifications'] },
+    { link: 'mail-templates', title: 'admin.home.mailTemplates', desc: 'admin.home.mailTemplatesDesc', icon: 'send', permissions: ['admin.notifications'] },
   ];
 
   /** Nur Kacheln, deren Recht der Nutzer hat (#5-1). Admin sieht alles (auth.can). */

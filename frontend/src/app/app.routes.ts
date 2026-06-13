@@ -224,6 +224,16 @@ export const routes: Routes = [
           ),
       },
       {
+        // Mail-Template-Editor (#5-4).
+        path: 'admin/mail-templates',
+        data: { title: 'admin.mailTemplates.title', permission: 'admin.notifications', parent: ['admin'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/mail-templates/mail-templates.component').then(
+            (m) => m.MailTemplatesComponent,
+          ),
+      },
+      {
         path: 'admin/forms',
         data: { title: 'admin.forms.listTitle', permission: 'form.configure', parent: ['admin'] },
         canActivate: [authGuard],

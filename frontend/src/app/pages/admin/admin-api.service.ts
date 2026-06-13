@@ -40,6 +40,9 @@ import {
   type GremiumUpdateBody,
   type GroupMapping,
   type GroupMappingBody,
+  type MailPreview,
+  type MailTemplate,
+  type MailTemplateUpdateBody,
   type Role,
   type RoleAssignment,
   type RoleAssignmentInput,
@@ -185,6 +188,20 @@ export class AdminApiService {
   }
   deleteGroupMapping(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/admin/group-mappings/${id}`);
+  }
+
+  // --- Mail-Templates (#5-4) ------------------------------------------------
+  listMailTemplates(): Observable<MailTemplate[]> {
+    return this.http.get<MailTemplate[]>(`${this.base}/admin/mail-templates`);
+  }
+  updateMailTemplate(id: Uuid, body: MailTemplateUpdateBody): Observable<MailTemplate> {
+    return this.http.patch<MailTemplate>(`${this.base}/admin/mail-templates/${id}`, body);
+  }
+  previewMailTemplate(
+    id: Uuid,
+    body: { lang: string; context: Record<string, unknown> },
+  ): Observable<MailPreview> {
+    return this.http.post<MailPreview>(`${this.base}/admin/mail-templates/${id}/preview`, body);
   }
 
   /**

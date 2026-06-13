@@ -53,6 +53,9 @@ from app.modules.notifications.router import (
     admin_router as notification_settings_router,
 )
 from app.modules.notifications.router import router as notifications_router
+from app.modules.notifications.router import (
+    templates_router as mail_templates_router,
+)
 from app.modules.pdf.action_dispatcher import ChainActionDispatcher
 from app.modules.pdf.router import router as pdf_router
 from app.modules.protocol.router import router as protocol_router
@@ -87,6 +90,7 @@ api_router.include_router(livevote_router)
 api_router.include_router(protocol_router)
 api_router.include_router(notifications_router)
 api_router.include_router(notification_settings_router)
+api_router.include_router(mail_templates_router)
 api_router.include_router(budget_tree_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(files_router)

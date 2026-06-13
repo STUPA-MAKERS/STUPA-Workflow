@@ -13,12 +13,18 @@ besondere Permission): jede:r verwaltet ausschließlich die eigenen Einstellunge
 from __future__ import annotations
 
 from typing import Annotated, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
 from app.deps import DbSession, Principal, require_principal
 from app.modules.notifications.models import NotificationSettings
 from app.modules.notifications.schemas import (
+    MailPreviewOut,
+    MailPreviewRequest,
+    MailTemplateCreate,
+    MailTemplateOut,
+    MailTemplateUpdate,
     NotificationPreferenceOut,
     NotificationPreferencesUpdate,
     NotificationSettingsOut,
@@ -29,6 +35,7 @@ from app.shared.errors import ProblemDetail
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 admin_router = APIRouter(prefix="/admin/notification-settings", tags=["notifications"])
+templates_router = APIRouter(prefix="/admin/mail-templates", tags=["notifications"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _AUTH_ERRORS: dict[int | str, dict[str, Any]] = {401: _PROBLEM, 403: _PROBLEM}
@@ -111,3 +118,56 @@ async def put_notification_settings(
         task_reminder_repeat_days=payload.task_reminder_repeat_days,
     )
     return _settings_out(row)
+
+
+# --------------------------------------------------------------------------- #
+# Mail-Templates (#5-4) — P(admin.notifications). Service-CRUD existierte schon,
+# war aber nicht über die API erreichbar (kein Admin-UI).
+# --------------------------------------------------------------------------- #
+@templates_router.get("", response_model=list[MailTemplateOut], responses=_AUTH_ERRORS)
+async def list_mail_templates(
+    service: ServiceDep, _principal: NotifAdmin
+) -> list[MailTemplateOut]:
+    """Alle Mail-Templates (i18n Subject/Body/HTML + Platzhalter)."""
+    return await service.list_templates()
+
+
+@templates_router.post(
+    "",
+    response_model=MailTemplateOut,
+    status_code=201,
+    responses={**_AUTH_ERRORS, 409: _PROBLEM, 422: _PROBLEM},
+)
+async def create_mail_template(
+    payload: MailTemplateCreate, service: ServiceDep, _principal: NotifAdmin
+) -> MailTemplateOut:
+    return await service.create_template(payload)
+
+
+@templates_router.patch(
+    "/{template_id}",
+    response_model=MailTemplateOut,
+    responses={**_AUTH_ERRORS, 404: _PROBLEM, 422: _PROBLEM},
+)
+async def update_mail_template(
+    template_id: UUID,
+    payload: MailTemplateUpdate,
+    service: ServiceDep,
+    _principal: NotifAdmin,
+) -> MailTemplateOut:
+    return await service.update_template(template_id, payload)
+
+
+@templates_router.post(
+    "/{template_id}/preview",
+    response_model=MailPreviewOut,
+    responses={**_AUTH_ERRORS, 404: _PROBLEM, 422: _PROBLEM},
+)
+async def preview_mail_template(
+    template_id: UUID,
+    payload: MailPreviewRequest,
+    service: ServiceDep,
+    _principal: NotifAdmin,
+) -> MailPreviewOut:
+    """Template mit Beispiel-Kontext + Sprache rendern (Vorschau)."""
+    return await service.preview_template(template_id, payload)

@@ -227,6 +227,32 @@ export interface Role {
   permissions: string[];
 }
 
+/** Mail-Template (admin-API `/admin/mail-templates`, #5-4): i18n Subject/Body/HTML. */
+export interface MailTemplate {
+  id: Uuid;
+  key: string;
+  subjectI18n: I18nMap;
+  bodyI18n: I18nMap;
+  bodyHtmlI18n: I18nMap;
+  placeholders: Record<string, string>;
+}
+
+/** Teil-Update eines Mail-Templates (Key unveränderlich). */
+export interface MailTemplateUpdateBody {
+  subjectI18n?: I18nMap;
+  bodyI18n?: I18nMap;
+  bodyHtmlI18n?: I18nMap;
+  placeholders?: Record<string, string>;
+}
+
+/** Gerenderte Vorschau eines Templates. */
+export interface MailPreview {
+  subject: string;
+  text: string;
+  html?: string | null;
+  lang: string;
+}
+
 /** OIDC-Gruppe → Rolle(+ optional Gremium) Mapping (admin-API `/group-mappings`, #5-4). */
 export interface GroupMapping {
   id: Uuid;
