@@ -632,7 +632,7 @@ const AUTOSAVE_DELAY_MS = 1000;
     } @else {
       <!-- Übersicht: vorhandene Sitzungen (#104). Auch reine Gremium-Mitglieder
            sehen ihre (serverseitig gefilterte) Timeline (#sessions-visibility). -->
-      @if (canManageAny() || canWriteGlobal() || inAnyCommittee()) {
+      @if (canManageAny() || canWriteGlobal() || inAnyCommittee() || inSubstitutePool()) {
         <section class="mtg__listSection">
           @if (loadingList()) {
             <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
@@ -2034,14 +2034,17 @@ export class MeetingsComponent implements OnDestroy {
   readonly canWriteGlobal = computed(() => this.auth.can('protocol.write'));
   /** Mitglied irgendeines Gremiums → darf die (gefilterte) Sitzungsübersicht sehen. */
   readonly inAnyCommittee = computed(() => this.auth.gremien().length > 0);
-  /** Übersicht ohne Detail-Route, ohne Verwalter-/Schreibrecht **und** ohne
-   *  Gremium-Mitgliedschaft ⇒ keine Berechtigung (#sessions). */
+  /** Stellvertreter-Pool-Mitglied → darf die (gefilterte) Timeline sehen (#7). */
+  readonly inSubstitutePool = computed(() => this.auth.inSubstitutePool());
+  /** Übersicht ohne Detail-Route, ohne Verwalter-/Schreibrecht, ohne Gremium-
+   *  Mitgliedschaft **und** ohne Pool-Zugehörigkeit ⇒ keine Berechtigung (#sessions/#7). */
   readonly showForbidden = computed(
     () =>
       !this.detailMode() &&
       !this.canManageAny() &&
       !this.canWriteGlobal() &&
-      !this.inAnyCommittee(),
+      !this.inAnyCommittee() &&
+      !this.inSubstitutePool(),
   );
   /** Mitglied ohne Schreib-/Verwaltungsrecht → reine Live-Verfolgung. */
   readonly isFollower = computed(() => {

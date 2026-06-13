@@ -203,6 +203,7 @@ def test_me_returns_principal() -> None:
         "gremien": [],
         "session_manage_gremien": [],
         "has_scoped_budget_view": False,
+        "in_substitute_pool": False,
     }
 
 

@@ -36,7 +36,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.delegations.models import MeetingDelegation
+from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
 from app.modules.livevote.broker import MeetingBroker
 from app.modules.livevote.events import (
     MeetingStateEvent,
@@ -430,12 +430,23 @@ class MeetingService:
     async def _visible_gremium_ids(self, principal: Principal) -> set[UUID] | None:
         """Gremien, deren Sitzungen der Principal sehen darf — ``None`` = **alle**.
 
-        Admin/``meeting.manage`` sehen alles; sonst nur die Gremien, in denen der
-        Principal Mitglied ist (beliebige Rolle). So sieht ein fremder Nutzer keine
-        Sitzungen, ein Gremium-Mitglied aber die seines Gremiums (#sessions)."""
+        Admin/``meeting.manage`` sehen alles; sonst die Gremien, in denen der Principal
+        Mitglied ist (beliebige Rolle) **oder** im Stellvertreter-Pool steht (#7): ein
+        Pool-Vertreter sieht die Sitzungs-Timeline seiner Gremien (zur Vorbereitung),
+        bekommt den Live-Kanal aber erst über eine konkrete Delegation (``is_participant``)."""
         if "admin" in principal.roles or principal.has("meeting.manage"):
             return None
-        return await gremium_member_ids(self.session, principal.sub)
+        member = await gremium_member_ids(self.session, principal.sub)
+        pool = await self._substitute_pool_gremium_ids(principal.sub)
+        return member | pool
+
+    async def _substitute_pool_gremium_ids(self, sub: str) -> set[UUID]:
+        """Gremien, in deren Stellvertreter-Pool ``sub`` steht (#7)."""
+        pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
+        stmt = select(DelegationSubstitute.gremium_id).where(
+            DelegationSubstitute.substitute_principal_id == pid_subq
+        )
+        return set((await self.session.execute(stmt)).scalars().all())
 
     async def _get(self, meeting_id: UUID) -> Meeting:
         meeting = (

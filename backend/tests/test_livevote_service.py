@@ -513,3 +513,43 @@ async def test_service_patch_closed_session_settings_frozen() -> None:
             meeting.id, MeetingPatch(protokollantId=uuid4()), _principal()
         )
     assert meeting.date is None
+
+
+async def test_pool_substitute_sees_committee_timeline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#7: Ein Stellvertreter-Pool-Mitglied sieht die Sitzungs-Timeline seiner Gremien
+    (Mitglieds- ∪ Pool-Gremien), auch ohne eigene Mitgliedschaft."""
+    from app.modules.auth.principal import Principal
+    from app.modules.livevote import service as livevote_service_mod
+    from tests.auth_fakes import fake_session, result
+
+    member_g = uuid4()
+    pool_g = uuid4()
+
+    async def _members(_session, _sub, now=None):  # noqa: ANN001, ANN202
+        return {member_g}
+
+    monkeypatch.setattr(livevote_service_mod, "gremium_member_ids", _members)
+    # execute(...).scalars().all() → das Pool-Gremium.
+    svc = MeetingService(fake_session(result(pool_g)))
+    visible = await svc._visible_gremium_ids(
+        Principal(sub="sub-1", permissions=set())
+    )
+    assert visible == {member_g, pool_g}
+
+
+async def test_pool_substitute_not_live_participant_without_delegation() -> None:
+    """#7: Pool-Zugehörigkeit gibt NUR Timeline-Sicht, keinen Live-Kanal — der kommt
+    erst über eine konkrete Delegation (is_participant)."""
+    from app.modules.auth.principal import Principal
+    from tests.auth_fakes import fake_session, result
+
+    gremium = uuid4()
+    meeting = uuid4()
+    # is_member → kein Mitglied (leere Member-Gremien); _delegated_meeting_ids → keine.
+    svc = MeetingService(fake_session(result(), result()))
+    is_part = await svc.is_participant(
+        meeting, gremium, Principal(sub="sub-1", permissions=set())
+    )
+    assert is_part is False

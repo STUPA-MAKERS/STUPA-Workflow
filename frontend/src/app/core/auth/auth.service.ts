@@ -43,6 +43,11 @@ export class AuthService {
   readonly hasScopedBudgetView = computed(
     () => this._principal()?.has_scoped_budget_view === true,
   );
+  /** Principal steht in ≥1 Stellvertreter-Pool (#7) — darf die Sitzungs-Timeline
+   *  seiner Gremien sehen (Live-Kanal erst über eine konkrete Delegation). */
+  readonly inSubstitutePool = computed(
+    () => this._principal()?.in_substitute_pool === true,
+  );
 
   /**
    * Lädt den Principal genau einmal und cached das Ergebnis (`shareReplay`).

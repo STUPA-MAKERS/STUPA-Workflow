@@ -69,6 +69,8 @@ export interface Principal {
   session_manage_gremien?: Uuid[];
   /** ≥1 Kostenstelle ist einem Mitglieds-Gremium zugeordnet (#budget-scope). */
   has_scoped_budget_view?: boolean;
+  /** Principal steht in ≥1 Stellvertreter-Pool (#7) — Sitzungs-Timeline sichtbar. */
+  in_substitute_pool?: boolean;
 }
 
 /** Antwort von POST /api/auth/logout — RP-Initiated-Logout-URL (OIDC) oder null. */

@@ -67,3 +67,7 @@ class MeOut(BaseModel):
     # Sichtbarkeits-Root zugeordnet (#budget-scope) — FE-Gating des Budget-Tabs
     # ohne globale ``budget.*``-Permission.
     has_scoped_budget_view: bool = False
+    # Principal steht in mindestens einem Stellvertreter-Pool (#7) — FE-Gating, damit
+    # Pool-Vertreter die Sitzungs-Timeline ihrer Gremien sehen (Live-Kanal erst über
+    # eine konkrete Delegation).
+    in_substitute_pool: bool = False

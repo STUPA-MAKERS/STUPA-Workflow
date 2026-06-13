@@ -171,7 +171,23 @@ async def me(
         gremien=await _gremien_for(db, principal.sub),
         session_manage_gremien=await _session_manage_gremien(db, principal.sub),
         has_scoped_budget_view=await _has_scoped_budget_view(db, principal.sub),
+        in_substitute_pool=await _in_substitute_pool(db, principal.sub),
     )
+
+
+async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
+    """Steht ``sub`` in mindestens einem Stellvertreter-Pool (#7)? FE-Gating der
+    Sitzungs-Timeline für Pool-Vertreter ohne eigene Mitgliedschaft."""
+    from app.modules.auth.models import Principal as PrincipalRow
+    from app.modules.delegations.models import DelegationSubstitute
+
+    pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
+    hit = await db.scalar(
+        select(DelegationSubstitute.id)
+        .where(DelegationSubstitute.substitute_principal_id == pid_subq)
+        .limit(1)
+    )
+    return hit is not None
 
 
 async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
