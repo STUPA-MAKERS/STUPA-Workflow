@@ -184,18 +184,30 @@ interface DayGroup {
               </button>
               @if (isOpen(e.id)) {
                 <div class="audit__details">
-                  <div class="audit__chips">
-                    <app-badge variant="neutral">{{ actionLabel(e.action) }}</app-badge>
-                    @if (e.targetType && e.targetId) {
-                      <span class="audit__chip audit__mono">{{ e.targetType }}:{{ e.targetId }}</span>
+                  <dl class="audit__meta">
+                    <div class="audit__metaRow">
+                      <dt>{{ 'admin.audit.detail.action' | t }}</dt>
+                      <dd><app-badge variant="neutral">{{ actionLabel(e.action) }}</app-badge></dd>
+                    </div>
+                    @if (e.targetType) {
+                      <div class="audit__metaRow">
+                        <dt>{{ 'admin.audit.detail.target' | t }}</dt>
+                        <dd>
+                          {{ targetTypeLabel(e.targetType) }}@if (e.targetLabel || e.targetId) {<span> · {{ e.targetLabel || e.targetId }}</span>}
+                        </dd>
+                      </div>
                     }
-                    @if (e.actor) {
-                      <span class="audit__chip audit__mono">{{ e.actor }}</span>
-                    }
+                    <div class="audit__metaRow">
+                      <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
+                      <dd>{{ e.actorName || e.actor || ('admin.audit.system' | t) }}</dd>
+                    </div>
                     @for (p of dataPairs(e); track p[0]) {
-                      <span class="audit__chip audit__mono">{{ p[0] }}: {{ p[1] }}</span>
+                      <div class="audit__metaRow">
+                        <dt>{{ p[0] }}</dt>
+                        <dd class="audit__mono">{{ p[1] }}</dd>
+                      </div>
                     }
-                  </div>
+                  </dl>
                   @if (targetLink(e); as link) {
                     <a class="audit__target" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
                   }
@@ -308,23 +320,38 @@ interface DayGroup {
         gap: var(--space-2);
         padding: 0 var(--space-3) var(--space-3) calc(1.75rem + 2 * var(--space-3));
       }
-      .audit__chips {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
+      .audit__meta {
+        display: grid;
         gap: var(--space-1);
+        margin: 0;
       }
-      .audit__chip {
-        font-size: var(--fs-xs);
+      .audit__metaRow {
+        display: grid;
+        grid-template-columns: minmax(6rem, 9rem) 1fr;
+        gap: var(--space-3);
+        align-items: baseline;
+      }
+      .audit__metaRow dt {
+        margin: 0;
         color: var(--color-text-muted);
-        background: var(--color-surface-sunken);
-        border-radius: var(--radius-sm);
-        padding: 1px var(--space-2);
+        font-size: var(--fs-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .audit__metaRow dd {
+        margin: 0;
+        font-size: var(--fs-sm);
         overflow-wrap: anywhere;
       }
       .audit__mono {
         font-family: var(--font-mono, monospace);
         font-size: var(--fs-xs);
+      }
+      @media (max-width: 40rem) {
+        .audit__metaRow {
+          grid-template-columns: 1fr;
+          gap: 0;
+        }
       }
       .audit__target {
         font-size: var(--fs-sm);
@@ -544,6 +571,13 @@ export class AuditLogComponent {
       targetType: e.targetType ?? '',
       targetId: e.targetId ?? '',
     });
+  }
+
+  /** Ziel-Typ lokalisiert (gremium → »Gremium« …); unbekannt → roher Key. */
+  protected targetTypeLabel(type: string): string {
+    const key = `admin.audit.targetType.${type}`;
+    const label = this.i18n.translate(key as TranslationKey);
+    return label === key ? type : label;
   }
 
   /** Router-Ziel des Eintrags-Ziels, falls eine Seite dafür existiert. */

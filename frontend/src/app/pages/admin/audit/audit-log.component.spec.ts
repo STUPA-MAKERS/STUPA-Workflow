@@ -99,10 +99,11 @@ describe('AuditLogComponent (#45)', () => {
     });
     // 2026-06-07 liegt in der Vergangenheit → volle Datums-Überschrift.
     expect(screen.getByRole('heading', { level: 2 }).textContent).toMatch(/2026/);
-    // Details erst nach Klick auf die Zeile sichtbar.
-    expect(screen.queryByText(/rows: 7/)).not.toBeInTheDocument();
+    // Details erst nach Klick auf die Zeile sichtbar (data-Paar jetzt als dt/dd).
+    expect(screen.queryByText('rows')).not.toBeInTheDocument();
     screen.getByRole('button', { expanded: false }).click();
     fixture.detectChanges();
-    expect(screen.getByText(/rows: 7/)).toBeInTheDocument();
+    expect(screen.getByText('rows')).toBeInTheDocument();
+    expect(screen.getByText('7')).toBeInTheDocument();
   });
 });
