@@ -1,0 +1,290 @@
+@if (loading()) {
+  <p class="det__status" aria-live="polite">{{ 'applications.detail.loading' | t }}</p>
+} @else if (notFound()) {
+  <p class="det__status" role="alert">{{ 'applications.detail.notFound' | t }}</p>
+} @else if (error()) {
+  <p class="det__status det__status--error" role="alert">
+    {{ 'applications.detail.error' | t }}
+  </p>
+} @else if (app(); as application) {
+  <header class="det__head">
+    <div class="det__titleRow">
+      <h1 class="det__title">{{ title() }}</h1>
+      @if (application.canEdit && !editing()) {
+        <div class="det__ownerActions">
+          @if (application.state?.editAllowed) {
+            <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
+          }
+          @if (isAdmin()) {
+            <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
+          }
+        </div>
+      }
+    </div>
+    <div class="det__meta">
+      @if (application.state) {
+        <app-badge [color]="application.state.color">
+          {{ application.state.label }}
+        </app-badge>
+      }
+      @if (application.budgetId && budgetLabel(application.budgetId)) {
+        <app-badge variant="neutral">{{ budgetLabel(application.budgetId) }}</app-badge>
+      }
+      <span class="det__version">
+        {{ 'applications.detail.version' | t: { version: application.version } }}
+      </span>
+      @if (canManage()) {
+        <app-button class="det__ccBtn" variant="ghost" size="sm" (click)="openBudgetDialog()">
+          <span class="det__ccBtnInner">
+            <app-icon name="euro" [size]="15" />
+            {{ application.budgetId ? ('applications.budget.change' | t) : ('applications.budget.assign' | t) }}
+          </span>
+        </app-button>
+      }
+    </div>
+    <dl class="det__facts">
+      <div>
+        <dt>{{ 'applications.detail.created' | t }}</dt>
+        <dd><time [attr.datetime]="application.createdAt">{{ application.createdAt | ldate: 'medium' }}</time></dd>
+      </div>
+      <div>
+        <dt>{{ 'applications.detail.updated' | t }}</dt>
+        <dd><time [attr.datetime]="application.updatedAt">{{ application.updatedAt | ldate: 'medium' }}</time></dd>
+      </div>
+      @if (application.applicant) {
+        <div>
+          <dt>{{ 'applications.detail.applicant' | t }}</dt>
+          <dd>{{ application.applicant.name || ('applications.detail.notProvided' | t) }}</dd>
+        </div>
+        @if (application.applicant.email) {
+          <div>
+            <dt>{{ 'applications.detail.email' | t }}</dt>
+            <dd><a [attr.href]="'mailto:' + application.applicant.email">{{ application.applicant.email }}</a></dd>
+          </div>
+        }
+      }
+      <div>
+        <dt>{{ 'applications.detail.amount' | t }}</dt>
+        <dd>{{ amount(application) }}</dd>
+      </div>
+    </dl>
+  </header>
+
+  <div class="det__layout" [class.det__layout--editing]="editing()">
+  <!-- LINKS: Übergänge als schwebende Karte (#det) -->
+  <aside class="det__rail det__rail--left">
+    @if (canTransition() && transitions().length) {
+      <app-card [heading]="'applications.transitions.title' | t">
+        <div class="det__transitions">
+          @for (t of transitions(); track t.id) {
+            <app-button
+              [color]="t.color"
+              [block]="true"
+              [loading]="firing() === t.id"
+              [disabled]="firing() !== null && firing() !== t.id"
+              (click)="fire(t)"
+            >
+              {{ t.label || ('applications.transitions.fallback' | t) }}
+            </app-button>
+          }
+        </div>
+      </app-card>
+    }
+  </aside>
+
+  <!-- MITTE: Antragsdaten + Historie + Anhänge -->
+  <div class="det__center">
+  <!-- Antragsdaten (Ansicht oder Inline-Bearbeitung der Ersteller:in/Verwalter:in) -->
+  <app-card [heading]="'applications.detail.data.title' | t">
+    @if (editing()) {
+      <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
+      <div class="det__editActions">
+        <app-button variant="ghost" size="sm" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
+        <app-button size="sm" [disabled]="editForm.invalid" [loading]="savingEdit()" (click)="saveEdit()">{{ 'applications.detail.save' | t }}</app-button>
+      </div>
+    } @else if (dataEntries(application).length || positionEntries(application).length) {
+      @if (dataEntries(application).length) {
+        <dl class="det__data">
+          @for (entry of dataEntries(application); track entry.key) {
+            <div class="det__dataRow">
+              <dt>{{ entry.label }}</dt>
+              <dd>{{ entry.value }}</dd>
+            </div>
+          }
+        </dl>
+      }
+      <!-- Kostenpositionen mit Vergleichsangeboten (#1) -->
+      @for (pf of positionEntries(application); track pf.key) {
+        <section class="det__positions">
+          <h3 class="det__positions-h">{{ pf.label }}</h3>
+          @for (p of pf.positions; track $index) {
+            <div class="det__pos">
+              <div class="det__pos-head">
+                <strong>{{ p.label || ('applications.detail.positionUntitled' | t) }}</strong>
+                <span class="det__pos-val">{{ money(positionValue(p)) }}</span>
+              </div>
+              <ul class="det__offers">
+                @for (o of p.offers; track $index) {
+                  <li class="det__offer" [class.det__offer--pref]="o.preferred">
+                    <span class="det__offer-label">{{ o.label || '—' }}</span>
+                    @if (o.preferred) {
+                      <app-badge variant="success">{{ 'apply.positions.preferred' | t }}</app-badge>
+                    }
+                    <span class="det__offer-val">{{ money(o.value) }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+          <p class="det__pos-total"><strong>{{ 'apply.positions.total' | t }}: {{ money(positionsTotal(pf.positions)) }}</strong></p>
+        </section>
+      }
+    } @else {
+      <p class="det__muted">{{ 'applications.detail.data.empty' | t }}</p>
+    }
+  </app-card>
+
+  <!-- Versions-Historie + Diff -->
+  <app-card [heading]="'applications.history.title' | t">
+    @if (versions().length > 1) {
+      <ol class="det__history">
+        @for (version of versions(); track version.version) {
+          <li class="det__version-item">
+            <div class="det__version-head">
+              <strong>{{ 'applications.history.version' | t: { version: version.version } }}</strong>
+              @if (version.changedBy) {
+                <span class="det__muted">{{ 'applications.history.by' | t: { actor: version.changedBy } }}</span>
+              }
+              <time class="det__muted" [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
+            </div>
+            @if (!version.diff) {
+              <p class="det__muted">{{ 'applications.history.initial' | t }}</p>
+            } @else if (isEmptyDiff(version)) {
+              <p class="det__muted">{{ 'applications.history.diff.none' | t }}</p>
+            } @else {
+              <ul class="det__diff">
+                @for (change of version.diff.changed; track change.key) {
+                  <li>
+                    <app-badge variant="warning">{{ 'applications.history.diff.changed' | t }}</app-badge>
+                    <code>{{ change.key }}</code>:
+                    <del>{{ fmt(change.old) }}</del> → <ins>{{ fmt(change.new) }}</ins>
+                  </li>
+                }
+                @for (added of version.diff.added; track added.key) {
+                  <li>
+                    <app-badge variant="success">{{ 'applications.history.diff.added' | t }}</app-badge>
+                    <code>{{ added.key }}</code>: <ins>{{ fmt(added.value) }}</ins>
+                  </li>
+                }
+                @for (removed of version.diff.removed; track removed.key) {
+                  <li>
+                    <app-badge variant="danger">{{ 'applications.history.diff.removed' | t }}</app-badge>
+                    <code>{{ removed.key }}</code>: <del>{{ fmt(removed.value) }}</del>
+                  </li>
+                }
+              </ul>
+            }
+          </li>
+        }
+      </ol>
+    } @else {
+      <p class="det__muted">{{ 'applications.history.empty' | t }}</p>
+    }
+  </app-card>
+
+  <!-- Anhänge (T-13-Contract): Upload + signierte Download-URLs + Scan-Status -->
+  <app-attachments-panel [applicationId]="application.id" [canUpload]="canManage()" />
+  </div><!-- /det__center -->
+
+  <!-- RECHTS: Kommentare als Chat (#det) -->
+  <aside class="det__rail det__rail--right">
+    <section class="det__chat" [attr.aria-label]="'applications.comments.title' | t">
+      <header class="det__chatHead">{{ 'applications.comments.title' | t }}</header>
+      <div class="det__chatScroll">
+        @for (comment of comments(); track comment.id) {
+          <article
+            class="det__msg"
+            [class.det__msg--own]="comment.authorKind !== 'applicant'"
+          >
+            <span class="det__avatar" aria-hidden="true">{{ initial(authorName(comment)) }}</span>
+            <div class="det__msgBody">
+              <div class="det__msgTop">
+                <span class="det__msgAuthor">{{ authorName(comment) }}</span>
+                <time class="det__msgTime" [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
+              </div>
+              <div class="det__bubble">{{ comment.body }}</div>
+            </div>
+          </article>
+        } @empty {
+          <p class="det__muted det__chatEmpty">{{ 'applications.comments.empty' | t }}</p>
+        }
+      </div>
+
+      <form class="det__composer" (submit)="submitComment($event)">
+        <div class="det__composerRow">
+          <textarea
+            class="det__composerInput"
+            rows="1"
+            [placeholder]="'applications.comments.placeholder' | t"
+            [ngModel]="newComment()"
+            (ngModelChange)="newComment.set($event)"
+            name="comment"
+            [attr.aria-label]="'applications.comments.add' | t"
+          ></textarea>
+          <app-button
+            type="submit"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'applications.comments.send' | t"
+            [disabled]="!newComment().trim()"
+            [loading]="posting()"
+          >
+            <app-icon name="send" [size]="15" />
+          </app-button>
+        </div>
+      </form>
+    </section>
+  </aside>
+  </div><!-- /det__layout -->
+}
+
+<app-dialog
+  [open]="confirmDelete()"
+  [title]="'applications.detail.deleteTitle' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="confirmDelete.set(false)"
+>
+  <p>{{ 'applications.detail.deleteConfirm' | t }}</p>
+  <div dialog-footer>
+    <app-button variant="ghost" size="sm" (click)="confirmDelete.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="danger" size="sm" [loading]="deleting()" (click)="doDelete()">{{ 'applications.detail.delete' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Kostenstelle zuordnen (#17): Tree-Picker im Dialog. -->
+<app-dialog
+  [open]="budgetDialogOpen()"
+  [title]="'applications.budget.title' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="budgetDialogOpen.set(false)"
+>
+  <p class="det__muted">{{ 'applications.budget.lead' | t }}</p>
+  <div class="det__ccTree">
+    <app-cost-centre-tree
+      [nodes]="budgetTree()"
+      [selectedId]="budgetChoice()"
+      [allLabel]="'applications.budget.none' | t"
+      [ariaLabel]="'applications.budget.field' | t"
+      (picked)="budgetChoice.set($event)"
+    />
+  </div>
+  <div dialog-footer>
+    <app-button variant="ghost" size="sm" (click)="budgetDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button
+      size="sm"
+      [loading]="assigningBudget()"
+      [disabled]="budgetChoice() === (app()?.budgetId ?? '')"
+      (click)="assignBudget()"
+    >{{ 'applications.budget.save' | t }}</app-button>
+  </div>
+</app-dialog>

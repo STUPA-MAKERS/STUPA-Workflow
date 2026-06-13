@@ -1,0 +1,142 @@
+<header class="grem__head">
+  <div>
+    <h1 class="grem__title">{{ 'admin.gremien.title' | t }}</h1>
+    <p class="grem__subtitle">{{ 'admin.gremien.subtitle' | t }}</p>
+  </div>
+  <app-button size="sm" (click)="openCreate()">{{ 'admin.gremien.addGremium' | t }}</app-button>
+</header>
+
+<section class="grem__list" [attr.aria-label]="'admin.gremien.title' | t">
+  @if (loading()) {
+    <p class="grem__status" aria-live="polite">{{ 'admin.gremien.loading' | t }}</p>
+  } @else if (loadError()) {
+    <p class="grem__status grem__status--error" role="alert">{{ 'admin.gremien.error' | t }}</p>
+  } @else {
+    <app-data-table [columns]="columns()" [rows]="gremien()" [rowKey]="rowId" [emptyText]="'admin.gremien.empty' | t">
+      <ng-template appCell="slug" let-g><span class="grem__mono">{{ $any(g).slug }}</span></ng-template>
+      <ng-template appCell="delegation" let-g>
+        @if ($any(g).allowVoteDelegation) {
+          <span class="grem__yes" [attr.title]="'admin.gremien.delegation' | t" aria-label="✓">✓</span>
+        } @else {
+          <span class="grem__no" [attr.title]="'admin.gremien.delegation' | t" aria-label="✗">✗</span>
+        }
+      </ng-template>
+      <ng-template appCell="actions" let-g>
+        <span class="grem__th-actions">
+          <a class="grem__icon-link" [routerLink]="['/admin/gremien', $any(g).id, 'members']" [attr.aria-label]="'admin.gremien.members' | t" [attr.title]="'admin.gremien.members' | t"><app-icon name="members" /></a>
+          <a class="grem__icon-link" [routerLink]="['/admin/gremien', $any(g).id, 'roles']" [attr.aria-label]="'admin.gremiumRoles.manage' | t" [attr.title]="'admin.gremiumRoles.manage' | t"><app-icon name="roles" /></a>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.editAction' | t" (click)="openEdit($any(g))"><app-icon name="edit" /></app-button>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.deleteAction' | t" (click)="askDelete($any(g))"><app-icon name="delete" /></app-button>
+        </span>
+      </ng-template>
+    </app-data-table>
+  }
+</section>
+
+<!-- Anlegen/Bearbeiten als Dialog (#18/#19). -->
+<app-dialog
+  [open]="dialogOpen()"
+  [title]="(editingId() ? 'admin.gremien.edit' : 'admin.gremien.create') | t"
+  [closeLabel]="'admin.gremien.cancel' | t"
+  (closed)="closeDialog()"
+>
+  <form id="grem-form" class="grem__form" (submit)="submit($event)">
+    <div class="field">
+      <label class="field__label" for="grem-name">{{ 'admin.gremien.name' | t }}</label>
+      <input id="grem-name" class="field__control" name="name" [ngModel]="form().name" (ngModelChange)="patch('name', $event)" required />
+      <p class="field__hint">{{ 'admin.gremien.slug' | t }}: <span class="grem__mono">{{ slugPreview() }}</span></p>
+    </div>
+    <app-select
+      [label]="'admin.gremien.cdVariant' | t"
+      [options]="cdOptions"
+      [ngModel]="form().cdVariant"
+      (ngModelChange)="patch('cdVariant', $event)"
+      name="cdVariant"
+    />
+    <app-select
+      [label]="'admin.gremien.defaultLang' | t"
+      [options]="langOptions()"
+      [ngModel]="form().defaultLang"
+      (ngModelChange)="patch('defaultLang', $event)"
+      name="defaultLang"
+    />
+    <app-checkbox
+      [ngModel]="form().allowVoteDelegation"
+      (ngModelChange)="patch('allowVoteDelegation', $event)"
+      [hint]="'admin.gremien.delegationHint' | t"
+      name="delegation"
+    >{{ 'admin.gremien.delegation' | t }}</app-checkbox>
+    @if (form().allowVoteDelegation) {
+      <div class="field">
+        <label class="field__label" for="grem-lead">{{ 'admin.gremien.delegationLead' | t }}</label>
+        <input
+          id="grem-lead"
+          class="field__control"
+          type="number"
+          min="0"
+          step="1"
+          name="delegationLeadMinutes"
+          [ngModel]="form().delegationLeadMinutes"
+          (ngModelChange)="patchLead($event)"
+        />
+        <p class="field__hint">{{ 'admin.gremien.delegationLeadHint' | t }}</p>
+      </div>
+      <app-checkbox
+        [ngModel]="form().delegationAllowExternal"
+        (ngModelChange)="patch('delegationAllowExternal', $event)"
+        [hint]="'admin.gremien.delegationExternalHint' | t"
+        name="delegationAllowExternal"
+      >{{ 'admin.gremien.delegationExternal' | t }}</app-checkbox>
+    }
+    <div class="field">
+      <label class="field__label" for="grem-quorum">{{ 'admin.gremien.quorum' | t }}</label>
+      <input
+        id="grem-quorum"
+        class="field__control"
+        type="number"
+        min="0"
+        max="100"
+        step="1"
+        name="quorumPercent"
+        [ngModel]="form().quorumPercent"
+        (ngModelChange)="patchQuorum($event)"
+      />
+      <p class="field__hint">{{ 'admin.gremien.quorumHint' | t }}</p>
+    </div>
+    <!-- Zusatz-Protokoll-Empfänger (#protocol-recipients): erhalten finalisierte
+         Protokolle zusätzlich zu den aktiven Mitgliedern. -->
+    <div class="field">
+      <label class="field__label" for="grem-mail">{{ 'admin.gremien.mailRecipients' | t }}</label>
+      <textarea
+        id="grem-mail"
+        class="field__control grem__mail"
+        rows="3"
+        name="mailRecipients"
+        [ngModel]="form().mailRecipients"
+        (ngModelChange)="patch('mailRecipients', $event)"
+        [placeholder]="'admin.gremien.mailRecipientsPlaceholder' | t"
+      ></textarea>
+      <p class="field__hint">{{ 'admin.gremien.mailRecipientsHint' | t }}</p>
+    </div>
+  </form>
+  <div dialog-footer class="grem__dialog-foot">
+    <app-button variant="ghost" (click)="closeDialog()">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button [disabled]="!form().name.trim()" [loading]="saving()" (click)="submit($event)">
+      {{ (editingId() ? 'admin.gremien.save' : 'admin.gremien.add') | t }}
+    </app-button>
+  </div>
+</app-dialog>
+
+<!-- Löschen mit Bestätigung (#41). -->
+<app-dialog
+  [open]="confirmDelete() !== null"
+  [title]="'admin.gremien.deleteTitle' | t"
+  [closeLabel]="'admin.gremien.cancel' | t"
+  (closed)="confirmDelete.set(null)"
+>
+  <p class="grem__confirm">{{ 'admin.gremien.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}</p>
+  <div dialog-footer class="grem__dialog-foot">
+    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{ 'admin.gremien.deleteAction' | t }}</app-button>
+  </div>
+</app-dialog>

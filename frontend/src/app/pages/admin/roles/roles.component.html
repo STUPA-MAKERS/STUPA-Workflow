@@ -1,0 +1,90 @@
+<section class="roles">
+  <header class="roles__head">
+    <div>
+      <h1>{{ 'admin.roles.title' | t }}</h1>
+      <p class="roles__sub">{{ 'admin.roles.subtitle' | t }}</p>
+    </div>
+    <app-button size="sm" (click)="openAdd()">{{ 'admin.roles.addGlobalRole' | t }}</app-button>
+  </header>
+
+  <app-data-table [columns]="columns()" [rows]="roles()" [rowKey]="rowId" [isExpanded]="rowExpanded" [clickable]="true" (rowClick)="onRowClick($event)">
+    <ng-template appCell="name" let-r>
+      <span class="roles__name-cell">
+        <app-icon name="chevron-down" class="roles__chevron" [class.roles__chevron--open]="expanded().has($any(r).id)" [size]="16" />
+        <span class="roles__name">{{ roleLabel($any(r)) | capitalize }}</span>
+      </span>
+    </ng-template>
+    <ng-template appCell="key" let-r><span class="roles__key">{{ $any(r).key }}</span></ng-template>
+    <ng-template appCell="perms" let-r>{{ $any(r).permissions.length }} / {{ permissions().length }}</ng-template>
+    <ng-template appCell="actions" let-r>
+      @if (canDelete($any(r))) {
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.roles.deleteRole' | t" (click)="$event.stopPropagation(); askDelete($any(r))"><app-icon name="delete" /></app-button>
+      }
+    </ng-template>
+
+    <ng-template appRowDetail let-r>
+      <div class="roles__detail">
+        <!-- Umbenennen (Anzeigename, #rename): Key bleibt unveränderlich. -->
+        <div class="roles__nameEdit">
+          <label class="roles__lbl roles__lbl--key">{{ 'admin.roles.roleKey' | t }}
+            <input [value]="$any(r).key" disabled /></label>
+          <label class="roles__lbl">{{ 'admin.common.labelDe' | t }}
+            <input [ngModel]="nameDraft($any(r)).de" (ngModelChange)="patchName($any(r), 'de', $event)" [name]="$any(r).id + '-nde'" /></label>
+          <label class="roles__lbl">{{ 'admin.common.labelEn' | t }}
+            <input [ngModel]="nameDraft($any(r)).en" (ngModelChange)="patchName($any(r), 'en', $event)" [name]="$any(r).id + '-nen'" /></label>
+        </div>
+        <div class="roles__foot">
+          <app-button size="sm" variant="secondary" (click)="renameRole($any(r))">{{ 'action.save' | t }}</app-button>
+        </div>
+        @if (isLocked($any(r))) {
+          <p class="roles__locked">{{ 'admin.roles.adminLocked' | t }}</p>
+          <div class="roles__grid">
+            @for (perm of permissions(); track perm) {
+              <span class="roles__perm-on">✓ {{ perm }}</span>
+            }
+          </div>
+        } @else {
+          <fieldset class="roles__grid">
+            @for (perm of permissions(); track perm) {
+              <app-checkbox
+                [ngModel]="$any(r).permissions.includes(perm)"
+                (ngModelChange)="togglePerm($any(r), perm, $event)"
+                [name]="$any(r).id + '-' + perm"
+              >{{ perm }}</app-checkbox>
+            }
+          </fieldset>
+          <div class="roles__foot">
+            <app-button size="sm" (click)="saveRole($any(r))">{{ 'action.save' | t }}</app-button>
+          </div>
+        }
+      </div>
+    </ng-template>
+  </app-data-table>
+</section>
+
+<!-- Löschen bestätigen (#40) -->
+<app-dialog [open]="!!confirmRole()" [title]="'admin.roles.deleteRole' | t" [closeLabel]="'admin.gremien.cancel' | t" (closed)="confirmRole.set(null)">
+  @if (confirmRole(); as r) {
+    <p>{{ 'admin.roles.deleteConfirm' | t: { role: roleLabel(r) } }}</p>
+  }
+  <div dialog-footer class="roles__foot">
+    <app-button variant="ghost" (click)="confirmRole.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button variant="danger" (click)="confirmDelete()">{{ 'admin.roles.deleteRole' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Globale Rolle anlegen (Dialog, #21/#19) -->
+<app-dialog [open]="addOpen()" [title]="'admin.roles.addGlobalRole' | t" [closeLabel]="'admin.gremien.cancel' | t" (closed)="addOpen.set(false)">
+  <div class="roles__add">
+    <label class="roles__lbl">{{ 'admin.roles.roleKey' | t }}
+      <input [ngModel]="draft().key" (ngModelChange)="patchDraft('key', $event)" name="roleKey" placeholder="z. B. referent" /></label>
+    <label class="roles__lbl">{{ 'admin.common.labelDe' | t }}
+      <input [ngModel]="draft().labelDe" (ngModelChange)="patchDraft('labelDe', $event)" name="roleLabelDe" /></label>
+    <label class="roles__lbl">{{ 'admin.common.labelEn' | t }}
+      <input [ngModel]="draft().labelEn" (ngModelChange)="patchDraft('labelEn', $event)" name="roleLabelEn" /></label>
+  </div>
+  <div dialog-footer class="roles__foot">
+    <app-button variant="ghost" (click)="addOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button [disabled]="!draft().key.trim()" (click)="createRole()">{{ 'admin.gremien.add' | t }}</app-button>
+  </div>
+</app-dialog>

@@ -94,20 +94,8 @@ const FA: Record<IconName, string> = {
   selector: 'app-icon',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<i class="fa-solid" [class]="faClass()" [style.fontSize.px]="size" aria-hidden="true"></i>`,
-  styles: [
-    `
-      :host {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        line-height: 0;
-      }
-      i {
-        line-height: 1;
-      }
-    `,
-  ],
+  templateUrl: './icon.component.html',
+  styleUrl: './icon.component.scss',
 })
 export class IconComponent {
   private readonly _name = signal<IconName>('sun');

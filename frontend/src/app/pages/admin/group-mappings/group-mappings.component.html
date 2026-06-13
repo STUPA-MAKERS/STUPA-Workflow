@@ -1,0 +1,84 @@
+<header class="gm__head">
+  <div>
+    <h1 class="gm__title">{{ 'admin.groupMappings.title' | t }}</h1>
+    <p class="gm__subtitle">{{ 'admin.groupMappings.subtitle' | t }}</p>
+  </div>
+  <app-button size="sm" (click)="openAdd()">{{ 'admin.groupMappings.add' | t }}</app-button>
+</header>
+
+<app-data-table
+  [columns]="columns()"
+  [rows]="rows()"
+  [rowKey]="rowId"
+  [emptyText]="'admin.groupMappings.empty' | t"
+>
+  <ng-template appCell="gremiumLabel" let-r>
+    @if ($any(r).gremiumLabel) {
+      {{ $any(r).gremiumLabel }}
+    } @else {
+      <span class="gm__muted">{{ 'admin.groupMappings.global' | t }}</span>
+    }
+  </ng-template>
+  <ng-template appCell="actions" let-r>
+    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" (click)="openEdit($any(r).id)">
+      <app-icon name="edit" />
+    </app-button>
+    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" (click)="confirmId.set($any(r).id)">
+      <app-icon name="delete" />
+    </app-button>
+  </ng-template>
+</app-data-table>
+
+<!-- Anlegen/Bearbeiten -->
+<app-dialog
+  [open]="dialogOpen()"
+  [title]="(editId() ? 'admin.groupMappings.editTitle' : 'admin.groupMappings.add') | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="dialogOpen.set(false)"
+>
+  <div class="gm__form">
+    <label class="gm__lbl" for="gm-oidc">{{ 'admin.groupMappings.oidcGroup' | t }}</label>
+    <input
+      id="gm-oidc"
+      class="gm__control"
+      autocomplete="off"
+      [placeholder]="'admin.groupMappings.oidcGroupPlaceholder' | t"
+      [ngModel]="oidcGroup()"
+      (ngModelChange)="oidcGroup.set($event)"
+      name="oidcGroup"
+    />
+    <app-select
+      [label]="'admin.groupMappings.role' | t"
+      [placeholder]="'admin.groupMappings.rolePlaceholder' | t"
+      [options]="roleOptions()"
+      [ngModel]="roleId()"
+      (ngModelChange)="roleId.set($event)"
+      name="role"
+    />
+    <app-select
+      [label]="'admin.groupMappings.gremium' | t"
+      [options]="gremiumOptions()"
+      [ngModel]="gremiumId()"
+      (ngModelChange)="gremiumId.set($event)"
+      name="gremium"
+    />
+  </div>
+  <div dialog-footer class="gm__foot">
+    <app-button variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button [disabled]="!oidcGroup().trim() || !roleId()" (click)="save()">{{ 'action.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Löschen -->
+<app-dialog
+  [open]="!!confirmId()"
+  [title]="'admin.groupMappings.deleteTitle' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="confirmId.set(null)"
+>
+  <p>{{ 'admin.groupMappings.deleteBody' | t }}</p>
+  <div dialog-footer class="gm__foot">
+    <app-button variant="ghost" (click)="confirmId.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" (click)="remove()">{{ 'action.delete' | t }}</app-button>
+  </div>
+</app-dialog>

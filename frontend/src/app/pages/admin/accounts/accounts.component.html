@@ -1,0 +1,46 @@
+<header class="acc__head">
+  <div>
+    <h1 class="acc__title">{{ 'admin.accounts.title' | t }}</h1>
+    <p class="acc__subtitle">{{ 'admin.accounts.desc' | t }}</p>
+  </div>
+  <app-button size="sm" (click)="openCreate()">{{ 'admin.accounts.add' | t }}</app-button>
+</header>
+
+<app-data-table [columns]="columns()" [rows]="accounts()" [rowKey]="rowId" [emptyText]="'admin.accounts.empty' | t">
+  <ng-template appCell="name" let-row>{{ $any(row).name }}</ng-template>
+  <ng-template appCell="iban" let-row><span class="acc__mono">{{ $any(row).iban || '—' }}</span></ng-template>
+  <ng-template appCell="active" let-row>
+    <app-badge [variant]="$any(row).active ? 'success' : 'neutral'">{{ ($any(row).active ? 'admin.accounts.active' : 'admin.accounts.inactive') | t }}</app-badge>
+  </ng-template>
+  <ng-template appCell="actions" let-row>
+    <span class="acc__actions">
+      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" (click)="openEdit($any(row))"><app-icon name="edit" /></app-button>
+      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" (click)="confirmDelete.set($any(row))"><app-icon name="delete" /></app-button>
+    </span>
+  </ng-template>
+</app-data-table>
+
+<app-dialog [open]="dialogOpen()" [title]="(editing() ? 'admin.accounts.edit' : 'admin.accounts.add') | t" [closeLabel]="'action.cancel' | t" (closed)="dialogOpen.set(false)">
+  <form id="acc-form" class="acc__form" (submit)="save($event)">
+    <label class="acc__label" for="acc-name">{{ 'admin.accounts.name' | t }}
+      <input id="acc-name" [ngModel]="fName()" (ngModelChange)="fName.set($event)" name="name" /></label>
+    <label class="acc__label" for="acc-iban">{{ 'admin.accounts.iban' | t }}
+      <input id="acc-iban" [ngModel]="fIban()" (ngModelChange)="fIban.set($event)" name="iban" [placeholder]="'admin.accounts.ibanPlaceholder' | t" /></label>
+    <label class="acc__check">
+      <input type="checkbox" [checked]="fActive()" (change)="fActive.set($any($event.target).checked)" />
+      <span>{{ 'admin.accounts.active' | t }}</span>
+    </label>
+  </form>
+  <div dialog-footer class="acc__foot">
+    <app-button variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button [disabled]="!fName().trim()" [loading]="saving()" (click)="save($event)">{{ 'action.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<app-dialog [open]="!!confirmDelete()" [title]="'admin.accounts.delete' | t" [closeLabel]="'action.cancel' | t" (closed)="confirmDelete.set(null)">
+  <p>{{ 'admin.accounts.deleteBody' | t: { name: confirmDelete()?.name ?? '' } }}</p>
+  <div dialog-footer class="acc__foot">
+    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'admin.accounts.deleteConfirm' | t }}</app-button>
+  </div>
+</app-dialog>

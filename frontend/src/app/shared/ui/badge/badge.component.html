@@ -1,0 +1,7 @@
+<span
+    class="badge"
+    [class]="color ? 'badge--custom' : 'badge--' + variant"
+    [style.background]="color || null"
+    [style.color]="color ? textColor : null"
+    ><ng-content
+  /></span>

@@ -1,0 +1,25 @@
+<table class="tbl">
+  @if (caption) {
+    <caption class="tbl__caption">{{ caption }}</caption>
+  }
+  <thead>
+    <tr>
+      @for (col of columns; track col.key) {
+        <th scope="col" [style.text-align]="col.align ?? 'start'">{{ col.label }}</th>
+      }
+    </tr>
+  </thead>
+  <tbody>
+    @for (row of rows; track $index) {
+      <tr>
+        @for (col of columns; track col.key) {
+          <td [style.text-align]="col.align ?? 'start'">{{ row[col.key] }}</td>
+        }
+      </tr>
+    } @empty {
+      <tr>
+        <td class="tbl__empty" [attr.colspan]="columns.length">{{ emptyText }}</td>
+      </tr>
+    }
+  </tbody>
+</table>

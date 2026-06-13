@@ -1,0 +1,75 @@
+.ns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 44rem;
+}
+.ns__head h1 {
+  margin: 0 0 var(--space-1);
+}
+.ns__intro,
+.ns__muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.card {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.card h2 {
+  margin: 0;
+}
+.ns__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+/* Field-Look des UI-Kits (app-input/.field__control der Config-Seiten). */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.field__label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--color-text);
+}
+.field__control {
+  height: var(--control-height);
+  max-width: 10rem;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: var(--lh-normal);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+.field__control:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+}
+.field__control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.field__hint {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.ns__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.ns__error {
+  color: var(--color-danger);
+  margin: 0;
+}

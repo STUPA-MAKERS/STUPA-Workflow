@@ -22,55 +22,8 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: TimeInputComponent, multi: true }],
-  template: `
-    <div class="ti">
-      @if (label) {
-        <label class="ti__label" [for]="id">
-          {{ label }}
-          @if (required) {
-            <span class="ti__req" aria-hidden="true">*</span>
-          }
-        </label>
-      }
-      <input
-        class="ti__text"
-        type="text"
-        inputmode="numeric"
-        autocomplete="off"
-        placeholder="HH:MM"
-        [id]="id"
-        [value]="display()"
-        [disabled]="disabled()"
-        [attr.aria-label]="!label && ariaLabel ? ariaLabel : null"
-        [attr.required]="required ? '' : null"
-        (input)="onText($any($event.target).value)"
-        (blur)="onBlur()"
-      />
-    </div>
-  `,
-  styles: [
-    `
-      .ti { display: flex; flex-direction: column; gap: var(--space-2); }
-      .ti__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--color-text); }
-      .ti__req { color: var(--color-danger); }
-      .ti__text {
-        height: var(--control-height);
-        box-sizing: border-box;
-        padding: 0 var(--space-4);
-        font: inherit;
-        font-size: var(--fs-md);
-        font-variant-numeric: tabular-nums;
-        color: var(--color-text);
-        background: var(--color-surface);
-        border: var(--border-width) solid var(--color-border-strong);
-        border-radius: var(--radius-md);
-        transition: border-color var(--motion-fast) var(--ease-standard);
-      }
-      .ti__text:hover:not(:disabled) { border-color: var(--color-text-muted); }
-      .ti__text:disabled { opacity: 0.6; cursor: not-allowed; }
-      .ti__text:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-    `,
-  ],
+  templateUrl: './time-input.component.html',
+  styleUrl: './time-input.component.scss',
 })
 export class TimeInputComponent implements ControlValueAccessor {
   @Input() label = '';

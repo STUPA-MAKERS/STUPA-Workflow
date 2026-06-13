@@ -1,0 +1,60 @@
+<section class="ns">
+  <header class="ns__head">
+    <h1>{{ 'admin.notifications.title' | t }}</h1>
+    <p class="ns__intro">{{ 'admin.notifications.intro' | t }}</p>
+  </header>
+
+  @if (error()) {
+    <p class="ns__error" role="alert">{{ $any(error()) | t }}</p>
+  }
+
+  <section class="card">
+    <h2>{{ 'admin.notifications.taskReminder' | t }}</h2>
+    <p class="ns__muted">{{ 'admin.notifications.taskReminderDesc' | t }}</p>
+
+    @if (loading()) {
+      <p class="ns__muted" aria-live="polite">{{ 'common.loading' | t }}</p>
+    } @else if (settings(); as s) {
+      <div class="ns__form">
+        <app-checkbox
+          [ngModel]="s.taskReminderEnabled"
+          (ngModelChange)="patch({ taskReminderEnabled: $event })"
+        >
+          {{ 'admin.notifications.enabled' | t }}
+        </app-checkbox>
+
+        <label class="field">
+          <span class="field__label">{{ 'admin.notifications.afterDays' | t }}</span>
+          <input
+            class="field__control"
+            type="number"
+            min="1"
+            [disabled]="!s.taskReminderEnabled"
+            [ngModel]="s.taskReminderAfterDays"
+            (ngModelChange)="patch({ taskReminderAfterDays: $event })"
+          />
+          <span class="field__hint">{{ 'admin.notifications.afterDaysHint' | t }}</span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">{{ 'admin.notifications.repeatDays' | t }}</span>
+          <input
+            class="field__control"
+            type="number"
+            min="0"
+            [disabled]="!s.taskReminderEnabled"
+            [ngModel]="s.taskReminderRepeatDays"
+            (ngModelChange)="patch({ taskReminderRepeatDays: $event })"
+          />
+          <span class="field__hint">{{ 'admin.notifications.repeatDaysHint' | t }}</span>
+        </label>
+
+        <div class="ns__actions">
+          <app-button [disabled]="!dirty() || saving()" (click)="save()">
+            {{ 'action.save' | t }}
+          </app-button>
+        </div>
+      </div>
+    }
+  </section>
+</section>

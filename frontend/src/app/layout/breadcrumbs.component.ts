@@ -23,50 +23,8 @@ interface Crumb {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink],
-  template: `
-    @if (crumbs().length > 1) {
-      <nav class="bc container" aria-label="Breadcrumb">
-        @for (c of crumbs(); track c.url; let last = $last) {
-          @if (last) {
-            <span class="bc__crumb bc__crumb--current" aria-current="page">{{ c.label }}</span>
-          } @else {
-            <a class="bc__crumb" [routerLink]="c.url">{{ c.label }}</a>
-            <span class="bc__sep" aria-hidden="true">›</span>
-          }
-        }
-      </nav>
-    }
-  `,
-  styles: [
-    `
-      .bc {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: var(--space-2);
-        padding-top: var(--space-6);
-        padding-bottom: var(--space-2);
-        font-size: var(--fs-sm);
-      }
-      .bc__crumb {
-        color: var(--color-primary);
-        font-weight: var(--fw-medium);
-        text-decoration: none;
-        padding: var(--space-1) var(--space-2);
-        border-radius: var(--radius-sm);
-      }
-      a.bc__crumb:hover {
-        background: var(--color-surface-sunken);
-      }
-      .bc__crumb--current {
-        color: var(--color-text);
-        font-weight: var(--fw-normal);
-      }
-      .bc__sep {
-        color: var(--color-text-muted);
-      }
-    `,
-  ],
+  templateUrl: './breadcrumbs.component.html',
+  styleUrl: './breadcrumbs.component.scss',
 })
 export class BreadcrumbsComponent {
   private readonly router = inject(Router);

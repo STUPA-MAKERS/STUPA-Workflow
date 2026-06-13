@@ -1,0 +1,136 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.gm__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.gm__title {
+  margin: 0;
+}
+.gm__subtitle {
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+}
+.gm__status {
+  color: var(--color-text-muted);
+  padding: var(--space-4) 0;
+}
+.gm__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.gm__table th {
+  text-align: start;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  background: var(--color-surface-sunken);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.gm__table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.gm__th-actions {
+  text-align: end;
+}
+.gm__add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.gm__typeahead {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.gm__lbl {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+.gm__control {
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
+}
+.gm__suggest {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1);
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.gm__suggest-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: start;
+  color: var(--color-text);
+}
+.gm__suggest-item:hover,
+.gm__suggest-item--sel {
+  background: var(--color-surface-sunken);
+}
+.gm__suggest-name {
+  font-weight: var(--fw-medium);
+}
+.gm__suggest-meta {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.gm__picked {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.gm__muted {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.gm__term {
+  display: flex;
+  gap: var(--space-3);
+}
+.gm__term .gm__lbl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+.gm__dialog-foot {
+  display: flex;
+  gap: var(--space-3);
+}
+/* Mobil (≤768px): Amtszeit-Datepicker untereinander statt nebeneinander. */
+@media (max-width: 768px) {
+  .gm__term {
+    flex-direction: column;
+  }
+}

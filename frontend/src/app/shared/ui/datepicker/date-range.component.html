@@ -1,0 +1,26 @@
+<fieldset class="dr">
+  @if (legend) {
+    <legend class="dr__legend">{{ legend }}</legend>
+  }
+  <div class="dr__row">
+    <div class="dr__field">
+      <app-datepicker
+        [id]="id + '-start'"
+        [ariaLabel]="startLabel"
+        [max]="end()"
+        [ngModel]="start()"
+        (ngModelChange)="onStart($event)"
+      />
+    </div>
+    <span class="dr__sep" aria-hidden="true">–</span>
+    <div class="dr__field">
+      <app-datepicker
+        [id]="id + '-end'"
+        [ariaLabel]="endLabel"
+        [min]="start()"
+        [ngModel]="end()"
+        (ngModelChange)="onEnd($event)"
+      />
+    </div>
+  </div>
+</fieldset>

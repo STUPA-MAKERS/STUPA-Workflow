@@ -1,0 +1,48 @@
+<div class="altcha" [attr.data-state]="state()">
+  <button
+    type="button"
+    class="altcha__btn"
+    [disabled]="state() === 'verifying' || state() === 'solved'"
+    (click)="solve()"
+  >
+    <span class="altcha__box" aria-hidden="true">
+      @switch (state()) {
+        @case ('solved') {
+          ✓
+        }
+        @case ('verifying') {
+          <span class="altcha__spinner"></span>
+        }
+      }
+    </span>
+    <span class="altcha__label">
+      @switch (state()) {
+        @case ('idle') {
+          {{ 'altcha.idle' | t }}
+        }
+        @case ('verifying') {
+          {{ 'altcha.verifying' | t }}
+        }
+        @case ('solved') {
+          {{ 'altcha.solved' | t }}
+        }
+        @case ('error') {
+          {{ 'altcha.error' | t }}
+        }
+      }
+    </span>
+  </button>
+  <p class="altcha__note" role="status">
+    @switch (state()) {
+      @case ('solved') {
+        {{ 'altcha.noteSolved' | t }}
+      }
+      @case ('error') {
+        {{ 'altcha.noteError' | t }}
+      }
+      @default {
+        {{ 'altcha.note' | t }}
+      }
+    }
+  </p>
+</div>

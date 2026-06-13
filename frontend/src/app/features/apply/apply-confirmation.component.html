@@ -1,0 +1,17 @@
+<section class="done">
+  <app-card [heading]="'apply.confirm.heading' | t">
+    <div class="done__top">
+      <span class="done__mail" aria-hidden="true">✉</span>
+      <app-badge variant="warning">{{ 'apply.confirm.badge' | t }}</app-badge>
+    </div>
+    <p class="done__text">{{ 'apply.confirm.body' | t }}</p>
+    <p class="done__expiry" role="note">{{ 'apply.confirm.expiry' | t }}</p>
+    @if (applicationId()) {
+      <p class="done__ref">
+        {{ 'apply.confirm.ref' | t }} <code>{{ applicationId() }}</code>
+      </p>
+    }
+    <p class="done__hint">{{ 'apply.confirm.hint' | t }}</p>
+    <a card-footer routerLink="/" class="done__home">{{ 'apply.confirm.home' | t }}</a>
+  </app-card>
+</section>

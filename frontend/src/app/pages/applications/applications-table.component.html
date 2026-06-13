@@ -1,0 +1,63 @@
+<div class="atbl__wrap">
+  <table class="atbl">
+    <thead>
+      <tr>
+        <th scope="col">{{ 'applications.list.col.title' | t }}</th>
+        <th scope="col">{{ 'applications.list.col.type' | t }}</th>
+        <th scope="col">{{ 'applications.list.col.state' | t }}</th>
+        <th scope="col" class="atbl__num" [attr.aria-sort]="ariaSort('amount')">
+          @if (sort()) {
+            <button type="button" class="atbl__sort" (click)="toggleSort('amount')">{{ 'applications.list.col.amount' | t }}{{ indicator('amount') }}</button>
+          } @else {
+            {{ 'applications.list.col.amount' | t }}
+          }
+        </th>
+        <th scope="col" [attr.aria-sort]="ariaSort('createdAt')">
+          @if (sort()) {
+            <button type="button" class="atbl__sort" (click)="toggleSort('createdAt')">{{ 'applications.list.col.created' | t }}{{ indicator('createdAt') }}</button>
+          } @else {
+            {{ 'applications.list.col.created' | t }}
+          }
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of rows(); track row.id) {
+        <tr>
+          <td>
+            <a class="atbl__rowLink" [routerLink]="['/applications', row.id]">
+              <span class="atbl__rowTitle">{{ row.title }}</span>
+              <span class="atbl__rowHint">{{ 'applications.list.open' | t }}</span>
+            </a>
+          </td>
+          <td>
+            @if (row.typeLabel) {
+              {{ row.typeLabel }}
+            } @else {
+              —
+            }
+          </td>
+          <td>
+            @if (row.stateLabel) {
+              <app-badge [color]="row.stateColor">{{ row.stateLabel }}</app-badge>
+            } @else {
+              —
+            }
+          </td>
+          <td class="atbl__num">{{ money(row.amount, row.currency) }}</td>
+          <td>
+            @if (row.createdAt) {
+              <time [attr.datetime]="row.createdAt">{{ row.createdAt | ldate: 'mediumDate' }}</time>
+            } @else {
+              —
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr>
+          <td class="atbl__empty" colspan="5">{{ emptyText() }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

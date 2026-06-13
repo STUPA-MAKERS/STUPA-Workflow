@@ -1,0 +1,44 @@
+<nav class="cct" [attr.aria-label]="ariaLabel()">
+  @if (allLabel(); as label) {
+    <button
+      type="button"
+      class="cct__node cct__node--top cct__node--all"
+      [class.cct__node--active]="!selectedId()"
+      (click)="picked.emit('')"
+    >{{ label }}</button>
+  }
+  <ng-container
+    *ngTemplateOutlet="branch; context: { $implicit: nodes(), depth: 0 }"
+  ></ng-container>
+  @if (!nodes().length && !allLabel()) {
+    <p class="cct__empty">{{ emptyLabel() }}</p>
+  }
+</nav>
+
+<ng-template #branch let-list let-depth="depth">
+  @for (n of list; track n.id) {
+    <div class="cct__branch" [style.--line-color]="depth === 0 ? dotColor(n) : null">
+      <button
+        type="button"
+        class="cct__node"
+        [class.cct__node--top]="depth === 0"
+        [class.cct__node--child]="depth > 0"
+        [class.cct__node--active]="selectedId() === n.id"
+        (click)="picked.emit(n.id)"
+      >
+        @if (depth === 0) {
+          <span class="cct__dot" [style.background]="dotColor(n)"></span>
+        }
+        <span class="cct__key">{{ n.key }}</span>
+        <span class="cct__label">{{ n.name }}</span>
+      </button>
+      @if (n.children?.length) {
+        <div class="cct__children">
+          <ng-container
+            *ngTemplateOutlet="branch; context: { $implicit: n.children, depth: depth + 1 }"
+          ></ng-container>
+        </div>
+      }
+    </div>
+  }
+</ng-template>

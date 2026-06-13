@@ -1,0 +1,12 @@
+@if (crumbs().length > 1) {
+  <nav class="bc container" aria-label="Breadcrumb">
+    @for (c of crumbs(); track c.url; let last = $last) {
+      @if (last) {
+        <span class="bc__crumb bc__crumb--current" aria-current="page">{{ c.label }}</span>
+      } @else {
+        <a class="bc__crumb" [routerLink]="c.url">{{ c.label }}</a>
+        <span class="bc__sep" aria-hidden="true">›</span>
+      }
+    }
+  </nav>
+}

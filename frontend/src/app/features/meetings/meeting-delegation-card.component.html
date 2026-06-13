@@ -1,0 +1,111 @@
+@if (visible()) {
+  <app-card [heading]="'delegation.card.title' | t">
+    @if (ctx(); as c) {
+      <div class="dlg__sections">
+        @if (c.myDelegation; as d) {
+          <div class="dlg__section">
+            <p class="dlg__row">
+              {{ 'delegation.card.outgoing' | t: { name: d.delegateName || d.delegateId } }}
+              @if (d.delegateVoting) {
+                <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+              }
+              @if (d.viaPool) {
+                <app-badge variant="neutral">{{ 'delegation.card.poolBadge' | t }}</app-badge>
+              }
+            </p>
+            @if (d.revocable) {
+              <div class="dlg__actions">
+                <app-button variant="ghost" size="sm" [loading]="busy()" (click)="revoke(d)">
+                  {{ 'delegation.card.revoke' | t }}
+                </app-button>
+              </div>
+            }
+          </div>
+        } @else if (canCreate()) {
+          <div class="dlg__section">
+            <p class="dlg__muted">{{ 'delegation.card.lead' | t }}</p>
+            @if (c.deadline && !c.deadlinePassed) {
+              <p class="dlg__muted">
+                {{ 'delegation.card.deadline' | t: { date: (c.deadline | ldate: 'short') } }}
+              </p>
+            }
+            <div class="dlg__actions">
+              <app-button size="sm" (click)="openDialog()">
+                {{ 'delegation.card.setup' | t }}
+              </app-button>
+            </div>
+          </div>
+        } @else if (c.canDelegate && c.deadlinePassed && !c.meetingStarted) {
+          <p class="dlg__muted">{{ 'delegation.card.deadlinePassed' | t }}</p>
+        }
+        @if (c.incoming.length > 0) {
+          <div class="dlg__section dlg__section--incoming">
+            @for (d of c.incoming; track d.id) {
+              <p class="dlg__row dlg__incoming">
+                {{ 'delegation.card.incoming' | t: { name: d.delegatorName || d.delegatorId } }}
+                @if (d.delegateVoting) {
+                  <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+                }
+              </p>
+            }
+          </div>
+        }
+      </div>
+    }
+  </app-card>
+
+  <app-dialog
+    [open]="dialogOpen()"
+    [title]="'delegation.dialog.title' | t"
+    [closeLabel]="'delegation.dialog.cancel' | t"
+    (closed)="dialogOpen.set(false)"
+  >
+    @if (ctx(); as c) {
+      @if (c.delegationAllowExternal) {
+        <div class="field">
+          <label class="field__label" for="dlg-search">{{ 'delegation.dialog.search' | t }}</label>
+          <input
+            id="dlg-search"
+            class="field__control"
+            name="search"
+            [ngModel]="query()"
+            (ngModelChange)="search($event)"
+            [placeholder]="'delegation.dialog.searchPlaceholder' | t"
+          />
+        </div>
+      }
+      <app-select
+        [label]="'delegation.dialog.recipient' | t"
+        [options]="recipientOptions()"
+        [ngModel]="delegateId()"
+        (ngModelChange)="delegateId.set($event)"
+        name="delegate"
+      />
+      @if (selectedRecipient(); as r) {
+        @if (r.viaPool) {
+          <p class="dlg__muted">{{ 'delegation.dialog.poolHint' | t }}</p>
+        } @else if (!r.isMember) {
+          <p class="dlg__muted">{{ 'delegation.dialog.externalHint' | t }}</p>
+        }
+      }
+      @if (c.votingDelegationEnabled) {
+        <app-checkbox
+          [ngModel]="delegateVoting()"
+          (ngModelChange)="delegateVoting.set($event)"
+          [hint]="'delegation.dialog.votingHint' | t"
+          name="delegateVoting"
+        >{{ 'delegation.dialog.voting' | t }}</app-checkbox>
+      } @else {
+        <p class="dlg__muted">{{ 'delegation.dialog.votingDisabled' | t }}</p>
+      }
+    }
+    <div dialog-footer class="dlg__foot">
+      <app-button variant="ghost" (click)="dialogOpen.set(false)">
+        {{ 'delegation.dialog.cancel' | t }}
+      </app-button>
+      <app-button [disabled]="!delegateId()" [loading]="busy()" (click)="create()">
+        {{ 'delegation.dialog.submit' | t }}
+      </app-button>
+    </div>
+  </app-dialog>
+}

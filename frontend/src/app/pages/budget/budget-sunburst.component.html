@@ -1,0 +1,30 @@
+<div class="sb" (pointermove)="onMove($event)" (pointerleave)="hovered.set(null)">
+  @if (total() > 0) {
+    <svg [attr.viewBox]="'0 0 ' + SIZE + ' ' + SIZE" class="sb__svg" role="img" [attr.aria-label]="root()?.name ?? ''">
+      @for (s of segments(); track s.id + ':' + s.depth) {
+        <path
+          [attr.d]="s.d"
+          [attr.fill]="s.color"
+          [attr.fill-opacity]="s.opacity"
+          class="sb__seg"
+          [class.sb__seg--dim]="hovered() !== null && hovered()?.id !== s.id"
+          (pointerenter)="hovered.set(s)"
+          (click)="nodeClick.emit(s.id)"
+        />
+      }
+      <circle [attr.cx]="CX" [attr.cy]="CY" [attr.r]="R_CENTER - 6" class="sb__center" (click)="rootClick()" />
+      <text [attr.x]="CX" [attr.y]="CY - 6" text-anchor="middle" class="sb__center-name">{{ root()?.name }}</text>
+      <text [attr.x]="CX" [attr.y]="CY + 14" text-anchor="middle" class="sb__center-val">{{ money(total()) }}</text>
+    </svg>
+    @if (hovered(); as h) {
+      <div class="sb__tip" [style.left.px]="tip().x" [style.top.px]="tip().y" role="status">
+        <strong>{{ h.name }}</strong>
+        <span class="sb__tip-path">{{ h.pathKey | simplifyPath }}</span>
+        <span>{{ money(h.value) }} · {{ h.percent }}%</span>
+      </div>
+    }
+    <p class="sb__hint" aria-hidden="true">{{ 'budget.overview.hint' | t }}</p>
+  } @else {
+    <p class="sb__empty">{{ 'budget.pie.empty' | t }}</p>
+  }
+</div>

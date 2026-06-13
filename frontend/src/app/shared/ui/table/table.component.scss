@@ -1,0 +1,30 @@
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.tbl__caption {
+  text-align: start;
+  padding-bottom: var(--space-3);
+  color: var(--color-text-muted);
+}
+th,
+td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+th {
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+}
+tbody tr:hover {
+  background: var(--color-surface-sunken);
+}
+.tbl__empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--space-6);
+}

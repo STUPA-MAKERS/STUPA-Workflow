@@ -1,0 +1,169 @@
+:host { display: block; }
+.inv { position: relative; min-height: 60vh; }
+.inv__head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+.inv__title { margin: 0; }
+.inv__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
+.inv__headActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.inv__btnIcon { display: inline-flex; align-items: center; gap: var(--space-2); }
+.inv__fileInput { display: none; }
+.inv__search, .inv__input {
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+/* Texteingaben füllen ihre (Grid-)Zelle und dürfen darunter schrumpfen —
+   ohne min-width:0 erzwingt die intrinsische Feldbreite ein Überlaufen
+   des 1fr-Grids und damit den horizontalen Scroll im Dialog (#15). */
+.inv__input { width: 100%; min-width: 0; box-sizing: border-box; }
+input.inv__input { height: var(--control-height); }
+.inv__search { min-width: 14rem; height: 2.25rem; }
+.inv__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
+.inv__empty { text-align: center; color: var(--color-text-muted); padding: var(--space-6) !important; }
+/* Leerzustand als zentrierte Karte (nicht in der scrollenden Tabelle, sonst
+   zentriert der Text über die Gesamt-Tabellenbreite statt im Viewport). */
+.inv__emptyCard {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--space-7) var(--space-5);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.inv__tableWrap {
+  overflow-x: auto;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.inv__table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.inv__table th, .inv__table td {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  text-align: start;
+  vertical-align: middle;
+}
+.inv__table tbody tr:last-child td { border-bottom: none; }
+.inv__table tbody tr:hover { background: var(--color-surface-sunken); }
+.inv__table th {
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-sunken);
+}
+.inv__num { text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.inv__cellDate { color: var(--color-text-muted); white-space: nowrap; }
+.inv__cellNumber { font-weight: var(--fw-medium); white-space: nowrap; }
+.inv__cellSupplier { min-width: 10rem; }
+.inv__mono { font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
+.inv__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
+.inv__fileLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-primary);
+  font: inherit;
+}
+.inv__fileLink:hover { text-decoration: underline; }
+.inv__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+/* --- Drop-Overlay --- */
+.inv__dropOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg));
+  border: 2px dashed var(--color-primary);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+.inv__dropInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-primary);
+  font-weight: var(--fw-semibold);
+}
+/* --- Dialog --- */
+.inv__form { display: flex; flex-direction: column; gap: var(--space-2); }
+.inv__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); margin-top: var(--space-2); }
+.inv__field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.inv__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
+.inv__grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3); align-items: end; }
+@media (max-width: 30rem) { .inv__grid2, .inv__grid3 { grid-template-columns: 1fr; } }
+.inv__textarea { resize: vertical; min-height: 4.5rem; }
+.inv__dialogFoot { display: flex; justify-content: flex-end; gap: var(--space-3); }
+.inv__fileChip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+.inv__fileChipName { font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv__fileChipRemove {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  line-height: 1;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+.inv__fileChipRemove:hover { color: var(--color-danger); }
+/* Mobil (≤768px): Tabellenzeilen als Karten (rein CSS) — wie Buchungen. */
+@media (max-width: 768px) {
+  .inv__search { flex: 1 1 100%; min-width: 0; }
+  .inv__tableWrap { overflow-x: visible; border: none; border-radius: 0; background: transparent; }
+  .inv__table, .inv__table tbody { display: block; }
+  .inv__table thead { display: none; }
+  .inv__table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+  .inv__table tbody tr:last-child { margin-bottom: 0; }
+  .inv__table th, .inv__table td { padding: 0; border-bottom: none; }
+  .inv__cellNumber { flex: 1 1 100%; order: -3; }
+  .inv__cellStatus { order: -2; }
+  .inv__amount { order: -1; margin-left: auto; font-size: var(--fs-md); }
+  .inv__cellDate, .inv__cellSupplier, .inv__cellFile, .inv__mono {
+    flex: 0 1 auto;
+    order: 1;
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+  }
+  .inv__actions { margin-left: auto; }
+  .inv__num:has(.inv__actions) { order: 2; flex: 1 1 100%; }
+  .inv__empty { flex: 1 1 100%; padding: var(--space-6) !important; }
+}

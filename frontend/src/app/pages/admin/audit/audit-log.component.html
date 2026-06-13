@@ -1,0 +1,110 @@
+<section class="audit">
+  <header class="audit__head">
+    <div>
+      <h1>{{ 'admin.audit.title' | t }}</h1>
+      <p class="audit__desc">{{ 'admin.audit.desc' | t }}</p>
+    </div>
+    <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+      <app-filter-field [label]="'admin.audit.filter.action' | t">
+        <select [value]="action()" (change)="setAction($any($event.target).value)">
+          <option value="">{{ 'admin.audit.filter.allActions' | t }}</option>
+          @for (a of actionOptions(); track a) {
+            <option [value]="a">{{ actionLabel(a) }}</option>
+          }
+        </select>
+      </app-filter-field>
+      <app-filter-field [label]="'admin.audit.filter.actor' | t">
+        <select [value]="actor()" (change)="setActor($any($event.target).value)">
+          <option value="">{{ 'admin.audit.filter.allActors' | t }}</option>
+          @for (a of actors(); track a.sub) {
+            <option [value]="a.sub">{{ a.name || a.sub }}</option>
+          }
+        </select>
+      </app-filter-field>
+      <app-filter-field [label]="'admin.audit.filter.since' | t">
+        <app-datepicker [ngModel]="since()" (ngModelChange)="setSince($event)" />
+      </app-filter-field>
+      <app-filter-field [label]="'admin.audit.filter.until' | t">
+        <app-datepicker [ngModel]="until()" (ngModelChange)="setUntil($event)" />
+      </app-filter-field>
+    </app-filter-bar>
+  </header>
+
+  @if (loadError()) {
+    <p class="audit__status audit__status--error" role="alert">{{ 'admin.audit.error' | t }}</p>
+  }
+
+  @if (!groups().length && !loading()) {
+    <p class="audit__status">{{ 'admin.audit.empty' | t }}</p>
+  }
+
+  @for (g of groups(); track g.key) {
+    <h2 class="audit__day">{{ dayLabel(g) }}</h2>
+    <ul class="audit__feed">
+      @for (e of g.entries; track e.id) {
+        <li class="audit__item">
+          <button
+            type="button"
+            class="audit__row"
+            (click)="toggle(e.id)"
+            [attr.aria-expanded]="isOpen(e.id)"
+          >
+            <span class="audit__icon" aria-hidden="true">
+              <app-icon [name]="icon(e.action)" [size]="14" />
+            </span>
+            <span class="audit__msg">{{ message(e) }}</span>
+            <time class="audit__time" [attr.datetime]="e.at">{{ e.at | ldate: 'time' }}</time>
+            <app-icon
+              class="audit__chev"
+              [name]="isOpen(e.id) ? 'chevron-up' : 'chevron-down'"
+              [size]="12"
+            />
+          </button>
+          @if (isOpen(e.id)) {
+            <div class="audit__details">
+              <dl class="audit__meta">
+                <div class="audit__metaRow">
+                  <dt>{{ 'admin.audit.detail.action' | t }}</dt>
+                  <dd><app-badge variant="neutral">{{ actionLabel(e.action) }}</app-badge></dd>
+                </div>
+                @if (e.targetType) {
+                  <div class="audit__metaRow">
+                    <dt>{{ 'admin.audit.detail.target' | t }}</dt>
+                    <dd>
+                      {{ targetTypeLabel(e.targetType) }}@if (e.targetLabel || e.targetId) {<span> · {{ e.targetLabel || e.targetId }}</span>}
+                    </dd>
+                  </div>
+                }
+                <div class="audit__metaRow">
+                  <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
+                  <dd>{{ e.actorName || e.actor || ('admin.audit.system' | t) }}</dd>
+                </div>
+                @for (p of dataPairs(e); track p[0]) {
+                  <div class="audit__metaRow">
+                    <dt>{{ p[0] }}</dt>
+                    <dd class="audit__mono">{{ p[1] }}</dd>
+                  </div>
+                }
+              </dl>
+              @if (targetLink(e); as link) {
+                <a class="audit__target" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
+              }
+            </div>
+          }
+        </li>
+      }
+    </ul>
+  }
+
+  <div #sentinel class="audit__sentinel" aria-hidden="true"></div>
+
+  @if (loading()) {
+    <p class="audit__status" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
+  } @else if (hasMore()) {
+    <div class="audit__more">
+      <app-button variant="secondary" size="sm" (click)="loadMore()">
+        {{ 'admin.audit.loadMore' | t }}
+      </app-button>
+    </div>
+  }
+</section>

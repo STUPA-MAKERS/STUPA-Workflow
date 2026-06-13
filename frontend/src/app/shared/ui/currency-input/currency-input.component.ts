@@ -24,86 +24,8 @@ import { I18nService } from '@core/i18n/i18n.service';
   providers: [
     { provide: NG_VALUE_ACCESSOR, useExisting: CurrencyInputComponent, multi: true },
   ],
-  template: `
-    <div class="flex flex-col gap-1">
-      @if (label()) {
-        <label class="text-sm font-medium text-muted">
-          {{ label() }}
-          @if (required()) {
-            <span class="text-danger ms-[2px]" aria-hidden="true">*</span>
-          }
-        </label>
-      }
-      <span class="cur" [class.cur--disabled]="disabled()">
-        <input
-          class="cur__input"
-          type="text"
-          inputmode="decimal"
-          [value]="text()"
-          [disabled]="disabled()"
-          [attr.placeholder]="placeholder()"
-          [attr.aria-label]="ariaLabel() || label() || null"
-          [attr.aria-invalid]="error() ? 'true' : null"
-          [attr.name]="name() || null"
-          (focus)="onFocus()"
-          (input)="onInput($any($event.target).value)"
-          (blur)="onBlur()"
-        />
-        <span class="cur__symbol" aria-hidden="true">€</span>
-      </span>
-      @if (hint() && !error()) {
-        <p class="text-xs text-muted m-0">{{ hint() }}</p>
-      }
-      @if (error()) {
-        <p class="text-xs text-danger m-0" role="alert">{{ error() }}</p>
-      }
-    </div>
-  `,
-  styles: [
-    `
-      :host {
-        display: block;
-        width: 100%;
-      }
-      .cur {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-1);
-        width: 100%;
-        height: var(--control-height);
-        padding: 0 var(--space-3);
-        background: var(--color-bg, var(--color-surface));
-        border: var(--border-width) solid var(--color-border-strong);
-        border-radius: var(--radius-md);
-      }
-      .cur:focus-within {
-        outline: 2px solid var(--color-primary);
-        outline-offset: 1px;
-      }
-      .cur--disabled {
-        opacity: 0.6;
-      }
-      .cur__input {
-        flex: 1 1 auto;
-        min-width: 0;
-        height: 100%;
-        border: 0;
-        background: transparent;
-        color: var(--color-text);
-        font: inherit;
-        font-variant-numeric: tabular-nums;
-        text-align: end;
-        padding: 0;
-      }
-      .cur__input:focus {
-        outline: none;
-      }
-      .cur__symbol {
-        flex: 0 0 auto;
-        color: var(--color-text-muted);
-      }
-    `,
-  ],
+  templateUrl: './currency-input.component.html',
+  styleUrl: './currency-input.component.scss',
 })
 export class CurrencyInputComponent implements ControlValueAccessor {
   private readonly i18n = inject(I18nService);

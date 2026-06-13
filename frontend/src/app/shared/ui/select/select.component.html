@@ -1,0 +1,35 @@
+<div class="sel">
+  @if (label) {
+    <label class="sel__label" [for]="id">
+      {{ label }}
+      @if (required) {
+        <span class="sel__req" aria-hidden="true">*</span>
+      }
+    </label>
+  }
+  <select
+    class="sel__control"
+    [id]="id"
+    [value]="value()"
+    [disabled]="disabled()"
+    [attr.aria-label]="!label && ariaLabel ? ariaLabel : null"
+    [attr.aria-invalid]="error ? 'true' : null"
+    [attr.aria-describedby]="describedBy"
+    [attr.required]="required ? '' : null"
+    (change)="onSelect($event)"
+    (blur)="onTouched()"
+  >
+    @if (placeholder) {
+      <option value="" [disabled]="required">{{ placeholder }}</option>
+    }
+    @for (opt of options; track opt.value) {
+      <option [value]="opt.value" [disabled]="opt.disabled ?? false">{{ opt.label }}</option>
+    }
+  </select>
+  @if (hint && !error) {
+    <p class="sel__hint" [id]="id + '-hint'">{{ hint }}</p>
+  }
+  @if (error) {
+    <p class="sel__error" [id]="id + '-error'" role="alert">{{ error }}</p>
+  }
+</div>

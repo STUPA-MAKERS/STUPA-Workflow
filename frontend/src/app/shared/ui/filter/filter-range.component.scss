@@ -1,0 +1,29 @@
+/* app-currency-input als Flex-Item behandeln (bringt eigenes Styling mit). */
+:host ::ng-deep app-currency-input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+:host ::ng-deep input:not(.cur__input),
+:host ::ng-deep select {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 0;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: var(--fs-md);
+}
+/* Zahlen-Spinner ausblenden — wirkt im schmalen Popout unruhig. */
+:host ::ng-deep input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+:host ::ng-deep input[type='number']::-webkit-outer-spin-button,
+:host ::ng-deep input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

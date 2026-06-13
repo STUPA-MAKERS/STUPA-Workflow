@@ -1,0 +1,33 @@
+<nav class="byt" [attr.aria-label]="'budget.tree.nav' | t">
+  @for (b of tops(); track b.id) {
+    <div class="byt__budget" [class.byt__budget--sel]="b.id === selectedBudgetId()" [style.--line-color]="dotColor(b)">
+      <button type="button" class="byt__node byt__node--top" (click)="pickBudget(b)">
+        <span class="byt__dot" [style.background]="dotColor(b)"></span>
+        <span class="byt__label">{{ b.name }}</span>
+      </button>
+      <ul class="byt__years">
+        @for (fy of shownYears(b.id); track fy.id) {
+          <li>
+            <button
+              type="button"
+              class="byt__node byt__node--year"
+              [class.byt__node--active]="b.id === selectedBudgetId() && fy.id === selectedFyId()"
+              (click)="pickYear(b.id, fy.id)"
+            >
+              {{ fy.display }}
+            </button>
+          </li>
+        }
+        @if (hiddenCount(b.id) > 0) {
+          <li class="byt__more" [title]="moreTitle(b.id)">…</li>
+        }
+        @if (!years(b.id).length) {
+          <li class="byt__empty">{{ 'budget.tree.noYears' | t }}</li>
+        }
+      </ul>
+    </div>
+  }
+  @if (!tops().length) {
+    <p class="byt__empty">{{ 'budget.tree.empty' | t }}</p>
+  }
+</nav>

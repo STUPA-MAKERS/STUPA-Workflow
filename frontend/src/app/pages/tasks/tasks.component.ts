@@ -21,43 +21,8 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, BadgeComponent, DataTableComponent, CellDirective],
-  template: `
-    <header class="tasks__head">
-      <h1 class="tasks__title">{{ 'tasks.title' | t }}</h1>
-      <p class="tasks__sub">{{ 'tasks.subtitle' | t }}</p>
-    </header>
-
-    @if (loading()) {
-      <p class="tasks__muted" aria-live="polite">{{ 'tasks.loading' | t }}</p>
-    } @else {
-      <app-data-table
-        [columns]="columns()"
-        [rows]="tasks()"
-        [emptyText]="'tasks.empty' | t"
-        [clickable]="true"
-        (rowClick)="open($any($event).id)"
-      >
-        <ng-template appCell="title" let-r>{{ titleOf($any(r)) }}</ng-template>
-        <ng-template appCell="type" let-r>{{ typeName($any(r).typeId) }}</ng-template>
-        <ng-template appCell="state" let-r>
-          <app-badge [color]="$any(r).state?.color">{{ $any(r).state?.label }}</app-badge>
-        </ng-template>
-        <ng-template appCell="amount" let-r>{{ $any(r).amount ? ($any(r).amount + ' ' + ($any(r).currency ?? '')) : '—' }}</ng-template>
-        <ng-template appCell="waiting" let-r>
-          <span class="tasks__muted" [attr.title]="$any(r).createdAt">{{ waitingSince($any(r).createdAt) }}</span>
-        </ng-template>
-      </app-data-table>
-    }
-  `,
-  styles: [
-    `
-      :host { display: flex; flex-direction: column; gap: var(--space-4); }
-      .tasks__title { margin: 0; }
-      .tasks__sub { color: var(--color-text-muted); font-size: var(--fs-sm); margin: var(--space-1) 0 0; }
-      .tasks__muted { color: var(--color-text-muted); }
-      .tasks__actions { display: inline-flex; gap: var(--space-2); justify-content: flex-end; }
-    `,
-  ],
+  templateUrl: './tasks.component.html',
+  styleUrl: './tasks.component.scss',
 })
 export class TasksComponent {
   private readonly api = inject(ApiClient);

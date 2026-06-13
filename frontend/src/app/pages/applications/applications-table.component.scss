@@ -1,0 +1,133 @@
+.atbl__wrap {
+  overflow-x: auto;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.atbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.atbl tbody tr:last-child td {
+  border-bottom: none;
+}
+.atbl th,
+.atbl td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  text-align: start;
+  vertical-align: middle;
+}
+.atbl th {
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  /* Dunklerer Header wie die Aufgaben-Tabelle (shared DataTable) — #table-parity. */
+  background: var(--color-surface-sunken);
+}
+.atbl__num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.atbl__sort {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+.atbl__sort:hover {
+  color: var(--color-primary);
+}
+.atbl tbody tr:hover {
+  background: var(--color-surface-sunken);
+}
+.atbl__rowLink {
+  display: inline-flex;
+  flex-direction: column;
+  color: var(--color-primary);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+}
+.atbl__rowLink:hover .atbl__rowTitle {
+  text-decoration: underline;
+}
+.atbl__rowType,
+.atbl__rowHint {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--fw-normal);
+}
+/* Höhere Spezifität als .atbl td (sonst gewinnt dessen text-align:start +
+   schmaleres Padding → Leertext links + zu niedrig). Zentriert + space-6 wie
+   die shared DataTable (#9/#table-parity). */
+.atbl td.atbl__empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--space-6);
+}
+/* Mobil (≤768px): Zeilen als Karten stapeln (rein CSS, kein Markup-Diff). */
+@media (max-width: 768px) {
+  .atbl__wrap {
+    overflow-x: visible;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+  .atbl,
+  .atbl tbody {
+    display: block;
+  }
+  .atbl thead {
+    display: none;
+  }
+  .atbl tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-3);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+  .atbl tbody tr:last-child {
+    margin-bottom: 0;
+  }
+  .atbl td {
+    padding: 0;
+    border-bottom: none;
+  }
+  .atbl tbody tr:last-child td {
+    border-bottom: none;
+  }
+  /* Titel als volle erste Zeile der Karte. */
+  .atbl td:first-child {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  /* Typ + Datum als gedämpfte Meta-Angaben. */
+  .atbl td:nth-child(2),
+  .atbl td:last-child {
+    color: var(--color-text-muted);
+    font-size: var(--fs-xs);
+  }
+  /* Betrag rechtsbündig in der Meta-Zeile. */
+  .atbl__num {
+    margin-left: auto;
+    font-weight: var(--fw-medium);
+  }
+  .atbl__empty {
+    flex: 1 1 100%;
+    padding: var(--space-6);
+  }
+}

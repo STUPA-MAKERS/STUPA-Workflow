@@ -1,0 +1,56 @@
+<div class="dp">
+  @if (label) {
+    <label class="dp__label" [for]="id">
+      {{ label }}
+      @if (required) {
+        <span class="dp__req" aria-hidden="true">*</span>
+      }
+    </label>
+  }
+  <div class="dp__field">
+    <input
+      class="dp__text"
+      type="text"
+      inputmode="numeric"
+      autocomplete="off"
+      [id]="id"
+      [value]="display()"
+      [placeholder]="placeholder()"
+      [disabled]="disabled()"
+      [attr.aria-label]="!label && ariaLabel ? ariaLabel : null"
+      [attr.aria-invalid]="error ? 'true' : null"
+      [attr.aria-describedby]="describedBy"
+      [attr.required]="required ? '' : null"
+      (input)="onText($any($event.target).value)"
+      (blur)="onBlur()"
+    />
+    <button
+      type="button"
+      class="dp__cal"
+      [disabled]="disabled()"
+      [attr.aria-label]="'datepicker.openCalendar' | t"
+      (click)="openPicker()"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+      </svg>
+    </button>
+    <input
+      #native
+      class="dp__native"
+      type="date"
+      tabindex="-1"
+      aria-hidden="true"
+      [value]="value()"
+      [attr.min]="min || null"
+      [attr.max]="max || null"
+      (change)="onNative($any($event.target).value)"
+    />
+  </div>
+  @if (hint && !error) {
+    <p class="dp__hint" [id]="id + '-hint'">{{ hint }}</p>
+  }
+  @if (error) {
+    <p class="dp__error" [id]="id + '-error'" role="alert">{{ error }}</p>
+  }
+</div>

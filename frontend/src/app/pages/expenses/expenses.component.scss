@@ -1,0 +1,321 @@
+:host { display: block; }
+/* Kopf auf normale Body-Breite zentrieren (wie Anträge); Baum im linken Rand. */
+.exp__head { width: 100%; max-width: var(--layout-max-width); margin: 0 auto var(--space-5); }
+.exp__headRow { display: flex; align-items: start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.exp__title { margin: 0; }
+.exp__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
+.exp__headActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.exp__btnIcon { display: inline-flex; align-items: center; gap: var(--space-2); }
+.exp__kinds { display: inline-flex; gap: var(--space-1); }
+.exp__search, .exp__input {
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+/* Text-Inputs auf Control-Höhe → bündig mit app-select/datepicker daneben (#dropdown-height). */
+input.exp__input {
+  height: var(--control-height);
+  box-sizing: border-box;
+}
+.exp__search { min-width: 14rem; height: 2.25rem; }
+.exp__layout {
+  display: grid;
+  grid-template-columns:
+    minmax(12rem, 1fr)
+    minmax(0, var(--layout-max-width))
+    minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+/* Kostenstellen-Baum im linken Rand (Breakout) + sticky (wie Anträge). */
+.exp__tree {
+  justify-self: end;
+  width: 100%;
+  max-width: 16rem;
+  position: sticky;
+  top: calc(var(--layout-header-height) + var(--space-4));
+  align-self: start;
+  /* 3/4 viewport so the tree scrolls internally and clearly floats. */
+  max-height: 75vh;
+  overflow-y: auto;
+}
+.exp__main { min-width: 0; }
+.exp__empty { text-align: center; color: var(--color-text-muted); padding: var(--space-6) !important; }
+@media (max-width: 60rem) {
+  .exp__layout { grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr); }
+  .exp__head { max-width: none; }
+}
+@media (max-width: 40rem) {
+  .exp__layout { grid-template-columns: 1fr; }
+  .exp__tree { position: static; max-height: none; }
+}
+.exp__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
+.exp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.exp__row {
+  display: grid;
+  grid-template-columns: 7rem 6rem 1fr auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.exp__date { color: var(--color-text-muted); font-size: var(--fs-sm); }
+.exp__desc { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.exp__descText { font-weight: var(--fw-medium); }
+.exp__meta { font-size: var(--fs-sm); color: var(--color-text-muted); }
+.exp__cc { font-variant-numeric: tabular-nums; }
+.exp__appLink { color: var(--color-primary); text-decoration: none; }
+.exp__appLink:hover { text-decoration: underline; }
+.exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
+.exp__amount--income { color: var(--color-success, #2e7d32); }
+.exp__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+.exp__sentinel { height: 1px; }
+.exp__more { display: flex; justify-content: center; margin-top: var(--space-4); }
+.exp__count { text-align: center; color: var(--color-text-muted); font-size: var(--fs-sm); margin-top: var(--space-3); }
+/* --- Tabelle (#25) --- */
+.exp__tableWrap {
+  overflow-x: auto;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.exp__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.exp__table th,
+.exp__table td {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  text-align: start;
+  vertical-align: middle;
+}
+.exp__table tbody tr:last-child td {
+  border-bottom: none;
+}
+.exp__table tbody tr:hover {
+  background: var(--color-surface-sunken);
+}
+.exp__table th {
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  /* Dunklerer, höherer Header wie die shared DataTable — #table-parity. */
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-sunken);
+}
+.exp__sort {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+.exp__sort:hover {
+  color: var(--color-primary);
+}
+.exp__num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.exp__cellDate {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.exp__cellDesc {
+  font-weight: var(--fw-medium);
+  min-width: 12rem;
+}
+.exp__mono {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+.exp__amount {
+  font-weight: var(--fw-semibold);
+}
+.exp__amount--income {
+  color: var(--color-success, #2e7d32);
+}
+.exp__appLink {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.exp__appLink:hover {
+  text-decoration: underline;
+}
+.exp__actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+.exp__form { display: flex; flex-direction: column; gap: var(--space-2); }
+.exp__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); margin-top: var(--space-2); }
+/* Zwei-Spalten-Reihe für zusammengehörige Felder (Daten, Beleg/Methode). */
+.exp__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
+.exp__field { display: flex; flex-direction: column; gap: var(--space-1); }
+.exp__textarea { resize: vertical; min-height: 4.5rem; }
+@media (max-width: 30rem) { .exp__grid2 { grid-template-columns: 1fr; } }
+.exp__hint { font-size: var(--fs-sm); color: var(--color-text-muted); margin: 0; }
+.exp__hint--warn { color: var(--color-danger); }
+.exp__dialogFoot { display: flex; justify-content: flex-end; gap: var(--space-3); }
+/* Antrags-Typeahead (wie Nutzersuche) */
+.exp__typeahead { position: relative; }
+.exp__suggest {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1);
+  position: absolute;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.3));
+}
+.exp__suggestItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+}
+.exp__suggestItem:hover { background: var(--color-primary-subtle); }
+.exp__picked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.exp__pickedText { font-weight: var(--fw-medium); }
+/* Betrags-Filter (von/bis) */
+@media (max-width: 720px) {
+  .exp__layout { grid-template-columns: 1fr; }
+  .exp__tree { position: static; max-height: none; }
+  .exp__row { grid-template-columns: 1fr auto; }
+}
+/* Mobil (≤768px): Baum hinter einklappbarem Toggle (Standard: zu),
+   eine Spalte. Desktop unverändert — Toggle existiert dort nur versteckt. */
+.exp__treeToggle {
+  display: none;
+}
+@media (max-width: 768px) {
+  .exp__layout { grid-template-columns: 1fr; }
+  .exp__tree {
+    position: static;
+    max-height: none;
+    max-width: none;
+    justify-self: stretch;
+  }
+  .exp__treeToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--space-2) var(--space-3);
+    font: inherit;
+    font-weight: var(--fw-medium);
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+  .exp__treeBody {
+    display: none;
+    padding-top: var(--space-3);
+  }
+  .exp__treeBody--open {
+    display: block;
+  }
+}
+/* Mobil (≤768px): Suche in voller Breite, Tabellenzeilen als Karten (rein CSS). */
+@media (max-width: 768px) {
+  .exp__search { flex: 1 1 100%; min-width: 0; }
+  .exp__tableWrap {
+    overflow-x: visible;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+  .exp__table,
+  .exp__table tbody { display: block; }
+  .exp__table thead { display: none; }
+  .exp__table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+  .exp__table tbody tr:last-child { margin-bottom: 0; }
+  .exp__table th,
+  .exp__table td {
+    padding: 0;
+    border-bottom: none;
+  }
+  /* Karten-Aufbau (#mobile-cards): Beschreibung oben (fett, volle Breite),
+     dann Art-Badge + Betrag, dann eine gedämpfte Meta-Zeile. */
+  .exp__cellDesc {
+    flex: 1 1 100%;
+    min-width: 0;
+    order: -3;
+    font-weight: var(--fw-medium);
+  }
+  .exp__cellKind { order: -2; }
+  /* Betrag prominent, rechtsbündig auf der Badge-Zeile. */
+  .exp__amount {
+    order: -1;
+    margin-left: auto;
+    font-size: var(--fs-md);
+    font-weight: var(--fw-semibold);
+  }
+  /* Sekundär-Infos (Daten, Empfänger, Kostenstelle, Antrag, Konto) klein +
+     gedämpft auf eigener, umbrechender Zeile → weniger gedrängt. */
+  .exp__cellDate,
+  .exp__cellMeta {
+    flex: 0 1 auto;
+    order: 1;
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+  }
+  /* Aktionen auf eigene Zeile (große Tap-Ziele). */
+  .exp__actions { margin-left: auto; }
+  .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
+  .exp__empty {
+    flex: 1 1 100%;
+    padding: var(--space-6) !important;
+  }
+}

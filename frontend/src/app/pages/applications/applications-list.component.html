@@ -1,0 +1,126 @@
+<header class="apps__head">
+  <div class="apps__headRow">
+    <div>
+      <h1 class="apps__title">{{ 'applications.list.title' | t }}</h1>
+      <p class="apps__subtitle">{{ 'applications.list.subtitle' | t }}</p>
+    </div>
+    <!-- Filter in einem Popout (#20): Button mit Icon + Aktiv-Indikator. -->
+    <div class="apps__headActions">
+      @if (canExport()) {
+        <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
+          <span class="apps__filterBtn">
+            <app-icon name="export" [size]="16" />
+            {{ 'applications.list.export' | t }}
+          </span>
+        </app-button>
+      }
+      <app-filter-bar
+        [activeCount]="activeFilterCount()"
+        [label]="'applications.list.filter.button' | t"
+        [applyLabel]="'applications.list.filter.apply' | t"
+        [resetLabel]="'applications.list.filter.reset' | t"
+        (apply)="applyFilters()"
+        (reset)="reset()"
+      >
+        <app-filter-field [label]="'applications.list.search' | t">
+          <input
+            type="search"
+            [placeholder]="'applications.list.search.placeholder' | t"
+            [ngModel]="q()"
+            (ngModelChange)="q.set($event)"
+            name="q"
+          />
+        </app-filter-field>
+        <app-filter-field [label]="'applications.list.filter.type' | t">
+          <select [ngModel]="typeId()" (ngModelChange)="typeId.set($event)" name="type">
+            <option value="">{{ 'applications.list.filter.all' | t }}</option>
+            @for (type of types(); track type.id) {
+              <option [value]="type.id">{{ type.name }}</option>
+            }
+          </select>
+        </app-filter-field>
+        <app-select
+          id="apps-state"
+          name="state"
+          [label]="'applications.list.filter.state' | t"
+          [placeholder]="'applications.list.filter.all' | t"
+          [options]="stateOptions()"
+          [ngModel]="state()"
+          (ngModelChange)="state.set($event)"
+        />
+        <app-filter-field [label]="'applications.list.filter.amount' | t">
+          <app-filter-range>
+            <app-currency-input start name="amountMin" [placeholder]="'applications.list.filter.min' | t" [ariaLabel]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" />
+            <app-currency-input end name="amountMax" [placeholder]="'applications.list.filter.max' | t" [ariaLabel]="'applications.list.filter.max' | t" [ngModel]="amountMax()" (ngModelChange)="amountMax.set($event)" />
+          </app-filter-range>
+        </app-filter-field>
+        <app-filter-field [label]="'applications.list.filter.date' | t">
+          <app-filter-range>
+            <app-datepicker start [ariaLabel]="'applications.list.filter.from' | t" [ngModel]="createdFrom()" (ngModelChange)="createdFrom.set($event)" name="createdFrom" />
+            <app-datepicker end [ariaLabel]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
+          </app-filter-range>
+        </app-filter-field>
+      </app-filter-bar>
+    </div>
+  </div>
+</header>
+
+<div class="apps__layout">
+<!-- Mobil (≤768px) einklappbar: Toggle nur dort sichtbar, Desktop zeigt
+     den Baum unverändert immer (wie der Budget-Tab-Picker). -->
+<aside class="apps__tree">
+  <button
+    type="button"
+    class="apps__treeToggle"
+    [attr.aria-expanded]="treeOpen()"
+    (click)="treeOpen.set(!treeOpen())"
+  >
+    {{ 'applications.list.filter.budget' | t }}
+    <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="14" />
+  </button>
+  <div class="apps__treeBody" [class.apps__treeBody--open]="treeOpen()">
+    <app-cost-centre-tree
+      [nodes]="budgetTree()"
+      [selectedId]="budgetId()"
+      [allLabel]="'applications.list.filter.all' | t"
+      [ariaLabel]="'applications.list.filter.budget' | t"
+      (picked)="selectBudgetNode($event); treeOpen.set(false)"
+    />
+  </div>
+</aside>
+<div class="apps__main">
+@if (loading()) {
+  <p class="apps__status" aria-live="polite">{{ 'applications.list.loading' | t }}</p>
+} @else if (error()) {
+  <p class="apps__status apps__status--error" role="alert">
+    {{ 'applications.list.error' | t }}
+  </p>
+} @else {
+  <app-applications-table
+    [rows]="tableRows()"
+    [sort]="sortState()"
+    [emptyText]="'applications.list.empty' | t"
+    (sortChange)="onSort($event)"
+  />
+
+  <!-- Infinite-Scroll: Sentinel nur solange weitere Seiten existieren (#27). -->
+  @if (hasMore()) {
+    <div #sentinel class="apps__sentinel" aria-hidden="true"></div>
+    <div class="apps__more">
+      @if (loadingMore()) {
+        <span class="apps__status" aria-live="polite">{{ 'applications.list.loadingMore' | t }}</span>
+      } @else {
+        <app-button variant="secondary" size="sm" (click)="loadMore()">
+          {{ 'applications.list.loadMore' | t }}
+        </app-button>
+      }
+    </div>
+  }
+  @if (total() > 0) {
+    <p class="apps__count" aria-live="polite">
+      {{ 'applications.list.count' | t: { count: items().length, total: total() } }}
+    </p>
+  }
+}
+</div>
+</div>

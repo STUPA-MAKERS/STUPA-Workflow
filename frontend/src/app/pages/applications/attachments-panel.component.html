@@ -1,0 +1,70 @@
+<app-card [heading]="'applications.attachments.title' | t">
+  @if (canUpload()) {
+    <div class="att__upload">
+      <input
+        #fileInput
+        type="file"
+        class="att__file"
+        (change)="onFileSelected($event)"
+        [attr.aria-label]="'applications.attachments.upload' | t"
+      />
+      <app-button
+        type="button"
+        size="sm"
+        [loading]="uploading()"
+        (click)="fileInput.click()"
+      >
+        {{ (uploading() ? 'applications.attachments.uploading' : 'applications.attachments.upload') | t }}
+      </app-button>
+      <p class="att__hint">{{ 'applications.attachments.hint' | t }}</p>
+    </div>
+  }
+
+  @if (attachments().length) {
+    <ul class="att__list">
+      @for (att of attachments(); track att.id) {
+        <li class="att__item">
+          <div class="att__meta">
+            <span class="att__name">{{ att.filename }}</span>
+            <span class="att__size">{{ size(att) }}</span>
+            @if (att.isComparisonOffer) {
+              <app-badge variant="info">
+                {{ 'applications.attachments.comparisonOffer' | t }}
+              </app-badge>
+            }
+            <app-badge [variant]="scanVariant(att.scanState)">
+              {{ scanLabel(att.scanState) | t }}
+            </app-badge>
+          </div>
+          <div class="att__actions">
+            <app-button
+              variant="secondary"
+              size="sm"
+              [disabled]="att.scanState !== 'clean' || downloadingId() === att.id"
+              [loading]="downloadingId() === att.id"
+              (click)="download(att)"
+            >
+              {{ 'applications.attachments.download' | t }}
+            </app-button>
+            @if (canUpload()) {
+              <app-button
+                variant="ghost"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'applications.attachments.delete' | t"
+                [title]="'applications.attachments.delete' | t"
+                [disabled]="removingId() === att.id"
+                [loading]="removingId() === att.id"
+                (click)="remove(att)"
+              >
+                ✕
+              </app-button>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="att__muted">{{ 'applications.attachments.empty' | t }}</p>
+  }
+</app-card>

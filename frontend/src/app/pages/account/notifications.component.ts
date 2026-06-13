@@ -18,81 +18,8 @@ import { CheckboxComponent } from '@shared/ui';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, TranslatePipe, CheckboxComponent],
-  template: `
-    <section class="notif">
-      <header class="notif__head">
-        <h1>{{ 'account.notifications.title' | t }}</h1>
-        <p class="notif__intro">{{ 'account.notifications.intro' | t }}</p>
-      </header>
-
-      @if (error()) {
-        <p class="notif__error" role="alert">{{ $any(error()) | t }}</p>
-      }
-
-      <section class="card">
-        @if (loading()) {
-          <p class="notif__muted" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
-        } @else {
-          <ul class="notif__list">
-            @for (p of prefs(); track p.kind) {
-              <li class="notif__item">
-                <app-checkbox
-                  [ngModel]="p.enabled"
-                  (ngModelChange)="toggle(p.kind, $event)"
-                  [hint]="kindHint(p.kind)"
-                >
-                  {{ kindLabel(p.kind) }}
-                </app-checkbox>
-              </li>
-            }
-          </ul>
-        }
-      </section>
-    </section>
-  `,
-  styles: [
-    `
-      .notif {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-5);
-        max-width: 44rem;
-      }
-      .notif__head h1 {
-        margin: 0 0 var(--space-1);
-      }
-      .notif__intro {
-        margin: 0;
-        color: var(--color-text-muted);
-      }
-      .card {
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-lg);
-        padding: var(--space-4) var(--space-5);
-        background: var(--color-surface);
-      }
-      .notif__list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-3);
-      }
-      .notif__item + .notif__item {
-        border-top: var(--border-width) solid var(--color-border);
-        padding-top: var(--space-3);
-      }
-      .notif__muted {
-        color: var(--color-text-muted);
-        margin: 0;
-      }
-      .notif__error {
-        color: var(--color-danger);
-        margin: 0;
-      }
-    `,
-  ],
+  templateUrl: './notifications.component.html',
+  styleUrl: './notifications.component.scss',
 })
 export class AccountNotificationsComponent {
   private readonly api = inject(ApiClient);

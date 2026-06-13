@@ -41,78 +41,7 @@ function emptyHook(): WebhookConfig {
     DialogComponent,
     IconComponent,
   ],
-  template: `
-    <section class="cfg">
-      <header class="cfg__head">
-        <div>
-          <h1>{{ 'admin.webhook.title' | t }}</h1>
-          <p class="cfg__desc">{{ 'admin.webhook.desc' | t }}</p>
-        </div>
-        <app-button size="sm" (click)="openAdd()">{{ 'admin.webhook.add' | t }}</app-button>
-      </header>
-
-      <app-data-table [columns]="columns()" [rows]="hooks()" [emptyText]="'admin.webhook.none' | t">
-        <ng-template appCell="active" let-h>
-          @if ($any(h).active) {
-            <span class="cfg__yes" aria-label="✓">✓</span>
-          } @else {
-            <span class="cfg__no" aria-label="✗">✗</span>
-          }
-        </ng-template>
-        <ng-template appCell="events" let-h>
-          <app-badge variant="neutral">{{ $any(h).events.length }}</app-badge>
-        </ng-template>
-        <ng-template appCell="actions" let-h let-i="index">
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.edit' | t" (click)="openEdit(i)">
-            <app-icon name="edit" />
-          </app-button>
-        </ng-template>
-      </app-data-table>
-    </section>
-
-    <app-dialog
-      [open]="draft() !== null"
-      [title]="(editingIndex() === null ? 'admin.webhook.add' : 'admin.common.edit') | t"
-      [closeLabel]="'action.cancel' | t"
-      (closed)="close()"
-    >
-      @if (draft(); as d) {
-        <form class="cfg__form" (submit)="$event.preventDefault(); save()">
-          <label class="field">
-            <span class="field__label">{{ 'admin.webhook.name' | t }}</span>
-            <input class="field__control" [ngModel]="d.name" (ngModelChange)="patch('name', $event)" name="name" />
-          </label>
-          <label class="field">
-            <span class="field__label">{{ 'admin.webhook.url' | t }}</span>
-            <input class="field__control" [ngModel]="d.url" (ngModelChange)="patch('url', $event)" name="url" placeholder="https://" />
-          </label>
-          <app-checkbox [ngModel]="d.active" (ngModelChange)="patch('active', $event)" name="active">
-            {{ 'admin.webhook.active' | t }}
-          </app-checkbox>
-          <fieldset class="cfg__events">
-            <legend>{{ 'admin.webhook.events' | t }}</legend>
-            <p class="cfg__hint">{{ 'admin.webhook.eventsHint' | t }}</p>
-            @for (ev of allEvents; track ev) {
-              <app-checkbox [ngModel]="d.events.includes(ev)" (ngModelChange)="toggleEvent(ev)" [name]="'ev-' + ev">
-                {{ ev }}
-              </app-checkbox>
-            }
-          </fieldset>
-          @if (errors().length > 0) {
-            <ul class="cfg__errors" role="alert">
-              @for (e of errors(); track e) {
-                <li>{{ tr(e) }}</li>
-              }
-            </ul>
-          }
-        </form>
-      }
-      <div dialog-footer class="cfg__dialog-foot">
-        <app-button variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-        <app-button [disabled]="errors().length > 0" (click)="save()">{{ 'action.save' | t }}</app-button>
-      </div>
-    </app-dialog>
-  `,
+  templateUrl: './webhooks.component.html',
   styleUrl: './config.shared.scss',
 })
 export class WebhooksComponent {

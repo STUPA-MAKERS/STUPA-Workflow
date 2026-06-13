@@ -25,79 +25,8 @@ import { Markdown } from 'tiptap-markdown';
   selector: 'app-markdown-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<div #host class="mde__host" [class.mde__host--disabled]="disabled()"></div>`,
-  styles: [
-    `
-      :host {
-        display: block;
-      }
-      .mde__host {
-        min-height: 16rem;
-        padding: var(--space-3) var(--space-4);
-        background: var(--color-surface);
-        border: var(--border-width) solid var(--color-border-strong);
-        border-radius: var(--radius-md);
-        overflow-wrap: anywhere;
-      }
-      .mde__host--disabled {
-        opacity: 0.7;
-      }
-      .mde__host :first-child {
-        margin-top: 0;
-      }
-      .mde__host .ProseMirror {
-        outline: none;
-        min-height: 14rem;
-        line-height: 1.55;
-      }
-      .mde__host .ProseMirror h1 {
-        font-size: var(--fs-xl);
-      }
-      .mde__host .ProseMirror h2 {
-        font-size: var(--fs-lg);
-      }
-      .mde__host .ProseMirror h3 {
-        font-size: var(--fs-md);
-        font-weight: var(--fw-semibold);
-      }
-      .mde__host .ProseMirror ul,
-      .mde__host .ProseMirror ol {
-        padding-left: var(--space-5);
-        margin: var(--space-2) 0;
-      }
-      .mde__host .ProseMirror blockquote {
-        margin: var(--space-2) 0;
-        padding-left: var(--space-3);
-        border-left: 3px solid var(--color-border-strong);
-        color: var(--color-text-muted);
-      }
-      .mde__host .ProseMirror code {
-        background: var(--color-bg);
-        padding: 0 var(--space-1);
-        border-radius: var(--radius-sm);
-        font-size: 0.9em;
-      }
-      .mde__host .ProseMirror pre {
-        background: var(--color-bg);
-        padding: var(--space-3);
-        border-radius: var(--radius-md);
-        overflow-x: auto;
-      }
-      .mde__host .ProseMirror hr {
-        border: 0;
-        border-top: var(--border-width) solid var(--color-border);
-        margin: var(--space-3) 0;
-      }
-      /* Platzhalter, wenn leer (Tiptap setzt is-editor-empty auf den ersten Knoten). */
-      .mde__host .ProseMirror p.is-editor-empty:first-child::before {
-        content: attr(data-placeholder);
-        color: var(--color-text-muted);
-        float: left;
-        height: 0;
-        pointer-events: none;
-      }
-    `,
-  ],
+  templateUrl: './markdown-editor.component.html',
+  styleUrl: './markdown-editor.component.scss',
 })
 export class MarkdownEditorComponent implements OnDestroy {
   /** Anfangs-/Soll-Markdown des aktuellen Dokuments. */

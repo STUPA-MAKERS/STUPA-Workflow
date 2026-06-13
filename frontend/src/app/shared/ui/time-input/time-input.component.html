@@ -1,0 +1,24 @@
+<div class="ti">
+  @if (label) {
+    <label class="ti__label" [for]="id">
+      {{ label }}
+      @if (required) {
+        <span class="ti__req" aria-hidden="true">*</span>
+      }
+    </label>
+  }
+  <input
+    class="ti__text"
+    type="text"
+    inputmode="numeric"
+    autocomplete="off"
+    placeholder="HH:MM"
+    [id]="id"
+    [value]="display()"
+    [disabled]="disabled()"
+    [attr.aria-label]="!label && ariaLabel ? ariaLabel : null"
+    [attr.required]="required ? '' : null"
+    (input)="onText($any($event.target).value)"
+    (blur)="onBlur()"
+  />
+</div>

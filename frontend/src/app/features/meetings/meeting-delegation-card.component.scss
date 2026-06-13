@@ -1,0 +1,57 @@
+.dlg__sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.dlg__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* »Du vertrittst …«-Zeilen vom Einrichten-Block absetzen. */
+.dlg__section--incoming {
+  border-top: var(--border-width) solid var(--color-border);
+  padding-top: var(--space-3);
+}
+.dlg__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0;
+}
+.dlg__incoming {
+  font-size: var(--fs-sm);
+}
+.dlg__muted {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+.dlg__actions {
+  display: flex;
+  margin-top: var(--space-1);
+}
+.dlg__foot {
+  display: flex;
+  gap: var(--space-3);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.field__label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+.field__control {
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
+}

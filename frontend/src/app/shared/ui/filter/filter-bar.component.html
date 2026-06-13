@@ -1,0 +1,36 @@
+<div class="filter">
+  <app-button
+    variant="secondary"
+    size="sm"
+    [attr.aria-expanded]="open()"
+    (click)="toggle()"
+  >
+    <span class="filter__btn">
+      <app-icon name="filter" [size]="16" />
+      {{ label() || ('filter.button' | t) }}
+      @if (activeCount() > 0) {
+        <span class="filter__count" aria-hidden="true">{{ activeCount() }}</span>
+      }
+    </span>
+  </app-button>
+
+  @if (open()) {
+    <div class="filter__panel" role="dialog" [attr.aria-label]="label() || ('filter.button' | t)">
+      <div class="filter__fields">
+        <ng-content />
+      </div>
+      <div class="filter__actions">
+        @if (!live()) {
+          <app-button size="sm" (click)="emitApply()">
+            {{ applyLabel() || ('filter.apply' | t) }}
+          </app-button>
+        }
+        @if (live() ? activeCount() > 0 : true) {
+          <app-button variant="ghost" size="sm" (click)="emitReset()">
+            {{ resetLabel() || ('filter.reset' | t) }}
+          </app-button>
+        }
+      </div>
+    </div>
+  }
+</div>

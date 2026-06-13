@@ -1,0 +1,107 @@
+.roles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.roles__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.roles__sub {
+  color: var(--color-text-muted);
+}
+.roles__name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.roles__chevron {
+  color: var(--color-text-muted);
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+.roles__chevron--open {
+  transform: rotate(180deg);
+  color: var(--color-primary);
+}
+.roles__name {
+  font-weight: var(--fw-medium);
+}
+.roles__row-actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+.roles__key {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.roles__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+/* Umbenennen-Zeile: Key (schmal) + DE + EN als gleichmäßige Spalten (#16). */
+.roles__nameEdit {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.5fr) 1fr 1fr;
+  gap: var(--space-3) var(--space-4);
+  align-items: end;
+}
+.roles__lbl--key {
+  min-width: 0;
+}
+@media (max-width: 40rem) {
+  .roles__nameEdit {
+    grid-template-columns: 1fr;
+  }
+}
+.roles__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.roles__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+.roles__locked {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.roles__perm-on {
+  font-size: var(--fs-sm);
+  color: var(--color-success);
+}
+.roles__add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.roles__lbl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+.roles__lbl input {
+  height: var(--control-height);
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}

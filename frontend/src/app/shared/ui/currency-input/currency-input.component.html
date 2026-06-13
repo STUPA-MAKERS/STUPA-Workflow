@@ -1,0 +1,33 @@
+<div class="flex flex-col gap-1">
+  @if (label()) {
+    <label class="text-sm font-medium text-muted">
+      {{ label() }}
+      @if (required()) {
+        <span class="text-danger ms-[2px]" aria-hidden="true">*</span>
+      }
+    </label>
+  }
+  <span class="cur" [class.cur--disabled]="disabled()">
+    <input
+      class="cur__input"
+      type="text"
+      inputmode="decimal"
+      [value]="text()"
+      [disabled]="disabled()"
+      [attr.placeholder]="placeholder()"
+      [attr.aria-label]="ariaLabel() || label() || null"
+      [attr.aria-invalid]="error() ? 'true' : null"
+      [attr.name]="name() || null"
+      (focus)="onFocus()"
+      (input)="onInput($any($event.target).value)"
+      (blur)="onBlur()"
+    />
+    <span class="cur__symbol" aria-hidden="true">€</span>
+  </span>
+  @if (hint() && !error()) {
+    <p class="text-xs text-muted m-0">{{ hint() }}</p>
+  }
+  @if (error()) {
+    <p class="text-xs text-danger m-0" role="alert">{{ error() }}</p>
+  }
+</div>

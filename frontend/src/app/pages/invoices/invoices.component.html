@@ -1,0 +1,230 @@
+<div
+  class="inv"
+  (dragenter)="onDragEnter($event)"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+>
+  <header class="inv__head">
+    <div>
+      <h1 class="inv__title">{{ 'invoices.title' | t }}</h1>
+      <p class="inv__subtitle">{{ 'invoices.subtitle' | t }}</p>
+    </div>
+    <div class="inv__headActions">
+      <input
+        class="inv__search"
+        type="search"
+        [placeholder]="'invoices.search' | t"
+        [ngModel]="q()"
+        (ngModelChange)="q.set($event)"
+        [attr.aria-label]="'invoices.search' | t"
+      />
+      @if (canManage()) {
+        <input
+          #fileInput
+          type="file"
+          accept="application/pdf,.pdf"
+          class="inv__fileInput"
+          (change)="onFilePicked($event)"
+          [attr.aria-label]="'invoices.import' | t"
+        />
+        <app-button variant="secondary" size="sm" [loading]="importing()" (click)="fileInput.click()">
+          <span class="inv__btnIcon"><app-icon name="upload" [size]="16" /> {{ 'invoices.import' | t }}</span>
+        </app-button>
+        <app-button size="sm" (click)="openCreate()">{{ 'invoices.add' | t }}</app-button>
+      }
+    </div>
+  </header>
+
+  @if (loading()) {
+    <p class="inv__status" aria-live="polite">{{ 'invoices.loading' | t }}</p>
+  } @else if (visible().length === 0) {
+    <div class="inv__emptyCard">{{ 'invoices.empty' | t }}</div>
+  } @else {
+    <div class="inv__tableWrap">
+      <table class="inv__table">
+        <thead>
+          <tr>
+            <th scope="col">{{ 'invoices.col.issueDate' | t }}</th>
+            <th scope="col">{{ 'invoices.col.dueDate' | t }}</th>
+            <th scope="col">{{ 'invoices.col.number' | t }}</th>
+            <th scope="col">{{ 'invoices.col.supplier' | t }}</th>
+            <th scope="col" class="inv__num">{{ 'invoices.col.net' | t }}</th>
+            <th scope="col" class="inv__num">{{ 'invoices.col.tax' | t }}</th>
+            <th scope="col" class="inv__num">{{ 'invoices.col.gross' | t }}</th>
+            <th scope="col">{{ 'invoices.col.status' | t }}</th>
+            <th scope="col">{{ 'invoices.col.file' | t }}</th>
+            @if (canManage()) { <th scope="col" class="inv__num"></th> }
+          </tr>
+        </thead>
+        <tbody>
+          @for (i of visible(); track i.id) {
+            <tr [attr.title]="i.actor ? ('invoices.bookedBy' | t: { actor: i.actor }) : null">
+              <td class="inv__cellDate">{{ i.issueDate ? (i.issueDate | ldate: 'mediumDate') : '—' }}</td>
+              <td class="inv__cellDate">{{ i.dueDate ? (i.dueDate | ldate: 'mediumDate') : '—' }}</td>
+              <td class="inv__cellNumber">{{ i.number || '—' }}</td>
+              <td class="inv__cellSupplier">{{ i.supplier || '—' }}</td>
+              <td class="inv__num inv__mono">{{ i.netAmount ? money(i.netAmount) : '—' }}</td>
+              <td class="inv__num inv__mono">{{ i.taxAmount ? money(i.taxAmount) : '—' }}</td>
+              <td class="inv__num inv__amount">{{ money(i.grossAmount) }}</td>
+              <td class="inv__cellStatus">
+                <app-badge [variant]="i.status === 'paid' ? 'success' : 'warning'">{{ statusLabel(i.status) }}</app-badge>
+              </td>
+              <td class="inv__cellFile">
+                @if (i.hasFile) {
+                  <button type="button" class="inv__fileLink" (click)="openFile(i)">
+                    <app-icon name="export" [size]="14" /> {{ i.fileName || ('invoices.openFile' | t) }}
+                  </button>
+                } @else { — }
+              </td>
+              @if (canManage()) {
+                <td class="inv__num">
+                  <span class="inv__actions">
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(i)"><app-icon name="edit" /></app-button>
+                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(i)"><app-icon name="delete" /></app-button>
+                  </span>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Drop-Overlay (#15): erscheint, solange eine Datei über dem Tab schwebt. -->
+  @if (dragActive()) {
+    <div class="inv__dropOverlay" aria-hidden="true">
+      <div class="inv__dropInner">
+        <app-icon name="upload" [size]="32" />
+        <span>{{ 'invoices.drop' | t }}</span>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Anlegen / Import-Review -->
+<app-dialog
+  [open]="createOpen()"
+  [title]="(importToken() ? 'invoices.importReview' : 'invoices.add') | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="createOpen.set(false)"
+>
+  <form id="inv-create" class="inv__form" (submit)="create($event)">
+    @if (importToken()) {
+      <div class="inv__fileChip">
+        <app-icon name="document" [size]="16" />
+        <span class="inv__fileChipName">{{ importFileName() }}</span>
+        <button
+          type="button"
+          class="inv__fileChipRemove"
+          [attr.aria-label]="'invoices.removeBeleg' | t"
+          [title]="'invoices.removeBeleg' | t"
+          (click)="clearAttachment()"
+        >✕</button>
+      </div>
+    } @else {
+      <input
+        #createFile
+        type="file"
+        accept="application/pdf,.pdf"
+        class="inv__fileInput"
+        (change)="onCreateFilePicked($event)"
+        [attr.aria-label]="'invoices.attachBeleg' | t"
+      />
+      <app-button type="button" variant="secondary" size="sm" [loading]="attaching()" (click)="createFile.click()">
+        <span class="inv__btnIcon"><app-icon name="upload" [size]="16" /> {{ 'invoices.attachBeleg' | t }}</span>
+      </app-button>
+    }
+
+    <div class="inv__grid2">
+      <div class="inv__field">
+        <label class="inv__label" for="inv-number">{{ 'invoices.field.number' | t }}</label>
+        <input id="inv-number" class="inv__input" name="number" [ngModel]="newNumber()" (ngModelChange)="newNumber.set($event)" />
+      </div>
+      <div class="inv__field">
+        <label class="inv__label" for="inv-supplier">{{ 'invoices.field.supplier' | t }}</label>
+        <input id="inv-supplier" class="inv__input" name="supplier" [ngModel]="newSupplier()" (ngModelChange)="newSupplier.set($event)" />
+      </div>
+    </div>
+
+    <div class="inv__grid2">
+      <app-datepicker name="issue" [label]="'invoices.field.issueDate' | t" [ngModel]="newIssueDate()" (ngModelChange)="newIssueDate.set($event)" />
+      <app-datepicker name="due" [label]="'invoices.field.dueDate' | t" [ngModel]="newDueDate()" (ngModelChange)="newDueDate.set($event)" />
+    </div>
+
+    <div class="inv__grid3">
+      <div class="inv__field">
+        <label class="inv__label">{{ 'invoices.field.net' | t }}</label>
+        <app-currency-input name="net" [ngModel]="newNet()" (ngModelChange)="newNet.set($event)" [ariaLabel]="'invoices.field.net' | t" />
+      </div>
+      <div class="inv__field">
+        <label class="inv__label">{{ 'invoices.field.tax' | t }}</label>
+        <app-currency-input name="tax" [ngModel]="newTax()" (ngModelChange)="newTax.set($event)" [ariaLabel]="'invoices.field.tax' | t" />
+      </div>
+      <div class="inv__field">
+        <label class="inv__label">{{ 'invoices.field.gross' | t }} *</label>
+        <app-currency-input name="gross" [ngModel]="newGross()" (ngModelChange)="newGross.set($event)" [ariaLabel]="'invoices.field.gross' | t" />
+      </div>
+    </div>
+
+    <app-select name="status" [label]="'invoices.field.status' | t" [options]="statusOptions()" [ngModel]="newStatus()" (ngModelChange)="newStatus.set($event)" />
+
+    <label class="inv__label" for="inv-note">{{ 'invoices.field.note' | t }}</label>
+    <textarea id="inv-note" class="inv__input inv__textarea" name="note" rows="3" [ngModel]="newNote()" (ngModelChange)="newNote.set($event)"></textarea>
+  </form>
+  <div dialog-footer class="inv__dialogFoot">
+    <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button [disabled]="!canSubmitCreate()" [loading]="saving()" (click)="create($event)">{{ 'invoices.add' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Bearbeiten -->
+<app-dialog [open]="!!editing()" [title]="'invoices.edit' | t" [closeLabel]="'action.cancel' | t" (closed)="editing.set(null)">
+  <form id="inv-edit" class="inv__form" (submit)="saveEdit($event)">
+    <div class="inv__grid2">
+      <div class="inv__field">
+        <label class="inv__label" for="inv-enumber">{{ 'invoices.field.number' | t }}</label>
+        <input id="inv-enumber" class="inv__input" name="enumber" [ngModel]="editNumber()" (ngModelChange)="editNumber.set($event)" />
+      </div>
+      <div class="inv__field">
+        <label class="inv__label" for="inv-esupplier">{{ 'invoices.field.supplier' | t }}</label>
+        <input id="inv-esupplier" class="inv__input" name="esupplier" [ngModel]="editSupplier()" (ngModelChange)="editSupplier.set($event)" />
+      </div>
+    </div>
+    <div class="inv__grid2">
+      <app-datepicker name="eissue" [label]="'invoices.field.issueDate' | t" [ngModel]="editIssueDate()" (ngModelChange)="editIssueDate.set($event)" />
+      <app-datepicker name="edue" [label]="'invoices.field.dueDate' | t" [ngModel]="editDueDate()" (ngModelChange)="editDueDate.set($event)" />
+    </div>
+    <div class="inv__grid3">
+      <div class="inv__field">
+        <label class="inv__label">{{ 'invoices.field.net' | t }}</label>
+        <app-currency-input name="enet" [ngModel]="editNet()" (ngModelChange)="editNet.set($event)" [ariaLabel]="'invoices.field.net' | t" />
+      </div>
+      <div class="inv__field">
+        <label class="inv__label">{{ 'invoices.field.tax' | t }}</label>
+        <app-currency-input name="etax" [ngModel]="editTax()" (ngModelChange)="editTax.set($event)" [ariaLabel]="'invoices.field.tax' | t" />
+      </div>
+      <div class="inv__field">
+        <label class="inv__label">{{ 'invoices.field.gross' | t }} *</label>
+        <app-currency-input name="egross" [ngModel]="editGross()" (ngModelChange)="editGross.set($event)" [ariaLabel]="'invoices.field.gross' | t" />
+      </div>
+    </div>
+    <app-select name="estatus" [label]="'invoices.field.status' | t" [options]="statusOptions()" [ngModel]="editStatus()" (ngModelChange)="editStatus.set($event)" />
+    <label class="inv__label" for="inv-enote">{{ 'invoices.field.note' | t }}</label>
+    <textarea id="inv-enote" class="inv__input inv__textarea" name="enote" rows="3" [ngModel]="editNote()" (ngModelChange)="editNote.set($event)"></textarea>
+  </form>
+  <div dialog-footer class="inv__dialogFoot">
+    <app-button variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button [disabled]="!(editGrossValid())" [loading]="saving()" (click)="saveEdit($event)">{{ 'action.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Löschen -->
+<app-dialog [open]="!!confirmDelete()" [title]="'invoices.delete.title' | t" [closeLabel]="'action.cancel' | t" (closed)="confirmDelete.set(null)">
+  <p>{{ 'invoices.delete.body' | t: { number: confirmDelete()?.number ?? '' } }}</p>
+  <div dialog-footer class="inv__dialogFoot">
+    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'invoices.delete.confirm' | t }}</app-button>
+  </div>
+</app-dialog>

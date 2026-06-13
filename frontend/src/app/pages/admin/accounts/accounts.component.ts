@@ -33,69 +33,8 @@ import { BudgetTreeApi, type Account } from '../../budget/budget-tree.api';
     DialogComponent,
     IconComponent,
   ],
-  template: `
-    <header class="acc__head">
-      <div>
-        <h1 class="acc__title">{{ 'admin.accounts.title' | t }}</h1>
-        <p class="acc__subtitle">{{ 'admin.accounts.desc' | t }}</p>
-      </div>
-      <app-button size="sm" (click)="openCreate()">{{ 'admin.accounts.add' | t }}</app-button>
-    </header>
-
-    <app-data-table [columns]="columns()" [rows]="accounts()" [rowKey]="rowId" [emptyText]="'admin.accounts.empty' | t">
-      <ng-template appCell="name" let-row>{{ $any(row).name }}</ng-template>
-      <ng-template appCell="iban" let-row><span class="acc__mono">{{ $any(row).iban || '—' }}</span></ng-template>
-      <ng-template appCell="active" let-row>
-        <app-badge [variant]="$any(row).active ? 'success' : 'neutral'">{{ ($any(row).active ? 'admin.accounts.active' : 'admin.accounts.inactive') | t }}</app-badge>
-      </ng-template>
-      <ng-template appCell="actions" let-row>
-        <span class="acc__actions">
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" (click)="openEdit($any(row))"><app-icon name="edit" /></app-button>
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" (click)="confirmDelete.set($any(row))"><app-icon name="delete" /></app-button>
-        </span>
-      </ng-template>
-    </app-data-table>
-
-    <app-dialog [open]="dialogOpen()" [title]="(editing() ? 'admin.accounts.edit' : 'admin.accounts.add') | t" [closeLabel]="'action.cancel' | t" (closed)="dialogOpen.set(false)">
-      <form id="acc-form" class="acc__form" (submit)="save($event)">
-        <label class="acc__label" for="acc-name">{{ 'admin.accounts.name' | t }}
-          <input id="acc-name" [ngModel]="fName()" (ngModelChange)="fName.set($event)" name="name" /></label>
-        <label class="acc__label" for="acc-iban">{{ 'admin.accounts.iban' | t }}
-          <input id="acc-iban" [ngModel]="fIban()" (ngModelChange)="fIban.set($event)" name="iban" [placeholder]="'admin.accounts.ibanPlaceholder' | t" /></label>
-        <label class="acc__check">
-          <input type="checkbox" [checked]="fActive()" (change)="fActive.set($any($event.target).checked)" />
-          <span>{{ 'admin.accounts.active' | t }}</span>
-        </label>
-      </form>
-      <div dialog-footer class="acc__foot">
-        <app-button variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-        <app-button [disabled]="!fName().trim()" [loading]="saving()" (click)="save($event)">{{ 'action.save' | t }}</app-button>
-      </div>
-    </app-dialog>
-
-    <app-dialog [open]="!!confirmDelete()" [title]="'admin.accounts.delete' | t" [closeLabel]="'action.cancel' | t" (closed)="confirmDelete.set(null)">
-      <p>{{ 'admin.accounts.deleteBody' | t: { name: confirmDelete()?.name ?? '' } }}</p>
-      <div dialog-footer class="acc__foot">
-        <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-        <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'admin.accounts.deleteConfirm' | t }}</app-button>
-      </div>
-    </app-dialog>
-  `,
-  styles: [
-    `
-      :host { display: block; }
-      .acc__head { display: flex; align-items: start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); flex-wrap: wrap; }
-      .acc__title { margin: 0; }
-      .acc__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
-      .acc__mono { font-variant-numeric: tabular-nums; }
-      .acc__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
-      .acc__form { display: flex; flex-direction: column; gap: var(--space-3); }
-      .acc__label { display: flex; flex-direction: column; gap: var(--space-1); }
-      .acc__label input { padding: var(--space-2) var(--space-3); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: inherit; }
-      .acc__check { display: flex; align-items: center; gap: var(--space-2); }
-      .acc__foot { display: flex; gap: var(--space-3); }
-    `,
-  ],
+  templateUrl: './accounts.component.html',
+  styleUrl: './accounts.component.scss',
 })
 export class AccountsComponent {
   private readonly api = inject(BudgetTreeApi);

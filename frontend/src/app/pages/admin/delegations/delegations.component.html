@@ -1,0 +1,67 @@
+<section class="cfg">
+  <header class="cfg__head">
+    <h1>{{ 'admin.deleg.title' | t }}</h1>
+  </header>
+  <p class="cfg__empty">{{ 'admin.deleg.subtitle' | t }}</p>
+
+  @if (loading()) {
+    <p class="cfg__empty" aria-live="polite">{{ 'admin.deleg.loading' | t }}</p>
+  } @else if (loadError()) {
+    <p class="cfg__empty" role="alert">{{ 'admin.deleg.error' | t }}</p>
+  } @else {
+    <app-data-table
+      [columns]="columns()"
+      [rows]="delegations()"
+      [rowKey]="rowId"
+      [emptyText]="'admin.deleg.none' | t"
+    >
+      <ng-template appCell="meeting" let-d>
+        <a [routerLink]="['/meetings', $any(d).meetingId]">
+          {{ $any(d).meetingTitle || $any(d).meetingId }}
+        </a>
+        @if ($any(d).meetingDate) {
+          <span class="cfg__muted"> · {{ $any(d).meetingDate | ldate: 'mediumDate' }}</span>
+        }
+      </ng-template>
+      <ng-template appCell="who" let-d>
+        {{ $any(d).delegatorName || $any(d).delegatorId }} →
+        {{ $any(d).delegateName || $any(d).delegateId }}
+      </ng-template>
+      <ng-template appCell="flags" let-d>
+        @if ($any(d).delegateVoting) {
+          <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+        }
+        @if ($any(d).viaPool) {
+          <app-badge variant="neutral">{{ 'delegation.card.poolBadge' | t }}</app-badge>
+        }
+      </ng-template>
+      <ng-template appCell="actions" let-d>
+        <app-button
+          variant="ghost"
+          size="sm"
+          [ariaLabel]="'admin.deleg.revoke' | t"
+          (click)="askRevoke($any(d))"
+        >
+          {{ 'admin.deleg.revoke' | t }}
+        </app-button>
+      </ng-template>
+    </app-data-table>
+  }
+</section>
+
+<app-dialog
+  [open]="confirmRevoke() !== null"
+  [title]="'admin.deleg.revokeTitle' | t"
+  [closeLabel]="'admin.deleg.cancel' | t"
+  (closed)="confirmRevoke.set(null)"
+>
+  <p>{{ 'admin.deleg.revokeConfirm' | t: { name: confirmRevoke()?.delegateName ?? '' } }}</p>
+  <div dialog-footer class="cfg__row-foot">
+    <app-button variant="ghost" (click)="confirmRevoke.set(null)">
+      {{ 'admin.deleg.cancel' | t }}
+    </app-button>
+    <app-button variant="danger" [loading]="busy()" (click)="revoke()">
+      {{ 'admin.deleg.revoke' | t }}
+    </app-button>
+  </div>
+</app-dialog>

@@ -1,0 +1,323 @@
+<header class="exp__head">
+  <div class="exp__headRow">
+    <div>
+      <h1 class="exp__title">{{ 'expenses.title' | t }}</h1>
+      <p class="exp__subtitle">{{ 'expenses.subtitle' | t }}</p>
+    </div>
+    <div class="exp__headActions">
+      <input
+        class="exp__search"
+        type="search"
+        [placeholder]="'expenses.search' | t"
+        [ngModel]="q()"
+        (ngModelChange)="onSearch($event)"
+        [attr.aria-label]="'expenses.search' | t"
+      />
+      <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+        <app-filter-field [label]="'expenses.filter.kind' | t">
+          <div class="exp__kinds">
+            <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
+            <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+            <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
+          </div>
+        </app-filter-field>
+        <app-filter-field [label]="'expenses.filter.amountRange' | t">
+          <app-filter-range>
+            <app-currency-input start [placeholder]="'expenses.filter.amountMin' | t" [ariaLabel]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
+            <app-currency-input end [placeholder]="'expenses.filter.amountMax' | t" [ariaLabel]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
+          </app-filter-range>
+        </app-filter-field>
+        <app-filter-field [label]="'expenses.filter.dateRange' | t">
+          <app-filter-range>
+            <app-datepicker start [ariaLabel]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
+            <app-datepicker end [ariaLabel]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
+          </app-filter-range>
+        </app-filter-field>
+      </app-filter-bar>
+      @if (canExport()) {
+        <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
+          <span class="exp__btnIcon"><app-icon name="export" [size]="16" /> {{ 'expenses.export' | t }}</span>
+        </app-button>
+      }
+      @if (canManage()) {
+        <app-button variant="secondary" size="sm" (click)="openTransfer()">{{ 'expenses.transfer' | t }}</app-button>
+        <app-button size="sm" (click)="openCreate()">{{ 'expenses.add' | t }}</app-button>
+      }
+    </div>
+  </div>
+</header>
+
+<div class="exp__layout">
+  <!-- Mobil (≤768px) einklappbar: Toggle nur dort sichtbar, Desktop zeigt
+       den Baum unverändert immer (wie der Budget-Tab-Picker). -->
+  <aside class="exp__tree">
+    <button
+      type="button"
+      class="exp__treeToggle"
+      [attr.aria-expanded]="treeOpen()"
+      (click)="treeOpen.set(!treeOpen())"
+    >
+      {{ 'expenses.filter.costCentre' | t }}
+      <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="14" />
+    </button>
+    <div class="exp__treeBody" [class.exp__treeBody--open]="treeOpen()">
+      <app-cost-centre-tree
+        [nodes]="budgetTree()"
+        [selectedId]="budgetId()"
+        [allLabel]="'expenses.filter.allCostCentres' | t"
+        [ariaLabel]="'expenses.filter.costCentre' | t"
+        (picked)="selectBudget($event); treeOpen.set(false)"
+      />
+    </div>
+  </aside>
+
+  <div class="exp__main">
+    @if (loading()) {
+      <p class="exp__status" aria-live="polite">{{ 'expenses.loading' | t }}</p>
+    } @else {
+      <div class="exp__tableWrap">
+        <table class="exp__table">
+          <thead>
+            <tr>
+              <th scope="col" [attr.aria-sort]="ariaSort('invoiceDate')">
+                <button type="button" class="exp__sort" (click)="onSort('invoiceDate')">{{ 'expenses.col.invoiceDate' | t }}{{ sortInd('invoiceDate') }}</button>
+              </th>
+              <th scope="col" [attr.aria-sort]="ariaSort('paymentDate')">
+                <button type="button" class="exp__sort" (click)="onSort('paymentDate')">{{ 'expenses.col.paymentDate' | t }}{{ sortInd('paymentDate') }}</button>
+              </th>
+              <th scope="col">{{ 'expenses.col.kind' | t }}</th>
+              <th scope="col">{{ 'expenses.col.description' | t }}</th>
+              <th scope="col">{{ 'expenses.col.correspondent' | t }}</th>
+              <th scope="col">{{ 'expenses.col.costCentre' | t }}</th>
+              <th scope="col">{{ 'expenses.col.application' | t }}</th>
+              <th scope="col">{{ 'expenses.col.account' | t }}</th>
+              <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
+                <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'expenses.col.amount' | t }}{{ sortInd('amount') }}</button>
+              </th>
+              @if (canManage()) { <th scope="col" class="exp__num"></th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (e of items(); track e.id) {
+              <tr [class.exp__tr--income]="e.kind === 'income'" [attr.title]="e.actor ? ('expenses.bookedBy' | t: { actor: e.actor }) : null">
+                <td class="exp__cellDate">{{ e.invoiceDate ? (e.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
+                <td class="exp__cellDate">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</td>
+                <td class="exp__cellKind">
+                  <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
+                </td>
+                <td class="exp__cellDesc">{{ e.description }}</td>
+                <td class="exp__cellMeta">{{ e.correspondent || '—' }}</td>
+                <td class="exp__mono exp__cellMeta">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
+                <td class="exp__cellMeta">
+                  @if (e.applicationId) {
+                    <a class="exp__appLink" [routerLink]="['/applications', e.applicationId]">{{ e.applicationTitle || ('expenses.linkedApplication' | t) }}</a>
+                  } @else { — }
+                </td>
+                <td class="exp__cellMeta">{{ e.accountName || '—' }}</td>
+                <td class="exp__num exp__amount" [class.exp__amount--income]="e.kind === 'income'">{{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}</td>
+                @if (canManage()) {
+                  <td class="exp__num">
+                    <span class="exp__actions">
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(e)"><app-icon name="edit" /></app-button>
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(e)"><app-icon name="delete" /></app-button>
+                    </span>
+                  </td>
+                }
+              </tr>
+            } @empty {
+              <tr>
+                <td class="exp__empty" [attr.colspan]="canManage() ? 10 : 9">{{ 'expenses.empty' | t }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (hasMore()) {
+        <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
+        <div class="exp__more">
+          @if (loadingMore()) {
+            <span class="exp__status">{{ 'expenses.loadingMore' | t }}</span>
+          } @else {
+            <app-button variant="secondary" size="sm" (click)="loadMore()">{{ 'expenses.loadMore' | t }}</app-button>
+          }
+        </div>
+      }
+      @if (total() > 0) {
+        <p class="exp__count">{{ 'expenses.count' | t: { count: items().length, total: total() } }}</p>
+      }
+    }
+  </div>
+</div>
+
+<!-- Anlegen -->
+<app-dialog [open]="createOpen()" [title]="'expenses.add' | t" [closeLabel]="'action.cancel' | t" (closed)="createOpen.set(false)">
+  <form id="exp-create" class="exp__form" (submit)="create($event)">
+    <div class="exp__kinds">
+      <app-button type="button" [variant]="newKind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="newKind.set('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+      <app-button type="button" [variant]="newKind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setNewKindIncome()">{{ 'expenses.kind.income' | t }}</app-button>
+    </div>
+
+    <label class="exp__label" for="exp-desc">{{ 'expenses.field.description' | t }}</label>
+    <input id="exp-desc" class="exp__input" [ngModel]="newDescription()" (ngModelChange)="newDescription.set($event)" name="description" [placeholder]="'expenses.field.descriptionPlaceholder' | t" />
+
+    <label class="exp__label" for="exp-amount">{{ 'expenses.field.amount' | t }}</label>
+    <app-currency-input name="amount" [ngModel]="newAmount()" (ngModelChange)="newAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
+
+    @if (newKind() === 'expense') {
+      <label class="exp__label" for="exp-app">{{ 'expenses.field.linkApplication' | t }}</label>
+      @if (newApplicationId()) {
+        <div class="exp__picked">
+          <span class="exp__pickedText">{{ appQuery() }}</span>
+          <app-button type="button" variant="ghost" size="sm" (click)="clearApp()">{{ 'expenses.field.unlink' | t }}</app-button>
+        </div>
+        <p class="exp__hint">{{ 'expenses.field.inheritedCostCentre' | t }}</p>
+      } @else {
+        <div class="exp__typeahead">
+          <input
+            id="exp-app"
+            class="exp__input"
+            type="search"
+            autocomplete="off"
+            [ngModel]="appQuery()"
+            (ngModelChange)="onAppSearch($event)"
+            name="appSearch"
+            [placeholder]="'expenses.field.linkApplicationPlaceholder' | t"
+            role="combobox"
+            [attr.aria-expanded]="appCandidates().length > 0"
+            aria-autocomplete="list"
+          />
+          @if (appCandidates().length) {
+            <ul class="exp__suggest" role="listbox">
+              @for (a of appCandidates(); track a.id) {
+                <li>
+                  <button type="button" class="exp__suggestItem" (click)="pickApp(a)">{{ a.title }}</button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      }
+    }
+
+    @if (!newApplicationId()) {
+      <app-select name="cc" [label]="'expenses.field.costCentre' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="newBudgetId()" (ngModelChange)="onPickBudget($event)" />
+      @if (newBudgetId()) {
+        @if (fiscalYearOptions().length) {
+          <app-select name="fy" [label]="'expenses.field.fiscalYear' | t" [placeholder]="'expenses.field.fiscalYearPlaceholder' | t" [options]="fiscalYearOptions()" [required]="true" [ngModel]="newFiscalYearId()" (ngModelChange)="newFiscalYearId.set($event)" />
+        } @else {
+          <p class="exp__hint exp__hint--warn">{{ 'expenses.field.noFiscalYear' | t }}</p>
+        }
+      }
+    }
+
+    @if (accountOptions().length) {
+      <app-select name="account" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="newAccountId()" (ngModelChange)="newAccountId.set($event)" />
+    }
+
+    @if (invoiceOptions().length) {
+      <app-select name="invoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="newInvoiceId()" (ngModelChange)="onPickInvoice($event)" />
+    }
+
+    <div class="exp__grid2">
+      <app-datepicker name="invDate" [label]="'expenses.field.invoiceDate' | t" [ngModel]="newInvoiceDate()" (ngModelChange)="newInvoiceDate.set($event)" />
+      <app-datepicker name="payDate" [label]="'expenses.field.paymentDate' | t" [ngModel]="newPaymentDate()" (ngModelChange)="newPaymentDate.set($event)" />
+    </div>
+
+    <label class="exp__label" for="exp-corr">{{ 'expenses.field.correspondent' | t }}</label>
+    <input id="exp-corr" class="exp__input" name="corr" [ngModel]="newCorrespondent()" (ngModelChange)="newCorrespondent.set($event)" [placeholder]="'expenses.field.correspondentPlaceholder' | t" />
+
+    <div class="exp__grid2">
+      <div class="exp__field">
+        <label class="exp__label" for="exp-ref">{{ 'expenses.field.referenceNumber' | t }}</label>
+        <input id="exp-ref" class="exp__input" name="ref" [ngModel]="newReferenceNumber()" (ngModelChange)="newReferenceNumber.set($event)" />
+      </div>
+      <app-select name="paymethod" [label]="'expenses.field.paymentMethod' | t" [placeholder]="'expenses.field.paymentMethodPlaceholder' | t" [options]="paymentMethodOptions()" [ngModel]="newPaymentMethod()" (ngModelChange)="newPaymentMethod.set($event)" />
+    </div>
+
+    <label class="exp__label" for="exp-cat">{{ 'expenses.field.category' | t }}</label>
+    <input id="exp-cat" class="exp__input" name="cat" [ngModel]="newCategory()" (ngModelChange)="newCategory.set($event)" />
+
+    <label class="exp__label" for="exp-note">{{ 'expenses.field.note' | t }}</label>
+    <textarea id="exp-note" class="exp__input exp__textarea" name="note" rows="3" [ngModel]="newNote()" (ngModelChange)="newNote.set($event)"></textarea>
+  </form>
+  <div dialog-footer class="exp__dialogFoot">
+    <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button [disabled]="!canSubmitCreate()" [loading]="saving()" (click)="create($event)">{{ 'expenses.add' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Bearbeiten -->
+<app-dialog [open]="!!editing()" [title]="'expenses.edit' | t" [closeLabel]="'action.cancel' | t" (closed)="editing.set(null)">
+  <form id="exp-edit" class="exp__form" (submit)="saveEdit($event)">
+    <label class="exp__label" for="exp-edesc">{{ 'expenses.field.description' | t }}</label>
+    <input id="exp-edesc" class="exp__input" [ngModel]="editDescription()" (ngModelChange)="editDescription.set($event)" name="edesc" />
+    <label class="exp__label" for="exp-eamount">{{ 'expenses.field.amount' | t }}</label>
+    <app-currency-input name="eamount" [ngModel]="editAmount()" (ngModelChange)="editAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
+
+    @if (accountOptions().length) {
+      <app-select name="eaccount" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="editAccountId()" (ngModelChange)="editAccountId.set($event)" />
+    }
+
+    @if (invoiceOptions().length) {
+      <app-select name="einvoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="editInvoiceId()" (ngModelChange)="onPickEditInvoice($event)" />
+    }
+
+    <div class="exp__grid2">
+      <app-datepicker name="einvDate" [label]="'expenses.field.invoiceDate' | t" [ngModel]="editInvoiceDate()" (ngModelChange)="editInvoiceDate.set($event)" />
+      <app-datepicker name="epayDate" [label]="'expenses.field.paymentDate' | t" [ngModel]="editPaymentDate()" (ngModelChange)="editPaymentDate.set($event)" />
+    </div>
+
+    <label class="exp__label" for="exp-ecorr">{{ 'expenses.field.correspondent' | t }}</label>
+    <input id="exp-ecorr" class="exp__input" name="ecorr" [ngModel]="editCorrespondent()" (ngModelChange)="editCorrespondent.set($event)" [placeholder]="'expenses.field.correspondentPlaceholder' | t" />
+
+    <div class="exp__grid2">
+      <div class="exp__field">
+        <label class="exp__label" for="exp-eref">{{ 'expenses.field.referenceNumber' | t }}</label>
+        <input id="exp-eref" class="exp__input" name="eref" [ngModel]="editReferenceNumber()" (ngModelChange)="editReferenceNumber.set($event)" />
+      </div>
+      <app-select name="epaymethod" [label]="'expenses.field.paymentMethod' | t" [placeholder]="'expenses.field.paymentMethodPlaceholder' | t" [options]="paymentMethodOptions()" [ngModel]="editPaymentMethod()" (ngModelChange)="editPaymentMethod.set($event)" />
+    </div>
+
+    <label class="exp__label" for="exp-ecat">{{ 'expenses.field.category' | t }}</label>
+    <input id="exp-ecat" class="exp__input" name="ecat" [ngModel]="editCategory()" (ngModelChange)="editCategory.set($event)" />
+
+    <label class="exp__label" for="exp-enote">{{ 'expenses.field.note' | t }}</label>
+    <textarea id="exp-enote" class="exp__input exp__textarea" name="enote" rows="3" [ngModel]="editNote()" (ngModelChange)="editNote.set($event)"></textarea>
+  </form>
+  <div dialog-footer class="exp__dialogFoot">
+    <app-button variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button [loading]="saving()" (click)="saveEdit($event)">{{ 'action.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Löschen -->
+<app-dialog [open]="!!confirmDelete()" [title]="'expenses.delete.title' | t" [closeLabel]="'action.cancel' | t" (closed)="confirmDelete.set(null)">
+  <p>{{ 'expenses.delete.body' | t: { description: confirmDelete()?.description ?? '' } }}</p>
+  <div dialog-footer class="exp__dialogFoot">
+    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'expenses.delete.confirm' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Übertrag (KS → KS) -->
+<app-dialog [open]="transferOpen()" [title]="'expenses.transferTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="transferOpen.set(false)">
+  <form id="exp-transfer" class="exp__form" (submit)="createTransfer($event)">
+    <app-select name="tfrom" [label]="'expenses.transferFrom' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="tFromId()" (ngModelChange)="onTransferFrom($event)" />
+    <app-select name="tto" [label]="'expenses.transferTo' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="tToId()" (ngModelChange)="tToId.set($event)" />
+    @if (tFromId()) {
+      @if (transferFyOptions().length) {
+        <app-select name="tfy" [label]="'expenses.field.fiscalYear' | t" [placeholder]="'expenses.field.fiscalYearPlaceholder' | t" [options]="transferFyOptions()" [required]="true" [ngModel]="tFiscalYearId()" (ngModelChange)="tFiscalYearId.set($event)" />
+      } @else {
+        <p class="exp__hint exp__hint--warn">{{ 'expenses.field.noFiscalYear' | t }}</p>
+      }
+    }
+    <label class="exp__label" for="exp-tamount">{{ 'expenses.field.amount' | t }}</label>
+    <app-currency-input name="tamount" [ngModel]="tAmount()" (ngModelChange)="tAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
+    <label class="exp__label" for="exp-tdesc">{{ 'expenses.field.description' | t }}</label>
+    <input id="exp-tdesc" class="exp__input" [ngModel]="tDescription()" (ngModelChange)="tDescription.set($event)" name="tdesc" [placeholder]="'expenses.field.descriptionPlaceholder' | t" />
+  </form>
+  <div dialog-footer class="exp__dialogFoot">
+    <app-button variant="ghost" (click)="transferOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button [disabled]="!canSubmitTransfer()" [loading]="saving()" (click)="createTransfer($event)">{{ 'expenses.transferConfirm' | t }}</app-button>
+  </div>
+</app-dialog>

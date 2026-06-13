@@ -1,0 +1,16 @@
+<label class="cbx" [class.cbx--disabled]="disabled()" [for]="id">
+  <input
+    class="cbx__input"
+    type="checkbox"
+    [id]="id"
+    [checked]="checked()"
+    [disabled]="disabled()"
+    [attr.aria-describedby]="hint ? id + '-hint' : null"
+    (change)="onToggle($event)"
+    (blur)="onTouched()"
+  />
+  <span class="cbx__label"><ng-content /></span>
+</label>
+@if (hint) {
+  <p class="cbx__hint" [id]="id + '-hint'">{{ hint }}</p>
+}

@@ -1,0 +1,58 @@
+/* Block-Host, damit der Picker die Breite des (Flex-)Containers füllt statt
+   über seine Intrinsic-Breite hinauszuwachsen (#6: Datums-Inputs im Dialog
+   zu breit / horizontaler Scroll). */
+:host { display: block; min-width: 0; }
+.dp { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.dp__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--color-text); }
+.dp__req { color: var(--color-danger); }
+.dp__field { position: relative; display: flex; }
+.dp__text {
+  flex: 1;
+  /* In Flex-Containern darf das Feld unter seine Intrinsic-Breite schrumpfen. */
+  min-width: 0;
+  width: 100%;
+  height: var(--control-height);
+  box-sizing: border-box;
+  padding: 0 2.5rem 0 var(--space-4);
+  font: inherit;
+  font-size: var(--fs-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+.dp__text:hover:not(:disabled) { border-color: var(--color-text-muted); }
+.dp__text:disabled { opacity: 0.6; cursor: not-allowed; }
+.dp__text[aria-invalid='true'] { border-color: var(--color-danger); }
+.dp__cal {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: var(--control-height);
+  width: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+.dp__cal:hover:not(:disabled) { color: var(--color-text); }
+.dp__cal:disabled { opacity: 0.6; cursor: not-allowed; }
+/* Natives Feld unsichtbar (nur sein Kalender-Popup erscheint via showPicker). */
+.dp__native {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+}
+.dp__hint { font-size: var(--fs-xs); color: var(--color-text-muted); }
+.dp__error { font-size: var(--fs-xs); color: var(--color-danger); }

@@ -1,0 +1,18 @@
+<section class="hero">
+  <p class="hero__eyebrow">{{ 'app.title' | t }}</p>
+  <h1 class="hero__title">{{ 'home.heading' | t }}</h1>
+  <p class="hero__subtitle">{{ 'home.subtitle' | t }}</p>
+  <a routerLink="/apply" class="hero__cta">{{ 'home.cta' | t }}</a>
+</section>
+
+<div class="grid">
+  <app-card [heading]="'home.cards.applications.title' | t">
+    <p>{{ 'home.cards.applications.body' | t }}</p>
+  </app-card>
+  <app-card [heading]="'home.cards.voting.title' | t">
+    <p>{{ 'home.cards.voting.body' | t }}</p>
+  </app-card>
+  <app-card [heading]="'home.cards.budget.title' | t">
+    <p>{{ 'home.cards.budget.body' | t }}</p>
+  </app-card>
+</div>
