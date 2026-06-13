@@ -32,7 +32,7 @@ import { ToastService } from '@shared/ui/toast/toast.service';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { downloadBlob } from '@shared/download.util';
 import {
-  type Account,
+  type AccountOption,
   BudgetTreeApi,
   type BudgetTreeNode,
   type Expense,
@@ -698,12 +698,9 @@ export class ExpensesComponent {
   // --- Export + Konten ---
   readonly canExport = computed(() => this.auth.can('budget.export'));
   readonly exporting = signal(false);
-  readonly accounts = signal<Account[]>([]);
+  readonly accounts = signal<AccountOption[]>([]);
   readonly accountOptions = computed<SelectOption[]>(() =>
-    this.accounts().map((a) => ({
-      value: a.id,
-      label: a.iban ? `${a.name} (${a.iban})` : a.name,
-    })),
+    this.accounts().map((a) => ({ value: a.id, label: a.name })),
   );
   readonly newAccountId = signal('');
 
@@ -738,8 +735,10 @@ export class ExpensesComponent {
       next: (tree) => this.budgetTree.set(tree),
       error: () => this.budgetTree.set([]),
     });
-    this.api.listAccounts().subscribe({
-      next: (accs) => this.accounts.set(accs.filter((a) => a.active)),
+    // Konten-Auswahl (id+Name) für die Bankkonto-Zuordnung — Bucher dürfen das ohne
+    // account.manage (#5-2/#2). Server liefert bereits nur aktive Konten.
+    this.api.listAccountOptions().subscribe({
+      next: (accs) => this.accounts.set(accs),
       error: () => this.accounts.set([]),
     });
     this.reload();

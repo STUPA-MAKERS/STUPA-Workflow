@@ -16,7 +16,7 @@ async function setup() {
   );
   const api = {
     listApplicationTypesFull: jest.fn(() => of([type('f1', 'Förderantrag')])),
-    listGremien: jest.fn(() => of([{ id: 'g1', name: 'StuPa' }])),
+    listGremienOptions: jest.fn(() => of([{ id: 'g1', name: 'StuPa' }])),
     createApplicationType,
   };
   const view = await render(FormsListComponent, {

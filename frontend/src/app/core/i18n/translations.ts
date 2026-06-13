@@ -960,6 +960,7 @@ export const de = {
   'admin.form.minPositions': 'Min. Positionen',
 
   'admin.flow.title': 'Flow-Editor',
+  'admin.flow.loadFailed': 'Flow konnte nicht geladen werden (fehlende Berechtigung?).',
   'admin.flow.desc':
     'Definiere Status und Übergänge eines Antragstyps. „Einfach" startet von einer Vorlage, „Experte" gibt volle Kontrolle über Bedingungen und Aktionen.',
   'admin.flow.modeSimple': 'Einfach',
@@ -2621,6 +2622,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.minPositions': 'Min. positions',
 
   'admin.flow.title': 'Flow editor',
+  'admin.flow.loadFailed': 'Could not load flow (missing permission?).',
   'admin.flow.desc':
     'Define the states and transitions of an application type. “Simple” starts from a template, “Expert” gives full control over guards and actions.',
   'admin.flow.modeSimple': 'Simple',

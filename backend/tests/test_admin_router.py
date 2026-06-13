@@ -109,6 +109,9 @@ class _FakeConfig:
             )
         ]
 
+    async def get_active_global_flow(self):
+        return None  # leerer Flow reicht für die Gate-Tests (#5-2)
+
     async def create_role(self, payload, actor):  # noqa: ANN001
         return RoleOut(
             id=uuid4(), key=payload.key, label=payload.label,
@@ -457,6 +460,46 @@ def test_members_endpoints_forbidden_for_unrelated_area(
     gid = uuid4()
     assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 403
     assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 403
+
+
+def test_flow_editor_can_read_its_sources_without_admin_types(
+    app: FastAPI, client: TestClient
+) -> None:
+    """#5-2: Der Flow-Editor läuft unter flow.configure und liest globalen Flow, Rollen
+    und Webhooks als Auswahlquellen — diese Reads müssen ohne admin.types/roles/
+    webhook.manage gehen, sonst startet der Editor leer."""
+    _as(app, {"flow.configure"})
+    assert client.get("/api/admin/flow-versions/global").status_code == 200
+    assert client.get("/api/admin/roles").status_code == 200
+    assert client.get("/api/admin/webhooks").status_code == 200
+
+
+def test_global_flow_readable_by_budget_structure(
+    app: FastAPI, client: TestClient
+) -> None:
+    """#5-2: Der Budget-Baum (budget.structure) liest den globalen Flow für die
+    Status-Dropdowns (accepted/denied)."""
+    _as(app, {"budget.structure"})
+    assert client.get("/api/admin/flow-versions/global").status_code == 200
+
+
+def test_application_types_readable_by_form_configure(
+    app: FastAPI, client: TestClient
+) -> None:
+    """#5-2: Der Form-Editor (form.configure) liest die Antragstypen-Liste."""
+    _as(app, {"form.configure"})
+    assert client.get("/api/admin/application-types").status_code == 200
+
+
+def test_editor_source_reads_still_gated_for_unrelated_area(
+    app: FastAPI, client: TestClient
+) -> None:
+    """admin.notifications berührt keinen dieser Bereiche → weiterhin 403."""
+    _as(app, {"admin.notifications"})
+    assert client.get("/api/admin/flow-versions/global").status_code == 403
+    assert client.get("/api/admin/webhooks").status_code == 403
+    assert client.get("/api/admin/application-types").status_code == 403
+    assert client.get("/api/admin/roles").status_code == 403
 
 
 def test_list_permissions_catalogue(app: FastAPI, client: TestClient) -> None:

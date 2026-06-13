@@ -238,7 +238,8 @@ export class FlowEditorComponent {
             this.graph.set(autoLayout(normalizeFlowGraph(graph)));
           }
         },
-        error: () => undefined,
+        // Kerndaten des Editors: Fehler sichtbar machen statt leerer Canvas (#5-2).
+        error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
       });
     // Gremien für vote-State-Config + Committee-Guards/Actions.
     this.options

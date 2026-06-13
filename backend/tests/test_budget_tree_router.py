@@ -19,6 +19,7 @@ from app.main import create_app
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_router import ServiceDep, get_budget_tree_service
 from app.modules.budget.tree_schemas import (
+    AccountOption,
     AllocationOut,
     AssignBudgetOut,
     BudgetNodeOut,
@@ -27,6 +28,7 @@ from app.modules.budget.tree_schemas import (
     FiscalYearOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
+from app.shared.paging import Page
 
 _BID = uuid.uuid4()
 _GID = uuid.uuid4()
@@ -150,6 +152,14 @@ class _FakeService:
 
     async def delete_expense(self, expense_id: uuid.UUID) -> None:
         self.calls["delete_expense"] = expense_id
+
+    async def list_account_options(self) -> list[AccountOption]:
+        self.calls["list_account_options"] = True
+        return [AccountOption(id=uuid.uuid4(), name="Hauptkonto")]
+
+    async def list_expenses_paged(self, **kwargs: Any) -> Page[ExpenseOut]:
+        self.calls["list_expenses_paged"] = kwargs
+        return Page(items=[_expense_out()], total=1, limit=50, offset=0)
 
     async def fiscal_year_label_map(self) -> dict[uuid.UUID, str]:
         self.calls["fy_labels"] = True
@@ -289,6 +299,49 @@ def test_create_expense_forbidden_for_viewer(fake: _FakeService) -> None:
         f"/api/budgets/{_BID}/expenses", json={"amount": "1.00", "description": "x"}
     )
     assert resp.status_code == 403
+
+
+def _app_as(fake: _FakeService, perms: set[str]) -> TestClient:
+    app = create_app()
+    app.dependency_overrides[get_budget_tree_service] = lambda: fake
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="x", permissions=perms
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
+    return TestClient(app)
+
+
+def test_expense_list_readable_by_booker(fake: _FakeService) -> None:
+    """#5-2: Die Buchungsliste muss für jede Budget-Rolle lesbar sein (view/structure/
+    book), nicht nur budget.view — sonst sieht ein reiner Bucher eine leere Seite."""
+    assert _app_as(fake, {"budget.book"}).get("/api/expenses").status_code == 200
+    assert _app_as(fake, {"budget.structure"}).get("/api/expenses").status_code == 200
+
+
+def test_expense_list_forbidden_without_budget_perm(fake: _FakeService) -> None:
+    assert _app_as(fake, {"meeting.manage"}).get("/api/expenses").status_code == 403
+
+
+def test_account_options_readable_by_booker(fake: _FakeService) -> None:
+    """#5-2/#2: Die Bankkonto-Auswahl (id+Name, ohne IBAN) ist für Bucher lesbar,
+    ohne account.manage — das war die Ursache, dass das Konto nicht setzbar war."""
+    resp = _app_as(fake, {"budget.book"}).get("/api/accounts/options")
+    assert resp.status_code == 200
+    assert resp.json()[0]["name"] == "Hauptkonto"
+    assert "iban" not in resp.json()[0]
+
+
+def test_account_options_forbidden_without_budget_or_account_perm(
+    fake: _FakeService,
+) -> None:
+    assert (
+        _app_as(fake, {"meeting.manage"}).get("/api/accounts/options").status_code == 403
+    )
+
+
+def test_full_accounts_list_still_requires_account_manage(fake: _FakeService) -> None:
+    """Volle Stammdaten (inkl. IBAN) bleiben account.manage vorbehalten."""
+    assert _app_as(fake, {"budget.book"}).get("/api/accounts").status_code == 403
 
 
 def test_tree_without_permission_is_gremium_scoped(

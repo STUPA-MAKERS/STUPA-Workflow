@@ -57,6 +57,12 @@ export interface AccountBody {
   active?: boolean;
 }
 
+/** Minimale Konto-Auswahl (id + Name, ohne IBAN) für Buchungs-Dropdowns (#5-2/#2). */
+export interface AccountOption {
+  id: Uuid;
+  name: string;
+}
+
 /** Übertrag Kostenstelle → Kostenstelle (gleiches HHJ). */
 export interface TransferCreate {
   fromBudgetId: Uuid;
@@ -296,6 +302,11 @@ export class BudgetTreeApi {
   // ------------------------------------------------------------- accounts
   listAccounts(): Observable<Account[]> {
     return this.http.get<Account[]>(`${this.base}/accounts`);
+  }
+  /** Aktive Konten als id+Name (ohne IBAN) für Buchungs-Dropdowns — Bucher dürfen das
+   *  ohne account.manage (#5-2/#2). */
+  listAccountOptions(): Observable<AccountOption[]> {
+    return this.http.get<AccountOption[]>(`${this.base}/accounts/options`);
   }
   createAccount(body: AccountBody): Observable<Account> {
     return this.http.post<Account>(`${this.base}/accounts`, body);

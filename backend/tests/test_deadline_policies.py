@@ -112,6 +112,15 @@ def test_list_ok(app: FastAPI, app_client: TestClient) -> None:
     assert res.json()[0]["key"] == "semester"
 
 
+def test_list_readable_by_flow_configure(app: FastAPI, app_client: TestClient) -> None:
+    """#5-2: Der Flow-Editor (flow.configure) liest die Frist-Policies als Auswahl für
+    Fristen-Guards/Aktionen — Lesen ohne admin.types erlaubt. Schreiben bleibt admin.types."""
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="f", permissions={"flow.configure"}
+    )
+    assert app_client.get("/api/admin/deadline-policies").status_code == 200
+
+
 def test_create_relative_policy(
     app: FastAPI, app_client: TestClient, fake_service: _FakeService
 ) -> None:

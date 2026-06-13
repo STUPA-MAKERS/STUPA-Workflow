@@ -301,6 +301,14 @@ class AccountOut(_CamelModel):
     active: bool
 
 
+class AccountOption(_CamelModel):
+    """Minimale Konto-Auswahl (id + Name, **keine IBAN**) für Buchungs-Dropdowns —
+    lesbar für Bucher (``budget.book``/``budget.view``), ohne Konten-Stammdaten-Recht (#5-2/#2)."""
+
+    id: UUID
+    name: str
+
+
 # ------------------------------------------------------------------- transfer
 class TransferCreate(_CamelModel):
     """Übertrag Kostenstelle → Kostenstelle (gleiches HHJ).

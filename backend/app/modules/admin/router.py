@@ -131,6 +131,21 @@ _ANY_ADMIN_AREA = Depends(
 # der Gremien-Admin auch admin.roles besitzen muss (#5-3). Schreiben von Rollen
 # bleibt admin.roles.
 _GREMIEN_OR_ROLES = Depends(require_any_permission("admin.gremien", "admin.roles"))
+# Lese-Gates für Seiten, die fremde Bereichsdaten nur als Auswahl-/Anzeigequelle
+# brauchen (#5-2). Schreiben bleibt jeweils auf dem strengen Recht.
+#   * Flow-Editor (flow.configure) liest globalen Flow, Rollen, Webhooks, Fristen.
+#   * Budget-Baum (budget.structure) liest den globalen Flow (Status-Dropdowns).
+#   * Form-Editor (form.configure) liest Antragstypen.
+_FLOW_READABLE = Depends(
+    require_any_permission("admin.types", "flow.configure", "budget.structure")
+)
+_ROLES_READ = Depends(
+    require_any_permission(
+        "admin.site", "admin.gremien", "admin.types", "admin.roles", "flow.configure"
+    )
+)
+_WEBHOOK_OR_FLOW = Depends(require_any_permission("webhook.manage", "flow.configure"))
+_TYPES_OR_FORM = Depends(require_any_permission("admin.types", "form.configure"))
 
 
 # =========================================================================== #
@@ -336,7 +351,7 @@ async def list_gremien_authed(
 @router.get(
     "/application-types",
     response_model=list[ApplicationTypeOut],
-    dependencies=[_TYPES],
+    dependencies=[_TYPES_OR_FORM],
     responses=_errors(401, 403),
 )
 async def list_application_types(service: ServiceDep) -> list[ApplicationTypeOut]:
@@ -375,7 +390,7 @@ async def update_application_type(
 @router.get(
     "/flow-versions/global",
     response_model=FlowGraph | None,
-    dependencies=[_TYPES],
+    dependencies=[_FLOW_READABLE],
     responses=_errors(401, 403),
 )
 async def get_global_flow(service: ServiceDep) -> FlowGraph | None:
@@ -438,7 +453,7 @@ async def list_permissions(service: ServiceDep) -> list[str]:
 @router.get(
     "/roles",
     response_model=list[RoleOut],
-    dependencies=[_ANY_ADMIN_AREA],
+    dependencies=[_ROLES_READ],
     responses=_errors(401, 403),
 )
 async def list_roles(service: ServiceDep) -> list[RoleOut]:
@@ -596,7 +611,7 @@ async def update_group_mapping(
 @router.get(
     "/webhooks",
     response_model=list[WebhookOut],
-    dependencies=[_WEBHOOK],
+    dependencies=[_WEBHOOK_OR_FLOW],
     responses=_errors(401, 403),
 )
 async def list_webhooks(service: ServiceDep) -> list[WebhookOut]:

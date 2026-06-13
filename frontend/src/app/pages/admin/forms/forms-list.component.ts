@@ -245,7 +245,9 @@ export class FormsListComponent {
 
   constructor() {
     this.reload();
-    this.api.listGremien().subscribe({
+    // Authed /gremien (Dropdown-Quelle) statt admin/gremien — Form-Verwalter (form.configure)
+    // braucht kein admin.gremien, um die Gremien-Spalte/Auswahl zu füllen (#5-2).
+    this.api.listGremienOptions().subscribe({
       next: (g) => this.gremien.set(g),
       error: () => this.gremien.set([]),
     });

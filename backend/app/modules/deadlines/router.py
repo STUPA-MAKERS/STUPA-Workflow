@@ -12,7 +12,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
 
-from app.deps import DbSession, Principal, require_principal
+from app.deps import DbSession, Principal, require_any_permission, require_principal
 from app.modules.deadlines.schemas import (
     DeadlinePolicyCreate,
     DeadlinePolicyOut,
@@ -26,6 +26,9 @@ router = APIRouter(prefix="/admin/deadline-policies", tags=["deadlines"])
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 # Frist-Policies gehören zur Typ-/Flow-Konfiguration (#6: admin.types).
 _CONFIG = Depends(require_principal("admin.types"))
+# Lesen auch für den Flow-Editor (flow.configure) erlaubt — er braucht die Policies
+# als Auswahl für Fristen-Guards/Aktionen (#5-2). Schreiben bleibt admin.types.
+_CONFIG_READ = Depends(require_any_permission("admin.types", "flow.configure"))
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -40,7 +43,7 @@ ServiceDep = Annotated[DeadlinePolicyService, Depends(get_service)]
 ConfigAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
 
 
-@router.get("", response_model=list[DeadlinePolicyOut], dependencies=[_CONFIG])
+@router.get("", response_model=list[DeadlinePolicyOut], dependencies=[_CONFIG_READ])
 async def list_policies(service: ServiceDep) -> list[DeadlinePolicyOut]:
     return [DeadlinePolicyOut.model_validate(p, from_attributes=True) for p in await service.list()]
 

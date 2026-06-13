@@ -24,11 +24,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from app.deps import DbSession, Principal, require_principal
+from app.deps import DbSession, Principal, require_any_permission, require_principal
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.tree_schemas import (
     AccountCreate,
+    AccountOption,
     AccountOut,
     AccountUpdate,
     AllocationOut,
@@ -302,7 +303,10 @@ async def book_expense(
 @router.get(
     "/expenses",
     response_model=Page[ExpenseOut],
-    dependencies=[Depends(require_principal("budget.view"))],
+    # Lesen für jede Budget-Rolle (#5-2): view/structure/book sehen die Buchungsliste.
+    dependencies=[
+        Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
+    ],
     responses=_errors(401, 403, 404),
 )
 async def list_expenses(
@@ -421,6 +425,21 @@ async def create_transfer(
 
 
 # ------------------------------------------------------------------- accounts
+@router.get(
+    "/accounts/options",
+    response_model=list[AccountOption],
+    # Minimale Auswahl (id+Name, keine IBAN) für Buchungs-Dropdowns — Bucher dürfen das
+    # ohne account.manage (#5-2/#2). Volle Stammdaten bleiben account.manage.
+    dependencies=[
+        Depends(require_any_permission("account.manage", "budget.book", "budget.view"))
+    ],
+    responses=_errors(401, 403),
+)
+async def list_account_options(service: ServiceDep) -> list[AccountOption]:
+    """Aktive Konten als id+Name (ohne IBAN) — für Buchungs-Auswahl."""
+    return await service.list_account_options()
+
+
 @router.get(
     "/accounts",
     response_model=list[AccountOut],

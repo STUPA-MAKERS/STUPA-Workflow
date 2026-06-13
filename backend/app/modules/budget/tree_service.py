@@ -29,6 +29,7 @@ from app.modules.budget.tree_models import (
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import (
     AccountCreate,
+    AccountOption,
     AccountOut,
     AccountUpdate,
     AllocationOut,
@@ -854,6 +855,15 @@ class BudgetTreeService:
             await self.session.scalars(select(Account).order_by(Account.name))
         ).all()
         return [self._account_out(a) for a in rows]
+
+    async def list_account_options(self) -> list[AccountOption]:
+        """Aktive Konten als id+Name (ohne IBAN) für Buchungs-Dropdowns (#5-2/#2)."""
+        rows = (
+            await self.session.scalars(
+                select(Account).where(Account.active.is_(True)).order_by(Account.name)
+            )
+        ).all()
+        return [AccountOption(id=a.id, name=a.name) for a in rows]
 
     async def create_account(self, payload: AccountCreate) -> AccountOut:
         acc = Account(
