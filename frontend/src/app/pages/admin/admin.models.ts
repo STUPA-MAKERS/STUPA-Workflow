@@ -229,20 +229,32 @@ export interface Role {
 
 /** Mail-Template (admin-API `/admin/mail-templates`, #5-4): i18n Subject/Body/HTML. */
 export interface MailTemplate {
-  id: Uuid;
+  /** Builtins (noch nicht überschrieben) haben keine DB-ID (#12). */
+  id: Uuid | null;
   key: string;
   subjectI18n: I18nMap;
   bodyI18n: I18nMap;
   bodyHtmlI18n: I18nMap;
   placeholders: Record<string, string>;
+  /** 'override' = aus der DB; 'builtin' = unveränderter Katalog-Default. */
+  source: 'override' | 'builtin';
 }
 
-/** Teil-Update eines Mail-Templates (Key unveränderlich). */
-export interface MailTemplateUpdateBody {
-  subjectI18n?: I18nMap;
-  bodyI18n?: I18nMap;
-  bodyHtmlI18n?: I18nMap;
-  placeholders?: Record<string, string>;
+/** Override per Key anlegen/aktualisieren (#12, Katalog-Merge). */
+export interface MailTemplateUpsertBody {
+  key: string;
+  subjectI18n: I18nMap;
+  bodyI18n: I18nMap;
+  bodyHtmlI18n: I18nMap;
+}
+
+/** Vorschau aus dem Editor-Entwurf (ohne ID, #12). */
+export interface MailPreviewPayload {
+  subjectI18n: I18nMap;
+  bodyI18n: I18nMap;
+  bodyHtmlI18n: I18nMap;
+  lang: string;
+  context: Record<string, unknown>;
 }
 
 /** Gerenderte Vorschau eines Templates. */

@@ -3,7 +3,6 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { Uuid } from '@core/api/models';
 import { ButtonComponent } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { AdminApiService } from '../admin-api.service';
@@ -30,15 +29,20 @@ type Lang = (typeof LANGS)[number];
 
     <div class="mt__layout">
       <nav class="mt__list" [attr.aria-label]="'admin.mailTemplates.title' | t">
-        @for (tpl of templates(); track tpl.id) {
+        @for (tpl of templates(); track tpl.key) {
           <button
             type="button"
             class="mt__listItem"
-            [class.mt__listItem--sel]="selectedId() === tpl.id"
-            (click)="select(tpl.id)"
+            [class.mt__listItem--sel]="selectedKey() === tpl.key"
+            (click)="select(tpl.key)"
             [title]="tpl.key"
           >
-            <span class="mt__listLabel">{{ keyLabel(tpl.key) }}</span>
+            <span class="mt__listLabel">
+              {{ keyLabel(tpl.key) }}
+              @if (tpl.source === 'override') {
+                <span class="mt__listTag">{{ 'admin.mailTemplates.customized' | t }}</span>
+              }
+            </span>
             <span class="mt__listKey">{{ tpl.key }}</span>
           </button>
         } @empty {
@@ -105,6 +109,9 @@ type Lang = (typeof LANGS)[number];
           <div class="mt__actions">
             <app-button [loading]="saving()" (click)="save()">{{ 'action.save' | t }}</app-button>
             <app-button variant="secondary" [loading]="previewing()" (click)="runPreview()">{{ 'admin.mailTemplates.preview' | t }}</app-button>
+            @if (d.source === 'override') {
+              <app-button variant="ghost" [loading]="resetting()" (click)="reset()">{{ 'admin.mailTemplates.reset' | t }}</app-button>
+            }
           </div>
 
           @if (preview(); as pv) {
@@ -173,6 +180,12 @@ type Lang = (typeof LANGS)[number];
         font-family: var(--font-mono, monospace);
         font-size: var(--fs-xs);
         color: var(--color-text-muted);
+      }
+      .mt__listTag {
+        margin-left: var(--space-2);
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-medium);
+        color: var(--color-primary);
       }
       .mt__listItem:hover {
         background: var(--color-surface-sunken);
@@ -286,10 +299,12 @@ export class MailTemplatesComponent {
   readonly langs = LANGS;
   private readonly templates_ = signal<MailTemplate[]>([]);
   readonly templates = this.templates_.asReadonly();
-  readonly selectedId = signal<string | null>(null);
+  // Auswahl per Key, nicht ID: Builtins (#12) haben keine DB-ID.
+  readonly selectedKey = signal<string | null>(null);
   readonly draft = signal<MailTemplate | null>(null);
   readonly lang = signal<Lang>('de');
   readonly saving = signal(false);
+  readonly resetting = signal(false);
   readonly previewing = signal(false);
   readonly preview = signal<MailPreview | null>(null);
 
@@ -315,16 +330,16 @@ export class MailTemplatesComponent {
     this.api.listMailTemplates().subscribe({
       next: (t) => {
         this.templates_.set(t);
-        if (t.length && !this.selectedId()) this.select(t[0].id);
+        if (t.length && !this.selectedKey()) this.select(t[0].key);
       },
       error: () => this.toast.error(this.i18n.translate('admin.mailTemplates.loadFailed')),
     });
   }
 
-  select(id: string): void {
-    const tpl = this.templates_().find((t) => t.id === id);
+  select(key: string): void {
+    const tpl = this.templates_().find((t) => t.key === key);
     if (!tpl) return;
-    this.selectedId.set(id);
+    this.selectedKey.set(key);
     this.preview.set(null);
     // Tiefe Kopie der i18n-Maps, damit das Editieren das Original nicht mutiert.
     this.draft.set({
@@ -346,8 +361,10 @@ export class MailTemplatesComponent {
     const d = this.draft();
     if (!d || this.saving()) return;
     this.saving.set(true);
+    // Upsert per Key (#12): erzeugt eine Override, auch für Builtin-Defaults.
     this.api
-      .updateMailTemplate(d.id as Uuid, {
+      .upsertMailTemplate({
+        key: d.key,
         subjectI18n: d.subjectI18n,
         bodyI18n: d.bodyI18n,
         bodyHtmlI18n: d.bodyHtmlI18n,
@@ -355,7 +372,7 @@ export class MailTemplatesComponent {
       .subscribe({
         next: (updated) => {
           this.saving.set(false);
-          this.templates_.update((list) => list.map((t) => (t.id === updated.id ? updated : t)));
+          this.applyUpdate(updated);
           this.toast.success(this.i18n.translate('admin.mailTemplates.saved'));
         },
         error: () => {
@@ -365,6 +382,29 @@ export class MailTemplatesComponent {
       });
   }
 
+  reset(): void {
+    const d = this.draft();
+    if (!d || this.resetting()) return;
+    this.resetting.set(true);
+    this.api.resetMailTemplate(d.key).subscribe({
+      next: (builtin) => {
+        this.resetting.set(false);
+        this.applyUpdate(builtin);
+        this.toast.success(this.i18n.translate('admin.mailTemplates.resetDone'));
+      },
+      error: () => {
+        this.resetting.set(false);
+        this.toast.error(this.i18n.translate('admin.mailTemplates.failed'));
+      },
+    });
+  }
+
+  /** Aktualisierte/zurückgesetzte Version in Liste + Editor übernehmen. */
+  private applyUpdate(tpl: MailTemplate): void {
+    this.templates_.update((list) => list.map((t) => (t.key === tpl.key ? tpl : t)));
+    if (this.selectedKey() === tpl.key) this.select(tpl.key);
+  }
+
   runPreview(): void {
     const d = this.draft();
     if (!d || this.previewing()) return;
@@ -372,15 +412,24 @@ export class MailTemplatesComponent {
     // Beispiel-Kontext aus den Platzhaltern (Wert = Beschreibung als Platzhaltertext).
     const context: Record<string, unknown> = {};
     for (const [key, desc] of Object.entries(d.placeholders)) context[key] = desc || key;
-    this.api.previewMailTemplate(d.id as Uuid, { lang: this.lang(), context }).subscribe({
-      next: (pv) => {
-        this.previewing.set(false);
-        this.preview.set(pv);
-      },
-      error: () => {
-        this.previewing.set(false);
-        this.toast.error(this.i18n.translate('admin.mailTemplates.previewFailed'));
-      },
-    });
+    // Entwurf rendern (ohne ID): funktioniert für Builtins und Overrides (#12).
+    this.api
+      .previewMailPayload({
+        subjectI18n: d.subjectI18n,
+        bodyI18n: d.bodyI18n,
+        bodyHtmlI18n: d.bodyHtmlI18n,
+        lang: this.lang(),
+        context,
+      })
+      .subscribe({
+        next: (pv) => {
+          this.previewing.set(false);
+          this.preview.set(pv);
+        },
+        error: () => {
+          this.previewing.set(false);
+          this.toast.error(this.i18n.translate('admin.mailTemplates.previewFailed'));
+        },
+      });
   }
 }

@@ -6,19 +6,20 @@ import { AdminApiService } from '../admin-api.service';
 import { MailTemplatesComponent } from './mail-templates.component';
 
 const TPL = {
-  id: 't1',
+  id: null,
   key: 'magic_link',
   subjectI18n: { de: 'Anmeldung', en: 'Sign in' },
   bodyI18n: { de: 'Hallo {{name}}', en: 'Hi {{name}}' },
   bodyHtmlI18n: {},
   placeholders: { name: 'Anzeigename' },
+  source: 'builtin',
 };
 
 function setupApi() {
   return {
     listMailTemplates: jest.fn(() => of([TPL])),
-    updateMailTemplate: jest.fn(() => of(TPL)),
-    previewMailTemplate: jest.fn(() =>
+    upsertMailTemplate: jest.fn(() => of({ ...TPL, source: 'override' })),
+    previewMailPayload: jest.fn(() =>
       of({ subject: 'Anmeldung', text: 'Hallo Anzeigename', html: null, lang: 'de' }),
     ),
   };
@@ -46,9 +47,9 @@ describe('MailTemplatesComponent', () => {
   it('saves edits and renders a preview', async () => {
     const api = await setup();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    expect(api.updateMailTemplate).toHaveBeenCalled();
+    expect(api.upsertMailTemplate).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
-    expect(api.previewMailTemplate).toHaveBeenCalled();
+    expect(api.previewMailPayload).toHaveBeenCalled();
     expect(await screen.findByText('Hallo Anzeigename')).toBeInTheDocument();
   });
 });

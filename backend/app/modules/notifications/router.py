@@ -21,10 +21,12 @@ from app.deps import DbSession, Principal, require_principal
 from app.modules.notifications.models import NotificationSettings
 from app.modules.notifications.schemas import (
     MailPreviewOut,
+    MailPreviewPayloadRequest,
     MailPreviewRequest,
     MailTemplateCreate,
     MailTemplateOut,
     MailTemplateUpdate,
+    MailTemplateUpsert,
     NotificationPreferenceOut,
     NotificationPreferencesUpdate,
     NotificationSettingsOut,
@@ -156,6 +158,42 @@ async def update_mail_template(
     _principal: NotifAdmin,
 ) -> MailTemplateOut:
     return await service.update_template(template_id, payload)
+
+
+@templates_router.put(
+    "",
+    response_model=MailTemplateOut,
+    responses={**_AUTH_ERRORS, 422: _PROBLEM},
+)
+async def upsert_mail_template(
+    payload: MailTemplateUpsert, service: ServiceDep, _principal: NotifAdmin
+) -> MailTemplateOut:
+    """Override per Key anlegen/aktualisieren (#12) — auch für Builtin-Keys."""
+    return await service.upsert_template(payload)
+
+
+@templates_router.delete(
+    "/by-key/{key}",
+    response_model=MailTemplateOut,
+    responses={**_AUTH_ERRORS, 404: _PROBLEM},
+)
+async def reset_mail_template(
+    key: str, service: ServiceDep, _principal: NotifAdmin
+) -> MailTemplateOut:
+    """Override löschen → Builtin-Default wiederherstellen (#12)."""
+    return await service.reset_template(key)
+
+
+@templates_router.post(
+    "/preview",
+    response_model=MailPreviewOut,
+    responses={**_AUTH_ERRORS, 422: _PROBLEM},
+)
+async def preview_mail_payload(
+    payload: MailPreviewPayloadRequest, service: ServiceDep, _principal: NotifAdmin
+) -> MailPreviewOut:
+    """Editor-Entwurf rendern (ohne persistierte ID, #12)."""
+    return await service.preview_payload(payload)
 
 
 @templates_router.post(

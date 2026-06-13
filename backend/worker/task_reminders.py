@@ -31,6 +31,12 @@ from app.modules.notifications.recipients import (
     state_actionable,
 )
 from app.modules.notifications.service import NotificationService
+from app.modules.notifications.templates_catalogue import (
+    TASK_REMINDER_BODY as _BUILTIN_REMINDER_BODY,
+)
+from app.modules.notifications.templates_catalogue import (
+    TASK_REMINDER_SUBJECT as _BUILTIN_REMINDER_SUBJECT,
+)
 from app.settings import Settings, load_settings
 
 logger = logging.getLogger("worker.task_reminders")
@@ -41,23 +47,6 @@ def _naive_utc(dt: datetime) -> datetime:
     asyncpg lehnt einen tz-bewussten Bind dagegen ab (DataError) und
     ``now - entered_at`` wirft »can't subtract offset-naive and offset-aware«."""
     return dt.astimezone(UTC).replace(tzinfo=None) if dt.tzinfo is not None else dt
-
-_BUILTIN_REMINDER_SUBJECT = {
-    "de": "Erinnerung: offene Aufgabe"
-    "{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
-    "en": "Reminder: open task"
-    '{% if applicationTitle %} — "{{ applicationTitle }}"{% endif %}',
-}
-_BUILTIN_REMINDER_BODY = {
-    "de": "Hallo,\n\nder Antrag"
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} wartet seit "
-    "{{ daysOpen }} Tagen auf eine Aktion"
-    "{% if status %} (Status: {{ status }}){% endif %}.\n",
-    "en": "Hello,\n\nthe application"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %} has been '
-    "waiting for action for {{ daysOpen }} days"
-    "{% if status %} (status: {{ status }}){% endif %}.\n",
-}
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> Any:

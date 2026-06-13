@@ -41,8 +41,9 @@ import {
   type GroupMapping,
   type GroupMappingBody,
   type MailPreview,
+  type MailPreviewPayload,
   type MailTemplate,
-  type MailTemplateUpdateBody,
+  type MailTemplateUpsertBody,
   type Role,
   type RoleAssignment,
   type RoleAssignmentInput,
@@ -194,14 +195,19 @@ export class AdminApiService {
   listMailTemplates(): Observable<MailTemplate[]> {
     return this.http.get<MailTemplate[]>(`${this.base}/admin/mail-templates`);
   }
-  updateMailTemplate(id: Uuid, body: MailTemplateUpdateBody): Observable<MailTemplate> {
-    return this.http.patch<MailTemplate>(`${this.base}/admin/mail-templates/${id}`, body);
+  /** Override per Key anlegen/aktualisieren (#12) — auch für Builtin-Defaults. */
+  upsertMailTemplate(body: MailTemplateUpsertBody): Observable<MailTemplate> {
+    return this.http.put<MailTemplate>(`${this.base}/admin/mail-templates`, body);
   }
-  previewMailTemplate(
-    id: Uuid,
-    body: { lang: string; context: Record<string, unknown> },
-  ): Observable<MailPreview> {
-    return this.http.post<MailPreview>(`${this.base}/admin/mail-templates/${id}/preview`, body);
+  /** Override löschen → Builtin-Default wiederherstellen (#12). */
+  resetMailTemplate(key: string): Observable<MailTemplate> {
+    return this.http.delete<MailTemplate>(
+      `${this.base}/admin/mail-templates/by-key/${encodeURIComponent(key)}`,
+    );
+  }
+  /** Vorschau aus dem Editor-Entwurf (ohne ID, #12). */
+  previewMailPayload(body: MailPreviewPayload): Observable<MailPreview> {
+    return this.http.post<MailPreview>(`${this.base}/admin/mail-templates/preview`, body);
   }
 
   /**

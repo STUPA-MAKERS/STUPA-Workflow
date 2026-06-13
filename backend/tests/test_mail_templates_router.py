@@ -15,9 +15,11 @@ from app.modules.auth.principal import Principal
 from app.modules.notifications.router import get_notification_service
 from app.modules.notifications.schemas import (
     MailPreviewOut,
+    MailPreviewPayloadRequest,
     MailTemplateCreate,
     MailTemplateOut,
     MailTemplateUpdate,
+    MailTemplateUpsert,
 )
 
 
@@ -64,6 +66,35 @@ class _FakeService:
             subject="Anmeldung", text="Hallo Max", html=None, lang=req.lang
         )
 
+    async def upsert_template(self, payload: MailTemplateUpsert) -> MailTemplateOut:
+        self.upserted = payload
+        return MailTemplateOut(
+            id=uuid4(),
+            key=payload.key,
+            subject_i18n=payload.subject_i18n,
+            body_i18n=payload.body_i18n,
+            body_html_i18n=payload.body_html_i18n,
+            placeholders={},
+            source="override",
+        )
+
+    async def reset_template(self, key: str) -> MailTemplateOut:
+        self.reset_key = key
+        return MailTemplateOut(
+            id=None,
+            key=key,
+            subject_i18n={"de": "B"},
+            body_i18n={"de": "B"},
+            body_html_i18n={},
+            placeholders={},
+            source="builtin",
+        )
+
+    async def preview_payload(self, req: MailPreviewPayloadRequest) -> MailPreviewOut:
+        return MailPreviewOut(
+            subject=req.subject_i18n.get("de", ""), text="rendered", html=None, lang=req.lang
+        )
+
 
 def _client(principal: Principal | None) -> tuple[TestClient, _FakeService]:
     app = create_app()
@@ -105,3 +136,43 @@ def test_update_and_preview_template() -> None:
     )
     assert prev.status_code == 200
     assert prev.json() == {"subject": "Anmeldung", "text": "Hallo Max", "html": None, "lang": "de"}
+
+
+def test_upsert_template_by_key() -> None:
+    client, svc = _client(Principal(sub="a", permissions={"admin.notifications"}))
+    r = client.put(
+        "/api/admin/mail-templates",
+        json={"key": "task_new", "subjectI18n": {"de": "Neu"}, "bodyI18n": {"de": "Text"}},
+    )
+    assert r.status_code == 200
+    assert r.json()["key"] == "task_new"
+    assert r.json()["source"] == "override"
+    assert svc.upserted.key == "task_new"
+
+
+def test_reset_template_by_key() -> None:
+    client, svc = _client(Principal(sub="a", permissions={"admin.notifications"}))
+    r = client.delete("/api/admin/mail-templates/by-key/task_new")
+    assert r.status_code == 200
+    assert r.json()["source"] == "builtin"
+    assert r.json()["id"] is None
+    assert svc.reset_key == "task_new"
+
+
+def test_preview_payload() -> None:
+    client, _ = _client(Principal(sub="a", permissions={"admin.notifications"}))
+    r = client.post(
+        "/api/admin/mail-templates/preview",
+        json={"subjectI18n": {"de": "Hi"}, "bodyI18n": {"de": "B"}, "lang": "de", "context": {}},
+    )
+    assert r.status_code == 200
+    assert r.json()["subject"] == "Hi"
+
+
+def test_upsert_requires_admin() -> None:
+    client, _ = _client(Principal(sub="u", permissions={"admin.types"}))
+    r = client.put(
+        "/api/admin/mail-templates",
+        json={"key": "task_new", "subjectI18n": {"de": "x"}, "bodyI18n": {"de": "y"}},
+    )
+    assert r.status_code == 403

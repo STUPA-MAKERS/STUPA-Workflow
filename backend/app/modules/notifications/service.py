@@ -35,10 +35,12 @@ from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.schemas import (
     MailPreviewOut,
+    MailPreviewPayloadRequest,
     MailPreviewRequest,
     MailTemplateCreate,
     MailTemplateOut,
     MailTemplateUpdate,
+    MailTemplateUpsert,
 )
 from app.modules.notifications.templating import RenderedMail, TemplateRenderError, render_mail
 from app.settings import Settings, get_settings
@@ -113,10 +115,89 @@ class NotificationService:
         return _template_out(tpl)
 
     async def list_templates(self) -> list[MailTemplateOut]:
-        rows = (
-            await self.session.scalars(select(MailTemplate).order_by(MailTemplate.key))
-        ).all()
-        return [_template_out(t) for t in rows]
+        """Jede Mail-Art (#12): DB-Override falls vorhanden, sonst Builtin-Default.
+
+        Reihenfolge = Katalog; nicht-katalogisierte DB-Zeilen (z. B. eigene
+        Flow-``templateKey``) hängen alphabetisch hinten an."""
+        from app.modules.notifications.templates_catalogue import (
+            CATALOGUE_BY_KEY,
+            TEMPLATE_CATALOGUE,
+        )
+
+        rows = {
+            t.key: t
+            for t in (await self.session.scalars(select(MailTemplate))).all()
+        }
+        out: list[MailTemplateOut] = []
+        for spec in TEMPLATE_CATALOGUE:
+            row = rows.get(spec.key)
+            if row is not None:
+                out.append(_template_out(row, source="override"))
+            else:
+                out.append(
+                    MailTemplateOut(
+                        id=None,
+                        key=spec.key,
+                        subject_i18n=spec.subject_i18n,
+                        body_i18n=spec.body_i18n,
+                        body_html_i18n={},
+                        placeholders=spec.placeholders,
+                        source="builtin",
+                    )
+                )
+        for key in sorted(rows):
+            if key not in CATALOGUE_BY_KEY:
+                out.append(_template_out(rows[key], source="override"))
+        return out
+
+    async def upsert_template(self, payload: MailTemplateUpsert) -> MailTemplateOut:
+        """Override per Key anlegen/aktualisieren (#12). Builtin-Keys erlaubt;
+        unbekannte Keys (kein Katalog, keine Bestandszeile) → 422."""
+        from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
+
+        existing = await self._get_template_by_key(payload.key)
+        if existing is None and payload.key not in CATALOGUE_BY_KEY:
+            raise ValidationProblem(
+                "Unknown template key.",
+                errors=[{"field": "key", "msg": f"unknown: {payload.key}"}],
+            )
+        if existing is None:
+            spec = CATALOGUE_BY_KEY[payload.key]
+            existing = MailTemplate(
+                key=payload.key,
+                subject_i18n=payload.subject_i18n,
+                body_i18n=payload.body_i18n,
+                body_html_i18n=payload.body_html_i18n,
+                placeholders=spec.placeholders,
+            )
+            self.session.add(existing)
+        else:
+            existing.subject_i18n = payload.subject_i18n
+            existing.body_i18n = payload.body_i18n
+            existing.body_html_i18n = payload.body_html_i18n
+        await self.session.commit()
+        return _template_out(existing, source="override")
+
+    async def reset_template(self, key: str) -> MailTemplateOut:
+        """Override löschen → Builtin-Default wiederherstellen (#12)."""
+        from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
+
+        spec = CATALOGUE_BY_KEY.get(key)
+        if spec is None:
+            raise NotFoundError(f"mail template {key!r} not in catalogue")
+        existing = await self._get_template_by_key(key)
+        if existing is not None:
+            await self.session.delete(existing)
+            await self.session.commit()
+        return MailTemplateOut(
+            id=None,
+            key=spec.key,
+            subject_i18n=spec.subject_i18n,
+            body_i18n=spec.body_i18n,
+            body_html_i18n={},
+            placeholders=spec.placeholders,
+            source="builtin",
+        )
 
     async def update_template(
         self, template_id: uuid.UUID, payload: MailTemplateUpdate
@@ -143,6 +224,29 @@ class NotificationService:
             raise NotFoundError(f"mail template {template_id} not found")
         try:
             rendered = self._render(tpl, context=req.context, lang=req.lang)
+        except TemplateRenderError as exc:
+            raise ValidationProblem(
+                "Template render failed.",
+                errors=[{"field": "context", "msg": str(exc)}],
+            ) from exc
+        return MailPreviewOut(
+            subject=rendered.subject,
+            text=rendered.text,
+            html=rendered.html,
+            lang=rendered.lang,
+        )
+
+    async def preview_payload(self, req: MailPreviewPayloadRequest) -> MailPreviewOut:
+        """Vorschau aus dem Editor-Entwurf rendern (ohne DB-Zeile, #12)."""
+        transient = MailTemplate(
+            key="__preview__",
+            subject_i18n=req.subject_i18n,
+            body_i18n=req.body_i18n,
+            body_html_i18n=req.body_html_i18n,
+            placeholders={},
+        )
+        try:
+            rendered = self._render(transient, context=req.context, lang=req.lang)
         except TemplateRenderError as exc:
             raise ValidationProblem(
                 "Template render failed.",
@@ -360,10 +464,14 @@ class NotificationService:
                 reason=reason,
             )
             return int(ok)
-        # Template fehlt in der DB → Builtin-Fallback (Defaults oben decken die Vars).
+        # Template fehlt in der DB → Builtin-Fallback. Katalog-Keys (z. B.
+        # ``deadline_approaching``) nutzen ihren eigenen Default, sonst status_update.
+        from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
+
+        spec = CATALOGUE_BY_KEY.get(str(template_key))
         rendered = render_mail(
-            subject_i18n=_BUILTIN_NOTIFY_SUBJECT,
-            body_i18n=_BUILTIN_NOTIFY_BODY,
+            subject_i18n=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,
+            body_i18n=spec.body_i18n if spec else _BUILTIN_NOTIFY_BODY,
             context=context,
             lang=lang or self.settings.mail_default_lang,
             default_lang=self.settings.mail_default_lang,
@@ -513,7 +621,7 @@ def _as_specs(raw: list[Any]) -> list[dict[str, Any]]:
     return [r for r in raw if isinstance(r, dict)]
 
 
-def _template_out(tpl: MailTemplate) -> MailTemplateOut:
+def _template_out(tpl: MailTemplate, *, source: str = "override") -> MailTemplateOut:
     return MailTemplateOut(
         id=tpl.id,
         key=tpl.key,
@@ -521,4 +629,5 @@ def _template_out(tpl: MailTemplate) -> MailTemplateOut:
         body_i18n=tpl.body_i18n,
         body_html_i18n=tpl.body_html_i18n,
         placeholders=tpl.placeholders,
+        source=source,  # type: ignore[arg-type]
     )

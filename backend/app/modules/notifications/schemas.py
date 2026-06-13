@@ -6,6 +6,7 @@ Request/Response für `mail_template`-CRUD + Mail-Vorschau. camelCase im JSON
 
 from __future__ import annotations
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -38,20 +39,45 @@ class MailTemplateUpdate(_CamelModel):
     placeholders: dict[str, str] | None = None
 
 
-class MailTemplateOut(_CamelModel):
-    """Persistiertes Template."""
+class MailTemplateUpsert(_CamelModel):
+    """Override per ``key`` anlegen/aktualisieren (#12 Katalog-Merge).
 
-    id: UUID
+    Editor speichert sowohl Builtin- (noch keine DB-Zeile) als auch Override-
+    Templates über denselben Weg — Key statt ID, da Builtins keine ID haben."""
+
+    key: str = Field(min_length=1)
+    subject_i18n: I18nMap = Field(alias="subjectI18n")
+    body_i18n: I18nMap = Field(alias="bodyI18n")
+    body_html_i18n: I18nMap = Field(default_factory=dict, alias="bodyHtmlI18n")
+
+
+class MailTemplateOut(_CamelModel):
+    """Template wie im Editor — Override (DB) oder Builtin-Default (#12)."""
+
+    # Builtins (noch nicht überschrieben) haben keine DB-ID.
+    id: UUID | None = None
     key: str
     subject_i18n: I18nMap = Field(serialization_alias="subjectI18n")
     body_i18n: I18nMap = Field(serialization_alias="bodyI18n")
     body_html_i18n: I18nMap = Field(serialization_alias="bodyHtmlI18n")
     placeholders: dict[str, str]
+    # 'override' = aus der DB; 'builtin' = aus dem Katalog (unverändert).
+    source: Literal["override", "builtin"] = "override"
 
 
 class MailPreviewRequest(_CamelModel):
     """Vorschau-Anfrage: Template mit Beispiel-Kontext + Sprache rendern."""
 
+    lang: str = "de"
+    context: dict[str, object] = Field(default_factory=dict)
+
+
+class MailPreviewPayloadRequest(_CamelModel):
+    """Vorschau aus dem Editor-Entwurf (ohne persistierte ID, #12)."""
+
+    subject_i18n: I18nMap = Field(alias="subjectI18n")
+    body_i18n: I18nMap = Field(alias="bodyI18n")
+    body_html_i18n: I18nMap = Field(default_factory=dict, alias="bodyHtmlI18n")
     lang: str = "de"
     context: dict[str, object] = Field(default_factory=dict)
 

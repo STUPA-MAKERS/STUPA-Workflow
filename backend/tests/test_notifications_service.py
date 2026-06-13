@@ -59,11 +59,18 @@ async def test_create_template_duplicate_conflict() -> None:
 
 
 async def test_list_templates() -> None:
+    # Merge (#12): voller Katalog (Builtins) + nicht-katalogisierte DB-Zeilen.
     ta, tb = _template("a"), _template("b")
     ta.id, tb.id = uuid.uuid4(), uuid.uuid4()
     session = FakeSession(scalars=[[ta, tb]])
     out = await _service(session).list_templates()
-    assert [t.key for t in out] == ["a", "b"]
+    by_key = {t.key: t for t in out}
+    # Builtin-Defaults erscheinen ohne DB-ID, source='builtin'.
+    assert by_key["status_update"].source == "builtin"
+    assert by_key["status_update"].id is None
+    # Bestands-Overrides (nicht im Katalog) hängen hinten an, source='override'.
+    assert by_key["a"].source == "override" and by_key["b"].source == "override"
+    assert out[-2].key == "a" and out[-1].key == "b"
 
 
 async def test_update_template_changes_fields() -> None:
