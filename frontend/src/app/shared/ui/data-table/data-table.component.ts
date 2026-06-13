@@ -184,7 +184,15 @@ export interface ColumnDef {
         .dt__detail-row > td,
         .dt__empty {
           display: block;
+        }
+        .dt__detail-row,
+        .dt__detail-row > td {
           text-align: start !important;
+        }
+        /* Leerzustand bleibt auch mobil zentriert — visuelle Parität mit der
+           Anträge-Tabelle (#9). */
+        .dt__empty {
+          text-align: center !important;
         }
         .dt__detail-row {
           padding: 0;
