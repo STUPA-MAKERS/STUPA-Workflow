@@ -24,7 +24,7 @@ export interface BudgetAllocationView {
 /** Buchungsart einer tatsächlichen Bewegung (#25). */
 export type ExpenseKind = 'expense' | 'income';
 /** Zahlungsmethode (#1-2). */
-export type PaymentMethod = 'ueberweisung' | 'bar' | 'lastschrift' | 'karte';
+export type PaymentMethod = 'ueberweisung' | 'bar' | 'lastschrift' | 'karte' | 'paypal';
 
 /** Gebuchte Ausgabe/Einnahme (#25); Geld als String (Decimal). */
 export interface Expense {

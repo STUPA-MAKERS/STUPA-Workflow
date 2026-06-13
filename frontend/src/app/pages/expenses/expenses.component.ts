@@ -181,10 +181,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
                     <td>
                       <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
                     </td>
-                    <td class="exp__cellDesc">
-                      {{ e.description }}
-                      @if (e.transferId) { <app-badge variant="neutral">{{ 'expenses.transfer' | t }}</app-badge> }
-                    </td>
+                    <td class="exp__cellDesc">{{ e.description }}</td>
                     <td>{{ e.correspondent || '—' }}</td>
                     <td class="exp__mono">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
                     <td>
@@ -411,6 +408,11 @@ import { SimplifyPathPipe } from '@shared/budget-path';
         background: var(--color-surface);
         color: var(--color-text);
         font: inherit;
+      }
+      /* Text-Inputs auf Control-Höhe → bündig mit app-select/datepicker daneben (#dropdown-height). */
+      input.exp__input {
+        height: var(--control-height);
+        box-sizing: border-box;
       }
       .exp__search { min-width: 14rem; height: 2.25rem; }
       .exp__layout {
@@ -766,7 +768,7 @@ export class ExpensesComponent {
 
   /** Zahlungsmethode-Auswahl (#1-2); leerer Wert = keine Angabe. */
   readonly paymentMethodOptions = computed<SelectOption[]>(() =>
-    (['ueberweisung', 'bar', 'lastschrift', 'karte'] as const).map((v) => ({
+    (['ueberweisung', 'bar', 'lastschrift', 'karte', 'paypal'] as const).map((v) => ({
       value: v,
       label: this.i18n.translate(`expenses.paymentMethod.${v}`),
     })),

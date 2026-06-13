@@ -213,7 +213,7 @@ class BudgetApplicationOut(_CamelModel):
 # ------------------------------------------------------------------- expense
 ExpenseKind = Literal["expense", "income"]
 # Zahlungsmethode (#1-2): Überweisung | Bar | Lastschrift | Karte.
-PaymentMethod = Literal["ueberweisung", "bar", "lastschrift", "karte"]
+PaymentMethod = Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"]
 
 
 class ExpenseCreate(_CamelModel):

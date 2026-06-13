@@ -222,7 +222,7 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
         ),
         CheckConstraint(
             "payment_method IS NULL OR payment_method IN "
-            "('ueberweisung', 'bar', 'lastschrift', 'karte')",
+            "('ueberweisung', 'bar', 'lastschrift', 'karte', 'paypal')",
             name="budget_expense_payment_method_valid",
         ),
         Index("ix_budget_expense_budget_id", "budget_id"),
