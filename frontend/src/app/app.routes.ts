@@ -201,7 +201,7 @@ export const routes: Routes = [
         data: {
           title: 'nav.admin',
           // #6: jede Bereichs-Admin-Rolle erreicht die Admin-Übersicht.
-          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.notifications', 'webhook.manage', 'audit.read'],
+          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'webhook.manage', 'audit.read'],
         },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -209,7 +209,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/users',
-        data: { title: 'admin.users.title', permission: 'admin.roles', parent: ['admin'] },
+        data: { title: 'admin.users.title', permission: 'admin.users', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/users/users.component').then((m) => m.UsersComponent),
@@ -225,7 +225,7 @@ export const routes: Routes = [
       {
         // OIDC-Gruppen → Rolle Mappings (#5-4).
         path: 'admin/group-mappings',
-        data: { title: 'admin.groupMappings.title', permission: 'admin.roles', parent: ['admin'] },
+        data: { title: 'admin.groupMappings.title', permission: 'admin.group_mappings', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/group-mappings/group-mappings.component').then(
@@ -300,7 +300,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/gremien/:id/roles',
-        data: { title: 'admin.gremiumRoles.title', permission: 'admin.roles', parent: ['admin', 'admin/gremien'] },
+        data: { title: 'admin.gremiumRoles.title', permission: 'admin.gremium_roles', parent: ['admin', 'admin/gremien'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/gremium-roles/gremium-roles.component').then(
@@ -316,7 +316,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/delegations',
-        data: { title: 'admin.deleg.title', permission: 'admin.roles', parent: ['admin'] },
+        data: { title: 'admin.deleg.title', permission: 'admin.delegations', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/delegations/delegations.component').then(
@@ -325,7 +325,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/deadlines',
-        data: { title: 'admin.deadlines.title', permission: 'admin.types', parent: ['admin'] },
+        data: { title: 'admin.deadlines.title', permission: 'admin.deadlines', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/deadlines/deadlines.component').then(

@@ -1,6 +1,6 @@
 """Admin-Router der Deadline-Policy-Registry (benannte Fristen).
 
-CRUD unter ``/admin/deadline-policies``, gegated mit ``admin.types`` (autoritativ, #6).
+CRUD unter ``/admin/deadline-policies``, gegated mit ``admin.deadlines`` (autoritativ).
 Der Flow referenziert eine Policy über ``key``; das Datum (z. B. pro Semester) lässt
 sich hier pflegen, **ohne** den Flow neu zu versionieren.
 """
@@ -24,11 +24,12 @@ from app.shared.errors import ConflictError, NotFoundError, ProblemDetail
 router = APIRouter(prefix="/admin/deadline-policies", tags=["deadlines"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
-# Frist-Policies gehören zur Typ-/Flow-Konfiguration (#6: admin.types).
-_CONFIG = Depends(require_principal("admin.types"))
+# Frist-Policies haben eine eigene Admin-Seite (#per-page-admin: admin.deadlines,
+# zuvor admin.types). Migration 0026 gibt admin.types-Inhabern admin.deadlines mit.
+_CONFIG = Depends(require_principal("admin.deadlines"))
 # Lesen auch für den Flow-Editor (flow.configure) erlaubt — er braucht die Policies
-# als Auswahl für Fristen-Guards/Aktionen (#5-2). Schreiben bleibt admin.types.
-_CONFIG_READ = Depends(require_any_permission("admin.types", "flow.configure"))
+# als Auswahl für Fristen-Guards/Aktionen (#5-2). Schreiben bleibt admin.deadlines.
+_CONFIG_READ = Depends(require_any_permission("admin.deadlines", "flow.configure"))
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -40,7 +41,7 @@ def get_service(session: DbSession) -> DeadlinePolicyService:
 
 
 ServiceDep = Annotated[DeadlinePolicyService, Depends(get_service)]
-ConfigAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
+ConfigAdmin = Annotated[Principal, Depends(require_principal("admin.deadlines"))]
 
 
 @router.get("", response_model=list[DeadlinePolicyOut], dependencies=[_CONFIG_READ])
@@ -55,9 +56,7 @@ async def list_policies(service: ServiceDep) -> list[DeadlinePolicyOut]:
     dependencies=[_CONFIG],
     responses=_errors(401, 403, 409, 422),
 )
-async def create_policy(
-    body: DeadlinePolicyCreate, service: ServiceDep
-) -> DeadlinePolicyOut:
+async def create_policy(body: DeadlinePolicyCreate, service: ServiceDep) -> DeadlinePolicyOut:
     try:
         policy = await service.create(
             key=body.key,

@@ -103,9 +103,7 @@ def get_gremium_role_service(session: DbSession) -> GremiumRoleService:
 
 ServiceDep = Annotated[ConfigService, Depends(get_config_service)]
 SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
-GremiumRoleServiceDep = Annotated[
-    GremiumRoleService, Depends(get_gremium_role_service)
-]
+GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_service)]
 
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 
@@ -116,21 +114,40 @@ TypesAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
 RolesAdmin = Annotated[Principal, Depends(require_principal("admin.roles"))]
 WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))]
+# #per-page-admin: die zuvor von ``admin.roles`` mitgegatete Personen-/Zugriffs-
+# verwaltung ist je Admin-Seite getrennt. ``admin.roles`` = /admin/roles (Rollen-
+# Definition); die Schreib-Operationen der übrigen Seiten gaten auf eigene Keys.
+UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
+GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
+GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
+
+# Alle Admin-Bereichs-Rechte (für ANY-of-Reads + Admin-Landing).
+_ALL_ADMIN_AREAS = (
+    "admin.site",
+    "admin.gremien",
+    "admin.types",
+    "admin.roles",
+    "admin.users",
+    "admin.group_mappings",
+    "admin.gremium_roles",
+    "admin.delegations",
+    "admin.deadlines",
+)
 
 _GREMIEN = Depends(require_principal("admin.gremien"))
 _TYPES = Depends(require_principal("admin.types"))
 _SITE = Depends(require_principal("admin.site"))
 _ROLES = Depends(require_principal("admin.roles"))
+_USERS = Depends(require_principal("admin.users"))
+_GROUP_MAPPINGS = Depends(require_principal("admin.group_mappings"))
 _WEBHOOK = Depends(require_principal("webhook.manage"))
 # Geteilte Reads, die mehrere Admin-Bereiche bedienen (ANY-of).
-_ANY_ADMIN_AREA = Depends(
-    require_any_permission("admin.site", "admin.gremien", "admin.types", "admin.roles")
-)
+_ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
 # Gremium-Mitglieder-Subseite (admin.gremien) braucht lesenden Zugriff auf
-# Gremium-Rollen (Rollen-Dropdown) und Principals (Namen + Typeahead), ohne dass
-# der Gremien-Admin auch admin.roles besitzen muss (#5-3). Schreiben von Rollen
-# bleibt admin.roles.
-_GREMIEN_OR_ROLES = Depends(require_any_permission("admin.gremien", "admin.roles"))
+# Gremium-Rollen (Rollen-Dropdown) bzw. Principals (Namen + Typeahead), ohne dass
+# der Gremien-Admin die jeweilige Schreib-Permission besitzen muss (#5-3).
+_GREMIEN_OR_GREMIUM_ROLES = Depends(require_any_permission("admin.gremien", "admin.gremium_roles"))
+_GREMIEN_OR_USERS = Depends(require_any_permission("admin.gremien", "admin.users"))
 # Lese-Gates für Seiten, die fremde Bereichsdaten nur als Auswahl-/Anzeigequelle
 # brauchen (#5-2). Schreiben bleibt jeweils auf dem strengen Recht.
 #   * Flow-Editor (flow.configure) liest globalen Flow, Rollen, Webhooks, Fristen.
@@ -139,9 +156,16 @@ _GREMIEN_OR_ROLES = Depends(require_any_permission("admin.gremien", "admin.roles
 _FLOW_READABLE = Depends(
     require_any_permission("admin.types", "flow.configure", "budget.structure")
 )
+# Rollen-Liste: gebraucht von der Rollen-Seite, der Benutzer-Seite (Zuweisungs-
+# Dropdown) und diversen Konfig-Editoren als Anzeigequelle.
 _ROLES_READ = Depends(
     require_any_permission(
-        "admin.site", "admin.gremien", "admin.types", "admin.roles", "flow.configure"
+        "admin.site",
+        "admin.gremien",
+        "admin.types",
+        "admin.roles",
+        "admin.users",
+        "flow.configure",
     )
 )
 _WEBHOOK_OR_FLOW = Depends(require_any_permission("webhook.manage", "flow.configure"))
@@ -206,9 +230,7 @@ async def update_gremium(
     status_code=204,
     responses=_errors(401, 403, 404),
 )
-async def delete_gremium(
-    gremium_id: UUID, service: ServiceDep, principal: GremienAdmin
-) -> None:
+async def delete_gremium(gremium_id: UUID, service: ServiceDep, principal: GremienAdmin) -> None:
     await service.delete_gremium(gremium_id, principal.sub)
 
 
@@ -246,7 +268,7 @@ async def set_gremium_mail_recipients(
 @router.get(
     "/gremien/{gremium_id}/roles",
     response_model=list[GremiumRoleOut],
-    dependencies=[_GREMIEN_OR_ROLES],
+    dependencies=[_GREMIEN_OR_GREMIUM_ROLES],
     responses=_errors(401, 403),
 )
 async def list_gremium_roles(
@@ -265,7 +287,7 @@ async def create_gremium_role(
     gremium_id: UUID,
     payload: GremiumRoleCreate,
     service: GremiumRoleServiceDep,
-    principal: RolesAdmin,
+    principal: GremiumRolesAdmin,
 ) -> GremiumRoleOut:
     return await service.create_role(gremium_id, payload, principal.sub)
 
@@ -279,14 +301,14 @@ async def update_gremium_role(
     role_id: UUID,
     payload: GremiumRoleUpdate,
     service: GremiumRoleServiceDep,
-    principal: RolesAdmin,
+    principal: GremiumRolesAdmin,
 ) -> GremiumRoleOut:
     return await service.update_role(role_id, payload, principal.sub)
 
 
 @router.delete("/gremium-roles/{role_id}", status_code=204, responses=_errors(401, 403, 404, 409))
 async def delete_gremium_role(
-    role_id: UUID, service: GremiumRoleServiceDep, principal: RolesAdmin
+    role_id: UUID, service: GremiumRoleServiceDep, principal: GremiumRolesAdmin
 ) -> None:
     await service.delete_role(role_id, principal.sub)
 
@@ -417,7 +439,7 @@ async def create_global_flow(
 @router.get(
     "/principals",
     response_model=list[PrincipalOut],
-    dependencies=[_GREMIEN_OR_ROLES],
+    dependencies=[_GREMIEN_OR_USERS],
     responses=_errors(401, 403),
 )
 async def list_principals(
@@ -433,7 +455,7 @@ async def list_principals(
     responses=_errors(401, 403, 404, 422),
 )
 async def patch_principal(
-    principal_id: UUID, payload: PrincipalUpdate, service: ServiceDep, principal: RolesAdmin
+    principal_id: UUID, payload: PrincipalUpdate, service: ServiceDep, principal: UsersAdmin
 ) -> PrincipalOut:
     """Benutzer aktivieren/deaktivieren (#30)."""
     return await service.set_principal_active(principal_id, payload.active, principal.sub)
@@ -466,9 +488,7 @@ async def list_roles(service: ServiceDep) -> list[RoleOut]:
     status_code=201,
     responses=_errors(400, 401, 403, 409, 422),
 )
-async def create_role(
-    payload: RoleCreate, service: ServiceDep, principal: RolesAdmin
-) -> RoleOut:
+async def create_role(payload: RoleCreate, service: ServiceDep, principal: RolesAdmin) -> RoleOut:
     return await service.create_role(payload, principal.sub)
 
 
@@ -488,9 +508,7 @@ async def update_role(
     status_code=204,
     responses=_errors(401, 403, 404, 409),
 )
-async def delete_role(
-    role_id: UUID, service: ServiceDep, principal: RolesAdmin
-) -> None:
+async def delete_role(role_id: UUID, service: ServiceDep, principal: RolesAdmin) -> None:
     """Rolle löschen (#38); ``admin``/``member`` sind geschützt (409)."""
     await service.delete_role(role_id, principal.sub)
 
@@ -498,7 +516,7 @@ async def delete_role(
 @router.get(
     "/role-assignments",
     response_model=list[RoleAssignmentOut],
-    dependencies=[_ROLES],
+    dependencies=[_USERS],
     responses=_errors(401, 403),
 )
 async def list_role_assignments(service: ServiceDep) -> list[RoleAssignmentOut]:
@@ -514,7 +532,7 @@ async def list_role_assignments(service: ServiceDep) -> list[RoleAssignmentOut]:
 async def create_role_assignment(
     payload: RoleAssignmentCreate,
     service: ServiceDep,
-    principal: RolesAdmin,
+    principal: UsersAdmin,
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
@@ -524,9 +542,7 @@ async def create_role_assignment(
     # Betroffene:n informieren (#4-3, Art role_change/delegation, abwählbar #4-2).
     info = await assignment_mail_info(getattr(service, "session", None), out.id)
     pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(
-        mailer.assignment_changed, settings, info, granted=True, pool=pool
-    )
+    background.add_task(mailer.assignment_changed, settings, info, granted=True, pool=pool)
     return out
 
 
@@ -539,7 +555,7 @@ async def update_role_assignment(
     assignment_id: UUID,
     payload: RoleAssignmentUpdate,
     service: ServiceDep,
-    principal: RolesAdmin,
+    principal: UsersAdmin,
 ) -> RoleAssignmentOut:
     return await service.update_role_assignment(assignment_id, payload, principal.sub)
 
@@ -552,7 +568,7 @@ async def update_role_assignment(
 async def delete_role_assignment(
     assignment_id: UUID,
     service: ServiceDep,
-    principal: RolesAdmin,
+    principal: UsersAdmin,
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
@@ -563,16 +579,14 @@ async def delete_role_assignment(
     info = await assignment_mail_info(getattr(service, "session", None), assignment_id)
     await service.delete_role_assignment(assignment_id, principal.sub)
     pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(
-        mailer.assignment_changed, settings, info, granted=False, pool=pool
-    )
+    background.add_task(mailer.assignment_changed, settings, info, granted=False, pool=pool)
     return Response(status_code=204)
 
 
 @router.get(
     "/group-mappings",
     response_model=list[GroupMappingOut],
-    dependencies=[_ROLES],
+    dependencies=[_GROUP_MAPPINGS],
     responses=_errors(401, 403),
 )
 async def list_group_mappings(service: ServiceDep) -> list[GroupMappingOut]:
@@ -586,7 +600,7 @@ async def list_group_mappings(service: ServiceDep) -> list[GroupMappingOut]:
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def create_group_mapping(
-    payload: GroupMappingCreate, service: ServiceDep, principal: RolesAdmin
+    payload: GroupMappingCreate, service: ServiceDep, principal: GroupMappingsAdmin
 ) -> GroupMappingOut:
     return await service.create_group_mapping(payload, principal.sub)
 
@@ -600,16 +614,14 @@ async def update_group_mapping(
     mapping_id: UUID,
     payload: GroupMappingUpdate,
     service: ServiceDep,
-    principal: RolesAdmin,
+    principal: GroupMappingsAdmin,
 ) -> GroupMappingOut:
     return await service.update_group_mapping(mapping_id, payload, principal.sub)
 
 
-@router.delete(
-    "/group-mappings/{mapping_id}", status_code=204, responses=_errors(401, 403, 404)
-)
+@router.delete("/group-mappings/{mapping_id}", status_code=204, responses=_errors(401, 403, 404))
 async def delete_group_mapping(
-    mapping_id: UUID, service: ServiceDep, principal: RolesAdmin
+    mapping_id: UUID, service: ServiceDep, principal: GroupMappingsAdmin
 ) -> None:
     await service.delete_group_mapping(mapping_id, principal.sub)
 
@@ -684,9 +696,7 @@ async def put_site_config_draft(
     response_model=SiteConfigOut,
     responses=_errors(400, 401, 403, 409),
 )
-async def activate_site_config(
-    service: SiteServiceDep, principal: SiteAdmin
-) -> SiteConfigOut:
+async def activate_site_config(service: SiteServiceDep, principal: SiteAdmin) -> SiteConfigOut:
     """Draft aktivieren → neue aktive Version (Versionssprung, auditiert)."""
     return await service.activate(principal.sub)
 

@@ -42,7 +42,18 @@ SCOPES: dict[str, frozenset[str]] = {
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),
     "admin:write": frozenset(
-        {"admin.site", "admin.gremien", "admin.types", "admin.roles", "webhook.manage"}
+        {
+            "admin.site",
+            "admin.gremien",
+            "admin.types",
+            "admin.roles",
+            "admin.users",
+            "admin.group_mappings",
+            "admin.gremium_roles",
+            "admin.delegations",
+            "admin.deadlines",
+            "webhook.manage",
+        }
     ),
 }
 
@@ -68,6 +79,7 @@ def resolve_lifetime(key: str | None) -> int | None:
     if key is None or key not in LIFETIMES:
         key = DEFAULT_LIFETIME
     return LIFETIMES[key]
+
 
 # i18n-Schlüssel-Stamm je Scope für die Consent-UI (Label/Beschreibung im FE).
 SCOPE_ORDER: tuple[str, ...] = (

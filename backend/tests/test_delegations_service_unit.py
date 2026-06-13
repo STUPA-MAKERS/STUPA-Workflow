@@ -99,9 +99,7 @@ def _delegate(sub: str = "other") -> SimpleNamespace:
 
 
 def _payload(delegate_id: Any, *, voting: bool = False) -> DelegationCreate:
-    return DelegationCreate(
-        meetingId=MEETING_ID, delegateId=delegate_id, delegateVoting=voting
-    )
+    return DelegationCreate(meetingId=MEETING_ID, delegateId=delegate_id, delegateVoting=voting)
 
 
 def _names(*rows: tuple[Any, str | None, str | None]):  # noqa: ANN202
@@ -153,24 +151,24 @@ async def test_check_non_uuid_group_is_normal() -> None:
 async def test_check_outgoing_voting_blocked() -> None:
     # Zeile: (is_delegator, delegate_voting, delegator_sub)
     db = fake_session(result((True, True, "me")))
-    assert await voting_delegation_check(
-        db, "me", MEETING_ID, str(GREMIUM_ID), NOW
-    ) == (True, None)
+    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (True, None)
 
 
 async def test_check_incoming_voting_exercised() -> None:
     # Eingehende Stimm-Delegation → delegator_sub für die Vertretungs-Stimme.
     db = fake_session(result((False, True, "delegator-1")))
-    assert await voting_delegation_check(
-        db, "me", MEETING_ID, str(GREMIUM_ID), NOW
-    ) == (False, "delegator-1")
+    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (
+        False,
+        "delegator-1",
+    )
 
 
 async def test_check_nonvoting_rows_are_neutral() -> None:
     db = fake_session(result((True, False, "me"), (False, False, "other")))
-    assert await voting_delegation_check(
-        db, "me", MEETING_ID, str(GREMIUM_ID), NOW
-    ) == (False, None)
+    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (
+        False,
+        None,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -222,9 +220,7 @@ async def test_create_persists_and_audits() -> None:
 
 async def test_create_voting_enabled_ok() -> None:
     db = _happy_db()
-    out = await _svc(db, voting=True).create(
-        _payload(db._delegate.id, voting=True), _actor()
-    )
+    out = await _svc(db, voting=True).create(_payload(db._delegate.id, voting=True), _actor())
     assert out.delegate_voting is True
 
 
@@ -243,9 +239,7 @@ async def test_create_pool_recipient_bypasses_lead_deadline() -> None:
 
 async def test_create_external_allowed_when_flag_set() -> None:
     delegate = _delegate()
-    db = _happy_db(
-        gremium=_gremium(external=True), delegate=delegate, member_ids=[], pool_ids=[]
-    )
+    db = _happy_db(gremium=_gremium(external=True), delegate=delegate, member_ids=[], pool_ids=[])
     out = await _svc(db).create(_payload(delegate.id), _actor())
     assert out.via_pool is False
 
@@ -460,9 +454,7 @@ async def test_revoke_not_found_404() -> None:
 
 
 async def test_revoke_foreign_without_admin_403() -> None:
-    row = SimpleNamespace(
-        id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4()
-    )
+    row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4())
     db = fake_session(result(_me()))
     db.get_results = [row]
     with pytest.raises(ForbiddenError):
@@ -479,12 +471,10 @@ async def test_revoke_after_meeting_start_422() -> None:
 
 
 async def test_revoke_admin_bypasses_deadline() -> None:
-    row = SimpleNamespace(
-        id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4()
-    )
+    row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4())
     db = fake_session(result(_me()), result(), result())
     db.get_results = [row]  # kein Meeting-Lookup nötig (Admin)
-    await _svc(db).revoke(row.id, _actor(perms={"admin.roles"}))
+    await _svc(db).revoke(row.id, _actor(perms={"admin.delegations"}))
     assert db.deleted == [row]
 
 
@@ -510,7 +500,7 @@ async def test_substitute_create_admin_persists_and_audits() -> None:
     db.get_results = [_gremium()]
     out = await _svc(db).substitute_create(
         SubstituteCreate(gremiumId=GREMIUM_ID, substituteId=sub.id),
-        _actor(perms={"admin.roles"}),
+        _actor(perms={"admin.delegations"}),
     )
     assert out.substitute_id == sub.id
     assert out.member_id is None
@@ -525,7 +515,7 @@ async def test_substitute_create_duplicate_409() -> None:
     with pytest.raises(ConflictError):
         await _svc(db).substitute_create(
             SubstituteCreate(gremiumId=GREMIUM_ID, substituteId=sub.id),
-            _actor(perms={"admin.roles"}),
+            _actor(perms={"admin.delegations"}),
         )
 
 
@@ -535,24 +525,22 @@ async def test_substitute_create_member_equals_substitute_422() -> None:
     db.get_results = [_gremium()]
     with pytest.raises(ValidationProblem, match="differ"):
         await _svc(db).substitute_create(
-            SubstituteCreate(
-                gremiumId=GREMIUM_ID, memberId=sub.id, substituteId=sub.id
-            ),
-            _actor(perms={"admin.roles"}),
+            SubstituteCreate(gremiumId=GREMIUM_ID, memberId=sub.id, substituteId=sub.id),
+            _actor(perms={"admin.delegations"}),
         )
 
 
 async def test_substitute_delete_not_found_404() -> None:
     db = fake_session()
     with pytest.raises(NotFoundError):
-        await _svc(db).substitute_delete(uuid4(), _actor(perms={"admin.roles"}))
+        await _svc(db).substitute_delete(uuid4(), _actor(perms={"admin.delegations"}))
 
 
 async def test_substitute_delete_ok() -> None:
     row = SimpleNamespace(id=uuid4(), gremium_id=GREMIUM_ID)
     db = fake_session(result(), result())  # audit lock + prev
     db.get_results = [row]
-    await _svc(db).substitute_delete(row.id, _actor(perms={"admin.roles"}))
+    await _svc(db).substitute_delete(row.id, _actor(perms={"admin.delegations"}))
     assert db.deleted == [row]
 
 
@@ -564,9 +552,7 @@ async def test_substitutes_list_resolves_names() -> None:
         substitute_principal_id=uuid4(),
         created_at=NOW,
     )
-    db = fake_session(
-        result(row), _names((row.substitute_principal_id, "Sub", None))
-    )
+    db = fake_session(result(row), _names((row.substitute_principal_id, "Sub", None)))
     db.get_results = [_gremium()]
     out = await _svc(db).substitutes_list(GREMIUM_ID, _actor())
     assert out[0].substitute_name == "Sub"

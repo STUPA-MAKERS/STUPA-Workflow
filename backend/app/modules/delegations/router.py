@@ -5,8 +5,8 @@ Delegationen, ``POST`` anlegen, ``DELETE`` widerrufen, plus Sitzungs-Kontext
 (Deadline/Empfänger), Vote-Status (FE-Banner) und der pro Gremium gepflegte
 Stellvertreter-Pool. RBAC ist serverseitig **autoritativ** — jede Route verlangt
 eine Session (``require_principal`` → 401); die fachlichen Regeln (Gates,
-Deadline, Empfänger-Kreis, Ketten) prüft der Service. Admins (``admin.roles``)
-sehen/widerrufen alle Delegationen; den Pool pflegt ``admin.roles`` oder die
+Deadline, Empfänger-Kreis, Ketten) prüft der Service. Admins (``admin.delegations``)
+sehen/widerrufen alle Delegationen; den Pool pflegt ``admin.delegations`` oder die
 Gremium-Rolle mit ``session.manage``. Fehler als ``ProblemDetail``.
 """
 
@@ -81,13 +81,9 @@ async def create_delegation(
 ) -> DelegationOut:
     out = await service.create(payload, principal)
     # Vertreter:in informieren (#4-3, Art delegation, abwählbar #4-2).
-    info = await meeting_delegation_mail_info(
-        getattr(service, "session", None), out.id
-    )
+    info = await meeting_delegation_mail_info(getattr(service, "session", None), out.id)
     pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(
-        mailer.delegation_changed, settings, info, granted=True, pool=pool
-    )
+    background.add_task(mailer.delegation_changed, settings, info, granted=True, pool=pool)
     return out
 
 
@@ -106,14 +102,10 @@ async def revoke_delegation(
     mailer: AutoMailerDep,
 ) -> Response:
     # Mail-Daten VOR dem Widerruf einsammeln (#4-3) — danach ist die Zeile weg.
-    info = await meeting_delegation_mail_info(
-        getattr(service, "session", None), delegation_id
-    )
+    info = await meeting_delegation_mail_info(getattr(service, "session", None), delegation_id)
     await service.revoke(delegation_id, principal)
     pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(
-        mailer.delegation_changed, settings, info, granted=False, pool=pool
-    )
+    background.add_task(mailer.delegation_changed, settings, info, granted=False, pool=pool)
     return Response(status_code=204)
 
 

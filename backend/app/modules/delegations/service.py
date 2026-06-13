@@ -65,8 +65,9 @@ from app.shared.errors import (
     ValidationProblem,
 )
 
-# Permission, die die volle (fremde) Delegations-Sicht/-Verwaltung freischaltet.
-_ADMIN_PERM = "admin.roles"
+# Permission, die die volle (fremde) Delegations-Sicht/-Verwaltung freischaltet
+# (#per-page-admin: eigene Seite /admin/delegations → eigener Key).
+_ADMIN_PERM = "admin.delegations"
 # Gremium-Rollen-Permission, die den Stellvertreter-Pool pflegen darf.
 _POOL_MANAGE_PERM = "session.manage"
 
@@ -88,20 +89,24 @@ async def _membership_with_vote_cast(
 ) -> bool:
     """Aktive Gremium-Mitgliedschaft, deren Rolle ``vote.cast`` gewährt."""
     rows = (
-        await session.execute(
-            select(GremiumRole.permissions)
-            .select_from(GremiumMembership)
-            .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
-            .where(
-                GremiumMembership.principal_id == principal_id,
-                GremiumMembership.gremium_id == gremium_id,
-                (GremiumMembership.valid_from.is_(None))
-                | (GremiumMembership.valid_from <= now),
-                (GremiumMembership.valid_until.is_(None))
-                | (GremiumMembership.valid_until > now),
+        (
+            await session.execute(
+                select(GremiumRole.permissions)
+                .select_from(GremiumMembership)
+                .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+                .where(
+                    GremiumMembership.principal_id == principal_id,
+                    GremiumMembership.gremium_id == gremium_id,
+                    (GremiumMembership.valid_from.is_(None))
+                    | (GremiumMembership.valid_from <= now),
+                    (GremiumMembership.valid_until.is_(None))
+                    | (GremiumMembership.valid_until > now),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return any("vote.cast" in (perms or []) for perms in rows)
 
 
@@ -123,10 +128,8 @@ async def _independently_eligible(
                 RoleAssignment.principal_id == principal_id,
                 RoleAssignment.delegated_by.is_(None),
                 RoleAssignment.gremium_id == gremium_id,
-                (RoleAssignment.valid_from.is_(None))
-                | (RoleAssignment.valid_from <= now),
-                (RoleAssignment.valid_until.is_(None))
-                | (RoleAssignment.valid_until >= now),
+                (RoleAssignment.valid_from.is_(None)) | (RoleAssignment.valid_from <= now),
+                (RoleAssignment.valid_until.is_(None)) | (RoleAssignment.valid_until >= now),
             )
             .limit(1)
         )
@@ -225,8 +228,10 @@ class DelegationService:
         self, *, sub: str | None = None, pid: UUID | None = None
     ) -> PrincipalRow | None:
         stmt = select(PrincipalRow)
-        stmt = stmt.where(PrincipalRow.sub == sub) if sub is not None else stmt.where(
-            PrincipalRow.id == pid
+        stmt = (
+            stmt.where(PrincipalRow.sub == sub)
+            if sub is not None
+            else stmt.where(PrincipalRow.id == pid)
         )
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
@@ -235,9 +240,9 @@ class DelegationService:
             return {}
         rows = (
             await self.session.execute(
-                select(
-                    PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email
-                ).where(PrincipalRow.id.in_(ids))
+                select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email).where(
+                    PrincipalRow.id.in_(ids)
+                )
             )
         ).all()
         return {pid: (name or email) for pid, name, email in rows}
@@ -254,36 +259,42 @@ class DelegationService:
             raise NotFoundError(f"gremium {gremium_id} not found")
         return gremium
 
-    async def _pool_substitute_ids(
-        self, gremium_id: UUID, member_id: UUID
-    ) -> set[UUID]:
+    async def _pool_substitute_ids(self, gremium_id: UUID, member_id: UUID) -> set[UUID]:
         """Pool-Empfänger für ``member_id``: persönliche + gremium-weite Einträge."""
         rows = (
-            await self.session.execute(
-                select(DelegationSubstitute.substitute_principal_id).where(
-                    DelegationSubstitute.gremium_id == gremium_id,
-                    or_(
-                        DelegationSubstitute.member_principal_id.is_(None),
-                        DelegationSubstitute.member_principal_id == member_id,
-                    ),
+            (
+                await self.session.execute(
+                    select(DelegationSubstitute.substitute_principal_id).where(
+                        DelegationSubstitute.gremium_id == gremium_id,
+                        or_(
+                            DelegationSubstitute.member_principal_id.is_(None),
+                            DelegationSubstitute.member_principal_id == member_id,
+                        ),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return set(rows)
 
     async def _member_ids(self, gremium_id: UUID, now: datetime) -> set[UUID]:
         """Aktive Gremium-Mitglieder (beliebige Rolle)."""
         rows = (
-            await self.session.execute(
-                select(GremiumMembership.principal_id).where(
-                    GremiumMembership.gremium_id == gremium_id,
-                    (GremiumMembership.valid_from.is_(None))
-                    | (GremiumMembership.valid_from <= now),
-                    (GremiumMembership.valid_until.is_(None))
-                    | (GremiumMembership.valid_until > now),
+            (
+                await self.session.execute(
+                    select(GremiumMembership.principal_id).where(
+                        GremiumMembership.gremium_id == gremium_id,
+                        (GremiumMembership.valid_from.is_(None))
+                        | (GremiumMembership.valid_from <= now),
+                        (GremiumMembership.valid_until.is_(None))
+                        | (GremiumMembership.valid_until > now),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return set(rows)
 
     def _revocable(self, meeting: Meeting, now: datetime) -> bool:
@@ -384,30 +395,20 @@ class DelegationService:
         # Nur die eigene Stimme ist delegierbar: der Delegierende muss eigenständig
         # stimmberechtigtes Mitglied des Sitzungs-Gremiums sein.
         if not await _independently_eligible(self.session, me.id, gremium.id, now):
-            raise ForbiddenError(
-                "Only voting members of the meeting's gremium may delegate."
-            )
+            raise ForbiddenError("Only voting members of the meeting's gremium may delegate.")
 
         # Empfänger-Kreis: Mitglied | Pool | extern (nur wenn freigeschaltet).
         pool_ids = await self._pool_substitute_ids(gremium.id, me.id)
         member_ids = await self._member_ids(gremium.id, now)
         via_pool = delegate.id in pool_ids
-        if (
-            not via_pool
-            and delegate.id not in member_ids
-            and not gremium.delegation_allow_external
-        ):
-            raise ForbiddenError(
-                "Recipient must be a gremium member or a designated substitute."
-            )
+        if not via_pool and delegate.id not in member_ids and not gremium.delegation_allow_external:
+            raise ForbiddenError("Recipient must be a gremium member or a designated substitute.")
 
         # Deadline: Pool bis Sitzungsbeginn, sonst Beginn − Vorlauf (Gremium-Config).
         start = meeting_start_utc(meeting, self.settings.local_timezone)
         if start is not None:
             deadline = (
-                start
-                if via_pool
-                else start - timedelta(minutes=gremium.delegation_lead_minutes)
+                start if via_pool else start - timedelta(minutes=gremium.delegation_lead_minutes)
             )
             if now >= deadline:
                 raise ValidationProblem(
@@ -427,9 +428,7 @@ class DelegationService:
         ).all()
         for delegator_id, delegate_id, voting in existing:
             if delegator_id == me.id:
-                raise ConflictError(
-                    "You already delegated for this meeting.", code="conflict"
-                )
+                raise ConflictError("You already delegated for this meeting.", code="conflict")
             if delegate_id == me.id:
                 raise ValidationProblem(
                     "You receive a delegation for this meeting and cannot delegate on.",
@@ -475,9 +474,7 @@ class DelegationService:
         return (await self._out([(row, meeting, gremium)], now, me.id))[0]
 
     # -------------------------------------------------------------------- list
-    async def list(
-        self, actor: Principal, meeting_id: UUID | None = None
-    ) -> list[DelegationOut]:
+    async def list(self, actor: Principal, meeting_id: UUID | None = None) -> list[DelegationOut]:
         """Eigene (ausgehende **und** eingehende) Delegationen; Admins alle."""
         now = datetime.now(UTC)
         me = await self._principal_row(sub=actor.sub)
@@ -493,9 +490,7 @@ class DelegationService:
                     MeetingDelegation.delegate_principal_id == me.id,
                 )
             )
-        return await self._out(
-            await self._joined(*where), now, me.id if me else None
-        )
+        return await self._out(await self._joined(*where), now, me.id if me else None)
 
     # ------------------------------------------------------------------ revoke
     async def revoke(self, delegation_id: UUID, actor: Principal) -> None:
@@ -529,9 +524,7 @@ class DelegationService:
         await self.session.commit()
 
     # --------------------------------------------------------- meeting context
-    async def meeting_context(
-        self, meeting_id: UUID, actor: Principal
-    ) -> MeetingDelegationContext:
+    async def meeting_context(self, meeting_id: UUID, actor: Principal) -> MeetingDelegationContext:
         """Kontext für den »Vertretung einrichten«-Dialog einer Sitzung."""
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
@@ -544,9 +537,7 @@ class DelegationService:
             if start is not None
             else None
         )
-        meeting_started = meeting.status != "planned" or (
-            start is not None and now >= start
-        )
+        meeting_started = meeting.status != "planned" or (start is not None and now >= start)
 
         my_delegation: DelegationOut | None = None
         incoming: list[DelegationOut] = []
@@ -603,9 +594,7 @@ class DelegationService:
         )
 
     # -------------------------------------------------------------- recipients
-    async def recipients(
-        self, meeting_id: UUID, q: str, actor: Principal
-    ) -> list[RecipientOut]:
+    async def recipients(self, meeting_id: UUID, q: str, actor: Principal) -> list[RecipientOut]:
         """Typeahead: erlaubte Empfänger; bei ``delegation_allow_external``
         zusätzlich plattformweite Suche nach Name/Mail."""
         now = datetime.now(UTC)
@@ -674,18 +663,22 @@ class DelegationService:
         except (ValueError, TypeError):
             return empty
         rows = (
-            await self.session.execute(
-                select(MeetingDelegation).where(
-                    MeetingDelegation.meeting_id == vote.meeting_id,
-                    MeetingDelegation.gremium_id == gremium_id,
-                    MeetingDelegation.delegate_voting.is_(True),
-                    or_(
-                        MeetingDelegation.delegator_principal_id == me.id,
-                        MeetingDelegation.delegate_principal_id == me.id,
-                    ),
+            (
+                await self.session.execute(
+                    select(MeetingDelegation).where(
+                        MeetingDelegation.meeting_id == vote.meeting_id,
+                        MeetingDelegation.gremium_id == gremium_id,
+                        MeetingDelegation.delegate_voting.is_(True),
+                        or_(
+                            MeetingDelegation.delegator_principal_id == me.id,
+                            MeetingDelegation.delegate_principal_id == me.id,
+                        ),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         blocked = False
         exercising = False
         delegated_to: UUID | None = None
@@ -709,26 +702,28 @@ class DelegationService:
     async def _require_pool_manage(self, gremium_id: UUID, actor: Principal) -> None:
         if actor.has(_ADMIN_PERM):
             return
-        allowed = await gremium_ids_with_permission(
-            self.session, actor.sub, _POOL_MANAGE_PERM
-        )
+        allowed = await gremium_ids_with_permission(self.session, actor.sub, _POOL_MANAGE_PERM)
         if gremium_id not in allowed:
-            raise ForbiddenError("Managing the substitute pool requires admin.roles "
-                                 "or the gremium's session.manage permission.")
+            raise ForbiddenError(
+                "Managing the substitute pool requires admin.delegations "
+                "or the gremium's session.manage permission."
+            )
 
-    async def substitutes_list(
-        self, gremium_id: UUID, _actor: Principal
-    ) -> list[SubstituteOut]:
+    async def substitutes_list(self, gremium_id: UUID, _actor: Principal) -> list[SubstituteOut]:
         """Pool eines Gremiums — sichtbar für jeden eingeloggten Nutzer
         (Empfänger-Wahl; Pflege ist separat gegatet)."""
         await self._gremium(gremium_id)
         rows = (
-            await self.session.execute(
-                select(DelegationSubstitute)
-                .where(DelegationSubstitute.gremium_id == gremium_id)
-                .order_by(DelegationSubstitute.created_at)
+            (
+                await self.session.execute(
+                    select(DelegationSubstitute)
+                    .where(DelegationSubstitute.gremium_id == gremium_id)
+                    .order_by(DelegationSubstitute.created_at)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         ids: set[UUID] = set()
         for r in rows:
             ids.add(r.substitute_principal_id)
@@ -740,19 +735,15 @@ class DelegationService:
                 id=r.id,
                 gremium_id=r.gremium_id,
                 member_id=r.member_principal_id,
-                member_name=names.get(r.member_principal_id)
-                if r.member_principal_id
-                else None,
+                member_name=names.get(r.member_principal_id) if r.member_principal_id else None,
                 substitute_id=r.substitute_principal_id,
                 substitute_name=names.get(r.substitute_principal_id),
             )
             for r in rows
         ]
 
-    async def substitute_create(
-        self, payload: SubstituteCreate, actor: Principal
-    ) -> SubstituteOut:
-        """Pool-Eintrag anlegen — ``admin.roles`` oder Gremium-``session.manage``."""
+    async def substitute_create(self, payload: SubstituteCreate, actor: Principal) -> SubstituteOut:
+        """Pool-Eintrag anlegen — ``admin.delegations`` oder Gremium-``session.manage``."""
         await self._require_pool_manage(payload.gremium_id, actor)
         await self._gremium(payload.gremium_id)
         substitute = await self._principal_row(pid=payload.substitute_id)
@@ -808,9 +799,7 @@ class DelegationService:
             id=row.id,
             gremium_id=row.gremium_id,
             member_id=row.member_principal_id,
-            member_name=names.get(row.member_principal_id)
-            if row.member_principal_id
-            else None,
+            member_name=names.get(row.member_principal_id) if row.member_principal_id else None,
             substitute_id=row.substitute_principal_id,
             substitute_name=names.get(row.substitute_principal_id),
         )

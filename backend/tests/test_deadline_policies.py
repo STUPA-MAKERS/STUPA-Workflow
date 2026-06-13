@@ -68,8 +68,11 @@ class _FakeService:
     async def create(self, **kw):  # noqa: ANN003
         self.created = kw
         p = DeadlinePolicy(
-            key=kw["key"], label=kw["label"], kind=kw["kind"],
-            absolute_at=kw["absolute_at"], offset_days=kw["offset_days"],
+            key=kw["key"],
+            label=kw["label"],
+            kind=kw["kind"],
+            absolute_at=kw["absolute_at"],
+            offset_days=kw["offset_days"],
         )
         p.id = uuid4()
         return p
@@ -94,14 +97,12 @@ def app_client(app: FastAPI) -> TestClient:
 
 def _as_admin(app: FastAPI) -> None:
     app.dependency_overrides[get_current_principal] = lambda: Principal(
-        sub="admin", permissions={"admin.types"}
+        sub="admin", permissions={"admin.deadlines"}
     )
 
 
 def test_list_requires_admin_config(app: FastAPI, app_client: TestClient) -> None:
-    app.dependency_overrides[get_current_principal] = lambda: Principal(
-        sub="u", permissions=set()
-    )
+    app.dependency_overrides[get_current_principal] = lambda: Principal(sub="u", permissions=set())
     assert app_client.get("/api/admin/deadline-policies").status_code == 403
 
 
@@ -128,8 +129,10 @@ def test_create_relative_policy(
     res = app_client.post(
         "/api/admin/deadline-policies",
         json={
-            "key": "edit_window", "label": {"de": "Frist"},
-            "kind": "relative_changed", "offsetDays": 7,
+            "key": "edit_window",
+            "label": {"de": "Frist"},
+            "kind": "relative_changed",
+            "offsetDays": 7,
         },
     )
     assert res.status_code == 201
@@ -174,7 +177,7 @@ async def test_schedule_state_deadline_creates_row_for_policy() -> None:
     app = SimpleNamespace(id=uuid4(), flow_version_id=flow_id, created_at=_NOW, updated_at=_NOW)
     state = SimpleNamespace(id=state_id, config={"deadlinePolicyKey": "k"})
 
-    await FlowService(session).schedule_state_deadline(cast('Any', app), cast('Any', state))
+    await FlowService(session).schedule_state_deadline(cast("Any", app), cast("Any", state))
 
     created = [o for o in session.added if getattr(o, "kind", None) == "flow_deadline"]
     assert len(created) == 1
@@ -187,5 +190,5 @@ async def test_schedule_state_deadline_noop_without_policy_key() -> None:
     session = fake_session()
     app = SimpleNamespace(id=uuid4(), flow_version_id=uuid4(), created_at=_NOW, updated_at=_NOW)
     state = SimpleNamespace(id=uuid4(), config={})
-    await FlowService(session).schedule_state_deadline(cast('Any', app), cast('Any', state))
+    await FlowService(session).schedule_state_deadline(cast("Any", app), cast("Any", state))
     assert session.added == []

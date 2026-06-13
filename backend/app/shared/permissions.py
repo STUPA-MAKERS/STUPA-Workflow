@@ -53,7 +53,21 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.site",
     "admin.gremien",
     "admin.types",
+    # #per-page-admin (Migration 0019 remappt Bestands-Zuweisungen): die zuvor von
+    # ``admin.roles`` mitgegatete Personen-/Zugriffsverwaltung wird je Admin-Seite
+    # getrennt. ``admin.roles`` behält die Rollen-Definitions-Seite (/admin/roles);
+    # die übrigen Seiten bekommen eigene Keys.
     "admin.roles",
+    # /admin/users — Benutzer (de)aktivieren + Rollen-Zuweisungen verwalten.
+    "admin.users",
+    # /admin/group-mappings — IdP-Gruppen → Rollen-Mappings.
+    "admin.group_mappings",
+    # /admin/gremien/:id/roles — Gremium-Rollen-Definitionen.
+    "admin.gremium_roles",
+    # /admin/delegations — Delegationen/Stellvertreter-Pool plattformweit verwalten.
+    "admin.delegations",
+    # /admin/deadlines — Fristen-Policies (zuvor von ``admin.types`` mitgegatet).
+    "admin.deadlines",
     # Plattform-Benachrichtigungs-Config (#task-reminder): Erinnerungs-Schwellen,
     # künftig Mail-Templates. Migration 0018 verteilt es an admin.site-Inhaber.
     "admin.notifications",
