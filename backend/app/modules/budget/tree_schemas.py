@@ -243,6 +243,7 @@ class ExpenseCreate(_CamelModel):
     reference_number: str | None = Field(default=None, alias="referenceNumber")
     payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
     category: str | None = Field(default=None)
+    invoice_id: UUID | None = Field(default=None, alias="invoiceId")
 
     @model_validator(mode="after")
     def _income_not_linkable(self) -> ExpenseCreate:
@@ -268,6 +269,7 @@ class ExpenseUpdate(_CamelModel):
     reference_number: str | None = Field(default=None, alias="referenceNumber")
     payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
     category: str | None = Field(default=None)
+    invoice_id: UUID | None = Field(default=None, alias="invoiceId")
 
     @model_validator(mode="after")
     def _at_least_one(self) -> ExpenseUpdate:
@@ -300,6 +302,66 @@ class ExpenseOut(_CamelModel):
     reference_number: str | None = Field(default=None, alias="referenceNumber")
     payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
     category: str | None = None
+    invoice_id: UUID | None = Field(default=None, alias="invoiceId")
+    invoice_number: str | None = Field(default=None, alias="invoiceNumber")
+    created_at: datetime = Field(alias="createdAt")
+
+
+# -------------------------------------------------------------------- invoices
+InvoiceStatus = Literal["open", "paid"]
+
+
+class InvoiceCreate(_CamelModel):
+    """Rechnung anlegen (#invoices). ``grossAmount`` Pflicht; Rest optional."""
+
+    number: str | None = None
+    issue_date: date | None = Field(default=None, alias="issueDate")
+    due_date: date | None = Field(default=None, alias="dueDate")
+    supplier: str | None = None
+    net_amount: Decimal | None = Field(default=None, alias="netAmount", ge=0)
+    tax_amount: Decimal | None = Field(default=None, alias="taxAmount", ge=0)
+    gross_amount: Decimal = Field(alias="grossAmount", ge=0)
+    note: str | None = None
+    status: InvoiceStatus = "open"
+
+
+class InvoiceUpdate(_CamelModel):
+    """Rechnung teil-aktualisieren. Nur gesetzte Felder werden geschrieben."""
+
+    number: str | None = None
+    issue_date: date | None = Field(default=None, alias="issueDate")
+    due_date: date | None = Field(default=None, alias="dueDate")
+    supplier: str | None = None
+    net_amount: Decimal | None = Field(default=None, alias="netAmount", ge=0)
+    tax_amount: Decimal | None = Field(default=None, alias="taxAmount", ge=0)
+    gross_amount: Decimal | None = Field(default=None, alias="grossAmount", ge=0)
+    note: str | None = None
+    status: InvoiceStatus | None = None
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> InvoiceUpdate:
+        if not self.model_fields_set:
+            raise ValueError("at least one field required")
+        return self
+
+
+class InvoiceOut(_CamelModel):
+    """Rechnung (Stammdaten + Datei-Flag)."""
+
+    id: UUID
+    number: str | None = None
+    issue_date: date | None = Field(default=None, alias="issueDate")
+    due_date: date | None = Field(default=None, alias="dueDate")
+    supplier: str | None = None
+    net_amount: Decimal | None = Field(default=None, alias="netAmount")
+    tax_amount: Decimal | None = Field(default=None, alias="taxAmount")
+    gross_amount: Decimal = Field(alias="grossAmount")
+    currency: str
+    note: str | None = None
+    status: InvoiceStatus = "open"
+    file_name: str | None = Field(default=None, alias="fileName")
+    has_file: bool = Field(default=False, alias="hasFile")
+    actor: str | None = None
     created_at: datetime = Field(alias="createdAt")
 
 

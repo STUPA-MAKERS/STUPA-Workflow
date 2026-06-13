@@ -26,6 +26,7 @@ from app.modules.budget.tree_schemas import (
     BudgetTreeNodeOut,
     ExpenseOut,
     FiscalYearOut,
+    InvoiceOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
 from app.shared.paging import Page
@@ -45,6 +46,15 @@ def _expense_out() -> ExpenseOut:
         id=_EID, budgetId=_BID, pathKey="VS", fiscalYearId=_FYID,
         amount=Decimal("42.00"), currency="EUR", description="Rechnung",
         actor="admin", createdAt=datetime(2026, 6, 9, tzinfo=UTC),
+    )
+
+
+def _invoice_out() -> InvoiceOut:
+    from datetime import datetime
+
+    return InvoiceOut(
+        id=uuid.uuid4(), number="R-2026-1", grossAmount=Decimal("119.00"),
+        currency="EUR", status="open", createdAt=datetime(2026, 6, 9, tzinfo=UTC),
     )
 
 
@@ -164,6 +174,14 @@ class _FakeService:
     async def fiscal_year_label_map(self) -> dict[uuid.UUID, str]:
         self.calls["fy_labels"] = True
         return {_FYID: "2026"}
+
+    async def list_invoices(self) -> list[InvoiceOut]:
+        self.calls["list_invoices"] = True
+        return [_invoice_out()]
+
+    async def create_invoice(self, payload: Any, *, actor: str) -> InvoiceOut:
+        self.calls["create_invoice"] = (payload, actor)
+        return _invoice_out()
 
 
 def _fy_out() -> FiscalYearOut:
@@ -342,6 +360,21 @@ def test_account_options_forbidden_without_budget_or_account_perm(
 def test_full_accounts_list_still_requires_account_manage(fake: _FakeService) -> None:
     """Volle Stammdaten (inkl. IBAN) bleiben account.manage vorbehalten."""
     assert _app_as(fake, {"budget.book"}).get("/api/accounts").status_code == 403
+
+
+def test_invoices_list_readable_by_view(fake: _FakeService) -> None:
+    """#invoices: Rechnungen-Liste für jede Budget-Rolle lesbar."""
+    r = _app_as(fake, {"budget.view"}).get("/api/invoices")
+    assert r.status_code == 200
+    assert r.json()[0]["number"] == "R-2026-1"
+
+
+def test_invoice_create_requires_book(fake: _FakeService) -> None:
+    body = {"grossAmount": "119.00", "number": "R-1"}
+    ok = _app_as(fake, {"budget.book"}).post("/api/invoices", json=body)
+    assert ok.status_code == 201
+    forbidden = _app_as(fake, {"budget.view"}).post("/api/invoices", json=body)
+    assert forbidden.status_code == 403
 
 
 def test_tree_without_permission_is_gremium_scoped(

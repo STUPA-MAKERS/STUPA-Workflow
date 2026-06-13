@@ -48,6 +48,9 @@ from app.modules.budget.tree_schemas import (
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
+    InvoiceCreate,
+    InvoiceOut,
+    InvoiceUpdate,
     MoveFiscalYearRequest,
     TransferCreate,
     TransferOut,
@@ -424,6 +427,70 @@ async def create_transfer(
 ) -> TransferOut:
     """Übertrag Kostenstelle → Kostenstelle (Ausgabe + Einnahme, gleiches HHJ)."""
     return await service.create_transfer(payload, actor=principal.sub)
+
+
+# ------------------------------------------------------------------- invoices
+# Lesen: jede Budget-Rolle; Schreiben: budget.book (#invoices).
+_INVOICE_READ = Depends(
+    require_any_permission("budget.view", "budget.structure", "budget.book")
+)
+
+
+@router.get(
+    "/invoices",
+    response_model=list[InvoiceOut],
+    dependencies=[_INVOICE_READ],
+    responses=_errors(401, 403),
+)
+async def list_invoices(service: ServiceDep) -> list[InvoiceOut]:
+    """Rechnungen (neueste Rechnungsdatum zuerst)."""
+    return await service.list_invoices()
+
+
+@router.get(
+    "/invoices/{invoice_id}",
+    response_model=InvoiceOut,
+    dependencies=[_INVOICE_READ],
+    responses=_errors(401, 403, 404),
+)
+async def get_invoice(invoice_id: UUID, service: ServiceDep) -> InvoiceOut:
+    return await service.get_invoice(invoice_id)
+
+
+@router.post(
+    "/invoices",
+    response_model=InvoiceOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(400, 401, 403, 422),
+)
+async def create_invoice(
+    payload: InvoiceCreate,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
+) -> InvoiceOut:
+    return await service.create_invoice(payload, actor=principal.sub)
+
+
+@router.patch(
+    "/invoices/{invoice_id}",
+    response_model=InvoiceOut,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def update_invoice(
+    invoice_id: UUID, payload: InvoiceUpdate, service: ServiceDep
+) -> InvoiceOut:
+    return await service.update_invoice(invoice_id, payload)
+
+
+@router.delete(
+    "/invoices/{invoice_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(401, 403, 404),
+)
+async def delete_invoice(invoice_id: UUID, service: ServiceDep) -> None:
+    await service.delete_invoice(invoice_id)
 
 
 # ------------------------------------------------------------------- accounts

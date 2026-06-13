@@ -25,6 +25,7 @@ from app.modules.budget.tree_models import (
     BudgetAllocation,
     BudgetExpense,
     FiscalYear,
+    Invoice,
 )
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import (
@@ -47,6 +48,9 @@ from app.modules.budget.tree_schemas import (
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
+    InvoiceCreate,
+    InvoiceOut,
+    InvoiceUpdate,
     MoveFiscalYearRequest,
     TransferCreate,
     TransferOut,
@@ -636,6 +640,7 @@ class BudgetTreeService:
         path_key: str | None,
         app_title: str | None = None,
         account_name: str | None = None,
+        invoice_number: str | None = None,
     ) -> ExpenseOut:
         return ExpenseOut(
             id=e.id,
@@ -659,6 +664,8 @@ class BudgetTreeService:
             referenceNumber=e.reference_number,
             paymentMethod=e.payment_method,  # type: ignore[arg-type]
             category=e.category,
+            invoiceId=e.invoice_id,
+            invoiceNumber=invoice_number,
             createdAt=e.created_at,
         )
 
@@ -716,6 +723,7 @@ class BudgetTreeService:
             reference_number=payload.reference_number,
             payment_method=payload.payment_method,
             category=payload.category,
+            invoice_id=payload.invoice_id,
         )
         self.session.add(expense)
         await self.session.commit()
@@ -762,6 +770,8 @@ class BudgetTreeService:
             expense.payment_method = payload.payment_method
         if "category" in fields:
             expense.category = payload.category
+        if "invoice_id" in fields:
+            expense.invoice_id = payload.invoice_id
         await self.session.commit()
         node = await self._get_node(expense.budget_id)
         app_title: str | None = None
@@ -852,10 +862,17 @@ class BudgetTreeService:
         )
         rows = (
             await self.session.execute(
-                select(BudgetExpense, Budget.path_key, Application.data, Account.name)
+                select(
+                    BudgetExpense,
+                    Budget.path_key,
+                    Application.data,
+                    Account.name,
+                    Invoice.number,
+                )
                 .join(Budget, Budget.id == BudgetExpense.budget_id)
                 .outerjoin(Application, Application.id == BudgetExpense.application_id)
                 .outerjoin(Account, Account.id == BudgetExpense.account_id)
+                .outerjoin(Invoice, Invoice.id == BudgetExpense.invoice_id)
                 .where(*filters)
                 .order_by(ordering, BudgetExpense.created_at.desc())
                 .limit(limit)
@@ -863,8 +880,10 @@ class BudgetTreeService:
             )
         ).all()
         items = [
-            self._expense_out(e, path_key, _title_of(data) if data else None, acc_name)
-            for (e, path_key, data, acc_name) in rows
+            self._expense_out(
+                e, path_key, _title_of(data) if data else None, acc_name, inv_number
+            )
+            for (e, path_key, data, acc_name, inv_number) in rows
         ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
 
@@ -935,6 +954,94 @@ class BudgetTreeService:
         if acc is None:
             raise NotFoundError(f"account {account_id} not found")
         await self.session.delete(acc)  # Buchungen behalten account_id=NULL (SET NULL).
+        await self.session.commit()
+
+    # --------------------------------------------------------------- invoices
+    @staticmethod
+    def _invoice_out(inv: Invoice) -> InvoiceOut:
+        return InvoiceOut(
+            id=inv.id,
+            number=inv.number,
+            issueDate=inv.issue_date,
+            dueDate=inv.due_date,
+            supplier=inv.supplier,
+            netAmount=inv.net_amount,
+            taxAmount=inv.tax_amount,
+            grossAmount=inv.gross_amount,
+            currency=inv.currency,
+            note=inv.note,
+            status=inv.status,  # type: ignore[arg-type]
+            fileName=inv.file_name,
+            hasFile=inv.file_object_key is not None,
+            actor=inv.actor,
+            createdAt=inv.created_at,
+        )
+
+    async def list_invoices(self) -> list[InvoiceOut]:
+        rows = (
+            await self.session.scalars(
+                select(Invoice).order_by(Invoice.issue_date.desc().nulls_last())
+            )
+        ).all()
+        return [self._invoice_out(i) for i in rows]
+
+    async def get_invoice(self, invoice_id: UUID) -> InvoiceOut:
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        return self._invoice_out(inv)
+
+    async def create_invoice(self, payload: InvoiceCreate, *, actor: str) -> InvoiceOut:
+        inv = Invoice(
+            number=payload.number,
+            issue_date=payload.issue_date,
+            due_date=payload.due_date,
+            supplier=payload.supplier,
+            net_amount=payload.net_amount,
+            tax_amount=payload.tax_amount,
+            gross_amount=payload.gross_amount,
+            note=payload.note,
+            status=payload.status,
+            actor=actor,
+        )
+        self.session.add(inv)
+        await self.session.commit()
+        return self._invoice_out(inv)
+
+    async def update_invoice(
+        self, invoice_id: UUID, payload: InvoiceUpdate
+    ) -> InvoiceOut:
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        fields = payload.model_fields_set
+        if "number" in fields:
+            inv.number = payload.number
+        if "issue_date" in fields:
+            inv.issue_date = payload.issue_date
+        if "due_date" in fields:
+            inv.due_date = payload.due_date
+        if "supplier" in fields:
+            inv.supplier = payload.supplier
+        if "net_amount" in fields:
+            inv.net_amount = payload.net_amount
+        if "tax_amount" in fields:
+            inv.tax_amount = payload.tax_amount
+        if "gross_amount" in fields and payload.gross_amount is not None:
+            inv.gross_amount = payload.gross_amount
+        if "note" in fields:
+            inv.note = payload.note
+        if "status" in fields and payload.status is not None:
+            inv.status = payload.status
+        await self.session.commit()
+        return self._invoice_out(inv)
+
+    async def delete_invoice(self, invoice_id: UUID) -> None:
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        # Buchungen behalten invoice_id=NULL (FK SET NULL).
+        await self.session.delete(inv)
         await self.session.commit()
 
     # --------------------------------------------------------------- transfer
