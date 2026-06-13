@@ -53,6 +53,9 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.site",
     "admin.gremien",
     "admin.types",
+    # Antragsarten LÖSCHEN — bewusst getrennt von admin.types (Anlegen/Bearbeiten);
+    # das Entfernen einer Antragsart ist destruktiv (Formular/Flow hängen dran).
+    "admin.types_delete",
     "admin.roles",
     # Plattform-Benachrichtigungs-Config (#task-reminder): Erinnerungs-Schwellen,
     # künftig Mail-Templates. Migration 0018 verteilt es an admin.site-Inhaber.

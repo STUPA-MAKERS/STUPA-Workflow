@@ -266,6 +266,25 @@ class ConfigService:
         await self.session.commit()
         return _type_out(row)
 
+    async def delete_application_type(self, type_id: UUID, actor: str) -> None:
+        """Antragsart löschen (Formular-Versionen kaskadieren per FK). 409, wenn noch
+        Anträge dieser Art existieren — die ``application.type_id``-FK hat kein
+        ``ON DELETE``, ein Löschen würde die Anträge mitreißen bzw. die FK verletzen."""
+        row = await self._get_type(type_id)
+        row_id = row.id
+        from app.modules.applications.models import Application
+
+        in_use = await self.session.scalar(
+            select(Application.id).where(Application.type_id == type_id).limit(1)
+        )
+        if in_use is not None:
+            raise ConflictError(
+                "application type still has applications and cannot be deleted"
+            )
+        await self.session.delete(row)
+        await self._audit(actor, AuditAction.CONFIG_CHANGE, "application_type", row_id)
+        await self.session.commit()
+
     async def _get_type(self, type_id: UUID) -> ApplicationType:
         row = await self.session.get(ApplicationType, type_id)
         if row is None:

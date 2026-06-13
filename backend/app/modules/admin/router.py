@@ -113,6 +113,8 @@ AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 # ``admin.config`` ist in drei Bereichs-Rechte aufgeteilt (Migration 0017).
 GremienAdmin = Annotated[Principal, Depends(require_principal("admin.gremien"))]
 TypesAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
+# Löschen von Antragsarten ist destruktiv → eigene Permission, getrennt von admin.types.
+TypesDeleteAdmin = Annotated[Principal, Depends(require_principal("admin.types_delete"))]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
 RolesAdmin = Annotated[Principal, Depends(require_principal("admin.roles"))]
 WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))]
@@ -382,6 +384,19 @@ async def update_application_type(
     principal: TypesAdmin,
 ) -> ApplicationTypeOut:
     return await service.update_application_type(type_id, payload, principal.sub)
+
+
+@router.delete(
+    "/application-types/{type_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404, 409),
+)
+async def delete_application_type(
+    type_id: UUID, service: ServiceDep, principal: TypesDeleteAdmin
+) -> None:
+    """Antragsart löschen — eigene Permission ``admin.types_delete``. 409, wenn noch
+    Anträge dieser Art existieren (die hängen an Formular-/Flow-Versionen)."""
+    await service.delete_application_type(type_id, principal.sub)
 
 
 # =========================================================================== #

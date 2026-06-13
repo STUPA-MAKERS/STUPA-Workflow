@@ -420,6 +420,18 @@ export class AdminApiService {
       .pipe(map(() => void 0));
   }
 
+  /** Antragsart löschen — eigene Permission ``admin.types_delete``; 409 bei
+   *  bestehenden Anträgen dieser Art (#delete-types). */
+  deleteApplicationType(id: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.appTypes = this.store.appTypes.filter((t) => t.id !== id);
+      return of(void 0);
+    }
+    return this.http
+      .delete<unknown>(`${this.base}/admin/application-types/${id}`)
+      .pipe(map(() => void 0));
+  }
+
   /** Aktuelle Form-Version eines Typs zum Bearbeiten laden (#13). */
   getFormDraft(typeId: Uuid): Observable<FormDraft> {
     if (this.mock) {
