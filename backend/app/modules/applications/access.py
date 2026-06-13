@@ -27,6 +27,11 @@ from app.shared.errors import ForbiddenError, UnauthorizedError
 
 READ_PERMISSION = "application.read"
 MANAGE_PERMISSION = "application.manage"
+# Globale Sonderrechte (#app-read-all / #app-edit-any): jeden Antrag lesen bzw. in
+# jedem Flow-State bearbeiten (Letzteres hebt zusätzlich den State-Edit-Lock im
+# Service auf).
+READ_ALL_PERMISSION = "application.read_all"
+EDIT_ANY_PERMISSION = "application.edit_any"
 
 
 @dataclass(slots=True)
@@ -135,7 +140,12 @@ async def require_app_read(
 ) -> Access:
     """Lesezugriff: Principal mit ``application.read``, ``view``-Antragsteller,
     eingeloggte:r Ersteller:in (#24) **oder** Gremium-Mitglied, in dessen Gremium der
-    Antrag (ab)gestimmt wurde (#vote-read, nur lesend)."""
+    Antrag (ab)gestimmt wurde (#vote-read, nur lesend).
+
+    ``application.read_all`` (#app-read-all) gewährt globalen Lesezugriff unabhängig
+    von Gremium/Eigentum."""
+    if principal is not None and principal.has(READ_ALL_PERMISSION):
+        return Access(application_id, principal, None)
     try:
         return await _resolve_with_creator(
             db, application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
@@ -158,7 +168,10 @@ async def require_app_edit(
     eingeloggte:r Ersteller:in des eigenen Antrags (#24).
 
     Der Edit-Lock (``state.editAllowed``) wird **zusätzlich** im Service geprüft (409),
-    unabhängig von der Identität."""
+    unabhängig von der Identität. ``application.edit_any`` (#app-edit-any) gewährt
+    Schreibzugriff und hebt den State-Lock im Service auf."""
+    if principal is not None and principal.has(EDIT_ANY_PERMISSION):
+        return Access(application_id, principal, None)
     return await _resolve_with_creator(
         db, application_id, principal, applicant, perm=MANAGE_PERMISSION, scope="edit"
     )

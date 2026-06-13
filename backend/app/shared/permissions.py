@@ -24,9 +24,14 @@ from __future__ import annotations
 #   ``audit.read``     behält die Lesesicht; ``audit.verify`` die Hash-Kette
 PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read",
+    # Jeden Antrag lesen — Gremiums-/Eigentums-unabhängig (global). #app-read-all.
+    "application.read_all",
     "application.create",
     "application.transition",
     "application.manage",
+    # Antragsdaten in JEDEM Flow-State ändern — hebt den State-Edit-Lock auf
+    # (state.edit_allowed). #app-edit-any.
+    "application.edit_any",
     "form.configure",
     "flow.configure",
     "vote.cast",

@@ -397,12 +397,18 @@ class ApplicationsService:
 
     # ------------------------------------------------------------------ patch
     async def patch(
-        self, application_id: UUID, data: dict[str, Any], *, changed_by: str
+        self,
+        application_id: UUID,
+        data: dict[str, Any],
+        *,
+        changed_by: str,
+        bypass_state_lock: bool = False,
     ) -> ApplicationOut:
-        """``data`` aktualisieren → neue Version + Diff. Gesperrter State → 409."""
+        """``data`` aktualisieren → neue Version + Diff. Gesperrter State → 409,
+        außer ``bypass_state_lock`` (Aufrufer mit ``application.edit_any``, #app-edit-any)."""
         app = await self._get_app(application_id)
         state = await self._get_state(app.current_state_id)
-        if state is not None and not state.edit_allowed:
+        if state is not None and not state.edit_allowed and not bypass_state_lock:
             raise ConflictError("Application is locked for editing in its current state.")
 
         # Validierung VOR dem Schreibzugriff (422 statt 500), gegen die gepinnte Form.

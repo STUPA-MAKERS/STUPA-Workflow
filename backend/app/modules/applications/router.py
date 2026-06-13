@@ -37,7 +37,13 @@ from app.deps import (
     get_current_principal,
     require_principal,
 )
-from app.modules.applications.access import Access, require_app_edit, require_app_read
+from app.modules.applications.access import (
+    EDIT_ANY_PERMISSION,
+    READ_ALL_PERMISSION,
+    Access,
+    require_app_edit,
+    require_app_read,
+)
 from app.modules.applications.schemas import (
     ApplicationCreate,
     ApplicationCreated,
@@ -223,7 +229,11 @@ async def list_applications(
 
     Ohne ``application.read`` (und ohne Admin) sieht der Principal nur die **eigenen**
     Anträge (``created_by``), #24; ``mine=true`` erzwingt das auch für Berechtigte."""
-    can_read = "admin" in principal.roles or principal.has("application.read")
+    can_read = (
+        "admin" in principal.roles
+        or principal.has("application.read")
+        or principal.has(READ_ALL_PERMISSION)
+    )
     return await service.list_applications(
         state_id=state_id,
         gremium_id=gremium_id,
@@ -347,9 +357,14 @@ async def patch_application(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_edit)],
 ) -> ApplicationOut:
-    """Antragsdaten ändern → neue Version (gesperrter State → 409)."""
+    """Antragsdaten ändern → neue Version (gesperrter State → 409, außer
+    ``application.edit_any``)."""
+    bypass = access.principal is not None and access.principal.has(EDIT_ANY_PERMISSION)
     return await service.patch(
-        access.application_id, payload.data, changed_by=access.actor
+        access.application_id,
+        payload.data,
+        changed_by=access.actor,
+        bypass_state_lock=bypass,
     )
 
 

@@ -109,7 +109,8 @@ class _FakeService:
         self.last_include_pii = include_pii
         return _out(application_id, with_pii=include_pii)
 
-    async def patch(self, application_id, data, *, changed_by):  # noqa: ANN001
+    async def patch(self, application_id, data, *, changed_by, bypass_state_lock=False):  # noqa: ANN001
+        self.last_bypass_state_lock = bypass_state_lock
         return _out(application_id, with_pii=False)
 
     async def delete(self, application_id):  # noqa: ANN001
@@ -327,6 +328,23 @@ def test_patch_application_applicant_view_forbidden(app: FastAPI, client: TestCl
     _as_applicant(app, app_id, "view")
     r = client.patch(f"/api/applications/{app_id}", json={"data": {}})
     assert r.status_code == 403
+
+
+def test_read_all_reads_any_application(app: FastAPI, client: TestClient) -> None:
+    """#app-read-all: ``application.read_all`` liest jeden Antrag (kein Owner/Manage)."""
+    _as_principal(app, "application.read_all")
+    r = client.get(f"/api/applications/{uuid4()}")
+    assert r.status_code == 200
+
+
+def test_edit_any_bypasses_state_lock(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """#app-edit-any: ``application.edit_any`` darf schreiben + hebt den State-Lock auf."""
+    _as_principal(app, "application.edit_any")
+    r = client.patch(f"/api/applications/{uuid4()}", json={"data": {"title": "X"}})
+    assert r.status_code == 200
+    assert fake_service.last_bypass_state_lock is True
 
 
 def test_delete_application_admin(
