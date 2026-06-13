@@ -75,6 +75,11 @@
   color: var(--color-primary);
   background: var(--color-primary-subtle);
 }
+/* Aktives Item behält beim Hovern seinen grünen Hintergrund (#nav-hover). */
+.header__link.is-active:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
 .header__actions {
   display: flex;
   align-items: center;
