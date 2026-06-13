@@ -1661,10 +1661,11 @@ const AUTOSAVE_DELAY_MS = 1000;
           transparent
         );
         position: relative;
-        /* An die Viewport-Höhe binden statt 640px-Cap: Timeline füllt den Bildschirm
-           und scrollt intern, statt die ganze Seite wachsen zu lassen (#sitzungen-100vh).
-           Abzug ≈ Header + Breadcrumb + Seiten-H1 + Footer/Abstände. */
-        max-height: calc(100dvh - 15rem);
+        /* Höhe wird per JS (measureTimeline) exakt auf den freien Viewport-Rest
+           gesetzt — Header/Breadcrumb/H1/Toolbar oben, Footer/Main-Padding unten —
+           damit die Seite NICHT scrollt und nur die Timeline intern scrollt
+           (#sitzungen-100vh). Statisches calc() reichte nicht, weil der Footer
+           unter main die Seite immer über 100vh schob. Floor als Fallback. */
         min-height: 12rem;
         overflow-y: auto;
         display: flex;
@@ -2211,6 +2212,18 @@ export class MeetingsComponent implements OnDestroy {
         });
       }
     });
+    // Timeline-Höhe auf den freien Viewport-Rest setzen, sobald sie (neu) erscheint
+    // bzw. ihr Inhalt wächst (#sitzungen-100vh). Resize triggert separat (Listener).
+    effect(() => {
+      const el = this.timelineScroll();
+      // Abhängigkeiten: (Wieder-)Erscheinen + Inhaltsmenge.
+      this.timelineEmpty();
+      this.loadingList();
+      this.pastItems();
+      this.upcomingItems();
+      if (el) this.scheduleMeasure();
+    });
+    window.addEventListener('resize', this.onResize, { passive: true });
     // Gremien-Liste für das Anlege-Dropdown (#68) — nur wer Sitzungen verwalten
     // darf. Ohne globale `meeting.manage` werden nur die SELBST verwalteten
     // Gremien angeboten (Vorstand/Manager via Gremium-Rolle) — alles andere
@@ -2237,6 +2250,43 @@ export class MeetingsComponent implements OnDestroy {
     this.channel?.close();
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
     if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
+    window.removeEventListener('resize', this.onResize);
+    if (this.measureRaf !== null) cancelAnimationFrame(this.measureRaf);
+  }
+
+  // --- Timeline-Höhe (#sitzungen-100vh) ------------------------------------
+  /** Mindesthöhe der Timeline (px), falls der Viewport sehr klein ist. */
+  private readonly TIMELINE_MIN_PX = 192;
+  private measureRaf: number | null = null;
+  private readonly onResize = (): void => this.scheduleMeasure();
+
+  /** Messung gebündelt auf den nächsten Frame (Layout muss gesetzt sein). */
+  private scheduleMeasure(): void {
+    if (this.measureRaf !== null) cancelAnimationFrame(this.measureRaf);
+    this.measureRaf = requestAnimationFrame(() => {
+      this.measureRaf = null;
+      this.measureTimeline();
+    });
+  }
+
+  /**
+   * Timeline-Höhe = Viewport − alles darüber (Header/Breadcrumb/H1/Toolbar) −
+   * alles darunter (Footer + Main-Unterrand). Scroll-unabhängig gemessen
+   * (`rect.top + scrollY` = absoluter Layout-Offset), damit die Seite selbst
+   * nicht scrollt und nur die Timeline intern scrollt.
+   */
+  private measureTimeline(): void {
+    const el = this.timelineScroll()?.nativeElement;
+    if (!el) return;
+    const topOffset = el.getBoundingClientRect().top + window.scrollY;
+    const footer = document.querySelector<HTMLElement>('.footer');
+    const footerH = footer ? footer.offsetHeight : 0;
+    const main = el.closest<HTMLElement>('.main');
+    const mainPadBottom = main
+      ? Number.parseFloat(getComputedStyle(main).paddingBottom) || 0
+      : 0;
+    const avail = window.innerHeight - topOffset - footerH - mainPadBottom - 8;
+    el.style.height = `${Math.max(this.TIMELINE_MIN_PX, Math.round(avail))}px`;
   }
 
   // --- laden / anlegen -----------------------------------------------------
