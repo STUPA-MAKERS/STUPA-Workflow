@@ -23,6 +23,8 @@ export interface BudgetAllocationView {
 
 /** Buchungsart einer tatsächlichen Bewegung (#25). */
 export type ExpenseKind = 'expense' | 'income';
+/** Zahlungsmethode (#1-2). */
+export type PaymentMethod = 'ueberweisung' | 'bar' | 'lastschrift' | 'karte';
 
 /** Gebuchte Ausgabe/Einnahme (#25); Geld als String (Decimal). */
 export interface Expense {
@@ -40,6 +42,14 @@ export interface Expense {
   accountName: string | null;
   transferId: Uuid | null;
   actor: string | null;
+  // Zusatz-Metadaten (#1-1/#1-2/#3/#4), alle optional. Daten als ISO-Datum (YYYY-MM-DD).
+  invoiceDate: string | null;
+  paymentDate: string | null;
+  correspondent: string | null;
+  note: string | null;
+  referenceNumber: string | null;
+  paymentMethod: PaymentMethod | null;
+  category: string | null;
   createdAt: string;
 }
 
@@ -80,8 +90,19 @@ export interface ExpensePage {
   offset: number;
 }
 
+/** Zusatz-Metadaten einer Buchung (#1-1/#1-2/#3/#4) — beim Anlegen & Ändern. */
+export interface ExpenseMetadata {
+  invoiceDate?: string | null;
+  paymentDate?: string | null;
+  correspondent?: string | null;
+  note?: string | null;
+  referenceNumber?: string | null;
+  paymentMethod?: PaymentMethod | null;
+  category?: string | null;
+}
+
 /** Buchung anlegen (#25): eigenständig (``budgetId``) oder an Antrag gebunden. */
-export interface ExpenseCreate {
+export interface ExpenseCreate extends ExpenseMetadata {
   amount: string;
   description: string;
   kind?: ExpenseKind;
@@ -91,10 +112,11 @@ export interface ExpenseCreate {
   accountId?: Uuid | null;
 }
 
-/** Buchung ändern (Betrag/Beschreibung). */
-export interface ExpenseUpdate {
+/** Buchung ändern: Betrag, Beschreibung, Bankkonto + Zusatz-Metadaten (#1-1/#2/#3/#4). */
+export interface ExpenseUpdate extends ExpenseMetadata {
   amount?: string;
   description?: string;
+  accountId?: Uuid | null;
 }
 
 /** Filter/Paging der Buchungsliste (#25). */
@@ -108,7 +130,7 @@ export interface ExpenseQuery {
   amountMax?: number;
   createdFrom?: string;
   createdTo?: string;
-  sort?: 'createdAt' | 'amount';
+  sort?: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
   order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;

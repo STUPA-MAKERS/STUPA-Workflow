@@ -26,6 +26,13 @@ const EXPENSE: Expense = {
   accountName: null,
   transferId: null,
   actor: 'admin',
+  invoiceDate: '2026-05-20',
+  paymentDate: '2026-05-28',
+  correspondent: 'Copyshop Müller',
+  note: null,
+  referenceNumber: 'R-2026-7',
+  paymentMethod: 'ueberweisung',
+  category: 'Werbung',
   createdAt: '2026-05-30T09:00:00Z',
 };
 
@@ -72,6 +79,15 @@ describe('ExpensesComponent', () => {
   it('shows the empty state when there are no bookings', async () => {
     await setup();
     expect(await screen.findByText('Keine Buchungen gefunden.')).toBeInTheDocument();
+  });
+
+  it('renders invoice date, payment date and payee/payer columns (#1-1/#3)', async () => {
+    await setup({ page: page([EXPENSE]) });
+    expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
+    expect(screen.getByText('Copyshop Müller')).toBeInTheDocument();
+    // Spaltenüberschriften der neuen Datums-Spalten.
+    expect(screen.getByRole('button', { name: /Rechnungsdatum/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Zahldatum/ })).toBeInTheDocument();
   });
 
   it('books a standalone expense via POST /expenses', async () => {

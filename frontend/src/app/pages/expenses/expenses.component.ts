@@ -38,6 +38,7 @@ import {
   type Expense,
   type ExpenseKind,
   type FiscalYear,
+  type PaymentMethod,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { SimplifyPathPipe } from '@shared/budget-path';
@@ -154,11 +155,15 @@ import { SimplifyPathPipe } from '@shared/budget-path';
             <table class="exp__table">
               <thead>
                 <tr>
-                  <th scope="col" [attr.aria-sort]="ariaSort('createdAt')">
-                    <button type="button" class="exp__sort" (click)="onSort('createdAt')">{{ 'expenses.col.date' | t }}{{ sortInd('createdAt') }}</button>
+                  <th scope="col" [attr.aria-sort]="ariaSort('invoiceDate')">
+                    <button type="button" class="exp__sort" (click)="onSort('invoiceDate')">{{ 'expenses.col.invoiceDate' | t }}{{ sortInd('invoiceDate') }}</button>
+                  </th>
+                  <th scope="col" [attr.aria-sort]="ariaSort('paymentDate')">
+                    <button type="button" class="exp__sort" (click)="onSort('paymentDate')">{{ 'expenses.col.paymentDate' | t }}{{ sortInd('paymentDate') }}</button>
                   </th>
                   <th scope="col">{{ 'expenses.col.kind' | t }}</th>
                   <th scope="col">{{ 'expenses.col.description' | t }}</th>
+                  <th scope="col">{{ 'expenses.col.correspondent' | t }}</th>
                   <th scope="col">{{ 'expenses.col.costCentre' | t }}</th>
                   <th scope="col">{{ 'expenses.col.application' | t }}</th>
                   <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
@@ -170,11 +175,13 @@ import { SimplifyPathPipe } from '@shared/budget-path';
               <tbody>
                 @for (e of items(); track e.id) {
                   <tr [class.exp__tr--income]="e.kind === 'income'">
-                    <td class="exp__cellDate">{{ e.createdAt | ldate: 'mediumDate' }}</td>
+                    <td class="exp__cellDate">{{ e.invoiceDate ? (e.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
+                    <td class="exp__cellDate">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</td>
                     <td>
                       <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
                     </td>
                     <td class="exp__cellDesc">{{ e.description }}</td>
+                    <td>{{ e.correspondent || '—' }}</td>
                     <td class="exp__mono">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
                     <td>
                       @if (e.applicationId) {
@@ -193,7 +200,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
                   </tr>
                 } @empty {
                   <tr>
-                    <td class="exp__empty" [attr.colspan]="canManage() ? 7 : 6">{{ 'expenses.empty' | t }}</td>
+                    <td class="exp__empty" [attr.colspan]="canManage() ? 9 : 8">{{ 'expenses.empty' | t }}</td>
                   </tr>
                 }
               </tbody>
@@ -280,6 +287,28 @@ import { SimplifyPathPipe } from '@shared/budget-path';
         @if (accountOptions().length) {
           <app-select name="account" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="newAccountId()" (ngModelChange)="newAccountId.set($event)" />
         }
+
+        <div class="exp__grid2">
+          <app-datepicker name="invDate" [label]="'expenses.field.invoiceDate' | t" [ngModel]="newInvoiceDate()" (ngModelChange)="newInvoiceDate.set($event)" />
+          <app-datepicker name="payDate" [label]="'expenses.field.paymentDate' | t" [ngModel]="newPaymentDate()" (ngModelChange)="newPaymentDate.set($event)" />
+        </div>
+
+        <label class="exp__label" for="exp-corr">{{ 'expenses.field.correspondent' | t }}</label>
+        <input id="exp-corr" class="exp__input" name="corr" [ngModel]="newCorrespondent()" (ngModelChange)="newCorrespondent.set($event)" [placeholder]="'expenses.field.correspondentPlaceholder' | t" />
+
+        <div class="exp__grid2">
+          <div class="exp__field">
+            <label class="exp__label" for="exp-ref">{{ 'expenses.field.referenceNumber' | t }}</label>
+            <input id="exp-ref" class="exp__input" name="ref" [ngModel]="newReferenceNumber()" (ngModelChange)="newReferenceNumber.set($event)" />
+          </div>
+          <app-select name="paymethod" [label]="'expenses.field.paymentMethod' | t" [placeholder]="'expenses.field.paymentMethodPlaceholder' | t" [options]="paymentMethodOptions()" [ngModel]="newPaymentMethod()" (ngModelChange)="newPaymentMethod.set($event)" />
+        </div>
+
+        <label class="exp__label" for="exp-cat">{{ 'expenses.field.category' | t }}</label>
+        <input id="exp-cat" class="exp__input" name="cat" [ngModel]="newCategory()" (ngModelChange)="newCategory.set($event)" />
+
+        <label class="exp__label" for="exp-note">{{ 'expenses.field.note' | t }}</label>
+        <textarea id="exp-note" class="exp__input exp__textarea" name="note" rows="3" [ngModel]="newNote()" (ngModelChange)="newNote.set($event)"></textarea>
       </form>
       <div dialog-footer class="exp__dialogFoot">
         <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
@@ -294,6 +323,32 @@ import { SimplifyPathPipe } from '@shared/budget-path';
         <input id="exp-edesc" class="exp__input" [ngModel]="editDescription()" (ngModelChange)="editDescription.set($event)" name="edesc" />
         <label class="exp__label" for="exp-eamount">{{ 'expenses.field.amount' | t }}</label>
         <app-currency-input name="eamount" [ngModel]="editAmount()" (ngModelChange)="editAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
+
+        @if (accountOptions().length) {
+          <app-select name="eaccount" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="editAccountId()" (ngModelChange)="editAccountId.set($event)" />
+        }
+
+        <div class="exp__grid2">
+          <app-datepicker name="einvDate" [label]="'expenses.field.invoiceDate' | t" [ngModel]="editInvoiceDate()" (ngModelChange)="editInvoiceDate.set($event)" />
+          <app-datepicker name="epayDate" [label]="'expenses.field.paymentDate' | t" [ngModel]="editPaymentDate()" (ngModelChange)="editPaymentDate.set($event)" />
+        </div>
+
+        <label class="exp__label" for="exp-ecorr">{{ 'expenses.field.correspondent' | t }}</label>
+        <input id="exp-ecorr" class="exp__input" name="ecorr" [ngModel]="editCorrespondent()" (ngModelChange)="editCorrespondent.set($event)" [placeholder]="'expenses.field.correspondentPlaceholder' | t" />
+
+        <div class="exp__grid2">
+          <div class="exp__field">
+            <label class="exp__label" for="exp-eref">{{ 'expenses.field.referenceNumber' | t }}</label>
+            <input id="exp-eref" class="exp__input" name="eref" [ngModel]="editReferenceNumber()" (ngModelChange)="editReferenceNumber.set($event)" />
+          </div>
+          <app-select name="epaymethod" [label]="'expenses.field.paymentMethod' | t" [placeholder]="'expenses.field.paymentMethodPlaceholder' | t" [options]="paymentMethodOptions()" [ngModel]="editPaymentMethod()" (ngModelChange)="editPaymentMethod.set($event)" />
+        </div>
+
+        <label class="exp__label" for="exp-ecat">{{ 'expenses.field.category' | t }}</label>
+        <input id="exp-ecat" class="exp__input" name="ecat" [ngModel]="editCategory()" (ngModelChange)="editCategory.set($event)" />
+
+        <label class="exp__label" for="exp-enote">{{ 'expenses.field.note' | t }}</label>
+        <textarea id="exp-enote" class="exp__input exp__textarea" name="enote" rows="3" [ngModel]="editNote()" (ngModelChange)="editNote.set($event)"></textarea>
       </form>
       <div dialog-footer class="exp__dialogFoot">
         <app-button variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>
@@ -494,6 +549,11 @@ import { SimplifyPathPipe } from '@shared/budget-path';
       }
       .exp__form { display: flex; flex-direction: column; gap: var(--space-2); }
       .exp__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); margin-top: var(--space-2); }
+      /* Zwei-Spalten-Reihe für zusammengehörige Felder (Daten, Beleg/Methode). */
+      .exp__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
+      .exp__field { display: flex; flex-direction: column; gap: var(--space-1); }
+      .exp__textarea { resize: vertical; min-height: 4.5rem; }
+      @media (max-width: 30rem) { .exp__grid2 { grid-template-columns: 1fr; } }
       .exp__hint { font-size: var(--fs-sm); color: var(--color-text-muted); margin: 0; }
       .exp__hint--warn { color: var(--color-danger); }
       .exp__dialogFoot { display: flex; justify-content: flex-end; gap: var(--space-3); }
@@ -653,7 +713,9 @@ export class ExpensesComponent {
   readonly budgetId = signal('');
   /** Mobil: Baum hinter einklappbarem Toggle (Desktop immer sichtbar). */
   readonly treeOpen = signal(false);
-  readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
+  readonly sortField = signal<'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate'>(
+    'invoiceDate',
+  );
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -688,11 +750,35 @@ export class ExpensesComponent {
   readonly appCandidates = signal<{ id: string; title: string }[]>([]);
   readonly fiscalYearOptions = signal<SelectOption[]>([]);
   readonly saving = signal(false);
+  // Zusatz-Metadaten im Anlegen-Dialog (#1-1/#1-2/#3/#4).
+  readonly newInvoiceDate = signal('');
+  readonly newPaymentDate = signal('');
+  readonly newCorrespondent = signal('');
+  readonly newReferenceNumber = signal('');
+  readonly newPaymentMethod = signal('');
+  readonly newCategory = signal('');
+  readonly newNote = signal('');
+
+  /** Zahlungsmethode-Auswahl (#1-2); leerer Wert = keine Angabe. */
+  readonly paymentMethodOptions = computed<SelectOption[]>(() =>
+    (['ueberweisung', 'bar', 'lastschrift', 'karte'] as const).map((v) => ({
+      value: v,
+      label: this.i18n.translate(`expenses.paymentMethod.${v}`),
+    })),
+  );
 
   // --- Bearbeiten/Löschen ---
   readonly editing = signal<Expense | null>(null);
   readonly editAmount = signal('');
   readonly editDescription = signal('');
+  readonly editAccountId = signal('');
+  readonly editInvoiceDate = signal('');
+  readonly editPaymentDate = signal('');
+  readonly editCorrespondent = signal('');
+  readonly editReferenceNumber = signal('');
+  readonly editPaymentMethod = signal('');
+  readonly editCategory = signal('');
+  readonly editNote = signal('');
   readonly confirmDelete = signal<Expense | null>(null);
 
   // --- Export + Konten ---
@@ -799,7 +885,7 @@ export class ExpensesComponent {
   }
 
   /** Spalten-Sortierung umschalten (gleiche Spalte → Richtung kippen). */
-  onSort(field: 'createdAt' | 'amount'): void {
+  onSort(field: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate'): void {
     if (this.sortField() === field) {
       this.sortOrder.update((o) => (o === 'desc' ? 'asc' : 'desc'));
     } else {
@@ -809,12 +895,14 @@ export class ExpensesComponent {
     this.reload();
   }
 
-  sortInd(field: 'createdAt' | 'amount'): string {
+  sortInd(field: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate'): string {
     if (this.sortField() !== field) return '';
     return this.sortOrder() === 'asc' ? ' ↑' : ' ↓';
   }
 
-  ariaSort(field: 'createdAt' | 'amount'): 'ascending' | 'descending' | 'none' {
+  ariaSort(
+    field: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate',
+  ): 'ascending' | 'descending' | 'none' {
     if (this.sortField() !== field) return 'none';
     return this.sortOrder() === 'asc' ? 'ascending' : 'descending';
   }
@@ -877,6 +965,13 @@ export class ExpensesComponent {
     this.newFiscalYearId.set('');
     this.newApplicationId.set('');
     this.newAccountId.set('');
+    this.newInvoiceDate.set('');
+    this.newPaymentDate.set('');
+    this.newCorrespondent.set('');
+    this.newReferenceNumber.set('');
+    this.newPaymentMethod.set('');
+    this.newCategory.set('');
+    this.newNote.set('');
     this.appQuery.set('');
     this.appCandidates.set([]);
     this.fiscalYearOptions.set([]);
@@ -1043,6 +1138,13 @@ export class ExpensesComponent {
         budgetId: linked ? null : this.newBudgetId() || null,
         fiscalYearId: linked ? null : this.newFiscalYearId() || null,
         accountId: this.newAccountId() || null,
+        invoiceDate: this.newInvoiceDate() || null,
+        paymentDate: this.newPaymentDate() || null,
+        correspondent: this.newCorrespondent().trim() || null,
+        referenceNumber: this.newReferenceNumber().trim() || null,
+        paymentMethod: (this.newPaymentMethod() as PaymentMethod) || null,
+        category: this.newCategory().trim() || null,
+        note: this.newNote().trim() || null,
       })
       .subscribe({
         next: () => {
@@ -1069,6 +1171,14 @@ export class ExpensesComponent {
     this.editing.set(e);
     this.editAmount.set(e.amount);
     this.editDescription.set(e.description);
+    this.editAccountId.set(e.accountId ?? '');
+    this.editInvoiceDate.set(e.invoiceDate ?? '');
+    this.editPaymentDate.set(e.paymentDate ?? '');
+    this.editCorrespondent.set(e.correspondent ?? '');
+    this.editReferenceNumber.set(e.referenceNumber ?? '');
+    this.editPaymentMethod.set(e.paymentMethod ?? '');
+    this.editCategory.set(e.category ?? '');
+    this.editNote.set(e.note ?? '');
   }
 
   saveEdit(event: Event): void {
@@ -1080,6 +1190,14 @@ export class ExpensesComponent {
       .updateExpense(e.id, {
         amount: this.editAmount(),
         description: this.editDescription().trim(),
+        accountId: this.editAccountId() || null,
+        invoiceDate: this.editInvoiceDate() || null,
+        paymentDate: this.editPaymentDate() || null,
+        correspondent: this.editCorrespondent().trim() || null,
+        referenceNumber: this.editReferenceNumber().trim() || null,
+        paymentMethod: (this.editPaymentMethod() as PaymentMethod) || null,
+        category: this.editCategory().trim() || null,
+        note: this.editNote().trim() || null,
       })
       .subscribe({
         next: (updated) => {
