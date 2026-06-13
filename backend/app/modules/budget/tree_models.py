@@ -191,6 +191,11 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     account_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("account.id", ondelete="SET NULL"), nullable=True
     )
+    # Optionale Rechnung (#invoices): 1 Rechnung : N Buchungen. SET NULL beim Löschen
+    # der Rechnung → die Buchung bleibt bestehen.
+    invoice_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("invoice.id", ondelete="SET NULL"), nullable=True
+    )
     # Verknüpft die beiden Buchungen eines Übertrags (Ausgabe Quelle ↔ Einnahme Ziel).
     transfer_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     # 'expense' (ausgegeben) | 'income' (Einnahme).
@@ -231,6 +236,7 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
         Index("ix_budget_expense_account_id", "account_id"),
         Index("ix_budget_expense_transfer_id", "transfer_id"),
         Index("ix_budget_expense_invoice_date", "invoice_date"),
+        Index("ix_budget_expense_invoice_id", "invoice_id"),
     )
 
 
@@ -247,6 +253,40 @@ class Account(UUIDPkMixin, CreatedAtMixin, Base):
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
     __table_args__ = (Index("ix_account_name", "name"),)
+
+
+class Invoice(UUIDPkMixin, CreatedAtMixin, Base):
+    """Rechnung (#invoices) — eigenständiger Beleg, optional aus ZUGFeRD/Factur-X
+    importiert. Buchungen referenzieren optional **eine** Rechnung (1 Rechnung : N
+    Buchungen). Nicht an Kostenstellen/Gremien gebunden (wie Konten)."""
+
+    __tablename__ = "invoice"
+
+    number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    issue_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Lieferant/Aussteller (Freitext, aus ZUGFeRD SellerTradeParty oder manuell).
+    supplier: Mapped[str | None] = mapped_column(Text, nullable=True)
+    net_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    tax_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    gross_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 'open' (offen) | 'paid' (bezahlt).
+    status: Mapped[str] = mapped_column(Text, server_default="open")
+    # Original-Beleg (PDF/XML) im Object-Storage.
+    file_object_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_mime: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("currency = 'EUR'", name="invoice_currency_eur"),
+        CheckConstraint("status IN ('open', 'paid')", name="invoice_status_valid"),
+        CheckConstraint("gross_amount >= 0", name="invoice_gross_nonneg"),
+        Index("ix_invoice_number", "number"),
+        Index("ix_invoice_issue_date", "issue_date"),
+    )
 
 
 __all__ = ["Account", "Budget", "BudgetAllocation", "BudgetExpense", "FiscalYear"]
