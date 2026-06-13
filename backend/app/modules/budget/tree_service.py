@@ -7,6 +7,8 @@ Dünne I/O-Verdrahtung; alle Entscheidungen liegen in :mod:`app.modules.budget.t
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import uuid
 from decimal import Decimal
 from uuid import UUID
@@ -18,6 +20,7 @@ from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.applications.service import _title_of
 from app.modules.budget import tree_rules
+from app.modules.budget.invoice_import import parse_zugferd_pdf
 from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree_models import (
     Account,
@@ -50,16 +53,42 @@ from app.modules.budget.tree_schemas import (
     FiscalYearUpdate,
     InvoiceCreate,
     InvoiceOut,
+    InvoiceParseResult,
     InvoiceUpdate,
     MoveFiscalYearRequest,
     TransferCreate,
     TransferOut,
 )
+from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
+from app.modules.files.scanner import ScannerError, build_scanner
+from app.modules.files.schemas import SignedUrlOut
+from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.flow.models import State
-from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.settings import Settings, get_settings
+from app.shared.errors import (
+    ConflictError,
+    NotFoundError,
+    PayloadTooLargeError,
+    ServiceUnavailableError,
+    UnsupportedMediaTypeError,
+    ValidationProblem,
+)
 from app.shared.paging import Page
 
+logger = logging.getLogger("app.budget")
+
 _ZERO = Decimal("0")
+
+# Beleg-Tokens (#15) sind immer server-erzeugte Keys unter diesem Prefix; alles
+# andere weisen wir ab, damit ein Client den ``fileObjectKey`` nicht auf ein
+# fremdes Bucket-Objekt zeigen lassen kann.
+_INVOICE_FILE_PREFIX = "invoices/"
+
+
+def _validate_invoice_file_token(token: str) -> str:
+    if not token.startswith(_INVOICE_FILE_PREFIX) or ".." in token:
+        raise ValidationProblem("invalid invoice file token")
+    return token
 
 
 def _natural_path_key(path_key: str) -> tuple:
@@ -108,8 +137,18 @@ def _fy_out(f: FiscalYear, start_month: int, start_day: int) -> FiscalYearOut:
 class BudgetTreeService:
     """DB-gestützte Operationen des Kostenstellen-Baums (an eine Session gebunden)."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        storage: ObjectStorage | None = None,
+        settings: Settings | None = None,
+    ) -> None:
         self.session = session
+        # Storage/Settings nur für den Rechnungs-Import (#15) nötig; die übrigen
+        # Budget-Endpunkte verdrahten sie nicht (bleiben ``None``).
+        self.storage = storage
+        self.settings = settings or get_settings()
 
     # --------------------------------------------------------------- low-level
     async def _get_node(self, budget_id: UUID) -> Budget:
@@ -1004,9 +1043,101 @@ class BudgetTreeService:
             status=payload.status,
             actor=actor,
         )
+        if payload.file_token is not None:
+            # Beleg aus dem ZUGFeRD-Import übernehmen (#15) — der Token ist der
+            # bereits gespeicherte MinIO-Key (Prefix-validiert gegen Fremdobjekte).
+            inv.file_object_key = _validate_invoice_file_token(payload.file_token)
+            inv.file_name = payload.file_name
+            inv.file_mime = payload.file_mime
         self.session.add(inv)
         await self.session.commit()
         return self._invoice_out(inv)
+
+    # ------------------------------------------------------ ZUGFeRD-Import (#15)
+    async def parse_invoice_file(
+        self, data: bytes, *, filename: str | None
+    ) -> InvoiceParseResult:
+        """PDF prüfen (MIME + AV-Scan), ZUGFeRD parsen, Original ablegen.
+
+        Reihenfolge bewusst: scannen → parsen → erst danach speichern, damit ein
+        Nicht-ZUGFeRD-PDF (häufigster Fall) **kein** verwaistes Objekt hinterlässt.
+        """
+        max_bytes = self.settings.attachment_max_bytes
+        if len(data) > max_bytes:
+            raise PayloadTooLargeError(f"Invoice exceeds {max_bytes} bytes.")
+        if not data:
+            raise UnsupportedMediaTypeError("Empty file.")
+        try:
+            mime = validate_upload(filename, data)
+        except MimeRejected as exc:
+            raise UnsupportedMediaTypeError(str(exc)) from exc
+        if mime != "application/pdf":
+            raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
+
+        await self._scan_or_raise(data)
+        # Parsing ist synchron/CPU-gebunden → Threadpool (keine Loop-Blockade).
+        parsed = await asyncio.to_thread(parse_zugferd_pdf, data)
+
+        safe_name = sanitize_filename(filename)
+        storage_key = await self._store_invoice_file(data, mime, safe_name)
+        return InvoiceParseResult(
+            number=parsed.number,
+            issueDate=parsed.issue_date,
+            dueDate=parsed.due_date,
+            supplier=parsed.supplier,
+            netAmount=parsed.net_amount,
+            taxAmount=parsed.tax_amount,
+            grossAmount=parsed.gross_amount,
+            currency=parsed.currency,
+            fileToken=storage_key,
+            fileName=safe_name,
+            fileMime=mime,
+        )
+
+    async def invoice_file_url(self, invoice_id: UUID) -> SignedUrlOut:
+        """Kurzlebige Download-URL des Original-Belegs (#15)."""
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        if inv.file_object_key is None:
+            raise NotFoundError("invoice has no stored file")
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        try:
+            url = self.storage.presigned_get_url(
+                inv.file_object_key,
+                expires_seconds=self.settings.attachment_url_ttl_seconds,
+                download_name=inv.file_name,
+            )
+        except StorageError as exc:
+            raise ServiceUnavailableError("Could not sign download URL.") from exc
+        return SignedUrlOut(url=url, expiresIn=self.settings.attachment_url_ttl_seconds)
+
+    async def _scan_or_raise(self, data: bytes) -> None:
+        """Synchroner AV-Scan; ohne ClamAV (DEV/Contract-CI) übersprungen."""
+        scanner = build_scanner(self.settings)
+        if scanner is None:
+            return
+        try:
+            verdict = await scanner.scan(data)
+        except ScannerError as exc:
+            raise ServiceUnavailableError("Virus scan unavailable.") from exc
+        if not verdict.clean:
+            raise UnsupportedMediaTypeError(
+                f"File rejected by virus scan: {verdict.signature or 'unknown'}"
+            )
+
+    async def _store_invoice_file(
+        self, data: bytes, mime: str, safe_name: str
+    ) -> str:
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        storage_key = f"invoices/{uuid.uuid4().hex}/{safe_name}"
+        try:
+            await self.storage.put(storage_key, data, mime)
+        except StorageError as exc:
+            raise ServiceUnavailableError("Object storage write failed.") from exc
+        return storage_key
 
     async def update_invoice(
         self, invoice_id: UUID, payload: InvoiceUpdate
@@ -1041,8 +1172,15 @@ class BudgetTreeService:
         if inv is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
         # Buchungen behalten invoice_id=NULL (FK SET NULL).
+        storage_key = inv.file_object_key
         await self.session.delete(inv)
         await self.session.commit()
+        if storage_key is not None and self.storage is not None:
+            # Original-Beleg best-effort entfernen (fehlt es schon, gilt das Löschen).
+            try:
+                await self.storage.remove(storage_key)
+            except StorageError:
+                logger.warning("could not remove file for deleted invoice %s", invoice_id)
 
     # --------------------------------------------------------------- transfer
     async def create_transfer(

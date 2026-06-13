@@ -41,6 +41,9 @@ dependencies = [
     # Excel-Export (TASKS #2): Budget-Baum + Anträge als .xlsx (filter-aware).
     # Lazy importiert (nur auf dem Export-Pfad), reines Python-Paket.
     "openpyxl>=3.1",
+    # ZUGFeRD/Factur-X-Import (#invoices): eingebettetes CII-XML aus Rechnungs-PDFs
+    # lesen. Reines Python (pypdf), lazy importiert (nur auf dem Import-Pfad).
+    "pycheval>=0.3,<0.4",
 ]
 
 [project.optional-dependencies]

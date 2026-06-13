@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -29,6 +30,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
+from app.settings import load_settings
 from app.shared.paging import Page
 
 _BID = uuid.uuid4()
@@ -446,6 +448,13 @@ def test_budget_export_xlsx(fake: _FakeService) -> None:
 
 
 def test_get_budget_tree_service_factory() -> None:
-    svc = get_budget_tree_service(session=object())  # type: ignore[arg-type]
+    # request.app.state.object_storage liefert den (optionalen) Storage (#15).
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(object_storage=None)))
+    svc = get_budget_tree_service(
+        session=object(),  # type: ignore[arg-type]
+        request=request,  # type: ignore[arg-type]
+        settings=load_settings(),
+    )
     assert isinstance(svc, BudgetTreeService)
+    assert svc.storage is None
     assert ServiceDep is not None

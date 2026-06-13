@@ -323,6 +323,29 @@ class InvoiceCreate(_CamelModel):
     gross_amount: Decimal = Field(alias="grossAmount", ge=0)
     note: str | None = None
     status: InvoiceStatus = "open"
+    # Optionaler Beleg aus dem ZUGFeRD-Import (#15): Handle auf das bereits in
+    # MinIO abgelegte Original-PDF (``/invoices/parse`` liefert den Token).
+    file_token: str | None = Field(default=None, alias="fileToken")
+    file_name: str | None = Field(default=None, alias="fileName")
+    file_mime: str | None = Field(default=None, alias="fileMime")
+
+
+class InvoiceParseResult(_CamelModel):
+    """Ergebnis von ``POST /invoices/parse`` (#15): geparste Kopfdaten + Handle
+    auf das gespeicherte Original-PDF. Die UI füllt damit den Erfassungs-Dialog
+    vor; ``fileToken`` wird beim Bestätigen an ``POST /invoices`` zurückgegeben."""
+
+    number: str | None = None
+    issue_date: date | None = Field(default=None, alias="issueDate")
+    due_date: date | None = Field(default=None, alias="dueDate")
+    supplier: str | None = None
+    net_amount: Decimal | None = Field(default=None, alias="netAmount")
+    tax_amount: Decimal | None = Field(default=None, alias="taxAmount")
+    gross_amount: Decimal = Field(alias="grossAmount")
+    currency: str = "EUR"
+    file_token: str = Field(alias="fileToken")
+    file_name: str = Field(alias="fileName")
+    file_mime: str = Field(alias="fileMime")
 
 
 class InvoiceUpdate(_CamelModel):

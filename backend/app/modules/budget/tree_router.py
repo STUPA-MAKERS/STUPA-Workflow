@@ -22,11 +22,21 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
 
-from app.deps import DbSession, Principal, require_any_permission, require_principal
+from app.deps import (
+    DbSession,
+    Principal,
+    SettingsDep,
+    require_any_permission,
+    require_principal,
+)
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.budget.invoice_import import (
+    NotZugferdError,
+    UnsupportedInvoiceCurrencyError,
+)
 from app.modules.budget.tree_schemas import (
     AccountCreate,
     AccountOption,
@@ -50,13 +60,15 @@ from app.modules.budget.tree_schemas import (
     FiscalYearUpdate,
     InvoiceCreate,
     InvoiceOut,
+    InvoiceParseResult,
     InvoiceUpdate,
     MoveFiscalYearRequest,
     TransferCreate,
     TransferOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
-from app.shared.errors import ForbiddenError, ProblemDetail
+from app.modules.files.schemas import SignedUrlOut
+from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
 from app.shared.paging import Page
 
 router = APIRouter(tags=["budget"])
@@ -68,8 +80,12 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-def get_budget_tree_service(session: DbSession) -> BudgetTreeService:
-    return BudgetTreeService(session)
+def get_budget_tree_service(
+    session: DbSession, request: Request, settings: SettingsDep
+) -> BudgetTreeService:
+    # Storage nur für den Rechnungs-Import (#15); die übrigen Endpunkte nutzen es nicht.
+    storage = getattr(request.app.state, "object_storage", None)
+    return BudgetTreeService(session, storage=storage, settings=settings)
 
 
 ServiceDep = Annotated[BudgetTreeService, Depends(get_budget_tree_service)]
@@ -491,6 +507,50 @@ async def update_invoice(
 )
 async def delete_invoice(invoice_id: UUID, service: ServiceDep) -> None:
     await service.delete_invoice(invoice_id)
+
+
+@router.post(
+    "/invoices/parse",
+    response_model=InvoiceParseResult,
+    # Schreibrecht: Import legt das Original-PDF ab und liest dessen Daten (#15).
+    responses=_errors(401, 403, 413, 415, 422, 503),
+)
+async def parse_invoice(
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
+    file: Annotated[UploadFile, File()],
+) -> InvoiceParseResult:
+    """ZUGFeRD/Factur-X-PDF parsen (#15): Felder + Datei-Handle für den Dialog.
+
+    Kein gültiges Factur-X ⇒ 422 ``invoice_not_zugferd`` (UI bietet manuelle
+    Erfassung an); Währung ≠ EUR ⇒ 422 ``invoice_currency_unsupported``.
+    """
+    data = await file.read()
+    try:
+        return await service.parse_invoice_file(data, filename=file.filename)
+    except UnsupportedInvoiceCurrencyError as exc:
+        raise ValidationProblem(
+            f"Only EUR invoices are supported (got {exc.currency}).",
+            code="invoice_currency_unsupported",
+        ) from exc
+    except NotZugferdError as exc:
+        raise ValidationProblem(
+            "No embedded ZUGFeRD/Factur-X data found.",
+            code="invoice_not_zugferd",
+        ) from exc
+
+
+@router.get(
+    "/invoices/{invoice_id}/file",
+    response_model=SignedUrlOut,
+    dependencies=[_INVOICE_READ],
+    responses=_errors(401, 403, 404, 503),
+)
+async def get_invoice_file_url(
+    invoice_id: UUID, service: ServiceDep
+) -> SignedUrlOut:
+    """Kurzlebige Download-URL des Original-Belegs (#15)."""
+    return await service.invoice_file_url(invoice_id)
 
 
 # ------------------------------------------------------------------- accounts
