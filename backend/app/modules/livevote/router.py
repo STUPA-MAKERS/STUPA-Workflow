@@ -218,6 +218,7 @@ async def get_meeting(
     meeting_id: UUID, service: ServiceDep, principal: ReaderDep
 ) -> MeetingOut:
     """Sitzungs-State."""
+    await service.assert_can_read(meeting_id, principal)
     return await service.get(meeting_id, principal)
 
 
@@ -253,9 +254,14 @@ async def patch_meeting(
     responses=_errors(401, 403, 404),
 )
 async def list_attendance(
-    meeting_id: UUID, attendance: AttendanceDep, principal: ReaderDep
+    meeting_id: UUID,
+    attendance: AttendanceDep,
+    service: ServiceDep,
+    principal: ReaderDep,
 ) -> list[AttendanceOut]:
     """Anwesenheits-Roster (aktuelle Gremium-Mitglieder + Status)."""
+    # #12 sec-audit: Roster (Namen/E-Mails) nur für Berechtigte der Sitzung.
+    await service.assert_can_read(meeting_id, principal)
     return await attendance.roster(meeting_id, principal.sub)
 
 
@@ -303,9 +309,10 @@ async def set_member_attendance(
     responses=_errors(401, 403, 404),
 )
 async def list_agenda(
-    meeting_id: UUID, agenda: AgendaDep, _principal: ReaderDep
+    meeting_id: UUID, agenda: AgendaDep, service: ServiceDep, principal: ReaderDep
 ) -> list[AgendaItemOut]:
     """Tagesordnung der Sitzung (zugewiesene Anträge, geordnet)."""
+    await service.assert_can_read(meeting_id, principal)
     return await agenda.list(meeting_id)
 
 
@@ -407,9 +414,10 @@ async def delete_meeting_vote(
     responses=_errors(401, 403, 404),
 )
 async def list_assignable(
-    meeting_id: UUID, agenda: AgendaDep, _principal: ReaderDep
+    meeting_id: UUID, agenda: AgendaDep, service: ServiceDep, principal: ReaderDep
 ) -> list[AssignableApplicationOut]:
     """Anträge in einem Abstimmungs-State dieses Gremiums, noch nicht auf der TO."""
+    await service.assert_can_read(meeting_id, principal)
     return await agenda.assignable(meeting_id)
 
 

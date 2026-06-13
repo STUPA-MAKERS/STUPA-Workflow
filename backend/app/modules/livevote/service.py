@@ -427,6 +427,20 @@ class MeetingService:
             stmt = stmt.where(MeetingDelegation.delegate_voting.is_(True))
         return set((await self.session.execute(stmt)).scalars().all())
 
+    async def assert_can_read(self, meeting_id: UUID, principal: Principal) -> None:
+        """Lesezugriff auf Sitzungs-Details (Detail/Roster/Agenda) absichern (#12
+        sec-audit): erlaubt für Admin/``meeting.manage``, Mitglieder + Pool-Vertreter
+        des Gremiums sowie Delegations-Empfänger dieser Sitzung — dieselbe Sichtbarkeit
+        wie die Timeline. By-id-GETs waren zuvor für jeden eingeloggten Nutzer offen
+        (Cross-Tenant-Lesen, u. a. Roster mit Namen/E-Mails)."""
+        meeting = await self._get(meeting_id)  # 404, falls nicht vorhanden
+        visible = await self._visible_gremium_ids(principal)
+        if visible is None or meeting.gremium_id in visible:
+            return
+        if meeting_id in await self._delegated_meeting_ids(principal.sub):
+            return
+        raise ForbiddenError("not allowed to view this meeting")
+
     async def _visible_gremium_ids(self, principal: Principal) -> set[UUID] | None:
         """Gremien, deren Sitzungen der Principal sehen darf — ``None`` = **alle**.
 

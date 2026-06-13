@@ -553,3 +553,41 @@ async def test_pool_substitute_not_live_participant_without_delegation() -> None
         meeting, gremium, Principal(sub="sub-1", permissions=set())
     )
     assert is_part is False
+
+
+async def test_assert_can_read_denies_non_member(monkeypatch: pytest.MonkeyPatch) -> None:
+    """#12 sec-audit: ein fremder eingeloggter Nutzer darf Sitzungs-Details (Roster
+    etc.) NICHT lesen — kein Mitglied/Pool/Verwalter/Delegations-Empfänger."""
+    from app.modules.auth.principal import Principal
+    from app.modules.livevote import service as mod
+    from app.shared.errors import ForbiddenError
+    from tests.auth_fakes import fake_session, result
+
+    meeting = Meeting(gremium_id=uuid4(), title="GV")
+    meeting.id = uuid4()
+
+    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+        return set()
+
+    monkeypatch.setattr(mod, "gremium_member_ids", _none)
+    # _get → meeting; pool-Query → leer; delegated-Query → leer.
+    svc = MeetingService(fake_session(result(meeting), result(), result()))
+    with pytest.raises(ForbiddenError):
+        await svc.assert_can_read(meeting.id, Principal(sub="x", permissions=set()))
+
+
+async def test_assert_can_read_allows_member(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mitglied des Sitzungs-Gremiums darf lesen."""
+    from app.modules.auth.principal import Principal
+    from app.modules.livevote import service as mod
+    from tests.auth_fakes import fake_session, result
+
+    meeting = Meeting(gremium_id=uuid4(), title="GV")
+    meeting.id = uuid4()
+
+    async def _member(_s, _sub, now=None):  # noqa: ANN001, ANN202
+        return {meeting.gremium_id}
+
+    monkeypatch.setattr(mod, "gremium_member_ids", _member)
+    svc = MeetingService(fake_session(result(meeting), result()))  # _get + pool
+    await svc.assert_can_read(meeting.id, Principal(sub="x", permissions=set()))
