@@ -37,7 +37,7 @@ describe('MailTemplatesComponent', () => {
 
   it('lists templates and auto-selects the first with its subject', async () => {
     await setup();
-    expect(await screen.findByRole('button', { name: 'magic_link' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /magic_link/ })).toBeInTheDocument();
     expect(screen.getByDisplayValue('Anmeldung')).toBeInTheDocument();
     // placeholder reference is shown.
     expect(screen.getByText(/name/)).toBeInTheDocument();

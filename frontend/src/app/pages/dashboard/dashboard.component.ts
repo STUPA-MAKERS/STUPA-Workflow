@@ -6,6 +6,7 @@ import { catchError, of } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
+import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
@@ -114,6 +115,14 @@ export class DashboardComponent {
 
   sessionVariant(status: Meeting['status']): 'success' | 'info' | 'neutral' {
     return status === 'live' ? 'success' : status === 'planned' ? 'info' : 'neutral';
+  }
+
+  private readonly i18n = inject(I18nService);
+  /** Rollen-Key lokalisiert (admin→Administrator …); unbekannt → roher Key. */
+  roleLabel(role: string): string {
+    const key = `role.${role}`;
+    const label = this.i18n.translate(key as TranslationKey);
+    return label === key ? role : label;
   }
 
   /** Globale Rollen des Nutzers (Badges, #54). */

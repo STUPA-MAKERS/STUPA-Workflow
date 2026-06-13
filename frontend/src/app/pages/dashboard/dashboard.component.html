@@ -4,7 +4,7 @@
   @if (roles().length || gremien().length) {
     <div class="dash__roles">
       @for (role of roles(); track role) {
-        <app-badge variant="primary">{{ role | capitalize }}</app-badge>
+        <app-badge variant="primary">{{ roleLabel(role) | capitalize }}</app-badge>
       }
       @for (g of gremien(); track g.id) {
         <app-badge variant="neutral">{{ g.name }}</app-badge>

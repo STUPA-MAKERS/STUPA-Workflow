@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
+import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
 import { ButtonComponent } from '@shared/ui';
@@ -35,8 +36,10 @@ type Lang = (typeof LANGS)[number];
             class="mt__listItem"
             [class.mt__listItem--sel]="selectedId() === tpl.id"
             (click)="select(tpl.id)"
+            [title]="tpl.key"
           >
-            {{ tpl.key }}
+            <span class="mt__listLabel">{{ keyLabel(tpl.key) }}</span>
+            <span class="mt__listKey">{{ tpl.key }}</span>
           </button>
         } @empty {
           <p class="mt__muted">{{ 'admin.mailTemplates.empty' | t }}</p>
@@ -154,6 +157,9 @@ type Lang = (typeof LANGS)[number];
         gap: var(--space-1);
       }
       .mt__listItem {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
         text-align: start;
         padding: var(--space-2) var(--space-3);
         background: transparent;
@@ -162,7 +168,11 @@ type Lang = (typeof LANGS)[number];
         cursor: pointer;
         color: var(--color-text);
         font: inherit;
-        font-variant-numeric: tabular-nums;
+      }
+      .mt__listKey {
+        font-family: var(--font-mono, monospace);
+        font-size: var(--fs-xs);
+        color: var(--color-text-muted);
       }
       .mt__listItem:hover {
         background: var(--color-surface-sunken);
@@ -282,6 +292,14 @@ export class MailTemplatesComponent {
   readonly saving = signal(false);
   readonly previewing = signal(false);
   readonly preview = signal<MailPreview | null>(null);
+
+  /** Template-Key lokalisiert (deadline_approaching → »Frist-Erinnerung« …);
+   *  unbekannt → roher Key (#mail-template-keys). */
+  keyLabel(key: string): string {
+    const k = `admin.mailTemplates.key.${key}`;
+    const label = this.i18n.translate(k as TranslationKey);
+    return label === k ? key : label;
+  }
 
   readonly placeholderList = computed<{ key: string; desc: string; token: string }[]>(() => {
     const d = this.draft();

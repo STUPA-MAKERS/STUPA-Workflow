@@ -123,7 +123,8 @@ describe('DashboardComponent', () => {
   it('greets the signed-in member by name and shows their roles', async () => {
     const { http } = await setup(MEMBER);
     expect(screen.getByText('Willkommen, Mia Member')).toBeInTheDocument();
-    expect(screen.getByText('Member')).toBeInTheDocument();
+    // Rolle 'member' lokalisiert (de → Mitglied).
+    expect(screen.getByText('Mitglied')).toBeInTheDocument();
     http.verify();
   });
 
