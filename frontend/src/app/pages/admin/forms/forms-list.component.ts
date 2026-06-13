@@ -14,7 +14,6 @@ import {
   DataTableComponent,
   DialogComponent,
   IconComponent,
-  SelectComponent,
   ToastService,
 } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
@@ -50,7 +49,6 @@ function emptyForm(): NewForm {
     ButtonComponent,
     BadgeComponent,
     CheckboxComponent,
-    SelectComponent,
     DialogComponent,
     DataTableComponent,
     CellDirective,

@@ -64,7 +64,7 @@ type Lang = (typeof LANGS)[number];
           <input
             id="mt-subj"
             class="mt__control"
-            [ngModel]="d.subjectI18n[lang()] ?? ''"
+            [ngModel]="d.subjectI18n[lang()]"
             (ngModelChange)="patch('subjectI18n', $event)"
             name="subject"
           />
@@ -74,7 +74,7 @@ type Lang = (typeof LANGS)[number];
             id="mt-body"
             class="mt__control mt__area"
             rows="8"
-            [ngModel]="d.bodyI18n[lang()] ?? ''"
+            [ngModel]="d.bodyI18n[lang()]"
             (ngModelChange)="patch('bodyI18n', $event)"
             name="body"
           ></textarea>
@@ -84,7 +84,7 @@ type Lang = (typeof LANGS)[number];
             id="mt-html"
             class="mt__control mt__area"
             rows="6"
-            [ngModel]="d.bodyHtmlI18n[lang()] ?? ''"
+            [ngModel]="d.bodyHtmlI18n[lang()]"
             (ngModelChange)="patch('bodyHtmlI18n', $event)"
             name="bodyHtml"
             [placeholder]="'admin.mailTemplates.bodyHtmlPlaceholder' | t"

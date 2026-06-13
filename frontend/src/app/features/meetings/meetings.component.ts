@@ -1628,47 +1628,33 @@ const AUTOSAVE_DELAY_MS = 1000;
       }
       /* --- Timeline (#104) --- */
       .mtg__timeline {
+        /* Fade oben/unten in den Seitenhintergrund (#10). */
+        --fade: linear-gradient(
+          to bottom,
+          transparent,
+          #000 var(--space-6),
+          #000 calc(100% - var(--space-6)),
+          transparent
+        );
         position: relative;
         max-height: min(70vh, 640px);
         overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
-        /* Etwas mehr vertikales Padding, damit Inhalt unter dem Fade beginnt/endet. */
         padding: var(--space-5) var(--space-1);
-        /* Oben/unten in den Seitenhintergrund ausblenden (#10). */
-        -webkit-mask-image: linear-gradient(
-          to bottom,
-          transparent 0,
-          #000 var(--space-6),
-          #000 calc(100% - var(--space-6)),
-          transparent 100%
-        );
-        mask-image: linear-gradient(
-          to bottom,
-          transparent 0,
-          #000 var(--space-6),
-          #000 calc(100% - var(--space-6)),
-          transparent 100%
-        );
-        /* Schlanke, dezente Scrollbar (#10). */
+        -webkit-mask-image: var(--fade);
+        mask-image: var(--fade);
         scrollbar-width: thin;
         scrollbar-color: var(--color-border-strong) transparent;
       }
       .mtg__timeline::-webkit-scrollbar {
         width: 8px;
       }
-      .mtg__timeline::-webkit-scrollbar-track {
-        background: transparent;
-      }
       .mtg__timeline::-webkit-scrollbar-thumb {
         background: var(--color-border-strong);
-        border-radius: 999px;
         border: 2px solid transparent;
-        background-clip: padding-box;
-      }
-      .mtg__timeline::-webkit-scrollbar-thumb:hover {
-        background: var(--color-text-muted);
+        border-radius: 999px;
         background-clip: padding-box;
       }
       /* durchgehende Rail-Linie hinter den Punkten */
