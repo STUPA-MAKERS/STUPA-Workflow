@@ -44,14 +44,17 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
       }
       .check__row {
         display: inline-flex;
-        align-items: flex-start;
+        /* Box vertikal zentriert zum Label → gleich viel Luft oben wie unten (#17),
+           wie bei <app-checkbox>. */
+        align-items: center;
         gap: var(--space-3);
         cursor: pointer;
       }
       .check__box {
+        flex: none;
         width: 1.15rem;
         height: 1.15rem;
-        margin-top: 0.1rem;
+        margin: 0;
         accent-color: var(--color-primary);
       }
       .check__label {
