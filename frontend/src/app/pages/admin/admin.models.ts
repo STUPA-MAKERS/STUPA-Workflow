@@ -227,6 +227,21 @@ export interface Role {
   permissions: string[];
 }
 
+/** OIDC-Gruppe → Rolle(+ optional Gremium) Mapping (admin-API `/group-mappings`, #5-4). */
+export interface GroupMapping {
+  id: Uuid;
+  oidcGroup: string;
+  roleId: Uuid;
+  gremiumId?: Uuid | null;
+}
+
+/** Eingabe zum Anlegen/Ändern eines Group-Mappings. */
+export interface GroupMappingBody {
+  oidcGroup: string;
+  roleId: Uuid;
+  gremiumId?: Uuid | null;
+}
+
 /** Rollenzuweisung (admin-API `/role-assignments`) — Vertretung/Delegation. */
 export interface RoleAssignment {
   id: Uuid;

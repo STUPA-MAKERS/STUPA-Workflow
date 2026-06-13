@@ -1702,6 +1702,26 @@ export const de = {
     'Die Administrator-Rolle hat immer alle Rechte und ist hier nicht bearbeitbar.',
   'admin.home.roles': 'Rollen & Rechte',
   'admin.home.rolesDesc': 'Berechtigungen je Rolle pflegen.',
+  'admin.home.groupMappings': 'Gruppen-Mappings',
+  'admin.home.groupMappingsDesc': 'OIDC-Gruppen auf Rollen abbilden.',
+  'admin.groupMappings.title': 'Gruppen-Mappings',
+  'admin.groupMappings.subtitle':
+    'Beim Login werden OIDC-Gruppen des Nutzers auf Plattform-Rollen (optional je Gremium) abgebildet.',
+  'admin.groupMappings.add': 'Mapping hinzufügen',
+  'admin.groupMappings.editTitle': 'Mapping bearbeiten',
+  'admin.groupMappings.empty': 'Noch keine Gruppen-Mappings angelegt.',
+  'admin.groupMappings.global': '— (global)',
+  'admin.groupMappings.oidcGroup': 'OIDC-Gruppe',
+  'admin.groupMappings.oidcGroupPlaceholder': 'Gruppenname aus dem IdP',
+  'admin.groupMappings.role': 'Rolle',
+  'admin.groupMappings.rolePlaceholder': 'Rolle wählen …',
+  'admin.groupMappings.gremium': 'Gremium',
+  'admin.groupMappings.deleteTitle': 'Mapping löschen',
+  'admin.groupMappings.deleteBody': 'Dieses Gruppen-Mapping wirklich löschen?',
+  'admin.groupMappings.saved': 'Mapping gespeichert.',
+  'admin.groupMappings.deleted': 'Mapping gelöscht.',
+  'admin.groupMappings.failed': 'Aktion fehlgeschlagen.',
+  'admin.groupMappings.loadFailed': 'Mappings konnten nicht geladen werden.',
 } as const;
 
 export const en: Partial<Record<TranslationKey, string>> = {
@@ -3380,6 +3400,26 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'The administrator role always has all permissions and cannot be edited here.',
   'admin.home.roles': 'Roles & permissions',
   'admin.home.rolesDesc': 'Maintain permissions per role.',
+  'admin.home.groupMappings': 'Group mappings',
+  'admin.home.groupMappingsDesc': 'Map OIDC groups to roles.',
+  'admin.groupMappings.title': 'Group mappings',
+  'admin.groupMappings.subtitle':
+    "At login the user's OIDC groups are mapped to platform roles (optionally per committee).",
+  'admin.groupMappings.add': 'Add mapping',
+  'admin.groupMappings.editTitle': 'Edit mapping',
+  'admin.groupMappings.empty': 'No group mappings yet.',
+  'admin.groupMappings.global': '— (global)',
+  'admin.groupMappings.oidcGroup': 'OIDC group',
+  'admin.groupMappings.oidcGroupPlaceholder': 'Group name from the IdP',
+  'admin.groupMappings.role': 'Role',
+  'admin.groupMappings.rolePlaceholder': 'Select role …',
+  'admin.groupMappings.gremium': 'Committee',
+  'admin.groupMappings.deleteTitle': 'Delete mapping',
+  'admin.groupMappings.deleteBody': 'Really delete this group mapping?',
+  'admin.groupMappings.saved': 'Mapping saved.',
+  'admin.groupMappings.deleted': 'Mapping deleted.',
+  'admin.groupMappings.failed': 'Action failed.',
+  'admin.groupMappings.loadFailed': 'Could not load mappings.',
 };
 
 export const CATALOG: Record<Locale, Partial<Record<TranslationKey, string>>> = { de, en };

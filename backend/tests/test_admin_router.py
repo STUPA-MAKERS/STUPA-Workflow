@@ -177,6 +177,9 @@ class _FakeConfig:
             id=mapping_id, oidc_group="g", role_id=uuid4(), gremium_id=None
         )
 
+    async def delete_group_mapping(self, mapping_id, actor):  # noqa: ANN001
+        self.deleted_mapping = mapping_id
+
     async def list_webhooks(self):
         return [
             WebhookOut(
@@ -527,6 +530,14 @@ def test_revoke_role_assignment_204_and_404(app: FastAPI, client: TestClient) ->
 def test_revoke_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
     _as(app, {"admin.types"})
     assert client.delete(f"/api/admin/role-assignments/{uuid4()}").status_code == 403
+
+
+def test_group_mapping_delete_204_and_gate(app: FastAPI, client: TestClient) -> None:
+    """#5-4: Group-Mappings sind jetzt löschbar (admin.roles)."""
+    _as_admin(app)
+    assert client.delete(f"/api/admin/group-mappings/{uuid4()}").status_code == 204
+    _as(app, {"admin.types"})  # falsche Bereichs-Rolle → 403
+    assert client.delete(f"/api/admin/group-mappings/{uuid4()}").status_code == 403
 
 
 # --------------------------------------------------------------------------- webhooks

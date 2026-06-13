@@ -124,6 +124,7 @@ export class AdminHomeComponent {
   protected readonly tiles: AdminTile[] = [
     { link: 'users', title: 'admin.home.users', desc: 'admin.home.usersDesc', icon: 'members', permissions: ['admin.roles'] },
     { link: 'roles', title: 'admin.home.roles', desc: 'admin.home.rolesDesc', icon: 'roles', permissions: ['admin.roles'] },
+    { link: 'group-mappings', title: 'admin.home.groupMappings', desc: 'admin.home.groupMappingsDesc', icon: 'key', permissions: ['admin.roles'] },
     { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc', icon: 'parliament', permissions: ['admin.gremien'] },
     { link: 'budget-pots', title: 'budget.tree.title', desc: 'admin.home.budgetPotsDesc', icon: 'euro', permissions: ['budget.structure'] },
     { link: 'accounts', title: 'admin.accounts.title', desc: 'admin.accounts.desc', icon: 'building', permissions: ['account.manage'] },

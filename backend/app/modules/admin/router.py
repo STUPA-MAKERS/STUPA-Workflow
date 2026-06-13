@@ -605,6 +605,15 @@ async def update_group_mapping(
     return await service.update_group_mapping(mapping_id, payload, principal.sub)
 
 
+@router.delete(
+    "/group-mappings/{mapping_id}", status_code=204, responses=_errors(401, 403, 404)
+)
+async def delete_group_mapping(
+    mapping_id: UUID, service: ServiceDep, principal: RolesAdmin
+) -> None:
+    await service.delete_group_mapping(mapping_id, principal.sub)
+
+
 # =========================================================================== #
 # Webhooks (P webhook.manage)
 # =========================================================================== #

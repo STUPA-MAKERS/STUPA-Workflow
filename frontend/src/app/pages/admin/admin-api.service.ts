@@ -38,6 +38,8 @@ import {
   type DeadlinePolicy,
   type GremiumRole,
   type GremiumUpdateBody,
+  type GroupMapping,
+  type GroupMappingBody,
   type Role,
   type RoleAssignment,
   type RoleAssignmentInput,
@@ -169,6 +171,20 @@ export class AdminApiService {
   listRoles(): Observable<Role[]> {
     if (this.mock) return of(structuredCopy(this.store.roles));
     return this.http.get<Role[]>(`${this.base}/admin/roles`);
+  }
+
+  // --- OIDC-Gruppen → Rolle Mappings (#5-4) ---------------------------------
+  listGroupMappings(): Observable<GroupMapping[]> {
+    return this.http.get<GroupMapping[]>(`${this.base}/admin/group-mappings`);
+  }
+  createGroupMapping(body: GroupMappingBody): Observable<GroupMapping> {
+    return this.http.post<GroupMapping>(`${this.base}/admin/group-mappings`, body);
+  }
+  updateGroupMapping(id: Uuid, body: Partial<GroupMappingBody>): Observable<GroupMapping> {
+    return this.http.patch<GroupMapping>(`${this.base}/admin/group-mappings/${id}`, body);
+  }
+  deleteGroupMapping(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/group-mappings/${id}`);
   }
 
   /**

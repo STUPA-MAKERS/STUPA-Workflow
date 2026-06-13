@@ -763,6 +763,14 @@ class ConfigService:
         await self.session.commit()
         return _mapping_out(row)
 
+    async def delete_group_mapping(self, mapping_id: UUID, actor: str) -> None:
+        row = await self.session.get(GroupMapping, mapping_id)
+        if row is None:
+            raise NotFoundError(f"group mapping {mapping_id} not found")
+        await self._audit(actor, AuditAction.ROLE_CHANGE, "group_mapping", row.id)
+        await self.session.delete(row)
+        await self.session.commit()
+
     # =================================================================== #
     # Webhooks
     # =================================================================== #

@@ -214,6 +214,16 @@ export const routes: Routes = [
           import('./pages/admin/roles/roles.component').then((m) => m.AdminRolesComponent),
       },
       {
+        // OIDC-Gruppen → Rolle Mappings (#5-4).
+        path: 'admin/group-mappings',
+        data: { title: 'admin.groupMappings.title', permission: 'admin.roles', parent: ['admin'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/group-mappings/group-mappings.component').then(
+            (m) => m.GroupMappingsComponent,
+          ),
+      },
+      {
         path: 'admin/forms',
         data: { title: 'admin.forms.listTitle', permission: 'form.configure', parent: ['admin'] },
         canActivate: [authGuard],
