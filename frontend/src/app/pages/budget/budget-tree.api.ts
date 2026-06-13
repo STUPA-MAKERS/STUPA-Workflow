@@ -190,6 +190,15 @@ export interface InvoiceParseResult {
   fileToken: string;
   fileName: string;
   fileMime: string;
+  /** Mögliche Dublette: gleiche Rechnungsnummer existiert bereits (#invoices). */
+  duplicate: boolean;
+}
+
+/** Handle auf ein abgelegtes Beleg-PDF (#invoices): ``POST /invoices/file``. */
+export interface InvoiceFileResult {
+  fileToken: string;
+  fileName: string;
+  fileMime: string;
 }
 
 /** Minimale Rechnungs-Auswahl für das Buchungs-Dropdown (#18). */
@@ -421,11 +430,16 @@ export class BudgetTreeApi {
     form.append('file', file);
     return this.http.post<InvoiceParseResult>(`${this.base}/invoices/parse`, form);
   }
-  /** Kurzlebige Download-URL des Original-Belegs (#15). */
-  invoiceFileUrl(id: Uuid): Observable<{ url: string; expiresIn: number }> {
-    return this.http.get<{ url: string; expiresIn: number }>(
-      `${this.base}/invoices/${id}/file`,
-    );
+  /** Beleg-PDF ablegen ohne ZUGFeRD-Parse (#invoices) — für manuelle Rechnungen. */
+  uploadInvoiceFile(file: File): Observable<InvoiceFileResult> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<InvoiceFileResult>(`${this.base}/invoices/file`, form);
+  }
+  /** Original-Beleg als Blob laden (#invoices): API streamt das PDF, da MinIO
+   *  nur intern erreichbar ist (kein presigned URL mit internem Host). */
+  invoiceFileBlob(id: Uuid): Observable<Blob> {
+    return this.http.get(`${this.base}/invoices/${id}/file`, { responseType: 'blob' });
   }
 
   // ------------------------------------------------------------- accounts

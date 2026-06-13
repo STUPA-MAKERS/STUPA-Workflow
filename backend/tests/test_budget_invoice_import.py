@@ -80,6 +80,100 @@ def test_map_rejects_non_eur() -> None:
     assert ei.value.currency == "USD"
 
 
+# ------------------------------------------------- tolerant CII fallback (#15)
+# Reales CII-XML (Stil invoice-portal.de): die E-Mail trägt kein
+# ``schemeID="EM"`` und die ``IBANID`` ist leer — beides lehnt der strenge
+# pycheval-Parser ab, obwohl die Datei ein gültiges ZUGFeRD ist. Der tolerante
+# Fallback liest die Kopfdaten trotzdem.
+_REAL_WORLD_CII = """<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice
+    xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+    xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
+    xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+  <rsm:ExchangedDocument>
+    <ram:ID>2021_10</ram:ID>
+    <ram:IssueDateTime>
+      <udt:DateTimeString format="102">20210924</udt:DateTimeString>
+    </ram:IssueDateTime>
+  </rsm:ExchangedDocument>
+  <rsm:SupplyChainTradeTransaction>
+    <ram:ApplicableHeaderTradeAgreement>
+      <ram:SellerTradeParty>
+        <ram:Name>Webware Internet Solutions GmbH</ram:Name>
+        <ram:DefinedTradeContact>
+          <ram:EmailURIUniversalCommunication>
+            <ram:URIID>johndoe@webware24.de</ram:URIID>
+          </ram:EmailURIUniversalCommunication>
+        </ram:DefinedTradeContact>
+        <ram:URIUniversalCommunication>
+          <ram:URIID schemeID="9930">DE319642369</ram:URIID>
+        </ram:URIUniversalCommunication>
+      </ram:SellerTradeParty>
+    </ram:ApplicableHeaderTradeAgreement>
+    <ram:ApplicableHeaderTradeSettlement>
+      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+      <ram:SpecifiedTradeSettlementPaymentMeans>
+        <ram:PayeePartyCreditorFinancialAccount>
+          <ram:IBANID/>
+        </ram:PayeePartyCreditorFinancialAccount>
+      </ram:SpecifiedTradeSettlementPaymentMeans>
+      <ram:SpecifiedTradePaymentTerms>
+        <ram:DueDateDateTime>
+          <udt:DateTimeString format="102">20211008</udt:DateTimeString>
+        </ram:DueDateDateTime>
+      </ram:SpecifiedTradePaymentTerms>
+      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        <ram:TaxBasisTotalAmount>1200.00</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="EUR">228.00</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>1428.00</ram:GrandTotalAmount>
+      </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+    </ram:ApplicableHeaderTradeSettlement>
+  </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>"""
+
+
+def test_cii_fallback_reads_header_despite_strict_errors() -> None:
+    # pycheval lehnt das XML wegen E-Mail-schemeID/leerer IBAN ab …
+    from pycheval.exc import FacturXError
+
+    with pytest.raises(FacturXError):
+        parse_xml(_REAL_WORLD_CII)
+
+    # … der tolerante Fallback liefert die Kopfdaten trotzdem korrekt.
+    parsed = imp._parse_cii_header(_REAL_WORLD_CII)
+    assert parsed.number == "2021_10"
+    assert parsed.issue_date == dt.date(2021, 9, 24)
+    assert parsed.due_date == dt.date(2021, 10, 8)
+    assert parsed.supplier == "Webware Internet Solutions GmbH"
+    assert parsed.net_amount == Decimal("1200.00")
+    assert parsed.tax_amount == Decimal("228.00")
+    assert parsed.gross_amount == Decimal("1428.00")
+    assert parsed.currency == "EUR"
+
+
+def test_cii_fallback_rejects_non_eur() -> None:
+    xml = _REAL_WORLD_CII.replace(
+        "<ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>",
+        "<ram:InvoiceCurrencyCode>USD</ram:InvoiceCurrencyCode>",
+    )
+    with pytest.raises(UnsupportedInvoiceCurrencyError) as ei:
+        imp._parse_cii_header(xml)
+    assert ei.value.currency == "USD"
+
+
+def test_cii_fallback_without_gross_is_not_zugferd() -> None:
+    xml = _REAL_WORLD_CII.replace(
+        "<ram:GrandTotalAmount>1428.00</ram:GrandTotalAmount>", ""
+    )
+    with pytest.raises(NotZugferdError):
+        imp._parse_cii_header(xml)
+
+
+def test_cii_fallback_unparseable_is_not_zugferd() -> None:
+    with pytest.raises(NotZugferdError):
+        imp._parse_cii_header(b"<rsm:CrossIndustryInvoice>not closed")
+
+
 def test_parse_blank_pdf_is_not_zugferd() -> None:
     with pytest.raises(NotZugferdError):
         imp.parse_zugferd_pdf(_blank_pdf())
@@ -88,6 +182,45 @@ def test_parse_blank_pdf_is_not_zugferd() -> None:
 def test_parse_garbage_is_not_zugferd() -> None:
     with pytest.raises(NotZugferdError):
         imp.parse_zugferd_pdf(b"definitely not a pdf")
+
+
+def _pdf_with_xml(name: str, xml: str | bytes) -> bytes:
+    """Ein-Seiten-PDF mit dem XML als Anhang ``name`` (für Extractor-Tests)."""
+    payload = xml.encode("utf-8") if isinstance(xml, str) else xml
+    writer = PdfWriter()
+    writer.add_blank_page(width=300, height=300)
+    writer.add_attachment(name, payload)
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def test_parse_pdf_with_zugferd20_filename() -> None:
+    # ZUGFeRD 2.0 bettet das XML als ``zugferd-invoice.xml`` ein. pychevals
+    # ``extract_facturx_from_pdf`` matcht nur ``factur-x.xml`` und lief hier in
+    # eine Endlosschleife (Timeout) — unser eigener Extractor liest es korrekt.
+    pdf = _pdf_with_xml("zugferd-invoice.xml", generate_xml(_minimum_invoice()))
+    parsed = imp.parse_zugferd_pdf(pdf)
+    assert parsed.number == "R-2026-001"
+    assert parsed.supplier == "Muster GmbH"
+    assert parsed.gross_amount == Decimal("119.00")
+
+
+def test_parse_pdf_with_facturx_filename() -> None:
+    pdf = _pdf_with_xml("factur-x.xml", generate_xml(_minimum_invoice()))
+    assert imp.parse_zugferd_pdf(pdf).number == "R-2026-001"
+
+
+def test_extract_picks_xml_attachment_by_extension() -> None:
+    # Unbekannter Name, aber ``.xml`` → Notnagel greift.
+    pdf = _pdf_with_xml("rechnung_cii.xml", generate_xml(_minimum_invoice()))
+    assert imp.parse_zugferd_pdf(pdf).number == "R-2026-001"
+
+
+def test_extract_without_xml_attachment_is_not_zugferd() -> None:
+    pdf = _pdf_with_xml("notes.txt", b"just a note")
+    with pytest.raises(NotZugferdError):
+        imp.parse_zugferd_pdf(pdf)
 
 
 # ------------------------------------------------------------- service path
@@ -111,9 +244,21 @@ class _FakeStorage:
         return f"https://signed/{key}"
 
 
+class _FakeScalars:
+    def first(self) -> None:
+        return None
+
+
+class _FakeSession:
+    """Minimal-Session: Dubletten-Check (``scalars(...).first()``) liefert None."""
+
+    async def scalars(self, *_a: Any, **_k: Any) -> _FakeScalars:
+        return _FakeScalars()
+
+
 def _service(storage: _FakeStorage) -> BudgetTreeService:
-    # parse_invoice_file rührt die Session nicht an → Dummy genügt.
-    return BudgetTreeService(object(), storage=storage, settings=load_settings())  # type: ignore[arg-type]
+    # parse_invoice_file fragt nur den Dubletten-Check über die Session ab.
+    return BudgetTreeService(_FakeSession(), storage=storage, settings=load_settings())  # type: ignore[arg-type]
 
 
 async def test_parse_invoice_file_stores_and_returns(

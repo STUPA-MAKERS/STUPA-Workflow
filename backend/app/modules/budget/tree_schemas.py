@@ -346,6 +346,19 @@ class InvoiceParseResult(_CamelModel):
     file_token: str = Field(alias="fileToken")
     file_name: str = Field(alias="fileName")
     file_mime: str = Field(alias="fileMime")
+    # Mögliche Dublette: es existiert bereits eine Rechnung mit gleicher Nummer
+    # (#invoices). Die UI warnt vor dem Bestätigen, blockt den Import aber nicht.
+    duplicate: bool = False
+
+
+class InvoiceFileResult(_CamelModel):
+    """Ergebnis von ``POST /invoices/file`` (#invoices): Handle auf das gerade
+    abgelegte Original-PDF — auch für **nicht**-ZUGFeRD-Belege. Wird wie
+    ``InvoiceParseResult.fileToken`` an ``POST /invoices`` zurückgereicht."""
+
+    file_token: str = Field(alias="fileToken")
+    file_name: str = Field(alias="fileName")
+    file_mime: str = Field(alias="fileMime")
 
 
 class InvoiceUpdate(_CamelModel):

@@ -42,8 +42,10 @@ dependencies = [
     # Lazy importiert (nur auf dem Export-Pfad), reines Python-Paket.
     "openpyxl>=3.1",
     # ZUGFeRD/Factur-X-Import (#invoices): eingebettetes CII-XML aus Rechnungs-PDFs
-    # lesen. Reines Python (pypdf), lazy importiert (nur auf dem Import-Pfad).
+    # lesen. Reines Python, lazy importiert (nur auf dem Import-Pfad). pypdf wird
+    # direkt genutzt (eigener Anhang-Extractor statt pychevals buggy while-Loop).
     "pycheval>=0.3,<0.4",
+    "pypdf>=6.0",
 ]
 
 [project.optional-dependencies]

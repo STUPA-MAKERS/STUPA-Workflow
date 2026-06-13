@@ -59,6 +59,7 @@ from app.modules.budget.tree_schemas import (
     FiscalYearOut,
     FiscalYearUpdate,
     InvoiceCreate,
+    InvoiceFileResult,
     InvoiceOut,
     InvoiceParseResult,
     InvoiceUpdate,
@@ -67,7 +68,6 @@ from app.modules.budget.tree_schemas import (
     TransferOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
-from app.modules.files.schemas import SignedUrlOut
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
 from app.shared.paging import Page
 
@@ -540,17 +540,39 @@ async def parse_invoice(
         ) from exc
 
 
+@router.post(
+    "/invoices/file",
+    response_model=InvoiceFileResult,
+    # Schreibrecht: legt das Original-PDF ab (auch für nicht-ZUGFeRD-Belege).
+    responses=_errors(401, 403, 413, 415, 503),
+)
+async def upload_invoice_file(
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
+    file: Annotated[UploadFile, File()],
+) -> InvoiceFileResult:
+    """Beleg-PDF ablegen ohne ZUGFeRD-Parse (#invoices): Datei-Handle für den
+    Erfassungs-Dialog, damit auch manuell erfasste Rechnungen einen Beleg tragen."""
+    data = await file.read()
+    return await service.store_invoice_file(data, filename=file.filename)
+
+
 @router.get(
     "/invoices/{invoice_id}/file",
-    response_model=SignedUrlOut,
     dependencies=[_INVOICE_READ],
     responses=_errors(401, 403, 404, 503),
+    response_class=Response,
 )
-async def get_invoice_file_url(
-    invoice_id: UUID, service: ServiceDep
-) -> SignedUrlOut:
-    """Kurzlebige Download-URL des Original-Belegs (#15)."""
-    return await service.invoice_file_url(invoice_id)
+async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
+    """Original-Beleg inline streamen (#invoices). MinIO liegt intern → kein
+    presigned URL, sondern serverseitiger Fetch über ``/api/`` (wie Protokoll-PDF)."""
+    data, mime, name = await service.invoice_file_bytes(invoice_id)
+    safe = "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={"Content-Disposition": f'inline; filename="{safe}"'},
+    )
 
 
 # ------------------------------------------------------------------- accounts

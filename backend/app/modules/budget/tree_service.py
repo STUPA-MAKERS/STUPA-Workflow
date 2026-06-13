@@ -52,6 +52,7 @@ from app.modules.budget.tree_schemas import (
     FiscalYearOut,
     FiscalYearUpdate,
     InvoiceCreate,
+    InvoiceFileResult,
     InvoiceOut,
     InvoiceParseResult,
     InvoiceUpdate,
@@ -61,7 +62,6 @@ from app.modules.budget.tree_schemas import (
 )
 from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
 from app.modules.files.scanner import ScannerError, build_scanner
-from app.modules.files.schemas import SignedUrlOut
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.flow.models import State
 from app.settings import Settings, get_settings
@@ -1054,6 +1054,45 @@ class BudgetTreeService:
         return self._invoice_out(inv)
 
     # ------------------------------------------------------ ZUGFeRD-Import (#15)
+    async def _validate_scan_store(
+        self, data: bytes, *, filename: str | None
+    ) -> tuple[str, str, str]:
+        """PDF prüfen (Größe/MIME/AV-Scan) und ablegen → (token, safe_name, mime).
+
+        Gemeinsamer Pfad für ZUGFeRD-Parse und manuellen Beleg-Upload (#invoices).
+        """
+        max_bytes = self.settings.attachment_max_bytes
+        if len(data) > max_bytes:
+            raise PayloadTooLargeError(f"Invoice exceeds {max_bytes} bytes.")
+        if not data:
+            raise UnsupportedMediaTypeError("Empty file.")
+        try:
+            mime = validate_upload(filename, data)
+        except MimeRejected as exc:
+            raise UnsupportedMediaTypeError(str(exc)) from exc
+        if mime != "application/pdf":
+            raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
+
+        await self._scan_or_raise(data)
+        safe_name = sanitize_filename(filename)
+        storage_key = await self._store_invoice_file(data, mime, safe_name)
+        return storage_key, safe_name, mime
+
+    async def store_invoice_file(
+        self, data: bytes, *, filename: str | None
+    ) -> InvoiceFileResult:
+        """Beleg-PDF prüfen + ablegen (ohne ZUGFeRD-Parse) — für manuelle Belege.
+
+        Erlaubt das Anhängen eines Originals an **nicht**-ZUGFeRD-Rechnungen
+        (#invoices): liefert denselben ``fileToken``, den ``POST /invoices`` erwartet.
+        """
+        storage_key, safe_name, mime = await self._validate_scan_store(
+            data, filename=filename
+        )
+        return InvoiceFileResult(
+            fileToken=storage_key, fileName=safe_name, fileMime=mime
+        )
+
     async def parse_invoice_file(
         self, data: bytes, *, filename: str | None
     ) -> InvoiceParseResult:
@@ -1092,10 +1131,25 @@ class BudgetTreeService:
             fileToken=storage_key,
             fileName=safe_name,
             fileMime=mime,
+            duplicate=await self._invoice_number_exists(parsed.number),
         )
 
-    async def invoice_file_url(self, invoice_id: UUID) -> SignedUrlOut:
-        """Kurzlebige Download-URL des Original-Belegs (#15)."""
+    async def _invoice_number_exists(self, number: str | None) -> bool:
+        """Existiert bereits eine Rechnung mit dieser Nummer? (Dubletten-Warnung)."""
+        if not number:
+            return False
+        existing = await self.session.scalars(
+            select(Invoice.id).where(Invoice.number == number).limit(1)
+        )
+        return existing.first() is not None
+
+    async def invoice_file_bytes(self, invoice_id: UUID) -> tuple[bytes, str, str]:
+        """Original-Beleg serverseitig laden → (data, mime, filename).
+
+        Bewusst **kein** presigned-URL: MinIO liegt nur im internen Docker-Netz,
+        eine S3v4-signierte URL bindet den internen Host und ist vom Browser
+        unerreichbar (#invoices) — wie beim Protokoll-PDF streamen wir über die API.
+        """
         inv = await self.session.get(Invoice, invoice_id)
         if inv is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
@@ -1104,14 +1158,10 @@ class BudgetTreeService:
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
         try:
-            url = self.storage.presigned_get_url(
-                inv.file_object_key,
-                expires_seconds=self.settings.attachment_url_ttl_seconds,
-                download_name=inv.file_name,
-            )
+            data = await self.storage.get(inv.file_object_key)
         except StorageError as exc:
-            raise ServiceUnavailableError("Could not sign download URL.") from exc
-        return SignedUrlOut(url=url, expiresIn=self.settings.attachment_url_ttl_seconds)
+            raise ServiceUnavailableError("Could not read invoice file.") from exc
+        return data, inv.file_mime or "application/pdf", inv.file_name or "beleg.pdf"
 
     async def _scan_or_raise(self, data: bytes) -> None:
         """Synchroner AV-Scan; ohne ClamAV (DEV/Contract-CI) übersprungen."""

@@ -23,6 +23,7 @@ import {
   type SelectOption,
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
+import { downloadBlob } from '@shared/download.util';
 import {
   BudgetTreeApi,
   type Invoice,
@@ -96,6 +97,8 @@ import {
 
       @if (loading()) {
         <p class="inv__status" aria-live="polite">{{ 'invoices.loading' | t }}</p>
+      } @else if (visible().length === 0) {
+        <div class="inv__emptyCard">{{ 'invoices.empty' | t }}</div>
       } @else {
         <div class="inv__tableWrap">
           <table class="inv__table">
@@ -142,10 +145,6 @@ import {
                     </td>
                   }
                 </tr>
-              } @empty {
-                <tr>
-                  <td class="inv__empty" [attr.colspan]="canManage() ? 10 : 9">{{ 'invoices.empty' | t }}</td>
-                </tr>
               }
             </tbody>
           </table>
@@ -175,8 +174,26 @@ import {
           <div class="inv__fileChip">
             <app-icon name="document" [size]="16" />
             <span class="inv__fileChipName">{{ importFileName() }}</span>
-            <span class="inv__fileChipBadge">{{ 'invoices.importedBeleg' | t }}</span>
+            <button
+              type="button"
+              class="inv__fileChipRemove"
+              [attr.aria-label]="'invoices.removeBeleg' | t"
+              [title]="'invoices.removeBeleg' | t"
+              (click)="clearAttachment()"
+            >✕</button>
           </div>
+        } @else {
+          <input
+            #createFile
+            type="file"
+            accept="application/pdf,.pdf"
+            class="inv__fileInput"
+            (change)="onCreateFilePicked($event)"
+            [attr.aria-label]="'invoices.attachBeleg' | t"
+          />
+          <app-button type="button" variant="secondary" size="sm" [loading]="attaching()" (click)="createFile.click()">
+            <span class="inv__btnIcon"><app-icon name="upload" [size]="16" /> {{ 'invoices.attachBeleg' | t }}</span>
+          </app-button>
         }
 
         <div class="inv__grid2">
@@ -296,10 +313,24 @@ import {
         color: var(--color-text);
         font: inherit;
       }
-      input.inv__input { height: var(--control-height); box-sizing: border-box; }
+      /* Texteingaben füllen ihre (Grid-)Zelle und dürfen darunter schrumpfen —
+         ohne min-width:0 erzwingt die intrinsische Feldbreite ein Überlaufen
+         des 1fr-Grids und damit den horizontalen Scroll im Dialog (#15). */
+      .inv__input { width: 100%; min-width: 0; box-sizing: border-box; }
+      input.inv__input { height: var(--control-height); }
       .inv__search { min-width: 14rem; height: 2.25rem; }
       .inv__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
       .inv__empty { text-align: center; color: var(--color-text-muted); padding: var(--space-6) !important; }
+      /* Leerzustand als zentrierte Karte (nicht in der scrollenden Tabelle, sonst
+         zentriert der Text über die Gesamt-Tabellenbreite statt im Viewport). */
+      .inv__emptyCard {
+        text-align: center;
+        color: var(--color-text-muted);
+        padding: var(--space-7) var(--space-5);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+      }
       .inv__tableWrap {
         overflow-x: auto;
         border: var(--border-width) solid var(--color-border);
@@ -368,7 +399,7 @@ import {
       /* --- Dialog --- */
       .inv__form { display: flex; flex-direction: column; gap: var(--space-2); }
       .inv__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); margin-top: var(--space-2); }
-      .inv__field { display: flex; flex-direction: column; gap: var(--space-1); }
+      .inv__field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
       .inv__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
       .inv__grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3); align-items: end; }
       @media (max-width: 30rem) { .inv__grid2, .inv__grid3 { grid-template-columns: 1fr; } }
@@ -384,12 +415,18 @@ import {
         background: var(--color-surface-sunken);
       }
       .inv__fileChipName { font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .inv__fileChipBadge {
+      .inv__fileChipRemove {
         margin-left: auto;
-        font-size: var(--fs-xs);
-        color: var(--color-primary);
-        white-space: nowrap;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        color: var(--color-text-muted);
+        font-size: var(--fs-md);
+        line-height: 1;
+        padding: var(--space-1);
+        border-radius: var(--radius-sm);
       }
+      .inv__fileChipRemove:hover { color: var(--color-danger); }
       /* Mobil (≤768px): Tabellenzeilen als Karten (rein CSS) — wie Buchungen. */
       @media (max-width: 768px) {
         .inv__search { flex: 1 1 100%; min-width: 0; }
@@ -438,6 +475,8 @@ export class InvoicesComponent {
   readonly q = signal('');
   readonly saving = signal(false);
   readonly importing = signal(false);
+  /** Manueller Beleg-Upload im Anlegen-Dialog läuft (#invoices). */
+  readonly attaching = signal(false);
 
   /** Client-seitige Suche über Nummer/Lieferant/Notiz. */
   readonly visible = computed(() => {
@@ -576,8 +615,10 @@ export class InvoicesComponent {
         this.importing.set(false);
         const code = (err as { error?: { code?: string } } | null)?.error?.code;
         if (code === 'invoice_not_zugferd') {
-          // Kein eingebettetes ZUGFeRD → manuell erfassen (leerer Dialog).
+          // Kein eingebettetes ZUGFeRD → manuell erfassen, aber das gedroppte PDF
+          // trotzdem als Beleg anhängen (#invoices).
           this.openCreate();
+          this.attachFile(file);
           this.toast.show(this.i18n.translate('invoices.toast.notZugferd'), 'info');
         } else {
           this.toast.error(this.problemDetail(err));
@@ -600,6 +641,44 @@ export class InvoicesComponent {
     this.importFileName.set(p.fileName);
     this.importFileMime = p.fileMime;
     this.createOpen.set(true);
+    // Dubletten-Warnung: gleiche Rechnungsnummer existiert bereits (#invoices).
+    if (p.duplicate) {
+      this.toast.show(
+        this.i18n.translate('invoices.toast.duplicate', { number: p.number ?? '' }),
+        'warning',
+      );
+    }
+  }
+
+  /** Beleg-PDF hochladen + als Anhang merken (manuell oder Nicht-ZUGFeRD-Drop). */
+  private attachFile(file: File): void {
+    if (this.attaching()) return;
+    this.attaching.set(true);
+    this.api.uploadInvoiceFile(file).subscribe({
+      next: (res) => {
+        this.attaching.set(false);
+        this.importToken.set(res.fileToken);
+        this.importFileName.set(res.fileName);
+        this.importFileMime = res.fileMime;
+      },
+      error: (err) => {
+        this.attaching.set(false);
+        this.toast.error(this.problemDetail(err));
+      },
+    });
+  }
+
+  onCreateFilePicked(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) this.attachFile(file);
+  }
+
+  clearAttachment(): void {
+    this.importToken.set('');
+    this.importFileName.set('');
+    this.importFileMime = '';
   }
 
   // ----------------------------------------------------------------- create
@@ -722,8 +801,10 @@ export class InvoicesComponent {
 
   // ------------------------------------------------------------------- file
   openFile(i: Invoice): void {
-    this.api.invoiceFileUrl(i.id).subscribe({
-      next: ({ url }) => window.open(url, '_blank', 'noopener'),
+    // API streamt das PDF (MinIO ist intern). Blob → Objekt-URL im neuen Tab;
+    // ``downloadBlob`` löst zuverlässig aus (auch async, ohne Popup-Blocker).
+    this.api.invoiceFileBlob(i.id).subscribe({
+      next: (blob) => downloadBlob(blob, i.fileName || 'beleg.pdf'),
       error: () => this.toast.error(this.i18n.translate('invoices.toast.failed')),
     });
   }

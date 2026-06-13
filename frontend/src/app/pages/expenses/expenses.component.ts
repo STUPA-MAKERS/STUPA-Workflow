@@ -292,7 +292,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
         }
 
         @if (invoiceOptions().length) {
-          <app-select name="invoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="newInvoiceId()" (ngModelChange)="newInvoiceId.set($event)" />
+          <app-select name="invoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="newInvoiceId()" (ngModelChange)="onPickInvoice($event)" />
         }
 
         <div class="exp__grid2">
@@ -336,7 +336,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
         }
 
         @if (invoiceOptions().length) {
-          <app-select name="einvoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="editInvoiceId()" (ngModelChange)="editInvoiceId.set($event)" />
+          <app-select name="einvoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="editInvoiceId()" (ngModelChange)="onPickEditInvoice($event)" />
         }
 
         <div class="exp__grid2">
@@ -907,6 +907,29 @@ export class ExpensesComponent {
     return [i.number, i.supplier, this.money(i.grossAmount)]
       .filter((p) => !!p)
       .join(' · ');
+  }
+
+  /** Rechnung im Anlegen-Dialog wählen → relevante Felder aus der Rechnung
+   *  übernehmen (Betrag, Empfänger/Zahler, Belegnummer, Rechnungsdatum) (#invoices). */
+  onPickInvoice(id: string): void {
+    this.newInvoiceId.set(id);
+    const inv = this.invoices().find((i) => i.id === id);
+    if (!inv) return;
+    this.newAmount.set(inv.grossAmount ?? '');
+    if (inv.supplier) this.newCorrespondent.set(inv.supplier);
+    if (inv.number) this.newReferenceNumber.set(inv.number);
+    if (inv.issueDate) this.newInvoiceDate.set(inv.issueDate);
+  }
+
+  /** Wie {@link onPickInvoice}, aber für den Bearbeiten-Dialog. */
+  onPickEditInvoice(id: string): void {
+    this.editInvoiceId.set(id);
+    const inv = this.invoices().find((i) => i.id === id);
+    if (!inv) return;
+    this.editAmount.set(inv.grossAmount ?? '');
+    if (inv.supplier) this.editCorrespondent.set(inv.supplier);
+    if (inv.number) this.editReferenceNumber.set(inv.number);
+    if (inv.issueDate) this.editInvoiceDate.set(inv.issueDate);
   }
 
   setKind(k: '' | ExpenseKind): void {
