@@ -6,6 +6,7 @@ import {
   HostListener,
   Input,
   OnChanges,
+  OnDestroy,
   Output,
   SimpleChanges,
   ViewChild,
@@ -38,17 +39,27 @@ let nextId = 0;
           [attr.aria-labelledby]="titleId"
           (click)="$event.stopPropagation()"
         >
-          <header class="dialog__header">
-            <h2 class="dialog__title" [id]="titleId">{{ title }}</h2>
-            <button
-              type="button"
-              class="dialog__close"
-              [attr.aria-label]="closeLabel"
-              (click)="close()"
-            >
-              ✕
-            </button>
-          </header>
+          <!-- Mobile-Sheet: Greifleiste + Header sind die Drag-Zone zum
+               Herunterwischen (Flick schließt). Auf Desktop ausgeblendet (#14). -->
+          <div
+            class="dialog__drag"
+            (touchstart)="onDragStart($event)"
+            (touchmove)="onDragMove($event)"
+            (touchend)="onDragEnd($event)"
+          >
+            <span class="dialog__grabber" aria-hidden="true"></span>
+            <header class="dialog__header">
+              <h2 class="dialog__title" [id]="titleId">{{ title }}</h2>
+              <button
+                type="button"
+                class="dialog__close"
+                [attr.aria-label]="closeLabel"
+                (click)="close()"
+              >
+                ✕
+              </button>
+            </header>
+          </div>
           <div class="dialog__body"><ng-content /></div>
           <footer class="dialog__footer"><ng-content select="[dialog-footer]" /></footer>
         </div>
@@ -80,6 +91,10 @@ let nextId = 0;
       }
       .dialog--lg {
         max-width: 44rem;
+      }
+      /* Greifleiste nur im Mobile-Sheet sichtbar (#14). */
+      .dialog__grabber {
+        display: none;
       }
       .dialog__header {
         display: flex;
@@ -129,9 +144,27 @@ let nextId = 0;
           max-height: 92dvh;
           border-radius: var(--radius-lg) var(--radius-lg) 0 0;
           border-bottom: 0;
+          /* Flush am unteren Rand inkl. Safe-Area (Home-Indicator) füllen — keine
+             Backdrop-Lücke unter dem Sheet (#14). */
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+          /* Sanftes Zurückschnappen / Schließen beim Wischen. */
+          transition: transform 0.22s var(--ease-standard);
+        }
+        /* Drag-Zone: native Scroll-Geste hier unterdrücken, damit das Sheet dem
+           Finger folgt statt den Inhalt zu scrollen. */
+        .dialog__drag {
+          touch-action: none;
+        }
+        .dialog__grabber {
+          display: block;
+          width: 2.25rem;
+          height: 0.25rem;
+          margin: var(--space-2) auto 0;
+          border-radius: 999px;
+          background: var(--color-border-strong);
         }
         .dialog__header {
-          padding: var(--space-4) var(--space-4) var(--space-2);
+          padding: var(--space-2) var(--space-4);
         }
         .dialog__body {
           padding: 0 var(--space-4);
@@ -144,7 +177,7 @@ let nextId = 0;
     `,
   ],
 })
-export class DialogComponent implements OnChanges {
+export class DialogComponent implements OnChanges, OnDestroy {
   @Input() open = false;
   @Input() title = '';
   @Input() closeLabel = 'Schließen';
@@ -159,14 +192,35 @@ export class DialogComponent implements OnChanges {
   /** Element, das vor dem Öffnen den Fokus hatte — für Restore beim Schließen. */
   private previouslyFocused: HTMLElement | null = null;
 
+  /** Body-Scroll-Sperre: gemerkter vorheriger overflow-Wert für den Restore. */
+  private prevBodyOverflow: string | null = null;
+  // Drag-to-dismiss (Mobile-Sheet, #14).
+  private dragStartY = 0;
+  private dragStartT = 0;
+  private dragging = false;
+  private dragDy = 0;
+
   ngOnChanges(changes: SimpleChanges): void {
     const c = changes['open'];
     if (!c || c.firstChange) {
-      if (this.open) this.captureAndFocus();
+      if (this.open) {
+        this.captureAndFocus();
+        this.lockScroll();
+      }
       return;
     }
-    if (!c.previousValue && c.currentValue) this.captureAndFocus();
-    else if (c.previousValue && !c.currentValue) this.restoreFocus();
+    if (!c.previousValue && c.currentValue) {
+      this.captureAndFocus();
+      this.lockScroll();
+    } else if (c.previousValue && !c.currentValue) {
+      this.restoreFocus();
+      this.unlockScroll();
+    }
+  }
+
+  ngOnDestroy(): void {
+    // Falls der Dialog im offenen Zustand zerstört wird: Scroll-Sperre lösen.
+    this.unlockScroll();
   }
 
   @HostListener('document:keydown.escape')
@@ -202,10 +256,59 @@ export class DialogComponent implements OnChanges {
     this.close();
   }
 
+  // --- Drag-to-dismiss (Mobile-Sheet, #14) -----------------------------------
+  onDragStart(event: TouchEvent): void {
+    if (event.touches.length !== 1) return;
+    this.dragging = true;
+    this.dragStartY = event.touches[0].clientY;
+    this.dragStartT = event.timeStamp;
+    this.dragDy = 0;
+    const pane = this.pane?.nativeElement;
+    if (pane) pane.style.transition = 'none';
+  }
+
+  onDragMove(event: TouchEvent): void {
+    if (!this.dragging) return;
+    // Nur nach unten ziehen (kein „Hochziehen").
+    this.dragDy = Math.max(0, event.touches[0].clientY - this.dragStartY);
+    const pane = this.pane?.nativeElement;
+    if (pane) pane.style.transform = `translateY(${this.dragDy}px)`;
+  }
+
+  onDragEnd(event: TouchEvent): void {
+    if (!this.dragging) return;
+    this.dragging = false;
+    const pane = this.pane?.nativeElement;
+    if (pane) pane.style.transition = '';
+    const dt = event.timeStamp - this.dragStartT;
+    const velocity = this.dragDy / Math.max(1, dt); // px/ms
+    // Flick (schnelle Abwärtsbewegung) ODER deutlicher Weg → schließen.
+    if (velocity > 0.5 || this.dragDy > 120) {
+      this.close();
+    } else if (pane) {
+      pane.style.transform = '';
+    }
+  }
+
   close(): void {
     this.open = false;
+    const pane = this.pane?.nativeElement;
+    if (pane) pane.style.transform = '';
     this.restoreFocus();
+    this.unlockScroll();
     this.closed.emit();
+  }
+
+  private lockScroll(): void {
+    if (this.prevBodyOverflow !== null) return;
+    this.prevBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+
+  private unlockScroll(): void {
+    if (this.prevBodyOverflow === null) return;
+    document.body.style.overflow = this.prevBodyOverflow;
+    this.prevBodyOverflow = null;
   }
 
   /** Vorherigen Fokus merken und Fokus in den Dialog setzen (nach Render). */
