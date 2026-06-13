@@ -173,7 +173,10 @@ export interface SortState {
         color: var(--color-text-muted);
         font-weight: var(--fw-normal);
       }
-      .atbl__empty {
+      /* Höhere Spezifität als .atbl td (sonst gewinnt dessen text-align:start +
+         schmaleres Padding → Leertext links + zu niedrig). Zentriert + space-6 wie
+         die shared DataTable (#9/#table-parity). */
+      .atbl td.atbl__empty {
         text-align: center;
         color: var(--color-text-muted);
         padding: var(--space-6);

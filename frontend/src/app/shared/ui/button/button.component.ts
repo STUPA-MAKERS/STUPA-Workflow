@@ -148,6 +148,9 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
         text-overflow: ellipsis;
         min-width: 0;
         max-width: 100%;
+        /* line-height des Buttons ist 1 (kompakt); für den Text etwas mehr Raum,
+           sonst schneidet overflow:hidden Unterlängen (g/p/ü) unten ab (#btn-clip). */
+        line-height: 1.3;
       }
       .btn__spinner {
         width: 1em;

@@ -178,18 +178,18 @@ import { SimplifyPathPipe } from '@shared/budget-path';
                   <tr [class.exp__tr--income]="e.kind === 'income'" [attr.title]="e.actor ? ('expenses.bookedBy' | t: { actor: e.actor }) : null">
                     <td class="exp__cellDate">{{ e.invoiceDate ? (e.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
                     <td class="exp__cellDate">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</td>
-                    <td>
+                    <td class="exp__cellKind">
                       <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
                     </td>
                     <td class="exp__cellDesc">{{ e.description }}</td>
-                    <td>{{ e.correspondent || '—' }}</td>
-                    <td class="exp__mono">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
-                    <td>
+                    <td class="exp__cellMeta">{{ e.correspondent || '—' }}</td>
+                    <td class="exp__mono exp__cellMeta">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
+                    <td class="exp__cellMeta">
                       @if (e.applicationId) {
                         <a class="exp__appLink" [routerLink]="['/applications', e.applicationId]">{{ e.applicationTitle || ('expenses.linkedApplication' | t) }}</a>
                       } @else { — }
                     </td>
-                    <td>{{ e.accountName || '—' }}</td>
+                    <td class="exp__cellMeta">{{ e.accountName || '—' }}</td>
                     <td class="exp__num exp__amount" [class.exp__amount--income]="e.kind === 'income'">{{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}</td>
                     @if (canManage()) {
                       <td class="exp__num">
@@ -667,8 +667,8 @@ import { SimplifyPathPipe } from '@shared/budget-path';
           display: flex;
           flex-wrap: wrap;
           align-items: center;
-          gap: var(--space-1) var(--space-3);
-          padding: var(--space-3) var(--space-4);
+          gap: var(--space-2) var(--space-3);
+          padding: var(--space-4);
           margin-bottom: var(--space-3);
           background: var(--color-surface);
           border: var(--border-width) solid var(--color-border);
@@ -680,14 +680,34 @@ import { SimplifyPathPipe } from '@shared/budget-path';
           padding: 0;
           border-bottom: none;
         }
-        /* Beschreibung als volle erste Zeile der Karte. */
+        /* Karten-Aufbau (#mobile-cards): Beschreibung oben (fett, volle Breite),
+           dann Art-Badge + Betrag, dann eine gedämpfte Meta-Zeile. */
         .exp__cellDesc {
           flex: 1 1 100%;
           min-width: 0;
-          order: -1;
+          order: -3;
+          font-weight: var(--fw-medium);
         }
-        /* Betrag (+ Aktionen) rechtsbündig in der Meta-Zeile. */
-        .exp__amount { margin-left: auto; }
+        .exp__cellKind { order: -2; }
+        /* Betrag prominent, rechtsbündig auf der Badge-Zeile. */
+        .exp__amount {
+          order: -1;
+          margin-left: auto;
+          font-size: var(--fs-md);
+          font-weight: var(--fw-semibold);
+        }
+        /* Sekundär-Infos (Daten, Empfänger, Kostenstelle, Antrag, Konto) klein +
+           gedämpft auf eigener, umbrechender Zeile → weniger gedrängt. */
+        .exp__cellDate,
+        .exp__cellMeta {
+          flex: 0 1 auto;
+          order: 1;
+          font-size: var(--fs-xs);
+          color: var(--color-text-muted);
+        }
+        /* Aktionen auf eigene Zeile (große Tap-Ziele). */
+        .exp__actions { margin-left: auto; }
+        .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
         .exp__empty {
           flex: 1 1 100%;
           padding: var(--space-6) !important;
