@@ -101,7 +101,10 @@ let nextId = 0;
         padding: var(--space-1);
       }
       .dialog__body {
-        padding: 0 var(--space-5);
+        /* Vertikales Padding = Breite des Fokus-Rings (2px Offset + 2px Outline),
+           damit der grüne Ring beim ersten/letzten Feld nicht am Body-Rand
+           abgeschnitten wird (#15). overflow-y:auto erzwingt sonst Clipping. */
+        padding: var(--space-1) var(--space-5);
         overflow-y: auto;
       }
       .dialog__footer {
