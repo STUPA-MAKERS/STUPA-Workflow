@@ -38,6 +38,7 @@ import {
   type Expense,
   type ExpenseKind,
   type FiscalYear,
+  type Invoice,
   type PaymentMethod,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
@@ -290,6 +291,10 @@ import { SimplifyPathPipe } from '@shared/budget-path';
           <app-select name="account" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="newAccountId()" (ngModelChange)="newAccountId.set($event)" />
         }
 
+        @if (invoiceOptions().length) {
+          <app-select name="invoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="newInvoiceId()" (ngModelChange)="newInvoiceId.set($event)" />
+        }
+
         <div class="exp__grid2">
           <app-datepicker name="invDate" [label]="'expenses.field.invoiceDate' | t" [ngModel]="newInvoiceDate()" (ngModelChange)="newInvoiceDate.set($event)" />
           <app-datepicker name="payDate" [label]="'expenses.field.paymentDate' | t" [ngModel]="newPaymentDate()" (ngModelChange)="newPaymentDate.set($event)" />
@@ -328,6 +333,10 @@ import { SimplifyPathPipe } from '@shared/budget-path';
 
         @if (accountOptions().length) {
           <app-select name="eaccount" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="editAccountId()" (ngModelChange)="editAccountId.set($event)" />
+        }
+
+        @if (invoiceOptions().length) {
+          <app-select name="einvoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="editInvoiceId()" (ngModelChange)="editInvoiceId.set($event)" />
         }
 
         <div class="exp__grid2">
@@ -820,6 +829,14 @@ export class ExpensesComponent {
   );
   readonly newAccountId = signal('');
 
+  // --- Rechnungs-Verknüpfung (#invoices): 1 Rechnung : N Buchungen. ---
+  readonly invoices = signal<Invoice[]>([]);
+  readonly invoiceOptions = computed<SelectOption[]>(() =>
+    this.invoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) })),
+  );
+  readonly newInvoiceId = signal('');
+  readonly editInvoiceId = signal('');
+
   // --- Übertrag-Dialog ---
   readonly transferOpen = signal(false);
   readonly tFromId = signal('');
@@ -857,6 +874,11 @@ export class ExpensesComponent {
       next: (accs) => this.accounts.set(accs),
       error: () => this.accounts.set([]),
     });
+    // Rechnungen für das Verknüpfungs-Dropdown (#invoices) — Bucher dürfen lesen.
+    this.api.listInvoices().subscribe({
+      next: (rows) => this.invoices.set(rows),
+      error: () => this.invoices.set([]),
+    });
     this.reload();
 
     effect((onCleanup) => {
@@ -878,6 +900,13 @@ export class ExpensesComponent {
       style: 'currency',
       currency: 'EUR',
     });
+  }
+
+  /** Rechnungs-Label fürs Dropdown: Nummer · Lieferant · Brutto. */
+  private invoiceLabel(i: Invoice): string {
+    return [i.number, i.supplier, this.money(i.grossAmount)]
+      .filter((p) => !!p)
+      .join(' · ');
   }
 
   setKind(k: '' | ExpenseKind): void {
@@ -995,6 +1024,7 @@ export class ExpensesComponent {
     this.newFiscalYearId.set('');
     this.newApplicationId.set('');
     this.newAccountId.set('');
+    this.newInvoiceId.set('');
     this.newInvoiceDate.set('');
     this.newPaymentDate.set('');
     this.newCorrespondent.set('');
@@ -1168,6 +1198,7 @@ export class ExpensesComponent {
         budgetId: linked ? null : this.newBudgetId() || null,
         fiscalYearId: linked ? null : this.newFiscalYearId() || null,
         accountId: this.newAccountId() || null,
+        invoiceId: this.newInvoiceId() || null,
         invoiceDate: this.newInvoiceDate() || null,
         paymentDate: this.newPaymentDate() || null,
         correspondent: this.newCorrespondent().trim() || null,
@@ -1202,6 +1233,7 @@ export class ExpensesComponent {
     this.editAmount.set(e.amount);
     this.editDescription.set(e.description);
     this.editAccountId.set(e.accountId ?? '');
+    this.editInvoiceId.set(e.invoiceId ?? '');
     this.editInvoiceDate.set(e.invoiceDate ?? '');
     this.editPaymentDate.set(e.paymentDate ?? '');
     this.editCorrespondent.set(e.correspondent ?? '');
@@ -1221,6 +1253,7 @@ export class ExpensesComponent {
         amount: this.editAmount(),
         description: this.editDescription().trim(),
         accountId: this.editAccountId() || null,
+        invoiceId: this.editInvoiceId() || null,
         invoiceDate: this.editInvoiceDate() || null,
         paymentDate: this.editPaymentDate() || null,
         correspondent: this.editCorrespondent().trim() || null,

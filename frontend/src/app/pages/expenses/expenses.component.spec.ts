@@ -56,9 +56,10 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage } = {}) {
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // Konstruktor lädt Kostenstellen-Baum + Konten + erste Buchungsseite.
+  // Konstruktor lädt Kostenstellen-Baum + Konten + Rechnungen + erste Buchungsseite.
   http.match((r) => r.url.endsWith('/budgets')).forEach((req) => req.flush([]));
   http.match((r) => r.url.endsWith('/accounts/options')).forEach((req) => req.flush([]));
+  http.match((r) => r.url.endsWith('/invoices') && r.method === 'GET').forEach((req) => req.flush([]));
   http
     .match((r) => r.url.endsWith('/expenses') && r.method === 'GET')
     .forEach((req) => req.flush(opts.page ?? page([])));

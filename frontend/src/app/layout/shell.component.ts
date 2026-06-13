@@ -152,6 +152,11 @@ export class ShellComponent {
       permissions: ['budget.view', 'budget.structure', 'budget.book'],
     },
     {
+      path: '/invoices',
+      labelKey: 'nav.invoices',
+      permissions: ['budget.view', 'budget.structure', 'budget.book'],
+    },
+    {
       path: '/admin',
       labelKey: 'nav.admin',
       permissions: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.notifications', 'webhook.manage', 'audit.read'],

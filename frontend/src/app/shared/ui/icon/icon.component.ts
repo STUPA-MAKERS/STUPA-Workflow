@@ -37,6 +37,8 @@ export type IconName =
   | 'key'
   | 'handshake'
   | 'paperclip'
+  | 'upload'
+  | 'document'
   | 'chart-pie';
 
 /** Icon-Name → Font-Awesome-Solid-Klasse (#80, FA-Migration). */
@@ -77,6 +79,8 @@ const FA: Record<IconName, string> = {
   key: 'fa-key',
   handshake: 'fa-handshake',
   paperclip: 'fa-paperclip',
+  upload: 'fa-file-arrow-up',
+  document: 'fa-file-lines',
   'chart-pie': 'fa-chart-pie',
 };
 

@@ -50,6 +50,9 @@ export interface Expense {
   referenceNumber: string | null;
   paymentMethod: PaymentMethod | null;
   category: string | null;
+  // Verknüpfte Rechnung (#invoices): 1 Rechnung : N Buchungen.
+  invoiceId: Uuid | null;
+  invoiceNumber: string | null;
   createdAt: string;
 }
 
@@ -99,6 +102,8 @@ export interface ExpenseMetadata {
   referenceNumber?: string | null;
   paymentMethod?: PaymentMethod | null;
   category?: string | null;
+  /** Verknüpfte Rechnung (#invoices); ``null`` löst die Verknüpfung. */
+  invoiceId?: Uuid | null;
 }
 
 /** Buchung anlegen (#25): eigenständig (``budgetId``) oder an Antrag gebunden. */
@@ -117,6 +122,80 @@ export interface ExpenseUpdate extends ExpenseMetadata {
   amount?: string;
   description?: string;
   accountId?: Uuid | null;
+}
+
+// ------------------------------------------------------------------ invoices
+/** Status einer Rechnung (#invoices). */
+export type InvoiceStatus = 'open' | 'paid';
+
+/** Rechnung (#invoices) — eigenständiger Beleg; Geld als String (Decimal). */
+export interface Invoice {
+  id: Uuid;
+  number: string | null;
+  issueDate: string | null;
+  dueDate: string | null;
+  supplier: string | null;
+  netAmount: string | null;
+  taxAmount: string | null;
+  grossAmount: string;
+  currency: string;
+  note: string | null;
+  status: InvoiceStatus;
+  fileName: string | null;
+  hasFile: boolean;
+  actor: string | null;
+  createdAt: string;
+}
+
+/** Rechnung anlegen (#invoices): ``grossAmount`` Pflicht, Rest optional. Bei
+ *  Import wird ``fileToken``/``fileName``/``fileMime`` aus dem Parse übernommen. */
+export interface InvoiceCreate {
+  number?: string | null;
+  issueDate?: string | null;
+  dueDate?: string | null;
+  supplier?: string | null;
+  netAmount?: string | null;
+  taxAmount?: string | null;
+  grossAmount: string;
+  note?: string | null;
+  status?: InvoiceStatus;
+  fileToken?: string | null;
+  fileName?: string | null;
+  fileMime?: string | null;
+}
+
+/** Rechnung ändern (#invoices) — nur gesetzte Felder; ohne Datei-Handling. */
+export interface InvoiceUpdate {
+  number?: string | null;
+  issueDate?: string | null;
+  dueDate?: string | null;
+  supplier?: string | null;
+  netAmount?: string | null;
+  taxAmount?: string | null;
+  grossAmount?: string;
+  note?: string | null;
+  status?: InvoiceStatus;
+}
+
+/** Ergebnis von ``POST /invoices/parse`` (#15): geparste Felder + Datei-Handle. */
+export interface InvoiceParseResult {
+  number: string | null;
+  issueDate: string | null;
+  dueDate: string | null;
+  supplier: string | null;
+  netAmount: string | null;
+  taxAmount: string | null;
+  grossAmount: string;
+  currency: string;
+  fileToken: string;
+  fileName: string;
+  fileMime: string;
+}
+
+/** Minimale Rechnungs-Auswahl für das Buchungs-Dropdown (#18). */
+export interface InvoiceOption {
+  id: Uuid;
+  label: string;
 }
 
 /** Filter/Paging der Buchungsliste (#25). */
@@ -319,6 +398,34 @@ export class BudgetTreeApi {
   /** Übertrag Kostenstelle → Kostenstelle (Ausgabe + Einnahme, gleiches HHJ). */
   createTransfer(body: TransferCreate): Observable<unknown> {
     return this.http.post(`${this.base}/budget-transfers`, body);
+  }
+
+  // ------------------------------------------------------------- invoices
+  /** Rechnungen (#invoices), neuestes Rechnungsdatum zuerst. */
+  listInvoices(): Observable<Invoice[]> {
+    return this.http.get<Invoice[]>(`${this.base}/invoices`);
+  }
+  createInvoice(body: InvoiceCreate): Observable<Invoice> {
+    return this.http.post<Invoice>(`${this.base}/invoices`, body);
+  }
+  updateInvoice(id: Uuid, body: InvoiceUpdate): Observable<Invoice> {
+    return this.http.patch<Invoice>(`${this.base}/invoices/${id}`, body);
+  }
+  deleteInvoice(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/invoices/${id}`);
+  }
+  /** ZUGFeRD/Factur-X-PDF parsen (#15): Felder + Datei-Handle für den Dialog.
+   *  422 ``invoice_not_zugferd`` ⇒ UI bietet manuelle Erfassung an. */
+  parseInvoice(file: File): Observable<InvoiceParseResult> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<InvoiceParseResult>(`${this.base}/invoices/parse`, form);
+  }
+  /** Kurzlebige Download-URL des Original-Belegs (#15). */
+  invoiceFileUrl(id: Uuid): Observable<{ url: string; expiresIn: number }> {
+    return this.http.get<{ url: string; expiresIn: number }>(
+      `${this.base}/invoices/${id}/file`,
+    );
   }
 
   // ------------------------------------------------------------- accounts
