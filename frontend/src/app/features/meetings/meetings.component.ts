@@ -167,7 +167,12 @@ const AUTOSAVE_DELAY_MS = 1000;
           <p class="mtg__lead">{{ 'meetings.follow.lead' | t }}</p>
           @for (item of agenda(); track item.id; let i = $index) {
             <article class="mtg__followTop">
-              <h3 class="mtg__topTitle">{{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || ('meetings.agenda.untitled' | t) }}</h3>
+              <h3 class="mtg__topTitle">
+                {{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || ('meetings.agenda.untitled' | t) }}
+                @if (stateLabelOf(item.stateLabel); as st) {
+                  <app-badge variant="neutral">{{ st }}</app-badge>
+                }
+              </h3>
               @if (item.applicationId) {
                 <a class="mtg__pdf" [routerLink]="['/applications', item.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
               }
@@ -1884,8 +1889,19 @@ export class MeetingsComponent implements OnDestroy {
     return label === key ? opt : label;
   }
   readonly assignableOptions = computed<SelectOption[]>(() =>
-    this.assignable().map((a) => ({ value: a.applicationId, label: a.title || a.applicationId })),
+    this.assignable().map((a) => {
+      const title = a.title || a.applicationId;
+      const state = this.stateLabelOf(a.stateLabel);
+      // Status mit anzeigen (#5-4): welcher Antrag in welchem Abstimmungs-State.
+      return { value: a.applicationId, label: state ? `${title} (${state})` : title };
+    }),
   );
+
+  /** Lokalisierter Flow-State-Name aus einer I18nMap (#5-4). */
+  stateLabelOf(map: I18nMap | null | undefined): string {
+    if (!map) return '';
+    return map[this.i18n.locale()] ?? map['de'] ?? Object.values(map)[0] ?? '';
+  }
 
   /** Initiales Laden der Übersicht-Timeline (erste Seite beider Richtungen). */
   readonly loadingList = signal(false);
