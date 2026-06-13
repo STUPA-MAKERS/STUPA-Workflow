@@ -35,6 +35,13 @@ from app.settings import Settings, load_settings
 
 logger = logging.getLogger("worker.task_reminders")
 
+
+def _naive_utc(dt: datetime) -> datetime:
+    """Auf naives UTC bringen. ``StatusEvent.at`` ist TIMESTAMP WITHOUT TIME ZONE —
+    asyncpg lehnt einen tz-bewussten Bind dagegen ab (DataError) und
+    ``now - entered_at`` wirft »can't subtract offset-naive and offset-aware«."""
+    return dt.astimezone(UTC).replace(tzinfo=None) if dt.tzinfo is not None else dt
+
 _BUILTIN_REMINDER_SUBJECT = {
     "de": "Erinnerung: offene Aufgabe"
     "{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
@@ -140,7 +147,7 @@ async def _due_applications(
             .where(
                 Application.current_state_id.is_not(None),
                 Application.email_confirmed_at.is_not(None),
-                latest_event.c.entered_at <= now - after,
+                latest_event.c.entered_at <= _naive_utc(now - after),
             )
         )
     ).all()
@@ -233,7 +240,7 @@ async def _remind_one(
             "applicationId": str(application_id),
             "applicationTitle": title.strip() if isinstance(title, str) else "",
             "status": status_label,
-            "daysOpen": max(1, (now - entered_at).days),
+            "daysOpen": max(1, (_naive_utc(now) - _naive_utc(entered_at)).days),
         },
         idempotency_parts=(
             "task_reminder",
