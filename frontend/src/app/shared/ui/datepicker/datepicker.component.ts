@@ -90,12 +90,19 @@ let nextId = 0;
   `,
   styles: [
     `
-      .dp { display: flex; flex-direction: column; gap: var(--space-2); }
+      /* Block-Host, damit der Picker die Breite des (Flex-)Containers füllt statt
+         über seine Intrinsic-Breite hinauszuwachsen (#6: Datums-Inputs im Dialog
+         zu breit / horizontaler Scroll). */
+      :host { display: block; min-width: 0; }
+      .dp { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
       .dp__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--color-text); }
       .dp__req { color: var(--color-danger); }
       .dp__field { position: relative; display: flex; }
       .dp__text {
         flex: 1;
+        /* In Flex-Containern darf das Feld unter seine Intrinsic-Breite schrumpfen. */
+        min-width: 0;
+        width: 100%;
         height: var(--control-height);
         box-sizing: border-box;
         padding: 0 2.5rem 0 var(--space-4);
