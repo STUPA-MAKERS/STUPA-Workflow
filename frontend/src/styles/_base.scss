@@ -8,11 +8,19 @@
 
 * {
   margin: 0;
+  // Browser-Default beim Antippen ist ein rechteckiger Highlight-Kasten, der die
+  // Rundung der Kachel ignoriert ("innerer Kasten"). App-weit entfernen — das
+  // Tap-Feedback liefert stattdessen die :active-Tönung der ganzen Kachel.
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
   font-size: 100%;
   -webkit-text-size-adjust: 100%;
+  // Wurzelfarbe = Theme-Hintergrund. Im standalone-PWA (viewport-fit=cover)
+  // färbt Chrome/Android die untere Navigationsleiste nach der Body-/Wurzel-
+  // Hintergrundfarbe ein — so folgt sie dem Theme statt schwarz zu bleiben.
+  background-color: var(--color-bg);
 }
 
 body {

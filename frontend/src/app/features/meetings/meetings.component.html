@@ -592,10 +592,7 @@
         <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
       } @else {
         <!-- Auch ohne Sitzungen die Timeline mit Jetzt-Balken zeigen (#empty-timeline):
-             der „noch keine Sitzungen"-Fall ist nur eine leere Timeline. -->
-        @if (timelineEmpty()) {
-          <p class="mtg__muted mtg__tlEmptyHint">{{ 'meetings.list.empty' | t }}</p>
-        }
+             der „noch keine Sitzungen"-Fall ist nur eine leere Timeline (ohne Hinweistext). -->
         <!-- Timeline (#104): Vergangenes oben (serverseitig lazy beim Hochscrollen),
              Anstehendes unten (lazy beim Runterscrollen). -->
         <div class="mtg__timeline" #tlScroll (scroll)="onTimelineScroll(tlScroll)">

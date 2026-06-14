@@ -308,7 +308,7 @@ export const de = {
   'role.admin': 'Administrator',
   'role.member': 'Mitglied',
 
-  'home.heading': 'Antragsplattform',
+  'home.heading': 'STUPA Workflow',
   'home.subtitle': 'Anträge, Abstimmungen, Sitzungsprotokolle und Budget — an einem Ort.',
   'home.cta': 'Jetzt Antrag stellen',
   'home.cards.applications.title': 'Anträge',
@@ -2154,7 +2154,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'role.admin': 'Administrator',
   'role.member': 'Member',
 
-  'home.heading': 'Application Platform',
+  'home.heading': 'STUPA Workflow',
   'home.subtitle': 'Applications, votes, meeting minutes and budget — in one place.',
   'home.cta': 'Submit an application',
   'home.cards.applications.title': 'Applications',

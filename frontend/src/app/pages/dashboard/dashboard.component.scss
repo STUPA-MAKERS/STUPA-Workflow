@@ -44,6 +44,9 @@
 .dash__cta:hover {
   filter: brightness(1.06);
 }
+.dash__cta:active {
+  filter: brightness(0.95);
+}
 
 .dash__cta:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -154,6 +157,11 @@
 .dash__row:last-child {
   border-bottom: none;
 }
+// Tap auf eine Zeile (Link/CTA aktiviert die ganze Zeile via :active-Kette).
+.dash__row:active {
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
 
 .dash__row-link {
   display: flex;
@@ -261,10 +269,15 @@
   box-shadow: var(--shadow-sm);
   transition:
     box-shadow var(--motion-base) var(--ease-standard),
-    border-color var(--motion-base) var(--ease-standard);
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
 }
 .dash__session:hover {
   box-shadow: var(--shadow-md);
+  border-color: var(--color-border-strong);
+}
+.dash__session:active {
+  background: var(--color-surface-sunken);
   border-color: var(--color-border-strong);
 }
 .dash__session--live {

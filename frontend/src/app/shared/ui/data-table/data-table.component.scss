@@ -37,7 +37,8 @@
   cursor: pointer;
 }
 .dt__table tbody tr:hover td,
-.dt__row--clickable:focus-visible td {
+.dt__row--clickable:focus-visible td,
+.dt__row--clickable:active td {
   background: var(--color-surface-sunken);
 }
 .dt__detail-row > td {

@@ -282,6 +282,19 @@
 .footer {
   border-top: var(--border-width) solid var(--color-border);
   background: var(--color-bg-elevated);
+  // Inhalt über die Android-Gestenleiste heben (viewport-fit=cover).
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+// Installierte PWA (standalone): Footer ausblenden — im Browser bleibt er.
+// Die Safe-Area-Reserve wandert dann auf den Hauptinhalt.
+@media all and (display-mode: standalone) {
+  .footer {
+    display: none;
+  }
+  .main {
+    padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom));
+  }
 }
 .footer__inner {
   display: flex;
