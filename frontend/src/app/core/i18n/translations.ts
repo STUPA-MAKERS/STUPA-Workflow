@@ -735,6 +735,7 @@ export const de = {
   'meetings.toast.actionFailed': 'Aktion fehlgeschlagen.',
   'meetings.toast.protokollantRequired':
     'Bitte zuerst einen Protokollanten zuweisen, dann die Sitzung starten.',
+  'meetings.toast.dateTimeRequired': 'Datum und Uhrzeit sind erforderlich.',
   'meetings.toast.voteOpened': 'Abstimmung geöffnet.',
   'meetings.toast.protocolFailed': 'Protokoll konnte nicht geladen werden.',
   'meetings.toast.saved': 'Protokoll gespeichert.',
@@ -2572,6 +2573,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.toast.actionFailed': 'Action failed.',
   'meetings.toast.protokollantRequired':
     'Assign a minute-taker first, then start the meeting.',
+  'meetings.toast.dateTimeRequired': 'Date and time are required.',
   'meetings.toast.voteOpened': 'Vote opened.',
   'meetings.toast.protocolFailed': 'The minutes could not be loaded.',
   'meetings.toast.saved': 'Minutes saved.',

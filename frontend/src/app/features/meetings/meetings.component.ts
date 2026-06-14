@@ -383,12 +383,11 @@ export class MeetingsComponent implements OnDestroy {
       !this.inAnyCommittee() &&
       !this.inSubstitutePool(),
   );
-  /** Ist der angemeldete Nutzer der für DIESE Sitzung gewählte Protokollant? */
-  readonly isProtokollant = computed(() => {
-    const m = this.meeting();
-    const uid = this.auth.userId();
-    return !!m && !!m.protokollantId && !!uid && m.protokollantId === uid;
-  });
+  /** Ist der angemeldete Nutzer der für DIESE Sitzung gewählte Protokollant?
+   *  Serverseitig aufgelöst (`isProtokollant`): das FE kennt nur `principal.sub`,
+   *  nicht die interne `principal_id`, mit der `protokollantId` verglichen werden
+   *  müsste — ein FE-seitiger Vergleich schlug daher immer fehl (#protokollant-view). */
+  readonly isProtokollant = computed(() => this.meeting()?.isProtokollant ?? false);
   /** Live-Verfolgung (Protokoll lesen + offene Abstimmungen mitstimmen) statt
    *  Edit-/Manager-View. Sobald ein Protokollant gewählt ist, bekommt **nur**
    *  dieser den Manager-View — alle anderen (auch Verwalter) die Live-Ansicht.
@@ -1216,6 +1215,11 @@ export class MeetingsComponent implements OnDestroy {
     const m = this.settingsMeeting();
     // Geschlossene Sitzung: komplett gesperrt (#15) — Backend lehnt ohnehin ab.
     if (!m || this.savingSettings() || this.settingsLocked()) return;
+    // Datum + Uhrzeit sind Pflicht (wie im Anlegen-Dialog) — nicht leer speicherbar.
+    if (!this.settingsDate().trim() || !this.settingsTime().trim()) {
+      this.toast.error(this.i18n.translate('meetings.toast.dateTimeRequired'));
+      return;
+    }
     this.savingSettings.set(true);
     // Protokollant nach Finalisierung gesperrt (#15) — Feld ist disabled, der
     // Wert wird gar nicht erst mitgesendet (Backend würde mit 409 ablehnen).

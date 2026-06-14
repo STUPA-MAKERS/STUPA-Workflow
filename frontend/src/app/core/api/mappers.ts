@@ -244,6 +244,7 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     createdAt: wire.createdAt,
     protokollantId: wire.protokollantId ?? null,
     protokollantName: wire.protokollantName ?? null,
+    isProtokollant: wire.isProtokollant ?? false,
     canControl: wire.canControl ?? canWrite,
     canManage: wire.canManage ?? false,
     canWrite,

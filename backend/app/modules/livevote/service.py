@@ -174,6 +174,7 @@ class MeetingService:
         can_write: bool = False,
         can_manage_votes: bool = False,
         can_vote: bool = False,
+        is_protokollant: bool = False,
         protokollant_name: str | None = None,
         gremium_name: str | None = None,
         votes: list[MeetingVoteOut] | None = None,
@@ -192,6 +193,7 @@ class MeetingService:
             createdAt=meeting.created_at,
             protokollantId=meeting.protokollant_id,
             protokollantName=protokollant_name,
+            isProtokollant=is_protokollant,
             # ``canControl`` = darf die Sitzung **führen** (Protokoll/TOPs/Status) —
             # Protokollant oder Sitzungsverwalter. Master-Flag fürs FE-Editor-Gating.
             canControl=can_write,
@@ -504,6 +506,7 @@ class MeetingService:
             can_write=await self.can_write(meeting, principal),
             can_manage_votes=await self.can_manage_votes(meeting, principal),
             can_vote=await self.can_vote(meeting, principal),
+            is_protokollant=await self._is_protokollant(meeting, principal),
             protokollant_name=name,
             gremium_name=gremium_name,
             votes=votes,

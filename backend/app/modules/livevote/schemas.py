@@ -104,6 +104,10 @@ class MeetingOut(_CamelModel):
     created_at: _datetime = Field(alias="createdAt")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
     protokollant_name: str | None = Field(default=None, alias="protokollantName")
+    # Ist der ANFRAGENDE Principal der zugewiesene Protokollant dieser Sitzung? Das FE
+    # kann das nicht selbst berechnen (es kennt nur `sub`, nicht die interne
+    # principal_id), deshalb serverseitig auflösen (#protokollant-view).
+    is_protokollant: bool = Field(default=False, alias="isProtokollant")
     # Master-Flag fürs FE: darf der Principal die Sitzung **führen** (Protokoll/TOPs/
     # Status)? = Protokollant oder Sitzungsverwalter. Granulare Flags darunter.
     can_control: bool = Field(default=False, alias="canControl")

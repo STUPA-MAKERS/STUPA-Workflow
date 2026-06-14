@@ -10,7 +10,6 @@
   <select
     class="sel__control"
     [id]="id"
-    [value]="value()"
     [disabled]="disabled()"
     [attr.aria-label]="!label && ariaLabel ? ariaLabel : null"
     [attr.aria-invalid]="error ? 'true' : null"
@@ -19,11 +18,15 @@
     (change)="onSelect($event)"
     (blur)="onTouched()"
   >
+    <!-- Auswahl per [selected] je Option (nicht [value] am <select>): so greift sie
+         auch, wenn die Optionen ASYNC nachgeladen werden (z. B. Protokollant-Roster).
+         Ein [value] am <select> würde eine zum Setzzeitpunkt fehlende Option ignorieren
+         und auf den Platzhalter zurückfallen (#select-async). -->
     @if (placeholder) {
-      <option value="" [disabled]="required">{{ placeholder }}</option>
+      <option value="" [disabled]="required" [selected]="value() === ''">{{ placeholder }}</option>
     }
     @for (opt of options; track opt.value) {
-      <option [value]="opt.value" [disabled]="opt.disabled ?? false">{{ opt.label }}</option>
+      <option [value]="opt.value" [selected]="opt.value === value()" [disabled]="opt.disabled ?? false">{{ opt.label }}</option>
     }
   </select>
   @if (hint && !error) {

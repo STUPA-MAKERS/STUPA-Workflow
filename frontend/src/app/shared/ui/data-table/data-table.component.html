@@ -1,4 +1,5 @@
-<div class="dt" [class.dt--boxed]="boxed">
+<div class="dt" [class.dt--boxed]="boxed && rows.length > 0">
+  @if (rows.length > 0) {
   <table class="dt__table">
     <thead>
       <tr>
@@ -27,11 +28,10 @@
             </td>
           </tr>
         }
-      } @empty {
-        <tr>
-          <td class="dt__empty" [attr.colspan]="columns.length">{{ emptyText }}</td>
-        </tr>
       }
     </tbody>
   </table>
+  } @else {
+    <div class="empty-state">{{ emptyText }}</div>
+  }
 </div>
