@@ -16,8 +16,8 @@
   gap: var(--space-4);
   flex-wrap: wrap;
 }
-/* Gremium-Filter + »Neue Sitzung« in einer Zeile, gleiche Höhe (md-Button ≈
-   Control-Höhe des Selects). */
+/* Gremium-Filter + »Neue Sitzung« in einer Zeile, vertikal zentriert. Button
+   im sm-Stil wie »Rechnung hinzufügen« im Rechnungen-Tab. */
 .mtg__headActions {
   display: flex;
   align-items: center;
