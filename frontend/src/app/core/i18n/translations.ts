@@ -1246,6 +1246,11 @@ export const de = {
     'Pflege Logos, Fußzeile, rechtliche Links und Freitexte. Die Vorschau rechts zeigt deine Eingaben sofort; „Entwurf aktivieren" macht sie live.',
   'admin.brand.version': 'Version {n}',
   'admin.brand.draftDirty': 'Nicht aktivierter Entwurf',
+  'admin.brand.appName.group': 'App-Name',
+  'admin.brand.appName.full': 'Voller Name (Browser-Tab, Kopfzeile, Startseite)',
+  'admin.brand.appName.short': 'Kurzname (PWA-Symbol/Startbildschirm)',
+  'admin.brand.appName.hint':
+    'Leer lassen, um die Standardnamen (STUPA Antragsplattform / StuPa) zu verwenden.',
   'admin.brand.logos': 'Logos',
   'admin.brand.logo.wordmark': 'Wortmarke',
   'admin.brand.logo.imagemark': 'Bildmarke',
@@ -3081,6 +3086,11 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Manage logos, footer, legal links and free texts. The preview on the right reflects your input instantly; “Activate draft” makes it live.',
   'admin.brand.version': 'Version {n}',
   'admin.brand.draftDirty': 'Unactivated draft',
+  'admin.brand.appName.group': 'App name',
+  'admin.brand.appName.full': 'Full name (browser tab, header, home page)',
+  'admin.brand.appName.short': 'Short name (PWA icon/home screen)',
+  'admin.brand.appName.hint':
+    'Leave empty to use the default names (STUPA Antragsplattform / StuPa).',
   'admin.brand.logos': 'Logos',
   'admin.brand.logo.wordmark': 'Wordmark',
   'admin.brand.logo.imagemark': 'Image mark',

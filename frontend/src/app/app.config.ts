@@ -18,6 +18,7 @@ import { MockLiveVoteSource } from '@core/ws/mock-live-vote.source';
 import { WsService } from '@core/ws/ws.service';
 import { ThemeService } from '@core/theme/theme.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { BrandingService } from '@core/branding/branding.service';
 import { SwUpdateService } from '@core/pwa/sw-update.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { routes } from './app.routes';
@@ -47,6 +48,7 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(() => {
       inject(ThemeService).init();
       inject(I18nService); // initialisiert document.lang über Konstruktor-Default
+      inject(BrandingService).init(); // App-Name aus Site-Config → Tab-Titel/Header/Home (#brand-name)
       inject(AuthService).ensureLoaded().subscribe();
       inject(SwUpdateService).init(); // PWA-Update-Hinweis (#5)
     }),

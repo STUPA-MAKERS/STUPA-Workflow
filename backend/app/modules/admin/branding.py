@@ -202,6 +202,13 @@ class SiteFreetexts(_CamelModel):
 class Branding(_CamelModel):
     """Vollständige Branding-Config (aktiv oder Draft)."""
 
+    # App-Name (config-driven, sprach-neutral). Treibt PWA-Manifest (name/short_name),
+    # Browser-Tab-Titel, Header-aria-label und die Home-H1. Leer → FE/Manifest fallen
+    # auf die hartkodierten Defaults bzw. die i18n-Werte (app.title/home.heading) zurück.
+    app_name: str = Field(default="", alias="appName", max_length=MAX_LABEL_CHARS)
+    app_short_name: str = Field(
+        default="", alias="appShortName", max_length=MAX_LABEL_CHARS
+    )
     logos: dict[LogoSlot, BrandingAsset] = Field(default_factory=dict)
     footer_columns: list[FooterColumn] = Field(
         default_factory=list, alias="footerColumns", max_length=20

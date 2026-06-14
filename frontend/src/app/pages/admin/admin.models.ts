@@ -554,6 +554,10 @@ export interface SiteFreetexts {
 }
 
 export interface Branding {
+  /** Voller App-Name (Browser-Tab, Kopfzeile, Startseite); leer ⇒ Default/i18n. */
+  appName?: string;
+  /** Kurzer App-Name (PWA-Symbol/Startbildschirm); leer ⇒ Default. */
+  appShortName?: string;
   logos: Partial<Record<LogoSlot, BrandingAsset>>;
   footerColumns: FooterColumn[];
   copyright: I18nMap;

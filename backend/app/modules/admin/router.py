@@ -726,3 +726,20 @@ async def get_public_site_config(
     """Aktive Branding-Config ohne Auth (Logos-URLs, Footer, Texte)."""
     response.headers["Cache-Control"] = "public, max-age=300"
     return await service.public()
+
+
+# Dynamisches PWA-Manifest (auth-frei, Single Source of Truth = aktive Site-Config).
+# Der Edge-Proxy (nginx) mappt das vom Browser verlinkte ``/manifest.webmanifest``
+# (frontend/src/index.html) auf diese Route, damit name/short_name dem konfigurierten
+# App-Namen folgen. Alle übrigen Felder sind statisch (Icons, theme_color, scope …).
+@public_router.get("/manifest.webmanifest", include_in_schema=False)
+async def get_manifest(service: SiteServiceDep) -> Response:
+    """PWA-Manifest aus der aktiven Branding-Config (application/manifest+json)."""
+    import json
+
+    body = json.dumps(await service.manifest(), ensure_ascii=False)
+    return Response(
+        content=body,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=300"},
+    )

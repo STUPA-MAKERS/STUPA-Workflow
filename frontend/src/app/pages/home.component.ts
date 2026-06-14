@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CardComponent } from '@shared/ui/card/card.component';
 
@@ -12,4 +13,7 @@ import { CardComponent } from '@shared/ui/card/card.component';
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
 })
-export class HomeComponent {}
+export class HomeComponent {
+  /** Konfigurierbarer App-Name für die H1 (Fallback: i18n `home.heading`, #brand-name). */
+  readonly branding = inject(BrandingService);
+}

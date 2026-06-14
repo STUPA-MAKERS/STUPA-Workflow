@@ -20,6 +20,28 @@
 
     <div class="br__cols">
       <div class="flex flex-col gap-4">
+        <!-- App name (config-driven; leer ⇒ Default/i18n) -->
+        <fieldset class="br__group">
+          <legend>{{ 'admin.brand.appName.group' | t }}</legend>
+          <p class="text-xs text-muted">{{ 'admin.brand.appName.hint' | t }}</p>
+          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.appName.full' | t }}
+            <input
+              [attr.aria-label]="'admin.brand.appName.full' | t"
+              [(ngModel)]="d.appName"
+              (ngModelChange)="reemit()"
+              placeholder="STUPA Antragsplattform"
+            />
+          </div>
+          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.appName.short' | t }}
+            <input
+              [attr.aria-label]="'admin.brand.appName.short' | t"
+              [(ngModel)]="d.appShortName"
+              (ngModelChange)="reemit()"
+              placeholder="StuPa"
+            />
+          </div>
+        </fieldset>
+
         <!-- Logos -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.logos' | t }}</legend>

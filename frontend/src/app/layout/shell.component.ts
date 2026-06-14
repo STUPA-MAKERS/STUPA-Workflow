@@ -18,6 +18,7 @@ import {
 } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
+import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ThemeService } from '@core/theme/theme.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -68,6 +69,7 @@ export class ShellComponent {
   readonly theme = inject(ThemeService);
   readonly i18n = inject(I18nService);
   readonly auth = inject(AuthService);
+  readonly branding = inject(BrandingService);
   private readonly admin = inject(AdminApiService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);

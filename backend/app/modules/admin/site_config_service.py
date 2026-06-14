@@ -22,6 +22,79 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.shared.errors import ConflictError
 
+# Default-App-Namen (Fallback, wenn die Config sie leer lässt) — 1:1 die Werte des
+# bisher statischen ``frontend/public/manifest.webmanifest``.
+DEFAULT_APP_NAME = "STUPA Antragsplattform"
+DEFAULT_APP_SHORT_NAME = "StuPa"
+
+# Statische Manifest-Felder (alles außer name/short_name) — Single Source of Truth
+# fürs dynamisch ausgelieferte PWA-Manifest. Spiegelt das bisherige statische
+# ``frontend/public/manifest.webmanifest`` (Icons, theme_color, scope, … ).
+_MANIFEST_BASE: dict = {
+    "description": (
+        "Antragsplattform des Studierendenparlaments — Anträge, Abstimmungen, "
+        "Sitzungsprotokolle und Budget."
+    ),
+    "lang": "de",
+    "display": "standalone",
+    "scope": "./",
+    "start_url": "./",
+    "theme_color": "#004225",
+    "background_color": "#ffffff",
+    "icons": [
+        {"src": "icons/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "any"},
+        {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "any"},
+        {
+            "src": "icons/icon-128x128.png",
+            "sizes": "128x128",
+            "type": "image/png",
+            "purpose": "any",
+        },
+        {
+            "src": "icons/icon-144x144.png",
+            "sizes": "144x144",
+            "type": "image/png",
+            "purpose": "any",
+        },
+        {
+            "src": "icons/icon-152x152.png",
+            "sizes": "152x152",
+            "type": "image/png",
+            "purpose": "any",
+        },
+        {
+            "src": "icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any",
+        },
+        {
+            "src": "icons/icon-384x384.png",
+            "sizes": "384x384",
+            "type": "image/png",
+            "purpose": "any",
+        },
+        {
+            "src": "icons/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any",
+        },
+        {
+            "src": "icons/icon-maskable-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable",
+        },
+        {
+            "src": "icons/icon-maskable-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable",
+        },
+    ],
+}
+
 
 def _branding(row: SiteConfigVersion | None) -> Branding:
     return Branding.model_validate(row.branding) if row is not None else Branding()
@@ -119,3 +192,15 @@ class SiteConfigService:
         return PublicSiteConfigOut(
             version=active.version if active else 0, branding=_branding(active)
         )
+
+    async def manifest(self) -> dict:
+        """PWA-Manifest aus der aktiven Branding-Config bauen (Single Source of Truth).
+
+        ``name``/``short_name`` kommen aus der Config (Fallback auf die Defaults, wenn
+        leer); alle übrigen Felder (Icons, theme_color, scope, …) sind statisch."""
+        branding = _branding(await self._active())
+        return {
+            "name": branding.app_name.strip() or DEFAULT_APP_NAME,
+            "short_name": branding.app_short_name.strip() or DEFAULT_APP_SHORT_NAME,
+            **_MANIFEST_BASE,
+        }
