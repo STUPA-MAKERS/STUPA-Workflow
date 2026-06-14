@@ -624,3 +624,60 @@ async def test_assert_can_read_allows_member(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(mod, "gremium_member_ids", _member)
     svc = MeetingService(fake_session(result(meeting), result()))  # _get + pool
     await svc.assert_can_read(meeting.id, Principal(sub="x", permissions=set()))
+
+
+# --------------------------------------------------------- #meeting-view-all (global read)
+async def test_view_all_sees_every_committee() -> None:
+    """#meeting-view-all: der globale Read-Holder sieht ALLE Gremien — _visible
+    gibt ``None`` (= keine Gremium-Filterung) zurück, genau wie meeting.manage/Admin."""
+    from app.modules.auth.principal import Principal
+    from tests.auth_fakes import fake_session
+
+    svc = MeetingService(fake_session())  # keine DB-Query nötig (Kurzschluss)
+    visible = await svc._visible_gremium_ids(
+        Principal(sub="viewer", permissions={"meeting.view_all"})
+    )
+    assert visible is None
+
+
+async def test_view_all_is_live_participant_without_membership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#meeting-view-all: öffnet den Live-Read-Kanal gremiumsübergreifend, auch ohne
+    Mitgliedschaft/Delegation (rein lesend — das Stimmrecht bleibt separat gegatet)."""
+    from app.modules.auth.principal import Principal
+    from app.modules.livevote import service as mod
+    from tests.auth_fakes import fake_session
+
+    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+        return set()
+
+    monkeypatch.setattr(mod, "gremium_member_ids", _none)
+    svc = MeetingService(fake_session())  # view_all kurzschließt vor jeder DB-Query
+    is_part = await svc.is_participant(
+        uuid4(), uuid4(), Principal(sub="viewer", permissions={"meeting.view_all"})
+    )
+    assert is_part is True
+
+
+async def test_view_all_can_read_foreign_meeting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#meeting-view-all: assert_can_read lässt den globalen Read-Holder ein Sitzungs-
+    Detail eines FREMDEN Gremiums lesen (kein 403), ohne Mitglied/Delegierter zu sein."""
+    from app.modules.auth.principal import Principal
+    from app.modules.livevote import service as mod
+    from tests.auth_fakes import fake_session, result
+
+    meeting = Meeting(gremium_id=uuid4(), title="GV")
+    meeting.id = uuid4()
+
+    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+        return set()
+
+    monkeypatch.setattr(mod, "gremium_member_ids", _none)
+    # _get → meeting; _visible kurzschließt via view_all (kein pool/delegated-Query nötig).
+    svc = MeetingService(fake_session(result(meeting)))
+    await svc.assert_can_read(
+        meeting.id, Principal(sub="viewer", permissions={"meeting.view_all"})
+    )

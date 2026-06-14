@@ -21,7 +21,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from app.deps import DbSession, SettingsDep, require_principal
+from app.deps import (
+    DbSession,
+    SettingsDep,
+    require_any_permission,
+    require_principal,
+)
 from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage
 from app.modules.livevote.service import BrokerPublisher, MeetingService
@@ -37,6 +42,9 @@ router = APIRouter(tags=["protocol"])
 WRITE_PERMISSION = "meeting.manage"
 # #6: Finalisieren+Versand separat gegatet — Entwurf schreiben bleibt meeting.manage.
 FINALIZE_PERMISSION = "protocol.finalize"
+# #meeting-view-all: globale, rein additive LESE-Permission. Der Protokoll-GET öffnet
+# zusätzlich für ihre Inhaber (das Schreiben bleibt meeting.manage).
+VIEW_ALL_PERMISSION = "meeting.view_all"
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
@@ -67,6 +75,13 @@ def get_protocol_service(
 ServiceDep = Annotated[ProtocolService, Depends(get_protocol_service)]
 WriterDep = Annotated[Principal, Depends(require_principal(WRITE_PERMISSION))]
 FinalizerDep = Annotated[Principal, Depends(require_principal(FINALIZE_PERMISSION))]
+# Protokoll LESEN: Schreiber (meeting.manage) ODER der globale Read-Holder
+# (meeting.view_all). Die per-Sitzung-Sichtbarkeit prüft der Endpunkt zusätzlich über
+# ``MeetingService.assert_can_read`` (kein Cross-Tenant-Lesen für reine meeting.manage-
+# Gremiums-Rollen; meeting.view_all sieht ohnehin alles).
+ReaderDep = Annotated[
+    Principal, Depends(require_any_permission(WRITE_PERMISSION, VIEW_ALL_PERMISSION))
+]
 
 
 @router.post(
@@ -87,12 +102,17 @@ async def create_or_load_protocol(
     responses=_errors(401, 403, 404),
 )
 async def get_protocol(
-    meeting_id: UUID, service: ServiceDep, _principal: WriterDep
+    meeting_id: UUID, service: ServiceDep, _principal: ReaderDep
 ) -> ProtocolOut:
     """Protokoll der Sitzung **lesen** (404 ohne Protokoll) — Reload-/Poll-Pfad.
 
     Der Status-Poll während des Hintergrund-Renders lief vorher über den POST und
-    schlug nach kurzer Zeit am Default-Write-Rate-Limit auf (429, #async-finalize)."""
+    schlug nach kurzer Zeit am Default-Write-Rate-Limit auf (429, #async-finalize).
+
+    #meeting-view-all: zusätzlich für ``meeting.view_all`` (rein lesend) geöffnet. Der
+    Protokoll-Read ist — wie schon zuvor für ``meeting.manage`` — global-permission-
+    gegatet (keine per-Gremium-Scope-Prüfung); ``meeting.view_all`` ist per Definition
+    die gremiumsübergreifende »sieht alles«-Lese-Permission."""
     return await service.get_by_meeting(meeting_id)
 
 
@@ -172,13 +192,16 @@ async def finalize_protocol(
     response_class=Response,
 )
 async def get_protocol_pdf(
-    protocol_id: UUID, service: ServiceDep, _principal: WriterDep
+    protocol_id: UUID, service: ServiceDep, _principal: ReaderDep
 ) -> Response:
     """PDF des Protokolls inline streamen (MinIO liegt intern, kein Browser-Zugriff).
 
     Server-seitiger Storage-Fetch statt presigned URL: MinIO ist nur im ``internal``-
     Docker-Netz erreichbar, eine S3v4-signierte URL bindet den internen Host → vom
-    Browser unerreichbar. Über nginx ``/api/`` ist dieser Endpunkt erreichbar."""
+    Browser unerreichbar. Über nginx ``/api/`` ist dieser Endpunkt erreichbar.
+
+    #meeting-view-all: auch für ``meeting.view_all`` lesbar (rein lesend); der PDF-Read
+    ist — wie der Protokoll-GET — global-permission-gegatet."""
     data = await service.get_pdf_bytes(protocol_id)
     return Response(
         content=data,

@@ -37,6 +37,12 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "vote.cast",
     "vote.manage",
     "meeting.manage",
+    # GLOBALE, rein additive LESE-Permission (#meeting-view-all): sieht JEDE Sitzung
+    # gremiumsübergreifend (Timeline/Liste, Detail, Agenda, Protokoll, Vote-Ergebnisse)
+    # — verwaltet/schreibt/stimmt aber NICHT. Widening bleibt strikt read-only; die
+    # Schreib-/Vote-Guards (meeting.manage/session.manage/vote.manage/vote.cast/
+    # protocol.write) bleiben unberührt.
+    "meeting.view_all",
     "protocol.finalize",
     # Löschen von Sitzungen mit FINALISIERTEM Protokoll (#16) — bewusst getrennt
     # von meeting.manage; jedes Löschen landet als meeting_delete im Audit-Log.

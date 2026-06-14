@@ -411,9 +411,13 @@ class MeetingService:
         """Mitglied **oder** Delegations-Empfänger dieser Sitzung — darf mitlesen.
 
         Externe Stellvertreter (#delegation-rework) sind keine Gremium-Mitglieder,
-        brauchen für ihre Vertretung aber den Live-Kanal der Sitzung.
+        brauchen für ihre Vertretung aber den Live-Kanal der Sitzung. ``meeting.view_all``
+        (#meeting-view-all) öffnet den Live-Read-Kanal gremiumsübergreifend (rein lesend —
+        das STIMMRECHT bleibt separat über ``can_vote``/``vote.cast`` gegatet).
         """
         if await self.is_member(gremium_id, principal):
+            return True
+        if principal.has("meeting.view_all"):
             return True
         return meeting_id in await self._delegated_meeting_ids(principal.sub)
 
@@ -446,11 +450,19 @@ class MeetingService:
     async def _visible_gremium_ids(self, principal: Principal) -> set[UUID] | None:
         """Gremien, deren Sitzungen der Principal sehen darf — ``None`` = **alle**.
 
-        Admin/``meeting.manage`` sehen alles; sonst die Gremien, in denen der Principal
-        Mitglied ist (beliebige Rolle) **oder** im Stellvertreter-Pool steht (#7): ein
-        Pool-Vertreter sieht die Sitzungs-Timeline seiner Gremien (zur Vorbereitung),
-        bekommt den Live-Kanal aber erst über eine konkrete Delegation (``is_participant``)."""
-        if "admin" in principal.roles or principal.has("meeting.manage"):
+        Admin/``meeting.manage``/``meeting.view_all`` sehen alles; sonst die Gremien, in
+        denen der Principal Mitglied ist (beliebige Rolle) **oder** im Stellvertreter-Pool
+        steht (#7): ein Pool-Vertreter sieht die Sitzungs-Timeline seiner Gremien (zur
+        Vorbereitung), bekommt den Live-Kanal aber erst über eine konkrete Delegation
+        (``is_participant``). ``meeting.view_all`` (#meeting-view-all) ist die globale,
+        rein additive LESE-Permission: gremiumsübergreifende Sicht auf JEDE Sitzung
+        (Timeline/Liste/Detail/Agenda/Protokoll/Vote-Ergebnisse) — verwaltet/schreibt/
+        stimmt aber nicht (das bleibt an meeting.manage/session.manage/vote.* gegatet)."""
+        if (
+            "admin" in principal.roles
+            or principal.has("meeting.manage")
+            or principal.has("meeting.view_all")
+        ):
             return None
         member = await gremium_member_ids(self.session, principal.sub)
         pool = await self._substitute_pool_gremium_ids(principal.sub)
