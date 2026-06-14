@@ -48,6 +48,9 @@
   // past the fold and dragging the sticky element off-screen.
   max-height: 75vh;
   overflow-y: auto;
+  // Innen-Padding = Fade-Höhe: der erste/letzte Eintrag startet UNTER dem Fade,
+  // ist also in Ruhe nicht ausgeblendet — der Rand fadet erst beim Scrollen (#2).
+  padding-block: var(--space-5);
   // Oben/unten in den Hintergrund ausblenden (wie die Sitzungs-Timeline, #2).
   --fade: linear-gradient(
     to bottom,
