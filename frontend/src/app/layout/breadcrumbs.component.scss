@@ -1,9 +1,18 @@
+/* Volle Breite wie `<main class="main--wide">` — gleiche linke Kante wie H1/Inhalt. */
+.bc--wide {
+  max-width: none;
+}
 .bc__crumb {
   color: var(--color-primary);
   font-weight: var(--fw-medium);
   text-decoration: none;
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
+}
+/* Erste Krume bündig zur Inhalts-Kante (H1): horizontales Pill-Padding nach links
+   herausziehen; die Hover-Box bleibt erhalten (#breadcrumb-align). */
+.bc__crumb:first-child {
+  margin-left: calc(-1 * var(--space-2));
 }
 a.bc__crumb:hover {
   background: var(--color-surface-sunken);
