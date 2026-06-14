@@ -4,7 +4,7 @@
   } @else if (error() && !req()) {
     <p class="text-danger">{{ 'account.consent.error' | t }}</p>
   } @else if (req(); as r) {
-    <div class="card consent__card">
+    <div class="consent__card border border-solid border-line rounded-lg p-5 bg-surface">
       <header class="consent__head">
         <app-icon name="webhook" [size]="28" />
         <div>

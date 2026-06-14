@@ -11,17 +11,6 @@
   backdrop-filter: blur(1px);
   animation: lo-fade 120ms ease-out;
 }
-.lo__box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-6);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  box-shadow: var(--shadow-lg);
-}
 .lo__spinner {
   width: 2.25rem;
   height: 2.25rem;

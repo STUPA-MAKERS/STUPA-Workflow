@@ -91,12 +91,12 @@
       </div>
 
       @if (preview(); as pv) {
-        <div class="mt__preview">
+        <div class="mt-4 p-4 border border-solid border-line rounded-lg bg-surface">
           <h2 class="mt__previewH">{{ 'admin.mailTemplates.previewHeading' | t }} ({{ pv.lang }})</h2>
           <p class="mt__previewSubj"><strong>{{ 'admin.mailTemplates.subject' | t }}:</strong> {{ pv.subject }}</p>
           <pre class="mt__previewText">{{ pv.text }}</pre>
           @if (pv.html) {
-            <div class="mt__previewHtml" [innerHTML]="pv.html"></div>
+            <div class="mt-3 pt-3 border-t border-solid border-line" [innerHTML]="pv.html"></div>
           }
         </div>
       }

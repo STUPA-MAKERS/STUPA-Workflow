@@ -189,7 +189,7 @@
               (ngModelChange)="setStateColor(s.key, $event)"
             />
             @if (s.color) {
-              <button type="button" class="fe__color-clear" (click)="setStateColor(s.key, '')">
+              <button type="button" class="border-0 bg-transparent text-muted cursor-pointer text-xs" (click)="setStateColor(s.key, '')">
                 {{ 'admin.flow.colorClear' | t }}
               </button>
             }
@@ -279,13 +279,13 @@
               (ngModelChange)="setTransitionColor(sel.index, $event)"
             />
             @if (sel.t.color) {
-              <button type="button" class="fe__color-clear" (click)="setTransitionColor(sel.index, '')">
+              <button type="button" class="border-0 bg-transparent text-muted cursor-pointer text-xs" (click)="setTransitionColor(sel.index, '')">
                 {{ 'admin.flow.colorClear' | t }}
               </button>
             }
           </span>
         </label>
-        <div class="fe__auto" [class.fe__auto--on]="!!sel.t.automatic">
+        <div class="p-3 border border-solid border-line rounded-md" [class.fe__auto--on]="!!sel.t.automatic">
           <app-checkbox [ngModel]="!!sel.t.automatic" (ngModelChange)="setTransitionAutomatic(sel.index, $event)" [hint]="'admin.flow.automaticHint' | t">
             {{ 'admin.flow.automatic' | t }}
           </app-checkbox>
@@ -293,7 +293,7 @@
         <!-- »Erfordert Aktion« (#requires-action): nur für manuelle Übergänge sinnvoll —
              automatische feuert der Worker, sie erzeugen ohnehin keine Aufgabe. -->
         @if (!sel.t.automatic) {
-          <div class="fe__auto">
+          <div class="p-3 border border-solid border-line rounded-md">
             <app-checkbox [ngModel]="sel.t.requiresAction !== false" (ngModelChange)="setTransitionRequiresAction(sel.index, $event)" [hint]="'admin.flow.requiresActionHint' | t">
               {{ 'admin.flow.requiresAction' | t }}
             </app-checkbox>
@@ -327,7 +327,7 @@
               (ngModelChange)="setGroupColor(grp.id, $event)"
             />
             @if (grp.color) {
-              <button type="button" class="fe__color-clear" (click)="setGroupColor(grp.id, '')">
+              <button type="button" class="border-0 bg-transparent text-muted cursor-pointer text-xs" (click)="setGroupColor(grp.id, '')">
                 {{ 'admin.flow.colorClear' | t }}
               </button>
             }
@@ -375,7 +375,7 @@
 
   <!-- Aktionen des gewählten Übergangs: eigene Pane unterhalb des Graphen (#flow). -->
   @if (selectedTransition(); as sel) {
-    <section class="fe__actionsPane" [attr.aria-label]="'admin.flow.transitionInspector' | t">
+    <section class="border border-solid border-line rounded-lg bg-surface p-4 flex flex-col gap-4" [attr.aria-label]="'admin.flow.transitionInspector' | t">
       <header class="flex items-center justify-between gap-4 flex-wrap">
         <div class="flex items-baseline gap-3 flex-wrap">
           <h2 class="text-md font-semibold m-0">{{ 'admin.flow.transitionInspector' | t }}</h2>
@@ -384,7 +384,7 @@
       </header>
 
       <!-- Bedingung (#28): boolescher Guard-Baum (und/oder/nicht + Blatt-Operatoren). -->
-      <div class="fe__paneSection">
+      <div class="flex flex-col gap-2 pb-3 border-b border-solid border-line">
         <h3 class="m-0 text-md">{{ 'admin.flow.guard' | t }}</h3>
         <p class="text-xs text-muted m-0">{{ 'admin.flow.guardHelp' | t }}</p>
         <app-guard-editor
@@ -409,7 +409,7 @@
       @if ((sel.t.actions ?? []).length) {
         <div class="fe__actions-grid">
           @for (act of sel.t.actions ?? []; track $index; let ai = $index) {
-            <div class="fe__action-card">
+            <div class="flex flex-col gap-2 p-3 border border-solid border-line rounded-md bg-surface-sunken">
               <div class="flex items-center justify-between gap-2">
                 <strong>{{ actionLabel(act.type) }}</strong>
                 <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeAction(sel.index, ai)">✕</app-button>

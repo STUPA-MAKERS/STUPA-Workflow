@@ -13,14 +13,6 @@
   font-size: var(--fs-sm);
 }
 
-.live__notice {
-  margin: 0;
-  padding: var(--space-4);
-  background: var(--color-warning-subtle);
-  border: var(--border-width) solid var(--color-warning);
-  border-radius: var(--radius-md);
-}
-
 .live__hint,
 .live__waiting {
   margin: 0;

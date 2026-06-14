@@ -8,7 +8,7 @@
     <p class="text-danger m-0" role="alert">{{ $any(error()) | t }}</p>
   }
 
-  <section class="card">
+  <section class="border border-solid border-line rounded-lg py-4 px-5 bg-surface">
     @if (loading()) {
       <p class="text-muted m-0" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
     } @else {

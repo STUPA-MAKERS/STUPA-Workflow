@@ -49,7 +49,7 @@
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.footer' | t }}</legend>
           @for (col of d.footerColumns; track $index; let ci = $index) {
-            <div class="br__col">
+            <div class="border border-solid border-line rounded-md p-3 flex flex-col gap-2">
               <div class="br__col-head">
                 <input
                   class="font-semibold"
@@ -142,7 +142,7 @@
       <aside class="br__preview" aria-label="{{ 'admin.common.preview' | t }}">
         <h2 class="br__preview-h">{{ 'admin.common.preview' | t }}</h2>
 
-        <div class="br__pv-header" data-testid="preview-header">
+        <div class="flex items-center gap-3 pb-3 border-b border-solid border-line" data-testid="preview-header">
           @if (d.logos.imagemark; as im) {
             <img class="br__pv-logo" [src]="im.url" alt="" aria-hidden="true" />
           }
@@ -166,7 +166,7 @@
           <p class="br__pv-ph text-sm text-muted" data-testid="preview-support">{{ 'admin.brand.text.support' | t }}</p>
         }
 
-        <footer class="br__pv-footer" data-testid="preview-footer">
+        <footer class="flex flex-wrap gap-4 pt-3 border-t border-solid border-line text-sm" data-testid="preview-footer">
           @for (col of d.footerColumns; track $index) {
             <div class="br__pv-col">
               <strong>{{ text(col.label) }}</strong>

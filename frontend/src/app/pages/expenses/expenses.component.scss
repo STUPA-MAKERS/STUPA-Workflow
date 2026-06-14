@@ -189,16 +189,6 @@ input.exp__input {
   font: inherit;
 }
 .exp__suggestItem:hover { background: var(--color-primary-subtle); }
-.exp__picked {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
 /* Betrags-Filter (von/bis) */
 @media (max-width: 720px) {
   .exp__layout { grid-template-columns: 1fr; }

@@ -26,15 +26,6 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.att__item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding-bottom: var(--space-3);
-  border-bottom: var(--border-width) solid var(--color-border);
-  flex-wrap: wrap;
-}
 .att__meta {
   display: flex;
   align-items: center;

@@ -295,17 +295,6 @@
   align-items: baseline;
 }
 
-.bt__tag {
-  margin-left: var(--space-2);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  color: var(--color-text-muted);
-  background: var(--color-surface-sunken);
-  border: var(--border-width) solid var(--color-border);
-}
-
 /* --- Mobil (≤768px = 48rem): eine Spalte, Zeilen dürfen umbrechen, Aktionen
    bleiben tappbar (min. 2.5rem). Desktop bleibt unberührt. --- */
 @media (max-width: 48rem) {

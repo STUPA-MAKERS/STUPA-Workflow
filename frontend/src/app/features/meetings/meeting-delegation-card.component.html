@@ -39,7 +39,7 @@
           <p class="text-muted text-sm m-0">{{ 'delegation.card.deadlinePassed' | t }}</p>
         }
         @if (c.incoming.length > 0) {
-          <div class="dlg__section--incoming flex flex-col gap-2">
+          <div class="flex flex-col gap-2 border-t border-solid border-line pt-3">
             @for (d of c.incoming; track d.id) {
               <p class="flex items-center gap-2 flex-wrap m-0 text-sm">
                 {{ 'delegation.card.incoming' | t: { name: d.delegatorName || d.delegatorId } }}

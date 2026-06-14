@@ -15,7 +15,7 @@
   }
 
   @if (notEligible()) {
-    <p class="live__notice" role="alert">{{ 'voting.live.notEligible' | t }}</p>
+    <p class="m-0 p-4 bg-warning-subtle border border-solid border-warning rounded-md" role="alert">{{ 'voting.live.notEligible' | t }}</p>
   } @else if (result(); as res) {
     <div class="flex flex-col gap-5">
       <app-badge [variant]="res.result === 'passed' ? 'success' : 'danger'">

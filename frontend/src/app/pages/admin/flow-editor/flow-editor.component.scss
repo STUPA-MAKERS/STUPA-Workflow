@@ -402,14 +402,6 @@ select {
   cursor: pointer;
 }
 
-.fe__color-clear {
-  border: none;
-  background: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-size: var(--fs-xs);
-}
-
 .fe__node-initial-dot {
   fill: var(--color-primary);
   pointer-events: none;
@@ -476,12 +468,6 @@ select {
   box-sizing: border-box;
 }
 
-.fe__auto {
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
 .fe__auto--on {
   border-color: var(--color-primary);
   background: var(--color-primary-subtle);
@@ -503,39 +489,14 @@ select {
 }
 
 /* --- Aktionen-Pane unterhalb des Graphen (#flow) ------------------------- */
-.fe__actionsPane {
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
 .fe__actionsPane-add {
   max-width: 16rem;
-}
-.fe__paneSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding-bottom: var(--space-3);
-  border-bottom: var(--border-width) solid var(--color-border);
 }
 .fe__actions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
   gap: var(--space-3);
   align-items: start;
-}
-.fe__action-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-sunken);
 }
 .fe__recipient {
   display: flex;

@@ -66,14 +66,6 @@ formly-form {
   gap: var(--space-4);
 }
 /* Kostenpositionen-Block (#1) */
-.det__pos {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-}
 .det__pos-val {
   font-variant-numeric: tabular-nums;
 }
@@ -268,11 +260,6 @@ formly-form {
   overflow: hidden;
   max-height: calc(100vh - var(--layout-header-height) - 6rem);
 }
-.det__chatHead {
-  padding: var(--space-3) var(--space-4);
-  font-weight: var(--fw-semibold);
-  border-bottom: var(--border-width) solid var(--color-border);
-}
 .det__chatScroll {
   display: flex;
   flex-direction: column;
@@ -341,13 +328,6 @@ formly-form {
 .det__msg--internal .det__bubble {
   background: transparent;
   border: var(--border-width) dashed var(--color-border-strong);
-}
-.det__composer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-top: var(--border-width) solid var(--color-border);
 }
 .det__visToggle {
   display: inline-flex;

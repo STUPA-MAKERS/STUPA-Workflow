@@ -48,7 +48,7 @@
 <!-- Vertretung/Delegation (#delegation-rework): aktive sitzungsgebundene
      Vertretungen — ausgehend (»du wirst vertreten«) und eingehend (»du vertrittst«). -->
 @if (delegations().length) {
-  <section class="dash__panel dash__delegations" aria-labelledby="dash-deleg-h">
+  <section class="dash__delegations flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-deleg-h">
     <div class="flex items-start justify-between gap-3">
       <div>
         <h2 id="dash-deleg-h" class="m-0 text-lg">{{ 'delegation.dash.title' | t }}</h2>
@@ -82,7 +82,7 @@
 @if (canReadApplications()) {
   <div class="dash__panels">
     <!-- Offene Aufgaben: Anträge, die auf den Nutzer warten. -->
-    <section class="dash__panel" aria-labelledby="dash-tasks-h">
+    <section class="flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-tasks-h">
       <div class="flex items-start justify-between gap-3">
         <div>
           <h2 id="dash-tasks-h" class="m-0 text-lg">{{ 'dashboard.tasks.title' | t }}</h2>
@@ -123,7 +123,7 @@
     </section>
 
     <!-- Meine Anträge: eigene/lesbare Anträge mit Status + Deep-Link. -->
-    <section class="dash__panel" aria-labelledby="dash-apps-h">
+    <section class="flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-apps-h">
       <div class="flex items-start justify-between gap-3">
         <div>
           <h2 id="dash-apps-h" class="m-0 text-lg">{{ 'dashboard.applications.title' | t }}</h2>

@@ -107,9 +107,13 @@ module.exports = {
       'on-primary': 'var(--color-on-primary)',
       accent: 'var(--color-accent)',
       success: 'var(--color-success)',
+      'success-subtle': 'var(--color-success-subtle)',
       warning: 'var(--color-warning)',
+      'warning-subtle': 'var(--color-warning-subtle)',
       danger: 'var(--color-danger)',
+      'danger-subtle': 'var(--color-danger-subtle)',
       info: 'var(--color-info)',
+      'info-subtle': 'var(--color-info-subtle)',
     },
     extend: {
       fontFamily: {

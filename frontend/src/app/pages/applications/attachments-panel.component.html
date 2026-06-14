@@ -23,7 +23,7 @@
   @if (attachments().length) {
     <ul class="att__list">
       @for (att of attachments(); track att.id) {
-        <li class="att__item">
+        <li class="flex items-center justify-between gap-4 pb-3 border-b border-solid border-line flex-wrap">
           <div class="att__meta">
             <span class="att__name">{{ att.filename }}</span>
             <span class="att__size">{{ size(att) }}</span>

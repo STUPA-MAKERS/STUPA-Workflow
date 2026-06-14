@@ -94,14 +94,6 @@
   background: var(--color-primary);
 }
 
-.timeline__body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding-bottom: var(--space-4);
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-
 .timeline__note {
   margin: var(--space-1) 0 0;
   color: var(--color-text-muted);
@@ -214,11 +206,6 @@
   overflow: hidden;
   max-height: calc(100vh - var(--layout-header-height) - 6rem);
 }
-.det__chatHead {
-  padding: var(--space-3) var(--space-4);
-  font-weight: var(--fw-semibold);
-  border-bottom: var(--border-width) solid var(--color-border);
-}
 .det__chatScroll {
   display: flex;
   flex-direction: column;
@@ -277,13 +264,6 @@
 .det__msg--own .det__bubble {
   border-radius: var(--radius-lg) 0 var(--radius-lg) var(--radius-lg);
   background: var(--color-primary-subtle);
-}
-.det__composer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-top: var(--border-width) solid var(--color-border);
 }
 .det__composerInput {
   flex: 1;

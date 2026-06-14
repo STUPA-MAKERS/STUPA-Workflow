@@ -3,13 +3,6 @@
   max-width: 40rem;
 }
 
-.card {
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  background: var(--color-surface);
-}
-
 .consent__head {
   display: flex;
   gap: var(--space-3);

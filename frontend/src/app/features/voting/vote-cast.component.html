@@ -15,7 +15,7 @@
   @case ('ready') {
     @if (notEligible() && !vote()) {
       <section class="vote vote--narrow">
-        <p class="vote__notice" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
+        <p class="m-0 py-3 px-4 bg-warning-subtle text-text border border-solid border-warning rounded-md" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
         <a routerLink="/voting" class="vote__link">{{ 'voting.live.heading' | t }}</a>
       </section>
     }
@@ -53,13 +53,13 @@
 
         @if (delegation(); as deleg) {
           @if (deleg.blocked) {
-            <p class="vote__notice" role="alert">
+            <p class="m-0 py-3 px-4 bg-warning-subtle text-text border border-solid border-warning rounded-md" role="alert">
               {{ 'voting.cast.delegation.blocked' | t: { name: deleg.delegatedToName || '?' } }}
             </p>
           }
         }
         @if (notEligible() && !delegation()?.blocked && !delegation()?.exercising) {
-          <p class="vote__notice" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
+          <p class="m-0 py-3 px-4 bg-warning-subtle text-text border border-solid border-warning rounded-md" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
         } @else if (isClosed()) {
           <p class="text-muted">{{ 'voting.cast.closedHint' | t }}</p>
         } @else if (!delegation()?.blocked) {
@@ -101,7 +101,7 @@
             {{ 'voting.cast.delegation.proxyHeading' | t: { name: delegation()?.delegatedByName || '?' } }}
           </h2>
           <div
-            class="vote__options vote__options--proxy"
+            class="vote__options p-3 border border-solid border-line rounded-md bg-surface"
             role="group"
             [attr.aria-label]="'voting.cast.delegation.proxyHeading' | t: { name: delegation()?.delegatedByName || '?' }"
           >

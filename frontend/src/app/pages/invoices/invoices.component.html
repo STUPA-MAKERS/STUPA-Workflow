@@ -142,7 +142,7 @@
 >
   <form id="inv-create" class="flex flex-col gap-2" (submit)="create($event)">
     @if (importToken()) {
-      <div class="inv__fileChip">
+      <div class="flex items-center gap-2 py-2 px-3 border border-solid border-line rounded-md bg-surface-sunken">
         <app-icon name="document" [size]="16" />
         <span class="inv__fileChipName">{{ importFileName() }}</span>
         <button

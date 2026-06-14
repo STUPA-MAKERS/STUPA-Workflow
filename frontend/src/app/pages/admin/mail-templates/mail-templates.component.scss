@@ -89,13 +89,6 @@
   border-radius: var(--radius-sm);
   cursor: help;
 }
-.mt__preview {
-  margin-top: var(--space-4);
-  padding: var(--space-4);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-}
 .mt__previewH {
   margin: 0 0 var(--space-2);
   font-size: var(--fs-md);
@@ -108,9 +101,4 @@
   font-family: var(--font-mono, monospace);
   font-size: var(--fs-sm);
   margin: 0;
-}
-.mt__previewHtml {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: var(--border-width) solid var(--color-border);
 }

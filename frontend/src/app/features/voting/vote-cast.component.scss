@@ -10,15 +10,6 @@
   max-width: 32rem;
 }
 
-.vote__notice {
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-warning-subtle);
-  color: var(--color-text);
-  border: var(--border-width) solid var(--color-warning);
-  border-radius: var(--radius-md);
-}
-
 .vote__link {
   color: var(--color-primary);
   font-weight: var(--fw-semibold);
@@ -29,14 +20,6 @@
 .vote__options {
   display: grid;
   gap: var(--space-3);
-}
-
-// Vertretungs-Block optisch absetzen.
-.vote__options--proxy {
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
 }
 
 .vote__option {

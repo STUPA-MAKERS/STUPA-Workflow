@@ -164,7 +164,7 @@
     @if (newKind() === 'expense') {
       <label class="text-sm font-medium mt-2" for="exp-app">{{ 'expenses.field.linkApplication' | t }}</label>
       @if (newApplicationId()) {
-        <div class="exp__picked">
+        <div class="flex items-center justify-between gap-2 py-2 px-3 border border-solid border-line rounded-md bg-surface">
           <span class="font-medium">{{ appQuery() }}</span>
           <app-button type="button" variant="ghost" size="sm" (click)="clearApp()">{{ 'expenses.field.unlink' | t }}</app-button>
         </div>

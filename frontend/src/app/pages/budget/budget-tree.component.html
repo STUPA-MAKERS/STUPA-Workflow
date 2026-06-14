@@ -46,7 +46,7 @@
               <span class="bt__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
               <span class="bt__name">{{ $any(row).node.name }}</span>
               @if ($any(row).node.fullyBound) {
-                <span class="bt__tag" [title]="'budget.tree.fullyBoundHint' | t">{{ 'budget.tree.fullyBoundBadge' | t }}</span>
+                <span class="ml-2 py-0 px-2 rounded-sm text-xs font-semibold text-muted bg-surface-sunken border border-solid border-line" [title]="'budget.tree.fullyBoundHint' | t">{{ 'budget.tree.fullyBoundBadge' | t }}</span>
               }
             </span>
           </ng-template>

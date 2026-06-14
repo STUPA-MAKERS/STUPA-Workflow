@@ -40,7 +40,7 @@
 
   @for (g of groups(); track g.key) {
     <h2 class="audit__day">{{ dayLabel(g) }}</h2>
-    <ul class="audit__feed">
+    <ul class="list-none m-0 p-0 border border-solid border-line rounded-md bg-surface overflow-hidden">
       @for (e of g.entries; track e.id) {
         <li class="audit__item">
           <button
