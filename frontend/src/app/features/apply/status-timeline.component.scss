@@ -145,32 +145,6 @@
   white-space: pre-line;
 }
 
-.comment-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.comment-form__label {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-}
-
-.comment-form__input {
-  padding: var(--space-3) var(--space-4);
-  font: inherit;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  resize: vertical;
-}
-
-.comment-form__actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
 @media (max-width: 40rem) {
   .readonly__row {
     grid-template-columns: 1fr;
@@ -180,17 +154,14 @@
 
 /* Mobil: Aktions-Buttons als volle Tap-Flächen (≥2.5rem). */
 @media (max-width: 40rem) {
-  .status__actions,
-  .comment-form__actions {
+  .status__actions {
     justify-content: stretch;
   }
-  .status__actions app-button,
-  .comment-form__actions app-button {
+  .status__actions app-button {
     display: flex;
     flex: 1 1 auto;
   }
-  .status__actions ::ng-deep .btn,
-  .comment-form__actions ::ng-deep .btn {
+  .status__actions ::ng-deep .btn {
     width: 100%;
     min-height: 2.5rem;
   }

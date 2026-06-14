@@ -10,26 +10,3 @@
   gap: var(--space-2);
   flex: 1 1 9rem;
 }
-.dr__label {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--color-text);
-}
-.dr__control {
-  color-scheme: light dark;
-  padding: var(--space-3) var(--space-4);
-  font: inherit;
-  font-size: var(--fs-md);
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  transition: border-color var(--motion-fast) var(--ease-standard);
-}
-.dr__control:hover:not(:disabled) {
-  border-color: var(--color-text-muted);
-}
-.dr__control:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}

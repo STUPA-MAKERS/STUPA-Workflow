@@ -3,36 +3,6 @@
   flex-direction: column;
   gap: var(--space-5);
 }
-.gm__status {
-  color: var(--color-text-muted);
-  padding: var(--space-4) 0;
-}
-.gm__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-sm);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-.gm__table th {
-  text-align: start;
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-  background: var(--color-surface-sunken);
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-.gm__table td {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-.gm__th-actions {
-  text-align: end;
-}
 .gm__lbl {
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);

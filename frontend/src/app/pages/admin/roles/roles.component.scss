@@ -6,11 +6,6 @@
   transform: rotate(180deg);
   color: var(--color-primary);
 }
-.roles__row-actions {
-  display: inline-flex;
-  gap: var(--space-1);
-  justify-content: flex-end;
-}
 .roles__key {
   font-family: var(--font-mono, monospace);
   font-size: var(--fs-xs);

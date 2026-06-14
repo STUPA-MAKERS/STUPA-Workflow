@@ -48,22 +48,6 @@ input.exp__input {
   .exp__tree { position: static; max-height: none; }
 }
 .exp__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
-.exp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.exp__row {
-  display: grid;
-  grid-template-columns: 7rem 6rem 1fr auto auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-.exp__date { color: var(--color-text-muted); font-size: var(--fs-sm); }
-.exp__desc { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.exp__descText { font-weight: var(--fw-medium); }
-.exp__meta { font-size: var(--fs-sm); color: var(--color-text-muted); }
-.exp__cc { font-variant-numeric: tabular-nums; }
 .exp__appLink { color: var(--color-primary); text-decoration: none; }
 .exp__appLink:hover { text-decoration: underline; }
 .exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
@@ -193,7 +177,6 @@ input.exp__input {
 @media (max-width: 720px) {
   .exp__layout { grid-template-columns: 1fr; }
   .exp__tree { position: static; max-height: none; }
-  .exp__row { grid-template-columns: 1fr auto; }
 }
 /* Mobil (≤768px): Baum hinter einklappbarem Toggle (Standard: zu),
    eine Spalte. Desktop unverändert — Toggle existiert dort nur versteckt. */

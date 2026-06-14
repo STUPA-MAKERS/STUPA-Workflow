@@ -1,9 +1,3 @@
-.fe__desc {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  margin: 0;
-}
-
 .fe__modes {
   display: inline-flex;
   border: var(--border-width) solid var(--color-border);
@@ -60,76 +54,6 @@
 .fe__block-head h2 {
   font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
-}
-
-.fe__empty {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
-.fe__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
-}
-
-.fe__trow {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding-bottom: var(--space-3);
-  border-bottom: var(--border-width) dashed var(--color-border);
-}
-
-.fe__chk {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--fs-sm);
-}
-
-.fe__chk input {
-  accent-color: var(--color-primary);
-}
-
-.fe__expert {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
-  padding-left: var(--space-4);
-  border-left: 3px solid var(--color-primary-subtle);
-}
-
-.fe__actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.fe__actions-label {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-
-.fe__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  background: var(--color-primary-subtle);
-  color: var(--color-primary);
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-xs);
-}
-
-.fe__chip button {
-  background: transparent;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
 }
 
 input,
@@ -473,21 +397,6 @@ select {
   background: var(--color-primary-subtle);
 }
 
-.fe__dialog-foot {
-  display: flex;
-  gap: var(--space-3);
-}
-
-.fe__action-descs {
-  margin: 0;
-  padding-left: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-
 /* --- Aktionen-Pane unterhalb des Graphen (#flow) ------------------------- */
 .fe__actionsPane-add {
   max-width: 16rem;
@@ -521,26 +430,6 @@ select {
 }
 
 /* State-Art-Config + Decision-Regeln (#28) */
-.fe__rules {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.fe__rule {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-wrap: wrap;
-}
-.fe__rule select,
-.fe__rule input {
-  height: var(--control-height);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  padding: 0 var(--space-2);
-}
 .fe__rule-val {
   width: 5rem;
 }
