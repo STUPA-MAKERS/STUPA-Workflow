@@ -82,8 +82,8 @@
           <ng-template appCell="bar" let-row>
             <span class="bd__bar-cell">
               <span class="bd__track" role="img" [attr.aria-label]="($any(row).percent ?? 0) + '%'">
-                <span class="bd__seg bd__seg--bound" [class.bd__seg--over]="$any(row).committed > $any(row).allocated && $any(row).allocated > 0" [style.width.%]="boundPct($any(row))"></span>
-                <span class="bd__seg bd__seg--expended" [class.bd__seg--over]="$any(row).committed > $any(row).allocated && $any(row).allocated > 0" [style.width.%]="expendedPct($any(row))"></span>
+                <span class="bd__seg bd__seg--bound" [class.bd__seg--over]="$any(row).available < 0" [style.width.%]="boundPct($any(row))"></span>
+                <span class="bd__seg bd__seg--expended" [class.bd__seg--over]="$any(row).available < 0" [style.width.%]="expendedPct($any(row))"></span>
               </span>
               <span class="bd__pct">{{ $any(row).percent === null ? '—' : $any(row).percent + '%' }}</span>
             </span>

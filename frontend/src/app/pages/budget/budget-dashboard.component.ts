@@ -48,7 +48,7 @@ interface UsageRow {
   income: number;
   requested: number;
   available: number;
-  /** committed/allocated in Prozent (null wenn keine Zuteilung). */
+  /** committed/(available+committed) in Prozent (null wenn Nenner 0). */
   percent: number | null;
 }
 
@@ -209,7 +209,10 @@ export class BudgetDashboardComponent {
         income,
         requested,
         available,
-        percent: a && allocated > 0 ? Math.round((committed / allocated) * 100) : null,
+        percent:
+          a && available + committed > 0
+            ? Math.round((committed / (available + committed)) * 100)
+            : null,
       });
       for (const c of node.children) walk(c, depth + 1);
     };
@@ -338,19 +341,21 @@ export class BudgetDashboardComponent {
     const n = value == null || value === '' ? 0 : Number(value);
     return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
   }
-  barPct(row: UsageRow): number {
-    if (!row.allocated) return 0;
-    return Math.min(100, Math.round((row.committed / row.allocated) * 100));
+  /** Gesamtbudget der Zeile = verfügbar + gebunden + ausgegeben (= zugewiesen +
+   *  Einnahmen). Bezugsgröße der Auslastung, damit Einnahmen-finanzierte
+   *  Kostenstellen nicht über 100% laufen (#budget-usage). */
+  private usageTotal(row: UsageRow): number {
+    return row.available + row.committed;
   }
-  /** Gebundener Anteil (noch nicht ausgegeben) als % der Allokation — hellgrau. */
+  /** Gebundener Anteil am Gesamtbudget — hellgrau. */
   boundPct(row: UsageRow): number {
-    if (!row.allocated) return 0;
-    return Math.max(0, Math.min(100, (row.bound / row.allocated) * 100));
+    const total = this.usageTotal(row);
+    return total > 0 ? Math.max(0, Math.min(100, (row.bound / total) * 100)) : 0;
   }
-  /** Ausgegebener Anteil als % der Allokation — primary. */
+  /** Ausgegebener Anteil am Gesamtbudget — primary. */
   expendedPct(row: UsageRow): number {
-    if (!row.allocated) return 0;
-    return Math.max(0, Math.min(100, (row.expended / row.allocated) * 100));
+    const total = this.usageTotal(row);
+    return total > 0 ? Math.max(0, Math.min(100, (row.expended / total) * 100)) : 0;
   }
   shortId(id: Uuid): string {
     return id.slice(0, 8);
