@@ -29,6 +29,9 @@ export class AuthService {
     const p = this._principal();
     return p?.display_name || p?.email || '—';
   });
+  /** Principal-ID (`sub`) des angemeldeten Nutzers — z. B. Vergleich mit dem
+   *  zugewiesenen Protokollanten einer Sitzung. `null`, solange anonym. */
+  readonly userId = computed(() => this._principal()?.sub ?? null);
   readonly roles = computed(() => this._principal()?.roles ?? []);
   /** Gremien des angemeldeten Principals (#5) — für die »Meine Gremien«-Ansicht. */
   readonly gremien = computed(() => this._principal()?.gremien ?? []);

@@ -77,11 +77,12 @@ class FakeWs {
   }
 }
 
-function fakeAuth(perms: string[]): Partial<AuthService> {
+function fakeAuth(perms: string[], userId: string | null = 'pr-1'): Partial<AuthService> {
   const set = new Set(perms);
   return {
     can: (p: string) => set.has(p),
     canAny: (...p: string[]) => p.some((x) => set.has(x)),
+    userId: (() => userId) as unknown as AuthService['userId'],
     gremien: (() => []) as unknown as AuthService['gremien'],
     sessionManageGremien: (() => []) as unknown as AuthService['sessionManageGremien'],
     inSubstitutePool: (() => false) as unknown as AuthService['inSubstitutePool'],
@@ -94,9 +95,11 @@ async function setup(
     id?: string | null;
     gremien?: { id: string; name: string }[];
     meetings?: MeetingOutWire[];
+    userId?: string | null;
   } = {},
 ) {
   const perms = opts.perms ?? ['meeting.manage', 'protocol.write'];
+  const userId = opts.userId === undefined ? 'pr-1' : opts.userId;
   const id = opts.id === undefined ? 'm-1' : opts.id;
   const ws = new FakeWs();
   const navigate = jest.fn(() => Promise.resolve(true));
@@ -105,7 +108,7 @@ async function setup(
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
-      { provide: AuthService, useValue: fakeAuth(perms) },
+      { provide: AuthService, useValue: fakeAuth(perms, userId) },
       { provide: WsService, useValue: ws },
       { provide: Router, useValue: { navigate } },
       {
@@ -374,5 +377,27 @@ describe('MeetingsComponent', () => {
     req.flush({ ...MEETING, protokollantId: 'pr-1', protokollantName: 'Max P' });
     // Name erscheint nach dem Speichern (Karte/Toolbar).
     expect(await screen.findByText(/Max P/)).toBeInTheDocument();
+  });
+
+  it('gives non-protokollants the live read/vote view once a protokollant is assigned', async () => {
+    // Sitzung mit zugewiesenem Protokollanten (jemand anderes) — der angemeldete
+    // Nutzer ist NICHT der Protokollant ⇒ Live-/Mitstimm-Ansicht, kein Manager-View.
+    const assigned: MeetingOutWire = {
+      ...MEETING,
+      canControl: false,
+      canManage: false,
+      canWrite: false,
+      canManageVotes: false,
+      canVote: true,
+      protokollantId: 'someone-else',
+      protokollantName: 'Other P',
+    };
+    const { http } = await setup({ perms: ['vote.cast'], userId: 'pr-1' });
+    http.expectOne('/api/meetings/m-1').flush(assigned);
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    flushDelegationContext(http);
+    expect(await screen.findByText('Live-Sitzung')).toBeInTheDocument();
+    expect(screen.queryByText('Sitzungssteuerung')).not.toBeInTheDocument();
   });
 });

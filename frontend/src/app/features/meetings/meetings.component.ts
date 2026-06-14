@@ -383,10 +383,23 @@ export class MeetingsComponent implements OnDestroy {
       !this.inAnyCommittee() &&
       !this.inSubstitutePool(),
   );
-  /** Mitglied ohne Schreib-/Verwaltungsrecht → reine Live-Verfolgung. */
+  /** Ist der angemeldete Nutzer der für DIESE Sitzung gewählte Protokollant? */
+  readonly isProtokollant = computed(() => {
+    const m = this.meeting();
+    const uid = this.auth.userId();
+    return !!m && !!m.protokollantId && !!uid && m.protokollantId === uid;
+  });
+  /** Live-Verfolgung (Protokoll lesen + offene Abstimmungen mitstimmen) statt
+   *  Edit-/Manager-View. Sobald ein Protokollant gewählt ist, bekommt **nur**
+   *  dieser den Manager-View — alle anderen (auch Verwalter) die Live-Ansicht.
+   *  Ohne gewählten Protokollant greift das alte Schreib-/Verwaltungs-Gate,
+   *  damit eine frisch angelegte Sitzung vor dem Start nicht in einer Sackgasse
+   *  landet (Zuweisung erfolgt dann aus der Übersicht). */
   readonly isFollower = computed(() => {
     const m = this.meeting();
-    return !!m && !m.canWrite && !m.canManage;
+    if (!m) return false;
+    if (m.protokollantId) return !this.isProtokollant();
+    return !m.canWrite && !m.canManage;
   });
   /** Beamer-Anzeige (nur aktuelle Frage + Live-Ergebnis, keine Dialoge). */
   readonly beamerMode = signal(false);
