@@ -153,7 +153,7 @@
             <div class="flex items-baseline gap-3 flex-wrap mb-2">
               <strong>{{ 'applications.history.version' | t: { version: version.version } }}</strong>
               @if (version.changedBy) {
-                <span class="text-muted">{{ 'applications.history.by' | t: { actor: version.changedBy } }}</span>
+                <span class="text-muted">{{ 'applications.history.by' | t: { actor: version.changedBy === 'applicant' ? ('applications.comments.author.applicant' | t) : version.changedBy } }}</span>
               }
               <time class="text-muted" [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
             </div>
