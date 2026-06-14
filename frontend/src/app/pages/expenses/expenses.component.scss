@@ -43,7 +43,6 @@ input.exp__input {
   overflow-y: auto;
 }
 .exp__main { min-width: 0; }
-.exp__empty { text-align: center; color: var(--color-text-muted); padding: var(--space-6) !important; }
 @media (max-width: 60rem) {
   .exp__layout { grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr); }
   .exp__head { max-width: none; }
@@ -314,8 +313,8 @@ input.exp__input {
   /* Aktionen auf eigene Zeile (große Tap-Ziele). */
   .exp__actions { margin-left: auto; }
   .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
-  .exp__empty {
+  /* Leerzelle muss die Karten-Zeile voll füllen; Aussehen kommt aus .empty-state. */
+  td.empty-state {
     flex: 1 1 100%;
-    padding: var(--space-6) !important;
   }
 }

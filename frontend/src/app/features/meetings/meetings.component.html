@@ -132,7 +132,7 @@
           }
         </article>
       } @empty {
-        <p class="mtg__muted">{{ 'meetings.follow.noTops' | t }}</p>
+        <p class="empty-state">{{ 'meetings.follow.noTops' | t }}</p>
       }
     </app-card>
 
@@ -175,7 +175,7 @@
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="2" class="mtg__muted mtg__tocEmpty">{{ 'meetings.attendance.empty' | t }}</td></tr>
+            <tr><td colspan="2" class="empty-state">{{ 'meetings.attendance.empty' | t }}</td></tr>
           }
         </tbody>
       </table>
@@ -264,7 +264,7 @@
             }
           </li>
         } @empty {
-          <li class="mtg__muted mtg__tocEmpty">{{ 'meetings.agenda.empty' | t }}</li>
+          <li class="empty-state">{{ 'meetings.agenda.empty' | t }}</li>
         }
       </ol>
       @if (m.canWrite && !protocol()?.isLocked) {
@@ -439,7 +439,7 @@
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="2" class="mtg__muted mtg__tocEmpty">{{ 'meetings.attendance.empty' | t }}</td></tr>
+            <tr><td colspan="2" class="empty-state">{{ 'meetings.attendance.empty' | t }}</td></tr>
           }
         </tbody>
       </table>
@@ -458,7 +458,7 @@
             @for (name of viewers(); track name) {
               <li class="mtg__viewer"><span class="mtg__viewerDot" aria-hidden="true"></span>{{ name }}</li>
             } @empty {
-              <li class="mtg__muted">{{ 'meetings.viewers.empty' | t }}</li>
+              <li class="empty-state">{{ 'meetings.viewers.empty' | t }}</li>
             }
           </ul>
         </section>
@@ -611,7 +611,7 @@
           @for (m of upcomingItems(); track m.id) {
             <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
           } @empty {
-            <p class="mtg__muted mtg__tlNoUp">{{ 'meetings.list.noUpcoming' | t }}</p>
+            <p class="empty-state">{{ 'meetings.list.noUpcoming' | t }}</p>
           }
           @if (loadingUpcoming()) {
             <p class="mtg__muted mtg__tlNoUp" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>

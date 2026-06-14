@@ -126,7 +126,7 @@
               </tr>
             } @empty {
               <tr>
-                <td class="exp__empty" [attr.colspan]="canManage() ? 10 : 9">{{ 'expenses.empty' | t }}</td>
+                <td class="empty-state" [attr.colspan]="canManage() ? 10 : 9">{{ 'expenses.empty' | t }}</td>
               </tr>
             }
           </tbody>

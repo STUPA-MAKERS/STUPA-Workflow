@@ -380,13 +380,6 @@
   padding: var(--space-1) var(--space-2);
   font-size: var(--fs-sm);
 }
-.mtg__tocEmpty {
-  padding: var(--space-4) var(--space-2);
-  text-align: center;
-  border: var(--border-width) dashed var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-sm);
-}
 .mtg__tocAddBlock {
   display: flex;
   flex-direction: column;

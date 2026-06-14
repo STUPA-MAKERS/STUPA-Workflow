@@ -69,7 +69,7 @@
   @if (loading()) {
     <p class="inv__status" aria-live="polite">{{ 'invoices.loading' | t }}</p>
   } @else if (visible().length === 0) {
-    <div class="inv__emptyCard">{{ 'invoices.empty' | t }}</div>
+    <div class="empty-state">{{ 'invoices.empty' | t }}</div>
   } @else {
     <div class="inv__tableWrap">
       <table class="inv__table">

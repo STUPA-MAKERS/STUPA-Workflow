@@ -66,14 +66,6 @@
   color: var(--color-text-muted);
   font-weight: var(--fw-normal);
 }
-/* Höhere Spezifität als .atbl td (sonst gewinnt dessen text-align:start +
-   schmaleres Padding → Leertext links + zu niedrig). Zentriert + space-6 wie
-   die shared DataTable (#9/#table-parity). */
-.atbl td.atbl__empty {
-  text-align: center;
-  color: var(--color-text-muted);
-  padding: var(--space-6);
-}
 /* Mobil (≤768px): Zeilen als Karten stapeln (rein CSS, kein Markup-Diff). */
 @media (max-width: 768px) {
   .atbl__wrap {
@@ -126,8 +118,8 @@
     margin-left: auto;
     font-weight: var(--fw-medium);
   }
-  .atbl__empty {
+  /* Leerzelle muss die Karten-Zeile voll füllen; Aussehen kommt aus .empty-state. */
+  .atbl td.empty-state {
     flex: 1 1 100%;
-    padding: var(--space-6);
   }
 }

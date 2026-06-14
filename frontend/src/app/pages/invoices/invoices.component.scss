@@ -29,17 +29,6 @@
 input.inv__input { height: var(--control-height); }
 .inv__search { min-width: 14rem; height: 2.25rem; }
 .inv__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
-.inv__empty { text-align: center; color: var(--color-text-muted); padding: var(--space-6) !important; }
-/* Leerzustand als zentrierte Karte (nicht in der scrollenden Tabelle, sonst
-   zentriert der Text über die Gesamt-Tabellenbreite statt im Viewport). */
-.inv__emptyCard {
-  text-align: center;
-  color: var(--color-text-muted);
-  padding: var(--space-7) var(--space-5);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-}
 .inv__tableWrap {
   overflow-x: auto;
   border: var(--border-width) solid var(--color-border);
@@ -166,5 +155,4 @@ input.inv__input { height: var(--control-height); }
   }
   .inv__actions { margin-left: auto; }
   .inv__num:has(.inv__actions) { order: 2; flex: 1 1 100%; }
-  .inv__empty { flex: 1 1 100%; padding: var(--space-6) !important; }
 }

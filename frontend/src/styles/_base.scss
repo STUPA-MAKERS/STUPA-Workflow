@@ -152,3 +152,18 @@ input[type='checkbox'],
 input[type='radio'] {
   accent-color: var(--color-primary);
 }
+
+// App-weiter Leerzustand für Tabellen/Listen/Karten — eine Quelle der Wahrheit.
+// Spiegelt das Gold-Standard-.dt__empty der shared DataTable: zentriert, gedämpft,
+// großzügiges Padding. Mobile-Override erzwingt Zentrierung auch im ≤768px-
+// Karten-/Flex-Layout, wo td/li sonst linksbündig driften (#empty-parity).
+.empty-state {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--space-6) !important;
+}
+@media (max-width: 768px) {
+  .empty-state {
+    text-align: center !important;
+  }
+}
