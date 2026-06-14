@@ -279,51 +279,6 @@
   width: 12rem;
 }
 
-.bd__bar-cell {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.bd__track {
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 0.7rem;
-  display: flex;
-  background: var(--color-surface-sunken);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-}
-
-.bd__seg {
-  height: 100%;
-  background: var(--color-primary);
-}
-
-/* Zweifarbig (#budget): hellgrau = gebunden, primary = ausgegeben. */
-.bd__seg--bound {
-  background: var(--color-border-strong, #8a8f98);
-}
-
-.bd__seg--expended {
-  background: var(--color-primary);
-}
-
-.bd__seg--over {
-  background: var(--color-danger);
-}
-
-.bd__pct {
-  flex: none;
-  width: 2.75rem;
-  text-align: end;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
 .bd__app-row {
   cursor: pointer;
 }
@@ -413,12 +368,5 @@
   .bd__name {
     max-width: 100%;
     white-space: normal;
-  }
-  /* Auslastungs-Balken: im Karten-Layout kollabiert der flex-Track sonst auf
-     Inhaltsbreite (≈0) — feste, rechtsbündige Breite gibt ihm Fläche. */
-  .bd__bar-cell {
-    flex: 1 1 auto;
-    max-width: 14rem;
-    margin-left: auto;
   }
 }
