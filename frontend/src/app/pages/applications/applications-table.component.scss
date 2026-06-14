@@ -118,8 +118,4 @@
     margin-left: auto;
     font-weight: var(--fw-medium);
   }
-  /* Leerzelle muss die Karten-Zeile voll füllen; Aussehen kommt aus .empty-state. */
-  .atbl td.empty-state {
-    flex: 1 1 100%;
-  }
 }

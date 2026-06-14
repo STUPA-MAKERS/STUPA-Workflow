@@ -1,3 +1,4 @@
+@if (rows().length) {
 <div class="atbl__wrap">
   <table class="atbl">
     <thead>
@@ -53,11 +54,10 @@
             }
           </td>
         </tr>
-      } @empty {
-        <tr>
-          <td class="empty-state" colspan="5">{{ emptyText() }}</td>
-        </tr>
       }
     </tbody>
   </table>
 </div>
+} @else {
+  <div class="empty-state">{{ emptyText() }}</div>
+}

@@ -153,17 +153,16 @@ input[type='radio'] {
   accent-color: var(--color-primary);
 }
 
-// App-weiter Leerzustand für Tabellen/Listen/Karten — eine Quelle der Wahrheit.
-// Spiegelt das Gold-Standard-.dt__empty der shared DataTable: zentriert, gedämpft,
-// großzügiges Padding. Mobile-Override erzwingt Zentrierung auch im ≤768px-
-// Karten-/Flex-Layout, wo td/li sonst linksbündig driften (#empty-parity).
+// App-weiter Leerzustand für Listen/Tabellen — eine Quelle der Wahrheit. Wird als
+// EIGENSTÄNDIGE Karte gerendert (Tabelle wird im Leerfall ausgeblendet), damit alle
+// Seiten optisch identisch sind: gerahmte Box (Border + Radius + Surface) mit
+// zentriertem, gedämpftem Text — exakt der Look der shared DataTable (dt--boxed +
+// dt__empty). Desktop wie Mobil identisch (#empty-parity).
 .empty-state {
   text-align: center;
   color: var(--color-text-muted);
-  padding: var(--space-6) !important;
-}
-@media (max-width: 768px) {
-  .empty-state {
-    text-align: center !important;
-  }
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
 }

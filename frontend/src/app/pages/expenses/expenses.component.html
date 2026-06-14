@@ -74,7 +74,7 @@
   <div class="exp__main">
     @if (loading()) {
       <p class="exp__status" aria-live="polite">{{ 'expenses.loading' | t }}</p>
-    } @else {
+    } @else if (items().length) {
       <div class="exp__tableWrap">
         <table class="exp__table">
           <thead>
@@ -124,10 +124,6 @@
                   </td>
                 }
               </tr>
-            } @empty {
-              <tr>
-                <td class="empty-state" [attr.colspan]="canManage() ? 10 : 9">{{ 'expenses.empty' | t }}</td>
-              </tr>
             }
           </tbody>
         </table>
@@ -145,6 +141,8 @@
       @if (total() > 0) {
         <p class="exp__count">{{ 'expenses.count' | t: { count: items().length, total: total() } }}</p>
       }
+    } @else {
+      <div class="empty-state">{{ 'expenses.empty' | t }}</div>
     }
   </div>
 </div>

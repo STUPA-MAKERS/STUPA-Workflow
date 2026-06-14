@@ -25,6 +25,15 @@
   margin-top: 0;
 }
 
+/* Leerzustand sitzt INNERHALB der .card (die schon Rahmen+Radius+Surface liefert) —
+   daher nur zentrierter, gedämpfter Text mit space-6, KEIN eigener Rahmen (sonst
+   Box-in-Box). Optische Parität zum kanonischen .empty-state. */
+.grants__empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--space-6) 0;
+}
+
 .grants__list-head,
 .mcp__config-head {
   display: flex;

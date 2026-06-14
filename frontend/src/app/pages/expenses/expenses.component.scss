@@ -313,8 +313,4 @@ input.exp__input {
   /* Aktionen auf eigene Zeile (große Tap-Ziele). */
   .exp__actions { margin-left: auto; }
   .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
-  /* Leerzelle muss die Karten-Zeile voll füllen; Aussehen kommt aus .empty-state. */
-  td.empty-state {
-    flex: 1 1 100%;
-  }
 }

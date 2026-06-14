@@ -49,7 +49,7 @@
     } @else if (error()) {
       <p class="grants__error">{{ 'account.grants.error' | t }}</p>
     } @else if (grants().length === 0) {
-      <p class="empty-state">{{ 'account.grants.empty' | t }}</p>
+      <p class="grants__empty">{{ 'account.grants.empty' | t }}</p>
     } @else {
       <table class="grants__table">
         <thead>
