@@ -3,6 +3,7 @@ import {
   Component,
   type ElementRef,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -73,15 +74,22 @@ export class InvoicesComponent {
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
+  private readonly PAGE = 20;
   readonly items = signal<Invoice[]>([]);
+  readonly total = signal(0);
+  private nextOffset = 0;
   readonly loading = signal(true);
+  readonly loadingMore = signal(false);
+  readonly hasMore = computed(() => this.items().length < this.total());
   readonly q = signal('');
   readonly saving = signal(false);
   readonly importing = signal(false);
   /** Manueller Beleg-Upload im Anlegen-Dialog läuft (#invoices). */
   readonly attaching = signal(false);
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Filter (Buchungen-Stil): Status, Brutto-Bereich, Rechnungs-/Fälligkeitsdatum. */
+  /** Filter (Buchungen-Stil): Status, Brutto-Bereich, Rechnungs-/Fälligkeitsdatum.
+   *  Treiben jetzt die Server-Abfrage (#invoices serverseitige Suche). */
   readonly statusFilter = signal<'' | InvoiceStatus>('');
   readonly grossMin = signal('');
   readonly grossMax = signal('');
@@ -104,40 +112,35 @@ export class InvoicesComponent {
       ].filter((v) => String(v ?? '').trim() !== '').length,
   );
 
-  /** Client-seitige Suche (Nummer/Lieferant/Notiz) + Status-/Betrags-/Datums-Filter. */
-  readonly visible = computed(() => {
-    const needle = this.q().trim().toLowerCase();
-    const status = this.statusFilter();
-    const gMin = this.grossMin().trim() ? Number(this.grossMin()) : null;
-    const gMax = this.grossMax().trim() ? Number(this.grossMax()) : null;
-    const issueFrom = this.issueFrom();
-    const issueTo = this.issueTo();
-    const dueFrom = this.dueFrom();
-    const dueTo = this.dueTo();
-    return this.items().filter((i) => {
-      if (
-        needle &&
-        ![i.number, i.supplier, i.note].some((v) => (v ?? '').toLowerCase().includes(needle))
-      )
-        return false;
-      if (status && i.status !== status) return false;
-      const gross = Number(i.grossAmount);
-      if (gMin !== null && gross < gMin) return false;
-      if (gMax !== null && gross > gMax) return false;
-      if (!this.inDateRange(i.issueDate, issueFrom, issueTo)) return false;
-      if (!this.inDateRange(i.dueDate, dueFrom, dueTo)) return false;
-      return true;
-    });
-  });
+  readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
-  /** ISO-Datums (YYYY-MM-DD) vergleichen sich lexikografisch. Ohne Datum fällt eine
-   *  Zeile aus jedem gesetzten Bereich. */
-  private inDateRange(date: string | null | undefined, from: string, to: string): boolean {
-    if (!from && !to) return true;
-    if (!date) return false;
-    if (from && date < from) return false;
-    if (to && date > to) return false;
-    return true;
+  /** Suche (debounced ~250ms) treibt den ``q``-Parameter der Server-Abfrage. */
+  onSearch(value: string): void {
+    this.q.set(value);
+    this.debouncedReload();
+  }
+
+  /** Statusfilter setzen + neu laden (Server filtert). */
+  setStatus(value: '' | InvoiceStatus): void {
+    this.statusFilter.set(value);
+    this.reload();
+  }
+
+  /** Brutto-Bereichsfilter (debounced, da getippt). */
+  onGrossFilter(which: 'min' | 'max', value: string): void {
+    (which === 'min' ? this.grossMin : this.grossMax).set(value);
+    this.debouncedReload();
+  }
+
+  /** Datums-Bereichsfilter (Rechnungs-/Fälligkeitsdatum). */
+  onDateFilter(which: 'issueFrom' | 'issueTo' | 'dueFrom' | 'dueTo', value: string): void {
+    ({
+      issueFrom: this.issueFrom,
+      issueTo: this.issueTo,
+      dueFrom: this.dueFrom,
+      dueTo: this.dueTo,
+    })[which].set(value);
+    this.debouncedReload();
   }
 
   resetFilters(): void {
@@ -148,6 +151,12 @@ export class InvoicesComponent {
     this.issueTo.set('');
     this.dueFrom.set('');
     this.dueTo.set('');
+    this.reload();
+  }
+
+  private debouncedReload(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.reload(), 250);
   }
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
@@ -197,6 +206,20 @@ export class InvoicesComponent {
 
   constructor() {
     this.reload();
+
+    // Infinite-Scroll: Sentinel am Listenende → nächste Seite nachladen.
+    effect((onCleanup) => {
+      const el = this.sentinel()?.nativeElement;
+      if (!el || typeof IntersectionObserver === 'undefined') return;
+      const obs = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) this.loadMore();
+        },
+        { rootMargin: '400px' },
+      );
+      obs.observe(el);
+      onCleanup(() => obs.disconnect());
+    });
   }
 
   money(amount: string): string {
@@ -211,17 +234,50 @@ export class InvoicesComponent {
   }
 
   private reload(): void {
+    this.nextOffset = 0;
+    this.items.set([]);
+    this.total.set(0);
     this.loading.set(true);
-    this.api.listInvoices().subscribe({
-      next: (rows) => {
-        this.items.set(rows);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.items.set([]);
-        this.loading.set(false);
-      },
-    });
+    this.fetch(true);
+  }
+
+  loadMore(): void {
+    if (this.loadingMore() || this.loading() || !this.hasMore()) return;
+    this.loadingMore.set(true);
+    this.fetch(false);
+  }
+
+  private fetch(initial: boolean): void {
+    this.api
+      .listInvoicesPaged({
+        q: this.q().trim() || undefined,
+        status: this.statusFilter() || undefined,
+        grossMin: this.grossMin().trim() ? Number(this.grossMin()) : undefined,
+        grossMax: this.grossMax().trim() ? Number(this.grossMax()) : undefined,
+        issueFrom: this.issueFrom() || undefined,
+        issueTo: this.issueTo() || undefined,
+        dueFrom: this.dueFrom() || undefined,
+        dueTo: this.dueTo() || undefined,
+        limit: this.PAGE,
+        offset: this.nextOffset,
+      })
+      .subscribe({
+        next: (page) => {
+          this.total.set(page.total);
+          this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
+          this.nextOffset = page.offset + page.items.length;
+          this.loading.set(false);
+          this.loadingMore.set(false);
+        },
+        error: () => {
+          if (initial) {
+            this.items.set([]);
+            this.total.set(0);
+          }
+          this.loading.set(false);
+          this.loadingMore.set(false);
+        },
+      });
   }
 
   // ----------------------------------------------------------- drag & drop
@@ -453,6 +509,7 @@ export class InvoicesComponent {
         this.saving.set(false);
         this.confirmDelete.set(null);
         this.items.update((list) => list.filter((x) => x.id !== i.id));
+        this.total.update((t) => Math.max(0, t - 1));
         this.toast.success(this.i18n.translate('invoices.toast.deleted'));
       },
       error: () => {

@@ -32,6 +32,7 @@ from app.modules.budget.tree_schemas import (
     BudgetNodeUpdate,
     ExpenseCreate,
     FiscalYearCreate,
+    InvoiceCreate,
     TransferCreate,
 )
 from app.modules.budget.tree_service import BudgetTreeService
@@ -321,4 +322,82 @@ async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:
 
     # Kein Treffer ⇒ leer (count/row identisch, kein Infinite-Scroll-Drift).
     empty = await svc.list_expenses_paged(budget_id=top.id, fiscal_year_id=fy.id, q="zzzzzznope")
+    assert empty.total == 0 and empty.items == []
+
+
+async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> None:
+    """Server-seitige Rechnungssuche (#invoices): Fuzzy-``q`` + Filter + Offset-Paging.
+
+    Beweist gegen echtes Postgres den Trigram-Pfad (Tippfehler trifft) sowie die an
+    die GETEILTEN ``filters`` gehängten Status-/Brutto-/Datums-Prädikate — identisch
+    in Zähl- **und** Zeilen-Query (kein ``total``/Treffer-Drift). SQLite-Stubs nähmen
+    hier den ILIKE-Substring-Fallback (Rang 0.0), der dieselbe API grün hält.
+    """
+    svc = BudgetTreeService(session)
+    invoices = [
+        InvoiceCreate(
+            number="R-2026-001",
+            supplier="Konferenzgebühr GmbH",
+            grossAmount=Decimal("100"),
+            status="open",
+            issueDate=date(2026, 1, 10),
+            dueDate=date(2026, 2, 10),
+        ),
+        InvoiceCreate(
+            number="R-2026-002",
+            supplier="Druckerei Müller",
+            note="Druckerpapier A4",
+            grossAmount=Decimal("250"),
+            status="paid",
+            issueDate=date(2026, 3, 5),
+            dueDate=date(2026, 4, 5),
+        ),
+        InvoiceCreate(
+            number="R-2026-003",
+            supplier="Bahn AG",
+            grossAmount=Decimal("500"),
+            status="open",
+            issueDate=date(2026, 6, 1),
+            dueDate=date(2026, 7, 1),
+        ),
+    ]
+    for payload in invoices:
+        await svc.create_invoice(payload, actor="tester")
+
+    # Fuzzy: Tippfehler »Konferenzgebuehr« trifft trotzdem die ähnlichste Rechnung.
+    hit = await svc.list_invoices_paged(q="Konferenzgebuehr")
+    assert hit.total == 1
+    assert hit.items[0].supplier == "Konferenzgebühr GmbH"
+
+    # Fuzzy über die Notiz (Druckerpapier) — fremde Rechnungen fallen raus.
+    note_hit = await svc.list_invoices_paged(q="Druckerpapier")
+    assert [i.number for i in note_hit.items] == ["R-2026-002"]
+
+    # Statusfilter: nur offene Rechnungen.
+    open_only = await svc.list_invoices_paged(status="open")
+    assert open_only.total == 2
+    assert {i.status for i in open_only.items} == {"open"}
+
+    # Brutto-Bereich: 200 ≤ brutto ≤ 600 ⇒ die beiden teureren.
+    mid = await svc.list_invoices_paged(gross_min=Decimal("200"), gross_max=Decimal("600"))
+    assert {i.number for i in mid.items} == {"R-2026-002", "R-2026-003"}
+
+    # Rechnungsdatum-Bereich (ISO-String, wie der FE-Datepicker liefert).
+    by_issue = await svc.list_invoices_paged(issue_from="2026-02-01", issue_to="2026-04-01")
+    assert [i.number for i in by_issue.items] == ["R-2026-002"]
+
+    # Fälligkeitsdatum-Bereich.
+    by_due = await svc.list_invoices_paged(due_from="2026-06-15")
+    assert [i.number for i in by_due.items] == ["R-2026-003"]
+
+    # Offset-Paging: total bleibt unabhängig vom Fenster; Seiten überlappen nicht.
+    first = await svc.list_invoices_paged(limit=2, offset=0)
+    second = await svc.list_invoices_paged(limit=2, offset=2)
+    assert first.total == 3 and second.total == 3
+    assert len(first.items) == 2 and len(second.items) == 1
+    ids = {i.id for i in first.items} | {i.id for i in second.items}
+    assert len(ids) == 3
+
+    # Kein Treffer ⇒ leer (Zähl-/Zeilen-Query identisch).
+    empty = await svc.list_invoices_paged(q="zzzzzznope")
     assert empty.total == 0 and empty.items == []

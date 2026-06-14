@@ -17,6 +17,7 @@
 input.inv__input { height: var(--control-height); }
 .inv__search { min-width: 14rem; height: 2.25rem; }
 .inv__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
+.inv__sentinel { height: 1px; }
 .inv__tableWrap {
   overflow-x: auto;
   border: var(--border-width) solid var(--color-border);

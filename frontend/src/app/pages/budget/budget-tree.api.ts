@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
 
@@ -207,6 +208,28 @@ export interface InvoiceOption {
   label: string;
 }
 
+/** Filter/Paging der Rechnungsliste (#invoices) — serverseitig fuzzy + gefiltert. */
+export interface InvoiceQuery {
+  q?: string;
+  status?: InvoiceStatus;
+  grossMin?: number;
+  grossMax?: number;
+  issueFrom?: string;
+  issueTo?: string;
+  dueFrom?: string;
+  dueTo?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Offset-Seite von Rechnungen (#invoices). */
+export interface InvoicePage {
+  items: Invoice[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 /** Filter/Paging der Buchungsliste (#25). */
 export interface ExpenseQuery {
   budget?: Uuid;
@@ -410,9 +433,22 @@ export class BudgetTreeApi {
   }
 
   // ------------------------------------------------------------- invoices
-  /** Rechnungen (#invoices), neuestes Rechnungsdatum zuerst. */
+  /** Rechnungen (#invoices), fuzzy-gesucht + gefiltert + offset-paginiert
+   *  (spiegelt {@link listExpenses}). */
+  listInvoicesPaged(query: InvoiceQuery = {}): Observable<InvoicePage> {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== null && value !== '') {
+        params[key] = String(value);
+      }
+    }
+    return this.http.get<InvoicePage>(`${this.base}/invoices`, { params });
+  }
+
+  /** Volle Rechnungsliste (neuestes Rechnungsdatum zuerst) — für das Buchungs-
+   *  Verknüpfungs-Dropdown (#invoices), das alle Rechnungen braucht. */
   listInvoices(): Observable<Invoice[]> {
-    return this.http.get<Invoice[]>(`${this.base}/invoices`);
+    return this.listInvoicesPaged({ limit: 200 }).pipe(map((page) => page.items));
   }
   createInvoice(body: InvoiceCreate): Observable<Invoice> {
     return this.http.post<Invoice>(`${this.base}/invoices`, body);

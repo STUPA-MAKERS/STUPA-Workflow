@@ -177,9 +177,9 @@ class _FakeService:
         self.calls["fy_labels"] = True
         return {_FYID: "2026"}
 
-    async def list_invoices(self) -> list[InvoiceOut]:
-        self.calls["list_invoices"] = True
-        return [_invoice_out()]
+    async def list_invoices_paged(self, **kwargs: Any) -> Page[InvoiceOut]:
+        self.calls["list_invoices_paged"] = kwargs
+        return Page(items=[_invoice_out()], total=1, limit=50, offset=0)
 
     async def create_invoice(self, payload: Any, *, actor: str) -> InvoiceOut:
         self.calls["create_invoice"] = (payload, actor)
@@ -365,10 +365,19 @@ def test_full_accounts_list_still_requires_account_manage(fake: _FakeService) ->
 
 
 def test_invoices_list_readable_by_view(fake: _FakeService) -> None:
-    """#invoices: Rechnungen-Liste für jede Budget-Rolle lesbar."""
-    r = _app_as(fake, {"budget.view"}).get("/api/invoices")
+    """#invoices: Rechnungen-Liste (paged) für jede Budget-Rolle lesbar."""
+    r = _app_as(fake, {"budget.view"}).get(
+        "/api/invoices?q=Acme&status=open&grossMin=10&issueFrom=2026-01-01&limit=20"
+    )
     assert r.status_code == 200
-    assert r.json()[0]["number"] == "R-2026-1"
+    body = r.json()
+    assert body["total"] == 1
+    assert body["items"][0]["number"] == "R-2026-1"
+    # Query-Params landen (alias-aufgelöst) im Service-Aufruf.
+    kwargs = fake.calls["list_invoices_paged"]
+    assert kwargs["q"] == "Acme"
+    assert kwargs["status"] == "open"
+    assert kwargs["limit"] == 20
 
 
 def test_invoice_create_requires_book(fake: _FakeService) -> None:

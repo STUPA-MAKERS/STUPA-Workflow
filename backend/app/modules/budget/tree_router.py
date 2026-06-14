@@ -62,6 +62,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceFileResult,
     InvoiceOut,
     InvoiceParseResult,
+    InvoiceStatus,
     InvoiceUpdate,
     MoveFiscalYearRequest,
     TransferCreate,
@@ -453,13 +454,39 @@ _INVOICE_READ = Depends(require_any_permission("budget.view", "budget.structure"
 
 @router.get(
     "/invoices",
-    response_model=list[InvoiceOut],
+    response_model=Page[InvoiceOut],
     dependencies=[_INVOICE_READ],
     responses=_errors(401, 403),
 )
-async def list_invoices(service: ServiceDep) -> list[InvoiceOut]:
-    """Rechnungen (neueste Rechnungsdatum zuerst)."""
-    return await service.list_invoices()
+async def list_invoices(
+    service: ServiceDep,
+    q: Annotated[str | None, Query()] = None,
+    status: Annotated[InvoiceStatus | None, Query()] = None,
+    gross_min: Annotated[Decimal | None, Query(alias="grossMin", ge=0)] = None,
+    gross_max: Annotated[Decimal | None, Query(alias="grossMax", ge=0)] = None,
+    issue_from: Annotated[str | None, Query(alias="issueFrom")] = None,
+    issue_to: Annotated[str | None, Query(alias="issueTo")] = None,
+    due_from: Annotated[str | None, Query(alias="dueFrom")] = None,
+    due_to: Annotated[str | None, Query(alias="dueTo")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[InvoiceOut]:
+    """Rechnungen fuzzy-gesucht + gefiltert + offset-paginiert (#invoices, neuestes
+    Rechnungsdatum zuerst). ``q`` = Nummer/Lieferant/Notiz-Suche; ``status`` =
+    ``open``/``paid``; ``grossMin``/``grossMax`` = Brutto-Bereich; ``issueFrom``/
+    ``issueTo`` = Rechnungsdatum-Bereich; ``dueFrom``/``dueTo`` = Fälligkeitsdatum."""
+    return await service.list_invoices_paged(
+        q=q,
+        status=status,
+        gross_min=gross_min,
+        gross_max=gross_max,
+        issue_from=issue_from,
+        issue_to=issue_to,
+        due_from=due_from,
+        due_to=due_to,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(

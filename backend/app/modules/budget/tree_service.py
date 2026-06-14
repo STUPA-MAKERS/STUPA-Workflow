@@ -1117,12 +1117,79 @@ class BudgetTreeService:
         )
 
     async def list_invoices(self) -> list[InvoiceOut]:
+        """(Kompat) Alle Rechnungen (neuestes Rechnungsdatum zuerst) — für das
+        Buchungs-Verknüpfungs-Dropdown (#invoices), das die volle Liste braucht."""
+        page = await self.list_invoices_paged(limit=10_000, offset=0)
+        return page.items
+
+    async def list_invoices_paged(
+        self,
+        *,
+        q: str | None = None,
+        status: str | None = None,
+        gross_min: Decimal | None = None,
+        gross_max: Decimal | None = None,
+        issue_from: str | None = None,
+        issue_to: str | None = None,
+        due_from: str | None = None,
+        due_to: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Page[InvoiceOut]:
+        """Rechnungen gefiltert + fuzzy-gesucht + offset-paginiert (#invoices).
+
+        Spiegelt :meth:`list_expenses_paged`: die Such-/Filter-Prädikate hängen an
+        einer GETEILTEN ``filters``-Liste, die identisch in die Zähl- **und** die
+        Zeilen-Query geht (kein ``total``/Treffer-Drift beim Infinite-Scroll). Mit
+        Suchbegriff ``q`` ordnet der Trigram-Rang die Treffer nach Relevanz vor das
+        bisherige »neuestes Rechnungsdatum zuerst«.
+        """
+        filters = []
+        # Fuzzy-Suche (#3/#4): Trigram-Ranking über Nummer/Lieferant/Notiz (GIN-Indizes
+        # aus Migration 0027). Auf Nicht-Postgres greift der ILIKE-Substring-Fallback.
+        rank_expr = None
+        if q and q.strip():
+            where, rank_expr = trigram_rank(
+                q,
+                [Invoice.number, Invoice.supplier, Invoice.note],
+                dialect=dialect_of(self.session),
+            )
+            filters.append(where)
+        if status is not None:
+            filters.append(Invoice.status == status)
+        if gross_min is not None:
+            filters.append(Invoice.gross_amount >= gross_min)
+        if gross_max is not None:
+            filters.append(Invoice.gross_amount <= gross_max)
+        # Nullable Datums-Spalten: eine Rechnung ohne Datum fällt aus jedem gesetzten
+        # Bereich (wie die bisherige Client-Logik ``inDateRange``). ``func.date`` parst
+        # den ISO-String aus dem FE-Datepicker zu einem echten Datum — Postgres würde
+        # sonst ``date >= varchar`` ablehnen; auf SQLite ein No-Op (ISO bleibt ISO).
+        if issue_from:
+            filters.append(Invoice.issue_date >= func.date(issue_from))
+        if issue_to:
+            filters.append(Invoice.issue_date <= func.date(issue_to))
+        if due_from:
+            filters.append(Invoice.due_date >= func.date(due_from))
+        if due_to:
+            filters.append(Invoice.due_date <= func.date(due_to))
+
+        total = await self.session.scalar(
+            select(func.count()).select_from(Invoice).where(*filters)
+        )
+        ordering = Invoice.issue_date.desc().nulls_last()
+        order_by = (rank_expr.desc(), ordering) if rank_expr is not None else (ordering,)
         rows = (
             await self.session.scalars(
-                select(Invoice).order_by(Invoice.issue_date.desc().nulls_last())
+                select(Invoice).where(*filters).order_by(*order_by).limit(limit).offset(offset)
             )
         ).all()
-        return [self._invoice_out(i) for i in rows]
+        return Page(
+            items=[self._invoice_out(i) for i in rows],
+            total=total or 0,
+            limit=limit,
+            offset=offset,
+        )
 
     async def get_invoice(self, invoice_id: UUID) -> InvoiceOut:
         inv = await self.session.get(Invoice, invoice_id)

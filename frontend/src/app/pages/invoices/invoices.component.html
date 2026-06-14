@@ -16,36 +16,35 @@
         type="search"
         [placeholder]="'invoices.search' | t"
         [ngModel]="q()"
-        (ngModelChange)="q.set($event)"
+        (ngModelChange)="onSearch($event)"
         [attr.aria-label]="'invoices.search' | t"
       />
       <!-- Filterleiste im Buchungen-Stil: Status + Brutto-, Rechnungs- und
-           Fälligkeitsdatum-Bereich. Client-seitig über visible(). Popover öffnet
-           rechtsbündig unter dem Button. -->
+           Fälligkeitsdatum-Bereich. Treiben jetzt die Server-Abfrage (#invoices). -->
       <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
         <app-filter-field [label]="'invoices.filter.status' | t">
           <div class="inline-flex gap-2 flex-wrap">
-            <app-button [variant]="statusFilter() === '' ? 'primary' : 'ghost'" size="sm" (click)="statusFilter.set('')">{{ 'invoices.filter.all' | t }}</app-button>
-            <app-button [variant]="statusFilter() === 'open' ? 'primary' : 'ghost'" size="sm" (click)="statusFilter.set('open')">{{ 'invoices.status.open' | t }}</app-button>
-            <app-button [variant]="statusFilter() === 'paid' ? 'primary' : 'ghost'" size="sm" (click)="statusFilter.set('paid')">{{ 'invoices.status.paid' | t }}</app-button>
+            <app-button [variant]="statusFilter() === '' ? 'primary' : 'ghost'" size="sm" (click)="setStatus('')">{{ 'invoices.filter.all' | t }}</app-button>
+            <app-button [variant]="statusFilter() === 'open' ? 'primary' : 'ghost'" size="sm" (click)="setStatus('open')">{{ 'invoices.status.open' | t }}</app-button>
+            <app-button [variant]="statusFilter() === 'paid' ? 'primary' : 'ghost'" size="sm" (click)="setStatus('paid')">{{ 'invoices.status.paid' | t }}</app-button>
           </div>
         </app-filter-field>
         <app-filter-field [label]="'invoices.filter.grossRange' | t">
           <app-filter-range>
-            <app-currency-input start [placeholder]="'invoices.filter.amountMin' | t" [ariaLabel]="'invoices.filter.amountMin' | t" [ngModel]="grossMin()" (ngModelChange)="grossMin.set($event)" />
-            <app-currency-input end [placeholder]="'invoices.filter.amountMax' | t" [ariaLabel]="'invoices.filter.amountMax' | t" [ngModel]="grossMax()" (ngModelChange)="grossMax.set($event)" />
+            <app-currency-input start [placeholder]="'invoices.filter.amountMin' | t" [ariaLabel]="'invoices.filter.amountMin' | t" [ngModel]="grossMin()" (ngModelChange)="onGrossFilter('min', $event)" />
+            <app-currency-input end [placeholder]="'invoices.filter.amountMax' | t" [ariaLabel]="'invoices.filter.amountMax' | t" [ngModel]="grossMax()" (ngModelChange)="onGrossFilter('max', $event)" />
           </app-filter-range>
         </app-filter-field>
         <app-filter-field [label]="'invoices.filter.issueRange' | t">
           <app-filter-range>
-            <app-datepicker start [ariaLabel]="'invoices.filter.issueFrom' | t" [ngModel]="issueFrom()" (ngModelChange)="issueFrom.set($event)" />
-            <app-datepicker end [ariaLabel]="'invoices.filter.issueTo' | t" [ngModel]="issueTo()" (ngModelChange)="issueTo.set($event)" />
+            <app-datepicker start [ariaLabel]="'invoices.filter.issueFrom' | t" [ngModel]="issueFrom()" (ngModelChange)="onDateFilter('issueFrom', $event)" />
+            <app-datepicker end [ariaLabel]="'invoices.filter.issueTo' | t" [ngModel]="issueTo()" (ngModelChange)="onDateFilter('issueTo', $event)" />
           </app-filter-range>
         </app-filter-field>
         <app-filter-field [label]="'invoices.filter.dueRange' | t">
           <app-filter-range>
-            <app-datepicker start [ariaLabel]="'invoices.filter.dueFrom' | t" [ngModel]="dueFrom()" (ngModelChange)="dueFrom.set($event)" />
-            <app-datepicker end [ariaLabel]="'invoices.filter.dueTo' | t" [ngModel]="dueTo()" (ngModelChange)="dueTo.set($event)" />
+            <app-datepicker start [ariaLabel]="'invoices.filter.dueFrom' | t" [ngModel]="dueFrom()" (ngModelChange)="onDateFilter('dueFrom', $event)" />
+            <app-datepicker end [ariaLabel]="'invoices.filter.dueTo' | t" [ngModel]="dueTo()" (ngModelChange)="onDateFilter('dueTo', $event)" />
           </app-filter-range>
         </app-filter-field>
       </app-filter-bar>
@@ -68,7 +67,7 @@
 
   @if (loading()) {
     <p class="inv__status" aria-live="polite">{{ 'invoices.loading' | t }}</p>
-  } @else if (visible().length === 0) {
+  } @else if (items().length === 0) {
     <div class="empty-state">{{ 'invoices.empty' | t }}</div>
   } @else {
     <div class="inv__tableWrap">
@@ -88,7 +87,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (i of visible(); track i.id) {
+          @for (i of items(); track i.id) {
             <tr [attr.title]="i.actor ? ('invoices.bookedBy' | t: { actor: i.actor }) : null">
               <td class="inv__cellDate">{{ i.issueDate ? (i.issueDate | ldate: 'mediumDate') : '—' }}</td>
               <td class="inv__cellDate">{{ i.dueDate ? (i.dueDate | ldate: 'mediumDate') : '—' }}</td>
@@ -120,6 +119,19 @@
         </tbody>
       </table>
     </div>
+    @if (hasMore()) {
+      <div #sentinel class="inv__sentinel" aria-hidden="true"></div>
+      <div class="flex justify-center mt-4">
+        @if (loadingMore()) {
+          <span class="inv__status">{{ 'invoices.loadingMore' | t }}</span>
+        } @else {
+          <app-button variant="secondary" size="sm" (click)="loadMore()">{{ 'invoices.loadMore' | t }}</app-button>
+        }
+      </div>
+    }
+    @if (total() > 0) {
+      <p class="text-center text-muted text-sm mt-3">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</p>
+    }
   }
 
   <!-- Drop-Overlay (#15): erscheint, solange eine Datei über dem Tab schwebt. -->
