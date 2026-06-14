@@ -1,4 +1,4 @@
-<header class="mtg__head">
+<header class="mtg__head" [class.mtg__head--detail]="meeting()">
   <div class="mtg__headRow">
     <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
     @if (!meeting()) {

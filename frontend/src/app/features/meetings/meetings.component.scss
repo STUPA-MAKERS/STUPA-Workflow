@@ -9,6 +9,14 @@
   gap: var(--space-2);
   width: 100%;
 }
+/* Nur in der DETAIL-Ansicht (Sitzung geladen): Titel/Meta auf Body-Breite zentrieren
+   wie die Toolbar (#mtg__toolbar) + Shell-Mittelspalte — sonst sässe nur der Titel
+   links am vollen Rand der wide-Seite. In der LISTEN-Ansicht bleibt der Titel links
+   (sonst wirkt er mittig), daher per Klasse statt global (#8a). */
+.mtg__head--detail {
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
+}
 .mtg__headRow {
   display: flex;
   align-items: center;
