@@ -216,6 +216,12 @@ export class MeetingsComponent implements OnDestroy {
   ]);
   /** Sitzung-anlegen-Dialog offen (#27). */
   readonly createOpen = signal(false);
+  /** Schritt des zweistufigen Anlegen-Dialogs (#6-1): 1 = Gremium/Datum/Zeit,
+   *  2 = Name + Protokollant. Beim (Wieder-)Öffnen/Schließen auf 1 zurückgesetzt. */
+  readonly createStep = signal<1 | 2>(1);
+  /** Zuletzt automatisch vorbelegter Titel (#6-1): nur überschreiben, solange der
+   *  Nutzer den Vorschlag nicht von Hand geändert hat — kein Clobbern. */
+  private lastAutoPrefill = '';
 
   // --- Timeline (#104) — server-seitiges Keyset-Lazy-Loading ----------------
   /** Seitengröße je Nachlade-Schritt (beide Richtungen). */
@@ -327,9 +333,57 @@ export class MeetingsComponent implements OnDestroy {
   openCreate(): void {
     this.newProtokollant.set('');
     this.createMembers.set([]);
+    // Zweistufiger Dialog (#6-1): immer auf Schritt 1 starten + Prefill-Merker leeren.
+    this.createStep.set(1);
+    this.lastAutoPrefill = '';
     // Vorbelegtes Gremium (z. B. aus dem Übersichtsfilter): direkt Mitglieder laden.
     if (this.newGremiumId()) this.loadCreateMembers(this.newGremiumId());
     this.createOpen.set(true);
+  }
+
+  /** Anlegen-Dialog schließen (X/Abbrechen) → Schritt zurücksetzen (#6-1). */
+  closeCreate(): void {
+    this.createOpen.set(false);
+    this.createStep.set(1);
+  }
+
+  /** Schritt-1-Pflichtfelder vollständig (#6-1): Gremium + Datum + Uhrzeit gesetzt. */
+  readonly createStep1Valid = computed(
+    () => !!this.newGremiumId() && !!this.newDate().trim() && !!this.newTime().trim(),
+  );
+
+  /** Langes deutsches Datum (»14. Juni 2026«) für den Namens-Vorschlag (#6-1) —
+   *  spiegelt den `ldate`-Pipe (`dateStyle: 'long'`, locale-abhängig). */
+  private longDate(isoDate: string): string {
+    const date = new Date(isoDate);
+    if (Number.isNaN(date.getTime())) return isoDate;
+    const locale = this.i18n.locale() === 'en' ? 'en-US' : 'de-DE';
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date);
+  }
+
+  /** Von Schritt 1 zu Schritt 2 (#6-1): Namen vorbelegen (»Sitzung des <Gremium>
+   *  am <Datum>«), ohne eine manuelle Eingabe zu überschreiben. */
+  goToCreateStep2(): void {
+    if (!this.createStep1Valid()) return;
+    const committee =
+      this.gremiumOptions().find((o) => o.value === this.newGremiumId())?.label ?? '';
+    const suggestion = this.i18n.translate('meetings.create.namePrefill', {
+      committee,
+      date: this.longDate(this.newDate().trim()),
+    });
+    // Nur vorbelegen, wenn das Feld leer ist ODER noch der vorige Auto-Vorschlag
+    // drinsteht — eine vom Nutzer geänderte Eingabe bleibt unangetastet (#6-1).
+    const current = this.newTitle();
+    if (!current.trim() || current === this.lastAutoPrefill) {
+      this.newTitle.set(suggestion);
+      this.lastAutoPrefill = suggestion;
+    }
+    this.createStep.set(2);
+  }
+
+  /** Zurück zu Schritt 1 (#6-1). */
+  backToCreateStep1(): void {
+    this.createStep.set(1);
   }
 
   /** Gremium im Anlegen-Dialog wechseln → Protokollant-Kandidaten neu laden. */
@@ -666,6 +720,8 @@ export class MeetingsComponent implements OnDestroy {
         this.newProtokollant.set('');
         this.createMembers.set([]);
         this.createOpen.set(false);
+        this.createStep.set(1);
+        this.lastAutoPrefill = '';
         this.toast.success(this.i18n.translate('meetings.toast.created'));
         // Auf die Detail-Route navigieren, damit die Sitzung wiederauffindbar ist (#104).
         void this.router.navigate(['/meetings', m.id]);
@@ -1133,7 +1189,15 @@ export class MeetingsComponent implements OnDestroy {
 
   openVoteDialog(item: AgendaItem): void {
     this.voteItem.set(item);
-    this.voteQuestion.set(item.title ?? '');
+    // Antrags-TOP (#6-2): Beschlussfrage mit dem Antragsnamen vorbelegen — der
+    // TOP-`title` IST bei antragsgebundenen TOPs der Antragstitel (Backend
+    // `agenda_service`). Editierbarer Vorschlag; ein Freitext-TOP behält sein
+    // bisheriges Verhalten (TOP-Titel als Frage).
+    this.voteQuestion.set(
+      item.applicationId
+        ? this.i18n.translate('meetings.vote.questionPrefill', { name: item.title ?? '' })
+        : (item.title ?? ''),
+    );
     this.voteSecret.set(false);
     this.voteMajorityRule.set('simple');
     this.voteEligibleCount.set('');

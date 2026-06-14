@@ -668,71 +668,82 @@
     <p class="mtg__status">{{ 'meetings.empty' | t }}</p>
   }
 
-  <!-- Anlegen (nur Sitzungsleitung) als Dialog (#27/#19) -->
+  <!-- Anlegen (nur Sitzungsleitung) als zweistufiger Dialog (#27/#19/#6-1):
+       Schritt 1 = Gremium/Datum/Zeit, Schritt 2 = Name + Protokollant. -->
   <app-dialog
     [open]="createOpen()"
     [title]="'meetings.create.title' | t"
     [closeLabel]="'action.cancel' | t"
-    (closed)="createOpen.set(false)"
+    (closed)="closeCreate()"
   >
     <form id="mtg-create" class="mtg__createForm" (submit)="create($event)">
-      <label class="text-sm font-medium text-text-muted" [for]="'mtg-new'">{{ 'meetings.create.name' | t }}</label>
-      <input
-        id="mtg-new"
-        class="mtg__input"
-        [placeholder]="'meetings.create.placeholder' | t"
-        [ngModel]="newTitle()"
-        (ngModelChange)="newTitle.set($event)"
-        name="title"
-      />
-      <app-select
-        name="gremium"
-        [label]="'meetings.create.gremium' | t"
-        [placeholder]="'meetings.create.gremiumPlaceholder' | t"
-        [options]="gremiumOptions()"
-        [required]="true"
-        [ngModel]="newGremiumId()"
-        (ngModelChange)="onCreateGremiumChange($event)"
-      />
-      @if (!gremiumOptions().length) {
-        <p class="text-text-muted text-sm self-center">{{ 'meetings.create.noGremien' | t }}</p>
+      @if (createStep() === 1) {
+        <app-select
+          name="gremium"
+          [label]="'meetings.create.gremium' | t"
+          [placeholder]="'meetings.create.gremiumPlaceholder' | t"
+          [options]="gremiumOptions()"
+          [required]="true"
+          [ngModel]="newGremiumId()"
+          (ngModelChange)="onCreateGremiumChange($event)"
+        />
+        @if (!gremiumOptions().length) {
+          <p class="text-text-muted text-sm self-center">{{ 'meetings.create.noGremien' | t }}</p>
+        }
+        <!-- Datum + Uhrzeit sind Pflicht: ohne Termin lässt sich keine Sitzung planen. -->
+        <app-datepicker
+          [label]="'meetings.create.date' | t"
+          [required]="true"
+          [ngModel]="newDate()"
+          (ngModelChange)="newDate.set($event)"
+          name="date"
+        />
+        <!-- 24h erzwungen (#time-input): natives type="time" folgt der Browser-Locale (AM/PM). -->
+        <app-time-input
+          id="mtg-new-time"
+          [label]="'meetings.create.time' | t"
+          [required]="true"
+          [ngModel]="newTime()"
+          (ngModelChange)="newTime.set($event)"
+          name="time"
+        />
+      } @else {
+        <label class="text-sm font-medium text-text-muted" [for]="'mtg-new'">{{ 'meetings.create.name' | t }}</label>
+        <input
+          id="mtg-new"
+          class="mtg__input"
+          [placeholder]="'meetings.create.placeholder' | t"
+          [ngModel]="newTitle()"
+          (ngModelChange)="newTitle.set($event)"
+          name="title"
+        />
+        <!-- Protokollant wählbar beim Anlegen; spätestens vor dem Start Pflicht. -->
+        <app-select
+          name="newProt"
+          [label]="'meetings.protokollant.label' | t"
+          [options]="createProtokollantOptions()"
+          [disabled]="!newGremiumId()"
+          [ngModel]="newProtokollant()"
+          (ngModelChange)="newProtokollant.set($event)"
+        />
       }
-      <!-- Datum + Uhrzeit sind Pflicht: ohne Termin lässt sich keine Sitzung planen. -->
-      <app-datepicker
-        [label]="'meetings.create.date' | t"
-        [required]="true"
-        [ngModel]="newDate()"
-        (ngModelChange)="newDate.set($event)"
-        name="date"
-      />
-      <!-- 24h erzwungen (#time-input): natives type="time" folgt der Browser-Locale (AM/PM). -->
-      <app-time-input
-        id="mtg-new-time"
-        [label]="'meetings.create.time' | t"
-        [required]="true"
-        [ngModel]="newTime()"
-        (ngModelChange)="newTime.set($event)"
-        name="time"
-      />
-      <!-- Protokollant wählbar beim Anlegen; spätestens vor dem Start Pflicht. -->
-      <app-select
-        name="newProt"
-        [label]="'meetings.protokollant.label' | t"
-        [options]="createProtokollantOptions()"
-        [disabled]="!newGremiumId()"
-        [ngModel]="newProtokollant()"
-        (ngModelChange)="newProtokollant.set($event)"
-      />
     </form>
     <div dialog-footer class="mtg__dialogFoot">
-      <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-      <app-button
-        [disabled]="!newTitle().trim() || !newGremiumId() || !newDate().trim() || !newTime().trim()"
-        [loading]="creating()"
-        (click)="create($event)"
-      >
-        {{ 'meetings.create.submit' | t }}
-      </app-button>
+      @if (createStep() === 1) {
+        <app-button variant="ghost" (click)="closeCreate()">{{ 'action.cancel' | t }}</app-button>
+        <app-button [disabled]="!createStep1Valid()" (click)="goToCreateStep2()">
+          {{ 'meetings.create.next' | t }}
+        </app-button>
+      } @else {
+        <app-button variant="ghost" (click)="backToCreateStep1()">{{ 'meetings.create.back' | t }}</app-button>
+        <app-button
+          [disabled]="!newTitle().trim() || !newGremiumId() || !newDate().trim() || !newTime().trim()"
+          [loading]="creating()"
+          (click)="create($event)"
+        >
+          {{ 'meetings.create.submit' | t }}
+        </app-button>
+      }
     </div>
   </app-dialog>
 }
