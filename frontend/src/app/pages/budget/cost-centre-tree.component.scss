@@ -5,6 +5,16 @@
   display: block;
   max-height: 75vh;
   overflow-y: auto;
+  // Oben/unten in den Hintergrund ausblenden (wie die Sitzungs-Timeline, #2).
+  --fade: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-5),
+    #000 calc(100% - var(--space-5)),
+    transparent
+  );
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
 }
 .cct__node {
   display: inline-flex;
