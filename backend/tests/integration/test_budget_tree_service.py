@@ -43,9 +43,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-async def session(
-    migrated: tuple[str, str], engine: Engine
-) -> AsyncIterator[AsyncSession]:
+async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[AsyncSession]:
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:
@@ -70,9 +68,7 @@ async def test_path_composition_and_tree(session: AsyncSession) -> None:
     g = await _gremium(session)
     top_key = f"VS{_suffix()}"
     top = await svc.create_node(BudgetNodeCreate(key=top_key, name="VS-Mittel", gremiumId=g.id))
-    child = await svc.create_node(
-        BudgetNodeCreate(key="800", name="Dezentral", parentId=top.id)
-    )
+    child = await svc.create_node(BudgetNodeCreate(key="800", name="Dezentral", parentId=top.id))
     assert top.path_key == top_key
     assert child.path_key == f"{top_key}-800"
     assert child.gremium_id == g.id  # Kind erbt Gremium
@@ -87,8 +83,11 @@ async def test_fiscal_year_unique_year(session: AsyncSession) -> None:
     g = await _gremium(session)
     top = await svc.create_node(
         BudgetNodeCreate(
-            key=f"HJ{_suffix()}", name="Top", gremiumId=g.id,
-            fiscalStartMonth=7, fiscalStartDay=1,
+            key=f"HJ{_suffix()}",
+            name="Top",
+            gremiumId=g.id,
+            fiscalStartMonth=7,
+            fiscalStartDay=1,
         )
     )
     fy26 = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
@@ -104,9 +103,7 @@ async def test_fiscal_year_unique_year(session: AsyncSession) -> None:
 async def test_top_down_allocation_constraint(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)
-    top = await svc.create_node(
-        BudgetNodeCreate(key=f"AL{_suffix()}", name="Top", gremiumId=g.id)
-    )
+    top = await svc.create_node(BudgetNodeCreate(key=f"AL{_suffix()}", name="Top", gremiumId=g.id))
     c1 = await svc.create_node(BudgetNodeCreate(key="01", name="K1", parentId=top.id))
     c2 = await svc.create_node(BudgetNodeCreate(key="02", name="K2", parentId=top.id))
     fy = await svc.create_fiscal_year(
@@ -128,9 +125,7 @@ async def test_top_down_allocation_constraint(session: AsyncSession) -> None:
 async def test_fully_bound_binds_whole_allocation(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)
-    top = await svc.create_node(
-        BudgetNodeCreate(key=f"FB{_suffix()}", name="Top", gremiumId=g.id)
-    )
+    top = await svc.create_node(BudgetNodeCreate(key=f"FB{_suffix()}", name="Top", gremiumId=g.id))
     c1 = await svc.create_node(BudgetNodeCreate(key="01", name="K1", parentId=top.id))
     fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
     await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("1000")))
@@ -168,9 +163,7 @@ def _fy_view(node, fy_id):  # noqa: ANN001
 async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)
-    top = await svc.create_node(
-        BudgetNodeCreate(key=f"RK{_suffix()}", name="Top", gremiumId=g.id)
-    )
+    top = await svc.create_node(BudgetNodeCreate(key=f"RK{_suffix()}", name="Top", gremiumId=g.id))
     mid = await svc.create_node(BudgetNodeCreate(key="800", name="Mid", parentId=top.id))
     leaf = await svc.create_node(BudgetNodeCreate(key="04", name="Leaf", parentId=mid.id))
     assert leaf.path_key == f"{top.path_key}-800-04"
@@ -190,9 +183,7 @@ async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> 
 async def test_account_and_transfer(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)
-    top = await svc.create_node(
-        BudgetNodeCreate(key=f"TR{_suffix()}", name="Top", gremiumId=g.id)
-    )
+    top = await svc.create_node(BudgetNodeCreate(key=f"TR{_suffix()}", name="Top", gremiumId=g.id))
     a = await svc.create_node(BudgetNodeCreate(key="01", name="A", parentId=top.id))
     b = await svc.create_node(BudgetNodeCreate(key="02", name="B", parentId=top.id))
     fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
@@ -202,8 +193,11 @@ async def test_account_and_transfer(session: AsyncSession) -> None:
     assert acc.name == "Giro"
     booking = await svc.book_expense(
         ExpenseCreate(
-            budgetId=a.id, fiscalYearId=fy.id, amount=Decimal("50"),
-            description="mit Konto", accountId=acc.id,
+            budgetId=a.id,
+            fiscalYearId=fy.id,
+            amount=Decimal("50"),
+            description="mit Konto",
+            accountId=acc.id,
         ),
         actor="tester",
     )
@@ -212,8 +206,11 @@ async def test_account_and_transfer(session: AsyncSession) -> None:
     # Übertrag A → B (200): Ausgabe auf A + Einnahme auf B, gleiches HHJ.
     transfer = await svc.create_transfer(
         TransferCreate(
-            fromBudgetId=a.id, toBudgetId=b.id, fiscalYearId=fy.id,
-            amount=Decimal("200"), description="Umbuchung",
+            fromBudgetId=a.id,
+            toBudgetId=b.id,
+            fiscalYearId=fy.id,
+            amount=Decimal("200"),
+            description="Umbuchung",
         ),
         actor="tester",
     )
@@ -231,9 +228,7 @@ async def test_account_and_transfer(session: AsyncSession) -> None:
 async def test_committed_rollup(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)
-    top = await svc.create_node(
-        BudgetNodeCreate(key=f"RU{_suffix()}", name="Top", gremiumId=g.id)
-    )
+    top = await svc.create_node(BudgetNodeCreate(key=f"RU{_suffix()}", name="Top", gremiumId=g.id))
     mid = await svc.create_node(BudgetNodeCreate(key="800", name="Mid", parentId=top.id))
     leaf = await svc.create_node(BudgetNodeCreate(key="04", name="Leaf", parentId=mid.id))
     fy = await svc.create_fiscal_year(
@@ -249,9 +244,7 @@ async def test_committed_rollup(session: AsyncSession) -> None:
     flv = FlowVersion(application_type_id=app_type.id, version=1)
     session.add_all([fv, flv])
     await session.flush()
-    state = State(
-        flow_version_id=flv.id, key="approved", label_i18n={}, kind="normal"
-    )
+    state = State(flow_version_id=flv.id, key="approved", label_i18n={}, kind="normal")
     session.add(state)
     await session.flush()
     app = Application(
@@ -287,9 +280,45 @@ async def test_committed_rollup(session: AsyncSession) -> None:
 async def test_delete_with_children_conflicts(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)
-    top = await svc.create_node(
-        BudgetNodeCreate(key=f"DL{_suffix()}", name="Top", gremiumId=g.id)
-    )
+    top = await svc.create_node(BudgetNodeCreate(key=f"DL{_suffix()}", name="Top", gremiumId=g.id))
     await svc.create_node(BudgetNodeCreate(key="01", name="K", parentId=top.id))
     with pytest.raises(ConflictError):
         await svc.delete_node(top.id)
+
+
+async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:
+    """Fuzzy-Suche (#3) gegen echtes Postgres: pg_trgm filtert + rankt Buchungen.
+
+    Beweist den echten Trigram-Pfad (nicht den ILIKE-Fallback): ein Tippfehler in
+    der Query findet die ähnlichste Beschreibung, fremde Buchungen fallen raus, und
+    der Treffer steht relevanz-bedingt vorne.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"FZ{_suffix()}", name="Top", gremiumId=g.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    for desc in ("Konferenzgebühr", "Druckerpapier", "Bahnticket Berlin"):
+        await svc.book_expense(
+            ExpenseCreate(
+                budgetId=top.id,
+                fiscalYearId=fy.id,
+                amount=Decimal("10"),
+                description=desc,
+            ),
+            actor="tester",
+        )
+
+    # Tippfehler »Konferenzgebuehr« ⇒ trotzdem Treffer (Trigram-Ähnlichkeit).
+    page = await svc.list_expenses_paged(
+        budget_id=top.id, fiscal_year_id=fy.id, q="Konferenzgebuehr"
+    )
+    assert page.total == 1
+    assert page.items[0].description == "Konferenzgebühr"
+
+    # Eindeutige Teilzeichenkette ⇒ genau eine Buchung; fremde fallen raus.
+    only = await svc.list_expenses_paged(budget_id=top.id, fiscal_year_id=fy.id, q="Druckerpapier")
+    assert [e.description for e in only.items] == ["Druckerpapier"]
+
+    # Kein Treffer ⇒ leer (count/row identisch, kein Infinite-Scroll-Drift).
+    empty = await svc.list_expenses_paged(budget_id=top.id, fiscal_year_id=fy.id, q="zzzzzznope")
+    assert empty.total == 0 and empty.items == []

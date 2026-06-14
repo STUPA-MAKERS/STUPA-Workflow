@@ -30,9 +30,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-async def session(
-    migrated: tuple[str, str], engine: Engine
-) -> AsyncIterator[AsyncSession]:
+async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[AsyncSession]:
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:
@@ -52,9 +50,7 @@ def _fields() -> list[FormFieldDef]:
                 "promoteTarget": "amount",
             }
         ),
-        FormFieldDef.model_validate(
-            {"key": "note", "type": "text", "label": {"de": "Notiz"}}
-        ),
+        FormFieldDef.model_validate({"key": "note", "type": "text", "label": {"de": "Notiz"}}),
     ]
 
 
@@ -82,9 +78,7 @@ async def _seed_type(
         app_type.id, FormVersionCreate(fields=fields or _fields(), activate=True)
     )
 
-    flow = FlowVersion(
-        application_type_id=app_type.id, version=1, active=True, editor_layout={}
-    )
+    flow = FlowVersion(application_type_id=app_type.id, version=1, active=True, editor_layout={})
     session.add(flow)
     await session.flush()
     draft = State(
@@ -138,9 +132,7 @@ async def test_create_separates_pii_and_writes_v1(session: AsyncSession) -> None
     assert applicant.email == "Antrag@example.org"
     assert applicant.name == "Erika"
     # citext: case-insensitiver Treffer trotz gemischter Schreibweise.
-    hit = await session.scalar(
-        select(Applicant).where(Applicant.email == "antrag@EXAMPLE.org")
-    )
+    hit = await session.scalar(select(Applicant).where(Applicant.email == "antrag@EXAMPLE.org"))
     assert hit is not None and hit.id == applicant.id
 
     versions = (
@@ -216,9 +208,7 @@ async def test_patch_locked_state_409(session: AsyncSession) -> None:
     await session.commit()
 
     with pytest.raises(ConflictError):
-        await svc.patch(
-            app.id, {"title": "X", "cost": "1.00", "note": "g"}, changed_by="applicant"
-        )
+        await svc.patch(app.id, {"title": "X", "cost": "1.00", "note": "g"}, changed_by="applicant")
 
 
 # --------------------------------------------------------------------------- #
@@ -255,11 +245,17 @@ async def test_comment_visibility(session: AsyncSession) -> None:
     app, _ = await svc.create(_create_payload(app_type.id))
 
     await svc.add_comment(
-        app.id, author="admin", author_kind="principal", body="intern",
+        app.id,
+        author="admin",
+        author_kind="principal",
+        body="intern",
         visibility="internal",
     )
     await svc.add_comment(
-        app.id, author=None, author_kind="applicant", body="öffentlich",
+        app.id,
+        author=None,
+        author_kind="applicant",
+        body="öffentlich",
         visibility="public",
     )
 
@@ -340,3 +336,76 @@ async def test_patch_has_budget_context_from_type(session: AsyncSession) -> None
         await svc.patch(app.id, {"title": "T2"}, changed_by="applicant")
     assert ei.value.errors is not None
     assert any(e.field == "reason" for e in ei.value.errors)
+
+
+# --------------------------------------------------------------------------- #
+# fuzzy search (#3/#4) — echtes Postgres / pg_trgm
+# --------------------------------------------------------------------------- #
+async def _seed_type_for_search(session: AsyncSession) -> ApplicationType:
+    """Wie :func:`_seed_type`, aber ohne das (entfernte) ``FlowVersion``-Type-Feld.
+
+    ``_seed_type`` übergibt ``FlowVersion(application_type_id=…)`` — diese Spalte gibt
+    es seit Migration 0019 nicht mehr (Type-Flows entfernt); der Helfer ist auf main
+    bereits gebrochen. Hier ein minimaler, korrekter Seed für die Suche.
+    """
+    gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
+    session.add(gremium)
+    await session.flush()
+    app_type = ApplicationType(
+        gremium_id=gremium.id, key=f"t-{uuid.uuid4()}", name_i18n={}, has_budget=False
+    )
+    session.add(app_type)
+    await session.commit()
+    forms = FormsService(session)
+    await forms.create_form_version(app_type.id, FormVersionCreate(fields=_fields(), activate=True))
+    flow = FlowVersion(version=1, active=True, editor_layout={})
+    session.add(flow)
+    await session.flush()
+    draft = State(
+        flow_version_id=flow.id,
+        key="draft",
+        label_i18n={"de": "Entwurf"},
+        edit_allowed=True,
+        is_initial=True,
+    )
+    session.add(draft)
+    app_type.active_flow_version_id = flow.id
+    await session.commit()
+    return app_type
+
+
+async def test_list_fuzzy_search_meaningful_text(session: AsyncSession) -> None:
+    """Fuzzy-Suche auf SINNVOLLEM Text (Titel + Text-Antworten), nicht ids/Zahlen.
+
+    Beweist gegen echtes Postgres: ``app_search_text(data)`` + Trigram findet den
+    Antrag per Tippfehler im Titel UND per Text-Antwortwert (``note``), während ein
+    reiner Zahlenwert (``cost``) NICHT trifft (kein Text-Match auf Beträgen).
+    """
+    app_type = await _seed_type_for_search(session)
+    svc = ApplicationsService(session)
+    for title, note, cost in (
+        ("Solaranlage Dach", "Photovoltaik für die Mensa", "1234.00"),
+        ("Bücherregal", "Holz aus dem Baumarkt", "200.00"),
+    ):
+        payload = ApplicationCreate.model_validate(
+            {
+                "typeId": str(app_type.id),
+                "data": {"title": title, "cost": cost, "note": note},
+                "applicantEmail": "x@example.org",
+            }
+        )
+        # actor != "applicant" ⇒ sofort ``email_confirmed_at`` (sichtbar in der Liste).
+        await svc.create(payload, actor="admin")
+
+    # Tippfehler im Titel »Solaranlge« ⇒ Trigram-Treffer.
+    by_title = await svc.list_applications(q="Solaranlge", limit=50, offset=0)
+    assert by_title.total == 1
+    assert by_title.items[0].title == "Solaranlage Dach"
+
+    # Treffer über den Text-Antwortwert (``note``), nicht nur den Titel.
+    by_note = await svc.list_applications(q="Photovoltaik", limit=50, offset=0)
+    assert {i.title for i in by_note.items} == {"Solaranlage Dach"}
+
+    # Der reine Betrag (``cost`` = 1234.00) ist KEIN Text-Antwortwert ⇒ kein Treffer.
+    by_amount = await svc.list_applications(q="1234", limit=50, offset=0)
+    assert by_amount.total == 0

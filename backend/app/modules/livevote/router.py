@@ -154,9 +154,7 @@ WsPrincipalDep = Annotated[Principal | None, Depends(get_ws_principal)]
 # --------------------------------------------------------------------------- #
 # REST
 # --------------------------------------------------------------------------- #
-@router.post(
-    "/meetings", response_model=MeetingOut, responses=_errors(400, 401, 403, 422)
-)
+@router.post("/meetings", response_model=MeetingOut, responses=_errors(400, 401, 403, 422))
 async def create_meeting(
     payload: MeetingCreate,
     service: ServiceDep,
@@ -206,9 +204,7 @@ async def list_meetings(
     return await service.list(principal, gremium_id)
 
 
-@router.get(
-    "/meetings/timeline", response_model=MeetingPage, responses=_errors(400, 401, 403)
-)
+@router.get("/meetings/timeline", response_model=MeetingPage, responses=_errors(400, 401, 403))
 async def list_meetings_timeline(
     service: ServiceDep,
     principal: ReaderDep,
@@ -216,36 +212,36 @@ async def list_meetings_timeline(
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
+    q: Annotated[str | None, Query()] = None,
 ) -> MeetingPage:
     """Keyset-paginierte Sitzungs-Timeline um *jetzt* herum (#104).
 
     ``upcoming`` liefert anstehende Sitzungen chronologisch vorwärts, ``past`` die
     vergangenen rückwärts (für Infinite-Scroll nach oben). ``cursor`` stammt aus
-    ``nextCursor`` der vorigen Seite; ``None`` ⇒ Beginn ab *jetzt*."""
+    ``nextCursor`` der vorigen Seite; ``None`` ⇒ Beginn ab *jetzt*.
+
+    Mit ``q`` kollabiert die Timeline in eine **einzige** relevanz-sortierte Liste
+    (Fuzzy-Suche, #search): ``direction`` ist dann bedeutungslos, ``cursor`` trägt
+    einen Offset, ``nextCursor === null`` ⇒ Ende der Trefferliste."""
     return await service.list_timeline(
         principal,
         direction=direction,
         cursor=cursor,
         limit=limit,
         gremium_id=gremium_id,
+        q=q,
     )
 
 
-@router.get(
-    "/meetings/{meeting_id}", response_model=MeetingOut, responses=_errors(401, 403, 404)
-)
-async def get_meeting(
-    meeting_id: UUID, service: ServiceDep, principal: ReaderDep
-) -> MeetingOut:
+@router.get("/meetings/{meeting_id}", response_model=MeetingOut, responses=_errors(401, 403, 404))
+async def get_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDep) -> MeetingOut:
     """Sitzungs-State."""
     await service.assert_can_read(meeting_id, principal)
     return await service.get(meeting_id, principal)
 
 
 @router.delete("/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404))
-async def delete_meeting(
-    meeting_id: UUID, service: ServiceDep, principal: ReaderDep
-) -> None:
+async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDep) -> None:
     """Sitzung löschen — nur Sitzungsverwalter (``session.manage``)/Admin."""
     await service.delete(meeting_id, principal)
 
@@ -273,9 +269,7 @@ async def patch_meeting(
         # Zyklus. Dieselbe Session wie der Service (eine Transaktion/ein Commit).
         from app.modules.protocol.service import ProtocolService
 
-        await ProtocolService(service.session).get_or_create(
-            meeting_id, author=principal.sub
-        )
+        await ProtocolService(service.session).get_or_create(meeting_id, author=principal.sub)
         # Frisch lesen, damit die Antwort die neue ``protocolId`` trägt (das FE lädt
         # das Protokoll direkt nach dem Start darüber nach).
         return await service.get(meeting_id, principal)
@@ -380,9 +374,7 @@ async def open_meeting_vote(
     # Abstimmungen erst ab Start: vor »live« gibt es kein Protokoll, in dem das
     # Ergebnis festgehalten würde.
     if meeting.status != "live":
-        raise ConflictError(
-            "the meeting has not started — start it before opening a vote"
-        )
+        raise ConflictError("the meeting has not started — start it before opening a vote")
     item = await agenda.item(meeting_id, payload.agenda_item_id)
     if item.application_id is not None:
         if await service.agenda_item_has_vote(item.id):
@@ -541,12 +533,8 @@ async def set_agenda_body(
     # Protokollieren (TOP-Text) erst ab Start. Reine Titel-Umbenennung (Freitext-TOP)
     # gehört zur Planung und bleibt vor »live« erlaubt.
     if payload.body is not None and meeting.status != "live":
-        raise ConflictError(
-            "the meeting has not started — start it before taking minutes"
-        )
-    items = await agenda.set_body(
-        meeting_id, item_id, body=payload.body, title=payload.title
-    )
+        raise ConflictError("the meeting has not started — start it before taking minutes")
+    items = await agenda.set_body(meeting_id, item_id, body=payload.body, title=payload.title)
     # Live-Follower über den geänderten TOP-Text informieren (#live-refresh).
     await service.broadcast_state(meeting_id, principal)
     return items
@@ -628,9 +616,7 @@ async def meeting_socket(
     locker: LockerWsDep,
 ) -> None:
     """Voter-Kanal: Live-State, ``cast`` (Lock + unique), ``subscribe`` (Reconnect)."""
-    await _serve(
-        websocket, meeting_id, principal, meetings, voting, broker, locker, beamer=False
-    )
+    await _serve(websocket, meeting_id, principal, meetings, voting, broker, locker, beamer=False)
 
 
 @router.websocket("/ws/meetings/{meeting_id}/beamer")
@@ -644,6 +630,4 @@ async def beamer_socket(
     locker: LockerWsDep,
 ) -> None:
     """Read-only Beamer-Stream: nur ``meeting_state|vote_opened|vote_tally|vote_closed``."""
-    await _serve(
-        websocket, meeting_id, principal, meetings, voting, broker, locker, beamer=True
-    )
+    await _serve(websocket, meeting_id, principal, meetings, voting, broker, locker, beamer=True)

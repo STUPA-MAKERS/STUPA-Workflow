@@ -87,9 +87,7 @@ async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
     p = PrincipalRow(sub=f"s-{uuid.uuid4()}", display_name="Max P", email="m@x.de")
     session.add(p)
     await session.flush()
-    role = GremiumRole(
-        gremium_id=gremium.id, key=f"r-{uuid.uuid4()}", name_i18n={"de": "M"}
-    )
+    role = GremiumRole(gremium_id=gremium.id, key=f"r-{uuid.uuid4()}", name_i18n={"de": "M"})
     session.add(role)
     await session.flush()
     session.add(
@@ -147,12 +145,11 @@ async def test_list_timeline_keyset_pagination(session: AsyncSession) -> None:
     gremium, _ = await _gremium_and_application(session)
     svc = MeetingService(session)
     principal = Principal(sub="adm", roles=["admin"])
+
     # Direkt-Insert: ``MeetingCreate`` verlangt jetzt einen Termin (Datum+Uhrzeit),
     # der Timeline-Test braucht aber auch eine UNDATIERTE Sitzung (Sortier-Ende).
     async def mk(title: str, day: _date | None = None) -> None:
-        session.add(
-            Meeting(gremium_id=gremium.id, title=title, date=day, status="planned")
-        )
+        session.add(Meeting(gremium_id=gremium.id, title=title, date=day, status="planned"))
         await session.commit()
 
     # Heute ist 2026 ⇒ 2020/2021 vergangen, 2030/2031 zukünftig, undatiert = Zukunftsende.
@@ -361,9 +358,7 @@ async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) 
     free = MeetingAgendaItem(
         meeting_id=meeting.id, application_id=None, title="Freitext", position=0
     )
-    backed = MeetingAgendaItem(
-        meeting_id=meeting.id, application_id=application.id, position=1
-    )
+    backed = MeetingAgendaItem(meeting_id=meeting.id, application_id=application.id, position=1)
     session.add_all([free, backed])
     await session.commit()
 
@@ -385,3 +380,45 @@ async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) 
     by_id = {i.id: i for i in items}
     assert by_id[free.id].title == "Wieder anders"
     assert by_id[free.id].body == "hello"
+
+
+async def test_list_timeline_fuzzy_search(session: AsyncSession) -> None:
+    """Fuzzy-Suche (#4) gegen echtes Postgres: pg_trgm kollabiert die Timeline.
+
+    Bei aktiver Query verschmelzen Past/Upcoming zu EINER relevanz-sortierten Liste
+    (Offset-Paging). Beweist den echten Trigram-Pfad: Tippfehler trifft, fremde
+    Sitzungen + andere Gremien fallen aus dem Scope, Treffer steht vorne.
+    """
+    gremium = Gremium(name="Studierendenparlament", slug=f"g-{uuid.uuid4()}")
+    session.add(gremium)
+    await session.commit()
+    svc = MeetingService(session)
+    principal = Principal(sub="adm", roles=["admin"])  # Admin ⇒ sieht alle Gremien.
+    for title, day in (
+        ("Haushaltssitzung", _date(2026, 6, 20)),
+        ("Wahlausschuss", _date(2026, 1, 10)),
+        ("Klausurtagung", _date(2026, 9, 5)),
+    ):
+        await svc.create(
+            MeetingCreate(gremiumId=gremium.id, title=title, date=day, startTime=_time(18, 0)),
+            principal,
+        )
+
+    # Tippfehler »Haushaltsitzung« (ein s) ⇒ Trigram-Treffer; einzige Liste.
+    page = await svc.list_timeline(principal, direction="upcoming", q="Haushaltsitzung", limit=20)
+    assert page.next_cursor is None
+    assert [m.title for m in page.items] == ["Haushaltssitzung"]
+
+    # Treffer über den Gremium-Namen (joint mit): findet ALLE drei Sitzungen.
+    by_gremium = await svc.list_timeline(
+        principal, direction="upcoming", q="Studierendenparlament", limit=20
+    )
+    assert {m.title for m in by_gremium.items} == {
+        "Haushaltssitzung",
+        "Wahlausschuss",
+        "Klausurtagung",
+    }
+
+    # Kein Treffer ⇒ leer.
+    empty = await svc.list_timeline(principal, direction="upcoming", q="zzzzznope", limit=20)
+    assert empty.items == [] and empty.next_cursor is None

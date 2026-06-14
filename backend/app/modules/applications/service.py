@@ -55,6 +55,7 @@ from app.modules.forms.validation import (
     extract_promoted,
     validate_answers,
 )
+from app.search import dialect_of, trigram_rank
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
@@ -90,9 +91,7 @@ def _title_of(data: dict[str, Any] | None) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
-def _state_out(
-    state: State | None, color_override: str | None = None
-) -> StateOut | None:
+def _state_out(state: State | None, color_override: str | None = None) -> StateOut | None:
     if state is None:
         return None
     return StateOut(
@@ -166,9 +165,7 @@ class ApplicationsService:
                 .where(FlowVersion.active.is_(True))
             )
         ).all()
-        color_map: dict[str, str | None] = {
-            key: color for key, color in rows if color is not None
-        }
+        color_map: dict[str, str | None] = {key: color for key, color in rows if color is not None}
         self._state_color_map: dict[str, str | None] = color_map
         return color_map
 
@@ -265,9 +262,7 @@ class ApplicationsService:
 
         # Effektive Form (Typ + ggf. Topf-Felder); validiert Topf-Scoping (404).
         forms = FormsService(self.session)
-        effective = await forms.get_effective_form(
-            payload.type_id, payload.budget_pot_id
-        )
+        effective = await forms.get_effective_form(payload.type_id, payload.budget_pot_id)
         fields = [f for section in effective.sections for f in section.fields]
 
         context = {"has_budget": app_type.has_budget}
@@ -344,15 +339,11 @@ class ApplicationsService:
         Typ-Flows sind entfernt — es gibt nur den einen globalen Flow; fehlt er
         (frische Installation ohne Flow-Konfiguration) → 404."""
         global_flow_id = (
-            await self.session.execute(
-                select(FlowVersion.id).where(FlowVersion.active.is_(True))
-            )
+            await self.session.execute(select(FlowVersion.id).where(FlowVersion.active.is_(True)))
         ).scalar_one_or_none()
         if global_flow_id is not None:
             return global_flow_id
-        raise NotFoundError(
-            f"no active global flow for application type {app_type.id}"
-        )
+        raise NotFoundError(f"no active global flow for application type {app_type.id}")
 
     async def _initial_state(self, flow_version_id: UUID) -> State:
         state = (
@@ -564,8 +555,21 @@ class ApplicationsService:
                     )
                 )
                 filters.append(Application.budget_id.in_(descendants))
-        if q:
-            filters.append(cast(Application.data, Text).ilike(f"%{q}%"))
+        # Fuzzy-Suche (#3/#4) auf SINNVOLLEM Text: Titel + Text-Antwortwerte des
+        # ``data``-JSONB — keine ids/Enums/Zahlen. Postgres nutzt die IMMUTABLE
+        # ``app_search_text(data)``-Funktion (= Indexausdruck aus Migration 0027,
+        # zieht alle String-Skalare). Der SQLite-Fallback (Unit-Stubs) hat die
+        # Funktion nicht → dort der ganze ``data``-Blob als Text (nur Substring-ILIKE).
+        rank_expr: ColumnElement[Any] | None = None
+        if q and q.strip():
+            dialect = dialect_of(self.session)
+            search_col = (
+                func.app_search_text(Application.data)
+                if dialect == "postgresql"
+                else cast(Application.data, Text)
+            )
+            where, rank_expr = trigram_rank(q, [search_col], dialect=dialect)
+            filters.append(where)
         if amount_min is not None:
             filters.append(Application.amount >= amount_min)
         if amount_max is not None:
@@ -579,17 +583,16 @@ class ApplicationsService:
 
         sort_col = Application.amount if sort == "amount" else Application.created_at
         ordering = (sort_col.asc() if order == "asc" else sort_col.desc()).nulls_last()
+        # Suche aktiv ⇒ relevanteste zuerst (Rang), dann die gewählte Sortierung als
+        # deterministischer Tiebreak; ohne Suche unverändert.
+        order_by = (rank_expr.desc(), ordering) if rank_expr is not None else (ordering,)
 
         total = await self.session.scalar(
             select(func.count()).select_from(Application).where(*filters)
         )
         rows = (
             await self.session.scalars(
-                select(Application)
-                .where(*filters)
-                .order_by(ordering)
-                .limit(limit)
-                .offset(offset)
+                select(Application).where(*filters).order_by(*order_by).limit(limit).offset(offset)
             )
         ).all()
         items: list[ApplicationListItem] = []
@@ -611,22 +614,16 @@ class ApplicationsService:
             )
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
 
-    async def name_maps(
-        self, locale: str = "de"
-    ) -> tuple[dict[UUID, str], dict[UUID, str]]:
+    async def name_maps(self, locale: str = "de") -> tuple[dict[UUID, str], dict[UUID, str]]:
         """``(type_names, gremium_names)`` für den Antrags-Export (xlsx)."""
         type_rows = (
-            await self.session.execute(
-                select(ApplicationType.id, ApplicationType.name_i18n)
-            )
+            await self.session.execute(select(ApplicationType.id, ApplicationType.name_i18n))
         ).all()
         type_names = {
             tid: (n or {}).get(locale) or (n or {}).get("de") or (n or {}).get("en") or ""
             for tid, n in type_rows
         }
-        gremium_rows = (
-            await self.session.execute(select(Gremium.id, Gremium.name))
-        ).all()
+        gremium_rows = (await self.session.execute(select(Gremium.id, Gremium.name))).all()
         gremium_names = {gid: name for gid, name in gremium_rows}
         return type_names, gremium_names
 
@@ -680,9 +677,7 @@ class ApplicationsService:
             return []
         states = (
             await self.session.scalars(
-                select(State).where(
-                    State.id.in_({a.current_state_id for a in apps})
-                )
+                select(State).where(State.id.in_({a.current_state_id for a in apps}))
             )
         ).all()
         by_id = {s.id: s for s in states}
@@ -713,8 +708,7 @@ class ApplicationsService:
                 # die eigene Antragstellung (#24) — ein **terminaler** State (z. B.
                 # »abgelehnt«, keine Ausgänge) ist damit **keine** Aufgabe.
                 ok = any(
-                    t.requires_action
-                    for t in await flow.available_transitions(app.id, principal)
+                    t.requires_action for t in await flow.available_transitions(app.id, principal)
                 )
             if ok:
                 items.append(
@@ -743,9 +737,9 @@ class ApplicationsService:
             return {}
         rows = (
             await self.session.execute(
-                select(
-                    PrincipalRow.sub, PrincipalRow.display_name, PrincipalRow.email
-                ).where(PrincipalRow.sub.in_(wanted))
+                select(PrincipalRow.sub, PrincipalRow.display_name, PrincipalRow.email).where(
+                    PrincipalRow.sub.in_(wanted)
+                )
             )
         ).all()
         return {sub: (dn or em or sub) for sub, dn, em in rows}

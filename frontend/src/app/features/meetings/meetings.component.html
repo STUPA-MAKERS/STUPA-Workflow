@@ -3,6 +3,19 @@
     <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
     @if (!meeting()) {
       <div class="mtg__headActions">
+        <!-- Header-Live-Suche (#3/#4): debounced; kollabiert die Timeline in eine
+             einzige relevanz-sortierte Liste. -->
+        @if (showOverview()) {
+          <input
+            class="mtg__headSearch"
+            type="search"
+            [placeholder]="'meetings.list.searchPlaceholder' | t"
+            [attr.aria-label]="'meetings.list.searchPlaceholder' | t"
+            [ngModel]="searchQuery()"
+            (ngModelChange)="onSearch($event)"
+            name="meetingSearch"
+          />
+        }
         <!-- Gremium-Filter ohne Label, in einer Zeile + gleicher Höhe wie der Button. -->
         @if (showOverview() && filterGremiumOptions().length > 2) {
           <app-select
@@ -596,25 +609,39 @@
         <!-- Timeline (#104): Vergangenes oben (serverseitig lazy beim Hochscrollen),
              Anstehendes unten (lazy beim Runterscrollen). -->
         <div class="mtg__timeline" #tlScroll (scroll)="onTimelineScroll(tlScroll)">
-          @if (hasMorePast()) {
-            <button type="button" class="mtg__tlMore" [disabled]="loadingPast()" (click)="loadMorePast(tlScroll)">
-              <app-icon name="chevron-up" />
-              {{ (loadingPast() ? 'meetings.list.loading' : 'meetings.list.loadPast') | t }}
-            </button>
-          }
-          @for (m of pastItems(); track m.id) {
-            <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: true }" />
-          }
-          <div class="mtg__tlNow" #nowMarker>
-            <span class="mtg__tlNowLabel">{{ 'meetings.list.now' | t }}</span>
-          </div>
-          @for (m of upcomingItems(); track m.id) {
-            <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
-          } @empty {
-            <p class="mtg__tlNoUp text-text-muted">{{ 'meetings.list.noUpcoming' | t }}</p>
-          }
-          @if (loadingUpcoming()) {
-            <p class="mtg__tlNoUp text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
+          @if (searchActive()) {
+            <!-- Such-Modus (#3/#4): EINE relevanz-sortierte Liste, kein Past/Upcoming-
+                 Split, kein Jetzt-Marker. Offset-Paging beim Runterscrollen. -->
+            @for (m of searchItems(); track m.id) {
+              <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
+            }
+            @if (searchEmpty()) {
+              <p class="mtg__tlNoUp text-text-muted">{{ 'meetings.list.searchEmpty' | t }}</p>
+            }
+            @if (loadingSearch()) {
+              <p class="mtg__tlNoUp text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
+            }
+          } @else {
+            @if (hasMorePast()) {
+              <button type="button" class="mtg__tlMore" [disabled]="loadingPast()" (click)="loadMorePast(tlScroll)">
+                <app-icon name="chevron-up" />
+                {{ (loadingPast() ? 'meetings.list.loading' : 'meetings.list.loadPast') | t }}
+              </button>
+            }
+            @for (m of pastItems(); track m.id) {
+              <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: true }" />
+            }
+            <div class="mtg__tlNow" #nowMarker>
+              <span class="mtg__tlNowLabel">{{ 'meetings.list.now' | t }}</span>
+            </div>
+            @for (m of upcomingItems(); track m.id) {
+              <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
+            } @empty {
+              <p class="mtg__tlNoUp text-text-muted">{{ 'meetings.list.noUpcoming' | t }}</p>
+            }
+            @if (loadingUpcoming()) {
+              <p class="mtg__tlNoUp text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
+            }
           }
         </div>
 

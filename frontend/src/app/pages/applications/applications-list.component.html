@@ -6,6 +6,16 @@
     </div>
     <!-- Filter in einem Popout (#20): Button mit Icon + Aktiv-Indikator. -->
     <div class="apps__headActions">
+      <!-- Header-Live-Suche (#3): debounced, schreibt den ``q``-Query-Param. -->
+      <input
+        class="apps__search"
+        type="search"
+        [placeholder]="'applications.list.search.placeholder' | t"
+        [attr.aria-label]="'applications.list.search.placeholder' | t"
+        [ngModel]="q()"
+        (ngModelChange)="onSearch($event)"
+        name="qHeader"
+      />
       @if (canExport()) {
         <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
           <span class="inline-flex items-center gap-2">

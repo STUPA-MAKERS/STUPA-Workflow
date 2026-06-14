@@ -56,6 +56,7 @@ from app.modules.livevote.schemas import (
 from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed, VoteOut
+from app.search import dialect_of, trigram_rank
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
     BadRequestError,
@@ -100,6 +101,28 @@ def _decode_cursor(cursor: str | None) -> tuple[_datetime, UUID] | None:
         raw = base64.urlsafe_b64decode(cursor.encode()).decode()
         ts_str, id_str = raw.split("|", 1)
         return _datetime.fromisoformat(ts_str), UUID(id_str)
+    except (ValueError, TypeError) as exc:
+        raise BadRequestError("invalid pagination cursor") from exc
+
+
+def _encode_offset(offset: int) -> str:
+    """Opaker Offset-Cursor für die Such-Timeline (Relevanz ⇒ kein Keyset)."""
+    return base64.urlsafe_b64encode(f"o|{offset}".encode()).decode()
+
+
+def _decode_offset(cursor: str | None) -> int:
+    """Offset-Cursor → int (``0`` bei leerem Cursor, 400 bei Murks)."""
+    if not cursor:
+        return 0
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode()).decode()
+        tag, num = raw.split("|", 1)
+        if tag != "o":
+            raise ValueError("not an offset cursor")
+        offset = int(num)
+        if offset < 0:
+            raise ValueError("negative offset")
+        return offset
     except (ValueError, TypeError) as exc:
         raise BadRequestError("invalid pagination cursor") from exc
 
@@ -159,9 +182,7 @@ class BrokerPublisher:
 class MeetingService:
     """An eine ``AsyncSession`` (+ optionalen Publisher) gebundener Sitzungs-Service."""
 
-    def __init__(
-        self, session: AsyncSession, publisher: BrokerPublisher | None = None
-    ) -> None:
+    def __init__(self, session: AsyncSession, publisher: BrokerPublisher | None = None) -> None:
         self.session = session
         self.publisher = publisher
 
@@ -209,12 +230,14 @@ class MeetingService:
         if not meeting_ids:
             return {}
         rows = (
-            await self.session.execute(
-                select(Vote)
-                .where(Vote.meeting_id.in_(meeting_ids))
-                .order_by(Vote.created_at)
+            (
+                await self.session.execute(
+                    select(Vote).where(Vote.meeting_id.in_(meeting_ids)).order_by(Vote.created_at)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         # Stimmenstand (counts/leading) + Ablehnungs-Grund je Vote aus den Ballots
         # rekonstruieren (Reload-Pfad; der Live-WS-Pfad trägt sie schon mit). Gebündelt
         # geladen (kein N+1).
@@ -263,9 +286,7 @@ class MeetingService:
             return {}
         rows = (
             await self.session.execute(
-                select(
-                    MeetingAttendance.meeting_id, func.count()
-                )
+                select(MeetingAttendance.meeting_id, func.count())
                 .where(
                     MeetingAttendance.meeting_id.in_(meeting_ids),
                     MeetingAttendance.status == "present",
@@ -316,11 +337,7 @@ class MeetingService:
         ] = {}
         for v in votes:
             config = VoteConfig.model_validate(v.config)
-            choices = (
-                secret_by_vote.get(v.id, [])
-                if config.secret
-                else open_by_vote.get(v.id, [])
-            )
+            choices = secret_by_vote.get(v.id, []) if config.secret else open_by_vote.get(v.id, [])
             counts = tally_mod.tally(config.options, choices)
             outcome = tally_mod.result(config, counts, v.eligible_count or 0)
             reason: Literal["quorum", "majority"] | None = None
@@ -333,9 +350,7 @@ class MeetingService:
     async def _principal_id(self, sub: str) -> UUID | None:
         """``principal.id`` zur OIDC-``sub`` (für den Protokollant-Vergleich)."""
         return (
-            await self.session.execute(
-                select(PrincipalRow.id).where(PrincipalRow.sub == sub)
-            )
+            await self.session.execute(select(PrincipalRow.id).where(PrincipalRow.sub == sub))
         ).scalar_one_or_none()
 
     @staticmethod
@@ -395,9 +410,7 @@ class MeetingService:
             self.session, principal.sub, "vote.cast"
         ):
             return True
-        return meeting.id in await self._delegated_meeting_ids(
-            principal.sub, voting_only=True
-        )
+        return meeting.id in await self._delegated_meeting_ids(principal.sub, voting_only=True)
 
     async def is_member(self, gremium_id: UUID, principal: Principal) -> bool:
         """Aktuelles Mitglied des Gremiums (beliebige Rolle) — darf live mitlesen."""
@@ -421,9 +434,7 @@ class MeetingService:
             return True
         return meeting_id in await self._delegated_meeting_ids(principal.sub)
 
-    async def _delegated_meeting_ids(
-        self, sub: str, *, voting_only: bool = False
-    ) -> set[UUID]:
+    async def _delegated_meeting_ids(self, sub: str, *, voting_only: bool = False) -> set[UUID]:
         """Sitzungen, für die ``sub`` eine (Stimm-)Delegation **empfängt**."""
         pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
         stmt = select(MeetingDelegation.meeting_id).where(
@@ -487,9 +498,7 @@ class MeetingService:
     async def _protocol_id(self, meeting_id: UUID) -> UUID | None:
         """``protocol.id`` der Sitzung (UNIQUE ``meeting_id``) oder ``None``."""
         return (
-            await self.session.execute(
-                select(Protocol.id).where(Protocol.meeting_id == meeting_id)
-            )
+            await self.session.execute(select(Protocol.id).where(Protocol.meeting_id == meeting_id))
         ).scalar_one_or_none()
 
     async def _emit(
@@ -524,9 +533,7 @@ class MeetingService:
             votes=votes,
         )
 
-    async def get(
-        self, meeting_id: UUID, principal: Principal | None = None
-    ) -> MeetingOut:
+    async def get(self, meeting_id: UUID, principal: Principal | None = None) -> MeetingOut:
         """Sitzungs-State (404, falls unbekannt).
 
         ``principal`` optional: der WS-Pfad (Reconnect-State) braucht die Flags nicht
@@ -541,9 +548,7 @@ class MeetingService:
             votes=votes,
         )
 
-    async def list(
-        self, principal: Principal, gremium_id: UUID | None = None
-    ) -> list[MeetingOut]:
+    async def list(self, principal: Principal, gremium_id: UUID | None = None) -> list[MeetingOut]:
         """Sitzungen (neueste zuerst), optional auf ein Gremium gefiltert.
 
         Erlaubt das **Wiederfinden** angelegter Sitzungen (#104): ohne Liste war eine
@@ -556,9 +561,7 @@ class MeetingService:
         if visible is not None:
             # Delegations-Empfänger sehen »ihre« Sitzungen auch ohne Mitgliedschaft.
             delegated = await self._delegated_meeting_ids(principal.sub)
-            stmt = stmt.where(
-                or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated))
-            )
+            stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
         meetings = list((await self.session.execute(stmt)).scalars().all())
         return await self._decorate(meetings, principal)
 
@@ -570,6 +573,7 @@ class MeetingService:
         cursor: str | None = None,
         limit: int = 20,
         gremium_id: UUID | None = None,
+        q: str | None = None,
     ) -> MeetingPage:
         """Keyset-paginierte Sitzungs-Timeline um *jetzt* herum (#104).
 
@@ -577,7 +581,16 @@ class MeetingService:
         (frühestes zuerst, undatierte Sitzungen am Ende), ``past`` rückwärts in die
         Vergangenheit (jüngstes zuerst). Der ``cursor`` trägt den Sortier-Zeitstempel
         und die ID der zuletzt gelieferten Sitzung — stabil auch bei gleichem Termin.
+
+        Bei aktiver Suche (``q``) KOLLABIERT die Timeline in eine **einzige**
+        relevanz-sortierte Liste (kein Past/Upcoming-Split, kein Jetzt-Marker): die
+        Bucket-Aufteilung lässt sich nicht relevanz-ranken. Sichtbarkeits-Scoping +
+        ``gremium_id``-Filter bleiben; der ``cursor`` trägt dann einen Offset (#search).
         """
+        if q and q.strip():
+            return await self._search_timeline(
+                principal, q=q.strip(), cursor=cursor, limit=limit, gremium_id=gremium_id
+            )
         sort_ts = _sort_ts_expr()
         # Naiver „Jetzt"-Zeitstempel — vergleichbar mit dem (datums-basierten) Sort-Key.
         now_ts = datetime.now(UTC).replace(tzinfo=None)
@@ -600,38 +613,72 @@ class MeetingService:
         if visible is not None:
             # Delegations-Empfänger sehen »ihre« Sitzungen auch ohne Mitgliedschaft.
             delegated = await self._delegated_meeting_ids(principal.sub)
-            stmt = stmt.where(
-                or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated))
-            )
+            stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
         if direction == "upcoming":
             stmt = stmt.where(is_upcoming)
             if cur is not None:
                 cts, cid = cur
-                stmt = stmt.where(
-                    or_(sort_ts > cts, and_(sort_ts == cts, Meeting.id > cid))
-                )
+                stmt = stmt.where(or_(sort_ts > cts, and_(sort_ts == cts, Meeting.id > cid)))
             stmt = stmt.order_by(sort_ts.asc(), Meeting.id.asc())
         else:
             stmt = stmt.where(is_past)
             if cur is not None:
                 cts, cid = cur
-                stmt = stmt.where(
-                    or_(sort_ts < cts, and_(sort_ts == cts, Meeting.id < cid))
-                )
+                stmt = stmt.where(or_(sort_ts < cts, and_(sort_ts == cts, Meeting.id < cid)))
             stmt = stmt.order_by(sort_ts.desc(), Meeting.id.desc())
         # Ein Element über das Limit hinaus laden → verrät, ob eine Folgeseite existiert.
         rows = (await self.session.execute(stmt.limit(limit + 1))).all()
         has_more = len(rows) > limit
         rows = rows[:limit]
         items = await self._decorate([row[0] for row in rows], principal)
-        next_cursor = (
-            _encode_cursor(rows[-1][1], rows[-1][0].id) if has_more and rows else None
-        )
+        next_cursor = _encode_cursor(rows[-1][1], rows[-1][0].id) if has_more and rows else None
         return MeetingPage(items=items, nextCursor=next_cursor)
 
-    async def _decorate(
-        self, meetings: list[Meeting], principal: Principal
-    ) -> list[MeetingOut]:
+    async def _search_timeline(
+        self,
+        principal: Principal,
+        *,
+        q: str,
+        cursor: str | None,
+        limit: int,
+        gremium_id: UUID | None,
+    ) -> MeetingPage:
+        """Relevanz-sortierte Sitzungssuche (kollabierte Timeline, Offset-Paging).
+
+        Trigram-Ranking über Titel + Gremium-Name + Protokollant-Anzeigename. Die
+        Sichtbarkeit (``_visible_gremium_ids`` + Delegationen) und der ``gremium_id``-
+        Filter bleiben identisch zum Keyset-Pfad; nur der Bucket-Split + Jetzt-Marker
+        entfallen. ``cursor`` trägt hier einen Offset (Relevanz ⇒ kein Keyset).
+        """
+        offset = _decode_offset(cursor)
+        where, rank = trigram_rank(
+            q,
+            [Meeting.title, Gremium.name, PrincipalRow.display_name],
+            dialect=dialect_of(self.session),
+        )
+        stmt = (
+            select(Meeting)
+            .join(Gremium, Gremium.id == Meeting.gremium_id)
+            .outerjoin(PrincipalRow, PrincipalRow.id == Meeting.protokollant_id)
+            .where(where)
+        )
+        if gremium_id is not None:
+            stmt = stmt.where(Meeting.gremium_id == gremium_id)
+        visible = await self._visible_gremium_ids(principal)
+        if visible is not None:
+            delegated = await self._delegated_meeting_ids(principal.sub)
+            stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
+        # Relevanteste zuerst; ID als deterministischer Tiebreak (stabiles Offset-Paging).
+        stmt = stmt.order_by(rank.desc(), Meeting.id.desc()).offset(offset)
+        # Ein Element über das Limit hinaus → verrät, ob eine Folgeseite existiert.
+        rows = (await self.session.execute(stmt.limit(limit + 1))).scalars().all()
+        has_more = len(rows) > limit
+        page_rows = list(rows[:limit])
+        items = await self._decorate(page_rows, principal)
+        next_cursor = _encode_offset(offset + limit) if has_more else None
+        return MeetingPage(items=items, nextCursor=next_cursor)
+
+    async def _decorate(self, meetings: list[Meeting], principal: Principal) -> list[MeetingOut]:
         """Sitzungen mit Protokoll-ID, Votes und per-Principal-RBAC-Flags anreichern.
 
         Geteilt von :meth:`list` und :meth:`list_timeline`; lädt alles gebündelt
@@ -694,9 +741,7 @@ class MeetingService:
             votes_mgmt_ids = manage_ids | await gremium_ids_with_permission(
                 self.session, principal.sub, "vote.manage"
             )
-            vote_ids = await gremium_ids_with_permission(
-                self.session, principal.sub, "vote.cast"
-            )
+            vote_ids = await gremium_ids_with_permission(self.session, principal.sub, "vote.cast")
             my_id = await self._principal_id(principal.sub)
         votes_by_meeting = await self._votes_for([m.id for m in meetings])
         out: list[MeetingOut] = []
@@ -712,9 +757,7 @@ class MeetingService:
                     can_vote=m.gremium_id in vote_ids,
                     gremium_name=gremium_names.get(m.gremium_id),
                     protokollant_name=(
-                        prot_names.get(m.protokollant_id)
-                        if m.protokollant_id is not None
-                        else None
+                        prot_names.get(m.protokollant_id) if m.protokollant_id is not None else None
                     ),
                     votes=votes_by_meeting.get(m.id, []),
                 )
@@ -752,9 +795,7 @@ class MeetingService:
         if row is None:
             raise NotFoundError(f"principal {protokollant_id} not found")
         if gremium_id not in await gremium_member_ids(self.session, row.sub):
-            raise ForbiddenError(
-                "protokollant must be an active member of the committee"
-            )
+            raise ForbiddenError("protokollant must be an active member of the committee")
         return protokollant_id
 
     async def patch(
@@ -771,9 +812,7 @@ class MeetingService:
             or "start_time" in payload.model_fields_set
             or "protokollant_id" in payload.model_fields_set
         )
-        wants_write = (
-            payload.status is not None or payload.active_application_id is not None
-        )
+        wants_write = payload.status is not None or payload.active_application_id is not None
         if wants_manage and not await self.can_manage(meeting.gremium_id, principal):
             raise ForbiddenError("only a session manager may plan this meeting")
         if wants_write and not await self.can_write(meeting, principal):
@@ -781,27 +820,19 @@ class MeetingService:
 
         # »closed« ist terminal: eine geschlossene Sitzung lässt sich nicht
         # wieder öffnen (kein closed→live/planned). Erneutes »closed« ist ein No-op.
-        if (
-            meeting.status == "closed"
-            and payload.status is not None
-            and payload.status != "closed"
-        ):
+        if meeting.status == "closed" and payload.status is not None and payload.status != "closed":
             raise ConflictError("a closed session cannot be re-opened")
 
         # Geschlossen = eingefroren (#15): Datum/Zeit/Protokollant sind danach
         # nicht mehr änderbar — das Protokoll referenziert diese Planungsdaten.
         if meeting.status == "closed" and wants_manage:
-            raise ConflictError(
-                "the session is closed — its settings can no longer be changed"
-            )
+            raise ConflictError("the session is closed — its settings can no longer be changed")
 
         # Start (planned→live): das Protokoll entsteht erst beim Start der Sitzung
         # — davor kann nicht protokolliert/abgestimmt werden. ``meeting.status`` wird
         # erst NACH der Protokollant-Prüfung gesetzt (atomar: kein »live« ohne
         # Protokollant, auch nicht in-memory bei einem abgewiesenen Patch).
-        going_live = (
-            payload.status == "live" and meeting.status != "live"
-        )
+        going_live = payload.status == "live" and meeting.status != "live"
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id
         if "date" in payload.model_fields_set:
@@ -812,9 +843,7 @@ class MeetingService:
             # Nach Finalisierung ist die Schriftführung Teil des unterschriebenen
             # Dokuments — der Protokollant ist dann gesperrt (#15).
             if await self._protocol_final(meeting.id):
-                raise ConflictError(
-                    "protocol is finalized — the protokollant can no longer change"
-                )
+                raise ConflictError("protocol is finalized — the protokollant can no longer change")
             meeting.protokollant_id = await self._resolve_protokollant(
                 meeting.gremium_id, payload.protokollant_id
             )
@@ -822,9 +851,7 @@ class MeetingService:
         # des beim Start angelegten Protokolls (das Protokoll selbst legt der Router
         # nach diesem Commit an, planned→live).
         if going_live and meeting.protokollant_id is None:
-            raise ConflictError(
-                "assign a protokollant before starting the meeting"
-            )
+            raise ConflictError("assign a protokollant before starting the meeting")
         if payload.status is not None:
             # Schließ-Zeitpunkt (#14): einmalig beim Wechsel auf ``closed`` —
             # liefert die »Ende«-Zeile der Protokoll-Titelseite.

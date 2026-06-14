@@ -13,6 +13,7 @@ import uuid
 from decimal import Decimal
 from uuid import UUID
 
+from sqlalchemy import Text as _Text
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,6 +67,7 @@ from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upl
 from app.modules.files.scanner import ScannerError, build_scanner
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.flow.models import State
+from app.search import dialect_of, trigram_rank
 from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,
@@ -931,8 +933,27 @@ class BudgetTreeService:
             filters.append(BudgetExpense.kind == kind)
         if application_id is not None:
             filters.append(BudgetExpense.application_id == application_id)
-        if q:
-            filters.append(BudgetExpense.description.ilike(f"%{q}%"))
+        # Fuzzy-Suche (#3): Trigram-Ranking über die Freitext-Felder der Buchung +
+        # mitgejointe Texte (Antrag/Konto/Rechnung). ``rank_expr`` ordnet die Treffer;
+        # ``where`` hängt an den GETEILTEN ``filters`` (Zähl- UND Zeilen-Query identisch).
+        rank_expr = None
+        if q and q.strip():
+            where, rank_expr = trigram_rank(
+                q,
+                [
+                    BudgetExpense.description,
+                    BudgetExpense.correspondent,
+                    BudgetExpense.reference_number,
+                    BudgetExpense.category,
+                    BudgetExpense.note,
+                    Invoice.number,
+                    Invoice.supplier,
+                    Account.name,
+                    func.cast(Application.data, _Text),
+                ],
+                dialect=dialect_of(self.session),
+            )
+            filters.append(where)
         if amount_min is not None:
             filters.append(BudgetExpense.amount >= amount_min)
         if amount_max is not None:
@@ -953,8 +974,24 @@ class BudgetTreeService:
         # Nullable Datums-Spalten: leere Werte unabhängig von der Richtung ans Ende.
         ordering = direction.nulls_last() if sort in ("invoiceDate", "paymentDate") else direction
 
-        total = await self.session.scalar(
-            select(func.count()).select_from(BudgetExpense).where(*filters)
+        # Die Suche referenziert mitgejointe Texte (Antrag/Konto/Rechnung) → die
+        # Zähl-Query muss dieselben Joins tragen wie die Zeilen-Query, sonst löst das
+        # ``where`` über fremde Tabellen nicht auf (bzw. cross-joint). Ohne ``q``
+        # bleibt die Zähl-Query schlank (kein Join).
+        count_stmt = select(func.count()).select_from(BudgetExpense)
+        if rank_expr is not None:
+            count_stmt = (
+                count_stmt.outerjoin(Application, Application.id == BudgetExpense.application_id)
+                .outerjoin(Account, Account.id == BudgetExpense.account_id)
+                .outerjoin(Invoice, Invoice.id == BudgetExpense.invoice_id)
+            )
+        total = await self.session.scalar(count_stmt.where(*filters))
+        # Suche aktiv ⇒ relevanteste zuerst (Rang), danach die bisherige Sortierung
+        # als deterministischer Tiebreak; ohne Suche unverändert.
+        order_by = (
+            (rank_expr.desc(), ordering, BudgetExpense.created_at.desc())
+            if rank_expr is not None
+            else (ordering, BudgetExpense.created_at.desc())
         )
         rows = (
             await self.session.execute(
@@ -970,7 +1007,7 @@ class BudgetTreeService:
                 .outerjoin(Account, Account.id == BudgetExpense.account_id)
                 .outerjoin(Invoice, Invoice.id == BudgetExpense.invoice_id)
                 .where(*filters)
-                .order_by(ordering, BudgetExpense.created_at.desc())
+                .order_by(*order_by)
                 .limit(limit)
                 .offset(offset)
             )

@@ -240,6 +240,20 @@ export class MeetingsComponent implements OnDestroy {
   readonly loadingPast = signal(false);
   private didInitialScroll = false;
 
+  // --- Such-Modus (#3/#4) --------------------------------------------------
+  /** Aktive Suchanfrage (leer ⇒ normale Past/Upcoming-Timeline). */
+  readonly searchQuery = signal('');
+  /** Aktiv, sobald ``searchQuery`` (getrimmt) nicht leer ist → kollabierte Liste. */
+  readonly searchActive = computed(() => this.searchQuery().trim().length > 0);
+  /** Relevanz-sortierte Treffer (kollabiert, kein Past/Upcoming-Split, kein Jetzt-Marker). */
+  readonly searchItems = signal<Meeting[]>([]);
+  private searchCursor: string | null = null;
+  readonly searchHasMore = signal(false);
+  readonly loadingSearch = signal(false);
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Lauf-Nummer der Such-Fetches (verspätete Antworten alter Queries verwerfen). */
+  private searchSeq = 0;
+
   readonly timelineScroll = viewChild<ElementRef<HTMLElement>>('tlScroll');
   readonly nowMarker = viewChild<ElementRef<HTMLElement>>('nowMarker');
 
@@ -249,19 +263,89 @@ export class MeetingsComponent implements OnDestroy {
   readonly timelineEmpty = computed(
     () => !this.upcomingItems().length && !this.pastItems().length,
   );
+  /** Such-Treffer leer (nach dem Laden keine Sitzung) — eigener Leerzustand. */
+  readonly searchEmpty = computed(
+    () => this.searchActive() && !this.loadingSearch() && !this.searchItems().length,
+  );
 
   /**
    * Scroll-getriebenes Nachladen: nahe dem oberen Rand ⇒ ältere Vergangenheit,
    * nahe dem unteren Rand ⇒ weitere Zukunft. Beide serverseitig per Cursor.
+   * Im Such-Modus (kollabierte Liste) lädt der untere Rand die nächste Offset-Seite.
    */
   onTimelineScroll(el: HTMLElement): void {
+    if (this.searchActive()) {
+      if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreSearch();
+      return;
+    }
     if (el.scrollTop <= 80) this.loadMorePast(el);
     if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreUpcoming();
   }
 
-  /** Gremium-Filter umschalten → Timeline neu laden (#meetings-filter). */
+  /** Header-Suche (#3/#4): debounced ~250 ms; bei Änderung Cursor/Listen leeren
+   *  und neu laden. Leere Query ⇒ zurück zur normalen Timeline. */
+  onSearch(value: string): void {
+    this.searchQuery.set(value);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.runSearch(), 250);
+  }
+
+  /** Suche (neu) ausführen: Treffer-Liste leeren + erste relevanz-sortierte Seite
+   *  laden. Bei leerer Query auf die normale Timeline zurückfallen. */
+  private runSearch(): void {
+    const q = this.searchQuery().trim();
+    this.searchCursor = null;
+    this.searchItems.set([]);
+    this.searchHasMore.set(false);
+    if (!q) {
+      // Zurück zur normalen Timeline: einmalig neu laden + Jetzt-Marker re-positionieren.
+      this.loadList();
+      return;
+    }
+    this.loadingSearch.set(true);
+    this.fetchSearch(true);
+  }
+
+  /** Nächste Such-Seite laden (Offset-Cursor; Relevanz ⇒ kein Keyset). */
+  loadMoreSearch(): void {
+    if (this.loadingSearch() || !this.searchHasMore() || this.searchCursor === null) return;
+    this.loadingSearch.set(true);
+    this.fetchSearch(false);
+  }
+
+  /** Eine Such-Seite holen. ``initial`` ersetzt die Liste, sonst anhängen. */
+  private fetchSearch(initial: boolean): void {
+    const seq = ++this.searchSeq;
+    this.api
+      .listMeetingsTimeline({
+        direction: 'upcoming', // im Such-Modus bedeutungslos (Backend kollabiert)
+        cursor: this.searchCursor,
+        limit: this.PAGE,
+        gremiumId: this.gremiumFilter() || undefined,
+        q: this.searchQuery().trim(),
+      })
+      .subscribe({
+        next: (page) => {
+          if (seq !== this.searchSeq) return;
+          this.searchItems.update((cur) => (initial ? page.items : [...cur, ...page.items]));
+          this.searchCursor = page.nextCursor;
+          this.searchHasMore.set(page.nextCursor !== null);
+          this.loadingSearch.set(false);
+        },
+        error: () => {
+          if (seq !== this.searchSeq) return;
+          this.loadingSearch.set(false);
+        },
+      });
+  }
+
+  /** Gremium-Filter umschalten → Timeline (bzw. Suche) neu laden (#meetings-filter). */
   selectGremiumFilter(id: string): void {
     this.gremiumFilter.set(id);
+    if (this.searchActive()) {
+      this.runSearch();
+      return;
+    }
     this.loadList();
   }
 
@@ -545,11 +629,12 @@ export class MeetingsComponent implements OnDestroy {
     // bzw. ihr Inhalt wächst (#sitzungen-100vh). Resize triggert separat (Listener).
     effect(() => {
       const el = this.timelineScroll();
-      // Abhängigkeiten: (Wieder-)Erscheinen + Inhaltsmenge.
+      // Abhängigkeiten: (Wieder-)Erscheinen + Inhaltsmenge (inkl. Such-Treffer).
       this.timelineEmpty();
       this.loadingList();
       this.pastItems();
       this.upcomingItems();
+      this.searchItems();
       if (el) this.scheduleMeasure();
     });
     window.addEventListener('resize', this.onResize, { passive: true });
@@ -579,6 +664,7 @@ export class MeetingsComponent implements OnDestroy {
     this.channel?.close();
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
     if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
+    if (this.searchTimer !== null) clearTimeout(this.searchTimer);
     window.removeEventListener('resize', this.onResize);
     if (this.measureRaf !== null) cancelAnimationFrame(this.measureRaf);
   }

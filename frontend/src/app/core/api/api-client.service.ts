@@ -383,11 +383,13 @@ export class ApiClient {
     cursor?: string | null;
     limit?: number;
     gremiumId?: Uuid;
+    q?: string;
   }): Observable<MeetingPage> {
     let params = new HttpParams().set('direction', opts.direction);
     if (opts.cursor) params = params.set('cursor', opts.cursor);
     if (opts.limit) params = params.set('limit', String(opts.limit));
     if (opts.gremiumId) params = params.set('gremiumId', opts.gremiumId);
+    if (opts.q && opts.q.trim()) params = params.set('q', opts.q.trim());
     return this.http
       .get<MeetingPageWire>(`${this.base}/meetings/timeline`, { params })
       .pipe(map(mapMeetingPage));
