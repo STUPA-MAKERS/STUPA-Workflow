@@ -1,5 +1,5 @@
 @if (crumbs().length > 1) {
-  <nav class="container flex flex-wrap items-center gap-2 pt-6 pb-2 text-sm" [class.bc--wide]="wide()" aria-label="Breadcrumb">
+  <nav class="container flex flex-wrap items-center gap-2 pt-6 pb-2 text-sm" aria-label="Breadcrumb">
     @for (c of crumbs(); track c.url; let last = $last) {
       @if (last) {
         <span class="bc__crumb text-text font-normal" aria-current="page">{{ c.label }}</span>

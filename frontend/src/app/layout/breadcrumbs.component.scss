@@ -1,6 +1,8 @@
-/* Volle Breite wie `<main class="main--wide">` — gleiche linke Kante wie H1/Inhalt. */
-.bc--wide {
-  max-width: none;
+/* Block-Host, damit die `.container`-Nav per margin-inline:auto sauber zentriert —
+   sonst (inline-Host-Default) bricht die Zentrierung und die Leiste sitzt ganz links,
+   versetzt zum gleich zentrierten Header-Logo (#breadcrumb-align). */
+:host {
+  display: block;
 }
 .bc__crumb {
   color: var(--color-primary);

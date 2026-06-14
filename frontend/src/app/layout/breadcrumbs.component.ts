@@ -31,10 +31,6 @@ export class BreadcrumbsComponent {
   private readonly i18n = inject(I18nService);
 
   readonly crumbs = signal<Crumb[]>([]);
-  /** Volle Breite wie der Inhalt (Route-Data `wide`) — sonst sässe die Krumenleiste
-   *  zentriert (max-width), während `<main>` per `main--wide` voll aufzieht, und die
-   *  linke Kante wiche von H1/Inhalt ab (#breadcrumb-align). */
-  readonly wide = signal(false);
 
   /** Pfad → i18n-Titel-Key, aus der Route-Config (für Eltern-Auflösung). */
   private titleByPath: Map<string, TranslationKey> | null = null;
@@ -51,18 +47,6 @@ export class BreadcrumbsComponent {
 
   private refresh(): void {
     this.crumbs.set(this.build());
-    this.wide.set(this.computeWide());
-  }
-
-  /** `wide` aus den Route-Daten ableiten (wie die Shell): tiefster Knoten gewinnt. */
-  private computeWide(): boolean {
-    let node: ActivatedRouteSnapshot | null = this.router.routerState.snapshot.root;
-    let wide = false;
-    while (node) {
-      if (node.data?.['wide'] === true) wide = true;
-      node = node.firstChild;
-    }
-    return wide;
   }
 
   private build(): Crumb[] {
