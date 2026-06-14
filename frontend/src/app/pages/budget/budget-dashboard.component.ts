@@ -219,6 +219,7 @@ export class BudgetDashboardComponent {
 
   readonly usageColumns = computed<ColumnDef[]>(() => [
     { key: 'node', label: this.i18n.translate('budget.tree.col.node') },
+    { key: 'bar', label: this.i18n.translate('budget.usage.bar'), width: '10rem' },
     { key: 'requested', label: this.i18n.translate('budget.tree.col.requested'), align: 'end' },
     { key: 'bound', label: this.i18n.translate('budget.tree.col.bound'), align: 'end' },
     { key: 'expended', label: this.i18n.translate('budget.tree.col.expended'), align: 'end' },
@@ -336,6 +337,20 @@ export class BudgetDashboardComponent {
   money(value: string | number | null | undefined, currency = 'EUR'): string {
     const n = value == null || value === '' ? 0 : Number(value);
     return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
+  }
+  barPct(row: UsageRow): number {
+    if (!row.allocated) return 0;
+    return Math.min(100, Math.round((row.committed / row.allocated) * 100));
+  }
+  /** Gebundener Anteil (noch nicht ausgegeben) als % der Allokation — hellgrau. */
+  boundPct(row: UsageRow): number {
+    if (!row.allocated) return 0;
+    return Math.max(0, Math.min(100, (row.bound / row.allocated) * 100));
+  }
+  /** Ausgegebener Anteil als % der Allokation — primary. */
+  expendedPct(row: UsageRow): number {
+    if (!row.allocated) return 0;
+    return Math.max(0, Math.min(100, (row.expended / row.allocated) * 100));
   }
   shortId(id: Uuid): string {
     return id.slice(0, 8);

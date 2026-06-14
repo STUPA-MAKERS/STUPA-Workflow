@@ -79,6 +79,15 @@
               <span class="bd__name">{{ $any(row).node.name }}</span>
             </button>
           </ng-template>
+          <ng-template appCell="bar" let-row>
+            <span class="bd__bar-cell">
+              <span class="bd__track" role="img" [attr.aria-label]="($any(row).percent ?? 0) + '%'">
+                <span class="bd__seg bd__seg--bound" [class.bd__seg--over]="$any(row).committed > $any(row).allocated && $any(row).allocated > 0" [style.width.%]="boundPct($any(row))"></span>
+                <span class="bd__seg bd__seg--expended" [class.bd__seg--over]="$any(row).committed > $any(row).allocated && $any(row).allocated > 0" [style.width.%]="expendedPct($any(row))"></span>
+              </span>
+              <span class="bd__pct">{{ $any(row).percent === null ? '—' : $any(row).percent + '%' }}</span>
+            </span>
+          </ng-template>
           <ng-template appCell="requested" let-row><span class="text-muted">{{ money($any(row).requested, $any(row).node.currency) }}</span></ng-template>
           <ng-template appCell="bound" let-row>{{ money($any(row).committed, $any(row).node.currency) }}</ng-template>
           <ng-template appCell="expended" let-row>
