@@ -1,11 +1,11 @@
 @if (crumbs().length > 1) {
-  <nav class="bc container" aria-label="Breadcrumb">
+  <nav class="container flex flex-wrap items-center gap-2 pt-6 pb-2 text-sm" aria-label="Breadcrumb">
     @for (c of crumbs(); track c.url; let last = $last) {
       @if (last) {
-        <span class="bc__crumb bc__crumb--current" aria-current="page">{{ c.label }}</span>
+        <span class="bc__crumb text-text font-normal" aria-current="page">{{ c.label }}</span>
       } @else {
         <a class="bc__crumb" [routerLink]="c.url">{{ c.label }}</a>
-        <span class="bc__sep" aria-hidden="true">›</span>
+        <span class="text-muted" aria-hidden="true">›</span>
       }
     }
   </nav>

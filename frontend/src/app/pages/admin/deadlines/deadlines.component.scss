@@ -1,12 +1,5 @@
 :host { display: flex; flex-direction: column; gap: var(--space-5); }
-.dl__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
-.dl__title { margin: 0; }
-.dl__sub { color: var(--color-text-muted); font-size: var(--fs-sm); margin: var(--space-1) 0 0; }
 .dl__mono { font-family: var(--font-mono, monospace); font-size: var(--fs-xs); }
-.dl__actions { display: inline-flex; align-items: center; gap: var(--space-1); justify-content: flex-end; }
-.dl__form { display: flex; flex-direction: column; gap: var(--space-4); }
-.field { display: flex; flex-direction: column; gap: var(--space-2); }
-.field__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .field__control {
   height: var(--control-height);
   padding: 0 var(--space-3);
@@ -17,4 +10,3 @@
   font-size: var(--fs-md);
 }
 .field__control:disabled { opacity: 0.6; cursor: not-allowed; }
-.dl__foot { display: flex; justify-content: flex-end; gap: var(--space-3); }

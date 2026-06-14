@@ -6,31 +6,6 @@
   margin: 0 auto;
 }
 
-.wizard__head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.wizard__title {
-  margin: 0;
-}
-
-.wizard__step-title {
-  margin: 0 0 var(--space-2);
-  font-size: var(--fs-xl);
-}
-
-.wizard__lead {
-  margin: 0 0 var(--space-5);
-  color: var(--color-text-muted);
-}
-
-.wizard__muted {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
 /* Konfigurierter Markdown-Info-Text unter der Typ-Auswahl (#18). */
 .wizard__info {
   margin-top: var(--space-4);
@@ -47,11 +22,6 @@
   :last-child {
     margin-bottom: 0;
   }
-}
-
-.type-list {
-  display: grid;
-  gap: var(--space-3);
 }
 
 .type-option {
@@ -77,15 +47,6 @@
 .type-option.is-selected {
   border-color: var(--color-primary);
   background: var(--color-primary-subtle);
-}
-
-.type-option__name {
-  font-weight: var(--fw-medium);
-}
-
-.contact {
-  display: grid;
-  gap: var(--space-5);
 }
 
 :host ::ng-deep formly-form {
@@ -114,12 +75,6 @@
   border-top: 1px solid var(--color-border);
 }
 
-.summary {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0 0 var(--space-6);
-}
-
 .summary__row {
   display: grid;
   grid-template-columns: minmax(8rem, 14rem) 1fr;
@@ -138,10 +93,6 @@
   color: var(--color-text);
 }
 
-.review__altcha {
-  margin-top: var(--space-4);
-}
-
 .wizard__nav {
   display: flex;
   align-items: center;
@@ -155,12 +106,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-.wizard__autosave {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-  text-align: center;
 }
 
 @media (max-width: 40rem) {

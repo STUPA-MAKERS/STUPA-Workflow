@@ -1,19 +1,7 @@
 :host { display: block; }
 .inv { position: relative; min-height: 60vh; }
-.inv__head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-5);
-}
 .inv__title { margin: 0; }
 .inv__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
-.inv__headActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.inv__statusFilter { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; }
-.inv__btnIcon { display: inline-flex; align-items: center; gap: var(--space-2); }
-.inv__fileInput { display: none; }
 .inv__search, .inv__input {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -95,14 +83,11 @@ input.inv__input { height: var(--control-height); }
   font-weight: var(--fw-semibold);
 }
 /* --- Dialog --- */
-.inv__form { display: flex; flex-direction: column; gap: var(--space-2); }
-.inv__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); margin-top: var(--space-2); }
 .inv__field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .inv__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
 .inv__grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3); align-items: end; }
 @media (max-width: 30rem) { .inv__grid2, .inv__grid3 { grid-template-columns: 1fr; } }
 .inv__textarea { resize: vertical; min-height: 4.5rem; }
-.inv__dialogFoot { display: flex; justify-content: flex-end; gap: var(--space-3); }
 .inv__fileChip {
   display: flex;
   align-items: center;

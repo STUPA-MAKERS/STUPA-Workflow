@@ -1,16 +1,16 @@
-<header class="fl__head">
+<header class="flex items-center justify-between gap-4 flex-wrap">
   <div>
-    <h1 class="fl__title">{{ 'admin.forms.listTitle' | t }}</h1>
-    <p class="fl__subtitle">{{ 'admin.forms.listSubtitle' | t }}</p>
+    <h1 class="m-0">{{ 'admin.forms.listTitle' | t }}</h1>
+    <p class="text-muted mt-1">{{ 'admin.forms.listSubtitle' | t }}</p>
   </div>
   <app-button size="sm" (click)="openCreate()">{{ 'admin.forms.add' | t }}</app-button>
 </header>
 
 <section class="fl__list" [attr.aria-label]="'admin.forms.listTitle' | t">
   @if (loading()) {
-    <p class="fl__status" aria-live="polite">{{ 'admin.forms.overviewLoading' | t }}</p>
+    <p class="text-muted py-4" aria-live="polite">{{ 'admin.forms.overviewLoading' | t }}</p>
   } @else if (loadError()) {
-    <p class="fl__status fl__status--error" role="alert">{{ 'admin.forms.overviewError' | t }}</p>
+    <p class="text-muted py-4 text-danger" role="alert">{{ 'admin.forms.overviewError' | t }}</p>
   } @else {
     <app-data-table [columns]="columns()" [rows]="types()" [rowKey]="rowId" [emptyText]="'admin.forms.overviewEmpty' | t">
       <ng-template appCell="name" let-t>
@@ -30,7 +30,7 @@
         </app-badge>
       </ng-template>
       <ng-template appCell="actions" let-t>
-        <span class="fl__actions">
+        <span class="inline-flex items-center gap-2 justify-end w-full">
           <a class="fl__icon-link" [routerLink]="['/admin/forms', $any(t).id]" [attr.aria-label]="'admin.forms.edit' | t" [attr.title]="'admin.forms.edit' | t"><app-icon name="edit" /></a>
           @if (canDelete()) {
             <app-button variant="ghost" size="sm" [iconOnly]="true" [attr.aria-label]="'admin.forms.delete' | t" [title]="'admin.forms.delete' | t" (click)="askDelete($any(t))"><app-icon name="delete" /></app-button>
@@ -48,14 +48,14 @@
   [closeLabel]="'admin.common.cancel' | t"
   (closed)="closeDialog()"
 >
-  <form id="fl-form" class="fl__form" (submit)="submit($event)">
-    <div class="field">
-      <label class="field__label" for="fl-name-de">{{ 'admin.forms.nameDe' | t }}</label>
+  <form id="fl-form" class="flex flex-col gap-4" (submit)="submit($event)">
+    <div class="flex flex-col gap-1">
+      <label class="font-medium text-sm" for="fl-name-de">{{ 'admin.forms.nameDe' | t }}</label>
       <input id="fl-name-de" class="field__control" name="nameDe" [ngModel]="form().nameDe" (ngModelChange)="patch('nameDe', $event)" required />
-      <p class="field__hint">{{ 'admin.common.key' | t }}: <span class="fl__mono">{{ keyPreview() }}</span></p>
+      <p class="m-0 text-xs text-muted">{{ 'admin.common.key' | t }}: <span class="fl__mono">{{ keyPreview() }}</span></p>
     </div>
-    <div class="field">
-      <label class="field__label" for="fl-name-en">{{ 'admin.forms.nameEn' | t }}</label>
+    <div class="flex flex-col gap-1">
+      <label class="font-medium text-sm" for="fl-name-en">{{ 'admin.forms.nameEn' | t }}</label>
       <input id="fl-name-en" class="field__control" name="nameEn" [ngModel]="form().nameEn" (ngModelChange)="patch('nameEn', $event)" />
     </div>
     <app-checkbox

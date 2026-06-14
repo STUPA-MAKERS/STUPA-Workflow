@@ -1,7 +1,7 @@
 <ul class="bars" [class.bars--beamer]="variant() === 'beamer'">
   @for (row of rows(); track row.option) {
-    <li class="bars__row" [class.bars__row--leading]="row.leading">
-      <div class="bars__head">
+    <li class="flex flex-col gap-2" [class.bars__row--leading]="row.leading">
+      <div class="flex items-baseline justify-between gap-3">
         <span class="bars__label">{{ row.label }}</span>
         <span class="bars__count">{{ row.count }}</span>
       </div>

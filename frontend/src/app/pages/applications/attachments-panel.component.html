@@ -16,7 +16,7 @@
       >
         {{ (uploading() ? 'applications.attachments.uploading' : 'applications.attachments.upload') | t }}
       </app-button>
-      <p class="att__hint">{{ 'applications.attachments.hint' | t }}</p>
+      <p class="m-0 text-muted text-sm">{{ 'applications.attachments.hint' | t }}</p>
     </div>
   }
 
@@ -36,7 +36,7 @@
               {{ scanLabel(att.scanState) | t }}
             </app-badge>
           </div>
-          <div class="att__actions">
+          <div class="flex items-center gap-2">
             <app-button
               variant="secondary"
               size="sm"
@@ -65,6 +65,6 @@
       }
     </ul>
   } @else {
-    <p class="att__muted">{{ 'applications.attachments.empty' | t }}</p>
+    <p class="text-muted">{{ 'applications.attachments.empty' | t }}</p>
   }
 </app-card>

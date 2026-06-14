@@ -24,18 +24,6 @@
   margin-inline: auto;
 }
 
-.bd__exportBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.bd__head-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 /* Metrik-Tabs im Übersicht-Overlay (#budget-sunburst) — gleiche Optik wie die
    Navigations-Pills im App-Header, horizontal zentriert. */
 .bd__ovTabs {
@@ -75,10 +63,6 @@
   background: var(--color-primary-subtle);
 }
 
-.bd__title {
-  margin: 0;
-}
-
 .bd__subtitle {
   color: var(--color-text-muted);
   margin: var(--space-1) 0 0;
@@ -99,13 +83,6 @@
 }
 
 /* --- Breadcrumbs --------------------------------------------------------- */
-.bd__crumbs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .bd__crumb {
   border: 0;
   background: transparent;
@@ -124,10 +101,6 @@
 .bd__crumb--current {
   color: var(--color-text);
   cursor: default;
-}
-
-.bd__crumb-sep {
-  color: var(--color-text-muted);
 }
 
 .bd__status {
@@ -206,9 +179,6 @@
 }
 .bd__apps {
   min-width: 0;
-}
-.bd__muted {
-  color: var(--color-text-muted);
 }
 /* Schmaler werden → Charts unter den Inhalt, Nav bleibt links. */
 @media (max-width: 60rem) {

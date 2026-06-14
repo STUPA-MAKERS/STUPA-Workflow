@@ -1,7 +1,7 @@
-<section class="admin-home">
+<section class="flex flex-col gap-7">
   <header class="admin-home__head">
     <h1>{{ 'admin.home.title' | t }}</h1>
-    <p class="admin-home__sub">{{ 'admin.home.subtitle' | t }}</p>
+    <p class="text-muted">{{ 'admin.home.subtitle' | t }}</p>
   </header>
 
   <div class="admin-home__grid">
@@ -9,8 +9,8 @@
       <a class="admin-home__tile" [routerLink]="tile.link">
         <span class="admin-home__icon"><app-icon [name]="tile.icon" [size]="28" /></span>
         <span class="admin-home__text">
-          <span class="admin-home__title">{{ tile.title | t }}</span>
-          <span class="admin-home__desc">{{ tile.desc | t }}</span>
+          <span class="text-lg font-semibold">{{ tile.title | t }}</span>
+          <span class="text-muted text-sm">{{ tile.desc | t }}</span>
         </span>
       </a>
     }

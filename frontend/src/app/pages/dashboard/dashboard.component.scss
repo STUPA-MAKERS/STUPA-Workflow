@@ -4,27 +4,6 @@
   gap: var(--space-6);
 }
 
-.dash__head {
-  display: flex;
-  flex-direction: column;
-}
-
-.dash__title {
-  margin-bottom: var(--space-2);
-}
-
-.dash__subtitle {
-  color: var(--color-text-muted);
-  font-size: var(--fs-lg);
-}
-
-.dash__roles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-
 /* --- Primary CTA --------------------------------------------------------- */
 .dash__cta {
   display: flex;
@@ -51,11 +30,6 @@
 .dash__cta:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-}
-
-.dash__cta-title {
-  margin: 0 0 var(--space-1);
-  font-size: var(--fs-xl);
 }
 
 .dash__cta-body {
@@ -93,24 +67,6 @@
   box-shadow: var(--shadow-sm);
 }
 
-.dash__panel-head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.dash__panel-title {
-  margin: 0;
-  font-size: var(--fs-lg);
-}
-
-.dash__panel-sub {
-  margin: var(--space-1) 0 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
 .dash__state {
   color: var(--color-text-muted);
   margin: 0;
@@ -118,13 +74,6 @@
 
 .dash__state--error {
   color: var(--color-danger);
-}
-
-.dash__empty {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: start;
 }
 
 .dash__empty-cta {
@@ -135,14 +84,6 @@
 
 .dash__empty-cta:hover {
   text-decoration: underline;
-}
-
-.dash__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .dash__row {
@@ -181,11 +122,6 @@
 
 .dash__row-link:hover .dash__row-title {
   text-decoration: underline;
-}
-
-.dash__row-type {
-  color: var(--color-text-muted);
-  font-size: var(--fs-xs);
 }
 
 .dash__row-meta {
@@ -251,11 +187,6 @@
   font-size: var(--fs-sm);
 }
 
-.dash__sessions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
 /* Kompakte Sitzungs-Kachel: flacher Anchor (kein app-card), Badge oben rechts. */
 .dash__session {
   position: relative;

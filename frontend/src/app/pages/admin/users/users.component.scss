@@ -1,13 +1,3 @@
-.users {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-.users__sub {
-  color: var(--color-text-muted);
-}
-
 .users__search {
   display: flex;
   flex-wrap: wrap;
@@ -80,20 +70,6 @@
   background: var(--color-surface-sunken);
 }
 
-.users__name {
-  font-weight: var(--fw-medium);
-}
-
-.users__row-actions {
-  display: inline-flex;
-  gap: var(--space-1);
-  justify-content: flex-end;
-}
-
-.users__muted {
-  color: var(--color-text-muted);
-}
-
 .users__mono {
   font-family: var(--font-mono, monospace);
   font-size: var(--fs-xs);
@@ -116,11 +92,6 @@
   gap: var(--space-1);
   flex: 0 0 auto;
   white-space: nowrap;
-}
-
-.users__until {
-  color: var(--color-text-muted);
-  font-size: var(--fs-xs);
 }
 
 // × sitzt INNERHALB des Badges (#50): kleiner Abstand links, erbt die Badge-Farbe.
@@ -184,13 +155,6 @@
 /* Zuweisen-Button auf Höhe der Selects/Datepicker links (Task #5). */
 .users__assign app-button button.btn {
   height: var(--control-height);
-}
-
-.users__lbl {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--fs-sm);
 }
 
 /* Mobil (≤768px): Zuweisen-Zeile gestapelt — jedes Control volle Breite,

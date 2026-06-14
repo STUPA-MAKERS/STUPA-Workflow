@@ -1,4 +1,4 @@
-<nav class="cct" [attr.aria-label]="ariaLabel()">
+<nav class="flex flex-col gap-1 text-sm" [attr.aria-label]="ariaLabel()">
   @if (allLabel(); as label) {
     <button
       type="button"
@@ -11,7 +11,7 @@
     *ngTemplateOutlet="branch; context: { $implicit: nodes(), depth: 0 }"
   ></ng-container>
   @if (!nodes().length && !allLabel()) {
-    <p class="cct__empty">{{ emptyLabel() }}</p>
+    <p class="text-muted text-xs px-2">{{ emptyLabel() }}</p>
   }
 </nav>
 

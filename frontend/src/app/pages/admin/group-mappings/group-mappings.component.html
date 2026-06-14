@@ -1,7 +1,7 @@
-<header class="gm__head">
+<header class="flex items-center justify-between gap-4 flex-wrap">
   <div>
     <h1 class="gm__title">{{ 'admin.groupMappings.title' | t }}</h1>
-    <p class="gm__subtitle">{{ 'admin.groupMappings.subtitle' | t }}</p>
+    <p class="text-muted mt-1">{{ 'admin.groupMappings.subtitle' | t }}</p>
   </div>
   <app-button size="sm" (click)="openAdd()">{{ 'admin.groupMappings.add' | t }}</app-button>
 </header>
@@ -16,7 +16,7 @@
     @if ($any(r).gremiumLabel) {
       {{ $any(r).gremiumLabel }}
     } @else {
-      <span class="gm__muted">{{ 'admin.groupMappings.global' | t }}</span>
+      <span class="text-muted">{{ 'admin.groupMappings.global' | t }}</span>
     }
   </ng-template>
   <ng-template appCell="actions" let-r>
@@ -36,7 +36,7 @@
   [closeLabel]="'action.cancel' | t"
   (closed)="dialogOpen.set(false)"
 >
-  <div class="gm__form">
+  <div class="flex flex-col gap-3">
     <label class="gm__lbl" for="gm-oidc">{{ 'admin.groupMappings.oidcGroup' | t }}</label>
     <input
       id="gm-oidc"
@@ -63,7 +63,7 @@
       name="gremium"
     />
   </div>
-  <div dialog-footer class="gm__foot">
+  <div dialog-footer class="flex justify-end gap-3">
     <app-button variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button [disabled]="!oidcGroup().trim() || !roleId()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
@@ -77,7 +77,7 @@
   (closed)="confirmId.set(null)"
 >
   <p>{{ 'admin.groupMappings.deleteBody' | t }}</p>
-  <div dialog-footer class="gm__foot">
+  <div dialog-footer class="flex justify-end gap-3">
     <app-button variant="ghost" (click)="confirmId.set(null)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="danger" (click)="remove()">{{ 'action.delete' | t }}</app-button>
   </div>

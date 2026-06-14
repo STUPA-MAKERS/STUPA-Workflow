@@ -3,11 +3,6 @@
   border-collapse: collapse;
   font-size: var(--fs-sm);
 }
-.tbl__caption {
-  text-align: start;
-  padding-bottom: var(--space-3);
-  color: var(--color-text-muted);
-}
 th,
 td {
   padding: var(--space-3) var(--space-4);
@@ -22,9 +17,4 @@ th {
 }
 tbody tr:hover {
   background: var(--color-surface-sunken);
-}
-.tbl__empty {
-  text-align: center;
-  color: var(--color-text-muted);
-  padding: var(--space-6);
 }

@@ -1,8 +1,8 @@
-<header class="dash__head">
-  <h1 class="dash__title">{{ 'dashboard.greeting' | t: { name: auth.displayName() } }}</h1>
-  <p class="dash__subtitle">{{ 'dashboard.subtitle' | t }}</p>
+<header class="flex flex-col">
+  <h1 class="mb-2">{{ 'dashboard.greeting' | t: { name: auth.displayName() } }}</h1>
+  <p class="text-muted text-lg">{{ 'dashboard.subtitle' | t }}</p>
   @if (roles().length || gremien().length) {
-    <div class="dash__roles">
+    <div class="flex flex-wrap gap-2 mt-4">
       @for (role of roles(); track role) {
         <app-badge variant="primary">{{ roleLabel(role) | capitalize }}</app-badge>
       }
@@ -16,7 +16,7 @@
 <!-- Primäre CTA: neuen Antrag stellen (führt in den Apply-Wizard). -->
 <a class="dash__cta" routerLink="/apply">
   <div class="dash__cta-text">
-    <h2 class="dash__cta-title">{{ 'dashboard.apply.title' | t }}</h2>
+    <h2 class="m-0 mb-1 text-xl">{{ 'dashboard.apply.title' | t }}</h2>
     <p class="dash__cta-body">{{ 'dashboard.apply.body' | t }}</p>
   </div>
   <span class="dash__cta-action">{{ 'dashboard.apply.cta' | t }} →</span>
@@ -24,7 +24,7 @@
 
 <!-- Laufende / anstehende Sitzungen — große Shortcuts (#Sessions). -->
 @if (sessionShortcuts().length) {
-  <section class="dash__sessions" aria-labelledby="dash-sessions-h">
+  <section class="flex flex-col gap-3" aria-labelledby="dash-sessions-h">
     <h2 id="dash-sessions-h" class="dash__quick-h">{{ 'dashboard.sessions.title' | t }}</h2>
     <div class="dash__grid">
       @for (s of sessionShortcuts(); track s.id) {
@@ -49,13 +49,13 @@
      Vertretungen — ausgehend (»du wirst vertreten«) und eingehend (»du vertrittst«). -->
 @if (delegations().length) {
   <section class="dash__panel dash__delegations" aria-labelledby="dash-deleg-h">
-    <div class="dash__panel-head">
+    <div class="flex items-start justify-between gap-3">
       <div>
-        <h2 id="dash-deleg-h" class="dash__panel-title">{{ 'delegation.dash.title' | t }}</h2>
-        <p class="dash__panel-sub">{{ 'delegation.dash.subtitle' | t }}</p>
+        <h2 id="dash-deleg-h" class="m-0 text-lg">{{ 'delegation.dash.title' | t }}</h2>
+        <p class="mt-1 text-muted text-sm">{{ 'delegation.dash.subtitle' | t }}</p>
       </div>
     </div>
-    <ul class="dash__list">
+    <ul class="list-none m-0 p-0 flex flex-col">
       @for (d of delegations(); track d.id) {
         <li class="dash__row">
           <a class="dash__row-link" [routerLink]="['/meetings', d.meetingId]">
@@ -63,7 +63,7 @@
               {{ (isOutgoing(d) ? 'delegation.dash.outgoing' : 'delegation.dash.incoming')
                 | t: { name: (isOutgoing(d) ? d.delegateName : d.delegatorName) || '?' } }}
             </span>
-            <span class="dash__row-type">
+            <span class="text-muted text-xs">
               {{ d.meetingTitle }}@if (d.meetingDate) {, {{ d.meetingDate | ldate: 'mediumDate' }}}
             </span>
           </a>
@@ -83,10 +83,10 @@
   <div class="dash__panels">
     <!-- Offene Aufgaben: Anträge, die auf den Nutzer warten. -->
     <section class="dash__panel" aria-labelledby="dash-tasks-h">
-      <div class="dash__panel-head">
+      <div class="flex items-start justify-between gap-3">
         <div>
-          <h2 id="dash-tasks-h" class="dash__panel-title">{{ 'dashboard.tasks.title' | t }}</h2>
-          <p class="dash__panel-sub">{{ 'dashboard.tasks.subtitle' | t }}</p>
+          <h2 id="dash-tasks-h" class="m-0 text-lg">{{ 'dashboard.tasks.title' | t }}</h2>
+          <p class="mt-1 text-muted text-sm">{{ 'dashboard.tasks.subtitle' | t }}</p>
         </div>
         @if (!loading() && !error() && openTasks().length) {
           <app-badge variant="warning">{{ openTasks().length }}</app-badge>
@@ -100,13 +100,13 @@
       } @else if (taskRows().length === 0) {
         <p class="dash__state">{{ 'dashboard.tasks.empty' | t }}</p>
       } @else {
-        <ul class="dash__list">
+        <ul class="list-none m-0 p-0 flex flex-col">
           @for (item of taskRows(); track item.id) {
             <li class="dash__row">
               <a class="dash__row-link" [routerLink]="['/applications', item.id]">
                 <span class="dash__row-title">{{ titleOf(item) }}</span>
                 @if (item.title?.trim()) {
-                  <span class="dash__row-type">{{ name(item) }}</span>
+                  <span class="text-muted text-xs">{{ name(item) }}</span>
                 }
               </a>
               <span class="dash__row-meta">
@@ -124,10 +124,10 @@
 
     <!-- Meine Anträge: eigene/lesbare Anträge mit Status + Deep-Link. -->
     <section class="dash__panel" aria-labelledby="dash-apps-h">
-      <div class="dash__panel-head">
+      <div class="flex items-start justify-between gap-3">
         <div>
-          <h2 id="dash-apps-h" class="dash__panel-title">{{ 'dashboard.applications.title' | t }}</h2>
-          <p class="dash__panel-sub">{{ 'dashboard.applications.subtitle' | t }}</p>
+          <h2 id="dash-apps-h" class="m-0 text-lg">{{ 'dashboard.applications.title' | t }}</h2>
+          <p class="mt-1 text-muted text-sm">{{ 'dashboard.applications.subtitle' | t }}</p>
         </div>
         @if (!loading() && !error() && total()) {
           <app-badge variant="primary">{{ total() }}</app-badge>
@@ -139,18 +139,18 @@
       } @else if (error()) {
         <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
       } @else if (applicationRows().length === 0) {
-        <div class="dash__empty">
+        <div class="flex flex-col gap-2 items-start">
           <p class="dash__state">{{ 'dashboard.applications.empty' | t }}</p>
           <a class="dash__empty-cta" routerLink="/apply">{{ 'dashboard.applications.emptyCta' | t }} →</a>
         </div>
       } @else {
-        <ul class="dash__list">
+        <ul class="list-none m-0 p-0 flex flex-col">
           @for (item of applicationRows(); track item.id) {
             <li class="dash__row">
               <a class="dash__row-link" [routerLink]="['/applications', item.id]">
                 <span class="dash__row-title">{{ titleOf(item) }}</span>
                 @if (item.title?.trim()) {
-                  <span class="dash__row-type">{{ name(item) }}</span>
+                  <span class="text-muted text-xs">{{ name(item) }}</span>
                 }
               </a>
               <span class="dash__row-meta">

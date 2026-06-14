@@ -1,11 +1,11 @@
 @if (draft(); as d) {
-  <section class="br">
-    <header class="br__head">
+  <section class="flex flex-col gap-5">
+    <header class="flex items-center justify-between gap-4 flex-wrap">
       <h1>{{ 'admin.brand.title' | t }}</h1>
-      <div class="br__ver">
-        <span class="br__badge">{{ 'admin.brand.version' | t: { n: version() } }}</span>
+      <div class="inline-flex gap-2">
+        <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted">{{ 'admin.brand.version' | t: { n: version() } }}</span>
         @if (hasDraftChanges()) {
-          <span class="br__badge br__badge--draft">{{ 'admin.brand.draftDirty' | t }}</span>
+          <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted bg-warning-subtle text-warning">{{ 'admin.brand.draftDirty' | t }}</span>
         }
       </div>
     </header>
@@ -19,20 +19,20 @@
     }
 
     <div class="br__cols">
-      <div class="br__editor">
+      <div class="flex flex-col gap-4">
         <!-- Logos -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.logos' | t }}</legend>
-          <p class="br__hint">{{ 'admin.brand.logoHint' | t: { mb: maxMb } }}</p>
+          <p class="text-xs text-muted">{{ 'admin.brand.logoHint' | t: { mb: maxMb } }}</p>
           @for (slot of logoSlots; track slot) {
             <div class="br__logo">
               <span class="br__logo-name">{{ slotLabel(slot) }}</span>
               @if (d.logos[slot]; as asset) {
                 <img class="br__logo-prev" [src]="asset.url" [alt]="slotLabel(slot)" />
-                <span class="br__logo-meta">{{ asset.filename }}</span>
+                <span class="text-xs text-muted">{{ asset.filename }}</span>
                 <app-button variant="ghost" size="sm" (click)="removeLogo(slot)">{{ 'admin.common.remove' | t }}</app-button>
               } @else {
-                <span class="br__logo-empty">{{ 'admin.brand.dropHere' | t }}</span>
+                <span class="text-sm text-muted">{{ 'admin.brand.dropHere' | t }}</span>
               }
               <input
                 #logo
@@ -52,7 +52,7 @@
             <div class="br__col">
               <div class="br__col-head">
                 <input
-                  class="br__col-title"
+                  class="font-semibold"
                   [attr.aria-label]="'admin.common.labelDe' | t"
                   [(ngModel)]="col.label['de']"
                   (ngModelChange)="reemit()"
@@ -76,7 +76,7 @@
                   <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeLink(col, li)">✕</app-button>
                 </div>
               }
-              <app-button class="br__addlink" variant="ghost" size="sm" (click)="addLink(col)">+ {{ 'admin.brand.addLink' | t }}</app-button>
+              <app-button class="self-start" variant="ghost" size="sm" (click)="addLink(col)">+ {{ 'admin.brand.addLink' | t }}</app-button>
             </div>
           }
           <app-button variant="ghost" size="sm" (click)="addColumn()">{{ 'admin.brand.addColumn' | t }}</app-button>
@@ -89,7 +89,7 @@
             <input [attr.aria-label]="('admin.brand.copyright' | t) + ' (DE)'" [(ngModel)]="d.copyright['de']" (ngModelChange)="reemit()" placeholder="DE" />
             <input [attr.aria-label]="('admin.brand.copyright' | t) + ' (EN)'" [(ngModel)]="d.copyright['en']" (ngModelChange)="reemit()" placeholder="EN" />
           </div>
-          <h2 class="br__sub">{{ 'admin.brand.legal' | t }}</h2>
+          <h2 class="text-sm font-semibold mt-2">{{ 'admin.brand.legal' | t }}</h2>
           @for (link of d.legalLinks; track $index; let li = $index) {
             <div class="br__link">
               <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />
@@ -98,38 +98,38 @@
               <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeLegalLink(li)">✕</app-button>
             </div>
           }
-          <app-button class="br__addlink" variant="ghost" size="sm" (click)="addLegalLink()">+ {{ 'admin.brand.addLink' | t }}</app-button>
+          <app-button class="self-start" variant="ghost" size="sm" (click)="addLegalLink()">+ {{ 'admin.brand.addLink' | t }}</app-button>
         </fieldset>
 
         <!-- Freetexts -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.texts' | t }}</legend>
-          <div class="br__lbl">{{ 'admin.brand.text.loginHint' | t }}
+          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.loginHint' | t }}
             <div class="br__bi">
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.loginHint' | t) + ' (DE)'" [(ngModel)]="d.freetexts.loginHint['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.loginHint' | t) + ' (EN)'" [(ngModel)]="d.freetexts.loginHint['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
             </div>
           </div>
-          <div class="br__lbl">{{ 'admin.brand.text.welcome' | t }}
+          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.welcome' | t }}
             <div class="br__bi">
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.welcome' | t) + ' (DE)'" [(ngModel)]="d.freetexts.welcome['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.welcome' | t) + ' (EN)'" [(ngModel)]="d.freetexts.welcome['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
             </div>
           </div>
-          <div class="br__lbl">{{ 'admin.brand.text.support' | t }}
+          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.support' | t }}
             <div class="br__bi">
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.support' | t) + ' (DE)'" [(ngModel)]="d.freetexts.support['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.support' | t) + ' (EN)'" [(ngModel)]="d.freetexts.support['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
             </div>
           </div>
-          <div class="br__lbl">{{ 'admin.brand.text.emailFooter' | t }}
+          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.emailFooter' | t }}
             <div class="br__bi">
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.emailFooter' | t) + ' (DE)'" [(ngModel)]="d.freetexts.emailFooter['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.emailFooter' | t) + ' (EN)'" [(ngModel)]="d.freetexts.emailFooter['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
             </div>
           </div>
           <!-- Info-Text unter der Antrags-Auswahl (#18) — Markdown-kompatibel. -->
-          <div class="br__lbl">{{ 'admin.brand.text.applyInfo' | t }}
+          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.applyInfo' | t }}
             <div class="br__bi">
               <textarea rows="4" [attr.aria-label]="('admin.brand.text.applyInfo' | t) + ' (DE)'" [(ngModel)]="applyInfo(d)['de']" (ngModelChange)="reemit()" placeholder="DE (Markdown)"></textarea>
               <textarea rows="4" [attr.aria-label]="('admin.brand.text.applyInfo' | t) + ' (EN)'" [(ngModel)]="applyInfo(d)['en']" (ngModelChange)="reemit()" placeholder="EN (Markdown)"></textarea>
@@ -156,14 +156,14 @@
         </div>
 
         @if (text(d.freetexts.welcome); as w) {
-          <p class="br__pv-welcome" data-testid="preview-welcome">{{ w }}</p>
+          <p class="text-base" data-testid="preview-welcome">{{ w }}</p>
         } @else {
-          <p class="br__pv-welcome br__pv-ph" data-testid="preview-welcome">{{ 'admin.brand.text.welcome' | t }}</p>
+          <p class="br__pv-ph text-base" data-testid="preview-welcome">{{ 'admin.brand.text.welcome' | t }}</p>
         }
         @if (text(d.freetexts.support); as s) {
-          <p class="br__pv-support" data-testid="preview-support">{{ s }}</p>
+          <p class="text-sm text-muted" data-testid="preview-support">{{ s }}</p>
         } @else {
-          <p class="br__pv-support br__pv-ph" data-testid="preview-support">{{ 'admin.brand.text.support' | t }}</p>
+          <p class="br__pv-ph text-sm text-muted" data-testid="preview-support">{{ 'admin.brand.text.support' | t }}</p>
         }
 
         <footer class="br__pv-footer" data-testid="preview-footer">
@@ -187,7 +187,7 @@
       </aside>
     </div>
 
-    <footer class="br__foot">
+    <footer class="flex justify-end gap-3">
       <app-button variant="secondary" [disabled]="linkErrors().length > 0" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
       <app-button [disabled]="!hasDraftChanges() || linkErrors().length > 0" (click)="activate()">{{ 'admin.brand.activate' | t }}</app-button>
     </footer>

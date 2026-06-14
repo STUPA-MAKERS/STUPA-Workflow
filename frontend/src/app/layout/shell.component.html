@@ -34,7 +34,7 @@
 
     <div class="header__actions">
       @if (auth.isAuthenticated()) {
-        <div class="account">
+        <div class="relative flex items-center gap-2">
           <button
             type="button"
             class="account__name-btn"
@@ -83,7 +83,7 @@
       }
 
       <!-- Sprache + Erscheinungsbild: rechts neben „Abmelden" (#81). -->
-      <div class="prefs">
+      <div class="inline-flex items-center gap-1 flex-none">
         <label class="lang">
           <span class="lang__icon" aria-hidden="true"><app-icon name="language" [size]="16" /></span>
           <select
@@ -142,7 +142,7 @@
 </main>
 
 <footer class="footer">
-  <div class="container footer__inner">
+  <div class="container flex items-center flex-wrap gap-4 py-6 text-muted text-sm">
     <img class="footer__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     <span class="footer__text">{{ footerCopyright() || ('footer.coBranding' | t) }}</span>
     @if (footerLinks().length > 0) {

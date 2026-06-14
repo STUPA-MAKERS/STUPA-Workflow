@@ -6,38 +6,11 @@
   margin: 0 auto;
 }
 
-.live__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.live__title {
-  margin: 0;
-}
-
 .live__beamer {
   color: var(--color-primary);
   font-weight: var(--fw-semibold);
   text-decoration: none;
   font-size: var(--fs-sm);
-}
-
-.live__banner {
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-sunken);
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  text-align: center;
-}
-
-.live__banner--warn {
-  background: var(--color-warning-subtle);
-  color: var(--color-text);
 }
 
 .live__notice {
@@ -59,24 +32,7 @@
   padding: var(--space-8) var(--space-4);
 }
 
-.live__voted {
-  margin: 0;
-  font-weight: var(--fw-medium);
-  text-align: center;
-}
-
-.live__result {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
 // --- Daumen-Bedienung: große, gestapelte Touch-Ziele ------------------------
-.live__options {
-  display: grid;
-  gap: var(--space-4);
-}
-
 .live__option {
   width: 100%;
 }

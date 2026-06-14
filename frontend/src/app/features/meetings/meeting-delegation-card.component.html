@@ -1,10 +1,10 @@
 @if (visible()) {
   <app-card [heading]="'delegation.card.title' | t">
     @if (ctx(); as c) {
-      <div class="dlg__sections">
+      <div class="flex flex-col gap-4">
         @if (c.myDelegation; as d) {
-          <div class="dlg__section">
-            <p class="dlg__row">
+          <div class="flex flex-col gap-2">
+            <p class="flex items-center gap-2 flex-wrap m-0">
               {{ 'delegation.card.outgoing' | t: { name: d.delegateName || d.delegateId } }}
               @if (d.delegateVoting) {
                 <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
@@ -14,7 +14,7 @@
               }
             </p>
             @if (d.revocable) {
-              <div class="dlg__actions">
+              <div class="flex mt-1">
                 <app-button variant="ghost" size="sm" [loading]="busy()" (click)="revoke(d)">
                   {{ 'delegation.card.revoke' | t }}
                 </app-button>
@@ -22,26 +22,26 @@
             }
           </div>
         } @else if (canCreate()) {
-          <div class="dlg__section">
-            <p class="dlg__muted">{{ 'delegation.card.lead' | t }}</p>
+          <div class="flex flex-col gap-2">
+            <p class="text-muted text-sm m-0">{{ 'delegation.card.lead' | t }}</p>
             @if (c.deadline && !c.deadlinePassed) {
-              <p class="dlg__muted">
+              <p class="text-muted text-sm m-0">
                 {{ 'delegation.card.deadline' | t: { date: (c.deadline | ldate: 'short') } }}
               </p>
             }
-            <div class="dlg__actions">
+            <div class="flex mt-1">
               <app-button size="sm" (click)="openDialog()">
                 {{ 'delegation.card.setup' | t }}
               </app-button>
             </div>
           </div>
         } @else if (c.canDelegate && c.deadlinePassed && !c.meetingStarted) {
-          <p class="dlg__muted">{{ 'delegation.card.deadlinePassed' | t }}</p>
+          <p class="text-muted text-sm m-0">{{ 'delegation.card.deadlinePassed' | t }}</p>
         }
         @if (c.incoming.length > 0) {
-          <div class="dlg__section dlg__section--incoming">
+          <div class="dlg__section--incoming flex flex-col gap-2">
             @for (d of c.incoming; track d.id) {
-              <p class="dlg__row dlg__incoming">
+              <p class="flex items-center gap-2 flex-wrap m-0 text-sm">
                 {{ 'delegation.card.incoming' | t: { name: d.delegatorName || d.delegatorId } }}
                 @if (d.delegateVoting) {
                   <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
@@ -62,8 +62,8 @@
   >
     @if (ctx(); as c) {
       @if (c.delegationAllowExternal) {
-        <div class="field">
-          <label class="field__label" for="dlg-search">{{ 'delegation.dialog.search' | t }}</label>
+        <div class="flex flex-col gap-2 mb-3">
+          <label class="text-sm font-medium" for="dlg-search">{{ 'delegation.dialog.search' | t }}</label>
           <input
             id="dlg-search"
             class="field__control"
@@ -83,9 +83,9 @@
       />
       @if (selectedRecipient(); as r) {
         @if (r.viaPool) {
-          <p class="dlg__muted">{{ 'delegation.dialog.poolHint' | t }}</p>
+          <p class="text-muted text-sm m-0">{{ 'delegation.dialog.poolHint' | t }}</p>
         } @else if (!r.isMember) {
-          <p class="dlg__muted">{{ 'delegation.dialog.externalHint' | t }}</p>
+          <p class="text-muted text-sm m-0">{{ 'delegation.dialog.externalHint' | t }}</p>
         }
       }
       @if (c.votingDelegationEnabled) {
@@ -96,10 +96,10 @@
           name="delegateVoting"
         >{{ 'delegation.dialog.voting' | t }}</app-checkbox>
       } @else {
-        <p class="dlg__muted">{{ 'delegation.dialog.votingDisabled' | t }}</p>
+        <p class="text-muted text-sm m-0">{{ 'delegation.dialog.votingDisabled' | t }}</p>
       }
     }
-    <div dialog-footer class="dlg__foot">
+    <div dialog-footer class="flex gap-3">
       <app-button variant="ghost" (click)="dialogOpen.set(false)">
         {{ 'delegation.dialog.cancel' | t }}
       </app-button>

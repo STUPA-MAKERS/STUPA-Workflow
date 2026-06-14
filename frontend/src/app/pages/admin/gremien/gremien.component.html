@@ -1,16 +1,16 @@
-<header class="grem__head">
+<header class="flex items-center justify-between gap-4 flex-wrap">
   <div>
-    <h1 class="grem__title">{{ 'admin.gremien.title' | t }}</h1>
-    <p class="grem__subtitle">{{ 'admin.gremien.subtitle' | t }}</p>
+    <h1 class="m-0">{{ 'admin.gremien.title' | t }}</h1>
+    <p class="text-muted mt-1">{{ 'admin.gremien.subtitle' | t }}</p>
   </div>
   <app-button size="sm" (click)="openCreate()">{{ 'admin.gremien.addGremium' | t }}</app-button>
 </header>
 
 <section class="grem__list" [attr.aria-label]="'admin.gremien.title' | t">
   @if (loading()) {
-    <p class="grem__status" aria-live="polite">{{ 'admin.gremien.loading' | t }}</p>
+    <p class="text-muted py-4" aria-live="polite">{{ 'admin.gremien.loading' | t }}</p>
   } @else if (loadError()) {
-    <p class="grem__status grem__status--error" role="alert">{{ 'admin.gremien.error' | t }}</p>
+    <p class="text-muted py-4 text-danger" role="alert">{{ 'admin.gremien.error' | t }}</p>
   } @else {
     <app-data-table [columns]="columns()" [rows]="gremien()" [rowKey]="rowId" [emptyText]="'admin.gremien.empty' | t">
       <ng-template appCell="slug" let-g><span class="grem__mono">{{ $any(g).slug }}</span></ng-template>
@@ -40,11 +40,11 @@
   [closeLabel]="'admin.gremien.cancel' | t"
   (closed)="closeDialog()"
 >
-  <form id="grem-form" class="grem__form" (submit)="submit($event)">
-    <div class="field">
-      <label class="field__label" for="grem-name">{{ 'admin.gremien.name' | t }}</label>
+  <form id="grem-form" class="flex flex-col gap-4" (submit)="submit($event)">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium" for="grem-name">{{ 'admin.gremien.name' | t }}</label>
       <input id="grem-name" class="field__control" name="name" [ngModel]="form().name" (ngModelChange)="patch('name', $event)" required />
-      <p class="field__hint">{{ 'admin.gremien.slug' | t }}: <span class="grem__mono">{{ slugPreview() }}</span></p>
+      <p class="text-xs text-muted m-0">{{ 'admin.gremien.slug' | t }}: <span class="grem__mono">{{ slugPreview() }}</span></p>
     </div>
     <app-select
       [label]="'admin.gremien.cdVariant' | t"
@@ -67,8 +67,8 @@
       name="delegation"
     >{{ 'admin.gremien.delegation' | t }}</app-checkbox>
     @if (form().allowVoteDelegation) {
-      <div class="field">
-        <label class="field__label" for="grem-lead">{{ 'admin.gremien.delegationLead' | t }}</label>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium" for="grem-lead">{{ 'admin.gremien.delegationLead' | t }}</label>
         <input
           id="grem-lead"
           class="field__control"
@@ -79,7 +79,7 @@
           [ngModel]="form().delegationLeadMinutes"
           (ngModelChange)="patchLead($event)"
         />
-        <p class="field__hint">{{ 'admin.gremien.delegationLeadHint' | t }}</p>
+        <p class="text-xs text-muted m-0">{{ 'admin.gremien.delegationLeadHint' | t }}</p>
       </div>
       <app-checkbox
         [ngModel]="form().delegationAllowExternal"
@@ -88,8 +88,8 @@
         name="delegationAllowExternal"
       >{{ 'admin.gremien.delegationExternal' | t }}</app-checkbox>
     }
-    <div class="field">
-      <label class="field__label" for="grem-quorum">{{ 'admin.gremien.quorum' | t }}</label>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium" for="grem-quorum">{{ 'admin.gremien.quorum' | t }}</label>
       <input
         id="grem-quorum"
         class="field__control"
@@ -101,12 +101,12 @@
         [ngModel]="form().quorumPercent"
         (ngModelChange)="patchQuorum($event)"
       />
-      <p class="field__hint">{{ 'admin.gremien.quorumHint' | t }}</p>
+      <p class="text-xs text-muted m-0">{{ 'admin.gremien.quorumHint' | t }}</p>
     </div>
     <!-- Zusatz-Protokoll-Empfänger (#protocol-recipients): erhalten finalisierte
          Protokolle zusätzlich zu den aktiven Mitgliedern. -->
-    <div class="field">
-      <label class="field__label" for="grem-mail">{{ 'admin.gremien.mailRecipients' | t }}</label>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium" for="grem-mail">{{ 'admin.gremien.mailRecipients' | t }}</label>
       <textarea
         id="grem-mail"
         class="field__control grem__mail"
@@ -116,10 +116,10 @@
         (ngModelChange)="patch('mailRecipients', $event)"
         [placeholder]="'admin.gremien.mailRecipientsPlaceholder' | t"
       ></textarea>
-      <p class="field__hint">{{ 'admin.gremien.mailRecipientsHint' | t }}</p>
+      <p class="text-xs text-muted m-0">{{ 'admin.gremien.mailRecipientsHint' | t }}</p>
     </div>
   </form>
-  <div dialog-footer class="grem__dialog-foot">
+  <div dialog-footer class="flex gap-3">
     <app-button variant="ghost" (click)="closeDialog()">{{ 'admin.gremien.cancel' | t }}</app-button>
     <app-button [disabled]="!form().name.trim()" [loading]="saving()" (click)="submit($event)">
       {{ (editingId() ? 'admin.gremien.save' : 'admin.gremien.add') | t }}
@@ -135,7 +135,7 @@
   (closed)="confirmDelete.set(null)"
 >
   <p class="grem__confirm">{{ 'admin.gremien.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}</p>
-  <div dialog-footer class="grem__dialog-foot">
+  <div dialog-footer class="flex gap-3">
     <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
     <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{ 'admin.gremien.deleteAction' | t }}</app-button>
   </div>

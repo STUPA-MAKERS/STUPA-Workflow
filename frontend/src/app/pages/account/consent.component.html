@@ -1,20 +1,20 @@
-<section class="consent">
+<section class="flex justify-center py-5">
   @if (loading()) {
-    <p class="consent__muted">{{ 'common.loading' | t }}</p>
+    <p class="text-muted">{{ 'common.loading' | t }}</p>
   } @else if (error() && !req()) {
-    <p class="consent__error">{{ 'account.consent.error' | t }}</p>
+    <p class="text-danger">{{ 'account.consent.error' | t }}</p>
   } @else if (req(); as r) {
     <div class="card consent__card">
       <header class="consent__head">
         <app-icon name="webhook" [size]="28" />
         <div>
           <h1>{{ 'account.consent.title' | t }}</h1>
-          <p class="consent__intro">{{ 'account.consent.intro' | t }}</p>
+          <p class="m-0 text-muted">{{ 'account.consent.intro' | t }}</p>
         </div>
       </header>
 
       @if (!r.canUseMcp) {
-        <p class="consent__error">{{ 'account.consent.notAllowed' | t }}</p>
+        <p class="text-danger">{{ 'account.consent.notAllowed' | t }}</p>
       }
 
       <h2 class="consent__label">{{ 'account.consent.scopes' | t }}</h2>
@@ -27,11 +27,11 @@
                 [checked]="selected()[s.key]"
                 (change)="toggle(s.key)"
               />
-              <span class="scope__text">
-                <span class="scope__name">{{ scopeLabelKey(s.key) | t }}</span>
-                <span class="scope__desc">{{ scopeDescKey(s.key) | t }}</span>
+              <span class="flex flex-col">
+                <span class="font-semibold">{{ scopeLabelKey(s.key) | t }}</span>
+                <span class="text-sm text-muted">{{ scopeDescKey(s.key) | t }}</span>
                 @if (!s.held) {
-                  <span class="scope__warn">{{ 'account.consent.notHeld' | t }}</span>
+                  <span class="text-xs text-danger mt-1">{{ 'account.consent.notHeld' | t }}</span>
                 }
               </span>
             </label>
@@ -40,7 +40,7 @@
       </ul>
 
       <h2 class="consent__label">{{ 'account.consent.lifetime' | t }}</h2>
-      <div class="consent__lifetimes">
+      <div class="flex flex-wrap gap-2">
         @for (lt of r.lifetimes; track lt) {
           <button
             type="button"
@@ -54,7 +54,7 @@
       </div>
 
       @if (error()) {
-        <p class="consent__error">{{ 'account.consent.error' | t }}</p>
+        <p class="text-danger">{{ 'account.consent.error' | t }}</p>
       }
 
       <footer class="consent__actions">

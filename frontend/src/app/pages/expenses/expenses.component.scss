@@ -1,12 +1,8 @@
 :host { display: block; }
 /* Kopf auf normale Body-Breite zentrieren (wie Anträge); Baum im linken Rand. */
 .exp__head { width: 100%; max-width: var(--layout-max-width); margin: 0 auto var(--space-5); }
-.exp__headRow { display: flex; align-items: start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .exp__title { margin: 0; }
 .exp__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
-.exp__headActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.exp__btnIcon { display: inline-flex; align-items: center; gap: var(--space-2); }
-.exp__kinds { display: inline-flex; gap: var(--space-1); }
 .exp__search, .exp__input {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -74,8 +70,6 @@ input.exp__input {
 .exp__amount--income { color: var(--color-success, #2e7d32); }
 .exp__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
 .exp__sentinel { height: 1px; }
-.exp__more { display: flex; justify-content: center; margin-top: var(--space-4); }
-.exp__count { text-align: center; color: var(--color-text-muted); font-size: var(--fs-sm); margin-top: var(--space-3); }
 /* --- Tabelle (#25) --- */
 .exp__tableWrap {
   overflow-x: auto;
@@ -162,18 +156,11 @@ input.exp__input {
   gap: var(--space-1);
   justify-content: flex-end;
 }
-.exp__form { display: flex; flex-direction: column; gap: var(--space-2); }
-.exp__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); margin-top: var(--space-2); }
 /* Zwei-Spalten-Reihe für zusammengehörige Felder (Daten, Beleg/Methode). */
 .exp__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
-.exp__field { display: flex; flex-direction: column; gap: var(--space-1); }
 .exp__textarea { resize: vertical; min-height: 4.5rem; }
 @media (max-width: 30rem) { .exp__grid2 { grid-template-columns: 1fr; } }
-.exp__hint { font-size: var(--fs-sm); color: var(--color-text-muted); margin: 0; }
-.exp__hint--warn { color: var(--color-danger); }
-.exp__dialogFoot { display: flex; justify-content: flex-end; gap: var(--space-3); }
 /* Antrags-Typeahead (wie Nutzersuche) */
-.exp__typeahead { position: relative; }
 .exp__suggest {
   list-style: none;
   margin: var(--space-1) 0 0;
@@ -212,7 +199,6 @@ input.exp__input {
   border-radius: var(--radius-md);
   background: var(--color-surface);
 }
-.exp__pickedText { font-weight: var(--fw-medium); }
 /* Betrags-Filter (von/bis) */
 @media (max-width: 720px) {
   .exp__layout { grid-template-columns: 1fr; }

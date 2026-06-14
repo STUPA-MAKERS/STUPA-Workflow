@@ -33,19 +33,12 @@
   gap: var(--space-3);
   flex-wrap: wrap;
 }
-.mtg__name {
-  font-weight: var(--fw-semibold);
-}
 .mtg__status {
   color: var(--color-text-muted);
   padding: var(--space-5) 0;
 }
 .mtg__status--error {
   color: var(--color-danger);
-}
-.mtg__lead {
-  color: var(--color-text-muted);
-  margin: 0 0 var(--space-3);
 }
 .mtg__listSection {
   display: flex;
@@ -69,13 +62,6 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
-}
-.mtg__muted {
-  color: var(--color-text-muted);
-}
-.mtg__hint {
-  font-size: var(--fs-sm);
-  align-self: center;
 }
 .mtg__statusActions {
   display: flex;
@@ -108,15 +94,6 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
-}
-.mtg__voteTitle {
-  font-weight: var(--fw-medium);
-  margin-right: auto;
-}
-.mtg__quorumNote {
-  font-size: var(--fs-xs);
-  color: var(--color-danger);
-  font-weight: var(--fw-medium);
 }
 .mtg__tally {
   display: flex;
@@ -161,11 +138,6 @@
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
-.mtg__pdf {
-  color: var(--color-primary);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-}
 .mtg__snippets {
   display: flex;
   flex-wrap: wrap;
@@ -193,11 +165,6 @@
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
-}
-.mtg__paneLabel {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--color-text-muted);
 }
 .mtg__textarea,
 .mtg__input {
@@ -357,10 +324,6 @@
   border-color: var(--color-primary);
   background: var(--color-primary-subtle);
 }
-.mtg__tocGrip {
-  cursor: grab;
-  color: var(--color-text-muted);
-}
 .mtg__tocNum {
   font-family: var(--font-mono, monospace);
   font-size: var(--fs-xs);
@@ -431,10 +394,6 @@
   gap: var(--space-3);
   flex-wrap: wrap;
 }
-.mtg__topTitle {
-  margin: 0;
-  font-size: var(--fs-md);
-}
 .mtg__topEmpty {
   display: grid;
   place-items: center;
@@ -445,9 +404,6 @@
   border: var(--border-width) dashed var(--color-border);
   border-radius: var(--radius-md);
 }
-.mtg__viewers { margin-top: var(--space-5); }
-.mtg__viewerList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-sm); }
-.mtg__viewer { display: flex; align-items: center; gap: var(--space-2); }
 .mtg__viewerDot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--color-success); flex: none; }
 .mtg__attTable {
   width: 100%;
@@ -461,16 +417,6 @@
 }
 .mtg__attRow:last-child td {
   border-bottom: none;
-}
-.mtg__attName {
-  font-weight: var(--fw-medium);
-  width: 100%;
-}
-.mtg__attYou {
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-normal);
-  color: var(--color-text-muted);
-  margin-left: var(--space-1);
 }
 .mtg__attStatus {
   text-align: end;
@@ -698,11 +644,6 @@
 .mtg__toolbarSpacer {
   margin-left: auto;
 }
-.mtg__btnIcon {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
 /* Breakout-Grid: Tagesordnung im linken Rand, Anwesenheit im rechten Rand,
    Protokoll-Body zentriert auf Body-Breite (analog Budget-Dashboard). */
 .mtg__shell {
@@ -906,23 +847,12 @@
   gap: var(--space-2);
   flex-wrap: wrap;
 }
-.mtg__tlDate {
-  font-size: var(--fs-sm);
-}
 .mtg__tlGremium {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
-}
-.mtg__tlTitle {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-}
-.mtg__tlProto {
-  font-size: var(--fs-sm);
 }
 .mtg__tlNow {
   position: relative;

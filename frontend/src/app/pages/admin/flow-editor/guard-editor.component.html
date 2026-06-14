@@ -1,4 +1,4 @@
-<div class="ge">
+<div class="flex flex-col gap-2">
   <app-select
     class="ge__op"
     [options]="opOptions()"
@@ -50,7 +50,7 @@
           </div>
         }
         @case ('none') {
-          <span class="ge__bool">{{ 'admin.flow.guardBoolTrue' | t }}</span>
+          <span class="text-sm text-muted">{{ 'admin.flow.guardBoolTrue' | t }}</span>
         }
       }
     }

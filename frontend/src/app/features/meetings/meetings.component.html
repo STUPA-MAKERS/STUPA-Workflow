@@ -22,15 +22,15 @@
   </div>
   @if (meeting(); as m) {
     <div class="mtg__meta">
-      <span class="mtg__name">{{ m.title }}</span>
+      <span class="font-semibold">{{ m.title }}</span>
       @if (m.date) {
-        <span class="mtg__muted">{{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}</span>
+        <span class="text-text-muted">{{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}</span>
       }
       <app-badge [variant]="statusVariant(m.status)">
         {{ statusKey(m.status) | t }}
       </app-badge>
       @if (m.protokollantName) {
-        <span class="mtg__muted">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
+        <span class="text-text-muted">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
       }
       <app-button
         variant="ghost"
@@ -86,27 +86,27 @@
   <!-- Mitglied: Live-Verfolgung (Protokoll lesen, offene Abstimmungen mitstimmen). -->
   @if (isFollower() && !beamerMode()) {
     <app-card [heading]="'meetings.follow.title' | t">
-      <p class="mtg__lead">{{ 'meetings.follow.lead' | t }}</p>
+      <p class="text-text-muted mb-3">{{ 'meetings.follow.lead' | t }}</p>
       @for (item of agenda(); track item.id; let i = $index) {
         <article class="mtg__followTop">
-          <h3 class="mtg__topTitle">
+          <h3 class="m-0 text-base">
             {{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || ('meetings.agenda.untitled' | t) }}
             @if (stateLabelOf(item.stateLabel); as st) {
               <app-badge variant="neutral">{{ st }}</app-badge>
             }
           </h3>
           @if (item.applicationId) {
-            <a class="mtg__pdf" [routerLink]="['/applications', item.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
+            <a class="text-primary text-sm font-medium" [routerLink]="['/applications', item.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
           }
           @if (item.body) { <div class="mtg__preview" [innerHTML]="renderBody(item.body)"></div> }
           @for (vote of votesForTop(item.id); track vote.id) {
             <div class="mtg__vote">
               <div class="mtg__voteHead">
-                <span class="mtg__voteTitle">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
+                <span class="font-medium mr-auto">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
                 <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
                 @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
                 @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
-                  <span class="mtg__quorumNote">{{ 'vote.failedQuorum' | t }}</span>
+                  <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
                 }
               </div>
               @if (vote.status === 'open' && canVote()) {
@@ -126,13 +126,13 @@
                   }
                 </dl>
               } @else if (vote.status === 'open') {
-                <p class="mtg__muted mtg__voteHidden">{{ 'meetings.vote.progressHidden' | t }}</p>
+                <p class="mtg__voteHidden text-text-muted">{{ 'meetings.vote.progressHidden' | t }}</p>
               }
             </div>
           }
         </article>
       } @empty {
-        <p class="mtg__muted">{{ 'meetings.follow.noTops' | t }}</p>
+        <p class="text-text-muted">{{ 'meetings.follow.noTops' | t }}</p>
       }
     </app-card>
 
@@ -142,9 +142,9 @@
         <tbody>
           @for (a of attendance(); track a.principalId) {
             <tr class="mtg__attRow">
-              <td class="mtg__attName">
+              <td class="font-medium w-full">
                 {{ a.displayName || a.email || a.principalId }}
-                @if (a.isSelf) { <span class="mtg__attYou">{{ 'meetings.attendance.you' | t }}</span> }
+                @if (a.isSelf) { <span class="text-xs font-normal text-text-muted ml-1">{{ 'meetings.attendance.you' | t }}</span> }
               </td>
               <td class="mtg__attStatus">
                 @if (a.isSelf) {
@@ -169,13 +169,13 @@
                     {{ (a.status ? attendanceKey(a.status) : 'meetings.attendance.unknown') | t }}
                   </app-badge>
                   @if (a.source === 'lead') {
-                    <span class="mtg__muted"> ({{ 'meetings.attendance.bySession' | t }})</span>
+                    <span class="text-text-muted"> ({{ 'meetings.attendance.bySession' | t }})</span>
                   }
                 }
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="2" class="mtg__muted mtg__tocEmpty">{{ 'meetings.attendance.empty' | t }}</td></tr>
+            <tr><td colspan="2" class="mtg__tocEmpty text-text-muted">{{ 'meetings.attendance.empty' | t }}</td></tr>
           }
         </tbody>
       </table>
@@ -195,10 +195,10 @@
            (das Protokoll entsteht beim Start und braucht eine Schriftführung). -->
       <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live' || !m.protokollantId" [ariaLabel]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
       @if (m.status === 'planned' && !m.protokollantId) {
-        <span class="mtg__muted mtg__needProt">{{ 'meetings.control.needProtokollant' | t }}</span>
+        <span class="mtg__needProt text-text-muted">{{ 'meetings.control.needProtokollant' | t }}</span>
       }
       <app-button variant="danger" size="sm" [loading]="finalizing()" [title]="'meetings.control.closeSession' | t" (click)="closeConfirmOpen.set(true)">
-        <span class="mtg__btnIcon"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeShort' | t }}</span>
+        <span class="inline-flex items-center gap-2"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeShort' | t }}</span>
       </app-button>
     }
     <!-- Sitzung geschlossen, Protokoll (wieder) Entwurf: Render fehlgeschlagen/
@@ -233,7 +233,7 @@
             (click)="selectTop(item.id)"
           >
             @if (m.canWrite && !protocol()?.isLocked) {
-              <span class="mtg__tocGrip" aria-hidden="true">⠿</span>
+              <span class="cursor-grab text-text-muted" aria-hidden="true">⠿</span>
             }
             <span class="mtg__tocNum">{{ i + 1 }}</span>
             @if (renamingTopId() === item.id) {
@@ -264,7 +264,7 @@
             }
           </li>
         } @empty {
-          <li class="mtg__muted mtg__tocEmpty">{{ 'meetings.agenda.empty' | t }}</li>
+          <li class="mtg__tocEmpty text-text-muted">{{ 'meetings.agenda.empty' | t }}</li>
         }
       </ol>
       @if (m.canWrite && !protocol()?.isLocked) {
@@ -292,9 +292,9 @@
         <!-- Das Protokoll entsteht ausschließlich beim Start; davor kann nicht
              protokolliert/abgestimmt werden. Kein manueller Anlege-Button mehr. -->
         @if (m.status === 'planned') {
-          <p class="mtg__muted mtg__beforeStart">{{ 'meetings.protocol.beforeStart' | t }}</p>
+          <p class="mtg__beforeStart text-text-muted">{{ 'meetings.protocol.beforeStart' | t }}</p>
         } @else {
-          <p class="mtg__muted">{{ 'meetings.protocol.none' | t }}</p>
+          <p class="text-text-muted">{{ 'meetings.protocol.none' | t }}</p>
         }
       } @else if (protocol(); as proto) {
         <div class="mtg__protoMeta">
@@ -302,7 +302,7 @@
             {{ (proto.isFinal ? 'meetings.protocol.final' : proto.status === 'rendering' ? 'meetings.protocol.rendering' : 'meetings.protocol.draft') | t }}
           </app-badge>
           @if (proto.pdfUrl) {
-            <a class="mtg__pdf" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
+            <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
           }
           <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
             @switch (saveState()) {
@@ -317,9 +317,9 @@
         <div class="mtg__topEditor">
           @if (selectedTop(); as top) {
             <div class="mtg__topHead">
-              <h3 class="mtg__topTitle">{{ 'meetings.agenda.top' | t: { n: selectedIndex() + 1 } }}: {{ top.title || ('meetings.agenda.untitled' | t) }}</h3>
+              <h3 class="m-0 text-base">{{ 'meetings.agenda.top' | t: { n: selectedIndex() + 1 } }}: {{ top.title || ('meetings.agenda.untitled' | t) }}</h3>
               @if (top.applicationId) {
-                <a class="mtg__pdf" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
+                <a class="text-primary text-sm font-medium" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
               }
             </div>
             <app-markdown-editor
@@ -335,11 +335,11 @@
               @for (vote of votesForTop(top.id); track vote.id) {
                 <div class="mtg__vote">
                   <div class="mtg__voteHead">
-                    <span class="mtg__voteTitle">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
+                    <span class="font-medium mr-auto">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
                     <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
                     @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
                     @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
-                      <span class="mtg__quorumNote">{{ 'vote.failedQuorum' | t }}</span>
+                      <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
                     }
                     @if (m.canManageVotes && !proto.isLocked) {
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="deleteVote(vote.id)"><app-icon name="delete" /></app-button>
@@ -355,7 +355,7 @@
                       }
                     </dl>
                   } @else if (vote.status === 'open') {
-                    <p class="mtg__muted mtg__voteHidden">{{ 'meetings.vote.progressHidden' | t }}</p>
+                    <p class="mtg__voteHidden text-text-muted">{{ 'meetings.vote.progressHidden' | t }}</p>
                   }
                   @if (vote.status === 'open' && canVote()) {
                     <div class="mtg__voteActions">
@@ -377,22 +377,22 @@
               }
             </div>
           } @else {
-            <p class="mtg__muted mtg__topEmpty">{{ 'meetings.protocol.selectTop' | t }}</p>
+            <p class="mtg__topEmpty text-text-muted">{{ 'meetings.protocol.selectTop' | t }}</p>
           }
         </div>
 
         <!-- Finalisieren passiert implizit beim Schließen der Sitzung (#Meetings). -->
         <div class="mtg__protoActions">
           @if (proto.isFinal) {
-            <p class="mtg__muted">{{ 'meetings.protocol.finalizedHint' | t }}</p>
+            <p class="text-text-muted">{{ 'meetings.protocol.finalizedHint' | t }}</p>
           } @else if (proto.status === 'rendering') {
-            <p class="mtg__muted">{{ 'meetings.protocol.renderingHint' | t }}</p>
+            <p class="text-text-muted">{{ 'meetings.protocol.renderingHint' | t }}</p>
           } @else if (canWrite()) {
             @if (m.status === 'closed') {
               <!-- Retry-Button lebt als Repeat-Icon in der Toolbar; hier nur der Hinweis. -->
-              <p class="mtg__muted">{{ 'meetings.protocol.retryHint' | t }}</p>
+              <p class="text-text-muted">{{ 'meetings.protocol.retryHint' | t }}</p>
             } @else {
-              <p class="mtg__muted">{{ 'meetings.protocol.finalizeOnClose' | t }}</p>
+              <p class="text-text-muted">{{ 'meetings.protocol.finalizeOnClose' | t }}</p>
             }
           }
         </div>
@@ -406,9 +406,9 @@
         <tbody>
           @for (a of attendance(); track a.principalId) {
             <tr class="mtg__attRow">
-              <td class="mtg__attName">
+              <td class="font-medium w-full">
                 {{ a.displayName || a.email || a.principalId }}
-                @if (a.isSelf) { <span class="mtg__attYou">{{ 'meetings.attendance.you' | t }}</span> }
+                @if (a.isSelf) { <span class="text-xs font-normal text-text-muted ml-1">{{ 'meetings.attendance.you' | t }}</span> }
               </td>
               <td class="mtg__attStatus">
                 @if (m.canControl || a.isSelf) {
@@ -433,13 +433,13 @@
                     {{ (a.status ? attendanceKey(a.status) : 'meetings.attendance.unknown') | t }}
                   </app-badge>
                   @if (a.source === 'lead') {
-                    <span class="mtg__muted"> ({{ 'meetings.attendance.bySession' | t }})</span>
+                    <span class="text-text-muted"> ({{ 'meetings.attendance.bySession' | t }})</span>
                   }
                 }
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="2" class="mtg__muted mtg__tocEmpty">{{ 'meetings.attendance.empty' | t }}</td></tr>
+            <tr><td colspan="2" class="mtg__tocEmpty text-text-muted">{{ 'meetings.attendance.empty' | t }}</td></tr>
           }
         </tbody>
       </table>
@@ -450,15 +450,15 @@
       <!-- Live-Zuschauer (#live-viewers): wer hat die Sitzungs-Seite gerade
            offen — nur für Protokollant/Leitung (canWrite). -->
       @if (m.canWrite) {
-        <section class="mtg__viewers" [attr.aria-label]="'meetings.viewers.title' | t">
+        <section class="mt-5" [attr.aria-label]="'meetings.viewers.title' | t">
           <h2 class="mtg__sideH">
             {{ 'meetings.viewers.title' | t }} ({{ viewers().length }})
           </h2>
-          <ul class="mtg__viewerList" aria-live="polite">
+          <ul class="list-none m-0 p-0 flex flex-col gap-1 text-sm" aria-live="polite">
             @for (name of viewers(); track name) {
-              <li class="mtg__viewer"><span class="mtg__viewerDot" aria-hidden="true"></span>{{ name }}</li>
+              <li class="flex items-center gap-2"><span class="mtg__viewerDot" aria-hidden="true"></span>{{ name }}</li>
             } @empty {
-              <li class="mtg__muted">{{ 'meetings.viewers.empty' | t }}</li>
+              <li class="text-text-muted">{{ 'meetings.viewers.empty' | t }}</li>
             }
           </ul>
         </section>
@@ -473,14 +473,14 @@
         @for (vote of looseVotes(); track vote.id) {
           <li class="mtg__vote" [class.mtg__vote--active]="vote.applicationId && vote.applicationId === m.activeApplicationId">
             <div class="mtg__voteHead">
-              <span class="mtg__voteTitle">{{ vote.question || vote.title || ('meetings.vote.untitled' | t) }}</span>
+              <span class="font-medium mr-auto">{{ vote.question || vote.title || ('meetings.vote.untitled' | t) }}</span>
               <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
               @if (vote.applicationId && vote.applicationId === m.activeApplicationId) {
                 <app-badge variant="primary">{{ 'meetings.vote.active' | t }}</app-badge>
               }
               @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
               @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
-                <span class="mtg__quorumNote">{{ 'vote.failedQuorum' | t }}</span>
+                <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
               }
             </div>
             @if (vote.status === 'open') {
@@ -493,7 +493,7 @@
                 }
               </dl>
             } @else if (vote.status === 'open') {
-              <p class="mtg__muted mtg__voteHidden">{{ 'meetings.vote.progressHidden' | t }}</p>
+              <p class="mtg__voteHidden text-text-muted">{{ 'meetings.vote.progressHidden' | t }}</p>
             }
             @if (vote.status === 'open' && canVote()) {
               <div class="mtg__voteActions">
@@ -529,16 +529,16 @@
     (closed)="closeVoteDialog()"
   >
     <form class="mtg__voteForm" (submit)="$event.preventDefault(); submitVote()">
-      <label class="mtg__paneLabel" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
+      <label class="text-sm font-medium text-text-muted" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
       <!-- Mehrzeilig (#19): Beschlussfragen sind oft länger als eine Zeile. -->
       <textarea id="mtg-vq" class="mtg__input mtg__voteQuestion" rows="4" [ngModel]="voteQuestion()" (ngModelChange)="voteQuestion.set($event)" name="vq" [placeholder]="'meetings.vote.questionPlaceholder' | t"></textarea>
-      <span class="mtg__paneLabel">{{ 'meetings.vote.options' | t }}</span>
+      <span class="text-sm font-medium text-text-muted">{{ 'meetings.vote.options' | t }}</span>
       <div class="mtg__voteFixed">
         @for (opt of FIXED_VOTE_OPTIONS; track opt) {
           <app-badge variant="neutral">{{ voteOptionLabel(opt) }}</app-badge>
         }
       </div>
-      <p class="mtg__muted mtg__hint">{{ 'meetings.vote.optionsFixedHint' | t }}</p>
+      <p class="text-text-muted text-sm self-center">{{ 'meetings.vote.optionsFixedHint' | t }}</p>
       <label class="mtg__voteSecret">
         <input type="checkbox" [checked]="voteSecret()" (change)="voteSecret.set($any($event.target).checked)" />
         {{ 'meetings.vote.secret' | t }}
@@ -552,12 +552,12 @@
         (ngModelChange)="voteMajorityRule.set($event)"
       />
       <div class="mtg__voteQuorum">
-        <label class="mtg__paneLabel" for="mtg-velig">{{ 'meetings.vote.eligibleCount' | t }}</label>
+        <label class="text-sm font-medium text-text-muted" for="mtg-velig">{{ 'meetings.vote.eligibleCount' | t }}</label>
         <input id="mtg-velig" class="mtg__input" type="number" min="0" inputmode="numeric" [ngModel]="voteEligibleCount()" (ngModelChange)="voteEligibleCount.set($event)" name="velig" [placeholder]="'meetings.vote.eligibleCountPlaceholder' | t" />
-        <label class="mtg__paneLabel" for="mtg-vquorum">{{ 'meetings.vote.quorumPercent' | t }}</label>
+        <label class="text-sm font-medium text-text-muted" for="mtg-vquorum">{{ 'meetings.vote.quorumPercent' | t }}</label>
         <input id="mtg-vquorum" class="mtg__input" type="number" min="0" max="100" inputmode="numeric" [ngModel]="voteQuorumPercent()" (ngModelChange)="voteQuorumPercent.set($event)" name="vquorum" [placeholder]="'meetings.vote.quorumPercentPlaceholder' | t" />
       </div>
-      <p class="mtg__muted mtg__hint">{{ 'meetings.vote.quorumHint' | t }}</p>
+      <p class="text-text-muted text-sm self-center">{{ 'meetings.vote.quorumHint' | t }}</p>
     </form>
     <div dialog-footer class="mtg__dialogFoot">
       <app-button variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
@@ -589,7 +589,7 @@
   @if (showOverview()) {
     <section class="mtg__listSection">
       @if (loadingList()) {
-        <p class="mtg__muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
+        <p class="text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
       } @else {
         <!-- Auch ohne Sitzungen die Timeline mit Jetzt-Balken zeigen (#empty-timeline):
              der „noch keine Sitzungen"-Fall ist nur eine leere Timeline (ohne Hinweistext). -->
@@ -611,10 +611,10 @@
           @for (m of upcomingItems(); track m.id) {
             <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
           } @empty {
-            <p class="mtg__muted mtg__tlNoUp">{{ 'meetings.list.noUpcoming' | t }}</p>
+            <p class="mtg__tlNoUp text-text-muted">{{ 'meetings.list.noUpcoming' | t }}</p>
           }
           @if (loadingUpcoming()) {
-            <p class="mtg__muted mtg__tlNoUp" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
+            <p class="mtg__tlNoUp text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
           }
         </div>
 
@@ -632,7 +632,7 @@
             <span class="mtg__tlDot" [class.mtg__tlDot--live]="m.status === 'live'"></span>
             <div class="mtg__tlBody">
               <div class="mtg__tlMeta">
-                <span class="mtg__muted mtg__tlDate">
+                <span class="text-text-muted text-sm">
                   @if (m.date) {
                     {{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}
                   } @else {
@@ -644,9 +644,9 @@
                   <span class="mtg__tlGremium"><app-icon name="parliament" [size]="12" /> {{ m.gremiumName }}</span>
                 }
               </div>
-              <h3 class="mtg__tlTitle">{{ m.title }}</h3>
+              <h3 class="m-0 text-base font-semibold">{{ m.title }}</h3>
               @if (m.protokollantName) {
-                <span class="mtg__muted mtg__tlProto">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
+                <span class="text-text-muted text-sm">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
               }
             </div>
             <span class="mtg__rowActions" (click)="$event.stopPropagation()">
@@ -676,7 +676,7 @@
     (closed)="createOpen.set(false)"
   >
     <form id="mtg-create" class="mtg__createForm" (submit)="create($event)">
-      <label class="mtg__paneLabel" [for]="'mtg-new'">{{ 'meetings.create.name' | t }}</label>
+      <label class="text-sm font-medium text-text-muted" [for]="'mtg-new'">{{ 'meetings.create.name' | t }}</label>
       <input
         id="mtg-new"
         class="mtg__input"
@@ -695,7 +695,7 @@
         (ngModelChange)="onCreateGremiumChange($event)"
       />
       @if (!gremiumOptions().length) {
-        <p class="mtg__muted mtg__hint">{{ 'meetings.create.noGremien' | t }}</p>
+        <p class="text-text-muted text-sm self-center">{{ 'meetings.create.noGremien' | t }}</p>
       }
       <!-- Datum + Uhrzeit sind Pflicht: ohne Termin lässt sich keine Sitzung planen. -->
       <app-datepicker
@@ -757,7 +757,7 @@
       (ngModelChange)="settingsProtokollant.set($event)"
     />
     @if (!settingsLocked() && protokollantLocked()) {
-      <p class="mtg__muted">{{ 'meetings.protokollant.lockedHint' | t }}</p>
+      <p class="text-text-muted">{{ 'meetings.protokollant.lockedHint' | t }}</p>
     }
     <app-datepicker
       [label]="'meetings.create.date' | t"
@@ -768,7 +768,7 @@
     />
     <app-time-input id="mtg-set-time" [label]="'meetings.create.time' | t" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
     @if (settingsLocked()) {
-      <p class="mtg__muted">{{ 'meetings.settings.closedHint' | t }}</p>
+      <p class="text-text-muted">{{ 'meetings.settings.closedHint' | t }}</p>
     }
   </form>
   <div dialog-footer class="mtg__dialogFoot">

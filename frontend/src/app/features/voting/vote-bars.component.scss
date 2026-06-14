@@ -7,19 +7,6 @@
   list-style: none;
 }
 
-.bars__row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.bars__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
 .bars__label {
   font-weight: var(--fw-semibold);
 }

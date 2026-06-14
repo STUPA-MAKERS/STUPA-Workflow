@@ -1,17 +1,17 @@
-<section class="roles">
-  <header class="roles__head">
+<section class="flex flex-col gap-5">
+  <header class="flex items-center justify-between gap-4 flex-wrap">
     <div>
       <h1>{{ 'admin.roles.title' | t }}</h1>
-      <p class="roles__sub">{{ 'admin.roles.subtitle' | t }}</p>
+      <p class="text-muted">{{ 'admin.roles.subtitle' | t }}</p>
     </div>
     <app-button size="sm" (click)="openAdd()">{{ 'admin.roles.addGlobalRole' | t }}</app-button>
   </header>
 
   <app-data-table [columns]="columns()" [rows]="roles()" [rowKey]="rowId" [isExpanded]="rowExpanded" [clickable]="true" (rowClick)="onRowClick($event)">
     <ng-template appCell="name" let-r>
-      <span class="roles__name-cell">
+      <span class="inline-flex items-center gap-2">
         <app-icon name="chevron-down" class="roles__chevron" [class.roles__chevron--open]="expanded().has($any(r).id)" [size]="16" />
-        <span class="roles__name">{{ roleLabel($any(r)) | capitalize }}</span>
+        <span class="font-medium">{{ roleLabel($any(r)) | capitalize }}</span>
       </span>
     </ng-template>
     <ng-template appCell="key" let-r><span class="roles__key">{{ $any(r).key }}</span></ng-template>
@@ -23,7 +23,7 @@
     </ng-template>
 
     <ng-template appRowDetail let-r>
-      <div class="roles__detail">
+      <div class="flex flex-col gap-4 p-5">
         <!-- Umbenennen (Anzeigename, #rename): Key bleibt unveränderlich. -->
         <div class="roles__nameEdit">
           <label class="roles__lbl roles__lbl--key">{{ 'admin.roles.roleKey' | t }}
@@ -33,14 +33,14 @@
           <label class="roles__lbl">{{ 'admin.common.labelEn' | t }}
             <input [ngModel]="nameDraft($any(r)).en" (ngModelChange)="patchName($any(r), 'en', $event)" [name]="$any(r).id + '-nen'" /></label>
         </div>
-        <div class="roles__foot">
+        <div class="flex justify-end gap-3">
           <app-button size="sm" variant="secondary" (click)="renameRole($any(r))">{{ 'action.save' | t }}</app-button>
         </div>
         @if (isLocked($any(r))) {
-          <p class="roles__locked">{{ 'admin.roles.adminLocked' | t }}</p>
+          <p class="m-0 text-muted text-sm">{{ 'admin.roles.adminLocked' | t }}</p>
           <div class="roles__grid">
             @for (perm of permissions(); track perm) {
-              <span class="roles__perm-on">✓ {{ perm }}</span>
+              <span class="text-sm text-success">✓ {{ perm }}</span>
             }
           </div>
         } @else {
@@ -53,7 +53,7 @@
               >{{ perm }}</app-checkbox>
             }
           </fieldset>
-          <div class="roles__foot">
+          <div class="flex justify-end gap-3">
             <app-button size="sm" (click)="saveRole($any(r))">{{ 'action.save' | t }}</app-button>
           </div>
         }
@@ -67,7 +67,7 @@
   @if (confirmRole(); as r) {
     <p>{{ 'admin.roles.deleteConfirm' | t: { role: roleLabel(r) } }}</p>
   }
-  <div dialog-footer class="roles__foot">
+  <div dialog-footer class="flex justify-end gap-3">
     <app-button variant="ghost" (click)="confirmRole.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
     <app-button variant="danger" (click)="confirmDelete()">{{ 'admin.roles.deleteRole' | t }}</app-button>
   </div>
@@ -75,7 +75,7 @@
 
 <!-- Globale Rolle anlegen (Dialog, #21/#19) -->
 <app-dialog [open]="addOpen()" [title]="'admin.roles.addGlobalRole' | t" [closeLabel]="'admin.gremien.cancel' | t" (closed)="addOpen.set(false)">
-  <div class="roles__add">
+  <div class="flex flex-col gap-3">
     <label class="roles__lbl">{{ 'admin.roles.roleKey' | t }}
       <input [ngModel]="draft().key" (ngModelChange)="patchDraft('key', $event)" name="roleKey" placeholder="z. B. referent" /></label>
     <label class="roles__lbl">{{ 'admin.common.labelDe' | t }}
@@ -83,7 +83,7 @@
     <label class="roles__lbl">{{ 'admin.common.labelEn' | t }}
       <input [ngModel]="draft().labelEn" (ngModelChange)="patchDraft('labelEn', $event)" name="roleLabelEn" /></label>
   </div>
-  <div dialog-footer class="roles__foot">
+  <div dialog-footer class="flex justify-end gap-3">
     <app-button variant="ghost" (click)="addOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
     <app-button [disabled]="!draft().key.trim()" (click)="createRole()">{{ 'admin.gremien.add' | t }}</app-button>
   </div>

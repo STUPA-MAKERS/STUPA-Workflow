@@ -1,11 +1,3 @@
-.sb {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-2) var(--space-5);
-}
 .sb__svg {
   width: min(480px, 100%);
   height: auto;
@@ -50,9 +42,6 @@
   pointer-events: none;
   z-index: 1;
   max-width: 16rem;
-}
-.sb__tip-path {
-  color: var(--color-text-muted);
 }
 .sb__hint,
 .sb__empty {

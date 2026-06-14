@@ -1,16 +1,16 @@
 <section class="notif">
   <header class="notif__head">
     <h1>{{ 'account.notifications.title' | t }}</h1>
-    <p class="notif__intro">{{ 'account.notifications.intro' | t }}</p>
+    <p class="m-0 text-muted">{{ 'account.notifications.intro' | t }}</p>
   </header>
 
   @if (error()) {
-    <p class="notif__error" role="alert">{{ $any(error()) | t }}</p>
+    <p class="text-danger m-0" role="alert">{{ $any(error()) | t }}</p>
   }
 
   <section class="card">
     @if (loading()) {
-      <p class="notif__muted" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
+      <p class="text-muted m-0" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
     } @else {
       <ul class="notif__list">
         @for (p of prefs(); track p.kind) {

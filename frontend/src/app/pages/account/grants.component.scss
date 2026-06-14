@@ -9,11 +9,6 @@
   margin: 0 0 var(--space-1);
 }
 
-.grants__intro {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
 .card {
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -28,12 +23,6 @@
 /* Leerzustand sitzt INNERHALB der .card (die schon Rahmen+Radius+Surface liefert) —
    daher nur zentrierter, gedämpfter Text mit space-6, KEIN eigener Rahmen (sonst
    Box-in-Box). Optische Parität zum kanonischen .empty-state. */
-.grants__empty {
-  text-align: center;
-  color: var(--color-text-muted);
-  padding: var(--space-6) 0;
-}
-
 .grants__list-head,
 .mcp__config-head {
   display: flex;
@@ -79,18 +68,6 @@
 .mcp__steps code {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-}
-
-.grants__muted {
-  color: var(--color-text-muted);
-}
-
-.grants__error {
-  color: var(--color-danger);
-}
-
-.mcp__actions {
-  margin: var(--space-3) 0;
 }
 
 .mcp__steps {

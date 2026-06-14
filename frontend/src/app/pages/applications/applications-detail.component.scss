@@ -3,13 +3,6 @@
   flex-direction: column;
   gap: var(--space-5);
 }
-.det__status {
-  color: var(--color-text-muted);
-  padding: var(--space-5) 0;
-}
-.det__status--error {
-  color: var(--color-danger);
-}
 .det__head {
   display: flex;
   flex-direction: column;
@@ -19,34 +12,14 @@
   max-width: var(--layout-max-width);
   margin-inline: auto;
 }
-.det__titleRow {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-.det__title {
-  margin: 0;
-}
 .det__ownerActions {
   display: flex;
   gap: var(--space-2);
-}
-.det__editActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
 }
 .det__meta {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-}
-.det__version {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
 }
 .det__facts {
   display: grid;
@@ -86,9 +59,6 @@
   margin: 0;
   word-break: break-word;
 }
-.det__muted {
-  color: var(--color-text-muted);
-}
 /* Edit-Formular: Formly-Felder vertikal Luft geben (Image #5: Spacing). */
 formly-form {
   display: flex;
@@ -96,16 +66,6 @@ formly-form {
   gap: var(--space-4);
 }
 /* Kostenpositionen-Block (#1) */
-.det__positions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-.det__positions-h {
-  margin: 0;
-  font-size: var(--fs-md);
-}
 .det__pos {
   display: flex;
   flex-direction: column;
@@ -113,11 +73,6 @@ formly-form {
   padding: var(--space-3);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
-}
-.det__pos-head {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
 }
 .det__pos-val {
   font-variant-numeric: tabular-nums;
@@ -129,12 +84,6 @@ formly-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-}
-.det__offer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--fs-sm);
 }
 .det__offer-label {
   flex: 1;
@@ -158,11 +107,6 @@ formly-form {
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
-.det__ccBtnInner {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
 .det__ccTree {
   margin-top: var(--space-3);
   max-height: 50vh;
@@ -175,13 +119,6 @@ formly-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-.det__version-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-2);
 }
 .det__diff {
   margin: 0;
@@ -305,11 +242,6 @@ formly-form {
   font-size: var(--fs-sm);
   margin: 0 0 var(--space-3);
 }
-.det__transitions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
 /* Bearbeiten: Ränder ausblenden, Formular volle Breite. */
 .det__layout--editing {
   grid-template-columns: 1fr;
@@ -349,12 +281,6 @@ formly-form {
   padding: var(--space-4);
   min-height: 5rem;
 }
-.det__chatEmpty {
-  margin: auto;
-  text-align: center;
-  font-size: var(--fs-sm);
-  padding: var(--space-4) 0;
-}
 .det__msg {
   display: flex;
   gap: var(--space-2);
@@ -389,17 +315,6 @@ formly-form {
 }
 .det__msg--own .det__msgBody {
   align-items: flex-end;
-}
-.det__msgTop {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-.det__msgAuthor {
-  font-weight: var(--fw-semibold);
-  color: var(--color-text);
 }
 .det__intern {
   display: inline-flex;
@@ -456,11 +371,6 @@ formly-form {
   background: var(--color-surface);
   color: var(--color-text);
   box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.2));
-}
-.det__composerRow {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
 }
 .det__composerInput {
   flex: 1;

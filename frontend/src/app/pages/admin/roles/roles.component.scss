@@ -1,23 +1,3 @@
-.roles {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-.roles__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-.roles__sub {
-  color: var(--color-text-muted);
-}
-.roles__name-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
 .roles__chevron {
   color: var(--color-text-muted);
   transition: transform var(--motion-fast) var(--ease-standard);
@@ -25,9 +5,6 @@
 .roles__chevron--open {
   transform: rotate(180deg);
   color: var(--color-primary);
-}
-.roles__name {
-  font-weight: var(--fw-medium);
 }
 .roles__row-actions {
   display: inline-flex;
@@ -38,12 +15,6 @@
   font-family: var(--font-mono, monospace);
   font-size: var(--fs-xs);
   color: var(--color-text-muted);
-}
-.roles__detail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
 }
 /* Umbenennen-Zeile: Key (schmal) + DE + EN als gleichmäßige Spalten (#16). */
 .roles__nameEdit {
@@ -68,25 +39,6 @@
   margin: 0;
   padding: 0;
   border: 0;
-}
-.roles__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-.roles__locked {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-.roles__perm-on {
-  font-size: var(--fs-sm);
-  color: var(--color-success);
-}
-.roles__add {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
 }
 .roles__lbl {
   display: flex;

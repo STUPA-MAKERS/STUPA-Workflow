@@ -30,10 +30,6 @@
   border-top-color: var(--color-primary);
   animation: lo-spin 0.7s linear infinite;
 }
-.lo__text {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
 @keyframes lo-spin {
   to {
     transform: rotate(360deg);

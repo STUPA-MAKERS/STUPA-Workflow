@@ -84,23 +84,8 @@
     display: block;
   }
 }
-.apps__headRow {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-.apps__subtitle {
-  color: var(--color-text-muted);
-}
 .apps__headActions {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.apps__filterBtn {
-  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
 }
@@ -115,17 +100,6 @@
    Observer (rootMargin 400px) frühzeitig nachlädt. */
 .apps__sentinel {
   height: 1px;
-}
-.apps__more {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-4);
-}
-.apps__count {
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  margin-top: var(--space-3);
 }
 /* Mobil (≤768px): Kopf-Aktionen dürfen umbrechen. */
 @media (max-width: 768px) {

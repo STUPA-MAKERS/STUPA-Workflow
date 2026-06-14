@@ -1,8 +1,8 @@
 
-<header class="gm__head">
+<header class="flex items-center justify-between gap-4 flex-wrap">
   <div>
-    <h1 class="gm__title">{{ 'admin.gremien.membersOf' | t }}: {{ gremium()?.name ?? '…' }}</h1>
-    <p class="gm__subtitle">{{ 'admin.gremien.membersHint' | t }}</p>
+    <h1 class="m-0">{{ 'admin.gremien.membersOf' | t }}: {{ gremium()?.name ?? '…' }}</h1>
+    <p class="text-muted mt-1">{{ 'admin.gremien.membersHint' | t }}</p>
   </div>
   <app-button size="sm" (click)="openAdd()">{{ 'admin.gremien.addMember' | t }}</app-button>
 </header>
@@ -10,7 +10,7 @@
 <app-data-table [columns]="columns()" [rows]="members()" [rowKey]="rowId" [emptyText]="'admin.gremien.membersEmpty' | t">
   <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
   <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
-  <ng-template appCell="term" let-m><span class="gm__muted">{{ $any(m).term }}</span></ng-template>
+  <ng-template appCell="term" let-m><span class="text-muted text-sm">{{ $any(m).term }}</span></ng-template>
   <ng-template appCell="actions" let-m>
     <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberRemove' | t" (click)="removeMember($any(m).assignmentId)">
       <app-icon name="delete" />
@@ -22,10 +22,10 @@
      ohne Vorlauf-Deadline (bis Sitzungsbeginn) delegiert werden darf — auch wenn
      sie nicht selbst Mitglied sind (z. B. Fachschafts-Vertreter). -->
 <section class="gm__pool" [attr.aria-label]="'admin.substitutes.title' | t">
-  <header class="gm__head">
+  <header class="flex items-center justify-between gap-4 flex-wrap">
     <div>
-      <h2 class="gm__title">{{ 'admin.substitutes.title' | t }}</h2>
-      <p class="gm__subtitle">{{ 'admin.substitutes.hint' | t }}</p>
+      <h2 class="m-0">{{ 'admin.substitutes.title' | t }}</h2>
+      <p class="text-muted mt-1">{{ 'admin.substitutes.hint' | t }}</p>
     </div>
     <app-button size="sm" (click)="openAddSub()">{{ 'admin.substitutes.add' | t }}</app-button>
   </header>
@@ -40,7 +40,7 @@
       @if ($any(s).memberId) {
         {{ $any(s).memberName || $any(s).memberId }}
       } @else {
-        <span class="gm__muted">{{ 'admin.substitutes.allMembers' | t }}</span>
+        <span class="text-muted text-sm">{{ 'admin.substitutes.allMembers' | t }}</span>
       }
     </ng-template>
     <ng-template appCell="actions" let-s>
@@ -58,8 +58,8 @@
   [closeLabel]="'admin.gremien.cancel' | t"
   (closed)="addSubOpen.set(false)"
 >
-  <div class="gm__add">
-    <div class="gm__typeahead">
+  <div class="flex flex-col gap-4">
+    <div class="relative flex flex-col gap-1">
       <label class="gm__lbl" for="gm-sub-search">{{ 'admin.substitutes.search' | t }}</label>
       <input
         id="gm-sub-search"
@@ -75,8 +75,8 @@
           @for (c of subCandidates(); track c.id) {
             <li>
               <button type="button" class="gm__suggest-item" [class.gm__suggest-item--sel]="subSelected()?.id === c.id" (click)="pickSub(c)">
-                <span class="gm__suggest-name">{{ c.displayName || c.email || c.sub }}</span>
-                @if (c.email) { <span class="gm__suggest-meta">{{ c.email }}</span> }
+                <span class="font-medium">{{ c.displayName || c.email || c.sub }}</span>
+                @if (c.email) { <span class="text-xs text-muted">{{ c.email }}</span> }
               </button>
             </li>
           }
@@ -84,7 +84,7 @@
       }
     </div>
     @if (subSelected(); as s) {
-      <p class="gm__picked">{{ 'admin.gremien.memberPicked' | t }}: <strong>{{ s.displayName || s.email || s.sub }}</strong></p>
+      <p class="m-0 text-sm">{{ 'admin.gremien.memberPicked' | t }}: <strong>{{ s.displayName || s.email || s.sub }}</strong></p>
     }
     <app-select
       [label]="'admin.substitutes.forMember' | t"
@@ -94,7 +94,7 @@
       name="subMember"
     />
   </div>
-  <div dialog-footer class="gm__dialog-foot">
+  <div dialog-footer class="flex gap-3">
     <app-button variant="ghost" (click)="addSubOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
     <app-button [disabled]="!subSelected()" (click)="addSub()">{{ 'admin.substitutes.addAction' | t }}</app-button>
   </div>
@@ -107,8 +107,8 @@
   [closeLabel]="'admin.gremien.cancel' | t"
   (closed)="closeAdd()"
 >
-  <div class="gm__add">
-    <div class="gm__typeahead">
+  <div class="flex flex-col gap-4">
+    <div class="relative flex flex-col gap-1">
       <label class="gm__lbl" for="gm-search">{{ 'admin.gremien.memberSearch' | t }}</label>
       <input
         id="gm-search"
@@ -124,8 +124,8 @@
           @for (c of candidates(); track c.id) {
             <li>
               <button type="button" class="gm__suggest-item" [class.gm__suggest-item--sel]="selected()?.id === c.id" (click)="pick(c)">
-                <span class="gm__suggest-name">{{ c.displayName || c.email || c.sub }}</span>
-                @if (c.email) { <span class="gm__suggest-meta">{{ c.email }}</span> }
+                <span class="font-medium">{{ c.displayName || c.email || c.sub }}</span>
+                @if (c.email) { <span class="text-xs text-muted">{{ c.email }}</span> }
               </button>
             </li>
           }
@@ -134,7 +134,7 @@
     </div>
 
     @if (selected(); as s) {
-      <p class="gm__picked">{{ 'admin.gremien.memberPicked' | t }}: <strong>{{ s.displayName || s.email || s.sub }}</strong></p>
+      <p class="m-0 text-sm">{{ 'admin.gremien.memberPicked' | t }}: <strong>{{ s.displayName || s.email || s.sub }}</strong></p>
     }
 
     <app-select
@@ -146,7 +146,7 @@
       name="memberRole"
     />
     @if (roleOptions().length === 0) {
-      <p class="gm__picked">
+      <p class="m-0 text-sm">
         {{ 'admin.gremiumRoles.empty' | t }}
         <a [routerLink]="['/admin/gremien', gremiumIdRef, 'roles']">{{ 'admin.gremiumRoles.manage' | t }}</a>
       </p>
@@ -158,7 +158,7 @@
         <app-datepicker [ngModel]="addUntil()" (ngModelChange)="addUntil.set($event)" name="until" /></label>
     </div>
   </div>
-  <div dialog-footer class="gm__dialog-foot">
+  <div dialog-footer class="flex gap-3">
     <app-button variant="ghost" (click)="closeAdd()">{{ 'admin.gremien.cancel' | t }}</app-button>
     <app-button [disabled]="!selected() || !addRoleId()" (click)="addMember()">{{ 'admin.gremien.memberAdd' | t }}</app-button>
   </div>

@@ -1,4 +1,4 @@
-<div class="sb" (pointermove)="onMove($event)" (pointerleave)="hovered.set(null)">
+<div class="relative flex flex-col items-center gap-3 pt-2 pb-5 px-2" (pointermove)="onMove($event)" (pointerleave)="hovered.set(null)">
   @if (total() > 0) {
     <svg [attr.viewBox]="'0 0 ' + SIZE + ' ' + SIZE" class="sb__svg" role="img" [attr.aria-label]="root()?.name ?? ''">
       @for (s of segments(); track s.id + ':' + s.depth) {
@@ -19,7 +19,7 @@
     @if (hovered(); as h) {
       <div class="sb__tip" [style.left.px]="tip().x" [style.top.px]="tip().y" role="status">
         <strong>{{ h.name }}</strong>
-        <span class="sb__tip-path">{{ h.pathKey | simplifyPath }}</span>
+        <span class="text-muted">{{ h.pathKey | simplifyPath }}</span>
         <span>{{ money(h.value) }} · {{ h.percent }}%</span>
       </div>
     }

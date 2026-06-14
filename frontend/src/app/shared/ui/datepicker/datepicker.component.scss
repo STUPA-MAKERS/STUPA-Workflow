@@ -3,9 +3,6 @@
    zu breit / horizontaler Scroll). */
 :host { display: block; min-width: 0; }
 .dp { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.dp__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--color-text); }
-.dp__req { color: var(--color-danger); }
-.dp__field { position: relative; display: flex; }
 .dp__text {
   flex: 1;
   /* In Flex-Containern darf das Feld unter seine Intrinsic-Breite schrumpfen. */
@@ -54,5 +51,3 @@
   border: 0;
   padding: 0;
 }
-.dp__hint { font-size: var(--fs-xs); color: var(--color-text-muted); }
-.dp__error { font-size: var(--fs-xs); color: var(--color-danger); }

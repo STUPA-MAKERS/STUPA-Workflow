@@ -3,20 +3,8 @@
   flex-direction: column;
   gap: var(--space-4);
 }
-.audit__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
 .audit__head h1 {
   margin: 0;
-}
-.audit__desc {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  margin: var(--space-1) 0 0;
 }
 .audit__day {
   margin: var(--space-3) 0 var(--space-2);
@@ -118,23 +106,11 @@
     gap: 0;
   }
 }
-.audit__target {
-  font-size: var(--fs-sm);
-  align-self: flex-start;
-}
-.audit__status {
-  color: var(--color-text-muted);
-  text-align: center;
-}
 .audit__status--error {
   color: var(--color-danger);
 }
 .audit__sentinel {
   height: 1px;
-}
-.audit__more {
-  display: flex;
-  justify-content: center;
 }
 @media (max-width: 40rem) {
   .audit__row {

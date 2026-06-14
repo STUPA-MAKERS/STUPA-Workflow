@@ -3,18 +3,18 @@
     @if (heading) {
       @switch (headingLevel) {
         @case (2) {
-          <h2 class="card__title">{{ heading }}</h2>
+          <h2 class="text-lg font-semibold">{{ heading }}</h2>
         }
         @case (4) {
-          <h4 class="card__title">{{ heading }}</h4>
+          <h4 class="text-lg font-semibold">{{ heading }}</h4>
         }
         @default {
-          <h3 class="card__title">{{ heading }}</h3>
+          <h3 class="text-lg font-semibold">{{ heading }}</h3>
         }
       }
     }
     <ng-content select="[card-header]" />
   </header>
-  <div class="card__body"><ng-content /></div>
+  <div class="p-5"><ng-content /></div>
   <footer class="card__footer"><ng-content select="[card-footer]" /></footer>
 </section>

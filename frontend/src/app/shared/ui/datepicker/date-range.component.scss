@@ -4,19 +4,6 @@
   padding: 0;
   min-inline-size: 0;
 }
-.dr__legend {
-  padding: 0;
-  margin-bottom: var(--space-2);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--color-text);
-}
-.dr__row {
-  display: flex;
-  align-items: end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
 .dr__field {
   display: flex;
   flex-direction: column;
@@ -45,8 +32,4 @@
 .dr__control:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-.dr__sep {
-  padding-bottom: var(--space-3);
-  color: var(--color-text-muted);
 }

@@ -1,11 +1,11 @@
-<section class="fe">
-  <header class="fe__head">
+<section class="flex flex-col gap-5">
+  <header class="flex items-center justify-between gap-4 flex-wrap">
     <h1>{{ 'admin.flow.title' | t }}</h1>
   </header>
 
   <p class="fe__global">{{ 'admin.flow.globalNotice' | t }}</p>
 
-  <div class="fe__toolbar">
+  <div class="flex gap-2 flex-wrap">
     <app-button variant="ghost" size="sm" (click)="addState()">+ {{ 'admin.flow.addState' | t }}</app-button>
     <app-button variant="ghost" size="sm" [disabled]="!canUndo()" [ariaLabel]="'admin.flow.undo' | t" (click)="undo()">↶ {{ 'admin.flow.undo' | t }}</app-button>
     <app-button variant="ghost" size="sm" [disabled]="!canRedo()" [ariaLabel]="'admin.flow.redo' | t" (click)="redo()">↷ {{ 'admin.flow.redo' | t }}</app-button>
@@ -13,7 +13,7 @@
     @if (multiCount() >= 2) {
       <app-button variant="ghost" size="sm" (click)="createGroupFromSelection()">⬚ {{ 'admin.flow.group.create' | t }} ({{ multiCount() }})</app-button>
     }
-    <span class="fe__toolbar-zoom" role="group" [attr.aria-label]="'admin.flow.zoom' | t">
+    <span class="inline-flex gap-1 items-center ml-auto" role="group" [attr.aria-label]="'admin.flow.zoom' | t">
       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomOut' | t" (click)="zoomOut()">−</app-button>
       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomIn' | t" (click)="zoomIn()">+</app-button>
       <app-button variant="ghost" size="sm" (click)="resetView()">{{ 'admin.flow.zoomReset' | t }}</app-button>
@@ -32,10 +32,10 @@
 
   <!-- Drill-Down-Breadcrumbs (#flow-groups): oberste Ebene › Gruppe › Untergruppe. -->
   @if (breadcrumbs().length) {
-    <nav class="fe__crumbs" [attr.aria-label]="'admin.flow.group.inspector' | t">
+    <nav class="flex items-center gap-1 flex-wrap" [attr.aria-label]="'admin.flow.group.inspector' | t">
       <button type="button" class="fe__crumb" (click)="navigateTo(null)">{{ 'admin.flow.group.rootCrumb' | t }}</button>
       @for (c of breadcrumbs(); track c.id; let last = $last) {
-        <span class="fe__crumb-sep" aria-hidden="true">›</span>
+        <span class="text-muted" aria-hidden="true">›</span>
         @if (last) {
           <span class="fe__crumb fe__crumb--current" aria-current="page">{{ c.name }}</span>
         } @else {
@@ -174,14 +174,14 @@
     <!-- Inspektor -->
     <aside class="fe__panel" [attr.aria-label]="'admin.flow.inspector' | t">
       @if (selectedState(); as s) {
-        <h2 class="fe__panel-h">{{ 'admin.flow.stateInspector' | t }}</h2>
-        <label class="fe__lbl">{{ 'admin.common.key' | t }}
+        <h2 class="text-md font-semibold m-0">{{ 'admin.flow.stateInspector' | t }}</h2>
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.key' | t }}
           <input [ngModel]="s.key" (ngModelChange)="setStateKey(s.key, $event)" autocomplete="off" /></label>
-        <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.labelDe' | t }}
           <input [ngModel]="s.label['de']" (ngModelChange)="setStateLabel(s.key, 'de', $event)" /></label>
-        <label class="fe__lbl">{{ 'admin.common.labelEn' | t }}
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.labelEn' | t }}
           <input [ngModel]="s.label['en']" (ngModelChange)="setStateLabel(s.key, 'en', $event)" /></label>
-        <label class="fe__lbl">{{ 'admin.flow.color' | t }}
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.color' | t }}
           <span class="fe__color-row">
             <input
               type="color"
@@ -203,7 +203,7 @@
         </app-checkbox>
 
         <!-- State-Art + kind-spezifische Config (#28) -->
-        <label class="fe__lbl">{{ 'admin.flow.kindLabel' | t }}
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.kindLabel' | t }}
           <select [ngModel]="s.kind ?? 'normal'" (ngModelChange)="setStateKind(s.key, $event)">
             @for (k of stateKinds; track k) {
               <option [value]="k">{{ kindLabel(k) }}</option>
@@ -221,7 +221,7 @@
           />
         }
         @if (s.kind === 'vote') {
-          <p class="fe__hint">{{ 'admin.flow.branchHint' | t }}</p>
+          <p class="text-xs text-muted m-0">{{ 'admin.flow.branchHint' | t }}</p>
         }
 
         <!-- Frist (#13): benannte Deadline-Policy referenzieren. Beim Betreten des
@@ -233,28 +233,28 @@
           [ngModel]="s.config?.deadlinePolicyKey ?? ''"
           (ngModelChange)="setStateDeadlinePolicy(s.key, $event)"
         />
-        <p class="fe__hint">{{ 'admin.flow.cfgDeadlineHint' | t }}</p>
+        <p class="text-xs text-muted m-0">{{ 'admin.flow.cfgDeadlineHint' | t }}</p>
 
         <!-- Guard-Priorität: ein Ausgangs-Punkt je Guard; Reihenfolge = Auswertung
              (erster passender Guard gewinnt). Nur sinnvoll ab zwei Gruppen (#8). -->
         @if ((s.kind ?? 'normal') === 'normal' && guardGroupsFor(s.key).length > 1) {
-          <div class="fe__guards">
-            <span class="fe__lbl-text">{{ 'admin.flow.guardPriority' | t }}</span>
+          <div class="flex flex-col gap-2">
+            <span class="text-sm font-medium">{{ 'admin.flow.guardPriority' | t }}</span>
             @for (g of guardGroupsFor(s.key); track g.sig; let first = $first; let last = $last; let i = $index) {
-              <div class="fe__guard-row">
+              <div class="flex items-center gap-2">
                 <span class="fe__guard-rank">{{ i + 1 }}</span>
                 <span class="fe__guard-name">{{ guardGroupLabel(g) }}</span>
                 <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="first" [ariaLabel]="'admin.flow.moveUp' | t" (click)="moveGuardUp(s.key, g.sig)">↑</app-button>
                 <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="'admin.flow.moveDown' | t" (click)="moveGuardDown(s.key, g.sig)">↓</app-button>
               </div>
             }
-            <span class="fe__hint">{{ 'admin.flow.guardPriorityHint' | t }}</span>
+            <span class="text-xs text-muted m-0">{{ 'admin.flow.guardPriorityHint' | t }}</span>
           </div>
         }
 
         <app-button variant="danger" size="sm" (click)="removeSelectedState()">{{ 'admin.flow.removeState' | t }}</app-button>
       } @else if (selectedTransition(); as sel) {
-        <h2 class="fe__panel-h">{{ 'admin.flow.transitionInspector' | t }}</h2>
+        <h2 class="text-md font-semibold m-0">{{ 'admin.flow.transitionInspector' | t }}</h2>
         <app-select
           [label]="'admin.flow.from' | t"
           [options]="stateOptions()"
@@ -267,11 +267,11 @@
           [ngModel]="sel.t.to"
           (ngModelChange)="setTransitionEndpoint(sel.index, 'to', $event)"
         />
-        <label class="fe__lbl">{{ 'admin.common.labelDe' | t }}
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.labelDe' | t }}
           <input [ngModel]="sel.t.label?.['de'] ?? ''" (ngModelChange)="setTransitionLabel(sel.index, 'de', $event)" /></label>
-        <label class="fe__lbl">{{ 'admin.common.labelEn' | t }}
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.labelEn' | t }}
           <input [ngModel]="sel.t.label?.['en'] ?? ''" (ngModelChange)="setTransitionLabel(sel.index, 'en', $event)" /></label>
-        <label class="fe__lbl">{{ 'admin.flow.color' | t }}
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.color' | t }}
           <span class="fe__color-row">
             <input
               type="color"
@@ -302,7 +302,7 @@
 
         <!-- Ergebnis-Zweig nur für vote/approval-Quell-States (#28): pass/fail bzw. accept/reject. -->
         @if (branchesFor(sel.t.from).length) {
-          <label class="fe__lbl">{{ 'admin.flow.branch' | t }}
+          <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.branch' | t }}
             <select [ngModel]="sel.t.branch ?? ''" (ngModelChange)="setTransitionBranch(sel.index, $event)">
               <option value="">{{ 'admin.flow.branchNone' | t }}</option>
               @for (b of branchesFor(sel.t.from); track b) {
@@ -316,10 +316,10 @@
         <app-button variant="danger" size="sm" (click)="removeSelectedTransition()">{{ 'admin.flow.removeTransition' | t }}</app-button>
       } @else if (currentGroup(); as grp) {
         <!-- Geöffnete Gruppe (#flow-groups): Einstellungen der aktuellen Ebene. -->
-        <h2 class="fe__panel-h">{{ 'admin.flow.group.inspector' | t }}</h2>
-        <label class="fe__lbl">{{ 'admin.flow.group.name' | t }}
+        <h2 class="text-md font-semibold m-0">{{ 'admin.flow.group.inspector' | t }}</h2>
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.group.name' | t }}
           <input [ngModel]="grp.name" (ngModelChange)="renameGroup(grp.id, $event)" autocomplete="off" /></label>
-        <label class="fe__lbl">{{ 'admin.flow.color' | t }}
+        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.color' | t }}
           <span class="fe__color-row">
             <input
               type="color"
@@ -333,13 +333,13 @@
             }
           </span>
         </label>
-        <p class="fe__hint">{{ grp.stateKeys.length }} {{ 'admin.flow.group.members' | t }}@if (grp.groupIds?.length) {, {{ grp.groupIds?.length }} {{ 'admin.flow.group.subgroups' | t }}}</p>
+        <p class="text-xs text-muted m-0">{{ grp.stateKeys.length }} {{ 'admin.flow.group.members' | t }}@if (grp.groupIds?.length) {, {{ grp.groupIds?.length }} {{ 'admin.flow.group.subgroups' | t }}}</p>
         <app-button variant="danger" size="sm" (click)="dissolveCurrentGroup()">{{ 'admin.flow.group.dissolve' | t }}</app-button>
-        <p class="fe__hint">{{ 'admin.flow.group.dissolveHint' | t }}</p>
-        <p class="fe__hint">{{ 'admin.flow.group.multiHint' | t }}</p>
+        <p class="text-xs text-muted m-0">{{ 'admin.flow.group.dissolveHint' | t }}</p>
+        <p class="text-xs text-muted m-0">{{ 'admin.flow.group.multiHint' | t }}</p>
       } @else {
-        <p class="fe__panel-empty">{{ 'admin.flow.selectHint' | t }}</p>
-        <p class="fe__hint">{{ 'admin.flow.group.multiHint' | t }}</p>
+        <p class="text-muted text-sm m-0">{{ 'admin.flow.selectHint' | t }}</p>
+        <p class="text-xs text-muted m-0">{{ 'admin.flow.group.multiHint' | t }}</p>
       }
     </aside>
   </div>
@@ -349,25 +349,25 @@
   @if (stateTransitionLists(); as lists) {
     <section class="fe__transLists" [attr.aria-label]="'admin.flow.list.heading' | t">
       <div class="fe__transCol">
-        <h3 class="fe__subH">{{ 'admin.flow.list.incoming' | t }} ({{ lists.incoming.length }})</h3>
+        <h3 class="m-0 text-md">{{ 'admin.flow.list.incoming' | t }} ({{ lists.incoming.length }})</h3>
         @for (r of lists.incoming; track r.index) {
           <button type="button" class="fe__transRow" (click)="selectEdge(r.index)">
             <span class="fe__transMain">@if (r.automatic) {<span aria-hidden="true">⚡ </span>}{{ r.label || (r.from + ' → ' + r.to) }}</span>
             <span class="fe__transMeta">{{ r.from }} → {{ r.to }}@if (r.branch) { · {{ r.branch }}} · {{ r.guard }}</span>
           </button>
         } @empty {
-          <p class="fe__panel-empty">{{ 'admin.flow.list.empty' | t }}</p>
+          <p class="text-muted text-sm m-0">{{ 'admin.flow.list.empty' | t }}</p>
         }
       </div>
       <div class="fe__transCol">
-        <h3 class="fe__subH">{{ 'admin.flow.list.outgoing' | t }} ({{ lists.outgoing.length }})</h3>
+        <h3 class="m-0 text-md">{{ 'admin.flow.list.outgoing' | t }} ({{ lists.outgoing.length }})</h3>
         @for (r of lists.outgoing; track r.index) {
           <button type="button" class="fe__transRow" (click)="selectEdge(r.index)">
             <span class="fe__transMain">@if (r.automatic) {<span aria-hidden="true">⚡ </span>}{{ r.label || (r.from + ' → ' + r.to) }}</span>
             <span class="fe__transMeta">{{ r.from }} → {{ r.to }}@if (r.branch) { · {{ r.branch }}} · {{ r.guard }}</span>
           </button>
         } @empty {
-          <p class="fe__panel-empty">{{ 'admin.flow.list.empty' | t }}</p>
+          <p class="text-muted text-sm m-0">{{ 'admin.flow.list.empty' | t }}</p>
         }
       </div>
     </section>
@@ -376,17 +376,17 @@
   <!-- Aktionen des gewählten Übergangs: eigene Pane unterhalb des Graphen (#flow). -->
   @if (selectedTransition(); as sel) {
     <section class="fe__actionsPane" [attr.aria-label]="'admin.flow.transitionInspector' | t">
-      <header class="fe__actionsPane-head">
-        <div class="fe__actionsPane-title">
-          <h2 class="fe__panel-h">{{ 'admin.flow.transitionInspector' | t }}</h2>
-          <span class="fe__actionsPane-sub">{{ sel.t.label?.['de'] || sel.t.label?.['en'] || (sel.t.from + ' → ' + sel.t.to) }}</span>
+      <header class="flex items-center justify-between gap-4 flex-wrap">
+        <div class="flex items-baseline gap-3 flex-wrap">
+          <h2 class="text-md font-semibold m-0">{{ 'admin.flow.transitionInspector' | t }}</h2>
+          <span class="text-sm text-muted">{{ sel.t.label?.['de'] || sel.t.label?.['en'] || (sel.t.from + ' → ' + sel.t.to) }}</span>
         </div>
       </header>
 
       <!-- Bedingung (#28): boolescher Guard-Baum (und/oder/nicht + Blatt-Operatoren). -->
       <div class="fe__paneSection">
-        <h3 class="fe__subH">{{ 'admin.flow.guard' | t }}</h3>
-        <p class="fe__hint">{{ 'admin.flow.guardHelp' | t }}</p>
+        <h3 class="m-0 text-md">{{ 'admin.flow.guard' | t }}</h3>
+        <p class="text-xs text-muted m-0">{{ 'admin.flow.guardHelp' | t }}</p>
         <app-guard-editor
           [guard]="sel.t.guard ?? null"
           [roleOptions]="globalRoleOptions()"
@@ -396,8 +396,8 @@
         />
       </div>
 
-      <div class="fe__paneSection-head">
-        <h3 class="fe__subH">{{ 'admin.flow.actions' | t }}</h3>
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="m-0 text-md">{{ 'admin.flow.actions' | t }}</h3>
         <select class="fe__actionsPane-add" #asel (change)="addAction(sel.index, asel.value); asel.value = ''">
           <option value="">{{ 'admin.flow.addAction' | t }}</option>
           @for (opt of actionOptions(); track opt.value) {
@@ -410,7 +410,7 @@
         <div class="fe__actions-grid">
           @for (act of sel.t.actions ?? []; track $index; let ai = $index) {
             <div class="fe__action-card">
-              <div class="fe__action-head">
+              <div class="flex items-center justify-between gap-2">
                 <strong>{{ actionLabel(act.type) }}</strong>
                 <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeAction(sel.index, ai)">✕</app-button>
               </div>
@@ -432,14 +432,14 @@
                     [ngModel]="actionParam(act, 'gremiumId')"
                     (ngModelChange)="setActionParam(sel.index, ai, 'gremiumId', $event)"
                   />
-                  <p class="fe__field-hint">{{ 'admin.flow.actSessionHint' | t }}</p>
+                  <p class="text-xs text-muted">{{ 'admin.flow.actSessionHint' | t }}</p>
                 }
                 @case ('assignBudget') {
-                  <label class="fe__lbl">{{ 'admin.flow.actBudget' | t }}
+                  <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.actBudget' | t }}
                     <input [ngModel]="actionParam(act, 'budgetId')" (ngModelChange)="setActionParam(sel.index, ai, 'budgetId', $event)" [attr.placeholder]="'admin.flow.actBudgetPh' | t" /></label>
                 }
                 @case ('notify') {
-                  <span class="fe__lbl-text">{{ 'admin.flow.actRecipients' | t }}</span>
+                  <span class="text-sm font-medium">{{ 'admin.flow.actRecipients' | t }}</span>
                   @for (r of recipientsOf(act); track $index; let ri = $index) {
                     <div class="fe__recipient">
                       <select [ngModel]="r.kind" (ngModelChange)="setRecipientKind(sel.index, ai, ri, $event)">
@@ -464,7 +464,7 @@
           }
         </div>
       } @else {
-        <p class="fe__panel-empty">{{ 'admin.flow.actionsEmpty' | t }}</p>
+        <p class="text-muted text-sm m-0">{{ 'admin.flow.actionsEmpty' | t }}</p>
       }
     </section>
   }
@@ -474,8 +474,8 @@
     <pre data-testid="flow-json">{{ json() }}</pre>
   </details>
 
-  <footer class="fe__foot">
-    <span class="fe__status" [class.fe__status--ok]="validation().valid">
+  <footer class="flex items-center justify-end gap-4">
+    <span class="text-sm text-danger" [class.fe__status--ok]="validation().valid">
       {{ (validation().valid ? 'admin.common.valid' : 'admin.common.errors') | t }}
     </span>
     <app-button [disabled]="!validation().valid" [loading]="saving()" (click)="save()">{{

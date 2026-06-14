@@ -1,14 +1,14 @@
 <header class="apps__head">
-  <div class="apps__headRow">
+  <div class="flex items-start justify-between gap-4 flex-wrap">
     <div>
       <h1 class="apps__title">{{ 'applications.list.title' | t }}</h1>
-      <p class="apps__subtitle">{{ 'applications.list.subtitle' | t }}</p>
+      <p class="text-muted">{{ 'applications.list.subtitle' | t }}</p>
     </div>
     <!-- Filter in einem Popout (#20): Button mit Icon + Aktiv-Indikator. -->
     <div class="apps__headActions">
       @if (canExport()) {
         <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
-          <span class="apps__filterBtn">
+          <span class="inline-flex items-center gap-2">
             <app-icon name="export" [size]="16" />
             {{ 'applications.list.export' | t }}
           </span>
@@ -106,7 +106,7 @@
   <!-- Infinite-Scroll: Sentinel nur solange weitere Seiten existieren (#27). -->
   @if (hasMore()) {
     <div #sentinel class="apps__sentinel" aria-hidden="true"></div>
-    <div class="apps__more">
+    <div class="flex justify-center mt-4">
       @if (loadingMore()) {
         <span class="apps__status" aria-live="polite">{{ 'applications.list.loadingMore' | t }}</span>
       } @else {
@@ -117,7 +117,7 @@
     </div>
   }
   @if (total() > 0) {
-    <p class="apps__count" aria-live="polite">
+    <p class="text-center text-muted text-sm mt-3" aria-live="polite">
       {{ 'applications.list.count' | t: { count: items().length, total: total() } }}
     </p>
   }

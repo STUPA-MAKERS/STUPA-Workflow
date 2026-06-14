@@ -2,7 +2,7 @@
   <header class="beamer__head">
     <h1 class="beamer__title">{{ 'voting.beamer.heading' | t }}</h1>
     @if (result()) {
-      <span class="beamer__phase beamer__phase--done">{{ 'voting.beamer.closed' | t }}</span>
+      <span class="beamer__phase--done text-xl font-semibold">{{ 'voting.beamer.closed' | t }}</span>
     }
   </header>
 
@@ -16,10 +16,10 @@
         [leading]="t.leading"
       />
 
-      <footer class="beamer__stats">
+      <footer class="flex items-baseline gap-6 flex-wrap text-2xl font-semibold">
         <p class="beamer__count">{{ 'voting.beamer.votesOf' | t: { cast: castCount(), eligible: t.eligible } }}</p>
         <p
-          class="beamer__quorum"
+          class="m-0"
           [class.beamer__quorum--met]="t.quorumMet"
           [class.beamer__quorum--missed]="!t.quorumMet"
         >
@@ -27,13 +27,13 @@
           {{ (t.quorumMet ? 'vote.tally.quorumMet' : 'vote.tally.quorumMissed') | t }}
         </p>
         @if (result(); as res) {
-          <p class="beamer__result" [class.beamer__result--passed]="res.result === 'passed'">
+          <p class="ml-auto text-3xl font-bold text-danger" [class.beamer__result--passed]="res.result === 'passed'">
             {{ resultKey() | t }}
           </p>
         }
       </footer>
     }
   } @else {
-    <p class="beamer__waiting" role="status">{{ 'voting.beamer.waiting' | t }}</p>
+    <p class="m-0 py-12 px-4 text-center text-2xl text-muted" role="status">{{ 'voting.beamer.waiting' | t }}</p>
   }
 </section>

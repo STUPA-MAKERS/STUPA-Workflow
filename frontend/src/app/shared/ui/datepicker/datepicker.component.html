@@ -1,13 +1,13 @@
 <div class="dp">
   @if (label) {
-    <label class="dp__label" [for]="id">
+    <label class="text-sm font-medium text-text" [for]="id">
       {{ label }}
       @if (required) {
-        <span class="dp__req" aria-hidden="true">*</span>
+        <span class="text-danger" aria-hidden="true">*</span>
       }
     </label>
   }
-  <div class="dp__field">
+  <div class="relative flex">
     <input
       class="dp__text"
       type="text"
@@ -48,9 +48,9 @@
     />
   </div>
   @if (hint && !error) {
-    <p class="dp__hint" [id]="id + '-hint'">{{ hint }}</p>
+    <p class="text-xs text-muted" [id]="id + '-hint'">{{ hint }}</p>
   }
   @if (error) {
-    <p class="dp__error" [id]="id + '-error'" role="alert">{{ error }}</p>
+    <p class="text-xs text-danger" [id]="id + '-error'" role="alert">{{ error }}</p>
   }
 </div>

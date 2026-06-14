@@ -1,8 +1,8 @@
 <section class="audit">
-  <header class="audit__head">
+  <header class="flex justify-between items-start gap-3 flex-wrap">
     <div>
       <h1>{{ 'admin.audit.title' | t }}</h1>
-      <p class="audit__desc">{{ 'admin.audit.desc' | t }}</p>
+      <p class="text-muted text-sm mt-1">{{ 'admin.audit.desc' | t }}</p>
     </div>
     <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
       <app-filter-field [label]="'admin.audit.filter.action' | t">
@@ -31,11 +31,11 @@
   </header>
 
   @if (loadError()) {
-    <p class="audit__status audit__status--error" role="alert">{{ 'admin.audit.error' | t }}</p>
+    <p class="audit__status--error text-muted text-center" role="alert">{{ 'admin.audit.error' | t }}</p>
   }
 
   @if (!groups().length && !loading()) {
-    <p class="audit__status">{{ 'admin.audit.empty' | t }}</p>
+    <p class="text-muted text-center">{{ 'admin.audit.empty' | t }}</p>
   }
 
   @for (g of groups(); track g.key) {
@@ -87,7 +87,7 @@
                 }
               </dl>
               @if (targetLink(e); as link) {
-                <a class="audit__target" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
+                <a class="text-sm self-start" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
               }
             </div>
           }
@@ -99,9 +99,9 @@
   <div #sentinel class="audit__sentinel" aria-hidden="true"></div>
 
   @if (loading()) {
-    <p class="audit__status" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
+    <p class="text-muted text-center" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
   } @else if (hasMore()) {
-    <div class="audit__more">
+    <div class="flex justify-center">
       <app-button variant="secondary" size="sm" (click)="loadMore()">
         {{ 'admin.audit.loadMore' | t }}
       </app-button>

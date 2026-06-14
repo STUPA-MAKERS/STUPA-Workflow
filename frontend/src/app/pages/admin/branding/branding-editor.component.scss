@@ -1,36 +1,3 @@
-.br {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.br__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.br__ver {
-  display: inline-flex;
-  gap: var(--space-2);
-}
-
-.br__badge {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  background: var(--color-surface-sunken);
-  color: var(--color-text-muted);
-}
-
-.br__badge--draft {
-  background: var(--color-warning-subtle);
-  color: var(--color-warning);
-}
-
 .br__cols {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -41,12 +8,6 @@
   .br__cols {
     grid-template-columns: 1fr;
   }
-}
-
-.br__editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
 }
 
 .br__group {
@@ -61,11 +22,6 @@
 .br__group legend {
   font-weight: var(--fw-semibold);
   padding: 0 var(--space-2);
-}
-
-.br__hint {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
 }
 
 .br__desc {
@@ -98,16 +54,6 @@
   object-fit: contain;
 }
 
-.br__logo-meta {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-
-.br__logo-empty {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-
 .br__col {
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
@@ -125,10 +71,6 @@
   flex-wrap: wrap;
 }
 
-.br__col-title {
-  font-weight: var(--fw-semibold);
-}
-
 /* Zweispaltiger DE/EN-Editor (#16) — beide Sprachen nebeneinander. */
 .br__bi {
   display: grid;
@@ -140,20 +82,6 @@
   .br__bi {
     grid-template-columns: 1fr;
   }
-}
-
-.br__sub {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  margin-top: var(--space-2);
-}
-
-.br__lbl {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
 }
 
 input:not([type='file']),
@@ -200,10 +128,6 @@ input[type='file']::file-selector-button:hover {
   border-color: var(--color-text-muted);
 }
 
-.br__addlink {
-  align-self: flex-start;
-}
-
 .br__preview {
   display: flex;
   flex-direction: column;
@@ -240,20 +164,11 @@ input[type='file']::file-selector-button:hover {
   max-height: 1.75rem;
 }
 
-.br__pv-welcome {
-  font-size: var(--fs-md);
-}
-
 /* Platzhalter in der Vorschau, solange noch nichts gepflegt ist (Image 6: „immer leer“). */
 .br__pv-ph {
   color: var(--color-text-muted);
   font-style: italic;
   opacity: 0.7;
-}
-
-.br__pv-support {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
 }
 
 .br__pv-legal {
@@ -291,12 +206,6 @@ input[type='file']::file-selector-button:hover {
   flex-basis: 100%;
   color: var(--color-text-muted);
   font-size: var(--fs-xs);
-}
-
-.br__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
 }
 
 /* Mobil (≤768px): Vorschau nicht mehr sticky (stapelt unter dem Editor);

@@ -1,26 +1,26 @@
 <section class="gr">
-  <header class="gr__head">
+  <header class="flex items-center justify-between gap-4 flex-wrap">
     <div>
-      <h1 class="gr__title">{{ 'admin.gremiumRoles.title' | t }}</h1>
-      <p class="gr__sub">{{ 'admin.gremiumRoles.subtitle' | t }}</p>
+      <h1 class="m-0">{{ 'admin.gremiumRoles.title' | t }}</h1>
+      <p class="text-muted text-sm mt-1">{{ 'admin.gremiumRoles.subtitle' | t }}</p>
     </div>
     <app-button size="sm" (click)="openAdd()">{{ 'admin.gremiumRoles.add' | t }}</app-button>
   </header>
 
   <app-data-table [columns]="columns()" [rows]="roles()" [emptyText]="'admin.gremiumRoles.empty' | t">
     <ng-template appCell="name" let-r>{{ label($any(r)) | capitalize }}</ng-template>
-    <ng-template appCell="key" let-r><span class="gr__mono">{{ $any(r).key }}</span></ng-template>
+    <ng-template appCell="key" let-r><span class="font-mono text-xs">{{ $any(r).key }}</span></ng-template>
     <ng-template appCell="permissions" let-r>
-      <span class="gr__permTags">
+      <span class="inline-flex flex-wrap gap-1">
         @for (p of $any(r).permissions ?? []; track p) {
           <span class="gr__permTag">{{ permLabel(p) | t }}</span>
         } @empty {
-          <span class="gr__mono">—</span>
+          <span class="font-mono text-xs">—</span>
         }
       </span>
     </ng-template>
     <ng-template appCell="actions" let-r let-i="index">
-      <span class="gr__actions">
+      <span class="inline-flex items-center gap-1 justify-end">
         <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.edit' | t" (click)="openEdit(i)">
           <app-icon name="edit" />
         </app-button>
@@ -47,23 +47,23 @@
   (closed)="close()"
 >
   @if (draft(); as d) {
-    <form class="gr__form" (submit)="$event.preventDefault(); save()">
-      <label class="field">
-        <span class="field__label">{{ 'admin.common.key' | t }}</span>
+    <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); save()">
+      <label class="flex flex-col gap-2">
+        <span class="text-sm font-medium">{{ 'admin.common.key' | t }}</span>
         <input class="field__control" [ngModel]="d.key" (ngModelChange)="patch('key', $event)" name="key" [disabled]="editingId() !== null" placeholder="z. B. vorsitz" />
       </label>
-      <label class="field">
-        <span class="field__label">{{ 'admin.common.labelDe' | t }}</span>
+      <label class="flex flex-col gap-2">
+        <span class="text-sm font-medium">{{ 'admin.common.labelDe' | t }}</span>
         <input class="field__control" [ngModel]="d.labelDe" (ngModelChange)="patch('labelDe', $event)" name="labelDe" />
       </label>
-      <label class="field">
-        <span class="field__label">{{ 'admin.common.labelEn' | t }}</span>
+      <label class="flex flex-col gap-2">
+        <span class="text-sm font-medium">{{ 'admin.common.labelEn' | t }}</span>
         <input class="field__control" [ngModel]="d.labelEn" (ngModelChange)="patch('labelEn', $event)" name="labelEn" />
       </label>
       <fieldset class="gr__perms">
-        <legend class="field__label">{{ 'admin.gremiumRoles.permissions' | t }}</legend>
+        <legend class="text-sm font-medium">{{ 'admin.gremiumRoles.permissions' | t }}</legend>
         @for (p of allPermissions; track p) {
-          <label class="gr__perm">
+          <label class="inline-flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               [checked]="d.permissions.includes(p)"
@@ -75,7 +75,7 @@
       </fieldset>
     </form>
   }
-  <div dialog-footer class="gr__foot">
+  <div dialog-footer class="flex justify-end gap-3">
     <app-button variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
     <app-button [disabled]="!draft()?.key?.trim()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
@@ -88,7 +88,7 @@
   (closed)="confirmDelete.set(null)"
 >
   <p>{{ 'admin.gremiumRoles.deleteConfirm' | t: { name: label(confirmDelete()) } }}</p>
-  <div dialog-footer class="gr__foot">
+  <div dialog-footer class="flex justify-end gap-3">
     <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
   </div>

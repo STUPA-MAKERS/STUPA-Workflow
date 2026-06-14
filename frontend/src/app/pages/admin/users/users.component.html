@@ -1,7 +1,7 @@
-<section class="users">
+<section class="flex flex-col gap-6">
   <header class="users__head">
     <h1>{{ 'admin.users.title' | t }}</h1>
-    <p class="users__sub">{{ 'admin.users.subtitle' | t }}</p>
+    <p class="text-muted">{{ 'admin.users.subtitle' | t }}</p>
   </header>
 
   <!-- Suche -->
@@ -20,16 +20,16 @@
 
   <app-data-table [columns]="columns()" [rows]="principals()" [rowKey]="rowId" [isExpanded]="rowExpanded" [emptyText]="'admin.users.noResults' | t">
       <ng-template appCell="name" let-p>
-        <span class="users__name">{{ userLabel($any(p)) }}</span>
+        <span class="font-medium">{{ userLabel($any(p)) }}</span>
         @if ($any(p).active === false) {
           <app-badge variant="neutral">{{ 'admin.users.inactive' | t }}</app-badge>
         }
       </ng-template>
-      <ng-template appCell="email" let-p><span class="users__muted">{{ $any(p).email || '—' }}</span></ng-template>
+      <ng-template appCell="email" let-p><span class="text-muted">{{ $any(p).email || '—' }}</span></ng-template>
       <ng-template appCell="roles" let-p>
         <div class="users__roles">
           @if (globalAssignments($any(p)).length === 0) {
-            <span class="users__muted">{{ 'admin.users.noRoles' | t }}</span>
+            <span class="text-muted">{{ 'admin.users.noRoles' | t }}</span>
           }
           @for (a of globalAssignments($any(p)); track a.id) {
             <span class="users__tag">
@@ -45,17 +45,17 @@
                 }
               </app-badge>
               @if (a.validUntil) {
-                <span class="users__until">→ {{ a.validUntil | slice: 0 : 10 }}</span>
+                <span class="text-muted text-xs">→ {{ a.validUntil | slice: 0 : 10 }}</span>
               }
             </span>
           }
         </div>
       </ng-template>
       <ng-template appCell="lastLogin" let-p>
-        <span class="users__muted">{{ $any(p).lastLogin ? ($any(p).lastLogin | slice: 0 : 10) : ('admin.users.never' | t) }}</span>
+        <span class="text-muted">{{ $any(p).lastLogin ? ($any(p).lastLogin | slice: 0 : 10) : ('admin.users.never' | t) }}</span>
       </ng-template>
       <ng-template appCell="actions" let-p>
-        <span class="users__row-actions">
+        <span class="inline-flex gap-1 justify-end">
           <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.users.addRole' | t" [attr.aria-expanded]="isExpanded($any(p).id)" (click)="toggleAssign($any(p).id)">
             <app-icon name="add" />
           </app-button>
@@ -68,7 +68,7 @@
       <ng-template appRowDetail let-p>
         <fieldset class="users__assign">
           <app-select
-            class="users__lbl"
+            class="flex flex-col gap-1 text-sm"
             [label]="'admin.users.role' | t"
             [placeholder]="'admin.users.selectRole' | t"
             [options]="roleOptions()"
@@ -77,14 +77,14 @@
             [name]="'role-' + $any(p).id"
           />
           <app-datepicker
-            class="users__lbl"
+            class="flex flex-col gap-1 text-sm"
             [label]="'admin.users.validFrom' | t"
             [ngModel]="draftFor($any(p).id).validFrom"
             (ngModelChange)="patchDraft($any(p).id, { validFrom: $event })"
             [name]="'vf-' + $any(p).id"
           />
           <app-datepicker
-            class="users__lbl"
+            class="flex flex-col gap-1 text-sm"
             [label]="'admin.users.validUntil' | t"
             [ngModel]="draftFor($any(p).id).validUntil"
             (ngModelChange)="patchDraft($any(p).id, { validUntil: $event })"

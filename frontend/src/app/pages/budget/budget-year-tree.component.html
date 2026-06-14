@@ -1,7 +1,7 @@
-<nav class="byt" [attr.aria-label]="'budget.tree.nav' | t">
+<nav class="flex flex-col gap-1 text-sm" [attr.aria-label]="'budget.tree.nav' | t">
   @for (b of tops(); track b.id) {
     <div class="byt__budget" [class.byt__budget--sel]="b.id === selectedBudgetId()" [style.--line-color]="dotColor(b)">
-      <button type="button" class="byt__node byt__node--top" (click)="pickBudget(b)">
+      <button type="button" class="byt__node font-semibold" (click)="pickBudget(b)">
         <span class="byt__dot" [style.background]="dotColor(b)"></span>
         <span class="byt__label">{{ b.name }}</span>
       </button>
@@ -10,7 +10,7 @@
           <li>
             <button
               type="button"
-              class="byt__node byt__node--year"
+              class="byt__node text-text-muted text-xs"
               [class.byt__node--active]="b.id === selectedBudgetId() && fy.id === selectedFyId()"
               (click)="pickYear(b.id, fy.id)"
             >

@@ -31,13 +31,6 @@
   min-width: 0;
 }
 
-.status__actionBtns {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-top: var(--space-3);
-}
-
 /* Schmale Viewports: alles untereinander (Aktionen zuerst). */
 @media (max-width: 1024px) {
   .status__shell,
@@ -46,29 +39,11 @@
   }
 }
 
-.status__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.status__title {
-  margin: 0;
-}
-
 .status__id {
   margin: var(--space-1) 0 0;
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
   font-family: var(--font-mono);
-}
-
-.status__badges {
-  display: inline-flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
 }
 
 .status__text,
@@ -79,17 +54,6 @@
 .status__hint {
   margin: 0 0 var(--space-4);
   font-size: var(--fs-sm);
-}
-
-.status__muted {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
-.status__link {
-  color: var(--color-primary);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
 }
 
 .status__actions {
@@ -138,22 +102,6 @@
   border-bottom: var(--border-width) solid var(--color-border);
 }
 
-.timeline__label {
-  margin: 0;
-  font-weight: var(--fw-semibold);
-}
-
-.timeline__time {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-
-.timeline__actor {
-  margin-left: var(--space-2);
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-
 .timeline__note {
   margin: var(--space-1) 0 0;
   color: var(--color-text-muted);
@@ -161,12 +109,6 @@
 }
 
 // --- readonly data ----------------------------------------------------------
-.readonly {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-}
-
 .readonly__row {
   display: grid;
   grid-template-columns: minmax(8rem, 14rem) 1fr;
@@ -285,13 +227,6 @@
   padding: var(--space-4);
   min-height: 5rem;
 }
-.det__chatEmpty {
-  margin: auto;
-  text-align: center;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  padding: var(--space-4) 0;
-}
 .det__msg {
   display: flex;
   gap: var(--space-2);
@@ -327,17 +262,6 @@
 .det__msg--own .det__msgBody {
   align-items: flex-end;
 }
-.det__msgTop {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-.det__msgAuthor {
-  font-weight: var(--fw-semibold);
-  color: var(--color-text);
-}
 .det__msgTime {
   white-space: nowrap;
 }
@@ -360,11 +284,6 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-top: var(--border-width) solid var(--color-border);
-}
-.det__composerRow {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
 }
 .det__composerInput {
   flex: 1;

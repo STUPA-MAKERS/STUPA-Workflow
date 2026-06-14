@@ -1,8 +1,8 @@
-<div class="field">
-  <label class="field__label" [for]="id">
+<div class="flex flex-col gap-2">
+  <label class="text-sm font-medium text-text" [for]="id">
     {{ label }}
     @if (required) {
-      <span class="field__req" aria-hidden="true">*</span>
+      <span class="text-danger" aria-hidden="true">*</span>
     }
   </label>
   <input
@@ -19,9 +19,9 @@
     (blur)="onTouched()"
   />
   @if (hint && !error) {
-    <p class="field__hint" [id]="id + '-hint'">{{ hint }}</p>
+    <p class="text-xs text-muted" [id]="id + '-hint'">{{ hint }}</p>
   }
   @if (error) {
-    <p class="field__error" [id]="id + '-error'" role="alert">{{ error }}</p>
+    <p class="text-xs text-danger" [id]="id + '-error'" role="alert">{{ error }}</p>
   }
 </div>

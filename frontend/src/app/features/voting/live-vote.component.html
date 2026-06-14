@@ -1,23 +1,23 @@
 <section class="live">
-  <header class="live__head">
-    <h1 class="live__title">{{ 'voting.live.heading' | t }}</h1>
+  <header class="flex items-baseline justify-between gap-3 flex-wrap">
+    <h1 class="m-0">{{ 'voting.live.heading' | t }}</h1>
     <a routerLink="/voting/beamer" class="live__beamer">{{ 'voting.live.toBeamer' | t }}</a>
   </header>
 
   @if (connection() === 'reconnecting') {
-    <p class="live__banner live__banner--warn" role="status">
+    <p class="m-0 py-2 px-4 rounded-md bg-surface-sunken text-muted text-sm text-center bg-warning-subtle text-text" role="status">
       {{ 'voting.live.reconnecting' | t }}
     </p>
   } @else if (connection() === 'connecting') {
-    <p class="live__banner" role="status">{{ 'voting.live.connecting' | t }}</p>
+    <p class="m-0 py-2 px-4 rounded-md bg-surface-sunken text-muted text-sm text-center" role="status">{{ 'voting.live.connecting' | t }}</p>
   } @else if (connection() === 'closed') {
-    <p class="live__banner" role="status">{{ 'voting.live.closed' | t }}</p>
+    <p class="m-0 py-2 px-4 rounded-md bg-surface-sunken text-muted text-sm text-center" role="status">{{ 'voting.live.closed' | t }}</p>
   }
 
   @if (notEligible()) {
     <p class="live__notice" role="alert">{{ 'voting.live.notEligible' | t }}</p>
   } @else if (result(); as res) {
-    <div class="live__result">
+    <div class="flex flex-col gap-5">
       <app-badge [variant]="res.result === 'passed' ? 'success' : 'danger'">
         {{ resultKey() | t }}
       </app-badge>
@@ -27,7 +27,7 @@
     </div>
   } @else if (vote(); as v) {
     <p class="live__hint">{{ 'voting.live.castHint' | t }}</p>
-    <div class="live__options" role="group" [attr.aria-label]="'voting.live.heading' | t">
+    <div class="grid gap-4" role="group" [attr.aria-label]="'voting.live.heading' | t">
       @for (option of v.options; track option) {
         <app-button
           class="live__option"
@@ -40,7 +40,7 @@
       }
     </div>
     @if (myChoice(); as choice) {
-      <p class="live__voted" role="status">{{ 'voting.live.voted' | t: { choice: optionLabel(choice) } }}</p>
+      <p class="m-0 font-medium text-center" role="status">{{ 'voting.live.voted' | t: { choice: optionLabel(choice) } }}</p>
     }
     @if (tally(); as t) {
       <app-vote-bars [options]="v.options" [counts]="t.counts" [eligible]="t.eligible" [leading]="t.leading" />

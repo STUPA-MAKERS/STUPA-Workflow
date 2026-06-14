@@ -1,15 +1,15 @@
 @if (loading()) {
-  <p class="det__status" aria-live="polite">{{ 'applications.detail.loading' | t }}</p>
+  <p class="text-muted py-5" aria-live="polite">{{ 'applications.detail.loading' | t }}</p>
 } @else if (notFound()) {
-  <p class="det__status" role="alert">{{ 'applications.detail.notFound' | t }}</p>
+  <p class="text-muted py-5" role="alert">{{ 'applications.detail.notFound' | t }}</p>
 } @else if (error()) {
-  <p class="det__status det__status--error" role="alert">
+  <p class="text-muted py-5 text-danger" role="alert">
     {{ 'applications.detail.error' | t }}
   </p>
 } @else if (app(); as application) {
   <header class="det__head">
-    <div class="det__titleRow">
-      <h1 class="det__title">{{ title() }}</h1>
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <h1 class="m-0">{{ title() }}</h1>
       @if (application.canEdit && !editing()) {
         <div class="det__ownerActions">
           @if (application.state?.editAllowed) {
@@ -30,12 +30,12 @@
       @if (application.budgetId && budgetLabel(application.budgetId)) {
         <app-badge variant="neutral">{{ budgetLabel(application.budgetId) }}</app-badge>
       }
-      <span class="det__version">
+      <span class="text-muted text-sm">
         {{ 'applications.detail.version' | t: { version: application.version } }}
       </span>
       @if (canManage()) {
         <app-button class="det__ccBtn" variant="ghost" size="sm" (click)="openBudgetDialog()">
-          <span class="det__ccBtnInner">
+          <span class="inline-flex items-center gap-2">
             <app-icon name="euro" [size]="15" />
             {{ application.budgetId ? ('applications.budget.change' | t) : ('applications.budget.assign' | t) }}
           </span>
@@ -75,7 +75,7 @@
   <aside class="det__rail det__rail--left">
     @if (canTransition() && transitions().length) {
       <app-card [heading]="'applications.transitions.title' | t">
-        <div class="det__transitions">
+        <div class="flex flex-col gap-2">
           @for (t of transitions(); track t.id) {
             <app-button
               [color]="t.color"
@@ -98,7 +98,7 @@
   <app-card [heading]="'applications.detail.data.title' | t">
     @if (editing()) {
       <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
-      <div class="det__editActions">
+      <div class="flex justify-end gap-2 mt-3">
         <app-button variant="ghost" size="sm" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
         <app-button size="sm" [disabled]="editForm.invalid" [loading]="savingEdit()" (click)="saveEdit()">{{ 'applications.detail.save' | t }}</app-button>
       </div>
@@ -115,17 +115,17 @@
       }
       <!-- Kostenpositionen mit Vergleichsangeboten (#1) -->
       @for (pf of positionEntries(application); track pf.key) {
-        <section class="det__positions">
-          <h3 class="det__positions-h">{{ pf.label }}</h3>
+        <section class="flex flex-col gap-3 mt-4">
+          <h3 class="m-0 text-base">{{ pf.label }}</h3>
           @for (p of pf.positions; track $index) {
             <div class="det__pos">
-              <div class="det__pos-head">
+              <div class="flex justify-between gap-3">
                 <strong>{{ p.label || ('applications.detail.positionUntitled' | t) }}</strong>
                 <span class="det__pos-val">{{ money(positionValue(p)) }}</span>
               </div>
               <ul class="det__offers">
                 @for (o of p.offers; track $index) {
-                  <li class="det__offer" [class.det__offer--pref]="o.preferred">
+                  <li class="flex items-center gap-3 text-sm" [class.det__offer--pref]="o.preferred">
                     <span class="det__offer-label">{{ o.label || '—' }}</span>
                     @if (o.preferred) {
                       <app-badge variant="success">{{ 'apply.positions.preferred' | t }}</app-badge>
@@ -140,7 +140,7 @@
         </section>
       }
     } @else {
-      <p class="det__muted">{{ 'applications.detail.data.empty' | t }}</p>
+      <p class="text-muted">{{ 'applications.detail.data.empty' | t }}</p>
     }
   </app-card>
 
@@ -150,17 +150,17 @@
       <ol class="det__history">
         @for (version of versions(); track version.version) {
           <li class="det__version-item">
-            <div class="det__version-head">
+            <div class="flex items-baseline gap-3 flex-wrap mb-2">
               <strong>{{ 'applications.history.version' | t: { version: version.version } }}</strong>
               @if (version.changedBy) {
-                <span class="det__muted">{{ 'applications.history.by' | t: { actor: version.changedBy } }}</span>
+                <span class="text-muted">{{ 'applications.history.by' | t: { actor: version.changedBy } }}</span>
               }
-              <time class="det__muted" [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
+              <time class="text-muted" [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
             </div>
             @if (!version.diff) {
-              <p class="det__muted">{{ 'applications.history.initial' | t }}</p>
+              <p class="text-muted">{{ 'applications.history.initial' | t }}</p>
             } @else if (isEmptyDiff(version)) {
-              <p class="det__muted">{{ 'applications.history.diff.none' | t }}</p>
+              <p class="text-muted">{{ 'applications.history.diff.none' | t }}</p>
             } @else {
               <ul class="det__diff">
                 @for (change of version.diff.changed; track change.key) {
@@ -188,7 +188,7 @@
         }
       </ol>
     } @else {
-      <p class="det__muted">{{ 'applications.history.empty' | t }}</p>
+      <p class="text-muted">{{ 'applications.history.empty' | t }}</p>
     }
   </app-card>
 
@@ -208,20 +208,20 @@
           >
             <span class="det__avatar" aria-hidden="true">{{ initial(authorName(comment)) }}</span>
             <div class="det__msgBody">
-              <div class="det__msgTop">
-                <span class="det__msgAuthor">{{ authorName(comment) }}</span>
+              <div class="flex items-baseline gap-2 text-xs text-muted">
+                <span class="font-semibold text-text">{{ authorName(comment) }}</span>
                 <time class="det__msgTime" [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
               </div>
               <div class="det__bubble">{{ comment.body }}</div>
             </div>
           </article>
         } @empty {
-          <p class="det__muted det__chatEmpty">{{ 'applications.comments.empty' | t }}</p>
+          <p class="text-muted m-auto text-center text-sm py-4">{{ 'applications.comments.empty' | t }}</p>
         }
       </div>
 
       <form class="det__composer" (submit)="submitComment($event)">
-        <div class="det__composerRow">
+        <div class="flex items-end gap-2">
           <textarea
             class="det__composerInput"
             rows="1"
@@ -268,7 +268,7 @@
   [closeLabel]="'applications.detail.cancel' | t"
   (closed)="budgetDialogOpen.set(false)"
 >
-  <p class="det__muted">{{ 'applications.budget.lead' | t }}</p>
+  <p class="text-muted">{{ 'applications.budget.lead' | t }}</p>
   <div class="det__ccTree">
     <app-cost-centre-tree
       [nodes]="budgetTree()"

@@ -2,11 +2,6 @@
   max-width: 36rem;
   margin: 0 auto;
 }
-.done__top {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
 .done__mail {
   font-size: 1.5rem;
   line-height: 1;
@@ -25,16 +20,6 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface-sunken);
   color: var(--color-text);
-  font-size: var(--fs-sm);
-}
-.done__ref {
-  margin-top: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-.done__hint {
-  margin-top: var(--space-2);
-  color: var(--color-text-muted);
   font-size: var(--fs-sm);
 }
 .done__home {

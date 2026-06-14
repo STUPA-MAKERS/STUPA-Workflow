@@ -1,6 +1,6 @@
 <section class="wizard">
-  <header class="wizard__head">
-    <h1 class="wizard__title">{{ 'apply.title' | t }}</h1>
+  <header class="flex flex-col gap-5">
+    <h1 class="m-0">{{ 'apply.title' | t }}</h1>
     <app-stepper
       [steps]="steps()"
       [activeIndex]="activeIndex()"
@@ -11,9 +11,9 @@
   <app-card>
     @switch (currentStep()) {
       @case ('type') {
-        <h2 class="wizard__step-title">{{ 'apply.type.title' | t }}</h2>
-        <p class="wizard__lead">{{ 'apply.type.lead' | t }}</p>
-        <div class="type-list" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
+        <h2 class="mb-2 text-xl">{{ 'apply.type.title' | t }}</h2>
+        <p class="mb-5 text-muted">{{ 'apply.type.lead' | t }}</p>
+        <div class="grid gap-3" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
           @for (t of types(); track t.id) {
             <button
               type="button"
@@ -23,14 +23,14 @@
               [class.is-selected]="typeId() === t.id"
               (click)="selectType(t.id)"
             >
-              <span class="type-option__name">{{ t.name }}</span>
+              <span class="font-medium">{{ t.name }}</span>
             </button>
           } @empty {
-            <p class="wizard__muted">{{ 'apply.type.empty' | t }}</p>
+            <p class="text-muted text-sm">{{ 'apply.type.empty' | t }}</p>
           }
         </div>
         @if (loadingForm()) {
-          <p class="wizard__muted" role="status">{{ 'apply.form.loading' | t }}</p>
+          <p class="text-muted text-sm" role="status">{{ 'apply.form.loading' | t }}</p>
         }
         <!-- Konfigurierter Info-Text (#18): /admin/branding, Markdown, je Sprache. -->
         @if (applyInfoHtml()) {
@@ -39,9 +39,9 @@
       }
 
       @case ('contact') {
-        <h2 class="wizard__step-title">{{ 'apply.contact.title' | t }}</h2>
-        <p class="wizard__lead">{{ 'apply.contact.lead' | t }}</p>
-        <form class="contact" [formGroup]="contactForm">
+        <h2 class="mb-2 text-xl">{{ 'apply.contact.title' | t }}</h2>
+        <p class="mb-5 text-muted">{{ 'apply.contact.lead' | t }}</p>
+        <form class="grid gap-5" [formGroup]="contactForm">
           <app-input
             [label]="'apply.contact.email' | t"
             type="email"
@@ -63,14 +63,14 @@
 
       @case ('section') {
         @if (currentSection(); as section) {
-          <h2 class="wizard__step-title">{{ section.label }}</h2>
+          <h2 class="mb-2 text-xl">{{ section.label }}</h2>
           <formly-form [form]="section.form" [fields]="section.fields" [model]="model" />
         }
       }
 
       @case ('review') {
-        <h2 class="wizard__step-title">{{ 'apply.review.title' | t }}</h2>
-        <dl class="summary">
+        <h2 class="mb-2 text-xl">{{ 'apply.review.title' | t }}</h2>
+        <dl class="grid gap-1 mb-6">
           <div class="summary__row">
             <dt>{{ 'apply.review.email' | t }}</dt>
             <dd>{{ reviewEmail() }}</dd>
@@ -83,7 +83,7 @@
           }
         </dl>
         @if (!loggedIn()) {
-          <div class="review__altcha">
+          <div class="mt-4">
             <app-altcha (solved)="onAltchaSolved($event)" (unavailable)="onAltchaUnavailable()" />
           </div>
         }
@@ -124,6 +124,6 @@
   </app-card>
 
   @if (effForm()) {
-    <p class="wizard__autosave" role="status">{{ 'apply.autosave' | t }}</p>
+    <p class="text-xs text-muted text-center" role="status">{{ 'apply.autosave' | t }}</p>
   }
 </section>

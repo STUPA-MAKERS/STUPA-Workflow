@@ -1,14 +1,14 @@
 <section class="grants">
   <header class="grants__head">
     <h1>{{ 'account.grants.title' | t }}</h1>
-    <p class="grants__intro">{{ 'account.grants.intro' | t }}</p>
+    <p class="m-0 text-muted">{{ 'account.grants.intro' | t }}</p>
   </header>
 
   @if (canUseMcp()) {
     <section class="card mcp">
       <h2>{{ 'account.mcp.title' | t }}</h2>
       <p>{{ 'account.mcp.intro' | t }}</p>
-      <div class="mcp__actions">
+      <div class="my-3">
         <button type="button" class="btn btn--primary" (click)="downloadPackage()">
           <app-icon name="export" [size]="16" />
           {{ 'account.mcp.download' | t }}
@@ -45,11 +45,11 @@
     </div>
 
     @if (loading()) {
-      <p class="grants__muted">{{ 'common.loading' | t }}</p>
+      <p class="text-muted">{{ 'common.loading' | t }}</p>
     } @else if (error()) {
-      <p class="grants__error">{{ 'account.grants.error' | t }}</p>
+      <p class="text-danger">{{ 'account.grants.error' | t }}</p>
     } @else if (grants().length === 0) {
-      <p class="grants__empty">{{ 'account.grants.empty' | t }}</p>
+      <p class="text-center text-muted py-6">{{ 'account.grants.empty' | t }}</p>
     } @else {
       <table class="grants__table">
         <thead>

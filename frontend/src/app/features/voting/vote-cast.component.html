@@ -1,12 +1,12 @@
 @switch (phase()) {
   @case ('loading') {
-    <p class="vote__muted" role="status">{{ 'voting.cast.loading' | t }}</p>
+    <p class="text-muted" role="status">{{ 'voting.cast.loading' | t }}</p>
   }
 
   @case ('error') {
     <section class="vote vote--narrow">
       <app-card [heading]="'voting.cast.error.heading' | t">
-        <p class="vote__muted">{{ 'voting.cast.error.body' | t }}</p>
+        <p class="text-muted">{{ 'voting.cast.error.body' | t }}</p>
         <a card-footer routerLink="/voting" class="vote__link">{{ 'voting.live.heading' | t }}</a>
       </app-card>
     </section>
@@ -21,10 +21,10 @@
     }
     @if (vote(); as v) {
       <section class="vote">
-        <header class="vote__head">
+        <header class="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 class="vote__title">{{ 'voting.cast.heading' | t }}</h1>
-            <p class="vote__meta">
+            <h1 class="m-0">{{ 'voting.cast.heading' | t }}</h1>
+            <p class="mt-1 text-muted text-sm">
               {{ majorityKey() | t }}
               @if (v.config.quorum) {
                 · {{ 'vote.tally.quorum' | t }} {{ v.config.quorum.value
@@ -32,7 +32,7 @@
               }
             </p>
           </div>
-          <div class="vote__badges">
+          <div class="inline-flex gap-2 flex-wrap">
             @if (isOpen()) {
               <app-badge variant="success">{{ 'vote.option.yes' | t }}</app-badge>
             }
@@ -61,14 +61,14 @@
         @if (notEligible() && !delegation()?.blocked && !delegation()?.exercising) {
           <p class="vote__notice" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
         } @else if (isClosed()) {
-          <p class="vote__muted">{{ 'voting.cast.closedHint' | t }}</p>
+          <p class="text-muted">{{ 'voting.cast.closedHint' | t }}</p>
         } @else if (!delegation()?.blocked) {
-          <p class="vote__muted">{{ 'voting.cast.openHint' | t }}</p>
+          <p class="text-muted">{{ 'voting.cast.openHint' | t }}</p>
         }
 
         @if (isOpen() && !notEligible()) {
           @if (delegation()?.exercising) {
-            <h2 class="vote__castHeading">{{ 'voting.cast.delegation.ownHeading' | t }}</h2>
+            <h2 class="mt-2 text-base font-semibold">{{ 'voting.cast.delegation.ownHeading' | t }}</h2>
           }
           <div class="vote__options" role="group" [attr.aria-label]="'voting.cast.heading' | t">
             @for (option of options(); track option) {
@@ -85,7 +85,7 @@
           </div>
 
           @if (myChoice(); as choice) {
-            <p class="vote__choice" role="status">
+            <p class="m-0 font-medium" role="status">
               {{ 'voting.cast.yourChoice' | t: { choice: optionLabel(choice) } }}
               @if (!allowChange()) {
                 — {{ 'voting.cast.locked' | t }}
@@ -97,7 +97,7 @@
         @if (isOpen() && delegation()?.exercising) {
           <!-- Vertretungs-Stimme (#delegation-rework): GETRENNTE Abgabe unter dem
                Stimmrecht des/der Delegierenden — darf von der eigenen abweichen. -->
-          <h2 class="vote__castHeading">
+          <h2 class="mt-2 text-base font-semibold">
             {{ 'voting.cast.delegation.proxyHeading' | t: { name: delegation()?.delegatedByName || '?' } }}
           </h2>
           <div
@@ -119,7 +119,7 @@
           </div>
 
           @if (proxyChoice(); as choice) {
-            <p class="vote__choice" role="status">
+            <p class="m-0 font-medium" role="status">
               {{ 'voting.cast.delegation.proxyChoice' | t: { choice: optionLabel(choice) } }}
               @if (!allowChange()) {
                 — {{ 'voting.cast.locked' | t }}
@@ -136,14 +136,14 @@
               [eligible]="v.tally.eligible"
               [leading]="v.tally.leading"
             />
-            <p class="vote__tallyMeta">
+            <p class="mt-4 text-muted text-sm">
               {{ 'voting.beamer.votesOf' | t: { cast: castCount(), eligible: v.tally.eligible } }}
               · {{ 'vote.tally.quorum' | t }}:
               {{ (v.tally.quorumMet ? 'vote.tally.quorumMet' : 'vote.tally.quorumMissed') | t }}
             </p>
           </app-card>
         } @else if (secret()) {
-          <p class="vote__muted">{{ 'vote.tally.secretHint' | t }}</p>
+          <p class="text-muted">{{ 'vote.tally.secretHint' | t }}</p>
         }
 
         <a routerLink="/voting/beamer" class="vote__link">{{ 'voting.cast.toBeamer' | t }}</a>

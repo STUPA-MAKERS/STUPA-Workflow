@@ -1,17 +1,3 @@
-.fe {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.fe__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
 .fe__desc {
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
@@ -96,14 +82,6 @@
   border-bottom: var(--border-width) dashed var(--color-border);
 }
 
-.fe__lbl {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-}
-
 .fe__chk {
   display: inline-flex;
   align-items: center;
@@ -165,18 +143,6 @@ select {
 }
 
 /* --- Drag&Drop-Canvas (#8) ----------------------------------------------- */
-.fe__toolbar {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.fe__toolbar-zoom {
-  display: inline-flex;
-  gap: var(--space-1);
-  align-items: center;
-  margin-left: auto;
-}
-
 .fe__work {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18rem;
@@ -338,13 +304,6 @@ select {
 
 /* --- Gruppen (#flow-groups) ------------------------------------------------ */
 /* Breadcrumbs der Drill-Down-Navigation. */
-.fe__crumbs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-wrap: wrap;
-}
-
 .fe__crumb {
   padding: 0.15rem 0.45rem;
   font: inherit;
@@ -366,10 +325,6 @@ select {
 }
 .fe__crumb--current:hover {
   background: none;
-}
-
-.fe__crumb-sep {
-  color: var(--color-text-muted);
 }
 
 /* Gruppen-Kasten: ein Knoten je Gruppe; Klick öffnet (Drill-Down). */
@@ -514,28 +469,11 @@ select {
   top: var(--space-4);
 }
 
-.fe__panel-h {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  margin: 0;
-}
-
-.fe__panel-empty {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  margin: 0;
-}
-
 /* Controls im Panel füllen die Breite → saubere Ausrichtung (FE8). */
 .fe__panel .fe__lbl input,
 .fe__panel .fe__lbl select {
   width: 100%;
   box-sizing: border-box;
-}
-
-.fe__field-hint {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
 }
 
 .fe__auto {
@@ -574,23 +512,6 @@ select {
   flex-direction: column;
   gap: var(--space-4);
 }
-.fe__actionsPane-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-.fe__actionsPane-title {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.fe__actionsPane-sub {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
 .fe__actionsPane-add {
   max-width: 16rem;
 }
@@ -600,16 +521,6 @@ select {
   gap: var(--space-2);
   padding-bottom: var(--space-3);
   border-bottom: var(--border-width) solid var(--color-border);
-}
-.fe__paneSection-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-.fe__subH {
-  margin: 0;
-  font-size: var(--fs-md);
 }
 .fe__actions-grid {
   display: grid;
@@ -625,12 +536,6 @@ select {
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface-sunken);
-}
-.fe__action-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
 }
 .fe__recipient {
   display: flex;
@@ -650,32 +555,11 @@ select {
   font-size: var(--fs-xs);
 }
 
-.fe__foot {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-4);
-}
-
-.fe__status {
-  font-size: var(--fs-sm);
-  color: var(--color-danger);
-}
-
 .fe__status--ok {
   color: var(--color-success);
 }
 
 /* State-Art-Config + Decision-Regeln (#28) */
-.fe__hint {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-  margin: 0;
-}
-.fe__lbl-text {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-}
 .fe__rules {
   display: flex;
   flex-direction: column;
@@ -704,16 +588,6 @@ select {
 }
 
 /* Guard-Prioritäts-Stack (#8) */
-.fe__guards {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.fe__guard-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
 .fe__guard-rank {
   flex: 0 0 1.25rem;
   text-align: center;

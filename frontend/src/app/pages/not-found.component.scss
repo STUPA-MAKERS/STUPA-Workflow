@@ -1,16 +1,3 @@
-.nf {
-  text-align: center;
-  padding-block: var(--space-12);
-}
-.nf__code {
-  font-size: var(--fs-3xl);
-  font-weight: var(--fw-bold);
-  color: var(--color-primary);
-}
-.nf__body {
-  color: var(--color-text-muted);
-  margin-block: var(--space-3) var(--space-5);
-}
 .nf__back {
   display: inline-flex;
   padding: var(--space-3) var(--space-5);

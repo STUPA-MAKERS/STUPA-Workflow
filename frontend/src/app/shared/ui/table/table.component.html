@@ -1,6 +1,6 @@
 <table class="tbl">
   @if (caption) {
-    <caption class="tbl__caption">{{ caption }}</caption>
+    <caption class="text-start pb-3 text-muted">{{ caption }}</caption>
   }
   <thead>
     <tr>
@@ -18,7 +18,7 @@
       </tr>
     } @empty {
       <tr>
-        <td class="tbl__empty" [attr.colspan]="columns.length">{{ emptyText }}</td>
+        <td class="text-center text-muted p-6" [attr.colspan]="columns.length">{{ emptyText }}</td>
       </tr>
     }
   </tbody>
