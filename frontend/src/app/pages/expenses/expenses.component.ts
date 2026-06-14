@@ -343,7 +343,7 @@ export class ExpensesComponent {
 
   private debouncedReload(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reload(), 250);
+    this.searchTimer = setTimeout(() => this.reload(), 400);
   }
 
   private reload(): void {

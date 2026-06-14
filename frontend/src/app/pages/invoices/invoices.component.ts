@@ -114,7 +114,7 @@ export class InvoicesComponent {
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
-  /** Suche (debounced ~250ms) treibt den ``q``-Parameter der Server-Abfrage. */
+  /** Suche (debounced ~400ms) treibt den ``q``-Parameter der Server-Abfrage. */
   onSearch(value: string): void {
     this.q.set(value);
     this.debouncedReload();
@@ -156,7 +156,7 @@ export class InvoicesComponent {
 
   private debouncedReload(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reload(), 250);
+    this.searchTimer = setTimeout(() => this.reload(), 400);
   }
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');

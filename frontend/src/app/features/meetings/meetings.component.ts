@@ -282,12 +282,12 @@ export class MeetingsComponent implements OnDestroy {
     if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreUpcoming();
   }
 
-  /** Header-Suche (#3/#4): debounced ~250 ms; bei Änderung Cursor/Listen leeren
+  /** Header-Suche (#3/#4): debounced ~400 ms; bei Änderung Cursor/Listen leeren
    *  und neu laden. Leere Query ⇒ zurück zur normalen Timeline. */
   onSearch(value: string): void {
     this.searchQuery.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.runSearch(), 250);
+    this.searchTimer = setTimeout(() => this.runSearch(), 400);
   }
 
   /** Suche (neu) ausführen: Treffer-Liste leeren + erste relevanz-sortierte Seite

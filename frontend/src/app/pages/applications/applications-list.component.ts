@@ -89,7 +89,7 @@ export class ApplicationsListComponent {
 
   /** Sichtbare Filter-Controls (gespiegelt aus den Query-Params). */
   readonly q = signal('');
-  /** Debounce-Timer der Header-Suche (~250 ms, wie /expenses). */
+  /** Debounce-Timer der Header-Suche (~400 ms, wie /expenses). */
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   readonly typeId = signal('');
   readonly state = signal('');
@@ -270,14 +270,14 @@ export class ApplicationsListComponent {
     });
   }
 
-  /** Header-Live-Suche (#3): debounced ~250 ms → ``q``-Query-Param → Reload (mirror
+  /** Header-Live-Suche (#3): debounced ~400 ms → ``q``-Query-Param → Reload (mirror
    *  /expenses). Der ``q``-Wert lebt weiter in der URL (teil-/verlinkbar). */
   onSearch(value: string): void {
     this.q.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(
       () => this.navigate({ q: this.q().trim() || null, offset: null }),
-      250,
+      400,
     );
   }
 
