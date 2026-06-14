@@ -761,19 +761,20 @@
     }
     <app-datepicker
       [label]="'meetings.create.date' | t"
+      [required]="true"
       [disabled]="settingsLocked()"
       [ngModel]="settingsDate()"
       (ngModelChange)="settingsDate.set($event)"
       name="setDate"
     />
-    <app-time-input id="mtg-set-time" [label]="'meetings.create.time' | t" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
+    <app-time-input id="mtg-set-time" [label]="'meetings.create.time' | t" [required]="true" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
     @if (settingsLocked()) {
       <p class="text-text-muted">{{ 'meetings.settings.closedHint' | t }}</p>
     }
   </form>
   <div dialog-footer class="mtg__dialogFoot">
     <app-button variant="ghost" (click)="closeSettings()">{{ 'action.cancel' | t }}</app-button>
-    <app-button [loading]="savingSettings()" [disabled]="settingsLocked()" (click)="saveSettings()">{{ 'action.save' | t }}</app-button>
+    <app-button [loading]="savingSettings()" [disabled]="settingsLocked() || !settingsDate().trim() || !settingsTime().trim()" (click)="saveSettings()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 

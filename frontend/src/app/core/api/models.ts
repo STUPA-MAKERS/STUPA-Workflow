@@ -708,6 +708,8 @@ export interface MeetingOutWire {
   createdAt: IsoDateTime;
   protokollantId?: Uuid | null;
   protokollantName?: string | null;
+  /** Ist der anfragende Nutzer der zugewiesene Protokollant? (serverseitig aufgelöst). */
+  isProtokollant?: boolean;
   /** Master-Flag: darf der Nutzer die Sitzung führen (Protokoll/TOPs/Status)? */
   canControl?: boolean;
   /** Sitzung verwalten (anlegen/planen/Protokollant zuweisen). */
@@ -812,6 +814,8 @@ export interface Meeting {
   createdAt: IsoDateTime;
   protokollantId: Uuid | null;
   protokollantName: string | null;
+  /** Ist der angemeldete Nutzer der zugewiesene Protokollant dieser Sitzung? */
+  isProtokollant: boolean;
   /** Master-Flag: darf der Nutzer die Sitzung führen (Protokoll/TOPs/Status)? */
   canControl: boolean;
   /** Sitzung verwalten (anlegen/planen/Protokollant zuweisen). */

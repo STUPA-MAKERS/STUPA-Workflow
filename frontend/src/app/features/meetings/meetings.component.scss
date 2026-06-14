@@ -8,6 +8,11 @@
   flex-direction: column;
   gap: var(--space-2);
   width: 100%;
+  /* Auf Body-Breite zentrieren wie Toolbar (#mtg__toolbar) und Shell-Mittelspalte —
+     sonst sässe nur der Titel/Meta links am vollen Rand der wide-Seite, versetzt zur
+     Krumenleiste und zum restlichen Inhalt (#meetings-header-align). */
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
 }
 .mtg__headRow {
   display: flex;
