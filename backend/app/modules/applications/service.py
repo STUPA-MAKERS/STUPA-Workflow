@@ -472,6 +472,8 @@ class ApplicationsService:
             )
         ).all()
         out: list[TimelineEventOut] = []
+        # Akteur (principal.sub) → Klarname auflösen — NIE rohe UUIDs im UI zeigen.
+        names = await self._author_names({ev.actor for ev in events if ev.actor})
         for ev in events:
             to_state = await self._get_state(ev.to_state_id)
             out.append(
@@ -479,7 +481,7 @@ class ApplicationsService:
                     fromStateId=ev.from_state_id,
                     toStateId=ev.to_state_id,
                     toState=await self._state_out_resolved(to_state),
-                    actor=ev.actor,
+                    actor=(names.get(ev.actor, ev.actor) if ev.actor else None),
                     at=ev.at,
                     note=ev.note,
                 )
@@ -496,12 +498,14 @@ class ApplicationsService:
                 .order_by(SubmissionVersion.version)
             )
         ).all()
+        # Bearbeiter (principal.sub) → Klarname auflösen — NIE rohe UUIDs im UI zeigen.
+        names = await self._author_names({r.changed_by for r in rows if r.changed_by})
         return [
             VersionOut(
                 version=r.version,
                 data=r.data,
                 diff=r.diff,  # type: ignore[arg-type] — gespeicherter DataDiff
-                changedBy=r.changed_by,
+                changedBy=(names.get(r.changed_by, r.changed_by) if r.changed_by else None),
                 at=r.at,
             )
             for r in rows
