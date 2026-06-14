@@ -51,8 +51,10 @@
 
 :host ::ng-deep formly-form {
   display: grid;
-  /* Großzügiger vertikaler Abstand zwischen den Fragen eines Schritts. */
-  gap: var(--space-6);
+  /* Abstand zwischen Fragen kommt symmetrisch aus margin/padding um den Trenner
+     (siehe formly-field + formly-field) — KEIN zusätzlicher grid-gap, sonst stapelt
+     sich der Abstand oben (gap + padding-top) und die Frage wirkt kopflastig (#7). */
+  gap: 0;
 }
 
 :host ::ng-deep formly-field {
@@ -69,9 +71,11 @@
   overflow-clip-margin: var(--space-1);
 }
 
-/* Dünner Trenner zwischen aufeinanderfolgenden Fragen eines Schritts. */
+/* Dünner Trenner zwischen aufeinanderfolgenden Fragen eines Schritts — gleich viel
+   Luft ober- wie unterhalb des Trenners (margin oben, padding unten). */
 :host ::ng-deep formly-field + formly-field {
-  padding-top: var(--space-6);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
   border-top: 1px solid var(--color-border);
 }
 
