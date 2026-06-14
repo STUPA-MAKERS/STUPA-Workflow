@@ -71,7 +71,7 @@
                   @for (entry of timeline(); track entry.at) {
                     <li class="timeline__item">
                       <span class="timeline__dot" aria-hidden="true"></span>
-                      <div class="flex flex-col gap-1 pb-4 border-b border-solid border-line">
+                      <div class="flex flex-col gap-1 pb-4 border-0 border-b border-solid border-line">
                         <p class="m-0 font-semibold">{{ entry.label }}</p>
                         <time class="text-xs text-muted" [attr.datetime]="entry.at">
                           {{ entry.at | ldate: 'medium' }}
@@ -127,7 +127,7 @@
                »own« = eigene (Antragsteller-)Nachrichten rechts, Gremium links. -->
           <aside class="status__rail status__rail--right">
             <section class="det__chat" [attr.aria-label]="'status.comments.title' | t">
-              <header class="py-3 px-4 font-semibold border-b border-solid border-line">{{ 'status.comments.title' | t }}</header>
+              <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'status.comments.title' | t }}</header>
               <div class="det__chatScroll">
                 @for (c of comments(); track c.id) {
                   <article class="det__msg" [class.det__msg--own]="c.authorKind === 'applicant'">
@@ -145,7 +145,7 @@
                 }
               </div>
 
-              <form class="flex flex-col gap-2 py-3 px-4 border-t border-solid border-line" (submit)="$event.preventDefault(); addComment()">
+              <form class="flex flex-col gap-2 py-3 px-4 border-0 border-t border-solid border-line" (submit)="$event.preventDefault(); addComment()">
                 <div class="flex items-end gap-2">
                   <textarea
                     class="det__composerInput"

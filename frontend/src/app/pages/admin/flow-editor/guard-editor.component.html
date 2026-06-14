@@ -9,7 +9,7 @@
 
   @switch (kind()) {
     @case ('combinator') {
-      <div class="flex flex-col gap-2 pl-3 border-l-2 border-solid border-line">
+      <div class="flex flex-col gap-2 pl-3 border-0 border-l-2 border-solid border-line">
         @for (child of children(); track $index) {
           <div class="ge__child">
             <app-guard-editor

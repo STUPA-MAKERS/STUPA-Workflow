@@ -199,7 +199,7 @@
   <!-- RECHTS: Kommentare als Chat (#det) -->
   <aside class="det__rail det__rail--right">
     <section class="det__chat" [attr.aria-label]="'applications.comments.title' | t">
-      <header class="py-3 px-4 font-semibold border-b border-solid border-line">{{ 'applications.comments.title' | t }}</header>
+      <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'applications.comments.title' | t }}</header>
       <div class="det__chatScroll">
         @for (comment of comments(); track comment.id) {
           <article
@@ -220,7 +220,7 @@
         }
       </div>
 
-      <form class="flex flex-col gap-2 py-3 px-4 border-t border-solid border-line" (submit)="submitComment($event)">
+      <form class="flex flex-col gap-2 py-3 px-4 border-0 border-t border-solid border-line" (submit)="submitComment($event)">
         <div class="flex items-end gap-2">
           <textarea
             class="det__composerInput"
