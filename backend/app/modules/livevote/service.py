@@ -48,6 +48,7 @@ from app.modules.livevote.events import (
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.livevote.schemas import (
     MeetingCreate,
+    MeetingGremiumOut,
     MeetingOut,
     MeetingPage,
     MeetingPatch,
@@ -565,6 +566,29 @@ class MeetingService:
             stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
         meetings = list((await self.session.execute(stmt)).scalars().all())
         return await self._decorate(meetings, principal)
+
+    async def list_filter_gremien(self, principal: Principal) -> list[MeetingGremiumOut]:
+        """Gremien (id + Name) für den Filter der Sitzungsübersicht (#meetings-filter).
+
+        Liefert genau die Gremien, in denen der Principal MINDESTENS EINE sichtbare
+        Sitzung hat — **nicht** seine Mitglieds-Gremien. Sichtbarkeit ist dieselbe wie
+        in Timeline/Liste: ``_visible_gremium_ids`` (``None`` = alle, etwa bei
+        ``meeting.view_all``/``manage``/Admin) plus die Gremien einzeln delegierter
+        Sitzungen. Sitzungslose Gremien tauchen so gar nicht erst auf.
+        """
+        stmt = select(Meeting.gremium_id, Gremium.name).join(
+            Gremium, Gremium.id == Meeting.gremium_id
+        )
+        visible = await self._visible_gremium_ids(principal)
+        if visible is not None:
+            # Delegations-Empfänger sehen »ihre« Sitzungen auch ohne Mitgliedschaft —
+            # dann gehört deren Gremium ebenfalls in den Filter.
+            delegated = await self._delegated_meeting_ids(principal.sub)
+            stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
+        rows = (await self.session.execute(stmt.distinct())).all()
+        items = [MeetingGremiumOut(id=gid, name=name) for gid, name in rows]
+        items.sort(key=lambda g: g.name.casefold())
+        return items
 
     async def list_timeline(
         self,

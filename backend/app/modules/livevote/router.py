@@ -45,6 +45,7 @@ from app.modules.livevote.schemas import (
     AttendanceOut,
     AttendanceSetBody,
     MeetingCreate,
+    MeetingGremiumOut,
     MeetingMemberOut,
     MeetingOut,
     MeetingPage,
@@ -231,6 +232,23 @@ async def list_meetings_timeline(
         gremium_id=gremium_id,
         q=q,
     )
+
+
+@router.get(
+    "/meetings/gremien",
+    response_model=list[MeetingGremiumOut],
+    responses=_errors(401, 403),
+)
+async def list_meeting_filter_gremien(
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> list[MeetingGremiumOut]:
+    """Gremien für den Filter der Sitzungsübersicht (#meetings-filter).
+
+    Liefert alle Gremien, in denen der Principal MINDESTENS EINE lesbare Sitzung hat
+    — nicht die Mitglieds-Gremien. Muss VOR ``/meetings/{meeting_id}`` stehen, sonst
+    fängt der UUID-Pfad ``gremien`` ab."""
+    return await service.list_filter_gremien(principal)
 
 
 @router.get("/meetings/{meeting_id}", response_model=MeetingOut, responses=_errors(401, 403, 404))

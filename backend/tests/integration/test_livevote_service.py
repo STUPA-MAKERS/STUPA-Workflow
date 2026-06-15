@@ -195,6 +195,47 @@ async def test_list_timeline_rejects_bad_cursor(session: AsyncSession) -> None:
         await svc.list_timeline(principal, direction="past", cursor="!!not-base64!!")
 
 
+async def test_list_filter_gremien_visibility(session: AsyncSession) -> None:
+    """`/meetings/gremien` (#meetings-filter): nur Gremien mit mind. EINER sichtbaren
+    Sitzung. Ein Mitglieds-Gremium OHNE Sitzung erscheint nicht; ein Gremium mit
+    Sitzung, in dem man NICHT Mitglied ist, ebenfalls nicht. Admin sieht jedes
+    Gremium, das überhaupt eine Sitzung hat."""
+    svc = MeetingService(session)
+    g_with = Gremium(name="Mit Sitzung", slug=f"g-{uuid.uuid4()}")
+    g_empty = Gremium(name="Ohne Sitzung", slug=f"g-{uuid.uuid4()}")
+    g_other = Gremium(name="Fremd", slug=f"g-{uuid.uuid4()}")
+    session.add_all([g_with, g_empty, g_other])
+    await session.flush()
+
+    member = await _member(session, g_with)  # Mitglied in g_with (hat Sitzung)
+    # Dasselbe Mitglied zusätzlich in g_empty (KEINE Sitzung) → darf NICHT auftauchen.
+    role2 = GremiumRole(gremium_id=g_empty.id, key=f"r-{uuid.uuid4()}", name_i18n={"de": "M"})
+    session.add(role2)
+    await session.flush()
+    session.add(
+        GremiumMembership(
+            principal_id=member.id,
+            gremium_id=g_empty.id,
+            gremium_role_id=role2.id,
+            valid_from=None,
+            valid_until=None,
+        )
+    )
+    # Je eine Sitzung in g_with (Mitglied) und g_other (Nicht-Mitglied).
+    session.add(Meeting(gremium_id=g_with.id, title="A", date=_date(2026, 7, 1), status="planned"))
+    session.add(Meeting(gremium_id=g_other.id, title="B", date=_date(2026, 7, 2), status="planned"))
+    await session.commit()
+
+    member_principal = Principal(sub=member.sub, roles=[])
+    seen = await svc.list_filter_gremien(member_principal)
+    # g_empty (keine Sitzung) + g_other (kein Mitglied) fallen raus.
+    assert [g.name for g in seen] == ["Mit Sitzung"]
+
+    admin_seen = {g.name for g in await svc.list_filter_gremien(Principal(sub="adm", roles=["admin"]))}
+    assert {"Mit Sitzung", "Fremd"} <= admin_seen  # alle Gremien MIT Sitzung
+    assert "Ohne Sitzung" not in admin_seen  # sitzungsloses Gremium nie
+
+
 async def test_open_vote_lookup(session: AsyncSession) -> None:
     gremium, application = await _gremium_and_application(session)
     meeting = Meeting(gremium_id=gremium.id, title="GV", status="live")

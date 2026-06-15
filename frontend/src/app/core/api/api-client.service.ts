@@ -412,6 +412,17 @@ export class ApiClient {
       .pipe(map(mapMeetingPage));
   }
 
+  /**
+   * GET /meetings/gremien — Gremien für den Filter der Sitzungsübersicht.
+   *
+   * Alle Gremien, in denen der Nutzer mind. EINE lesbare Sitzung hat (read-Recht)
+   * — nicht die Mitglieds-Gremien (#meetings-filter). Antwort ist bereits camelCase
+   * (`id`/`name`), daher kein Wire-Mapping nötig.
+   */
+  listMeetingFilterGremien(): Observable<{ id: Uuid; name: string }[]> {
+    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/gremien`);
+  }
+
   /** GET /meetings/{id} — Sitzungs-State + Votes. */
   getMeeting(id: Uuid): Observable<Meeting> {
     return this.http.get<MeetingOutWire>(`${this.base}/meetings/${id}`).pipe(map(mapMeeting));

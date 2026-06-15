@@ -211,11 +211,14 @@ export class MeetingsComponent implements OnDestroy {
   ]);
   /** Gremien als Dropdown-Optionen (echte Liste, `/gremien`). */
   readonly gremiumOptions = signal<SelectOption[]>([]);
-  /** Gremium-Filter der Übersicht (''=alle). Quelle: Mitglieds-Gremien (#meetings-filter). */
+  /** Gremium-Filter der Übersicht (''=alle). Quelle: Gremien mit mind. einer
+   *  SICHTBAREN Sitzung (read-Recht), nicht die Mitglieds-Gremien (#meetings-filter). */
   readonly gremiumFilter = signal<string>('');
+  /** Gremien mit mind. einer lesbaren Sitzung — vom Backend (`/meetings/gremien`). */
+  readonly filterGremien = signal<{ id: string; name: string }[]>([]);
   readonly filterGremiumOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('meetings.list.allCommittees') },
-    ...this.auth.gremien().map((g) => ({ value: g.id, label: g.name })),
+    ...this.filterGremien().map((g) => ({ value: g.id, label: g.name })),
   ]);
   /** Sitzung-anlegen-Dialog offen (#27). */
   readonly createOpen = signal(false);
@@ -652,6 +655,16 @@ export class MeetingsComponent implements OnDestroy {
       if (el) this.scheduleMeasure();
     });
     window.addEventListener('resize', this.onResize, { passive: true });
+    // Gremien-Liste für den Übersichts-FILTER (#meetings-filter): alle Gremien, in
+    // denen der Nutzer mind. eine LESBARE Sitzung hat — read-Recht, nicht
+    // Mitgliedschaft. Jeder Leser darf filtern, daher ungated geladen.
+    this.api
+      .listMeetingFilterGremien()
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: (gs) => this.filterGremien.set(gs),
+        error: () => this.filterGremien.set([]),
+      });
     // Gremien-Liste für das Anlege-Dropdown (#68) — nur wer Sitzungen verwalten
     // darf. Ohne globale `meeting.manage` werden nur die SELBST verwalteten
     // Gremien angeboten (Vorstand/Manager via Gremium-Rolle) — alles andere

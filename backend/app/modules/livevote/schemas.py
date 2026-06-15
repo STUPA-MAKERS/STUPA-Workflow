@@ -149,6 +149,21 @@ class MeetingPage(_CamelModel):
     next_cursor: str | None = Field(default=None, alias="nextCursor")
 
 
+class MeetingGremiumOut(_CamelModel):
+    """Gremium (id + Name) für den Gremium-Filter der Sitzungsübersicht
+    (#meetings-filter).
+
+    Quelle ist NICHT die Mitgliedschaft, sondern die Sichtbarkeit: ein Gremium
+    erscheint genau dann, wenn der Principal dort MINDESTENS EINE lesbare Sitzung
+    hat. Damit kann ein Pool-Vertreter/Delegations-Empfänger ohne Mitgliedschaft
+    sein Gremium filtern, während ein Mitglied eines sitzungslosen Gremiums es
+    nicht angeboten bekommt.
+    """
+
+    id: UUID
+    name: str
+
+
 AttendanceStatus = Literal["present", "excused", "absent"]
 
 
