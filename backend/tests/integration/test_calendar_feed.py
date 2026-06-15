@@ -64,6 +64,10 @@ async def test_calendar_token_round_trip(session: AsyncSession) -> None:
     assert resolved is not None and resolved.sub == member.sub
     # Unbekannter Token → None.
     assert await service.principal_by_calendar_token(session, "nope") is None
+    # Deaktivierter Principal → Feed gesperrt (kein Leak; Endpunkt antwortet 404).
+    resolved.active = False
+    await session.flush()
+    assert await service.principal_by_calendar_token(session, token) is None
 
 
 async def test_member_meetings_filters(session: AsyncSession) -> None:

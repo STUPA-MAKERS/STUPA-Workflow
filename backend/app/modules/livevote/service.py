@@ -844,6 +844,16 @@ class MeetingService:
             meeting.start_time = payload.start_time
         if "end_time" in payload.model_fields_set:
             meeting.end_time = payload.end_time
+        # End-Uhrzeit muss (falls beide gesetzt) nach der Start-Uhrzeit liegen — auch
+        # über PATCH (das Schema prüft nur Create). Nur bei zeit-berührenden Patches
+        # erzwingen, damit ein reiner Status-/Protokollant-Patch nie daran scheitert.
+        if (
+            ("start_time" in payload.model_fields_set or "end_time" in payload.model_fields_set)
+            and meeting.start_time is not None
+            and meeting.end_time is not None
+            and meeting.end_time <= meeting.start_time
+        ):
+            raise BadRequestError("endTime must be after startTime")
         if "protokollant_id" in payload.model_fields_set:
             # Nach Finalisierung ist die Schriftführung Teil des unterschriebenen
             # Dokuments — der Protokollant ist dann gesperrt (#15).

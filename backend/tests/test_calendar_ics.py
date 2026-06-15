@@ -108,8 +108,9 @@ def test_no_description_without_gremium() -> None:
 
 
 def test_text_escaping() -> None:
-    out = _ics([_ev(title="A, B; C")])
-    assert "SUMMARY:A\\, B\\; C" in out
+    # RFC5545 escaping: comma, semicolon und backslash (icalendar).
+    out = _ics([_ev(title="A, B; C\\ D")])
+    assert "SUMMARY:A\\, B\\; C\\\\ D" in out
 
 
 def test_naive_stamp_treated_as_utc() -> None:

@@ -95,6 +95,8 @@ async def calendar_feed(
         media_type=_ICS_MEDIA_TYPE,
         headers={
             "Content-Disposition": 'inline; filename="stupa-sitzungen.ics"',
-            "Cache-Control": "private, max-age=3600",
+            # Kurzer Cache: neue/​geänderte Sitzungen erscheinen zeitnah; ein rotierter
+            # Token (neue URL) ist ohnehin sofort gültig (eigener Cache-Key).
+            "Cache-Control": "private, max-age=300",
         },
     )
