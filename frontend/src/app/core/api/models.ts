@@ -702,6 +702,7 @@ export interface MeetingOutWire {
   title: string;
   date?: string | null;
   startTime?: string | null;
+  endTime?: string | null;
   status: MeetingStatus;
   activeApplicationId?: Uuid | null;
   gremiumId?: Uuid | null;
@@ -748,6 +749,8 @@ export interface MeetingCreateBody {
   date?: string | null;
   /** Geplante Uhrzeit (`HH:mm`), optional (#34). */
   startTime?: string | null;
+  /** Geplante End-Uhrzeit (`HH:mm`), optional (#ics) — muss nach `startTime` liegen. */
+  endTime?: string | null;
   /** Zugewiesener Protokollant (Mitglied des Gremiums), optional. */
   protokollantId?: Uuid | null;
 }
@@ -760,6 +763,8 @@ export interface MeetingPatchBody {
   date?: string | null;
   /** Geplante Uhrzeit (`HH:mm`) (#34). */
   startTime?: string | null;
+  /** Geplante End-Uhrzeit (`HH:mm`) (#ics). */
+  endTime?: string | null;
   /** Protokollant (um)setzen. */
   protokollantId?: Uuid | null;
 }
@@ -772,6 +777,11 @@ export interface ProtocolPatchBody {
 /** Body für `POST /protocols/{id}/votes` — Abstimmungen einbetten. */
 export interface ProtocolVotesBody {
   voteIds: Uuid[];
+}
+
+/** `CalendarFeedOut` — eigene iCal-Abo-URL (`url` null, solange kein Token erzeugt). */
+export interface CalendarFeed {
+  url: string | null;
 }
 
 // --- View-Modelle ---------------------------------------------------------- //
@@ -808,6 +818,8 @@ export interface Meeting {
   date: string | null;
   /** Geplante Uhrzeit (`HH:mm`) oder `null` (#34). */
   startTime: string | null;
+  /** Geplante End-Uhrzeit (`HH:mm`) oder `null` (#ics). */
+  endTime: string | null;
   status: MeetingStatus;
   activeApplicationId: Uuid | null;
   gremiumId: Uuid | null;

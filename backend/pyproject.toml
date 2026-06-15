@@ -46,6 +46,9 @@ dependencies = [
     # direkt genutzt (eigener Anhang-Extractor statt pychevals buggy while-Loop).
     "pycheval>=0.3,<0.4",
     "pypdf>=6.0",
+    # iCal-Abo (#ics): RFC5545-Feed der eigenen Sitzungen. Lazy importiert (nur auf
+    # dem Feed-Pfad), reines Python-Paket.
+    "icalendar>=6.0",
 ]
 
 [project.optional-dependencies]

@@ -235,6 +235,7 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     title: wire.title,
     date: wire.date ?? null,
     startTime: wire.startTime ?? null,
+    endTime: wire.endTime ?? null,
     status: wire.status,
     activeApplicationId: wire.activeApplicationId ?? null,
     gremiumId: wire.gremiumId ?? null,

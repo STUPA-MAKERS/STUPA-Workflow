@@ -34,6 +34,7 @@ from app.modules.auth.oauth_router import router as oauth_router
 from app.modules.auth.oauth_router import well_known_router as oauth_well_known_router
 from app.modules.auth.router import router as auth_router
 from app.modules.budget.tree_router import router as budget_tree_router
+from app.modules.calendar.router import router as calendar_router
 from app.modules.deadlines.router import router as deadline_policies_router
 from app.modules.delegations.router import router as delegations_router
 from app.modules.files.router import router as files_router
@@ -92,6 +93,7 @@ api_router.include_router(notifications_router)
 api_router.include_router(notification_settings_router)
 api_router.include_router(mail_templates_router)
 api_router.include_router(budget_tree_router)
+api_router.include_router(calendar_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(files_router)
 api_router.include_router(pdf_router)

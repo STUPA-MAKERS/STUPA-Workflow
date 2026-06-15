@@ -374,6 +374,14 @@ export const routes: Routes = [
           ),
       },
       {
+        // Konto → Kalender-Abo (#ics): persönliche iCal-Feed-URL der eigenen Sitzungen.
+        path: 'account/calendar',
+        data: { title: 'account.calendar.title' },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/account/calendar.component').then((m) => m.AccountCalendarComponent),
+      },
+      {
         path: 'forbidden',
         data: { title: 'forbidden.heading' },
         loadComponent: () =>

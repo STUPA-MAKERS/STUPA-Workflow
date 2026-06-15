@@ -27,8 +27,16 @@ class MeetingCreate(_CamelModel):
     # Termin ist Pflicht: ohne Datum/Uhrzeit lässt sich keine Sitzung planen.
     date: _date
     start_time: _time = Field(alias="startTime")
+    # Optionale End-Uhrzeit (#ics); fehlt sie, nimmt der iCal-Feed 1 h Dauer an.
+    end_time: _time | None = Field(default=None, alias="endTime")
     # Genau ein zugewiesener Protokollant (Mitglied des Gremiums).
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> MeetingCreate:
+        if self.end_time is not None and self.end_time <= self.start_time:
+            raise ValueError("endTime must be after startTime")
+        return self
 
 
 class MeetingPatch(_CamelModel):
@@ -41,17 +49,23 @@ class MeetingPatch(_CamelModel):
     status: MeetingStatus | None = None
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
+    end_time: _time | None = Field(default=None, alias="endTime")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
         # ``date``/``protokollantId`` zählen mit: geplante Sitzungen vorab terminieren
         # bzw. den Protokollanten (um)setzen.
-        managed = {"date", "start_time", "protokollant_id"} & self.model_fields_set
+        managed = {
+            "date",
+            "start_time",
+            "end_time",
+            "protokollant_id",
+        } & self.model_fields_set
         if self.status is None and self.active_application_id is None and not managed:
             raise ValueError(
                 "at least one of 'status', 'activeApplicationId', 'date', "
-                "'startTime' or 'protokollantId' required"
+                "'startTime', 'endTime' or 'protokollantId' required"
             )
         return self
 
@@ -96,6 +110,7 @@ class MeetingOut(_CamelModel):
     title: str
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
+    end_time: _time | None = Field(default=None, alias="endTime")
     # Automatisch beim Schließen gesetzt (#14) — »Ende« der Protokoll-Titelseite.
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
     status: MeetingStatus

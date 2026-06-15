@@ -1,0 +1,44 @@
+.cal {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cal__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cal__label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.cal__row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.cal__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-line, #d0d0d0);
+  border-radius: 0.5rem;
+  background: var(--color-bg, #fff);
+  color: inherit;
+}
+
+.cal__actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}

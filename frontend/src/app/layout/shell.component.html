@@ -58,6 +58,15 @@
                 <app-icon name="bell" [size]="16" />
                 {{ 'account.menu.notifications' | t }}
               </a>
+              <a
+                class="account__menu-item"
+                role="menuitem"
+                routerLink="/account/calendar"
+                (click)="closeAccountMenu()"
+              >
+                <app-icon name="clock" [size]="16" />
+                {{ 'account.menu.calendar' | t }}
+              </a>
               @if (auth.canAny('mcp.use')) {
                 <a
                   class="account__menu-item"

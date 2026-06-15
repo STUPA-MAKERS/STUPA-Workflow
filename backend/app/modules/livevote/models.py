@@ -45,6 +45,10 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     date: Mapped[_date | None] = mapped_column(Date, nullable=True)
     # Geplante Uhrzeit (#34) — optional, ergänzt das Datum.
     start_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
+    # Geplante End-Uhrzeit (#ics) — optional; fehlt sie, nimmt der iCal-Feed eine
+    # Default-Dauer von 1 h ab ``start_time`` an. Muss (falls gesetzt) nach
+    # ``start_time`` liegen (Schema-Check beim Anlegen).
+    end_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
     # Automatisch gesetzt beim Wechsel auf ``closed`` (#14) — liefert die
     # »Ende«-Zeile der Protokoll-Titelseite. ``closed`` ist terminal.

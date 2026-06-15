@@ -734,6 +734,14 @@
           (ngModelChange)="newTime.set($event)"
           name="time"
         />
+        <!-- Optionale End-Uhrzeit (#ics): fehlt sie, nimmt der iCal-Feed 1 h Dauer an. -->
+        <app-time-input
+          id="mtg-new-end-time"
+          [label]="'meetings.create.endTime' | t"
+          [ngModel]="newEndTime()"
+          (ngModelChange)="newEndTime.set($event)"
+          name="endTime"
+        />
       } @else {
         <label class="text-sm font-medium text-text-muted" [for]="'mtg-new'">{{ 'meetings.create.name' | t }}</label>
         <input
@@ -806,6 +814,7 @@
       name="setDate"
     />
     <app-time-input id="mtg-set-time" [label]="'meetings.create.time' | t" [required]="true" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
+    <app-time-input id="mtg-set-end-time" [label]="'meetings.create.endTime' | t" [disabled]="settingsLocked()" [ngModel]="settingsEndTime()" (ngModelChange)="settingsEndTime.set($event)" name="setEndTime" />
     @if (settingsLocked()) {
       <p class="text-text-muted">{{ 'meetings.settings.closedHint' | t }}</p>
     }

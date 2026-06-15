@@ -189,6 +189,8 @@ export class MeetingsComponent implements OnDestroy {
   readonly newDate = signal('');
   /** Optionale geplante Uhrzeit (#34), `HH:mm`. */
   readonly newTime = signal('');
+  /** Optionale geplante End-Uhrzeit (#ics), `HH:mm` — muss nach `newTime` liegen. */
+  readonly newEndTime = signal('');
   /** Datums-/Zeit-Editor einer bereits angelegten, geplanten Sitzung (#7/#34). */
   readonly planDate = signal('');
   readonly planTime = signal('');
@@ -547,6 +549,7 @@ export class MeetingsComponent implements OnDestroy {
   readonly settingsProtokollant = signal<string>('');
   readonly settingsDate = signal<string>('');
   readonly settingsTime = signal<string>('');
+  readonly settingsEndTime = signal<string>('');
   readonly savingSettings = signal(false);
   /** Geschlossene Sitzung (#15): Einstellungen KOMPLETT gesperrt — gilt auch im
    *  Listen-Edit (der Status reist im Meeting-Objekt mit). */
@@ -785,8 +788,14 @@ export class MeetingsComponent implements OnDestroy {
     const gremiumId = this.newGremiumId();
     const date = this.newDate().trim();
     const startTime = this.newTime().trim();
+    const endTime = this.newEndTime().trim();
     // Datum + Uhrzeit sind Pflicht (Termin der Sitzung); Submit ist sonst gesperrt.
     if (!title || !gremiumId || !date || !startTime || this.creating()) return;
+    // End-Uhrzeit (falls gesetzt) muss nach der Start-Uhrzeit liegen (HH:mm lexikografisch).
+    if (endTime && endTime <= startTime) {
+      this.toast.error(this.i18n.translate('meetings.create.endBeforeStart'));
+      return;
+    }
     this.creating.set(true);
     this.api
       .createMeeting({
@@ -794,6 +803,7 @@ export class MeetingsComponent implements OnDestroy {
         gremiumId,
         date,
         startTime,
+        endTime: endTime || null,
         protokollantId: this.newProtokollant() || null,
       })
       .subscribe({
@@ -803,6 +813,7 @@ export class MeetingsComponent implements OnDestroy {
         this.newGremiumId.set('');
         this.newDate.set('');
         this.newTime.set('');
+        this.newEndTime.set('');
         this.newProtokollant.set('');
         this.createMembers.set([]);
         this.createOpen.set(false);
@@ -1344,6 +1355,7 @@ export class MeetingsComponent implements OnDestroy {
     this.settingsProtokollant.set(m.protokollantId ?? '');
     this.settingsDate.set(m.date ?? '');
     this.settingsTime.set(m.startTime ?? '');
+    this.settingsEndTime.set(m.endTime ?? '');
     this.settingsRoster.set([]);
     this.api.listAttendance(m.id).subscribe({
       next: (rows) => {
@@ -1370,6 +1382,11 @@ export class MeetingsComponent implements OnDestroy {
       this.toast.error(this.i18n.translate('meetings.toast.dateTimeRequired'));
       return;
     }
+    const settingsEnd = this.settingsEndTime().trim();
+    if (settingsEnd && settingsEnd <= this.settingsTime().trim()) {
+      this.toast.error(this.i18n.translate('meetings.create.endBeforeStart'));
+      return;
+    }
     this.savingSettings.set(true);
     // Protokollant nach Finalisierung gesperrt (#15) — Feld ist disabled, der
     // Wert wird gar nicht erst mitgesendet (Backend würde mit 409 ablehnen).
@@ -1380,6 +1397,7 @@ export class MeetingsComponent implements OnDestroy {
           : { protokollantId: this.settingsProtokollant() || null }),
         date: this.settingsDate().trim() || null,
         startTime: this.settingsTime().trim() || null,
+        endTime: this.settingsEndTime().trim() || null,
       })
       .subscribe({
         next: (updated) => {

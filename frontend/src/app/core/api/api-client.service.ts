@@ -20,6 +20,7 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  CalendarFeed,
   ConsentRequest,
   McpSetup,
   NotificationPreference,
@@ -98,6 +99,17 @@ export class ApiClient {
 
   logout(): Observable<LogoutOut> {
     return this.http.post<LogoutOut>(`${this.base}/auth/logout`, {});
+  }
+
+  // --- calendar (iCal-Abo, #ics) -------------------------------------------
+  /** GET /calendar/me — eigene Abo-URL (`url` null, solange noch nicht erzeugt). */
+  myCalendar(): Observable<CalendarFeed> {
+    return this.http.get<CalendarFeed>(`${this.base}/calendar/me`);
+  }
+
+  /** POST /calendar/me/rotate — Feed-Token (neu) erzeugen; alte URL wird ungültig. */
+  rotateCalendar(): Observable<CalendarFeed> {
+    return this.http.post<CalendarFeed>(`${this.base}/calendar/me/rotate`, {});
   }
 
   /**

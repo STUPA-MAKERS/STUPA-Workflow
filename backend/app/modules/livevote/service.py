@@ -207,6 +207,7 @@ class MeetingService:
             title=meeting.title,
             date=meeting.date,
             startTime=meeting.start_time,
+            endTime=meeting.end_time,
             closedAt=meeting.closed_at,
             status=meeting.status,  # type: ignore[arg-type]
             activeApplicationId=meeting.active_application_id,
@@ -776,6 +777,7 @@ class MeetingService:
             title=payload.title,
             date=payload.date,
             start_time=payload.start_time,
+            end_time=payload.end_time,
             status="planned",
             created_by=principal.sub,
             protokollant_id=protokollant_id,
@@ -810,6 +812,7 @@ class MeetingService:
         wants_manage = (
             "date" in payload.model_fields_set
             or "start_time" in payload.model_fields_set
+            or "end_time" in payload.model_fields_set
             or "protokollant_id" in payload.model_fields_set
         )
         wants_write = payload.status is not None or payload.active_application_id is not None
@@ -839,6 +842,8 @@ class MeetingService:
             meeting.date = payload.date
         if "start_time" in payload.model_fields_set:
             meeting.start_time = payload.start_time
+        if "end_time" in payload.model_fields_set:
+            meeting.end_time = payload.end_time
         if "protokollant_id" in payload.model_fields_set:
             # Nach Finalisierung ist die Schriftführung Teil des unterschriebenen
             # Dokuments — der Protokollant ist dann gesperrt (#15).

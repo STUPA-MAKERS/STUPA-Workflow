@@ -38,6 +38,19 @@ class Principal(UUIDPkMixin, Base):
     active: Mapped[bool] = mapped_column(
         Boolean, server_default="true", default=True
     )
+    # Persönlicher, rotierbarer Token für das iCal-Abo (#ics). Liegt im Klartext in
+    # der Subscription-URL (`/api/calendar/{token}.ics`) — low-sensitivity (exponiert
+    # nur Sitzungstitel/-zeiten der eigenen Gremien). Rotieren widerruft die alte URL.
+    calendar_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        # Eindeutiger Feed-Token (Lookup im iCal-Endpunkt). Bewusst ein Unique-**Index**
+        # statt einer Unique-Constraint: die Migration kann ihn symmetrisch + idempotent
+        # erzeugen/droppen (CREATE/DROP INDEX IF [NOT] EXISTS) — eine Constraint bräuchte
+        # beim Downgrade ein DROP CONSTRAINT und ließe sich nicht so sauber rückrollen.
+        # Mehrere NULLs sind erlaubt (Postgres) → Pflicht nur bei gesetztem Wert.
+        Index("uq_principal_calendar_token", "calendar_token", unique=True),
+    )
 
 
 class Role(UUIDPkMixin, Base):
