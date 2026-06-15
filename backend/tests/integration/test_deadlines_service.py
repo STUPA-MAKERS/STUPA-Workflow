@@ -35,7 +35,6 @@ from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
 from app.modules.notifications.mail import CapturingMailSender
-from app.modules.notifications.models import MailTemplate
 from app.modules.notifications.queue import DirectMailQueue
 from app.modules.voting.models import Ballot, Vote
 from app.settings import load_settings
@@ -85,7 +84,7 @@ async def _seed_flow(session: AsyncSession) -> tuple[ApplicationType, dict[str, 
         ),
     )
     flow = FlowVersion(
-        application_type_id=app_type.id, version=1, active=True, editor_layout={}
+        version=1, active=True, editor_layout={}
     )
     session.add(flow)
     await session.flush()
@@ -241,12 +240,9 @@ async def test_reminder_sent_exactly_once(
     async with maker() as s:
         app_type, states = await _seed_flow(s)
         app = await _make_app(s, app_type, states["active"])
-        s.add(MailTemplate(
-            key="deadline_approaching",
-            subject_i18n={"de": "Frist bald"},
-            body_i18n={"de": "Frist {{ deadlineId }} läuft ab."},
-        ))
-        await s.commit()
+        # Das ``deadline_approaching``-Mail-Template wird inzwischen vom Seed
+        # (Migration 0002) angelegt — kein eigenes Insert mehr (sonst UNIQUE-Konflikt
+        # auf ``mail_template.key``).
         await DeadlineService(s).create(
             kind="vote", due_at=datetime.now(UTC) + timedelta(minutes=30),
             application_id=app.id,

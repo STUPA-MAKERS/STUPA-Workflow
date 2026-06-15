@@ -77,7 +77,7 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
     )
 
     flow = FlowVersion(
-        application_type_id=app_type.id, version=1, active=True, editor_layout={}
+        version=1, active=True, editor_layout={}
     )
     session.add(flow)
     await session.flush()
@@ -233,15 +233,22 @@ async def test_percent_quorum_denominator_is_roster_not_voters(
     )
     svc = VotingService(session)
     await svc.open(vote.id, now=NOW)
-    # 5 Stimmen → 5/20 = 25% < 50%: Quorum verfehlt (fail-closed). Mit dem alten
-    # Fail-open-Nenner (nur Abstimmende) wären es 5/5 = 100% gewesen.
+    # 5 Stimmen → 5/20 = 25% < 50%: Quorum verfehlt (Nenner = Roster, NICHT
+    # Abstimmende). Mit dem alten Fail-open-Nenner (nur Abstimmende) wären es
+    # 5/5 = 100% gewesen.
     for i in range(5):
         await svc.cast(vote.id, _voter(f"v{i}"), "yes", now=NOW)
+
+    # Das Tally weist den Roster-Nenner (20) aus und meldet das Quorum als verfehlt.
+    pre = await svc.get(vote.id)
+    assert pre.tally.eligible == 20
+    assert pre.tally.quorum_met is False
+
+    # Schließen ist bei verfehltem Quorum blockiert (#12): kein still-»rejected«,
+    # sondern 409 — Ausweg wäre, mehr Stimmen zu sammeln oder den Vote abzubrechen.
     closer = Principal(sub="mgr", permissions={"vote.manage"})
-    out = await svc.close(vote.id, closer)
-    assert out.tally.eligible == 20
-    assert out.tally.quorum_met is False
-    assert out.result == "rejected"
+    with pytest.raises(ConflictError):
+        await svc.close(vote.id, closer)
 
 
 # --------------------------------------------------------------------------- #

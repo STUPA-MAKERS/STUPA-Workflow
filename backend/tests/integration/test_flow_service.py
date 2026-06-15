@@ -86,7 +86,7 @@ async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State
     )
 
     flow = FlowVersion(
-        application_type_id=app_type.id, version=1, active=True, editor_layout={}
+        version=1, active=True, editor_layout={}
     )
     session.add(flow)
     await session.flush()
@@ -193,7 +193,10 @@ async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -
         app.id, transition.id, _manager(), note="ok"
     )
     assert res.new_state_id == states["review"].id
-    assert res.dispatched_actions == ["notify"]
+    # fire() dispatcht neben der konfigurierten ``notify``-Action zusätzlich die
+    # implizite ``taskNotify``-Task-Mail an die Handlungsberechtigten des neuen
+    # States (#4-3, build_implicit_notifications).
+    assert res.dispatched_actions == ["notify", "taskNotify"]
     assert rec.actions[0].type == "notify"
     assert rec.actions[0].idempotency_key.endswith(":0:notify")
 
@@ -235,23 +238,18 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
     await flow.fire(app.id, t_review.id, _manager())
     await apps.patch(app.id, {"title": "Aktualisiert"}, changed_by="mgr-1")  # ok
 
-    # Position auf `voting` (kein Manager-Pfad dorthin), dann **per fire** in den
-    # gesperrten `approved`-State (edit_allowed=False) übergehen — der Lock entsteht
-    # also end-to-end aus dem Übergang, nicht aus manuellem State-Setzen.
+    # Position auf `voting` (kein Manager-Pfad dorthin), dann **per fire_branch** in
+    # den gesperrten `approved`-State (edit_allowed=False) übergehen — der Lock
+    # entsteht also end-to-end aus dem Übergang, nicht aus manuellem State-Setzen.
+    # ``voting``→``approved`` ist ein ``pass``-Branch (#vote-branch): Branch-Übergänge
+    # feuert ausschließlich das Vote-Ergebnis (fire_branch), nie ``fire`` manuell
+    # (das würde absichtlich mit 409 blockieren).
     app_row = await session.get(Application, app.id)
     assert app_row is not None
     app_row.current_state_id = states["voting"].id
     await session.commit()
 
-    t_approved = (
-        await session.execute(
-            select(Transition).where(
-                Transition.from_state_id == states["voting"].id,
-                Transition.to_state_id == states["approved"].id,
-            )
-        )
-    ).scalar_one()
-    res = await flow.fire(app.id, t_approved.id, _manager())
+    res = await flow.fire_branch(app.id, "pass", _manager())
     assert res.new_state_id == states["approved"].id
 
     # Folge des Übergangs: T-12 patch sperrt jetzt mit 409.

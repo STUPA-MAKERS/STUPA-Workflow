@@ -143,7 +143,7 @@ async def test_running_application_keeps_pinned_version(session: AsyncSession) -
         app_type.id, FormVersionCreate(fields=_fields(), activate=True)
     )
 
-    flow = FlowVersion(application_type_id=app_type.id, version=1, active=True, editor_layout={})
+    flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
     await session.flush()
     application = Application(

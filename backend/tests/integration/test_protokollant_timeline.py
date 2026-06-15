@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator
 from datetime import date, time
 
 import pytest
+from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
@@ -24,7 +25,9 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-async def session(migrated: tuple[str, str]) -> AsyncIterator[AsyncSession]:
+async def session(
+    migrated: tuple[str, str], engine: Engine
+) -> AsyncIterator[AsyncSession]:
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:

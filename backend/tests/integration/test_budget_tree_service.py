@@ -242,7 +242,7 @@ async def test_committed_rollup(session: AsyncSession) -> None:
     session.add(app_type)
     await session.flush()
     fv = FormVersion(application_type_id=app_type.id, version=1)
-    flv = FlowVersion(application_type_id=app_type.id, version=1)
+    flv = FlowVersion(version=1)
     session.add_all([fv, flv])
     await session.flush()
     state = State(flow_version_id=flv.id, key="approved", label_i18n={}, kind="normal")

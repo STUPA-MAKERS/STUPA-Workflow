@@ -18,7 +18,7 @@ from datetime import date as _date
 from datetime import time as _time
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import Engine, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin.models import (
@@ -51,7 +51,9 @@ _CONFIG = VoteConfig.model_validate(
 
 
 @pytest.fixture
-async def session(migrated: tuple[str, str]) -> AsyncIterator[AsyncSession]:
+async def session(
+    migrated: tuple[str, str], engine: Engine
+) -> AsyncIterator[AsyncSession]:
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:
@@ -69,7 +71,7 @@ async def _gremium_and_application(session: AsyncSession) -> tuple[Gremium, Appl
     session.add(app_type)
     await session.flush()
     form_version = FormVersion(application_type_id=app_type.id, version=1)
-    flow_version = FlowVersion(application_type_id=app_type.id, version=1)
+    flow_version = FlowVersion(version=1)
     session.add_all([form_version, flow_version])
     await session.flush()
     application = Application(
@@ -232,7 +234,11 @@ async def test_parallel_casts_yield_single_ballot(
     session.add(vote)
     await session.commit()
 
-    principal = Principal(sub="alice", groups={str(gremium.id)})
+    # Stimmberechtigung verlangt die ``vote.cast``-Permission UND Gruppen-
+    # Mitgliedschaft (service.cast, fail-closed) — beides setzen, sonst 403.
+    principal = Principal(
+        sub="alice", permissions={"vote.cast"}, groups={str(gremium.id)}
+    )
     from datetime import UTC, datetime
 
     now = datetime.now(UTC)

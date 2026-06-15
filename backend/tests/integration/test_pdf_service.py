@@ -43,7 +43,7 @@ def _fields() -> list[FormFieldDef]:
     return [
         FormFieldDef(key="title", type="text", label={"de": "Titel"}, required=True),
         FormFieldDef.model_validate(
-            {"key": "note", "type": "text", "label": {"de": "Notiz"}}
+            {"key": "note", "type": "text", "label": {"de": "Notiz"}, "isPII": True}
         ),
     ]
 
@@ -61,7 +61,7 @@ async def _seed_type(session: AsyncSession, *, cd_variant: str = "makers") -> Ap
     await FormsService(session).create_form_version(
         app_type.id, FormVersionCreate(fields=_fields(), activate=True)
     )
-    flow = FlowVersion(application_type_id=app_type.id, version=1, active=True, editor_layout={})
+    flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
     await session.flush()
     draft = State(
