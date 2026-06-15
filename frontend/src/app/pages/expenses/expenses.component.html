@@ -97,7 +97,7 @@
           </thead>
           <tbody>
             @for (e of items(); track e.id) {
-              <tr [class.exp__tr--income]="e.kind === 'income'" [attr.title]="e.actor ? ('expenses.bookedBy' | t: { actor: e.actor }) : null">
+              <tr [class.exp__tr--income]="e.kind === 'income'" [attr.title]="e.actor ? ('expenses.bookedBy' | t: { actor: e.actorName ?? e.actor }) : null">
                 <td class="exp__cellDate">{{ e.invoiceDate ? (e.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellDate">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellKind">

@@ -720,6 +720,27 @@ class BudgetTreeService:
             )
         return picked
 
+    async def _actor_names(self, subs: set[str]) -> dict[str, str]:
+        """Buchungs-Actor (principal.sub) → Klarname (display_name/email/sub).
+
+        Spiegelt ``ApplicationsService._author_names`` (#no-uuids-in-ui): die UUID
+        des Buchenden darf nie im UI landen. Legacy-Actor, die schon ein Name sind,
+        finden keinen Principal-Treffer und fehlen im Dict (FE fällt auf ``actor``).
+        """
+        from app.modules.auth.models import Principal as PrincipalRow
+
+        wanted = {s for s in subs if s}
+        if not wanted:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(PrincipalRow.sub, PrincipalRow.display_name, PrincipalRow.email).where(
+                    PrincipalRow.sub.in_(wanted)
+                )
+            )
+        ).all()
+        return {sub: (dn or em or sub) for sub, dn, em in rows}
+
     @staticmethod
     def _expense_out(
         e: BudgetExpense,
@@ -727,6 +748,7 @@ class BudgetTreeService:
         app_title: str | None = None,
         account_name: str | None = None,
         invoice_number: str | None = None,
+        actor_name: str | None = None,
     ) -> ExpenseOut:
         return ExpenseOut(
             id=e.id,
@@ -743,6 +765,7 @@ class BudgetTreeService:
             accountName=account_name,
             transferId=e.transfer_id,
             actor=e.actor,
+            actorName=actor_name,
             invoiceDate=e.invoice_date,
             paymentDate=e.payment_date,
             correspondent=e.correspondent,
@@ -825,7 +848,14 @@ class BudgetTreeService:
             },
         )
         await self.session.commit()
-        return self._expense_out(expense, node.path_key, app_title, account_name)
+        names = await self._actor_names({expense.actor} if expense.actor else set())
+        return self._expense_out(
+            expense,
+            node.path_key,
+            app_title,
+            account_name,
+            actor_name=names.get(expense.actor or ""),
+        )
 
     async def _validate_account(self, account_id: UUID | None) -> str | None:
         """Konto prüfen (falls angegeben) → Name; sonst ``None``."""
@@ -885,7 +915,10 @@ class BudgetTreeService:
             if expense.account_id is not None
             else None
         )
-        return self._expense_out(expense, node.path_key, app_title, acc_name)
+        names = await self._actor_names({expense.actor} if expense.actor else set())
+        return self._expense_out(
+            expense, node.path_key, app_title, acc_name, actor_name=names.get(expense.actor or "")
+        )
 
     async def list_expenses(
         self, budget_id: UUID, fiscal_year_id: UUID | None = None
@@ -1012,8 +1045,17 @@ class BudgetTreeService:
                 .offset(offset)
             )
         ).all()
+        # Buchenden-UUIDs (#no-uuids-in-ui) gesammelt → Klarnamen in einem Query.
+        names = await self._actor_names({row[0].actor for row in rows if row[0].actor})
         items = [
-            self._expense_out(e, path_key, _title_of(data) if data else None, acc_name, inv_number)
+            self._expense_out(
+                e,
+                path_key,
+                _title_of(data) if data else None,
+                acc_name,
+                inv_number,
+                actor_name=names.get(e.actor or ""),
+            )
             for (e, path_key, data, acc_name, inv_number) in rows
         ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)

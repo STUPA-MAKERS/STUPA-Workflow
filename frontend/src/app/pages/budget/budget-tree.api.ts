@@ -42,7 +42,10 @@ export interface Expense {
   accountId: Uuid | null;
   accountName: string | null;
   transferId: Uuid | null;
+  // `actor` = rohe Principal-`sub` (Audit); `actorName` = serverseitig aufgelöster
+  // Klarname. Im UI immer `actorName` zeigen, nie die UUID (#no-uuids-in-ui).
   actor: string | null;
+  actorName: string | null;
   // Zusatz-Metadaten (#1-1/#1-2/#3/#4), alle optional. Daten als ISO-Datum (YYYY-MM-DD).
   invoiceDate: string | null;
   paymentDate: string | null;

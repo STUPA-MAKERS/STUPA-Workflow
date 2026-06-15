@@ -226,6 +226,43 @@ async def test_account_and_transfer(session: AsyncSession) -> None:
     assert not [e for e in page.items if e.transfer_id == transfer.transfer_id]
 
 
+async def test_expense_actor_resolved_to_display_name(session: AsyncSession) -> None:
+    """``actor`` (Principal-``sub``) wird serverseitig zum Klarnamen aufgelöst
+    (#no-uuids-in-ui): ``actorName`` trägt den Anzeigenamen, ``actor`` bleibt die
+    rohe UUID. Ein unbekannter Actor (Legacy-Name) ⇒ ``actorName is None``."""
+    from app.modules.auth.models import Principal as PrincipalRow
+
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"AC{_suffix()}", name="Top", gremiumId=g.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+
+    sub = str(uuid.uuid4())  # UUID-sub wie beim echten IdP
+    session.add(PrincipalRow(sub=sub, display_name="Erika Mustermann", email="e@x.de"))
+    await session.commit()
+
+    booked = await svc.book_expense(
+        ExpenseCreate(budgetId=top.id, fiscalYearId=fy.id, amount=Decimal("5"), description="x"),
+        actor=sub,
+    )
+    # Create-Response löst direkt auf.
+    assert booked.actor == sub
+    assert booked.actor_name == "Erika Mustermann"
+
+    # Unbekannter Actor (Legacy-Name, kein Principal) ⇒ keine Auflösung.
+    legacy = await svc.book_expense(
+        ExpenseCreate(budgetId=top.id, fiscalYearId=fy.id, amount=Decimal("7"), description="y"),
+        actor="legacy-name",
+    )
+    assert legacy.actor == "legacy-name" and legacy.actor_name is None
+
+    # Listen-Pfad löst ebenfalls auf (Batch).
+    page = await svc.list_expenses_paged(budget_id=top.id, fiscal_year_id=fy.id)
+    by_id = {e.id: e for e in page.items}
+    assert by_id[booked.id].actor_name == "Erika Mustermann"
+    assert by_id[legacy.id].actor_name is None
+
+
 async def test_committed_rollup(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)

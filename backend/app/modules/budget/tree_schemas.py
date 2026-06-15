@@ -293,7 +293,10 @@ class ExpenseOut(_CamelModel):
     account_id: UUID | None = Field(default=None, alias="accountId")
     account_name: str | None = Field(default=None, alias="accountName")
     transfer_id: UUID | None = Field(default=None, alias="transferId")
+    # ``actor`` = Principal-``sub`` (Roh-Identität, Audit). ``actorName`` ist der
+    # serverseitig aufgelöste Klarname — NIE die UUID im UI zeigen (#no-uuids-in-ui).
     actor: str | None = None
+    actor_name: str | None = Field(default=None, alias="actorName")
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
     payment_date: date | None = Field(default=None, alias="paymentDate")
     correspondent: str | None = None
