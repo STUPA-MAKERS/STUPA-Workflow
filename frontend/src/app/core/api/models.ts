@@ -130,6 +130,7 @@ export interface StateOutWire {
 export interface ApplicantOutWire {
   email?: string | null;
   name?: string | null;
+  anonymized: boolean;
 }
 
 /** `ApplicationOut` — Antrag-Detail. */
@@ -201,6 +202,8 @@ export interface AgendaItem {
   /** Markdown-Text dieses TOP (pro-TOP-Editor, #58). */
   body?: string | null;
   position: number;
+  /** Nicht-öffentlich: im öffentlichen Protokoll-PDF redigiert (#PII-Re-Add). */
+  nonPublic?: boolean;
   stateLabel?: I18nMap | null;
 }
 
@@ -367,6 +370,7 @@ export interface ApplicationState {
 export interface Applicant {
   email: string | null;
   name: string | null;
+  anonymized: boolean;
 }
 
 export interface Application {
@@ -561,6 +565,7 @@ export interface FormFieldDef {
   options?: FieldOption[];
   visibleIf?: Record<string, unknown>;
   compute?: Record<string, unknown>;
+  isPII?: boolean;
   isPromoted?: boolean;
   promoteTarget?: string;
 }
@@ -736,6 +741,8 @@ export interface ProtocolOutWire {
   status: 'draft' | 'rendering' | 'final';
   /** Ergebnis-Link nach `finalize` (PDF in MinIO). */
   pdfUrl?: string | null;
+  /** Redigierte öffentliche Variante — nur gesetzt, wenn ein TOP nicht-öffentlich ist. */
+  publicPdfUrl?: string | null;
   sentAt?: IsoDateTime | null;
 }
 
@@ -869,6 +876,8 @@ export interface Protocol {
   /** Nicht editierbar: final **oder** der Worker rendert gerade (`rendering`). */
   isLocked: boolean;
   pdfUrl: string | null;
+  /** Redigierte öffentliche Variante (nicht-öffentliche TOPs), sonst null. */
+  publicPdfUrl: string | null;
   sentAt: IsoDateTime | null;
 }
 

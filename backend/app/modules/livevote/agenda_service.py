@@ -119,6 +119,7 @@ class AgendaService:
                     title=title,
                     body=r.body,
                     position=r.position,
+                    nonPublic=r.non_public,
                     stateLabel=state.label_i18n if state is not None else None,
                 )
             )
@@ -130,11 +131,13 @@ class AgendaService:
         item_id: UUID,
         body: str | None = None,
         title: str | None = None,
+        non_public: bool | None = None,
     ) -> list[AgendaItemOut]:
-        """Markdown-Text und/oder Titel eines TOP setzen (pro-TOP-Editor).
+        """Markdown-Text, Titel und/oder Sichtbarkeit eines TOP setzen (pro-TOP-Editor).
 
         ``body`` setzt (falls geliefert) den Markdown-Text; ``title`` benennt nur
-        **Freitext-TOPs** um (Antrag-TOPs erben den Titel vom Antrag).
+        **Freitext-TOPs** um (Antrag-TOPs erben den Titel vom Antrag); ``non_public``
+        schaltet die Redaktion im öffentlichen Protokoll-PDF um.
         """
         row = (
             await self.session.execute(
@@ -150,6 +153,8 @@ class AgendaService:
             row.body = body
         if title is not None and row.application_id is None:
             row.title = title.strip()
+        if non_public is not None:
+            row.non_public = non_public
         await self.session.flush()
         await self.session.commit()
         return await self.list(meeting_id)
@@ -232,6 +237,7 @@ class AgendaService:
         meeting_id: UUID,
         application_id: UUID | None = None,
         title: str | None = None,
+        non_public: bool = False,
     ) -> list[AgendaItemOut]:
         """TOP setzen: Antrag (Abstimmungs-State des Gremiums) **oder** Freitext."""
         meeting = await self._meeting(meeting_id)
@@ -243,6 +249,7 @@ class AgendaService:
                     application_id=None,
                     title=title.strip(),
                     position=await self._next_position(meeting_id),
+                    non_public=non_public,
                 )
             )
             await self.session.flush()
@@ -271,6 +278,7 @@ class AgendaService:
                     meeting_id=meeting_id,
                     application_id=application_id,
                     position=await self._next_position(meeting_id),
+                    non_public=non_public,
                 )
             )
             await self.session.flush()

@@ -888,6 +888,20 @@
   padding-left: var(--space-6);
   margin: var(--space-1) 0;
 }
+/* Rail-Segment durch den Jetzt-Marker (#timeline-rail-now): die durchgehende
+   Container-Linie (.mtg__timeline::before) liegt durch den z-index-Stacking-
+   Context dieses Markers unter ihm und „bricht" optisch oberhalb von JETZT.
+   Dieses Segment zeichnet die Linie an gleicher x-Position weiter und über-
+   brückt die Margins/Gaps ober- und unterhalb, sodass JETZT auf der Linie sitzt. */
+.mtg__tlNow::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: calc(-1 * (var(--space-1) + var(--space-2)));
+  bottom: calc(-1 * (var(--space-1) + var(--space-2)));
+  width: var(--border-width);
+  background: var(--color-border);
+}
 .mtg__tlNow::after {
   content: '';
   flex: 1;

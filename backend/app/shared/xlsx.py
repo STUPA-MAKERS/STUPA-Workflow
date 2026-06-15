@@ -9,7 +9,8 @@ Modul kennt keine DB, nur Reihen → Bytes.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+import json
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -230,6 +231,72 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
             ]
         )
     _autosize(ws, headers)
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def build_auskunft_workbook(
+    *,
+    email: str,
+    applications: Sequence[Mapping[str, Any]],
+    versions: Sequence[Mapping[str, Any]],
+    principal: Mapping[str, Any] | None,
+) -> bytes:
+    """DSGVO-Auskunft (Art. 15) als ``.xlsx``-Bytes — alle zu ``email`` gespeicherten
+    personenbezogenen Daten. DB-agnostisch: erhält fertig aufbereitete Reihen.
+
+    Drei Blätter: Konto (Principal), Anträge (inkl. ``data`` als JSON), Versionen."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws_account = wb.active
+    assert ws_account is not None  # noqa: S101 - openpyxl liefert immer ein aktives Sheet
+    ws_account.title = "Konto"
+    acc_headers = ["Feld", "Wert"]
+    _header_row(ws_account, acc_headers)
+    ws_account.append(["E-Mail (Anfrage)", email])
+    if principal is not None:
+        ws_account.append(["Login-Subjekt (sub)", principal.get("sub") or ""])
+        ws_account.append(["E-Mail", principal.get("email") or ""])
+        ws_account.append(["Anzeigename", principal.get("displayName") or ""])
+        ws_account.append(["Aktiv", "ja" if principal.get("active") else "nein"])
+        ws_account.append(["Letzter Login", _fmt_dt(principal.get("lastLogin"))])
+    _autosize(ws_account, acc_headers)
+
+    ws_apps = wb.create_sheet(title="Anträge")
+    app_headers = [
+        "Antrags-ID", "Antragstyp", "Status", "Erstellt", "Antragsteller", "Daten (JSON)",
+    ]
+    _header_row(ws_apps, app_headers)
+    for a in applications:
+        ws_apps.append(
+            [
+                str(a.get("id") or ""),
+                a.get("typeName") or "",
+                a.get("status") or "",
+                _fmt_dt(a.get("createdAt")),
+                a.get("applicantName") or "",
+                json.dumps(a.get("data") or {}, ensure_ascii=False, sort_keys=True),
+            ]
+        )
+    _autosize(ws_apps, app_headers)
+
+    ws_versions = wb.create_sheet(title="Versionen")
+    v_headers = ["Antrags-ID", "Version", "Geändert von", "Zeitpunkt", "Daten (JSON)"]
+    _header_row(ws_versions, v_headers)
+    for v in versions:
+        ws_versions.append(
+            [
+                str(v.get("applicationId") or ""),
+                v.get("version"),
+                v.get("changedBy") or "",
+                _fmt_dt(v.get("at")),
+                json.dumps(v.get("data") or {}, ensure_ascii=False, sort_keys=True),
+            ]
+        )
+    _autosize(ws_versions, v_headers)
+
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()

@@ -34,4 +34,6 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     "protocol",
     # Frist-Erinnerungen zu Anträgen.
     "deadline",
+    # DSGVO-Löschanträge: eingegangen/ausgeführt/abgelehnt (#PII-Re-Add).
+    "privacy",
 )

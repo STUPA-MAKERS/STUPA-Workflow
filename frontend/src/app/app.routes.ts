@@ -202,7 +202,7 @@ export const routes: Routes = [
         data: {
           title: 'nav.admin',
           // #6: jede Bereichs-Admin-Rolle erreicht die Admin-Übersicht.
-          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'webhook.manage', 'audit.read'],
+          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read'],
         },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -264,6 +264,15 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/admin/flow-editor/flow-editor.component').then(
             (m) => m.FlowEditorComponent,
+          ),
+      },
+      {
+        path: 'admin/privacy',
+        data: { title: 'admin.privacy.title', permission: 'privacy.manage', parent: ['admin'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/privacy/privacy.component').then(
+            (m) => m.PrivacyComponent,
           ),
       },
       {

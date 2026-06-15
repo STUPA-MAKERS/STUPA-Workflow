@@ -40,6 +40,7 @@ import { BadgeComponent, type BadgeVariant } from '@shared/ui/badge/badge.compon
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 import {
+  CheckboxComponent,
   DatepickerComponent,
   DialogComponent,
   IconComponent,
@@ -81,6 +82,7 @@ const AUTOSAVE_DELAY_MS = 1000;
     BadgeComponent,
     ButtonComponent,
     CardComponent,
+    CheckboxComponent,
     SelectComponent,
     DatepickerComponent,
     TimeInputComponent,
@@ -137,10 +139,9 @@ export class MeetingsComponent implements OnDestroy {
   /** Feste Stimm-Optionen (kanonische Keys) — Pass/Fail braucht yes/no/abstain. */
   readonly FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
   readonly voteSecret = signal(false);
-  // Optionale Beschluss-Parameter beim Öffnen (#5-4): Mehrheitsregel + Quorum.
+  // Beschluss-Parameter beim Öffnen: nur die Mehrheitsregel. Quorum/Stimmberechtigte
+  // kommen aus der Gremium-Konfiguration (kein manuelles Setzen pro Vote).
   readonly voteMajorityRule = signal<'simple' | 'absolute' | 'two_thirds'>('simple');
-  readonly voteEligibleCount = signal<string>('');
-  readonly voteQuorumPercent = signal<string>('');
   readonly majorityRuleOptions = computed<SelectOption[]>(() =>
     (['simple', 'absolute', 'two_thirds'] as const).map((v) => ({
       value: v,
@@ -623,8 +624,18 @@ export class MeetingsComponent implements OnDestroy {
       this.upcomingItems();
       if (marker && scroller && !this.didInitialScroll && !this.loadingList()) {
         this.didInitialScroll = true;
+        // Doppeltes rAF: erst nach Layout + Höhen-Messung positionieren. Position über
+        // getBoundingClientRect (nicht offsetTop) — robust unabhängig vom offsetParent,
+        // sonst landet die Liste fälschlich bei der ältesten Sitzung statt bei „Jetzt".
         requestAnimationFrame(() => {
-          scroller.scrollTop = Math.max(0, marker.offsetTop - 8);
+          requestAnimationFrame(() => {
+            const m = this.nowMarker()?.nativeElement;
+            const s = this.timelineScroll()?.nativeElement;
+            if (!m || !s) return;
+            const top =
+              m.getBoundingClientRect().top - s.getBoundingClientRect().top + s.scrollTop - 8;
+            s.scrollTop = Math.max(0, top);
+          });
         });
       }
     });
@@ -1277,6 +1288,23 @@ export class MeetingsComponent implements OnDestroy {
     });
   }
 
+  /** TOP als (nicht-)öffentlich markieren (#PII-Re-Add) — im öffentlichen PDF redigiert. */
+  setNonPublic(item: AgendaItem, nonPublic: boolean): void {
+    const m = this.meeting();
+    if (!m) return;
+    this.savingAgenda.set(true);
+    this.api.setAgendaNonPublic(m.id, item.id, nonPublic).subscribe({
+      next: (rows) => {
+        this.savingAgenda.set(false);
+        this.agenda.set(rows);
+      },
+      error: () => {
+        this.savingAgenda.set(false);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
+    });
+  }
+
 
   // --- Live-Abstimmung/Beschlussfrage öffnen (#Sessions) -------------------
   /** App-TOP: genau eine Abstimmung; Freitext-TOP: beliebig viele Beschlussfragen. */
@@ -1297,8 +1325,6 @@ export class MeetingsComponent implements OnDestroy {
     );
     this.voteSecret.set(false);
     this.voteMajorityRule.set('simple');
-    this.voteEligibleCount.set('');
-    this.voteQuorumPercent.set('');
     this.voteDialogOpen.set(true);
   }
 
@@ -1319,12 +1345,8 @@ export class MeetingsComponent implements OnDestroy {
         options,
         secret: this.voteSecret(),
         majorityRule: this.voteMajorityRule(),
-        eligibleCount: this.voteEligibleCount().trim()
-          ? Number(this.voteEligibleCount())
-          : null,
-        quorumPercent: this.voteQuorumPercent().trim()
-          ? Number(this.voteQuorumPercent())
-          : null,
+        // eligibleCount/quorumPercent bewusst weggelassen → Server nutzt die
+        // Gremium-Defaults (kein manuelles Setzen pro Vote).
       })
       .subscribe({
         next: (updated) => {

@@ -1137,6 +1137,13 @@ export class FlowEditorComponent {
     }));
   }
 
+  protected setStateTerminal(key: string, on: boolean): void {
+    this.graph.update((g) => ({
+      ...g,
+      states: g.states.map((s) => (s.key === key ? { ...s, isTerminal: on } : s)),
+    }));
+  }
+
   // --- state kind + config (#28) -------------------------------------------
   private patchState(key: string, patch: Partial<StateDef>): void {
     this.graph.update((g) => ({

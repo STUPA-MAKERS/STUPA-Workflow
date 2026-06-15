@@ -1,0 +1,36 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.pv__header h1 {
+  margin: 0;
+}
+
+.pv__row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.pv__grow {
+  flex: 1 1 18rem;
+}
+
+.pv__retention {
+  flex: 0 0 12rem;
+}
+
+/* Dialog-Textarea (Ablehnungsgrund) — gleiche Optik wie die Text-Felder. */
+.field__control {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
+  font-family: inherit;
+}

@@ -36,11 +36,13 @@ def test_form_field_camel_alias_roundtrip() -> None:
         "label": {"de": "Betrag"},
         "isPromoted": True,
         "promoteTarget": "amount",
+        "isPII": False,
         "visibleIf": {"==": [{"var": "has_budget"}, True]},
     }
     f = FormFieldDef.model_validate(raw)
     assert f.is_promoted is True
     assert f.promote_target == "amount"
+    assert f.is_pii is False
     dumped = f.model_dump(by_alias=True, exclude_none=True)
     assert dumped["isPromoted"] is True
     assert dumped["promoteTarget"] == "amount"

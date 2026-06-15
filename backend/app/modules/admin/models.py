@@ -133,6 +133,9 @@ class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):
     name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     has_budget: Mapped[bool] = mapped_column(Boolean, server_default="false")
     comparison_offers: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # DSGVO-Aufbewahrung: Monate bis Anonymisierung; NULL = globaler Default
+    # (``privacy_settings.default_retention_months``).
+    retention_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     active_form_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("form_version.id", ondelete="SET NULL", use_alter=True),
         nullable=True,

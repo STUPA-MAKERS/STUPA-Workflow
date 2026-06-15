@@ -74,6 +74,7 @@ class ApplicantOut(_CamelModel):
 
     email: str | None = None
     name: str | None = None
+    anonymized: bool = False
 
 
 class ApplicationOut(_CamelModel):

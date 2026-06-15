@@ -30,6 +30,18 @@ class AuditAction(StrEnum):
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"
+    # DSGVO/PII (#PII-Re-Add): Auskunft (Art. 15), Löschung/Anonymisierung (Art. 17),
+    # Aufbewahrung (Art. 5(1)(e)) + Löschantrags-Queue. ``data`` trägt nur id-/E-Mail-
+    # Referenzen + Metadaten, nie rohe PII-Werte (security.md §4).
+    PII_ACCESS = "pii_access"
+    PII_DELETION = "pii_deletion"
+    PII_EXPORT = "pii_export"
+    ANONYMIZATION = "anonymization"
+    ERASURE_REQUESTED = "erasure_requested"
+    ERASURE_EXECUTED = "erasure_executed"
+    ERASURE_REJECTED = "erasure_rejected"
+    PRINCIPAL_ERASED = "principal_erased"
+    RETENTION_ANONYMIZE = "retention_anonymize"
     # Budget-/Geld-Mutationen (#sec-audit): Kostenstellen-CRUD, Top-Down-Zuteilung,
     # Buchungen/Umbuchungen, Rechnungen, Antrag→Kostenstelle/HHJ. Nur id-Referenzen
     # und Beträge im ``data`` (keine PII) — wer wann Mittel bewegt/gelöscht hat.

@@ -208,3 +208,23 @@ async def get_protocol_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": "inline; filename=protokoll.pdf"},
     )
+
+
+@router.get(
+    "/protocols/{protocol_id}/pdf/public",
+    responses=_errors(401, 403, 404, 503),
+    response_class=Response,
+)
+async def get_protocol_public_pdf(
+    protocol_id: UUID, service: ServiceDep, _principal: ReaderDep
+) -> Response:
+    """Redigierte öffentliche Protokoll-Variante streamen (#PII-Re-Add).
+
+    Nur vorhanden, wenn die Sitzung mind. einen nicht-öffentlichen TOP hatte; sonst 404.
+    Gleiche Lese-Berechtigung wie das interne PDF."""
+    data = await service.get_public_pdf_bytes(protocol_id)
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline; filename=protokoll-oeffentlich.pdf"},
+    )

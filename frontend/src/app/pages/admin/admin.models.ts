@@ -38,6 +38,8 @@ export interface StateDef {
   color?: string | null;
   editAllowed?: boolean;
   isInitial?: boolean;
+  /** Endzustand (#PII-Re-Add): terminale Anträge sind aufbewahrungs-/anonymisierbar. */
+  isTerminal?: boolean;
   /** State-Art (#28); fehlt ⇒ `normal`. */
   kind?: StateKind | null;
   /** Kind-spezifische Konfiguration (#28). */
@@ -340,6 +342,8 @@ export interface ApplicationTypeFull {
   gremiumId?: Uuid | null;
   hasBudget: boolean;
   comparisonOffers?: ComparisonOffers | null;
+  /** DSGVO-Aufbewahrung in Monaten; null = globaler Default (#PII-Re-Add). */
+  retentionMonths?: number | null;
   activeFormVersionId?: Uuid | null;
 }
 
@@ -518,6 +522,29 @@ export interface NotificationSettings {
   taskReminderAfterDays: number;
   /** Danach alle N Tage erneut; 0 = nur einmal je State-Aufenthalt. */
   taskReminderRepeatDays: number;
+}
+
+/** DSGVO-Löschantrag (Queue, P privacy.manage). */
+export type ErasureSubjectType = 'applicant' | 'principal';
+export type ErasureStatus = 'open' | 'executed' | 'rejected';
+
+export interface ErasureRequest {
+  id: Uuid;
+  createdAt: string;
+  subjectType: ErasureSubjectType;
+  applicationId?: Uuid | null;
+  principalId?: Uuid | null;
+  email?: string | null;
+  status: ErasureStatus;
+  requestedBy?: string | null;
+  handledBy?: string | null;
+  handledAt?: string | null;
+  reason?: string | null;
+}
+
+/** Plattformweite DSGVO-Config (globaler Aufbewahrungs-Default, P privacy.manage). */
+export interface PrivacySettings {
+  defaultRetentionMonths: number;
 }
 
 // --- Branding / Site-Config (#21 — T-34-Contract, nicht SDS) ----------------

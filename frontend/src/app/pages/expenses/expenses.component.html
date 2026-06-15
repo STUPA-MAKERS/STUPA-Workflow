@@ -89,8 +89,6 @@
               <th scope="col">{{ 'expenses.col.description' | t }}</th>
               <th scope="col">{{ 'expenses.col.correspondent' | t }}</th>
               <th scope="col">{{ 'expenses.col.costCentre' | t }}</th>
-              <th scope="col">{{ 'expenses.col.application' | t }}</th>
-              <th scope="col">{{ 'expenses.col.account' | t }}</th>
               <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
                 <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'expenses.col.amount' | t }}{{ sortInd('amount') }}</button>
               </th>
@@ -108,12 +106,6 @@
                 <td class="exp__cellDesc">{{ e.description }}</td>
                 <td class="exp__cellMeta">{{ e.correspondent || '—' }}</td>
                 <td class="exp__mono exp__cellMeta">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
-                <td class="exp__cellMeta">
-                  @if (e.applicationId) {
-                    <a class="exp__appLink" [routerLink]="['/applications', e.applicationId]">{{ e.applicationTitle || ('expenses.linkedApplication' | t) }}</a>
-                  } @else { — }
-                </td>
-                <td class="exp__cellMeta">{{ e.accountName || '—' }}</td>
                 <td class="exp__num exp__amount" [class.exp__amount--income]="e.kind === 'income'">{{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}</td>
                 @if (canManage()) {
                   <td class="exp__num">

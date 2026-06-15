@@ -50,7 +50,9 @@ def _fields() -> list[FormFieldDef]:
                 "promoteTarget": "amount",
             }
         ),
-        FormFieldDef.model_validate({"key": "note", "type": "text", "label": {"de": "Notiz"}}),
+        FormFieldDef.model_validate(
+            {"key": "note", "type": "text", "label": {"de": "Notiz"}, "isPII": True}
+        ),
     ]
 
 
@@ -78,7 +80,7 @@ async def _seed_type(
         app_type.id, FormVersionCreate(fields=fields or _fields(), activate=True)
     )
 
-    flow = FlowVersion(application_type_id=app_type.id, version=1, active=True, editor_layout={})
+    flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
     await session.flush()
     draft = State(
@@ -217,10 +219,12 @@ async def test_patch_locked_state_409(session: AsyncSession) -> None:
 async def test_list_filters_and_paging(session: AsyncSession) -> None:
     app_type, draft, _ = await _seed_type(session)
     svc = ApplicationsService(session)
-    a1, _ = await svc.create(_create_payload(app_type.id))
+    # actor != "applicant" ⇒ sofort ``email_confirmed_at`` (sonst sind die unbestätigten
+    # Gast-Einreichungen in der Liste unsichtbar; vgl. ``test_list_fuzzy_search_…``).
+    a1, _ = await svc.create(_create_payload(app_type.id), actor="admin")
     p2 = _create_payload(app_type.id)
     p2.data = {"title": "Solarpanel", "cost": "5.00", "note": "g"}
-    await svc.create(p2)
+    await svc.create(p2, actor="admin")
 
     page = await svc.list_applications(type_id=app_type.id, limit=50, offset=0)
     assert page.total == 2
@@ -409,3 +413,42 @@ async def test_list_fuzzy_search_meaningful_text(session: AsyncSession) -> None:
     # Der reine Betrag (``cost`` = 1234.00) ist KEIN Text-Antwortwert ⇒ kein Treffer.
     by_amount = await svc.list_applications(q="1234", limit=50, offset=0)
     assert by_amount.total == 0
+
+
+# --------------------------------------------------------------------------- #
+# anonymize (DSGVO Art. 17)
+# --------------------------------------------------------------------------- #
+async def test_anonymize_clears_pii_keeps_application(session: AsyncSession) -> None:
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id))
+
+    await svc.anonymize(app.id)
+
+    out = await svc.get(app.id, include_pii=True)
+    assert out is not None  # Antrag bleibt
+    assert out.data.get("note") is None  # PII-Feld geleert
+    assert out.data["title"] == "Mein Antrag"  # Nicht-PII bleibt
+    assert out.applicant is not None
+    assert out.applicant.email is None
+    assert out.applicant.name is None
+    assert out.applicant.anonymized is True
+
+
+async def test_anonymize_scrubs_version_history(session: AsyncSession) -> None:
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id))  # note="geheim" in v1
+    await svc.patch(
+        app.id, {"title": "T", "cost": "100.00", "note": "geheim2"}, changed_by="applicant"
+    )
+
+    await svc.anonymize(app.id)
+
+    versions = await svc.versions(app.id)
+    assert len(versions) == 2
+    for v in versions:
+        assert "note" not in v.data  # PII aus jedem Snapshot
+        if v.diff is not None:
+            for bucket in ("added", "removed", "changed"):
+                assert "note" not in v.diff.get(bucket, {})

@@ -65,6 +65,7 @@ class FormField(UUIDPkMixin, Base):
     compute: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     options: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     order: Mapped[int] = mapped_column("order", Integer, server_default="0")
+    is_pii: Mapped[bool] = mapped_column(Boolean, server_default="false")
     is_promoted: Mapped[bool] = mapped_column(Boolean, server_default="false")
     promote_target: Mapped[str | None] = mapped_column(Text, nullable=True)
 

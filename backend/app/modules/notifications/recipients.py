@@ -62,6 +62,8 @@ class RecipientResolver:
                     out.add(email)
             elif kind == "email" and ref:
                 out.add(str(ref).strip())
+            elif kind == "permission" and ref:
+                out.update(await self._emails_for_permission(str(ref), now))
             # Unbekannte/unvollständige Spec → still ignorieren (Regel bleibt gültig).
         return sorted(e for e in out if e)
 
@@ -119,10 +121,38 @@ class RecipientResolver:
         rows = (await self.session.scalars(stmt)).all()
         return [e for e in rows if e]
 
+    async def _emails_for_permission(self, perm: str, now: datetime) -> list[str]:
+        """Adressen aller aktiven Principals, die ``perm`` über eine gültige
+        Rollenzuweisung halten (``admin``-Rolle zählt immer, Admin-Bypass)."""
+        stmt = (
+            select(Principal.email)
+            .join(RoleAssignment, RoleAssignment.principal_id == Principal.id)
+            .join(Role, Role.id == RoleAssignment.role_id)
+            .outerjoin(RolePermission, RolePermission.role_id == Role.id)
+            .where(
+                Principal.email.is_not(None),
+                Principal.active.is_(True),
+                or_(
+                    RoleAssignment.valid_from.is_(None),
+                    RoleAssignment.valid_from <= now,
+                ),
+                or_(
+                    RoleAssignment.valid_until.is_(None),
+                    RoleAssignment.valid_until > now,
+                ),
+                or_(RolePermission.permission == perm, Role.key == "admin"),
+            )
+            .distinct()
+        )
+        rows = (await self.session.scalars(stmt)).all()
+        return [e for e in rows if e]
+
     async def _applicant_email(self, application_id: uuid.UUID) -> str | None:
+        # Anonymisierte Anträge haben keine PII-Mail mehr → nicht adressieren.
         return await self.session.scalar(
             select(Applicant.email).where(
                 Applicant.application_id == application_id,
+                Applicant.anonymized_at.is_(None),
             )
         )
 

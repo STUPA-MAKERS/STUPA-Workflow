@@ -18,6 +18,9 @@
           @if (isAdmin()) {
             <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
           }
+          @if (application.applicant && !application.applicant.anonymized) {
+            <app-button variant="danger" size="sm" (click)="confirmErase.set(true)">{{ 'applications.detail.eraseRequest' | t }}</app-button>
+          }
         </div>
       }
     </div>
@@ -54,9 +57,15 @@
       @if (application.applicant) {
         <div>
           <dt>{{ 'applications.detail.applicant' | t }}</dt>
-          <dd>{{ application.applicant.name || ('applications.detail.notProvided' | t) }}</dd>
+          <dd>
+            @if (application.applicant.anonymized) {
+              {{ 'applications.detail.anonymized' | t }}
+            } @else {
+              {{ application.applicant.name || ('applications.detail.notProvided' | t) }}
+            }
+          </dd>
         </div>
-        @if (application.applicant.email) {
+        @if (!application.applicant.anonymized && application.applicant.email) {
           <div>
             <dt>{{ 'applications.detail.email' | t }}</dt>
             <dd><a [attr.href]="'mailto:' + application.applicant.email">{{ application.applicant.email }}</a></dd>
@@ -258,6 +267,19 @@
   <div dialog-footer>
     <app-button variant="ghost" size="sm" (click)="confirmDelete.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
     <app-button variant="danger" size="sm" [loading]="deleting()" (click)="doDelete()">{{ 'applications.detail.delete' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<app-dialog
+  [open]="confirmErase()"
+  [title]="'applications.detail.eraseTitle' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="confirmErase.set(false)"
+>
+  <p>{{ 'applications.detail.eraseConfirm' | t }}</p>
+  <div dialog-footer>
+    <app-button variant="ghost" size="sm" (click)="confirmErase.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="danger" size="sm" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
   </div>
 </app-dialog>
 

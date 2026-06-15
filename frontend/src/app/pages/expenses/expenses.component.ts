@@ -10,7 +10,6 @@ import {
 } from '@angular/core';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -58,7 +57,6 @@ import { SimplifyPathPipe } from '@shared/budget-path';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
-    RouterLink,
     LocalizedDatePipe,
     TranslatePipe,
     SimplifyPathPipe,

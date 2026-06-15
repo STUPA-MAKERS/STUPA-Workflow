@@ -42,4 +42,6 @@ class ProtocolOut(_CamelModel):
     # Ergebnis-Link nach ``finalize`` (kurzlebige, signierte MinIO-URL; nie ein
     # direkter Bucket-Link — security.md §6). NULL solange Entwurf / ohne Storage.
     pdf_url: str | None = Field(default=None, alias="pdfUrl")
+    # Redigierte öffentliche Variante — nur gesetzt, wenn ein TOP nicht-öffentlich ist.
+    public_pdf_url: str | None = Field(default=None, alias="publicPdfUrl")
     sent_at: datetime | None = Field(default=None, alias="sentAt")

@@ -77,7 +77,36 @@ _DATA_TABLES = (
     "form_field",
     "form_version",
     "application_type",
+    # Sitzungs-/Abstimmungs-/Fristen-Domäne (#PII-Re-Add Test-Isolation): diese Tabellen
+    # werden nicht über die ``application``-CASCADE erreicht und leckten sonst zwischen
+    # Tests (z. B. ``uq_flow_version_version``/Vote-/Ballot-Kollisionen). CASCADE räumt
+    # die Kinder (agenda_item, attendance, protocol, ballot, …) mit ab.
+    "meeting",
+    "vote",
+    "ballot",
+    "protocol",
+    "deadline",
+    "deadline_policy",
+    "task_reminder_log",
 )
+
+
+def clear_privacy_tables(eng: Engine) -> None:
+    """Privacy-/Auth-Stammtabellen leeren (für Test-Isolation der DSGVO-Suite).
+
+    Die ``engine``-Fixture säubert nur die Antrags-/Flow-Tabellen; ``principal``,
+    ``auth_session``, ``erasure_request`` und ``privacy_settings`` bleiben sonst über
+    die Session-Laufzeit erhalten und würden zwischen Tests lecken (z. B. ein Login-
+    Subjekt zu einer Antragsteller-Mail). Diese Helfer-Funktion stellt den sauberen
+    Ausgangszustand wieder her — ``audit_entry`` ist trigger-geschützt und wird von der
+    ``engine``-Fixture separat behandelt."""
+    with eng.begin() as conn:
+        conn.execute(
+            text(
+                "TRUNCATE erasure_request, auth_session, principal, privacy_settings "
+                "RESTART IDENTITY CASCADE"
+            )
+        )
 
 
 def _truncate(eng: Engine) -> None:

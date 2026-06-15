@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.modules.notifications import action_dispatcher, auto, comments
+from app.modules.notifications import action_dispatcher, auto, comments, privacy
 from app.modules.notifications import service as _svc
 
 # --- Builtins, die nur hier leben (Single Source) -------------------------- #
@@ -187,6 +187,27 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         _svc._BUILTIN_MAGIC_LINK_SUBJECT,  # noqa: SLF001
         _svc._BUILTIN_MAGIC_LINK_BODY,  # noqa: SLF001
         {"link": "Anmelde-Link"},
+    ),
+    MailTemplateSpec(
+        "erasure_requested",
+        "privacy",
+        privacy.ERASURE_REQUESTED_SUBJECT,
+        privacy.ERASURE_REQUESTED_BODY,
+        {"subjectType": "Art (applicant/principal)", "requestId": "ID des Löschantrags"},
+    ),
+    MailTemplateSpec(
+        "erasure_executed",
+        "privacy",
+        privacy.ERASURE_EXECUTED_SUBJECT,
+        privacy.ERASURE_EXECUTED_BODY,
+        {"subjectType": "Art (applicant/principal)", "requestId": "ID des Löschantrags"},
+    ),
+    MailTemplateSpec(
+        "erasure_rejected",
+        "privacy",
+        privacy.ERASURE_REJECTED_SUBJECT,
+        privacy.ERASURE_REJECTED_BODY,
+        {"reason": "Ablehnungsgrund", "requestId": "ID des Löschantrags"},
     ),
 )
 

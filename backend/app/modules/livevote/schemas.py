@@ -188,6 +188,8 @@ class AgendaItemOut(_CamelModel):
     # Markdown-Text dieses TOP (pro-TOP-Editor).
     body: str | None = None
     position: int = 0
+    # Nicht-öffentlich: im öffentlichen Protokoll-PDF redigiert (#PII-Re-Add).
+    non_public: bool = Field(default=False, alias="nonPublic")
     # Aktueller Status des Antrags (i18n-Label), z. B. zum Anzeigen in der Liste.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
 
@@ -237,6 +239,7 @@ class AgendaAddBody(_CamelModel):
 
     application_id: UUID | None = Field(default=None, alias="applicationId")
     title: str | None = Field(default=None, min_length=1)
+    non_public: bool = Field(default=False, alias="nonPublic")
 
     @model_validator(mode="after")
     def _one_of(self) -> AgendaAddBody:
@@ -254,6 +257,7 @@ class AgendaBodyBody(_CamelModel):
 
     body: str | None = None
     title: str | None = Field(default=None, min_length=1)
+    non_public: bool | None = Field(default=None, alias="nonPublic")
 
 
 class AgendaReorderBody(_CamelModel):

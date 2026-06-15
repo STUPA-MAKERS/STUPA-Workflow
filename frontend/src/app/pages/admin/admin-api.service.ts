@@ -36,6 +36,9 @@ import {
   type GremiumCreateBody,
   type GremiumMembership,
   type DeadlinePolicy,
+  type ErasureRequest,
+  type ErasureStatus,
+  type PrivacySettings,
   type GremiumRole,
   type GremiumUpdateBody,
   type GroupMapping,
@@ -77,6 +80,7 @@ interface ApplicationTypeOutWire {
   nameI18n?: Record<string, string> | null;
   gremiumId?: Uuid | null;
   hasBudget?: boolean;
+  retentionMonths?: number | null;
   activeFormVersionId?: Uuid | null;
 }
 
@@ -93,6 +97,8 @@ export class AdminApiService {
     formDrafts: structuredCopy(MOCK_FORM_DRAFTS) as Record<string, FormDraft>,
     gremiumRoles: [] as GremiumRole[],
     deadlinePolicies: [] as DeadlinePolicy[],
+    erasures: [] as ErasureRequest[],
+    privacySettings: <PrivacySettings>{ defaultRetentionMonths: 24 },
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     roles: structuredCopy(MOCK_ROLES),
     principals: structuredCopy(MOCK_PRINCIPALS),
@@ -363,6 +369,7 @@ export class AdminApiService {
             name: (t.nameI18n ?? {}) as I18nMap,
             gremiumId: t.gremiumId ?? null,
             hasBudget: t.hasBudget ?? false,
+            retentionMonths: t.retentionMonths ?? null,
             activeFormVersionId: t.activeFormVersionId ?? null,
           })),
         ),
@@ -395,6 +402,7 @@ export class AdminApiService {
           name: (t.nameI18n ?? {}) as I18nMap,
           gremiumId: t.gremiumId ?? null,
           hasBudget: t.hasBudget ?? false,
+          retentionMonths: t.retentionMonths ?? null,
           activeFormVersionId: t.activeFormVersionId ?? null,
         })),
       );
@@ -646,6 +654,76 @@ export class AdminApiService {
       `${this.base}/admin/notification-settings`,
       settings,
     );
+  }
+
+  // --- DSGVO/Privacy (#PII-Re-Add, P privacy.manage) -----------------------
+  listErasures(status?: ErasureStatus): Observable<ErasureRequest[]> {
+    if (this.mock) {
+      const rows = status
+        ? this.store.erasures.filter((r) => r.status === status)
+        : this.store.erasures;
+      return of(structuredCopy(rows));
+    }
+    let params = new HttpParams();
+    if (status) params = params.set('status', status);
+    return this.http.get<ErasureRequest[]>(`${this.base}/admin/privacy/erasures`, {
+      params,
+    });
+  }
+
+  executeErasure(id: Uuid): Observable<ErasureRequest> {
+    if (this.mock) {
+      const row = this.store.erasures.find((r) => r.id === id);
+      if (row) row.status = 'executed';
+      return of(structuredCopy(row ?? ({ id } as ErasureRequest)));
+    }
+    return this.http.post<ErasureRequest>(
+      `${this.base}/admin/privacy/erasures/${id}/execute`,
+      {},
+    );
+  }
+
+  rejectErasure(id: Uuid, reason?: string | null): Observable<ErasureRequest> {
+    if (this.mock) {
+      const row = this.store.erasures.find((r) => r.id === id);
+      if (row) {
+        row.status = 'rejected';
+        row.reason = reason ?? null;
+      }
+      return of(structuredCopy(row ?? ({ id } as ErasureRequest)));
+    }
+    return this.http.post<ErasureRequest>(
+      `${this.base}/admin/privacy/erasures/${id}/reject`,
+      { reason: reason ?? null },
+    );
+  }
+
+  erasePrincipal(id: Uuid): Observable<void> {
+    if (this.mock) return of(void 0);
+    return this.http.post<void>(`${this.base}/admin/privacy/principals/${id}/erase`, {});
+  }
+
+  getPrivacySettings(): Observable<PrivacySettings> {
+    if (this.mock) return of(structuredCopy(this.store.privacySettings));
+    return this.http.get<PrivacySettings>(`${this.base}/admin/privacy/settings`);
+  }
+
+  putPrivacySettings(settings: PrivacySettings): Observable<PrivacySettings> {
+    if (this.mock) {
+      this.store.privacySettings = structuredCopy(settings);
+      return of(structuredCopy(this.store.privacySettings));
+    }
+    return this.http.put<PrivacySettings>(`${this.base}/admin/privacy/settings`, settings);
+  }
+
+  /** DSGVO-Auskunft (Art. 15) als XLSX-Blob (per E-Mail). */
+  downloadAuskunft(email: string): Observable<Blob> {
+    if (this.mock) return of(new Blob([], { type: 'application/octet-stream' }));
+    const params = new HttpParams().set('email', email);
+    return this.http.get(`${this.base}/admin/privacy/auskunft`, {
+      params,
+      responseType: 'blob',
+    });
   }
 
   // --- Branding / Site-Config (#21 — Mock-Contract) ------------------------

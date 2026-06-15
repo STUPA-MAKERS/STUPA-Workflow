@@ -184,6 +184,7 @@ class FormFieldDef(_CamelModel):
     options: list[FieldOption] | None = None
     visible_if: dict[str, Any] | None = Field(default=None, alias="visibleIf")
     compute: dict[str, Any] | None = None
+    is_pii: bool = Field(default=False, alias="isPII")
     is_promoted: bool = Field(default=False, alias="isPromoted")
     promote_target: str | None = Field(default=None, alias="promoteTarget")
 
@@ -221,6 +222,8 @@ class StateDef(_CamelModel):
     color: str | None = None
     edit_allowed: bool = Field(default=True, alias="editAllowed")
     is_initial: bool = Field(default=False, alias="isInitial")
+    # Endzustand (#PII-Re-Add): terminale Anträge sind aufbewahrungs-/anonymisierbar.
+    is_terminal: bool = Field(default=False, alias="isTerminal")
     # Global-Flow-Redesign (#28): State-Art + Konfiguration (vote/approval/decision).
     kind: StateKind = "normal"
     config: dict[str, Any] = Field(default_factory=dict)

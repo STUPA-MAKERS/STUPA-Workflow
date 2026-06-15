@@ -40,7 +40,7 @@ function appWire(): ApplicationOutWire {
     lang: 'de',
     createdAt: '2026-06-05T10:00:00Z',
     updatedAt: '2026-06-05T11:00:00Z',
-    applicant: { email: 'a@stupa', name: 'Mia' },
+    applicant: { email: 'a@stupa', name: 'Mia', anonymized: false },
   };
 }
 

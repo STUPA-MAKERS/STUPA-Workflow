@@ -80,6 +80,10 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # Plattform-Benachrichtigungs-Config (#task-reminder): Erinnerungs-Schwellen,
     # künftig Mail-Templates. Migration 0018 verteilt es an admin.site-Inhaber.
     "admin.notifications",
+    # /admin/privacy — DSGVO: Löschanträge bearbeiten, Principal/Antrag löschen,
+    # Auskunft exportieren, Aufbewahrung konfigurieren. Migration 0030 verteilt es
+    # an admin.site-Inhaber.
+    "privacy.manage",
     # MCP/Agent-Zugang: erlaubt das Ausstellen von OAuth-Token für API-Agenten
     # (#MCP). Admin hat es ohnehin (Bypass); explizit zuweisbar für Nicht-Admins.
     "mcp.use",

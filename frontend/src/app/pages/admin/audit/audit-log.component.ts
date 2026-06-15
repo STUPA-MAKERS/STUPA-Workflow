@@ -46,9 +46,32 @@ export const AUDIT_ACTIONS = [
   'delegation_substitute_add',
   'delegation_substitute_remove',
   'export',
+  'pii_access',
+  'pii_deletion',
+  'pii_export',
+  'anonymization',
+  'erasure_requested',
+  'erasure_executed',
+  'erasure_rejected',
+  'principal_erased',
+  'retention_anonymize',
   'webhook_config',
   'attachment_quarantine',
   'attachment_delete',
+  // Budget-/Geld-Mutationen (#sec-audit) — Spiegel der BUDGET_*-Werte in actions.py.
+  'budget_node_create',
+  'budget_node_update',
+  'budget_node_delete',
+  'budget_allocation_set',
+  'budget_expense_create',
+  'budget_expense_update',
+  'budget_expense_delete',
+  'budget_transfer_create',
+  'budget_invoice_create',
+  'budget_invoice_update',
+  'budget_invoice_delete',
+  'budget_assign',
+  'budget_move_fiscal_year',
 ] as const;
 
 const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
@@ -70,6 +93,20 @@ const ACTION_ICONS: Record<string, IconName> = {
   webhook_config: 'webhook',
   attachment_quarantine: 'paperclip',
   attachment_delete: 'paperclip',
+  // Geld-Mutationen: €-Glyph; Kostenstellen-Struktur als Torten-Glyph wie im Budget-Tab.
+  budget_node_create: 'chart-pie',
+  budget_node_update: 'chart-pie',
+  budget_node_delete: 'chart-pie',
+  budget_allocation_set: 'chart-pie',
+  budget_expense_create: 'euro',
+  budget_expense_update: 'euro',
+  budget_expense_delete: 'euro',
+  budget_transfer_create: 'euro',
+  budget_invoice_create: 'euro',
+  budget_invoice_update: 'euro',
+  budget_invoice_delete: 'euro',
+  budget_assign: 'euro',
+  budget_move_fiscal_year: 'euro',
 };
 
 /** Ziel-Typ → Router-Ziel (Detailseite bzw. zuständige Admin-Liste). */
@@ -84,6 +121,13 @@ const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   group_mapping: () => ['/admin/users'],
   webhook: () => ['/admin/webhooks'],
   site_config: () => ['/admin/branding'],
+  // Budget-Ziele → zuständiger Tab: Kostenstellen/Zuteilungen/Umbuchungen ins
+  // Budget-Dashboard, Buchungen in die Ausgaben-, Rechnungen in die Rechnungsliste.
+  budget: () => ['/budget'],
+  budget_allocation: () => ['/budget'],
+  budget_transfer: () => ['/budget'],
+  budget_expense: () => ['/expenses'],
+  invoice: () => ['/invoices'],
 };
 
 /** Tagesgruppe des Feeds (lokale Tagesgrenzen). */

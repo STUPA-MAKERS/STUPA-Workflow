@@ -134,6 +134,8 @@ export class ApplicationsDetailComponent {
   editModel: Record<string, unknown> = {};
   readonly confirmDelete = signal(false);
   readonly deleting = signal(false);
+  readonly confirmErase = signal(false);
+  readonly requestingErasure = signal(false);
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
@@ -445,6 +447,23 @@ export class ApplicationsDetailComponent {
       error: () => {
         this.deleting.set(false);
         this.toast.error(this.i18n.translate('applications.detail.deleteFailed'));
+      },
+    });
+  }
+
+  /** DSGVO Art. 17: Löschung der eigenen Antragsdaten beantragen (Magic-Link-Sicht). */
+  doRequestErasure(): void {
+    if (this.requestingErasure()) return;
+    this.requestingErasure.set(true);
+    this.api.requestErasure(this.id).subscribe({
+      next: () => {
+        this.requestingErasure.set(false);
+        this.confirmErase.set(false);
+        this.toast.success(this.i18n.translate('applications.detail.eraseRequested'));
+      },
+      error: () => {
+        this.requestingErasure.set(false);
+        this.toast.error(this.i18n.translate('applications.detail.eraseRequestFailed'));
       },
     });
   }

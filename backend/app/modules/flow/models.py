@@ -61,6 +61,8 @@ class State(UUIDPkMixin, Base):
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
     edit_allowed: Mapped[bool] = mapped_column(Boolean, server_default="true")
     is_initial: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    # Endzustand (DSGVO-Aufbewahrung): terminale Anträge sind anonymisierbar.
+    is_terminal: Mapped[bool] = mapped_column(Boolean, server_default="false")
     # Global-Flow-Redesign (#28, Cleanup): nur noch zwei State-Arten.
     #  * ``normal`` — gewöhnlicher Status; manuelle/automatische Übergänge per Guard.
     #  * ``vote``   — ein Gremium stimmt ab; ``config={gremiumId,...}``; 2 Ausgänge

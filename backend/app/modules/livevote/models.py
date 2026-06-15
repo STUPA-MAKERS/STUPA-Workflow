@@ -18,6 +18,7 @@ from datetime import datetime as _datetime
 from datetime import time as _time
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -125,6 +126,9 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     # Markdown-Text dieses TOP (pro-TOP-Editor); fließt ins finale Protokoll.
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")
+    # Nicht-öffentlich (#PII-Re-Add): im öffentlichen Protokoll-PDF durch einen
+    # Platzhalter ersetzt; die TOP-Nummerierung bleibt erhalten.
+    non_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     __table_args__ = (
         UniqueConstraint("meeting_id", "application_id", name="uq_agenda_meeting_application"),

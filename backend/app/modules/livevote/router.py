@@ -472,7 +472,9 @@ async def add_agenda_item(
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    return await agenda.add(meeting_id, payload.application_id, payload.title)
+    return await agenda.add(
+        meeting_id, payload.application_id, payload.title, non_public=payload.non_public
+    )
 
 
 @router.delete(
@@ -534,7 +536,13 @@ async def set_agenda_body(
     # gehört zur Planung und bleibt vor »live« erlaubt.
     if payload.body is not None and meeting.status != "live":
         raise ConflictError("the meeting has not started — start it before taking minutes")
-    items = await agenda.set_body(meeting_id, item_id, body=payload.body, title=payload.title)
+    items = await agenda.set_body(
+        meeting_id,
+        item_id,
+        body=payload.body,
+        title=payload.title,
+        non_public=payload.non_public,
+    )
     # Live-Follower über den geänderten TOP-Text informieren (#live-refresh).
     await service.broadcast_state(meeting_id, principal)
     return items

@@ -10,6 +10,8 @@ Deckt flows §1/§2 und data-model §1/§2 ab:
 * :meth:`timeline` / :meth:`versions` — Status-Verlauf bzw. Versionshistorie + Diff.
 * :meth:`list_applications` — gefilterte, gepagte Liste (Principal-only).
 * :meth:`add_comment` / :meth:`list_comments` — interne/öffentliche Kommentare (RBAC).
+* :meth:`anonymize` — PII leeren (Mail/Name → NULL, ``anonymized_at``), Antrag bleibt;
+  PII-markierte ``data``-Felder werden mit-geleert (data-model §1, R14.3).
 
 Form-/Topf-Felder kommen aus T-11: laufende Anträge validieren gegen ihre **gepinnte**
 ``form_version`` (data-model §4), nicht gegen die aktuell aktive.
@@ -19,10 +21,10 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Text, cast, false, func, or_, select
+from sqlalchemy import ColumnElement, Text, cast, delete, false, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +34,7 @@ from app.modules.applications.models import (
     Applicant,
     Application,
     Comment,
+    MagicLink,
     StatusEvent,
     SubmissionVersion,
 )
@@ -47,6 +50,7 @@ from app.modules.applications.schemas import (
 )
 from app.modules.budget.models import BudgetField
 from app.modules.budget.tree_models import Budget
+from app.modules.files.models import Attachment
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.forms.service import FormsService
@@ -59,6 +63,9 @@ from app.search import dialect_of, trigram_rank
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
+
+if TYPE_CHECKING:
+    from app.modules.files.service import FilesService
 
 # Promoted-Ziel, das in `application.amount` (numeric) synchronisiert wird.
 _AMOUNT_TARGET = "amount"
@@ -77,6 +84,7 @@ def _field_from_row(row: Any) -> FormFieldDef:  # noqa: ANN401 — form_field-Ze
             "visibleIf": row.visible_if,
             "compute": row.compute,
             "options": row.options,
+            "isPII": row.is_pii,
             "isPromoted": row.is_promoted,
             "promoteTarget": row.promote_target,
         }
@@ -115,6 +123,16 @@ def _whitelist(fields: list[FormFieldDef], data: dict[str, Any]) -> dict[str, An
     sonst beliebige, GIN-indizierte Junk-Blobs ablegen (DoS-/Amplification-Fläche)."""
     known = {f.key for f in fields}
     return {k: v for k, v in data.items() if k in known}
+
+
+def _scrub_diff(diff: dict[str, Any], pii_keys: set[str]) -> dict[str, Any]:
+    """PII-Feld-Keys aus einem gespeicherten ``DataDiff`` entfernen (added/removed/changed).
+
+    Diff-Werte enthalten alte/neue Klartext-Feldwerte → beim Anonymisieren mit-leeren."""
+    return {
+        bucket: {k: v for k, v in (entries or {}).items() if k not in pii_keys}
+        for bucket, entries in diff.items()
+    }
 
 
 def _amount_currency(
@@ -223,6 +241,7 @@ class ApplicationsService:
                 applicant_out = ApplicantOut(
                     email=applicant.email,
                     name=applicant.name,
+                    anonymized=applicant.anonymized_at is not None,
                 )
         return ApplicationOut(
             id=app.id,
@@ -793,3 +812,67 @@ class ApplicationsService:
             )
             for c in rows
         ]
+
+    # ------------------------------------------------------------- anonymize
+    async def anonymize(
+        self,
+        application_id: UUID,
+        *,
+        files: FilesService | None = None,
+        actor: str = "system",
+        commit: bool = True,
+    ) -> None:
+        """PII leeren (Mail/Name → NULL, ``anonymized_at`` setzen), Antrag bleibt.
+
+        Zusätzlich werden ``isPII``-markierte ``data``-Felder geleert (data-model §1),
+        sowie Magic-Links + Anhänge des Antrags entfernt (DSGVO Art. 17). ``commit=False``
+        lässt die Transaktion offen, damit der Aufrufer (Löschantrag/Cron) atomar
+        committet."""
+        app = await self._get_app(application_id)
+        applicant = (
+            await self.session.execute(
+                select(Applicant).where(Applicant.application_id == application_id)
+            )
+        ).scalar_one_or_none()
+        if applicant is not None:
+            applicant.email = None
+            applicant.name = None
+            applicant.anonymized_at = datetime.now(UTC)
+
+        fields = await self._pinned_fields(app)
+        pii_keys = {f.key for f in fields if f.is_pii}
+        if pii_keys:
+            app.data = {k: v for k, v in app.data.items() if k not in pii_keys}
+            # PII steckt auch in jeder gespeicherten Version + deren Diff (DSGVO Art. 17):
+            # alle submission_version-Zeilen mit-scrubben, sonst leakt versions()/Timeline
+            # den alten Klartext-Snapshot (HIGH #2).
+            versions = (
+                await self.session.scalars(
+                    select(SubmissionVersion).where(
+                        SubmissionVersion.application_id == application_id
+                    )
+                )
+            ).all()
+            for v in versions:
+                v.data = {k: val for k, val in v.data.items() if k not in pii_keys}
+                if v.diff is not None:
+                    v.diff = _scrub_diff(v.diff, pii_keys)
+
+        # Magic-Links sind ein direkter PII-Zugriffspfad (Mail-Link) → entfernen.
+        await self.session.execute(
+            delete(MagicLink).where(MagicLink.application_id == application_id)
+        )
+        # Anhänge können PII enthalten (Belege/Dateinamen): DB-Zeile + Storage-Objekt
+        # über den FilesService entfernen, wenn verfügbar; sonst nur die DB-Zeilen.
+        if files is not None:
+            await files.delete_for_application(application_id, actor=actor)
+        else:
+            await self.session.execute(
+                delete(Attachment).where(Attachment.application_id == application_id)
+            )
+        if commit:
+            await self.session.commit()
+            # onupdate-Spalten nach dem UPDATE expired → nachladen (vermeidet Lazy-IO).
+            await self.session.refresh(app)
+        else:
+            await self.session.flush()

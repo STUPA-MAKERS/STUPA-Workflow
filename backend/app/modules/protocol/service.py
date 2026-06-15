@@ -27,8 +27,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from datetime import time as _time
-from zoneinfo import ZoneInfo
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -77,6 +77,16 @@ def protocol_storage_key(protocol_id: UUID) -> str:
     return f"pdf/protocol/{protocol_id}.pdf"
 
 
+def protocol_public_storage_key(protocol_id: UUID) -> str:
+    """MinIO-Key der redigierten öffentlichen Protokoll-Variante (#PII-Re-Add)."""
+    return f"pdf/protocol/{protocol_id}-public.pdf"
+
+
+# Platzhalter für den Body nicht-öffentlicher TOPs im öffentlichen PDF (Nummerierung
+# bleibt erhalten, der Inhalt wird redigiert).
+_NON_PUBLIC_PLACEHOLDER = "*(nicht-öffentlicher Tagesordnungspunkt)*"
+
+
 class ProtocolService:
     """Protokoll-Operationen + (synchrone) Finalisierung über die T-20-Infrastruktur."""
 
@@ -116,6 +126,12 @@ class ProtocolService:
             return f"/api/protocols/{protocol.id}/pdf"
         return None
 
+    def _public_pdf_path(self, protocol: Protocol) -> str | None:
+        """App-relativer Pfad der redigierten öffentlichen Variante (#PII-Re-Add)."""
+        if protocol.public_pdf_storage_key is not None and self.storage is not None:
+            return f"/api/protocols/{protocol.id}/pdf/public"
+        return None
+
     async def get_pdf_bytes(self, protocol_id: UUID) -> bytes:
         """PDF-Bytes des Protokolls aus dem Storage holen (für den ``/pdf``-Stream).
 
@@ -131,6 +147,18 @@ class ProtocolService:
                 "Protocol PDF temporarily unavailable."
             ) from exc
 
+    async def get_public_pdf_bytes(self, protocol_id: UUID) -> bytes:
+        """Bytes der redigierten öffentlichen Variante (für den ``/pdf/public``-Stream)."""
+        protocol = await self._get(protocol_id)
+        if protocol.public_pdf_storage_key is None or self.storage is None:
+            raise NotFoundError(f"protocol {protocol_id} has no public PDF")
+        try:
+            return await self.storage.get(protocol.public_pdf_storage_key)
+        except StorageError as exc:
+            raise ServiceUnavailableError(
+                "Protocol PDF temporarily unavailable."
+            ) from exc
+
     def _to_out(self, protocol: Protocol) -> ProtocolOut:
         return ProtocolOut(
             id=protocol.id,
@@ -138,6 +166,7 @@ class ProtocolService:
             markdown=protocol.markdown,
             status=protocol.status,  # type: ignore[arg-type]
             pdfUrl=self._pdf_path(protocol),
+            publicPdfUrl=self._public_pdf_path(protocol),
             sentAt=protocol.sent_at,
         )
 
@@ -311,24 +340,35 @@ class ProtocolService:
         if protocol.status == "final":
             return self._to_out(protocol)
 
-        markdown = await self._build_document(protocol)
-        pdf = await self._render(protocol, markdown)
+        if await self._has_non_public(protocol.meeting_id):
+            # Dual-Render: vollständiges internes PDF + redigiertes öffentliches PDF.
+            # Per Mail geht NUR die öffentliche Variante (nicht-öffentliche TOPs sollen
+            # nicht im Verteiler landen).
+            internal_md = await self._build_document(protocol, public=False)
+            await self._render(protocol, internal_md, public=False)
+            public_md = await self._build_document(protocol, public=True)
+            public_pdf = await self._render(protocol, public_md, public=True)
+            mail_pdf = public_pdf
+        else:
+            markdown = await self._build_document(protocol)
+            mail_pdf = await self._render(protocol, markdown)
         protocol.status = "final"
         protocol.sent_at = now
         await self.session.flush()
-        await self._send(protocol, pdf)
+        await self._send(protocol, mail_pdf)
         await self.session.commit()
         return self._to_out(protocol)
 
     # ----------------------------------------------------------- finalize bits
-    async def _build_document(self, protocol: Protocol) -> str:
+    async def _build_document(self, protocol: Protocol, *, public: bool = False) -> str:
         meeting = await self.session.get(Meeting, protocol.meeting_id)
         gremium = await self.session.get(Gremium, protocol.gremium_id)
         title = meeting.title if meeting is not None else "Protokoll"
         # Quelle der Wahrheit ist der pro-TOP-Editor (Tagesordnung). Existieren TOPs,
         # wird das Protokoll aus ihren Markdown-Bodies + Beschluss-Snippets montiert;
         # andernfalls Fallback auf das frei editierte ``protocol.markdown`` (Bestand).
-        assembled = await self._assemble_from_agenda(protocol.meeting_id)
+        # ``public=True`` redigiert nicht-öffentliche TOPs (#PII-Re-Add).
+        assembled = await self._assemble_from_agenda(protocol.meeting_id, public=public)
         protokollant, present, absent = await self._header_meta(meeting)
         return build_protocol_document(
             ProtocolDoc(
@@ -410,8 +450,27 @@ class ProtocolService:
         absent = [name or sub for status, name, sub in rows if status == "absent"]
         return protokollant, present, absent
 
-    async def _assemble_from_agenda(self, meeting_id: UUID) -> str:
-        """Protokoll-Markdown aus den TOP-Bodies + ihren Beschluss-Abstimmungen bauen."""
+    async def _has_non_public(self, meeting_id: UUID) -> bool:
+        """Hat die Sitzung mind. einen nicht-öffentlichen TOP? (steuert Dual-Render)."""
+        return bool(
+            await self.session.scalar(
+                select(func.count())
+                .select_from(MeetingAgendaItem)
+                .where(
+                    MeetingAgendaItem.meeting_id == meeting_id,
+                    MeetingAgendaItem.non_public.is_(True),
+                )
+            )
+        )
+
+    async def _assemble_from_agenda(
+        self, meeting_id: UUID, *, public: bool = False
+    ) -> str:
+        """Protokoll-Markdown aus den TOP-Bodies + ihren Beschluss-Abstimmungen bauen.
+
+        ``public=True`` redigiert nicht-öffentliche TOPs: die Überschrift (und damit die
+        TOP-Nummerierung) bleibt erhalten, Body + Beschluss-Snippets werden durch einen
+        Platzhalter ersetzt."""
         items = (
             await self.session.execute(
                 select(MeetingAgendaItem)
@@ -429,6 +488,11 @@ class ProtocolService:
             # selbst als »TOP 1«, »TOP 2«, … (#pdf-format) — ``##`` würde als
             # »TOP 0.1« nummeriert und ein eigenes Präfix doppelt erscheinen.
             block = [f"# {heading}"]
+            if public and item.non_public:
+                # Überschrift bleibt (Nummerierung stabil), Inhalt redigiert.
+                block.append(_NON_PUBLIC_PLACEHOLDER)
+                blocks.append("\n\n".join(block))
+                continue
             if item.body and item.body.strip():
                 # Body-Headings eine Ebene absenken: nur die TOP-Überschrift
                 # bleibt Top-Level (sonst zählte jedes ``#`` als eigener TOP).
@@ -457,10 +521,14 @@ class ProtocolService:
             blocks.append("\n\n".join(block))
         return "\n\n".join(blocks) + "\n"
 
-    async def _render(self, protocol: Protocol, markdown: str) -> bytes | None:
+    async def _render(
+        self, protocol: Protocol, markdown: str, *, public: bool = False
+    ) -> bytes | None:
         """pytex → PDF → MinIO; gibt die PDF-Bytes zurück (für den Mail-Anhang).
 
-        Ohne Storage »aus« (DEV) wird nicht gerendert (``None``); Backend-Fehler → 503."""
+        ``public=True`` schreibt unter den öffentlichen Key und setzt
+        ``public_pdf_storage_key`` statt ``pdf_storage_key``. Ohne Storage »aus« (DEV)
+        wird nicht gerendert (``None``); Backend-Fehler → 503."""
         # Storage ist der bewusste An/Aus-Schalter (T-20-Konvention): fehlt er, läuft
         # finalize ohne PDF weiter (Demo/Contract-CI ohne MinIO).
         if self.storage is None or self.pytex is None:
@@ -468,9 +536,16 @@ class ProtocolService:
         try:
             variant = protocol_variant_for(protocol.cd_variant)
             pdf = await self.pytex.render_pdf(markdown, variant=variant)
-            key = protocol_storage_key(protocol.id)
+            key = (
+                protocol_public_storage_key(protocol.id)
+                if public
+                else protocol_storage_key(protocol.id)
+            )
             await self.storage.put(key, pdf, "application/pdf")
-            protocol.pdf_storage_key = key
+            if public:
+                protocol.public_pdf_storage_key = key
+            else:
+                protocol.pdf_storage_key = key
             return pdf
         except PytexError as exc:
             # 4xx = dauerhafter Eingabe-/Compile-Fehler (z. B. ungültiges LaTeX im

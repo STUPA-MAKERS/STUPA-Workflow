@@ -107,8 +107,8 @@ async def test_record_defaults_timestamp_when_absent() -> None:
 
 async def test_record_hook_function() -> None:
     db = fake_session(result(), result())
-    entry = await record(db, actor="a", action=AuditAction.EXPORT, target_id="x")
-    assert entry.action == "export"
+    entry = await record(db, actor="a", action=AuditAction.PII_ACCESS, target_id="x")
+    assert entry.action == "pii_access"
     assert entry.target_id == "x"
     assert db.added == [entry]
 

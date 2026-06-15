@@ -203,6 +203,39 @@ class FilesService:
         )
         await self.session.commit()
 
+    async def delete_for_application(
+        self, application_id: uuid.UUID, *, actor: str
+    ) -> int:
+        """Alle Anhänge eines Antrags entfernen (DSGVO-Anonymisierung).
+
+        DB-Zeile + Storage-Objekt je Anhang (best-effort) + Audit. Committet **nicht**
+        — der aufrufende Anonymisierungs-Vorgang committet die Transaktion atomar."""
+        rows = (
+            await self.session.scalars(
+                select(Attachment).where(Attachment.application_id == application_id)
+            )
+        ).all()
+        for attachment in rows:
+            storage_key = attachment.storage_key
+            await self.session.delete(attachment)
+            if self.storage is not None and storage_key is not None:
+                try:
+                    await self.storage.remove(storage_key)
+                except StorageError:
+                    logger.warning(
+                        "could not remove object for anonymized attachment %s",
+                        attachment.id,
+                    )
+            await audit_record(
+                self.session,
+                actor=actor,
+                action=AuditAction.ATTACHMENT_DELETE,
+                target_type="attachment",
+                target_id=str(attachment.id),
+                data={"application_id": str(application_id)},
+            )
+        return len(rows)
+
     # ------------------------------------------------------------ scan result #
     async def finalize_scan(
         self,

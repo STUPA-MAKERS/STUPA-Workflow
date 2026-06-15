@@ -18,6 +18,7 @@ import pytest
 from app.modules.applications.service import (
     ApplicationsService,
     _amount_currency,
+    _scrub_diff,
     _state_out,
     _whitelist,
 )
@@ -103,6 +104,20 @@ def test_whitelist_drops_unknown_keys() -> None:
     ]
     clean = _whitelist(fields, {"title": "x", "amount": "1", "junk": "y" * 100, "evil": 1})
     assert clean == {"title": "x", "amount": "1"}
+
+
+def test_scrub_diff_removes_pii_keys() -> None:
+    diff = {
+        "added": {"note": "secret", "title": "x"},
+        "removed": {"note": "old"},
+        "changed": {"note": {"old": "a", "new": "b"}, "title": {"old": "x", "new": "y"}},
+    }
+    scrubbed = _scrub_diff(diff, {"note"})
+    assert scrubbed == {
+        "added": {"title": "x"},
+        "removed": {},
+        "changed": {"title": {"old": "x", "new": "y"}},
+    }
 
 
 class _Result:

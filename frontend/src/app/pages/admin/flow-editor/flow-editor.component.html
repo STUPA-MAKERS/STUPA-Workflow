@@ -201,6 +201,9 @@
         <app-checkbox [ngModel]="s.editAllowed !== false" (ngModelChange)="setStateEditAllowed(s.key, $event)">
           {{ 'admin.flow.editAllowed' | t }}
         </app-checkbox>
+        <app-checkbox [ngModel]="s.isTerminal === true" (ngModelChange)="setStateTerminal(s.key, $event)">
+          {{ 'admin.flow.terminal' | t }}
+        </app-checkbox>
 
         <!-- State-Art + kind-spezifische Config (#28) -->
         <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.kindLabel' | t }}

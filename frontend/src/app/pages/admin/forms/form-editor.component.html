@@ -207,6 +207,7 @@
                   @if (isExpanded({ gi: gi, qi: qi })) {
                     <div class="fe__advanced">
                       <div class="fe__toggles">
+                        <app-checkbox [(ngModel)]="field.isPII" (ngModelChange)="touch()">{{ 'admin.form.isPII' | t }}</app-checkbox>
                         @if (isNumeric(field.type)) {
                           <app-checkbox [ngModel]="field.isPromoted" (ngModelChange)="onPromotedToggle({ gi: gi, qi: qi }, $event)">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
                           @if (field.isPromoted) {

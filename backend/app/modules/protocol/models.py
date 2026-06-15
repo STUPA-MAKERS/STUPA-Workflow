@@ -48,6 +48,8 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     )
     markdown: Mapped[str] = mapped_column(Text, server_default="")
     pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Redigierte öffentliche Variante (nur befüllt, wenn ein TOP nicht-öffentlich ist).
+    public_pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     author: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="draft")
     sent_at: Mapped[datetime | None] = mapped_column(

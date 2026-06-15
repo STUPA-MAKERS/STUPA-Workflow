@@ -243,6 +243,7 @@ class ConfigService:
                 if payload.comparison_offers is not None
                 else None
             ),
+            retention_months=payload.retention_months,
         )
         self.session.add(row)
         await self.session.flush()
@@ -262,6 +263,10 @@ class ConfigService:
             row.has_budget = payload.has_budget
         if payload.comparison_offers is not None:
             row.comparison_offers = payload.comparison_offers.model_dump(by_alias=True)
+        # Explizit gesendetes ``retentionMonths`` (auch ``null`` zum Zurücksetzen auf den
+        # globalen Default) übernehmen — nur weggelassene Felder bleiben unverändert.
+        if "retention_months" in payload.model_fields_set:
+            row.retention_months = payload.retention_months
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "application_type", row.id)
         await self.session.commit()
         return _type_out(row)
@@ -326,6 +331,7 @@ class ConfigService:
                         "color": s.color,
                         "editAllowed": s.edit_allowed,
                         "isInitial": s.is_initial,
+                        "isTerminal": s.is_terminal,
                         "kind": s.kind,
                         "config": s.config or {},
                     }
@@ -428,6 +434,7 @@ class ConfigService:
             row.color = state.color
             row.edit_allowed = state.edit_allowed
             row.is_initial = state.is_initial
+            row.is_terminal = state.is_terminal
             row.kind = state.kind
             row.config = state.config
             await self.session.flush()
@@ -877,6 +884,7 @@ def _type_out(row: ApplicationType) -> ApplicationTypeOut:
         name_i18n=row.name_i18n,
         has_budget=row.has_budget,
         comparison_offers=row.comparison_offers,
+        retention_months=row.retention_months,
         active_form_version_id=row.active_form_version_id,
     )
 

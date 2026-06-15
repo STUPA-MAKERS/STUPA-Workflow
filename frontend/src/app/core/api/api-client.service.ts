@@ -230,6 +230,11 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}/applications/${id}`);
   }
 
+  /** POST /applications/{id}/erasure-request — DSGVO Art. 17 Löschantrag stellen. */
+  requestErasure(id: Uuid): Observable<void> {
+    return this.http.post<void>(`${this.base}/applications/${id}/erasure-request`, {});
+  }
+
   timeline(id: Uuid): Observable<TimelineEntry[]> {
     const lang = this.i18n.locale();
     return this.http
@@ -497,6 +502,18 @@ export class ApiClient {
     return this.http.patch<AgendaItem[]>(
       `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
       { title },
+    );
+  }
+
+  /** PATCH /meetings/{id}/agenda/{itemId} — TOP als (nicht-)öffentlich markieren (#PII-Re-Add). */
+  setAgendaNonPublic(
+    meetingId: Uuid,
+    itemId: Uuid,
+    nonPublic: boolean,
+  ): Observable<AgendaItem[]> {
+    return this.http.patch<AgendaItem[]>(
+      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
+      { nonPublic },
     );
   }
 

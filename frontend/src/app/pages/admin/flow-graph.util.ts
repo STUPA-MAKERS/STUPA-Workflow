@@ -146,6 +146,7 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
     if (s.color) out.color = s.color;
     if (s.editAllowed === false) out.editAllowed = false;
     if (s.isInitial) out.isInitial = true;
+    if (s.isTerminal) out.isTerminal = true;
     // State-Art + Config (#28) — `normal` ist der Default und wird weggelassen.
     if (s.kind && s.kind !== 'normal') out.kind = s.kind;
     if (s.config && Object.keys(s.config).length > 0) out.config = s.config;

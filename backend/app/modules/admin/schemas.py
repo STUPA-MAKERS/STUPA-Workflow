@@ -160,6 +160,7 @@ class ApplicationTypeOut(_CamelModel):
     name_i18n: I18nMap = Field(serialization_alias="nameI18n")
     has_budget: bool = Field(serialization_alias="hasBudget")
     comparison_offers: dict | None = Field(serialization_alias="comparisonOffers")
+    retention_months: int | None = Field(default=None, serialization_alias="retentionMonths")
     active_form_version_id: UUID | None = Field(
         serialization_alias="activeFormVersionId"
     )
@@ -173,6 +174,9 @@ class ApplicationTypeCreate(_CamelModel):
     comparison_offers: ComparisonOffers | None = Field(
         default=None, alias="comparisonOffers"
     )
+    retention_months: int | None = Field(
+        default=None, alias="retentionMonths", ge=1
+    )
 
 
 class ApplicationTypeUpdate(_CamelModel):
@@ -181,6 +185,9 @@ class ApplicationTypeUpdate(_CamelModel):
     has_budget: bool | None = Field(default=None, alias="hasBudget")
     comparison_offers: ComparisonOffers | None = Field(
         default=None, alias="comparisonOffers"
+    )
+    retention_months: int | None = Field(
+        default=None, alias="retentionMonths", ge=1
     )
 
 

@@ -21,6 +21,9 @@ EVENTS: tuple[str, ...] = (
     "protocol_finalized",
     "deadline_approaching",
     "deadline_passed",
+    "erasure_requested",
+    "erasure_executed",
+    "erasure_rejected",
 )
 
 EVENT_SET: frozenset[str] = frozenset(EVENTS)

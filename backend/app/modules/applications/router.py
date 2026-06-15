@@ -60,8 +60,10 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth import service as auth_service
 from app.modules.forms.schemas import EffectiveFormOut
+from app.modules.notifications.privacy import notify_erasure_requested
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import NotificationService
+from app.modules.privacy.service import ErasureRequestService
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_application_payload_limit,
@@ -507,3 +509,36 @@ async def list_comments(
     return await service.list_comments(
         access.application_id, include_internal=access.can_see_internal
     )
+
+
+@router.post(
+    "/applications/{application_id}/erasure-request",
+    status_code=202,
+    responses=_errors(401, 403, 404),
+)
+async def request_erasure(
+    application_id: UUID,
+    session: DbSession,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    # DSGVO Art. 17: wer den Antrag lesen darf (Antragsteller per Magic-Link,
+    # Ersteller:in, Berechtigte) darf die Löschung der zugehörigen PII beantragen.
+    access: Annotated[Access, Depends(require_app_read)],
+) -> Response:
+    """Löschantrag (DSGVO Art. 17) stellen → offener Eintrag in der ``/admin/privacy``-
+    Queue; benachrichtigt die Datenschutz-Verantwortlichen."""
+    result = await ErasureRequestService(session).create(
+        subject_type="applicant",
+        application_id=access.application_id,
+        requested_by=access.actor,
+    )
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(
+        notify_erasure_requested,
+        queue=mail_queue_from_pool(pool),
+        settings=settings,
+        request_id=result.id,
+        subject_type="applicant",
+    )
+    return Response(status_code=202)

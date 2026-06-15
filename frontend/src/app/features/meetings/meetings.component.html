@@ -274,6 +274,7 @@
             }
             @if (m.canWrite && !protocol()?.isLocked) {
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); removeFromAgenda(item.id)"><app-icon name="delete" /></app-button>
+              <app-checkbox class="mtg__tocNp" [ngModel]="item.nonPublic === true" [disabled]="savingAgenda()" (ngModelChange)="setNonPublic(item, $event)" (click)="$event.stopPropagation()">{{ 'meetings.agenda.nonPublic' | t }}</app-checkbox>
             }
           </li>
         } @empty {
@@ -564,13 +565,8 @@
         [ngModel]="voteMajorityRule()"
         (ngModelChange)="voteMajorityRule.set($event)"
       />
-      <div class="mtg__voteQuorum">
-        <label class="text-sm font-medium text-text-muted" for="mtg-velig">{{ 'meetings.vote.eligibleCount' | t }}</label>
-        <input id="mtg-velig" class="mtg__input" type="number" min="0" inputmode="numeric" [ngModel]="voteEligibleCount()" (ngModelChange)="voteEligibleCount.set($event)" name="velig" [placeholder]="'meetings.vote.eligibleCountPlaceholder' | t" />
-        <label class="text-sm font-medium text-text-muted" for="mtg-vquorum">{{ 'meetings.vote.quorumPercent' | t }}</label>
-        <input id="mtg-vquorum" class="mtg__input" type="number" min="0" max="100" inputmode="numeric" [ngModel]="voteQuorumPercent()" (ngModelChange)="voteQuorumPercent.set($event)" name="vquorum" [placeholder]="'meetings.vote.quorumPercentPlaceholder' | t" />
-      </div>
-      <p class="text-text-muted text-sm self-center">{{ 'meetings.vote.quorumHint' | t }}</p>
+      <!-- Quorum/Stimmberechtigte werden NICHT manuell pro Vote gesetzt — sie kommen
+           ausschließlich aus der Gremium-Konfiguration. -->
     </form>
     <div dialog-footer class="mtg__dialogFoot">
       <app-button variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>

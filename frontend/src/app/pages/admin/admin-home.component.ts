@@ -46,6 +46,7 @@ export class AdminHomeComponent {
     { link: 'delegations', title: 'admin.home.delegations', desc: 'admin.home.delegationsDesc', icon: 'repeat', permissions: ['admin.delegations'] },
     { link: 'audit', title: 'admin.audit.title', desc: 'admin.audit.desc', icon: 'audit', permissions: ['audit.read'] },
     { link: 'deadlines', title: 'admin.deadlines.title', desc: 'admin.deadlines.subtitle', icon: 'clock', permissions: ['admin.deadlines'] },
+    { link: 'privacy', title: 'admin.home.privacy', desc: 'admin.home.privacyDesc', icon: 'key', permissions: ['privacy.manage'] },
     { link: 'notifications', title: 'admin.notifications.title', desc: 'admin.notifications.intro', icon: 'bell', permissions: ['admin.notifications'] },
     { link: 'mail-templates', title: 'admin.home.mailTemplates', desc: 'admin.home.mailTemplatesDesc', icon: 'send', permissions: ['admin.notifications'] },
   ];

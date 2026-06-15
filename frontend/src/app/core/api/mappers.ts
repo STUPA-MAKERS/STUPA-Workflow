@@ -70,6 +70,7 @@ function mapApplicant(wire: ApplicantOutWire | null | undefined): Applicant | nu
   return {
     email: wire.email ?? null,
     name: wire.name ?? null,
+    anonymized: wire.anonymized ?? false,
   };
 }
 
@@ -270,6 +271,7 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
     isFinal: wire.status === 'final',
     isLocked: wire.status !== 'draft',
     pdfUrl: wire.pdfUrl ?? null,
+    publicPdfUrl: wire.publicPdfUrl ?? null,
     sentAt: wire.sentAt ?? null,
   };
 }

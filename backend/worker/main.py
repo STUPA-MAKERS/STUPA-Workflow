@@ -30,6 +30,7 @@ from worker.mail import send_mail
 from worker.pdf import on_startup as pdf_on_startup
 from worker.pdf import render_pdf
 from worker.protocol import render_protocol
+from worker.retention import process_retention
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
 from worker.task_reminders import process_task_reminders
@@ -93,9 +94,13 @@ class WorkerSettings:
         deliver_webhook,
         process_deadlines,
         process_task_reminders,
+        process_retention,
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
+        # DSGVO-Aufbewahrung (#PII-Re-Add): täglich terminale Anträge anonymisieren +
+        # abgelaufene Sessions/Magic-Links purgen. Budget-Daten bleiben unangetastet.
+        cron(process_retention, hour=3, minute=30),
         # Fristen/Votes minütlich scannen (flows §9.4, T-44) — idempotent + SKIP LOCKED.
         cron(process_deadlines, second=0),
         # Aufgaben-Erinnerungen stündlich (#task-reminder) — Schwellen in Tagen,
