@@ -4,7 +4,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject } from 'rxjs';
 import { of } from 'rxjs';
@@ -19,6 +19,10 @@ const MEETING: MeetingOutWire = {
   id: 'm-1',
   title: 'StuPa-Sitzung',
   status: 'live',
+  // Datum/Uhrzeit sind Pflicht (Settings-Dialog speichert sonst nicht) — wie eine echte Sitzung.
+  date: '2026-06-12',
+  startTime: '17:00',
+  endTime: null,
   activeApplicationId: 'app-1',
   gremiumId: null,
   protocolId: 'p-1',
@@ -292,20 +296,39 @@ describe('MeetingsComponent', () => {
   });
 
   it('lets a manager create a meeting and redirects to its detail route (#104)', async () => {
-    const { http, navigate } = await setup({
+    const { http, navigate, fixture } = await setup({
       id: null,
       gremien: [{ id: 'g-1', name: 'StuPa' }],
     });
-    // Anlegen erfolgt jetzt über einen Dialog (#27): erst öffnen.
+    // Anlegen über einen 2-Schritt-Dialog (#27): öffnen.
     await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
+    // Schritt 1: Gremium wählen (lädt das Protokollant-Roster) + Pflicht-Termin.
+    // Im Dialog suchen: das Pflicht-Label trägt ein „*", und die Suchleiste der
+    // Übersicht erwähnt „Gremium" ebenfalls — beides macht eine globale Suche mehrdeutig.
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.selectOptions(within(dialog).getByLabelText(/Gremium/), 'g-1');
+    http.expectOne((r) => r.url.endsWith('/gremien/g-1/meeting-members')).flush([]);
+    // Datum/Uhrzeit über die Signals setzen — Datepicker/Time-Input parsen Freitext,
+    // was sich per userEvent kaum stabil tippen lässt.
+    fixture.componentInstance.newDate.set('2026-07-01');
+    fixture.componentInstance.newTime.set('17:00');
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Weiter' }));
+    // Schritt 2: Titel überschreiben (wird sonst aus Gremium + Datum vorbelegt).
     const input = await screen.findByLabelText('Titel');
+    await userEvent.clear(input);
     await userEvent.type(input, 'Neue Sitzung');
-    // Pflicht-Gremium wählen (#68) — sonst bleibt »Sitzung anlegen« gesperrt.
-    await userEvent.selectOptions(screen.getByLabelText(/Gremium/), 'g-1');
     await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
     const req = http.expectOne('/api/meetings');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ title: 'Neue Sitzung', gremiumId: 'g-1', date: null, startTime: null });
+    expect(req.request.body).toEqual({
+      title: 'Neue Sitzung',
+      gremiumId: 'g-1',
+      date: '2026-07-01',
+      startTime: '17:00',
+      endTime: null,
+      protokollantId: null,
+    });
     req.flush({ ...MEETING, title: 'Neue Sitzung', protocolId: null });
     // Wiederauffindbarkeit: nach dem Anlegen auf `/meetings/{id}` navigieren.
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
@@ -343,19 +366,18 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText(/konnte nicht geladen/i)).toBeInTheDocument();
   });
 
-  it('creates the protocol on demand when none exists yet', async () => {
+  it('offers no on-demand protocol button — the protocol is created on start', async () => {
+    // #protocol-on-start: das Protokoll entsteht ausschließlich beim Start der Sitzung;
+    // ein manueller »Protokoll anlegen«-Button existiert nicht mehr.
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, protocolId: null });
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
-    const createBtn = await screen.findByRole('button', { name: 'Protokoll anlegen' });
-    await userEvent.click(createBtn);
-    const req = http.expectOne('/api/meetings/m-1/protocol');
-    expect(req.request.method).toBe('POST');
-    req.flush(PROTOCOL);
-    // Ohne TOP zeigt der Editor den Hinweis (kein einzelnes Markdown-Feld mehr).
-    expect(await screen.findByText(/Wähle links einen TOP/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText('Für diese Sitzung gibt es noch kein Protokoll.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Protokoll anlegen' })).not.toBeInTheDocument();
   });
 
   it('persists the selected protokollant via PATCH and shows the name', async () => {
@@ -367,7 +389,9 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/attendance').flush([
       { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false },
     ]);
-    const select = await screen.findByLabelText(/Protokollant/i);
+    // Exaktes Label: der Start-Button trägt jetzt eine aria-label „Protokollant zuweisen …",
+    // an der ein /Protokollant/-Regex sonst mehrdeutig wird.
+    const select = await screen.findByLabelText('Protokollant');
     await screen.findByRole('option', { name: 'Max P' });
     await userEvent.selectOptions(select, 'pr-1');
     await userEvent.click(screen.getByRole('button', { name: /Speichern/i }));
