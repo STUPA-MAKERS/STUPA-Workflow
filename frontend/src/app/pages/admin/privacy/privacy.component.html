@@ -69,7 +69,7 @@
       type="number"
       [label]="'admin.privacy.retentionMonths' | t"
       [ngModel]="retentionMonths()"
-      (ngModelChange)="retentionMonths.set($event === '' || $event == null ? null : +$event)"
+      (ngModelChange)="retentionMonths.set($event === '' || $event === null || $event === undefined ? null : +$event)"
     />
     <app-button size="sm" [disabled]="(retentionMonths() ?? 0) < 1" (click)="saveRetention()">{{ 'action.save' | t }}</app-button>
   </div>

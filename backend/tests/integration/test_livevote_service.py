@@ -231,7 +231,8 @@ async def test_list_filter_gremien_visibility(session: AsyncSession) -> None:
     # g_empty (keine Sitzung) + g_other (kein Mitglied) fallen raus.
     assert [g.name for g in seen] == ["Mit Sitzung"]
 
-    admin_seen = {g.name for g in await svc.list_filter_gremien(Principal(sub="adm", roles=["admin"]))}
+    admin_gremien = await svc.list_filter_gremien(Principal(sub="adm", roles=["admin"]))
+    admin_seen = {g.name for g in admin_gremien}
     assert {"Mit Sitzung", "Fremd"} <= admin_seen  # alle Gremien MIT Sitzung
     assert "Ohne Sitzung" not in admin_seen  # sitzungsloses Gremium nie
 
