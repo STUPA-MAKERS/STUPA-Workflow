@@ -97,7 +97,6 @@ async def _seed_type(
         edit_allowed=False,
     )
     session.add_all([draft, locked])
-    app_type.active_flow_version_id = flow.id
     await session.commit()
     return app_type, draft, locked
 
@@ -408,7 +407,6 @@ async def _seed_type_for_search(session: AsyncSession) -> ApplicationType:
         is_initial=True,
     )
     session.add(draft)
-    app_type.active_flow_version_id = flow.id
     await session.commit()
     return app_type
 

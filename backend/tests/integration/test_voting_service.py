@@ -103,7 +103,6 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
                    to_state_id=states["rejected"].id, label_i18n={},
                    branch="fail", actions=[], order=1),
     ])
-    app_type.active_flow_version_id = flow.id
     await session.commit()
 
     apps = ApplicationsService(session)

@@ -247,7 +247,7 @@ async def test_meeting_create_requires_date_and_time() -> None:
     import pydantic
 
     with pytest.raises(pydantic.ValidationError):
-        MeetingCreate(gremiumId=uuid4(), title="GV")
+        MeetingCreate(gremiumId=uuid4(), title="GV")  # type: ignore[call-arg]
 
 
 @pytest.mark.asyncio

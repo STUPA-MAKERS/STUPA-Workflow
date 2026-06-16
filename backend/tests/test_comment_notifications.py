@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.modules.notifications.comments as mod
 from app.modules.notifications.comments import send_comment_notifications
@@ -51,7 +52,7 @@ def _app_row(title: str | None = "Beamer") -> list[Any]:
 
 async def test_principal_public_comment_mails_applicant() -> None:
     # scalars: 1× Präferenz-Filter (keine Abwahlen).
-    session = FakeSession(executes=[_app_row()], scalars=[[]])
+    session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[[]]))
     sent = await send_comment_notifications(
         session,
         queue=FakeQueue(),
@@ -73,7 +74,7 @@ async def test_principal_public_comment_mails_applicant() -> None:
 
 
 async def test_internal_comment_sends_nothing() -> None:
-    session = FakeSession(executes=[_app_row()])
+    session = cast(AsyncSession, FakeSession(executes=[_app_row()]))
     sent = await send_comment_notifications(
         session,
         queue=FakeQueue(),
@@ -96,7 +97,7 @@ async def test_applicant_comment_mails_actionable_team(
         return ["team@x.de", "vorstand@x.de"]
 
     monkeypatch.setattr(mod, "actionable_principal_emails", fake_actionable)
-    session = FakeSession(executes=[_app_row()], scalars=[[]])
+    session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[[]]))
     sent = await send_comment_notifications(
         session,
         queue=FakeQueue(),
@@ -118,7 +119,7 @@ async def test_applicant_comment_mails_actionable_team(
 
 async def test_preference_optout_blocks_comment_mail() -> None:
     # Präferenz-Filter liefert die Antragsteller-Adresse als abgewählt.
-    session = FakeSession(executes=[_app_row()], scalars=[["applicant@x.de"]])
+    session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[["applicant@x.de"]]))
     sent = await send_comment_notifications(
         session,
         queue=FakeQueue(),

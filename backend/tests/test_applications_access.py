@@ -45,11 +45,6 @@ class _FakeDb:
         return _EmptyResult()
 
 
-def _db(created_by: str | None = None) -> Any:
-    """``Any``-typisierter Fake (DbSession-kompatibel für den Typecheck)."""
-    return _FakeDb(created_by)
-
-
 def _db(created_by: str | None = None) -> AsyncSession:
     """``_FakeDb`` als ``AsyncSession`` getarnt — nur ``scalar`` wird aufgerufen."""
     return cast(AsyncSession, _FakeDb(created_by))

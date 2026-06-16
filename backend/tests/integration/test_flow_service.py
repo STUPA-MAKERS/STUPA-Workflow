@@ -143,7 +143,6 @@ async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State
         ),
     ]
     session.add_all(transitions)
-    app_type.active_flow_version_id = flow.id
     await session.commit()
     return app_type, states
 

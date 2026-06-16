@@ -259,7 +259,7 @@ class AuditService:
         labels: dict[tuple[str, str], str] = {}
 
         async def fill(
-            target_type: str, stmt: Select[tuple[uuid.UUID, str | None]]
+            target_type: str, stmt: Select[tuple[uuid.UUID, Any]]
         ) -> None:
             for row_id, label in (await self.session.execute(stmt)).all():
                 if label:

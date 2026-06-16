@@ -72,7 +72,6 @@ async def _seed_type(session: AsyncSession, *, cd_variant: str = "makers") -> Ap
         is_initial=True,
     )
     session.add(draft)
-    app_type.active_flow_version_id = flow.id
     await session.commit()
     return app_type
 

@@ -114,7 +114,6 @@ async def _seed_flow(session: AsyncSession) -> tuple[ApplicationType, dict[str, 
                    to_state_id=states["rejected"].id, label_i18n={},
                    branch="fail", actions=[], order=1),
     ])
-    app_type.active_flow_version_id = flow.id
     await session.commit()
     return app_type, states
 
