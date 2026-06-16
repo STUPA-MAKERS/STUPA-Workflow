@@ -340,23 +340,40 @@ class ProtocolService:
         if protocol.status == "final":
             return self._to_out(protocol)
 
+        # Render (pytex) läuft VOR dem Commit: ein dauerhafter Compile-Fehler (4xx)
+        # bzw. ein transienter pytex-Ausfall (5xx) rollt die Session zurück, das
+        # Protokoll bleibt Entwurf. Der Storage-``put`` und der Mail-Enqueue erfolgen
+        # aber bewusst ERST NACH erfolgreichem Commit (#pre-commit-side-effects):
+        # scheitert der Commit, gäbe es sonst ein verwaistes MinIO-Objekt und einen
+        # bereits eingereihten Versand-Job zu einer Zeile, die nie ``final`` wurde.
+        # ``_render_pdf`` setzt nur die Key-Spalten + liefert die Bytes; der Upload
+        # geschieht in ``_store`` post-commit.
+        uploads: list[tuple[str, bytes]] = []
         if await self._has_non_public(protocol.meeting_id):
             # Dual-Render: vollständiges internes PDF + redigiertes öffentliches PDF.
             # Per Mail geht NUR die öffentliche Variante (nicht-öffentliche TOPs sollen
             # nicht im Verteiler landen).
             internal_md = await self._build_document(protocol, public=False)
-            await self._render(protocol, internal_md, public=False)
+            internal_pdf = await self._render_pdf(protocol, internal_md, public=False)
             public_md = await self._build_document(protocol, public=True)
-            public_pdf = await self._render(protocol, public_md, public=True)
+            public_pdf = await self._render_pdf(protocol, public_md, public=True)
+            if internal_pdf is not None:
+                uploads.append((protocol_storage_key(protocol.id), internal_pdf))
+            if public_pdf is not None:
+                uploads.append((protocol_public_storage_key(protocol.id), public_pdf))
             mail_pdf = public_pdf
         else:
             markdown = await self._build_document(protocol)
-            mail_pdf = await self._render(protocol, markdown)
+            mail_pdf = await self._render_pdf(protocol, markdown)
+            if mail_pdf is not None:
+                uploads.append((protocol_storage_key(protocol.id), mail_pdf))
         protocol.status = "final"
         protocol.sent_at = now
         await self.session.flush()
-        await self._send(protocol, mail_pdf)
         await self.session.commit()
+        # Ab hier ist der DB-Stand persistent — Seiteneffekte sind jetzt sicher.
+        await self._store(uploads)
+        await self._send(protocol, mail_pdf)
         return self._to_out(protocol)
 
     # ----------------------------------------------------------- finalize bits
@@ -521,32 +538,29 @@ class ProtocolService:
             blocks.append("\n\n".join(block))
         return "\n\n".join(blocks) + "\n"
 
-    async def _render(
+    async def _render_pdf(
         self, protocol: Protocol, markdown: str, *, public: bool = False
     ) -> bytes | None:
-        """pytex → PDF → MinIO; gibt die PDF-Bytes zurück (für den Mail-Anhang).
+        """pytex → PDF-Bytes (VOR dem Commit). Setzt die Key-Spalte, lädt aber NICHT
+        hoch — der Storage-``put`` läuft post-commit in :meth:`_store`.
 
-        ``public=True`` schreibt unter den öffentlichen Key und setzt
-        ``public_pdf_storage_key`` statt ``pdf_storage_key``. Ohne Storage »aus« (DEV)
-        wird nicht gerendert (``None``); Backend-Fehler → 503."""
+        ``public=True`` setzt ``public_pdf_storage_key`` statt ``pdf_storage_key``.
+        Ohne Storage »aus« (DEV) wird nicht gerendert (``None``); ein dauerhafter
+        pytex-Fehler → 400, ein transienter → 503 (Entwurf bleibt erhalten)."""
         # Storage ist der bewusste An/Aus-Schalter (T-20-Konvention): fehlt er, läuft
         # finalize ohne PDF weiter (Demo/Contract-CI ohne MinIO).
         if self.storage is None or self.pytex is None:
             return None
         try:
             variant = protocol_variant_for(protocol.cd_variant)
-            pdf = await self.pytex.render_pdf(markdown, variant=variant)
-            key = (
-                protocol_public_storage_key(protocol.id)
-                if public
-                else protocol_storage_key(protocol.id)
+            # RCE-Schutz (security.md §2): Protokoll-/TOP-Bodies sind nutzer-geschrieben
+            # (Protokollant, protocol.write). pytex' ``trusted``-Default schaltet den
+            # Markdown-``eval``-Escape (``[//]: # "EXPR"`` → eval im Container) frei —
+            # darum rendert dieser Pfad bewusst ``untrusted`` (eval gesperrt + Sandbox),
+            # während app-generierte PDFs (pdf-Modul) ihr ``trusted``-Default behalten.
+            pdf = await self.pytex.render_pdf(
+                markdown, variant=variant, trust_level="untrusted"
             )
-            await self.storage.put(key, pdf, "application/pdf")
-            if public:
-                protocol.public_pdf_storage_key = key
-            else:
-                protocol.pdf_storage_key = key
-            return pdf
         except PytexError as exc:
             # 4xx = dauerhafter Eingabe-/Compile-Fehler (z. B. ungültiges LaTeX im
             # Protokoll-Markdown): kein Retry, dem Nutzer den (gescrubbten) Grund
@@ -558,9 +572,32 @@ class ProtocolService:
             raise ServiceUnavailableError(
                 "Protocol rendering temporarily unavailable."
             ) from exc
+        key = (
+            protocol_public_storage_key(protocol.id)
+            if public
+            else protocol_storage_key(protocol.id)
+        )
+        if public:
+            protocol.public_pdf_storage_key = key
+        else:
+            protocol.pdf_storage_key = key
+        return pdf
+
+    async def _store(self, uploads: list[tuple[str, bytes]]) -> None:
+        """Gerenderte PDFs NACH erfolgreichem Commit ins Object-Storage schreiben.
+
+        Erst jetzt entsteht das MinIO-Objekt — schlägt der vorausgehende Commit fehl,
+        gibt es kein verwaistes Objekt (#pre-commit-side-effects). Ohne Storage »aus«
+        bleibt ``uploads`` leer (``_render_pdf`` lieferte ``None``). Ein transienter
+        Storage-Fehler → 503: das Protokoll ist bereits ``final`` committed, der erneute
+        ``finalize`` ist über die ``status=='final'``-Idempotenz ein No-Op."""
+        if self.storage is None:
+            return
+        try:
+            for key, pdf in uploads:
+                await self.storage.put(key, pdf, "application/pdf")
         except StorageError as exc:
-            # Vorhandenes Backend transient nicht erreichbar → 503, Entwurf bleibt
-            # erhalten (Session-Rollback), Aufruf wiederholbar. Kein Pfad-Leak.
+            # Vorhandenes Backend transient nicht erreichbar → 503. Kein Pfad-Leak.
             raise ServiceUnavailableError(
                 "Protocol rendering temporarily unavailable."
             ) from exc

@@ -57,6 +57,7 @@ from app.modules.livevote.schemas import (
 from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed, VoteOut
+from app.modules.voting.service import open_tally_revealed
 from app.search import dialect_of, trigram_rank
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
@@ -245,6 +246,21 @@ class MeetingService:
         # geladen (kein N+1).
         tallies = await self._vote_tallies(rows)
         present_by_meeting = await self._present_by_meeting(meeting_ids)
+        # Vertretungs-Stimmen abwesender Delegierender je (Sitzung, Gremium) — der
+        # Aufschlag auf den Reveal-Nenner (#vote-progress). Geteilte Regel mit dem
+        # VotingService (``open_tally_revealed``), damit beide Pfade nicht driften.
+        # Nur abfragen, wenn überhaupt ein OFFENER, nicht-geheimer Vote dabei ist —
+        # nur dann fließt der Aufschlag in eine Reveal-Entscheidung ein (geschlossen/
+        # geheim decken nicht über diesen Nenner auf).
+        needs_deleg = any(
+            v.meeting_id is not None
+            and v.status not in ("closed", "cancelled")
+            and not bool((v.config if isinstance(v.config, dict) else {}).get("secret"))
+            for v in rows
+        )
+        absent_deleg = (
+            await self._absent_delegated_by_meeting(meeting_ids) if needs_deleg else {}
+        )
         out: dict[UUID, list[MeetingVoteOut]] = {}
         for v in rows:
             if v.meeting_id is None:
@@ -256,13 +272,15 @@ class MeetingService:
             voted = sum((counts or {}).values())
             present = present_by_meeting.get(v.meeting_id, 0)
             # Reveal-Regel wie im VotingService: geschlossen ODER (nicht geheim UND alle
-            # Anwesenden haben abgestimmt). Sonst counts/leading verdecken (#vote-progress).
+            # ERWARTETEN Stimmen — Anwesende + Vertretungen abwesender Delegierender —
+            # eingegangen). Sonst counts/leading verdecken (#vote-progress).
             if v.status == "closed":
                 revealed = True
             elif secret:
                 revealed = False
             else:
-                revealed = present > 0 and voted >= present
+                expected = present + absent_deleg.get((v.meeting_id, v.eligible_group), 0)
+                revealed = open_tally_revealed(present, voted, expected)
             out.setdefault(v.meeting_id, []).append(
                 MeetingVoteOut(
                     id=v.id,
@@ -297,6 +315,44 @@ class MeetingService:
             )
         ).all()
         return {mid: n for mid, n in rows}
+
+    async def _absent_delegated_by_meeting(
+        self, meeting_ids: list[UUID]
+    ) -> dict[tuple[UUID, str], int]:
+        """``{(meeting_id, str(gremium_id)): Anzahl}`` aktiver Stimm-Delegationen,
+        deren Delegierende:r NICHT anwesend ist (Reveal-Nenner-Aufschlag).
+
+        Schlüssel ist ``(meeting, str(gremium))`` passend zu ``vote.eligible_group``
+        (= Gremium-UUID als Text). Für jede solche Delegation gibt der/die Empfänger:in
+        eine Vertretungs-Stimme ab, die ``voted`` mitzählt — daher erhöht sie den
+        erwarteten Nenner. Gebündelt geladen (kein N+1)."""
+        if not meeting_ids:
+            return {}
+        present_subq = (
+            select(MeetingAttendance.principal_id)
+            .where(
+                MeetingAttendance.meeting_id == MeetingDelegation.meeting_id,
+                MeetingAttendance.status == "present",
+                MeetingAttendance.principal_id == MeetingDelegation.delegator_principal_id,
+            )
+            .exists()
+        )
+        rows = (
+            await self.session.execute(
+                select(
+                    MeetingDelegation.meeting_id,
+                    MeetingDelegation.gremium_id,
+                    func.count(),
+                )
+                .where(
+                    MeetingDelegation.meeting_id.in_(meeting_ids),
+                    MeetingDelegation.delegate_voting.is_(True),
+                    ~present_subq,
+                )
+                .group_by(MeetingDelegation.meeting_id, MeetingDelegation.gremium_id)
+            )
+        ).all()
+        return {(mid, str(gid)): n for mid, gid, n in rows}
 
     async def _vote_tallies(
         self, votes: Sequence[Vote]
@@ -969,10 +1025,16 @@ class MeetingService:
         ).scalar_one_or_none()
 
     async def agenda_item_has_vote(self, item_id: UUID) -> bool:
-        """Hat dieser TOP bereits eine Abstimmung (Antrags-TOP: max. eine)?"""
+        """Hat dieser TOP bereits eine **nicht-abgebrochene** Abstimmung (Antrags-TOP:
+        max. eine)?
+
+        Abgebrochene Votes (``status='cancelled'``) zählen NICHT: sonst blockierte ein
+        einmal abgebrochener Antrags-Vote das Neu-Eröffnen für immer (cancel→reopen)."""
         return (
             await self.session.execute(
-                select(Vote.id).where(Vote.agenda_item_id == item_id).limit(1)
+                select(Vote.id)
+                .where(Vote.agenda_item_id == item_id, Vote.status != "cancelled")
+                .limit(1)
             )
         ).first() is not None
 

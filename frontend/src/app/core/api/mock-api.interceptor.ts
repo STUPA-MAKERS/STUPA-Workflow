@@ -4,7 +4,7 @@ import {
   type HttpInterceptorFn,
   HttpResponse,
 } from '@angular/common/http';
-import { inject } from '@angular/core';
+import { inject, isDevMode } from '@angular/core';
 import { type Observable, of, throwError } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
@@ -483,6 +483,11 @@ function path(url: string): string {
 }
 
 export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
+  // SICHERHEIT (#67): Verteidigung in der Tiefe — der Mock darf ausschließlich im
+  // Dev-/Demo-Build greifen. In Prod ist `isDevMode()` false; selbst wenn der
+  // Interceptor versehentlich in die Kette geriete, kann ihn keine zur Laufzeit
+  // angreifbare Eingabe (?mock=1, localStorage, __USE_MOCK_API__) mehr aktivieren.
+  if (!isDevMode()) return next(req);
   if (!inject(USE_MOCK_API)) return next(req);
   if (!req.url.includes('/api/')) return next(req);
 

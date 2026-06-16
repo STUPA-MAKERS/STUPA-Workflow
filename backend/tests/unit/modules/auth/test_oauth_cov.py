@@ -767,7 +767,8 @@ async def test_refresh_tokens_success_rotation() -> None:
         revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=NOW + timedelta(days=30),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    db = fake_session(result(row))
+    # Zweites Ergebnis: der aktive Principal (Aktiv-Prüfung vor der Rotation).
+    db = fake_session(result(row), result(SimpleNamespace(active=True)))
     issued = await oauth_service.refresh_tokens(
         db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
         access_ttl=3600, refresh_ttl=86400,
@@ -782,13 +783,45 @@ async def test_refresh_tokens_success_never_expires() -> None:
         revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=None,
         access_ttl_seconds=None, principal_id="pid", scope="read",
     )
-    db = fake_session(result(row))
+    db = fake_session(result(row), result(SimpleNamespace(active=True)))
     issued = await oauth_service.refresh_tokens(
         db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
         access_ttl=3600, refresh_ttl=86400,
     )
     assert issued.expires_in is None
     assert db.added[0].refresh_expires_at is None
+
+
+async def test_refresh_tokens_inactive_principal_rejected() -> None:
+    """Deaktivierter Principal → ``invalid_grant`` (kein frisches Token-Paar)."""
+    row = SimpleNamespace(
+        revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=NOW + timedelta(days=30),
+        access_ttl_seconds=3600, principal_id="pid", scope="read",
+    )
+    db = fake_session(result(row), result(SimpleNamespace(active=False)))
+    with pytest.raises(oauth.OAuthError) as exc:
+        await oauth_service.refresh_tokens(
+            db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
+            access_ttl=3600, refresh_ttl=86400,
+        )
+    assert exc.value.error == "invalid_grant"
+    assert "inactive" in exc.value.description
+    assert row.revoked_at is None  # nicht rotiert
+
+
+async def test_refresh_tokens_principal_missing_rejected() -> None:
+    """Principal-Zeile fehlt → ``invalid_grant``."""
+    row = SimpleNamespace(
+        revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=NOW + timedelta(days=30),
+        access_ttl_seconds=3600, principal_id="pid", scope="read",
+    )
+    db = fake_session(result(row), result())  # zweites execute: keine Zeile
+    with pytest.raises(oauth.OAuthError) as exc:
+        await oauth_service.refresh_tokens(
+            db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
+            access_ttl=3600, refresh_ttl=86400,
+        )
+    assert exc.value.error == "invalid_grant"
 
 
 async def test_resolve_access_token_not_found() -> None:
@@ -884,6 +917,42 @@ def test_mcp_package_streams_tarball(
     # ausgeschlossener __pycache__-Inhalt fehlt; gebackene _baked.py ist drin.
     assert not any("__pycache__" in n for n in names)
     assert "antragsplattform-mcp/antragsplattform_mcp/_baked.py" in names
+
+
+def test_mcp_package_bakes_url_json_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FIX 1: die BASE_URL wird per json.dumps escaped — ein Wert mit Quote/Newline darf
+    das erzeugte Python-Literal nicht aufbrechen (eval-bar + exakter Roundtrip)."""
+    pkg = tmp_path / "mcp"
+    (pkg / "antragsplattform_mcp").mkdir(parents=True)
+    (pkg / "pyproject.toml").write_text("[project]\nname='x'\n")
+    monkeypatch.setattr(mcp_router_mod, "_package_dir", lambda settings: pkg)
+
+    hostile = 'https://a.example/"\n + __import__("os")'
+    settings = load_settings(
+        database_url="postgresql+asyncpg://x/y",
+        session_secret="session-secret-0123456",
+        magic_link_secret="magic-link-secret-0",
+        public_base_url=hostile,
+    )
+    client = _build_client(settings, principal=_mcp_principal())
+    resp = client.get("/api/mcp/package")
+    assert resp.status_code == 200
+
+    import io
+
+    with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
+        member = tar.extractfile(
+            "antragsplattform-mcp/antragsplattform_mcp/_baked.py"
+        )
+        assert member is not None
+        source = member.read().decode("utf-8")
+    # Das gebackene Modul ist gültiger Python-Code und BASE_URL trägt exakt den (gerstripten)
+    # Wert — kein Escape-Ausbruch.
+    ns: dict[str, object] = {}
+    exec(compile(source, "_baked.py", "exec"), ns)  # noqa: S102
+    assert ns["BASE_URL"] == hostile.rstrip("/")
 
 
 def test_is_pkg_true_and_false(tmp_path: Path) -> None:

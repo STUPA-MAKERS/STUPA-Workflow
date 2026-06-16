@@ -25,6 +25,16 @@ from sqlalchemy import ColumnElement, func, literal, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+def escape_like(value: str) -> str:
+    """LIKE/ILIKE-Metazeichen (``\\``, ``%``, ``_``) escapen.
+
+    Für die Teilstring-Suche als ``col.ilike(f"%{escape_like(v)}%", escape="\\")``
+    nutzen — so wirken vom Nutzer eingegebene ``%``/``_`` als Literale statt als
+    Wildcards (kein Index-Bypass / keine Wildcard-Injection durch die Eingabe).
+    """
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def dialect_of(session: AsyncSession) -> str:
     """Dialekt-Name der gebundenen Engine (``"postgresql"`` / ``"sqlite"`` / …).
 
@@ -65,6 +75,8 @@ def trigram_rank(
         rank_expr: ColumnElement[Any] = func.greatest(*sims) if len(sims) > 1 else sims[0]
         where_clause = rank_expr > threshold
         return where_clause, rank_expr
-    like = f"%{needle}%"
-    where_clause = or_(*[func.coalesce(col, "").ilike(like) for col in columns])
+    like = f"%{escape_like(needle)}%"
+    where_clause = or_(
+        *[func.coalesce(col, "").ilike(like, escape="\\") for col in columns]
+    )
     return where_clause, literal(0.0)

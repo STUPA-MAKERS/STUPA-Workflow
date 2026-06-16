@@ -38,6 +38,24 @@ async def test_render_success_returns_pdf_bytes() -> None:
 
 
 @respx.mock
+async def test_render_trust_level_override_per_call() -> None:
+    """Ein expliziter ``trust_level`` gilt nur für diesen Aufruf (Protokoll → untrusted),
+    ohne das Client-Default (``trusted``) zu ändern (RCE-Schutz, security.md §2)."""
+    route = respx.post(f"{BASE}/render").mock(
+        return_value=httpx.Response(
+            200, content=b"%PDF", headers={"content-type": "application/pdf"}
+        )
+    )
+    client = _client()  # Default trusted
+    await client.render_pdf("# d", trust_level="untrusted")
+    assert route.calls.last.request.url.params["trust_level"] == "untrusted"
+    assert client.trust_level == "trusted"  # Default unverändert
+    # Ohne Override fällt der Client auf sein Default zurück.
+    await client.render_pdf("# d")
+    assert route.calls.last.request.url.params["trust_level"] == "trusted"
+
+
+@respx.mock
 async def test_render_omits_variant_when_none() -> None:
     route = respx.post(f"{BASE}/render").mock(
         return_value=httpx.Response(

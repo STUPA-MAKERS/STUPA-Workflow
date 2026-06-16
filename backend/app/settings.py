@@ -5,6 +5,7 @@ Pflicht-Secrets ohne Default → fehlen sie, wirft `load_settings` einen klaren
 Layout/Namen siehe `deploy/.env.example`.
 """
 
+import logging
 from functools import lru_cache
 from typing import Any
 
@@ -13,6 +14,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Mindestlänge für Signing-/Client-Secrets (security.md §10: keine schwachen Secrets).
 _MIN_SECRET_LEN = 16
+
+_log = logging.getLogger("app.settings")
 
 
 class SettingsError(RuntimeError):
@@ -33,6 +36,15 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
     public_base_url: str = "http://localhost"
+
+    # — Härtungs-Schalter (fail-safe, security.md §3/§6) —
+    #   ``environment`` defaultet bewusst auf »development« (DEV-Ergonomie). Damit aber
+    #   produktionskritische Guards (Invoice-AV fail-closed, Proxy-Spoofing-Guard) nicht
+    #   *still* aussetzen, wenn jemand vergisst ENVIRONMENT=production zu setzen, gibt es
+    #   diesen expliziten Schalter: standardmäßig **an**. Wird er gesetzt (oder läuft
+    #   ``environment == "production"``), greifen die strengen Prüfungen. Nur für lokale
+    #   Sonderfälle bewusst auf ``false`` setzen. Siehe ``strict_security_enabled``.
+    strict_security: bool = True
 
     # — Pflicht-Secrets (kein Default; Mindestlänge erzwungen) —
     database_url: str
@@ -162,6 +174,10 @@ class Settings(BaseSettings):
     webhook_timeout_seconds: float = 10.0
     webhook_max_tries: int = 5
     webhook_retry_backoff_seconds: int = 30
+    #   Optionale Host-Allowlist für Webhook-Ziele. Leer = jeder *öffentliche* Host (der
+    #   SSRF-Guard bleibt unabhängig immer aktiv). In Produktion sollte sie gesetzt sein,
+    #   damit Ziele zusätzlich auf bekannte Hosts eingeschränkt werden — ``_strict_security_
+    #   warnings`` warnt laut, wenn sie unter Härtung leer ist (mirror zu FORWARDED_ALLOW_IPS).
     webhook_host_allowlist: list[str] = []
 
     # --- Delegation/Vertretung (T-45, R1.5) --------------------------------- #
@@ -239,6 +255,47 @@ class Settings(BaseSettings):
         if self.environment == "production" and "*" in self.forwarded_allow_ips:
             raise ValueError(
                 'FORWARDED_ALLOW_IPS must not be "*" in production (security.md §3).'
+            )
+        return self
+
+    @property
+    def is_production(self) -> bool:
+        """Läuft die App im Produktions-Profil (``ENVIRONMENT=production``)?"""
+        return self.environment == "production"
+
+    @property
+    def strict_security_enabled(self) -> bool:
+        """Sollen die strengen Härtungs-Guards greifen (fail-safe)?
+
+        Wahr, sobald ``strict_security`` an ist **oder** ``environment == "production"``.
+        Konsumenten (Invoice-AV fail-closed, Proxy-Guard) sollten dies statt eines reinen
+        ``environment == "production"``-Checks abfragen, damit ein vergessenes
+        ENVIRONMENT=production die Guards nicht still deaktiviert."""
+        return self.strict_security or self.is_production
+
+    @model_validator(mode="after")
+    def _strict_security_warnings(self) -> "Settings":
+        """Laute Warnungen, wenn die Konfiguration unter Härtung schwach bleibt.
+
+        Bricht den Start **nicht** ab (DEV-Ergonomie / Backward-Compat), macht aber im Log
+        sichtbar, dass produktionskritische Guards betroffen sind:
+
+        * ``environment != "production"`` → produktions-only Guards setzen ggf. aus
+          (Hinweis: ENVIRONMENT=production explizit setzen, siehe deploy/.env.example).
+        * leere ``webhook_host_allowlist`` unter Härtung → Webhook-Ziele nur per SSRF-Guard
+          gefiltert (mirror zu FORWARDED_ALLOW_IPS, security.md §5)."""
+        if not self.is_production:
+            _log.warning(
+                "ENVIRONMENT=%r (not 'production'): production-only security guards "
+                "may be disabled. Set ENVIRONMENT=production for hardened deployments "
+                "(see deploy/.env.example).",
+                self.environment,
+            )
+        if self.strict_security_enabled and not self.webhook_host_allowlist:
+            _log.warning(
+                "WEBHOOK_ALLOWLIST is empty under strict security: webhook targets are "
+                "only restricted by the SSRF guard, not pinned to known hosts "
+                "(security.md §5)."
             )
         return self
 

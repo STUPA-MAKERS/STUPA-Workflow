@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -307,7 +308,7 @@ class BudgetTreeService:
             await self._rename_key(node, new_key)
         if stichtag_changed and node.parent_id is None:
             for fy in await self._fiscal_years_of(budget_id):
-                fy.start_date, fy.end_date = tree_rules.fiscal_year_bounds(
+                fy.start_date, fy.end_date = self._fiscal_year_bounds(
                     fy.year, node.fiscal_start_month, node.fiscal_start_day
                 )
         await self._audit(
@@ -493,10 +494,24 @@ class BudgetTreeService:
             for (app, path_key, stage, state_label, state_color) in rows
         ]
 
+    @staticmethod
+    def _fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[date, date]:
+        """HHJ-Grenzen ableiten; unmöglicher Stichtag → 422 statt 500 (#sec-audit).
+
+        Die Schemata begrenzen ``fiscalStartDay`` bereits auf ``1..28`` — diese
+        Hülle ist die Defensive für Altbestand / direkte Service-Aufrufe."""
+        try:
+            return tree_rules.fiscal_year_bounds(year, start_month, start_day)
+        except ValueError as exc:
+            raise ValidationProblem(
+                "Invalid fiscal year start date.",
+                errors=[{"field": "fiscalStartDay", "msg": str(exc)}],
+            ) from exc
+
     async def create_fiscal_year(self, budget_id: UUID, payload: FiscalYearCreate) -> FiscalYearOut:
         """HHJ (Jahr) anlegen — Start/Ende aus Budget-Stichtag; eindeutig pro Top-Budget."""
         top = await self._require_top_level(budget_id)
-        start, end = tree_rules.fiscal_year_bounds(
+        start, end = self._fiscal_year_bounds(
             payload.year, top.fiscal_start_month, top.fiscal_start_day
         )
         existing = await self._fiscal_years_of(budget_id)
@@ -535,7 +550,7 @@ class BudgetTreeService:
             )
         if "year" in provided:
             fy.year = new_year
-            fy.start_date, fy.end_date = tree_rules.fiscal_year_bounds(
+            fy.start_date, fy.end_date = self._fiscal_year_bounds(
                 new_year, top.fiscal_start_month, top.fiscal_start_day
             )
         if "active" in provided:
@@ -553,6 +568,16 @@ class BudgetTreeService:
                 )
             )
         ).scalar_one_or_none()
+
+    async def _lock_budget(self, budget_id: UUID) -> None:
+        """Budget-Zeile pessimistisch sperren (``SELECT … FOR UPDATE``) — race-frei.
+
+        Serialisiert konkurrierende Geschwister-Zuteilungen: alle sperren dieselbe
+        Parent-Zeile, sodass Lese-Summe + Validierung + Schreiben atomar bleiben und
+        keine doppelte Über-Allokation durchschlüpfen kann (#sec-audit)."""
+        await self.session.execute(
+            select(Budget.id).where(Budget.id == budget_id).with_for_update()
+        )
 
     async def _children_alloc_sum(
         self, parent_id: UUID, fiscal_year_id: UUID, *, exclude_id: UUID | None = None
@@ -588,6 +613,15 @@ class BudgetTreeService:
                 "Fiscal year does not belong to this budget's top-level.",
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
+
+        # Pessimistische Sperre VOR Lesen+Validieren+Schreiben (#sec-audit, race-frei):
+        # Die eigene Budget-Zeile sperrt den Abwärts-Constraint (eigene Kinder), die
+        # Parent-Zeile serialisiert alle konkurrierenden Geschwister-Zuteilungen — beide
+        # lesen dann dieselbe, bereits gesperrte Geschwister-Summe und können nicht
+        # gemeinsam überbuchen.
+        await self._lock_budget(node.id)
+        if node.parent_id is not None:
+            await self._lock_budget(node.parent_id)
 
         # Aufwärts-Constraint: neue Kinder-Summe ≤ Parent-Zuteilung.
         if node.parent_id is not None:
@@ -910,11 +944,14 @@ class BudgetTreeService:
         if expense.application_id is not None:
             app = await self.session.get(Application, expense.application_id)
             app_title = _title_of(app.data) if app is not None else None
-        acc_name = (
-            (await self.session.get(Account, expense.account_id)).name  # type: ignore[union-attr]
+        # Defensiv (#race): ein paralleles ``delete_account`` (FK SET NULL) kann die
+        # Konto-Zeile zwischen Buchung und Re-Read entfernen → ``get`` liefert None.
+        acc = (
+            await self.session.get(Account, expense.account_id)
             if expense.account_id is not None
             else None
         )
+        acc_name = acc.name if acc is not None else None
         names = await self._actor_names({expense.actor} if expense.actor else set())
         return self._expense_out(
             expense, node.path_key, app_title, acc_name, actor_name=names.get(expense.actor or "")

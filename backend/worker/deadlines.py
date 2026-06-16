@@ -322,7 +322,10 @@ async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
             return False  # anderer Worker / bereits geschlossen
         voting = VotingService(session, dispatcher)
         try:
-            await voting.close(vote.id, _system_principal())
+            # ``now`` mitgeben, damit ein zeit-gebundener Vote mit abgelaufenem
+            # Fenster und unerfülltem Quorum terminal (fail-Branch) schließt statt
+            # ewig vom Cron erneut gegriffen zu werden (#stuck-vote).
+            await voting.close(vote.id, _system_principal(), now=now)
         except ConflictError as exc:
             logger.info("vote %s auto-close skipped: %s", vote_id, exc)
             return False

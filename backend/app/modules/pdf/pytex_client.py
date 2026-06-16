@@ -53,12 +53,24 @@ class PytexClient:
     trust_level: str = "trusted"
     timeout_seconds: float = 120.0
 
-    async def render_pdf(self, markdown: str, *, variant: str | None = None) -> bytes:
-        """Markdown → PDF-Bytes. ``variant=None`` ⇒ pytex erkennt aus dem Frontmatter."""
+    async def render_pdf(
+        self,
+        markdown: str,
+        *,
+        variant: str | None = None,
+        trust_level: str | None = None,
+    ) -> bytes:
+        """Markdown → PDF-Bytes. ``variant=None`` ⇒ pytex erkennt aus dem Frontmatter.
+
+        ``trust_level=None`` nutzt das Client-Default (``self.trust_level``, i. d. R.
+        ``trusted`` für app-generierte PDFs). Ein expliziter Override gilt **nur** für
+        diesen Aufruf — z. B. ``trust_level="untrusted"`` für vom Nutzer geschriebenes
+        Markdown (Protokoll/TOP-Bodies), das pytex' Markdown-``eval``-Escape sperrt
+        und den Build sandboxt (RCE-Schutz, security.md §2)."""
         params: dict[str, str] = {
             "input_kind": "md",
             "output_kind": "pdf",
-            "trust_level": self.trust_level,
+            "trust_level": trust_level if trust_level is not None else self.trust_level,
         }
         if variant is not None:
             params["variant"] = variant

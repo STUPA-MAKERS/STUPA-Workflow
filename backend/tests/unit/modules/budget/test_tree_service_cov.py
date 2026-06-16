@@ -341,6 +341,18 @@ async def test_update_node_stichtag_changed_but_not_top_level() -> None:
     assert out.fiscal_start_month == 7
 
 
+# ------------------------------------------------------------ _fiscal_year_bounds
+async def test_create_fiscal_year_impossible_stichtag_raises_422() -> None:
+    # Altbestand/Direkter Aufruf mit unmöglichem Stichtag (31.02.) → der Service
+    # wrappt das ValueError aus ``fiscal_year_bounds`` zu einem 422 statt 500 (#sec-audit).
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS",
+                  fiscal_start_month=2, fiscal_start_day=31)
+    sess = fake_session(result(top))  # _require_top_level only; raises vor Dublettencheck
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ValidationProblem):
+        await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+
+
 # ------------------------------------------------------------ _require_top_level
 async def test_require_top_level_rejects_child() -> None:
     child = _budget(id=uuid.uuid4(), parent_id=uuid.uuid4(), path_key="VS-800", key="800")
@@ -584,6 +596,24 @@ async def test_update_expense_app_missing_after_commit() -> None:
     svc = BudgetTreeService(sess)
     out = await svc.update_expense(expense.id, ExpenseUpdate(description="d"))
     assert out.application_title is None
+
+
+async def test_update_expense_account_deleted_concurrently() -> None:
+    # #race: ``account_id`` gesetzt, aber paralleles delete_account (FK SET NULL) → der
+    # Re-Read ``session.get(Account)`` nach Commit liefert None → acc_name None statt 500.
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    acc = _account(id=uuid.uuid4(), name="Konto")
+    expense = _expense(budget_id=node.id, application_id=None, account_id=acc.id, actor=None)
+    # Nur ``description`` im Payload → kein ``_validate_account``-Get. Nach Commit liest
+    # ``session.get(Account)`` die (zwischenzeitlich gelöschte) Zeile → None.
+    sess = fake_session(
+        result(node),   # _get_node nach Commit
+        result(),       # _actor_names (kein actor)
+        gets=[expense, None],
+    )
+    svc = BudgetTreeService(sess)
+    out = await svc.update_expense(expense.id, ExpenseUpdate(description="d"))
+    assert out.account_name is None
 
 
 async def test_update_expense_not_found() -> None:

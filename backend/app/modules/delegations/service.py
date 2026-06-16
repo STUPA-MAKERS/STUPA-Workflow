@@ -34,11 +34,11 @@ from datetime import time as _time
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.gremium_roles import gremium_ids_with_permission
+from app.modules.admin.gremium_roles import gremium_ids_with_permission, gremium_member_ids
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -70,6 +70,20 @@ from app.shared.errors import (
 _ADMIN_PERM = "admin.delegations"
 # Gremium-Rollen-Permission, die den Stellvertreter-Pool pflegen darf.
 _POOL_MANAGE_PERM = "session.manage"
+# Advisory-Lock-Basisschlüssel ("DELEG\0"): serialisiert ``create`` je Sitzung,
+# damit die Ketten-Prüfung (read-then-insert) nicht von einem parallelen Anlegen
+# unterlaufen wird. Mit ``meeting_id`` zu zwei int4-Argumenten kombiniert.
+_CREATE_LOCK_KEY = 0x4445_4C45  # "DELE"
+
+
+def _escape_like(needle: str) -> str:
+    """LIKE/ILIKE-Metazeichen im Nutzer-Suchbegriff neutralisieren.
+
+    ``%``/``_`` (und der Escape-Char ``\\`` selbst) sind im Muster sonst
+    Wildcards: ein vom Nutzer eingegebenes ``%`` würde sonst »alles« matchen.
+    Mit ``.ilike(pattern, escape='\\')`` aufrufen.
+    """
+    return needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def meeting_start_utc(meeting: Meeting, tz_name: str) -> datetime | None:
@@ -129,7 +143,7 @@ async def _independently_eligible(
                 RoleAssignment.delegated_by.is_(None),
                 RoleAssignment.gremium_id == gremium_id,
                 (RoleAssignment.valid_from.is_(None)) | (RoleAssignment.valid_from <= now),
-                (RoleAssignment.valid_until.is_(None)) | (RoleAssignment.valid_until >= now),
+                (RoleAssignment.valid_until.is_(None)) | (RoleAssignment.valid_until > now),
             )
             .limit(1)
         )
@@ -297,6 +311,43 @@ class DelegationService:
         )
         return set(rows)
 
+    async def _pool_member_gremium_ids(self, sub: str) -> set[UUID]:
+        """Gremien, in deren Stellvertreter-Pool ``sub`` steht (eigene Sicht)."""
+        pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
+        rows = (
+            await self.session.execute(
+                select(DelegationSubstitute.gremium_id).where(
+                    DelegationSubstitute.substitute_principal_id == pid_subq
+                )
+            )
+        ).scalars().all()
+        return set(rows)
+
+    async def _assert_can_view_gremium(self, gremium_id: UUID, actor: Principal) -> None:
+        """Sicht auf das Roster/den Pool eines Gremiums absichern (#sec-audit).
+
+        Erlaubt für globale Leser/Verwalter (``admin``-Rolle, ``admin.delegations``,
+        ``meeting.manage``, ``meeting.view_all``) sowie Mitglieder, Stellvertreter-Pool
+        und Träger der Gremium-Rolle ``session.manage`` **dieses** Gremiums — dieselbe
+        Sichtbarkeit wie die Sitzungs-Timeline. Sonst 403: zuvor gab jede
+        eingeloggte Identität fremde Roster/Pool-PII preis (Cross-Tenant-Lesen)."""
+        if (
+            "admin" in actor.roles
+            or actor.has(_ADMIN_PERM)
+            or actor.has("meeting.manage")
+            or actor.has("meeting.view_all")
+        ):
+            return
+        if gremium_id in await gremium_member_ids(self.session, actor.sub):
+            return
+        if gremium_id in await self._pool_member_gremium_ids(actor.sub):
+            return
+        if gremium_id in await gremium_ids_with_permission(
+            self.session, actor.sub, _POOL_MANAGE_PERM
+        ):
+            return
+        raise ForbiddenError("Not allowed to view this gremium's delegation roster.")
+
     def _revocable(self, meeting: Meeting, now: datetime) -> bool:
         if meeting.status != "planned":
             return False
@@ -417,6 +468,17 @@ class DelegationService:
                 )
 
         # Keine Ketten: je Sitzung ist man entweder Delegierender oder Empfänger.
+        # Read-then-insert ohne Lock kann von zwei parallelen Anlege-Vorgängen
+        # unterlaufen werden (A→B und B→C gleichzeitig). Daher die Anlage je Sitzung
+        # mit einem transaktionsgebundenen Advisory-Lock serialisieren (analog
+        # audit/service.py): zweites int4-Argument = stabile Ableitung aus der
+        # ``meeting_id`` (Hash auf 32 Bit). Der Lock fällt mit dem Commit/Rollback.
+        meeting_lock_arg = int.from_bytes(meeting.id.bytes[:4], "big") - 0x8000_0000
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:k1, :k2)").bindparams(
+                k1=_CREATE_LOCK_KEY, k2=meeting_lock_arg
+            )
+        )
         existing = (
             await self.session.execute(
                 select(
@@ -525,10 +587,15 @@ class DelegationService:
 
     # --------------------------------------------------------- meeting context
     async def meeting_context(self, meeting_id: UUID, actor: Principal) -> MeetingDelegationContext:
-        """Kontext für den »Vertretung einrichten«-Dialog einer Sitzung."""
+        """Kontext für den »Vertretung einrichten«-Dialog einer Sitzung.
+
+        404 (Sitzung), 403 (kein Mitglied/Pool/Verwalter des Sitzungs-Gremiums):
+        Roster + Empfänger-Namen sind PII und dürfen nicht an Fremde gehen."""
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
+        # #sec-audit: vor dem Bauen des Rosters/Empfänger-PII die Sicht prüfen.
+        await self._assert_can_view_gremium(gremium.id, actor)
         me = await self._principal_row(sub=actor.sub)
 
         start = meeting_start_utc(meeting, self.settings.local_timezone)
@@ -596,10 +663,15 @@ class DelegationService:
     # -------------------------------------------------------------- recipients
     async def recipients(self, meeting_id: UUID, q: str, actor: Principal) -> list[RecipientOut]:
         """Typeahead: erlaubte Empfänger; bei ``delegation_allow_external``
-        zusätzlich plattformweite Suche nach Name/Mail."""
+        zusätzlich plattformweite Suche nach Name/Mail.
+
+        404 (Sitzung), 403 (kein Mitglied/Pool/Verwalter des Sitzungs-Gremiums):
+        die zurückgegebenen Namen sind PII und nur für Berechtigte sichtbar."""
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
+        # #sec-audit: vor dem Auflösen von Empfänger-Namen die Sicht prüfen.
+        await self._assert_can_view_gremium(gremium.id, actor)
         me = await self._principal_row(sub=actor.sub)
         if me is None:
             return []
@@ -619,14 +691,17 @@ class DelegationService:
             if not needle or needle in (names.get(pid) or "").lower()
         ]
         if gremium.delegation_allow_external and needle:
+            # LIKE-Metazeichen escapen (#sec): das Nutzer-``%``/``_`` darf nicht als
+            # Wildcard wirken.
+            pattern = f"%{_escape_like(needle)}%"
             rows = (
                 await self.session.execute(
                     select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email)
                     .where(
                         PrincipalRow.active.is_(True),
                         or_(
-                            PrincipalRow.display_name.ilike(f"%{needle}%"),
-                            PrincipalRow.email.ilike(f"%{needle}%"),
+                            PrincipalRow.display_name.ilike(pattern, escape="\\"),
+                            PrincipalRow.email.ilike(pattern, escape="\\"),
                         ),
                     )
                     .limit(10)
@@ -709,10 +784,13 @@ class DelegationService:
                 "or the gremium's session.manage permission."
             )
 
-    async def substitutes_list(self, gremium_id: UUID, _actor: Principal) -> list[SubstituteOut]:
-        """Pool eines Gremiums — sichtbar für jeden eingeloggten Nutzer
-        (Empfänger-Wahl; Pflege ist separat gegatet)."""
+    async def substitutes_list(self, gremium_id: UUID, actor: Principal) -> list[SubstituteOut]:
+        """Pool eines Gremiums — sichtbar nur für Mitglieder/Pool/Verwalter **dieses**
+        Gremiums (#sec-audit; ``admin.delegations``/``meeting.*``/``session.manage``
+        oder Mitgliedschaft/Pool). Zuvor las jede eingeloggte Identität fremde
+        Pool-PII (Namen). 404 (Gremium), 403 (keine Sicht)."""
         await self._gremium(gremium_id)
+        await self._assert_can_view_gremium(gremium_id, actor)
         rows = (
             (
                 await self.session.execute(

@@ -99,10 +99,29 @@ def test_scope_caps_admin_bypass() -> None:
 
 
 # ------------------------------------------------------------------- lifetimes
-def test_resolve_lifetime_known_default_and_never() -> None:
+def test_resolve_lifetime_known_and_default() -> None:
     assert oauth.resolve_lifetime("30d") == 30 * 24 * 3600
-    assert oauth.resolve_lifetime("never") is None
     # None oder unbekannt → Default-Lebensdauer (fail-safe, kein KeyError).
     default = oauth.LIFETIMES[oauth.DEFAULT_LIFETIME]
     assert oauth.resolve_lifetime(None) == default
     assert oauth.resolve_lifetime("bogus") == default
+
+
+def test_resolve_lifetime_never_dropped_and_bounded() -> None:
+    # Die "never"-Option existiert nicht mehr → unbekannter Key → Default (nicht None).
+    assert "never" not in oauth.LIFETIMES
+    assert oauth.resolve_lifetime("never") == oauth.LIFETIMES[oauth.DEFAULT_LIFETIME]
+    # Jede Lebensdauer ist endlich und durch MAX_LIFETIME_SECONDS gedeckelt.
+    assert oauth.MAX_LIFETIME_SECONDS == 90 * 24 * 3600
+    for key in oauth.LIFETIMES:
+        ttl = oauth.resolve_lifetime(key)
+        assert ttl is not None
+        assert ttl <= oauth.MAX_LIFETIME_SECONDS
+
+
+def test_resolve_lifetime_caps_oversized_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Ein (hypothetisch) zu großer Katalogwert wird hart auf MAX gedeckelt.
+    monkeypatch.setitem(oauth.LIFETIMES, "huge", oauth.MAX_LIFETIME_SECONDS * 10)
+    assert oauth.resolve_lifetime("huge") == oauth.MAX_LIFETIME_SECONDS

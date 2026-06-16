@@ -279,6 +279,64 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
 
 
+async def test_finalize_renders_user_markdown_untrusted() -> None:
+    """RCE-Schutz: der nutzer-geschriebene Protokoll-Body wird ``untrusted`` gerendert
+    (pytex sperrt damit den Markdown-``eval``-Escape)."""
+    proto = _protocol()
+    pytex = FakePytex(pdf=b"%PDF")
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium("stupa")},
+        results=[result(proto), result(), result(), result()],
+    )
+    await _service(session, storage=FakeStorage(), pytex=pytex).finalize(PID, now=NOW)
+    assert pytex.trust_levels == ["untrusted"]
+
+
+async def test_finalize_uploads_and_mails_only_after_commit() -> None:
+    """#pre-commit-side-effects: Storage-Put + Mail-Enqueue erst NACH dem Commit.
+
+    ``commit`` zählt mit; die Fakes protokollieren erst danach Put/Enqueue. Wir prüfen
+    den committeten Endzustand: PDF liegt im Storage, Mail ist eingereiht, Commit lief."""
+    proto = _protocol()
+    storage = FakeStorage()
+    pytex = FakePytex(pdf=b"%PDF-1.4 ok")
+    mail = FakeMailQueue()
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium("stupa")},
+        results=[result(proto), result(), result("a@x.de"), result()],
+    )
+    await _service(
+        session, storage=storage, pytex=pytex, mail_queue=mail
+    ).finalize(PID, now=NOW)
+    assert session.committed == 1
+    # Genau ein Put (single-render) + eine Mail — beide aus dem Post-Commit-Pfad.
+    assert [p[0] for p in storage.puts] == [protocol_storage_key(PID)]
+    assert len(mail.sent) == 1
+
+
+async def test_finalize_storage_error_after_commit_raises_503() -> None:
+    """Schlägt der Storage-``put`` (post-commit) transient fehl → 503; das Protokoll
+    ist bereits ``final`` committed (idempotenter Retry-No-Op)."""
+
+    class _BoomStorage(FakeStorage):
+        async def put(self, key: str, data: bytes, content_type: str) -> None:
+            from app.modules.files.storage import StorageError
+
+            raise StorageError("minio down")
+
+    proto = _protocol()
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium()},
+        results=[result(proto), result()],
+    )
+    with pytest.raises(ServiceUnavailableError):
+        await _service(
+            session, storage=_BoomStorage(), pytex=FakePytex()
+        ).finalize(PID, now=NOW)
+    assert session.committed == 1  # Commit lief vor dem Storage-Put
+    assert proto.status == "final"
+
+
 async def test_finalize_without_storage_degrades_but_mails() -> None:
     proto = _protocol()
     pytex = FakePytex()

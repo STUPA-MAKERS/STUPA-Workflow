@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -36,6 +38,48 @@ from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlo
 # Feldtypen, deren Wert numerisch ist (für promoted-Extraktion + min/max).
 _NUMERIC_TYPES = frozenset({"number", "currency"})
 _TEXT_TYPES = frozenset({"text", "textarea", "markdown"})
+
+# ReDoS-Härtung (security.md): ein admin-definiertes ``validation.pattern`` (Roh-Regex)
+# läuft gegen Antragsteller-Eingaben. Ein katastrophal backtrackender Ausdruck würde
+# sonst die Single-Replica-Event-Loop blockieren. Zwei voneinander unabhängige Grenzen:
+#   1. **Harte Längenobergrenze** des zu prüfenden Werts → beschränkt die Eingabegröße
+#      und damit den Worst-Case unbedingt (greift, auch wenn der Timeout nicht killbar
+#      ist). Werte darüber gelten als »passt nicht«.
+#   2. **Wand-Timeout** im Thread: der Match läuft in einem Worker-Thread; greift er
+#      nicht innerhalb des Budgets, gibt der Aufrufer (Event-Loop) die Kontrolle zurück
+#      und behandelt das Feld als ungültig. Der Thread kann nicht hart gekillt werden —
+#      die Längenobergrenze sorgt aber dafür, dass er beschränkt terminiert.
+_PATTERN_MAX_INPUT_LEN = 4096
+_PATTERN_MATCH_TIMEOUT_SECONDS = 1.0
+# Geteilter, klein gehaltener Executor — Pattern-Matches sind selten und kurz.
+_PATTERN_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="form-regex")
+
+
+class _PatternMatchError(Exception):
+    """Pattern-Match scheiterte technisch (defekte Regex oder Zeitüberschreitung)."""
+
+
+def _pattern_matches(pattern: str, value: str) -> bool:
+    """``re.fullmatch`` gegen ``value`` — längenbeschränkt + Wand-Timeout (ReDoS).
+
+    Wirft :class:`_PatternMatchError` bei defektem Pattern **oder** Timeout; ruft der
+    Aufrufer dann ein Feld als ungültig aus. Werte über :data:`_PATTERN_MAX_INPUT_LEN`
+    gelten unbedingt als »passt nicht« (kein Match-Versuch)."""
+    if len(value) > _PATTERN_MAX_INPUT_LEN:
+        return False
+    future = _PATTERN_EXECUTOR.submit(_full_match, pattern, value)
+    try:
+        return future.result(timeout=_PATTERN_MATCH_TIMEOUT_SECONDS)
+    except FutureTimeout as exc:
+        # Thread läuft beschränkt (Längen-Cap) weiter; wir geben die Kontrolle zurück.
+        raise _PatternMatchError("pattern match timed out") from exc
+    except re.error as exc:
+        raise _PatternMatchError("invalid pattern") from exc
+
+
+def _full_match(pattern: str, value: str) -> bool:
+    return re.fullmatch(pattern, value) is not None
+
 
 # Reservierter Schlüssel des System-Titelfelds: jeder Antrag MUSS einen Titel haben.
 # Der Server hängt es an jede effektive Form (nicht im Builder editierbar).
@@ -289,10 +333,11 @@ def _validate_text(field: FormFieldDef, value: Any, errors: list[FieldError]) ->
         _err(errors, field.key, f"longer than maximum length {v.max_len}")
     if v.pattern is not None:
         try:
-            matched = re.fullmatch(v.pattern, value) is not None
-        except re.error:
-            # Defekt gespeichertes Pattern: defense-in-depth (validate_definition
-            # lehnt das schon beim Anlegen ab) — niemals 500 zur Laufzeit.
+            matched = _pattern_matches(v.pattern, value)
+        except _PatternMatchError:
+            # Defekt gespeichertes Pattern ODER ReDoS-Timeout: defense-in-depth
+            # (validate_definition lehnt invalide Pattern schon beim Anlegen ab) —
+            # niemals 500/Hänger zur Laufzeit, sondern als Feldfehler ausweisen.
             _err(errors, field.key, "field has an invalid validation pattern")
             return
         if not matched:

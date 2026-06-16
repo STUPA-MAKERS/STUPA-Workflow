@@ -8,6 +8,7 @@ Quellpaket als ``.tar.gz`` zur lokalen Installation (``pip install -e .``).
 from __future__ import annotations
 
 import io
+import json
 import tarfile
 from pathlib import Path
 from typing import Annotated, Any
@@ -106,9 +107,11 @@ def mcp_package(
 
         tar.add(pkg, arcname="antragsplattform-mcp", filter=_filter)
         # Auto-Wiring: PUBLIC_BASE_URL ins Paket backen → kein ANTRAGSPLATTFORM_URL nötig.
+        # ``json.dumps`` escaped Quotes/Newlines sicher in das Python-String-Literal
+        # (kein String-Interpolations-Injection-Risiko, falls die URL je injizierbar wird).
         baked = (
             '"""Auto-generated at download — pins this package to its source platform."""\n'
-            f'BASE_URL = "{base}"\n'
+            f"BASE_URL = {json.dumps(base)}\n"
         ).encode()
         baked_info = tarfile.TarInfo(
             "antragsplattform-mcp/antragsplattform_mcp/_baked.py"

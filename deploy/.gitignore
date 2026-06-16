@@ -1,1 +1,8 @@
 keycloak/
+
+# Secret-tragende Dateien NIE committen (co-located rule, nicht nur root .gitignore).
+# .env.example bleibt als Vorlage getrackt.
+.env
+.env.*
+!.env.example
+secrets/

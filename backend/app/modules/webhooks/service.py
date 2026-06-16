@@ -47,6 +47,12 @@ logger = logging.getLogger("app.webhooks")
 
 OutcomeKind = Literal["ok", "retry", "dead", "gone"]
 
+# Wir verwerten ausschließlich den HTTP-**Statuscode**; der Response-Body interessiert
+# nie. Ein bösartiger/kompromittierter Empfänger könnte mit einem Multi-GB-Body den
+# (geteilten) arq-Worker per OOM töten — darum den Body **gestreamt** lesen und nach
+# diesem harten Limit abbrechen (security.md §5).
+_MAX_RESPONSE_BYTES = 64 * 1024
+
 
 @dataclass(frozen=True, slots=True)
 class DeliveryOutcome:
@@ -241,7 +247,7 @@ class WebhookService:
         request = http_client.build_request("POST", ip_url, content=body, headers=headers)
         request.extensions["sni_hostname"] = host_header.rsplit(":", 1)[0]
         try:
-            response = await http_client.send(request)
+            status_code = await self._send_capped(http_client, request)
         except httpx.HTTPError as exc:
             logger.warning(
                 "webhook delivery %s transport error: %s",
@@ -249,24 +255,54 @@ class WebhookService:
                 type(exc).__name__,
             )
             return await self._fail(delivery, moment, response_code=None)
+        return await self._classify(delivery, moment, status_code, delivery_id)
 
-        if 200 <= response.status_code < 300:
+    async def _send_capped(
+        self, http_client: httpx.AsyncClient, request: httpx.Request
+    ) -> int:
+        """POST senden + nur den **Statuscode** zurückgeben — Body gestreamt und auf
+        :data:`_MAX_RESPONSE_BYTES` gedeckelt lesen (OOM-Schutz, security.md §5).
+
+        Der Body wird nie verwertet; wir lesen ihn nur so weit, bis das Limit erreicht
+        ist, und schließen dann den Stream. Verbindungs-Reuse bleibt durch das saubere
+        ``aclose`` (über den Context-Manager) intakt."""
+        response = await http_client.send(request, stream=True)
+        try:
+            read = 0
+            async for chunk in response.aiter_bytes():
+                read += len(chunk)
+                if read >= _MAX_RESPONSE_BYTES:
+                    # Body zu groß: weiteres Lesen abbrechen — der Statuscode steht fest.
+                    break
+            return response.status_code
+        finally:
+            await response.aclose()
+
+    async def _classify(
+        self,
+        delivery: WebhookDelivery,
+        moment: dt.datetime,
+        status_code: int,
+        delivery_id: UUID,
+    ) -> DeliveryOutcome:
+        """Statuscode → Endzustand/Retry (Spec, unverändert zur vorigen Inline-Logik)."""
+        if 200 <= status_code < 300:
             return await self._finish(
-                delivery, "ok", moment, response_code=response.status_code
+                delivery, "ok", moment, response_code=status_code
             )
-        if 400 <= response.status_code < 500:
+        if 400 <= status_code < 500:
             # 4xx ist ein Client-/Config-Fehler — Wiederholung ändert nichts →
             # sofort Dead-Letter, kein Retry (Spec).
             logger.warning(
                 "webhook delivery %s dead — non-retryable %s",
                 delivery_id,
-                response.status_code,
+                status_code,
             )
             return await self._finish(
-                delivery, "dead", moment, response_code=response.status_code,
+                delivery, "dead", moment, response_code=status_code,
                 attempts=delivery.attempts + 1,
             )
-        return await self._fail(delivery, moment, response_code=response.status_code)
+        return await self._fail(delivery, moment, response_code=status_code)
 
     async def _fail(
         self, delivery: WebhookDelivery, moment: dt.datetime, *, response_code: int | None

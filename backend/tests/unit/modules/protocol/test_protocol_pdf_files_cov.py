@@ -268,6 +268,38 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
     assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
 
 
+async def test_finalize_dual_render_without_storage_skips_uploads() -> None:
+    """Dual-Render-Pfad ohne Storage (DEV/Demo): ``_render_pdf`` liefert ``None`` →
+    keine Uploads, kein PDF-Anhang. Deckt die ``is None``-Arme im Dual-Render-Block."""
+    proto = _protocol()
+    mail = FakeMailQueue()
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium()},
+        results=[
+            result(proto),  # _get
+            result(),       # intern: _assemble_from_agenda items (leer)
+            result(),       # öffentlich: _assemble_from_agenda items (leer)
+            result("m@x.de"),  # _recipients resolve members
+            result(),       # _recipients mail-list
+        ],
+    )
+    session.scalar_results = [
+        1,        # _has_non_public → wahr (Dual-Render)
+        None,     # _header_meta protokollant (intern)
+        0,        # _quorate member-count (intern)
+        None,     # _header_meta protokollant (öffentlich)
+        0,        # _quorate member-count (öffentlich)
+        "StuPa",  # _send gremium_name
+    ]
+    out = await _service(
+        session, storage=None, pytex=FakePytex(), mail_queue=mail
+    ).finalize(PID, now=NOW)
+    assert out.status == "final"
+    assert proto.pdf_storage_key is None and proto.public_pdf_storage_key is None
+    # Ohne Storage kein PDF-Anhang.
+    assert len(mail.sent) == 1 and mail.sent[0].attachments == ()
+
+
 # ---------------------------------------------------------------------------
 #  _assemble_from_agenda — Zeile 483-522 (TOP-Montage, Public-Redaktion, Votes)
 # ---------------------------------------------------------------------------

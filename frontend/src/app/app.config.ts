@@ -35,8 +35,19 @@ export const appConfig: ApplicationConfig = {
     ),
     // Reihenfolge: loading (äußerste, misst volle Dauer) → auth (Credentials/Bearer)
     // → Mock-Antwort.
+    //
+    // SICHERHEIT (#67): Der Mock-Interceptor wird **nur** im Dev-/Demo-Build in die
+    // Interceptor-Kette aufgenommen. In Prod-Builds ist `isDevMode()` false, der
+    // Interceptor wird also gar nicht registriert — so kann ihn keine zur Laufzeit
+    // angreifbare Eingabe (?mock=1, localStorage['useMockApi'], __USE_MOCK_API__)
+    // mehr aktivieren (Session-/Daten-Spoofing). Der zusätzliche Laufzeit-Guard im
+    // Interceptor (isDevMode()) bleibt als Verteidigung in der Tiefe bestehen.
     provideHttpClient(
-      withInterceptors([loadingInterceptor, authInterceptor, mockApiInterceptor]),
+      withInterceptors(
+        isDevMode()
+          ? [loadingInterceptor, authInterceptor, mockApiInterceptor]
+          : [loadingInterceptor, authInterceptor],
+      ),
     ),
     // Live-Vote-Quelle: im Mock-Betrieb die In-Memory-Simulation, sonst die echte
     // WebSocket (WsService) gegen T-16 (api.md §4).
