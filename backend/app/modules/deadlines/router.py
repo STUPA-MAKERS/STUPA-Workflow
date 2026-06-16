@@ -44,7 +44,12 @@ ServiceDep = Annotated[DeadlinePolicyService, Depends(get_service)]
 ConfigAdmin = Annotated[Principal, Depends(require_principal("admin.deadlines"))]
 
 
-@router.get("", response_model=list[DeadlinePolicyOut], dependencies=[_CONFIG_READ])
+@router.get(
+    "",
+    response_model=list[DeadlinePolicyOut],
+    dependencies=[_CONFIG_READ],
+    responses=_errors(401, 403),
+)
 async def list_policies(service: ServiceDep) -> list[DeadlinePolicyOut]:
     return [DeadlinePolicyOut.model_validate(p, from_attributes=True) for p in await service.list()]
 

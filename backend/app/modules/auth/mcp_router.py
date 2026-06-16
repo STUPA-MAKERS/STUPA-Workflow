@@ -18,9 +18,17 @@ from fastapi.responses import StreamingResponse
 from app.deps import Principal, SettingsDep, require_principal
 from app.modules.auth import oauth
 from app.settings import Settings
-from app.shared.errors import NotFoundError
+from app.shared.errors import NotFoundError, ProblemDetail
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
+
+# Auth-Fehler-Contract (api.md §2): beide Endpunkte sind `mcp.use`-gegated → 401/403.
+_PROBLEM: dict[str, Any] = {"model": ProblemDetail}
+
+
+def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
+    return {code: _PROBLEM for code in codes}
+
 
 # Aus dem Quellbaum ausgeschlossen (kein Build-/Cache-Müll im Download).
 _EXCLUDE = {"__pycache__", ".venv", "venv", ".mypy_cache", ".pytest_cache", "dist", "build"}
@@ -49,7 +57,7 @@ def _package_dir(settings: Settings) -> Path | None:
     return None
 
 
-@router.get("/config")
+@router.get("/config", responses=_errors(401, 403))
 def mcp_config(
     settings: SettingsDep,
     _principal: Annotated[Principal, Depends(require_principal("mcp.use"))],
@@ -75,7 +83,7 @@ def mcp_config(
     }
 
 
-@router.get("/package")
+@router.get("/package", responses=_errors(401, 403, 404))
 def mcp_package(
     settings: SettingsDep,
     _principal: Annotated[Principal, Depends(require_principal("mcp.use"))],

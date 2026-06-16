@@ -327,6 +327,11 @@ def use_problem_json_contract(app: FastAPI) -> None:
             for operation in operations.values():
                 if not isinstance(operation, dict):
                     continue
+                # Opt-out: Endpunkte mit eigenem Fehler-Contract (z. B. RFC-6749-OAuth-
+                # Token-Fehler in OAuth-JSON statt problem+json) dokumentieren ihre
+                # Antworten selbst und werden hier NICHT umgeschrieben (s. oauth_router.token).
+                if operation.get("x-error-contract") == "oauth":
+                    continue
                 responses = operation.setdefault("responses", {})
                 # Jeder Body-annehmende Endpunkt kann bei unparsebarem/ungültigem Body
                 # ein 422 liefern (RequestValidationError bzw. vereinheitlichter

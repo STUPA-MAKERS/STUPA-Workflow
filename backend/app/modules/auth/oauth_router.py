@@ -31,13 +31,42 @@ from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.auth import oauth, oauth_service, sessions
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthToken
-from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError
+from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError, ProblemDetail
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 well_known_router = APIRouter(tags=["oauth"])
 
 _TX_MAX_AGE = 600  # authorize→finish über den OIDC-Hop: 10-min-Fenster
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+# Auth-Fehler-Contract (api.md §2): AppError-basierte Endpunkte liefern problem+json.
+# Der token-Endpunkt ist bewusst RFC-6749-§5.2-konform (OAuth-Fehler-JSON) → s. dort.
+_PROBLEM: dict[str, Any] = {"model": ProblemDetail}
+_REDIRECT = {"description": "Redirect (protocol error back to the loopback redirect_uri)."}
+
+
+def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
+    return {code: _PROBLEM for code in codes}
+
+
+class OAuthError(BaseModel):
+    """RFC-6749 §5.2 Token-Fehler-Body (``{error, error_description}``). Bewusst KEIN
+    problem+json — OAuth-/MCP-Clients erwarten genau dieses Schema. Der token-Endpunkt
+    ist daher via ``x-error-contract`` vom app-weiten problem+json-Rewrite ausgenommen."""
+
+    error: str
+    error_description: str | None = None
+
+
+# token dokumentiert seine 4xx selbst (application/json + OAuthError); das 422 bleibt der
+# app-weite problem+json-Body des globalen Validierungs-Handlers.
+_OAUTH_ERR: dict[str, Any] = {"model": OAuthError}
+_PROBLEM_JSON: dict[str, Any] = {
+    "description": "Validation Error",
+    "content": {
+        "application/problem+json": {"schema": {"$ref": "#/components/schemas/ProblemDetail"}}
+    },
+}
 
 
 def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
@@ -69,7 +98,11 @@ def _redirect_error(redirect_uri: str, *, error: str, state: str) -> RedirectRes
     )
 
 
-@router.get("/authorize", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+@router.get(
+    "/authorize",
+    status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    responses={302: _REDIRECT, **_errors(400, 404)},
+)
 def authorize(
     settings: SettingsDep,
     response_type: Annotated[str, Query()] = "",
@@ -122,7 +155,7 @@ def authorize(
     return resp
 
 
-@router.get("/finish", status_code=status.HTTP_302_FOUND)
+@router.get("/finish", status_code=status.HTTP_302_FOUND, responses=_errors(400, 401))
 async def finish(
     request: Request,
     settings: SettingsDep,
@@ -145,7 +178,11 @@ def _token_error(error: str, description: str, code: int = 400) -> JSONResponse:
     return JSONResponse({"error": error, "error_description": description}, status_code=code)
 
 
-@router.post("/token")
+@router.post(
+    "/token",
+    openapi_extra={"x-error-contract": "oauth"},
+    responses={400: _OAUTH_ERR, 401: _OAUTH_ERR, 404: _OAUTH_ERR, 422: _PROBLEM_JSON},
+)
 async def token(
     db: DbSession,
     settings: SettingsDep,
@@ -210,7 +247,7 @@ def _loopback_redirect(redirect_uri: str, params: dict[str, str]) -> str:
     return f"{redirect_uri}{sep}{urlencode(params)}"
 
 
-@router.get("/consent-request")
+@router.get("/consent-request", responses=_errors(400, 401))
 async def consent_request(
     request: Request,
     settings: SettingsDep,
@@ -253,7 +290,7 @@ class _ConsentBody(BaseModel):
     lifetime: str | None = None
 
 
-@router.post("/consent")
+@router.post("/consent", responses=_errors(400, 401, 403))
 async def consent(
     body: _ConsentBody,
     request: Request,
@@ -310,7 +347,7 @@ async def consent(
     return {"redirect": _loopback_redirect(tx["redirect_uri"], {"code": code, **state})}
 
 
-@router.get("/grants")
+@router.get("/grants", responses=_errors(401))
 async def list_grants(
     db: DbSession,
     principal: Annotated[Principal, Depends(require_principal())],
@@ -344,7 +381,11 @@ async def list_grants(
     ]
 
 
-@router.delete("/grants/{grant_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/grants/{grant_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=_errors(401, 404),
+)
 async def revoke_grant(
     grant_id: str,
     db: DbSession,
@@ -362,7 +403,7 @@ async def revoke_grant(
         await db.commit()
 
 
-@router.delete("/grants", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/grants", status_code=status.HTTP_204_NO_CONTENT, responses=_errors(401))
 async def revoke_all_grants(
     db: DbSession,
     principal: Annotated[Principal, Depends(require_principal())],
