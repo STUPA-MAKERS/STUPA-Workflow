@@ -9,8 +9,9 @@ import userEvent from '@testing-library/user-event';
 import { Subject } from 'rxjs';
 import { of } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
+import { I18nService } from '@core/i18n/i18n.service';
 import { USE_MOCK_API } from '@core/api/api.config';
-import type { MeetingOutWire, ProtocolOutWire } from '@core/api/models';
+import type { Meeting, MeetingOutWire, ProtocolOutWire } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
 import { MeetingsComponent } from './meetings.component';
@@ -54,6 +55,45 @@ const MEETING: MeetingOutWire = {
     },
   ],
   createdAt: '2026-06-12T17:00:00Z',
+};
+
+/** Domänen-Form (alle Felder Pflicht) für Stellen, die `Meeting` statt `MeetingOutWire`
+ *  erwarten (z. B. `meeting.set` / `openSettings`) — sonst meckert tsc über die
+ *  optionalen Wire-Felder. Inhaltlich identisch zur `MEETING`-Fixture. */
+const MEETING_MODEL: Meeting = {
+  id: 'm-1',
+  title: 'StuPa-Sitzung',
+  status: 'live',
+  date: '2026-06-12',
+  startTime: '17:00',
+  endTime: null,
+  activeApplicationId: 'app-1',
+  gremiumId: null,
+  gremiumName: null,
+  protocolId: 'p-1',
+  createdAt: '2026-06-12T17:00:00Z',
+  protokollantId: null,
+  protokollantName: null,
+  isProtokollant: false,
+  canControl: true,
+  canManage: true,
+  canWrite: true,
+  canManageVotes: true,
+  canVote: false,
+  votes: [
+    {
+      id: 'v-1', applicationId: 'app-1', agendaItemId: null, title: 'Antrag A',
+      question: null, options: [], status: 'open', result: null,
+      counts: { ja: 5, nein: 2 }, leading: 'ja', closesAt: null,
+      voted: 0, present: 0, revealed: true, failedReason: null,
+    },
+    {
+      id: 'v-2', applicationId: 'app-2', agendaItemId: null, title: 'Antrag B',
+      question: null, options: [], status: 'pending', result: null,
+      counts: null, leading: null, closesAt: null,
+      voted: 0, present: 0, revealed: true, failedReason: null,
+    },
+  ],
 };
 
 const PROTOCOL: ProtocolOutWire = {
@@ -2011,6 +2051,431 @@ describe('MeetingsComponent — methods', () => {
       cmp.meeting.set(null);
       ws.subject.next({ type: 'viewers', viewers: ['X'] }); // m null → früher return
       expect(cmp.viewers()).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Verbleibende Verzweigungen (Branch-Coverage): Fallbacks, Guards, leere
+  // Maps, fehlende Meeting-Instanz, Stale-Search, Timeline-Höhe, Mock-Modus.
+  // -------------------------------------------------------------------------
+  describe('branch coverage', () => {
+    it('falls back to an empty string for an empty state-label map', async () => {
+      const { cmp } = await loaded();
+      // map vorhanden, aber leer → map[locale]/map.de/Object.values()[0] alle leer ⇒ ''.
+      expect(cmp.stateLabelOf({})).toBe('');
+    });
+
+    it('clears a pending search timer when onSearch is called twice', async () => {
+      jest.useFakeTimers();
+      try {
+        const { fixture, http } = await setup({ id: null });
+        const cmp = fixture.componentInstance as Cmp;
+        http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
+        cmp.onSearch('a'); // legt searchTimer an
+        cmp.onSearch('ab'); // searchTimer gesetzt → clearTimeout-Zweig
+        jest.advanceTimersByTime(400);
+        http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'ab')
+          .flush({ items: [], nextCursor: null });
+        expect(cmp.searchActive()).toBe(true);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('discards a stale search response when a newer query started (next + error)', async () => {
+      jest.useFakeTimers();
+      try {
+        const { fixture, http } = await setup({ id: null });
+        const cmp = fixture.componentInstance as Cmp;
+        http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
+        // Erste Suche starten (in-flight lassen).
+        cmp.onSearch('first');
+        jest.advanceTimersByTime(400);
+        const firstReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'first');
+        // Zweite Suche startet (erhöht searchSeq) BEVOR die erste antwortet.
+        cmp.onSearch('second');
+        jest.advanceTimersByTime(400);
+        const secondReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'second');
+        // Verspätete Antwort der ERSTEN Query → seq stimmt nicht mehr → verworfen (next-Zweig).
+        firstReq.flush({ items: [{ ...MEETING, id: 'stale' }], nextCursor: null });
+        expect(cmp.searchItems().some((m) => m.id === 'stale')).toBe(false);
+        // Verspäteter FEHLER der zweiten … nachdem eine dritte Query lief → error-Zweig verworfen.
+        cmp.onSearch('third');
+        jest.advanceTimersByTime(400);
+        const thirdReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'third');
+        secondReq.flush(null, { status: 500, statusText: 'e' });
+        expect(cmp.loadingSearch()).toBe(true); // noch ladend (dritte Query offen)
+        thirdReq.flush({ items: [], nextCursor: null });
+        expect(cmp.loadingSearch()).toBe(false);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('ignores loadMorePast when it is not loadable', async () => {
+      const { fixture, http } = await setup({ id: null });
+      const cmp = fixture.componentInstance as Cmp;
+      http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
+      // pastHasMore false + pastCursor null → früher return, kein Request.
+      const el = { scrollTop: 0, scrollHeight: 100, clientHeight: 50 } as HTMLElement;
+      cmp.loadMorePast(el);
+      expect(cmp.loadingPast()).toBe(false);
+      http.verify();
+    });
+
+    it('replaces a matching meeting in the timeline and leaves others untouched', async () => {
+      const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
+      const cmp = fixture.componentInstance as Cmp;
+      http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => {
+        const past = req.request.params.get('direction') === 'past';
+        req.flush({
+          items: past
+            ? [{ ...MEETING, id: 'p1', status: 'closed' }]
+            : [{ ...MEETING, id: 'u1', status: 'planned', title: 'Alt' }],
+          nextCursor: null,
+        });
+      });
+      fixture.detectChanges();
+      // Einstellungen für u1 öffnen + speichern → replaceInTimeline ersetzt u1, lässt p1.
+      cmp.openSettings({ ...MEETING_MODEL, id: 'u1', status: 'planned', title: 'Alt' });
+      http.expectOne('/api/meetings/u1/attendance').flush([]);
+      cmp.settingsDate.set('2026-07-01');
+      cmp.settingsTime.set('17:00');
+      cmp.saveSettings();
+      const req = http.expectOne('/api/meetings/u1');
+      req.flush({ ...MEETING, id: 'u1', status: 'planned', title: 'Neu' });
+      expect(cmp.upcomingItems().find((m) => m.id === 'u1')?.title).toBe('Neu'); // ersetzt
+      expect(cmp.pastItems().find((m) => m.id === 'p1')?.title).toBe('StuPa-Sitzung'); // unverändert
+    });
+
+    it('returns the raw iso date for an invalid date (NaN branch)', async () => {
+      const { fixture, http } = await setup({ id: null, gremien: [{ id: 'g-1', name: 'StuPa' }] });
+      const cmp = fixture.componentInstance as Cmp;
+      cmp.onCreateGremiumChange('g-1');
+      http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
+      // Ungültiges Datum → longDate gibt den Roh-String zurück (NaN-Zweig).
+      cmp.newDate.set('not-a-date');
+      cmp.newTime.set('17:00');
+      cmp.goToCreateStep2();
+      expect(cmp.newTitle()).toContain('not-a-date');
+    });
+
+    it('formats the prefilled date with the en-US locale when English is active', async () => {
+      const { fixture, http } = await setup({ id: null, gremien: [{ id: 'g-1', name: 'StuPa' }] });
+      const cmp = fixture.componentInstance as Cmp;
+      const i18n = fixture.debugElement.injector.get(I18nService);
+      i18n.setLocale('en');
+      try {
+        cmp.onCreateGremiumChange('g-1');
+        http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
+        // Gültiges Datum + locale=en → Intl mit 'en-US' (longDate en-Zweig).
+        cmp.newDate.set('2026-07-01');
+        cmp.newTime.set('17:00');
+        cmp.goToCreateStep2();
+        // Englisches langes Datum (Monatsname auf Englisch).
+        expect(cmp.newTitle()).toContain('July');
+      } finally {
+        i18n.setLocale('de');
+      }
+    });
+
+    it('prefills step 2 with an empty committee label when the gremium is unknown', async () => {
+      const { fixture, http } = await setup({ id: null });
+      const cmp = fixture.componentInstance as Cmp;
+      http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
+      // Gremium-id, die NICHT in gremiumOptions vorkommt → find() → undefined → '' (?? '').
+      cmp.newGremiumId.set('g-unknown');
+      cmp.newDate.set('2026-07-01');
+      cmp.newTime.set('17:00');
+      cmp.goToCreateStep2();
+      expect(cmp.createStep()).toBe(2);
+      expect(cmp.newTitle().length).toBeGreaterThan(0);
+    });
+
+    it('labels settings protokollant options falling back email → principalId', async () => {
+      const { cmp } = await loaded();
+      cmp.settingsRoster.set([
+        { principalId: 'pr-1', displayName: 'Max', email: 'm@x', status: null, source: null, isSelf: false },
+        { principalId: 'pr-2', displayName: '', email: 'b@x', status: null, source: null, isSelf: false },
+        { principalId: 'pr-3', displayName: '', email: '', status: null, source: null, isSelf: false },
+      ]);
+      const opts = cmp.protokollantOptions();
+      // [0] = „niemand". Danach: displayName → email-Fallback → principalId-Fallback.
+      expect(opts[1]).toEqual({ value: 'pr-1', label: 'Max' });
+      expect(opts[2]).toEqual({ value: 'pr-2', label: 'b@x' }); // displayName leer → email
+      expect(opts[3]).toEqual({ value: 'pr-3', label: 'pr-3' }); // beide leer → principalId
+    });
+
+    it('returns empty vote lists when no meeting is loaded', async () => {
+      const { fixture } = await setup({ id: null });
+      const cmp = fixture.componentInstance as Cmp;
+      expect(cmp.meeting()).toBeNull();
+      expect(cmp.votesForTop('t-1')).toEqual([]); // meeting()?.votes ?? []
+      expect(cmp.looseVotes()).toEqual([]); // meeting()?.votes ?? []
+      expect(cmp.beamerVote()).toBeNull(); // meeting()?.votes ?? []
+    });
+
+    it('clears all pending timers (body autosave, render poll, search) on destroy', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, fixture, http } = await loaded();
+        // bodyTimer (Zeile 692): noch nicht gefeuerter Autosave.
+        cmp.onTopBodyChange('t-1', 'X');
+        // renderPollTimer (Zeile 693): Protokoll rendert → watchRendering plant einen Poll.
+        cmp.finalize();
+        http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
+        http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
+        // searchTimer (Zeile 694): laufende Such-Debounce.
+        cmp.onSearch('x');
+        fixture.destroy(); // ngOnDestroy → alle drei clearTimeout-Zweige
+        jest.advanceTimersByTime(8000); // keine Timer feuern mehr → keine Requests
+        http.verify();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('does nothing in refreshProtocol when no meeting is loaded', async () => {
+      const { fixture } = await setup({ id: null });
+      const cmp = fixture.componentInstance as Cmp;
+      expect(cmp.meeting()).toBeNull();
+      // refreshProtocol ist privat — direkt aufrufen: if (!m) return (kein Request).
+      const http = fixture.debugElement.injector.get(HttpTestingController);
+      (cmp as unknown as { refreshProtocol(): void }).refreshProtocol();
+      http.verify();
+    });
+
+    it('skips the live channel in mock mode (no WebSocket handshake)', async () => {
+      const ws = new FakeWs();
+      const view = await render(MeetingsComponent, {
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: USE_MOCK_API, useValue: true },
+          { provide: AuthService, useValue: fakeAuth(['meeting.manage', 'protocol.write']) },
+          { provide: WsService, useValue: ws },
+          { provide: Router, useValue: { navigate: jest.fn(() => Promise.resolve(true)) } },
+          { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })) } },
+        ],
+      });
+      const http = view.fixture.debugElement.injector.get(HttpTestingController);
+      // Mock-Modus: connectLive() return früh (useMock) — kein WS-Kanal.
+      http.expectOne('/api/meetings/m-1').flush(MEETING);
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+      flushDelegationContext(http);
+      expect(ws.closed).toBe(false); // connectMeeting wurde nie aufgerufen
+    });
+
+    it('re-watches a still-rendering protocol, clearing the prior poll timer', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, ws, http } = await loaded();
+        // Finalisieren → rendering → watchRendering plant einen Poll-Timer (renderPollTimer).
+        cmp.finalize();
+        http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
+        http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
+        // Bevor der 4s-Poll feuert, kommt ein meeting_state-Broadcast → getProtocol →
+        // applyProtocolUpdate → watchRendering ERNEUT, während der alte Timer noch läuft
+        // → clearTimeout(renderPollTimer)-Zweig (Zeile 1005).
+        ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
+        http.expectOne('/api/meetings/m-1/agenda').flush([]);
+        http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+        http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
+        // Nun feuert der (neu geplante) Poll → final.
+        jest.advanceTimersByTime(4000);
+        http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
+        expect(cmp.protocol()?.isFinal).toBe(true);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('stops a rendering poll when the meeting vanished before it fired', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, http } = await loaded();
+        cmp.finalize();
+        http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
+        http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
+        // Meeting weg, bevor der Poll-Timer feuert → if (!m) return im Poll-Callback.
+        cmp.meeting.set(null);
+        jest.advanceTimersByTime(4000);
+        http.verify(); // kein GET /protocol
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('starts renaming a freetext TOP with a null title (empty draft)', async () => {
+      const { cmp } = await loaded();
+      cmp.startRename(AGENDA_ITEM({ applicationId: null, title: null }) as never);
+      expect(cmp.renamingTopId()).toBe('t-1');
+      expect(cmp.renameDraft()).toBe(''); // item.title ?? ''
+    });
+
+    it('cancels a rename when the item turns out to be application-bound', async () => {
+      const { cmp, http } = await loaded();
+      // renamingTopId manuell auf die App-TOP-id setzen (startRename würde sie ablehnen),
+      // dann renameTop → item.applicationId-Zweig der OR-Kette → cancel, kein Request.
+      cmp.renamingTopId.set('t-app');
+      cmp.renameDraft.set('Neu');
+      cmp.renameTop(AGENDA_ITEM({ id: 't-app', applicationId: 'app-1', title: 'X' }) as never);
+      expect(cmp.renamingTopId()).toBeNull();
+      http.verify();
+    });
+
+    it('saves a renamed freetext TOP whose previous title was null (?? fallback)', async () => {
+      const { cmp, http } = await loaded();
+      // item.title === null → die OR-Kette erreicht `title === (item.title ?? '')`,
+      // wertet `item.title ?? ''` mit dem null-Zweig aus → '' ≠ 'Neu' → speichern.
+      cmp.startRename(AGENDA_ITEM({ id: 't-1', applicationId: null, title: null }) as never);
+      cmp.renameDraft.set('Neu');
+      cmp.renameTop(AGENDA_ITEM({ id: 't-1', applicationId: null, title: null }) as never);
+      const req = http.expectOne('/api/meetings/m-1/agenda/t-1');
+      expect(req.request.body).toEqual({ title: 'Neu' });
+      req.flush([AGENDA_ITEM({ title: 'Neu' })]);
+      expect(cmp.savingAgenda()).toBe(false);
+    });
+
+    it('prefills the application vote dialog with an empty name when the title is null', async () => {
+      const { cmp } = await loaded();
+      cmp.openVoteDialog(AGENDA_ITEM({ applicationId: 'app-1', title: null }) as never);
+      // questionPrefill mit name='' (item.title ?? '') → Vorschlag enthält keinen Titel.
+      expect(cmp.voteQuestion().length).toBeGreaterThanOrEqual(0);
+      expect(cmp.voteDialogOpen()).toBe(true);
+    });
+
+    it('adds a live-opened vote with all optional fields defaulted', async () => {
+      const { cmp, ws, fixture } = await loaded();
+      // vote_opened OHNE applicationId/agendaItemId/question/options → ?? null / ?? [] greifen.
+      // Bewusst minimale (Wire-)Nachricht: die optionalen Felder fehlen zur Laufzeit, daher
+      // der `as unknown as ServerMessage`-Cast (sonst verlangt VoteOpenedMsg `options`).
+      ws.subject.next({ type: 'vote_opened', voteId: 'v-min', closesAt: null } as unknown as ServerMessage);
+      fixture.detectChanges();
+      const v = cmp.meeting()?.votes.find((x) => x.id === 'v-min');
+      expect(v).toBeDefined();
+      expect(v?.applicationId).toBeNull();
+      expect(v?.agendaItemId).toBeNull();
+      expect(v?.question).toBeNull();
+      expect(v?.options).toEqual([]);
+    });
+
+    it('returns early from measureTimeline when there is no timeline element', async () => {
+      // Detail-Modus rendert KEINE Timeline → viewChild(tlScroll) ist undefined.
+      const { cmp } = await loaded();
+      const measure = (cmp as unknown as { measureTimeline(): void }).measureTimeline.bind(cmp);
+      expect(() => measure()).not.toThrow(); // if (!el) return
+    });
+
+    it('measures the timeline height with and without a footer/main wrapper', async () => {
+      const { fixture, http } = await setup({ id: null });
+      const cmp = fixture.componentInstance as Cmp;
+      http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
+      fixture.detectChanges();
+      const el = fixture.nativeElement.querySelector('.mtg__timeline') as HTMLElement;
+      expect(el).toBeTruthy();
+      const measure = (cmp as unknown as { measureTimeline(): void }).measureTimeline.bind(cmp);
+      // 1) Ohne .footer / .main im DOM → footerH=0 (footer-Ternär false), mainPadBottom=0.
+      measure();
+      expect(el.style.height).toMatch(/px$/);
+      // 2) Mit .footer (querySelector trifft) + .main-Vorfahr OHNE padding-bottom →
+      //    getComputedStyle liefert '' → Number.parseFloat → NaN → `|| 0` greift (Zeile 728).
+      const footer = document.createElement('div');
+      footer.className = 'footer';
+      Object.defineProperty(footer, 'offsetHeight', { value: 40, configurable: true });
+      document.body.appendChild(footer);
+      const mainNoPad = document.createElement('main');
+      mainNoPad.className = 'main';
+      el.parentElement?.insertBefore(mainNoPad, el);
+      mainNoPad.appendChild(el);
+      expect(el.closest('.main')).toBe(mainNoPad); // closest trifft den .main-Vorfahr
+      measure();
+      expect(el.style.height).toMatch(/px$/);
+      // 3) .main MIT parsebarer padding-bottom → parseFloat liefert die Zahl (Ternär-consequent).
+      const mainPadded = document.createElement('main');
+      mainPadded.className = 'main';
+      mainPadded.style.paddingBottom = '24px';
+      mainNoPad.parentElement?.insertBefore(mainPadded, mainNoPad);
+      mainPadded.appendChild(mainNoPad); // el bleibt verschachtelt; closest trifft mainNoPad weiterhin
+      // closest() liefert den NÄCHSTEN .main (mainNoPad) — daher el direkt in mainPadded hängen.
+      mainPadded.appendChild(el);
+      expect(el.closest('.main')).toBe(mainPadded);
+      measure();
+      expect(el.style.height).toMatch(/px$/);
+      footer.remove();
+      mainPadded.remove();
+      mainNoPad.remove();
+    });
+
+    it('defaults plan date/time to empty strings for a meeting without a date (?? fallback)', async () => {
+      const { http, fixture } = await setup();
+      const cmp = fixture.componentInstance as Cmp;
+      // adoptMeeting: m.date / m.startTime null → planDate/planTime fallen auf '' zurück.
+      http.expectOne('/api/meetings/m-1').flush({ ...MEETING, date: null, startTime: null });
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+      flushDelegationContext(http);
+      expect(cmp.planDate()).toBe('');
+      expect(cmp.planTime()).toBe('');
+    });
+
+    it('bails out of the now-marker scroll when the timeline disappears first', async () => {
+      // Übersicht mit Sitzungen → nowMarker + tlScroll werden gerendert, der Effect
+      // plant das doppelte rAF. BEVOR das rAF feuert, laden wir eine Sitzung → der
+      // `@if (!meeting())`-Block (inkl. Timeline) verschwindet → viewChild() = undefined
+      // → der innere rAF-Callback greift `if (!m || !s) return` (Zeile 637).
+      const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
+      const cmp = fixture.componentInstance as Cmp;
+      http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => {
+        const past = req.request.params.get('direction') === 'past';
+        req.flush({
+          items: [{ ...MEETING, id: past ? 'p1' : 'u1', status: past ? 'closed' : 'planned' }],
+          nextCursor: null,
+        });
+      });
+      fixture.detectChanges(); // Effect plant das äußere rAF
+      // Sitzung „laden" → Timeline aus dem DOM nehmen, bevor die rAFs feuern.
+      cmp.meeting.set(MEETING_MODEL);
+      fixture.detectChanges();
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      expect(cmp.meeting()).not.toBeNull();
+    });
+
+    it('positions the timeline at the now-marker once it is rendered', async () => {
+      // Übersicht mit Sitzungen in beiden Richtungen → nowMarker + tlScroll rendern.
+      // Der Effect scrollt einmalig (doppeltes rAF). Wir warten beide Frames ab,
+      // damit der innere rAF-Callback (inkl. der defensiven !m||!s-Zweige) ausgeführt wird.
+      const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
+      const cmp = fixture.componentInstance as Cmp;
+      http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => {
+        const past = req.request.params.get('direction') === 'past';
+        req.flush({
+          items: [{ ...MEETING, id: past ? 'p1' : 'u1', status: past ? 'closed' : 'planned' }],
+          nextCursor: null,
+        });
+      });
+      fixture.detectChanges();
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      expect(cmp.timelineEmpty()).toBe(false);
+    });
+
+    it('does nothing in patchVote once the meeting has been cleared', async () => {
+      const { cmp, http } = await loaded();
+      // openVote löst bei Erfolg patchVote aus — wenn das Meeting zwischenzeitlich
+      // null ist, greift der frühe Guard (if (!m) return) und kein State ändert sich.
+      cmp.openVote('v-2');
+      cmp.meeting.set(null);
+      http.expectOne('/api/votes/v-2/open').flush(null, { status: 204, statusText: 'No Content' });
+      expect(cmp.meeting()).toBeNull();
     });
   });
 });

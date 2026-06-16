@@ -442,4 +442,25 @@ describe('factories', () => {
     });
     expect(blankTransition('a', 'b')).toEqual({ from: 'a', to: 'b', actions: [] });
   });
+
+  it('blankState/blankTransition apply their default arguments', () => {
+    // No arguments → default key '', isInitial false (exercises the default-arg paths).
+    expect(blankState()).toEqual({
+      key: '',
+      label: { de: '', en: '' },
+      isInitial: false,
+      editAllowed: true,
+    });
+    // No arguments → default from/to '' (exercises both default-arg paths).
+    expect(blankTransition()).toEqual({ from: '', to: '', actions: [] });
+  });
+});
+
+describe('validateFlowGraph defensive defaults', () => {
+  it('treats a graph with no states field as empty (states ?? [])', () => {
+    const noStates = {} as unknown as FlowGraph;
+    const r = validateFlowGraph(noStates);
+    expect(r.valid).toBe(false);
+    expect(r.errors).toContain('flow graph has no states');
+  });
 });
