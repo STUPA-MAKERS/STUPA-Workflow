@@ -530,8 +530,8 @@ export const de = {
   'applications.detail.deleteConfirm':
     'Diesen Antrag endgültig löschen? Das kann nicht rückgängig gemacht werden.',
   'applications.detail.anonymized': 'Anonymisiert',
-  'applications.detail.eraseRequest': 'Daten löschen lassen',
-  'applications.detail.eraseTitle': 'Löschung beantragen',
+  'applications.detail.eraseRequest': 'Anonymisierung beantragen',
+  'applications.detail.eraseTitle': 'Anonymisierung beantragen',
   'applications.detail.eraseConfirm':
     'Möchten Sie die Löschung Ihrer zu diesem Antrag gespeicherten personenbezogenen Daten beantragen (DSGVO Art. 17)? Der Antrag wird zur Bearbeitung an die Datenschutz-Verwaltung übergeben.',
   'applications.detail.eraseRequested': 'Löschantrag eingegangen.',
@@ -594,6 +594,12 @@ export const de = {
   'applications.attachments.upload': 'Datei hochladen',
   'applications.attachments.uploading': 'Wird hochgeladen …',
   'applications.attachments.hint': 'Max. 10 MB. Wird nach dem Upload auf Schadsoftware geprüft.',
+  'applications.attachments.dropHint':
+    'Max. 10 MB pro Datei. Dateien hierher ziehen oder auswählen — wird nach dem Upload auf Schadsoftware geprüft.',
+  'applications.attachments.drop': 'Dateien zum Hochladen ablegen',
+  'applications.attachments.selectAll': 'Alle auswählen',
+  'applications.attachments.selectedCount': '{count} ausgewählt',
+  'applications.attachments.deleteSelected': 'Auswahl löschen',
   'applications.attachments.comparisonOffer': 'Vergleichsangebot',
   'applications.attachments.download': 'Herunterladen',
   'applications.attachments.delete': 'Anhang löschen',
@@ -2500,8 +2506,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.detail.deleteConfirm':
     'Permanently delete this application? This cannot be undone.',
   'applications.detail.anonymized': 'Anonymised',
-  'applications.detail.eraseRequest': 'Request data erasure',
-  'applications.detail.eraseTitle': 'Request erasure',
+  'applications.detail.eraseRequest': 'Request anonymisation',
+  'applications.detail.eraseTitle': 'Request anonymisation',
   'applications.detail.eraseConfirm':
     'Request erasure of the personal data stored for this application (GDPR Art. 17)? The request is forwarded to the privacy administrators for review.',
   'applications.detail.eraseRequested': 'Erasure request received.',
@@ -2562,6 +2568,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.attachments.upload': 'Upload file',
   'applications.attachments.uploading': 'Uploading …',
   'applications.attachments.hint': 'Max 10 MB. Scanned for malware after upload.',
+  'applications.attachments.dropHint':
+    'Max 10 MB per file. Drag files here or pick them — scanned for malware after upload.',
+  'applications.attachments.drop': 'Drop files to upload',
+  'applications.attachments.selectAll': 'Select all',
+  'applications.attachments.selectedCount': '{count} selected',
+  'applications.attachments.deleteSelected': 'Delete selected',
   'applications.attachments.comparisonOffer': 'Comparison offer',
   'applications.attachments.download': 'Download',
   'applications.attachments.delete': 'Delete attachment',

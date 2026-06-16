@@ -1,11 +1,15 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   effect,
   inject,
   input,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { from } from 'rxjs';
+import { concatMap } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -14,6 +18,8 @@ import type { Attachment, ScanState, Uuid } from '@core/api/models';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
 import { CardComponent } from '@shared/ui/card/card.component';
+import { CheckboxComponent } from '@shared/ui/checkbox/checkbox.component';
+import { IconComponent } from '@shared/ui/icon/icon.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { formatBytes, scanBadgeVariant } from './applications.util';
 
@@ -32,12 +38,25 @@ import { formatBytes, scanBadgeVariant } from './applications.util';
  * heißt nur „Scan fertig" — sauber-vs-Befund verrät erst der Download: 200 ⇒
  * bereit, **409** ⇒ Quarantäne (Zeile wird auf `quarantined` gesetzt), **410** ⇒
  * Link abgelaufen.
+ *
+ * Upload-Wege: Datei-Picker (mehrfach) **und** Drag&Drop auf das Panel (Overlay-
+ * Stil wie die Rechnungen-Seite). Mehrere Dateien werden sequentiell hochgeladen
+ * (concatMap), damit das Rate-Limit (429) nicht durch parallele Requests kippt.
+ * Anhänge sind mehrfach auswählbar (Checkbox je Zeile + „alle") für Sammel-Löschung.
  */
 @Component({
   selector: 'app-attachments-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, BadgeComponent, ButtonComponent, CardComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    BadgeComponent,
+    ButtonComponent,
+    CardComponent,
+    CheckboxComponent,
+    IconComponent,
+  ],
   templateUrl: './attachments-panel.component.html',
   styleUrl: './attachments-panel.component.scss',
 })
@@ -54,6 +73,20 @@ export class AttachmentsPanelComponent {
   readonly downloadingId = signal<Uuid | null>(null);
   readonly removingId = signal<Uuid | null>(null);
 
+  /** Mehrfachauswahl (Sammel-Löschung) + laufende Sammel-Aktion. */
+  readonly selected = signal<ReadonlySet<Uuid>>(new Set());
+  readonly bulkDeleting = signal(false);
+  readonly selectedCount = computed(() => this.selected().size);
+  readonly allSelected = computed(() => {
+    const list = this.attachments();
+    return list.length > 0 && list.every((a) => this.selected().has(a.id));
+  });
+
+  /** Drag&Drop-Overlay (Stil wie Rechnungen-Seite). `dragDepth` zählt
+   *  enter/leave verschachtelter Kinder, damit das Overlay nicht flackert. */
+  readonly dragActive = signal(false);
+  private dragDepth = 0;
+
   readonly scanVariant = scanBadgeVariant;
 
   constructor() {
@@ -61,6 +94,7 @@ export class AttachmentsPanelComponent {
     effect(() => {
       const id = this.applicationId();
       if (!id) return;
+      this.selected.set(new Set());
       this.api.listAttachments(id).subscribe({
         next: (list) => this.attachments.set(list),
         error: () => {
@@ -80,25 +114,129 @@ export class AttachmentsPanelComponent {
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    this.upload(file);
+    this.upload(Array.from(input.files ?? []));
     // Reset, damit dieselbe Datei erneut gewählt werden kann (change feuert sonst nicht).
     input.value = '';
   }
 
-  private upload(file: File): void {
-    if (this.uploading()) return;
+  /** Mehrere Dateien sequentiell hochladen (concatMap → kein 429 durch Parallel-
+   *  Requests). Erfolg/Fehler werden je Datei verbucht, am Ende eine Sammel-Meldung. */
+  private upload(files: File[]): void {
+    if (this.uploading() || !files.length) return;
     this.uploading.set(true);
-    this.api.uploadAttachment(this.applicationId(), file).subscribe({
-      next: (att) => {
-        this.attachments.update((list) => [...list, att]);
-        this.uploading.set(false);
-        this.toast.success(this.i18n.translate('applications.attachments.added'));
+    let ok = 0;
+    let failedStatus: number | undefined;
+    from(files)
+      .pipe(concatMap((file) => this.api.uploadAttachment(this.applicationId(), file)))
+      .subscribe({
+        next: (att) => {
+          ok++;
+          this.attachments.update((list) => [...list, att]);
+        },
+        error: (err: { status?: number }) => {
+          failedStatus = err.status;
+          this.uploading.set(false);
+          if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
+          this.toast.error(this.i18n.translate(this.uploadErrorKey(failedStatus)));
+        },
+        complete: () => {
+          this.uploading.set(false);
+          if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
+        },
+      });
+  }
+
+  // ----------------------------------------------------------- drag & drop
+  onDragEnter(event: DragEvent): void {
+    if (!this.canUpload() || !this.hasFiles(event)) return;
+    event.preventDefault();
+    this.dragDepth++;
+    this.dragActive.set(true);
+  }
+
+  onDragOver(event: DragEvent): void {
+    if (!this.canUpload() || !this.hasFiles(event)) return;
+    event.preventDefault();
+  }
+
+  onDragLeave(event: DragEvent): void {
+    if (!this.dragActive()) return;
+    event.preventDefault();
+    this.dragDepth = Math.max(0, this.dragDepth - 1);
+    if (this.dragDepth === 0) this.dragActive.set(false);
+  }
+
+  onDrop(event: DragEvent): void {
+    if (!this.canUpload()) return;
+    event.preventDefault();
+    this.dragDepth = 0;
+    this.dragActive.set(false);
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (files.length) this.upload(files);
+  }
+
+  private hasFiles(event: DragEvent): boolean {
+    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+  }
+
+  // ----------------------------------------------------------- bulk-select
+  isSelected(id: Uuid): boolean {
+    return this.selected().has(id);
+  }
+
+  toggleSelect(id: Uuid, checked: boolean): void {
+    this.selected.update((cur) => {
+      const next = new Set(cur);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  toggleSelectAll(checked: boolean): void {
+    this.selected.set(checked ? new Set(this.attachments().map((a) => a.id)) : new Set());
+  }
+
+  /** Ausgewählte Anhänge sequentiell löschen (concatMap), dann Auswahl leeren. */
+  bulkDelete(): void {
+    const ids = [...this.selected()];
+    if (!ids.length || this.bulkDeleting()) return;
+    this.bulkDeleting.set(true);
+    let failed = false;
+    from(ids)
+      .pipe(concatMap((id) => this.api.deleteAttachment(id)))
+      .subscribe({
+        next: () => {},
+        error: () => {
+          failed = true;
+          this.bulkDeleting.set(false);
+          this.refreshAfterBulk(ids);
+          this.toast.error(this.i18n.translate('applications.attachments.deleteError'));
+        },
+        complete: () => {
+          if (failed) return;
+          this.bulkDeleting.set(false);
+          this.refreshAfterBulk(ids);
+          this.toast.success(this.i18n.translate('applications.attachments.deleted'));
+        },
+      });
+  }
+
+  /** Erfolgreich gelöschte (DELETE ist idempotent) aus Liste + Auswahl entfernen.
+   *  Bei Teilausfall bleiben verbliebene markiert, damit ein Retry möglich ist. */
+  private refreshAfterBulk(attempted: Uuid[]): void {
+    const id = this.applicationId();
+    this.api.listAttachments(id).subscribe({
+      next: (list) => {
+        const remaining = new Set(list.map((a) => a.id));
+        this.attachments.set(list);
+        this.selected.update((cur) => new Set([...cur].filter((x) => remaining.has(x))));
       },
-      error: (err: { status?: number }) => {
-        this.uploading.set(false);
-        this.toast.error(this.i18n.translate(this.uploadErrorKey(err.status)));
+      error: () => {
+        // Ohne frische Liste: angefragte IDs lokal entfernen.
+        const removed = new Set(attempted);
+        this.attachments.update((list) => list.filter((a) => !removed.has(a.id)));
+        this.selected.update((cur) => new Set([...cur].filter((x) => !removed.has(x))));
       },
     });
   }

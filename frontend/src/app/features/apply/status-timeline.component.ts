@@ -24,6 +24,7 @@ import { isFieldVisible } from '@shared/forms/jsonlogic';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { CardComponent } from '@shared/ui/card/card.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { IconComponent } from '@shared/ui/icon/icon.component';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { ToastService } from '@shared/ui/toast/toast.service';
@@ -53,6 +54,7 @@ interface ReadonlyRow {
     BadgeComponent,
     CardComponent,
     ButtonComponent,
+    DialogComponent,
     IconComponent,
     AttachmentsPanelComponent,
     TranslatePipe,
@@ -88,6 +90,10 @@ export class StatusTimelineComponent {
     validators: [Validators.required],
   });
   readonly postingComment = signal(false);
+
+  /** DSGVO Art. 17: Anonymisierung der eigenen Antragsdaten beantragen. */
+  readonly confirmErase = signal(false);
+  readonly requestingErasure = signal(false);
 
   readonly canEdit = computed(
     () => this.editScope() && Boolean(this.application()?.state?.editAllowed),
@@ -334,6 +340,24 @@ export class StatusTimelineComponent {
         } else {
           this.toast.error(err.error?.detail ?? this.i18n.translate('status.toast.saveFailed'));
         }
+      },
+    });
+  }
+
+  /** DSGVO Art. 17: Anonymisierung der eigenen Antragsdaten beantragen. */
+  doRequestErasure(): void {
+    const app = this.application();
+    if (!app || this.requestingErasure()) return;
+    this.requestingErasure.set(true);
+    this.api.requestErasure(app.id).subscribe({
+      next: () => {
+        this.requestingErasure.set(false);
+        this.confirmErase.set(false);
+        this.toast.success(this.i18n.translate('applications.detail.eraseRequested'));
+      },
+      error: () => {
+        this.requestingErasure.set(false);
+        this.toast.error(this.i18n.translate('applications.detail.eraseRequestFailed'));
       },
     });
   }

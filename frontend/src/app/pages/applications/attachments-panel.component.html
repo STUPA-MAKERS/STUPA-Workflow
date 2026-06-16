@@ -1,9 +1,17 @@
+<div
+  class="att"
+  (dragenter)="onDragEnter($event)"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+>
 <app-card [heading]="'applications.attachments.title' | t">
   @if (canUpload()) {
     <div class="att__upload">
       <input
         #fileInput
         type="file"
+        multiple
         class="att__file"
         (change)="onFileSelected($event)"
         [attr.aria-label]="'applications.attachments.upload' | t"
@@ -16,15 +24,44 @@
       >
         {{ (uploading() ? 'applications.attachments.uploading' : 'applications.attachments.upload') | t }}
       </app-button>
-      <p class="m-0 text-muted text-sm">{{ 'applications.attachments.hint' | t }}</p>
+      <p class="m-0 text-muted text-sm">{{ 'applications.attachments.dropHint' | t }}</p>
     </div>
   }
 
   @if (attachments().length) {
+    @if (canUpload()) {
+      <div class="att__bulkbar">
+        <app-checkbox
+          [ngModel]="allSelected()"
+          (ngModelChange)="toggleSelectAll($event)"
+          [attr.aria-label]="'applications.attachments.selectAll' | t"
+        >{{ 'applications.attachments.selectAll' | t }}</app-checkbox>
+        @if (selectedCount()) {
+          <span class="att__bulkcount">{{ 'applications.attachments.selectedCount' | t: { count: selectedCount() } }}</span>
+          <app-button
+            class="att__bulkdel"
+            variant="danger"
+            size="sm"
+            [loading]="bulkDeleting()"
+            [disabled]="bulkDeleting()"
+            (click)="bulkDelete()"
+          >
+            {{ 'applications.attachments.deleteSelected' | t }}
+          </app-button>
+        }
+      </div>
+    }
     <ul class="att__list">
       @for (att of attachments(); track att.id) {
         <li class="flex items-center justify-between gap-4 pb-3 border-0 border-b border-solid border-line flex-wrap">
           <div class="att__meta">
+            @if (canUpload()) {
+              <app-checkbox
+                [ngModel]="isSelected(att.id)"
+                (ngModelChange)="toggleSelect(att.id, $event)"
+                [attr.aria-label]="att.filename"
+              />
+            }
             <span class="att__name">{{ att.filename }}</span>
             <span class="att__size">{{ size(att) }}</span>
             @if (att.isComparisonOffer) {
@@ -68,3 +105,15 @@
     <p class="text-muted">{{ 'applications.attachments.empty' | t }}</p>
   }
 </app-card>
+
+  <!-- Drop-Overlay (Stil wie Rechnungen-Seite): erscheint, solange eine Datei
+       über dem Panel schwebt. -->
+  @if (dragActive()) {
+    <div class="att__dropOverlay" aria-hidden="true">
+      <div class="att__dropInner">
+        <app-icon name="upload" [size]="32" />
+        <span>{{ 'applications.attachments.drop' | t }}</span>
+      </div>
+    </div>
+  }
+</div>

@@ -150,6 +150,7 @@ export interface ApplicationOutWire {
   updatedAt: IsoDateTime;
   applicant?: ApplicantOutWire | null;
   canEdit?: boolean;
+  isOwner?: boolean;
 }
 
 /** `ApplicationListItem` — Listen-Eintrag (kein `data`/`applicant`). */
@@ -390,6 +391,9 @@ export interface Application {
   applicant: Applicant | null;
   /** Darf der/die Anfragende bearbeiten/löschen (Verwalter:in oder Ersteller:in, #24)? */
   canEdit: boolean;
+  /** Ist der/die Anfragende der/die Ersteller:in (Antragsteller:in)? Gating für die
+   *  Anonymisierungs-Anfrage (DSGVO Art. 17) — nur das Datensubjekt. */
+  isOwner: boolean;
 }
 
 export interface ApplicationListItem {

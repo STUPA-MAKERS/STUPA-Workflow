@@ -91,6 +91,7 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     updatedAt: wire.updatedAt,
     applicant: mapApplicant(wire.applicant),
     canEdit: wire.canEdit ?? false,
+    isOwner: wire.isOwner ?? false,
   };
 }
 

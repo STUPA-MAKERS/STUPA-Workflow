@@ -18,7 +18,7 @@
           @if (isAdmin()) {
             <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
           }
-          @if (application.applicant && !application.applicant.anonymized) {
+          @if (application.isOwner && !application.applicant?.anonymized) {
             <app-button variant="danger" size="sm" (click)="confirmErase.set(true)">{{ 'applications.detail.eraseRequest' | t }}</app-button>
           }
         </div>
@@ -166,9 +166,9 @@
               }
               <time class="text-muted" [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
             </div>
-            @if (!version.diff) {
+            @if (version.version === 1) {
               <p class="text-muted">{{ 'applications.history.initial' | t }}</p>
-            } @else if (isEmptyDiff(version)) {
+            } @else if (!version.diff || isEmptyDiff(version)) {
               <p class="text-muted">{{ 'applications.history.diff.none' | t }}</p>
             } @else {
               <ul class="det__diff">

@@ -1,8 +1,49 @@
+.att {
+  position: relative;
+}
 .att__upload {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   margin-bottom: var(--space-4);
+}
+/* --- Mehrfachauswahl (Sammel-Löschung) --- */
+.att__bulkbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+}
+.att__bulkcount {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.att__bulkdel {
+  margin-left: auto;
+}
+/* --- Drop-Overlay (Stil wie Rechnungen-Seite) --- */
+.att__dropOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg));
+  border: 2px dashed var(--color-primary);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+.att__dropInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-primary);
+  font-weight: var(--fw-semibold);
 }
 .att__file {
   position: absolute;
