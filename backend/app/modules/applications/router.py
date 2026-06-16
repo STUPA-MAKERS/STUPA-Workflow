@@ -229,13 +229,16 @@ async def list_applications(
 ) -> Page[ApplicationListItem]:
     """Antragsliste (Filter: state/gremium/type/topf/q/Betrag/Datum; Sortierung; Paging).
 
-    Ohne ``application.read`` (und ohne Admin) sieht der Principal nur die **eigenen**
-    Anträge (``created_by``), #24; ``mine=true`` erzwingt das auch für Berechtigte."""
+    Ohne ``application.read`` (und ohne Admin) sieht der Principal die **eigenen**
+    Anträge (``created_by``, #24) **und** den Gremium-Lesescope (#committee-read:
+    Anträge in einer Sicht-Kostenstelle bzw. ``vote``-State seiner Gremien).
+    ``mine=true`` erzwingt den reinen Eigentümer-Filter auch für Berechtigte."""
     can_read = (
         "admin" in principal.roles
         or principal.has("application.read")
         or principal.has(READ_ALL_PERMISSION)
     )
+    restricted = not can_read and not mine
     return await service.list_applications(
         state_id=state_id,
         gremium_id=gremium_id,
@@ -250,6 +253,9 @@ async def list_applications(
         sort=sort,
         order=order,
         owner_sub=principal.sub if (mine or not can_read) else None,
+        # Gremium-Lesescope nur für Eingeschränkte (#committee-read); »mine« bleibt
+        # bewusst rein eigentümer-bezogen, Berechtigte sehen ohnehin alles.
+        committee_sub=principal.sub if restricted else None,
         limit=page.limit,
         offset=page.offset,
     )
