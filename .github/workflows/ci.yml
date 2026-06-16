@@ -285,11 +285,9 @@ jobs:
           path: backend
       - name: Kritische Module 100 % Branch
         working-directory: backend
-        # NICHT blockierend (continue-on-error): im reinen Unit-Lauf liegen mehrere
-        # kritische Module weit unter 100 % Branch (oauth/mcp/flow/budget/audit sind
-        # v. a. integrationsgetestet). Der Schritt reportet den Abstand zum 100 %-Ziel,
-        # bricht den Build aber nicht — bis die Unit-Branch-Coverage nachgezogen ist.
-        continue-on-error: true
+        # BLOCKIEREND: auth, voting, flow, budget, webhooks und audit erreichen jetzt
+        # 100 % Branch in der reinen Unit-Suite (DB-lose Fakes). Das Gate hält diesen
+        # Stand — fällt ein kritisches Modul unter 100 % Branch, bricht der Build.
         run: python -m scripts.coverage_critical coverage.xml pyproject.toml
 
   # ---- 9 Image-Build + Smoke ---------------------------------------------- #
