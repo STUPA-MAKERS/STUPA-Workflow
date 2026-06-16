@@ -8,11 +8,14 @@ referenzierte Votes/Decisions korrekt ein«):
 * :func:`build_vote_snippet` rendert eine Abstimmung als Markdown-Abschnitt
   (Titel + Ergebnis + Stimmen), der beim Einbetten an den Body angehängt wird.
 
-**Keine Injection** (security.md §2): das Ergebnis geht als HTTP-**Body** an den
+**Injection-Härtung** (security.md §2): das Ergebnis geht als HTTP-**Body** an den
 pytex-Client (kein Shell). Frontmatter-Skalare werden YAML-quotiert; Snippet-Text
 wird Markdown-escaped — beides wiederverwendet aus :mod:`app.modules.pdf.markdown`
-(keine Duplikation). Der Editor-Body bleibt bewusst **verbatim** (es ist genau das
-vom Protokollanten geschriebene Markdown, das pytex rendern soll).
+(keine Duplikation). Der Editor-Body ist nutzer-geschrieben; :func:`sanitize_user_markdown`
+entfernt vor der Ausgabe pytex' ``eval``-Escape (``[//]: # "EXPR"`` → RCE im Container)
+sowie Bilder mit absolutem/``..``-Pfad. Normales Markdown (Überschriften, Listen,
+Hervorhebung, echte Links/Bilder) bleibt erhalten. Als zweite, unabhängige Schicht
+rendert der Service den Body ``untrusted`` (pytex sperrt dann ``eval`` ohnehin).
 
 **Variante je Gremium** (flows §7): pytex kennt die Protokoll-Varianten
 ``protocol-stupa`` / ``protocol-asta``; die Gremium-``cd_variant`` wählt sie.
@@ -22,11 +25,78 @@ Für andere ``cd_variant`` bleibt die Variante ``None`` → pytex erkennt sie au
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date as _date
 from datetime import time as _time
 
 from app.modules.pdf.markdown import _md_escape, _yaml_scalar
+
+# --- RCE-Defense-in-Depth (security.md §2) ----------------------------------
+# pytex hat im ``trusted``-Modus einen Markdown-``eval``-Escape: eine Zeile der
+# Form ``[//]: # "EXPR"`` (eine Markdown-Link-Referenz-Definition, die im PDF
+# unsichtbar bleibt) führt ``eval(EXPR, {__builtins__})`` IM pytex-Container aus
+# → Remote Code Execution. Der Body ist nutzer-geschrieben (Protokollant), also
+# wird der Render-Pfad ohnehin ``untrusted`` gefahren — zusätzlich neutralisieren
+# wir den Konstrukt aber schon hier, damit selbst ein versehentlich ``trusted``
+# gerenderter Body pytex' ``eval`` nie erreichen kann (zwei unabhängige Layer).
+#
+# Erkannte Varianten der Link-Referenz-Definition (führender Whitespace erlaubt):
+#   [//]: # "EXPR"      [//]: # 'EXPR'      [//]: # (EXPR)      [//]: # EXPR
+# ``//`` ist die Konvention für »Kommentar«; das Label ist case-insensitiv und der
+# Doppelpunkt kann von beliebigem Whitespace gefolgt sein. Wir matchen defensiv
+# JEDE ``[label]: # …``-Zeile (das ``#``-Ziel ist nie ein echter Link).
+_EVAL_COMMENT_RE = re.compile(
+    r"^[ \t]*\[[^\]]*\]:[ \t]*#.*$",
+    re.MULTILINE,
+)
+# pytex' interner Marker für den ausgewerteten Ausdruck: ``\iffalse{pytex(...)}\fi``
+# (LaTeX-``\iffalse``-Block, der die Auswertung kapselt). Im Editor-Body hat er
+# nichts zu suchen → entfernen (auch mehrzeilig, non-greedy).
+_PYTEX_IFFALSE_RE = re.compile(
+    r"\\iffalse\s*\{?\s*pytex\s*\(.*?\)\s*\}?\s*\\fi",
+    re.DOTALL | re.IGNORECASE,
+)
+# FIX 3 (Bild-Pfad-Traversal, narrow): Markdown-Bilder ``![alt](PFAD)`` mit
+# absolutem (``/...``) oder ``../``-Traversal-Pfad könnten via ``\includegraphics``
+# einen Container-Dateipfad referenzieren. pytex beschränkt zwar auf Bild-Endungen
+# (Restrisiko gering), aber ein lesbares Bild außerhalb des Render-Verzeichnisses
+# könnte exfiltriert werden. Solche Bild-Pfade werden zum Klartext-Platzhalter
+# entschärft; relative In-Repo-Pfade bleiben unberührt.
+_UNSAFE_IMAGE_RE = re.compile(
+    r"!\[(?P<alt>[^\]]*)\]\(\s*(?P<path>[^)\s]+)[^)]*\)",
+)
+
+
+def _is_unsafe_image_path(path: str) -> bool:
+    """Bild-Pfad mit absolutem Root- oder ``..``-Traversal-Anteil? (FIX 3)."""
+    if path.startswith(("/", "\\")) or re.match(r"^[a-zA-Z]:[\\/]", path):
+        return True  # absolut (POSIX/UNC/Windows-Laufwerk)
+    # ``../`` an beliebiger Stelle (auch URL-encoded ``%2e%2e``) ist Traversal.
+    normalized = path.replace("\\", "/").lower()
+    return "../" in normalized or "%2e%2e" in normalized
+
+
+def _neutralize_unsafe_image(match: re.Match[str]) -> str:
+    path = match.group("path")
+    if not _is_unsafe_image_path(path):
+        return match.group(0)  # harmloser relativer Pfad → unverändert
+    alt = match.group("alt").strip() or "Bild"
+    # Pfad NICHT durchreichen — als Klartext-Platzhalter entschärfen.
+    return f"*[{_md_escape(alt)} (Bild entfernt)]*"
+
+
+def sanitize_user_markdown(markdown: str) -> str:
+    """Nutzer-Markdown von pytex-``eval``-Escapes (+ Pfad-Traversal-Bildern) befreien.
+
+    Entfernt RCE-Vektoren (``[//]: # "…"``-Kommentar-Eval, ``\\iffalse{pytex(…)}\\fi``)
+    und entschärft Bilder mit absolutem/``..``-Pfad (FIX 3). **Normales** Markdown
+    (Überschriften, Listen, Hervorhebung, echte Links/Bilder mit relativem Pfad)
+    bleibt vollständig erhalten."""
+    cleaned = _PYTEX_IFFALSE_RE.sub("", markdown)
+    cleaned = _EVAL_COMMENT_RE.sub("", cleaned)
+    cleaned = _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, cleaned)
+    return cleaned
 
 # Gremium-``cd_variant`` → pytex-Protokoll-Variante (flows §7).
 _PROTOCOL_VARIANTS = {"stupa", "asta"}
@@ -110,8 +180,14 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
 
 
 def build_protocol_document(doc: ProtocolDoc) -> str:
-    """Frontmatter + Editor-Body → finales Markdown (deterministisch, injection-sicher)."""
-    body = doc.markdown.strip("\n")
+    """Frontmatter + Editor-Body → finales Markdown (deterministisch).
+
+    Der nutzer-geschriebene Body wird durch :func:`sanitize_user_markdown` von
+    pytex-``eval``-Escapes (RCE, security.md §2) und Pfad-Traversal-Bildern befreit;
+    normales Markdown bleibt verbatim. Frontmatter-Skalare bleiben YAML-quotiert.
+    Der Body ist **nicht** generell injection-sicher gegenüber LaTeX — darum rendert
+    der Service diesen Pfad zusätzlich ``untrusted`` (Defense in Depth)."""
+    body = sanitize_user_markdown(doc.markdown).strip("\n")
     out = [*_frontmatter(doc), ""]
     if body:
         out.append(body)

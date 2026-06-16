@@ -432,3 +432,60 @@ def test_handshake_without_cookie_is_rejected() -> None:
     client = TestClient(app)
     with pytest.raises(WebSocketDisconnect), client.websocket_connect(_url(meeting)):
         pass
+
+
+def test_handshake_foreign_origin_is_rejected() -> None:
+    """FIX 4 (CSWSH): fremder ``Origin`` ⇒ Handshake schließt mit 4403, noch VOR dem
+    Cookie-/RBAC-Pfad. Der Doppel-Close des Routers verpufft geräuschlos."""
+    app, meeting = _build_real_handshake(naive=False)
+    client = TestClient(app)
+    name, value = _signed_cookie()
+    client.cookies.set(name, value)
+    with pytest.raises(WebSocketDisconnect) as exc, client.websocket_connect(
+        _url(meeting), headers={"origin": "https://evil.example"}
+    ):
+        pass
+    assert exc.value.code == 4403
+
+
+# --------------------------------------------------------------------------- #
+# FIX 5 — Verbindungs-Cap je (Sitzung, Principal)
+# --------------------------------------------------------------------------- #
+from app.modules.livevote import router as lv_router  # noqa: E402
+
+
+def test_connection_slot_acquire_release_cap() -> None:
+    mid = uuid4()
+    sub = "p"
+    lv_router._connection_counts.clear()
+    cap = lv_router._MAX_CONNECTIONS_PER_PRINCIPAL
+    # Bis zum Limit belegbar …
+    for _ in range(cap):
+        assert lv_router._try_acquire_slot(mid, sub) is True
+    # … darüber hinaus abgewiesen.
+    assert lv_router._try_acquire_slot(mid, sub) is False
+    # Freigabe öffnet wieder einen Slot.
+    lv_router._release_slot(mid, sub)
+    assert lv_router._try_acquire_slot(mid, sub) is True
+    # Alles freigeben räumt den Zähler-Eintrag (kein Speicherleck).
+    for _ in range(cap):
+        lv_router._release_slot(mid, sub)
+    assert (mid, sub) not in lv_router._connection_counts
+    # Freigabe ohne Bestand ist idempotent (kein KeyError / negative Zähler).
+    lv_router._release_slot(mid, sub)
+    assert (mid, sub) not in lv_router._connection_counts
+
+
+def test_too_many_connections_rejected_over_ws() -> None:
+    meeting = _meeting()
+    app, _, _ = _build(meeting=meeting, principal=_voter())
+    lv_router._connection_counts.clear()
+    # Slots künstlich auf das Limit füllen → der nächste Connect wird abgewiesen.
+    key = (meeting.id, "p")
+    lv_router._connection_counts[key] = lv_router._MAX_CONNECTIONS_PER_PRINCIPAL
+    client = TestClient(app)
+    try:
+        with client.websocket_connect(_url(meeting)) as ws:
+            assert _recv(ws) == {"type": "error", "code": "too_many_connections"}
+    finally:
+        lv_router._connection_counts.clear()

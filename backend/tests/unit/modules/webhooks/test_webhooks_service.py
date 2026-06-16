@@ -297,6 +297,44 @@ async def test_deliver_dead_after_max_tries() -> None:
 
 
 @respx.mock
+async def test_deliver_caps_oversized_response_body() -> None:
+    # Bösartiger Empfänger antwortet 2xx, aber mit einem riesigen Body (> 64 KiB).
+    # Der Body wird gestreamt gelesen und nach dem Limit verworfen — der Statuscode
+    # entscheidet weiterhin (OOM-Schutz, security.md §5).
+    from app.modules.webhooks.service import _MAX_RESPONSE_BYTES
+
+    big_body = b"x" * (_MAX_RESPONSE_BYTES * 4)
+    hook = _hook(url="https://hook.test/h")
+    respx.post(_IP_URL).mock(return_value=httpx.Response(200, content=big_body))
+    session = FakeSession()
+    delivery = _delivery(hook.id, attempts=0)
+    session.store.update({delivery.id: delivery, hook.id: hook})
+    async with httpx.AsyncClient() as client:
+        outcome = await _svc(session).deliver(
+            delivery.id, http_client=client, resolver=_public_resolver
+        )
+    assert outcome.kind == "ok"
+    assert delivery.status == "ok"
+    assert delivery.response_code == 200
+
+
+@respx.mock
+async def test_deliver_small_response_body_read_fully() -> None:
+    # Kleiner Body (< Limit) → Schleife endet regulär ohne break; Statuscode bleibt.
+    hook = _hook(url="https://hook.test/h")
+    respx.post(_IP_URL).mock(return_value=httpx.Response(200, content=b"ok"))
+    session = FakeSession()
+    delivery = _delivery(hook.id, attempts=0)
+    session.store.update({delivery.id: delivery, hook.id: hook})
+    async with httpx.AsyncClient() as client:
+        outcome = await _svc(session).deliver(
+            delivery.id, http_client=client, resolver=_public_resolver
+        )
+    assert outcome.kind == "ok"
+    assert delivery.response_code == 200
+
+
+@respx.mock
 async def test_deliver_transport_error_retries() -> None:
     hook = _hook(url="https://hook.test/h")
     respx.post(_IP_URL).mock(side_effect=httpx.ConnectError("down"))

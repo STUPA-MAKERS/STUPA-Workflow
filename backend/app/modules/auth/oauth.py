@@ -61,24 +61,31 @@ SCOPES: dict[str, frozenset[str]] = {
 # eingeloggten Nutzers gekappt — ein Nicht-Admin erhält nur seine Teilmenge.
 DEFAULT_SCOPE = " ".join(SCOPES.keys())
 
-# Wählbare Token-Lebensdauern (Consent-UI) → Access-Token-TTL in Sekunden; ``None`` =
-# läuft nie ab (jederzeit über die Grants-Seite widerrufbar). Reihenfolge = Anzeige.
-LIFETIMES: dict[str, int | None] = {
+# Harte Obergrenze für jede Token-Lebensdauer (Sekunden). Es gibt KEINE nie ablaufenden
+# Tokens mehr (security): selbst der längste wählbare Wert ist hierdurch gedeckelt.
+MAX_LIFETIME_SECONDS = 90 * 24 * 3600  # 90 Tage
+
+# Wählbare Token-Lebensdauern (Consent-UI) → Access-Token-TTL in Sekunden. Reihenfolge =
+# Anzeige. Eine "never"-Option gibt es bewusst nicht — jedes Token läuft ab (≤ 90d),
+# unabhängig vom jederzeit möglichen Widerruf über die Grants-Seite.
+LIFETIMES: dict[str, int] = {
     "1h": 3600,
     "8h": 8 * 3600,
     "1d": 24 * 3600,
     "30d": 30 * 24 * 3600,
     "90d": 90 * 24 * 3600,
-    "never": None,
 }
 DEFAULT_LIFETIME = "30d"
 
 
-def resolve_lifetime(key: str | None) -> int | None:
-    """Lifetime-Key → Access-TTL (Sekunden) oder ``None`` (nie). Unbekannt → Default."""
+def resolve_lifetime(key: str | None) -> int:
+    """Lifetime-Key → Access-TTL (Sekunden). Unbekannt/``None`` → Default.
+
+    Das Ergebnis ist immer endlich und durch ``MAX_LIFETIME_SECONDS`` gedeckelt — es
+    kann nie ``None`` (unbegrenzt) zurückgeben."""
     if key is None or key not in LIFETIMES:
         key = DEFAULT_LIFETIME
-    return LIFETIMES[key]
+    return min(LIFETIMES[key], MAX_LIFETIME_SECONDS)
 
 
 # i18n-Schlüssel-Stamm je Scope für die Consent-UI (Label/Beschreibung im FE).

@@ -73,9 +73,19 @@ class _FakePytex:
 
     def __init__(self) -> None:
         self.calls: list[str] = []
+        # Pro Render mitgeschriebener ``trust_level`` (RCE-Schutz: der Protokoll-Pfad
+        # rendert nutzer-Markdown ``untrusted``); ``None`` = Default.
+        self.trust_levels: list[str | None] = []
 
-    async def render_pdf(self, markdown: str, *, variant: str | None = None) -> bytes:
+    async def render_pdf(
+        self,
+        markdown: str,
+        *,
+        variant: str | None = None,
+        trust_level: str | None = None,
+    ) -> bytes:
         self.calls.append(markdown)
+        self.trust_levels.append(trust_level)
         # deterministisch + je Render unterscheidbar (Index in der Call-Liste).
         return f"%PDF-{len(self.calls)}::{markdown}".encode()
 

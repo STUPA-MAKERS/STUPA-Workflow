@@ -498,6 +498,68 @@ def test_applications_export_xlsx(
     assert fake_service.session.committed is True
 
 
+def test_applications_export_caps_rows(app: FastAPI, client: TestClient) -> None:
+    """Treffermenge > EXPORT_MAX_ROWS → 413 statt riesige Workbook (anti-DoS, FIX 6)."""
+    from app.modules.applications.router import EXPORT_MAX_ROWS
+
+    class _BigService:
+        def __init__(self) -> None:
+            self.name_maps_called = False
+
+        async def list_applications(self, **kwargs: object) -> Page[ApplicationListItem]:
+            # ``total`` über der Kappe signalisiert »zu groß«.
+            item = ApplicationListItem(
+                id=uuid4(), typeId=uuid4(), state=_state(), createdAt=_NOW, updatedAt=_NOW
+            )
+            return Page(
+                items=[item],
+                total=EXPORT_MAX_ROWS + 1,
+                limit=int(kwargs["limit"]),  # type: ignore[call-overload]
+                offset=0,
+            )
+
+        async def name_maps(self, locale: str = "de") -> tuple[dict, dict]:
+            self.name_maps_called = True
+            return {}, {}
+
+    big = _BigService()
+    app.dependency_overrides[get_applications_service] = lambda: big
+    _as_principal(app, "application.export")
+    r = client.get("/api/applications/export.xlsx")
+    assert r.status_code == 413
+    # name_maps/Workbook-Bau wird gar nicht erst erreicht.
+    assert big.name_maps_called is False
+
+
+def test_applications_export_caps_rows_by_item_count(
+    app: FastAPI, client: TestClient
+) -> None:
+    """Auch wenn ``total`` nicht zählt: mehr gelieferte Zeilen als Kappe → 413 (FIX 6)."""
+    from app.modules.applications.router import EXPORT_MAX_ROWS
+
+    class _ManyItemsService:
+        async def list_applications(self, **kwargs: object) -> Page[ApplicationListItem]:
+            items = [
+                ApplicationListItem(
+                    id=uuid4(),
+                    typeId=uuid4(),
+                    state=_state(),
+                    createdAt=_NOW,
+                    updatedAt=_NOW,
+                )
+                for _ in range(EXPORT_MAX_ROWS + 1)
+            ]
+            return Page(items=items, total=0, limit=int(kwargs["limit"]), offset=0)  # type: ignore[call-overload]
+
+        async def name_maps(self, locale: str = "de") -> tuple[dict, dict]:
+            return {}, {}
+
+    app.dependency_overrides[get_applications_service] = lambda: _ManyItemsService()
+    _as_principal(app, "application.export")
+    r = client.get("/api/applications/export.xlsx")
+    assert r.status_code == 413
+
+
 # --------------------------------------------------------------------------- #
 # comments
 # --------------------------------------------------------------------------- #
@@ -558,6 +620,35 @@ def test_list_comments_principal_all(
     r = client.get(f"/api/applications/{uuid4()}/comments")
     assert r.status_code == 200
     assert fake_service.last_include_internal is True
+
+
+def test_comment_body_too_long_422(app: FastAPI, client: TestClient) -> None:
+    """Freitext-Kappe (FIX 5): Body > 10 000 Zeichen → 422."""
+    _as_principal(app, "application.read")
+    r = client.post(
+        f"/api/applications/{uuid4()}/comments",
+        json={"body": "x" * 10_001, "visibility": "public"},
+    )
+    assert r.status_code == 422
+
+
+def test_comment_body_at_cap_ok(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """Genau an der Kappe (10 000) bleibt gültig (FIX 5)."""
+    _as_principal(app, "application.read")
+    r = client.post(
+        f"/api/applications/{uuid4()}/comments",
+        json={"body": "x" * 10_000, "visibility": "public"},
+    )
+    assert r.status_code == 201
+
+
+def test_create_application_long_name_rejected_422(client: TestClient) -> None:
+    """applicantName-Kappe (FIX 5): > 256 Zeichen → 422."""
+    body = _create_body() | {"applicantName": "n" * 257}
+    r = client.post("/api/applications", json=body)
+    assert r.status_code == 422
 
 
 # --------------------------------------------------------------------------- #

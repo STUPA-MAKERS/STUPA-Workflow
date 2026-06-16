@@ -19,12 +19,13 @@ from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFil
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.applications.access import (
     MANAGE_PERMISSION,
+    READ_ALL_PERMISSION,
     READ_PERMISSION,
     Access,
+    _committee_can_read,
     _resolve_with_creator,
     require_app_edit,
     require_app_read,
-    resolve_access,
 )
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.queue import scan_queue_from_pool
@@ -65,6 +66,34 @@ def get_files_service(
 
 
 ServiceDep = Annotated[FilesService, Depends(get_files_service)]
+
+
+async def _resolve_attachment_read(
+    db: DbSession,
+    application_id: UUID,
+    principal: Principal | None,
+    applicant: Applicant | None,
+) -> Access:
+    """Lesezugriff auf den Antrag eines Anhangs — deckt **dieselben** Pfade wie
+    :func:`require_app_read` ab (statt nur globalem ``application.read`` via
+    ``resolve_access``): ``application.read_all``, ``view``-Antragsteller, eingeloggte:r
+    Ersteller:in (#24) **oder** Gremium-Mitglied im Lesescope (#committee-read).
+
+    Spiegelt bewusst die Antrags-Read-Logik, damit ein Antrag, den jemand lesen darf,
+    auch dessen Anhänge liefert (keine Verfügbarkeitslücke). Der Cross-Object-404 bleibt
+    Sache des Routers (kein Existenz-Orakel)."""
+    if principal is not None and principal.has(READ_ALL_PERMISSION):
+        return Access(application_id, principal, None)
+    try:
+        return await _resolve_with_creator(
+            db, application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
+        )
+    except ForbiddenError:
+        if principal is not None and await _committee_can_read(
+            db, application_id, principal
+        ):
+            return Access(application_id, principal, None)
+        raise
 
 
 async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
@@ -133,6 +162,7 @@ async def list_attachments(
 async def get_attachment_url(
     attachment_id: UUID,
     service: ServiceDep,
+    db: DbSession,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> SignedUrlOut:
@@ -142,16 +172,13 @@ async def get_attachment_url(
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
     attachment = await service.get_attachment(attachment_id)
-    # A/P-Zugriff gegen den Antrag des Anhangs prüfen. Cross-Tenant (auth, aber fremder
-    # Antrag) → bewusst 404 statt 403: ein authentifizierter Fremder soll die Existenz
-    # eines Anhangs nicht unterscheiden können (kein Existenz-Orakel). view-Scope genügt.
+    # Lesezugriff gegen den Antrag des Anhangs prüfen — gleiche Pfade wie require_app_read
+    # (read_all/Ersteller/Gremium-Read), nicht nur globales application.read. Cross-Tenant
+    # (auth, aber kein Lesezugriff) → bewusst 404 statt 403: ein authentifizierter Fremder
+    # soll die Existenz eines Anhangs nicht unterscheiden können (kein Existenz-Orakel).
     try:
-        resolve_access(
-            attachment.application_id,
-            principal,
-            applicant,
-            perm=READ_PERMISSION,
-            scope="view",
+        await _resolve_attachment_read(
+            db, attachment.application_id, principal, applicant
         )
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc
@@ -166,6 +193,7 @@ async def get_attachment_url(
 async def download_attachment(
     attachment_id: UUID,
     service: ServiceDep,
+    db: DbSession,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Response:
@@ -179,12 +207,8 @@ async def download_attachment(
         raise UnauthorizedError("Authentication required.")
     attachment = await service.get_attachment(attachment_id)
     try:
-        resolve_access(
-            attachment.application_id,
-            principal,
-            applicant,
-            perm=READ_PERMISSION,
-            scope="view",
+        await _resolve_attachment_read(
+            db, attachment.application_id, principal, applicant
         )
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc

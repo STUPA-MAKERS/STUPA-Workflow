@@ -81,6 +81,12 @@ async def _principal_from_access_token(
     if row is None or row.active is False:
         return None
     principal = await rbac.resolve_principal(db, row, now)
+    # Kill-Switch: Access-Tokens stammen ausschließlich aus dem OAuth-Grant-Flow, der
+    # am Consent auf `mcp.use` gegated ist. Wird diese Permission später entzogen,
+    # müssen bereits ausgestellte Tokens sofort wirkungslos werden — daher hier gegen
+    # die UNGESCOPTE Permission-Menge (vor der Scope-Kappung) erneut prüfen.
+    if not principal.has("mcp.use"):
+        return None
     principal.scope_permissions = oauth.scope_permissions(oauth.parse_scope(scope))
     return principal
 

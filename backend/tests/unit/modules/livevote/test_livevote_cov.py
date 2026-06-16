@@ -131,8 +131,10 @@ class _QueueSession:
         self.committed = 0
         self.flushed = 0
         self.bind = _Bind if bind else None
+        self.last_statement: Any = None
 
     async def execute(self, _stmt: Any) -> _Result:
+        self.last_statement = _stmt
         return self.executes.pop(0) if self.executes else _Result([])
 
     async def scalars(self, _stmt: Any) -> _Scalars:
@@ -507,6 +509,7 @@ def _vote_row(
         application_id=uuid4(),
         agenda_item_id=uuid4(),
         question="Q?",
+        eligible_group=str(uuid4()),
         config={"options": ["yes", "no"], "majorityRule": "simple", "secret": secret},
         status=status,
         result=result,
@@ -523,6 +526,21 @@ async def test_votes_for_empty() -> None:
 async def test_present_by_meeting_empty() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc._present_by_meeting([]) == {}
+
+
+async def test_absent_delegated_by_meeting_empty() -> None:
+    svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
+    assert await svc._absent_delegated_by_meeting([]) == {}
+
+
+async def test_absent_delegated_by_meeting_groups_rows() -> None:
+    # FIX 2: liefert {(meeting, str(gremium)): Anzahl} für aktive Stimm-Delegationen
+    # abwesender Delegierender.
+    mid, gid = uuid4(), uuid4()
+    sess = _QueueSession(executes=[res((mid, gid, 2))])
+    svc = MeetingService(sess)  # type: ignore[arg-type]
+    out = await svc._absent_delegated_by_meeting([mid])
+    assert out == {(mid, str(gid)): 2}
 
 
 async def test_vote_tallies_empty() -> None:
@@ -590,6 +608,29 @@ async def test_votes_for_open_all_voted_revealed() -> None:
     item = out[mid][0]
     assert item.revealed is True
     assert item.counts == {"yes": 2, "no": 0}
+
+
+async def test_votes_for_open_proxy_denominator_hides_until_proxy_votes() -> None:
+    # FIX 2: 2 Anwesende + 1 Stimm-Delegation eines Abwesenden → expected=3. Mit nur
+    # 2 Stimmen (Anwesende) ist die Proxy-Stimme noch offen → verdeckt.
+    mid = uuid4()
+    gid = uuid4()
+    vrow = _vote_row(meeting_id=mid, status="open", secret=False, eligible=5)
+    vrow.eligible_group = str(gid)
+    sess = _QueueSession(
+        executes=[
+            res(vrow),  # votes
+            res((vrow.id, "yes"), (vrow.id, "yes")),  # open ballots: 2
+            res(),  # secret ballots
+            res((mid, 2)),  # present=2
+            res((mid, gid, 1)),  # 1 Proxy-Stimme abwesender Delegierender → expected=3
+        ]
+    )
+    svc = MeetingService(sess)  # type: ignore[arg-type]
+    out = await svc._votes_for([mid])
+    item = out[mid][0]
+    assert item.revealed is False  # 2 < expected 3 → verdeckt
+    assert item.counts == {}
 
 
 async def test_votes_for_open_not_all_voted_hidden() -> None:
@@ -1213,6 +1254,21 @@ async def test_agenda_item_has_vote() -> None:
     assert await svc.agenda_item_has_vote(uuid4()) is True
     svc2 = MeetingService(_QueueSession(executes=[res()]))  # type: ignore[arg-type]
     assert await svc2.agenda_item_has_vote(uuid4()) is False
+
+
+async def test_agenda_item_has_vote_excludes_cancelled() -> None:
+    # FIX 1 (#cancel-reopen): das Guard-Statement MUSS abgebrochene Votes
+    # ausblenden (status != 'cancelled') — sonst blockt ein einmal abgebrochener
+    # Antrags-Vote das Neu-Eröffnen für immer.
+    sess = _QueueSession(executes=[res()])
+    svc = MeetingService(sess)  # type: ignore[arg-type]
+    await svc.agenda_item_has_vote(uuid4())
+    rendered = str(
+        sess.last_statement.compile(  # type: ignore[attr-defined]
+            compile_kwargs={"literal_binds": True}
+        )
+    )
+    assert "status" in rendered and "cancelled" in rendered
 
 
 async def test_application_state_kind() -> None:

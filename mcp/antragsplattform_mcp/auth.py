@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import secrets
 import threading
 import time
@@ -35,6 +36,26 @@ class AuthError(RuntimeError):
     pass
 
 
+# Loopback hosts where cleartext http is tolerated for local dev (RFC 8252 §8.3).
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
+
+
+def _require_secure_base(base_url: str) -> None:
+    """Reject cleartext http:// base URLs — OAuth code/tokens must not transit in the
+    clear. http:// is allowed ONLY for explicit loopback/dev (localhost/127.0.0.1/[::1]);
+    everything else MUST be https://. Apply before any discovery/token request."""
+    parsed = urlparse(base_url)
+    if parsed.scheme == "https":
+        return
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme == "http" and host in _LOOPBACK_HOSTS:
+        return
+    raise AuthError(
+        f"Insecure platform URL {base_url!r}: OAuth requires https:// "
+        "(http:// is allowed only for loopback/dev: localhost, 127.0.0.1, [::1])."
+    )
+
+
 def _pkce_pair() -> tuple[str, str]:
     verifier = secrets.token_urlsafe(64)
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
@@ -43,6 +64,9 @@ def _pkce_pair() -> tuple[str, str]:
 
 
 def _discover(base_url: str) -> dict:
+    # Reject cleartext URLs before any network call — discovery + the endpoints it yields
+    # (authorization/token) carry the OAuth code and tokens.
+    _require_secure_base(base_url)
     # Standard discovery is at the root; some deployments only route /api through the
     # edge proxy, so fall back to the /api-mirrored metadata.
     candidates = [
@@ -188,11 +212,22 @@ def _load(config: Config) -> dict | None:
 
 def _save(config: Config, tokens: dict) -> None:
     path = config.token_path()
-    path.write_text(json.dumps(tokens))
+    # Atomically create the cache file mode 0600 from the start (no TOCTOU window where the
+    # secret is world-readable under the prevailing umask). Write to a sibling temp file and
+    # os.replace into place; permission failures on the secret MUST NOT be swallowed.
+    payload = json.dumps(tokens).encode("utf-8")
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
-        path.chmod(0o600)
-    except OSError:
-        pass
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(payload)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def ensure_access_token(config: Config, *, force_login: bool = False) -> str:

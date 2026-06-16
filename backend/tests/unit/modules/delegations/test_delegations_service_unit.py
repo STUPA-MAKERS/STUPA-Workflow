@@ -192,6 +192,7 @@ def _happy_db(
         result(["vote.cast"]),  # Eligibility: membership mit vote.cast
         result(*(pool_ids or [])),  # Pool-Empfänger
         result(*(member_ids if member_ids is not None else [delegate.id])),
+        result(),  # create advisory-lock (pg_advisory_xact_lock je Sitzung)
         result(*(existing or [])),  # bestehende Delegationen der Sitzung
         result(),  # audit advisory lock
         result(),  # audit prev-hash
@@ -357,7 +358,7 @@ async def test_create_pool_after_meeting_start_422() -> None:
 async def test_create_double_outgoing_409() -> None:
     db = _happy_db()
     me, delegate = db._me, db._delegate
-    db._results[5] = result((me.id, uuid4(), False))  # bestehende eigene Zeile
+    db._results[6] = result((me.id, uuid4(), False))  # bestehende eigene Zeile
     with pytest.raises(ConflictError, match="already delegated"):
         await _svc(db).create(_payload(delegate.id), _actor())
 
@@ -365,7 +366,7 @@ async def test_create_double_outgoing_409() -> None:
 async def test_create_chain_when_actor_is_recipient_422() -> None:
     db = _happy_db()
     me, delegate = db._me, db._delegate
-    db._results[5] = result((uuid4(), me.id, False))  # jemand delegiert an mich
+    db._results[6] = result((uuid4(), me.id, False))  # jemand delegiert an mich
     with pytest.raises(ValidationProblem, match="delegate on"):
         await _svc(db).create(_payload(delegate.id), _actor())
 
@@ -373,7 +374,7 @@ async def test_create_chain_when_actor_is_recipient_422() -> None:
 async def test_create_chain_when_recipient_delegated_away_422() -> None:
     db = _happy_db()
     delegate = db._delegate
-    db._results[5] = result((delegate.id, uuid4(), False))  # Empfänger delegierte selbst
+    db._results[6] = result((delegate.id, uuid4(), False))  # Empfänger delegierte selbst
     with pytest.raises(ValidationProblem, match="delegated their own"):
         await _svc(db).create(_payload(delegate.id), _actor())
 
@@ -381,7 +382,7 @@ async def test_create_chain_when_recipient_delegated_away_422() -> None:
 async def test_create_second_voting_delegation_to_same_recipient_409() -> None:
     db = _happy_db()
     delegate = db._delegate
-    db._results[5] = result((uuid4(), delegate.id, True))  # trägt schon ein Stimmrecht
+    db._results[6] = result((uuid4(), delegate.id, True))  # trägt schon ein Stimmrecht
     with pytest.raises(ConflictError, match="carries"):
         await _svc(db, voting=True).create(_payload(delegate.id, voting=True), _actor())
 
@@ -554,7 +555,7 @@ async def test_substitutes_list_resolves_names() -> None:
     )
     db = fake_session(result(row), _names((row.substitute_principal_id, "Sub", None)))
     db.get_results = [_gremium()]
-    out = await _svc(db).substitutes_list(GREMIUM_ID, _actor())
+    out = await _svc(db).substitutes_list(GREMIUM_ID, _actor(perms={"admin.delegations"}))
     assert out[0].substitute_name == "Sub"
     assert out[0].member_id is None
 

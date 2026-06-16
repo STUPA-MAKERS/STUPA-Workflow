@@ -48,6 +48,19 @@ from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 
 
+def open_tally_revealed(present: int, voted: int, expected: int) -> bool:
+    """Reveal-Regel für offene, NICHT-geheime Votes (#vote-progress).
+
+    Der laufende Stimmenstand wird erst sichtbar, wenn **alle erwarteten** Stimmen
+    eingegangen sind — sonst leakt der Zwischenstand am Beamer/Voter. ``expected``
+    ist der Nenner: anwesende Mitglieder **plus** aktive Stimm-Delegationen, deren
+    Delegierende:r ABWESEND ist (für diese gibt der/die Empfänger:in eine
+    Vertretungs-Stimme ab → ``voted`` zählt sie mit). Ohne diesen Aufschlag könnte
+    ``voted`` ``present`` übersteigen, bevor alle Anwesenden gestimmt haben, und das
+    Tally vorzeitig aufdecken. Geteilt mit dem Live-Vote-Reload-Pfad (livevote)."""
+    return present > 0 and voted >= expected
+
+
 class VotingService:
     """An eine ``AsyncSession`` (+ optionalen Flow-Dispatcher) gebundener Service."""
 
@@ -128,6 +141,45 @@ class VotingService:
             )
         ) or 0
 
+    async def _absent_delegated_count(self, vote: Vote) -> int:
+        """Aktive Stimm-Delegationen dieser Sitzung/dieses Gremiums, deren
+        Delegierende:r NICHT anwesend ist (Reveal-Nenner-Aufschlag, #vote-progress).
+
+        Für diese Delegationen gibt der/die Empfänger:in eine Vertretungs-Stimme ab,
+        die ``voted`` mitzählt, obwohl der/die Delegierende nicht unter den Anwesenden
+        ist. Ohne den Aufschlag könnte ``voted`` ``present`` früh übersteigen und das
+        Tally vorzeitig aufdecken. ``eligible_group`` ist die Gremium-UUID als Text;
+        passt sie nicht, gibt es keine Delegation (0)."""
+        if vote.meeting_id is None:
+            return 0
+        try:
+            gremium_id = UUID(vote.eligible_group)
+        except (ValueError, TypeError):
+            return 0
+        from app.modules.delegations.models import MeetingDelegation
+        from app.modules.livevote.models import MeetingAttendance
+
+        present_subq = (
+            select(MeetingAttendance.principal_id)
+            .where(
+                MeetingAttendance.meeting_id == vote.meeting_id,
+                MeetingAttendance.status == "present",
+            )
+            .scalar_subquery()
+        )
+        return (
+            await self.session.scalar(
+                select(func.count())
+                .select_from(MeetingDelegation)
+                .where(
+                    MeetingDelegation.meeting_id == vote.meeting_id,
+                    MeetingDelegation.gremium_id == gremium_id,
+                    MeetingDelegation.delegate_voting.is_(True),
+                    MeetingDelegation.delegator_principal_id.notin_(present_subq),
+                )
+            )
+        ) or 0
+
     async def _tally_out(
         self, vote: Vote, config: VoteConfig, counts: dict[str, int], eligible: int
     ) -> TallyOut:
@@ -148,7 +200,10 @@ class VotingService:
             present, revealed = 0, True
         else:
             present = await self._present_count(vote)
-            revealed = present > 0 and voted >= present
+            # Erwartete Stimmen = Anwesende + Vertretungs-Stimmen abwesender
+            # Delegierender (sonst leakt der Zwischenstand zu früh, #vote-progress).
+            expected = present + await self._absent_delegated_count(vote)
+            revealed = open_tally_revealed(present, voted, expected)
         return TallyOut(
             counts=counts if revealed else {},
             eligible=eligible,
@@ -422,14 +477,27 @@ class VotingService:
         )
 
     # ----------------------------------------------------------------- close
-    async def close(self, vote_id: UUID, principal: Principal) -> VoteClosed:
+    async def close(
+        self, vote_id: UUID, principal: Principal, *, now: datetime | None = None
+    ) -> VoteClosed:
         """``open`` → ``closed``: auszählen → Ergebnis → ``flow.fire(result_branch)``.
 
         **Atomar**: Vote-Schließung (``status=closed`` + ``result``) und der
         ``voteResult``-Übergang werden in **einer** Transaktion committet (``fire``
         committet die vorgemerkten Vote-Änderungen mit). Schlägt ``fire`` fehl
         (Guard/Race), rollt die Session-Dependency alles zurück → der Vote bleibt
-        **offen und wiederholbar** statt »zu, aber Branch nie gefeuert« (stuck)."""
+        **offen und wiederholbar** statt »zu, aber Branch nie gefeuert« (stuck).
+
+        **Verfallene Quorum-Abstimmung (#stuck-vote).** Ein zeit-gebundener,
+        quorum-gegateter Vote, dessen Fenster (``closes_at``) abgelaufen ist und
+        dessen Quorum NICHT erreicht wurde, ist endgültig gescheitert: weitere
+        Stimmen sind unmöglich (das Cast-Fenster ist zu). Beim manuellen Schließen
+        (``now=None``) gilt das frühere fail-closed 409 (mehr Stimmen sammeln oder
+        abbrechen). Übergibt der Aufrufer (Cron) jedoch ``now`` UND ist das Fenster
+        bereits abgelaufen, wird der Vote als terminal QUORUM-VERFEHLT geschlossen
+        und der ``fail``-Branch gefeuert — sonst hinge der Antrag ewig im ``vote``-
+        State und der Cron würde denselben unschließbaren Vote im Sekundentakt
+        erneut greifen."""
         # Row-Lock serialisiert gegen cast(): keine Last-Sekunden-Stimme zwischen
         # Auszählung und ``status=closed``.
         vote = await self._get_vote(vote_id, for_update=True)
@@ -440,21 +508,34 @@ class VotingService:
         eligible = vote.eligible_count or 0
         outcome = tally_mod.result(config, counts, eligible)
 
-        # Beschlussfähigkeit (#12): ohne erfülltes Quorum gibt es kein gültiges
-        # Ergebnis — Schließen ist blockiert (409) statt still als »rejected« zu
-        # enden. Ausweg: weitere Stimmen sammeln oder die Abstimmung abbrechen.
-        if not outcome.quorum_met:
+        # Fenster abgelaufen? Nur relevant, wenn der Aufrufer ``now`` mitgibt (Cron).
+        window_expired = (
+            now is not None and vote.closes_at is not None and now >= vote.closes_at
+        )
+
+        # Beschlussfähigkeit (#12): ohne erfülltes Quorum gibt es im Normalfall kein
+        # gültiges Ergebnis — Schließen ist blockiert (409) statt still als »rejected«
+        # zu enden. Ausweg: weitere Stimmen sammeln oder die Abstimmung abbrechen.
+        # AUSNAHME (#stuck-vote): ist das Cast-Fenster bereits abgelaufen, sind keine
+        # weiteren Stimmen mehr möglich → der Vote ist terminal quorum-verfehlt und
+        # wird über den ``fail``-Branch geschlossen (statt ewig blockiert).
+        if not outcome.quorum_met and not window_expired:
             raise ConflictError(
                 "quorum not met — the vote cannot be closed; collect more ballots "
                 "or cancel the vote.",
                 code="conflict",
             )
 
+        # Verfallenes Quorum: »rejected« erzwingen → fail-Branch (s. ``branch_name``).
+        result_value: tally_mod.VoteResult = (
+            outcome.result if outcome.quorum_met else "rejected"
+        )
+
         # Global-Flow (#28): ein ``vote``-State hat zwei feste Ausgänge mit ``branch``
         # ``pass``/``fail``. ``passed`` → pass, sonst (``rejected``/``tie``) fail-closed
         # → fail. Generische Beschlussfragen (ohne Antrag) feuern KEINEN Branch — sie
         # halten nur das Ergebnis fürs Protokoll.
-        branch_name = "pass" if outcome.result == "passed" else "fail"
+        branch_name = "pass" if result_value == "passed" else "fail"
         flow = FlowService(self.session, self.dispatcher)
         branch = (
             await flow.branch_transition(vote.application_id, branch_name)
@@ -474,13 +555,13 @@ class VotingService:
         # Vote-Zustand vormerken — NICHT separat committen: `fire` schreibt ihn
         # atomar mit Transition + status_event; ohne Branch committen wir hier.
         vote.status = "closed"
-        vote.result = outcome.result
+        vote.result = result_value
         vote.result_branch_transition_id = branch.id if branch is not None else None
 
         new_state_id: UUID | None = None
         if branch is not None and vote.application_id is not None:
             fired = await flow.fire_branch(
-                vote.application_id, branch_name, principal, note=f"vote:{outcome.result}"
+                vote.application_id, branch_name, principal, note=f"vote:{result_value}"
             )
             new_state_id = fired.new_state_id
         else:
@@ -491,13 +572,13 @@ class VotingService:
             eligible=eligible,
             quorumMet=outcome.quorum_met,
             leading=outcome.leading,
-            result=outcome.result,
-            failedReason=tally_mod.failed_reason(outcome.result, outcome.quorum_met),
+            result=result_value,
+            failedReason=tally_mod.failed_reason(result_value, outcome.quorum_met),
         )
         return VoteClosed(
             id=vote.id,
             meetingId=vote.meeting_id,
-            result=outcome.result,
+            result=result_value,
             tally=tally_out,
             firedTransitionId=branch.id if branch is not None else None,
             newStateId=new_state_id,

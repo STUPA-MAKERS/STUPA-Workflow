@@ -19,6 +19,9 @@ def test_is_valid_key() -> None:
     assert r.is_valid_key("800")
     assert not r.is_valid_key("VS-800")  # Trenner verboten
     assert not r.is_valid_key("")
+    # Längen-Grenze (#sec-audit): genau _KEY_MAX gültig, eins drüber verworfen.
+    assert r.is_valid_key("A" * r._KEY_MAX)
+    assert not r.is_valid_key("A" * (r._KEY_MAX + 1))
 
 
 def test_compose_path_key() -> None:
@@ -155,6 +158,28 @@ def test_build_forest_gremium_filter() -> None:
 def test_fiscal_year_bounds() -> None:
     assert r.fiscal_year_bounds(2026, 1, 1) == (date(2026, 1, 1), date(2026, 12, 31))
     assert r.fiscal_year_bounds(2026, 7, 1) == (date(2026, 7, 1), date(2027, 6, 30))
+
+
+def test_is_valid_fiscal_start() -> None:
+    # 1..28 in jedem Monat gültig …
+    assert r.is_valid_fiscal_start(1, 1)
+    assert r.is_valid_fiscal_start(12, 28)
+    # … 29+ kann je nach Monat fehlen → verworfen, Monat ausserhalb 1..12 ebenso.
+    assert not r.is_valid_fiscal_start(2, 30)
+    assert not r.is_valid_fiscal_start(4, 31)
+    assert not r.is_valid_fiscal_start(0, 1)
+    assert not r.is_valid_fiscal_start(13, 1)
+    assert not r.is_valid_fiscal_start(1, 0)
+
+
+def test_fiscal_year_bounds_rejects_impossible_stichtag() -> None:
+    # Unmöglicher Stichtag (z. B. 30.02. / 31.04.) → ValueError statt 500 beim INSERT.
+    import pytest
+
+    with pytest.raises(ValueError, match="invalid fiscal start"):
+        r.fiscal_year_bounds(2026, 2, 30)
+    with pytest.raises(ValueError, match="invalid fiscal start"):
+        r.fiscal_year_bounds(2026, 4, 31)
 
 
 def test_fiscal_year_display() -> None:

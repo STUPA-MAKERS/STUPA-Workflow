@@ -335,7 +335,9 @@ class _FakeService:
 
     async def invoice_file_bytes(self, invoice_id: uuid.UUID) -> tuple[bytes, str, str]:
         self.calls["invoice_file_bytes"] = invoice_id
-        return (b"%PDF-1.4 fake", "application/pdf", 'we"ird\r\nname.pdf')
+        # Bewusst ein vom Client untergeschobener HTML-Mime: der Router darf ihm NICHT
+        # vertrauen, sondern liefert hart als application/pdf-Attachment aus (#sec-audit).
+        return (b"<html>polyglot</html>", "text/html", 'we"ird\r\nname.pdf')
 
     # ----- accounts
     async def list_accounts(self) -> list[AccountOut]:
@@ -800,8 +802,12 @@ def test_get_invoice_file_sanitises_filename(fake: _FakeService) -> None:
     resp = _client(fake, ("budget.view",)).get(f"/api/invoices/{_IID}/file")
     assert resp.status_code == 200
     cd = resp.headers["content-disposition"]
+    # Sicherheits-Härtung (#sec-audit): Client-Mime ignoriert → hart application/pdf,
+    # und Content-Disposition: attachment (kein Inline-Render des HTML-Polyglots).
+    assert resp.headers["content-type"] == "application/pdf"
+    assert cd.startswith("attachment;")
     # Quotes/Backslash/CR/LF aus dem Dateinamen entfernt.
-    assert '"' not in cd.split("filename=", 1)[1].rstrip().strip('"').replace("inline; ", "")
+    assert '"' not in cd.split('filename="', 1)[1].rstrip().rstrip('"')
     assert "\r" not in cd and "\n" not in cd
     assert fake.calls["invoice_file_bytes"] == _IID
 

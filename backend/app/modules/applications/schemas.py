@@ -43,7 +43,8 @@ class ApplicationCreate(_CamelModel):
     # Optional auf Schema-Ebene: für eingeloggte Nutzer:innen aus dem Account ableitbar
     # (#24). Für anonyme Einreichung erzwingt der Router die Pflicht (422).
     applicant_email: EmailStr | None = Field(default=None, alias="applicantEmail")
-    applicant_name: str | None = Field(default=None, alias="applicantName")
+    # Obere Schranke (anti-DoS): persistierter Freitext (Anzeigename) wird gekappt.
+    applicant_name: str | None = Field(default=None, alias="applicantName", max_length=256)
     lang: Lang = DEFAULT_LANG
     # Strukturell schon im Schema validiert (malformt → 422); kryptografische Prüfung via
     # `require_altcha` (security.md §7, Issue #23). Vgl. `MagicLinkRequest.altcha`.
@@ -146,7 +147,10 @@ class ApplicationListItem(_CamelModel):
 # Comments
 # --------------------------------------------------------------------------- #
 class CommentCreate(_CamelModel):
-    body: str = Field(min_length=1)
+    # Obere Schranke (anti-DoS): persistierter Freitext bekommt eine harte Kappe,
+    # damit ein einzelner Kommentar nicht beliebig groß wird (DB/Mail-Render). 10 000
+    # Zeichen reichen für jede reale Nachfrage; darüber → 422.
+    body: str = Field(min_length=1, max_length=10_000)
     visibility: Literal["internal", "public"] = "public"
 
 

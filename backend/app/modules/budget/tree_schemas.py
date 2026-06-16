@@ -29,15 +29,17 @@ class BudgetNodeCreate(_CamelModel):
     ``fiscalStartMonth``/``fiscalStartDay`` = HHJ-Stichtag (nur am Top-Level relevant;
     Default 01.01.)."""
 
-    key: str = Field(min_length=1)
-    name: str = Field(min_length=1)
+    key: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=200)
     parent_id: UUID | None = Field(default=None, alias="parentId")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     currency: str = Field(default="EUR", min_length=3, max_length=3)
     active: bool = True
     color: str | None = None
     fiscal_start_month: int = Field(default=1, ge=1, le=12, alias="fiscalStartMonth")
-    fiscal_start_day: int = Field(default=1, ge=1, le=31, alias="fiscalStartDay")
+    # 1..28: der HHJ-Stichtag muss in **jedem** Monat existieren (sonst 31.04. / 30.02. →
+    # ``date(...)`` ValueError → 500, der das Budget unbrauchbar macht, #sec-audit).
+    fiscal_start_day: int = Field(default=1, ge=1, le=28, alias="fiscalStartDay")
 
 
 class BudgetNodeUpdate(_CamelModel):
@@ -46,8 +48,8 @@ class BudgetNodeUpdate(_CamelModel):
     ``None`` = unverändert. ``color=""`` löscht die Farbe. ``acceptedStateKeys``/
     ``deniedStateKeys``/``fiscalStart*`` nur am Top-Level sinnvoll."""
 
-    key: str | None = Field(default=None, min_length=1)
-    name: str | None = Field(default=None, min_length=1)
+    key: str | None = Field(default=None, min_length=1, max_length=64)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
     active: bool | None = None
     color: str | None = None
     accepted_state_keys: list[str] | None = Field(default=None, alias="acceptedStateKeys")
@@ -57,7 +59,8 @@ class BudgetNodeUpdate(_CamelModel):
     # Sichtbarkeits-Gremium (#budget-scope) — ``None`` im Payload löscht die Zuordnung.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     fiscal_start_month: int | None = Field(default=None, ge=1, le=12, alias="fiscalStartMonth")
-    fiscal_start_day: int | None = Field(default=None, ge=1, le=31, alias="fiscalStartDay")
+    # 1..28: siehe ``BudgetNodeCreate`` — Stichtag muss in jedem Monat existieren.
+    fiscal_start_day: int | None = Field(default=None, ge=1, le=28, alias="fiscalStartDay")
 
 
 class BudgetNodeOut(_CamelModel):
@@ -407,7 +410,7 @@ class InvoiceOut(_CamelModel):
 class AccountCreate(_CamelModel):
     """Konto anlegen — Name + IBAN (Freitext). Nicht an Kostenstellen gebunden."""
 
-    name: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=200)
     iban: str = Field(default="", max_length=64)
     active: bool = True
 
@@ -415,7 +418,7 @@ class AccountCreate(_CamelModel):
 class AccountUpdate(_CamelModel):
     """Konto teil-aktualisieren."""
 
-    name: str | None = Field(default=None, min_length=1)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
     iban: str | None = Field(default=None, max_length=64)
     active: bool | None = None
 

@@ -75,6 +75,33 @@ MANAGE_PERMISSION = "meeting.manage"
 _FALLBACK_BROKER = InMemoryBroker()
 _FALLBACK_LOCKER = InMemoryLocker()
 
+# Pro (Sitzung, Principal) gleichzeitig offene WS-Verbindungen (DoS-Schutz,
+# security.md): ein einzelner Nutzer soll nicht beliebig viele Sockets öffnen
+# (jeder hält ein Abo + Empfangs-Task). In-Prozess-Zähler (pro Worker-Prozess); für
+# Single-Worker-Deployments ausreichend, ein verteiltes Limit liegt an Redis/Ingress.
+_MAX_CONNECTIONS_PER_PRINCIPAL = 5
+_connection_counts: dict[tuple[UUID, str], int] = {}
+
+
+def _try_acquire_slot(meeting_id: UUID, sub: str) -> bool:
+    """Einen Verbindungs-Slot belegen (``False``, wenn das Limit erreicht ist)."""
+    key = (meeting_id, sub)
+    current = _connection_counts.get(key, 0)
+    if current >= _MAX_CONNECTIONS_PER_PRINCIPAL:
+        return False
+    _connection_counts[key] = current + 1
+    return True
+
+
+def _release_slot(meeting_id: UUID, sub: str) -> None:
+    """Einen belegten Verbindungs-Slot freigeben (idempotent, räumt 0-Einträge auf)."""
+    key = (meeting_id, sub)
+    current = _connection_counts.get(key, 0)
+    if current <= 1:
+        _connection_counts.pop(key, None)
+    else:
+        _connection_counts[key] = current - 1
+
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
@@ -618,17 +645,28 @@ async def _serve(
     authorized = await _authorize(websocket, meeting_id, principal, meetings, beamer=beamer)
     if authorized is None:
         return
-    await websocket.accept()
-    await LiveVoteConnection(
-        websocket,
-        meeting_id,
-        beamer=beamer,
-        principal=authorized,
-        meetings=meetings,
-        voting=voting,
-        broker=broker,
-        locker=locker,
-    ).run()
+    # Verbindungs-Cap je (Sitzung, Principal) — VOR dem Accept prüfen, damit ein
+    # flutender Client gar nicht erst aufmacht (DoS-Schutz). Bei Überschreitung:
+    # ``not_eligible``-Frame + 4403 (wie der RBAC-Verstoß).
+    if not _try_acquire_slot(meeting_id, authorized.sub):
+        await websocket.accept()
+        await websocket.send_json(ErrorEvent(code="too_many_connections").dump())
+        await websocket.close(code=WS_FORBIDDEN)
+        return
+    try:
+        await websocket.accept()
+        await LiveVoteConnection(
+            websocket,
+            meeting_id,
+            beamer=beamer,
+            principal=authorized,
+            meetings=meetings,
+            voting=voting,
+            broker=broker,
+            locker=locker,
+        ).run()
+    finally:
+        _release_slot(meeting_id, authorized.sub)
 
 
 @router.websocket("/ws/meetings/{meeting_id}")

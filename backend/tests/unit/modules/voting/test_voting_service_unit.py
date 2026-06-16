@@ -17,7 +17,7 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.modules.voting import service as voting_service
 from app.modules.voting.schemas import VoteCreate
-from app.modules.voting.service import VotingService
+from app.modules.voting.service import VotingService, open_tally_revealed
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
     ConflictError,
@@ -504,6 +504,79 @@ async def test_close_blocked_without_quorum(_patch_flow: type[_FakeFlow]) -> Non
 
 
 # --------------------------------------------------------------------------- #
+# close — verfallene Quorum-Abstimmung (#stuck-vote, FIX 3)
+# --------------------------------------------------------------------------- #
+async def test_close_expired_unmet_quorum_fires_fail_branch(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """Zeit-Vote mit abgelaufenem Fenster + Quorum verfehlt + ``now`` (Cron) ⇒
+    terminal QUORUM-VERFEHLT: ``fail``-Branch feuert, Vote schließt (kein Dauer-Stuck)."""
+    branch_t = TransitionOut(id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={})
+    _patch_flow.branch = branch_t
+    vote = _vote(
+        config=_config(quorum={"type": "percent", "value": 50}),
+        eligible_count=10,
+        closes_at=NOW - timedelta(minutes=1),
+    )
+    db = fake_session(result(vote), result("yes", "no"))  # 2/10 → Quorum verfehlt
+    out = await VotingService(db).close(vote.id, _voter(), now=NOW)
+    assert vote.status == "closed"
+    assert out.result == "rejected"
+    assert out.tally.failed_reason == "quorum"
+    assert out.fired_transition_id == branch_t.id
+    assert _patch_flow.branch_calls == ["fail"]
+
+
+async def test_close_expired_unmet_quorum_generic_vote_just_closes(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """Verfallene generische Beschlussfrage (ohne Antrag): terminal geschlossen,
+    kein Branch — committet selbst."""
+    vote = _vote(
+        application_id=None,
+        config=_config(quorum={"type": "percent", "value": 50}),
+        eligible_count=10,
+        closes_at=NOW - timedelta(minutes=1),
+    )
+    db = fake_session(result(vote), result("yes", "no"))
+    out = await VotingService(db).close(vote.id, _voter(), now=NOW)
+    assert vote.status == "closed"
+    assert out.result == "rejected"
+    assert out.fired_transition_id is None
+    assert db.committed == 1
+
+
+async def test_close_now_but_window_not_expired_still_blocks(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """``now`` gesetzt, aber Fenster noch offen ⇒ kein Verfall: 409 wie gehabt."""
+    vote = _vote(
+        config=_config(quorum={"type": "percent", "value": 50}),
+        eligible_count=10,
+        closes_at=NOW + timedelta(minutes=5),
+    )
+    db = fake_session(result(vote), result("yes", "no"))
+    with pytest.raises(ConflictError):
+        await VotingService(db).close(vote.id, _voter(), now=NOW)
+    assert vote.status == "open"
+
+
+async def test_close_now_untimed_vote_still_blocks(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """``now`` gesetzt, aber ``closes_at=None`` (kein Fenster) ⇒ kein Verfall: 409."""
+    vote = _vote(
+        config=_config(quorum={"type": "percent", "value": 50}),
+        eligible_count=10,
+        closes_at=None,
+    )
+    db = fake_session(result(vote), result("yes", "no"))
+    with pytest.raises(ConflictError):
+        await VotingService(db).close(vote.id, _voter(), now=NOW)
+    assert vote.status == "open"
+
+
+# --------------------------------------------------------------------------- #
 # cancel (#12)
 # --------------------------------------------------------------------------- #
 async def test_cancel_open_vote_sets_cancelled_without_branch() -> None:
@@ -594,6 +667,69 @@ async def test_get_meeting_open_without_attendance_stays_hidden() -> None:
     db.scalar_results = [0]  # present=0 → present>0 False
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
+
+
+# --------------------------------------------------------------------------- #
+# Reveal-Helper + Vertretungs-Nenner (#vote-progress, FIX 2)
+# --------------------------------------------------------------------------- #
+def test_open_tally_revealed_rule() -> None:
+    # present muss > 0 sein UND voted >= expected.
+    assert open_tally_revealed(present=2, voted=2, expected=2) is True
+    assert open_tally_revealed(present=2, voted=3, expected=2) is True
+    assert open_tally_revealed(present=2, voted=1, expected=2) is False
+    assert open_tally_revealed(present=0, voted=0, expected=0) is False
+
+
+async def test_get_meeting_open_hidden_until_proxy_voted() -> None:
+    # #vote-progress: 2 Anwesende + 1 Stimm-Delegation eines ABWESENDEN
+    # Delegierenden → expected=3. Erst 2 Stimmen (eigene) → noch nicht alle
+    # erwarteten Stimmen da → verdeckt (Proxy-Stimme fehlt noch).
+    gid = uuid4()
+    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
+    db = fake_session(result(vote), result("yes", "yes"))
+    db.scalar_results = [2, 1]  # present=2, absent-delegated=1 → expected=3
+    out = await VotingService(db).get(vote.id)
+    assert out.tally.revealed is False
+    assert out.tally.counts == {}
+
+
+async def test_get_meeting_open_reveals_when_proxy_also_voted() -> None:
+    gid = uuid4()
+    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
+    db = fake_session(result(vote), result("yes", "yes", "no"))
+    db.scalar_results = [2, 1]  # present=2 + 1 proxy → expected=3, voted=3 → revealed
+    out = await VotingService(db).get(vote.id)
+    assert out.tally.revealed is True
+    assert out.tally.counts == {"yes": 2, "no": 1, "abstain": 0}
+
+
+async def test_absent_delegated_count_no_meeting_is_zero() -> None:
+    vote = _vote(meeting_id=None)
+    svc = VotingService(fake_session())
+    assert await svc._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
+
+
+async def test_absent_delegated_count_non_uuid_group_is_zero() -> None:
+    # eligible_group ist kein UUID-Text (z. B. »stupa«) → keine Delegations-Query.
+    vote = _vote(meeting_id=uuid4(), eligible_group="stupa")
+    svc = VotingService(fake_session())
+    assert await svc._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
+
+
+async def test_absent_delegated_count_queries_when_uuid_group() -> None:
+    gid = uuid4()
+    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
+    db = fake_session()
+    db.scalar_results = [4]
+    assert await VotingService(db)._absent_delegated_count(vote) == 4  # pyright: ignore[reportArgumentType]
+
+
+async def test_absent_delegated_count_none_scalar_is_zero() -> None:
+    gid = uuid4()
+    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
+    db = fake_session()
+    db.scalar_results = [None]  # COUNT → None → 0 (or-Default)
+    assert await VotingService(db)._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
 
 
 # --------------------------------------------------------------------------- #

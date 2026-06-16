@@ -69,9 +69,19 @@ class FakePytex:
         self.pdf = pdf
         self.error = error
         self.calls: list[tuple[str, str | None]] = []
+        # Pro Aufruf mitgeschriebener ``trust_level``-Override (RCE-Schutz: der
+        # Protokoll-Pfad rendert nutzer-Markdown ``untrusted``); ``None`` = Default.
+        self.trust_levels: list[str | None] = []
 
-    async def render_pdf(self, markdown: str, *, variant: str | None = None) -> bytes:
+    async def render_pdf(
+        self,
+        markdown: str,
+        *,
+        variant: str | None = None,
+        trust_level: str | None = None,
+    ) -> bytes:
         self.calls.append((markdown, variant))
+        self.trust_levels.append(trust_level)
         if self.error is not None:
             raise self.error
         return self.pdf

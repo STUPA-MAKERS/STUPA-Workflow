@@ -44,7 +44,7 @@ from app.modules.flow.dispatch import (
 from app.modules.flow.models import State, Transition
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
-from app.shared.guards import eval_guard, guard_requires_applicant
+from app.shared.guards import GuardContext, eval_guard, guard_requires_applicant
 
 
 def _guard_fires_on_deadline(guard: Any, *, negated: bool = False) -> bool:
@@ -169,9 +169,8 @@ class FlowService:
                 .order_by(Transition.order)
             )
         ).scalars().all()
-        target = next(
-            (t for t in transitions if _guard_fires_on_deadline(t.guard)), None
-        )
+        candidates = [t for t in transitions if _guard_fires_on_deadline(t.guard)]
+        target = self._pick_deadline_transition(candidates)
         await DeadlineService(self.session).create(
             kind="flow_deadline",
             due_at=due_at,
@@ -180,6 +179,35 @@ class FlowService:
                 {"transitionId": str(target.id)} if target is not None else None
             ),
         )
+
+    # Minimal-Kontext: nur die Frist gilt als erfüllt, sonst nichts (keine Rollen,
+    # kein Budget-Fit, keine Feldwerte). Ein Kandidat, dessen vollständiger Guard
+    # SCHON hier ``True`` ergibt, verlangt nichts außer der abgelaufenen Frist und
+    # feuert daher bei Ablauf garantiert — I/O-frei zur Schedule-Zeit auswertbar.
+    _DEADLINE_ONLY_CTX = GuardContext(manual=False, deadline_passed=True)
+
+    @classmethod
+    def _pick_deadline_transition(
+        cls, candidates: list[Transition]
+    ) -> Transition | None:
+        """Aus den ``deadlinePassed``-Kandidaten (nach ``order``) den ersten wählen,
+        dessen **vollständiger** Guard allein durch die abgelaufene Frist erfüllt ist
+        (#deadline-guard).
+
+        Der alte Code pinnte stur den ersten ``deadlinePassed``-Übergang — hatte der
+        ein weiteres UND-verknüpftes Prädikat, feuerte er bei Ablauf nicht, der Cron
+        verbrauchte die Frist trotzdem (``ConflictError`` → ``action_on_pass=NULL``)
+        und der Antrag blieb fristlos hängen, obwohl ein Geschwister-Übergang allein
+        auf die Frist hörte. Darum jetzt: den ersten Kandidaten nehmen, dessen Guard
+        unter :data:`_DEADLINE_ONLY_CTX` (nur ``deadline_passed=True``, sonst leer)
+        hält — der feuert garantiert. Hält **keiner** ohne Zusatzbedingung, den ersten
+        als reinen Marker pinnen (Rückwärtsverhalten — Frist bleibt sichtbar)."""
+        if not candidates:
+            return None
+        for t in candidates:
+            if eval_guard(t.guard, cls._DEADLINE_ONLY_CTX):
+                return t
+        return candidates[0]
 
     async def _deadline_passed(self, app: Application) -> bool:
         """Echtes ``deadline_passed`` des aktuellen States aus der DB ableiten.

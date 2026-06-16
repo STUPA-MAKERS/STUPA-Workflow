@@ -166,6 +166,12 @@ class FilesService:
         attachment = await self.get_attachment(attachment_id)
         if _is_infected(attachment) or attachment.storage_key is None:
             raise GoneError("Attachment removed (failed virus scan).")
+        # FAIL-CLOSED (security.md §6) — DARF NICHT umgedreht werden: solange der ClamAV-
+        # Scan nicht abgeschlossen ist (``scanned=False``), wird der Download verweigert
+        # (409). Ein noch nicht gescanntes Objekt wird NIE ausgeliefert; ein künftiger
+        # Refactor, der diese Bedingung lockert/invertiert, würde ungescanntem Inhalt den
+        # Download erlauben. (StreamMaxLength von clamd kappt die gescannte Größe; der
+        # Upload ist bereits über ``max_bytes`` ≤ MAX_ATTACHMENT_BYTES gedeckelt.)
         if not attachment.scanned:
             raise ConflictError("Attachment is still being scanned.")
         if self.storage is None:
