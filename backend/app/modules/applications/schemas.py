@@ -94,6 +94,9 @@ class ApplicationOut(_CamelModel):
     applicant: ApplicantOut | None = None
     # Darf der/die Anfragende bearbeiten/löschen (Verwalter:in oder Ersteller:in, #24)?
     can_edit: bool = Field(default=False, alias="canEdit")
+    # Ist der/die Anfragende der/die Ersteller:in (Antragsteller:in)? Gating für die
+    # Anonymisierungs-Anfrage (DSGVO Art. 17): nur das Datensubjekt, nicht Verwaltung.
+    is_owner: bool = Field(default=False, alias="isOwner")
 
 
 class ApplicationPatch(_CamelModel):

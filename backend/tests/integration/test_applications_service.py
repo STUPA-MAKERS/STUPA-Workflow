@@ -191,6 +191,41 @@ async def test_patch_creates_version_and_diff(session: AsyncSession) -> None:
     assert "cost" in v2.diff["changed"]
 
 
+async def test_patch_preserves_system_title_field(session: AsyncSession) -> None:
+    """Issue #1: ein Antragstyp OHNE eigenes `title`-Feld nutzt das zur Laufzeit
+    vorangestellte System-Titelfeld. `patch()` whitelistet gegen die gepinnten Felder
+    (ohne `title`) — ohne das System-Feld ginge `data.title` bei jedem Update verloren."""
+    # Form ohne explizites `title`-Feld (wie auf der Live-Instanz).
+    no_title_fields = [
+        FormFieldDef.model_validate(
+            {
+                "key": "cost",
+                "type": "currency",
+                "label": {"de": "Kosten"},
+                "isPromoted": True,
+                "promoteTarget": "amount",
+            }
+        ),
+        FormFieldDef.model_validate(
+            {"key": "note", "type": "text", "label": {"de": "Notiz"}}
+        ),
+    ]
+    app_type, _, _ = await _seed_type(session, fields=no_title_fields)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id))  # title="Mein Antrag"
+    assert (await svc.get(app.id, include_pii=False)).data["title"] == "Mein Antrag"
+
+    out = await svc.patch(
+        app.id,
+        {"title": "Mein Antrag", "cost": "120.00", "note": "x"},
+        changed_by="applicant",
+    )
+    assert out.data["title"] == "Mein Antrag"  # darf NICHT gedroppt werden
+
+    refreshed = await svc.get(app.id, include_pii=False)
+    assert refreshed.data["title"] == "Mein Antrag"
+
+
 async def test_patch_invalid_data_422_no_new_version(session: AsyncSession) -> None:
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
@@ -452,3 +487,50 @@ async def test_anonymize_scrubs_version_history(session: AsyncSession) -> None:
         if v.diff is not None:
             for bucket in ("added", "removed", "changed"):
                 assert "note" not in v.diff.get(bucket, {})
+
+
+async def test_anonymize_scrubs_field_marked_pii_in_later_version(
+    session: AsyncSession,
+) -> None:
+    """Ein Feld wird ERST NACH der Einreichung als PII markiert (neue Form-Version).
+
+    Der Antrag bleibt auf seine gepinnte Version (``title`` dort nicht PII) — die
+    Anonymisierung muss isPII trotzdem über ALLE Versionen des Typs vereinen und den
+    Klartext entfernen (DSGVO Art. 17)."""
+    app_type, _, _ = await _seed_type(session)  # title NICHT PII, note PII
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id))  # title="Mein Antrag"
+
+    # `title` nachträglich als PII markieren → neue, aktive Form-Version.
+    later_fields = [
+        FormFieldDef.model_validate(
+            {
+                "key": "title",
+                "type": "text",
+                "label": {"de": "Titel"},
+                "required": True,
+                "isPII": True,
+            }
+        ),
+        FormFieldDef.model_validate(
+            {
+                "key": "cost",
+                "type": "currency",
+                "label": {"de": "Kosten"},
+                "isPromoted": True,
+                "promoteTarget": "amount",
+            }
+        ),
+        FormFieldDef.model_validate(
+            {"key": "note", "type": "text", "label": {"de": "Notiz"}, "isPII": True}
+        ),
+    ]
+    await FormsService(session).create_form_version(
+        app_type.id, FormVersionCreate(fields=later_fields, activate=True)
+    )
+
+    await svc.anonymize(app.id)
+
+    out = await svc.get(app.id, include_pii=True)
+    assert out.data.get("note") is None  # gepinnt-PII
+    assert out.data.get("title") is None  # erst später als PII markiert → trotzdem gescrubbt

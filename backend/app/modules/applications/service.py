@@ -55,8 +55,10 @@ from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.forms.service import FormsService
 from app.modules.forms.validation import (
+    SYSTEM_TITLE_KEY,
     AnswerValidationError,
     extract_promoted,
+    system_title_field,
     validate_answers,
 )
 from app.search import dialect_of, trigram_rank
@@ -225,8 +227,31 @@ class ApplicationsService:
             fields.extend(FormFieldDef.model_validate(r.field) for r in pot_rows)
         return fields
 
+    async def _pii_keys_for_type(self, type_id: UUID) -> set[str]:
+        """``isPII``-Feld-Keys über ALLE Form-Versionen eines Typs (für die Anonymisierung).
+
+        Ein Antrag ist auf seine ``form_version_id`` gepinnt; wird ein Feld erst später
+        als PII markiert (neue Version), kennt die gepinnte Zeile das Flag nicht. Für die
+        Erasure (DSGVO Art. 17) zählt jedoch der aktuelle Wille — daher die Vereinigung."""
+        from app.modules.forms.models import FormField, FormVersion
+
+        rows = await self.session.scalars(
+            select(FormField.key)
+            .join(FormVersion, FormVersion.id == FormField.form_version_id)
+            .where(
+                FormVersion.application_type_id == type_id,
+                FormField.is_pii.is_(True),
+            )
+        )
+        return set(rows)
+
     async def _to_out(
-        self, app: Application, *, include_pii: bool, can_edit: bool = False
+        self,
+        app: Application,
+        *,
+        include_pii: bool,
+        can_edit: bool = False,
+        is_owner: bool = False,
     ) -> ApplicationOut:
         state = await self._get_state(app.current_state_id)
         version = await self._current_version(app.id)
@@ -259,6 +284,7 @@ class ApplicationsService:
             updatedAt=app.updated_at,
             applicant=applicant_out,
             canEdit=can_edit,
+            isOwner=is_owner,
         )
 
     # ------------------------------------------------------------------ create
@@ -400,10 +426,11 @@ class ApplicationsService:
         requester_can_manage: bool = False,
     ) -> ApplicationOut:
         app = await self._get_app(application_id)
-        can_edit = requester_can_manage or (
-            requester_sub is not None and app.created_by == requester_sub
+        is_owner = requester_sub is not None and app.created_by == requester_sub
+        can_edit = requester_can_manage or is_owner
+        return await self._to_out(
+            app, include_pii=include_pii, can_edit=can_edit, is_owner=is_owner
         )
-        return await self._to_out(app, include_pii=include_pii, can_edit=can_edit)
 
     # ------------------------------------------------------------------ patch
     async def patch(
@@ -423,6 +450,11 @@ class ApplicationsService:
 
         # Validierung VOR dem Schreibzugriff (422 statt 500), gegen die gepinnte Form.
         fields = await self._pinned_fields(app)
+        # System-Titelfeld voranstellen (spiegelt `effective_form()`): `_pinned_fields`
+        # liefert nur die gespeicherten FormField-Zeilen OHNE das zur Laufzeit ergänzte
+        # `title`. Ohne dies verwirft `_whitelist` den Titel bei jedem PATCH (Datenverlust).
+        if not any(f.key == SYSTEM_TITLE_KEY for f in fields):
+            fields = [system_title_field(), *fields]
         # `has_budget`-Kontext aus dem Typ (wie bei create) — NICHT aus budget_pot_id:
         # sonst flippt `visibleIf: has_budget` bei einem has_budget-Typ ohne Topf und
         # ein Pflichtfeld ließe sich beim Edit straflos entfernen (MED).
@@ -841,6 +873,10 @@ class ApplicationsService:
 
         fields = await self._pinned_fields(app)
         pii_keys = {f.key for f in fields if f.is_pii}
+        # Felder, die ERST NACH der Einreichung als PII markiert wurden, kennt die
+        # gepinnte Form-Version nicht (is_pii=False). isPII über ALLE Form-Versionen
+        # des Typs vereinen, sonst bleibt der Klartext stehen (DSGVO Art. 17).
+        pii_keys |= await self._pii_keys_for_type(app.type_id)
         if pii_keys:
             app.data = {k: v for k, v in app.data.items() if k not in pii_keys}
             # PII steckt auch in jeder gespeicherten Version + deren Diff (DSGVO Art. 17):
