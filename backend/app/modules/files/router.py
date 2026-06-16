@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
 
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.applications.access import (
@@ -30,6 +30,7 @@ from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
 from app.modules.files.service import FilesService
+from app.modules.files.storage import _safe_disposition
 from app.shared.antiabuse import rate_limit_attachments
 from app.shared.errors import (
     ForbiddenError,
@@ -155,6 +156,43 @@ async def get_attachment_url(
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc
     return await service.signed_url(attachment_id)
+
+
+@router.get(
+    "/attachments/{attachment_id}/download",
+    response_class=Response,
+    responses=_errors(401, 404, 409, 410, 503),
+)
+async def download_attachment(
+    attachment_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> Response:
+    """Anhang-Bytes server-seitig streamen — MinIO liegt im internen Docker-Netz, eine
+    presigned S3-URL bindet den internen Host und ist vom Browser unerreichbar. Über
+    nginx ``/api/`` ist dieser Endpunkt erreichbar (gleiches Muster wie der Protokoll-PDF).
+
+    Zugriff wie :func:`get_attachment_url` (A/P; Cross-Tenant → 404, kein Existenz-Orakel).
+    ``Content-Disposition: attachment`` erzwingt Download statt Inline-Render (security.md §6)."""
+    if principal is None and applicant is None:
+        raise UnauthorizedError("Authentication required.")
+    attachment = await service.get_attachment(attachment_id)
+    try:
+        resolve_access(
+            attachment.application_id,
+            principal,
+            applicant,
+            perm=READ_PERMISSION,
+            scope="view",
+        )
+    except ForbiddenError as exc:
+        raise NotFoundError(f"attachment {attachment_id} not found") from exc
+    data, filename, mime = await service.download_bytes(attachment_id)
+    disposition = f'attachment; filename="{_safe_disposition(filename)}"'
+    return Response(
+        content=data, media_type=mime, headers={"Content-Disposition": disposition}
+    )
 
 
 @router.delete(

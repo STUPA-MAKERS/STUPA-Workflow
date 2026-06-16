@@ -160,8 +160,9 @@ class FilesService:
             raise NotFoundError(f"attachment {attachment_id} not found")
         return attachment
 
-    async def signed_url(self, attachment_id: uuid.UUID) -> SignedUrlOut:
-        """Kurzlebige Download-URL — nur nach sauberem Scan (sonst 409/410/503)."""
+    async def _ready_attachment(self, attachment_id: uuid.UUID) -> Attachment:
+        """Anhang laden + Download-Gates: 410 (entfernt/Befund), 409 (Scan läuft), 503
+        (kein Storage). Gemeinsam für die URL- und die Stream-Route."""
         attachment = await self.get_attachment(attachment_id)
         if _is_infected(attachment) or attachment.storage_key is None:
             raise GoneError("Attachment removed (failed virus scan).")
@@ -169,15 +170,35 @@ class FilesService:
             raise ConflictError("Attachment is still being scanned.")
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
+        return attachment
+
+    async def signed_url(self, attachment_id: uuid.UUID) -> SignedUrlOut:
+        """App-relative Download-URL — nur nach sauberem Scan (sonst 409/410/503).
+
+        **Keine** presigned MinIO-URL: MinIO liegt im internen Docker-Netz ohne Port-
+        Publish; eine S3v4-signierte URL bindet den (internen) Host in die Signatur →
+        vom Browser unerreichbar. Stattdessen streamt der ``/download``-Endpunkt die Bytes
+        server-seitig über nginx ``/api/`` (gleiches Muster wie ``protocol._pdf_path``)."""
+        await self._ready_attachment(attachment_id)
+        return SignedUrlOut(
+            url=f"/api/attachments/{attachment_id}/download",
+            expiresIn=self.settings.attachment_url_ttl_seconds,
+        )
+
+    async def download_bytes(self, attachment_id: uuid.UUID) -> tuple[bytes, str, str]:
+        """Anhang-Bytes server-seitig aus dem Storage holen (für den ``/download``-Stream).
+
+        Gleiche Quarantäne-Gates wie :meth:`signed_url` (409/410/503); transienter
+        Storage-Fehler → 503. Gibt ``(bytes, filename, mime)`` für die Stream-Antwort."""
+        attachment = await self._ready_attachment(attachment_id)
+        # Beides durch _ready_attachment garantiert (sonst 410/503) — für den Typechecker.
+        assert attachment.storage_key is not None
+        assert self.storage is not None
         try:
-            url = self.storage.presigned_get_url(
-                attachment.storage_key,
-                expires_seconds=self.settings.attachment_url_ttl_seconds,
-                download_name=attachment.filename,
-            )
+            data = await self.storage.get(attachment.storage_key)
         except StorageError as exc:
-            raise ServiceUnavailableError("Could not sign download URL.") from exc
-        return SignedUrlOut(url=url, expiresIn=self.settings.attachment_url_ttl_seconds)
+            raise ServiceUnavailableError("Attachment temporarily unavailable.") from exc
+        return data, attachment.filename, attachment.mime
 
     async def delete(self, attachment_id: uuid.UUID, *, actor: str) -> None:
         """Anhang löschen: DB-Zeile + Storage-Objekt entfernen (+ Audit). 404 fehlt.
