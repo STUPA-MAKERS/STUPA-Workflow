@@ -254,7 +254,7 @@ export class AdminApiService {
     if (this.mock) {
       const idx = this.store.roles.findIndex((r) => r.id === roleId);
       if (idx >= 0) this.store.roles[idx] = { ...this.store.roles[idx], permissions: [...permissions] };
-      return of(structuredCopy(this.store.roles[idx]));
+      return of(structuredCopy(this.store.roles[idx] ?? this.store.roles[0]));
     }
     return this.http.patch<Role>(`${this.base}/admin/roles/${roleId}`, { permissions });
   }
@@ -264,7 +264,7 @@ export class AdminApiService {
     if (this.mock) {
       const idx = this.store.roles.findIndex((r) => r.id === roleId);
       if (idx >= 0) this.store.roles[idx] = { ...this.store.roles[idx], label: { ...label } };
-      return of(structuredCopy(this.store.roles[idx]));
+      return of(structuredCopy(this.store.roles[idx] ?? this.store.roles[0]));
     }
     return this.http.patch<Role>(`${this.base}/admin/roles/${roleId}`, { label });
   }

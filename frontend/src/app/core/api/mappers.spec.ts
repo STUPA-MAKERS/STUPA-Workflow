@@ -6,6 +6,8 @@ import {
   mapAttachment,
   mapComment,
   mapMeeting,
+  mapMeetingPage,
+  mapMeetingVote,
   mapProtocol,
   mapSignedUrl,
   mapState,
@@ -21,6 +23,8 @@ import type {
   AttachmentOutWire,
   CommentOutWire,
   MeetingOutWire,
+  MeetingPageWire,
+  MeetingVoteOutWire,
   NewApplication,
   ProtocolOutWire,
   StateOutWire,
@@ -463,5 +467,269 @@ describe('mapProtocol', () => {
     expect(p.isFinal).toBe(false);
     expect(p.pdfUrl).toBeNull();
     expect(p.sentAt).toBeNull();
+  });
+
+  it('marks a rendering protocol as locked but not final, and keeps publicPdfUrl', () => {
+    const p = mapProtocol({
+      id: 'p-3',
+      meetingId: 'm-1',
+      markdown: '# x',
+      status: 'rendering',
+      publicPdfUrl: 'https://example/public.pdf',
+    } as ProtocolOutWire);
+    expect(p.isFinal).toBe(false);
+    expect(p.isLocked).toBe(true); // status !== 'draft'
+    expect(p.publicPdfUrl).toBe('https://example/public.pdf');
+  });
+
+  it('treats a draft as unlocked', () => {
+    const p = mapProtocol({
+      id: 'p-4',
+      meetingId: 'm-1',
+      markdown: '',
+      status: 'draft',
+    } as ProtocolOutWire);
+    expect(p.isLocked).toBe(false);
+    expect(p.publicPdfUrl).toBeNull();
+  });
+});
+
+describe('mapMeetingVote', () => {
+  it('maps every field through and normalises the null/0/true defaults', () => {
+    const minimal = { id: 'v-1', status: 'pending' } as MeetingVoteOutWire;
+    expect(mapMeetingVote(minimal)).toEqual({
+      id: 'v-1',
+      applicationId: null,
+      agendaItemId: null,
+      title: null,
+      question: null,
+      options: [],
+      status: 'pending',
+      result: null,
+      counts: null,
+      leading: null,
+      closesAt: null,
+      voted: 0,
+      present: 0,
+      revealed: true,
+      failedReason: null,
+    });
+  });
+
+  it('keeps explicitly supplied values (incl. revealed=false and a failedReason)', () => {
+    const wire: MeetingVoteOutWire = {
+      id: 'v-2',
+      applicationId: 'app-1',
+      agendaItemId: 'ag-1',
+      title: 'Antrag A',
+      question: 'Beschluss?',
+      options: ['ja', 'nein'],
+      status: 'closed',
+      result: 'rejected',
+      counts: { ja: 1, nein: 9 },
+      leading: 'nein',
+      closesAt: '2026-06-12T19:00:00Z',
+      voted: 10,
+      present: 12,
+      revealed: false,
+      failedReason: 'majority',
+    };
+    const v = mapMeetingVote(wire);
+    expect(v.revealed).toBe(false);
+    expect(v.failedReason).toBe('majority');
+    expect(v.options).toEqual(['ja', 'nein']);
+    expect(v.voted).toBe(10);
+    expect(v.present).toBe(12);
+    expect(v.result).toBe('rejected');
+  });
+});
+
+describe('mapMeeting permission flags', () => {
+  const base = {
+    id: 'm-1',
+    title: 'Sitzung',
+    status: 'live',
+    votes: [],
+    createdAt: '2026-06-12T17:00:00Z',
+  } as MeetingOutWire;
+
+  it('derives canWrite from canControl when canWrite is absent', () => {
+    const m = mapMeeting({ ...base, canControl: true });
+    expect(m.canWrite).toBe(true);
+    expect(m.canControl).toBe(true); // canControl ?? canWrite
+  });
+
+  it('prefers an explicit canWrite and falls canControl back to it', () => {
+    const m = mapMeeting({ ...base, canWrite: true });
+    expect(m.canWrite).toBe(true);
+    expect(m.canControl).toBe(true); // canControl absent → falls back to canWrite
+  });
+
+  it('defaults all permission flags to false when nothing is supplied', () => {
+    const m = mapMeeting(base);
+    expect(m.canWrite).toBe(false);
+    expect(m.canControl).toBe(false);
+    expect(m.canManage).toBe(false);
+    expect(m.canManageVotes).toBe(false);
+    expect(m.canVote).toBe(false);
+    expect(m.isProtokollant).toBe(false);
+  });
+
+  it('passes through all the explicit camelCase flags and names', () => {
+    const m = mapMeeting({
+      ...base,
+      date: '2026-06-20',
+      startTime: '18:00',
+      endTime: '20:00',
+      gremiumId: 'g-1',
+      gremiumName: 'STUPA',
+      protocolId: 'p-1',
+      protokollantId: 'p-9',
+      protokollantName: 'Mia',
+      isProtokollant: true,
+      canControl: true,
+      canManage: true,
+      canManageVotes: true,
+      canVote: true,
+    });
+    expect(m.date).toBe('2026-06-20');
+    expect(m.startTime).toBe('18:00');
+    expect(m.endTime).toBe('20:00');
+    expect(m.gremiumName).toBe('STUPA');
+    expect(m.protokollantName).toBe('Mia');
+    expect(m.isProtokollant).toBe(true);
+    expect(m.canManage).toBe(true);
+    expect(m.canManageVotes).toBe(true);
+    expect(m.canVote).toBe(true);
+  });
+});
+
+describe('mapper null/??-branch fills', () => {
+  it('mapState: null color and an explicit non-default kind', () => {
+    const s = mapState(
+      { id: 's', key: 'k', label: { de: 'L' }, color: null, editAllowed: false, kind: 'vote' },
+      'de',
+    );
+    expect(s?.color).toBeNull();
+    expect(s?.kind).toBe('vote');
+  });
+
+  it('mapApplicant: null email/name and explicit anonymized=true', () => {
+    const view = mapApplication(
+      {
+        id: 'a',
+        typeId: 't',
+        data: {},
+        version: 1,
+        createdAt: '2026-06-05T10:00:00Z',
+        updatedAt: '2026-06-05T10:00:00Z',
+        applicant: {} as { anonymized?: boolean },
+        canEdit: true,
+        isOwner: true,
+      } as ApplicationOutWire,
+      'de',
+    );
+    // anonymized omitted → defaults to false (?? false right branch)
+    expect(view.applicant).toEqual({ email: null, name: null, anonymized: false });
+    expect(view.canEdit).toBe(true);
+    expect(view.isOwner).toBe(true);
+    expect(view.budgetId).toBeNull();
+  });
+
+  it('mapApplication: missing data normalises to {}', () => {
+    const view = mapApplication(
+      {
+        id: 'a',
+        typeId: 't',
+        version: 1,
+        createdAt: '2026-06-05T10:00:00Z',
+        updatedAt: '2026-06-05T10:00:00Z',
+      } as unknown as ApplicationOutWire,
+      'de',
+    );
+    expect(view.data).toEqual({});
+  });
+
+  it('mapApplicationListItem: title + null amount/currency normalise', () => {
+    const view = mapApplicationListItem(
+      {
+        id: 'a',
+        typeId: 't',
+        title: 'Titel',
+        createdAt: '2026-06-05T10:00:00Z',
+        updatedAt: '2026-06-05T10:00:00Z',
+      } as ApplicationListItemWire,
+      'de',
+    );
+    expect(view.title).toBe('Titel');
+    expect(view.amount).toBeNull();
+    expect(view.currency).toBeNull();
+  });
+
+  it('mapVersion: missing data normalises to {}', () => {
+    const v = mapVersion({
+      version: 1,
+      diff: null,
+      at: '2026-06-01T10:00:00Z',
+    } as unknown as VersionOutWire);
+    expect(v.data).toEqual({});
+  });
+
+  it('mapVersion: diff missing the added map normalises added to []', () => {
+    const v = mapVersion({
+      version: 2,
+      data: {},
+      diff: { removed: { x: 1 }, changed: {} },
+      at: '2026-06-03T10:00:00Z',
+    } as unknown as VersionOutWire);
+    expect(v.diff?.added).toEqual([]);
+    expect(v.diff?.removed).toEqual([{ key: 'x', value: 1 }]);
+  });
+
+  it('mapProtocol: missing markdown normalises to empty string', () => {
+    const p = mapProtocol({
+      id: 'p',
+      meetingId: 'm',
+      status: 'draft',
+    } as unknown as ProtocolOutWire);
+    expect(p.markdown).toBe('');
+  });
+
+  it('toApplicationCreateBody: omitted applicantEmail/altcha default to null', () => {
+    const body = toApplicationCreateBody({
+      typeId: 't',
+      data: { x: 1 },
+      lang: 'de',
+    } as NewApplication);
+    expect(body.applicantEmail).toBeNull();
+    expect(body.altcha).toBeNull();
+    expect(body.data).toEqual({ x: 1 });
+  });
+});
+
+describe('mapMeetingPage', () => {
+  it('maps each meeting item and passes nextCursor through', () => {
+    const wire: MeetingPageWire = {
+      items: [
+        {
+          id: 'm-1',
+          title: 'Sitzung',
+          status: 'planned',
+          votes: [],
+          createdAt: '2026-06-12T17:00:00Z',
+        },
+      ],
+      nextCursor: 'cur-2',
+    };
+    const page = mapMeetingPage(wire);
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0].id).toBe('m-1');
+    expect(page.nextCursor).toBe('cur-2');
+  });
+
+  it('defaults a missing items list to [] and a missing cursor to null', () => {
+    const page = mapMeetingPage({} as MeetingPageWire);
+    expect(page.items).toEqual([]);
+    expect(page.nextCursor).toBeNull();
   });
 });

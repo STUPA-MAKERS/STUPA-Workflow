@@ -498,6 +498,17 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
+    // Sitzungs-Timeline VOR der generischen `/timeline`-Regel matchen — sonst
+    // fängt diese `/meetings/timeline` ab und liefert Antrags-Status-Events
+    // statt einer MeetingPage (war zuvor toter Code unterhalb).
+    if (p.endsWith('/meetings/timeline')) {
+      const direction = req.params.get('direction') ?? 'upcoming';
+      const page: MeetingPageWire = {
+        items: direction === 'upcoming' ? [MOCK_MEETING] : [],
+        nextCursor: null,
+      };
+      return ok(page);
+    }
     if (p.endsWith('/timeline')) return ok(MOCK_TIMELINE);
     if (p.endsWith('/versions')) return ok([...MOCK_VERSIONS]);
     if (p.endsWith('/comments')) return ok([...MOCK_COMMENTS]);
@@ -514,14 +525,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
-    if (p.endsWith('/meetings/timeline')) {
-      const direction = req.params.get('direction') ?? 'upcoming';
-      const page: MeetingPageWire = {
-        items: direction === 'upcoming' ? [MOCK_MEETING] : [],
-        nextCursor: null,
-      };
-      return ok(page);
-    }
     if (p.endsWith('/meetings')) return ok([MOCK_MEETING]);
     if (/\/meetings\/[^/]+\/attendance$/.test(p)) return ok([...MOCK_ATTENDANCE]);
     if (/\/meetings\/[^/]+\/agenda\/assignable$/.test(p)) {

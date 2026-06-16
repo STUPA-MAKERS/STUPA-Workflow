@@ -4,6 +4,7 @@ import {
   formatFieldValue,
   scanBadgeVariant,
 } from './applications.util';
+import type { ScanState } from '@core/api/models';
 
 describe('applicationTitle', () => {
   it('prefers the first non-empty known title field', () => {
@@ -47,6 +48,11 @@ describe('scanBadgeVariant', () => {
     expect(scanBadgeVariant('clean')).toBe('success');
     expect(scanBadgeVariant('quarantined')).toBe('danger');
   });
+
+  it('falls back to neutral for an unknown/pending scan state', () => {
+    // covers the `default` arm of the switch (e.g. "pending" before scanning starts)
+    expect(scanBadgeVariant('pending' as ScanState)).toBe('neutral');
+  });
 });
 
 describe('formatBytes', () => {
@@ -58,8 +64,18 @@ describe('formatBytes', () => {
     expect(formatBytes(1048576)).toBe('1.0 MB');
   });
 
+  it('climbs through GB and TB units (loop body)', () => {
+    // 1 GiB = 1024^3 → unit index walks KB→MB→GB
+    expect(formatBytes(1024 ** 3)).toBe('1.0 GB');
+    // 1 TiB = 1024^4 → walks to the last unit (loop stops at units.length - 1)
+    expect(formatBytes(1024 ** 4)).toBe('1.0 TB');
+    // beyond TB the unit stays at TB (loop guard `unit < units.length - 1`)
+    expect(formatBytes(1024 ** 5)).toBe('1024.0 TB');
+  });
+
   it('returns a dash for invalid sizes', () => {
     expect(formatBytes(-1)).toBe('—');
     expect(formatBytes(NaN)).toBe('—');
+    expect(formatBytes(Infinity)).toBe('—');
   });
 });

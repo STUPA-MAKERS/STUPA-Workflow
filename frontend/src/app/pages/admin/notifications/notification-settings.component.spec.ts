@@ -1,7 +1,8 @@
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { render, screen, fireEvent } from '@testing-library/angular';
 import type { NotificationSettings } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
+import { ToastService } from '@shared/ui';
 import { NotificationSettingsComponent } from './notification-settings.component';
 
 const SETTINGS: NotificationSettings = {
@@ -50,5 +51,96 @@ describe('NotificationSettingsComponent (#task-reminder)', () => {
   it('keeps save disabled until something changed', async () => {
     await setup();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+
+  it('shows an error state and stops loading when the GET fails', async () => {
+    const api = {
+      getNotificationSettings: jest.fn(() => throwError(() => new Error('boom'))),
+      putNotificationSettings: jest.fn(),
+    };
+    const view = await render(NotificationSettingsComponent, {
+      providers: [{ provide: AdminApiService, useValue: api }],
+    });
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    expect(c.loading()).toBe(false);
+    expect(c.error()).toBe('admin.notifications.error');
+    expect(c.settings()).toBeNull();
+  });
+
+  it('surfaces a save error and re-enables the form', async () => {
+    const putNotificationSettings = jest.fn(() => throwError(() => new Error('nope')));
+    const api = {
+      getNotificationSettings: jest.fn(() => of(SETTINGS)),
+      putNotificationSettings,
+    };
+    const view = await render(NotificationSettingsComponent, {
+      providers: [{ provide: AdminApiService, useValue: api }],
+    });
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    c.save();
+    expect(putNotificationSettings).toHaveBeenCalled();
+    expect(c.saving()).toBe(false);
+    expect(c.error()).toBe('admin.notifications.saveError');
+  });
+
+  it('patch is a no-op when settings are not loaded', async () => {
+    const api = {
+      getNotificationSettings: jest.fn(() => throwError(() => new Error('boom'))),
+      putNotificationSettings: jest.fn(),
+    };
+    const view = await render(NotificationSettingsComponent, {
+      providers: [{ provide: AdminApiService, useValue: api }],
+    });
+    await view.fixture.whenStable();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    c.patch({ taskReminderEnabled: false });
+    expect(c.settings()).toBeNull();
+    expect(c.dirty()).toBe(false);
+  });
+
+  it('save is a no-op when settings are not loaded', async () => {
+    const putNotificationSettings = jest.fn();
+    const api = {
+      getNotificationSettings: jest.fn(() => throwError(() => new Error('boom'))),
+      putNotificationSettings,
+    };
+    const view = await render(NotificationSettingsComponent, {
+      providers: [{ provide: AdminApiService, useValue: api }],
+    });
+    await view.fixture.whenStable();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    c.save();
+    expect(putNotificationSettings).not.toHaveBeenCalled();
+  });
+
+  it('shows a success toast on a successful save', async () => {
+    const toast = { success: jest.fn(), error: jest.fn() };
+    const putNotificationSettings = jest.fn((s: NotificationSettings) => of(s));
+    const api = {
+      getNotificationSettings: jest.fn(() => of(SETTINGS)),
+      putNotificationSettings,
+    };
+    const view = await render(NotificationSettingsComponent, {
+      providers: [
+        { provide: AdminApiService, useValue: api },
+        { provide: ToastService, useValue: toast },
+      ],
+    });
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    c.save();
+    expect(toast.success).toHaveBeenCalled();
+    expect(c.dirty()).toBe(false);
+    expect(c.saving()).toBe(false);
   });
 });
