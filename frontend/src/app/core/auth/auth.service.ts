@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { type Observable, of, shareReplay, tap } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { ApiClient } from '../api/api-client.service';
@@ -16,7 +16,13 @@ import type { Principal } from '../api/models';
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly api = inject(ApiClient);
+  // `ApiClient` (→ HttpClient) erst bei Bedarf auflösen, nicht im Feld-Initializer:
+  // sonst zieht der root-`AuthService` HttpClient in jede Komponente, die ihn nur
+  // für `can()`/`roles()` injiziert, und deren Specs scheitern an NG0201.
+  private readonly injector = inject(Injector);
+  private get api(): ApiClient {
+    return this.injector.get(ApiClient);
+  }
 
   private readonly _principal = signal<Principal | null>(null);
   private principal$?: Observable<Principal | null>;

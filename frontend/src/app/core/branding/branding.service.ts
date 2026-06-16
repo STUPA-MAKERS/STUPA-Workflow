@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -17,7 +17,10 @@ import { I18nService } from '@core/i18n/i18n.service';
  */
 @Injectable({ providedIn: 'root' })
 export class BrandingService {
-  private readonly api = inject(ApiClient);
+  // `ApiClient` (→ HttpClient) erst in `init()` auflösen, nicht im Feld-Initializer:
+  // sonst zieht der root-`BrandingService` HttpClient in jede Komponente, die ihn
+  // injiziert, und deren Specs scheitern an NG0201 (kein HttpClient-Provider).
+  private readonly injector = inject(Injector);
   private readonly i18n = inject(I18nService);
   private readonly title = inject(Title);
 
@@ -47,7 +50,7 @@ export class BrandingService {
 
   /** Einmal beim App-Start aufrufen: aktive Branding-Config laden (best-effort). */
   init(): void {
-    this.api.publicSiteConfig().subscribe({
+    this.injector.get(ApiClient).publicSiteConfig().subscribe({
       next: (cfg) => this._configuredName.set(cfg.branding?.appName ?? ''),
       error: () => {
         /* leer lassen → i18n-/Default-Fallback bleibt */
