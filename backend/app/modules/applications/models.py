@@ -119,7 +119,9 @@ class SubmissionVersion(UUIDPkMixin, Base):
     version: Mapped[int] = mapped_column(Integer)
     data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     changed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    at: Mapped[datetime] = mapped_column(server_default=func.now())
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     diff: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (UniqueConstraint("application_id", "version"),)
@@ -141,7 +143,9 @@ class StatusEvent(UUIDPkMixin, Base):
         ForeignKey("transition.id"), nullable=True
     )
     actor: Mapped[str | None] = mapped_column(Text, nullable=True)
-    at: Mapped[datetime] = mapped_column(server_default=func.now())
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (Index("ix_status_event_application_id_at", "application_id", "at"),)

@@ -32,6 +32,31 @@ from app.shared.paging import Page
 _CHAIN_LOCK_KEY = 0x4155_4449_5400  # "AUDIT\0"
 
 
+def data_uuid_strings(data: object) -> set[str]:
+    """Alle UUID-förmigen String-Werte (rekursiv) aus einem ``data``-Payload sammeln.
+
+    Genutzt für die Klarnamen-Auflösung der in ``data`` eingebetteten Entity-Ids
+    (#no-uuids-in-ui). Schlüssel werden ignoriert — nur Werte zählen."""
+    found: set[str] = set()
+
+    def walk(v: object) -> None:
+        if isinstance(v, str):
+            try:
+                uuid.UUID(v)
+            except ValueError:
+                return
+            found.add(v)
+        elif isinstance(v, dict):
+            for x in v.values():  # pyright: ignore[reportUnknownVariableType]
+                walk(x)
+        elif isinstance(v, (list, tuple)):
+            for x in v:  # pyright: ignore[reportUnknownVariableType]
+                walk(x)
+
+    walk(data)
+    return found
+
+
 @dataclass(frozen=True, slots=True)
 class ChainVerification:
     """Ergebnis von :meth:`AuditService.verify_chain`."""
@@ -346,6 +371,108 @@ class AuditService:
                     Attachment.id.in_(ids)
                 ),
             )
+        return labels
+
+    async def resolve_data_ids(
+        self, data_dicts: Sequence[dict[str, Any] | None]
+    ) -> dict[str, str]:
+        """UUIDs in den ``data``-Payloads → Klarname (Batch, #no-uuids-in-ui).
+
+        ``data`` trägt unbenannte Entity-Referenzen (``meetingId``, ``gremiumId``,
+        ``budgetId``, ``fiscalYearId``, ``applicationId``, …) als rohe UUIDs. Da die
+        Schlüssel **nicht** typisiert sind, werden alle UUID-förmigen Werte (rekursiv)
+        gesammelt und je Tabelle per ``id IN (...)`` aufgelöst — UUIDs sind global
+        eindeutig, daher keine Kollision. Nicht auflösbare/gelöschte Ids fehlen in der
+        Map; das FE zeigt dann die rohe UUID. Keine zusätzliche PII-Exposition (alles
+        hier ist für ``audit.read``-Principals ohnehin über die Admin-Sichten sichtbar).
+        """
+        candidates: set[uuid.UUID] = set()
+        for d in data_dicts:
+            for s in data_uuid_strings(d):
+                candidates.add(uuid.UUID(s))
+        if not candidates:
+            return {}
+
+        labels: dict[str, str] = {}
+
+        def i18n_label(m: object) -> str | None:
+            if not isinstance(m, dict) or not m:
+                return None
+            return m.get("de") or next(iter(m.values()), None)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+
+        async def fill(stmt: Select[tuple[uuid.UUID, Any]]) -> None:
+            for row_id, label in (await self.session.execute(stmt)).all():
+                if label and str(row_id) not in labels:
+                    labels[str(row_id)] = label
+
+        from app.modules.admin.models import ApplicationType, Gremium, Webhook
+        from app.modules.applications.models import Application
+        from app.modules.auth.models import Principal, Role
+        from app.modules.budget.tree_models import Budget, FiscalYear
+        from app.modules.files.models import Attachment
+        from app.modules.livevote.models import Meeting
+        from app.modules.voting.models import Vote
+
+        # Antrag: Titel steckt im JSONB-``data`` (kein Spalten-Label).
+        for row_id, data in (
+            await self.session.execute(
+                select(Application.id, Application.data).where(
+                    Application.id.in_(candidates)
+                )
+            )
+        ).all():
+            title = (data or {}).get("title")
+            if isinstance(title, str) and title.strip():
+                labels[str(row_id)] = title.strip()
+
+        await fill(select(Gremium.id, Gremium.name).where(Gremium.id.in_(candidates)))
+        await fill(select(Budget.id, Budget.name).where(Budget.id.in_(candidates)))
+        await fill(select(Meeting.id, Meeting.title).where(Meeting.id.in_(candidates)))
+        await fill(select(Webhook.id, Webhook.name).where(Webhook.id.in_(candidates)))
+        await fill(select(Vote.id, Vote.question).where(Vote.id.in_(candidates)))
+        await fill(
+            select(Attachment.id, Attachment.filename).where(
+                Attachment.id.in_(candidates)
+            )
+        )
+
+        # Mehrspaltige / abgeleitete Labels (Reihenfolge egal — ``fill`` überschreibt nie).
+        for row_id, display_name, email in (
+            await self.session.execute(
+                select(Principal.id, Principal.display_name, Principal.email).where(
+                    Principal.id.in_(candidates)
+                )
+            )
+        ).all():
+            if (label := display_name or email) and str(row_id) not in labels:
+                labels[str(row_id)] = label
+        for row_id, name_i18n, key in (
+            await self.session.execute(
+                select(Role.id, Role.name_i18n, Role.key).where(
+                    Role.id.in_(candidates)
+                )
+            )
+        ).all():
+            if (label := i18n_label(name_i18n) or key) and str(row_id) not in labels:
+                labels[str(row_id)] = label
+        for row_id, name_i18n in (
+            await self.session.execute(
+                select(ApplicationType.id, ApplicationType.name_i18n).where(
+                    ApplicationType.id.in_(candidates)
+                )
+            )
+        ).all():
+            if (label := i18n_label(name_i18n)) and str(row_id) not in labels:
+                labels[str(row_id)] = label
+        for row_id, year in (
+            await self.session.execute(
+                select(FiscalYear.id, FiscalYear.year).where(
+                    FiscalYear.id.in_(candidates)
+                )
+            )
+        ).all():
+            if str(row_id) not in labels:
+                labels[str(row_id)] = str(year)
         return labels
 
     async def list_actors(self) -> list[tuple[str, str | None]]:

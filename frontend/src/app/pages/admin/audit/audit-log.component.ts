@@ -371,6 +371,12 @@ export class AuditLogComponent {
     return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
   }
 
+  /** Akteur im Detail: „<Klarname> · <sub>" wenn aufgelöst, sonst roher sub/System. */
+  protected actorDisplay(e: AuditEntry): string {
+    if (e.actorName && e.actor) return `${e.actorName} · ${e.actor}`;
+    return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
+  }
+
   /** Ziel im Satz: aufgelöstes Label (Backend) bevorzugt, sonst `type:id`. */
   private targetLabel(e: AuditEntry): string {
     if (e.targetLabel) return `„${e.targetLabel}“`;
@@ -378,11 +384,15 @@ export class AuditLogComponent {
     return e.targetType ?? e.targetId ?? '—';
   }
 
-  /** `data`-Inhalt als (key, value)-Paare für die Detail-Chips. */
+  /** `data`-Inhalt als (key, value)-Paare für die Detail-Chips. UUID-Werte mit
+   *  bekanntem Klarnamen werden als „<Name> · <uuid>" gerendert (#no-uuids-in-ui),
+   *  sonst die rohe UUID. */
   protected dataPairs(e: AuditEntry): [string, string][] {
-    return Object.entries(e.data ?? {}).map(([k, v]) => [
-      k,
-      typeof v === 'object' ? JSON.stringify(v) : String(v),
-    ]);
+    const resolved = e.resolvedIds ?? {};
+    const fmt = (v: unknown): string => {
+      if (typeof v === 'string' && resolved[v]) return `${resolved[v]} · ${v}`;
+      return v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v);
+    };
+    return Object.entries(e.data ?? {}).map(([k, v]) => [k, fmt(v)]);
   }
 }

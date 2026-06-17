@@ -141,6 +141,7 @@ export interface ApplicationOutWire {
   gremiumId?: Uuid | null;
   budgetPotId?: Uuid | null;
   budgetId?: Uuid | null;
+  fiscalYearId?: Uuid | null;
   amount?: string | null;
   currency?: string | null;
   data: Record<string, unknown>;
@@ -381,6 +382,7 @@ export interface Application {
   gremiumId: Uuid | null;
   budgetPotId: Uuid | null;
   budgetId: Uuid | null;
+  fiscalYearId: Uuid | null;
   amount: string | null;
   currency: string | null;
   data: Record<string, unknown>;

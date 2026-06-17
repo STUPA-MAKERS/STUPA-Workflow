@@ -82,6 +82,7 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     gremiumId: wire.gremiumId ?? null,
     budgetPotId: wire.budgetPotId ?? null,
     budgetId: wire.budgetId ?? null,
+    fiscalYearId: wire.fiscalYearId ?? null,
     amount: wire.amount ?? null,
     currency: wire.currency ?? null,
     data: wire.data ?? {},

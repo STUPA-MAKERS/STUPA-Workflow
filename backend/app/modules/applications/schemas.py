@@ -85,6 +85,7 @@ class ApplicationOut(_CamelModel):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")
     budget_id: UUID | None = Field(default=None, alias="budgetId")
+    fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     amount: Decimal | None = None
     currency: str | None = None
     data: dict[str, Any]

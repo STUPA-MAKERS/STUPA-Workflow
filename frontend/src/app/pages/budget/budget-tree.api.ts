@@ -516,14 +516,17 @@ export class BudgetTreeApi {
     return this.http.get(`${this.base}/budget/export.xlsx`, { params, responseType: 'blob' });
   }
 
-  /** Antrag einer Kostenstelle zuordnen (#17); ``budgetId=null`` löst die Zuordnung. */
+  /** Antrag einer Kostenstelle zuordnen (#17); ``budgetId=null`` löst die Zuordnung.
+   *  ``fiscalYearId`` optional: gesetzt → explizites HHJ; offen → Server leitet das
+   *  eine aktive HHJ ab (sonst 422). */
   assignBudget(
     applicationId: Uuid,
     budgetId: Uuid | null,
+    fiscalYearId?: Uuid | null,
   ): Observable<{ applicationId: Uuid; budgetId: Uuid | null; fiscalYearId: Uuid | null }> {
     return this.http.post<{ applicationId: Uuid; budgetId: Uuid | null; fiscalYearId: Uuid | null }>(
       `${this.base}/applications/${applicationId}/assign-budget`,
-      { budgetId },
+      { budgetId, fiscalYearId: fiscalYearId ?? null },
     );
   }
 }

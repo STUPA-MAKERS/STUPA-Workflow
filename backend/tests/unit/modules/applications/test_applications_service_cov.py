@@ -162,6 +162,7 @@ def _app(**over: Any) -> _Obj:
         "gremium_id": uuid4(),
         "budget_pot_id": None,
         "budget_id": None,
+        "fiscal_year_id": None,
         "amount": None,
         "currency": None,
         "data": {"title": "Antrag"},

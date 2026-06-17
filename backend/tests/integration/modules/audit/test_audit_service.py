@@ -124,6 +124,28 @@ async def test_resolve_actor_names_and_list_actors(session: AsyncSession) -> Non
     assert all(sub is not None for sub, _ in actors)
 
 
+async def test_resolve_data_ids_resolves_embedded_uuids(session: AsyncSession) -> None:
+    """In ``data`` eingebettete UUIDs → Klarname; Unbekannte/Nicht-UUIDs fehlen."""
+    import uuid as _uuid
+
+    from app.modules.admin.models import Gremium
+
+    g = Gremium(name="Finanzausschuss", slug="finanz")
+    session.add(g)
+    await session.flush()
+    unknown = str(_uuid.uuid4())
+
+    # rekursiv (Liste/verschachteltes Dict) + Nicht-UUID-Werte werden ignoriert
+    resolved = await AuditService(session).resolve_data_ids(
+        [
+            {"gremiumId": str(g.id), "note": "kein-uuid"},
+            {"members": [{"delegateId": unknown}]},
+            None,
+        ]
+    )
+    assert resolved == {str(g.id): "Finanzausschuss"}
+
+
 async def test_update_is_rejected(session: AsyncSession, engine: Engine) -> None:
     await AuditService(session).record(actor="a", action=AuditAction.LOGIN)
     await session.commit()

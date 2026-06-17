@@ -566,6 +566,8 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
     http.expectOne((r) => r.method === 'GET' && r.url === '/api/budgets').flush(budgetTree());
+    // Top-Budget der zugeordneten Kostenstelle → HHJ-Liste wird nachgeladen (#fiscal).
+    http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
     flushForm(http);
     detectChanges();
     expect(cmp.budgetLabel('b1')).toContain('Veranstaltungen');
@@ -597,6 +599,8 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
     http.expectOne((r) => r.method === 'GET' && r.url === '/api/budgets').flush(budgetTree());
+    // initiale HHJ-Liste der zugeordneten Kostenstelle (#fiscal)
+    http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
     flushForm(http);
     flushAttachments(http);
     detectChanges();
@@ -605,12 +609,14 @@ describe('ApplicationsDetailComponent', () => {
     cmp.openBudgetDialog();
     expect(cmp.budgetDialogOpen()).toBe(true);
     expect(cmp.budgetChoice()).toBe('b1');
+    // Dialog öffnen lädt die HHJ-Liste des aktuellen Top-Budgets erneut
+    http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
 
     cmp.budgetChoice.set('');
     cmp.assignBudget();
     const post = http.expectOne((r) => r.url === '/api/applications/app-1/assign-budget');
     expect(post.request.method).toBe('POST');
-    expect(post.request.body).toEqual({ budgetId: null });
+    expect(post.request.body).toEqual({ budgetId: null, fiscalYearId: null });
     post.flush({ applicationId: 'app-1', budgetId: null, fiscalYearId: null });
     expect(cmp.assigningBudget()).toBe(false);
     expect(cmp.budgetDialogOpen()).toBe(false);
@@ -637,7 +643,7 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it.each([
-    [422, 'Zuordnung nicht möglich (Typ/Gremium passt nicht).'],
+    [422, 'Zuordnung nicht möglich – Kostenstelle/Haushaltsjahr prüfen.'],
     [403, 'Sie dürfen diesen Übergang nicht ausführen.'],
     [500, 'Statuswechsel fehlgeschlagen.'],
   ])('maps a failed budget assignment %s to its toast', async (status, message) => {

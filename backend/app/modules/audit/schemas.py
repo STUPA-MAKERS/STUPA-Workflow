@@ -36,6 +36,10 @@ class AuditEntryOut(_CamelModel):
     # vom Router batch-aufgelöst; None wenn Ziel gelöscht/unbekannt.
     target_label: str | None = Field(default=None, alias="targetLabel")
     data: dict[str, Any]
+    # UUID (als String) → Klarname für die in ``data`` eingebetteten Entity-Referenzen
+    # (#no-uuids-in-ui), vom Router batch-aufgelöst. Nur auflösbare Ids sind enthalten;
+    # das FE rendert „<Name> · <uuid>" und fällt sonst auf die rohe UUID zurück.
+    resolved_ids: dict[str, str] = Field(default_factory=dict, alias="resolvedIds")
     hash: str
     prev_hash: str | None = Field(alias="prevHash")
 
@@ -45,6 +49,7 @@ class AuditEntryOut(_CamelModel):
         entry: AuditEntry,
         actor_name: str | None = None,
         target_label: str | None = None,
+        resolved_ids: dict[str, str] | None = None,
     ) -> AuditEntryOut:
         """ORM-Zeile → Out-Schema (bytea-Hashes hex-kodiert)."""
         return cls(
@@ -57,6 +62,7 @@ class AuditEntryOut(_CamelModel):
             targetId=entry.target_id,
             targetLabel=target_label,
             data=entry.data,
+            resolvedIds=resolved_ids or {},
             hash=entry.hash.hex(),
             prevHash=entry.prev_hash.hex() if entry.prev_hash is not None else None,
         )
