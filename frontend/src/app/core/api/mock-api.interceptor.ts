@@ -4,7 +4,7 @@ import {
   type HttpInterceptorFn,
   HttpResponse,
 } from '@angular/common/http';
-import { inject } from '@angular/core';
+import { inject, isDevMode } from '@angular/core';
 import { type Observable, of, throwError } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
@@ -483,6 +483,11 @@ function path(url: string): string {
 }
 
 export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
+  // SICHERHEIT (#67): Verteidigung in der Tiefe — der Mock darf ausschließlich im
+  // Dev-/Demo-Build greifen. In Prod ist `isDevMode()` false; selbst wenn der
+  // Interceptor versehentlich in die Kette geriete, kann ihn keine zur Laufzeit
+  // angreifbare Eingabe (?mock=1, localStorage, __USE_MOCK_API__) mehr aktivieren.
+  if (!isDevMode()) return next(req);
   if (!inject(USE_MOCK_API)) return next(req);
   if (!req.url.includes('/api/')) return next(req);
 
@@ -498,6 +503,17 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
+    // Sitzungs-Timeline VOR der generischen `/timeline`-Regel matchen — sonst
+    // fängt diese `/meetings/timeline` ab und liefert Antrags-Status-Events
+    // statt einer MeetingPage (war zuvor toter Code unterhalb).
+    if (p.endsWith('/meetings/timeline')) {
+      const direction = req.params.get('direction') ?? 'upcoming';
+      const page: MeetingPageWire = {
+        items: direction === 'upcoming' ? [MOCK_MEETING] : [],
+        nextCursor: null,
+      };
+      return ok(page);
+    }
     if (p.endsWith('/timeline')) return ok(MOCK_TIMELINE);
     if (p.endsWith('/versions')) return ok([...MOCK_VERSIONS]);
     if (p.endsWith('/comments')) return ok([...MOCK_COMMENTS]);
@@ -514,14 +530,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
-    if (p.endsWith('/meetings/timeline')) {
-      const direction = req.params.get('direction') ?? 'upcoming';
-      const page: MeetingPageWire = {
-        items: direction === 'upcoming' ? [MOCK_MEETING] : [],
-        nextCursor: null,
-      };
-      return ok(page);
-    }
     if (p.endsWith('/meetings')) return ok([MOCK_MEETING]);
     if (/\/meetings\/[^/]+\/attendance$/.test(p)) return ok([...MOCK_ATTENDANCE]);
     if (/\/meetings\/[^/]+\/agenda\/assignable$/.test(p)) {

@@ -66,4 +66,61 @@ describe('VoteBarsComponent', () => {
     expect(bar).toHaveAttribute('aria-valuemax', '12');
     expect(bar).toHaveAttribute('aria-label', 'Ja: 5');
   });
+
+  it('treats options with no recorded count as zero', async () => {
+    // counts hat keinen Eintrag für »no« → ?? 0 greift (kein NaN-Balken).
+    const { container } = await renderBars({
+      options: ['yes', 'no'],
+      counts: { yes: 3 },
+      eligible: 6,
+    });
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('0')).toBeInTheDocument();
+    const fills = container.querySelectorAll('.bars__fill');
+    expect((fills[1] as HTMLElement).style.width).toBe('0%'); // 0 / 6
+  });
+
+  it('marks no row leading when leading is null', async () => {
+    const { container } = await renderBars({
+      options: ['yes', 'no'],
+      counts: { yes: 2, no: 2 },
+      eligible: 4,
+      leading: null,
+    });
+    expect(container.querySelector('.bars__row--leading')).toBeNull();
+  });
+
+  it('defaults to the compact variant (no beamer modifier)', async () => {
+    const { container } = await renderBars({
+      options: ['yes'],
+      counts: { yes: 1 },
+    });
+    expect(container.querySelector('.bars--beamer')).toBeNull();
+  });
+
+  it('switches to the beamer variant when requested', async () => {
+    const { container } = await renderBars({
+      options: ['yes'],
+      counts: { yes: 1 },
+      variant: 'beamer',
+    });
+    expect(container.querySelector('.bars--beamer')).not.toBeNull();
+  });
+
+  it('clamps bar width to 100% when a count exceeds the base', async () => {
+    // Mehr Stimmen als eligible (z. B. Resync-Glitch) → Balken bei 100% gekappt.
+    const { container } = await renderBars({
+      options: ['yes'],
+      counts: { yes: 9 },
+      eligible: 4,
+      leading: 'yes',
+    });
+    const fill = container.querySelector('.bars__fill') as HTMLElement;
+    expect(fill.style.width).toBe('100%');
+  });
+
+  it('omits aria-valuemax when eligible is unknown (no false quorum scale)', async () => {
+    await renderBars({ options: ['yes'], counts: { yes: 2 } });
+    expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuemax');
+  });
 });

@@ -84,11 +84,22 @@ def fake_service() -> _FakeService:
     return _FakeService()
 
 
+class _EmptyResult:
+    """SQLAlchemy-Result-Stub: ``all`` → leere Liste (keine Gremium-Mitgliedschaften)."""
+
+    def all(self) -> list[object]:  # noqa: A003
+        return []
+
+
 class _NoCreatorDb:
-    """Session-Stub: ``scalar`` → None (kein created_by) für den Ersteller-Check (#24)."""
+    """Session-Stub: ``scalar`` → None (kein created_by) für den Ersteller-Check (#24);
+    ``execute`` → leeres Result, sodass der Gremium-Read-Pfad sauber False ergibt."""
 
     async def scalar(self, *_a: object, **_k: object) -> None:
         return None
+
+    async def execute(self, *_a: object, **_k: object) -> _EmptyResult:
+        return _EmptyResult()
 
 
 async def _fake_session():  # noqa: ANN202
@@ -277,3 +288,84 @@ def test_delete_ok_with_manage(
     r = client.delete(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 204
     assert fake_service.deleted == ATT_ID
+
+
+# --------------------------------------------------------------------------- FIX 4
+# Attachment-Read deckt dieselben Pfade wie require_app_read ab (nicht nur globales
+# application.read): read_all / Ersteller:in / Gremium-Read.
+def test_get_url_read_all_ok(app: FastAPI, client: TestClient) -> None:
+    # application.read_all → Zugriff ohne application.read (read_all-Zweig).
+    _as(app, "application.read_all")
+    r = client.get(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 200
+    assert r.json()["url"] == f"/api/attachments/{ATT_ID}/download"
+
+
+def test_download_read_all_ok(app: FastAPI, client: TestClient) -> None:
+    _as(app, "application.read_all")
+    r = client.get(f"/api/attachments/{ATT_ID}/download")
+    assert r.status_code == 200
+    assert r.content == b"PDF-BYTES"
+
+
+def _patch_creator(monkeypatch: pytest.MonkeyPatch, *, is_creator: bool) -> None:
+    # _resolve_with_creator (im access-Modul) fragt _is_creator — den Ersteller-Zweig
+    # gezielt schalten, ohne echte DB.
+    import app.modules.applications.access as access_mod
+
+    async def _fake_is_creator(*_a: object, **_k: object) -> bool:
+        return is_creator
+
+    monkeypatch.setattr(access_mod, "_is_creator", _fake_is_creator)
+
+
+def _patch_committee(monkeypatch: pytest.MonkeyPatch, *, can_read: bool) -> None:
+    import app.modules.files.router as router_mod
+
+    async def _fake_committee(*_a: object, **_k: object) -> bool:
+        return can_read
+
+    monkeypatch.setattr(router_mod, "_committee_can_read", _fake_committee)
+
+
+def test_get_url_creator_fallback_ok(
+    app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Kein application.read, aber eingeloggte:r Ersteller:in (#24) → 200 via Creator-Zweig.
+    _as(app)
+    _patch_creator(monkeypatch, is_creator=True)
+    r = client.get(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 200
+
+
+def test_get_url_committee_read_fallback_ok(
+    app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Kein Recht, kein Ersteller, aber Gremium-Read (#committee-read) → 200 via Fallback.
+    _as(app)
+    _patch_creator(monkeypatch, is_creator=False)
+    _patch_committee(monkeypatch, can_read=True)
+    r = client.get(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 200
+
+
+def test_download_committee_read_fallback_ok(
+    app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as(app)
+    _patch_creator(monkeypatch, is_creator=False)
+    _patch_committee(monkeypatch, can_read=True)
+    r = client.get(f"/api/attachments/{ATT_ID}/download")
+    assert r.status_code == 200
+    assert r.content == b"PDF-BYTES"
+
+
+def test_get_url_no_access_paths_is_404(
+    app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Weder Recht noch Ersteller noch Gremium-Read → 404 (kein Existenz-Orakel).
+    _as(app)
+    _patch_creator(monkeypatch, is_creator=False)
+    _patch_committee(monkeypatch, can_read=False)
+    r = client.get(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 404

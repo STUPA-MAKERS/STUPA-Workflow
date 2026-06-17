@@ -82,6 +82,13 @@ router = APIRouter(tags=["applications"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
+# Harte Obergrenze für den synchronen XLSX-Export (anti-DoS): die Workbook wird
+# vollständig in-request im Speicher gebaut, daher beschränken wir auf eine sinnvolle
+# Zeilenzahl. Wird die Treffermenge größer, antworten wir mit 413 statt 100k Zeilen zu
+# materialisieren — der/die Nutzer:in soll dann enger filtern. (Echtes Streaming /
+# Worker-Offload wäre die größere Lösung; siehe concerns.)
+EXPORT_MAX_ROWS = 10_000
+
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
@@ -229,13 +236,16 @@ async def list_applications(
 ) -> Page[ApplicationListItem]:
     """Antragsliste (Filter: state/gremium/type/topf/q/Betrag/Datum; Sortierung; Paging).
 
-    Ohne ``application.read`` (und ohne Admin) sieht der Principal nur die **eigenen**
-    Anträge (``created_by``), #24; ``mine=true`` erzwingt das auch für Berechtigte."""
+    Ohne ``application.read`` (und ohne Admin) sieht der Principal die **eigenen**
+    Anträge (``created_by``, #24) **und** den Gremium-Lesescope (#committee-read:
+    Anträge in einer Sicht-Kostenstelle bzw. ``vote``-State seiner Gremien).
+    ``mine=true`` erzwingt den reinen Eigentümer-Filter auch für Berechtigte."""
     can_read = (
         "admin" in principal.roles
         or principal.has("application.read")
         or principal.has(READ_ALL_PERMISSION)
     )
+    restricted = not can_read and not mine
     return await service.list_applications(
         state_id=state_id,
         gremium_id=gremium_id,
@@ -250,6 +260,9 @@ async def list_applications(
         sort=sort,
         order=order,
         owner_sub=principal.sub if (mine or not can_read) else None,
+        # Gremium-Lesescope nur für Eingeschränkte (#committee-read); »mine« bleibt
+        # bewusst rein eigentümer-bezogen, Berechtigte sehen ohnehin alles.
+        committee_sub=principal.sub if restricted else None,
         limit=page.limit,
         offset=page.offset,
     )
@@ -257,7 +270,7 @@ async def list_applications(
 
 @router.get(
     "/applications/export.xlsx",
-    responses=_errors(401, 403),
+    responses=_errors(401, 403, 413),
 )
 async def export_applications_xlsx(
     service: ServiceDep,
@@ -291,9 +304,17 @@ async def export_applications_xlsx(
         created_to=created_to,
         sort=sort,
         order=order,
-        limit=100_000,
+        # +1 über der Kappe, damit wir »mehr als EXPORT_MAX_ROWS« sicher erkennen,
+        # selbst wenn ``total`` nicht zuverlässig gezählt wird.
+        limit=EXPORT_MAX_ROWS + 1,
         offset=0,
     )
+    # Treffermenge zu groß → 413 statt riesige Workbook in-request zu bauen. Wir prüfen
+    # sowohl ``total`` (falls gezählt) als auch die tatsächlich gelieferten Zeilen.
+    if page.total > EXPORT_MAX_ROWS or len(page.items) > EXPORT_MAX_ROWS:
+        raise PayloadTooLargeError(
+            f"Export exceeds {EXPORT_MAX_ROWS} rows; please narrow the filter."
+        )
     type_names, gremium_names = await service.name_maps()
     data = build_applications_workbook(
         page.items, type_names=type_names, gremium_names=gremium_names

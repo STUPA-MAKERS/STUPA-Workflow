@@ -291,8 +291,8 @@ async def test_set_allocation_fy_mismatch() -> None:
 async def test_set_allocation_top_level_new() -> None:
     top = _budget(path_key="VS")
     fy = _fy(budget_id=top.id)
-    # node, fy, top, own_children(none), self_alloc(none→create)
-    sess = fake_session(result(top), result(fy), result(top), result(), result())
+    # node, fy, top, _lock(self), own_children(none), self_alloc(none→create)
+    sess = fake_session(result(top), result(fy), result(top), result(), result(), result())
     svc = BudgetTreeService(sess)
     out = await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("1000")))
     assert out.allocated == Decimal("1000") and sess.committed == 1
@@ -305,8 +305,12 @@ async def test_set_allocation_child_exceeds_parent() -> None:
     fy = _fy(budget_id=top.id)
     sibling_rows = result((uuid.uuid4(), Decimal("600")))  # andere Kinder = 600
     parent_alloc = _alloc(budget_id=parent.id, fy_id=fy.id, allocated="1000")
-    # node, fy, top, siblings, parent_alloc → 600+500>... wait 600+500=1100>1000 → exceeds
-    sess = fake_session(result(child), result(fy), result(top), sibling_rows, result(parent_alloc))
+    # node, fy, top, _lock(self), _lock(parent), siblings, parent_alloc
+    # → 600+500=1100>1000 → exceeds
+    sess = fake_session(
+        result(child), result(fy), result(top), result(), result(),
+        sibling_rows, result(parent_alloc),
+    )
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.set_allocation(child.id, fy.id, AllocationSet(allocated=Decimal("500")))
@@ -321,8 +325,9 @@ async def test_set_allocation_child_ok_update_existing() -> None:
     parent_alloc = _alloc(budget_id=parent.id, fy_id=fy.id, allocated="1000")
     own_children = result()  # leaf, no own children
     self_alloc = _alloc(budget_id=child.id, fy_id=fy.id, allocated="200")
+    # node, fy, top, _lock(self), _lock(parent), siblings, parent_alloc, own_children, self_alloc
     sess = fake_session(
-        result(child), result(fy), result(top), sibling_rows,
+        result(child), result(fy), result(top), result(), result(), sibling_rows,
         result(parent_alloc), own_children, result(self_alloc),
     )
     svc = BudgetTreeService(sess)
@@ -335,7 +340,8 @@ async def test_set_allocation_below_children() -> None:
     top = _budget(path_key="VS")
     fy = _fy(budget_id=top.id)
     own_children = result((uuid.uuid4(), Decimal("700")))  # bereits 700 verteilt
-    sess = fake_session(result(top), result(fy), result(top), own_children)
+    # node, fy, top, _lock(self), own_children
+    sess = fake_session(result(top), result(fy), result(top), result(), own_children)
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("500")))
@@ -366,8 +372,9 @@ async def test_children_alloc_sum_excludes_self() -> None:
     fy = _fy(budget_id=top.id)
     sibling_rows = result((child.id, Decimal("999")), (uuid.uuid4(), Decimal("100")))
     parent_alloc = _alloc(budget_id=parent.id, fy_id=fy.id, allocated="1000")
+    # node, fy, top, _lock(self), _lock(parent), siblings, parent_alloc, own_children, self_alloc
     sess = fake_session(
-        result(child), result(fy), result(top), sibling_rows,
+        result(child), result(fy), result(top), result(), result(), sibling_rows,
         result(parent_alloc), result(), result(),
     )
     svc = BudgetTreeService(sess)
@@ -382,8 +389,11 @@ async def test_set_allocation_child_no_parent_alloc() -> None:
     top = parent
     fy = _fy(budget_id=top.id)
     sibling_rows = result()  # keine anderen Kinder
-    # parent_alloc None → exceeds (0+1 > 0) → 422
-    sess = fake_session(result(child), result(fy), result(top), sibling_rows, result())
+    # node, fy, top, _lock(self), _lock(parent), siblings, parent_alloc(None)
+    # → exceeds (0+1 > 0) → 422
+    sess = fake_session(
+        result(child), result(fy), result(top), result(), result(), sibling_rows, result(),
+    )
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.set_allocation(child.id, fy.id, AllocationSet(allocated=Decimal("1")))

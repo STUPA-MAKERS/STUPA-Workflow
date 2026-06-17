@@ -571,18 +571,31 @@ class ApplicationsService:
         sort: str = "createdAt",
         order: str = "desc",
         owner_sub: str | None = None,
+        committee_sub: str | None = None,
         limit: int,
         offset: int,
     ) -> Page[ApplicationListItem]:
         """Gefilterte, gepagte, sortierte Antragsliste (api.md ``GET /applications``).
 
         ``owner_sub`` beschränkt auf die eigenen Anträge (``created_by``) — gesetzt für
-        Nutzer:innen **ohne** ``application.read``, die nur ihre eigenen sehen dürfen (#24)."""
+        Nutzer:innen **ohne** ``application.read``, die nur ihre eigenen sehen dürfen (#24).
+        ``committee_sub`` weitet diese Beschränkung um den Gremium-Lesescope auf
+        (#committee-read): zusätzlich sichtbar sind Anträge in einer Sicht-Kostenstelle
+        eines Mitglieds-Gremiums oder in einem ``vote``-State für ein solches. Beide
+        Parameter werden mit ``OR`` verknüpft; ist keiner gesetzt, gilt keine
+        Lese-Beschränkung (Voll-Sicht für ``application.read``/Admin)."""
         # Unbestätigte Gast-Anträge sind unsichtbar, bis die E-Mail bestätigt wurde
         # (Bestand + eingeloggte Anträge tragen ``email_confirmed_at`` → bleiben sichtbar).
         filters: list[ColumnElement[bool]] = [Application.email_confirmed_at.is_not(None)]
+        # Lesescope (#24/#committee-read): eigene Anträge ODER Gremium-Scope. Die Klauseln
+        # werden ge-OR-t; ohne ``owner_sub``/``committee_sub`` bleibt die Liste ungefiltert.
+        read_scope: list[ColumnElement[bool]] = []
         if owner_sub is not None:
-            filters.append(Application.created_by == owner_sub)
+            read_scope.append(Application.created_by == owner_sub)
+        if committee_sub is not None:
+            read_scope.extend(await self._committee_read_clauses(committee_sub))
+        if read_scope:
+            filters.append(or_(*read_scope))
         if state_id is not None:
             filters.append(Application.current_state_id == state_id)
         if gremium_id is not None:
@@ -665,6 +678,58 @@ class ApplicationsService:
                 )
             )
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def _committee_read_clauses(self, sub: str) -> list[ColumnElement[bool]]:
+        """Gremium-Lesescope (#committee-read) als SQL-Klauseln (mit dem Owner-Filter
+        ge-OR-t). Zwei Pfade — gespiegelt von ``access._committee_can_read`` (Detail):
+
+        * Kostenstelle (Knoten ODER Vorfahre) mit ``view_gremium_id`` in einem
+          Mitglieds-Gremium → der ganze Teilbaum (``path_key``-Präfix), und
+        * aktueller ``vote``-State mit ``config.gremiumId`` in einem Mitglieds-Gremium.
+
+        Ohne aktive Mitgliedschaften leere Liste (kein zusätzlicher Scope)."""
+        from app.modules.admin.gremium_roles import gremium_member_ids
+
+        member_ids = await gremium_member_ids(self.session, sub)
+        if not member_ids:
+            return []
+        clauses: list[ColumnElement[bool]] = []
+
+        # (a) Sicht-Kostenstellen des Mitglieds (Knoten/Vorfahre) inkl. Unterbaum: erst
+        #     die »Wurzel«-Pfade mit passendem ``view_gremium_id``, dann alle Anträge,
+        #     deren ``budget_id`` auf einen dieser Pfade ODER einen Nachfahren zeigt.
+        root_paths = (
+            await self.session.scalars(
+                select(Budget.path_key).where(Budget.view_gremium_id.in_(member_ids))
+            )
+        ).all()
+        if root_paths:
+            scoped = select(Budget.id).where(
+                or_(
+                    *[
+                        or_(Budget.path_key == rp, Budget.path_key.like(f"{rp}-%"))
+                        for rp in root_paths
+                    ]
+                )
+            )
+            clauses.append(Application.budget_id.in_(scoped))
+
+        # (b) Aktueller ``vote``-State für ein Mitglieds-Gremium. JSONB-``config`` in
+        #     Python ausgewertet (dialekt-neutral, wie ``list_tasks``); die Menge der
+        #     ``vote``-States ist klein.
+        member_str = {str(g) for g in member_ids}
+        vote_state_ids = [
+            s.id
+            for s in (
+                await self.session.scalars(select(State).where(State.kind == "vote"))
+            ).all()
+            if isinstance(s.config, dict)
+            and str(s.config.get("gremiumId") or "") in member_str
+        ]
+        if vote_state_ids:
+            clauses.append(Application.current_state_id.in_(vote_state_ids))
+
+        return clauses
 
     async def name_maps(self, locale: str = "de") -> tuple[dict[UUID, str], dict[UUID, str]]:
         """``(type_names, gremium_names)`` für den Antrags-Export (xlsx)."""

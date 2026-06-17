@@ -120,4 +120,30 @@ describe('authGuard', () => {
     const data = { permission: ['meeting.manage', 'protocol.write'], allowCommitteeMember: true };
     expect(run(data, noCommittee)).toBeInstanceOf(UrlTree);
   });
+
+  it('allows scoped-budget-view members onto allowScopedBudgetView routes', () => {
+    const scoped: Principal = {
+      ...MEMBER,
+      permissions: [],
+      has_scoped_budget_view: true,
+    };
+    const data = { permission: ['budget.view'], allowScopedBudgetView: true };
+    expect(run(data, scoped)).toBe(true);
+  });
+
+  it('forbids allowScopedBudgetView routes when the principal lacks the scoped view', () => {
+    const noScope: Principal = {
+      ...MEMBER,
+      permissions: [],
+      has_scoped_budget_view: false,
+    };
+    const data = { permission: ['budget.view'], allowScopedBudgetView: true };
+    expect(run(data, noScope)).toBeInstanceOf(UrlTree);
+  });
+
+  it('lets any authenticated user onto allowAuthenticated routes', () => {
+    const anyUser: Principal = { ...MEMBER, permissions: [], gremien: [] };
+    const data = { permission: ['budget.view'], allowAuthenticated: true };
+    expect(run(data, anyUser)).toBe(true);
+  });
 });

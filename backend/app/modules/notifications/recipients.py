@@ -89,7 +89,7 @@ class RecipientResolver:
                 or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
                 or_(
                     RoleAssignment.valid_until.is_(None),
-                    RoleAssignment.valid_until >= now,
+                    RoleAssignment.valid_until > now,
                 ),
             )
         )

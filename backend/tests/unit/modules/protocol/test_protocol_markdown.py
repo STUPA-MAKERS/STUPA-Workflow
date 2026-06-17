@@ -10,6 +10,7 @@ from app.modules.protocol.markdown import (
     build_vote_snippet,
     demote_headings,
     protocol_variant_for,
+    sanitize_user_markdown,
 )
 
 
@@ -132,6 +133,11 @@ def test_demote_headings_shifts_levels_and_skips_fences() -> None:
     assert "kein # heading" in out
 
 
+def test_frontmatter_includes_protokollant_when_set() -> None:
+    md = build_protocol_document(_doc(protokollant="Frau Schmidt"))
+    assert 'protokoll: "Frau Schmidt"' in md
+
+
 def test_frontmatter_start_end_time_lines() -> None:
     """#14: Start/Ende reisen als ``beginn``/``ende`` — pytex rendert daraus die
     »Zeit: Start – Ende«-Titelseiten-Zeile."""
@@ -147,3 +153,81 @@ def test_frontmatter_start_end_time_lines() -> None:
 def test_frontmatter_end_time_omitted_when_unknown() -> None:
     md = build_protocol_document(_doc())
     assert "ende:" not in md
+
+
+# ---------------------------------------------------- RCE-Defense-in-Depth (FIX 1b)
+def test_sanitizer_strips_eval_comment_double_quotes() -> None:
+    """``[//]: # "EXPR"`` (pytex-``eval``-Escape) wird entfernt → kein RCE-Vektor."""
+    out = sanitize_user_markdown('# TOP\n[//]: # "__import__(\'os\').system(\'id\')"\nText')
+    assert "__import__" not in out
+    assert "[//]:" not in out
+    assert "# TOP" in out and "Text" in out
+
+
+def test_sanitizer_strips_eval_comment_single_quotes_and_parens_and_bare() -> None:
+    variants = [
+        "[//]: # 'evil'",
+        "[//]: # (evil)",
+        "[//]: # evil",
+        "   [//]: #  evil",  # führender Whitespace
+        "[comment]: # evil",  # anderes Label
+    ]
+    for line in variants:
+        out = sanitize_user_markdown(f"# TOP\n{line}\nText")
+        assert "evil" not in out, line
+        assert "# TOP" in out and "Text" in out
+
+
+def test_sanitizer_strips_iffalse_pytex_marker() -> None:
+    out = sanitize_user_markdown("vor\n\\iffalse{pytex(open('/etc/passwd'))}\\fi\nnach")
+    assert "pytex(" not in out
+    assert "passwd" not in out
+    assert "vor" in out and "nach" in out
+
+
+def test_sanitizer_keeps_normal_markdown_intact() -> None:
+    src = (
+        "# Heading\n\n"
+        "- list item\n"
+        "- *emph* and **bold**\n\n"
+        "A [real link](https://example.org) and `code`.\n\n"
+        "![Diagramm](images/chart.png)\n"
+    )
+    assert sanitize_user_markdown(src) == src
+
+
+def test_sanitizer_neutralizes_absolute_image_path() -> None:
+    out = sanitize_user_markdown("![secret](/etc/passwd)")
+    assert "/etc/passwd" not in out
+    assert "Bild entfernt" in out
+    assert "secret" in out  # Alt-Text bleibt als Platzhalter-Label
+
+
+def test_sanitizer_neutralizes_traversal_image_path() -> None:
+    out = sanitize_user_markdown("![x](../../secrets/key.png)")
+    assert "../../secrets" not in out
+    assert "Bild entfernt" in out
+
+
+def test_sanitizer_neutralizes_windows_and_encoded_traversal() -> None:
+    assert "Bild entfernt" in sanitize_user_markdown("![](C:\\windows\\win.png)")
+    assert "Bild entfernt" in sanitize_user_markdown("![](a/%2e%2e/b.png)")
+    assert "Bild entfernt" in sanitize_user_markdown("![](\\\\host\\share.png)")
+
+
+def test_sanitizer_image_without_alt_uses_default_label() -> None:
+    out = sanitize_user_markdown("![](/abs/img.png)")
+    assert "Bild entfernt" in out
+    assert "Bild" in out
+
+
+def test_sanitizer_keeps_relative_image_path() -> None:
+    src = "![ok](assets/logo.png)"
+    assert sanitize_user_markdown(src) == src
+
+
+def test_build_document_applies_sanitizer_to_body() -> None:
+    """Defense-in-Depth: der Eval-Kommentar darf das finale Dokument nie erreichen."""
+    md = build_protocol_document(_doc(markdown='# TOP 1\n[//]: # "evil"\nText.'))
+    assert "evil" not in md
+    assert "# TOP 1" in md and "Text." in md

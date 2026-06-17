@@ -21,24 +21,31 @@ class FakeChannel implements MeetingChannel {
 }
 class FakeSource implements LiveVoteSource {
   readonly channels: FakeChannel[] = [];
-  connectMeeting(): MeetingChannel {
+  lastMeetingId = '';
+  connectMeeting(id: string): MeetingChannel {
+    this.lastMeetingId = id;
     const ch = new FakeChannel();
     this.channels.push(ch);
     return ch;
   }
 }
 
-async function setup(canVote = true) {
+async function setup(canVote = true, withId = true) {
   const source = new FakeSource();
   const result = await render(LiveVoteComponent, {
     providers: [
       provideRouter([]),
       { provide: LIVE_VOTE_SOURCE, useValue: source },
       { provide: AuthService, useValue: { can: () => canVote } },
-      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: 'm1' }) } } },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: { paramMap: convertToParamMap(withId ? { id: 'm1' } : {}) },
+        },
+      },
     ],
   });
-  return { ...result, channel: source.channels[0] };
+  return { ...result, source, channel: source.channels[0] };
 }
 
 const OPEN_VOTE: ServerMessage = {
@@ -108,5 +115,76 @@ describe('LiveVoteComponent', () => {
     channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 8, no: 1, abstain: 1 } });
     detectChanges();
     expect(screen.getByText('Angenommen')).toBeInTheDocument();
+  });
+
+  it('shows a rejected result badge when the vote fails', async () => {
+    const { channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'rejected', counts: { yes: 1, no: 8, abstain: 1 } });
+    detectChanges();
+    expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
+  });
+
+  it('renders the closed result without a tally block when none arrived', async () => {
+    // Schließt ohne vorheriges vote_tally → result-Block ohne app-vote-bars.
+    const { channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 8, no: 1, abstain: 1 } });
+    detectChanges();
+    expect(screen.getByText('Angenommen')).toBeInTheDocument();
+  });
+
+  it('blocks casting once a result is in (cast guard)', async () => {
+    const { fixture, channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 8, no: 1, abstain: 1 } });
+    detectChanges();
+    fixture.componentInstance.cast('yes');
+    // result() gesetzt → cast() ist ein No-op, kein cast-Frame.
+    expect(channel.sent.some((m) => m.type === 'cast')).toBe(false);
+  });
+
+  it('blocks casting for a not-eligible viewer (cast guard)', async () => {
+    const { fixture, channel, detectChanges } = await setup(false);
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    fixture.componentInstance.cast('yes');
+    expect(channel.sent.some((m) => m.type === 'cast')).toBe(false);
+  });
+
+  it('resets the own choice when a new vote opens', async () => {
+    const { fixture, channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    fixture.componentInstance.cast('yes');
+    expect(fixture.componentInstance.myChoice()).toBe('yes');
+    // Neue Abstimmung mit anderer voteId → effect setzt myChoice zurück.
+    channel.subject.next({ ...OPEN_VOTE, voteId: 'v2' });
+    detectChanges();
+    expect(fixture.componentInstance.myChoice()).toBeNull();
+  });
+
+  it('keeps unknown option keys as their raw label', async () => {
+    const { channel, detectChanges } = await setup();
+    channel.subject.next({ ...OPEN_VOTE, options: ['yes', 'wildcard'] });
+    detectChanges();
+    expect(screen.getByRole('button', { name: 'wildcard' })).toBeInTheDocument();
+  });
+
+  it('falls back to the demo meeting id when the route has none', async () => {
+    const { source } = await setup(true, false);
+    expect(source.lastMeetingId).toBe('demo');
+  });
+
+  it('exposes a tie result key before any result arrives', async () => {
+    const { fixture } = await setup();
+    expect(fixture.componentInstance.resultKey()).toBe('vote.result.tie');
+  });
+
+  it('closes the live session on destroy', async () => {
+    const { fixture, channel } = await setup();
+    const close = jest.spyOn(channel, 'close');
+    fixture.destroy();
+    expect(close).toHaveBeenCalled();
   });
 });

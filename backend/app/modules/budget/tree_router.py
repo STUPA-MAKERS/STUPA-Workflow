@@ -592,14 +592,21 @@ async def upload_invoice_file(
     response_class=Response,
 )
 async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
-    """Original-Beleg inline streamen (#invoices). MinIO liegt intern → kein
-    presigned URL, sondern serverseitiger Fetch über ``/api/`` (wie Protokoll-PDF)."""
-    data, mime, name = await service.invoice_file_bytes(invoice_id)
+    """Original-Beleg serverseitig streamen (#invoices). MinIO liegt intern → kein
+    presigned URL, sondern serverseitiger Fetch über ``/api/`` (wie Protokoll-PDF).
+
+    Sicherheits-Härtung (#sec-audit): das vom Client beim Upload übergebene
+    ``file_mime`` wird auf dem Serve-Pfad **nicht** vertraut. Uploads erzwingen
+    bereits ``application/pdf`` (``tree_service``), daher wird hier hart auf
+    ``application/pdf`` gesetzt und mit ``Content-Disposition: attachment``
+    ausgeliefert — so kann ein als PDF abgelegtes HTML-Polyglot nicht im
+    App-Origin rendern (vgl. ``files/router.py`` Download)."""
+    data, _mime, name = await service.invoice_file_bytes(invoice_id)
     safe = "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
     return Response(
         content=data,
-        media_type=mime,
-        headers={"Content-Disposition": f'inline; filename="{safe}"'},
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe}"'},
     )
 
 

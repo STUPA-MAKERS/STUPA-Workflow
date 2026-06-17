@@ -102,6 +102,84 @@ describe('AuthService', () => {
     expect(assign).toHaveBeenCalledWith('/');
   });
 
+  it('exposes derived principal signals (id, gremien, scoped/manage/substitute flags)', () => {
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush({
+      ...PRINCIPAL,
+      gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }],
+      session_manage_gremien: ['g1'],
+      has_scoped_budget_view: true,
+      in_substitute_pool: true,
+    });
+    expect(auth.userId()).toBe('1');
+    expect(auth.gremien()).toEqual([{ id: 'g1', name: 'StuPa', slug: 'stupa' }]);
+    expect(auth.sessionManageGremien()).toEqual(['g1']);
+    expect(auth.hasScopedBudgetView()).toBe(true);
+    expect(auth.inSubstitutePool()).toBe(true);
+  });
+
+  it('defaults the derived signals when the principal omits them / is anonymous', () => {
+    // Anonymous: all derived signals use their empty/false fallbacks.
+    expect(auth.userId()).toBeNull();
+    expect(auth.gremien()).toEqual([]);
+    expect(auth.roles()).toEqual([]);
+    expect(auth.sessionManageGremien()).toEqual([]);
+    expect(auth.hasScopedBudgetView()).toBe(false);
+    expect(auth.inSubstitutePool()).toBe(false);
+
+    auth.ensureLoaded().subscribe();
+    // Authenticated but with the optional fields absent → still the fallbacks.
+    http.expectOne('/api/auth/me').flush(PRINCIPAL);
+    expect(auth.gremien()).toEqual([]);
+    expect(auth.sessionManageGremien()).toEqual([]);
+    expect(auth.hasScopedBudgetView()).toBe(false);
+    expect(auth.inSubstitutePool()).toBe(false);
+  });
+
+  it('falls back to the placeholder display name when name and email are blank', () => {
+    auth.ensureLoaded().subscribe();
+    http
+      .expectOne('/api/auth/me')
+      .flush({ ...PRINCIPAL, display_name: null, email: '' });
+    expect(auth.displayName()).toBe('—');
+  });
+
+  it('ensureAuthenticated maps the principal presence to a boolean', () => {
+    let authed: boolean | undefined;
+    auth.ensureAuthenticated().subscribe((v) => (authed = v));
+    http.expectOne('/api/auth/me').flush(PRINCIPAL);
+    expect(authed).toBe(true);
+  });
+
+  it('ensureAuthenticated is false for anonymous (401) sessions', () => {
+    let authed: boolean | undefined;
+    auth.ensureAuthenticated().subscribe((v) => (authed = v));
+    http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+    expect(authed).toBe(false);
+  });
+
+  it('grants admins every permission via can()/canAny()', () => {
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush({ ...PRINCIPAL, roles: ['admin'], permissions: [] });
+    expect(auth.can('anything.at.all')).toBe(true);
+    expect(auth.canAny('whatever')).toBe(true);
+    // Empty permission list → canAny is vacuously true (any session passes).
+    expect(auth.canAny()).toBe(true);
+  });
+
+  it('re-loads the principal after logout clears the memoised observable', () => {
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush(PRINCIPAL);
+
+    auth.logout();
+    http.expectOne('/api/auth/logout').flush({ logout_url: null });
+
+    // The cached principal$ was reset → a fresh ensureLoaded triggers a new /me.
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush(PRINCIPAL);
+    expect(auth.isAuthenticated()).toBe(true);
+  });
+
   it('handleUnauthorized re-authenticates only when a principal was present', () => {
     auth.handleUnauthorized();
     expect(assign).not.toHaveBeenCalled();

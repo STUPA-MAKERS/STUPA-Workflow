@@ -2,8 +2,11 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { of, throwError } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@shared/ui';
+import { AdminApiService } from '../admin-api.service';
+import type { Branding, SiteConfig } from '../admin.models';
 import { BrandingEditorComponent } from './branding-editor.component';
 
 async function setup() {
@@ -17,6 +20,45 @@ async function setup() {
     ],
   });
   return { ...view, toast };
+}
+
+function emptyBranding(): Branding {
+  return {
+    logos: {},
+    footerColumns: [],
+    copyright: { de: '', en: '' },
+    legalLinks: [],
+    freetexts: {
+      loginHint: { de: '', en: '' },
+      welcome: { de: '', en: '' },
+      support: { de: '', en: '' },
+      emailFooter: { de: '', en: '' },
+    },
+  };
+}
+
+const STUB_CFG: SiteConfig = {
+  version: 3,
+  active: emptyBranding(),
+  draft: emptyBranding(),
+  hasDraftChanges: false,
+};
+
+async function setupWithStub(api: Partial<Record<keyof AdminApiService, unknown>>) {
+  const toast = { success: jest.fn(), error: jest.fn() };
+  const fullApi = {
+    getSiteConfig: jest.fn(() => of(STUB_CFG)),
+    saveBrandingDraft: jest.fn(() => of({ ...STUB_CFG, hasDraftChanges: true })),
+    activateBranding: jest.fn(() => of({ ...STUB_CFG, version: 4, hasDraftChanges: false })),
+    ...api,
+  };
+  const view = await render(BrandingEditorComponent, {
+    providers: [
+      { provide: AdminApiService, useValue: fullApi },
+      { provide: ToastService, useValue: toast },
+    ],
+  });
+  return { ...view, toast, api: fullApi };
 }
 
 describe('BrandingEditorComponent (#21)', () => {
@@ -148,5 +190,115 @@ describe('BrandingEditorComponent (#21)', () => {
     const input = { files: [big], value: 'x' } as unknown as HTMLInputElement;
     c.onLogoSelected('imagemark', input);
     expect(toast.error).toHaveBeenCalledWith('Datei zu groß (max. 2 MB).');
+  });
+
+  it('onLogoSelected is a no-op when no file is picked', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const before = JSON.stringify(c.draft().logos);
+    const input = { files: [], value: '' } as unknown as HTMLInputElement;
+    expect(() => c.onLogoSelected('imagemark', input)).not.toThrow();
+    expect(JSON.stringify(c.draft().logos)).toBe(before);
+  });
+
+  it('reads an accepted logo via FileReader and stores it in the slot', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const file = new File(['raw'], 'mark.png', { type: 'image/png' });
+    const input = { files: [file], value: 'mark.png' } as unknown as HTMLInputElement;
+    c.onLogoSelected('wordmark', input);
+    await waitFor(() => expect(c.draft().logos.wordmark).toBeDefined());
+    expect(c.draft().logos.wordmark.filename).toBe('mark.png');
+    expect(c.draft().logos.wordmark.mime).toBe('image/png');
+  });
+
+  it('text() resolves an i18n map and tolerates null/undefined', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.text({ de: 'Hallo', en: 'Hi' })).toBe('Hallo');
+    expect(c.text(null)).toBe('');
+    expect(c.text(undefined)).toBe('');
+  });
+
+  it('applyInfo lazily initialises the freetext map', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const d = c.draft();
+    delete d.freetexts.applyInfo;
+    const map = c.applyInfo(d);
+    expect(map).toEqual({});
+    // a second call returns the already-initialised map
+    expect(c.applyInfo(d)).toBe(map);
+  });
+
+  it('slotLabel localises the logo slot', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(typeof c.slotLabel('favicon')).toBe('string');
+    expect(c.slotLabel('favicon').length).toBeGreaterThan(0);
+  });
+
+  it('patch/reemit are no-ops without a draft', async () => {
+    const { fixture } = await setupWithStub({ getSiteConfig: jest.fn(() => of({ ...STUB_CFG, draft: null as unknown as Branding })) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.draft()).toBeNull();
+    expect(() => c.reemit()).not.toThrow();
+    expect(() => c.addColumn()).not.toThrow();
+    expect(c.draft()).toBeNull();
+  });
+
+  it('saveDraft is a no-op without a draft', async () => {
+    const { fixture, api } = await setupWithStub({ getSiteConfig: jest.fn(() => of({ ...STUB_CFG, draft: null as unknown as Branding })) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.saveDraft();
+    expect(api.saveBrandingDraft).not.toHaveBeenCalled();
+  });
+
+  it('saveDraft toasts and persists on success', async () => {
+    const { fixture, api, toast } = await setupWithStub({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.saveDraft();
+    expect(api.saveBrandingDraft).toHaveBeenCalled();
+    expect(c.hasDraftChanges()).toBe(true);
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('saveDraft toasts an error when the request fails', async () => {
+    const { fixture, toast } = await setupWithStub({
+      saveBrandingDraft: jest.fn(() => throwError(() => new Error('boom'))),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.saveDraft();
+    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
+  });
+
+  it('activate bumps the version and toasts on success', async () => {
+    const { fixture, api, toast } = await setupWithStub({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.activate();
+    expect(api.activateBranding).toHaveBeenCalled();
+    expect(c.version()).toBe(4);
+    expect(c.hasDraftChanges()).toBe(false);
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('activate toasts an error when the request fails', async () => {
+    const { fixture, toast } = await setupWithStub({
+      activateBranding: jest.fn(() => throwError(() => new Error('boom'))),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.activate();
+    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 });

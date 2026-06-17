@@ -541,3 +541,111 @@ async def test_schedule_deadline_unresolvable_due_just_commits(
     db = fake_session(result())
     await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
     assert db.committed == 1
+
+
+# --------------------------------------------------------------------------- #
+# schedule_state_deadline — Ziel-Übergang via erfüllbarem Guard (#deadline-guard)
+# --------------------------------------------------------------------------- #
+class _PolSvcOk:
+    def __init__(self, _session: object) -> None: ...
+
+    async def get_by_key(self, _key: str) -> SimpleNamespace:
+        return SimpleNamespace(kind="absolute")
+
+
+class _CaptureDeadlineService:
+    """Fängt ``DeadlineService.create`` ab → letzter ``action_on_pass`` greifbar."""
+
+    last_action_on_pass: object = "<unset>"
+
+    def __init__(self, _session: object) -> None: ...
+
+    async def create(self, **kwargs: object) -> SimpleNamespace:
+        _CaptureDeadlineService.last_action_on_pass = kwargs.get("action_on_pass")
+        return SimpleNamespace(id=uuid4())
+
+
+def _deadline_state_setup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(flow_service, "DeadlinePolicyService", _PolSvcOk)
+    monkeypatch.setattr(
+        flow_service, "resolve_due_at", lambda *_a, **_k: datetime_now()
+    )
+    monkeypatch.setattr(flow_service, "DeadlineService", _CaptureDeadlineService)
+    _CaptureDeadlineService.last_action_on_pass = "<unset>"
+
+
+def datetime_now() -> object:
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC)
+
+
+async def test_schedule_deadline_picks_first_satisfiable_guard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Zwei deadlinePassed-Kandidaten; nur der ZWEITE ist im Cron-Kontext erfüllbar.
+    # → action_on_pass muss auf den zweiten zeigen, nicht stur auf den ersten.
+    _deadline_state_setup(monkeypatch)
+    flow_id, src = uuid4(), uuid4()
+    t1 = _transition(
+        flow_id=flow_id, from_id=src, to_id=uuid4(),
+        guard={"and": [{"deadlinePassed": True}, {"roleIs": "chair"}]},
+    )
+    t2 = _transition(
+        flow_id=flow_id, from_id=src, to_id=uuid4(), guard={"deadlinePassed": True}
+    )
+    # eval_guard: t1 (mit roleIs) scheitert im rollenlosen Cron-Kontext, t2 hält.
+    monkeypatch.setattr(
+        flow_service, "eval_guard", lambda guard, _ctx: guard == t2.guard
+    )
+    app = SimpleNamespace(
+        id=uuid4(), created_at=None, updated_at=None, flow_version_id=flow_id, data={}
+    )
+    state = SimpleNamespace(id=src, config={"deadlinePolicyKey": "sem"})
+    db = fake_session(result(), result(t1, t2))  # DELETE Altfristen, dann SELECT Übergänge
+    await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
+    assert _CaptureDeadlineService.last_action_on_pass == {"transitionId": str(t2.id)}
+
+
+async def test_schedule_deadline_falls_back_to_first_when_none_satisfiable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Kein Kandidat ist erfüllbar → erster Kandidat als reiner Marker gepinnt.
+    _deadline_state_setup(monkeypatch)
+    flow_id, src = uuid4(), uuid4()
+    t1 = _transition(
+        flow_id=flow_id, from_id=src, to_id=uuid4(),
+        guard={"and": [{"deadlinePassed": True}, {"roleIs": "chair"}]},
+    )
+    t2 = _transition(
+        flow_id=flow_id, from_id=src, to_id=uuid4(),
+        guard={"and": [{"deadlinePassed": True}, {"roleIs": "treasurer"}]},
+    )
+    monkeypatch.setattr(flow_service, "eval_guard", lambda *_a, **_k: False)
+    app = SimpleNamespace(
+        id=uuid4(), created_at=None, updated_at=None, flow_version_id=flow_id, data={}
+    )
+    state = SimpleNamespace(id=src, config={"deadlinePolicyKey": "sem"})
+    db = fake_session(result(), result(t1, t2))
+    await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
+    assert _CaptureDeadlineService.last_action_on_pass == {"transitionId": str(t1.id)}
+
+
+async def test_schedule_deadline_no_candidate_pins_null_marker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Kein deadlinePassed-Übergang → action_on_pass=None (reiner Marker, _pick → None).
+    _deadline_state_setup(monkeypatch)
+    flow_id, src = uuid4(), uuid4()
+    t = _transition(
+        flow_id=flow_id, from_id=src, to_id=uuid4(), guard={"roleIs": "chair"}
+    )
+    app = SimpleNamespace(
+        id=uuid4(), created_at=None, updated_at=None, flow_version_id=flow_id, data={}
+    )
+    state = SimpleNamespace(id=src, config={"deadlinePolicyKey": "sem"})
+    db = fake_session(result(), result(t))
+    await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
+    assert _CaptureDeadlineService.last_action_on_pass is None

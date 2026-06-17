@@ -43,4 +43,23 @@ describe('brandingLinkErrors', () => {
     expect(errs).toContain('javascript:1');
     expect(errs).toContain('data:x');
   });
+
+  it('returns [] for null/undefined branding (guard)', () => {
+    expect(brandingLinkErrors(null)).toEqual([]);
+    expect(brandingLinkErrors(undefined)).toEqual([]);
+  });
+
+  it('collects links across multiple footer columns', () => {
+    const b: Branding = {
+      logos: {},
+      footerColumns: [
+        { label: { de: 'a' }, links: [{ label: { de: 'l1' }, url: 'https://ok.org' }] },
+        { label: { de: 'b' }, links: [{ label: { de: 'l2' }, url: 'ftp://bad' }] },
+      ],
+      copyright: { de: '©' },
+      legalLinks: [],
+      freetexts: { loginHint: {}, welcome: {}, support: {}, emailFooter: {} },
+    };
+    expect(brandingLinkErrors(b)).toEqual(['ftp://bad']);
+  });
 });

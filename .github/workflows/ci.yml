@@ -232,7 +232,19 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: [detect, be-unit, fe-unit]
-    if: needs.detect.outputs.frontend == 'true'
+    # DEAKTIVIERT auf dem Standard-Gate-Pfad — opt-in (nicht gelöscht, weiter lauffähig):
+    #   - manuell:   Actions → Run workflow (workflow_dispatch)
+    #   - pro PR:    Label `run-e2e` setzen
+    #   - dauerhaft: Repo-Variable RUN_E2E=true
+    # Vorher lief der Job bei jedem Push/PR mit Frontend; jetzt erscheint er neutral
+    # als *skipped* und blockiert das Gate nicht (kein Job hängt von ihm ab).
+    if: >-
+      needs.detect.outputs.frontend == 'true'
+      && (
+        github.event_name == 'workflow_dispatch'
+        || contains(github.event.pull_request.labels.*.name, 'run-e2e')
+        || vars.RUN_E2E == 'true'
+      )
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -273,11 +285,9 @@ jobs:
           path: backend
       - name: Kritische Module 100 % Branch
         working-directory: backend
-        # NICHT blockierend (continue-on-error): im reinen Unit-Lauf liegen mehrere
-        # kritische Module weit unter 100 % Branch (oauth/mcp/flow/budget/audit sind
-        # v. a. integrationsgetestet). Der Schritt reportet den Abstand zum 100 %-Ziel,
-        # bricht den Build aber nicht — bis die Unit-Branch-Coverage nachgezogen ist.
-        continue-on-error: true
+        # BLOCKIEREND: auth, voting, flow, budget, webhooks und audit erreichen jetzt
+        # 100 % Branch in der reinen Unit-Suite (DB-lose Fakes). Das Gate hält diesen
+        # Stand — fällt ein kritisches Modul unter 100 % Branch, bricht der Build.
         run: python -m scripts.coverage_critical coverage.xml pyproject.toml
 
   # ---- 9 Image-Build + Smoke ---------------------------------------------- #

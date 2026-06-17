@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth import oauth
+from app.modules.auth.models import Principal
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 
 
@@ -167,6 +168,13 @@ async def refresh_tokens(
         raise oauth.OAuthError("invalid_grant", "client mismatch")
     if row.refresh_expires_at is not None and row.refresh_expires_at <= now:
         raise oauth.OAuthError("invalid_grant", "refresh token expired")
+    # Aktiv-Prüfung vor der Rotation: ein deaktivierter Principal darf kein frisches
+    # Token-Paar mehr erhalten (spiegelt die Ablehnung in ``deps`` für Access-Tokens).
+    principal = (
+        await db.execute(select(Principal).where(Principal.id == row.principal_id))
+    ).scalar_one_or_none()
+    if principal is None or principal.active is False:
+        raise oauth.OAuthError("invalid_grant", "principal inactive")
     row.revoked_at = now
     # Gewählte Lebensdauer über die Rotation hinweg beibehalten (``None`` = nie).
     keep_access = row.access_ttl_seconds

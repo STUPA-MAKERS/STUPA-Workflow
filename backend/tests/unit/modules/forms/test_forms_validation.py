@@ -282,6 +282,50 @@ def test_text_runtime_bad_pattern_is_422_not_500() -> None:
     assert ei.value.errors[0].msg == "field has an invalid validation pattern"
 
 
+# --------------------------------------------------------------------------- #
+# ReDoS-Härtung: Längenobergrenze + Wand-Timeout (security.md)
+# --------------------------------------------------------------------------- #
+def test_pattern_value_over_length_cap_is_rejected() -> None:
+    # Wert über _PATTERN_MAX_INPUT_LEN → unbedingt »passt nicht« (kein Match-Versuch).
+    from app.modules.forms.validation import _PATTERN_MAX_INPUT_LEN
+
+    f = _field("t", "text", validation={"pattern": ".*"})
+    over = "a" * (_PATTERN_MAX_INPUT_LEN + 1)
+    with pytest.raises(AnswerValidationError) as ei:
+        validate_answers([f], {"t": over})
+    assert ei.value.errors[0].msg == "does not match required pattern"
+
+
+def test_pattern_value_at_length_cap_still_matches() -> None:
+    # Wert exakt am Limit → regulär gematcht (kein Cap-Abbruch).
+    from app.modules.forms.validation import _PATTERN_MAX_INPUT_LEN
+
+    f = _field("t", "text", validation={"pattern": "a*"})
+    at = "a" * _PATTERN_MAX_INPUT_LEN
+    assert validate_answers([f], {"t": at}) == {"t": at}
+
+
+def test_pattern_match_timeout_is_422(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Wand-Timeout (ReDoS) → Feldfehler statt Event-Loop-Hänger/500.
+    from concurrent.futures import TimeoutError as FutureTimeout
+
+    from app.modules.forms import validation as val_mod
+
+    class _StuckFuture:
+        def result(self, timeout: float | None = None) -> bool:
+            raise FutureTimeout
+
+    class _StuckExecutor:
+        def submit(self, *_a: object, **_k: object) -> _StuckFuture:
+            return _StuckFuture()
+
+    monkeypatch.setattr(val_mod, "_PATTERN_EXECUTOR", _StuckExecutor())
+    f = _field("t", "text", validation={"pattern": "[a-z]+"})
+    with pytest.raises(AnswerValidationError) as ei:
+        validate_answers([f], {"t": "abc"})
+    assert ei.value.errors[0].msg == "field has an invalid validation pattern"
+
+
 def test_number_valid_and_range() -> None:
     f = _field("n", "number", validation={"min": 0, "max": 10})
     assert validate_answers([f], {"n": 5}) == {"n": 5}

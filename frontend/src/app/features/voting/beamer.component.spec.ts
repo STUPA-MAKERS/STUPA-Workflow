@@ -20,20 +20,27 @@ class FakeChannel implements MeetingChannel {
 class FakeSource implements LiveVoteSource {
   readonly channels: FakeChannel[] = [];
   lastBeamer = false;
-  connectMeeting(_id: string, beamer = false): MeetingChannel {
+  lastMeetingId = '';
+  connectMeeting(id: string, beamer = false): MeetingChannel {
     this.lastBeamer = beamer;
+    this.lastMeetingId = id;
     const ch = new FakeChannel();
     this.channels.push(ch);
     return ch;
   }
 }
 
-async function setup() {
+async function setup(withId = true) {
   const source = new FakeSource();
   const r = await render(BeamerComponent, {
     providers: [
       { provide: LIVE_VOTE_SOURCE, useValue: source },
-      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: 'm1' }) } } },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: { paramMap: convertToParamMap(withId ? { id: 'm1' } : {}) },
+        },
+      },
     ],
   });
   return { ...r, source, channel: source.channels[0] };
@@ -96,5 +103,46 @@ describe('BeamerComponent', () => {
   it('never sends cast frames (read-only)', async () => {
     const { channel } = await setup();
     expect(channel.sent.every((m) => m.type !== 'cast')).toBe(true);
+  });
+
+  it('subscribes for resync on open', async () => {
+    const { channel } = await setup();
+    expect(channel.sent).toContainEqual({ type: 'subscribe' });
+  });
+
+  it('falls back to the demo meeting id when the route has none', async () => {
+    const { source } = await setup(false);
+    expect(source.lastMeetingId).toBe('demo');
+  });
+
+  it('reports zero cast count and a tie result key before any tally arrives', async () => {
+    const { fixture } = await setup();
+    // Kein Tally → castCount() ist 0; kein Ergebnis → resultKey() fällt auf tie.
+    expect(fixture.componentInstance.castCount()).toBe(0);
+    expect(fixture.componentInstance.resultKey()).toBe('vote.result.tie');
+  });
+
+  it('shows a rejected result when the vote fails', async () => {
+    const { channel, detectChanges } = await setup();
+    channel.subject.next(OPEN);
+    channel.subject.next({
+      type: 'vote_tally',
+      voteId: 'v1',
+      counts: { yes: 1, no: 5, abstain: 0 },
+      eligible: 12,
+      quorumMet: false,
+      leading: 'no',
+    });
+    channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'rejected', counts: { yes: 1, no: 5, abstain: 0 } });
+    detectChanges();
+    expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
+    expect(screen.getByText(/Quorum:\s*nicht erreicht/)).toBeInTheDocument();
+  });
+
+  it('closes the live session on destroy (no reconnect)', async () => {
+    const { fixture, channel } = await setup();
+    const close = jest.spyOn(channel, 'close');
+    fixture.destroy();
+    expect(close).toHaveBeenCalled();
   });
 });

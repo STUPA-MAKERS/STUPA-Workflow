@@ -58,5 +58,7 @@ class Config:
         root = Path(
             os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
         ) / "antragsplattform-mcp"
-        root.mkdir(parents=True, exist_ok=True)
+        # mode 0700: the dir holds per-URL token caches (secrets) — keep it owner-only.
+        # (exist_ok keeps an existing dir; mode applies only to dirs we create here.)
+        root.mkdir(parents=True, exist_ok=True, mode=0o700)
         return root / f"token-{key}.json"

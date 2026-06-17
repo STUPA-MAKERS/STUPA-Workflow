@@ -90,27 +90,67 @@ async def _is_creator(db: AsyncSession, application_id: UUID, principal: Princip
     return created_by is not None and created_by == principal.sub
 
 
-async def _voted_in_member_committee(
+async def _committee_can_read(
     db: AsyncSession, application_id: UUID, principal: Principal
 ) -> bool:
-    """Wurde der Antrag in einem Gremium des Principals (ab)gestimmt? (#vote-read).
+    """Gremium-Mitglied darf den Antrag **lesen** (#committee-read) — rein lesend,
+    keine Schreib-/Transitionsrechte. Wahr, wenn der Antrag
 
-    Mitglieder dürfen jeden Antrag **lesen**, der in ihrem Gremium zur Abstimmung
-    stand/steht — verknüpft über ``vote → meeting.gremium_id``."""
+    * in einer Kostenstelle (Knoten ODER Vorfahre) liegt, deren ``view_gremium_id``
+      einem seiner Gremien zugeordnet ist (#budget-scope), **oder**
+    * aktuell in einem ``vote``-State steht, dessen ``config.gremiumId`` einem seiner
+      Gremien gehört, **oder**
+    * in einer Sitzung eines seiner Gremien (ab)gestimmt wurde/steht (Bestand,
+      #vote-read, ``vote → meeting.gremium_id``).
+
+    Spiegelt die SQL-Sammelvariante ``ApplicationsService._committee_read_clauses``
+    (Anträge-Liste): beide MÜSSEN dieselben Pfade abdecken, damit ein gelisteter
+    Antrag auch in der Detailansicht öffenbar ist (und umgekehrt)."""
     from app.modules.admin.gremium_roles import gremium_member_ids
-    from app.modules.livevote.models import Meeting
-    from app.modules.voting.models import Vote
 
     gremien = await gremium_member_ids(db, principal.sub)
     if not gremien:
         return False
-    row = await db.scalar(
+
+    # (a) Kostenstelle (Knoten/Vorfahre) mit Sicht-Gremium — kanonische Ahnen-Logik
+    #     des Budget-Baums wiederverwendet (statt die Prefix-Query zu duplizieren).
+    budget_id = await db.scalar(
+        select(Application.budget_id).where(Application.id == application_id)
+    )
+    if budget_id is not None:
+        from app.modules.budget.tree_service import BudgetTreeService
+
+        if await BudgetTreeService(db).can_view_node(budget_id, gremien):
+            return True
+
+    # (b) Aktueller ``vote``-State für eines der Gremien (``config.gremiumId``). JSONB
+    #     in Python ausgewertet (dialekt-neutral, wie ``ApplicationsService.list_tasks``).
+    from app.modules.flow.models import State
+
+    row = (
+        await db.execute(
+            select(State.kind, State.config)
+            .join(Application, Application.current_state_id == State.id)
+            .where(Application.id == application_id)
+        )
+    ).first()
+    if row is not None and row.kind == "vote":
+        cfg = row.config if isinstance(row.config, dict) else {}
+        gid = cfg.get("gremiumId")
+        if isinstance(gid, str) and gid and UUID(gid) in gremien:
+            return True
+
+    # (c) Bestand: in einer Sitzung eines Mitglieds-Gremiums abgestimmt (#vote-read).
+    from app.modules.livevote.models import Meeting
+    from app.modules.voting.models import Vote
+
+    voted = await db.scalar(
         select(Vote.id)
         .join(Meeting, Meeting.id == Vote.meeting_id)
         .where(Vote.application_id == application_id, Meeting.gremium_id.in_(gremien))
         .limit(1)
     )
-    return row is not None
+    return voted is not None
 
 
 async def _resolve_with_creator(
@@ -139,8 +179,9 @@ async def require_app_read(
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Access:
     """Lesezugriff: Principal mit ``application.read``, ``view``-Antragsteller,
-    eingeloggte:r Ersteller:in (#24) **oder** Gremium-Mitglied, in dessen Gremium der
-    Antrag (ab)gestimmt wurde (#vote-read, nur lesend).
+    eingeloggte:r Ersteller:in (#24) **oder** Gremium-Mitglied im Lesescope
+    (#committee-read, nur lesend): Antrag in einer Sicht-Kostenstelle des Gremiums,
+    in einem ``vote``-State für das Gremium oder darin (ab)gestimmt.
 
     ``application.read_all`` (#app-read-all) gewährt globalen Lesezugriff unabhängig
     von Gremium/Eigentum."""
@@ -151,7 +192,7 @@ async def require_app_read(
             db, application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
         )
     except ForbiddenError:
-        if principal is not None and await _voted_in_member_committee(
+        if principal is not None and await _committee_can_read(
             db, application_id, principal
         ):
             return Access(application_id, principal, None)

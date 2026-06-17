@@ -21,11 +21,15 @@ from decimal import Decimal
 _KEY_RE = re.compile(r"^[A-Za-z0-9]+$")
 _SEP = "-"
 _ZERO = Decimal("0")
+# Längen-Obergrenze je Pfad-Segment — deckungsgleich mit ``max_length`` der Schemata,
+# bremst unbounded Freitext in den ``path_key``-Präfixvergleichen (#sec-audit).
+_KEY_MAX = 64
 
 
 def is_valid_key(key: str) -> bool:
-    """Gültiges Pfad-Segment? Alphanumerisch, kein Trenner ``-`` (kollidiert mit Pfad)."""
-    return bool(_KEY_RE.match(key))
+    """Gültiges Pfad-Segment? Alphanumerisch, kein Trenner ``-`` (kollidiert mit Pfad),
+    und längenbeschränkt (``≤ _KEY_MAX``) — die ``path_key``-Präfixe bleiben gebunden."""
+    return len(key) <= _KEY_MAX and bool(_KEY_RE.match(key))
 
 
 def compose_path_key(parent_path: str | None, key: str) -> str:
@@ -144,11 +148,28 @@ def pick_fiscal_year[T](active_ids: Sequence[T]) -> T | None:
     return active_ids[0] if len(active_ids) == 1 else None
 
 
+def is_valid_fiscal_start(start_month: int, start_day: int) -> bool:
+    """Ist der HHJ-Stichtag (Tag/Monat) in **jedem** Jahr ein gültiges Datum?
+
+    Tag ``1..28`` existiert in jedem Monat → Stichtag ist jahresunabhängig gültig.
+    Größere Tage (29–31) können je nach Monat (Feb, Apr, …) fehlen und würden in
+    :func:`fiscal_year_bounds` ein ``date(...)`` ValueError → 500 auslösen.
+    """
+    return 1 <= start_month <= 12 and 1 <= start_day <= 28
+
+
 def fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[date, date]:
     """Start/Ende eines HHJ aus Jahr + Budget-Stichtag (Tag/Monat).
 
     ``start = Stichtag(year)``, ``end = Stichtag(year+1) − 1 Tag`` → lückenlose,
-    disjunkte Folge aufeinanderfolgender Jahre."""
+    disjunkte Folge aufeinanderfolgender Jahre.
+
+    Wirft ``ValueError`` bei unmöglichem Stichtag (z. B. 31.04. / 30.02.) — der
+    Service fängt das und liefert ein 422 statt eines 500 (#sec-audit)."""
+    if not is_valid_fiscal_start(start_month, start_day):
+        raise ValueError(
+            f"invalid fiscal start day/month: {start_day:02d}.{start_month:02d}"
+        )
     start = date(year, start_month, start_day)
     end = date(year + 1, start_month, start_day) - timedelta(days=1)
     return start, end

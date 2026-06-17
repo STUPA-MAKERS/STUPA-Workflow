@@ -51,6 +51,7 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import GroupMapping, Principal, Role, RolePermission
 from app.modules.auth.models import RoleAssignment as RoleAssignmentRow
 from app.modules.flow.models import FlowVersion, State, Transition
+from app.search import escape_like
 from app.shared.config_schemas import (
     EventName,
     FlowGraph,
@@ -698,12 +699,14 @@ class ConfigService:
         Rollenzuweisungen je Principal (ein Folge-Query, kein N+1)."""
         stmt = select(Principal)
         if query:
-            like = f"%{query}%"
+            # Wildcard-Metazeichen der Nutzereingabe escapen (s. app.search) — sonst
+            # wirken `%`/`_` als Wildcards (Wildcard-Injection / Index-Bypass).
+            like = f"%{escape_like(query)}%"
             stmt = stmt.where(
                 or_(
-                    Principal.sub.ilike(like),
-                    Principal.email.ilike(like),
-                    Principal.display_name.ilike(like),
+                    Principal.sub.ilike(like, escape="\\"),
+                    Principal.email.ilike(like, escape="\\"),
+                    Principal.display_name.ilike(like, escape="\\"),
                 )
             )
         stmt = stmt.order_by(Principal.display_name, Principal.sub).limit(limit)

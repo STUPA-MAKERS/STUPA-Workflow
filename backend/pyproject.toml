@@ -111,11 +111,11 @@ omit = ["tests/*"]
 
 [tool.coverage.report]
 show_missing = true
-# Gesamt-Gate (testing.md §1): Backend (unit-only, Lines+Branches). Auf den Ist-Stand
-# (~76 %) abgesenkt — über die Features hinweg ist die Unit-Coverage hinter das 85 %-Ziel
-# zurückgefallen. Schwelle schrittweise wieder anheben, sobald Unit-Tests nachgezogen
-# sind (Zielwert bleibt 85 %).
-fail_under = 75
+# Gesamt-Gate (testing.md §1): Backend (unit-only, Lines+Branches). Die Unit-Suite deckt
+# jetzt 98,7 % ab (alle Services/Router/Worker per DB-losen Fakes getestet). Gate auf 97 %
+# geratscht — knapp unter Ist-Stand, damit echte Regressionen brechen, ohne bei marginalen
+# Schwankungen falsch-rot zu sein. Ziel bleibt, die 97 % zu halten/anzuheben.
+fail_under = 97
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",

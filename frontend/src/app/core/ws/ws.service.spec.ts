@@ -118,4 +118,49 @@ describe('WsService', () => {
     ch.send({ type: 'subscribe' });
     expect(sock.sent).toEqual([]);
   });
+
+  it('completes the stream when the socket closes', () => {
+    const ch = svc.connectMeeting('m-1');
+    let completed = false;
+    ch.messages$.subscribe({ complete: () => (completed = true) });
+    MockWebSocket.instances[0].emit('close', {});
+    expect(completed).toBe(true);
+  });
+
+  it('emits a socket_error message on the error event', () => {
+    const ch = svc.connectMeeting('m-1');
+    const received: ServerMessage[] = [];
+    ch.messages$.subscribe((m) => received.push(m));
+    MockWebSocket.instances[0].emit('error', {});
+    expect(received[0]).toEqual({ type: 'error', code: 'socket_error' });
+  });
+
+  it('closes the underlying socket via channel.close()', () => {
+    const ch = svc.connectMeeting('m-1');
+    const closeSpy = jest.spyOn(MockWebSocket.instances[0], 'close');
+    ch.close();
+    expect(closeSpy).toHaveBeenCalled();
+  });
+
+  it('uses the wss scheme on https origins', () => {
+    const original = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...original, protocol: 'https:', host: 'example.org' },
+    });
+    svc.connectMeeting('m-secure');
+    expect(MockWebSocket.instances[0].url).toBe('wss://example.org/api/ws/meetings/m-secure');
+    Object.defineProperty(window, 'location', { configurable: true, value: original });
+  });
+
+  it('uses the ws scheme on http origins', () => {
+    const original = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...original, protocol: 'http:', host: 'example.org' },
+    });
+    svc.connectMeeting('m-plain');
+    expect(MockWebSocket.instances[0].url).toBe('ws://example.org/api/ws/meetings/m-plain');
+    Object.defineProperty(window, 'location', { configurable: true, value: original });
+  });
 });

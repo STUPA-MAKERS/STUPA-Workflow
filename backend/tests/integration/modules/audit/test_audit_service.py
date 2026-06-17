@@ -125,7 +125,7 @@ async def test_resolve_actor_names_and_list_actors(session: AsyncSession) -> Non
 
 
 async def test_resolve_data_ids_resolves_embedded_uuids(session: AsyncSession) -> None:
-    """In ``data`` eingebettete UUIDs → Klarname; Unbekannte/Nicht-UUIDs fehlen (#no-uuids-in-ui)."""
+    """In ``data`` eingebettete UUIDs → Klarname; Unbekannte/Nicht-UUIDs fehlen."""
     import uuid as _uuid
 
     from app.modules.admin.models import Gremium

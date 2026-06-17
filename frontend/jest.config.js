@@ -28,10 +28,10 @@ module.exports = {
     '!src/app/app.config.ts',
     '!src/app/app.routes.ts',
   ],
-  // Auf den aktuellen Ist-Stand abgesenkt — große Teile der Feature-Views sind noch
-  // ungetestet, die Coverage liegt hinter dem 80/70/75/80-Ziel. Schwellen wieder
-  // schrittweise anheben, sobald Specs nachgezogen sind (Zielwerte bleiben 80/70/75/80).
+  // Specs decken jetzt nahezu den gesamten App-Code ab (stmts 99.7 / branches 98.2 /
+  // funcs 99.3 / lines 99.9). Schwellen knapp unter den Ist-Stand geratscht — echte
+  // Regressionen brechen den Build, marginale Schwankungen nicht. Halten/anheben.
   coverageThreshold: {
-    global: { statements: 65, branches: 45, functions: 55, lines: 65 },
+    global: { statements: 98, branches: 96, functions: 98, lines: 99 },
   },
 };

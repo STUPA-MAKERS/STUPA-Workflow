@@ -100,7 +100,7 @@ class _VotingFake:
 
     def __init__(self, *_a: Any, **_k: Any) -> None: ...
 
-    async def close(self, vote_id: Any, principal: Any) -> Any:
+    async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
         _VotingFake.calls.append(vote_id)
         return SimpleNamespace()
 
