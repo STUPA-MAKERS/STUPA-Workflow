@@ -27,6 +27,7 @@ import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { BadgeComponent } from '@shared/ui/badge/badge.component';
 import { ButtonComponent } from '@shared/ui/button/button.component';
+import { SelectComponent, type SelectOption } from '@shared/ui';
 import { CardComponent } from '@shared/ui/card/card.component';
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { IconComponent } from '@shared/ui';
@@ -34,6 +35,7 @@ import { ToastService } from '@shared/ui/toast/toast.service';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
+  type FiscalYear,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
@@ -76,6 +78,7 @@ interface DetailPosition {
     CardComponent,
     DialogComponent,
     IconComponent,
+    SelectComponent,
     CostCentreTreeComponent,
     AttachmentsPanelComponent,
   ],
@@ -114,6 +117,10 @@ export class ApplicationsDetailComponent {
   protected readonly budgetChoice = signal('');
   protected readonly assigningBudget = signal(false);
   protected readonly budgetDialogOpen = signal(false);
+  /** HHJ-Auswahl (#tz/fiscal): HHJ des Top-Budgets der gewählten Kostenstelle; leer =
+   *  „automatisch" (Server leitet das eine aktive HHJ ab, sonst 422). */
+  protected readonly fiscalYears = signal<FiscalYear[]>([]);
+  protected readonly fiscalChoice = signal('');
   /** ``budgetId`` → „VOLLER-PFAD – Name" (Badge der aktuellen Kostenstelle, #det). */
   private readonly budgetLabels = computed(
     () => new Map(flattenBudgetOptions(this.budgetTree()).map((o) => [o.value, o.label])),
@@ -121,8 +128,61 @@ export class ApplicationsDetailComponent {
   protected budgetLabel(id: string | null | undefined): string {
     return (id && this.budgetLabels().get(id)) || '';
   }
+  /** ``fiscalYearId`` → Anzeige (z. B. ``2026``) der aktuell geladenen HHJ. */
+  private readonly fiscalLabels = computed(
+    () => new Map(this.fiscalYears().map((y) => [y.id, y.display])),
+  );
+  protected fiscalLabel(id: string | null | undefined): string {
+    return (id && this.fiscalLabels().get(id)) || '';
+  }
+  /** Dropdown-Optionen: „Automatisch" + alle HHJ des Top-Budgets (inaktive markiert). */
+  protected readonly fiscalOptions = computed<SelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('applications.budget.fiscalAuto') },
+    ...this.fiscalYears().map((y) => ({
+      value: y.id,
+      label: y.active
+        ? y.display
+        : `${y.display} (${this.i18n.translate('applications.budget.fiscalInactive')})`,
+    })),
+  ]);
+  /** Top-Budget (Wurzel) finden, dessen Teilbaum die Kostenstelle enthält. */
+  private topLevelIdOf(budgetId: string): string | null {
+    const contains = (n: BudgetTreeNode): boolean =>
+      n.id === budgetId || (n.children?.some(contains) ?? false);
+    for (const root of this.budgetTree()) if (contains(root)) return root.id;
+    return null;
+  }
+  /** HHJ des Top-Budgets der gewählten Kostenstelle laden (Dropdown + Badge). */
+  private loadFiscalYears(budgetId: string | null): void {
+    const top = budgetId ? this.topLevelIdOf(budgetId) : null;
+    if (!top) {
+      this.fiscalYears.set([]);
+      return;
+    }
+    const seq = this.loadSeq;
+    this.budgetApi.listFiscalYears(top).subscribe({
+      next: (ys) => {
+        if (seq === this.loadSeq) this.fiscalYears.set(ys);
+      },
+      error: () => {
+        if (seq === this.loadSeq) this.fiscalYears.set([]);
+      },
+    });
+  }
+  /** Kostenstelle im Dialog gewählt: HHJ-Liste neu laden; HHJ-Auswahl nur dann
+   *  beibehalten, wenn die ursprüngliche Kostenstelle wieder gewählt ist. */
+  protected onBudgetPicked(id: string): void {
+    this.budgetChoice.set(id);
+    this.fiscalChoice.set(
+      id === (this.app()?.budgetId ?? '') ? (this.app()?.fiscalYearId ?? '') : '',
+    );
+    this.loadFiscalYears(id || null);
+  }
   protected openBudgetDialog(): void {
-    this.budgetChoice.set(this.app()?.budgetId ?? '');
+    const cur = this.app()?.budgetId ?? '';
+    this.budgetChoice.set(cur);
+    this.fiscalChoice.set(this.app()?.fiscalYearId ?? '');
+    this.loadFiscalYears(cur || null);
     this.budgetDialogOpen.set(true);
   }
 
@@ -239,9 +299,13 @@ export class ApplicationsDetailComponent {
     // Kostenstellen-Zuordnung (#17): Baum laden (Badge-Label + Dialog-Picker).
     if (this.canManage()) {
       this.budgetChoice.set(this.app()?.budgetId ?? '');
+      this.fiscalChoice.set(this.app()?.fiscalYearId ?? '');
       this.budgetApi.tree().subscribe({
         next: (tree) => {
-          if (seq === this.loadSeq) this.budgetTree.set(tree);
+          if (seq !== this.loadSeq) return;
+          this.budgetTree.set(tree);
+          // HHJ-Liste für die aktuelle Kostenstelle laden (Badge-Anzeige des HHJ).
+          this.loadFiscalYears(this.app()?.budgetId ?? null);
         },
         error: () => {
           if (seq === this.loadSeq) this.budgetTree.set([]);
@@ -254,24 +318,26 @@ export class ApplicationsDetailComponent {
   assignBudget(): void {
     if (this.assigningBudget()) return;
     this.assigningBudget.set(true);
-    this.budgetApi.assignBudget(this.id, this.budgetChoice() || null).subscribe({
-      next: () => {
-        this.assigningBudget.set(false);
-        this.budgetDialogOpen.set(false);
-        this.toast.success(this.i18n.translate('applications.actions.success'));
-        this.refresh();
-      },
-      error: (err: { status?: number }) => {
-        this.assigningBudget.set(false);
-        const key =
-          err.status === 422
-            ? 'applications.budget.invalid'
-            : err.status === 403
-              ? 'applications.transitions.forbidden'
-              : 'applications.actions.error';
-        this.toast.error(this.i18n.translate(key));
-      },
-    });
+    this.budgetApi
+      .assignBudget(this.id, this.budgetChoice() || null, this.fiscalChoice() || null)
+      .subscribe({
+        next: () => {
+          this.assigningBudget.set(false);
+          this.budgetDialogOpen.set(false);
+          this.toast.success(this.i18n.translate('applications.actions.success'));
+          this.refresh();
+        },
+        error: (err: { status?: number }) => {
+          this.assigningBudget.set(false);
+          const key =
+            err.status === 422
+              ? 'applications.budget.invalid'
+              : err.status === 403
+                ? 'applications.transitions.forbidden'
+                : 'applications.actions.error';
+          this.toast.error(this.i18n.translate(key));
+        },
+      });
   }
 
   /** Antragsdaten als Label/Wert-Zeilen: Feld-Definition → Label + typisierter Wert;

@@ -417,6 +417,34 @@ async def test_assign_budget_app_not_found() -> None:
         await svc.assign_budget(uuid.uuid4(), AssignBudgetRequest(budgetId=uuid.uuid4()))
 
 
+async def test_assign_budget_explicit_fiscal_year() -> None:
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
+    app = _app()
+    # _get_application, _get_node, _top_level, _get_fiscal_year
+    sess = fake_session(result(app), result(node), result(top), result(fy))
+    svc = BudgetTreeService(sess)
+    out = await svc.assign_budget(
+        app.id, AssignBudgetRequest(budgetId=node.id, fiscalYearId=fy.id)
+    )
+    assert out.budget_id == node.id and out.fiscal_year_id == fy.id
+
+
+async def test_assign_budget_ambiguous_requires_fiscal_year() -> None:
+    # 2+ aktive HHJ und kein explizites fiscalYearId → 422 statt still NULL (R7.1e).
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
+    fy1 = _fy(id=uuid.uuid4(), budget_id=top.id)
+    fy2 = _fy(id=uuid.uuid4(), budget_id=top.id)
+    app = _app()
+    # _get_application, _get_node, _top_level, _fiscal_years_of
+    sess = fake_session(result(app), result(node), result(top), result(fy1, fy2))
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ValidationProblem):
+        await svc.assign_budget(app.id, AssignBudgetRequest(budgetId=node.id))
+
+
 async def test_move_fiscal_year_ok() -> None:
     top = _budget(path_key="VS")
     node = top
@@ -536,26 +564,26 @@ async def test_get_tree_linked_expense_replaces_bound() -> None:
     assert view.available == Decimal("750")    # 1000 − 150 − 100
 
 
-async def test_resolve_expense_fiscal_year_explicit_ok() -> None:
+async def test_resolve_fiscal_year_explicit_ok() -> None:
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)
     sess = fake_session(result(top), result(fy))  # _top_level, _get_fiscal_year
     svc = BudgetTreeService(sess)
-    assert await svc._resolve_expense_fiscal_year(node, fy.id) == fy.id
+    assert await svc._resolve_fiscal_year(node, fy.id) == fy.id
 
 
-async def test_resolve_expense_fiscal_year_wrong_top() -> None:
+async def test_resolve_fiscal_year_wrong_top() -> None:
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
     fy = _fy(id=uuid.uuid4(), budget_id=uuid.uuid4())  # gehört zu anderem Top-Budget
     sess = fake_session(result(top), result(fy))
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
-        await svc._resolve_expense_fiscal_year(node, fy.id)
+        await svc._resolve_fiscal_year(node, fy.id)
 
 
-async def test_resolve_expense_fiscal_year_ambiguous() -> None:
+async def test_resolve_fiscal_year_ambiguous() -> None:
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
     fy1 = _fy(id=uuid.uuid4(), budget_id=top.id)
@@ -563,7 +591,7 @@ async def test_resolve_expense_fiscal_year_ambiguous() -> None:
     sess = fake_session(result(top), result(fy1, fy2))  # _top_level, _fiscal_years_of
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
-        await svc._resolve_expense_fiscal_year(node, None)
+        await svc._resolve_fiscal_year(node, None)
 
 
 async def test_delete_expense_not_found() -> None:

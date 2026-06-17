@@ -33,6 +33,9 @@
       @if (application.budgetId && budgetLabel(application.budgetId)) {
         <app-badge variant="neutral">{{ budgetLabel(application.budgetId) }}</app-badge>
       }
+      @if (application.fiscalYearId && fiscalLabel(application.fiscalYearId)) {
+        <app-badge variant="neutral">{{ fiscalLabel(application.fiscalYearId) }}</app-badge>
+      }
       <span class="text-muted text-sm">
         {{ 'applications.detail.version' | t: { version: application.version } }}
       </span>
@@ -297,15 +300,24 @@
       [selectedId]="budgetChoice()"
       [allLabel]="'applications.budget.none' | t"
       [ariaLabel]="'applications.budget.field' | t"
-      (picked)="budgetChoice.set($event)"
+      (picked)="onBudgetPicked($event)"
     />
   </div>
+  @if (budgetChoice()) {
+    <app-select
+      class="det__ccFy"
+      [label]="'applications.budget.fiscalYear' | t"
+      [options]="fiscalOptions()"
+      [ngModel]="fiscalChoice()"
+      (ngModelChange)="fiscalChoice.set($event)"
+    />
+  }
   <div dialog-footer>
     <app-button variant="ghost" size="sm" (click)="budgetDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
     <app-button
       size="sm"
       [loading]="assigningBudget()"
-      [disabled]="budgetChoice() === (app()?.budgetId ?? '')"
+      [disabled]="budgetChoice() === (app()?.budgetId ?? '') && fiscalChoice() === (app()?.fiscalYearId ?? '')"
       (click)="assignBudget()"
     >{{ 'applications.budget.save' | t }}</app-button>
   </div>

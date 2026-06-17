@@ -275,6 +275,7 @@ class ApplicationsService:
             gremiumId=app.gremium_id,
             budgetPotId=app.budget_pot_id,
             budgetId=app.budget_id,
+            fiscalYearId=app.fiscal_year_id,
             amount=app.amount,
             currency=app.currency,
             data=app.data,

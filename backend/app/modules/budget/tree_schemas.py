@@ -171,9 +171,14 @@ class AssignBudgetRequest(_CamelModel):
     """Antrag einer Kostenstelle zuordnen; setzt zugleich HHJ (R7.1e).
 
     ``budgetId=null`` löst die Zuordnung (auch ``fiscalYearId`` → null).
+
+    ``fiscalYearId`` ist optional: wird es gesetzt, muss es zum Top-Budget der
+    Kostenstelle gehören; bleibt es offen, leitet der Service das **eine** aktive HHJ
+    ab und verlangt sonst eine explizite Wahl (422 — wie bei Ausgaben).
     """
 
     budget_id: UUID | None = Field(default=None, alias="budgetId")
+    fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
 
 
 class MoveFiscalYearRequest(_CamelModel):

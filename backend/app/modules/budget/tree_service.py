@@ -638,9 +638,14 @@ class BudgetTreeService:
     async def assign_budget(
         self, application_id: UUID, payload: AssignBudgetRequest
     ) -> AssignBudgetOut:
-        """Antrag einer Kostenstelle zuordnen; HHJ aus aktivem HHJ des Top-Budgets (R7.1e).
+        """Antrag einer Kostenstelle zuordnen; HHJ explizit oder abgeleitet (R7.1e).
 
         ``budgetId=null`` löst die Zuordnung (auch ``fiscalYearId`` → null).
+
+        Bei gesetzter Kostenstelle bestimmt ``_resolve_fiscal_year`` das HHJ: explizit
+        via ``fiscalYearId`` (muss zum Top-Budget gehören) oder — falls offen — das
+        **eine** aktive HHJ; ist das mehrdeutig/keins, schlägt es mit 422 fehl statt
+        ``fiscal_year_id`` still auf ``NULL`` zu lassen (symmetrisch zu Ausgaben).
         """
         app = await self._get_application(application_id)
         if payload.budget_id is None:
@@ -656,16 +661,14 @@ class BudgetTreeService:
             return AssignBudgetOut(applicationId=app.id, budgetId=None, fiscalYearId=None)
 
         node = await self._get_node(payload.budget_id)
-        top = await self._top_level(node)
-        active_ids = [f.id for f in await self._fiscal_years_of(top.id) if f.active]
-        fy_id = tree_rules.pick_fiscal_year(active_ids)
+        fy_id = await self._resolve_fiscal_year(node, payload.fiscal_year_id)
         app.budget_id = node.id
         app.fiscal_year_id = fy_id
         await self._audit(
             AuditAction.BUDGET_ASSIGN,
             target_type="application",
             target_id=str(app.id),
-            data={"budgetId": str(node.id), "fiscalYearId": str(fy_id) if fy_id else None},
+            data={"budgetId": str(node.id), "fiscalYearId": str(fy_id)},
         )
         await self.session.commit()
         return AssignBudgetOut(applicationId=app.id, budgetId=node.id, fiscalYearId=fy_id)
@@ -699,9 +702,10 @@ class BudgetTreeService:
         return AssignBudgetOut(applicationId=app.id, budgetId=app.budget_id, fiscalYearId=fy.id)
 
     # --------------------------------------------------------------- expenses
-    async def _resolve_expense_fiscal_year(self, node: Budget, fiscal_year_id: UUID | None) -> UUID:
-        """HHJ einer Ausgabe bestimmen: explizit (muss zum Top-Budget gehören) oder
-        — falls offen — das **eine** aktive HHJ des Top-Budgets (sonst 422)."""
+    async def _resolve_fiscal_year(self, node: Budget, fiscal_year_id: UUID | None) -> UUID:
+        """HHJ einer Knoten-Operation bestimmen (Ausgabe/Transfer/Antrags-Zuordnung):
+        explizit (muss zum Top-Budget gehören) oder — falls offen — das **eine** aktive
+        HHJ des Top-Budgets (sonst 422). Gibt nie ``None`` zurück."""
         top = await self._top_level(node)
         if fiscal_year_id is not None:
             fy = await self._get_fiscal_year(fiscal_year_id)
@@ -812,7 +816,7 @@ class BudgetTreeService:
                     errors=[{"field": "budgetId", "msg": "required"}],
                 )
             node = await self._get_node(payload.budget_id)
-            fy_id = await self._resolve_expense_fiscal_year(node, payload.fiscal_year_id)
+            fy_id = await self._resolve_fiscal_year(node, payload.fiscal_year_id)
         account_name = await self._validate_account(payload.account_id)
         expense = BudgetExpense(
             id=uuid.uuid4(),
@@ -1458,8 +1462,8 @@ class BudgetTreeService:
         src = await self._get_node(payload.from_budget_id)
         dst = await self._get_node(payload.to_budget_id)
         # HHJ muss zum Top-Level **beider** Kostenstellen gehören (gleiches HHJ).
-        fy_src = await self._resolve_expense_fiscal_year(src, payload.fiscal_year_id)
-        fy_dst = await self._resolve_expense_fiscal_year(dst, payload.fiscal_year_id)
+        fy_src = await self._resolve_fiscal_year(src, payload.fiscal_year_id)
+        fy_dst = await self._resolve_fiscal_year(dst, payload.fiscal_year_id)
         if fy_src != fy_dst:
             raise ValidationProblem(
                 "Both cost centres must share the fiscal year.",
