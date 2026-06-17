@@ -501,6 +501,58 @@ async def test_book_expense_linked_application_not_found() -> None:
         await svc.book_expense(payload, actor="a")
 
 
+async def test_book_expense_marks_open_invoice_paid() -> None:
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    top = node
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
+    inv = _invoice(id=uuid.uuid4())  # status='open'
+    sess = fake_session(
+        result(node), result(top), result(fy), result(),  # _actor_names empty
+        gets=[inv],  # _mark_invoice_paid → session.get(Invoice)
+    )
+    svc = BudgetTreeService(sess)
+    payload = ExpenseCreate(
+        amount=Decimal("10.00"), description="d", budgetId=node.id, invoiceId=inv.id,
+    )
+    out = await svc.book_expense(payload, actor="")
+    assert out.amount == Decimal("10.00")
+    assert inv.status == "paid"  # offen → bezahlt beim Buchen
+
+
+async def test_book_expense_already_paid_invoice_is_noop() -> None:
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    top = node
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
+    inv = _invoice(id=uuid.uuid4())
+    inv.status = "paid"  # bereits bezahlt → No-op (kein erneuter Status-Wechsel)
+    sess = fake_session(
+        result(node), result(top), result(fy), result(),
+        gets=[inv],
+    )
+    svc = BudgetTreeService(sess)
+    payload = ExpenseCreate(
+        amount=Decimal("10.00"), description="d", budgetId=node.id, invoiceId=inv.id,
+    )
+    await svc.book_expense(payload, actor="")
+    assert inv.status == "paid"
+
+
+async def test_book_expense_unknown_invoice_404() -> None:
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    top = node
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
+    sess = fake_session(
+        result(node), result(top), result(fy),
+        gets=[None],  # session.get(Invoice) → None
+    )
+    svc = BudgetTreeService(sess)
+    payload = ExpenseCreate(
+        amount=Decimal("1.00"), description="d", budgetId=node.id, invoiceId=uuid.uuid4(),
+    )
+    with pytest.raises(NotFoundError):
+        await svc.book_expense(payload, actor="")
+
+
 async def test_book_expense_linked_application_unassigned() -> None:
     app = _app(budget_id=None, fiscal_year_id=None)
     sess = fake_session(gets=[app])
@@ -535,27 +587,30 @@ async def test_update_expense_all_fields_with_app_and_account() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     app = _app(budget_id=node.id, data={"title": "T"})
     acc = _account(id=uuid.uuid4(), name="Konto")
+    inv = _invoice(id=uuid.uuid4())  # offen → wird beim Verknüpfen auf bezahlt gesetzt
     expense = _expense(budget_id=node.id, application_id=app.id, account_id=acc.id,
                        actor="u-1")
-    # gets: BudgetExpense, Account(validate in account_id branch), then after commit:
-    #   _get_node(execute), Application(get), Account(get), _actor_names(execute)
+    # gets: BudgetExpense, Account(validate in account_id branch), Invoice(mark paid),
+    #   then after commit: _get_node(execute), Application(get), Account(get),
+    #   _actor_names(execute)
     sess = fake_session(
         result(node),                     # _get_node(expense.budget_id) after commit
         result(("u-1", None, "bob@x")),   # _actor_names → display_name None → email
-        gets=[expense, acc, app, acc],
+        gets=[expense, acc, inv, app, acc],
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseUpdate(
         amount=Decimal("99.00"), description="neu", accountId=acc.id,
         invoiceDate=date(2026, 1, 2), paymentDate=date(2026, 1, 3),
         correspondent="ACME", note="n", referenceNumber="R9",
-        paymentMethod="bar", category="Reise", invoiceId=uuid.uuid4(),
+        paymentMethod="bar", category="Reise", invoiceId=inv.id,
     )
     out = await svc.update_expense(expense.id, payload)
     assert out.amount == Decimal("99.00")
     assert out.account_name == "Konto"
     assert out.application_title == "T"
     assert out.actor_name == "bob@x"   # display_name None → email
+    assert inv.status == "paid"        # verknüpfte Rechnung → bezahlt
 
 
 async def test_update_expense_clears_account_no_app() -> None:
@@ -586,6 +641,18 @@ async def test_update_expense_amount_none_skipped() -> None:
     out = await svc.update_expense(expense.id, payload)
     assert out.amount == Decimal("7.00")
     assert out.description == "d2"
+
+
+async def test_update_expense_clears_invoice_link_no_mark() -> None:
+    # "invoice_id" gesetzt, aber None → Verknüpfung gelöst, kein Invoice-Lookup/-Flip
+    # (Branch ``payload.invoice_id is not None`` == False).
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    expense = _expense(budget_id=node.id, invoice_id=uuid.uuid4())
+    sess = fake_session(result(node), result(), gets=[expense])  # nur get(BudgetExpense)
+    svc = BudgetTreeService(sess)
+    payload = ExpenseUpdate(invoiceId=None)
+    out = await svc.update_expense(expense.id, payload)
+    assert out.invoice_id is None
 
 
 async def test_update_expense_app_missing_after_commit() -> None:
