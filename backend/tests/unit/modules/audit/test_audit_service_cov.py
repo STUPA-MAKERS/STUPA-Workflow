@@ -311,3 +311,83 @@ async def test_list_actors_empty_log() -> None:
     db = fake_session(result())
     out = await AuditService(db).list_actors()
     assert out == []
+
+
+# --------------------------------------------------------------- resolve_data_ids
+async def test_resolve_data_ids_no_uuids_short_circuits() -> None:
+    """Keine UUID-förmigen Werte → kein execute, leere Map (early return)."""
+    db = fake_session()  # keine Abfrage erwartet
+    out = await AuditService(db).resolve_data_ids([{"k": "nicht-uuid", "n": 7}, None])
+    assert out == {}
+
+
+async def test_resolve_data_ids_all_entity_branches() -> None:
+    """Alle Auflösungs-Zweige: jeder Tabellen-Treffer, i18n-Fallbacks, leere/None-Label,
+    sowie der ``str(id) not in labels``-Dedup-Pfad (gleiche UUID in mehreren Tabellen).
+
+    execute-Reihenfolge: application, gremium, budget, meeting, webhook, vote,
+    attachment, principal, role, application_type, fiscal_year.
+    """
+    a1 = _uuid(1)  # Antrag — gewinnt; taucht in Folge-Tabellen erneut auf (Dedup)
+    a_blank, a_missing, a_nonstr, a_nodata = _uuid(2), _uuid(3), _uuid(4), _uuid(5)
+    g_ok, g_empty = _uuid(10), _uuid(11)
+    bud, meet, vote, attach = _uuid(20), _uuid(30), _uuid(40), _uuid(50)
+    p_name, p_email, p_none = _uuid(60), _uuid(61), _uuid(62)
+    r_i18n, r_key, r_none = _uuid(70), _uuid(71), _uuid(72)
+    t_de, t_other, t_empty, t_nondict = _uuid(80), _uuid(81), _uuid(82), _uuid(83)
+    fy = _uuid(90)
+
+    db = fake_session(
+        result(  # application: getrimmt; blank/missing/non-string/None-data ignoriert
+            (a1, {"title": "  Antrag  "}),
+            (a_blank, {"title": "   "}),
+            (a_missing, {}),
+            (a_nonstr, {"title": 123}),
+            (a_nodata, None),
+        ),
+        result((g_ok, "Vorstand"), (g_empty, ""), (a1, "DupG")),  # fill: ok/leer/dup
+        result((bud, "Budget X")),  # budget
+        result((meet, "Sitzung")),  # meeting
+        result(),  # webhook: keine Treffer
+        result((vote, "Frage?")),  # vote
+        result((attach, "f.pdf")),  # attachment
+        result(  # principal: name / email-Fallback / keins / dup
+            (p_name, "Carol", "c@e"),
+            (p_email, None, "d@e"),
+            (p_none, None, None),
+            (a1, "DupP", "x@e"),
+        ),
+        result(  # role: i18n / key-Fallback / keins / dup
+            (r_i18n, {"de": "Administrator"}, "admin"),
+            (r_key, {}, "treas"),
+            (r_none, None, None),
+            (a1, {"de": "DupR"}, "k"),
+        ),
+        result(  # application_type: de / erster Wert / leer / kein-dict / dup
+            (t_de, {"de": "Antrag"}),
+            (t_other, {"en": "EN only"}),
+            (t_empty, {}),
+            (t_nondict, None),
+            (a1, {"de": "DupT"}),
+        ),
+        result((fy, 2026), (a1, 2030)),  # fiscal_year: Jahr-String / dup
+    )
+
+    out = await AuditService(db).resolve_data_ids(
+        [{"ref": str(a1)}, {"nested": {"x": str(g_ok)}}]
+    )
+    assert out == {
+        str(a1): "Antrag",
+        str(g_ok): "Vorstand",
+        str(bud): "Budget X",
+        str(meet): "Sitzung",
+        str(vote): "Frage?",
+        str(attach): "f.pdf",
+        str(p_name): "Carol",
+        str(p_email): "d@e",
+        str(r_i18n): "Administrator",
+        str(r_key): "treas",
+        str(t_de): "Antrag",
+        str(t_other): "EN only",
+        str(fy): "2026",
+    }
