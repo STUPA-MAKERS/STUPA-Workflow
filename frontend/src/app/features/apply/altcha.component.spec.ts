@@ -55,7 +55,9 @@ describe('AltchaComponent', () => {
       }),
     );
     await waitFor(() => expect(solved).toHaveBeenCalledWith(expected));
-    expect(screen.getByText(/Bestätigt/)).toBeInTheDocument();
+    // `findByText` pollt bis zum Re-Render des „verified"-State — der DOM-Update folgt
+    // dem `solved`-Emit erst im nächsten Change-Detection-Zyklus (sonst flaky unter Last).
+    expect(await screen.findByText(/Bestätigt/)).toBeInTheDocument();
   });
 
   it('signals unavailable when altcha is disabled (404 → null)', async () => {
