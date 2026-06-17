@@ -362,6 +362,25 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.invoiceOptions()[0].label).not.toContain('·');
   });
 
+  it('lists only open invoices; edit keeps a linked paid invoice visible (#invoices)', () => {
+    const paid: Invoice = { ...INVOICE, id: 'inv-paid', number: 'RE-PAID', status: 'paid' };
+    const { cmp } = build({ invoices: [INVOICE, paid] });
+    // Anlegen-Dropdown: nur offene Rechnungen (bezahlte ausgeblendet).
+    expect(cmp.invoiceOptions().map((o) => o.value)).toEqual(['inv-1']);
+    // Bearbeiten ohne Auswahl: ebenfalls nur offene.
+    expect(cmp.editInvoiceOptions().map((o) => o.value)).toEqual(['inv-1']);
+    // Verknüpfte (bereits bezahlte) Rechnung bleibt im Bearbeiten-Dropdown sichtbar.
+    cmp.editInvoiceId.set('inv-paid');
+    expect(cmp.editInvoiceOptions().map((o) => o.value)).toEqual(['inv-paid', 'inv-1']);
+  });
+
+  it('sorts open invoices by issue date, newest first (#invoices)', () => {
+    const older: Invoice = { ...INVOICE, id: 'inv-old', issueDate: '2026-01-01' };
+    const newer: Invoice = { ...INVOICE, id: 'inv-new', issueDate: '2026-09-01' };
+    const { cmp } = build({ invoices: [older, newer] });
+    expect(cmp.invoiceOptions().map((o) => o.value)).toEqual(['inv-new', 'inv-old']);
+  });
+
   it('setKind, selectBudget reload the list with the new filter', () => {
     const { cmp, http } = build();
     cmp.setKind('income');

@@ -881,6 +881,8 @@ class BudgetTreeService:
                 "applicationId": (str(payload.application_id) if payload.application_id else None),
             },
         )
+        if payload.invoice_id is not None:
+            await self._mark_invoice_paid(payload.invoice_id)
         await self.session.commit()
         names = await self._actor_names({expense.actor} if expense.actor else set())
         return self._expense_out(
@@ -899,6 +901,25 @@ class BudgetTreeService:
         if acc is None:
             raise NotFoundError(f"account {account_id} not found")
         return acc.name
+
+    async def _mark_invoice_paid(self, invoice_id: UUID) -> None:
+        """Verknüpfte Rechnung beim Buchen auf ``paid`` setzen (#invoices).
+
+        Offene Rechnung → bezahlt; eine bereits bezahlte ist ein No-op. Unbekannte
+        Rechnung → 404 (statt erst beim Commit am FK aufzulaufen). Kein eigener Commit
+        — läuft in derselben Transaktion wie die Buchung."""
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        if inv.status == "paid":
+            return
+        inv.status = "paid"
+        await self._audit(
+            AuditAction.BUDGET_INVOICE_UPDATE,
+            target_type="invoice",
+            target_id=str(inv.id),
+            data={"status": "paid", "reason": "expense_booked"},
+        )
 
     async def update_expense(self, expense_id: UUID, payload: ExpenseUpdate) -> ExpenseOut:
         """Buchung ändern (#25): Betrag, Beschreibung, Bankkonto und Zusatz-Metadaten
@@ -932,6 +953,8 @@ class BudgetTreeService:
             expense.category = payload.category
         if "invoice_id" in fields:
             expense.invoice_id = payload.invoice_id
+            if payload.invoice_id is not None:
+                await self._mark_invoice_paid(payload.invoice_id)
         await self._audit(
             AuditAction.BUDGET_EXPENSE_UPDATE,
             target_type="budget_expense",

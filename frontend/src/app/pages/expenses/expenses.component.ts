@@ -181,11 +181,31 @@ export class ExpensesComponent {
 
   // --- Rechnungs-Verknüpfung (#invoices): 1 Rechnung : N Buchungen. ---
   readonly invoices = signal<Invoice[]>([]);
-  readonly invoiceOptions = computed<SelectOption[]>(() =>
-    this.invoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) })),
-  );
   readonly newInvoiceId = signal('');
   readonly editInvoiceId = signal('');
+  /** Offene Rechnungen nach Rechnungsdatum (neueste zuerst, ohne Datum zuletzt). Beim
+   *  Buchen wird die gewählte Rechnung serverseitig auf „bezahlt" gesetzt → eine bezahlte
+   *  Rechnung darf nicht erneut verknüpft werden, taucht also nicht mehr im Dropdown auf. */
+  private readonly openInvoices = computed<Invoice[]>(() =>
+    this.invoices()
+      .filter((i) => i.status === 'open')
+      .sort((a, b) => (b.issueDate ?? '').localeCompare(a.issueDate ?? '')),
+  );
+  /** Anlegen-Dialog: nur offene Rechnungen. */
+  readonly invoiceOptions = computed<SelectOption[]>(() =>
+    this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) })),
+  );
+  /** Bearbeiten-Dialog: offene Rechnungen + die aktuell verknüpfte (ggf. bereits
+   *  bezahlte), damit die bestehende Auswahl nicht aus dem Dropdown verschwindet. */
+  readonly editInvoiceOptions = computed<SelectOption[]>(() => {
+    const opts = this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) }));
+    const linkedId = this.editInvoiceId();
+    if (linkedId && !opts.some((o) => o.value === linkedId)) {
+      const inv = this.invoices().find((i) => i.id === linkedId);
+      if (inv) opts.unshift({ value: inv.id, label: this.invoiceLabel(inv) });
+    }
+    return opts;
+  });
 
   // --- Übertrag-Dialog ---
   readonly transferOpen = signal(false);
@@ -225,10 +245,7 @@ export class ExpensesComponent {
       error: () => this.accounts.set([]),
     });
     // Rechnungen für das Verknüpfungs-Dropdown (#invoices) — Bucher dürfen lesen.
-    this.api.listInvoices().subscribe({
-      next: (rows) => this.invoices.set(rows),
-      error: () => this.invoices.set([]),
-    });
+    this.loadInvoices();
     this.reload();
 
     effect((onCleanup) => {
@@ -356,6 +373,15 @@ export class ExpensesComponent {
     if (this.loadingMore() || this.loading() || !this.hasMore()) return;
     this.loadingMore.set(true);
     this.fetch(false);
+  }
+
+  /** Rechnungsliste (neu) laden — nach dem Buchen wechselt eine verknüpfte Rechnung
+   *  serverseitig auf „bezahlt" und fällt damit aus dem Offen-Dropdown. */
+  private loadInvoices(): void {
+    this.api.listInvoices().subscribe({
+      next: (rows) => this.invoices.set(rows),
+      error: () => this.invoices.set([]),
+    });
   }
 
   private fetch(initial: boolean): void {
@@ -585,6 +611,7 @@ export class ExpensesComponent {
           this.saving.set(false);
           this.createOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.toast.created'));
+          this.loadInvoices();
           this.reload();
         },
         error: (err) => {
@@ -641,6 +668,7 @@ export class ExpensesComponent {
           this.editing.set(null);
           this.items.update((list) => list.map((x) => (x.id === updated.id ? updated : x)));
           this.toast.success(this.i18n.translate('expenses.toast.saved'));
+          this.loadInvoices();
         },
         error: () => {
           this.saving.set(false);
