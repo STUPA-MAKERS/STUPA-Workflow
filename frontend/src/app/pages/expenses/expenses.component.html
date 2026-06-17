@@ -248,8 +248,8 @@
       <app-select name="eaccount" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="editAccountId()" (ngModelChange)="editAccountId.set($event)" />
     }
 
-    @if (invoiceOptions().length) {
-      <app-select name="einvoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="editInvoiceId()" (ngModelChange)="onPickEditInvoice($event)" />
+    @if (editInvoiceOptions().length) {
+      <app-select name="einvoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="editInvoiceOptions()" [ngModel]="editInvoiceId()" (ngModelChange)="onPickEditInvoice($event)" />
     }
 
     <div class="exp__grid2">
