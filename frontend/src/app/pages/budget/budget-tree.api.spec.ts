@@ -365,14 +365,21 @@ describe('BudgetTreeApi', () => {
       api.assignBudget('app-1', 'b-1').subscribe();
       const req = http.expectOne(`${BASE}/applications/app-1/assign-budget`);
       expect(req.request.method).toBe('POST');
-      expect(req.request.body).toEqual({ budgetId: 'b-1' });
+      expect(req.request.body).toEqual({ budgetId: 'b-1', fiscalYearId: null });
       req.flush({ applicationId: 'app-1', budgetId: 'b-1', fiscalYearId: null });
+    });
+
+    it('POSTs the explicit fiscalYearId when given', () => {
+      api.assignBudget('app-1', 'b-1', 'fy-1').subscribe();
+      const req = http.expectOne(`${BASE}/applications/app-1/assign-budget`);
+      expect(req.request.body).toEqual({ budgetId: 'b-1', fiscalYearId: 'fy-1' });
+      req.flush({ applicationId: 'app-1', budgetId: 'b-1', fiscalYearId: 'fy-1' });
     });
 
     it('POSTs null to clear the assignment', () => {
       api.assignBudget('app-1', null).subscribe();
       const req = http.expectOne(`${BASE}/applications/app-1/assign-budget`);
-      expect(req.request.body).toEqual({ budgetId: null });
+      expect(req.request.body).toEqual({ budgetId: null, fiscalYearId: null });
       req.flush({ applicationId: 'app-1', budgetId: null, fiscalYearId: null });
     });
   });
