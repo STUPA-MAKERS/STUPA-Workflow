@@ -21,7 +21,7 @@ from app.modules.audit.schemas import (
     AuditPageOut,
     ChainVerificationOut,
 )
-from app.modules.audit.service import AuditService
+from app.modules.audit.service import AuditService, data_uuid_strings
 from app.shared.errors import ProblemDetail
 from app.shared.paging import DEFAULT_LIMIT, MAX_LIMIT
 
@@ -69,11 +69,18 @@ async def list_audit(
     labels = await service.resolve_target_labels(
         [(e.target_type, e.target_id) for e in items]
     )
+    resolved_ids = await service.resolve_data_ids([e.data for e in items])
     out = [
         AuditEntryOut.from_entry(
             e,
             names.get(e.actor or ""),
             labels.get((e.target_type or "", e.target_id or "")),
+            # nur die in diesem Eintrag tatsächlich vorkommenden Ids weiterreichen
+            {
+                k: resolved_ids[k]
+                for k in data_uuid_strings(e.data)
+                if k in resolved_ids
+            },
         )
         for e in items
     ]

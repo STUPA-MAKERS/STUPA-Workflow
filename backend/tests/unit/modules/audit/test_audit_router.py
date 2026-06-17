@@ -38,6 +38,7 @@ class _FakeService:
         self.has_more = False
         self.names: dict[str, str | None] = {}
         self.target_labels: dict[tuple[str, str], str] = {}
+        self.data_ids: dict[str, str] = {}
         self.actors: list[tuple[str, str | None]] = []
         self.verification = ChainVerification(valid=True, checked=0)
 
@@ -54,6 +55,11 @@ class _FakeService:
         self, targets: list[tuple[str | None, str | None]]
     ) -> dict[tuple[str, str], str]:
         return self.target_labels
+
+    async def resolve_data_ids(
+        self, data_dicts: list[dict[str, Any] | None]
+    ) -> dict[str, str]:
+        return self.data_ids
 
     async def list_actors(self) -> list[tuple[str, str | None]]:
         return self.actors

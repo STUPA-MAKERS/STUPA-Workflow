@@ -498,6 +498,9 @@ export interface AuditEntry {
   /** Menschenlesbares Ziel-Label (Antragstitel, Rollenname, …); null = unbekannt/gelöscht. */
   targetLabel?: string | null;
   data: Record<string, unknown>;
+  /** UUID → Klarname für die in `data` eingebetteten Entity-Referenzen (vom Backend
+   *  aufgelöst). Nur auflösbare Ids; sonst wird die rohe UUID gezeigt. */
+  resolvedIds?: Record<string, string>;
   hash: string;
   prevHash: string | null;
 }

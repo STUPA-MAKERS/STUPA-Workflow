@@ -106,4 +106,34 @@ describe('AuditLogComponent (#45)', () => {
     expect(screen.getByText('rows')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
   });
+
+  it('renders embedded data UUIDs and the actor as "<name> · <uuid>" (#no-uuids-in-ui)', async () => {
+    const { fixture } = await setup({
+      items: [
+        entry(1, {
+          data: { gremiumId: 'g-1' },
+          resolvedIds: { 'g-1': 'Finanzausschuss' },
+        }),
+      ],
+      nextCursor: null,
+      hasMore: false,
+    });
+    screen.getByRole('button', { expanded: false }).click();
+    fixture.detectChanges();
+    // data-Chip: aufgelöste UUID als „<Name> · <uuid>".
+    expect(screen.getByText('Finanzausschuss · g-1')).toBeInTheDocument();
+    // Akteur-Detail: Klarname · sub.
+    expect(screen.getByText('Root Admin · kc|root')).toBeInTheDocument();
+  });
+
+  it('falls back to the raw UUID in data chips when unresolved', async () => {
+    const { fixture } = await setup({
+      items: [entry(1, { data: { gremiumId: 'g-unknown' } })],
+      nextCursor: null,
+      hasMore: false,
+    });
+    screen.getByRole('button', { expanded: false }).click();
+    fixture.detectChanges();
+    expect(screen.getByText('g-unknown')).toBeInTheDocument();
+  });
 });

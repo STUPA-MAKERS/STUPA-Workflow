@@ -71,13 +71,13 @@
                   <div class="audit__metaRow">
                     <dt>{{ 'admin.audit.detail.target' | t }}</dt>
                     <dd>
-                      {{ targetTypeLabel(e.targetType) }}@if (e.targetLabel || e.targetId) {<span> · {{ e.targetLabel || e.targetId }}</span>}
+                      {{ targetTypeLabel(e.targetType) }}@if (e.targetLabel) {<span> · {{ e.targetLabel }}</span>}@if (e.targetId) {<span> · {{ e.targetId }}</span>}
                     </dd>
                   </div>
                 }
                 <div class="audit__metaRow">
                   <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
-                  <dd>{{ e.actorName || e.actor || ('admin.audit.system' | t) }}</dd>
+                  <dd>{{ actorDisplay(e) }}</dd>
                 </div>
                 @for (p of dataPairs(e); track p[0]) {
                   <div class="audit__metaRow">
