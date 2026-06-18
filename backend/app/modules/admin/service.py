@@ -406,9 +406,18 @@ class ConfigService:
             ).all()
         }
 
-        # Neue Version oberhalb der bisherigen anlegen; alle übrigen deaktivieren.
+        # Die bisher aktive Version ZUERST deaktivieren — das partial-unique
+        # ``uq_flow_version_one_active_global`` (WHERE active) erlaubt genau eine aktive
+        # Zeile; würde die neue (aktive) Zeile vor dem Deaktivieren eingefügt, kollidierte
+        # sie mit der alten. (``session.execute`` flusht hängende Inserts vor — daher VOR
+        # ``add(version)``, sonst würde die neue Zeile zuerst geschrieben.)
         max_version = await self.session.scalar(
             select(FlowVersion.version).order_by(FlowVersion.version.desc()).limit(1)
+        )
+        await self.session.execute(
+            update(FlowVersion)
+            .where(FlowVersion.active.is_(True))
+            .values(active=False)
         )
         version = FlowVersion(
             version=(max_version or 0) + 1,
@@ -417,11 +426,6 @@ class ConfigService:
         )
         self.session.add(version)
         await self.session.flush()
-        await self.session.execute(
-            update(FlowVersion)
-            .where(FlowVersion.id != version.id)
-            .values(active=False)
-        )
 
         # Frische State-Zeilen der neuen Version (alte Versionen bleiben erhalten).
         id_by_key: dict[str, UUID] = {}
