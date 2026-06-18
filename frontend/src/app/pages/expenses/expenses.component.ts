@@ -160,6 +160,7 @@ export class ExpensesComponent {
   readonly editing = signal<Expense | null>(null);
   readonly editAmount = signal('');
   readonly editDescription = signal('');
+  readonly editBudgetId = signal('');
   readonly editAccountId = signal('');
   readonly editInvoiceDate = signal('');
   readonly editPaymentDate = signal('');
@@ -632,6 +633,7 @@ export class ExpensesComponent {
     this.editing.set(e);
     this.editAmount.set(e.amount);
     this.editDescription.set(e.description);
+    this.editBudgetId.set(e.budgetId);
     this.editAccountId.set(e.accountId ?? '');
     this.editInvoiceId.set(e.invoiceId ?? '');
     this.editInvoiceDate.set(e.invoiceDate ?? '');
@@ -648,10 +650,15 @@ export class ExpensesComponent {
     const e = this.editing();
     if (!e || this.saving()) return;
     this.saving.set(true);
+    // Kostenstelle nur bei eigenständigen Buchungen umbuchbar; gebundene erben sie
+    // vom Antrag (#25). Nur senden, wenn tatsächlich geändert → kein Audit-Rauschen.
+    const budgetChanged =
+      !e.applicationId && !!this.editBudgetId() && this.editBudgetId() !== e.budgetId;
     this.api
       .updateExpense(e.id, {
         amount: this.editAmount(),
         description: this.editDescription().trim(),
+        ...(budgetChanged ? { budgetId: this.editBudgetId() } : {}),
         accountId: this.editAccountId() || null,
         invoiceId: this.editInvoiceId() || null,
         invoiceDate: this.editInvoiceDate() || null,
