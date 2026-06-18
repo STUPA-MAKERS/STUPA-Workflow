@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+import { skipLoading } from '@core/loading/loading.interceptor';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -369,7 +370,12 @@ export class BudgetTreeApi {
 
   tree(gremiumId?: string): Observable<BudgetTreeNode[]> {
     const params = gremiumId ? { gremium: gremiumId } : undefined;
-    return this.http.get<BudgetTreeNode[]>(`${this.base}/budgets`, { params });
+    // Budget-/Dashboard-Seiten haben einen eigenen Lade-Indikator; sonst nur
+    // Navigations-/Dropdown-Hydration → globalen Overlay unterdrücken (#loading).
+    return this.http.get<BudgetTreeNode[]>(`${this.base}/budgets`, {
+      params,
+      context: skipLoading(),
+    });
   }
 
   createNode(body: BudgetNodeCreate): Observable<BudgetNode> {
@@ -385,7 +391,9 @@ export class BudgetTreeApi {
   }
 
   listFiscalYears(topId: Uuid): Observable<FiscalYear[]> {
-    return this.http.get<FiscalYear[]>(`${this.base}/budgets/${topId}/fiscal-years`);
+    return this.http.get<FiscalYear[]>(`${this.base}/budgets/${topId}/fiscal-years`, {
+      context: skipLoading(),
+    });
   }
 
   createFiscalYear(topId: Uuid, body: FiscalYearCreate): Observable<FiscalYear> {
@@ -401,6 +409,7 @@ export class BudgetTreeApi {
     const params = fiscalYearId ? { fiscalYear: fiscalYearId } : undefined;
     return this.http.get<BudgetApplication[]>(`${this.base}/budgets/${budgetId}/applications`, {
       params,
+      context: skipLoading(),
     });
   }
 
@@ -412,7 +421,10 @@ export class BudgetTreeApi {
         params[key] = String(value);
       }
     }
-    return this.http.get<ExpensePage>(`${this.base}/expenses`, { params });
+    return this.http.get<ExpensePage>(`${this.base}/expenses`, {
+      params,
+      context: skipLoading(),
+    });
   }
 
   /** Buchung anlegen (#25): eigenständig oder an einen Antrag gebunden. */
@@ -445,7 +457,10 @@ export class BudgetTreeApi {
         params[key] = String(value);
       }
     }
-    return this.http.get<InvoicePage>(`${this.base}/invoices`, { params });
+    return this.http.get<InvoicePage>(`${this.base}/invoices`, {
+      params,
+      context: skipLoading(),
+    });
   }
 
   /** Volle Rechnungsliste (neuestes Rechnungsdatum zuerst) — für das Buchungs-
@@ -488,7 +503,9 @@ export class BudgetTreeApi {
   /** Aktive Konten als id+Name (ohne IBAN) für Buchungs-Dropdowns — Bucher dürfen das
    *  ohne account.manage (#5-2/#2). */
   listAccountOptions(): Observable<AccountOption[]> {
-    return this.http.get<AccountOption[]>(`${this.base}/accounts/options`);
+    return this.http.get<AccountOption[]>(`${this.base}/accounts/options`, {
+      context: skipLoading(),
+    });
   }
   createAccount(body: AccountBody): Observable<Account> {
     return this.http.post<Account>(`${this.base}/accounts`, body);

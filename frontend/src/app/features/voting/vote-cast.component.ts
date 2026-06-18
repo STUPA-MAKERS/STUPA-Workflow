@@ -136,7 +136,7 @@ export class VoteCastComponent {
           ),
         );
         // Aktuellen Tally vom Server nachladen (kein optimistisches Raten).
-        this.api.getVote(vote.id).subscribe((v) => this.vote.set(v));
+        this.api.getVote(vote.id, { quiet: true }).subscribe((v) => this.vote.set(v));
       },
       error: (err: { status?: number; error?: ProblemDetail }) => {
         this.submitting.set(false);
@@ -145,7 +145,7 @@ export class VoteCastComponent {
           this.toast.error(this.i18n.translate('voting.cast.notEligible'));
         } else if (err.status === 409) {
           this.toast.error(this.i18n.translate('voting.cast.toast.conflict'));
-          this.api.getVote(vote.id).subscribe((v) => this.vote.set(v));
+          this.api.getVote(vote.id, { quiet: true }).subscribe((v) => this.vote.set(v));
         } else {
           this.toast.error(err.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'));
         }

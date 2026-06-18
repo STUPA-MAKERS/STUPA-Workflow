@@ -14,6 +14,7 @@
  * abstimmen.
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { skipLoading } from '@core/loading/loading.interceptor';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map, of } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
@@ -122,9 +123,12 @@ export class AdminApiService {
   }
 
   // --- Gremien / RBAC ------------------------------------------------------
-  listGremien(): Observable<Gremium[]> {
+  /** `quiet` = die Gremien-Seite zeigt ihren eigenen Lade-Indikator (kein Overlay). */
+  listGremien(opts: { quiet?: boolean } = {}): Observable<Gremium[]> {
     if (this.mock) return of(structuredCopy(this.store.gremien));
-    return this.http.get<Gremium[]>(`${this.base}/admin/gremien`);
+    return this.http.get<Gremium[]>(`${this.base}/admin/gremien`, {
+      context: opts.quiet ? skipLoading() : undefined,
+    });
   }
 
   /**
@@ -366,7 +370,9 @@ export class AdminApiService {
   listApplicationTypesFull(): Observable<ApplicationTypeFull[]> {
     if (this.mock) return of(structuredCopy(this.store.appTypes));
     return this.http
-      .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`)
+      .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`, {
+        context: skipLoading(),
+      })
       .pipe(
         map((list) =>
           list.map((t) => ({
@@ -453,6 +459,7 @@ export class AdminApiService {
     }
     return this.http.get<FormDraft>(
       `${this.base}/admin/application-types/${typeId}/form-versions/latest`,
+      { context: skipLoading() },
     );
   }
 
@@ -635,7 +642,10 @@ export class AdminApiService {
     if (opts.actor) params = params.set('actor', opts.actor);
     if (opts.since) params = params.set('since', opts.since);
     if (opts.until) params = params.set('until', opts.until);
-    return this.http.get<AuditPage>(`${this.base}/admin/audit`, { params });
+    return this.http.get<AuditPage>(`${this.base}/admin/audit`, {
+      params,
+      context: skipLoading(),
+    });
   }
 
   /** Distinkte Akteure des Audit-Logs (für den Actor-Filter). */
@@ -665,6 +675,7 @@ export class AdminApiService {
       .set('entityId', entityId);
     return this.http.get<ConfigRevision[]>(`${this.base}/admin/config-revisions`, {
       params,
+      context: skipLoading(),
     });
   }
 
@@ -681,7 +692,9 @@ export class AdminApiService {
       });
     }
     return this.http
-      .get<ConfigRevisionDiffWire>(`${this.base}/admin/config-revisions/${id}/diff`)
+      .get<ConfigRevisionDiffWire>(`${this.base}/admin/config-revisions/${id}/diff`, {
+        context: skipLoading(),
+      })
       .pipe(map((w) => ({ ...w, diff: mapDiff(w.diff) })));
   }
 
@@ -698,7 +711,9 @@ export class AdminApiService {
     if (this.mock) {
       return of({ taskReminderEnabled: true, taskReminderAfterDays: 5, taskReminderRepeatDays: 7 });
     }
-    return this.http.get<NotificationSettings>(`${this.base}/admin/notification-settings`);
+    return this.http.get<NotificationSettings>(`${this.base}/admin/notification-settings`, {
+      context: skipLoading(),
+    });
   }
 
   putNotificationSettings(

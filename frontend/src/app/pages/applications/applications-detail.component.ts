@@ -244,7 +244,7 @@ export class ApplicationsDetailComponent {
       return;
     }
     this.loading.set(true);
-    this.api.getApplication(id).subscribe({
+    this.api.getApplication(id, { quiet: true }).subscribe({
       next: (app) => {
         if (seq !== this.loadSeq) return;
         this.app.set(app);
@@ -280,7 +280,7 @@ export class ApplicationsDetailComponent {
       },
       error: () => {},
     });
-    this.api.comments(this.id).subscribe({
+    this.api.comments(this.id, { quiet: true }).subscribe({
       next: (c) => {
         if (seq === this.loadSeq) this.comments.set(c);
       },
@@ -600,7 +600,7 @@ export class ApplicationsDetailComponent {
   /** Antrag + abhängige Sektionen nach einem Übergang neu laden. */
   private refresh(): void {
     const seq = this.loadSeq;
-    this.api.getApplication(this.id).subscribe({
+    this.api.getApplication(this.id, { quiet: true }).subscribe({
       next: (app) => {
         if (seq !== this.loadSeq) return;
         this.app.set(app);

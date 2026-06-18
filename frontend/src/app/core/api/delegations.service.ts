@@ -9,6 +9,7 @@
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+import { skipLoading } from '@core/loading/loading.interceptor';
 import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { IsoDateTime, Uuid } from '@core/api/models';
@@ -100,7 +101,12 @@ export class DelegationsApiService {
 
   list(meetingId?: Uuid): Observable<Delegation[]> {
     const params = meetingId ? new HttpParams().set('meetingId', meetingId) : undefined;
-    return this.http.get<Delegation[]>(`${this.base}/delegations`, { params });
+    // Liste hat einen eigenen Lade-Indikator (bzw. läuft im Dashboard im Hintergrund)
+    // → globalen Overlay unterdrücken (#loading).
+    return this.http.get<Delegation[]>(`${this.base}/delegations`, {
+      params,
+      context: skipLoading(),
+    });
   }
 
   create(input: DelegationInput): Observable<Delegation> {
@@ -111,16 +117,22 @@ export class DelegationsApiService {
     return this.http.delete<void>(`${this.base}/delegations/${id}`);
   }
 
-  meetingContext(meetingId: Uuid): Observable<MeetingDelegationContext> {
+  /** `quiet` = Hintergrund-Reload nach Mutation (kein globaler Overlay). */
+  meetingContext(
+    meetingId: Uuid,
+    opts: { quiet?: boolean } = {},
+  ): Observable<MeetingDelegationContext> {
     return this.http.get<MeetingDelegationContext>(
       `${this.base}/delegations/meetings/${meetingId}/context`,
+      { context: opts.quiet ? skipLoading() : undefined },
     );
   }
 
   recipients(meetingId: Uuid, q: string): Observable<DelegationRecipient[]> {
+    // Debounced Typeahead → nie den globalen Overlay aufblitzen lassen (#loading).
     return this.http.get<DelegationRecipient[]>(
       `${this.base}/delegations/meetings/${meetingId}/recipients`,
-      { params: new HttpParams().set('q', q) },
+      { params: new HttpParams().set('q', q), context: skipLoading() },
     );
   }
 

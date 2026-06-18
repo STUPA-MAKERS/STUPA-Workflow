@@ -961,7 +961,7 @@ export class MeetingsComponent implements OnDestroy {
     this.toast.error(detail ? `${base}: ${detail}` : base);
     const m = this.meeting();
     if (m) {
-      this.api.getMeeting(m.id).subscribe({
+      this.api.getMeeting(m.id, { quiet: true }).subscribe({
         next: (updated) => this.meeting.set(updated),
         error: () => {},
       });
@@ -973,7 +973,7 @@ export class MeetingsComponent implements OnDestroy {
   private refreshProtocol(): void {
     const m = this.meeting();
     if (!m) return;
-    this.api.getProtocol(m.id).subscribe({
+    this.api.getProtocol(m.id, { quiet: true }).subscribe({
       next: (proto) => {
         this.protocol.set(proto);
         this.watchRendering(proto);
@@ -1010,7 +1010,7 @@ export class MeetingsComponent implements OnDestroy {
       if (!m) return;
       // GET statt POST: der Poll darf das Default-Write-Rate-Limit nicht
       // aufbrauchen (429 nach wenigen Minuten, #429).
-      this.api.getProtocol(m.id).subscribe({
+      this.api.getProtocol(m.id, { quiet: true }).subscribe({
         next: (updated) => this.applyProtocolUpdate(updated),
         error: () => this.watchRendering(proto),
       });
@@ -1188,7 +1188,9 @@ export class MeetingsComponent implements OnDestroy {
 
   // --- Tagesordnung (#10/#58) ----------------------------------------------
   private loadAgenda(meetingId: Uuid): void {
-    this.api.listAgenda(meetingId).subscribe({
+    // Erst-Load ist durch loadAttendance' Overlay abgedeckt; alle weiteren Aufrufe
+    // sind Refreshes (WS-Event, Drag&Drop-Recovery) → keinen Overlay aufblitzen.
+    this.api.listAgenda(meetingId, { quiet: true }).subscribe({
       next: (rows) => {
         this.agenda.set(rows);
         // Bleibt der gewählte TOP gültig? Sonst den ersten wählen.
@@ -1392,7 +1394,7 @@ export class MeetingsComponent implements OnDestroy {
     this.settingsTime.set(m.startTime ?? '');
     this.settingsEndTime.set(m.endTime ?? '');
     this.settingsRoster.set([]);
-    this.api.listAttendance(m.id).subscribe({
+    this.api.listAttendance(m.id, { quiet: true }).subscribe({
       next: (rows) => {
         this.settingsRoster.set(rows);
         // Auswahl erst NACH dem Laden der Optionen (erneut) setzen — sonst snappt
@@ -1559,7 +1561,7 @@ export class MeetingsComponent implements OnDestroy {
         // GET statt POST — Broadcast-Bursts dürfen das Write-Rate-Limit nicht
         // aufbrauchen (#429).
         if (this.canWrite() && this.protocol() && !this.protocol()!.isFinal) {
-          this.api.getProtocol(m.id).subscribe({
+          this.api.getProtocol(m.id, { quiet: true }).subscribe({
             next: (proto) => this.applyProtocolUpdate(proto),
             error: () => {},
           });
