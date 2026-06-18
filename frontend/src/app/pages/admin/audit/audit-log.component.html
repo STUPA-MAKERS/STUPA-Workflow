@@ -128,10 +128,10 @@
     @if (confirmRevert()) {
       <p>{{ 'admin.audit.revert.confirm' | t }}</p>
       <div class="flex gap-2 justify-end mt-4">
-        <app-button variant="ghost" (click)="confirmRevert.set(null)">
+        <app-button variant="ghost" size="sm" (click)="confirmRevert.set(null)">
           {{ 'admin.gremien.cancel' | t }}
         </app-button>
-        <app-button variant="danger" (click)="doRevert()">
+        <app-button variant="danger" size="sm" (click)="doRevert()">
           {{ 'admin.audit.revert.action' | t }}
         </app-button>
       </div>

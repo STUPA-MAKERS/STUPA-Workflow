@@ -197,6 +197,26 @@ async def test_revert_first_state_nothing_to_revert() -> None:
     assert ei.value.code == "nothing_to_revert"
 
 
+async def test_revert_status_missing_state_ids_not_revertable() -> None:
+    # status_change ohne from/to im data → Dispatcher liefert not_revertable (DB-los).
+    entry = AuditEntry(
+        id=1, action="status_change", target_id="app-1", data={"toStateId": "b"}
+    )
+    with pytest.raises(ConflictError) as ei:
+        await RevertService(fake_session(result(entry))).revert(1, "admin")
+    assert ei.value.code == "not_revertable"
+
+
+async def test_revert_non_revertable_budget_action() -> None:
+    # Löschungen (budget_expense_delete) sind bewusst nicht revertierbar.
+    entry = AuditEntry(
+        id=1, action="budget_expense_delete", target_id="x", data={}
+    )
+    with pytest.raises(ConflictError) as ei:
+        await RevertService(fake_session(result(entry))).revert(1, "admin")
+    assert ei.value.code == "not_revertable"
+
+
 async def test_revert_stale_when_newer_head_exists() -> None:
     rid, pid = uuid.uuid4(), uuid.uuid4()
     entry = AuditEntry(id=1, action="config_change", data={"revisionId": str(rid)})

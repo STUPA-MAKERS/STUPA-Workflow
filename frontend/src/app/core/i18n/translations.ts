@@ -1440,11 +1440,17 @@ export const de = {
   'admin.audit.revert.action': 'Zurücknehmen',
   'admin.audit.revert.title': 'Änderung zurücknehmen?',
   'admin.audit.revert.confirm':
-    'Die Konfiguration wird auf den Stand vor dieser Änderung zurückgesetzt. Die Rücknahme wird selbst protokolliert und ist umkehrbar.',
+    'Dieser Vorgang wird auf den Stand davor zurückgesetzt. Die Rücknahme wird selbst protokolliert und ist – wo möglich – umkehrbar.',
   'admin.audit.revert.success': 'Änderung zurückgenommen.',
   'admin.audit.revert.error': 'Rücknahme fehlgeschlagen.',
   'admin.audit.revert.conflict':
     'Es gibt eine neuere Änderung — bitte diese zuerst zurücknehmen.',
+  'admin.audit.revert.nothingToRevert':
+    'Dies ist der erste Stand — es gibt nichts, worauf zurückgesetzt werden könnte.',
+  'admin.audit.revert.alreadyReverted':
+    'Bereits zurückgenommen — es gibt nichts mehr zurückzunehmen.',
+  'admin.audit.revert.notRevertable':
+    'Dieser Vorgang kann nicht zurückgenommen werden.',
   'admin.config.diff.none': 'Keine Feldänderungen.',
   'admin.config.diff.changed': 'Geändert',
   'admin.config.diff.added': 'Hinzugefügt',
@@ -3432,8 +3438,13 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.config_revert': '{actor} reverted a configuration change ({target}).',
   'admin.audit.revert.action': 'Revert',
   'admin.audit.revert.title': 'Revert this change?',
+  'admin.audit.revert.nothingToRevert':
+    'This is the first state — there is nothing to revert to.',
+  'admin.audit.revert.alreadyReverted':
+    'Already reverted — there is nothing left to undo.',
+  'admin.audit.revert.notRevertable': 'This action cannot be reverted.',
   'admin.audit.revert.confirm':
-    'The configuration will be reset to the state before this change. The revert is itself logged and can be undone.',
+    'This action will be reset to the state before it. The revert is itself logged and — where possible — can be undone.',
   'admin.audit.revert.success': 'Change reverted.',
   'admin.audit.revert.error': 'Revert failed.',
   'admin.audit.revert.conflict':

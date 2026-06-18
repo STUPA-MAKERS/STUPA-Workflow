@@ -72,6 +72,7 @@ async def list_audit(
         [(e.target_type, e.target_id) for e in items]
     )
     resolved_ids = await service.resolve_data_ids([e.data for e in items])
+    revertable = await service.revertable_flags(items)
     out = [
         AuditEntryOut.from_entry(
             e,
@@ -83,6 +84,7 @@ async def list_audit(
                 for k in data_uuid_strings(e.data)
                 if k in resolved_ids
             },
+            revertable=revertable.get(e.id, False),
         )
         for e in items
     ]

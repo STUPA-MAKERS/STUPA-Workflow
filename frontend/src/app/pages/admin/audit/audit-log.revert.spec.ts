@@ -26,6 +26,7 @@ function cfgEntry(over: Partial<AuditEntry> = {}): AuditEntry {
     targetType: 'flow',
     targetId: 'global',
     data: { revisionId: 'rev-2', version: 2 },
+    revertable: true,
     hash: 'h',
     prevHash: null,
     ...over,
@@ -89,9 +90,21 @@ describe('AuditLogComponent — config diff + revert', () => {
     expect(c.isRevertable(c.entries()[0])).toBe(false);
   });
 
-  it('is not revertable without a linked revisionId', async () => {
-    const { c } = await setup({ entryOver: { data: {} } });
+  it('is not revertable when the backend flags it non-revertable (e.g. first version)', async () => {
+    const { c } = await setup({ entryOver: { revertable: false } });
     expect(c.isRevertable(c.entries()[0])).toBe(false);
+  });
+
+  it('offers revert for a flagged non-config entry (status change / booking)', async () => {
+    const { c } = await setup({
+      entryOver: {
+        action: 'status_change',
+        targetType: 'application',
+        data: { fromStateId: 'a', toStateId: 'b' },
+        revertable: true,
+      },
+    });
+    expect(c.isRevertable(c.entries()[0])).toBe(true);
   });
 
   it('reverts on confirm, then toasts success and reloads', async () => {
@@ -105,10 +118,22 @@ describe('AuditLogComponent — config diff + revert', () => {
   });
 
   it('surfaces a stale-conflict message on HTTP 409', async () => {
-    const revert = jest.fn(() => throwError(() => ({ status: 409 })));
+    const revert = jest.fn(() =>
+      throwError(() => ({ status: 409, error: { code: 'stale_revert' } })),
+    );
     const { c, toast } = await setup({ revert });
     c.askRevert(c.entries()[0]);
     c.doRevert();
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/neuere|newer/i));
+  });
+
+  it('surfaces a "first state" message for the nothing_to_revert code', async () => {
+    const revert = jest.fn(() =>
+      throwError(() => ({ status: 409, error: { code: 'nothing_to_revert' } })),
+    );
+    const { c, toast } = await setup({ revert });
+    c.askRevert(c.entries()[0]);
+    c.doRevert();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/erste|first/i));
   });
 });

@@ -304,9 +304,10 @@ export class AuditLogComponent {
     return typeof v === 'string' ? v : null;
   }
 
-  /** Revert anbietbar: Permission vorhanden **und** ein verlinkter Config-Snapshot. */
+  /** Revert anbietbar: Permission vorhanden **und** vom Backend als zurücknehmbar
+   *  markiert (Config mit Vorgänger, Statuswechsel, reversible Budget-Mutation). */
   protected isRevertable(e: AuditEntry): boolean {
-    return this.canRevert() && this.revisionId(e) !== null;
+    return this.canRevert() && e.revertable === true;
   }
 
   /** Geladener Diff des Eintrags (``null`` = lädt; ``undefined`` = kein Snapshot). */
@@ -346,13 +347,30 @@ export class AuditLogComponent {
         this.toast.success(this.i18n.translate('admin.audit.revert.success'));
         this.reload();
       },
-      error: (err: { status?: number }) => {
+      error: (err: { status?: number; error?: { code?: string } }) => {
         this.reverting.set(false);
-        const key: TranslationKey =
-          err?.status === 409 ? 'admin.audit.revert.conflict' : 'admin.audit.revert.error';
-        this.toast.error(this.i18n.translate(key));
+        this.toast.error(this.i18n.translate(this.revertErrorKey(err)));
       },
     });
+  }
+
+  /** 409-Fehlercode (ProblemDetail) → passende Meldung; sonst generischer Fehler. */
+  private revertErrorKey(err: {
+    status?: number;
+    error?: { code?: string };
+  }): TranslationKey {
+    if (err?.status !== 409) return 'admin.audit.revert.error';
+    switch (err.error?.code) {
+      case 'nothing_to_revert':
+        return 'admin.audit.revert.nothingToRevert';
+      case 'already_reverted':
+        return 'admin.audit.revert.alreadyReverted';
+      case 'not_revertable':
+        return 'admin.audit.revert.notRevertable';
+      case 'stale_revert':
+      default:
+        return 'admin.audit.revert.conflict';
+    }
   }
 
   /** Filter geändert → Liste verwerfen und vom neuesten Eintrag neu laden. */

@@ -507,6 +507,9 @@ export interface AuditEntry {
   /** UUID → Klarname für die in `data` eingebetteten Entity-Referenzen (vom Backend
    *  aufgelöst). Nur auflösbare Ids; sonst wird die rohe UUID gezeigt. */
   resolvedIds?: Record<string, string>;
+  /** Aus dem Audit-Log zurücknehmbar (#config-versioning, vom Backend bestimmt) —
+   *  treibt den »Zurücknehmen«-Button. Das Backend bleibt beim Klick autoritativ. */
+  revertable?: boolean;
   hash: string;
   prevHash: string | null;
 }

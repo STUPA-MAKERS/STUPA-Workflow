@@ -11,7 +11,7 @@ import asyncio
 import logging
 import uuid
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from sqlalchemy import Text as _Text
@@ -22,6 +22,7 @@ from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.applications.service import _title_of
 from app.modules.audit.actions import AuditAction
+from app.modules.audit.models import AuditEntry
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import tree_rules
 from app.modules.budget.invoice_import import parse_zugferd_pdf
@@ -94,6 +95,22 @@ def _validate_invoice_file_token(token: str) -> str:
     if not token.startswith(_INVOICE_FILE_PREFIX) or ".." in token:
         raise ValidationProblem("invalid invoice file token")
     return token
+
+
+def _json_safe(value: object) -> object:
+    """Audit-/Revert-Vorzustand JSON-serialisierbar machen.
+
+    Geld-/Datums-/Id-Werte (``Decimal``/``date``/``datetime``/``UUID``) werden als
+    String abgelegt, damit der im Audit-``data`` gespeicherte Vorzustand (für den
+    Audit-Log-Revert, #config-versioning) verlustfrei rekonstruierbar ist. Pydantic
+    coerct die Strings beim Revert wieder in die typisierten Patch-Felder."""
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, date):  # deckt auch ``datetime`` ab (Subklasse)
+        return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
+    return value
 
 
 def _natural_path_key(path_key: str) -> tuple:
@@ -302,6 +319,13 @@ class BudgetTreeService:
         ) or (
             "fiscal_start_day" in provided and provided["fiscal_start_day"] != node.fiscal_start_day
         )
+        # Vorzustand der geänderten Felder für den Audit-Log-Revert festhalten (#config-
+        # versioning): die JSON-sicheren Altwerte erlauben eine spätere Wiederherstellung.
+        before: dict[str, object] = {
+            field: _json_safe(getattr(node, field)) for field in provided
+        }
+        if new_key is not None:
+            before["key"] = node.key
         for field, value in provided.items():
             setattr(node, field, value)
         if new_key is not None and new_key != node.key:
@@ -311,11 +335,21 @@ class BudgetTreeService:
                 fy.start_date, fy.end_date = self._fiscal_year_bounds(
                     fy.year, node.fiscal_start_month, node.fiscal_start_day
                 )
+        # Nachzustand derselben Felder festhalten: Revert prüft damit, ob die Kostenstelle
+        # seither weiter geändert wurde (stale → 409 statt fremde Änderungen zu überschreiben).
+        after: dict[str, object] = {
+            field: _json_safe(getattr(node, field)) for field in before
+        }
         await self._audit(
             AuditAction.BUDGET_NODE_UPDATE,
             target_type="budget",
             target_id=str(node.id),
-            data={"fields": sorted(provided), "keyProvided": new_key is not None},
+            data={
+                "fields": sorted(provided),
+                "keyProvided": new_key is not None,
+                "before": before,
+                "after": after,
+            },
         )
         await self.session.commit()
         return _node_out(node)
@@ -647,6 +681,12 @@ class BudgetTreeService:
             )
 
         alloc = await self._allocation(budget_id, fiscal_year_id)
+        # Vorwert (oder ``None``, falls erstmalig gesetzt) für den Audit-Log-Revert merken.
+        previous_allocated = (
+            str(alloc.allocated)
+            if alloc is not None and alloc.allocated is not None
+            else None
+        )
         if alloc is None:
             alloc = BudgetAllocation(
                 id=uuid.uuid4(),
@@ -659,7 +699,11 @@ class BudgetTreeService:
             AuditAction.BUDGET_ALLOCATION_SET,
             target_type="budget_allocation",
             target_id=str(budget_id),
-            data={"fiscalYearId": str(fiscal_year_id), "allocated": str(payload.allocated)},
+            data={
+                "fiscalYearId": str(fiscal_year_id),
+                "allocated": str(payload.allocated),
+                "previousAllocated": previous_allocated,
+            },
         )
         await self.session.commit()
         return AllocationOut(
@@ -934,6 +978,8 @@ class BudgetTreeService:
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
         fields = payload.model_fields_set
+        # Vorzustand der gepatchten Felder für den Audit-Log-Revert (#config-versioning).
+        before: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
         if "amount" in fields and payload.amount is not None:
             expense.amount = payload.amount
         if "description" in fields and payload.description is not None:
@@ -959,11 +1005,19 @@ class BudgetTreeService:
             expense.invoice_id = payload.invoice_id
             if payload.invoice_id is not None:
                 await self._mark_invoice_paid(payload.invoice_id)
+        # Nachzustand der gepatchten Felder: Revert prüft damit auf zwischenzeitliche
+        # Änderungen (stale → 409 statt fremde Änderungen zu überschreiben).
+        after: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
         await self._audit(
             AuditAction.BUDGET_EXPENSE_UPDATE,
             target_type="budget_expense",
             target_id=str(expense.id),
-            data={"fields": sorted(fields), "amount": str(expense.amount)},
+            data={
+                "fields": sorted(fields),
+                "amount": str(expense.amount),
+                "before": before,
+                "after": after,
+            },
         )
         await self.session.commit()
         node = await self._get_node(expense.budget_id)
@@ -1566,6 +1620,213 @@ class BudgetTreeService:
         )
         await self.session.commit()
         return TransferOut(transferId=transfer_id, expenseId=out_row.id, incomeId=in_row.id)
+
+    # ----------------------------------------------- audit-log revert (#config-versioning)
+    async def revert_audit(self, entry: AuditEntry, actor: str) -> None:
+        """Eine auditierte Budget-/Geld-Mutation aus dem Audit-Log zurücknehmen.
+
+        Dispatch nach ``entry.action`` auf die jeweilige Inverse: additive Vorgänge
+        (Buchung/Umbuchung/Kostenstelle anlegen) werden gelöscht, Änderungen aus dem im
+        Audit-``data`` festgehaltenen Vorzustand wiederhergestellt. Jeder Pfad ist selbst
+        auditiert; ``stale_revert`` (409), wenn die Entität seither weiter verändert wurde,
+        ``already_reverted`` (409), wenn das Ziel nicht mehr existiert. Löschungen sind
+        bewusst **nicht** revertierbar (``not_revertable``)."""
+        self.actor = actor
+        action = entry.action
+        data = entry.data or {}
+        target_id = entry.target_id or ""
+        if action == AuditAction.BUDGET_EXPENSE_CREATE:
+            await self._revert_expense_create(UUID(target_id), entry.id)
+        elif action == AuditAction.BUDGET_TRANSFER_CREATE:
+            await self._revert_transfer_create(UUID(target_id), entry.id)
+        elif action == AuditAction.BUDGET_NODE_CREATE:
+            await self._revert_node_create(UUID(target_id))
+        elif action == AuditAction.BUDGET_NODE_UPDATE:
+            await self._revert_node_update(UUID(target_id), data)
+        elif action == AuditAction.BUDGET_ALLOCATION_SET:
+            await self._revert_allocation_set(UUID(target_id), data, entry.id)
+        elif action == AuditAction.BUDGET_EXPENSE_UPDATE:
+            await self._revert_expense_update(UUID(target_id), data)
+        else:  # pragma: no cover - der Dispatcher reicht nur revertierbare Aktionen herein
+            raise ConflictError(
+                "This budget action cannot be reverted.", code="not_revertable"
+            )
+
+    async def _revert_expense_create(
+        self, expense_id: UUID, reverted_audit_id: int
+    ) -> None:
+        """Buchung zurücknehmen = löschen; eine dadurch bezahlte Rechnung wieder öffnen."""
+        expense = await self.session.get(BudgetExpense, expense_id)
+        if expense is None:
+            raise ConflictError(
+                "Booking already removed; nothing to revert.", code="already_reverted"
+            )
+        if expense.invoice_id is not None:
+            inv = await self.session.get(Invoice, expense.invoice_id)
+            if inv is not None and inv.status == "paid":
+                inv.status = "open"
+                await self._audit(
+                    AuditAction.BUDGET_INVOICE_UPDATE,
+                    target_type="invoice",
+                    target_id=str(inv.id),
+                    data={"status": "open", "reason": "expense_revert"},
+                )
+        await self._audit(
+            AuditAction.BUDGET_EXPENSE_DELETE,
+            target_type="budget_expense",
+            target_id=str(expense_id),
+            data={
+                "budgetId": str(expense.budget_id),
+                "kind": expense.kind,
+                "amount": str(expense.amount),
+                "reverted": True,
+                "revertedAuditId": reverted_audit_id,
+            },
+        )
+        await self.session.delete(expense)
+        await self.session.commit()
+
+    async def _revert_transfer_create(
+        self, transfer_id: UUID, reverted_audit_id: int
+    ) -> None:
+        """Umbuchung zurücknehmen = beide (Ausgabe/Einnahme) Zeilen löschen."""
+        rows = (
+            (
+                await self.session.execute(
+                    select(BudgetExpense).where(
+                        BudgetExpense.transfer_id == transfer_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not rows:
+            raise ConflictError(
+                "Transfer already removed; nothing to revert.", code="already_reverted"
+            )
+        await self._audit(
+            AuditAction.BUDGET_EXPENSE_DELETE,
+            target_type="budget_transfer",
+            target_id=str(transfer_id),
+            data={
+                "amount": str(rows[0].amount),
+                "reverted": True,
+                "revertedAuditId": reverted_audit_id,
+            },
+        )
+        for e in rows:
+            await self.session.delete(e)
+        await self.session.commit()
+
+    async def _revert_node_create(self, budget_id: UUID) -> None:
+        """Kostenstelle-Anlage zurücknehmen = löschen (409, falls inzwischen belegt)."""
+        node = await self.session.get(Budget, budget_id)
+        if node is None:
+            raise ConflictError(
+                "Cost centre already removed; nothing to revert.",
+                code="already_reverted",
+            )
+        # delete_node prüft kinder-/zuteilungsfrei (sonst 409), auditiert + committet.
+        await self.delete_node(budget_id)
+
+    @staticmethod
+    def _value_matches(current: object, expected: object) -> bool:
+        """``current`` entspricht dem erfassten ``expected`` (Stale-Vergleich).
+
+        Zahlen werden wertbasiert verglichen, damit der DB-Roundtrip die Skalierung nicht
+        verfälscht (``"70"`` erfasst vs. ``"70.00"`` gelesen). Andere Werte exakt."""
+        if current == expected:
+            return True
+        try:
+            return Decimal(str(current)) == Decimal(str(expected))
+        except (InvalidOperation, ValueError):
+            return False
+
+    def _assert_not_stale(self, obj: object, after: object) -> None:
+        """Stale-Guard für Update-Reverts: jeder im Original gesetzte Feldwert (``after``)
+        muss noch dem aktuellen Stand entsprechen — sonst wurde die Entität seither weiter
+        geändert und der Revert würde fremde Änderungen überschreiben (409 ``stale_revert``).
+
+        Fehlt ``after`` (kein Nachzustand erfasst), wird best-effort wiederhergestellt."""
+        if not isinstance(after, dict):
+            return
+        for field, expected in after.items():
+            if not self._value_matches(_json_safe(getattr(obj, field, None)), expected):
+                raise ConflictError(
+                    "Changed since; revert the newer change first.",
+                    code="stale_revert",
+                )
+
+    async def _revert_node_update(self, budget_id: UUID, data: dict) -> None:
+        """Kostenstellen-Änderung zurücknehmen = die festgehaltenen Vorwerte schreiben."""
+        before = data.get("before")
+        if not isinstance(before, dict) or not before:
+            raise ConflictError(
+                "No prior state recorded for this change.", code="not_revertable"
+            )
+        node = await self.session.get(Budget, budget_id)
+        if node is None:
+            raise ConflictError(
+                "Cost centre no longer exists.", code="already_reverted"
+            )
+        self._assert_not_stale(node, data.get("after"))
+        await self.update_node(budget_id, BudgetNodeUpdate(**before))
+
+    async def _revert_allocation_set(
+        self, budget_id: UUID, data: dict, reverted_audit_id: int
+    ) -> None:
+        """Zuteilung zurücknehmen = Vorwert wiederherstellen (oder Zeile entfernen)."""
+        fy_raw = data.get("fiscalYearId")
+        if not fy_raw:
+            raise ConflictError("No fiscal year recorded.", code="not_revertable")
+        fiscal_year_id = UUID(fy_raw)
+        cur = await self._allocation(budget_id, fiscal_year_id)
+        set_value = data.get("allocated")
+        if (
+            cur is None
+            or set_value is None
+            or Decimal(str(cur.allocated)) != Decimal(str(set_value))
+        ):
+            raise ConflictError(
+                "Allocation changed since; revert the newer change first.",
+                code="stale_revert",
+            )
+        previous = data.get("previousAllocated")
+        if previous is None:
+            # Erstmalig gesetzt → Revert entfernt die Zuteilungs-Zeile wieder.
+            await self._audit(
+                AuditAction.BUDGET_ALLOCATION_SET,
+                target_type="budget_allocation",
+                target_id=str(budget_id),
+                data={
+                    "fiscalYearId": str(fiscal_year_id),
+                    "allocated": None,
+                    "reverted": True,
+                    "revertedAuditId": reverted_audit_id,
+                },
+            )
+            await self.session.delete(cur)
+            await self.session.commit()
+        else:
+            # set_allocation re-validiert die Top-Down-Constraints, auditiert + committet.
+            await self.set_allocation(
+                budget_id, fiscal_year_id, AllocationSet(allocated=Decimal(previous))
+            )
+
+    async def _revert_expense_update(self, expense_id: UUID, data: dict) -> None:
+        """Buchungs-Änderung zurücknehmen = die festgehaltenen Vorwerte schreiben."""
+        before = data.get("before")
+        if not isinstance(before, dict) or not before:
+            raise ConflictError(
+                "No prior state recorded for this change.", code="not_revertable"
+            )
+        expense = await self.session.get(BudgetExpense, expense_id)
+        if expense is None:
+            raise ConflictError("Booking no longer exists.", code="already_reverted")
+        # Alle im Original gesetzten Felder müssen unverändert sein (nicht nur der Betrag).
+        self._assert_not_stale(expense, data.get("after"))
+        await self.update_expense(expense_id, ExpenseUpdate(**before))
 
     # --------------------------------------------------------------- tree view
     async def get_tree(
