@@ -649,3 +649,66 @@ async def test_schedule_deadline_no_candidate_pins_null_marker(
     db = fake_session(result(), result(t))
     await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
     assert _CaptureDeadlineService.last_action_on_pass is None
+
+
+# --------------------------------------------------------------------------- #
+# revert_status (#config-versioning — Audit-Log-Revert)
+# --------------------------------------------------------------------------- #
+async def test_revert_status_stale_when_not_in_target_state() -> None:
+    """Antrag steht nicht (mehr) im Ziel-State des Übergangs → 409 stale_revert."""
+    to_id, from_id = uuid4(), uuid4()
+    app = _app(uuid4(), uuid4())  # current_state_id != to_id
+    db = fake_session(result(app))
+    with pytest.raises(ConflictError) as ei:
+        await FlowService(db).revert_status(
+            app.id, from_state_id=from_id, to_state_id=to_id, actor="admin",
+            reverted_audit_id=7,
+        )
+    assert ei.value.code == "stale_revert"
+
+
+async def test_revert_status_conflict_when_update_rowcount_zero() -> None:
+    """Konkurrierende Transition zwischen Lesen und UPDATE → rowcount 0 → 409 + rollback."""
+    to_id, from_id = uuid4(), uuid4()
+    app = _app(to_id, uuid4())  # current == to_id
+    db = fake_session(result(app), result(rowcount=0))
+    with pytest.raises(ConflictError) as ei:
+        await FlowService(db).revert_status(
+            app.id, from_state_id=from_id, to_state_id=to_id, actor="admin",
+            reverted_audit_id=7,
+        )
+    assert ei.value.code == "stale_revert"
+    assert db.rolled_back == 1
+
+
+async def test_revert_status_moves_back_without_restored_state() -> None:
+    """Happy path, Ziel-State nicht ladbar (None) → kein Frist-Reschedule, Event/Audit ok."""
+    to_id, from_id = uuid4(), uuid4()
+    app = _app(to_id, uuid4())
+    db = fake_session(result(app), result(rowcount=1))
+    sid = await FlowService(db).revert_status(
+        app.id, from_state_id=from_id, to_state_id=to_id, actor="admin",
+        reverted_audit_id=7,
+    )
+    assert db.committed == 1
+    event = db.added[0]
+    assert event.from_state_id == to_id and event.to_state_id == from_id
+    assert event.transition_id is None and event.note == "revert"
+    assert sid == event.id
+
+
+async def test_revert_status_reschedules_restored_state_deadline() -> None:
+    """Happy path mit ladbarem Ziel-State → Frist-Reschedule-Zweig wird betreten."""
+    to_id, from_id = uuid4(), uuid4()
+    app = _app(to_id, uuid4())
+    restored = SimpleNamespace(id=from_id, config={})
+    # _load_app, UPDATE, record(lock, prev), _load_state→restored.
+    db = fake_session(
+        result(app), result(rowcount=1), result(), result(), result(restored)
+    )
+    await FlowService(db).revert_status(
+        app.id, from_state_id=from_id, to_state_id=to_id, actor="admin",
+        reverted_audit_id=7,
+    )
+    # schedule_state_deadline committet (delete + früher Return ohne Policy-Key).
+    assert db.committed >= 1

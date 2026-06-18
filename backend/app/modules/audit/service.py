@@ -161,8 +161,8 @@ class AuditService:
             for eid, rid in revision_ids.items():
                 try:
                     uuid_map[uuid.UUID(rid)] = eid
-                except ValueError:  # pragma: no cover - revisionId ist immer eine UUID
-                    continue
+                except ValueError:
+                    continue  # defensiv: revisionId ist normalerweise immer eine UUID
             if uuid_map:
                 rows = (
                     await self.session.execute(
