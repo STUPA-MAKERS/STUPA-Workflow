@@ -39,8 +39,8 @@ async def test_render_success_returns_pdf_bytes() -> None:
 
 @respx.mock
 async def test_render_trust_level_override_per_call() -> None:
-    """Ein expliziter ``trust_level`` gilt nur für diesen Aufruf (Protokoll → untrusted),
-    ohne das Client-Default (``trusted``) zu ändern (RCE-Schutz, security.md §2)."""
+    """Ein expliziter ``trust_level`` gilt nur für diesen Aufruf, ohne das
+    Client-Default (``trusted``) zu ändern (Client-Plumbing für per-Call-Overrides)."""
     route = respx.post(f"{BASE}/render").mock(
         return_value=httpx.Response(
             200, content=b"%PDF", headers={"content-type": "application/pdf"}

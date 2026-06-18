@@ -73,8 +73,8 @@ class _FakePytex:
 
     def __init__(self) -> None:
         self.calls: list[str] = []
-        # Pro Render mitgeschriebener ``trust_level`` (RCE-Schutz: der Protokoll-Pfad
-        # rendert nutzer-Markdown ``untrusted``); ``None`` = Default.
+        # Pro Render mitgeschriebener ``trust_level``; ``None`` = Default (= ``trusted``
+        # im Client). Der Protokoll-Pfad nutzt den Default (RCE-Schutz im Sanitizer).
         self.trust_levels: list[str | None] = []
 
     async def render_pdf(

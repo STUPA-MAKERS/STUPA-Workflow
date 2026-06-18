@@ -14,8 +14,10 @@ wird Markdown-escaped — beides wiederverwendet aus :mod:`app.modules.pdf.markd
 (keine Duplikation). Der Editor-Body ist nutzer-geschrieben; :func:`sanitize_user_markdown`
 entfernt vor der Ausgabe pytex' ``eval``-Escape (``[//]: # "EXPR"`` → RCE im Container)
 sowie Bilder mit absolutem/``..``-Pfad. Normales Markdown (Überschriften, Listen,
-Hervorhebung, echte Links/Bilder) bleibt erhalten. Als zweite, unabhängige Schicht
-rendert der Service den Body ``untrusted`` (pytex sperrt dann ``eval`` ohnehin).
+Hervorhebung, echte Links/Bilder) bleibt erhalten. Dieser Sanitizer IST der
+RCE-Schutz: der Service rendert den Body ``trusted`` (Client-Default), weil die
+Protokoll-Variante pytex' Template-Maschinerie braucht — ``untrusted`` würde sie
+sperren und jeden Render mit 400 abbrechen.
 
 **Variante je Gremium** (flows §7): pytex kennt die Protokoll-Varianten
 ``protocol-stupa`` / ``protocol-asta``; die Gremium-``cd_variant`` wählt sie.
@@ -36,10 +38,10 @@ from app.modules.pdf.markdown import _md_escape, _yaml_scalar
 # pytex hat im ``trusted``-Modus einen Markdown-``eval``-Escape: eine Zeile der
 # Form ``[//]: # "EXPR"`` (eine Markdown-Link-Referenz-Definition, die im PDF
 # unsichtbar bleibt) führt ``eval(EXPR, {__builtins__})`` IM pytex-Container aus
-# → Remote Code Execution. Der Body ist nutzer-geschrieben (Protokollant), also
-# wird der Render-Pfad ohnehin ``untrusted`` gefahren — zusätzlich neutralisieren
-# wir den Konstrukt aber schon hier, damit selbst ein versehentlich ``trusted``
-# gerenderter Body pytex' ``eval`` nie erreichen kann (zwei unabhängige Layer).
+# → Remote Code Execution. Der Body ist nutzer-geschrieben (Protokollant). Da die
+# Protokoll-Variante pytex' Template-Maschinerie braucht (und deshalb ``trusted``
+# gerendert wird — ``untrusted`` → 400), ist DIESER Sanitizer der RCE-Schutz: er
+# entfernt den Konstrukt bedingungslos, bevor das Markdown pytex erreicht.
 #
 # Erkannte Varianten der Link-Referenz-Definition (führender Whitespace erlaubt):
 #   [//]: # "EXPR"      [//]: # 'EXPR'      [//]: # (EXPR)      [//]: # EXPR
@@ -185,8 +187,10 @@ def build_protocol_document(doc: ProtocolDoc) -> str:
     Der nutzer-geschriebene Body wird durch :func:`sanitize_user_markdown` von
     pytex-``eval``-Escapes (RCE, security.md §2) und Pfad-Traversal-Bildern befreit;
     normales Markdown bleibt verbatim. Frontmatter-Skalare bleiben YAML-quotiert.
-    Der Body ist **nicht** generell injection-sicher gegenüber LaTeX — darum rendert
-    der Service diesen Pfad zusätzlich ``untrusted`` (Defense in Depth)."""
+    Der eval-Escape ist damit weg, bevor pytex den Body sieht; ``\\write18``-Shell-
+    Escape greift unter der tectonic-Engine ohnehin nicht. Der Service rendert diesen
+    Pfad ``trusted`` (Client-Default) — die Protokoll-Variante braucht pytex'
+    Template-Maschinerie, die ``untrusted`` sperrt."""
     body = sanitize_user_markdown(doc.markdown).strip("\n")
     out = [*_frontmatter(doc), ""]
     if body:

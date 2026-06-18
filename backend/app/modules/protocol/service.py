@@ -553,14 +553,17 @@ class ProtocolService:
             return None
         try:
             variant = protocol_variant_for(protocol.cd_variant)
-            # RCE-Schutz (security.md §2): Protokoll-/TOP-Bodies sind nutzer-geschrieben
-            # (Protokollant, protocol.write). pytex' ``trusted``-Default schaltet den
-            # Markdown-``eval``-Escape (``[//]: # "EXPR"`` → eval im Container) frei —
-            # darum rendert dieser Pfad bewusst ``untrusted`` (eval gesperrt + Sandbox),
-            # während app-generierte PDFs (pdf-Modul) ihr ``trusted``-Default behalten.
-            pdf = await self.pytex.render_pdf(
-                markdown, variant=variant, trust_level="untrusted"
-            )
+            # RCE-Schutz (security.md §2): der nutzer-geschriebene Body (Protokollant)
+            # könnte pytex' Markdown-``eval``-Escape (``[//]: # "EXPR"`` → eval im
+            # Container) tragen. Den entfernt ``sanitize_user_markdown`` BEDINGUNGSLOS
+            # schon beim Zusammenbau (``build_protocol_document``), bevor das Markdown
+            # pytex erreicht — der einzige eval-Vektor ist damit weg; ``\write18``-Shell-
+            # Escape greift unter der tectonic-Engine ohnehin nicht. Darum rendert
+            # dieser Pfad ``trusted`` (Client-Default): die Protokoll-Variante
+            # (``protocol-stupa``/``-asta``) braucht pytex' Template-Maschinerie, die
+            # ``untrusted`` sperrt — untrusted ließ jeden Protokoll-Render mit 400 (pytex
+            # ``TrustError``) scheitern.
+            pdf = await self.pytex.render_pdf(markdown, variant=variant)
         except PytexError as exc:
             # 4xx = dauerhafter Eingabe-/Compile-Fehler (z. B. ungültiges LaTeX im
             # Protokoll-Markdown): kein Retry, dem Nutzer den (gescrubbten) Grund
