@@ -647,6 +647,34 @@ async def test_update_expense_amount_none_skipped() -> None:
     assert out.description == "d2"
 
 
+async def test_update_expense_rebooks_cost_centre() -> None:
+    # Kostenstelle einer eigenständigen Buchung umbuchen (#25): budget_id + Währung
+    # folgen dem neuen Knoten; HHJ bleibt fix.
+    old = _budget(id=uuid.uuid4(), path_key="VS-1", key="1")
+    new = _budget(id=uuid.uuid4(), path_key="VS-2", key="2", currency="EUR")
+    expense = _expense(budget_id=old.id, application_id=None, account_id=None, actor=None)
+    sess = fake_session(
+        result(new),   # _get_node(payload.budget_id) im budget_id-Branch
+        result(new),   # _get_node(expense.budget_id) nach commit (Pfad)
+        result(),      # _actor_names (kein actor)
+        gets=[expense],
+    )
+    svc = BudgetTreeService(sess)
+    out = await svc.update_expense(expense.id, ExpenseUpdate(budgetId=new.id))
+    assert out.budget_id == new.id
+    assert out.path_key == "VS-2"
+    assert expense.currency == "EUR"
+
+
+async def test_update_expense_rebook_unknown_budget_404() -> None:
+    # Ziel-Kostenstelle existiert nicht → 404 (kein FK-Crash beim Commit).
+    expense = _expense(budget_id=uuid.uuid4(), application_id=None, account_id=None)
+    sess = fake_session(result(), gets=[expense])  # _get_node → None → NotFoundError
+    svc = BudgetTreeService(sess)
+    with pytest.raises(NotFoundError):
+        await svc.update_expense(expense.id, ExpenseUpdate(budgetId=uuid.uuid4()))
+
+
 async def test_update_expense_clears_invoice_link_no_mark() -> None:
     # "invoice_id" gesetzt, aber None → Verknüpfung gelöst, kein Invoice-Lookup/-Flip
     # (Branch ``payload.invoice_id is not None`` == False).

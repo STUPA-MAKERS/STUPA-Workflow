@@ -260,14 +260,15 @@ class ExpenseCreate(_CamelModel):
 
 
 class ExpenseUpdate(_CamelModel):
-    """Gebuchte Ausgabe/Einnahme ändern. Betrag, Beschreibung, Bankkonto und die
-    Zusatz-Metadaten (Daten, Empfänger/Zahler, Anmerkungen, Belegnummer,
-    Zahlungsmethode, Kategorie) sind änderbar; Kostenstelle, HHJ und Antragsbindung
-    bleiben fix (Pfad-/Buchungsstabilität). Nur gesetzte Felder werden geschrieben;
-    explizites ``null`` leert ein optionales Feld."""
+    """Gebuchte Ausgabe/Einnahme ändern. Betrag, Beschreibung, Bankkonto, Kostenstelle
+    und die Zusatz-Metadaten (Daten, Empfänger/Zahler, Anmerkungen, Belegnummer,
+    Zahlungsmethode, Kategorie) sind änderbar; HHJ und Antragsbindung bleiben fix
+    (Buchungsstabilität). Nur gesetzte Felder werden geschrieben; explizites ``null``
+    leert ein optionales Feld (``budgetId`` ausgenommen — Pflicht-FK)."""
 
     amount: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
     description: str | None = Field(default=None, min_length=1)
+    budget_id: UUID | None = Field(default=None, alias="budgetId")
     account_id: UUID | None = Field(default=None, alias="accountId")
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
     payment_date: date | None = Field(default=None, alias="paymentDate")

@@ -122,10 +122,12 @@ export interface ExpenseCreate extends ExpenseMetadata {
   accountId?: Uuid | null;
 }
 
-/** Buchung ändern: Betrag, Beschreibung, Bankkonto + Zusatz-Metadaten (#1-1/#2/#3/#4). */
+/** Buchung ändern: Betrag, Beschreibung, Kostenstelle, Bankkonto + Zusatz-Metadaten (#1-1/#2/#3/#4). */
 export interface ExpenseUpdate extends ExpenseMetadata {
   amount?: string;
   description?: string;
+  /** Kostenstelle umbuchen (#25); HHJ bleibt fix. */
+  budgetId?: Uuid;
   accountId?: Uuid | null;
 }
 

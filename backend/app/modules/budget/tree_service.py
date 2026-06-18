@@ -970,10 +970,10 @@ class BudgetTreeService:
         )
 
     async def update_expense(self, expense_id: UUID, payload: ExpenseUpdate) -> ExpenseOut:
-        """Buchung ändern (#25): Betrag, Beschreibung, Bankkonto und Zusatz-Metadaten
-        (Daten, Empfänger/Zahler, Anmerkungen, Belegnummer, Zahlungsmethode, Kategorie).
-        HHJ/Kostenstelle/Antragsbindung bleiben fix. Nur gesetzte Felder werden
-        geschrieben; explizites ``null`` leert ein optionales Feld."""
+        """Buchung ändern (#25): Betrag, Beschreibung, Bankkonto, Kostenstelle und
+        Zusatz-Metadaten (Daten, Empfänger/Zahler, Anmerkungen, Belegnummer,
+        Zahlungsmethode, Kategorie). HHJ/Antragsbindung bleiben fix. Nur gesetzte
+        Felder werden geschrieben; explizites ``null`` leert ein optionales Feld."""
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
@@ -984,6 +984,13 @@ class BudgetTreeService:
             expense.amount = payload.amount
         if "description" in fields and payload.description is not None:
             expense.description = payload.description
+        if "budget_id" in fields and payload.budget_id is not None:
+            # Kostenstelle umbuchen: Zielknoten muss existieren (404 sonst). HHJ bleibt
+            # fix; Währung folgt der neuen Kostenstelle (Buchungen erben sie beim
+            # Anlegen). ``budgetId`` ist Pflicht-FK → ``null`` ist ein No-op.
+            target = await self._get_node(payload.budget_id)
+            expense.budget_id = target.id
+            expense.currency = target.currency
         if "account_id" in fields:
             await self._validate_account(payload.account_id)  # 404, falls unbekannt
             expense.account_id = payload.account_id

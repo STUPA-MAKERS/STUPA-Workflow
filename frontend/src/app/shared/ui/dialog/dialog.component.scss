@@ -43,11 +43,21 @@
   padding: var(--space-1);
 }
 .dialog__body {
-  /* Vertikales Padding = Breite des Fokus-Rings (2px Offset + 2px Outline),
-     damit der grüne Ring beim ersten/letzten Feld nicht am Body-Rand
-     abgeschnitten wird (#15). overflow-y:auto erzwingt sonst Clipping. */
-  padding: var(--space-1) var(--space-5);
+  /* Vertikales Padding reserviert die Fade-Zone als Leerraum: im Ruhezustand wird
+     nur dieser Rand ausgeblendet (kein Anschnitt von Inhalt/Fokus-Ring #15), beim
+     Scrollen blendet der Inhalt oben/unten in den Dialog-Hintergrund — wie das
+     Protokoll-Timeline und die Budget-Bäume. */
+  padding: var(--space-4) var(--space-5);
   overflow-y: auto;
+  --fade: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-4),
+    #000 calc(100% - var(--space-4)),
+    transparent
+  );
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
 }
 .dialog__footer {
   display: flex;
@@ -94,7 +104,8 @@
     padding: var(--space-2) var(--space-4);
   }
   .dialog__body {
-    padding: 0 var(--space-4);
+    /* Fade-Zone (var(--space-4)) als Leerraum behalten, sonst Anschnitt am Rand. */
+    padding: var(--space-4) var(--space-4);
   }
   .dialog__footer {
     padding: var(--space-4);
