@@ -56,7 +56,7 @@ export class DashboardComponent {
   );
 
   private readonly types = toSignal(
-    this.api.applicationTypes().pipe(catchError(() => of([] as ApplicationType[]))),
+    this.api.applicationTypes({ quiet: true }).pipe(catchError(() => of([] as ApplicationType[]))),
     { initialValue: [] as ApplicationType[] },
   );
   private readonly typeName = computed(() => {

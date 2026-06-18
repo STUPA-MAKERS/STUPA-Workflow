@@ -168,7 +168,7 @@ export class ApplicationsListComponent {
   }));
 
   constructor() {
-    this.api.applicationTypes().subscribe({
+    this.api.applicationTypes({ quiet: true }).subscribe({
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),
     });

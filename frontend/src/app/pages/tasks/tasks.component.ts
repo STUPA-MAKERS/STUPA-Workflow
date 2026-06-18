@@ -68,7 +68,7 @@ export class TasksComponent {
   }
 
   constructor() {
-    this.api.applicationTypes().subscribe({
+    this.api.applicationTypes({ quiet: true }).subscribe({
       next: (t) => this.types.set(t),
       error: () => this.types.set([]),
     });

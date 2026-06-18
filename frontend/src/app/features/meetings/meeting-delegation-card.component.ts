@@ -176,7 +176,7 @@ export class MeetingDelegationCardComponent {
   }
 
   private reload(): void {
-    this.api.meetingContext(this.meetingId()).subscribe({
+    this.api.meetingContext(this.meetingId(), { quiet: true }).subscribe({
       next: (c) => this.ctx.set(c),
       error: () => {},
     });

@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http'
 import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of, throwError } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
+import { skipLoading } from '@core/loading/loading.interceptor';
 import { API_BASE_URL } from './api.config';
 import {
   mapApplication,
@@ -104,7 +105,9 @@ export class ApiClient {
   // --- calendar (iCal-Abo, #ics) -------------------------------------------
   /** GET /calendar/me — eigene Abo-URL (`url` null, solange noch nicht erzeugt). */
   myCalendar(): Observable<CalendarFeed> {
-    return this.http.get<CalendarFeed>(`${this.base}/calendar/me`);
+    return this.http.get<CalendarFeed>(`${this.base}/calendar/me`, {
+      context: skipLoading(),
+    });
   }
 
   /** POST /calendar/me/rotate — Feed-Token (neu) erzeugen; alte URL wird ungültig. */
@@ -127,9 +130,12 @@ export class ApiClient {
 
   // --- application-types (public) ------------------------------------------
   /** GET /application-types — Backend liefert eine **Page**; FE will die Liste. */
-  applicationTypes(): Observable<ApplicationType[]> {
+  /** `quiet` = als Typ-Cache im Hintergrund geladen (kein globaler Overlay). */
+  applicationTypes(opts: { quiet?: boolean } = {}): Observable<ApplicationType[]> {
     return this.http
-      .get<Page<ApplicationTypeListItemWire>>(`${this.base}/application-types`)
+      .get<Page<ApplicationTypeListItemWire>>(`${this.base}/application-types`, {
+        context: opts.quiet ? skipLoading() : undefined,
+      })
       .pipe(map((page) => page.items.map(mapApplicationType)));
   }
 
@@ -140,6 +146,7 @@ export class ApiClient {
     if (budgetPotId) params = params.set('budgetPotId', budgetPotId);
     return this.http.get<EffectiveForm>(`${this.base}/application-types/${typeId}/form`, {
       params,
+      context: skipLoading(),
     });
   }
 
@@ -149,7 +156,9 @@ export class ApiClient {
    * validiert — auch wenn die aktive Form-Version inzwischen geändert wurde.
    */
   applicationForm(applicationId: Uuid): Observable<EffectiveForm> {
-    return this.http.get<EffectiveForm>(`${this.base}/applications/${applicationId}/form`);
+    return this.http.get<EffectiveForm>(`${this.base}/applications/${applicationId}/form`, {
+      context: skipLoading(),
+    });
   }
 
   // --- applications --------------------------------------------------------
@@ -160,7 +169,10 @@ export class ApiClient {
     }
     const lang = this.i18n.locale();
     return this.http
-      .get<Page<ApplicationListItemWire>>(`${this.base}/applications`, { params })
+      .get<Page<ApplicationListItemWire>>(`${this.base}/applications`, {
+        params,
+        context: skipLoading(),
+      })
       .pipe(
         map((page) => ({
           ...page,
@@ -177,21 +189,30 @@ export class ApiClient {
         params = params.set(key, String(value));
       }
     }
-    return this.http.get(`${this.base}/applications/export.xlsx`, { params, responseType: 'blob' });
+    return this.http.get(`${this.base}/applications/export.xlsx`, {
+      params,
+      responseType: 'blob',
+      context: skipLoading(),
+    });
   }
 
   /** GET /applications/tasks — offene Entscheidungen für die eigene Rolle (#64). */
   listTasks(): Observable<ApplicationListItem[]> {
     const lang = this.i18n.locale();
     return this.http
-      .get<ApplicationListItemWire[]>(`${this.base}/applications/tasks`)
+      .get<ApplicationListItemWire[]>(`${this.base}/applications/tasks`, {
+        context: skipLoading(),
+      })
       .pipe(map((items) => items.map((item) => mapApplicationListItem(item, lang))));
   }
 
-  getApplication(id: Uuid): Observable<Application> {
+  /** `quiet` = Hintergrund-Reload nach einer Mutation (kein globaler Overlay). */
+  getApplication(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Application> {
     const lang = this.i18n.locale();
     return this.http
-      .get<ApplicationOutWire>(`${this.base}/applications/${id}`)
+      .get<ApplicationOutWire>(`${this.base}/applications/${id}`, {
+        context: opts.quiet ? skipLoading() : undefined,
+      })
       .pipe(map((wire) => mapApplication(wire, lang)));
   }
 
@@ -235,10 +256,13 @@ export class ApiClient {
     return this.http.post<void>(`${this.base}/applications/${id}/erasure-request`, {});
   }
 
-  timeline(id: Uuid): Observable<TimelineEntry[]> {
+  /** `quiet` = Refresh nach einer Mutation (kein globaler Overlay). */
+  timeline(id: Uuid, opts: { quiet?: boolean } = {}): Observable<TimelineEntry[]> {
     const lang = this.i18n.locale();
     return this.http
-      .get<TimelineEventOutWire[]>(`${this.base}/applications/${id}/timeline`)
+      .get<TimelineEventOutWire[]>(`${this.base}/applications/${id}/timeline`, {
+        context: opts.quiet ? skipLoading() : undefined,
+      })
       .pipe(map((events) => events.map((e) => mapTimelineEvent(e, lang))));
   }
 
@@ -248,14 +272,19 @@ export class ApiClient {
    */
   versions(id: Uuid): Observable<ApplicationVersion[]> {
     return this.http
-      .get<VersionOutWire[]>(`${this.base}/applications/${id}/versions`)
+      .get<VersionOutWire[]>(`${this.base}/applications/${id}/versions`, {
+        context: skipLoading(),
+      })
       .pipe(map((items) => items.map(mapVersion)));
   }
 
   // --- comments (applicant: nur public) ------------------------------------
-  comments(id: Uuid): Observable<ApplicationComment[]> {
+  /** `quiet` = Hintergrund-/Refresh-Load (kein globaler Overlay). */
+  comments(id: Uuid, opts: { quiet?: boolean } = {}): Observable<ApplicationComment[]> {
     return this.http
-      .get<CommentOutWire[]>(`${this.base}/applications/${id}/comments`)
+      .get<CommentOutWire[]>(`${this.base}/applications/${id}/comments`, {
+        context: opts.quiet ? skipLoading() : undefined,
+      })
       .pipe(map((comments) => comments.map(mapComment)));
   }
 
@@ -275,7 +304,9 @@ export class ApiClient {
   transitions(id: Uuid): Observable<Transition[]> {
     const lang = this.i18n.locale();
     return this.http
-      .get<TransitionOutWire[]>(`${this.base}/applications/${id}/transitions`)
+      .get<TransitionOutWire[]>(`${this.base}/applications/${id}/transitions`, {
+        context: skipLoading(),
+      })
       .pipe(map((items) => items.map((t) => mapTransition(t, lang))));
   }
 
@@ -322,7 +353,9 @@ export class ApiClient {
   /** GET /applications/{id}/attachments — bestehende Anhänge (Panel-Hydration). */
   listAttachments(id: Uuid): Observable<Attachment[]> {
     return this.http
-      .get<AttachmentOutWire[]>(`${this.base}/applications/${id}/attachments`)
+      .get<AttachmentOutWire[]>(`${this.base}/applications/${id}/attachments`, {
+        context: skipLoading(),
+      })
       .pipe(map((list) => list.map(mapAttachment)));
   }
 
@@ -332,7 +365,9 @@ export class ApiClient {
    */
   attachmentUrl(attachmentId: Uuid): Observable<SignedUrl> {
     return this.http
-      .get<SignedUrlOutWire>(`${this.base}/attachments/${attachmentId}`)
+      .get<SignedUrlOutWire>(`${this.base}/attachments/${attachmentId}`, {
+        context: skipLoading(),
+      })
       .pipe(map(mapSignedUrl));
   }
 
@@ -347,8 +382,11 @@ export class ApiClient {
    * (camelCase) und braucht keine Mapper-Schicht; bei `secret` liefert der
    * Server in `tally` nur `counts`.
    */
-  getVote(id: Uuid): Observable<Vote> {
-    return this.http.get<Vote>(`${this.base}/votes/${id}`);
+  /** `quiet` = Tally-Refresh nach Stimmabgabe (kein globaler Overlay). */
+  getVote(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Vote> {
+    return this.http.get<Vote>(`${this.base}/votes/${id}`, {
+      context: opts.quiet ? skipLoading() : undefined,
+    });
   }
 
   /**
@@ -376,6 +414,7 @@ export class ApiClient {
   listMeetingMembers(gremiumId: Uuid): Observable<MeetingMember[]> {
     return this.http.get<MeetingMember[]>(
       `${this.base}/gremien/${gremiumId}/meeting-members`,
+      { context: skipLoading() },
     );
   }
 
@@ -384,7 +423,7 @@ export class ApiClient {
     let params = new HttpParams();
     if (gremiumId) params = params.set('gremiumId', gremiumId);
     return this.http
-      .get<MeetingOutWire[]>(`${this.base}/meetings`, { params })
+      .get<MeetingOutWire[]>(`${this.base}/meetings`, { params, context: skipLoading() })
       .pipe(map((items) => items.map(mapMeeting)));
   }
 
@@ -408,7 +447,7 @@ export class ApiClient {
     if (opts.gremiumId) params = params.set('gremiumId', opts.gremiumId);
     if (opts.q && opts.q.trim()) params = params.set('q', opts.q.trim());
     return this.http
-      .get<MeetingPageWire>(`${this.base}/meetings/timeline`, { params })
+      .get<MeetingPageWire>(`${this.base}/meetings/timeline`, { params, context: skipLoading() })
       .pipe(map(mapMeetingPage));
   }
 
@@ -424,8 +463,13 @@ export class ApiClient {
   }
 
   /** GET /meetings/{id} — Sitzungs-State + Votes. */
-  getMeeting(id: Uuid): Observable<Meeting> {
-    return this.http.get<MeetingOutWire>(`${this.base}/meetings/${id}`).pipe(map(mapMeeting));
+  /** `quiet` = Hintergrund-Reload (Refresh nach Vote-Aktion etc.; kein Overlay). */
+  getMeeting(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Meeting> {
+    return this.http
+      .get<MeetingOutWire>(`${this.base}/meetings/${id}`, {
+        context: opts.quiet ? skipLoading() : undefined,
+      })
+      .pipe(map(mapMeeting));
   }
 
   /** PATCH /meetings/{id} — Status und/oder aktiven Antrag setzen. */
@@ -442,8 +486,11 @@ export class ApiClient {
 
   // --- attendance (#Meetings/#55/#56) --------------------------------------
   /** GET /meetings/{id}/attendance — Roster der aktuellen Mitglieder + Status. */
-  listAttendance(meetingId: Uuid): Observable<Attendance[]> {
-    return this.http.get<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance`);
+  /** `quiet` = Roster-Reload für Dialog/Refresh (kein globaler Overlay). */
+  listAttendance(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<Attendance[]> {
+    return this.http.get<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance`, {
+      context: opts.quiet ? skipLoading() : undefined,
+    });
   }
 
   /** PUT /meetings/{id}/attendance/me — eigene Anwesenheit markieren. */
@@ -468,14 +515,18 @@ export class ApiClient {
 
   // --- agenda / Tagesordnung (#10/#58) -------------------------------------
   /** GET /meetings/{id}/agenda — zugewiesene Anträge (geordnet). */
-  listAgenda(meetingId: Uuid): Observable<AgendaItem[]> {
-    return this.http.get<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`);
+  /** `quiet` = Agenda-Reload nach WS-Event/Mutation (kein globaler Overlay). */
+  listAgenda(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<AgendaItem[]> {
+    return this.http.get<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
+      context: opts.quiet ? skipLoading() : undefined,
+    });
   }
 
   /** GET /meetings/{id}/agenda/assignable — Abstimmungs-Anträge, noch nicht auf der TO. */
   listAssignableApplications(meetingId: Uuid): Observable<AssignableApplication[]> {
     return this.http.get<AssignableApplication[]>(
       `${this.base}/meetings/${meetingId}/agenda/assignable`,
+      { context: skipLoading() },
     );
   }
 
@@ -595,9 +646,11 @@ export class ApiClient {
 
       Für Reload/Status-Poll (#async-finalize): GETs unterliegen nicht dem
       Default-Write-Rate-Limit — der 4s-Poll über den POST lief schnell in 429. */
-  getProtocol(meetingId: Uuid): Observable<Protocol> {
+  getProtocol(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<Protocol> {
     return this.http
-      .get<ProtocolOutWire>(`${this.base}/meetings/${meetingId}/protocol`)
+      .get<ProtocolOutWire>(`${this.base}/meetings/${meetingId}/protocol`, {
+        context: opts.quiet ? skipLoading() : undefined,
+      })
       .pipe(map(mapProtocol));
   }
 
@@ -626,7 +679,9 @@ export class ApiClient {
   // --- Benachrichtigungs-Präferenzen (#4-2, Self-Service) ------------------
   /** GET /notifications/preferences — eigene Schalter (voller Katalog). */
   listNotificationPreferences(): Observable<NotificationPreference[]> {
-    return this.http.get<NotificationPreference[]>(`${this.base}/notifications/preferences`);
+    return this.http.get<NotificationPreference[]>(`${this.base}/notifications/preferences`, {
+      context: skipLoading(),
+    });
   }
 
   /** PUT /notifications/preferences — eigene Schalter setzen (Bulk). */
@@ -641,7 +696,9 @@ export class ApiClient {
   // --- OAuth-Grants + MCP-Setup (#MCP, Self-Service) -----------------------
   /** GET /oauth/grants — eigene aktive Agent-/MCP-Grants. */
   listGrants(): Observable<OAuthGrant[]> {
-    return this.http.get<OAuthGrant[]>(`${this.base}/oauth/grants`);
+    return this.http.get<OAuthGrant[]>(`${this.base}/oauth/grants`, {
+      context: skipLoading(),
+    });
   }
 
   /** DELETE /oauth/grants/{id} — einen eigenen Grant widerrufen. */
@@ -656,7 +713,9 @@ export class ApiClient {
 
   /** GET /oauth/consent-request — schwebender Authorize-Request fürs Consent-FE. */
   consentRequest(): Observable<ConsentRequest> {
-    return this.http.get<ConsentRequest>(`${this.base}/oauth/consent-request`);
+    return this.http.get<ConsentRequest>(`${this.base}/oauth/consent-request`, {
+      context: skipLoading(),
+    });
   }
 
   /** POST /oauth/consent — Scope+Lebensdauer bestätigen/ablehnen → Redirect-URL. */

@@ -267,7 +267,7 @@ export class AdminGremienComponent {
   private reload(): void {
     this.loading.set(true);
     this.loadError.set(false);
-    this.api.listGremien().subscribe({
+    this.api.listGremien({ quiet: true }).subscribe({
       next: (g) => {
         this.gremien.set(g);
         this.loading.set(false);

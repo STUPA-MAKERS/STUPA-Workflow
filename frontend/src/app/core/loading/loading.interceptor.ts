@@ -1,20 +1,40 @@
-import { type HttpInterceptorFn } from '@angular/common/http';
+import { type HttpInterceptorFn, HttpContext, HttpContextToken } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { finalize } from 'rxjs';
 import { LoadingService } from './loading.service';
 
-/** Requests, die den Ladebildschirm NICHT auslösen sollen, setzen diesen Header. */
-export const SKIP_LOADING_HEADER = 'X-Skip-Loading';
+/**
+ * Per-Request-Opt-out für den globalen Ladebildschirm (#loading). `true` ⇒ dieser
+ * Request zählt **nicht** in den Overlay-Zähler.
+ */
+export const SKIP_LOADING = new HttpContextToken<boolean>(() => false);
+
+/** Fertiger {@link HttpContext}, der den globalen Ladebildschirm unterdrückt. */
+export function skipLoading(): HttpContext {
+  return new HttpContext().set(SKIP_LOADING, true);
+}
 
 /**
- * Zählt laufende Requests im {@link LoadingService} → globaler Ladebildschirm
- * (#loading). Als **äußerster** Interceptor registriert, damit die volle Request-
- * Dauer (inkl. Auth/Mock) erfasst wird. Hintergrund-Polling kann sich per
- * {@link SKIP_LOADING_HEADER} ausklinken (Header wird vor dem Senden entfernt).
+ * Speist den globalen Ladebildschirm (#loading) über den {@link LoadingService}.
+ *
+ * Der Overlay soll **nur erscheinen, wenn Daten geladen werden** — daher zählen
+ * ausschließlich **GET**-Requests, und nur solange sie nicht per
+ * {@link SKIP_LOADING} ausgeklinkt sind:
+ *
+ * - **Mutationen** (POST/PUT/PATCH/DELETE) lösen den Overlay nie aus — sie haben
+ *   lokales Feedback (Button-`loading`, optimistische Updates) und sollen die
+ *   Sicht nicht aufblitzen lassen (Autosave, Vote, Reorder, Finalize …).
+ * - **Hintergrund-GETs** (Status-Polls, Refresh nach Mutation/WS-Event, debounced
+ *   Typeahead) **und** Loads, die bereits einen **lokalen** Spinner zeigen, setzen
+ *   `SKIP_LOADING` und überspringen den Overlay — so stapeln sich nicht zwei
+ *   Spinner.
+ *
+ * Als **äußerster** Interceptor registriert, damit die volle Request-Dauer
+ * (inkl. Auth/Mock) erfasst wird.
  */
 export const loadingInterceptor: HttpInterceptorFn = (req, next) => {
-  if (req.headers.has(SKIP_LOADING_HEADER)) {
-    return next(req.clone({ headers: req.headers.delete(SKIP_LOADING_HEADER) }));
+  if (req.method !== 'GET' || req.context.get(SKIP_LOADING)) {
+    return next(req);
   }
   const loading = inject(LoadingService);
   loading.inc();

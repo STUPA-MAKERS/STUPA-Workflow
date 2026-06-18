@@ -330,13 +330,13 @@ export class StatusTimelineComponent {
         this.application.set(updated);
         this.saving.set(false);
         this.toast.success(this.i18n.translate('status.toast.saved'));
-        this.api.timeline(app.id).subscribe((t) => this.timeline.set(t));
+        this.api.timeline(app.id, { quiet: true }).subscribe((t) => this.timeline.set(t));
       },
       error: (err: { status?: number; error?: ProblemDetail }) => {
         this.saving.set(false);
         if (err.status === 409) {
           this.toast.error(this.i18n.translate('status.toast.locked'));
-          this.api.getApplication(app.id).subscribe((a) => this.application.set(a));
+          this.api.getApplication(app.id, { quiet: true }).subscribe((a) => this.application.set(a));
         } else {
           this.toast.error(err.error?.detail ?? this.i18n.translate('status.toast.saveFailed'));
         }
@@ -372,7 +372,7 @@ export class StatusTimelineComponent {
       next: () => {
         this.commentBody.reset();
         this.postingComment.set(false);
-        this.api.comments(app.id).subscribe((c) => this.comments.set(c));
+        this.api.comments(app.id, { quiet: true }).subscribe((c) => this.comments.set(c));
       },
       error: () => {
         this.postingComment.set(false);
