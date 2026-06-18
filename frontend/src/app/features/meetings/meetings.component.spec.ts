@@ -336,6 +336,57 @@ describe('MeetingsComponent', () => {
     expect(screen.queryByRole('link', { name: 'Öffentliches Protokoll' })).toBeNull();
   });
 
+  it('marks non-public TOPs with a NÖ badge once the meeting is closed and finalized', async () => {
+    const { http, container } = await setup();
+    http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
+    // Finalisiert ⇒ Editor locked ⇒ NÖ-Checkbox weg, das Badge übernimmt die Anzeige.
+    http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final' });
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([
+      { id: 't-1', applicationId: null, title: 'Vertraulich', body: '', position: 0, nonPublic: true },
+      { id: 't-2', applicationId: null, title: 'Öffentlich', body: '', position: 1, nonPublic: false },
+    ]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+    flushDelegationContext(http);
+
+    await screen.findByText('Vertraulich');
+    const noe = Array.from(container.querySelectorAll('app-badge')).filter(
+      (b) => b.textContent?.trim() === 'NÖ',
+    );
+    expect(noe).toHaveLength(1); // nur der nicht-öffentliche TOP, nicht der öffentliche
+  });
+
+  it('shows no NÖ badge while the meeting is still live', async () => {
+    const { http, container } = await setup();
+    http.expectOne('/api/meetings/m-1').flush(MEETING); // status 'live'
+    http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([
+      { id: 't-1', applicationId: null, title: 'Vertraulich', body: '', position: 0, nonPublic: true },
+    ]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+    flushDelegationContext(http);
+
+    await screen.findByText('Vertraulich');
+    const noe = Array.from(container.querySelectorAll('app-badge')).filter(
+      (b) => b.textContent?.trim() === 'NÖ',
+    );
+    expect(noe).toHaveLength(0);
+  });
+
+  it('hides the save-state indicator once the protocol is finalized', async () => {
+    const { http, container } = await setup();
+    http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
+    http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final' });
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+    flushDelegationContext(http);
+
+    await screen.findByText('Final');
+    expect(container.querySelector('.mtg__saveState')).toBeNull();
+  });
+
   it('retries a failed finalize via the toolbar repeat button', async () => {
     const { http } = await setup();
     // Sitzung schon geschlossen, Protokoll wieder Entwurf ⇒ Render fehlgeschlagen.
