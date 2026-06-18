@@ -279,9 +279,12 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
 
 
-async def test_finalize_renders_user_markdown_untrusted() -> None:
-    """RCE-Schutz: der nutzer-geschriebene Protokoll-Body wird ``untrusted`` gerendert
-    (pytex sperrt damit den Markdown-``eval``-Escape)."""
+async def test_finalize_renders_user_markdown_trusted() -> None:
+    """RCE-Schutz liegt im Sanitizer (``sanitize_user_markdown`` entfernt den
+    ``eval``-Escape bedingungslos), nicht im Trust-Level: der Protokoll-Body wird
+    ``trusted`` (Client-Default, kein per-Call-Override → ``trust_level=None``)
+    gerendert, weil die Protokoll-Variante pytex' Template-Maschinerie braucht
+    (``untrusted`` → 400)."""
     proto = _protocol()
     pytex = FakePytex(pdf=b"%PDF")
     session = FakeSession(
@@ -289,7 +292,7 @@ async def test_finalize_renders_user_markdown_untrusted() -> None:
         results=[result(proto), result(), result(), result()],
     )
     await _service(session, storage=FakeStorage(), pytex=pytex).finalize(PID, now=NOW)
-    assert pytex.trust_levels == ["untrusted"]
+    assert pytex.trust_levels == [None]
 
 
 async def test_finalize_uploads_and_mails_only_after_commit() -> None:
