@@ -294,6 +294,48 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText('Final')).toBeInTheDocument();
   });
 
+  it('offers separate internal + public PDF links when a redacted variant exists', async () => {
+    // Nicht-öffentliche TOPs ⇒ Backend liefert beide URLs (#PII-Re-Add).
+    const { http } = await setup();
+    http.expectOne('/api/meetings/m-1').flush(MEETING);
+    http.expectOne('/api/meetings/m-1/protocol').flush({
+      ...PROTOCOL,
+      status: 'final',
+      pdfUrl: '/api/protocols/p-1/pdf',
+      publicPdfUrl: '/api/protocols/p-1/pdf/public',
+    });
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+    flushDelegationContext(http);
+
+    const internal = await screen.findByRole('link', { name: 'Internes Protokoll' });
+    expect(internal).toHaveAttribute('href', '/api/protocols/p-1/pdf');
+    const pub = await screen.findByRole('link', { name: 'Öffentliches Protokoll' });
+    expect(pub).toHaveAttribute('href', '/api/protocols/p-1/pdf/public');
+  });
+
+  it('offers a single generic PDF link when nothing is redacted', async () => {
+    // Keine nicht-öffentlichen TOPs ⇒ nur ein PDF (publicPdfUrl null) — zugleich intern & öffentlich.
+    const { http } = await setup();
+    http.expectOne('/api/meetings/m-1').flush(MEETING);
+    http.expectOne('/api/meetings/m-1/protocol').flush({
+      ...PROTOCOL,
+      status: 'final',
+      pdfUrl: '/api/protocols/p-1/pdf',
+    });
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+    flushDelegationContext(http);
+
+    expect(await screen.findByRole('link', { name: 'PDF öffnen' })).toHaveAttribute(
+      'href',
+      '/api/protocols/p-1/pdf',
+    );
+    expect(screen.queryByRole('link', { name: 'Öffentliches Protokoll' })).toBeNull();
+  });
+
   it('retries a failed finalize via the toolbar repeat button', async () => {
     const { http } = await setup();
     // Sitzung schon geschlossen, Protokoll wieder Entwurf ⇒ Render fehlgeschlagen.

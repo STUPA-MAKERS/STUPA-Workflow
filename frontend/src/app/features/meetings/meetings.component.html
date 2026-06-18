@@ -315,7 +315,12 @@
           <app-badge [variant]="proto.isFinal ? 'success' : proto.status === 'rendering' ? 'warning' : 'neutral'">
             {{ (proto.isFinal ? 'meetings.protocol.final' : proto.status === 'rendering' ? 'meetings.protocol.rendering' : 'meetings.protocol.draft') | t }}
           </app-badge>
-          @if (proto.pdfUrl) {
+          @if (proto.publicPdfUrl) {
+            <!-- Nicht-öffentliche TOPs vorhanden → zwei Varianten: internes (voll) + redigiertes öffentliches PDF. -->
+            <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfInternal' | t }}</a>
+            <a class="text-primary text-sm font-medium" [href]="proto.publicPdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfPublic' | t }}</a>
+          } @else if (proto.pdfUrl) {
+            <!-- Nichts zu redigieren → ein PDF, zugleich internes wie öffentliches Protokoll. -->
             <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
           }
           <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
