@@ -73,8 +73,7 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
             fields=[FormFieldDef(key="title", type="text", label={"de": "Titel"},
                                  required=True)],
             activate=True,
-        ),
-    )
+        ), "tester")
 
     flow = FlowVersion(
         version=1, active=True, editor_layout={}

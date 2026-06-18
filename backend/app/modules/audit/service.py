@@ -23,7 +23,7 @@ from typing import Any
 from sqlalchemy import Select, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.audit.actions import AuditAction
+from app.modules.audit.actions import REVERTABLE_BUDGET_ACTIONS, AuditAction
 from app.modules.audit.hashing import canonical_payload, compute_hash
 from app.modules.audit.models import AuditEntry
 from app.shared.paging import Page
@@ -121,6 +121,61 @@ class AuditService:
         self.session.add(entry)
         await self.session.flush()
         return entry
+
+    async def revertable_flags(
+        self, entries: Sequence[AuditEntry]
+    ) -> dict[int, bool]:
+        """Pro Audit-Eintrag: ist er aus dem Log zurücknehmbar (#config-versioning)?
+
+        Günstige, weitgehend statische Eigenschaft für die Liste — **keine** teuren Head-/
+        Stale-Prüfungen pro Zeile (die übernimmt der Revert beim Klick, 409 sonst).
+        Config-Changes ohne Vorgänger (erster Stand) sind nicht revertierbar; Budget-
+        Änderungen brauchen den festgehaltenen Vorzustand. Ein Batch-Lookup löst den
+        Vorgänger-Check der Config-Snapshots auf."""
+        flags: dict[int, bool] = {}
+        revision_ids: dict[int, str] = {}
+        for e in entries:
+            data = e.data or {}
+            rid = data.get("revisionId")
+            if rid:
+                revision_ids[e.id] = str(rid)
+                flags[e.id] = False  # erst nach Vorgänger-Bestätigung True
+            elif e.action == AuditAction.STATUS_CHANGE:
+                flags[e.id] = bool(data.get("fromStateId") and data.get("toStateId"))
+            elif e.action in REVERTABLE_BUDGET_ACTIONS:
+                if e.action in (
+                    AuditAction.BUDGET_NODE_UPDATE,
+                    AuditAction.BUDGET_EXPENSE_UPDATE,
+                ):
+                    flags[e.id] = bool(data.get("before"))
+                elif e.action == AuditAction.BUDGET_ALLOCATION_SET:
+                    flags[e.id] = "previousAllocated" in data
+                else:
+                    flags[e.id] = True
+            else:
+                flags[e.id] = False
+        if revision_ids:
+            from app.modules.config_revision.models import ConfigRevision
+
+            uuid_map: dict[uuid.UUID, int] = {}
+            for eid, rid in revision_ids.items():
+                try:
+                    uuid_map[uuid.UUID(rid)] = eid
+                except ValueError:
+                    continue  # defensiv: revisionId ist normalerweise immer eine UUID
+            if uuid_map:
+                rows = (
+                    await self.session.execute(
+                        select(
+                            ConfigRevision.id, ConfigRevision.prev_revision_id
+                        ).where(ConfigRevision.id.in_(uuid_map.keys()))
+                    )
+                ).all()
+                for rev_id, prev_id in rows:
+                    eid = uuid_map.get(rev_id)
+                    if eid is not None:
+                        flags[eid] = prev_id is not None
+        return flags
 
     async def verify_chain(self) -> ChainVerification:
         """Kette ab Genesis nachrechnen; erster Bruch wird gemeldet (fail-closed).

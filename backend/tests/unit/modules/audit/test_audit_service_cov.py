@@ -15,6 +15,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from app.modules.audit.models import AuditEntry
 from app.modules.audit.service import AuditService
 from tests._support.audit_fakes import fake_session, result
 
@@ -391,3 +392,72 @@ async def test_resolve_data_ids_all_entity_branches() -> None:
         str(t_other): "EN only",
         str(fy): "2026",
     }
+
+
+# ------------------------------------------------------------- revertable_flags
+async def test_revertable_flags_classifies_actions() -> None:
+    """Pro Aktionstyp/Datenform: revertierbar ja/nein (#config-versioning).
+
+    Config-Changes brauchen einen Vorgänger (Batch-Lookup), Budget-Änderungen den
+    festgehaltenen Vorzustand; Löschungen und unbekannte Aktionen sind nicht
+    revertierbar."""
+    rev_a, prev_a, rev_b = _uuid(1), _uuid(2), _uuid(3)
+    entries = [
+        AuditEntry(id=1, action="config_change", data={"revisionId": str(rev_a)}),
+        AuditEntry(id=2, action="config_change", data={"revisionId": str(rev_b)}),
+        AuditEntry(
+            id=3, action="status_change", data={"fromStateId": "a", "toStateId": "b"}
+        ),
+        AuditEntry(id=4, action="status_change", data={"toStateId": "b"}),
+        AuditEntry(id=5, action="budget_node_create", data={}),
+        AuditEntry(id=6, action="budget_node_update", data={"before": {"name": "x"}}),
+        AuditEntry(id=7, action="budget_node_update", data={"fields": ["name"]}),
+        AuditEntry(
+            id=8, action="budget_allocation_set", data={"previousAllocated": None}
+        ),
+        AuditEntry(id=9, action="budget_allocation_set", data={"allocated": "5"}),
+        AuditEntry(id=10, action="budget_expense_delete", data={}),
+        AuditEntry(id=11, action="login", data={}),
+    ]
+    # Vorgänger-Lookup der Config-Snapshots: rev_a hat einen, rev_b (erster Stand) nicht.
+    db = fake_session(result((rev_a, prev_a), (rev_b, None)))
+    flags = await AuditService(db).revertable_flags(entries)
+    assert flags == {
+        1: True,
+        2: False,
+        3: True,
+        4: False,
+        5: True,
+        6: True,
+        7: False,
+        8: True,
+        9: False,
+        10: False,
+        11: False,
+    }
+
+
+async def test_revertable_flags_no_config_entries_skips_lookup() -> None:
+    """Ohne Config-Eintrag (kein revisionId) wird der Vorgänger-Lookup übersprungen."""
+    entries = [
+        AuditEntry(id=1, action="status_change", data={"fromStateId": "a", "toStateId": "b"}),
+        AuditEntry(id=2, action="login", data={}),
+    ]
+    flags = await AuditService(fake_session()).revertable_flags(entries)
+    assert flags == {1: True, 2: False}
+
+
+async def test_revertable_flags_invalid_revision_id_is_not_revertable() -> None:
+    """Defekte revisionId (keine UUID) → uuid_map leer, Lookup übersprungen, nicht revertierbar."""
+    entries = [AuditEntry(id=1, action="config_change", data={"revisionId": "not-a-uuid"})]
+    flags = await AuditService(fake_session()).revertable_flags(entries)
+    assert flags == {1: False}
+
+
+async def test_revertable_flags_ignores_unrequested_revision_rows() -> None:
+    """Ein Lookup-Row, der zu keinem Eintrag gehört, wird übersprungen (eid None)."""
+    rev_a, prev_a, foreign = _uuid(1), _uuid(2), _uuid(9)
+    entries = [AuditEntry(id=1, action="config_change", data={"revisionId": str(rev_a)})]
+    db = fake_session(result((rev_a, prev_a), (foreign, None)))
+    flags = await AuditService(db).revertable_flags(entries)
+    assert flags == {1: True}

@@ -18,11 +18,14 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 
 from app.modules.applications.models import Application
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.budget import tree_service as ts_mod
 from app.modules.budget.invoice_import import ParsedInvoice
@@ -55,6 +58,7 @@ from app.modules.files.scanner import ScannerError, ScanVerdict
 from app.modules.files.storage import StorageError
 from app.settings import Settings
 from app.shared.errors import (
+    ConflictError,
     NotFoundError,
     PayloadTooLargeError,
     ServiceUnavailableError,
@@ -1494,3 +1498,268 @@ async def test_audit_uses_actor() -> None:
     svc = BudgetTreeService(sess, actor="admin-sub")
     await svc.delete_node(node.id)
     assert sess.committed == 1
+
+
+# --------------------------------------------------------------------------- #
+# Audit-Log-Revert (#config-versioning): revert_audit + Helfer (DB-los)
+# --------------------------------------------------------------------------- #
+def _entry(
+    action: AuditAction, target_id: Any, data: dict | None = None, *, eid: int = 1
+) -> AuditEntry:
+    """Minimaler Audit-Eintrag (revert_audit liest nur action/target_id/data/id)."""
+    return cast(
+        AuditEntry,
+        SimpleNamespace(id=eid, action=action, target_id=str(target_id), data=data or {}),
+    )
+
+
+class _AsyncStub:
+    """Async-Aufrufrekorder zum Monkeypatchen wiederverwendeter Mutatoren."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    async def __call__(self, *args: Any, **kwargs: Any) -> None:
+        self.calls.append((args, kwargs))
+
+
+# --- Buchung (budget_expense_create) -------------------------------------- #
+async def test_revert_expense_create_already_reverted() -> None:
+    svc = BudgetTreeService(fake_session(gets=[None]), actor="admin")
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, uuid.uuid4()), "admin")
+    assert ei.value.code == "already_reverted"
+
+
+async def test_revert_expense_create_no_invoice_deletes() -> None:
+    exp = _expense(id=uuid.uuid4(), invoice_id=None)
+    sess = fake_session(gets=[exp])
+    svc = BudgetTreeService(sess, actor="admin")
+    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
+    assert exp in sess.deleted and sess.committed == 1
+
+
+async def test_revert_expense_create_reopens_paid_invoice() -> None:
+    inv = _invoice()
+    inv.status = "paid"
+    exp = _expense(id=uuid.uuid4(), invoice_id=inv.id)
+    sess = fake_session(gets=[exp, inv])
+    svc = BudgetTreeService(sess, actor="admin")
+    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
+    assert inv.status == "open"
+    assert exp in sess.deleted and sess.committed == 1
+
+
+async def test_revert_expense_create_invoice_missing_skips_reopen() -> None:
+    exp = _expense(id=uuid.uuid4(), invoice_id=uuid.uuid4())
+    sess = fake_session(gets=[exp, None])  # Rechnung nicht (mehr) vorhanden
+    svc = BudgetTreeService(sess, actor="admin")
+    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
+    assert exp in sess.deleted
+
+
+async def test_revert_expense_create_invoice_not_paid_unchanged() -> None:
+    inv = _invoice()  # status="open"
+    exp = _expense(id=uuid.uuid4(), invoice_id=inv.id)
+    sess = fake_session(gets=[exp, inv])
+    svc = BudgetTreeService(sess, actor="admin")
+    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
+    assert inv.status == "open" and exp in sess.deleted
+
+
+# --- Umbuchung (budget_transfer_create) ----------------------------------- #
+async def test_revert_transfer_create_deletes_both_rows() -> None:
+    tid = uuid.uuid4()
+    r1 = _expense(transfer_id=tid)
+    r2 = _expense(transfer_id=tid)
+    sess = fake_session(result(r1, r2))  # select … where transfer_id → scalars().all()
+    svc = BudgetTreeService(sess, actor="admin")
+    await svc.revert_audit(_entry(AuditAction.BUDGET_TRANSFER_CREATE, tid), "admin")
+    assert r1 in sess.deleted and r2 in sess.deleted and sess.committed == 1
+
+
+async def test_revert_transfer_create_already_reverted() -> None:
+    sess = fake_session(result())  # keine Zeilen mehr
+    svc = BudgetTreeService(sess, actor="admin")
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(_entry(AuditAction.BUDGET_TRANSFER_CREATE, uuid.uuid4()), "admin")
+    assert ei.value.code == "already_reverted"
+
+
+# --- Kostenstelle anlegen (budget_node_create) ---------------------------- #
+async def test_revert_node_create_already_reverted() -> None:
+    svc = BudgetTreeService(fake_session(gets=[None]), actor="admin")
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(_entry(AuditAction.BUDGET_NODE_CREATE, uuid.uuid4()), "admin")
+    assert ei.value.code == "already_reverted"
+
+
+async def test_revert_node_create_delegates_to_delete_node() -> None:
+    node = _budget(id=uuid.uuid4())
+    svc = BudgetTreeService(fake_session(gets=[node]), actor="admin")
+    stub = _AsyncStub()
+    svc.delete_node = stub  # type: ignore[method-assign]
+    await svc.revert_audit(_entry(AuditAction.BUDGET_NODE_CREATE, node.id), "admin")
+    assert stub.calls and stub.calls[0][0][0] == node.id
+
+
+# --- Kostenstelle ändern (budget_node_update) ----------------------------- #
+async def test_revert_node_update_not_revertable_without_before() -> None:
+    svc = BudgetTreeService(fake_session(), actor="admin")
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(
+            _entry(AuditAction.BUDGET_NODE_UPDATE, uuid.uuid4(), {}), "admin"
+        )
+    assert ei.value.code == "not_revertable"
+
+
+async def test_revert_node_update_already_reverted() -> None:
+    svc = BudgetTreeService(fake_session(gets=[None]), actor="admin")
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(
+            _entry(AuditAction.BUDGET_NODE_UPDATE, uuid.uuid4(), {"before": {"name": "X"}}),
+            "admin",
+        )
+    assert ei.value.code == "already_reverted"
+
+
+async def test_revert_node_update_stale_when_after_mismatch() -> None:
+    node = _budget(id=uuid.uuid4(), name="Aktuell")
+    svc = BudgetTreeService(fake_session(gets=[node]), actor="admin")
+    data = {"before": {"name": "Alt"}, "after": {"name": "Anders"}}
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(_entry(AuditAction.BUDGET_NODE_UPDATE, node.id, data), "admin")
+    assert ei.value.code == "stale_revert"
+
+
+async def test_revert_node_update_restores_via_update_node() -> None:
+    node = _budget(id=uuid.uuid4(), name="Neu")
+    svc = BudgetTreeService(fake_session(gets=[node]), actor="admin")
+    stub = _AsyncStub()
+    svc.update_node = stub  # type: ignore[method-assign]
+    data = {"before": {"name": "Alt"}, "after": {"name": "Neu"}}  # nicht stale
+    await svc.revert_audit(_entry(AuditAction.BUDGET_NODE_UPDATE, node.id, data), "admin")
+    assert stub.calls and stub.calls[0][0][1].name == "Alt"
+
+
+async def test_revert_node_update_no_after_is_best_effort() -> None:
+    node = _budget(id=uuid.uuid4(), name="X")
+    svc = BudgetTreeService(fake_session(gets=[node]), actor="admin")
+    stub = _AsyncStub()
+    svc.update_node = stub  # type: ignore[method-assign]
+    data = {"before": {"name": "Alt"}}  # kein after → kein Stale-Check
+    await svc.revert_audit(_entry(AuditAction.BUDGET_NODE_UPDATE, node.id, data), "admin")
+    assert stub.calls
+
+
+# --- Zuteilung (budget_allocation_set) ------------------------------------ #
+async def test_revert_allocation_not_revertable_without_fy() -> None:
+    svc = BudgetTreeService(fake_session(), actor="admin")
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(
+            _entry(AuditAction.BUDGET_ALLOCATION_SET, uuid.uuid4(), {"allocated": "5"}),
+            "admin",
+        )
+    assert ei.value.code == "not_revertable"
+
+
+async def test_revert_allocation_stale_when_row_missing() -> None:
+    bid, fy = uuid.uuid4(), uuid.uuid4()
+    svc = BudgetTreeService(fake_session(result()), actor="admin")  # _allocation → None
+    data = {"fiscalYearId": str(fy), "allocated": "100"}
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")
+    assert ei.value.code == "stale_revert"
+
+
+async def test_revert_allocation_stale_when_set_value_absent() -> None:
+    bid, fy = uuid.uuid4(), uuid.uuid4()
+    alloc = _alloc(budget_id=bid, fy_id=fy, allocated="100")
+    svc = BudgetTreeService(fake_session(result(alloc)), actor="admin")
+    data = {"fiscalYearId": str(fy)}  # kein allocated → set_value None → stale
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")
+    assert ei.value.code == "stale_revert"
+
+
+async def test_revert_allocation_stale_when_value_changed() -> None:
+    bid, fy = uuid.uuid4(), uuid.uuid4()
+    alloc = _alloc(budget_id=bid, fy_id=fy, allocated="200")
+    svc = BudgetTreeService(fake_session(result(alloc)), actor="admin")
+    data = {"fiscalYearId": str(fy), "allocated": "100"}  # cur 200 ≠ 100 → stale
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")
+    assert ei.value.code == "stale_revert"
+
+
+async def test_revert_allocation_removes_row_when_no_previous() -> None:
+    bid, fy = uuid.uuid4(), uuid.uuid4()
+    alloc = _alloc(budget_id=bid, fy_id=fy, allocated="100")
+    sess = fake_session(result(alloc))
+    svc = BudgetTreeService(sess, actor="admin")
+    data = {"fiscalYearId": str(fy), "allocated": "100", "previousAllocated": None}
+    await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")
+    assert alloc in sess.deleted and sess.committed == 1
+
+
+async def test_revert_allocation_restores_previous_via_set_allocation() -> None:
+    bid, fy = uuid.uuid4(), uuid.uuid4()
+    alloc = _alloc(budget_id=bid, fy_id=fy, allocated="100")
+    svc = BudgetTreeService(fake_session(result(alloc)), actor="admin")
+    stub = _AsyncStub()
+    svc.set_allocation = stub  # type: ignore[method-assign]
+    data = {"fiscalYearId": str(fy), "allocated": "100", "previousAllocated": "50"}
+    await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")
+    assert stub.calls and stub.calls[0][0][2].allocated == Decimal("50")
+
+
+# --- Buchung ändern (budget_expense_update) ------------------------------- #
+async def test_revert_expense_update_not_revertable_without_before() -> None:
+    svc = BudgetTreeService(fake_session(), actor="admin")
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(
+            _entry(AuditAction.BUDGET_EXPENSE_UPDATE, uuid.uuid4(), {}), "admin"
+        )
+    assert ei.value.code == "not_revertable"
+
+
+async def test_revert_expense_update_already_reverted() -> None:
+    svc = BudgetTreeService(fake_session(gets=[None]), actor="admin")
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(
+            _entry(
+                AuditAction.BUDGET_EXPENSE_UPDATE, uuid.uuid4(), {"before": {"amount": "50"}}
+            ),
+            "admin",
+        )
+    assert ei.value.code == "already_reverted"
+
+
+async def test_revert_expense_update_stale_when_amount_changed() -> None:
+    exp = _expense(id=uuid.uuid4(), amount="90.00")
+    svc = BudgetTreeService(fake_session(gets=[exp]), actor="admin")
+    data = {"before": {"amount": "50"}, "after": {"amount": "70"}}  # 90 ≠ 70 → stale
+    with pytest.raises(ConflictError) as ei:
+        await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_UPDATE, exp.id, data), "admin")
+    assert ei.value.code == "stale_revert"
+
+
+async def test_revert_expense_update_restores_decimal_tolerant() -> None:
+    # after "70" vs current "70.00": wertgleich (DB-Skalierung) → nicht stale.
+    exp = _expense(id=uuid.uuid4(), amount="70.00")
+    svc = BudgetTreeService(fake_session(gets=[exp]), actor="admin")
+    stub = _AsyncStub()
+    svc.update_expense = stub  # type: ignore[method-assign]
+    data = {"before": {"amount": "50"}, "after": {"amount": "70"}}
+    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_UPDATE, exp.id, data), "admin")
+    assert stub.calls and stub.calls[0][0][1].amount == Decimal("50")
+
+
+async def test_revert_expense_update_no_after_is_best_effort() -> None:
+    exp = _expense(id=uuid.uuid4(), amount="50")
+    svc = BudgetTreeService(fake_session(gets=[exp]), actor="admin")
+    stub = _AsyncStub()
+    svc.update_expense = stub  # type: ignore[method-assign]
+    data = {"before": {"amount": "50"}}  # kein after
+    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_UPDATE, exp.id, data), "admin")
+    assert stub.calls

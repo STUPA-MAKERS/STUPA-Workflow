@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -7,6 +14,7 @@ import { resolveI18n } from '@shared/forms/i18n-text';
 import { ButtonComponent } from '@shared/ui';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
+import { VersionHistoryComponent } from '../version-history/version-history.component';
 import type { I18nMap } from '@core/api/models';
 import {
   type Branding,
@@ -31,7 +39,7 @@ import { brandingLinkErrors } from '../branding.util';
   selector: 'app-branding-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, VersionHistoryComponent],
   templateUrl: './branding-editor.component.html',
   styleUrl: './branding-editor.component.scss',
 })
@@ -54,7 +62,15 @@ export class BrandingEditorComponent {
   /** Unzulässige Link-URLs (Schema ≠ http(s)/mailto) — blockiert Speichern. */
   protected readonly linkErrors = computed(() => brandingLinkErrors(this.draft()));
 
+  /** Versions-Sidebar — nach Aktivieren/Restore neu laden. */
+  protected readonly history = viewChild(VersionHistoryComponent);
+
   constructor() {
+    this.loadConfig();
+  }
+
+  /** Aktive + Entwurfs-Branding laden (auch nach Versions-Restore). */
+  protected loadConfig(): void {
     this.api.getSiteConfig().subscribe((cfg) => {
       this.version.set(cfg.version);
       this.hasDraftChanges.set(cfg.hasDraftChanges);
@@ -197,6 +213,7 @@ export class BrandingEditorComponent {
         this.hasDraftChanges.set(cfg.hasDraftChanges);
         this.draft.set(cfg.draft);
         this.toast.success(this.i18n.translate('admin.brand.activated', { n: cfg.version }));
+        this.history()?.reload();
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });

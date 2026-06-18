@@ -50,6 +50,7 @@ async function setupWithStub(api: Partial<Record<keyof AdminApiService, unknown>
     getSiteConfig: jest.fn(() => of(STUB_CFG)),
     saveBrandingDraft: jest.fn(() => of({ ...STUB_CFG, hasDraftChanges: true })),
     activateBranding: jest.fn(() => of({ ...STUB_CFG, version: 4, hasDraftChanges: false })),
+    listConfigRevisions: jest.fn(() => of([])),
     ...api,
   };
   const view = await render(BrandingEditorComponent, {

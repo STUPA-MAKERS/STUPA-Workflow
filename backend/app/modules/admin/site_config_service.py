@@ -20,6 +20,11 @@ from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.schemas import PublicSiteConfigOut, SiteConfigOut
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.config_revision.service import (
+    ENTITY_SITE_CONFIG,
+    GLOBAL_ID,
+    ConfigRevisionService,
+)
 from app.shared.errors import ConflictError
 
 # Default-App-Namen (Fallback, wenn die Config sie leer lässt) — 1:1 die Werte des
@@ -175,13 +180,53 @@ class SiteConfigService:
             .values(active=False)
         )
         latest.active = True
-        await audit_record(
-            self.session,
+        # Versionierter Snapshot der nun aktiven Branding-Config + verlinkter
+        # Audit-Eintrag (#config-versioning) — ersetzt den bisherigen reinen Audit-Call.
+        await ConfigRevisionService(self.session).record(
+            entity_type=ENTITY_SITE_CONFIG,
+            entity_id=GLOBAL_ID,
+            snapshot=dict(latest.branding or {}),
             actor=actor,
             action=AuditAction.CONFIG_ACTIVATION,
-            target_type="site_config",
-            target_id=str(latest.id),
-            data={"version": latest.version},
+            extra_data={"siteConfigVersion": latest.version},
+        )
+        await self.session.commit()
+        return await self.get()
+
+    async def restore_branding(
+        self,
+        branding: Branding,
+        actor: str,
+        *,
+        action: AuditAction = AuditAction.CONFIG_CHANGE,
+        extra_data: dict | None = None,
+    ) -> SiteConfigOut:
+        """Eine Branding-Config als **neue aktive Version** zurückspielen (Restore/Revert).
+
+        Legt direkt eine neue, aktive ``SiteConfigVersion`` aus dem Snapshot an
+        (deaktiviert die übrigen) und schreibt einen ``config_revision``/Audit-Eintrag.
+        Frühere Versionen bleiben erhalten (#config-versioning).
+        """
+        latest = await self._latest()
+        base = latest.version if latest is not None else 0
+        payload = branding.model_dump(by_alias=True)
+        row = SiteConfigVersion(
+            version=base + 1, active=True, branding=payload, created_by=actor
+        )
+        await self.session.execute(
+            update(SiteConfigVersion)
+            .where(SiteConfigVersion.active.is_(True))
+            .values(active=False)
+        )
+        self.session.add(row)
+        await self.session.flush()
+        await ConfigRevisionService(self.session).record(
+            entity_type=ENTITY_SITE_CONFIG,
+            entity_id=GLOBAL_ID,
+            snapshot=payload,
+            actor=actor,
+            action=action,
+            extra_data={**(extra_data or {}), "siteConfigVersion": row.version},
         )
         await self.session.commit()
         return await self.get()

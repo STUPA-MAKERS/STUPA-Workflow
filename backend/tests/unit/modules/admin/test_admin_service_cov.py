@@ -713,91 +713,42 @@ async def test_create_global_flow_version_fresh_no_existing_version() -> None:
     assert added_types.count("Transition") == 1
 
 
-async def test_create_global_flow_version_reuse_existing_with_apps_and_removed() -> None:
-    """Bestehender Flow: ein State entfällt, ein Antrag wird (per Key) gemappt,
-    Alt-Transitions werden gelöst+gelöscht, entfernte States umgebogen."""
+async def test_create_global_flow_version_new_version_remaps_apps() -> None:
+    """Save legt eine NEUE, unveränderliche FlowVersion an (#config-versioning); ein
+    laufender Antrag wird per State-KEY auf die jüngste Version gezogen (entfernter
+    Key → Initial). Frische State-/Transition-Zeilen, **kein** Löschen alter Versionen.
+
+    DB: ``app_keys`` (execute) liefert einen Antrag auf entferntem Key ``legacy``;
+    ``max_version`` (scalar) = 3 ⇒ neue Version 4; alle übrigen execute-Aufrufe
+    (deactivate, per-App-Update, None-Update, config_revision-Record) fallen auf das
+    leere Default-Result zurück; ``head`` (scalar) = None.
+    """
     graph = _two_state_graph()
-    existing_version = _flow_version_row(version=3, active=True)
-    # bestehende States: draft (überlebt), legacy (wird entfernt)
-    existing_draft = _flow_state_row(
-        "draft", is_initial=True, flow_version_id=existing_version.id
-    )
-    existing_legacy = _flow_state_row(
-        "legacy", flow_version_id=existing_version.id
-    )
-    old_trans_id = uuid.uuid4()
     app_id = uuid.uuid4()
-    # execute order:
-    #  1 app_keys -> {app_id: "legacy"} (gelöschter State → Initial)
-    #  2 select FlowVersion .scalar_one_or_none() -> existing
-    #  3 update FlowVersion deactivate others
-    #  4 select existing State -> [draft, legacy]
-    #  5 select Transition.id -> [old_trans_id]  (truthy → update StatusEvent + delete)
-    #  6 update StatusEvent transition_id None
-    #  7 delete Transition
-    #  8 update Application (loop, app_id)
-    #  9 update Application current_state None
-    # 10 update StatusEvent from_state (removed)
-    # 11 update StatusEvent to_state (removed)
-    # 12 delete State
-    # 13,14 audit
-    s, sess = svc(
-        [
-            res((app_id, "legacy")),  # app_keys
-            res(existing_version),  # FlowVersion select (.scalar_one_or_none)
-            res(),  # update deactivate
-            res(existing_draft, existing_legacy),  # existing states
-            res(old_trans_id),  # old transition ids
-            res(),  # update StatusEvent transition_id None
-            res(),  # delete Transition
-            res(),  # update Application loop
-            res(),  # update Application None
-            res(),  # update StatusEvent from_state
-            res(),  # update StatusEvent to_state
-            res(),  # delete State
-            *audit_results(),
-        ]
-    )
+    s, sess = svc([res((app_id, "legacy"))], scalars=[3])
     out = await s.create_global_flow_version(FlowVersionCreate(graph=graph), "admin")
-    assert out.version == 3
-    assert existing_version.active is True
-    # Der überlebende ``draft``-State behält seine id (wird nicht neu angelegt) — nur
-    # der NEUE State ``done`` wird hinzugefügt.
-    new_states = [o for o in sess.added if type(o).__name__ == "State"]
-    assert {o.key for o in new_states} == {"done"}
-    # Entfernte States werden per ``DELETE State WHERE id IN (...)``-Statement
-    # entfernt (nicht über die ORM-``delete``-Queue); der Pfad lief (mehrere
-    # zusätzliche execute-Statements gegenüber dem No-Removal-Fall).
-    assert sess.committed == 1
-    assert sess.flushed >= 3
-
-
-async def test_create_global_flow_version_existing_no_old_transitions() -> None:
-    """Bestehender Flow ohne Alt-Transitions (Branch: old_transition_ids leer) und
-    ohne entfernte States (Branch: removed_ids leer)."""
-    graph = _two_state_graph()
-    existing_version = _flow_version_row(version=2, active=False)
-    existing_draft = _flow_state_row(
-        "draft", is_initial=True, flow_version_id=existing_version.id
-    )
-    existing_done = _flow_state_row(
-        "done", is_terminal=True, flow_version_id=existing_version.id
-    )
-    s, sess = svc(
-        [
-            res(),  # app_keys (keine Anträge)
-            res(existing_version),  # FlowVersion select
-            res(),  # update deactivate
-            res(existing_draft, existing_done),  # existing states (beide überleben)
-            res(),  # old transition ids -> leer (kein StatusEvent/delete-Block)
-            res(),  # update Application current_state None
-            *audit_results(),
-        ]
-    )
-    out = await s.create_global_flow_version(FlowVersionCreate(graph=graph), "admin")
-    assert out.version == 2
-    # nichts gelöscht (keine entfernten States, keine alten Transitions)
+    assert out.version == 4
+    assert out.active is True
+    added_types = [type(o).__name__ for o in sess.added]
+    assert added_types.count("FlowVersion") == 1
+    # Frische States (kein Reuse einer Altversion) + Transition.
+    assert added_types.count("State") == 2
+    assert added_types.count("Transition") == 1
+    # Append-only: nichts wird gelöscht (frühere Version bleibt erhalten).
     assert sess.deleted == []
+    assert sess.committed == 1
+
+
+async def test_create_global_flow_version_no_apps_bumps_version() -> None:
+    """Ohne laufende Anträge: neue Version = ``max+1``; der ``current_state_id IS NULL``-
+    Sammel-Update läuft; nichts wird gelöscht."""
+    graph = _two_state_graph()
+    s, sess = svc([res()], scalars=[5])  # keine Anträge; max=5 → neue Version 6
+    out = await s.create_global_flow_version(FlowVersionCreate(graph=graph), "admin")
+    assert out.version == 6
+    assert out.active is True
+    assert sess.deleted == []
+    assert sess.committed == 1
 
 
 async def test_create_global_flow_version_transition_explicit_order() -> None:

@@ -485,4 +485,10 @@
       'admin.flow.save' | t
     }}</app-button>
   </footer>
+
+  <app-version-history
+    entityType="flow"
+    entityId="global"
+    (restored)="reloadFlow()"
+  />
 </section>

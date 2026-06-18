@@ -18,7 +18,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
-from app.deps import DbSession, require_principal
+from app.deps import DbSession, Principal, require_principal
 from app.modules.forms.schemas import (
     EffectiveFormOut,
     FormActiveSet,
@@ -78,7 +78,6 @@ async def get_form_draft(
     "/admin/application-types/{type_id}/form-versions",
     response_model=FormVersionOut,
     status_code=201,
-    dependencies=[Depends(require_principal("form.configure"))],
     # 400 = malformed JSON body (Parse-Fehler), 422 = Schema-/Definition-Validierung.
     responses=_errors(400, 401, 403, 404, 422),
 )
@@ -86,9 +85,10 @@ async def create_form_version(
     type_id: UUID,
     payload: FormVersionCreate,
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("form.configure"))],
 ) -> FormVersionOut:
     """Neue Form-Version anlegen (Definition wird serverseitig validiert)."""
-    return await service.create_form_version(type_id, payload)
+    return await service.create_form_version(type_id, payload, principal.sub)
 
 
 @router.patch(

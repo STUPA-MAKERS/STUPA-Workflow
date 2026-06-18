@@ -388,7 +388,7 @@ def test_create_form_version_bad_definition_422() -> None:
         ]
     )
     with pytest.raises(ValidationProblem) as ei:
-        _run(svc.create_form_version(uuid.uuid4(), payload))
+        _run(svc.create_form_version(uuid.uuid4(), payload, "sub"))
     assert ei.value.status == 422
     assert ei.value.errors is not None
     assert ei.value.errors[0].field == "fields"
@@ -404,13 +404,15 @@ def test_create_form_version_activate_true() -> None:
         activate=True,
         description={"de": "Beschreibung"},
     )
-    out = _run(svc.create_form_version(at.id, payload))
+    out = _run(svc.create_form_version(at.id, payload, "sub"))
     assert out.version == 3  # max 2 + 1
     assert out.active is True
     assert out.description == {"de": "Beschreibung"}
     assert [f.key for f in out.fields] == ["title"]
-    # active=True → ein UPDATE-Deaktivierungs-Statement + Typ verweist auf neue Version.
-    assert len(sess.statements) == 1
+    # active=True → ein UPDATE-Deaktivierungs-Statement; zusätzlich schreibt der
+    # config_revision-Record drei execute-Statements (Advisory-Lock + zwei aus dem
+    # Audit-Append: Lock + prev_hash-Select) → 4 Statements (#config-versioning).
+    assert len(sess.statements) == 4
     assert at.active_form_version_id is not None
     assert sess.committed == 1
     # FormVersion + ein FormField wurden hinzugefügt.
@@ -426,12 +428,13 @@ def test_create_form_version_activate_false_first_version() -> None:
         fields=[FormFieldDef(key="title", type="text", label={"de": "T"})],
         activate=False,
     )
-    out = _run(svc.create_form_version(at.id, payload))
+    out = _run(svc.create_form_version(at.id, payload, "sub"))
     assert out.version == 1
     assert out.active is False
     assert out.description is None
-    # activate=False → kein UPDATE-Statement, active_form_version_id bleibt None.
-    assert sess.statements == []
+    # activate=False → keine Deaktivierung; die drei execute-Statements stammen aus
+    # dem config_revision-Record (Advisory-Lock + Audit-Lock + prev_hash-Select).
+    assert len(sess.statements) == 3
     assert at.active_form_version_id is None
 
 

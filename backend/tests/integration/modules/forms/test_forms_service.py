@@ -77,8 +77,7 @@ async def test_create_first_version_activates_type(session: AsyncSession) -> Non
     svc = FormsService(session)
 
     out = await svc.create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
     assert out.version == 1
     assert out.active is True
 
@@ -97,8 +96,8 @@ async def test_create_first_version_activates_type(session: AsyncSession) -> Non
 async def test_version_counter_increments(session: AsyncSession) -> None:
     app_type = await _make_type(session)
     svc = FormsService(session)
-    v1 = await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
-    v2 = await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
+    v1 = await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
+    v2 = await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
     assert (v1.version, v2.version) == (1, 2)
 
 
@@ -106,11 +105,9 @@ async def test_activating_new_version_deactivates_old(session: AsyncSession) -> 
     app_type = await _make_type(session)
     svc = FormsService(session)
     v1 = await svc.create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
     v2 = await svc.create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
 
     old = await session.get(FormVersion, v1.id)
     new = await session.get(FormVersion, v2.id)
@@ -126,11 +123,9 @@ async def test_inactive_version_does_not_touch_active_pointer(
     app_type = await _make_type(session)
     svc = FormsService(session)
     v1 = await svc.create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
     await svc.create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=False)
-    )
+        app_type.id, FormVersionCreate(fields=_fields(), activate=False), "tester")
     refreshed = await session.get(ApplicationType, app_type.id)
     assert refreshed is not None and refreshed.active_form_version_id == v1.id
 
@@ -140,8 +135,7 @@ async def test_running_application_keeps_pinned_version(session: AsyncSession) -
     app_type = await _make_type(session)
     svc = FormsService(session)
     v1 = await svc.create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
 
     flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
@@ -154,8 +148,7 @@ async def test_running_application_keeps_pinned_version(session: AsyncSession) -
 
     # Neue aktive Version anlegen → Pin darf den Antrag nicht umhängen.
     v2 = await svc.create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
     pinned = await session.get(Application, application.id)
     assert pinned is not None
     assert pinned.form_version_id == v1.id != v2.id
@@ -165,8 +158,7 @@ async def test_create_version_unknown_type_404(session: AsyncSession) -> None:
     svc = FormsService(session)
     with pytest.raises(NotFoundError):
         await svc.create_form_version(
-            uuid.uuid4(), FormVersionCreate(fields=_fields())
-        )
+            uuid.uuid4(), FormVersionCreate(fields=_fields()), "tester")
 
 
 # --------------------------------------------------------------------------- #
@@ -175,7 +167,7 @@ async def test_create_version_unknown_type_404(session: AsyncSession) -> None:
 async def test_effective_form_main_only(session: AsyncSession) -> None:
     app_type = await _make_type(session)
     svc = FormsService(session)
-    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
+    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
 
     eff = await svc.get_effective_form(app_type.id)
     assert [s.key for s in eff.sections] == ["main"]
@@ -203,7 +195,7 @@ async def _add_pot(session: AsyncSession, gremium_id: uuid.UUID) -> BudgetPot:
 async def test_effective_form_with_budget_pot(session: AsyncSession) -> None:
     app_type = await _make_type(session, has_budget=True)
     svc = FormsService(session)
-    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
+    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
 
     assert app_type.gremium_id is not None
     pot = await _add_pot(session, app_type.gremium_id)
@@ -218,7 +210,7 @@ async def test_effective_form_pot_without_has_budget_404(session: AsyncSession) 
     # N1: Typ ohne has_budget darf keinen Topf an die Form hängen.
     app_type = await _make_type(session, has_budget=False)
     svc = FormsService(session)
-    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
+    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
     assert app_type.gremium_id is not None
     pot = await _add_pot(session, app_type.gremium_id)
     with pytest.raises(NotFoundError, match="does not support budget pots"):
@@ -230,7 +222,7 @@ async def test_effective_form_cross_gremium_pot_404(session: AsyncSession) -> No
     app_type = await _make_type(session, has_budget=True)
     other = await _make_type(session, has_budget=True)
     svc = FormsService(session)
-    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
+    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
     assert other.gremium_id is not None
     foreign_pot = await _add_pot(session, other.gremium_id)
     with pytest.raises(NotFoundError, match="not available for this application type"):
@@ -247,6 +239,6 @@ async def test_effective_form_no_active_version_404(session: AsyncSession) -> No
 async def test_effective_form_unknown_pot_404(session: AsyncSession) -> None:
     app_type = await _make_type(session)
     svc = FormsService(session)
-    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()))
+    await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
     with pytest.raises(NotFoundError, match="budget pot"):
         await svc.get_effective_form(app_type.id, uuid.uuid4())

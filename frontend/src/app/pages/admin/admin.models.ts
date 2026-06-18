@@ -13,7 +13,13 @@
  * eine T-34-Festlegung (`/api/admin/site-config`). TODO(T-24/#21): mit Backend
  * abstimmen, sobald der Endpunkt existiert.
  */
-import type { FormFieldDef, I18nMap, Uuid } from '@core/api/models';
+import type {
+  DataDiff,
+  DataDiffWire,
+  FormFieldDef,
+  I18nMap,
+  Uuid,
+} from '@core/api/models';
 
 // --- Flow-Graph (config_schemas §5.2) ---------------------------------------
 
@@ -501,6 +507,9 @@ export interface AuditEntry {
   /** UUID → Klarname für die in `data` eingebetteten Entity-Referenzen (vom Backend
    *  aufgelöst). Nur auflösbare Ids; sonst wird die rohe UUID gezeigt. */
   resolvedIds?: Record<string, string>;
+  /** Aus dem Audit-Log zurücknehmbar (#config-versioning, vom Backend bestimmt) —
+   *  treibt den »Zurücknehmen«-Button. Das Backend bleibt beim Klick autoritativ. */
+  revertable?: boolean;
   hash: string;
   prevHash: string | null;
 }
@@ -516,6 +525,48 @@ export interface AuditPage {
 export interface AuditActor {
   sub: string;
   name: string | null;
+}
+
+/**
+ * Ein Config-Snapshot (Versions-Sidebar, #config-versioning). Append-only —
+ * frühere Versionen sind nie löschbar; `isCurrent` markiert den aktiven Stand.
+ */
+export interface ConfigRevision {
+  id: Uuid;
+  entityType: string;
+  entityId: string;
+  version: number;
+  at: string;
+  createdBy: string | null;
+  createdByName: string | null;
+  isCurrent: boolean;
+}
+
+/** Feld-Diff eines Config-Snapshots gegen seinen Vorgänger (Wire-Form). */
+export interface ConfigRevisionDiffWire {
+  id: Uuid;
+  entityType: string;
+  entityId: string;
+  version: number;
+  prevVersion: number | null;
+  diff: DataDiffWire;
+}
+
+/** Feld-Diff eines Config-Snapshots (FE-View; `diff` in Array-Form für `@for`). */
+export interface ConfigRevisionDiff {
+  id: Uuid;
+  entityType: string;
+  entityId: string;
+  version: number;
+  prevVersion: number | null;
+  diff: DataDiff | null;
+}
+
+/** Ergebnis eines Audit-Log-Reverts. */
+export interface AuditRevertResult {
+  revertedAuditId: number;
+  entityType: string;
+  entityId: string;
 }
 
 /** Plattform-Benachrichtigungs-Config (#task-reminder, P admin.notifications). */

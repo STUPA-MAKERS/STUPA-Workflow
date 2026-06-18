@@ -169,7 +169,7 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
  * (kein Diff, z. B. erste Version) wird durchgereicht; fehlende Teil-Maps werden
  * defensiv auf `{}` normalisiert.
  */
-function mapDiff(wire: DataDiffWire | null | undefined): DataDiff | null {
+export function mapDiff(wire: DataDiffWire | null | undefined): DataDiff | null {
   if (!wire) return null;
   return {
     added: Object.entries(wire.added ?? {}).map(([key, value]) => ({ key, value })),

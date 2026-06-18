@@ -6,8 +6,10 @@ erzwungen (Router) und Eingaben streng validiert (Flow-Graph via
 Config-Mutation schreibt einen Audit-Eintrag (security.md §4) in derselben
 Transaktion wie die Änderung.
 
-Form-Versionen besitzt weiterhin das ``forms``-Modul (T-11); der **eine globale
-Flow** (Graph → state/transition-Zeilen) wird hier in-place gepflegt.
+Form-Versionen besitzt weiterhin das ``forms``-Modul (T-11); der globale Flow
+(Graph → state/transition-Zeilen) wird hier je Save als **neue, unveränderliche
+Version** angelegt (#config-versioning) — frühere Versionen bleiben erhalten, laufende
+Anträge folgen per State-Key der jüngsten Version (nicht gepinnt).
 """
 
 from __future__ import annotations
@@ -50,6 +52,11 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import GroupMapping, Principal, Role, RolePermission
 from app.modules.auth.models import RoleAssignment as RoleAssignmentRow
+from app.modules.config_revision.service import (
+    ENTITY_FLOW,
+    GLOBAL_ID,
+    ConfigRevisionService,
+)
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.search import escape_like
 from app.shared.config_schemas import (
@@ -358,16 +365,27 @@ class ConfigService:
         )
 
     async def create_global_flow_version(
-        self, payload: FlowVersionCreate, actor: str
+        self,
+        payload: FlowVersionCreate,
+        actor: str,
+        *,
+        action: AuditAction = AuditAction.CONFIG_ACTIVATION,
+        extra_data: dict | None = None,
     ) -> FlowVersionOut:
-        """Den **einen** globalen Flow speichern.
+        """Den globalen Flow als **neue, unveränderliche Version** speichern (#config-versioning).
 
-        Es gibt **genau einen** Flow — **keine Versionen**: dieselbe ``flow_version``-
-        Zeile wird in-place überschrieben (States/Transitions ersetzt). Alle Anträge
-        (auch laufende) bleiben darauf gepinnt; ihr aktueller State wird per KEY auf den
-        neuen Graphen gemappt — **gelöschte States ⇒ Initial-State**. Der Graph muss
-        genau einen Initial-State haben (``validate_flow_graph``)."""
-        from app.modules.applications.models import Application, StatusEvent
+        Jeder Save legt eine **neue** ``flow_version`` mit **frischen** ``state``/
+        ``transition``-Zeilen an; alle früheren Versionen (samt ihrer State-/Transition-
+        Zeilen und ``status_event``-Referenzen) bleiben **unangetastet** — eine Version
+        wird **nie gelöscht**. Anträge sind **nicht gepinnt**: ALLE laufenden Anträge
+        werden per State-**KEY** auf die neue (jüngste) Version gezogen — **entfernte
+        Keys ⇒ Initial-State**. Der Graph muss genau einen Initial-State haben
+        (``validate_flow_graph``).
+
+        Schreibt einen ``config_revision``-Snapshot (Graph) + verlinkten Audit-Eintrag;
+        ``action``/``extra_data`` erlauben den Restore/Revert-Pfad (``config_revert``).
+        """
+        from app.modules.applications.models import Application
 
         try:
             validate_flow_graph(payload.graph)
@@ -376,7 +394,7 @@ class ConfigService:
                 "Invalid flow graph.", errors=[{"field": "graph", "msg": str(exc)}]
             ) from exc
 
-        # Aktuellen State je Antrag (per KEY) merken, bevor die alten States fallen.
+        # Aktuellen State je Antrag (per KEY) merken — gilt versionsübergreifend.
         app_keys = {
             app_id: key
             for app_id, key in (
@@ -388,80 +406,49 @@ class ConfigService:
             ).all()
         }
 
-        # Den einen globalen Flow wiederverwenden (oder einmalig anlegen).
-        version = (
-            await self.session.execute(
-                select(FlowVersion)
-                .order_by(FlowVersion.active.desc(), FlowVersion.version.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        if version is None:
-            version = FlowVersion(
-                version=1, active=True,
-                editor_layout=payload.graph.layout or {},
-            )
-            self.session.add(version)
-            await self.session.flush()
-        else:
-            version.active = True
-            version.editor_layout = payload.graph.layout or {}
-        # Etwaige Alt-Versionen deaktivieren — es bleibt genau eine aktiv.
+        # Die bisher aktive Version ZUERST deaktivieren — das partial-unique
+        # ``uq_flow_version_one_active_global`` (WHERE active) erlaubt genau eine aktive
+        # Zeile; würde die neue (aktive) Zeile vor dem Deaktivieren eingefügt, kollidierte
+        # sie mit der alten. (``session.execute`` flusht hängende Inserts vor — daher VOR
+        # ``add(version)``, sonst würde die neue Zeile zuerst geschrieben.)
+        max_version = await self.session.scalar(
+            select(FlowVersion.version).order_by(FlowVersion.version.desc()).limit(1)
+        )
         await self.session.execute(
             update(FlowVersion)
-            .where(FlowVersion.id != version.id)
+            .where(FlowVersion.active.is_(True))
             .values(active=False)
         )
+        version = FlowVersion(
+            version=(max_version or 0) + 1,
+            active=True,
+            editor_layout=payload.graph.layout or {},
+        )
+        self.session.add(version)
+        await self.session.flush()
 
-        # States per KEY upserten: überlebende Keys behalten ihre id, damit die
-        # Timeline (status_event) und current_state-Referenzen gültig bleiben — nur
-        # wirklich entfernte States werden gelöscht (siehe unten).
-        existing_states = (
-            await self.session.execute(
-                select(State).where(State.flow_version_id == version.id)
-            )
-        ).scalars().all()
-        existing_by_key = {s.key: s for s in existing_states}
-        incoming_keys = {s.key for s in payload.graph.states}
-
+        # Frische State-Zeilen der neuen Version (alte Versionen bleiben erhalten).
         id_by_key: dict[str, UUID] = {}
         initial_id: UUID | None = None
         for state in payload.graph.states:
-            row = existing_by_key.get(state.key)
-            if row is None:
-                row = State(flow_version_id=version.id, key=state.key)
-                self.session.add(row)
-            row.label_i18n = state.label
-            row.color = state.color
-            row.edit_allowed = state.edit_allowed
-            row.is_initial = state.is_initial
-            row.is_terminal = state.is_terminal
-            row.kind = state.kind
-            row.config = state.config
+            row = State(
+                flow_version_id=version.id,
+                key=state.key,
+                label_i18n=state.label,
+                color=state.color,
+                edit_allowed=state.edit_allowed,
+                is_initial=state.is_initial,
+                is_terminal=state.is_terminal,
+                kind=state.kind,
+                config=state.config,
+            )
+            self.session.add(row)
             await self.session.flush()
             id_by_key[state.key] = row.id
             if state.is_initial:
                 initial_id = row.id
 
-        removed_ids = [s.id for s in existing_states if s.key not in incoming_keys]
-
-        # Transitions komplett neu bauen. status_event.transition_id vorher lösen,
-        # sonst blockiert deren FK das Löschen (Timeline behält from/to + Notiz).
-        old_transition_ids = (
-            await self.session.execute(
-                select(Transition.id).where(Transition.flow_version_id == version.id)
-            )
-        ).scalars().all()
-        if old_transition_ids:
-            await self.session.execute(
-                update(StatusEvent)
-                .where(StatusEvent.transition_id.in_(old_transition_ids))
-                .values(transition_id=None)
-            )
-            await self.session.execute(
-                delete(Transition).where(Transition.flow_version_id == version.id)
-            )
-            await self.session.flush()
+        # Frische Transition-Zeilen der neuen Version.
         for order, trans in enumerate(payload.graph.transitions):
             self.session.add(
                 Transition(
@@ -479,8 +466,8 @@ class ConfigService:
                 )
             )
 
-        # ALLE Anträge auf den einen Flow ziehen; gelöschter State ⇒ Initial
-        # (per KEY gemappt, deckt auch Anträge alter Versionen ab).
+        # ALLE Anträge auf die jüngste Version ziehen (nicht gepinnt, #flow-newest);
+        # entfernter State-Key ⇒ Initial. Deckt auch Anträge älterer Versionen ab.
         for app_id, key in app_keys.items():
             await self.session.execute(
                 update(Application)
@@ -497,26 +484,13 @@ class ConfigService:
             .values(current_state_id=initial_id, flow_version_id=version.id)
         )
 
-        # Entfernte States: Timeline-Referenzen auf Initial umbiegen, dann löschen.
-        # (current_state-Referenzen sind durch das Remapping oben bereits weg.)
-        if removed_ids:
-            await self.session.execute(
-                update(StatusEvent)
-                .where(StatusEvent.from_state_id.in_(removed_ids))
-                .values(from_state_id=initial_id)
-            )
-            await self.session.execute(
-                update(StatusEvent)
-                .where(StatusEvent.to_state_id.in_(removed_ids))
-                .values(to_state_id=initial_id)
-            )
-            await self.session.flush()
-            await self.session.execute(delete(State).where(State.id.in_(removed_ids)))
-            await self.session.flush()
-
-        await self._audit(
-            actor, AuditAction.CONFIG_ACTIVATION, "flow_version", version.id,
-            {"global": True},
+        await ConfigRevisionService(self.session).record(
+            entity_type=ENTITY_FLOW,
+            entity_id=GLOBAL_ID,
+            snapshot=payload.graph.model_dump(by_alias=True),
+            actor=actor,
+            action=action,
+            extra_data={**(extra_data or {}), "global": True},
         )
         await self.session.commit()
         return FlowVersionOut(

@@ -18,6 +18,7 @@ import { ButtonComponent, CheckboxComponent, SelectComponent, type SelectOption 
 import { GuardEditorComponent } from './guard-editor.component';
 import { ToastService } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
+import { VersionHistoryComponent } from '../version-history/version-history.component';
 import { AdminOptionsService } from '../admin-options.service';
 import {
   ACTION_TYPES,
@@ -152,6 +153,7 @@ const PROXY_COL_GAP = 240;
     CheckboxComponent,
     SelectComponent,
     GuardEditorComponent,
+    VersionHistoryComponent,
   ],
   templateUrl: './flow-editor.component.html',
   styleUrl: './flow-editor.component.scss',
@@ -164,6 +166,8 @@ export class FlowEditorComponent {
   private readonly budgetApi = inject(BudgetTreeApi);
 
   protected readonly canvas = viewChild<ElementRef<SVGSVGElement>>('canvas');
+  /** Versions-Sidebar — nach Save neu laden. */
+  protected readonly history = viewChild(VersionHistoryComponent);
 
   protected readonly actionTypes = ACTION_TYPES;
   protected readonly compareOps = COMPARE_OPS;
@@ -1905,11 +1909,25 @@ export class FlowEditorComponent {
       next: () => {
         this.saving.set(false);
         this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.history()?.reload();
       },
       error: (err: { error?: { detail?: string } }) => {
         this.saving.set(false);
         this.toast.error(err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed'));
       },
+    });
+  }
+
+  /** Aktiven globalen Flow neu laden (nach Versions-Restore aus der Sidebar). */
+  protected reloadFlow(): void {
+    this.api.getGlobalFlow().subscribe({
+      next: (graph) => {
+        if (graph && graph.states?.length) {
+          this.applyingHistory = true;
+          this.graph.set(autoLayout(normalizeFlowGraph(graph)));
+        }
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
     });
   }
 }

@@ -56,6 +56,10 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "webhook.manage",
     "audit.read",
     "audit.verify",
+    # #config-versioning: einen Config-Change aus dem Audit-Log zurücknehmen
+    # (Vorgänger-Stand wiederherstellen). Bewusst getrennt von audit.read/verify und
+    # destruktiv → standardmäßig nur der admin-Rolle zugeteilt (Migration 0034).
+    "audit.revert",
     "admin.site",
     "admin.gremien",
     "admin.types",

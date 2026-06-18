@@ -44,6 +44,7 @@ async function setup(
     createFormVersion,
     updateApplicationType,
     setFormActive,
+    listConfigRevisions: jest.fn(() => of([])),
     ...opts.api,
   };
   const toast = { success: jest.fn(), error: jest.fn() };

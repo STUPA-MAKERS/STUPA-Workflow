@@ -213,5 +213,11 @@
       <app-button variant="secondary" [disabled]="linkErrors().length > 0" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
       <app-button [disabled]="!hasDraftChanges() || linkErrors().length > 0" (click)="activate()">{{ 'admin.brand.activate' | t }}</app-button>
     </footer>
+
+    <app-version-history
+      entityType="site_config"
+      entityId="global"
+      (restored)="loadConfig()"
+    />
   </section>
 }

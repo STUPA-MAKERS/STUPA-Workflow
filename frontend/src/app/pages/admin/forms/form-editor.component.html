@@ -294,4 +294,12 @@
       </div>
     }
   }
+
+  @if (typeId()) {
+    <app-version-history
+      entityType="form"
+      [entityId]="typeId()"
+      (restored)="onVersionRestored()"
+    />
+  }
 </section>

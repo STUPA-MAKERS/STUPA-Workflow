@@ -41,10 +41,14 @@ class _FakeService:
         self.data_ids: dict[str, str] = {}
         self.actors: list[tuple[str, str | None]] = []
         self.verification = ChainVerification(valid=True, checked=0)
+        self.revertable: dict[int, bool] = {}
 
     async def query_cursor(self, **kwargs: Any) -> tuple[list[AuditEntry], bool]:
         self.cursor_kwargs = kwargs
         return self.items, self.has_more
+
+    async def revertable_flags(self, entries: list[AuditEntry]) -> dict[int, bool]:
+        return self.revertable
 
     async def resolve_actor_names(
         self, subs: list[str | None]
@@ -96,6 +100,7 @@ def test_list_returns_entries_with_hex_hashes_and_cursor() -> None:
     service.items = [_entry(2, prev=bytes([1]) * 32), _entry(1, prev=None)]
     service.has_more = True
     service.names = {"admin-1": "Admin One"}
+    service.revertable = {2: True, 1: False}
     client = _client(service, _principal("audit.read"))
     resp = client.get("/api/admin/audit")
     assert resp.status_code == 200
@@ -107,7 +112,9 @@ def test_list_returns_entries_with_hex_hashes_and_cursor() -> None:
     assert first["prevHash"] == "01" * 32
     assert first["targetType"] == "application"
     assert first["actorName"] == "Admin One"  # sub resolved to Klarname
+    assert first["revertable"] is True  # vom Router durchgereicht
     assert second["prevHash"] is None  # Genesis
+    assert second["revertable"] is False
 
 
 def test_list_no_more_has_null_cursor() -> None:

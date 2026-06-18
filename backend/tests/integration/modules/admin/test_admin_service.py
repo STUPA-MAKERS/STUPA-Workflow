@@ -116,9 +116,13 @@ def _global_graph(*, with_accepted: bool = True) -> dict:
     return {"states": states, "transitions": transitions}
 
 
-async def test_global_flow_is_single_and_resets_deleted_states(
+async def test_global_flow_new_version_per_save_app_follows_newest(
     session: AsyncSession,
 ) -> None:
+    """Jeder Save legt eine NEUE, unveränderliche FlowVersion an (#config-versioning):
+    frühere Versionen bleiben erhalten; laufende Anträge folgen per State-KEY der
+    jüngsten (aktiven) Version — sind also NICHT gepinnt; ein entfernter Key ⇒ Initial.
+    """
     from app.modules.applications.models import Application
     from app.modules.forms.models import FormVersion
 
@@ -132,7 +136,7 @@ async def test_global_flow_is_single_and_resets_deleted_states(
         )
     ).one()
 
-    # Antrag im (gleich zu löschenden) State »accepted« anlegen, auf den Flow gepinnt.
+    # Antrag im (im neuen Graphen entfallenden) State »accepted« anlegen.
     app_type = await _make_type(session)
     fv = FormVersion(application_type_id=app_type.id, version=1)
     session.add(fv)
@@ -144,20 +148,24 @@ async def test_global_flow_is_single_and_resets_deleted_states(
     session.add(app)
     await session.commit()
 
-    # Erneut speichern OHNE »accepted« → in-place (gleiche id), accepted gelöscht.
+    # Erneut speichern OHNE »accepted« → NEUE Version; die alte bleibt erhalten.
     g2 = await svc.create_global_flow_version(
         FlowVersionCreate.model_validate({"graph": _global_graph(with_accepted=False)}),
         _ACTOR,
     )
-    assert g2.id == g1.id  # keine neue Version, in-place
+    assert g2.id != g1.id  # neue, unveränderliche Version (kein In-place-Reuse)
 
-    # Genau ein globaler Flow.
-    n_global = await session.scalar(
-        select(func.count()).select_from(FlowVersion)
+    # Append-only: beide Versionen existieren weiter, genau eine ist aktiv (g2).
+    n_global = await session.scalar(select(func.count()).select_from(FlowVersion))
+    assert n_global == 2
+    n_active = await session.scalar(
+        select(func.count())
+        .select_from(FlowVersion)
+        .where(FlowVersion.active.is_(True))
     )
-    assert n_global == 1
+    assert n_active == 1
 
-    # Antrag: gelöschter State ⇒ Initial-State des einen Flows.
+    # Antrag folgt der jüngsten Version; entfernter State-Key ⇒ deren Initial-State.
     new_initial = (
         await session.scalars(
             select(State).where(
@@ -170,11 +178,12 @@ async def test_global_flow_is_single_and_resets_deleted_states(
     assert app.current_state_id == new_initial.id
 
 
-async def test_global_flow_save_repoints_timeline_off_deleted_state(
+async def test_global_flow_save_keeps_prior_states_and_timeline(
     session: AsyncSession,
 ) -> None:
-    """Saving a flow that drops a state must not fail on the status_event FK:
-    timeline entries pointing at the deleted state are repointed to Initial."""
+    """Ein Save, der einen State weglässt, LÖSCHT die alte Version nicht (#config-
+    versioning): deren State-Zeilen — und damit die ``status_event``-Timeline — bleiben
+    gültig. Kein FK-Bruch, kein Repointing nötig (anders als im alten In-place-Flow)."""
     from app.modules.applications.models import Application, StatusEvent
     from app.modules.forms.models import FormVersion
 
@@ -198,32 +207,24 @@ async def test_global_flow_save_repoints_timeline_off_deleted_state(
     )
     session.add(app)
     await session.flush()
-    # Timeline-Eintrag auf den zu löschenden State »accepted«.
+    # Timeline-Eintrag auf »accepted« (bleibt in der alten Version erhalten).
     ev = StatusEvent(application_id=app.id, from_state_id=None, to_state_id=accepted.id)
     session.add(ev)
     await session.commit()
 
-    # Drop »accepted« → würde ohne Repointing am FK fk_status_event_to_state_id_state
-    # scheitern.
-    g2 = await svc.create_global_flow_version(
+    # »accepted« im neuen Graphen weglassen → neue Version; alte behält »accepted«.
+    await svc.create_global_flow_version(
         FlowVersionCreate.model_validate({"graph": _global_graph(with_accepted=False)}),
         _ACTOR,
     )
 
-    new_initial = (
-        await session.scalars(
-            select(State).where(
-                State.flow_version_id == g2.id, State.is_initial.is_(True)
-            )
-        )
-    ).one()
+    # Timeline bleibt unverändert gültig: »accepted« existiert weiter (in g1).
     await session.refresh(ev)
-    assert ev.to_state_id == new_initial.id
-    # »accepted« ist wirklich weg.
-    gone = await session.scalar(
+    assert ev.to_state_id == accepted.id
+    still_there = await session.scalar(
         select(func.count()).select_from(State).where(State.id == accepted.id)
     )
-    assert gone == 0
+    assert still_there == 1
 
 
 # --------------------------------------------------------------- gremium

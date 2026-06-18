@@ -532,3 +532,85 @@ class FlowService:
             statusEventId=status_event_id,
             dispatchedActions=[a.type for a in dispatched],
         )
+
+    # ------------------------------------------------ audit-log revert (#config-versioning)
+    async def revert_status(
+        self,
+        application_id: UUID,
+        *,
+        from_state_id: UUID,
+        to_state_id: UUID,
+        actor: str,
+        reverted_audit_id: int,
+    ) -> UUID:
+        """Einen auditierten Statuswechsel zurücknehmen (Audit-Log-Revert).
+
+        Setzt den Antrag von ``to_state_id`` (dem Ziel des zurückzunehmenden Übergangs)
+        zurück auf ``from_state_id`` — **nur**, wenn er noch genau in ``to_state_id``
+        steht (sonst 409 ``stale_revert``; das deckt auch einen zwischenzeitlichen
+        Flow-Versionswechsel ab, da migrierte Anträge dann in einer anderen State-Zeile
+        stehen). Schreibt einen umgekehrten :class:`StatusEvent` (ohne ``transition``) +
+        einen ``status_change``-Audit-Eintrag (selbst revertierbar = Redo) und
+        materialisiert die Frist des wiederhergestellten States neu. Nebeneffekte des
+        Originals (stornierte Abstimmungen, gefeuerte Webhooks/Mails) werden bewusst
+        **nicht** rückgängig gemacht — der Revert wirkt nur auf den State selbst."""
+        app = await self._load_app(application_id)
+        if app.current_state_id != to_state_id:
+            raise ConflictError(
+                "A newer status change exists; revert that first.",
+                code="stale_revert",
+            )
+        # Optimistisches Locking wie in :meth:`fire` — eine konkurrierende Transition
+        # hat den State bereits verschoben → rowcount 0 → 409.
+        result = cast(
+            "CursorResult[Any]",
+            await self.session.execute(
+                update(Application)
+                .where(
+                    Application.id == app.id,
+                    Application.current_state_id == to_state_id,
+                )
+                .values(current_state_id=from_state_id)
+            ),
+        )
+        if result.rowcount != 1:
+            await self.session.rollback()
+            raise ConflictError(
+                "Concurrent status change detected; revert again.",
+                code="stale_revert",
+            )
+        event = StatusEvent(
+            application_id=app.id,
+            from_state_id=to_state_id,
+            to_state_id=from_state_id,
+            transition_id=None,
+            actor=actor,
+            note="revert",
+        )
+        self.session.add(event)
+        await self.session.flush()
+        status_event_id = event.id
+        # Audit als (umgekehrter) status_change → der Revert ist selbst revertierbar (Redo).
+        await AuditService(self.session).record(
+            actor=actor,
+            action=AuditAction.STATUS_CHANGE,
+            target_type="application",
+            target_id=str(app.id),
+            data={
+                "fromStateId": str(to_state_id),
+                "toStateId": str(from_state_id),
+                "transitionId": None,
+                "statusEventId": str(status_event_id),
+                "manual": True,
+                "hasNote": True,
+                "reverted": True,
+                "revertedAuditId": reverted_audit_id,
+            },
+        )
+        await self.session.commit()
+        # Frist des wiederhergestellten States neu materialisieren (#13), analog fire().
+        restored_state = await self._load_state(from_state_id)
+        if restored_state is not None:
+            await self.session.refresh(app)
+            await self.schedule_state_deadline(app, restored_state)
+        return status_event_id

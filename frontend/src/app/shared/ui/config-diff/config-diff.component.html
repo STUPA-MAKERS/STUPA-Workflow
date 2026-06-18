@@ -1,0 +1,40 @@
+@if (isEmpty(diff())) {
+  <p class="text-muted cfg-diff__none">{{ 'admin.config.diff.none' | t }}</p>
+} @else {
+  <ul class="cfg-diff">
+    @for (change of diff()!.changed; track change.key) {
+      <li class="cfg-diff__item cfg-diff__item--changed">
+        <div class="cfg-diff__head">
+          <app-badge variant="warning">{{ 'admin.config.diff.changed' | t }}</app-badge>
+          <code class="cfg-diff__key">{{ change.key }}</code>
+        </div>
+        <div class="cfg-diff__vals">
+          <del class="cfg-diff__val">{{ fmt(change.old) }}</del>
+          <ins class="cfg-diff__val">{{ fmt(change.new) }}</ins>
+        </div>
+      </li>
+    }
+    @for (added of diff()!.added; track added.key) {
+      <li class="cfg-diff__item cfg-diff__item--added">
+        <div class="cfg-diff__head">
+          <app-badge variant="success">{{ 'admin.config.diff.added' | t }}</app-badge>
+          <code class="cfg-diff__key">{{ added.key }}</code>
+        </div>
+        <div class="cfg-diff__vals">
+          <ins class="cfg-diff__val">{{ fmt(added.value) }}</ins>
+        </div>
+      </li>
+    }
+    @for (removed of diff()!.removed; track removed.key) {
+      <li class="cfg-diff__item cfg-diff__item--removed">
+        <div class="cfg-diff__head">
+          <app-badge variant="danger">{{ 'admin.config.diff.removed' | t }}</app-badge>
+          <code class="cfg-diff__key">{{ removed.key }}</code>
+        </div>
+        <div class="cfg-diff__vals">
+          <del class="cfg-diff__val">{{ fmt(removed.value) }}</del>
+        </div>
+      </li>
+    }
+  </ul>
+}

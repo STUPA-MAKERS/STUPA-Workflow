@@ -123,8 +123,7 @@ async def _seed(session: AsyncSession) -> _Scenario:
     session.add(app_type)
     await session.commit()
     await FormsService(session).create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
 
     # Flow: Initial-State + zwei vote-States (für je ein Gremium). ``flow_version`` wird
     # je Test trunkiert → genau EIN aktiver globaler Flow, hier frisch angelegt.

@@ -40,6 +40,9 @@ class AuditEntryOut(_CamelModel):
     # (#no-uuids-in-ui), vom Router batch-aufgelöst. Nur auflösbare Ids sind enthalten;
     # das FE rendert „<Name> · <uuid>" und fällt sonst auf die rohe UUID zurück.
     resolved_ids: dict[str, str] = Field(default_factory=dict, alias="resolvedIds")
+    # Aus dem Audit-Log zurücknehmbar (#config-versioning), vom Router bestimmt. Treibt
+    # den »Zurücknehmen«-Button; das Backend bleibt beim Klick autoritativ (409 bei stale).
+    revertable: bool = False
     hash: str
     prev_hash: str | None = Field(alias="prevHash")
 
@@ -50,6 +53,7 @@ class AuditEntryOut(_CamelModel):
         actor_name: str | None = None,
         target_label: str | None = None,
         resolved_ids: dict[str, str] | None = None,
+        revertable: bool = False,
     ) -> AuditEntryOut:
         """ORM-Zeile → Out-Schema (bytea-Hashes hex-kodiert)."""
         return cls(
@@ -63,6 +67,7 @@ class AuditEntryOut(_CamelModel):
             targetLabel=target_label,
             data=entry.data,
             resolvedIds=resolved_ids or {},
+            revertable=revertable,
             hash=entry.hash.hex(),
             prevHash=entry.prev_hash.hex() if entry.prev_hash is not None else None,
         )
@@ -94,3 +99,11 @@ class ChainVerificationOut(_CamelModel):
     checked: int
     broken_at: int | None = Field(default=None, alias="brokenAt")
     reason: str | None = None
+
+
+class AuditRevertOut(_CamelModel):
+    """Ergebnis eines Audit-Log-Reverts (``POST /admin/audit/{id}/revert``)."""
+
+    reverted_audit_id: int = Field(alias="revertedAuditId")
+    entity_type: str = Field(alias="entityType")
+    entity_id: str = Field(alias="entityId")
