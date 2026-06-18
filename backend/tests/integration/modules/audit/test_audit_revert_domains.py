@@ -134,6 +134,12 @@ async def test_revert_booking_deletes_expense_and_reopens_invoice(
     assert await session.get(BudgetExpense, booked.id) is None  # Buchung weg
     assert inv_row.status == "open"  # Rechnung wieder offen
 
+    # Aufräumen: die DB wird zwischen Integrationstests NICHT geleert; eine
+    # zurückgelassene offene Rechnung würde den globalen Rechnungs-Zähler eines
+    # anderen Tests verfälschen.
+    await session.delete(inv_row)
+    await session.commit()
+
 
 async def test_revert_transfer_deletes_both_rows(session: AsyncSession) -> None:
     svc = BudgetTreeService(session, actor="tester")
