@@ -269,6 +269,12 @@
             @if (votesForTop(item.id).length) {
               <span class="mtg__tocNum" [attr.aria-label]="'meetings.vote.count' | t">⚖ {{ votesForTop(item.id).length }}</span>
             }
+            <!-- Nach Sitzungsschluss markiert ein rechtsbündiges Badge nicht-öffentliche
+                 TOPs (NÖ). Nur wenn die editierbare NÖ-Checkbox (unten) NICHT sichtbar
+                 ist (read-only/finalisiert) — sonst doppelte NÖ-Anzeige. -->
+            @if (item.nonPublic && m.status === 'closed' && (!m.canWrite || protocol()?.isLocked)) {
+              <app-badge class="mtg__tocNpBadge" variant="warning">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
+            }
             @if (m.canWrite && !protocol()?.isLocked && !item.applicationId && renamingTopId() !== item.id) {
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.agenda.rename' | t" [title]="'meetings.agenda.rename' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); startRename(item)"><app-icon name="edit" /></app-button>
             }
@@ -323,14 +329,19 @@
             <!-- Nichts zu redigieren → ein PDF, zugleich internes wie öffentliches Protokoll. -->
             <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
           }
-          <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
-            @switch (saveState()) {
-              @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
-              @case ('saved') { ✓ {{ 'meetings.protocol.saved' | t }} }
-              @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
-              @default {}
-            }
-          </span>
+          @if (!proto.isLocked) {
+            <!-- Nach dem Finalisieren (locked: rendering/final) ist der Editor read-only
+                 → kein Autosave mehr; jede Save-Anzeige (auch „Speichern fehlgeschlagen")
+                 wird ausgeblendet, sie bezieht sich nur auf den Entwurf. -->
+            <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+              @switch (saveState()) {
+                @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+                @case ('saved') { ✓ {{ 'meetings.protocol.saved' | t }} }
+                @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+                @default {}
+              }
+            </span>
+          }
         </div>
 
         <div class="mtg__topEditor">

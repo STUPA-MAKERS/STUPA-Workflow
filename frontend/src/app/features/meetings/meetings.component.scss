@@ -363,6 +363,12 @@
   white-space: nowrap;
   font-size: var(--fs-sm);
 }
+// NÖ-Badge (nicht-öffentlicher TOP): rechtsbündig (``mtg__tocTitle`` flex:1 schiebt
+// es ans Zeilenende) und nie gestaucht.
+.mtg__tocNpBadge {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
 .mtg__tocRename {
   flex: 1;
   min-width: 0;
