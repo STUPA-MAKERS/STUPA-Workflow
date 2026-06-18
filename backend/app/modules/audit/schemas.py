@@ -94,3 +94,11 @@ class ChainVerificationOut(_CamelModel):
     checked: int
     broken_at: int | None = Field(default=None, alias="brokenAt")
     reason: str | None = None
+
+
+class AuditRevertOut(_CamelModel):
+    """Ergebnis eines Audit-Log-Reverts (``POST /admin/audit/{id}/revert``)."""
+
+    reverted_audit_id: int = Field(alias="revertedAuditId")
+    entity_type: str = Field(alias="entityType")
+    entity_id: str = Field(alias="entityId")

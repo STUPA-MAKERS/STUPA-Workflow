@@ -609,6 +609,8 @@ async def test_activate_promotes_draft() -> None:
     db = fake_session(
         result(draft),  # _latest
         result(),  # execute(update active=False)
+        result(),  # config_revision: advisory lock (#config-versioning)
+        result(),  # config_revision: head (scalar → None)
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         result(draft),  # get._active -> draft (jetzt aktiv)

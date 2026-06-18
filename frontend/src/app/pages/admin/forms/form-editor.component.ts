@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -17,6 +24,7 @@ import {
   ToastService,
 } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
+import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
   FIELD_TYPES,
   PROMOTE_TARGETS,
@@ -64,6 +72,7 @@ interface QPos {
     CheckboxComponent,
     SelectComponent,
     IconComponent,
+    VersionHistoryComponent,
   ],
   templateUrl: './form-editor.component.html',
   styleUrl: './form-editor.component.scss',
@@ -75,6 +84,8 @@ export class FormEditorComponent {
   private readonly i18n = inject(I18nService);
 
   protected readonly typeId = signal<Uuid>('');
+  /** Versions-Sidebar — nach Save neu laden. */
+  protected readonly history = viewChild(VersionHistoryComponent);
   protected readonly title = signal<I18nMap>({ de: '', en: '' });
   protected readonly description = signal<I18nMap>({ de: '', en: '' });
   /** »Mit Budget«: erlaubt die Topf-Auswahl beim Antrag (application_type.has_budget). */
@@ -190,6 +201,12 @@ export class FormEditorComponent {
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  /** Nach einem Versions-Restore (Sidebar) den Editor-Stand neu laden. */
+  protected onVersionRestored(): void {
+    const id = this.typeId();
+    if (id) this.load(id);
   }
 
   /** Formular aktivieren/deaktivieren (#forms) — deaktiviert sperrt neue Anträge. */
@@ -503,6 +520,7 @@ export class FormEditorComponent {
         this.active.set(true);
         this.hasVersion.set(true);
         this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.history()?.reload();
       },
       error: () => {
         this.saving.set(false);

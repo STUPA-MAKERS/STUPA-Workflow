@@ -77,8 +77,7 @@ async def _seed_type(
 
     forms = FormsService(session)
     await forms.create_form_version(
-        app_type.id, FormVersionCreate(fields=fields or _fields(), activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=fields or _fields(), activate=True), "tester")
 
     flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
@@ -395,7 +394,9 @@ async def _seed_type_for_search(session: AsyncSession) -> ApplicationType:
     session.add(app_type)
     await session.commit()
     forms = FormsService(session)
-    await forms.create_form_version(app_type.id, FormVersionCreate(fields=_fields(), activate=True))
+    await forms.create_form_version(
+        app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester"
+    )
     flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
     await session.flush()
@@ -524,8 +525,7 @@ async def test_anonymize_scrubs_field_marked_pii_in_later_version(
         ),
     ]
     await FormsService(session).create_form_version(
-        app_type.id, FormVersionCreate(fields=later_fields, activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=later_fields, activate=True), "tester")
 
     await svc.anonymize(app.id)
 

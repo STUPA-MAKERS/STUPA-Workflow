@@ -17,6 +17,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map, of } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
+import { mapDiff } from '@core/api/mappers';
 import type { I18nMap, Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
 import {
@@ -25,6 +26,10 @@ import {
   type ApplicationTypeFull,
   type ApplicationTypeUpdateBody,
   type AuditActor,
+  type AuditRevertResult,
+  type ConfigRevision,
+  type ConfigRevisionDiff,
+  type ConfigRevisionDiffWire,
   type NotificationSettings,
   type AuditPage,
   type Branding,
@@ -637,6 +642,55 @@ export class AdminApiService {
   listAuditActors(): Observable<AuditActor[]> {
     if (this.mock) return of([]);
     return this.http.get<AuditActor[]>(`${this.base}/admin/audit/actors`);
+  }
+
+  /** Einen Config-Change aus dem Audit-Log zurücknehmen (P audit.revert).
+   *  409 = neuerer Stand existiert / nicht revertierbar; 404 = Eintrag/Revision fehlt. */
+  revertAuditEntry(entryId: number): Observable<AuditRevertResult> {
+    return this.http.post<AuditRevertResult>(
+      `${this.base}/admin/audit/${entryId}/revert`,
+      {},
+    );
+  }
+
+  // --- Config-Versionen (#config-versioning) -------------------------------
+  /** Snapshots einer Config-Entität (neueste zuerst) — Versions-Sidebar. */
+  listConfigRevisions(
+    entityType: string,
+    entityId: string,
+  ): Observable<ConfigRevision[]> {
+    if (this.mock) return of([]);
+    const params = new HttpParams()
+      .set('entityType', entityType)
+      .set('entityId', entityId);
+    return this.http.get<ConfigRevision[]>(`${this.base}/admin/config-revisions`, {
+      params,
+    });
+  }
+
+  /** Feld-Diff eines Snapshots gegen seinen Vorgänger (Wire → Array-Form). */
+  getConfigRevisionDiff(id: Uuid): Observable<ConfigRevisionDiff> {
+    if (this.mock) {
+      return of({
+        id,
+        entityType: '',
+        entityId: '',
+        version: 0,
+        prevVersion: null,
+        diff: null,
+      });
+    }
+    return this.http
+      .get<ConfigRevisionDiffWire>(`${this.base}/admin/config-revisions/${id}/diff`)
+      .pipe(map((w) => ({ ...w, diff: mapDiff(w.diff) })));
+  }
+
+  /** Einen früheren Snapshot als neue aktive Version zurückspielen (Sidebar-Restore). */
+  restoreConfigRevision(id: Uuid): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/admin/config-revisions/${id}/restore`,
+      {},
+    );
   }
 
   // --- Benachrichtigungs-Config (#task-reminder, P(admin.notifications)) ----

@@ -51,7 +51,8 @@ async function setup(over: Overrides = {}) {
   const listRoles = over.listRoles ?? jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
   const listDeadlinePolicies = over.listDeadlinePolicies ?? jest.fn(() => of([{ id: 'dp1', key: 'semester', label: { de: 'Semesterfrist' }, kind: 'absolute' }]));
   const listWebhooks = over.listWebhooks ?? jest.fn(() => of([{ id: 'w1', name: 'Buchhaltung', url: 'https://h.test', events: [], active: true }]));
-  const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles, listDeadlinePolicies, listWebhooks };
+  const listConfigRevisions = jest.fn(() => of([]));
+  const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles, listDeadlinePolicies, listWebhooks, listConfigRevisions };
   // Kostenstellen (#7): Namen für `budgetIs`-Guard-Labels.
   const budgetApi = { tree: over.tree ?? jest.fn(() => of([])) };
   const toast = { success: jest.fn(), error: jest.fn(), info: jest.fn() };

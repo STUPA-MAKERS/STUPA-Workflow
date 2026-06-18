@@ -54,7 +54,9 @@ class _FakeService:
             sections=sections,
         )
 
-    async def create_form_version(self, type_id, payload: FormVersionCreate):  # noqa: ANN001
+    async def create_form_version(  # noqa: ANN001, ANN003
+        self, type_id, payload: FormVersionCreate, _actor="sub", **_kw
+    ):
         self.created = (type_id, payload)
         return FormVersionOut(
             id=uuid4(),

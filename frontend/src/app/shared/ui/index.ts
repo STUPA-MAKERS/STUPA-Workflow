@@ -17,6 +17,7 @@ export type { IconName } from './icon/icon.component';
 export { CardComponent } from './card/card.component';
 export { BadgeComponent } from './badge/badge.component';
 export type { BadgeVariant } from './badge/badge.component';
+export { ConfigDiffComponent } from './config-diff/config-diff.component';
 export { StepperComponent } from './stepper/stepper.component';
 export type { Step } from './stepper/stepper.component';
 export { DialogComponent } from './dialog/dialog.component';

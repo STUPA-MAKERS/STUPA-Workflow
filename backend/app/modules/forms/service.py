@@ -18,7 +18,12 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import ApplicationType
+from app.modules.audit.actions import AuditAction
 from app.modules.budget.models import BudgetField, BudgetPot
+from app.modules.config_revision.service import (
+    ENTITY_FORM,
+    ConfigRevisionService,
+)
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.forms.schemas import (
     SECTION_LABELS,
@@ -175,9 +180,20 @@ class FormsService:
         )
 
     async def create_form_version(
-        self, type_id: UUID, payload: FormVersionCreate
+        self,
+        type_id: UUID,
+        payload: FormVersionCreate,
+        actor: str,
+        *,
+        action: AuditAction = AuditAction.CONFIG_CHANGE,
+        extra_data: dict[str, Any] | None = None,
     ) -> FormVersionOut:
-        """Neue Form-Version anlegen (Definition validiert; optional aktivieren)."""
+        """Neue Form-Version anlegen (Definition validiert; optional aktivieren).
+
+        Alte Versionen bleiben unverändert (data-model §4); zusätzlich wird ein
+        ``config_revision``-Snapshot + verlinkter Audit-Eintrag geschrieben
+        (#config-versioning). ``action``/``extra_data`` tragen den Restore/Revert-Pfad.
+        """
         # Eingabe vor DB-Zugriff prüfen: defekte Definition → 422 (statt 500), api.md §2.
         try:
             validate_definition(payload.fields)
@@ -216,6 +232,17 @@ class FormsService:
             app_type = await self._get_type(type_id)
             app_type.active_form_version_id = version.id
 
+        await ConfigRevisionService(self.session).record(
+            entity_type=ENTITY_FORM,
+            entity_id=str(type_id),
+            snapshot={
+                "fields": [f.model_dump(by_alias=True) for f in payload.fields],
+                "description": payload.description,
+            },
+            actor=actor,
+            action=action,
+            extra_data=extra_data,
+        )
         await self.session.commit()
         return FormVersionOut(
             id=version.id,

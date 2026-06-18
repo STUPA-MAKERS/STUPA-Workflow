@@ -42,6 +42,7 @@ from app.modules.budget.tree_models import (
     BudgetExpense,
     FiscalYear,
 )
+from app.modules.config_revision.models import ConfigRevision
 from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
 from app.modules.files.models import Attachment
@@ -73,6 +74,7 @@ __all__ = [
     "BudgetAllocation",
     "BudgetEntry",
     "BudgetExpense",
+    "ConfigRevision",
     "BudgetField",
     "BudgetPot",
     "FiscalYear",

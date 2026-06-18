@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -17,14 +18,17 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  ConfigDiffComponent,
   DatepickerComponent,
+  DialogComponent,
   FilterBarComponent,
   FilterFieldComponent,
   IconComponent,
   type IconName,
+  ToastService,
 } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
-import type { AuditActor, AuditEntry } from '../admin.models';
+import type { AuditActor, AuditEntry, ConfigRevisionDiff } from '../admin.models';
 
 const PAGE_SIZE = 50;
 
@@ -39,6 +43,7 @@ export const AUDIT_ACTIONS = [
   'vote_cast',
   'config_change',
   'config_activation',
+  'config_revert',
   'role_change',
   'delegation_grant',
   'delegation_revoke',
@@ -83,6 +88,7 @@ const ACTION_ICONS: Record<string, IconName> = {
   vote_cast: 'check',
   config_change: 'gear',
   config_activation: 'gear',
+  config_revert: 'repeat',
   role_change: 'roles',
   delegation_grant: 'handshake',
   delegation_revoke: 'handshake',
@@ -158,6 +164,8 @@ interface DayGroup {
     LocalizedDatePipe,
     ButtonComponent,
     BadgeComponent,
+    ConfigDiffComponent,
+    DialogComponent,
     FilterBarComponent,
     FilterFieldComponent,
     DatepickerComponent,
@@ -169,6 +177,8 @@ interface DayGroup {
 export class AuditLogComponent {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
+  private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
 
   protected readonly entries = signal<AuditEntry[]>([]);
   protected readonly actors = signal<AuditActor[]>([]);
@@ -178,6 +188,18 @@ export class AuditLogComponent {
   protected readonly loadError = signal(false);
   /** Ausgeklappte Einträge (Detail-Bereich sichtbar). */
   protected readonly open = signal<ReadonlySet<number>>(new Set());
+
+  // --- Config-Diff + Revert (#config-versioning) ----------------------------
+  /** ``audit.revert``-Permission (FE-Gate; Backend bleibt autoritativ). Reaktiv, da
+   *  der Principal asynchron lädt. */
+  protected readonly canRevert = computed(() => this.auth.can('audit.revert'));
+  /** Geladene Config-Diffs je ``revisionId`` (``null`` = lädt noch). */
+  protected readonly diffs = signal<ReadonlyMap<string, ConfigRevisionDiff | null>>(
+    new Map(),
+  );
+  /** Eintrag, dessen Revert gerade bestätigt wird. */
+  protected readonly confirmRevert = signal<AuditEntry | null>(null);
+  protected readonly reverting = signal(false);
 
   // Filter
   protected readonly action = signal('');
@@ -269,6 +291,67 @@ export class AuditLogComponent {
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
+    });
+    if (this.isOpen(id)) {
+      const entry = this.entries().find((e) => e.id === id);
+      if (entry) this.loadDiff(entry);
+    }
+  }
+
+  /** ``revisionId`` aus dem ``data``-Payload (nur Config-Changes tragen es). */
+  protected revisionId(e: AuditEntry): string | null {
+    const v = e.data?.['revisionId'];
+    return typeof v === 'string' ? v : null;
+  }
+
+  /** Revert anbietbar: Permission vorhanden **und** ein verlinkter Config-Snapshot. */
+  protected isRevertable(e: AuditEntry): boolean {
+    return this.canRevert() && this.revisionId(e) !== null;
+  }
+
+  /** Geladener Diff des Eintrags (``null`` = lädt; ``undefined`` = kein Snapshot). */
+  protected diffOf(e: AuditEntry): ConfigRevisionDiff | null | undefined {
+    const id = this.revisionId(e);
+    return id ? this.diffs().get(id) : undefined;
+  }
+
+  /** Beim Aufklappen den Config-Diff einmalig nachladen (#2-Diff im Audit-Log). */
+  private loadDiff(e: AuditEntry): void {
+    const rid = this.revisionId(e);
+    if (!rid || this.diffs().has(rid)) return;
+    this.diffs.update((m) => new Map(m).set(rid, null));
+    this.api.getConfigRevisionDiff(rid).subscribe({
+      next: (d) => this.diffs.update((m) => new Map(m).set(rid, d)),
+      error: () =>
+        this.diffs.update((m) => {
+          const next = new Map(m);
+          next.delete(rid);
+          return next;
+        }),
+    });
+  }
+
+  protected askRevert(e: AuditEntry): void {
+    this.confirmRevert.set(e);
+  }
+
+  protected doRevert(): void {
+    const e = this.confirmRevert();
+    if (!e) return;
+    this.confirmRevert.set(null);
+    this.reverting.set(true);
+    this.api.revertAuditEntry(e.id).subscribe({
+      next: () => {
+        this.reverting.set(false);
+        this.toast.success(this.i18n.translate('admin.audit.revert.success'));
+        this.reload();
+      },
+      error: (err: { status?: number }) => {
+        this.reverting.set(false);
+        const key: TranslationKey =
+          err?.status === 409 ? 'admin.audit.revert.conflict' : 'admin.audit.revert.error';
+        this.toast.error(this.i18n.translate(key));
+      },
     });
   }
 

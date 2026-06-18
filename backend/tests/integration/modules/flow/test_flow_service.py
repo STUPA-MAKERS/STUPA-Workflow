@@ -82,8 +82,7 @@ async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State
                 )
             ],
             activate=True,
-        ),
-    )
+        ), "tester")
 
     flow = FlowVersion(
         version=1, active=True, editor_layout={}

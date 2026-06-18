@@ -17,6 +17,10 @@ class AuditAction(StrEnum):
     VOTE_CAST = "vote_cast"
     CONFIG_CHANGE = "config_change"
     CONFIG_ACTIVATION = "config_activation"
+    # Rücknahme eines Config-Changes aus dem Audit-Log (#config-versioning,
+    # ``audit.revert``). Trägt im ``data`` die zurückgenommene Audit-/Revision-Id +
+    # die neue ``revisionId`` (selbst revertierbar). Nur id-Referenzen.
+    CONFIG_REVERT = "config_revert"
     ROLE_CHANGE = "role_change"
     DELEGATION_GRANT = "delegation_grant"
     DELEGATION_REVOKE = "delegation_revoke"

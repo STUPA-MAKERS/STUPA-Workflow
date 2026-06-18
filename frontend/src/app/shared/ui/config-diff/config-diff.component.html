@@ -1,0 +1,25 @@
+@if (isEmpty(diff())) {
+  <p class="text-muted cfg-diff__none">{{ 'admin.config.diff.none' | t }}</p>
+} @else {
+  <ul class="cfg-diff">
+    @for (change of diff()!.changed; track change.key) {
+      <li>
+        <app-badge variant="warning">{{ 'admin.config.diff.changed' | t }}</app-badge>
+        <code>{{ change.key }}</code>:
+        <del>{{ fmt(change.old) }}</del> → <ins>{{ fmt(change.new) }}</ins>
+      </li>
+    }
+    @for (added of diff()!.added; track added.key) {
+      <li>
+        <app-badge variant="success">{{ 'admin.config.diff.added' | t }}</app-badge>
+        <code>{{ added.key }}</code>: <ins>{{ fmt(added.value) }}</ins>
+      </li>
+    }
+    @for (removed of diff()!.removed; track removed.key) {
+      <li>
+        <app-badge variant="danger">{{ 'admin.config.diff.removed' | t }}</app-badge>
+        <code>{{ removed.key }}</code>: <del>{{ fmt(removed.value) }}</del>
+      </li>
+    }
+  </ul>
+}

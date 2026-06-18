@@ -86,9 +86,30 @@
                   </div>
                 }
               </dl>
-              @if (targetLink(e); as link) {
-                <a class="text-sm self-start" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
+              @if (revisionId(e)) {
+                <div class="audit__diff">
+                  @if (diffOf(e); as d) {
+                    <app-config-diff [diff]="d.diff" />
+                  } @else {
+                    <p class="text-muted">{{ 'common.loading' | t }}</p>
+                  }
+                </div>
               }
+              <div class="flex gap-3 items-center flex-wrap">
+                @if (targetLink(e); as link) {
+                  <a class="text-sm self-start" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
+                }
+                @if (isRevertable(e)) {
+                  <app-button
+                    variant="danger"
+                    size="sm"
+                    [disabled]="reverting()"
+                    (click)="askRevert(e)"
+                  >
+                    {{ 'admin.audit.revert.action' | t }}
+                  </app-button>
+                }
+              </div>
             </div>
           }
         </li>
@@ -97,6 +118,25 @@
   }
 
   <div #sentinel class="audit__sentinel" aria-hidden="true"></div>
+
+  <app-dialog
+    [open]="!!confirmRevert()"
+    [title]="'admin.audit.revert.title' | t"
+    [closeLabel]="'admin.gremien.cancel' | t"
+    (closed)="confirmRevert.set(null)"
+  >
+    @if (confirmRevert()) {
+      <p>{{ 'admin.audit.revert.confirm' | t }}</p>
+      <div class="flex gap-2 justify-end mt-4">
+        <app-button variant="ghost" (click)="confirmRevert.set(null)">
+          {{ 'admin.gremien.cancel' | t }}
+        </app-button>
+        <app-button variant="danger" (click)="doRevert()">
+          {{ 'admin.audit.revert.action' | t }}
+        </app-button>
+      </div>
+    }
+  </app-dialog>
 
   @if (loading()) {
     <p class="text-muted text-center" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>

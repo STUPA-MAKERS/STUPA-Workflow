@@ -59,8 +59,7 @@ async def _seed_type(session: AsyncSession, *, cd_variant: str = "makers") -> Ap
     await session.commit()
 
     await FormsService(session).create_form_version(
-        app_type.id, FormVersionCreate(fields=_fields(), activate=True)
-    )
+        app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
     flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
     await session.flush()

@@ -14,14 +14,16 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 
-from app.deps import DbSession, require_principal
+from app.deps import DbSession, Principal, require_principal
 from app.modules.audit.schemas import (
     AuditActorOut,
     AuditEntryOut,
     AuditPageOut,
+    AuditRevertOut,
     ChainVerificationOut,
 )
 from app.modules.audit.service import AuditService, data_uuid_strings
+from app.modules.config_revision.revert import RevertService
 from app.shared.errors import ProblemDetail
 from app.shared.paging import DEFAULT_LIMIT, MAX_LIMIT
 
@@ -119,4 +121,28 @@ async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:
         checked=result.checked,
         brokenAt=result.broken_at,
         reason=result.reason,
+    )
+
+
+@router.post(
+    "/{entry_id}/revert",
+    response_model=AuditRevertOut,
+    # #config-versioning: Rücknahme eines Config-Changes — eigene, destruktive
+    # Permission (getrennt von audit.read/verify). 404 Eintrag/Revision fehlt,
+    # 409 nicht revertierbar / stale (neuerer Stand existiert).
+    dependencies=[Depends(require_principal("audit.revert"))],
+    responses={**_AUTH_ERRORS, 404: _PROBLEM, 409: _PROBLEM},
+)
+async def revert_audit_entry(
+    entry_id: int,
+    session: DbSession,
+    principal: Annotated[Principal, Depends(require_principal("audit.revert"))],
+) -> AuditRevertOut:
+    """Den durch ``entry_id`` beschriebenen Config-Change zurücknehmen (Vorgänger-Stand
+    wiederherstellen, bei Konflikt 409). Der Revert ist selbst geloggt + revertierbar."""
+    result = await RevertService(session).revert(entry_id, principal.sub)
+    return AuditRevertOut(
+        revertedAuditId=result.reverted_audit_id,
+        entityType=result.entity_type,
+        entityId=result.entity_id,
     )
