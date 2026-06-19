@@ -37,4 +37,10 @@ frontend/.angular/
 *.swp
 .idea/
 .vscode/
-.claude/
+
+# Claude Code / agent context: publish the shared skills + memory map,
+# keep per-developer local state (settings, worktrees) private.
+.claude/*
+!.claude/skills/
+!.claude/memory/
+.claude/settings.local.json
