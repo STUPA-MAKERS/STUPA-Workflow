@@ -5,9 +5,17 @@ import { ToastService } from '@shared/ui/toast/toast.service';
 import { BudgetTreeApi, type Account } from '../../budget/budget-tree.api';
 import { AccountsComponent } from './accounts.component';
 
+const FINTS_EMPTY = {
+  fintsEndpoint: null,
+  fintsBlz: null,
+  fintsLogin: null,
+  fintsConfigured: false,
+  fintsLastSyncAt: null,
+} as const;
+
 const ACCOUNTS: Account[] = [
-  { id: 'a-1', name: 'Hauptkonto', iban: 'DE111', active: true },
-  { id: 'a-2', name: 'Bar', iban: '', active: false },
+  { id: 'a-1', name: 'Hauptkonto', iban: 'DE111', active: true, ...FINTS_EMPTY },
+  { id: 'a-2', name: 'Bar', iban: '', active: false, ...FINTS_EMPTY },
 ];
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -126,7 +134,14 @@ describe('AccountsComponent', () => {
     cmp.fIban.set('  DE99  ');
     cmp.fActive.set(true);
     cmp.save(evt());
-    expect(api.createAccount).toHaveBeenCalledWith({ name: 'Neu', iban: 'DE99', active: true });
+    expect(api.createAccount).toHaveBeenCalledWith({
+      name: 'Neu',
+      iban: 'DE99',
+      active: true,
+      fintsEndpoint: null,
+      fintsBlz: null,
+      fintsLogin: null,
+    });
     expect(cmp.saving()).toBe(false);
     expect(cmp.dialogOpen()).toBe(false);
     expect(toast.success).toHaveBeenCalled();
@@ -143,6 +158,9 @@ describe('AccountsComponent', () => {
       name: 'Renamed',
       iban: 'DE111',
       active: true,
+      fintsEndpoint: null,
+      fintsBlz: null,
+      fintsLogin: null,
     });
     expect(api.createAccount).not.toHaveBeenCalled();
   });

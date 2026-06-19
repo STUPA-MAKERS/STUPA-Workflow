@@ -414,36 +414,149 @@ class InvoiceOut(_CamelModel):
 
 # -------------------------------------------------------------------- accounts
 class AccountCreate(_CamelModel):
-    """Konto anlegen — Name + IBAN (Freitext). Nicht an Kostenstellen gebunden."""
+    """Konto anlegen — Name + IBAN (Freitext). Nicht an Kostenstellen gebunden.
+
+    Optionale FinTS-Zugangsdaten (#fints): ``fintsPin`` ist **write-only** (wird nur
+    verschlüsselt gespeichert, nie zurückgegeben)."""
 
     name: str = Field(min_length=1, max_length=200)
     iban: str = Field(default="", max_length=64)
     active: bool = True
+    fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint", max_length=500)
+    fints_blz: str | None = Field(default=None, alias="fintsBlz", max_length=20)
+    fints_login: str | None = Field(default=None, alias="fintsLogin", max_length=200)
+    fints_pin: str | None = Field(default=None, alias="fintsPin", max_length=200)
 
 
 class AccountUpdate(_CamelModel):
-    """Konto teil-aktualisieren."""
+    """Konto teil-aktualisieren. FinTS-Felder: ``null``/``""`` löscht, gesetzter Wert
+    überschreibt. ``fintsPin=""`` löscht die gespeicherte PIN; ein gesetzter Wert ersetzt
+    sie (write-only)."""
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
     iban: str | None = Field(default=None, max_length=64)
     active: bool | None = None
+    fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint", max_length=500)
+    fints_blz: str | None = Field(default=None, alias="fintsBlz", max_length=20)
+    fints_login: str | None = Field(default=None, alias="fintsLogin", max_length=200)
+    fints_pin: str | None = Field(default=None, alias="fintsPin", max_length=200)
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> AccountUpdate:
+        if not self.model_fields_set:
+            raise ValueError("at least one field required")
+        return self
 
 
 class AccountOut(_CamelModel):
-    """Konto-Stammdaten."""
+    """Konto-Stammdaten. FinTS-Zugangsdaten ohne PIN (``fintsConfigured`` zeigt, ob eine
+    verschlüsselte PIN hinterlegt ist); die PIN wird **nie** ausgegeben (#fints)."""
 
     id: UUID
     name: str
     iban: str
     active: bool
+    fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint")
+    fints_blz: str | None = Field(default=None, alias="fintsBlz")
+    fints_login: str | None = Field(default=None, alias="fintsLogin")
+    # True, sobald Endpunkt + BLZ + Login + (verschlüsselte) PIN vorliegen → sync-bereit.
+    fints_configured: bool = Field(default=False, alias="fintsConfigured")
+    fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
 
 
 class AccountOption(_CamelModel):
     """Minimale Konto-Auswahl (id + Name, **keine IBAN**) für Buchungs-Dropdowns —
-    lesbar für Bucher (``budget.book``/``budget.view``), ohne Konten-Stammdaten-Recht (#5-2/#2)."""
+    lesbar für Bucher (``budget.book``/``budget.view``), ohne Konten-Stammdaten-Recht (#5-2/#2).
+
+    ``fintsConfigured`` (kein Geheimnis) zeigt dem Bucher, welche Konten per FinTS
+    synchronisierbar sind (#fints) — ohne ``account.manage`` für die vollen Stammdaten."""
 
     id: UUID
     name: str
+    fints_configured: bool = Field(default=False, alias="fintsConfigured")
+
+
+# ------------------------------------------------------- bank statement (#fints)
+BankLineState = Literal["unmatched", "suggested", "matched", "ignored"]
+BankSyncStatus = Literal["done", "needs_tan"]
+
+
+class StatementLineOut(_CamelModel):
+    """Gestageter Kontoumsatz (#fints). ``amount`` ist **vorzeichenbehaftet** (> 0 Eingang,
+    < 0 Ausgang); ``kind`` ist die daraus abgeleitete Buchungsart."""
+
+    id: UUID
+    account_id: UUID = Field(alias="accountId")
+    amount: Decimal
+    kind: ExpenseKind
+    currency: str
+    booking_date: date | None = Field(default=None, alias="bookingDate")
+    value_date: date | None = Field(default=None, alias="valueDate")
+    purpose: str | None = None
+    counterparty_name: str | None = Field(default=None, alias="counterpartyName")
+    counterparty_iban: str | None = Field(default=None, alias="counterpartyIban")
+    end_to_end_id: str | None = Field(default=None, alias="endToEndId")
+    reference: str | None = None
+    match_state: BankLineState = Field(alias="matchState")
+    suggested_budget_id: UUID | None = Field(default=None, alias="suggestedBudgetId")
+    suggested_path_key: str | None = Field(default=None, alias="suggestedPathKey")
+    suggested_expense_id: UUID | None = Field(default=None, alias="suggestedExpenseId")
+    created_at: datetime = Field(alias="createdAt")
+
+
+class BankSyncResult(_CamelModel):
+    """Ergebnis eines FinTS-Sync-Schritts (#fints).
+
+    ``status='done'`` → ``imported``/``duplicates`` gesetzt. ``status='needs_tan'`` →
+    ``sessionToken`` + ``challenge`` zeigen, dass eine TAN nötig ist (bei ``decoupled``
+    genügt das Freigeben in der Banking-App + Pollen via ``POST …/tan`` ohne Code)."""
+
+    status: BankSyncStatus
+    account_id: UUID = Field(alias="accountId")
+    imported: int = 0
+    duplicates: int = 0
+    # needs_tan:
+    session_token: UUID | None = Field(default=None, alias="sessionToken")
+    challenge: str | None = None
+    challenge_html: str | None = Field(default=None, alias="challengeHtml")
+    decoupled: bool = False
+
+
+class BankTanRequest(_CamelModel):
+    """TAN zum Fortsetzen einer schwebenden Sync-Sitzung (#fints). Bei *decoupled*
+    pushTAN leer lassen (reiner Poll: „in der App freigegeben?")."""
+
+    tan: str = Field(default="", max_length=100)
+
+
+class BankImportResult(_CamelModel):
+    """Ergebnis des Datei-Imports (CAMT.053/MT940, Option D, #fints)."""
+
+    account_id: UUID = Field(alias="accountId")
+    imported: int = 0
+    duplicates: int = 0
+
+
+class ConfirmLineRequest(_CamelModel):
+    """Einen Umsatz zur Buchung bestätigen (#fints).
+
+    Entweder ``matchExpenseId`` (an eine **bestehende** Buchung anhängen) **oder**
+    ``budgetId`` (neue Buchung gegen diese Kostenstelle anlegen — Art aus dem Vorzeichen).
+    ``fiscalYearId`` optional (sonst das eine aktive HHJ); ``description`` überschreibt den
+    Default (Verwendungszweck)."""
+
+    budget_id: UUID | None = Field(default=None, alias="budgetId")
+    fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
+    match_expense_id: UUID | None = Field(default=None, alias="matchExpenseId")
+    description: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _target_required(self) -> ConfirmLineRequest:
+        if self.budget_id is None and self.match_expense_id is None:
+            raise ValueError("either budgetId or matchExpenseId is required")
+        if self.budget_id is not None and self.match_expense_id is not None:
+            raise ValueError("budgetId and matchExpenseId are mutually exclusive")
+        return self
 
 
 # ------------------------------------------------------------------- transfer
@@ -478,8 +591,16 @@ BudgetTreeNodeOut.model_rebuild()
 
 __all__ = [
     "AccountCreate",
+    "AccountOption",
     "AccountOut",
     "AccountUpdate",
+    "BankImportResult",
+    "BankLineState",
+    "BankSyncResult",
+    "BankSyncStatus",
+    "BankTanRequest",
+    "ConfirmLineRequest",
+    "StatementLineOut",
     "TransferCreate",
     "TransferOut",
     "BudgetApplicationOut",

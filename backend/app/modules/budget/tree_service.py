@@ -71,6 +71,7 @@ from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.flow.models import State
 from app.search import dialect_of, trigram_rank
 from app.settings import Settings, get_settings
+from app.shared.crypto import encrypt_secret
 from app.shared.errors import (
     ConflictError,
     NotFoundError,
@@ -1225,7 +1226,49 @@ class BudgetTreeService:
     # --------------------------------------------------------------- accounts
     @staticmethod
     def _account_out(a: Account) -> AccountOut:
-        return AccountOut(id=a.id, name=a.name, iban=a.iban, active=a.active)
+        return AccountOut(
+            id=a.id,
+            name=a.name,
+            iban=a.iban,
+            active=a.active,
+            fintsEndpoint=a.fints_endpoint,
+            fintsBlz=a.fints_blz,
+            fintsLogin=a.fints_login,
+            # Sync-bereit erst mit Endpunkt + BLZ + Login + (verschlüsselter) PIN.
+            fintsConfigured=bool(
+                a.fints_endpoint and a.fints_blz and a.fints_login and a.fints_pin_encrypted
+            ),
+            fintsLastSyncAt=a.fints_last_sync_at,
+        )
+
+    def _require_fints_key(self) -> str:
+        """Verschlüsselungs-Schlüssel oder 503 (PIN darf nie unverschlüsselt liegen, #fints)."""
+        key = self.settings.fints_enc_key
+        if not key:
+            raise ServiceUnavailableError("FinTS is not configured (no encryption key set).")
+        return key
+
+    def _apply_fints_config(self, acc: Account, payload: AccountCreate | AccountUpdate) -> bool:
+        """FinTS-Felder aus dem Payload anwenden (PIN verschlüsseln). Liefert, ob sich
+        Zugangsdaten geändert haben — dann wird der persistente Dialog-Zustand verworfen
+        (erzwingt eine frische SCA mit den neuen Daten)."""
+        fields = payload.model_fields_set
+        changed = False
+        for col in ("fints_endpoint", "fints_blz", "fints_login"):
+            if col in fields:
+                setattr(acc, col, getattr(payload, col) or None)
+                changed = True
+        if "fints_pin" in fields:
+            if payload.fints_pin:
+                acc.fints_pin_encrypted = encrypt_secret(
+                    payload.fints_pin, key=self._require_fints_key()
+                )
+            else:
+                acc.fints_pin_encrypted = None
+            changed = True
+        if changed:
+            acc.fints_state = None
+        return changed
 
     async def list_accounts(self) -> list[AccountOut]:
         rows = (await self.session.scalars(select(Account).order_by(Account.name))).all()
@@ -1238,11 +1281,32 @@ class BudgetTreeService:
                 select(Account).where(Account.active.is_(True)).order_by(Account.name)
             )
         ).all()
-        return [AccountOption(id=a.id, name=a.name) for a in rows]
+        return [
+            AccountOption(
+                id=a.id,
+                name=a.name,
+                fintsConfigured=bool(
+                    a.fints_endpoint and a.fints_blz and a.fints_login and a.fints_pin_encrypted
+                ),
+            )
+            for a in rows
+        ]
+
+    async def _audit_fints_config(self, acc: Account) -> None:
+        """Audit der FinTS-Zugangsdaten-Änderung — **ohne** PIN/Klartext (security.md §4)."""
+        await self._audit(
+            AuditAction.BANK_ACCOUNT_CONFIG,
+            target_type="account",
+            target_id=str(acc.id),
+            data={"endpoint": acc.fints_endpoint, "blz": acc.fints_blz},
+        )
 
     async def create_account(self, payload: AccountCreate) -> AccountOut:
         acc = Account(id=uuid.uuid4(), name=payload.name, iban=payload.iban, active=payload.active)
+        fints_changed = self._apply_fints_config(acc, payload)
         self.session.add(acc)
+        if fints_changed:
+            await self._audit_fints_config(acc)
         await self.session.commit()
         return self._account_out(acc)
 
@@ -1250,8 +1314,11 @@ class BudgetTreeService:
         acc = await self.session.get(Account, account_id)
         if acc is None:
             raise NotFoundError(f"account {account_id} not found")
-        for field, value in payload.model_dump(exclude_unset=True).items():
-            setattr(acc, field, value)
+        for field in ("name", "iban", "active"):
+            if field in payload.model_fields_set and getattr(payload, field) is not None:
+                setattr(acc, field, getattr(payload, field))
+        if self._apply_fints_config(acc, payload):
+            await self._audit_fints_config(acc)
         await self.session.commit()
         return self._account_out(acc)
 

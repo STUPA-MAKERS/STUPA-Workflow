@@ -1,0 +1,135 @@
+:host {
+  display: contents;
+}
+
+.bank__tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  border-bottom-style: solid;
+  margin-bottom: 1rem;
+}
+
+.bank__tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-bottom-style: solid;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  color: var(--text-muted, #64748b);
+  font: inherit;
+
+  &--active {
+    color: var(--text, inherit);
+    border-bottom-color: var(--primary, #2563eb);
+    font-weight: 600;
+  }
+}
+
+.bank__source {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.bank__tan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-style: solid;
+  border-radius: 0.5rem;
+}
+
+.bank__tanMsg {
+  margin: 0;
+  font-weight: 600;
+}
+
+.bank__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.bank__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted, #64748b);
+}
+
+.bank__h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.bank__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.bank__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-style: solid;
+  border-radius: 0.5rem;
+}
+
+.bank__lineMain {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.bank__lineTop {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bank__amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+
+  &--income {
+    color: var(--success, #16a34a);
+  }
+}
+
+.bank__date {
+  font-size: 0.8125rem;
+  color: var(--text-muted, #64748b);
+}
+
+.bank__lineMeta {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted, #64748b);
+}
+
+.bank__purpose {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bank__lineActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}

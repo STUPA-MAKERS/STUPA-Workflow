@@ -67,18 +67,80 @@ export interface Account {
   name: string;
   iban: string;
   active: boolean;
+  // FinTS-Bankabgleich (#fints), ohne PIN. `fintsConfigured` = verschlüsselte PIN + alle
+  // Felder hinterlegt → sync-bereit. Die PIN wird nie ausgegeben (write-only).
+  fintsEndpoint: string | null;
+  fintsBlz: string | null;
+  fintsLogin: string | null;
+  fintsConfigured: boolean;
+  fintsLastSyncAt: string | null;
 }
 
 export interface AccountBody {
   name: string;
   iban?: string;
   active?: boolean;
+  // FinTS (#fints): `fintsPin` ist write-only; `""` löscht die gespeicherte PIN.
+  fintsEndpoint?: string | null;
+  fintsBlz?: string | null;
+  fintsLogin?: string | null;
+  fintsPin?: string | null;
+}
+
+/** Gestageter Kontoumsatz (#fints); `amount` vorzeichenbehaftet (>0 Eingang). */
+export interface StatementLine {
+  id: Uuid;
+  accountId: Uuid;
+  amount: string;
+  kind: ExpenseKind;
+  currency: string;
+  bookingDate: string | null;
+  valueDate: string | null;
+  purpose: string | null;
+  counterpartyName: string | null;
+  counterpartyIban: string | null;
+  endToEndId: string | null;
+  reference: string | null;
+  matchState: 'unmatched' | 'suggested' | 'matched' | 'ignored';
+  suggestedBudgetId: Uuid | null;
+  suggestedPathKey: string | null;
+  suggestedExpenseId: Uuid | null;
+  createdAt: string;
+}
+
+/** Ergebnis eines FinTS-Sync-Schritts (#fints): fertig oder TAN nötig. */
+export interface BankSyncResult {
+  status: 'done' | 'needs_tan';
+  accountId: Uuid;
+  imported: number;
+  duplicates: number;
+  sessionToken: Uuid | null;
+  challenge: string | null;
+  challengeHtml: string | null;
+  decoupled: boolean;
+}
+
+/** Ergebnis des CAMT.053/MT940-Datei-Imports (#fints, Option D). */
+export interface BankImportResult {
+  accountId: Uuid;
+  imported: number;
+  duplicates: number;
+}
+
+/** Umsatz bestätigen (#fints): neue Buchung gegen `budgetId` ODER an `matchExpenseId`. */
+export interface ConfirmLineBody {
+  budgetId?: Uuid | null;
+  fiscalYearId?: Uuid | null;
+  matchExpenseId?: Uuid | null;
+  description?: string | null;
 }
 
 /** Minimale Konto-Auswahl (id + Name, ohne IBAN) für Buchungs-Dropdowns (#5-2/#2). */
 export interface AccountOption {
   id: Uuid;
   name: string;
+  /** Per FinTS synchronisierbar (kein Geheimnis) — Bucher sieht es ohne account.manage (#fints). */
+  fintsConfigured: boolean;
 }
 
 /** Übertrag Kostenstelle → Kostenstelle (gleiches HHJ). */
@@ -522,6 +584,45 @@ export class BudgetTreeApi {
   }
   deleteAccount(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/accounts/${id}`);
+  }
+
+  // ------------------------------------------------------- bank reconcile (#fints)
+  /** FinTS-Sync starten (#fints): Umsätze stagen oder TAN anfordern (`needs_tan`). */
+  fintsSync(accountId: Uuid): Observable<BankSyncResult> {
+    return this.http.post<BankSyncResult>(`${this.base}/accounts/${accountId}/fints/sync`, {});
+  }
+  /** Schwebende TAN-Sitzung fortsetzen (#fints) — leere `tan` = decoupled-Poll. Poll
+   *  ohne globalen Lade-Overlay (#loading-overlay-convention). */
+  fintsSubmitTan(accountId: Uuid, sessionToken: Uuid, tan: string): Observable<BankSyncResult> {
+    return this.http.post<BankSyncResult>(
+      `${this.base}/accounts/${accountId}/fints/sessions/${sessionToken}/tan`,
+      { tan },
+      { context: skipLoading() },
+    );
+  }
+  /** Option D (#fints): CAMT.053/MT940-Datei hochladen → Umsätze stagen. */
+  importStatementFile(accountId: Uuid, file: File): Observable<BankImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<BankImportResult>(
+      `${this.base}/accounts/${accountId}/statement/import`,
+      form,
+    );
+  }
+  /** Gestagete Umsätze auflisten (#fints), optional je Konto/Status. */
+  listStatementLines(opts: { account?: Uuid; state?: string } = {}): Observable<StatementLine[]> {
+    const params: Record<string, string> = {};
+    if (opts.account) params['account'] = opts.account;
+    if (opts.state) params['state'] = opts.state;
+    return this.http.get<StatementLine[]>(`${this.base}/statement-lines`, { params });
+  }
+  /** Umsatz buchen (#fints). */
+  confirmStatementLine(lineId: Uuid, body: ConfirmLineBody): Observable<Expense> {
+    return this.http.post<Expense>(`${this.base}/statement-lines/${lineId}/confirm`, body);
+  }
+  /** Umsatz als irrelevant markieren (#fints). */
+  ignoreStatementLine(lineId: Uuid): Observable<void> {
+    return this.http.post<void>(`${this.base}/statement-lines/${lineId}/ignore`, {});
   }
 
   /** Gefilterte Buchungen als ``.xlsx`` (P(``budget.export``)) — Inhalt wie die Liste. */

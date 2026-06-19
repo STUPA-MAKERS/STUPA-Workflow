@@ -30,6 +30,20 @@
       <input type="checkbox" [checked]="fActive()" (change)="fActive.set($any($event.target).checked)" />
       <span>{{ 'admin.accounts.active' | t }}</span>
     </label>
+
+    <!-- FinTS-Bankabgleich (#fints): optionaler Online-Banking-Zugang. PIN write-only. -->
+    <fieldset class="acc__fints">
+      <legend class="acc__fintsLegend">{{ 'admin.accounts.fintsTitle' | t }}</legend>
+      <p class="acc__hint">{{ 'admin.accounts.fintsDesc' | t }}</p>
+      <label class="acc__label" for="acc-fints-endpoint">{{ 'admin.accounts.fintsEndpoint' | t }}
+        <input id="acc-fints-endpoint" [ngModel]="fEndpoint()" (ngModelChange)="fEndpoint.set($event)" name="fintsEndpoint" [placeholder]="'admin.accounts.fintsEndpointPlaceholder' | t" /></label>
+      <label class="acc__label" for="acc-fints-blz">{{ 'admin.accounts.fintsBlz' | t }}
+        <input id="acc-fints-blz" [ngModel]="fBlz()" (ngModelChange)="fBlz.set($event)" name="fintsBlz" inputmode="numeric" /></label>
+      <label class="acc__label" for="acc-fints-login">{{ 'admin.accounts.fintsLogin' | t }}
+        <input id="acc-fints-login" [ngModel]="fLogin()" (ngModelChange)="fLogin.set($event)" name="fintsLogin" autocomplete="off" /></label>
+      <label class="acc__label" for="acc-fints-pin">{{ 'admin.accounts.fintsPin' | t }}
+        <input id="acc-fints-pin" type="password" [ngModel]="fPin()" (ngModelChange)="fPin.set($event)" name="fintsPin" autocomplete="new-password" [placeholder]="(pinStored() ? 'admin.accounts.fintsPinStored' : 'admin.accounts.fintsPinPlaceholder') | t" /></label>
+    </fieldset>
   </form>
   <div dialog-footer class="flex gap-3">
     <app-button variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>

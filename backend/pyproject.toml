@@ -49,6 +49,13 @@ dependencies = [
     # iCal-Abo (#ics): RFC5545-Feed der eigenen Sitzungen. Lazy importiert (nur auf
     # dem Feed-Pfad), reines Python-Paket.
     "icalendar>=6.0",
+    # FinTS-Bankabgleich (#fints): PIN/TAN-Online-Banking-Client (z. B. Sparkasse) zum
+    # Abruf echter Kontoumsätze. Zieht ``mt-940`` transitiv (MT940-Parser). Lazy
+    # importiert (nur auf dem Sync-/Import-Pfad) — der Contract-CI lädt es nie.
+    "fints>=5.0",
+    # PIN-Verschlüsselung at-rest (Fernet) für FinTS-Zugangsdaten. Bisher transitiv über
+    # ``pyjwt[crypto]``, jetzt direkt genutzt (app.shared.crypto), daher explizit gepinnt.
+    "cryptography>=44.0",
 ]
 
 [project.optional-dependencies]
