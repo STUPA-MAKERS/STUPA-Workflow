@@ -35,9 +35,9 @@ def test_pick_mechanism_fallback_first_and_empty() -> None:
 
 def test_select_account_by_iban_then_first() -> None:
     accs = [_Acct("DE111"), _Acct("DE 2 2 2")]
-    assert fc._select_account(accs, "de222").iban == "DE 2 2 2"
-    assert fc._select_account(accs, None).iban == "DE111"
-    assert fc._select_account(accs, "DE999").iban == "DE111"  # kein Treffer → erstes
+    assert fc._select_account(accs, "de222") is accs[1]  # IBAN-Treffer (normalisiert)
+    assert fc._select_account(accs, None) is accs[0]  # ohne IBAN → erstes
+    assert fc._select_account(accs, "DE999") is accs[0]  # kein Treffer → erstes
 
 
 def test_select_account_empty_raises() -> None:

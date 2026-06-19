@@ -20,6 +20,7 @@ Logik (TAN-Mechanismus-Wahl, Konto-Auswahl, Umsatz-Normalisierung) bleibt geprü
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import TYPE_CHECKING, Literal
@@ -67,7 +68,7 @@ class FintsCredentials:
     start_date: date | None = None  # Abruf-Fenster-Beginn (vom Service gesetzt)
 
 
-def _pick_tan_mechanism(mechanisms: dict[str, object], preferred: str | None) -> str | None:
+def _pick_tan_mechanism(mechanisms: Mapping[str, object], preferred: str | None) -> str | None:
     """TAN-Mechanismus wählen: zuvor genutzter, sonst *decoupled*/pushTAN, sonst erster.
 
     ``mechanisms`` = ``{security_function: TwoStepParameters}`` aus
@@ -83,7 +84,7 @@ def _pick_tan_mechanism(mechanisms: dict[str, object], preferred: str | None) ->
     return next(iter(mechanisms))
 
 
-def _select_account(accounts: list[object], iban: str | None):  # type: ignore[no-untyped-def]  # noqa: ANN202
+def _select_account(accounts: Sequence[object], iban: str | None):  # type: ignore[no-untyped-def]  # noqa: ANN202
     """SEPA-Konto per IBAN wählen (sonst das erste). Leere Liste → ``FintsError``."""
     if not accounts:
         raise FintsError("bank returned no SEPA accounts")
