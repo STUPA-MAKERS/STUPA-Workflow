@@ -25,6 +25,11 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.13"
+  # Wheels Vorrang vor sdists geben: einige (transitive) Pakete tragen nur eine legacy
+  # setup.py (z. B. text-unidecode via sepaxml→fints, #fints), deren d2to1-Build mit
+  # neuem setuptools (>=71, kein `_get_unpatched` mehr) bricht. Die vorhandenen Wheels
+  # vermeiden den Build komplett und machen `pip install` deterministisch.
+  PIP_PREFER_BINARY: "1"
 
 jobs:
   # ---- Wegweiser: existiert ein Frontend-Projekt? -------------------------- #
