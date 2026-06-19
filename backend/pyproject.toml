@@ -56,10 +56,11 @@ dependencies = [
     # Abruf echter Kontoumsätze. Zieht ``mt-940`` transitiv (MT940-Parser). Lazy
     # importiert (nur auf dem Sync-/Import-Pfad) — der Contract-CI lädt es nie.
     "fints>=5.0",
-    # fints zieht lxml transitiv (sepaxml/xmlschema). Mindestens 6.1.0 erzwingen:
-    # ältere lxml haben ``resolve_entities=True`` als Default → XXE-Local-File-Read
-    # (PYSEC-2026-87). 6.1.0 setzt den sicheren Default für alle Parser (pip-audit).
-    "lxml>=6.1.0",
+    # Hinweis: fints pinnt lxml~=6.0.2 (<6.1), daher lässt sich der lxml-XXE-Fix (6.1.0,
+    # PYSEC-2026-87) hier NICHT erzwingen (ResolutionImpossible). lxml wird nur transitiv
+    # von fints/sepaxml/xmlschema zum Parsen der authentifizierten Bank-Antworten genutzt;
+    # unser eigenes CAMT-Parsing läuft über die stdlib ``ElementTree``. Das Advisory ist
+    # daher in pip-audit gezielt ausgenommen (CI be-deps-audit, mit Begründung).
     # PIN-Verschlüsselung at-rest (Fernet) für FinTS-Zugangsdaten. Bisher transitiv über
     # ``pyjwt[crypto]``, jetzt direkt genutzt (app.shared.crypto), daher explizit gepinnt.
     "cryptography>=44.0",

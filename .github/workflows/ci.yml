@@ -199,7 +199,14 @@ jobs:
         # einer verwundbaren Abhängigkeit. `--skip-editable` überspringt das lokale,
         # nicht-auf-PyPI liegende Projektpaket. Einzelne, geprüft-irrelevante Advisories
         # lassen sich gezielt mit `--ignore-vuln <GHSA/PYSEC-ID>` (mit Begründung) ausnehmen.
-        run: pip-audit --skip-editable --desc
+        #
+        # PYSEC-2026-87 (lxml<6.1 XXE-Local-File-Read): lxml kommt nur transitiv über
+        # fints/sepaxml/xmlschema und fints pinnt lxml~=6.0.2 (<6.1) hart — 6.1.0 ist daher
+        # nicht installierbar (#fints). lxml verarbeitet hier ausschließlich die
+        # authentifizierten Bank-Antworten; eigenes (untrusted) XML parsen wir mit der
+        # stdlib `ElementTree`. Risiko in diesem Kontext nicht erreichbar → ausgenommen,
+        # bis fints lxml>=6.1 zulässt.
+        run: pip-audit --skip-editable --desc --ignore-vuln PYSEC-2026-87
 
   # ---- 6 FE-Unit/Komponente (Jest + ATL) ----------------------------------- #
   fe-unit:
