@@ -32,7 +32,10 @@ dependencies = [
     # Worker-Pfad) — der Contract-CI (nur Postgres) lädt sie nie.
     "python-magic>=0.4",
     "minio>=7.2",
-    "clamd>=1.0",
+    # >=1.0.2: clamd 1.0.1 ist sdist-only und baut über d2to1 (importiert
+    # setuptools.dist._get_unpatched, ab setuptools>=71 entfernt) → Build-Bruch.
+    # 1.0.2 liefert ein Wheel. Floor verhindert, dass der Resolver auf 1.0.1 zurückfällt.
+    "clamd>=1.0.2",
     # Multipart-Parsing für den Datei-Upload (FastAPI UploadFile/Form).
     "python-multipart>=0.0.18",
     # Live-Vote (T-16): Redis-PubSub-Fan-out + Cast-Lock (redis.asyncio) — bislang
