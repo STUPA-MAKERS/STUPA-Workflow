@@ -25,10 +25,11 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.13"
-  # Wheels Vorrang vor sdists geben: einige (transitive) Pakete tragen nur eine legacy
-  # setup.py (z. B. text-unidecode via sepaxml→fints, #fints), deren d2to1-Build mit
-  # neuem setuptools (>=71, kein `_get_unpatched` mehr) bricht. Die vorhandenen Wheels
-  # vermeiden den Build komplett und machen `pip install` deterministisch.
+  # text-unidecode (transitiv via fints→sepaxml, #fints) trägt nur eine legacy setup.py,
+  # deren d2to1-Build mit neuem setuptools (>=71, kein `_get_unpatched` mehr) bricht.
+  # `--prefer-binary` reicht nicht (pip baut die sdist trotzdem für Metadaten); das
+  # vorhandene Wheel hart erzwingen — gezielt nur für dieses Paket, alles andere frei.
+  PIP_ONLY_BINARY: "text-unidecode"
   PIP_PREFER_BINARY: "1"
 
 jobs:
