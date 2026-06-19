@@ -470,6 +470,11 @@ export class BudgetTreeApi {
   listInvoices(): Observable<Invoice[]> {
     return this.listInvoicesPaged({ limit: 200 }).pipe(map((page) => page.items));
   }
+  /** Einzelne Rechnung per ID (#invoices) — Detail-Dialog, falls die verknüpfte
+   *  Rechnung außerhalb des auf 200 gekappten Listen-Caches liegt. */
+  getInvoice(id: Uuid): Observable<Invoice> {
+    return this.http.get<Invoice>(`${this.base}/invoices/${id}`);
+  }
   createInvoice(body: InvoiceCreate): Observable<Invoice> {
     return this.http.post<Invoice>(`${this.base}/invoices`, body);
   }

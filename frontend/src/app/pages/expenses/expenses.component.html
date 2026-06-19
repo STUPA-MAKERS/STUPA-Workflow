@@ -110,6 +110,7 @@
                 @if (canManage()) {
                   <td class="exp__num">
                     <span class="exp__actions">
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!e.invoiceId" [ariaLabel]="'expenses.action.viewInvoice' | t" [title]="'expenses.action.viewInvoice' | t" (click)="openInvoiceDialog(e)"><app-icon name="document" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(e)"><app-icon name="edit" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(e)"><app-icon name="delete" /></app-button>
                     </span>
@@ -282,6 +283,28 @@
     <app-button variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>
     <app-button [loading]="saving()" (click)="saveEdit($event)">{{ 'action.save' | t }}</app-button>
   </div>
+</app-dialog>
+
+<!-- Verknüpfte Rechnung (read-only) -->
+<app-dialog [open]="!!viewingInvoice()" [title]="'expenses.invoice.title' | t" [closeLabel]="'action.close' | t" (closed)="viewingInvoice.set(null)">
+  @if (viewingInvoice(); as inv) {
+    <dl class="exp__invDetails">
+      <div><dt>{{ 'invoices.field.number' | t }}</dt><dd>{{ inv.number || '—' }}</dd></div>
+      <div><dt>{{ 'invoices.field.supplier' | t }}</dt><dd>{{ inv.supplier || '—' }}</dd></div>
+      <div><dt>{{ 'invoices.field.issueDate' | t }}</dt><dd>{{ inv.issueDate ? (inv.issueDate | ldate: 'mediumDate') : '—' }}</dd></div>
+      <div><dt>{{ 'invoices.field.dueDate' | t }}</dt><dd>{{ inv.dueDate ? (inv.dueDate | ldate: 'mediumDate') : '—' }}</dd></div>
+      <div><dt>{{ 'invoices.field.net' | t }}</dt><dd class="exp__mono">{{ inv.netAmount ? money(inv.netAmount) : '—' }}</dd></div>
+      <div><dt>{{ 'invoices.field.tax' | t }}</dt><dd class="exp__mono">{{ inv.taxAmount ? money(inv.taxAmount) : '—' }}</dd></div>
+      <div><dt>{{ 'invoices.field.gross' | t }}</dt><dd class="exp__mono font-semibold">{{ money(inv.grossAmount) }}</dd></div>
+      <div><dt>{{ 'invoices.field.status' | t }}</dt><dd><app-badge [variant]="inv.status === 'paid' ? 'success' : 'warning'">{{ (inv.status === 'paid' ? 'invoices.status.paid' : 'invoices.status.open') | t }}</app-badge></dd></div>
+      @if (inv.note) { <div><dt>{{ 'invoices.field.note' | t }}</dt><dd>{{ inv.note }}</dd></div> }
+    </dl>
+    @if (inv.hasFile) {
+      <app-button variant="secondary" size="sm" (click)="openInvoiceFile(inv)"><app-icon name="export" [size]="14" /> {{ inv.fileName || ('invoices.openFile' | t) }}</app-button>
+    } @else {
+      <p class="text-sm text-muted m-0">{{ 'expenses.invoice.noFile' | t }}</p>
+    }
+  }
 </app-dialog>
 
 <!-- Löschen -->
