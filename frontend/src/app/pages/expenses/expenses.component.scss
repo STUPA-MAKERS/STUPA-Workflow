@@ -53,6 +53,15 @@ input.exp__input {
 .exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
 .exp__amount--income { color: var(--color-success, #2e7d32); }
 .exp__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+.exp__invDetails {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+.exp__invDetails > div { display: contents; }
+.exp__invDetails dt { color: var(--color-text-muted); }
+.exp__invDetails dd { margin: 0; }
 .exp__sentinel { height: 1px; }
 /* --- Tabelle (#25) --- */
 .exp__tableWrap {

@@ -98,6 +98,7 @@
 
   <!-- Mitglied: Live-Verfolgung (Protokoll lesen, offene Abstimmungen mitstimmen). -->
   @if (isFollower() && !beamerMode()) {
+    <div class="mtg__follow">
     <app-card [heading]="'meetings.follow.title' | t">
       <p class="text-text-muted mb-3">{{ 'meetings.follow.lead' | t }}</p>
       @for (item of agenda(); track item.id; let i = $index) {
@@ -196,10 +197,14 @@
 
     <!-- Vertretung/Delegation für diese Sitzung (#delegation-rework). -->
     <app-meeting-delegation-card [meetingId]="m.id" />
+    </div>
   }
 
   @if (!beamerMode() && !isFollower()) {
-  <!-- Toolbar oberhalb des Bodies: Steuerung + Einstellungen + Löschen (Icon-Buttons). -->
+  <!-- Toolbar oberhalb des Bodies: Steuerung + Einstellungen + Löschen (Icon-Buttons).
+       Nur-Leser (#meeting-view-all) haben keine Aktion → Leiste ausblenden statt
+       leere Box zu zeigen. -->
+  @if (m.canControl || canWrite() || m.canManage) {
   <div class="mtg__toolbar" role="toolbar" [attr.aria-label]="'meetings.control.title' | t">
     <!-- »closed« ist terminal: nach dem Schließen entfallen alle Steuer-Buttons,
          eine geschlossene Sitzung lässt sich nicht wieder öffnen. -->
@@ -228,6 +233,7 @@
       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="askDeleteMeeting(m)"><app-icon name="delete" /></app-button>
     }
   </div>
+  }
 
   <!-- 3-Spalten-Shell: TOPs links, Protokoll-Body Mitte, Anwesenheit rechts. -->
   <div class="mtg__shell">

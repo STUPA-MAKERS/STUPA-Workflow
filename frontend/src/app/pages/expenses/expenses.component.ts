@@ -184,6 +184,8 @@ export class ExpensesComponent {
   readonly invoices = signal<Invoice[]>([]);
   readonly newInvoiceId = signal('');
   readonly editInvoiceId = signal('');
+  /** Detail-Dialog der verknüpften Rechnung einer Buchung (#invoices, read-only). */
+  readonly viewingInvoice = signal<Invoice | null>(null);
   /** Offene Rechnungen nach Rechnungsdatum (neueste zuerst, ohne Datum zuletzt). Beim
    *  Buchen wird die gewählte Rechnung serverseitig auf „bezahlt" gesetzt → eine bezahlte
    *  Rechnung darf nicht erneut verknüpft werden, taucht also nicht mehr im Dropdown auf. */
@@ -626,6 +628,33 @@ export class ExpensesComponent {
   private problemDetail(err: unknown): string {
     const detail = (err as { error?: { detail?: string } } | null)?.error?.detail;
     return detail || this.i18n.translate('expenses.toast.failed');
+  }
+
+  // --- verknüpfte Rechnung anzeigen (#invoices) ---
+  /** Detail-Dialog zur verknüpften Rechnung öffnen. Die volle Rechnung steckt im
+   *  bereits geladenen ``invoices()``-Cache (1 Rechnung : N Buchungen); ohne
+   *  ``invoiceId`` ist der Button ohnehin deaktiviert. */
+  openInvoiceDialog(e: Expense): void {
+    if (!e.invoiceId) return;
+    const cached = this.invoices().find((i) => i.id === e.invoiceId);
+    if (cached) {
+      this.viewingInvoice.set(cached);
+      return;
+    }
+    // Verknüpfte Rechnung (oft bezahlt/älter) kann außerhalb des 200er-Caches
+    // liegen → gezielt per ID nachladen, statt den Button stumm verpuffen zu lassen.
+    this.api.getInvoice(e.invoiceId).subscribe({
+      next: (inv) => this.viewingInvoice.set(inv),
+      error: (err) => this.toast.error(this.problemDetail(err)),
+    });
+  }
+
+  /** Beleg-PDF streamen + herunterladen (MinIO nur intern erreichbar → Blob). */
+  openInvoiceFile(inv: Invoice): void {
+    this.api.invoiceFileBlob(inv.id).subscribe({
+      next: (blob) => downloadBlob(blob, inv.fileName || 'beleg.pdf'),
+      error: (err) => this.toast.error(this.problemDetail(err)),
+    });
   }
 
   // --- edit ---

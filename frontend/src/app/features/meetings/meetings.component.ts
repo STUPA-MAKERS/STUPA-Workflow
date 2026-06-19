@@ -505,6 +505,12 @@ export class MeetingsComponent implements OnDestroy {
   readonly canManageVotes = computed(() => this.meeting()?.canManageVotes ?? false);
   readonly canVote = computed(() => this.meeting()?.canVote ?? false);
   readonly canWriteGlobal = computed(() => this.auth.can('protocol.write'));
+  /** Globale, rein additive LESE-Permission (#meeting-view-all): sieht JEDE Sitzung.
+   *  Solche Nur-Leser bekommen die Protokollant-3-Spalten-Ansicht statt der Live-
+   *  Verfolgung, aber komplett read-only — `canWrite`/`canManage` sind false, also
+   *  Editor disabled und alle Edit-Controls ausgeblendet, exakt wie nach dem
+   *  Finalisieren (#meeting-view-all). */
+  readonly canViewAll = computed(() => this.auth.can('meeting.view_all'));
   /** Mitglied irgendeines Gremiums → darf die (gefilterte) Sitzungsübersicht sehen. */
   readonly inAnyCommittee = computed(() => this.auth.gremien().length > 0);
   /** Stellvertreter-Pool-Mitglied → darf die (gefilterte) Timeline sehen (#7). */
@@ -541,6 +547,13 @@ export class MeetingsComponent implements OnDestroy {
   readonly isFollower = computed(() => {
     const m = this.meeting();
     if (!m) return false;
+    // Globale Nur-Leser (#meeting-view-all) sehen die volle 3-Spalten-Ansicht
+    // read-only statt der Live-Verfolgung — aber NUR, wenn sie auf dieser Sitzung
+    // sonst keinerlei Schreib-/Verwaltungsrecht haben. Sonst (z. B. Admin mit
+    // view_all + meeting.manage) griffe die Protokollant-Exklusivität unten nicht
+    // mehr und ein Nicht-Protokollant könnte parallel zum gewählten Protokollanten
+    // editieren (#meeting-view-all).
+    if (this.canViewAll() && !m.canWrite && !m.canManage) return false;
     if (m.protokollantId) return !this.isProtokollant();
     return !m.canWrite && !m.canManage;
   });
@@ -754,7 +767,7 @@ export class MeetingsComponent implements OnDestroy {
     this.connectLive(m.id);
     // Bestehendes Protokoll per GET lesen (kein Write-Rate-Limit, #429);
     // angelegt wird nur explizit über den Button (POST, loadProtocol).
-    if (m.protocolId && this.canWrite()) this.refreshProtocol();
+    if (m.protocolId && (this.canWrite() || this.canViewAll())) this.refreshProtocol();
     this.loadAttendance(m.id);
     this.loadAgenda(m.id);
   }
@@ -1003,7 +1016,7 @@ export class MeetingsComponent implements OnDestroy {
       `meeting_state`-Broadcast des Workers verloren geht. */
   private watchRendering(proto: Protocol): void {
     if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
-    if (proto.status !== 'rendering' || !this.canWrite()) return;
+    if (proto.status !== 'rendering' || (!this.canWrite() && !this.canViewAll())) return;
     this.renderPollTimer = setTimeout(() => {
       this.renderPollTimer = null;
       const m = this.meeting();
@@ -1560,7 +1573,11 @@ export class MeetingsComponent implements OnDestroy {
         // broadcastet meeting_state nach dem Hintergrund-Render (#async-finalize).
         // GET statt POST — Broadcast-Bursts dürfen das Write-Rate-Limit nicht
         // aufbrauchen (#429).
-        if (this.canWrite() && this.protocol() && !this.protocol()!.isFinal) {
+        if (
+          (this.canWrite() || this.canViewAll()) &&
+          this.protocol() &&
+          !this.protocol()!.isFinal
+        ) {
           this.api.getProtocol(m.id, { quiet: true }).subscribe({
             next: (proto) => this.applyProtocolUpdate(proto),
             error: () => {},
