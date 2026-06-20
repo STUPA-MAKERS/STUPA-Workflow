@@ -48,6 +48,10 @@
           <!-- TAN-Schritt (PSD2/SCA) -->
           <div class="bank__tan">
             <p class="bank__tanMsg">{{ challenge() || ('fints.tanPrompt' | t) }}</p>
+            @if (challengeImage()) {
+              <!-- photoTAN/QR-TAN: optischen Challenge zum Scannen anzeigen (#fints-qrtan) -->
+              <img class="bank__tanImg" [src]="challengeImage()" [alt]="'fints.tanImageAlt' | t" />
+            }
             @if (!decoupled()) {
               <label class="bank__label" for="bank-tan">{{ 'fints.tan' | t }}
                 <input

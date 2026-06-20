@@ -20,6 +20,7 @@ Logik (TAN-Mechanismus-Wahl, Konto-Auswahl, Umsatz-Normalisierung) bleibt geprü
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -50,6 +51,9 @@ class FintsOutcome:
     tan_data: bytes | None = None
     challenge: str | None = None
     challenge_html: str | None = None
+    # Optischer Challenge (photoTAN/QR-TAN) als fertige Data-URL ``data:<mime>;base64,…``
+    # zum direkten Anzeigen im ``<img>`` (#fints-qrtan).
+    challenge_image: str | None = None
     decoupled: bool = False
 
 
@@ -110,6 +114,24 @@ def _build_client(creds: FintsCredentials) -> FinTS3PinTanClient:  # pragma: no 
     )
 
 
+def _matrix_data_url(response: object) -> str | None:
+    """Optischen TAN-Challenge (photoTAN/QR-TAN) → Data-URL ``data:<mime>;base64,…``.
+
+    ``NeedTANResponse.challenge_matrix`` ist ``(mime: str, data: bytes)`` oder ``None``;
+    fehlerhafte/leere Werte ⇒ ``None`` (dann gibt es nur Text-Challenge + TAN-Eingabe)."""
+    matrix = getattr(response, "challenge_matrix", None)
+    if not matrix:
+        return None
+    try:
+        mime, data = matrix
+    except (TypeError, ValueError):
+        return None
+    if not data:
+        return None
+    mime = str(mime or "image/png")
+    return f"data:{mime};base64,{base64.b64encode(bytes(data)).decode('ascii')}"
+
+
 def _needs_tan(
     client: FinTS3PinTanClient, response: NeedTANResponse, mechanism: str | None
 ) -> FintsOutcome:  # pragma: no cover
@@ -123,6 +145,7 @@ def _needs_tan(
         tan_data=response.get_data(),
         challenge=getattr(response, "challenge", None),
         challenge_html=str(getattr(response, "challenge_html", "") or "") or None,
+        challenge_image=_matrix_data_url(response),
         decoupled=bool(getattr(response, "decoupled", False)),
     )
 

@@ -24,6 +24,7 @@ import {
 import { ToastService } from '@shared/ui/toast/toast.service';
 import {
   type AccountOption,
+  type BankSyncResult,
   BudgetTreeApi,
   type StatementLine,
   flattenBudgetOptions,
@@ -83,6 +84,8 @@ export class BankImportDialogComponent {
   // --- FinTS-TAN-Schritt ---
   readonly sessionToken = signal<string>('');
   readonly challenge = signal<string>('');
+  /** Optischer Challenge (photoTAN/QR-TAN) als Data-URL — leer = nur Text/Code (#fints-qrtan). */
+  readonly challengeImage = signal<string>('');
   readonly decoupled = signal(false);
   readonly tanCode = signal('');
   readonly tanBusy = signal(false);
@@ -186,10 +189,11 @@ export class BankImportDialogComponent {
     });
   }
 
-  private handleSync(res: { status: string; sessionToken: Uuid | null; challenge: string | null; decoupled: boolean; imported: number; duplicates: number }): void {
+  private handleSync(res: BankSyncResult): void {
     if (res.status === 'needs_tan') {
       this.sessionToken.set(res.sessionToken ?? '');
       this.challenge.set(res.challenge ?? '');
+      this.challengeImage.set(res.challengeImage ?? '');
       this.decoupled.set(res.decoupled);
       return;
     }
@@ -205,6 +209,7 @@ export class BankImportDialogComponent {
   private resetTan(): void {
     this.sessionToken.set('');
     this.challenge.set('');
+    this.challengeImage.set('');
     this.decoupled.set(false);
     this.tanCode.set('');
   }

@@ -49,6 +49,7 @@ const SYNC_DONE: BankSyncResult = {
   sessionToken: null,
   challenge: null,
   challengeHtml: null,
+  challengeImage: null,
   decoupled: false,
 };
 
@@ -60,6 +61,7 @@ const SYNC_TAN: BankSyncResult = {
   sessionToken: 'sess-1',
   challenge: 'Bitte TAN',
   challengeHtml: null,
+  challengeImage: null,
   decoupled: false,
 };
 
@@ -146,6 +148,18 @@ describe('BankImportDialogComponent', () => {
     cmp.startSync();
     expect(cmp.hasPendingTan()).toBe(true);
     expect(cmp.challenge()).toBe('Bitte TAN');
+    expect(cmp.challengeImage()).toBe(''); // kein optischer Challenge
+  });
+
+  it('startSync needs_tan renders the photoTAN/QR image when provided', async () => {
+    const dataUrl = 'data:image/png;base64,QQ==';
+    const tanImg: BankSyncResult = { ...SYNC_TAN, challengeImage: dataUrl };
+    const { cmp, fixture } = await setup(makeApi({ fintsSync: jest.fn(() => of(tanImg)) }));
+    cmp.startSync();
+    fixture.detectChanges();
+    expect(cmp.challengeImage()).toBe(dataUrl);
+    const img = fixture.nativeElement.querySelector('.bank__tanImg') as HTMLImageElement | null;
+    expect(img?.getAttribute('src')).toBe(dataUrl);
   });
 
   it('submitTan done clears the TAN step and reloads', async () => {

@@ -516,6 +516,8 @@ class BankSyncResult(_CamelModel):
     session_token: UUID | None = Field(default=None, alias="sessionToken")
     challenge: str | None = None
     challenge_html: str | None = Field(default=None, alias="challengeHtml")
+    # Optischer Challenge (photoTAN/QR-TAN) als Data-URL zum direkten Anzeigen (#fints-qrtan).
+    challenge_image: str | None = Field(default=None, alias="challengeImage")
     decoupled: bool = False
 
 

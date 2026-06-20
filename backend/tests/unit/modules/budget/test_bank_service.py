@@ -377,6 +377,7 @@ async def test_sync_account_needs_tan(monkeypatch: pytest.MonkeyPatch) -> None:
             dialog_data=b"d",
             tan_data=b"t",
             challenge="Bitte TAN",
+            challenge_image="data:image/png;base64,QQ==",
             decoupled=False,
         )
 
@@ -385,6 +386,7 @@ async def test_sync_account_needs_tan(monkeypatch: pytest.MonkeyPatch) -> None:
     assert res.status == "needs_tan"
     assert res.session_token is not None
     assert res.challenge == "Bitte TAN"
+    assert res.challenge_image == "data:image/png;base64,QQ=="  # photoTAN/QR durchgereicht
     # Sitzung wurde verschlüsselt gespeichert.
     assert any(type(o).__name__ == "BankSyncSession" for o in session.added)
 

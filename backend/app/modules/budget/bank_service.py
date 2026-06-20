@@ -205,6 +205,7 @@ class BankService:
             sessionToken=token,
             challenge=outcome.challenge,
             challengeHtml=outcome.challenge_html,
+            challengeImage=outcome.challenge_image,
             decoupled=outcome.decoupled,
         )
 

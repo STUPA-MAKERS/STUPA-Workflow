@@ -117,6 +117,8 @@ export interface BankSyncResult {
   sessionToken: Uuid | null;
   challenge: string | null;
   challengeHtml: string | null;
+  /** Optischer Challenge (photoTAN/QR-TAN) als Data-URL zum direkten Anzeigen (#fints-qrtan). */
+  challengeImage: string | null;
   decoupled: boolean;
 }
 

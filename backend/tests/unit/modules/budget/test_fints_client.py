@@ -49,3 +49,30 @@ def test_outcome_dataclass_defaults() -> None:
     out = fc.FintsOutcome(status="done")
     assert out.lines == []
     assert out.decoupled is False
+    assert out.challenge_image is None
+
+
+class _Resp:
+    def __init__(self, matrix: object) -> None:
+        self.challenge_matrix = matrix
+
+
+def test_matrix_data_url_valid() -> None:
+    url = fc._matrix_data_url(_Resp(("image/png", b"\x89PNG")))
+    assert url is not None
+    assert url.startswith("data:image/png;base64,")
+
+
+def test_matrix_data_url_default_mime() -> None:
+    url = fc._matrix_data_url(_Resp((None, b"data")))
+    assert url is not None and url.startswith("data:image/png;base64,")
+
+
+def test_matrix_data_url_absent_or_empty() -> None:
+    assert fc._matrix_data_url(_Resp(None)) is None  # kein optischer Challenge
+    assert fc._matrix_data_url(_Resp(("image/png", b""))) is None  # leere Daten
+    assert fc._matrix_data_url(object()) is None  # Attribut fehlt
+
+
+def test_matrix_data_url_bad_tuple() -> None:
+    assert fc._matrix_data_url(_Resp(("only-one",))) is None  # nicht entpackbar

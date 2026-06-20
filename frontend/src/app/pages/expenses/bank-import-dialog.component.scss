@@ -45,6 +45,18 @@
   border-radius: 0.5rem;
 }
 
+.bank__tanImg {
+  align-self: center;
+  max-width: 16rem;
+  max-height: 16rem;
+  image-rendering: pixelated; // QR-/Matrix-Codes scharf skalieren
+  border: 1px solid var(--border, #e2e8f0);
+  border-style: solid;
+  border-radius: 0.5rem;
+  background: #fff; // weißer Hintergrund — QR auch im Dark-Mode scanbar
+  padding: 0.5rem;
+}
+
 .bank__tanMsg {
   margin: 0;
   font-weight: 600;
