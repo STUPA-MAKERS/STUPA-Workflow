@@ -330,8 +330,6 @@ export interface BudgetTreeNode {
   /** Nur am Top-Level: Flow-State-Keys, die als angenommen/abgelehnt gelten. */
   acceptedStateKeys: string[];
   deniedStateKeys: string[];
-  /** Ganze Kostenstelle (inkl. Unterbaum) gilt je HHJ als gebunden (committed = allocated). */
-  fullyBound: boolean;
   /** Im Budget-Tab ausblenden (#budget-hide) — reine Anzeige, Rollups unverändert. */
   hiddenInBudget: boolean;
   /** Sichtbarkeits-Gremium (#budget-scope): dessen Mitglieder sehen diesen
@@ -356,7 +354,6 @@ export interface BudgetNode {
   color?: string | null;
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
-  fullyBound?: boolean;
   hiddenInBudget?: boolean;
   fiscalStartMonth?: number;
   fiscalStartDay?: number;
@@ -393,7 +390,6 @@ export interface BudgetNodeUpdate {
   color?: string | null;
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
-  fullyBound?: boolean;
   hiddenInBudget?: boolean;
   /** Sichtbarkeits-Gremium (#budget-scope); `null` löscht die Zuordnung. */
   viewGremiumId?: Uuid | null;

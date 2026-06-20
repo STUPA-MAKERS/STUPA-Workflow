@@ -54,7 +54,6 @@ class BudgetNodeUpdate(_CamelModel):
     color: str | None = None
     accepted_state_keys: list[str] | None = Field(default=None, alias="acceptedStateKeys")
     denied_state_keys: list[str] | None = Field(default=None, alias="deniedStateKeys")
-    fully_bound: bool | None = Field(default=None, alias="fullyBound")
     hidden_in_budget: bool | None = Field(default=None, alias="hiddenInBudget")
     # Sichtbarkeits-Gremium (#budget-scope) — ``None`` im Payload löscht die Zuordnung.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
@@ -77,7 +76,6 @@ class BudgetNodeOut(_CamelModel):
     color: str | None = None
     accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
-    fully_bound: bool = Field(default=False, alias="fullyBound")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
@@ -118,7 +116,6 @@ class BudgetTreeNodeOut(_CamelModel):
     color: str | None = None
     accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
-    fully_bound: bool = Field(default=False, alias="fullyBound")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")

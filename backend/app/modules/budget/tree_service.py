@@ -135,7 +135,6 @@ def _node_out(b: Budget) -> BudgetNodeOut:
         color=b.color,
         acceptedStateKeys=list(b.accepted_state_keys or []),
         deniedStateKeys=list(b.denied_state_keys or []),
-        fullyBound=b.fully_bound,
         hiddenInBudget=bool(b.hidden_in_budget),
         viewGremiumId=b.view_gremium_id,
         fiscalStartMonth=b.fiscal_start_month,
@@ -273,7 +272,6 @@ class BudgetTreeService:
             currency=payload.currency,
             active=payload.active,
             color=payload.color,
-            fully_bound=False,
             # Stichtag nur am Top-Level fachlich relevant (Kinder bleiben beim Default).
             fiscal_start_month=payload.fiscal_start_month,
             fiscal_start_day=payload.fiscal_start_day,
@@ -1967,20 +1965,9 @@ class BudgetTreeService:
             if n.parent_id is None
         }
 
-        # »Komplett gebunden«: Kostenstellen, deren gesamte Zuteilung je HHJ als gebunden
-        # zählt. Echte Anträge/Ausgaben unter einem solchen Knoten (er selbst + Unterbaum)
-        # werden NICHT zusätzlich gezählt; stattdessen wird die Zuteilung als gebunden
-        # injiziert (rollt zum Parent hoch).
-        flagged_paths = sorted(n.path_key for n in nodes if n.fully_bound)
-
-        def _under_flagged(path: str) -> bool:
-            return any(path == fp or path.startswith(fp + _SEP) for fp in flagged_paths)
-
         bound_rows: list[tuple[object, str, Decimal | None]] = []
         requested_rows: list[tuple[object, str, Decimal | None]] = []
         for app_id, path, fy, amount, state_key in app_rows:
-            if _under_flagged(path):
-                continue  # voll gebunden → echte Anträge ignorieren
             accepted, denied = top_config.get(path.split("-")[0], (set(), set()))
             if state_key in accepted:
                 # Bindung anteilig um bereits gebundene Ausgaben mindern (#25).
@@ -2001,20 +1988,13 @@ class BudgetTreeService:
         expended_rows = [
             (fy, path, amount)
             for path, fy, amount, kind, _app in expense_rows
-            if kind == "expense" and not _under_flagged(path)
+            if kind == "expense"
         ]
         income_rows = [
             (fy, path, amount)
             for path, fy, amount, kind, _app in expense_rows
-            if kind == "income" and not _under_flagged(path)
+            if kind == "income"
         ]
-
-        # Synthetische Bindung: ganze Zuteilung der markierten Kostenstelle = gebunden.
-        flagged_ids = {n.id for n in nodes if n.fully_bound}
-        path_by_id = {n.id: n.path_key for n in nodes}
-        for a in allocs:
-            if a.budget_id in flagged_ids and a.allocated:
-                bound_rows.append((a.fiscal_year_id, path_by_id[a.budget_id], a.allocated))
 
         node_tuples = [
             (
@@ -2031,7 +2011,6 @@ class BudgetTreeService:
                 list(n.denied_state_keys or []),
                 n.fiscal_start_month,
                 n.fiscal_start_day,
-                n.fully_bound,
                 bool(n.hidden_in_budget),
                 n.view_gremium_id,
             )

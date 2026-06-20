@@ -10,7 +10,7 @@ Pfad wird einzeln getroffen.
 Ergänzt ``test_budget_tree_service_unit`` um die dort nicht berührten Methoden
 (Expenses, Accounts, Invoices, Transfer, ZUGFeRD-Import, ``can_view_node``,
 ``list_applications``, ``_rename_key``, Suche/Paging, ``_actor_names``) sowie die
-verbleibenden ``get_tree``-Zweige (fully_bound, remaining≤0, Gremium-Scope).
+verbleibenden ``get_tree``-Zweige (remaining≤0, Gremium-Scope).
 """
 
 from __future__ import annotations
@@ -169,14 +169,14 @@ def fake_session(*results: _R, gets: list[Any] | None = None) -> Any:
 # ----------------------------------------------------------------- factories
 def _budget(  # noqa: ANN001
     *, id=None, parent_id=None, path_key="VS", gremium_id=None, key="VS", name="N",
-    currency="EUR", fiscal_start_month=1, fiscal_start_day=1, fully_bound=False,
+    currency="EUR", fiscal_start_month=1, fiscal_start_day=1,
     view_gremium_id=None, accepted=None, denied=None,
 ):
     b = Budget(
         parent_id=parent_id, gremium_id=gremium_id, key=key,
         path_key=path_key, name=name, currency=currency, active=True,
         fiscal_start_month=fiscal_start_month, fiscal_start_day=fiscal_start_day,
-        fully_bound=fully_bound, view_gremium_id=view_gremium_id,
+        view_gremium_id=view_gremium_id,
     )
     b.id = id or uuid.uuid4()
     b.accepted_state_keys = accepted or []
@@ -1421,26 +1421,6 @@ async def test_actor_names_fallback_to_sub() -> None:
 
 
 # --------------------------------------------------------------- get_tree branches
-async def test_get_tree_fully_bound_injects_allocation() -> None:
-    """fully_bound: echte Anträge/Ausgaben unter dem Knoten ignoriert, Zuteilung als
-    gebunden injiziert (Zeilen 1577-1584, 1614-1618)."""
-    fy_id = uuid.uuid4()
-    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", fully_bound=True,
-                  accepted=["approved"])
-    alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
-    # app under flagged node → ignored; expense under flagged node → ignored
-    app_row = (uuid.uuid4(), "VS", fy_id, Decimal("250"), "approved")
-    exp_row = ("VS", fy_id, Decimal("60"), "expense", None)
-    sess = fake_session(
-        result(top), result(alloc), result(app_row), result(exp_row),
-    )
-    svc = BudgetTreeService(sess)
-    view = (await svc.get_tree())[0].by_fiscal_year[0]
-    assert view.bound == Decimal("1000")     # ganze Zuteilung injiziert
-    assert view.expended == Decimal("0")     # echte Ausgabe ignoriert
-    assert view.available == Decimal("0")
-
-
 async def test_get_tree_accepted_remaining_nonpositive_skipped() -> None:
     """accepted app, aber Ausgaben ≥ Betrag → remaining ≤ 0 → kein bound_row
     (Branch 1590->1582)."""
@@ -1483,20 +1463,6 @@ async def test_get_tree_denied_excluded() -> None:
     view = (await svc.get_tree())[0].by_fiscal_year[0]
     assert view.bound == Decimal("0")
     assert view.requested == Decimal("0")
-
-
-async def test_get_tree_fully_bound_zero_allocation_not_injected() -> None:
-    # fully_bound but allocation 0/None → not injected (Branch a.allocated falsy at 1617).
-    fy_id = uuid.uuid4()
-    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", fully_bound=True)
-    alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="0")
-    sess = fake_session(result(top), result(alloc), result(), result())
-    svc = BudgetTreeService(sess)
-    tree = await svc.get_tree()
-    # allocation 0 → either no view or bound 0
-    views = tree[0].by_fiscal_year
-    if views:
-        assert views[0].bound == Decimal("0")
 
 
 async def test_get_tree_with_gremium_scope() -> None:

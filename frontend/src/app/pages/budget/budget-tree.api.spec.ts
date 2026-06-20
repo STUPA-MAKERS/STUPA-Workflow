@@ -25,7 +25,6 @@ function node(over: Partial<BudgetTreeNode> = {}): BudgetTreeNode {
     color: null,
     acceptedStateKeys: [],
     deniedStateKeys: [],
-    fullyBound: false,
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,

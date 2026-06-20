@@ -42,7 +42,6 @@ function node(over: Partial<BudgetTreeNode> & { id: string }): BudgetTreeNode {
     color: over.color ?? null,
     acceptedStateKeys: over.acceptedStateKeys ?? [],
     deniedStateKeys: over.deniedStateKeys ?? [],
-    fullyBound: over.fullyBound ?? false,
     hiddenInBudget: over.hiddenInBudget ?? false,
     viewGremiumId: over.viewGremiumId ?? null,
     fiscalStartMonth: over.fiscalStartMonth ?? 1,

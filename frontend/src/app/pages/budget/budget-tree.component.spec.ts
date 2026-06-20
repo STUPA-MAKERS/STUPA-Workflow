@@ -32,7 +32,6 @@ function fullNode(over: Partial<BudgetTreeNode>): BudgetTreeNode {
     color: null,
     acceptedStateKeys: [],
     deniedStateKeys: [],
-    fullyBound: false,
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
@@ -733,12 +732,11 @@ describe('BudgetTreeComponent (#9)', () => {
   });
 
   // -------------------------------------------------------------- limit dialog
-  it('openLimit prefills the value from the current allocation and the fullyBound flag', async () => {
+  it('openLimit prefills the value from the current allocation', async () => {
     const { c } = await setup();
     c.openLimit(TREE[0]);
     expect(c.limitNode()).toBe(TREE[0]);
     expect(c.limitValue()).toBe('1000');
-    expect(c.limitFullyBound()).toBe(false);
   });
 
   it('openLimit defaults the value to "" when there is no matching allocation', async () => {
@@ -753,35 +751,6 @@ describe('BudgetTreeComponent (#9)', () => {
     c.openLimit(TREE[0]);
     c.closeLimit();
     expect(c.limitNode()).toBeNull();
-  });
-
-  it('toggleFullyBound does nothing without a limit node', async () => {
-    const { c, http } = await setup();
-    c.toggleFullyBound(true);
-    http.verify();
-  });
-
-  it('toggleFullyBound PATCHes the flag, toasts and reloads', async () => {
-    const { c, http, toast } = await setup();
-    c.openLimit(TREE[0]);
-    c.toggleFullyBound(true);
-    expect(c.limitFullyBound()).toBe(true);
-    const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
-    expect(patch.request.body).toEqual({ fullyBound: true });
-    patch.flush({});
-    expect(toast.success).toHaveBeenCalled();
-    flushReload(http);
-  });
-
-  it('toggleFullyBound reverts the flag and toasts an error on failure', async () => {
-    const { c, http, toast } = await setup();
-    c.openLimit(TREE[0]);
-    c.toggleFullyBound(true);
-    http
-      .expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH')
-      .flush(null, { status: 500, statusText: 'err' });
-    expect(c.limitFullyBound()).toBe(false); // reverted to !checked
-    expect(toast.error).toHaveBeenCalled();
   });
 
   it('saveLimit does nothing without a node or fiscal year', async () => {

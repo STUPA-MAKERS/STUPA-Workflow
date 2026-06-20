@@ -68,10 +68,6 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     # abgelehnt (→ ausgeschlossen) gelten. Alles andere zählt als »beantragt«.
     accepted_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
     denied_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
-    # Komplett gebunden (#budget): die gesamte Zuteilung der Kostenstelle (inkl.
-    # Unterbaum) gilt je HHJ als gebunden (committed = allocated, verfügbar 0) — echte
-    # Anträge/Ausgaben darauf werden dann nicht zusätzlich gezählt. Rollt zum Parent hoch.
-    fully_bound: Mapped[bool] = mapped_column(Boolean, server_default="false")
     # Im Budget-Tab ausblenden (#budget-hide): reine Anzeige-Einstellung — Werte
     # zählen unverändert in Eltern-Rollups/Export; nur das Dashboard filtert.
     # Python-Default zusätzlich zum Server-Default: auch frisch konstruierte

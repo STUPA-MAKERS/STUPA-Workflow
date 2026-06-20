@@ -1051,11 +1051,6 @@ export const de = {
   'budget.tree.openNav': 'Budget wählen',
   'budget.tree.navTitle': 'Budget & Haushaltsjahr',
   'budget.tree.pickHint': 'Wähle ein Budget, um seine Kostenstellen zu bearbeiten.',
-  'budget.tree.fullyBound': 'Komplett als gebunden rechnen (alle Haushaltsjahre)',
-  'budget.tree.fullyBoundHint':
-    'Die gesamte Zuteilung dieser Kostenstelle gilt je Haushaltsjahr als gebunden (verfügbar 0). Anträge darauf werden nicht zusätzlich gezählt.',
-  'budget.tree.fullyBoundBadge': 'gebunden',
-  'budget.tree.toast.fullyBoundSaved': 'Bindung gespeichert.',
   'budget.tree.day': 'Tag',
   'budget.tree.month': 'Monat',
   'budget.tree.toast.created': 'Kostenstelle angelegt.',
@@ -3096,11 +3091,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.openNav': 'Choose budget',
   'budget.tree.navTitle': 'Budget & fiscal year',
   'budget.tree.pickHint': 'Pick a budget to edit its cost centres.',
-  'budget.tree.fullyBound': 'Count entire cost centre as committed (all fiscal years)',
-  'budget.tree.fullyBoundHint':
-    'The full allocation of this cost centre counts as committed each fiscal year (available 0). Applications on it are not counted additionally.',
-  'budget.tree.fullyBoundBadge': 'committed',
-  'budget.tree.toast.fullyBoundSaved': 'Binding saved.',
   'budget.tree.day': 'Day',
   'budget.tree.month': 'Month',
   'budget.tree.toast.created': 'Cost centre created.',
