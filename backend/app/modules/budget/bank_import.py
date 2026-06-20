@@ -189,11 +189,12 @@ def assign_keys(account_scope: str, lines: list[StatementLine]) -> None:
     """Idempotenz-Schlüssel je Umsatz **in-place** setzen (#fints-research).
 
     Bevorzugt die bank-vergebene Referenz (``bank_ref``); fehlt sie, ein Inhalts-Hash aus
-    (Konto-Scope, Wert-/Buchungsdatum, Cent-Betrag, Gegen-IBAN, End-to-End-Ref, **voller**
+    (Konto-Scope, **Wertstellung**, Cent-Betrag, Gegen-IBAN, End-to-End-Ref, gekürzter
     Zweck) **plus** einem Intraday-Lauf-Index. Der Lauf-Index trennt zwei *innerhalb eines
-    Imports* identische Umsätze; die zusätzlichen Felder (E2E-Ref, Buchungsdatum, voller
-    Zweck) verringern das Risiko, dass zwei genuin verschiedene Zahlungen aus *getrennten*
-    Importen denselben Hash treffen und eine fälschlich als Dublette verworfen wird.
+    Imports* identische Umsätze; die E2E-Ref trennt genuin verschiedene Zahlungen aus
+    *getrennten* Importen. ``booking_date`` ist **bewusst nicht** Teil des Hashes — es ist
+    bei vorgemerkten Umsätzen erst null und später gesetzt; sonst gälte derselbe Umsatz
+    pending vs. gebucht als zwei verschiedene und würde doppelt importiert.
     """
     seen: dict[tuple[object, ...], int] = {}
     for ln in lines:
@@ -202,11 +203,10 @@ def assign_keys(account_scope: str, lines: list[StatementLine]) -> None:
             continue
         base: tuple[object, ...] = (
             ln.value_date.isoformat() if ln.value_date else "",
-            ln.booking_date.isoformat() if ln.booking_date else "",
             str(ln.amount),
             ln.counterparty_iban or "",
             ln.end_to_end_id or "",
-            ln.purpose or "",
+            (ln.purpose or "")[:140],
         )
         seq = seen.get(base, 0)
         seen[base] = seq + 1

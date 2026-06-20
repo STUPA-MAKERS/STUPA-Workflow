@@ -518,28 +518,29 @@ class BankService:
                     code="expense_already_allocated",
                 )
 
-        # Atomarer Claim: nebenläufige Confirms serialisieren — nur einer gewinnt, sonst
-        # würde derselbe Umsatz doppelt gebucht (#fints-review). Der konditionale UPDATE
-        # (match_state != 'matched') wirkt als Zeilen-Lock; der Verlierer bekommt 0 Zeilen.
-        prev_state = line.match_state
-        claimed = (
-            await self.session.execute(
-                update(BankStatementLine)
-                .where(
-                    BankStatementLine.id == line_id,
-                    BankStatementLine.match_state != "matched",
-                )
-                .values(match_state="matched")
-                .returning(BankStatementLine.id)
-            )
-        ).first()
-        if claimed is None:
-            raise ValidationProblem(
-                "Statement line is already matched.", code="line_already_matched"
-            )
-        await self.session.commit()  # Lock freigeben; nebenläufiger Verlierer sieht 'matched'
-
+        # **Eine** Transaktion für Claim + Buchung + Allocation + Audit (#fints-review):
+        # Der konditionale Claim-UPDATE (match_state != 'matched') hält die Zeile gesperrt,
+        # bis ganz unten committet wird → nebenläufige Confirms blockieren und sehen danach
+        # 'matched' (kein Doppel-Buchen). book_expense läuft mit ``commit=False``, sodass
+        # ein Fehler an JEDER Stelle per rollback ALLES zurücknimmt — Claim **und** Buchung
+        # (keine verwaiste Buchung, kein Doppel-Soll bei Retry).
         try:
+            claimed = (
+                await self.session.execute(
+                    update(BankStatementLine)
+                    .where(
+                        BankStatementLine.id == line_id,
+                        BankStatementLine.match_state != "matched",
+                    )
+                    .values(match_state="matched")
+                    .returning(BankStatementLine.id)
+                )
+            ).first()
+            if claimed is None:
+                raise ValidationProblem(
+                    "Statement line is already matched.", code="line_already_matched"
+                )
+
             if expense is not None:
                 expense_out = tree._expense_out(expense, None)
                 expense_id = expense.id
@@ -558,11 +559,11 @@ class BankService:
                         paymentMethod="ueberweisung",
                     ),
                     actor=self.actor or "",
+                    commit=False,  # gemeinsame Transaktion — der Commit unten ist der einzige
                 )
                 expense_out = created
                 expense_id = created.id
 
-            # book_expense hat bereits committet → eigene Mutationen hier anschließen.
             self.session.add(
                 BankAllocation(
                     id=uuid.uuid4(),
@@ -580,15 +581,9 @@ class BankService:
             )
             await self.session.commit()
         except Exception:
-            # Buchen nach dem Claim fehlgeschlagen → Claim zurücknehmen, damit der Umsatz
-            # erneut bestätigt werden kann (kein »matched« ohne Buchung).
+            # Alles in einer Transaktion → ein Rollback nimmt Claim + Buchung gemeinsam
+            # zurück; der Umsatz bleibt offen und kann sauber erneut bestätigt werden.
             await self.session.rollback()
-            await self.session.execute(
-                update(BankStatementLine)
-                .where(BankStatementLine.id == line_id)
-                .values(match_state=prev_state)
-            )
-            await self.session.commit()
             raise
         return expense_out
 
@@ -618,6 +613,12 @@ class BankService:
         line = await self.session.get(BankStatementLine, line_id)
         if line is None:
             raise NotFoundError(f"statement line {line_id} not found")
+        if line.match_state == "matched":
+            # Ein gebuchter Umsatz (mit Expense + Allocation) darf nicht still auf
+            # 'ignored' gekippt werden — das würde Reconcile-Status vom Ledger entkoppeln.
+            raise ValidationProblem(
+                "A matched statement line cannot be ignored.", code="line_already_matched"
+            )
         line.match_state = "ignored"
         await self._audit(AuditAction.BANK_LINE_IGNORE, target_id=str(line.id))
         await self.session.commit()

@@ -72,6 +72,8 @@ def test_require_fints_key_returns_key(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_create_account_with_fints(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _svc(session, monkeypatch)
+    # SSRF-Validator (DNS) ist separat getestet; hier neutralisieren, kein Netz im Unit-Test.
+    monkeypatch.setattr(ts_mod, "validate_fints_endpoint", lambda _u: None)
     out = await svc.create_account(
         AccountCreate(
             name="Giro",
@@ -113,6 +115,7 @@ async def test_update_account_name_only(monkeypatch: pytest.MonkeyPatch) -> None
 async def test_update_account_sets_then_clears_pin(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _svc(session, monkeypatch)
+    monkeypatch.setattr(ts_mod, "validate_fints_endpoint", lambda _u: None)  # kein DNS im Unit-Test
     acc = Account(id=uuid.uuid4(), name="Giro", iban="DE1", active=True)
     session.put(acc)
     await svc.update_account(

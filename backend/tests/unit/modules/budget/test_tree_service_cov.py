@@ -460,6 +460,21 @@ async def test_book_expense_standalone_with_account_and_actor() -> None:
     assert out.actor_name == "Alice"   # display_name aufgelöst
 
 
+async def test_book_expense_commit_false_defers_commit() -> None:
+    # commit=False (Bankabgleich): Buchung wird angelegt, aber NICHT committet.
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    top = node
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
+    sess = fake_session(result(node), result(top), result(fy), result())
+    svc = BudgetTreeService(sess)
+    payload = ExpenseCreate(
+        amount=Decimal("7.00"), description="d", budgetId=node.id, fiscalYearId=fy.id
+    )
+    out = await svc.book_expense(payload, actor="", commit=False)
+    assert out.amount == Decimal("7.00")
+    assert sess.committed == 0  # Commit dem Aufrufer überlassen
+
+
 async def test_create_expense_compat_wraps_budget_id() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     top = node

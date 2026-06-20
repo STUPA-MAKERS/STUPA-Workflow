@@ -21,7 +21,6 @@ Logik (TAN-Mechanismus-Wahl, Konto-Auswahl, Umsatz-Normalisierung) bleibt geprü
 from __future__ import annotations
 
 import base64
-import ipaddress
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -29,6 +28,7 @@ from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlsplit
 
 from app.modules.budget.bank_import import StatementLine, lines_from_mt940_transactions
+from app.modules.webhooks.ssrf import Resolver, SsrfError, assert_allowed_url, default_resolver
 
 if TYPE_CHECKING:
     from fints.client import FinTS3PinTanClient, NeedTANResponse
@@ -38,37 +38,24 @@ class FintsError(RuntimeError):
     """FinTS-Abruf fehlgeschlagen (Verbindung, Login, Protokoll)."""
 
 
-# Interne Hostnamen, die nie ein echter FinTS-Endpunkt sind (SSRF, #fints-review).
-_BLOCKED_HOST_SUFFIXES = (".localhost", ".local", ".internal", ".lan", ".home")
+def validate_fints_endpoint(url: str, *, resolver: Resolver = default_resolver) -> None:
+    """FinTS-Endpunkt gegen SSRF prüfen (#fints-review).
 
+    Erzwingt ``https`` (FinTS läuft über TLS) und delegiert die Host-/IP-Prüfung an den
+    bestehenden, gehärteten ``assert_allowed_url``-Guard (löst DNS auf, prüft **alle**
+    A/AAAA-Records, entpackt IPv4-mapped/6to4/**NAT64** und blockt jede nicht-globale
+    Adresse — inkl. loopback/privat/link-local/Metadaten-IP, alternativer IPv4-Kodierungen
+    und auf interne IPs auflösender öffentlicher Namen). ``resolver`` ist für Tests
+    injizierbar.
 
-def validate_fints_endpoint(url: str) -> None:
-    """FinTS-Endpunkt gegen offensichtliche SSRF-Ziele prüfen (#fints-review).
-
-    Erzwingt ``https`` (FinTS läuft über TLS) und blockt IP-Literale in nicht-globalen
-    Bereichen (loopback/privat/link-local, inkl. ``169.254.169.254``) sowie interne
-    Hostnamen (``localhost``/``.internal`` …). Reine Prüfung ohne DNS — deterministisch
-    und test-tauglich; gegen einen auf eine interne IP **auflösenden** öffentlichen Namen
-    schützt sie nicht (der FinTS-Zugang ist account.manage-beschränkt; das Protokoll ist
-    HBCI, kein freier HTTP-Abruf).
-
-    :raises ValueError: Schema ≠ https, Host fehlt, interne IP oder interner Hostname.
+    :raises ValueError: Schema ≠ https, oder vom SSRF-Guard abgelehnt.
     """
-    parsed = urlsplit(url)
-    if parsed.scheme.lower() != "https":
+    if urlsplit(url).scheme.lower() != "https":
         raise ValueError("FinTS endpoint must use https")
-    host = parsed.hostname
-    if not host:
-        raise ValueError("FinTS endpoint has no host")
-    lowered = host.lower()
-    if lowered == "localhost" or lowered.endswith(_BLOCKED_HOST_SUFFIXES):
-        raise ValueError(f"FinTS endpoint host is not allowed: {host}")
     try:
-        ip = ipaddress.ip_address(host)
-    except ValueError:
-        return  # Hostname (kein IP-Literal) — ok
-    if not ip.is_global:
-        raise ValueError(f"FinTS endpoint points at a non-global address: {host}")
+        assert_allowed_url(url, resolver=resolver)
+    except SsrfError as exc:
+        raise ValueError(f"FinTS endpoint not allowed: {exc}") from exc
 
 
 @dataclass(slots=True)

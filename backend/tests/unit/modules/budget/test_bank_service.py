@@ -229,8 +229,9 @@ async def test_confirm_line_new_booking(monkeypatch: pytest.MonkeyPatch) -> None
     line = _line(counterparty_iban="DEXP")
     session.put(line)
 
-    async def _book(self: Any, payload: Any, *, actor: str) -> ExpenseOut:
+    async def _book(self: Any, payload: Any, *, actor: str, commit: bool = True) -> ExpenseOut:
         assert payload.kind == "expense"
+        assert commit is False  # Bankabgleich bucht in gemeinsamer Transaktion
         return _canned_expense("expense")
 
     monkeypatch.setattr(BudgetTreeService, "book_expense", _book)

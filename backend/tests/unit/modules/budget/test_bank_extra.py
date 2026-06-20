@@ -170,7 +170,7 @@ async def test_confirm_line_description_override(monkeypatch: pytest.MonkeyPatch
     session.put(line)
     seen: dict[str, Any] = {}
 
-    async def _book(self: Any, payload: Any, *, actor: str) -> ExpenseOut:
+    async def _book(self: Any, payload: Any, *, actor: str, commit: bool = True) -> ExpenseOut:
         seen["description"] = payload.description
         return ExpenseOut(
             id=uuid.uuid4(), budgetId=uuid.uuid4(), fiscalYearId=uuid.uuid4(),
@@ -419,11 +419,22 @@ async def test_confirm_line_booking_failure_reverts_claim(monkeypatch: pytest.Mo
     line = _line()
     session.put(line)
 
-    async def _boom(self: Any, payload: Any, *, actor: str) -> Any:
+    async def _boom(self: Any, payload: Any, *, actor: str, commit: bool = True) -> Any:
         raise RuntimeError("budget gone")
 
     monkeypatch.setattr(BudgetTreeService, "book_expense", _boom)
-    session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim, dann restore
+    session.execute_q.append(_Result([(line.id,)]))  # claim gewinnt, dann scheitert das Buchen
     with pytest.raises(RuntimeError):
         await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
-    assert getattr(session, "rollbacks", 0) == 1  # Claim wurde zurückgenommen
+    # Eine Transaktion → ein Rollback nimmt Claim + Buchung gemeinsam zurück.
+    assert getattr(session, "rollbacks", 0) == 1
+
+
+@pytest.mark.asyncio
+async def test_ignore_line_rejects_matched(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    line = _line(match_state="matched")
+    session.put(line)
+    with pytest.raises(ValidationProblem):
+        await svc.ignore_line(line.id)

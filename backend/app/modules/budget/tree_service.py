@@ -868,7 +868,9 @@ class BudgetTreeService:
             payload.model_copy(update={"budget_id": budget_id}), actor=actor
         )
 
-    async def book_expense(self, payload: ExpenseCreate, *, actor: str) -> ExpenseOut:
+    async def book_expense(
+        self, payload: ExpenseCreate, *, actor: str, commit: bool = True
+    ) -> ExpenseOut:
         """Ausgabe/Einnahme buchen (#25).
 
         Gebunden (``applicationId`` gesetzt) erbt Kostenstelle + HHJ vom Antrag;
@@ -931,7 +933,10 @@ class BudgetTreeService:
         )
         if payload.invoice_id is not None:
             await self._mark_invoice_paid(payload.invoice_id)
-        await self.session.commit()
+        # ``commit=False``: der Aufrufer bündelt das Buchen mit Folge-Mutationen in EINER
+        # Transaktion (z. B. Bankabgleich: Claim + Buchung + Allocation atomar, #fints-review).
+        if commit:
+            await self.session.commit()
         names = await self._actor_names({expense.actor} if expense.actor else set())
         return self._expense_out(
             expense,

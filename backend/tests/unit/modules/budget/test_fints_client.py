@@ -78,20 +78,32 @@ def test_matrix_data_url_bad_tuple() -> None:
     assert fc._matrix_data_url(_Resp(("only-one",))) is None  # nicht entpackbar
 
 
+def _global_resolver(_host: str) -> list[str]:
+    return ["1.1.1.1"]  # öffentlich → erlaubt
+
+
+def _internal_resolver(_host: str) -> list[str]:
+    return ["10.0.0.5"]  # privat → blockiert
+
+
 def test_validate_fints_endpoint_ok() -> None:
-    fc.validate_fints_endpoint("https://banking.sparkasse.de/fints")  # hostname
-    fc.validate_fints_endpoint("https://1.1.1.1/fints")  # global IP literal
+    # Hostname (DNS gestubbt) + globales IP-Literal.
+    fc.validate_fints_endpoint("https://banking.sparkasse.de/fints", resolver=_global_resolver)
+    fc.validate_fints_endpoint("https://1.1.1.1/fints", resolver=_global_resolver)
 
 
 def test_validate_fints_endpoint_rejects() -> None:
+    # IP-Literale + Schema/Host brauchen kein DNS.
     for bad in [
         "http://banking.sparkasse.de/fints",   # nicht https
         "https:///fints",                       # kein Host
-        "https://localhost/fints",              # interner Name
-        "https://fints.internal/x",             # interner Suffix
         "https://127.0.0.1/x",                  # loopback
         "https://169.254.169.254/x",            # link-local (Metadaten)
         "https://10.0.0.5/x",                   # privat
+        "https://[::1]/x",                       # IPv6 loopback
     ]:
         with pytest.raises(ValueError):
-            fc.validate_fints_endpoint(bad)
+            fc.validate_fints_endpoint(bad, resolver=_global_resolver)
+    # Öffentlicher Name, der auf eine interne IP auflöst → vom DNS-Guard geblockt.
+    with pytest.raises(ValueError):
+        fc.validate_fints_endpoint("https://evil.example/x", resolver=_internal_resolver)
