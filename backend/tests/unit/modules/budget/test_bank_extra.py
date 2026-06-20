@@ -15,6 +15,7 @@ from app.modules.budget import bank_service
 from app.modules.budget.bank_service import BankService
 from app.modules.budget.tree_models import BudgetExpense
 from app.settings import load_settings
+from app.shared.errors import NotFoundError
 
 from .test_bank_service import _KEY, _account, _line, _Result, _Session  # Wiederverwendung
 
@@ -44,6 +45,19 @@ def test_as_date_and_camt_date() -> None:
 
 def test_line_from_mt940_data_no_amount() -> None:
     assert bi._line_from_mt940_data({}) is None
+
+
+def test_lines_from_mt940_skips_amountless() -> None:
+    class _Amt:
+        amount = Decimal("5.00")
+        currency = "EUR"
+
+    class _Tx:
+        def __init__(self, data: dict[str, Any]) -> None:
+            self.data = data
+
+    out = bi.lines_from_mt940_transactions([_Tx({}), _Tx({"amount": _Amt()})])
+    assert len(out) == 1  # die amount-lose Transaktion wird übersprungen
 
 
 def test_find_local_none() -> None:
@@ -234,3 +248,40 @@ def test_matcher_far_date_branch() -> None:
         line_ref=None, line_e2e=None, candidate=cand,
     )
     assert "entfernt" in r.reason  # > _WIDE_DAYS-Zweig
+
+
+def test_matcher_wide_window_branch() -> None:
+    from app.modules.budget import bank_match as bm
+
+    # delta = 4 Tage: zwischen _TIGHT_DAYS(2) und _WIDE_DAYS(5) → mittlerer Datums-Score.
+    cand = bm.ExpenseCandidate(
+        expense_id="e", budget_id="b", amount=Decimal("50.00"), when=date(2024, 1, 6),
+        reference=None,
+    )
+    r = bm.score_candidate(
+        line_amount=Decimal("-50.00"), line_when=date(2024, 1, 2),
+        line_ref=None, line_e2e=None, candidate=cand,
+    )
+    assert "±4" in r.reason
+
+
+@pytest.mark.asyncio
+async def test_load_session_not_found_and_wrong_account(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.budget import fints_client as fc
+
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    # gar keine Sitzung → NotFoundError
+    with pytest.raises(NotFoundError):
+        await svc._load_session(uuid.uuid4(), uuid.uuid4())
+    # Sitzung existiert, aber falsches Konto → NotFoundError (Konto-Mismatch-Zweig)
+    token = uuid.uuid4()
+    out = fc.FintsOutcome(
+        status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d", tan_data=b"t",
+    )
+    await svc._store_session(uuid.uuid4(), out, token=token)
+    stored = session.added[-1]
+    stored.id = token
+    session.put(stored)
+    with pytest.raises(NotFoundError):
+        await svc._load_session(token, uuid.uuid4())

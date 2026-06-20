@@ -215,12 +215,11 @@ def _sha(value: str) -> str:
 
 # ----------------------------------------------------------------------- helpers
 def _decode(data: bytes) -> str:
-    for enc in ("utf-8", "latin-1"):
-        try:
-            return data.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    return data.decode("utf-8", "replace")
+    # UTF-8 zuerst; latin-1 als Fallback dekodiert **jedes** Byte (kein weiterer Zweig nötig).
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data.decode("latin-1")
 
 
 def _clean(value: object | None) -> str | None:
