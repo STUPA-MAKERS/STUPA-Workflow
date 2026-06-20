@@ -76,3 +76,22 @@ def test_matrix_data_url_absent_or_empty() -> None:
 
 def test_matrix_data_url_bad_tuple() -> None:
     assert fc._matrix_data_url(_Resp(("only-one",))) is None  # nicht entpackbar
+
+
+def test_validate_fints_endpoint_ok() -> None:
+    fc.validate_fints_endpoint("https://banking.sparkasse.de/fints")  # hostname
+    fc.validate_fints_endpoint("https://1.1.1.1/fints")  # global IP literal
+
+
+def test_validate_fints_endpoint_rejects() -> None:
+    for bad in [
+        "http://banking.sparkasse.de/fints",   # nicht https
+        "https:///fints",                       # kein Host
+        "https://localhost/fints",              # interner Name
+        "https://fints.internal/x",             # interner Suffix
+        "https://127.0.0.1/x",                  # loopback
+        "https://169.254.169.254/x",            # link-local (Metadaten)
+        "https://10.0.0.5/x",                   # privat
+    ]:
+        with pytest.raises(ValueError):
+            fc.validate_fints_endpoint(bad)

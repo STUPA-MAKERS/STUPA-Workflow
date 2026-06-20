@@ -19,12 +19,13 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import bank_import, bank_match, fints_client
+from app.modules.budget.fints_client import FintsError
 from app.modules.budget.tree_models import (
     Account,
     BankAllocation,
@@ -44,8 +45,12 @@ from app.modules.budget.tree_schemas import (
 )
 from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import Settings, get_settings
-from app.shared.crypto import SecretCryptoError, decrypt_secret
+from app.shared.crypto import SecretCryptoError, decrypt_secret, encrypt_secret
 from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
+
+# Obergrenze für die Zeilenzahl eines Imports/Abrufs (Anti-DoS): ein 10-MiB-MT940 kann
+# zehntausende Umsätze tragen; jede Zeile macht im Staging 1-2 Queries (#fints-review).
+_MAX_STATEMENT_LINES = 10_000
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -144,15 +149,31 @@ class BankService:
             account_iban=acc.iban or None,
             product_id=self.settings.fints_product_id,
             tan_mechanism=acc.fints_tan_mechanism,
-            state=acc.fints_state.encode("latin-1") if acc.fints_state else None,
+            state=self._decode_state(acc.fints_state, key=key),
         )
+
+    @staticmethod
+    def _decode_state(stored: str | None, *, key: str) -> bytes | None:
+        """Persistierten FinTS-Client-Zustand entschlüsseln → Bytes (sonst ``None``).
+
+        Ein nicht entschlüsselbarer Zustand (Key-Rotation/Korruption) wird wie »kein
+        Zustand« behandelt → der nächste Sync erzwingt einfach eine frische SCA."""
+        if not stored:
+            return None
+        try:
+            return decrypt_secret(stored, key=key).encode("latin-1")
+        except SecretCryptoError:
+            return None
 
     async def sync_account(self, account_id: uuid.UUID) -> BankSyncResult:
         """Schritt 1 (#fints): FinTS-Sync starten → Umsätze stagen **oder** TAN anfordern."""
         acc = await self._account_or_404(account_id)
         creds = self._credentials(acc)
         start = datetime.now(UTC).date() - timedelta(days=self.settings.fints_max_days)
-        outcome = fints_client.start_sync(creds, start_date=start)
+        try:
+            outcome = fints_client.start_sync(creds, start_date=start)
+        except FintsError as exc:
+            raise ServiceUnavailableError(f"FinTS sync failed: {exc}") from exc
         return await self._handle_outcome(acc, outcome)
 
     async def submit_tan(
@@ -163,10 +184,16 @@ class BankService:
         pending = await self._load_session(session_token, account_id)
         creds = self._credentials(acc)
         creds.tan_mechanism = pending.tan_mechanism
-        outcome = fints_client.submit_tan(creds, pending, tan)
+        try:
+            outcome = fints_client.submit_tan(creds, pending, tan)
+        except FintsError as exc:
+            raise ServiceUnavailableError(f"FinTS TAN submission failed: {exc}") from exc
         if outcome.status == "needs_tan":
             # decoupled noch nicht freigegeben → Sitzung aktualisieren, erneut anfordern.
+            # Commit nötig: get_session committet NICHT automatisch, sonst ginge der
+            # aufgefrischte Dialog-Zustand/TTL beim Request-Ende verloren (#fints-review).
             await self._store_session(acc.id, outcome, token=session_token)
+            await self.session.commit()
             return self._needs_tan_result(acc.id, session_token, outcome)
         await self._delete_session(session_token)
         return await self._handle_outcome(acc, outcome)
@@ -180,7 +207,11 @@ class BankService:
             return self._needs_tan_result(acc.id, token, outcome)
 
         if outcome.new_state is not None:
-            acc.fints_state = outcome.new_state.decode("latin-1")
+            # Client-Zustand (system_id/Dialog-State, SCA-Fenster) **verschlüsselt** ablegen
+            # — wie die PIN; nie im Klartext (security.md, #fints-review).
+            acc.fints_state = encrypt_secret(
+                outcome.new_state.decode("latin-1"), key=self._require_enabled()
+            )
         if outcome.tan_mechanism:
             acc.fints_tan_mechanism = outcome.tan_mechanism
         acc.fints_last_sync_at = datetime.now(UTC)
@@ -221,8 +252,6 @@ class BankService:
             "challenge_html": outcome.challenge_html,
             "decoupled": outcome.decoupled,
         }
-        from app.shared.crypto import encrypt_secret
-
         return encrypt_secret(json.dumps(payload), key=self._require_enabled())
 
     async def _store_session(
@@ -307,6 +336,19 @@ class BankService:
         """Umsätze idempotent einspielen (``ON CONFLICT DO NOTHING``) + Vorschläge setzen.
 
         Liefert ``(neu, dubletten)``."""
+        if len(lines) > _MAX_STATEMENT_LINES:
+            raise ValidationProblem(
+                f"Statement has too many transactions (>{_MAX_STATEMENT_LINES}).",
+                code="bank_statement_too_large",
+            )
+        # EUR-only Ledger (DB-CHECK): Fremdwährungen NICHT still als EUR umdeuten, sondern
+        # klar ablehnen (#fints-review) — Cent-Beträge wären sonst falsch attribuiert.
+        non_eur = next((line.currency for line in lines if line.currency != "EUR"), None)
+        if non_eur is not None:
+            raise ValidationProblem(
+                f"Only EUR transactions are supported (got {non_eur}).",
+                code="bank_statement_currency_unsupported",
+            )
         scope = acc.iban or str(acc.id)
         bank_import.assign_keys(scope, lines)
         imported = 0
@@ -323,7 +365,7 @@ class BankService:
                     booking_date=line.booking_date,
                     value_date=line.value_date,
                     amount=line.amount,
-                    currency=line.currency if line.currency == "EUR" else "EUR",
+                    currency="EUR",
                     purpose=line.purpose,
                     counterparty_name=line.counterparty_name,
                     counterparty_iban=line.counterparty_iban,
@@ -443,7 +485,14 @@ class BankService:
         tree = BudgetTreeService(self.session, settings=self.settings, actor=self.actor)
         kind = "income" if line.amount > 0 else "expense"
         amount = abs(line.amount)
+        if amount == 0:
+            raise ValidationProblem(
+                "A zero-amount transaction cannot be booked.", code="line_zero_amount"
+            )
 
+        # Ziel **vor** dem Claim validieren, damit der Claim nur erfolgt, wenn das Buchen
+        # auch durchgeht (minimiert das Orphan-Fenster: matched ohne Buchung).
+        expense: BudgetExpense | None = None
         if payload.match_expense_id is not None:
             expense = await self.session.get(BudgetExpense, payload.match_expense_id)
             if expense is None:
@@ -453,45 +502,94 @@ class BankService:
                     "Booking kind does not match the transaction direction.",
                     code="line_kind_mismatch",
                 )
-            expense_out = tree._expense_out(expense, None)
-            expense_id = expense.id
-        else:
-            description = payload.description or self._default_description(line)
-            created = await tree.book_expense(
-                ExpenseCreate(
-                    amount=amount,
-                    description=description,
-                    kind=kind,  # type: ignore[arg-type]
-                    budgetId=payload.budget_id,
-                    fiscalYearId=payload.fiscal_year_id,
-                    correspondent=line.counterparty_name,
-                    paymentDate=line.value_date or line.booking_date,
-                    referenceNumber=line.end_to_end_id or line.reference,
-                    paymentMethod="ueberweisung",
-                ),
-                actor=self.actor or "",
+            if expense.amount != amount:
+                raise ValidationProblem(
+                    "Booking amount does not match the transaction amount.",
+                    code="line_amount_mismatch",
+                )
+            already = await self.session.scalar(
+                select(BankAllocation.id)
+                .where(BankAllocation.expense_id == expense.id)
+                .limit(1)
             )
-            expense_out = created
-            expense_id = created.id
+            if already is not None:
+                raise ValidationProblem(
+                    "That booking is already reconciled with a transaction.",
+                    code="expense_already_allocated",
+                )
 
-        # book_expense hat bereits committet → eigene Mutationen hier anschließen.
-        self.session.add(
-            BankAllocation(
-                id=uuid.uuid4(),
-                statement_line_id=line.id,
-                expense_id=expense_id,
-                allocated_amount=amount,
+        # Atomarer Claim: nebenläufige Confirms serialisieren — nur einer gewinnt, sonst
+        # würde derselbe Umsatz doppelt gebucht (#fints-review). Der konditionale UPDATE
+        # (match_state != 'matched') wirkt als Zeilen-Lock; der Verlierer bekommt 0 Zeilen.
+        prev_state = line.match_state
+        claimed = (
+            await self.session.execute(
+                update(BankStatementLine)
+                .where(
+                    BankStatementLine.id == line_id,
+                    BankStatementLine.match_state != "matched",
+                )
+                .values(match_state="matched")
+                .returning(BankStatementLine.id)
             )
-        )
-        line.match_state = "matched"
-        if payload.budget_id is not None:
-            await self._remember_counterparty(line.counterparty_iban, payload.budget_id)
-        await self._audit(
-            AuditAction.BANK_LINE_RECONCILE,
-            target_id=str(line.id),
-            data={"expenseId": str(expense_id), "kind": kind, "amount": str(amount)},
-        )
-        await self.session.commit()
+        ).first()
+        if claimed is None:
+            raise ValidationProblem(
+                "Statement line is already matched.", code="line_already_matched"
+            )
+        await self.session.commit()  # Lock freigeben; nebenläufiger Verlierer sieht 'matched'
+
+        try:
+            if expense is not None:
+                expense_out = tree._expense_out(expense, None)
+                expense_id = expense.id
+            else:
+                description = payload.description or self._default_description(line)
+                created = await tree.book_expense(
+                    ExpenseCreate(
+                        amount=amount,
+                        description=description,
+                        kind=kind,  # type: ignore[arg-type]
+                        budgetId=payload.budget_id,
+                        fiscalYearId=payload.fiscal_year_id,
+                        correspondent=line.counterparty_name,
+                        paymentDate=line.value_date or line.booking_date,
+                        referenceNumber=line.end_to_end_id or line.reference,
+                        paymentMethod="ueberweisung",
+                    ),
+                    actor=self.actor or "",
+                )
+                expense_out = created
+                expense_id = created.id
+
+            # book_expense hat bereits committet → eigene Mutationen hier anschließen.
+            self.session.add(
+                BankAllocation(
+                    id=uuid.uuid4(),
+                    statement_line_id=line.id,
+                    expense_id=expense_id,
+                    allocated_amount=amount,
+                )
+            )
+            if payload.budget_id is not None:
+                await self._remember_counterparty(line.counterparty_iban, payload.budget_id)
+            await self._audit(
+                AuditAction.BANK_LINE_RECONCILE,
+                target_id=str(line.id),
+                data={"expenseId": str(expense_id), "kind": kind, "amount": str(amount)},
+            )
+            await self.session.commit()
+        except Exception:
+            # Buchen nach dem Claim fehlgeschlagen → Claim zurücknehmen, damit der Umsatz
+            # erneut bestätigt werden kann (kein »matched« ohne Buchung).
+            await self.session.rollback()
+            await self.session.execute(
+                update(BankStatementLine)
+                .where(BankStatementLine.id == line_id)
+                .values(match_state=prev_state)
+            )
+            await self.session.commit()
+            raise
         return expense_out
 
     @staticmethod

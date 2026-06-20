@@ -12,10 +12,13 @@ import pytest
 
 from app.modules.budget import bank_import as bi
 from app.modules.budget import bank_service
+from app.modules.budget import fints_client as fc
 from app.modules.budget.bank_service import BankService
 from app.modules.budget.tree_models import BudgetExpense
+from app.modules.budget.tree_schemas import ConfirmLineRequest
 from app.settings import load_settings
-from app.shared.errors import NotFoundError
+from app.shared.crypto import encrypt_secret
+from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
 
 from .test_bank_service import _KEY, _account, _line, _Result, _Session  # Wiederverwendung
 
@@ -176,6 +179,8 @@ async def test_confirm_line_description_override(monkeypatch: pytest.MonkeyPatch
         )
 
     monkeypatch.setattr(BudgetTreeService, "book_expense", _book)
+    # claim gewinnt; kein counterparty_iban → kein _remember_counterparty
+    session.execute_q.append(_Result([(line.id,)]))
     await svc.confirm_line(
         line.id, ConfirmLineRequest(budgetId=uuid.uuid4(), description="Eigene Notiz")
     )
@@ -285,3 +290,140 @@ async def test_load_session_not_found_and_wrong_account(monkeypatch: pytest.Monk
     session.put(stored)
     with pytest.raises(NotFoundError):
         await svc._load_session(token, uuid.uuid4())
+
+
+# ----------------------------------------------------- review-fix branches (#fints-review)
+def test_decode_state_roundtrip_and_failures() -> None:
+    assert BankService._decode_state(None, key=_KEY) is None
+    token = encrypt_secret("blob", key=_KEY)
+    assert BankService._decode_state(token, key=_KEY) == b"blob"
+    assert BankService._decode_state("garbage", key=_KEY) is None  # undecryptable → None
+
+
+@pytest.mark.asyncio
+async def test_sync_account_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+
+    def _boom(creds: Any, *, start_date: Any) -> Any:
+        raise fc.FintsError("connection refused")
+
+    monkeypatch.setattr(fc, "start_sync", _boom)
+    with pytest.raises(ServiceUnavailableError):
+        await svc.sync_account(acc.id)
+
+
+@pytest.mark.asyncio
+async def test_submit_tan_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+    token = uuid.uuid4()
+    out = fc.FintsOutcome(
+        status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d", tan_data=b"t",
+    )
+    await svc._store_session(acc.id, out, token=token)
+    stored = session.added[-1]
+    stored.id = token
+    session.put(stored)
+
+    def _boom(creds: Any, pending: Any, tan: str) -> Any:
+        raise fc.FintsError("nope")
+
+    monkeypatch.setattr(fc, "submit_tan", _boom)
+    with pytest.raises(ServiceUnavailableError):
+        await svc.submit_tan(acc.id, token, "123456")
+
+
+@pytest.mark.asyncio
+async def test_stage_lines_too_many(monkeypatch: pytest.MonkeyPatch) -> None:
+    svc = _svc(_Session(), monkeypatch)
+    lines = [
+        bi.StatementLine(amount=Decimal("1.00"))
+        for _ in range(bank_service._MAX_STATEMENT_LINES + 1)
+    ]
+    with pytest.raises(ValidationProblem):
+        await svc._stage_lines(_account(), lines)
+
+
+@pytest.mark.asyncio
+async def test_stage_lines_rejects_non_eur(monkeypatch: pytest.MonkeyPatch) -> None:
+    svc = _svc(_Session(), monkeypatch)
+    lines = [bi.StatementLine(amount=Decimal("1.00"), currency="USD")]
+    with pytest.raises(ValidationProblem):
+        await svc._stage_lines(_account(), lines)
+
+
+@pytest.mark.asyncio
+async def test_confirm_line_claim_lost(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Nebenläufiger Verlierer: Claim-UPDATE liefert 0 Zeilen → already_matched.
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    line = _line()
+    session.put(line)
+    session.execute_q.append(_Result([]))  # Claim verloren
+    with pytest.raises(ValidationProblem):
+        await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
+
+
+@pytest.mark.asyncio
+async def test_confirm_line_zero_amount(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    line = _line(amount=Decimal("0.00"))
+    session.put(line)
+    with pytest.raises(ValidationProblem):
+        await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
+
+
+@pytest.mark.asyncio
+async def test_confirm_line_amount_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    line = _line(amount=Decimal("-50.00"))
+    session.put(line)
+    exp = BudgetExpense(
+        id=uuid.uuid4(), budget_id=uuid.uuid4(), fiscal_year_id=uuid.uuid4(),
+        kind="expense", amount=Decimal("99.00"), currency="EUR", description="x",
+    )
+    session.put(exp)
+    with pytest.raises(ValidationProblem):
+        await svc.confirm_line(line.id, ConfirmLineRequest(matchExpenseId=exp.id))
+
+
+@pytest.mark.asyncio
+async def test_confirm_line_already_allocated(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    line = _line(amount=Decimal("-50.00"))
+    session.put(line)
+    exp = BudgetExpense(
+        id=uuid.uuid4(), budget_id=uuid.uuid4(), fiscal_year_id=uuid.uuid4(),
+        kind="expense", amount=Decimal("50.00"), currency="EUR", description="x",
+    )
+    session.put(exp)
+    session.scalar_q.append(uuid.uuid4())  # bereits zugeordnet
+    with pytest.raises(ValidationProblem):
+        await svc.confirm_line(line.id, ConfirmLineRequest(matchExpenseId=exp.id))
+
+
+@pytest.mark.asyncio
+async def test_confirm_line_booking_failure_reverts_claim(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.budget.tree_service import BudgetTreeService
+
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    line = _line()
+    session.put(line)
+
+    async def _boom(self: Any, payload: Any, *, actor: str) -> Any:
+        raise RuntimeError("budget gone")
+
+    monkeypatch.setattr(BudgetTreeService, "book_expense", _boom)
+    session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim, dann restore
+    with pytest.raises(RuntimeError):
+        await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
+    assert getattr(session, "rollbacks", 0) == 1  # Claim wurde zurückgenommen

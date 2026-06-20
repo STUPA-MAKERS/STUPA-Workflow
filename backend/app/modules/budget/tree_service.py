@@ -25,6 +25,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import tree_rules
+from app.modules.budget.fints_client import validate_fints_endpoint
 from app.modules.budget.invoice_import import parse_zugferd_pdf
 from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree_models import (
@@ -1254,7 +1255,16 @@ class BudgetTreeService:
         changed = False
         for col in ("fints_endpoint", "fints_blz", "fints_login"):
             if col in fields:
-                setattr(acc, col, getattr(payload, col) or None)
+                value = getattr(payload, col) or None
+                if col == "fints_endpoint" and value:
+                    # SSRF-Guard: kein interner/non-https Endpunkt (#fints-review).
+                    try:
+                        validate_fints_endpoint(value)
+                    except ValueError as exc:
+                        raise ValidationProblem(
+                            str(exc), code="fints_endpoint_invalid"
+                        ) from exc
+                setattr(acc, col, value)
                 changed = True
         if "fints_pin" in fields:
             if payload.fints_pin:

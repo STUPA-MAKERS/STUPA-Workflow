@@ -21,7 +21,7 @@ from app.modules.budget.tree_models import Account, BankStatementLine, BudgetExp
 from app.modules.budget.tree_schemas import ConfirmLineRequest, ExpenseOut
 from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
-from app.shared.crypto import encrypt_secret
+from app.shared.crypto import decrypt_secret, encrypt_secret
 from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
 
 _KEY = "0123456789abcdef-fints-enc-key"
@@ -72,6 +72,9 @@ class _Session:
 
     async def commit(self) -> None:
         self.commits += 1
+
+    async def rollback(self) -> None:
+        self.rollbacks = getattr(self, "rollbacks", 0) + 1
 
 
 def _settings(**over: Any) -> Any:
@@ -231,9 +234,9 @@ async def test_confirm_line_new_booking(monkeypatch: pytest.MonkeyPatch) -> None
         return _canned_expense("expense")
 
     monkeypatch.setattr(BudgetTreeService, "book_expense", _book)
+    session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim wins, remember
     out = await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
     assert isinstance(out, ExpenseOut)
-    assert line.match_state == "matched"
     # Allocation hinzugefügt; counterparty-memory via execute (on_conflict).
     assert any(type(o).__name__ == "BankAllocation" for o in session.added)
 
@@ -255,9 +258,11 @@ async def test_confirm_line_match_existing(monkeypatch: pytest.MonkeyPatch) -> N
     )
     expense.created_at = datetime(2024, 1, 1, tzinfo=UTC)
     session.put(expense)
+    session.scalar_q.append(None)  # noch nicht zugeordnet
+    session.execute_q.append(_Result([(line.id,)]))  # claim gewinnt
     out = await svc.confirm_line(line.id, ConfirmLineRequest(matchExpenseId=expense.id))
     assert out.id == expense.id
-    assert line.match_state == "matched"
+    assert any(type(o).__name__ == "BankAllocation" for o in session.added)
 
 
 @pytest.mark.asyncio
@@ -358,7 +363,10 @@ async def test_sync_account_done(monkeypatch: pytest.MonkeyPatch) -> None:
     res = await svc.sync_account(acc.id)
     assert res.status == "done"
     assert res.imported == 1
-    assert acc.fints_state == "state"
+    # fints_state ist verschlüsselt abgelegt (nicht im Klartext) und round-trippt.
+    assert acc.fints_state is not None
+    assert acc.fints_state != "state"
+    assert decrypt_secret(acc.fints_state, key=_KEY) == "state"
     assert acc.fints_last_sync_at is not None
 
 

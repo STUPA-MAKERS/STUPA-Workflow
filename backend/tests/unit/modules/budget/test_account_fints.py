@@ -21,7 +21,7 @@ from app.modules.budget.tree_schemas import (
 from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
 from app.shared.crypto import decrypt_secret
-from app.shared.errors import NotFoundError, ServiceUnavailableError
+from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
 
 from .test_bank_service import _KEY, _Session
 
@@ -130,3 +130,14 @@ async def test_update_account_not_found(monkeypatch: pytest.MonkeyPatch) -> None
     svc = _svc(_Session(), monkeypatch)
     with pytest.raises(NotFoundError):
         await svc.update_account(uuid.uuid4(), AccountUpdate(name="x"))
+
+
+@pytest.mark.asyncio
+async def test_create_account_rejects_internal_fints_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc = _svc(_Session(), monkeypatch)
+    with pytest.raises(ValidationProblem):
+        await svc.create_account(
+            AccountCreate(name="Giro", fintsEndpoint="http://169.254.169.254/fints")
+        )
