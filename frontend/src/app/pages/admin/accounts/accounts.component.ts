@@ -11,8 +11,8 @@ import {
   DataTableComponent,
   DialogComponent,
   IconComponent,
-} from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+} from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { type Account, type AccountBody, BudgetTreeApi } from '../../budget/budget-tree.api';
 
 /**

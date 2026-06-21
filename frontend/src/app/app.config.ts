@@ -12,7 +12,9 @@ import { authInterceptor } from '@core/auth/auth.interceptor';
 import { AuthService } from '@core/auth/auth.service';
 import { mockApiInterceptor } from '@core/api/mock-api.interceptor';
 import { loadingInterceptor } from '@core/loading/loading.interceptor';
+import { LoadingService } from '@core/loading/loading.service';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { UI_KIT_INTL, UI_KIT_LOADING, uiKitIntlFromLang } from '@stupa-makers/ui-kit';
 import { LIVE_VOTE_SOURCE } from '@core/ws/live-vote.source';
 import { MockLiveVoteSource } from '@core/ws/mock-live-vote.source';
 import { WsService } from '@core/ws/ws.service';
@@ -56,6 +58,10 @@ export const appConfig: ApplicationConfig = {
       useFactory: () => (inject(USE_MOCK_API) ? inject(MockLiveVoteSource) : inject(WsService)),
     },
     provideFormly(),
+    // UI-Kit-Library (@stupa-makers/ui-kit) an die App-Dienste binden: i18n folgt der
+    // App-Locale (identische DE/EN-Strings), Lade-Overlay folgt dem LoadingService.
+    { provide: UI_KIT_INTL, useFactory: () => uiKitIntlFromLang(inject(I18nService).locale) },
+    { provide: UI_KIT_LOADING, useFactory: () => ({ visible: inject(LoadingService).visible }) },
     provideAppInitializer(() => {
       inject(ThemeService).init();
       inject(I18nService); // initialisiert document.lang über Konstruktor-Default

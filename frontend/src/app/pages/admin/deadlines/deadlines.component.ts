@@ -14,7 +14,7 @@ import {
   type SelectOption,
   SelectComponent,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 

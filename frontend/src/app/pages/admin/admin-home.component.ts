@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { type IconName, IconComponent } from '@shared/ui';
+import { type IconName, IconComponent } from '@stupa-makers/ui-kit';
 
 interface AdminTile {
   link: string;

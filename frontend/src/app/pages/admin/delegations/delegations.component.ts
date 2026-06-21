@@ -11,8 +11,8 @@ import {
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
-} from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+} from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 
 /**
  * Admin-Übersicht der **sitzungsgebundenen** Vertretungen (#delegation-rework).

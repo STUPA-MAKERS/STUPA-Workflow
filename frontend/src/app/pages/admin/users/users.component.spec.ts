@@ -2,7 +2,7 @@ import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { AdminPrincipal, Role, RoleAssignment } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { UsersComponent } from './users.component';

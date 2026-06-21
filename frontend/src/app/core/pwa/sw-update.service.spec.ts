@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { SwUpdate, type VersionEvent } from '@angular/service-worker';
 import { Subject } from 'rxjs';
 import { SwUpdateService } from './sw-update.service';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 
 /** Controllable SwUpdate stub: tests push version events and assert activation. */

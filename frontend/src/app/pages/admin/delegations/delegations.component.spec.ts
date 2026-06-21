@@ -2,7 +2,7 @@ import { of, throwError } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { DelegationsComponent } from './delegations.component';
 
 const DELEGATIONS: Delegation[] = [

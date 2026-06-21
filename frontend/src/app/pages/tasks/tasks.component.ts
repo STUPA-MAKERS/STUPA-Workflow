@@ -9,7 +9,7 @@ import {
   CellDirective,
   type ColumnDef,
   DataTableComponent,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 
 /**
  * Aufgaben (#64): Anträge mit ausstehender Entscheidung für die eigene Rolle

@@ -26,7 +26,7 @@ import {
   IconComponent,
   type IconName,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditActor, AuditEntry, ConfigRevisionDiff } from '../admin.models';
 

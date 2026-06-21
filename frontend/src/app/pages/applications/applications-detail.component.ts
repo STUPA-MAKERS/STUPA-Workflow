@@ -25,13 +25,13 @@ import type {
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields } from '@shared/forms/formly-mapper';
-import { BadgeComponent } from '@shared/ui/badge/badge.component';
-import { ButtonComponent } from '@shared/ui/button/button.component';
-import { SelectComponent, type SelectOption } from '@shared/ui';
-import { CardComponent } from '@shared/ui/card/card.component';
-import { DialogComponent } from '@shared/ui/dialog/dialog.component';
-import { IconComponent } from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { BadgeComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
+import { SelectComponent, type SelectOption } from '@stupa-makers/ui-kit';
+import { CardComponent } from '@stupa-makers/ui-kit';
+import { DialogComponent } from '@stupa-makers/ui-kit';
+import { IconComponent } from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,

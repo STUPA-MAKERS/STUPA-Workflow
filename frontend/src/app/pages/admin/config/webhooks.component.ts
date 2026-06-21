@@ -13,7 +13,7 @@ import {
   DialogComponent,
   IconComponent,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { EVENT_NAMES, type EventName, type WebhookConfig } from '../admin.models';
 

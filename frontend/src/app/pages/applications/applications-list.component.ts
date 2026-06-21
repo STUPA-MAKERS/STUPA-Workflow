@@ -20,7 +20,7 @@ import type {
   ApplicationType,
   Uuid,
 } from '@core/api/models';
-import { ButtonComponent } from '@shared/ui/button/button.component';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
 import {
   CurrencyInputComponent,
   DatepickerComponent,
@@ -30,7 +30,7 @@ import {
   IconComponent,
   SelectComponent,
   type SelectOption,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import {

@@ -3,7 +3,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { McpSetup, OAuthGrant } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { IconComponent } from '@shared/ui';
+import { IconComponent } from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
 
 /**

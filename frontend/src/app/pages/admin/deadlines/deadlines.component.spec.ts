@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { DeadlinePolicy } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AdminDeadlinesComponent } from './deadlines.component';
 

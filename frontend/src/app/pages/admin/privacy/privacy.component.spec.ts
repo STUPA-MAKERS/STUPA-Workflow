@@ -1,7 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { render, screen, fireEvent } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { ErasureRequest, PrivacySettings } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { PrivacyComponent } from './privacy.component';

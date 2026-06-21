@@ -16,7 +16,7 @@ import {
   DialogComponent,
   IconComponent,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
 

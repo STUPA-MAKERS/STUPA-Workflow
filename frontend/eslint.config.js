@@ -16,6 +16,8 @@ module.exports = tseslint.config(
       'node_modules/**',
       '.angular/**',
       'e2e/**',
+      // UI-Kit-Library als Submodule — hat eigenes Lint-/CI-Setup, nicht Teil des App-Lints.
+      'vendor/**',
       'playwright.config.ts',
       'playwright-report/**',
       'test-results/**',

@@ -1,4 +1,4 @@
-import type { BadgeVariant } from '@shared/ui/badge/badge.component';
+import type { BadgeVariant } from '@stupa-makers/ui-kit';
 import type { ScanState } from '@core/api/models';
 
 /**

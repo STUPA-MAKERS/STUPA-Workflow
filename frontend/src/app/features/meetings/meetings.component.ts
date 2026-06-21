@@ -36,9 +36,9 @@ import type {
 } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
-import { BadgeComponent, type BadgeVariant } from '@shared/ui/badge/badge.component';
-import { ButtonComponent } from '@shared/ui/button/button.component';
-import { CardComponent } from '@shared/ui/card/card.component';
+import { BadgeComponent, type BadgeVariant } from '@stupa-makers/ui-kit';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
+import { CardComponent } from '@stupa-makers/ui-kit';
 import {
   CheckboxComponent,
   DatepickerComponent,
@@ -48,9 +48,9 @@ import {
   SelectComponent,
   type SelectOption,
   TimeInputComponent,
-} from '@shared/ui';
-import { MarkdownEditorComponent } from '@shared/ui/markdown-editor/markdown-editor.component';
-import { ToastService } from '@shared/ui/toast/toast.service';
+} from '@stupa-makers/ui-kit';
+import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
 import { renderMarkdown } from './meetings.util';

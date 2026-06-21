@@ -2,7 +2,7 @@ import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of, throwError } from 'rxjs';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { GroupMapping, Role } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { GroupMappingsComponent } from './group-mappings.component';

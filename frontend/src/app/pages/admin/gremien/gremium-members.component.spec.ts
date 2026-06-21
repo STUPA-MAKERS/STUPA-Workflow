@@ -2,7 +2,7 @@ import { ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { render } from '@testing-library/angular';
 import { provideRouter } from '@angular/router';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { DelegationsApiService } from '@core/api/delegations.service';
 import type { AdminPrincipal, GremiumMembership, GremiumRole } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';

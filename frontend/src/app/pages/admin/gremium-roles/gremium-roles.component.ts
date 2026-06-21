@@ -13,7 +13,7 @@ import {
   DialogComponent,
   IconComponent,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { GREMIUM_PERMISSIONS, type GremiumRole } from '../admin.models';
 import type { TranslationKey } from '@core/i18n/translations';

@@ -21,13 +21,13 @@ import type {
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { isFieldVisible } from '@shared/forms/jsonlogic';
-import { BadgeComponent } from '@shared/ui/badge/badge.component';
-import { CardComponent } from '@shared/ui/card/card.component';
-import { ButtonComponent } from '@shared/ui/button/button.component';
-import { DialogComponent } from '@shared/ui/dialog/dialog.component';
-import { IconComponent } from '@shared/ui/icon/icon.component';
+import { BadgeComponent } from '@stupa-makers/ui-kit';
+import { CardComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
+import { DialogComponent } from '@stupa-makers/ui-kit';
+import { IconComponent } from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 

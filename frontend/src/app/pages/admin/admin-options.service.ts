@@ -3,7 +3,7 @@ import { type Observable, map } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import type { SelectOption } from '@shared/ui';
+import type { SelectOption } from '@stupa-makers/ui-kit';
 import { AdminApiService } from './admin-api.service';
 import { MOCK_ROLES } from './admin.mock';
 import {
