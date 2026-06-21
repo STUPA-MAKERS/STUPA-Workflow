@@ -81,8 +81,8 @@
     </form>
   }
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="!draft()?.key?.trim()" (click)="save()">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!draft()?.key?.trim()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -94,7 +94,7 @@
 >
   <p>{{ 'admin.gremiumRoles.deleteConfirm' | t: { name: label(confirmDelete()) } }}</p>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
   </div>
 </app-dialog>

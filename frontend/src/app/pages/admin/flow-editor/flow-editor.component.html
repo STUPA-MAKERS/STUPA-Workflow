@@ -477,7 +477,7 @@
     <span class="text-sm text-danger" [class.fe__status--ok]="validation().valid">
       {{ (validation().valid ? 'admin.common.valid' : 'admin.common.errors') | t }}
     </span>
-    <app-button [disabled]="!validation().valid" [loading]="saving()" (click)="save()">{{
+    <app-button size="sm" [disabled]="!validation().valid" [loading]="saving()" (click)="save()">{{
       'admin.flow.save' | t
     }}</app-button>
   </footer>

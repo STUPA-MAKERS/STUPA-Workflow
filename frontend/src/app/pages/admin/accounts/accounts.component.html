@@ -37,15 +37,15 @@
     </fieldset>
   </form>
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="!fName().trim()" [loading]="saving()" (click)="save($event)">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!fName().trim()" [loading]="saving()" (click)="save($event)">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
 <app-dialog [open]="!!confirmDelete()" [title]="'admin.accounts.delete' | t" [closeLabel]="'action.cancel' | t" (closed)="confirmDelete.set(null)">
   <p>{{ 'admin.accounts.deleteBody' | t: { name: confirmDelete()?.name ?? '' } }}</p>
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'admin.accounts.deleteConfirm' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'admin.accounts.deleteConfirm' | t }}</app-button>
   </div>
 </app-dialog>

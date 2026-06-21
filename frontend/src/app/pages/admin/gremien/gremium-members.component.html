@@ -95,8 +95,8 @@
     />
   </div>
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="addSubOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button [disabled]="!subSelected()" (click)="addSub()">{{ 'admin.substitutes.addAction' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="addSubOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!subSelected()" (click)="addSub()">{{ 'admin.substitutes.addAction' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -159,7 +159,7 @@
     </div>
   </div>
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="closeAdd()">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button [disabled]="!selected() || !addRoleId()" (click)="addMember()">{{ 'admin.gremien.memberAdd' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="closeAdd()">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!selected() || !addRoleId()" (click)="addMember()">{{ 'admin.gremien.memberAdd' | t }}</app-button>
   </div>
 </app-dialog>

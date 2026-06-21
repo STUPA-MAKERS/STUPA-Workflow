@@ -83,10 +83,10 @@
       }
 
       <div class="flex gap-3 mt-3">
-        <app-button [loading]="saving()" (click)="save()">{{ 'action.save' | t }}</app-button>
-        <app-button variant="secondary" [loading]="previewing()" (click)="runPreview()">{{ 'admin.mailTemplates.preview' | t }}</app-button>
+        <app-button size="sm" [loading]="saving()" (click)="save()">{{ 'action.save' | t }}</app-button>
+        <app-button size="sm" variant="secondary" [loading]="previewing()" (click)="runPreview()">{{ 'admin.mailTemplates.preview' | t }}</app-button>
         @if (d.source === 'override') {
-          <app-button variant="ghost" [loading]="resetting()" (click)="reset()">{{ 'admin.mailTemplates.reset' | t }}</app-button>
+          <app-button size="sm" variant="ghost" [loading]="resetting()" (click)="reset()">{{ 'admin.mailTemplates.reset' | t }}</app-button>
         }
       </div>
 

@@ -125,8 +125,8 @@
     </div>
   </form>
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="closeDialog()">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button [disabled]="!form().name.trim()" [loading]="saving()" (click)="submit($event)">
+    <app-button size="sm" variant="ghost" (click)="closeDialog()">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!form().name.trim()" [loading]="saving()" (click)="submit($event)">
       {{ (editingId() ? 'admin.gremien.save' : 'admin.gremien.add') | t }}
     </app-button>
   </div>
@@ -141,7 +141,7 @@
 >
   <p class="grem__confirm">{{ 'admin.gremien.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}</p>
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{ 'admin.gremien.deleteAction' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="deleting()" (click)="doDelete()">{{ 'admin.gremien.deleteAction' | t }}</app-button>
   </div>
 </app-dialog>

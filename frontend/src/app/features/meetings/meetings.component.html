@@ -590,8 +590,8 @@
            ausschließlich aus der Gremium-Konfiguration. -->
     </form>
     <div dialog-footer class="mtg__dialogFoot">
-      <app-button variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
-      <app-button [disabled]="openingVote()" [loading]="openingVote()" (click)="submitVote()">
+      <app-button size="sm" variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
+      <app-button size="sm" [disabled]="openingVote()" [loading]="openingVote()" (click)="submitVote()">
         {{ 'meetings.vote.openSubmit' | t }}
       </app-button>
     </div>
@@ -606,8 +606,8 @@
   >
     <p>{{ 'meetings.closeConfirm.body' | t }}</p>
     <div dialog-footer class="mtg__dialogFoot">
-      <app-button variant="ghost" (click)="closeConfirmOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-      <app-button variant="danger" [loading]="finalizing()" (click)="closeConfirmOpen.set(false); closeMeeting()">
+      <app-button size="sm" variant="ghost" (click)="closeConfirmOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+      <app-button size="sm" variant="danger" [loading]="finalizing()" (click)="closeConfirmOpen.set(false); closeMeeting()">
         {{ 'meetings.closeConfirm.confirm' | t }}
       </app-button>
     </div>
@@ -782,13 +782,13 @@
     </form>
     <div dialog-footer class="mtg__dialogFoot">
       @if (createStep() === 1) {
-        <app-button variant="ghost" (click)="closeCreate()">{{ 'action.cancel' | t }}</app-button>
-        <app-button [disabled]="!createStep1Valid()" (click)="goToCreateStep2()">
+        <app-button size="sm" variant="ghost" (click)="closeCreate()">{{ 'action.cancel' | t }}</app-button>
+        <app-button size="sm" [disabled]="!createStep1Valid()" (click)="goToCreateStep2()">
           {{ 'meetings.create.next' | t }}
         </app-button>
       } @else {
-        <app-button variant="ghost" (click)="backToCreateStep1()">{{ 'meetings.create.back' | t }}</app-button>
-        <app-button
+        <app-button size="sm" variant="ghost" (click)="backToCreateStep1()">{{ 'meetings.create.back' | t }}</app-button>
+        <app-button size="sm"
           [disabled]="!newTitle().trim() || !newGremiumId() || !newDate().trim() || !newTime().trim()"
           [loading]="creating()"
           (click)="create($event)"
@@ -837,8 +837,8 @@
     }
   </form>
   <div dialog-footer class="mtg__dialogFoot">
-    <app-button variant="ghost" (click)="closeSettings()">{{ 'action.cancel' | t }}</app-button>
-    <app-button [loading]="savingSettings()" [disabled]="settingsLocked() || !settingsDate().trim() || !settingsTime().trim()" (click)="saveSettings()">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="closeSettings()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [loading]="savingSettings()" [disabled]="settingsLocked() || !settingsDate().trim() || !settingsTime().trim()" (click)="saveSettings()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -851,7 +851,7 @@
 >
   <p>{{ 'meetings.delete.body' | t: { name: confirmDeleteMeeting()?.title ?? '' } }}</p>
   <div dialog-footer class="mtg__dialogFoot">
-    <app-button variant="ghost" (click)="confirmDeleteMeeting.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deletingMeeting()" (click)="doDeleteMeeting()">{{ 'meetings.delete.confirm' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmDeleteMeeting.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="deletingMeeting()" (click)="doDeleteMeeting()">{{ 'meetings.delete.confirm' | t }}</app-button>
   </div>
 </app-dialog>

@@ -83,8 +83,8 @@
 >
   <p>{{ 'admin.privacy.executeConfirm' | t }}</p>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="confirmExecute.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="doExecute()">{{ 'admin.privacy.execute' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmExecute.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="doExecute()">{{ 'admin.privacy.execute' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -104,8 +104,8 @@
     ></textarea>
   </label>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="rejecting.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="doReject()">{{ 'admin.privacy.reject' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="rejecting.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="doReject()">{{ 'admin.privacy.reject' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -117,7 +117,7 @@
 >
   <p>{{ 'admin.privacy.principalConfirm' | t }}</p>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="confirmPrincipal.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="doPrincipalErase()">{{ 'admin.privacy.principalErase' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmPrincipal.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="doPrincipalErase()">{{ 'admin.privacy.principalErase' | t }}</app-button>
   </div>
 </app-dialog>

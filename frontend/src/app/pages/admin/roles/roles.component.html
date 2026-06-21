@@ -65,8 +65,8 @@
     <p>{{ 'admin.roles.deleteConfirm' | t: { role: roleLabel(r) } }}</p>
   }
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="confirmRole.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="confirmDelete()">{{ 'admin.roles.deleteRole' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmRole.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="confirmDelete()">{{ 'admin.roles.deleteRole' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -78,7 +78,7 @@
     <app-input [label]="'admin.common.labelEn' | t" [ngModel]="draft().labelEn" (ngModelChange)="patchDraft('labelEn', $event)" name="roleLabelEn" />
   </div>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="addOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button [disabled]="!draft().key.trim()" (click)="createRole()">{{ 'admin.gremien.add' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="addOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!draft().key.trim()" (click)="createRole()">{{ 'admin.gremien.add' | t }}</app-button>
   </div>
 </app-dialog>

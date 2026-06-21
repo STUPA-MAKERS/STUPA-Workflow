@@ -64,8 +64,8 @@
     />
   </div>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="!oidcGroup().trim() || !roleId()" (click)="save()">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!oidcGroup().trim() || !roleId()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -78,7 +78,7 @@
 >
   <p>{{ 'admin.groupMappings.deleteBody' | t }}</p>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="confirmId.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="remove()">{{ 'action.delete' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmId.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="remove()">{{ 'action.delete' | t }}</app-button>
   </div>
 </app-dialog>

@@ -75,8 +75,8 @@
     >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
   </form>
   <div dialog-footer class="fl__dialog-foot">
-    <app-button variant="ghost" (click)="closeDialog()">{{ 'admin.common.cancel' | t }}</app-button>
-    <app-button [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
+    <app-button size="sm" variant="ghost" (click)="closeDialog()">{{ 'admin.common.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
       {{ 'admin.forms.add' | t }}
     </app-button>
   </div>
@@ -91,8 +91,8 @@
 >
   <p>{{ 'admin.forms.deleteConfirm' | t: { name: confirmDeleteName() } }}</p>
   <div dialog-footer class="fl__dialog-foot">
-    <app-button variant="ghost" (click)="cancelDelete()">{{ 'admin.common.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="confirmDeleteType()">
+    <app-button size="sm" variant="ghost" (click)="cancelDelete()">{{ 'admin.common.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="deleting()" (click)="confirmDeleteType()">
       {{ 'admin.forms.delete' | t }}
     </app-button>
   </div>

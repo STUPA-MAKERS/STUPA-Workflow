@@ -69,7 +69,7 @@
     </form>
   }
   <div dialog-footer class="cfg__dialog-foot">
-    <app-button variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="errors().length > 0" (click)="save()">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="errors().length > 0" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
