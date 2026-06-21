@@ -218,6 +218,9 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v5
+        with:
+          # @stupa-makers/ui-kit lives at frontend/vendor/ui-kit as a git submodule.
+          submodules: recursive
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
@@ -260,6 +263,8 @@ jobs:
       )
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
