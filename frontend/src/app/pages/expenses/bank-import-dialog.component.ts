@@ -81,6 +81,11 @@ export class BankImportDialogComponent {
   readonly importing = signal(false);
   readonly confirmingId = signal<string>('');
 
+  /** Drag&Drop-Overlay der Datei-Lasche (wie Anhänge-Panel). `dragDepth` zählt
+   * enter/leave verschachtelter Kinder, damit das Overlay nicht flackert. */
+  readonly dragActive = signal(false);
+  private dragDepth = 0;
+
   // --- FinTS-TAN-Schritt ---
   readonly sessionToken = signal<string>('');
   readonly challenge = signal<string>('');
@@ -229,13 +234,17 @@ export class BankImportDialogComponent {
   onFile(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
+    if (file) this.uploadFile(file);
+    input.value = ''; // gleiche Datei erneut wählbar
+  }
+
+  private uploadFile(file: File): void {
     const acc = this.accountId();
-    if (!file || !acc) return;
+    if (!acc || this.importing()) return;
     this.importing.set(true);
     this.api.importStatementFile(acc as Uuid, file).subscribe({
       next: (res) => {
         this.importing.set(false);
-        input.value = '';
         this.toast.success(
           this.i18n.translate('fints.imported', {
             imported: String(res.imported),
@@ -246,10 +255,42 @@ export class BankImportDialogComponent {
       },
       error: () => {
         this.importing.set(false);
-        input.value = '';
         this.toast.error(this.i18n.translate('fints.errFile'));
       },
     });
+  }
+
+  // Drag&Drop in der Datei-Lasche (Muster wie Anhänge-Panel).
+  onDragEnter(event: DragEvent): void {
+    if (!this.accountId() || !this.hasFiles(event)) return;
+    event.preventDefault();
+    this.dragDepth++;
+    this.dragActive.set(true);
+  }
+
+  onDragOver(event: DragEvent): void {
+    if (!this.accountId() || !this.hasFiles(event)) return;
+    event.preventDefault();
+  }
+
+  onDragLeave(event: DragEvent): void {
+    if (!this.dragActive()) return;
+    event.preventDefault();
+    this.dragDepth = Math.max(0, this.dragDepth - 1);
+    if (this.dragDepth === 0) this.dragActive.set(false);
+  }
+
+  onDrop(event: DragEvent): void {
+    if (!this.accountId()) return;
+    event.preventDefault();
+    this.dragDepth = 0;
+    this.dragActive.set(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (file) this.uploadFile(file);
+  }
+
+  private hasFiles(event: DragEvent): boolean {
+    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
   }
 
   // -------------------------------------------------------------- reconcile

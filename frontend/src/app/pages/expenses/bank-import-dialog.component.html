@@ -5,111 +5,140 @@
   size="lg"
   (closed)="close()"
 >
-  <!-- Quelle: FinTS-Abruf oder Datei-Import -->
-  <div class="bank__tabs" role="tablist">
-    <button
-      type="button"
-      class="bank__tab"
-      [class.bank__tab--active]="tab() === 'fints'"
-      role="tab"
-      [attr.aria-selected]="tab() === 'fints'"
-      (click)="tab.set('fints')"
-    >
-      {{ 'fints.tabFints' | t }}
-    </button>
-    <button
-      type="button"
-      class="bank__tab"
-      [class.bank__tab--active]="tab() === 'file'"
-      role="tab"
-      [attr.aria-selected]="tab() === 'file'"
-      (click)="tab.set('file')"
-    >
-      {{ 'fints.tabFile' | t }}
-    </button>
-  </div>
+  <div class="bank">
+    <!-- Quelle: FinTS-Abruf oder Datei-Import -->
+    <div class="bank__tabs" role="tablist">
+      <button
+        type="button"
+        class="bank__tab"
+        [class.bank__tab--active]="tab() === 'fints'"
+        role="tab"
+        [attr.aria-selected]="tab() === 'fints'"
+        (click)="tab.set('fints')"
+      >
+        {{ 'fints.tabFints' | t }}
+      </button>
+      <button
+        type="button"
+        class="bank__tab"
+        [class.bank__tab--active]="tab() === 'file'"
+        role="tab"
+        [attr.aria-selected]="tab() === 'file'"
+        (click)="tab.set('file')"
+      >
+        {{ 'fints.tabFile' | t }}
+      </button>
+    </div>
 
-  <!-- FinTS-Lasche -->
-  @if (tab() === 'fints') {
-    <div class="bank__source">
-      @if (fintsAccountOptions().length) {
+    <!-- FinTS-Lasche -->
+    @if (tab() === 'fints') {
+      <section class="bank__panel">
+        @if (fintsAccountOptions().length) {
+          <app-select
+            [label]="'fints.account' | t"
+            [options]="fintsAccountOptions()"
+            [ngModel]="accountId()"
+            (ngModelChange)="accountId.set($event)"
+            name="fintsAccount"
+          />
+          @if (!hasPendingTan()) {
+            <app-button [loading]="syncing()" [disabled]="!accountId()" (click)="startSync()">
+              {{ 'fints.sync' | t }}
+            </app-button>
+          } @else {
+            <!-- TAN-Schritt (PSD2/SCA) -->
+            <div class="bank__tan">
+              <p class="bank__tanMsg">{{ challenge() || ('fints.tanPrompt' | t) }}</p>
+              @if (challengeImage()) {
+                <!-- photoTAN/QR-TAN: optischen Challenge zum Scannen anzeigen (#fints-qrtan) -->
+                <img class="bank__tanImg" [src]="challengeImage()" [alt]="'fints.tanImageAlt' | t" />
+              }
+              @if (!decoupled()) {
+                <label class="bank__label" for="bank-tan">{{ 'fints.tan' | t }}
+                  <input
+                    id="bank-tan"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    [ngModel]="tanCode()"
+                    (ngModelChange)="tanCode.set($event)"
+                    name="tan"
+                  />
+                </label>
+                <app-button [loading]="tanBusy()" [disabled]="!tanCode().trim()" (click)="submitTan()">
+                  {{ 'fints.tanConfirm' | t }}
+                </app-button>
+              } @else {
+                <p class="bank__hint">{{ 'fints.tanDecoupled' | t }}</p>
+                <app-button [loading]="tanBusy()" (click)="submitTan()">
+                  {{ 'fints.tanPoll' | t }}
+                </app-button>
+              }
+            </div>
+          }
+        } @else {
+          <p class="bank__notice">{{ 'fints.noAccounts' | t }}</p>
+        }
+      </section>
+    } @else {
+      <!-- Datei-Lasche (CAMT.053 / MT940) — Drop-Area wie das Anhänge-Panel -->
+      <section
+        class="bank__panel bank__drop"
+        (dragenter)="onDragEnter($event)"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+      >
         <app-select
           [label]="'fints.account' | t"
-          [options]="fintsAccountOptions()"
+          [options]="fileAccountOptions()"
           [ngModel]="accountId()"
           (ngModelChange)="accountId.set($event)"
-          name="fintsAccount"
+          name="fileAccount"
         />
-        @if (!hasPendingTan()) {
-          <app-button [loading]="syncing()" [disabled]="!accountId()" (click)="startSync()">
-            {{ 'fints.sync' | t }}
+        <div class="bank__upload">
+          <input
+            #bankFile
+            id="bank-file"
+            type="file"
+            class="bank__file"
+            accept=".xml,.sta,.mt940,.txt"
+            [disabled]="!accountId() || importing()"
+            (change)="onFile($event)"
+            [attr.aria-label]="'fints.fileChoose' | t"
+          />
+          <app-button
+            type="button"
+            size="sm"
+            [loading]="importing()"
+            [disabled]="!accountId()"
+            (click)="bankFile.click()"
+          >
+            <span class="inline-flex items-center gap-2">
+              <app-icon name="upload" [size]="16" /> {{ 'fints.fileChoose' | t }}
+            </span>
           </app-button>
-        } @else {
-          <!-- TAN-Schritt (PSD2/SCA) -->
-          <div class="bank__tan">
-            <p class="bank__tanMsg">{{ challenge() || ('fints.tanPrompt' | t) }}</p>
-            @if (challengeImage()) {
-              <!-- photoTAN/QR-TAN: optischen Challenge zum Scannen anzeigen (#fints-qrtan) -->
-              <img class="bank__tanImg" [src]="challengeImage()" [alt]="'fints.tanImageAlt' | t" />
-            }
-            @if (!decoupled()) {
-              <label class="bank__label" for="bank-tan">{{ 'fints.tan' | t }}
-                <input
-                  id="bank-tan"
-                  inputmode="numeric"
-                  autocomplete="one-time-code"
-                  [ngModel]="tanCode()"
-                  (ngModelChange)="tanCode.set($event)"
-                  name="tan"
-                />
-              </label>
-              <app-button [loading]="tanBusy()" [disabled]="!tanCode().trim()" (click)="submitTan()">
-                {{ 'fints.tanConfirm' | t }}
-              </app-button>
-            } @else {
-              <p class="bank__hint">{{ 'fints.tanDecoupled' | t }}</p>
-              <app-button [loading]="tanBusy()" (click)="submitTan()">
-                {{ 'fints.tanPoll' | t }}
-              </app-button>
-            }
+          <p class="bank__hint">{{ 'fints.fileHint' | t }}</p>
+        </div>
+        @if (dragActive()) {
+          <div class="bank__dropOverlay" aria-hidden="true">
+            <div class="bank__dropInner">
+              <app-icon name="upload" [size]="32" />
+              <span>{{ 'fints.drop' | t }}</span>
+            </div>
           </div>
         }
-      } @else {
-        <p class="bank__hint">{{ 'fints.noAccounts' | t }}</p>
-      }
-    </div>
-  } @else {
-    <!-- Datei-Lasche (CAMT.053 / MT940) -->
-    <div class="bank__source">
-      <app-select
-        [label]="'fints.account' | t"
-        [options]="fileAccountOptions()"
-        [ngModel]="accountId()"
-        (ngModelChange)="accountId.set($event)"
-        name="fileAccount"
-      />
-      <label class="bank__label" for="bank-file">{{ 'fints.file' | t }}
-        <input
-          id="bank-file"
-          type="file"
-          accept=".xml,.sta,.mt940,.txt"
-          [disabled]="!accountId() || importing()"
-          (change)="onFile($event)"
-        />
-      </label>
-      <p class="bank__hint">{{ 'fints.fileHint' | t }}</p>
-    </div>
-  }
+      </section>
+    }
 
-  <!-- Abgleich: gestagete Umsätze -->
-  <div class="bank__reconcile">
-    <h3 class="bank__h3">{{ 'fints.openLines' | t }}</h3>
-    @if (loadingLines()) {
-      <p class="bank__hint" aria-live="polite">{{ 'fints.loading' | t }}</p>
-    } @else if (!lines().length) {
-      <p class="empty-state">{{ 'fints.empty' | t }}</p>
-    } @else {
-      <div class="bank__lines">
+    <!-- Abgleich: gestagete Umsätze -->
+    <section class="bank__reconcile">
+      <h3 class="bank__h3">{{ 'fints.openLines' | t }}</h3>
+      @if (loadingLines()) {
+        <p class="bank__hint" aria-live="polite">{{ 'fints.loading' | t }}</p>
+      } @else if (!lines().length) {
+        <p class="empty-state">{{ 'fints.empty' | t }}</p>
+      } @else {
+        <div class="bank__lines">
         @for (line of lines(); track line.id) {
           <div class="bank__line" [class.bank__line--income]="line.kind === 'income'">
             <div class="bank__lineMain">
@@ -160,9 +189,6 @@
         }
       </div>
     }
-  </div>
-
-  <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="close()">{{ 'action.close' | t }}</app-button>
+    </section>
   </div>
 </app-dialog>

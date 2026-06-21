@@ -60,7 +60,9 @@
         <app-button variant="secondary" size="sm" [loading]="importing()" (click)="fileInput.click()">
           <span class="inline-flex items-center gap-2"><app-icon name="upload" [size]="16" /> {{ 'invoices.import' | t }}</span>
         </app-button>
-        <app-button size="sm" (click)="openCreate()">{{ 'invoices.add' | t }}</app-button>
+        <app-button size="sm" (click)="openCreate()">
+          <span class="inline-flex items-center gap-2"><app-icon name="add" [size]="16" /> {{ 'invoices.add' | t }}</span>
+        </app-button>
       }
     </div>
   </header>

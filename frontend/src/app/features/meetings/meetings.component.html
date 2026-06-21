@@ -28,7 +28,9 @@
           />
         }
         @if (canCreate()) {
-          <app-button size="sm" (click)="openCreate()">{{ 'meetings.list.new' | t }}</app-button>
+          <app-button size="sm" (click)="openCreate()">
+            <span class="inline-flex items-center gap-2"><app-icon name="add" [size]="16" /> {{ 'meetings.list.new' | t }}</span>
+          </app-button>
         }
       </div>
     }

@@ -43,8 +43,12 @@
         <app-button variant="secondary" size="sm" (click)="bankDialogOpen.set(true)">
           <span class="inline-flex items-center gap-2"><app-icon name="euro" [size]="16" /> {{ 'fints.button' | t }}</span>
         </app-button>
-        <app-button variant="secondary" size="sm" (click)="openTransfer()">{{ 'expenses.transfer' | t }}</app-button>
-        <app-button size="sm" (click)="openCreate()">{{ 'expenses.add' | t }}</app-button>
+        <app-button variant="secondary" size="sm" (click)="openTransfer()">
+          <span class="inline-flex items-center gap-2"><app-icon name="repeat" [size]="16" /> {{ 'expenses.transfer' | t }}</span>
+        </app-button>
+        <app-button size="sm" (click)="openCreate()">
+          <span class="inline-flex items-center gap-2"><app-icon name="add" [size]="16" /> {{ 'expenses.add' | t }}</span>
+        </app-button>
       }
     </div>
   </div>
