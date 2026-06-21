@@ -115,3 +115,57 @@ def test_amount_out_of_range_rejected() -> None:
 </Ntry></Stmt></Document>"""
     with pytest.raises(bi.StatementParseError):
         bi.parse_camt053(huge)
+
+
+# --------------------------------------------------- review round 4 (#fints-review)
+class _Amt:
+    def __init__(self, amount: str, currency: str = "EUR") -> None:
+        self.amount = Decimal(amount)
+        self.currency = currency
+
+
+class _Tx:
+    def __init__(self, data: dict[str, object]) -> None:
+        self.data = data
+
+
+def test_mt940_sign_from_status() -> None:
+    """Vorzeichen explizit aus dem Status — inkl. Storno-Marker RC/RD (#fints-review)."""
+    def amt(status: str, value: str = "50.00") -> Decimal:
+        return bi.lines_from_mt940_transactions(
+            [_Tx({"amount": _Amt(value), "status": status})]
+        )[0].amount
+
+    assert amt("D") == Decimal("-50.00")
+    assert amt("C") == Decimal("50.00")
+    # RC = Storno einer Gutschrift = Abgang → negativ (der eigentliche Bug-Fix).
+    assert amt("RC") == Decimal("-50.00")
+    # RD = Storno einer Lastschrift = Eingang → positiv.
+    assert amt("RD") == Decimal("50.00")
+    # Unbekannter/leerer Status → Vorzeichen der Lib beibehalten (hier negativ vorgegeben).
+    neg = bi.lines_from_mt940_transactions([_Tx({"amount": _Amt("-7.00")})])[0]
+    assert neg.amount == Decimal("-7.00")
+
+
+def test_camt_direction_edges() -> None:
+    """Fehlender Indikator → übersprungen; RvslInd kehrt um; negativer <Amt> → abs."""
+    xml = b"""<?xml version="1.0"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
+ <Ntry><Amt Ccy="EUR">10.00</Amt></Ntry>
+ <Ntry><Amt Ccy="EUR">20.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><RvslInd>true</RvslInd></Ntry>
+ <Ntry><Amt Ccy="EUR">-30.00</Amt><CdtDbtInd>DBIT</CdtDbtInd></Ntry>
+</Stmt></Document>"""
+    lines = bi.parse_camt053(xml)
+    assert len(lines) == 2  # erster (ohne CdtDbtInd) übersprungen
+    assert lines[0].amount == Decimal("-20.00")  # Storno einer Gutschrift = Abgang
+    assert lines[0].raw.get("reversal") == "true"
+    assert lines[1].amount == Decimal("-30.00")  # negativer <Amt> → abs, dann DBIT
+
+
+def test_camt_sub_cent_rejected() -> None:
+    xml = b"""<?xml version="1.0"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt><Ntry>
+ <Amt Ccy="EUR">100.005</Amt><CdtDbtInd>CRDT</CdtDbtInd>
+</Ntry></Stmt></Document>"""
+    with pytest.raises(bi.StatementParseError):
+        bi.parse_camt053(xml)

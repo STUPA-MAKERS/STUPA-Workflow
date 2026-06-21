@@ -112,19 +112,30 @@ def best_match(
     line_e2e: str | None,
     candidates: list[ExpenseCandidate],
 ) -> MatchResult:
-    """Besten Kandidaten über der Schwelle wählen (sonst leeres :class:`MatchResult`)."""
-    best = MatchResult()
-    for cand in candidates:
-        result = score_candidate(
+    """Besten Kandidaten über der Schwelle wählen (sonst leeres :class:`MatchResult`).
+
+    Ein **mehrdeutiger** Spitzenwert (zwei gleichauf führende Buchungen) liefert *keinen*
+    Vorschlag — sonst entschiede die (undeterministische) DB-Zeilenreihenfolge, welche der
+    gleichwertigen Buchungen vorgeschlagen wird (#fints-review)."""
+    scored = [
+        score_candidate(
             line_amount=line_amount,
             line_when=line_when,
             line_ref=line_ref,
             line_e2e=line_e2e,
             candidate=cand,
         )
-        if result.score > best.score:
-            best = result
-    if best.score < SUGGEST_THRESHOLD:
+        for cand in candidates
+    ]
+    real = [r for r in scored if r.expense_id is not None]
+    if not real:
         return MatchResult()
+    top = max(r.score for r in real)
+    if top < SUGGEST_THRESHOLD:
+        return MatchResult()
+    winners = [r for r in real if r.score == top]
+    if len(winners) != 1:
+        return MatchResult()  # gleichauf → mehrdeutig, kein Vorschlag
+    best = winners[0]
     best.score = min(best.score, 100)  # erst der Sieger wird für die Anzeige gekappt
     return best

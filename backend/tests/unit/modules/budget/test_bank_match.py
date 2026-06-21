@@ -92,3 +92,27 @@ def test_best_of_several() -> None:
         candidates=cands,
     )
     assert r.expense_id == "exact"
+
+
+def test_ambiguous_tie_returns_empty() -> None:
+    # Zwei gleichwertige Treffer (gleicher Betrag + gleiches Datum, keine Referenz) →
+    # mehrdeutig → kein Vorschlag, sonst entschiede die DB-Reihenfolge (#fints-review).
+    cands = [
+        _cand("a", "50.00", date(2024, 1, 2), None),
+        _cand("b", "50.00", date(2024, 1, 2), None),
+    ]
+    r = bm.best_match(
+        line_amount=Decimal("-50.00"),
+        line_when=date(2024, 1, 2),
+        line_ref=None,
+        line_e2e=None,
+        candidates=cands,
+    )
+    assert r.expense_id is None
+
+
+def test_empty_candidates_returns_empty() -> None:
+    r = bm.best_match(
+        line_amount=Decimal("1.00"), line_when=None, line_ref=None, line_e2e=None, candidates=[]
+    )
+    assert r.expense_id is None

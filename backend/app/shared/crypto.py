@@ -2,10 +2,17 @@
 
 Hält Online-Banking-PINs (#fints) **verschlüsselt** in der DB. Der Fernet-Schlüssel
 wird aus dem konfigurierten ``fints_enc_key``-Secret abgeleitet (``sha256`` →
-url-safe-base64), damit jede ausreichend lange Passphrase funktioniert — Fernet selbst
-verlangt einen exakten 32-Byte-base64-Schlüssel. ``cryptography`` ist bereits transitive
-Abhängigkeit (``pyjwt[crypto]``) und wird hier **lazy** importiert (der reine Contract-CI-
-Pfad lädt es nie). Klartext-PIN/Secret werden **nie** geloggt (security.md §10).
+url-safe-base64), weil Fernet einen exakten 32-Byte-base64-Schlüssel verlangt.
+
+**Wichtig (#fints-review):** ``sha256`` ist *kein* Passwort-KDF (kein Salt, kein
+Work-Factor). ``fints_enc_key`` MUSS daher ein **zufälliges, hochentropisches** Secret sein
+(z. B. ``python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key())"``
+oder 32 Zufallsbytes) — eine vom Menschen gewählte Passphrase wäre bei DB-Leak offline
+brute-forcebar. ``_MIN_SECRET_LEN`` prüft nur die Länge, nicht die Entropie.
+
+``cryptography`` ist bereits transitive Abhängigkeit (``pyjwt[crypto]``) und wird hier
+**lazy** importiert (der reine Contract-CI-Pfad lädt es nie). Klartext-PIN/Secret werden
+**nie** geloggt (security.md §10).
 """
 
 from __future__ import annotations

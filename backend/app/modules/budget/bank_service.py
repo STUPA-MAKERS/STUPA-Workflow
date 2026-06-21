@@ -168,34 +168,70 @@ class BankService:
     async def sync_account(self, account_id: uuid.UUID) -> BankSyncResult:
         """Schritt 1 (#fints): FinTS-Sync starten → Umsätze stagen **oder** TAN anfordern."""
         acc = await self._account_or_404(account_id)
+        await self._purge_expired_sessions()
         creds = self._credentials(acc)
+        self._revalidate_endpoint(creds.endpoint)
         start = datetime.now(UTC).date() - timedelta(days=self.settings.fints_max_days)
         try:
             outcome = fints_client.start_sync(creds, start_date=start)
         except FintsError as exc:
-            raise ServiceUnavailableError(f"FinTS sync failed: {exc}") from exc
+            # Lib-/Bank-Fehlertext NICHT an den Client durchreichen (kann Sensibles tragen,
+            # #fints-review) — fints_client hat ihn bereits serverseitig geloggt.
+            raise ServiceUnavailableError(
+                "FinTS sync failed.", code="fints_sync_failed"
+            ) from exc
         return await self._handle_outcome(acc, outcome)
+
+    def _revalidate_endpoint(self, endpoint: str) -> None:
+        """SSRF-Endpunkt **erneut zur Abruf-Zeit** prüfen (#fints-review).
+
+        Die Validierung bei der Konto-Konfiguration allein genügt nicht: zwischen Setzen und
+        Abruf kann der DNS-Eintrag auf eine interne IP umgebogen werden (Rebinding), und
+        ``account.manage`` (setzt Endpunkt) ≠ ``budget.book`` (löst Sync aus). Hier erneut
+        auflösen + gegen den SSRF-Guard prüfen verkürzt das Fenster drastisch. **Restrisiko**
+        (von der Egress-Firewall abzufangen): ``python-fints`` löst beim Verbinden selbst noch
+        einmal auf und folgt Redirects — IP-Pinning des Connects ist Folge-Arbeit."""
+        try:
+            fints_client.validate_fints_endpoint(endpoint)
+        except ValueError as exc:
+            raise ValidationProblem(
+                "FinTS endpoint is not allowed.", code="fints_endpoint_blocked"
+            ) from exc
+
+    async def _purge_expired_sessions(self) -> None:
+        """Abgelaufene TAN-Sitzungen global aufräumen (#fints-review) — sonst bleiben
+        abgebrochene SCA-Dialoge (verschlüsselt) unbegrenzt liegen; der lazy Lösch-Pfad in
+        :meth:`_claim_session` greift nur für genau das angefragte Token."""
+        await self.session.execute(
+            delete(BankSyncSession).where(BankSyncSession.expires_at < datetime.now(UTC))
+        )
 
     async def submit_tan(
         self, account_id: uuid.UUID, session_token: uuid.UUID, tan: str
     ) -> BankSyncResult:
         """Schritt 2 (#fints): pausierten Dialog mit TAN fortsetzen (leer = decoupled-Poll)."""
         acc = await self._account_or_404(account_id)
-        pending = await self._load_session(session_token, account_id)
+        # Sitzung **atomar beanspruchen** (löschen) BEVOR der Netz-Call läuft (#fints-review):
+        # ein zweiter, paralleler Submit mit demselben Token findet nichts mehr → kein Replay
+        # des fortgesetzten Dialogs / kein Doppel-Audit. Schlägt der Call fehl, ist die Sitzung
+        # weg und der Nutzer startet den Sync neu (TAN-Flows sind kurz).
+        pending = await self._claim_session(session_token, account_id)
         creds = self._credentials(acc)
+        self._revalidate_endpoint(creds.endpoint)
         creds.tan_mechanism = pending.tan_mechanism
         try:
             outcome = fints_client.submit_tan(creds, pending, tan)
         except FintsError as exc:
-            raise ServiceUnavailableError(f"FinTS TAN submission failed: {exc}") from exc
+            raise ServiceUnavailableError(
+                "FinTS TAN submission failed.", code="fints_tan_failed"
+            ) from exc
         if outcome.status == "needs_tan":
-            # decoupled noch nicht freigegeben → Sitzung aktualisieren, erneut anfordern.
-            # Commit nötig: get_session committet NICHT automatisch, sonst ginge der
-            # aufgefrischte Dialog-Zustand/TTL beim Request-Ende verloren (#fints-review).
-            await self._store_session(acc.id, outcome, token=session_token)
+            # decoupled noch nicht freigegeben → **neues** Token (das alte ist verbraucht,
+            # nicht wiederverwendbar) anlegen und erneut anfordern.
+            new_token = uuid.uuid4()
+            await self._store_session(acc.id, outcome, token=new_token)
             await self.session.commit()
-            return self._needs_tan_result(acc.id, session_token, outcome)
-        await self._delete_session(session_token)
+            return self._needs_tan_result(acc.id, new_token, outcome)
         return await self._handle_outcome(acc, outcome)
 
     async def _handle_outcome(self, acc: Account, outcome: FintsOutcome) -> BankSyncResult:
@@ -257,14 +293,11 @@ class BankService:
     async def _store_session(
         self, account_id: uuid.UUID, outcome: FintsOutcome, *, token: uuid.UUID
     ) -> None:
+        # Token sind immer frisch (initialer ``needs_tan`` und decoupled-Re-Poll erzeugen je
+        # ein neues UUID) → reines Insert, kein Update-Pfad nötig (#fints-review).
         expires = datetime.now(UTC) + timedelta(
             seconds=self.settings.fints_tan_session_ttl_seconds
         )
-        existing = await self.session.get(BankSyncSession, token)
-        if existing is not None:
-            existing.payload_encrypted = self._encode_outcome(outcome)
-            existing.expires_at = expires
-            return
         self.session.add(
             BankSyncSession(
                 id=token,
@@ -274,21 +307,42 @@ class BankService:
             )
         )
 
-    async def _load_session(
+    async def _claim_session(
         self, token: uuid.UUID, account_id: uuid.UUID
     ) -> FintsOutcome:
+        """TAN-Sitzung **atomar** entnehmen: per ``DELETE … RETURNING`` löschen + sofort
+        committen, damit ein paralleler Submit sie nicht erneut laden kann (Anti-Replay,
+        #fints-review). Abgelaufen/nicht entschlüsselbar → 422 (Sync neu starten), nicht 500."""
         from app.modules.budget.fints_client import FintsOutcome
 
-        row = await self.session.get(BankSyncSession, token)
-        if row is None or row.account_id != account_id:
+        row = (
+            await self.session.execute(
+                delete(BankSyncSession)
+                .where(
+                    BankSyncSession.id == token,
+                    BankSyncSession.account_id == account_id,
+                )
+                .returning(
+                    BankSyncSession.payload_encrypted, BankSyncSession.expires_at
+                )
+            )
+        ).first()
+        # Claim sofort sichtbar machen → ein zeitgleicher zweiter Submit findet nichts mehr.
+        await self.session.commit()
+        if row is None:
             raise NotFoundError("TAN session not found")
-        if row.expires_at < datetime.now(UTC):
-            await self._delete_session(token)
-            await self.session.commit()
+        payload_encrypted, expires_at = row
+        if expires_at < datetime.now(UTC):
             raise ValidationProblem(
                 "TAN session expired — start the sync again.", code="fints_tan_expired"
             )
-        data = json.loads(decrypt_secret(row.payload_encrypted, key=self._require_enabled()))
+        try:
+            data = json.loads(decrypt_secret(payload_encrypted, key=self._require_enabled()))
+        except SecretCryptoError as exc:
+            raise ValidationProblem(
+                "TAN session could not be decrypted — start the sync again.",
+                code="fints_tan_expired",
+            ) from exc
         return FintsOutcome(
             status="needs_tan",
             tan_mechanism=data.get("tan_mechanism"),
@@ -298,11 +352,6 @@ class BankService:
             challenge=data.get("challenge"),
             challenge_html=data.get("challenge_html"),
             decoupled=bool(data.get("decoupled")),
-        )
-
-    async def _delete_session(self, token: uuid.UUID) -> None:
-        await self.session.execute(
-            delete(BankSyncSession).where(BankSyncSession.id == token)
         )
 
     # --------------------------------------------------------- file import (D)
@@ -398,6 +447,9 @@ class BankService:
                     BudgetExpense.kind == kind,
                     BudgetExpense.id.not_in(allocated),
                 )
+                # Deterministische Kandidaten-Reihenfolge (#fints-review): ohne ORDER BY
+                # entschiede die DB-Zeilenfolge bei gleichwertigen Treffern.
+                .order_by(BudgetExpense.created_at, BudgetExpense.id)
                 .limit(50)
             )
         ).scalars().all()
@@ -494,7 +546,14 @@ class BankService:
         # auch durchgeht (minimiert das Orphan-Fenster: matched ohne Buchung).
         expense: BudgetExpense | None = None
         if payload.match_expense_id is not None:
-            expense = await self.session.get(BudgetExpense, payload.match_expense_id)
+            # ``with_for_update`` sperrt die Buchungszeile bis zum Commit (#fints-review):
+            # ohne sie könnten zwei parallele Confirms unterschiedlicher Umsätze gegen
+            # **dieselbe** Buchung beide am ``already``-Check vorbeikommen und je eine
+            # Allocation anlegen (eine Zahlung doppelt abgeglichen) — der konditionale
+            # Claim-UPDATE schützt nur je Umsatz-Zeile, nicht die geteilte Buchung.
+            expense = await self.session.get(
+                BudgetExpense, payload.match_expense_id, with_for_update=True
+            )
             if expense is None:
                 raise NotFoundError(f"expense {payload.match_expense_id} not found")
             if expense.kind != kind:
@@ -506,6 +565,11 @@ class BankService:
                 raise ValidationProblem(
                     "Booking amount does not match the transaction amount.",
                     code="line_amount_mismatch",
+                )
+            if expense.account_id is not None and expense.account_id != line.account_id:
+                raise ValidationProblem(
+                    "Booking belongs to a different account than the statement line.",
+                    code="line_account_mismatch",
                 )
             already = await self.session.scalar(
                 select(BankAllocation.id)
@@ -613,12 +677,23 @@ class BankService:
         line = await self.session.get(BankStatementLine, line_id)
         if line is None:
             raise NotFoundError(f"statement line {line_id} not found")
-        if line.match_state == "matched":
-            # Ein gebuchter Umsatz (mit Expense + Allocation) darf nicht still auf
-            # 'ignored' gekippt werden — das würde Reconcile-Status vom Ledger entkoppeln.
+        # Konditionaler Claim wie bei confirm_line (#fints-review): ein parallel frisch
+        # gebuchter ('matched') Umsatz darf NICHT per ORM-Dirty-Flush auf 'ignored'
+        # zurückgekippt werden — das entkoppelte den Reconcile-Status vom Ledger.
+        claimed = (
+            await self.session.execute(
+                update(BankStatementLine)
+                .where(
+                    BankStatementLine.id == line_id,
+                    BankStatementLine.match_state != "matched",
+                )
+                .values(match_state="ignored")
+                .returning(BankStatementLine.id)
+            )
+        ).first()
+        if claimed is None:
             raise ValidationProblem(
                 "A matched statement line cannot be ignored.", code="line_already_matched"
             )
-        line.match_state = "ignored"
-        await self._audit(AuditAction.BANK_LINE_IGNORE, target_id=str(line.id))
+        await self._audit(AuditAction.BANK_LINE_IGNORE, target_id=str(line_id))
         await self.session.commit()

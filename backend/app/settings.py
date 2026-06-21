@@ -264,6 +264,9 @@ class Settings(BaseSettings):
     rl_magic_link_verify_ip_per_hour: int = 20
     rl_applications_ip_per_hour: int = 10
     rl_attachments_per_hour: int = 30  # POST /attachments: 30/Std/applicant (api.md §7)
+    # FinTS-Sync/TAN/Import: pro Principal/Std. Bremst SSRF-Port-Scan-Versuche + Bank-PIN-
+    # Lockout-Missbrauch über wiederholte Syncs (#fints-review).
+    rl_fints_per_hour: int = 60
     # Default-Limit auf allen *schreibenden* Endpunkten (api.md §7): IP-Schlüssel,
     # großzügig → fängt Endpunkte ohne eigenes (strengeres) Limit ab, Defense-in-Depth.
     rl_default_write_per_hour: int = 100

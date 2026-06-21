@@ -193,7 +193,10 @@ export class BankImportDialogComponent {
     if (res.status === 'needs_tan') {
       this.sessionToken.set(res.sessionToken ?? '');
       this.challenge.set(res.challenge ?? '');
-      this.challengeImage.set(res.challengeImage ?? '');
+      // Nur echte Bild-Data-URLs ins <img>-Binding lassen (Defense-in-Depth, #fints-review):
+      // der Server liefert sie zwar geprüft, aber wir vertrauen dem String nicht blind.
+      const img = res.challengeImage ?? '';
+      this.challengeImage.set(/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(img) ? img : '');
       this.decoupled.set(res.decoupled);
       return;
     }
@@ -297,6 +300,9 @@ export class BankImportDialogComponent {
   }
 
   close(): void {
+    // Einmal-TAN + Challenge nicht über das Schließen hinaus im (dauerhaft gemounteten)
+    // Component-State liegen lassen (#fints-review).
+    this.resetTan();
     this.closed.emit();
   }
 }

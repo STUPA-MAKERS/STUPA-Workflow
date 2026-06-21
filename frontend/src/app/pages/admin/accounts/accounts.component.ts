@@ -126,6 +126,8 @@ export class AccountsComponent {
       next: () => {
         this.saving.set(false);
         this.dialogOpen.set(false);
+        // Klartext-PIN nicht im Component-State (Angular DevTools) liegen lassen (#fints-review).
+        this.fPin.set('');
         this.toast.success(this.i18n.translate('admin.accounts.toastSaved'));
         this.reload();
       },

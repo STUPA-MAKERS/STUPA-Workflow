@@ -75,7 +75,7 @@ from app.modules.budget.tree_schemas import (
     TransferOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
-from app.shared.antiabuse import body_cap
+from app.shared.antiabuse import body_cap, rate_limit_fints
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
 from app.shared.paging import Page
 
@@ -692,8 +692,11 @@ async def delete_account(account_id: UUID, service: ServiceDep) -> None:
 @router.post(
     "/accounts/{account_id}/fints/sync",
     response_model=BankSyncResult,
-    dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404, 422, 503),
+    dependencies=[
+        Depends(require_principal("budget.book")),
+        Depends(rate_limit_fints),
+    ],
+    responses=_errors(401, 403, 404, 422, 429, 503),
 )
 async def fints_sync(account_id: UUID, service: BankServiceDep) -> BankSyncResult:
     """FinTS-Sync starten (#fints): Umsätze stagen **oder** TAN anfordern (``needs_tan``)."""
@@ -703,8 +706,11 @@ async def fints_sync(account_id: UUID, service: BankServiceDep) -> BankSyncResul
 @router.post(
     "/accounts/{account_id}/fints/sessions/{session_token}/tan",
     response_model=BankSyncResult,
-    dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404, 422, 503),
+    dependencies=[
+        Depends(require_principal("budget.book")),
+        Depends(rate_limit_fints),
+    ],
+    responses=_errors(401, 403, 404, 422, 429, 503),
 )
 async def fints_submit_tan(
     account_id: UUID,
@@ -721,9 +727,10 @@ async def fints_submit_tan(
     response_model=BankImportResult,
     dependencies=[
         Depends(require_principal("budget.book")),
+        Depends(rate_limit_fints),
         Depends(_enforce_invoice_body),
     ],
-    responses=_errors(401, 403, 413, 422, 503),
+    responses=_errors(401, 403, 413, 422, 429, 503),
 )
 async def import_statement_file(
     account_id: UUID,

@@ -55,7 +55,8 @@ class _Session:
     def put(self, obj: Any) -> None:
         self.store[(type(obj).__name__, obj.id)] = obj
 
-    async def get(self, model: type, ident: Any) -> Any:
+    async def get(self, model: type, ident: Any, **_kw: Any) -> Any:
+        # ``with_for_update`` u. a. werden im Fake ignoriert (keine echte Sperre).
         return self.store.get((model.__name__, ident))
 
     async def execute(self, _stmt: Any) -> _Result:
@@ -87,6 +88,8 @@ def _service(session: _Session, monkeypatch: pytest.MonkeyPatch, **over: Any) ->
         return None
 
     monkeypatch.setattr(bank_service, "audit_record", _noop)
+    # SSRF-Re-Validierung (DNS) ist separat getestet — im Unit-Test neutralisieren.
+    monkeypatch.setattr(fc, "validate_fints_endpoint", lambda _u: None)
     return BankService(session, settings=_settings(**over), actor="tester")  # type: ignore[arg-type]
 
 
@@ -196,8 +199,8 @@ async def test_ignore_line(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _service(session, monkeypatch)
     line = _line()
     session.put(line)
+    session.execute_q.append(_Result([(line.id,)]))  # konditionaler Claim gewinnt
     await svc.ignore_line(line.id)
-    assert line.match_state == "ignored"
     assert session.commits == 1
 
 
@@ -359,6 +362,7 @@ async def test_sync_account_done(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     monkeypatch.setattr(fc, "start_sync", _start)
+    session.execute_q.append(_Result([]))  # _purge_expired_sessions
     session.execute_q.extend([_Result([]), _Result([(uuid.uuid4(),)])])
     session.scalar_q.append(None)
     res = await svc.sync_account(acc.id)
@@ -391,6 +395,7 @@ async def test_sync_account_needs_tan(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     monkeypatch.setattr(fc, "start_sync", _start)
+    session.execute_q.append(_Result([]))  # _purge_expired_sessions
     res = await svc.sync_account(acc.id)
     assert res.status == "needs_tan"
     assert res.session_token is not None
@@ -401,25 +406,28 @@ async def test_sync_account_needs_tan(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_session_roundtrip_and_expiry(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_claim_session_roundtrip_and_expiry(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _service(session, monkeypatch)
     token = uuid.uuid4()
+    acc_id = uuid.uuid4()
     out = fc.FintsOutcome(
         status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d", tan_data=b"t",
         challenge="x", decoupled=True,
     )
-    await svc._store_session(uuid.uuid4(), out, token=token)
-    stored = session.added[-1]
-    stored.id = token
-    session.put(stored)
-    loaded = await svc._load_session(token, stored.account_id)
+    await svc._store_session(acc_id, out, token=token)
+    payload = session.added[-1].payload_encrypted
+    # Claim löscht atomar (DELETE … RETURNING) und liefert (payload, expires_at).
+    future = datetime.now(UTC) + timedelta(seconds=60)
+    session.execute_q.append(_Result([(payload, future)]))
+    loaded = await svc._claim_session(token, acc_id)
     assert loaded.client_data == b"c"
     assert loaded.decoupled is True
-    # expired
-    stored.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    # abgelaufen → ValidationProblem (kein 500)
+    past = datetime.now(UTC) - timedelta(seconds=1)
+    session.execute_q.append(_Result([(payload, past)]))
     with pytest.raises(ValidationProblem):
-        await svc._load_session(token, stored.account_id)
+        await svc._claim_session(token, acc_id)
 
 
 @pytest.mark.asyncio
@@ -433,15 +441,70 @@ async def test_submit_tan_done(monkeypatch: pytest.MonkeyPatch) -> None:
         status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d", tan_data=b"t",
     )
     await svc._store_session(acc.id, out, token=token)
-    stored = session.added[-1]
-    stored.id = token
-    session.put(stored)
+    payload = session.added[-1].payload_encrypted
+    future = datetime.now(UTC) + timedelta(seconds=60)
+    session.execute_q.append(_Result([(payload, future)]))  # _claim_session
 
     def _submit(creds: Any, pending: Any, tan: str) -> fc.FintsOutcome:
         assert tan == "123456"
+        assert pending.client_data == b"c"  # aus dem geclaimten, entschlüsselten Blob
         return fc.FintsOutcome(status="done", new_state=b"s", lines=[])
 
     monkeypatch.setattr(fc, "submit_tan", _submit)
     res = await svc.submit_tan(acc.id, token, "123456")
     assert res.status == "done"
     assert res.imported == 0
+
+
+# ------------------------------------------------- review round 4 (#fints-review)
+@pytest.mark.asyncio
+async def test_confirm_line_account_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Buchung gehört zu einem anderen Konto als der Umsatz → 422 (F4)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    line = _line(amount=Decimal("-50.00"))
+    session.put(line)
+    exp = BudgetExpense(
+        id=uuid.uuid4(), budget_id=uuid.uuid4(), fiscal_year_id=uuid.uuid4(),
+        kind="expense", amount=Decimal("50.00"), currency="EUR", description="x",
+    )
+    exp.account_id = uuid.uuid4()  # ≠ line.account_id
+    session.put(exp)
+    with pytest.raises(ValidationProblem):
+        await svc.confirm_line(line.id, ConfirmLineRequest(matchExpenseId=exp.id))
+
+
+@pytest.mark.asyncio
+async def test_sync_account_revalidate_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SSRF-Re-Validierung zur Abruf-Zeit lehnt ab → 422, kein Netz-Call (F1)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+
+    def _blocked(_url: str) -> None:
+        raise ValueError("blocked")
+
+    monkeypatch.setattr(fc, "validate_fints_endpoint", _blocked)
+    session.execute_q.append(_Result([]))  # _purge_expired_sessions
+    with pytest.raises(ValidationProblem):
+        await svc.sync_account(acc.id)
+
+
+@pytest.mark.asyncio
+async def test_claim_session_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    svc = _service(_Session(), monkeypatch)
+    # DELETE … RETURNING liefert nichts → NotFoundError.
+    with pytest.raises(NotFoundError):
+        await svc._claim_session(uuid.uuid4(), uuid.uuid4())
+
+
+@pytest.mark.asyncio
+async def test_claim_session_undecryptable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nicht entschlüsselbarer Blob (Key-Rotation) → 422, nicht 500 (Crypto #3)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    future = datetime.now(UTC) + timedelta(seconds=60)
+    session.execute_q.append(_Result([("not-a-fernet-token", future)]))
+    with pytest.raises(ValidationProblem):
+        await svc._claim_session(uuid.uuid4(), uuid.uuid4())

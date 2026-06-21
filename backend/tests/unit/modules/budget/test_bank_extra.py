@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 import xml.etree.ElementTree as ET
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -103,6 +103,8 @@ def _svc(session: _Session, monkeypatch: pytest.MonkeyPatch) -> BankService:
         return None
 
     monkeypatch.setattr(bank_service, "audit_record", _noop)
+    # SSRF-Re-Validierung (DNS) im Unit-Test neutralisieren — separat getestet.
+    monkeypatch.setattr(fc, "validate_fints_endpoint", lambda _u: None)
     settings = load_settings(fints_enc_key=_KEY)
     return BankService(session, settings=settings, actor="t")  # type: ignore[arg-type]
 
@@ -207,6 +209,7 @@ async def test_sync_done_without_new_state(monkeypatch: pytest.MonkeyPatch) -> N
         return fc.FintsOutcome(status="done", new_state=None, lines=[])
 
     monkeypatch.setattr(fc, "start_sync", _start)
+    session.execute_q.append(_Result([]))  # _purge_expired_sessions
     res = await svc.sync_account(acc.id)
     assert res.status == "done"
     assert res.imported == 0
@@ -226,9 +229,10 @@ async def test_submit_tan_still_needs_tan(monkeypatch: pytest.MonkeyPatch) -> No
         decoupled=True,
     )
     await svc._store_session(acc.id, out, token=token)
-    stored = session.added[-1]
-    stored.id = token
-    session.put(stored)
+    payload = session.added[-1].payload_encrypted
+    future = datetime.now(UTC) + timedelta(seconds=60)
+    session.execute_q.append(_Result([(payload, future)]))  # _claim_session
+
     def _submit(creds: Any, pending: Any, tan: str) -> fc.FintsOutcome:
         return fc.FintsOutcome(
             status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d",
@@ -238,7 +242,9 @@ async def test_submit_tan_still_needs_tan(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(fc, "submit_tan", _submit)
     res = await svc.submit_tan(acc.id, token, "")
     assert res.status == "needs_tan"
-    assert res.session_token == token
+    # Token rotiert: das alte ist verbraucht (Anti-Replay), das neue ist frisch.
+    assert res.session_token is not None
+    assert res.session_token != token
 
 
 def test_matcher_far_date_branch() -> None:
@@ -271,25 +277,13 @@ def test_matcher_wide_window_branch() -> None:
 
 
 @pytest.mark.asyncio
-async def test_load_session_not_found_and_wrong_account(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.budget import fints_client as fc
-
+async def test_claim_session_missing_or_wrong_account(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _svc(session, monkeypatch)
-    # gar keine Sitzung → NotFoundError
+    # ``DELETE … WHERE id AND account_id RETURNING`` liefert nichts (unbekanntes Token ODER
+    # Konto-Mismatch — die WHERE-Klausel deckt beides) → NotFoundError.
     with pytest.raises(NotFoundError):
-        await svc._load_session(uuid.uuid4(), uuid.uuid4())
-    # Sitzung existiert, aber falsches Konto → NotFoundError (Konto-Mismatch-Zweig)
-    token = uuid.uuid4()
-    out = fc.FintsOutcome(
-        status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d", tan_data=b"t",
-    )
-    await svc._store_session(uuid.uuid4(), out, token=token)
-    stored = session.added[-1]
-    stored.id = token
-    session.put(stored)
-    with pytest.raises(NotFoundError):
-        await svc._load_session(token, uuid.uuid4())
+        await svc._claim_session(uuid.uuid4(), uuid.uuid4())
 
 
 # ----------------------------------------------------- review-fix branches (#fints-review)
@@ -311,6 +305,7 @@ async def test_sync_account_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> 
         raise fc.FintsError("connection refused")
 
     monkeypatch.setattr(fc, "start_sync", _boom)
+    session.execute_q.append(_Result([]))  # _purge_expired_sessions
     with pytest.raises(ServiceUnavailableError):
         await svc.sync_account(acc.id)
 
@@ -326,9 +321,9 @@ async def test_submit_tan_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> No
         status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d", tan_data=b"t",
     )
     await svc._store_session(acc.id, out, token=token)
-    stored = session.added[-1]
-    stored.id = token
-    session.put(stored)
+    payload = session.added[-1].payload_encrypted
+    future = datetime.now(UTC) + timedelta(seconds=60)
+    session.execute_q.append(_Result([(payload, future)]))  # _claim_session
 
     def _boom(creds: Any, pending: Any, tan: str) -> Any:
         raise fc.FintsError("nope")

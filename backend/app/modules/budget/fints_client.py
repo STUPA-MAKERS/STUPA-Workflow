@@ -21,6 +21,7 @@ Logik (TAN-Mechanismus-Wahl, Konto-Auswahl, Umsatz-Normalisierung) bleibt geprü
 from __future__ import annotations
 
 import base64
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -33,9 +34,17 @@ from app.modules.webhooks.ssrf import Resolver, SsrfError, assert_allowed_url, d
 if TYPE_CHECKING:
     from fints.client import FinTS3PinTanClient, NeedTANResponse
 
+logger = logging.getLogger(__name__)
+
 
 class FintsError(RuntimeError):
     """FinTS-Abruf fehlgeschlagen (Verbindung, Login, Protokoll)."""
+
+
+# Erlaubte MIME-Typen für den optischen TAN-Challenge (photoTAN/QR-TAN als ``<img>``).
+_ALLOWED_TAN_IMAGE_MIME = frozenset(
+    {"image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"}
+)
 
 
 def validate_fints_endpoint(url: str, *, resolver: Resolver = default_resolver) -> None:
@@ -150,7 +159,10 @@ def _matrix_data_url(response: object) -> str | None:
         return None
     if not data:
         return None
-    mime = str(mime or "image/png")
+    # Den bank-gelieferten MIME-Typ NICHT blind übernehmen — nur bekannte Bild-Typen in die
+    # Data-URL lassen (Defense-in-Depth fürs ``<img>``-Binding), sonst Default (#fints-review).
+    candidate = str(mime or "").lower().strip()
+    mime = candidate if candidate in _ALLOWED_TAN_IMAGE_MIME else "image/png"
     return f"data:{mime};base64,{base64.b64encode(bytes(data)).decode('ascii')}"
 
 
@@ -212,7 +224,10 @@ def start_sync(creds: FintsCredentials, *, start_date: date) -> FintsOutcome:  #
     except FintsError:
         raise
     except Exception as exc:  # noqa: BLE001 — Lib-/Netzfehler einheitlich kapseln
-        raise FintsError(f"FinTS sync failed: {exc}") from exc
+        # Original-Fehler NUR serverseitig loggen — der Lib-/Bank-Text kann Request-/
+        # Antwort-Fragmente enthalten und PIN/TAN sind hier im Scope (#fints-review).
+        logger.warning("FinTS sync failed", exc_info=exc)
+        raise FintsError("FinTS sync failed.") from exc
 
 
 def submit_tan(  # pragma: no cover
@@ -243,4 +258,5 @@ def submit_tan(  # pragma: no cover
     except FintsError:
         raise
     except Exception as exc:  # noqa: BLE001
-        raise FintsError(f"FinTS TAN submission failed: {exc}") from exc
+        logger.warning("FinTS TAN submission failed", exc_info=exc)
+        raise FintsError("FinTS TAN submission failed.") from exc

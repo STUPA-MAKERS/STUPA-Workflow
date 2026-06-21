@@ -50,9 +50,13 @@ class StatementLine:
 
 
 def _sane_amount(value: Decimal) -> Decimal:
-    """Betrag auf gültigen Bereich prüfen (Vorzeichen bleibt erhalten)."""
+    """Betrag auf gültigen Bereich + Cent-Granularität prüfen (Vorzeichen bleibt erhalten)."""
     if not value.is_finite() or abs(value) > _MAX_AMOUNT:
         raise StatementParseError(f"amount out of range: {value}")
+    # Sub-Cent-Präzision (z. B. CAMT ``100.005``) NICHT still auf 2 Stellen runden — das
+    # würde Beträge gegenüber der Quelle verfälschen; klar ablehnen (#fints-review).
+    if value != value.quantize(Decimal("0.01")):
+        raise StatementParseError(f"amount has sub-cent precision: {value}")
     return value
 
 
@@ -95,7 +99,17 @@ def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
     magnitude = getattr(amount_obj, "amount", None)
     if magnitude is None:
         return None
-    amount = _sane_amount(Decimal(str(magnitude)))
+    # Vorzeichen **explizit** aus dem MT940-Status ableiten (#fints-review): die ``mt940``-
+    # Lib negiert NUR bei status == 'D', lässt Storno-Marker 'RC'/'RD' aber unverändert
+    # positiv → eine Lastschrift-Rückgabe (RC = Storno einer Gutschrift = Abgang) käme sonst
+    # als Eingang an. Abgang: D / RC. Eingang: C / RD. Unbekannt → Lib-Vorzeichen behalten.
+    raw_amount = Decimal(str(magnitude))
+    status = str(d.get("status") or "").upper()
+    if status in ("D", "RC"):
+        raw_amount = -abs(raw_amount)
+    elif status in ("C", "RD"):
+        raw_amount = abs(raw_amount)
+    amount = _sane_amount(raw_amount)
     return StatementLine(
         amount=amount,
         currency=str(getattr(amount_obj, "currency", None) or d.get("currency") or "EUR"),
@@ -137,13 +151,27 @@ def parse_camt053(data: bytes) -> list[StatementLine]:
             magnitude = Decimal((amt_el.text or "").strip())
         except (InvalidOperation, ValueError):
             continue
-        credit = (_find_text_local(ntry, "CdtDbtInd") or "").upper().startswith("CRDT")
-        amount = _sane_amount(magnitude if credit else -magnitude)
+        # Richtung **explizit** verlangen: ohne klares CRDT/DBIT ist die wirtschaftliche
+        # Richtung unbekannt — nicht still als Abgang annehmen (#fints-review).
+        ind = (_find_text_local(ntry, "CdtDbtInd") or "").upper()
+        if ind.startswith("CRDT"):
+            orig_credit = True
+        elif ind.startswith("DBIT"):
+            orig_credit = False
+        else:
+            continue
+        # Storno (``RvslInd=true``) kehrt die wirtschaftliche Richtung um (Rückbuchung).
+        reversal = (_find_text_local(ntry, "RvslInd") or "").strip().lower() in ("true", "1")
+        credit = (not orig_credit) if reversal else orig_credit
+        # CAMT ``<Amt>`` ist spec-gemäß ≥ 0; ein negativer Wert würde das Vorzeichen unten
+        # erneut kippen → defensiv den Betrag entkoppeln (Richtung kommt nur aus dem Indikator).
+        amount = _sane_amount(abs(magnitude) if credit else -abs(magnitude))
 
         tx = _find_local(ntry, "TxDtls")
         scope = tx if tx is not None else ntry
-        # Gegenpartei: bei Gutschrift der Debitor (Zahler), bei Lastschrift der Kreditor.
-        party_tag, acct_tag = ("Dbtr", "DbtrAcct") if credit else ("Cdtr", "CdtrAcct")
+        # Gegenpartei folgt dem **ursprünglichen** Indikator (Dbtr/Cdtr stehen im XML zur
+        # Originalrichtung) — bei Gutschrift der Debitor (Zahler), sonst der Kreditor.
+        party_tag, acct_tag = ("Dbtr", "DbtrAcct") if orig_credit else ("Cdtr", "CdtrAcct")
         party = _find_local(scope, party_tag)
         acct = _find_local(scope, acct_tag)
         lines.append(
@@ -162,7 +190,10 @@ def parse_camt053(data: bytes) -> list[StatementLine]:
                 end_to_end_id=_clean(_skip_notprovided(_find_text_local(scope, "EndToEndId"))),
                 reference=_clean(_find_text_local(scope, "InstrId")),
                 bank_ref=_clean(_find_text_local(ntry, "AcctSvcrRef")),
-                raw={"creditDebit": "CRDT" if credit else "DBIT"},
+                raw={
+                    "creditDebit": "CRDT" if orig_credit else "DBIT",
+                    **({"reversal": "true"} if reversal else {}),
+                },
             )
         )
     if not lines:

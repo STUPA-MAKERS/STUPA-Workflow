@@ -78,6 +78,15 @@ def test_matrix_data_url_bad_tuple() -> None:
     assert fc._matrix_data_url(_Resp(("only-one",))) is None  # nicht entpackbar
 
 
+def test_matrix_data_url_rejects_unknown_mime() -> None:
+    # Bank-gelieferter Nicht-Bild-MIME wird NICHT übernommen → Default image/png (#fints-review).
+    url = fc._matrix_data_url(_Resp(("text/html", b"data")))
+    assert url is not None and url.startswith("data:image/png;base64,")
+    # Erlaubter Typ bleibt erhalten.
+    jpg = fc._matrix_data_url(_Resp(("image/jpeg", b"data")))
+    assert jpg is not None and jpg.startswith("data:image/jpeg;base64,")
+
+
 def _global_resolver(_host: str) -> list[str]:
     return ["1.1.1.1"]  # öffentlich → erlaubt
 
