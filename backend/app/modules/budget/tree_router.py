@@ -33,6 +33,7 @@ from app.deps import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.budget.bank_service import BankService
 from app.modules.budget.invoice_import import (
     NotZugferdError,
     UnsupportedInvoiceCurrencyError,
@@ -46,11 +47,15 @@ from app.modules.budget.tree_schemas import (
     AllocationSet,
     AssignBudgetOut,
     AssignBudgetRequest,
+    BankImportResult,
+    BankSyncResult,
+    BankTanRequest,
     BudgetApplicationOut,
     BudgetNodeCreate,
     BudgetNodeOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
+    ConfirmLineRequest,
     ExpenseCreate,
     ExpenseKind,
     ExpenseOut,
@@ -65,6 +70,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceStatus,
     InvoiceUpdate,
     MoveFiscalYearRequest,
+    StatementLineOut,
     TransferCreate,
     TransferOut,
 )
@@ -100,6 +106,18 @@ def get_budget_tree_service(
 
 
 ServiceDep = Annotated[BudgetTreeService, Depends(get_budget_tree_service)]
+
+
+def get_bank_service(
+    session: DbSession,
+    settings: SettingsDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> BankService:
+    """FinTS-Bankabgleich (#fints) — ``actor`` = Principal-``sub`` für den Audit-Trail."""
+    return BankService(session, settings=settings, actor=principal.sub)
+
+
+BankServiceDep = Annotated[BankService, Depends(get_bank_service)]
 
 
 # Globale Voll-Sicht auf den Budget-Tab — jede dieser Permissions zeigt ALLES;
@@ -666,6 +684,99 @@ async def update_account(
 )
 async def delete_account(account_id: UUID, service: ServiceDep) -> None:
     await service.delete_account(account_id)
+
+
+# -------------------------------------------------------- bank reconcile (#fints)
+# Abruf/Import/Buchen bewegen Geld → ``budget.book``; Lesen der Staging-Liste wie die
+# Buchungsliste (jede Budget-Rolle, #5-2). Konto-Stammdaten/FinTS-Zugang = account.manage.
+@router.post(
+    "/accounts/{account_id}/fints/sync",
+    response_model=BankSyncResult,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(401, 403, 404, 422, 503),
+)
+async def fints_sync(account_id: UUID, service: BankServiceDep) -> BankSyncResult:
+    """FinTS-Sync starten (#fints): Umsätze stagen **oder** TAN anfordern (``needs_tan``)."""
+    return await service.sync_account(account_id)
+
+
+@router.post(
+    "/accounts/{account_id}/fints/sessions/{session_token}/tan",
+    response_model=BankSyncResult,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(401, 403, 404, 422, 503),
+)
+async def fints_submit_tan(
+    account_id: UUID,
+    session_token: UUID,
+    payload: BankTanRequest,
+    service: BankServiceDep,
+) -> BankSyncResult:
+    """Schwebende TAN-Sitzung fortsetzen (#fints) — leere ``tan`` = decoupled-Poll."""
+    return await service.submit_tan(account_id, session_token, payload.tan)
+
+
+@router.post(
+    "/accounts/{account_id}/statement/import",
+    response_model=BankImportResult,
+    dependencies=[
+        Depends(require_principal("budget.book")),
+        Depends(_enforce_invoice_body),
+    ],
+    responses=_errors(401, 403, 413, 422, 503),
+)
+async def import_statement_file(
+    account_id: UUID,
+    service: BankServiceDep,
+    file: Annotated[UploadFile, File()],
+) -> BankImportResult:
+    """Option D (#fints): CAMT.053/MT940-Datei hochladen → Umsätze stagen."""
+    data = await file.read()
+    return await service.import_file(account_id, data, filename=file.filename)
+
+
+@router.get(
+    "/statement-lines",
+    response_model=list[StatementLineOut],
+    dependencies=[
+        Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
+    ],
+    responses=_errors(401, 403),
+)
+async def list_statement_lines(
+    service: BankServiceDep,
+    account_id: Annotated[UUID | None, Query(alias="account")] = None,
+    state: Annotated[
+        Literal["unmatched", "suggested", "matched", "ignored"] | None, Query()
+    ] = None,
+) -> list[StatementLineOut]:
+    """Gestagete Kontoumsätze (#fints), optional je Konto/Status; neueste zuerst."""
+    return await service.list_lines(account_id=account_id, state=state)
+
+
+@router.post(
+    "/statement-lines/{line_id}/confirm",
+    response_model=ExpenseOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def confirm_statement_line(
+    line_id: UUID, payload: ConfirmLineRequest, service: BankServiceDep
+) -> ExpenseOut:
+    """Umsatz buchen (#fints): neue Buchung gegen ``budgetId`` **oder** an ``matchExpenseId``."""
+    return await service.confirm_line(line_id, payload)
+
+
+@router.post(
+    "/statement-lines/{line_id}/ignore",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(401, 403, 404),
+)
+async def ignore_statement_line(line_id: UUID, service: BankServiceDep) -> None:
+    """Umsatz als irrelevant markieren (#fints) — bleibt erhalten (idempotenter Import)."""
+    await service.ignore_line(line_id)
 
 
 # ---------------------------------------------------------------- fiscal years

@@ -123,44 +123,6 @@ async def test_top_down_allocation_constraint(session: AsyncSession) -> None:
         await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("900")))
 
 
-async def test_fully_bound_binds_whole_allocation(session: AsyncSession) -> None:
-    svc = BudgetTreeService(session)
-    g = await _gremium(session)
-    top = await svc.create_node(BudgetNodeCreate(key=f"FB{_suffix()}", name="Top", gremiumId=g.id))
-    c1 = await svc.create_node(BudgetNodeCreate(key="01", name="K1", parentId=top.id))
-    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
-    await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("1000")))
-    await svc.set_allocation(c1.id, fy.id, AllocationSet(allocated=Decimal("600")))
-
-    # Ohne Flag: nichts gebunden (keine Anträge) → c1 verfügbar 600.
-    tree = await svc.get_tree(gremium_id=g.id)
-    c1_view = _fy_view(_find(tree, c1.id), fy.id)
-    assert c1_view.committed == Decimal("0") and c1_view.available == Decimal("600")
-
-    # Flag setzen → ganze Zuteilung (600) gilt als gebunden, verfügbar 0; rollt zum Top.
-    await svc.update_node(c1.id, BudgetNodeUpdate(fullyBound=True))
-    tree = await svc.get_tree(gremium_id=g.id)
-    c1_view = _fy_view(_find(tree, c1.id), fy.id)
-    assert c1_view.committed == Decimal("600") and c1_view.available == Decimal("0")
-    top_view = _fy_view(_find(tree, top.id), fy.id)
-    assert top_view.committed == Decimal("600")  # gebunden rollt hoch
-    assert top_view.available == Decimal("400")  # 1000 − 600
-
-
-def _find(tree, node_id):  # noqa: ANN001
-    stack = list(tree)
-    while stack:
-        n = stack.pop()
-        if n.id == node_id:
-            return n
-        stack.extend(n.children)
-    raise AssertionError(f"node {node_id} not in tree")
-
-
-def _fy_view(node, fy_id):  # noqa: ANN001
-    return next(v for v in node.by_fiscal_year if v.fiscal_year_id == fy_id)
-
-
 async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)

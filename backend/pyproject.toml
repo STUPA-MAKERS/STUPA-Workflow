@@ -32,7 +32,10 @@ dependencies = [
     # Worker-Pfad) — der Contract-CI (nur Postgres) lädt sie nie.
     "python-magic>=0.4",
     "minio>=7.2",
-    "clamd>=1.0",
+    # >=1.0.2: clamd 1.0.1 ist sdist-only und baut über d2to1 (importiert
+    # setuptools.dist._get_unpatched, ab setuptools>=71 entfernt) → Build-Bruch.
+    # 1.0.2 liefert ein Wheel. Floor verhindert, dass der Resolver auf 1.0.1 zurückfällt.
+    "clamd>=1.0.2",
     # Multipart-Parsing für den Datei-Upload (FastAPI UploadFile/Form).
     "python-multipart>=0.0.18",
     # Live-Vote (T-16): Redis-PubSub-Fan-out + Cast-Lock (redis.asyncio) — bislang
@@ -49,6 +52,18 @@ dependencies = [
     # iCal-Abo (#ics): RFC5545-Feed der eigenen Sitzungen. Lazy importiert (nur auf
     # dem Feed-Pfad), reines Python-Paket.
     "icalendar>=6.0",
+    # FinTS-Bankabgleich (#fints): PIN/TAN-Online-Banking-Client (z. B. Sparkasse) zum
+    # Abruf echter Kontoumsätze. Zieht ``mt-940`` transitiv (MT940-Parser). Lazy
+    # importiert (nur auf dem Sync-/Import-Pfad) — der Contract-CI lädt es nie.
+    "fints>=5.0",
+    # Hinweis: fints pinnt lxml~=6.0.2 (<6.1), daher lässt sich der lxml-XXE-Fix (6.1.0,
+    # PYSEC-2026-87) hier NICHT erzwingen (ResolutionImpossible). lxml wird nur transitiv
+    # von fints/sepaxml/xmlschema zum Parsen der authentifizierten Bank-Antworten genutzt;
+    # unser eigenes CAMT-Parsing läuft über die stdlib ``ElementTree``. Das Advisory ist
+    # daher in pip-audit gezielt ausgenommen (CI be-deps-audit, mit Begründung).
+    # PIN-Verschlüsselung at-rest (Fernet) für FinTS-Zugangsdaten. Bisher transitiv über
+    # ``pyjwt[crypto]``, jetzt direkt genutzt (app.shared.crypto), daher explizit gepinnt.
+    "cryptography>=44.0",
 ]
 
 [project.optional-dependencies]

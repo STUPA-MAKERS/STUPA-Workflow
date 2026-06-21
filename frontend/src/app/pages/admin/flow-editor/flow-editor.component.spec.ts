@@ -27,13 +27,13 @@ const BUDGET_TREE = [
   {
     id: 'b1', parentId: null, gremiumId: null, key: 'VS-800', pathKey: 'VS-800', name: 'Verwaltung',
     currency: 'EUR', active: true, color: null, acceptedStateKeys: [], deniedStateKeys: [],
-    fullyBound: false, hiddenInBudget: false, viewGremiumId: null, fiscalStartMonth: 1,
+    hiddenInBudget: false, viewGremiumId: null, fiscalStartMonth: 1,
     fiscalStartDay: 1, byFiscalYear: [],
     children: [
       {
         id: 'b2', parentId: 'b1', gremiumId: null, key: 'VS-800-40', pathKey: 'VS-800-40', name: 'IT',
         currency: 'EUR', active: true, color: null, acceptedStateKeys: [], deniedStateKeys: [],
-        fullyBound: false, hiddenInBudget: false, viewGremiumId: null, fiscalStartMonth: 1,
+        hiddenInBudget: false, viewGremiumId: null, fiscalStartMonth: 1,
         fiscalStartDay: 1, byFiscalYear: [], children: [],
       },
     ],
