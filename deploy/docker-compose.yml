@@ -158,7 +158,10 @@ services:
       start_period: 5s
 
   minio:
-    image: minio/minio:latest
+    # Explizit gepinnt (keine :latest) -> reproduzierbare Deploys + Versions-Audit-Trail.
+    # Bei Bump: Tag + Datum in deploy/README/Notes vermerken.
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    pull_policy: missing
     <<: *restart
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
@@ -176,7 +179,10 @@ services:
       start_period: 15s
 
   clamav:
-    image: clamav/clamav:latest
+    # Explizit gepinnt (keine :latest) -> reproduzierbare Deploys + Versions-Audit-Trail.
+    # 1.x Patch-Tag; bei Bump Version in deploy-Notes vermerken.
+    image: clamav/clamav:1.4.3
+    pull_policy: missing
     <<: *restart
     volumes:
       - clamav_data:/var/lib/clamav
@@ -207,6 +213,23 @@ services:
       # (shell-escape) nicht zum Exfiltrations-Kanal (#sec-audit). api/worker erreichen
       # pytex weiterhin über dieses Netz.
       - pytex_net
+    # OS-Sandbox auf DEM Service, der LaTeX/Python ausführt (#sec-audit AUD-009):
+    # härter als altcha/backup, da pytex der einzige Render-/Exec-Pfad ist.
+    # - no-new-privileges: setuid/setgid kann keine Rechte eskalieren.
+    # - cap_drop ALL: kein Linux-Capability bleibt; uvicorn/tectonic brauchen keine.
+    # - read_only Rootfs: Code (/app) + Bundle (/usr/local/bin) unveränderbar; ein
+    #   Compile-Time-Exec-Bypass kann das Image nicht persistent verändern.
+    # Schreibbar bleiben nur: das pytex_cache-Volume (/cache, XDG_CACHE_HOME inkl.
+    # fontconfig-Cache) und zwei tmpfs — /tmp (tectonic kompiliert in /tmp/pytex-api-*)
+    # und /home/pytex (HOME des uid-10001-Users). Beide tmpfs nodev/nosuid/noexec.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nodev,nosuid,noexec,size=512m
+      - /home/pytex:rw,nodev,nosuid,noexec,size=16m
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8099/health')\" || exit 1"]
       interval: 15s
@@ -218,7 +241,8 @@ services:
     # Captcha-Verifier: ALTCHA Sentinel (offizielles self-hosted Image).
     # Lauscht intern auf :8080, persistiert nach /data. KEIN Host-Port —
     # erreichbar nur über das interne Netz (altcha:8080), kein Internet-Ingress.
-    # Erstes Login root/root (DEFAULT_ROOT_PASSWORD), sofort ändern. Fehlende
+    # Erstes Login root/<ALTCHA_ROOT_PASSWORD> (DEFAULT_ROOT_PASSWORD); das
+    # Passwort ist Pflicht (deploy.sh blockt leer/"root"). Fehlende
     # Secrets (JWT_SECRET, CODE_CHALLENGE_SECRET) generiert Sentinel selbst nach
     # /data/.env. Reale Captcha-Wiring zur Anwendung folgt im Captcha-Task.
     image: ghcr.io/altcha-org/sentinel:1.31.1

@@ -4,6 +4,13 @@
 # Admin-Console: http://localhost:8081  (admin / admin)
 # Realm: antrag   Client: antragsplattform-demo-local (confidential)   Test-User: tester / tester
 #
+# WARNUNG / WARNING: Alle Credentials hier UND in keycloak/antrag-realm.json
+# (admin/admin, tester/tester, der confidential client-secret) sind reine Local-Dev-Fixtures
+# für einen Wegwerf-Keycloak gegen http://localhost:8080. Sie dürfen NIEMALS in eine echte
+# Keycloak/IdP-Realm kopiert oder wiederverwendet werden. JSON erlaubt keine Inline-Kommentare,
+# daher steht dieser Hinweis hier.
+# These are throwaway local-dev fixtures only — never reuse them in a real realm/IdP.
+#
 # issuer = http://host.docker.internal:8081/realms/antrag muss für Browser UND api-Container
 # identisch auflösen:
 #   - Browser:    einmalig in /etc/hosts ->  127.0.0.1 host.docker.internal
