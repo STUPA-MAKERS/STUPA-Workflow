@@ -1,0 +1,316 @@
+"""Kontoauszug-Parser (#fints): MT940 (.sta) und CAMT.053 (XML) → normalisierte Umsätze.
+
+Reine Funktionen (kein DB-/Netz-I/O). Beide Quellen — der FinTS-Abruf (liefert MT940
+bzw. CAMT) **und** der manuelle Datei-Import — münden in dieselbe :class:`StatementLine`,
+sodass Matcher/Service quellen-agnostisch bleiben. ``mt940`` wird **lazy** importiert
+(transitiv über ``fints``); CAMT wird mit der Standard-Lib (ElementTree) namespace-tolerant
+geparst.
+
+``amount`` ist **vorzeichenbehaftet**: > 0 Eingang (income), < 0 Ausgang (expense). Der
+Service leitet daraus ``kind`` + ``abs(amount)`` für die Buchung ab.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
+from datetime import date
+from decimal import Decimal, InvalidOperation
+
+# Obergrenze = DB-Spalte ``numeric(12, 2)`` — größere Beträge aus untrusted Dateien sauber
+# abweisen statt numeric-overflow beim INSERT (vgl. invoice_import #sec-audit).
+_MAX_AMOUNT = Decimal("9999999999.99")
+
+
+class StatementParseError(ValueError):
+    """Datei ist weder gültiges MT940 noch CAMT.053 (oder leer/kaputt)."""
+
+
+@dataclass(slots=True)
+class StatementLine:
+    """Ein normalisierter Kontoumsatz (quellen-agnostisch)."""
+
+    amount: Decimal  # vorzeichenbehaftet: > 0 Eingang, < 0 Ausgang
+    currency: str = "EUR"
+    booking_date: date | None = None
+    value_date: date | None = None
+    purpose: str | None = None
+    counterparty_name: str | None = None
+    counterparty_iban: str | None = None
+    end_to_end_id: str | None = None
+    reference: str | None = None
+    # Bank-vergebene eindeutige Referenz (CAMT ``AcctSvcrRef`` / MT940 ``bank_reference``)
+    # — bevorzugter Idempotenz-Schlüssel; sonst Inhalts-Hash (s. :func:`assign_keys`).
+    bank_ref: str | None = None
+    # Vom Service gesetzt (nach :func:`assign_keys`).
+    idempotency_key: str = ""
+    # Roh-Felder zur Nachvollziehbarkeit (in ``raw_payload`` persistiert).
+    raw: dict[str, str] = field(default_factory=dict)
+
+
+def _sane_amount(value: Decimal) -> Decimal:
+    """Betrag auf gültigen Bereich + Cent-Granularität prüfen (Vorzeichen bleibt erhalten)."""
+    if not value.is_finite() or abs(value) > _MAX_AMOUNT:
+        raise StatementParseError(f"amount out of range: {value}")
+    # Sub-Cent-Präzision (z. B. CAMT ``100.005``) NICHT still auf 2 Stellen runden — das
+    # würde Beträge gegenüber der Quelle verfälschen; klar ablehnen (#fints-review).
+    if value != value.quantize(Decimal("0.01")):
+        raise StatementParseError(f"amount has sub-cent precision: {value}")
+    return value
+
+
+# ----------------------------------------------------------------------- MT940
+def parse_mt940(data: bytes) -> list[StatementLine]:
+    """MT940-Kontoauszug (z. B. Sparkasse ``.sta``) → Umsätze.
+
+    :raises StatementParseError: nicht parsebar / kein MT940."""
+    import mt940  # lazy (transitiv über fints)
+
+    text = _decode(data)
+    try:
+        transactions = mt940.models.Transactions()
+        transactions.parse(text)
+    except Exception as exc:  # pragma: no cover - mt940 wirft diverse Fehler bei kaputten Auszügen
+        raise StatementParseError(f"unparseable MT940: {exc}") from exc
+
+    lines = lines_from_mt940_transactions(transactions)
+    if not lines:
+        raise StatementParseError("MT940 contained no transactions")
+    return lines
+
+
+def lines_from_mt940_transactions(transactions: object) -> list[StatementLine]:
+    """``mt940``-Transaktionen (auch der FinTS-Abruf liefert diese) → Umsätze.
+
+    Geteilt von :func:`parse_mt940` (Datei-Import) und dem FinTS-Client (Live-Abruf),
+    damit beide Pfade identisch normalisieren."""
+    lines: list[StatementLine] = []
+    for tx in transactions:  # type: ignore[attr-defined]
+        line = _line_from_mt940_data(tx.data)
+        if line is not None:
+            lines.append(line)
+    return lines
+
+
+def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
+    """Eine ``mt940``-Transaktions-``data``-Map → :class:`StatementLine` (oder ``None``)."""
+    amount_obj = d.get("amount")
+    magnitude = getattr(amount_obj, "amount", None)
+    if magnitude is None:
+        return None
+    # Vorzeichen **explizit** aus dem MT940-Status ableiten (#fints-review): die ``mt940``-
+    # Lib negiert NUR bei status == 'D', lässt Storno-Marker 'RC'/'RD' aber unverändert
+    # positiv → eine Lastschrift-Rückgabe (RC = Storno einer Gutschrift = Abgang) käme sonst
+    # als Eingang an. Abgang: D / RC. Eingang: C / RD. Unbekannt → Lib-Vorzeichen behalten.
+    raw_amount = Decimal(str(magnitude))
+    status = str(d.get("status") or "").upper()
+    if status in ("D", "RC"):
+        raw_amount = -abs(raw_amount)
+    elif status in ("C", "RD"):
+        raw_amount = abs(raw_amount)
+    amount = _sane_amount(raw_amount)
+    return StatementLine(
+        amount=amount,
+        currency=str(getattr(amount_obj, "currency", None) or d.get("currency") or "EUR"),
+        booking_date=_as_date(d.get("entry_date") or d.get("guessed_entry_date")),
+        value_date=_as_date(d.get("date")),
+        purpose=_clean(d.get("purpose")),
+        counterparty_name=_clean(d.get("applicant_name") or d.get("recipient_name")),
+        counterparty_iban=_clean(d.get("applicant_iban")),
+        end_to_end_id=_clean(d.get("end_to_end_reference")),
+        reference=_clean(d.get("customer_reference")),
+        bank_ref=_clean(d.get("bank_reference")),
+        raw={k: str(v) for k, v in d.items() if v is not None},
+    )
+
+
+# -------------------------------------------------------------------- CAMT.053
+def parse_camt053(data: bytes) -> list[StatementLine]:
+    """CAMT.053-Auszug (XML, beliebige ``camt.053.001.xx``-Version) → Umsätze.
+
+    Namespace-tolerant (über local-name); eine :class:`StatementLine` je ``Ntry`` mit den
+    Details des ersten ``TxDtls``-Eintrags (Sammelbuchungen werden nicht aufgeteilt).
+
+    :raises StatementParseError: kein/kaputtes CAMT-XML."""
+    try:
+        root = ET.fromstring(data)  # noqa: S314 - eigener Auszug, keine externen Entities
+    except ET.ParseError as exc:
+        raise StatementParseError(f"unparseable CAMT XML: {exc}") from exc
+
+    entries = _findall_local(root, "Ntry")
+    if not entries:
+        raise StatementParseError("CAMT XML contained no entries (Ntry)")
+
+    lines: list[StatementLine] = []
+    for ntry in entries:
+        amt_el = _find_local(ntry, "Amt")
+        if amt_el is None or not (amt_el.text or "").strip():
+            continue
+        try:
+            magnitude = Decimal((amt_el.text or "").strip())
+        except (InvalidOperation, ValueError):
+            continue
+        # Richtung **explizit** verlangen: ohne klares CRDT/DBIT ist die wirtschaftliche
+        # Richtung unbekannt — nicht still als Abgang annehmen (#fints-review).
+        ind = (_find_text_local(ntry, "CdtDbtInd") or "").upper()
+        if ind.startswith("CRDT"):
+            orig_credit = True
+        elif ind.startswith("DBIT"):
+            orig_credit = False
+        else:
+            continue
+        # Storno (``RvslInd=true``) kehrt die wirtschaftliche Richtung um (Rückbuchung).
+        reversal = (_find_text_local(ntry, "RvslInd") or "").strip().lower() in ("true", "1")
+        credit = (not orig_credit) if reversal else orig_credit
+        # CAMT ``<Amt>`` ist spec-gemäß ≥ 0; ein negativer Wert würde das Vorzeichen unten
+        # erneut kippen → defensiv den Betrag entkoppeln (Richtung kommt nur aus dem Indikator).
+        amount = _sane_amount(abs(magnitude) if credit else -abs(magnitude))
+
+        tx = _find_local(ntry, "TxDtls")
+        scope = tx if tx is not None else ntry
+        # Gegenpartei folgt dem **ursprünglichen** Indikator (Dbtr/Cdtr stehen im XML zur
+        # Originalrichtung) — bei Gutschrift der Debitor (Zahler), sonst der Kreditor.
+        party_tag, acct_tag = ("Dbtr", "DbtrAcct") if orig_credit else ("Cdtr", "CdtrAcct")
+        party = _find_local(scope, party_tag)
+        acct = _find_local(scope, acct_tag)
+        lines.append(
+            StatementLine(
+                amount=amount,
+                currency=(amt_el.get("Ccy") or "EUR").upper(),
+                booking_date=_camt_date(_find_local(ntry, "BookgDt")),
+                value_date=_camt_date(_find_local(ntry, "ValDt")),
+                purpose=_clean(_find_text_local(scope, "Ustrd")),
+                counterparty_name=_clean(
+                    _find_text_local(party, "Nm") if party is not None else None
+                ),
+                counterparty_iban=_clean(
+                    _find_text_local(acct, "IBAN") if acct is not None else None
+                ),
+                end_to_end_id=_clean(_skip_notprovided(_find_text_local(scope, "EndToEndId"))),
+                reference=_clean(_find_text_local(scope, "InstrId")),
+                bank_ref=_clean(_find_text_local(ntry, "AcctSvcrRef")),
+                raw={
+                    "creditDebit": "CRDT" if orig_credit else "DBIT",
+                    **({"reversal": "true"} if reversal else {}),
+                },
+            )
+        )
+    if not lines:
+        raise StatementParseError("CAMT XML contained no usable entries")
+    return lines
+
+
+def parse_statement(data: bytes, *, filename: str | None = None) -> list[StatementLine]:
+    """Auszug parsen — Format aus Inhalt (XML vs. nicht-XML) bzw. Endung erraten.
+
+    :raises StatementParseError: keine der beiden Quellen passt."""
+    if not data:
+        raise StatementParseError("empty file")
+    head = data.lstrip()[:512]
+    looks_xml = head.startswith(b"<?xml") or head.startswith(b"<") and b"Document" in data[:4096]
+    name = (filename or "").lower()
+    if looks_xml or name.endswith(".xml"):
+        return parse_camt053(data)
+    return parse_mt940(data)
+
+
+# ------------------------------------------------------------------ idempotency
+def assign_keys(account_scope: str, lines: list[StatementLine]) -> None:
+    """Idempotenz-Schlüssel je Umsatz **in-place** setzen (#fints-research).
+
+    Bevorzugt die bank-vergebene Referenz (``bank_ref``); fehlt sie, ein Inhalts-Hash aus
+    (Konto-Scope, **Wertstellung**, Cent-Betrag, Gegen-IBAN, End-to-End-Ref, gekürzter
+    Zweck) **plus** einem Intraday-Lauf-Index. Der Lauf-Index trennt zwei *innerhalb eines
+    Imports* identische Umsätze; die E2E-Ref trennt genuin verschiedene Zahlungen aus
+    *getrennten* Importen. ``booking_date`` ist **bewusst nicht** Teil des Hashes — es ist
+    bei vorgemerkten Umsätzen erst null und später gesetzt; sonst gälte derselbe Umsatz
+    pending vs. gebucht als zwei verschiedene und würde doppelt importiert.
+    """
+    seen: dict[tuple[object, ...], int] = {}
+    for ln in lines:
+        if ln.bank_ref:
+            ln.idempotency_key = _sha(f"{account_scope}|ref|{ln.bank_ref}")
+            continue
+        base: tuple[object, ...] = (
+            ln.value_date.isoformat() if ln.value_date else "",
+            str(ln.amount),
+            ln.counterparty_iban or "",
+            ln.end_to_end_id or "",
+            (ln.purpose or "")[:140],
+        )
+        seq = seen.get(base, 0)
+        seen[base] = seq + 1
+        ln.idempotency_key = _sha(f"{account_scope}|{'|'.join(map(str, base))}|{seq}")
+
+
+def _sha(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+# ----------------------------------------------------------------------- helpers
+def _decode(data: bytes) -> str:
+    # UTF-8 zuerst; latin-1 als Fallback dekodiert **jedes** Byte (kein weiterer Zweig nötig).
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data.decode("latin-1")
+
+
+def _clean(value: object | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _skip_notprovided(value: str | None) -> str | None:
+    """``NOTPROVIDED`` (SEPA-Platzhalter) wie leer behandeln."""
+    if value and value.strip().upper() == "NOTPROVIDED":
+        return None
+    return value
+
+
+def _as_date(value: object | None) -> date | None:
+    """mt940-``Date`` (``datetime.date``-Subklasse) defensiv → ``date``."""
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return date(value.year, value.month, value.day)
+    return None
+
+
+def _local(tag: str) -> str:
+    """Lokaler Tag-Name ohne ``{namespace}``-Präfix."""
+    return tag.rsplit("}", 1)[-1]
+
+
+def _find_local(el: ET.Element | None, name: str) -> ET.Element | None:
+    if el is None:
+        return None
+    for child in el.iter():
+        if child is not el and _local(child.tag) == name:
+            return child
+    return None
+
+
+def _findall_local(el: ET.Element, name: str) -> list[ET.Element]:
+    return [c for c in el.iter() if _local(c.tag) == name]
+
+
+def _find_text_local(el: ET.Element | None, name: str) -> str | None:
+    found = _find_local(el, name)
+    return found.text if found is not None else None
+
+
+def _camt_date(el: ET.Element | None) -> date | None:
+    """CAMT ``BookgDt``/``ValDt`` → ``date`` (``Dt`` = YYYY-MM-DD, oder ``DtTm``)."""
+    if el is None:
+        return None
+    raw = _find_text_local(el, "Dt") or _find_text_local(el, "DtTm")
+    if not raw or len(raw) < 10:
+        return None
+    try:
+        return date(int(raw[0:4]), int(raw[5:7]), int(raw[8:10]))
+    except ValueError:
+        return None

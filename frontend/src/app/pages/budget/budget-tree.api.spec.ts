@@ -25,7 +25,6 @@ function node(over: Partial<BudgetTreeNode> = {}): BudgetTreeNode {
     color: null,
     acceptedStateKeys: [],
     deniedStateKeys: [],
-    fullyBound: false,
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
@@ -311,6 +310,61 @@ describe('BudgetTreeApi', () => {
       api.deleteAccount('a-1').subscribe();
       const req = http.expectOne(`${BASE}/accounts/a-1`);
       expect(req.request.method).toBe('DELETE');
+      req.flush(null);
+    });
+  });
+
+  describe('bank reconcile (#fints)', () => {
+    it('fintsSync POSTs /accounts/:id/fints/sync', () => {
+      api.fintsSync('a-1').subscribe();
+      const req = http.expectOne(`${BASE}/accounts/a-1/fints/sync`);
+      expect(req.request.method).toBe('POST');
+      req.flush({ status: 'done' });
+    });
+
+    it('fintsSubmitTan POSTs the tan to the session endpoint', () => {
+      api.fintsSubmitTan('a-1', 's-1', '123456').subscribe();
+      const req = http.expectOne(`${BASE}/accounts/a-1/fints/sessions/s-1/tan`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ tan: '123456' });
+      req.flush({ status: 'done' });
+    });
+
+    it('importStatementFile POSTs multipart to /statement/import', () => {
+      api.importStatementFile('a-1', new File(['x'], 's.sta')).subscribe();
+      const req = http.expectOne(`${BASE}/accounts/a-1/statement/import`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body instanceof FormData).toBe(true);
+      req.flush({ accountId: 'a-1', imported: 1, duplicates: 0 });
+    });
+
+    it('listStatementLines GETs /statement-lines with filters', () => {
+      api.listStatementLines({ account: 'a-1', state: 'unmatched' }).subscribe();
+      const req = http.expectOne((r) => r.url === `${BASE}/statement-lines`);
+      expect(req.request.params.get('account')).toBe('a-1');
+      expect(req.request.params.get('state')).toBe('unmatched');
+      req.flush([]);
+    });
+
+    it('listStatementLines GETs /statement-lines without filters', () => {
+      api.listStatementLines().subscribe();
+      const req = http.expectOne(`${BASE}/statement-lines`);
+      expect(req.request.params.keys().length).toBe(0);
+      req.flush([]);
+    });
+
+    it('confirmStatementLine POSTs /statement-lines/:id/confirm', () => {
+      api.confirmStatementLine('l-1', { budgetId: 'b-1' }).subscribe();
+      const req = http.expectOne(`${BASE}/statement-lines/l-1/confirm`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ budgetId: 'b-1' });
+      req.flush({ id: 'e-1' });
+    });
+
+    it('ignoreStatementLine POSTs /statement-lines/:id/ignore', () => {
+      api.ignoreStatementLine('l-1').subscribe();
+      const req = http.expectOne(`${BASE}/statement-lines/l-1/ignore`);
+      expect(req.request.method).toBe('POST');
       req.flush(null);
     });
   });

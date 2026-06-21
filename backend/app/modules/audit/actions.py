@@ -62,6 +62,14 @@ class AuditAction(StrEnum):
     BUDGET_INVOICE_DELETE = "budget_invoice_delete"
     BUDGET_ASSIGN = "budget_assign"
     BUDGET_MOVE_FISCAL_YEAR = "budget_move_fiscal_year"
+    # FinTS-Bankabgleich (#fints): Zugangsdaten gesetzt (keine PIN/kein Klartext im
+    # ``data``, nur Konto-id + Endpunkt/BLZ), Sync-Lauf, Umsatz-Import (Anzahl), Abgleich
+    # eines Umsatzes auf eine Buchung, Ignorieren. Nur id-Referenzen/Zähler (security.md §4).
+    BANK_ACCOUNT_CONFIG = "bank_account_config"
+    BANK_SYNC = "bank_sync"
+    BANK_STATEMENT_IMPORT = "bank_statement_import"
+    BANK_LINE_RECONCILE = "bank_line_reconcile"
+    BANK_LINE_IGNORE = "bank_line_ignore"
 
 
 # Budget-/Geld-Mutationen, die aus dem Audit-Log zurückgenommen werden können

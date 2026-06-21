@@ -45,9 +45,6 @@
             <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
               <span class="bt__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
               <span class="bt__name">{{ $any(row).node.name }}</span>
-              @if ($any(row).node.fullyBound) {
-                <span class="ml-2 py-0 px-2 rounded-sm text-xs font-semibold text-muted bg-surface-sunken border border-solid border-line" [title]="'budget.tree.fullyBoundHint' | t">{{ 'budget.tree.fullyBoundBadge' | t }}</span>
-              }
             </span>
           </ng-template>
           <ng-template appCell="allocated" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.allocated, $any(row).node.currency) : '—' }}</ng-template>
@@ -106,11 +103,6 @@
       <p class="text-muted">{{ node.pathKey | simplifyPath }} – {{ node.name }}</p>
       <label class="bt__lbl">{{ 'budget.tree.limitFor' | t }}
         <app-currency-input name="limit" [ngModel]="limitValue()" (ngModelChange)="limitValue.set($event)" [ariaLabel]="'budget.tree.limitFor' | t" /></label>
-      <label class="flex items-center gap-2">
-        <input type="checkbox" [checked]="limitFullyBound()" (change)="toggleFullyBound($any($event.target).checked)" />
-        <span>{{ 'budget.tree.fullyBound' | t }}</span>
-      </label>
-      <p class="text-muted m-0 text-xs">{{ 'budget.tree.fullyBoundHint' | t }}</p>
     </div>
   }
   <div dialog-footer class="flex gap-3">

@@ -25,6 +25,12 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.13"
+  # clamd<=1.0.1 und text-unidecode bauen über d2to1 (importiert
+  # setuptools.dist._get_unpatched, ab setuptools>=71 entfernt) → sdist-Build bricht.
+  # Beide liefern Wheels; hart erzwingen (gezielt, alles andere darf weiter aus Quelle
+  # bauen), damit ein Resolver-Backtrack auf eine sdist-only-Version nicht erneut bricht.
+  PIP_ONLY_BINARY: "clamd,text-unidecode"
+  PIP_PREFER_BINARY: "1"
 
 jobs:
   # ---- Wegweiser: existiert ein Frontend-Projekt? -------------------------- #
@@ -193,7 +199,14 @@ jobs:
         # einer verwundbaren Abhängigkeit. `--skip-editable` überspringt das lokale,
         # nicht-auf-PyPI liegende Projektpaket. Einzelne, geprüft-irrelevante Advisories
         # lassen sich gezielt mit `--ignore-vuln <GHSA/PYSEC-ID>` (mit Begründung) ausnehmen.
-        run: pip-audit --skip-editable --desc
+        #
+        # PYSEC-2026-87 (lxml<6.1 XXE-Local-File-Read): lxml kommt nur transitiv über
+        # fints/sepaxml/xmlschema und fints pinnt lxml~=6.0.2 (<6.1) hart — 6.1.0 ist daher
+        # nicht installierbar (#fints). lxml verarbeitet hier ausschließlich die
+        # authentifizierten Bank-Antworten; eigenes (untrusted) XML parsen wir mit der
+        # stdlib `ElementTree`. Risiko in diesem Kontext nicht erreichbar → ausgenommen,
+        # bis fints lxml>=6.1 zulässt.
+        run: pip-audit --skip-editable --desc --ignore-vuln PYSEC-2026-87
 
   # ---- 6 FE-Unit/Komponente (Jest + ATL) ----------------------------------- #
   fe-unit:

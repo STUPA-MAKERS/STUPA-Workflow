@@ -13,7 +13,7 @@ import {
   IconComponent,
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
-import { BudgetTreeApi, type Account } from '../../budget/budget-tree.api';
+import { type Account, type AccountBody, BudgetTreeApi } from '../../budget/budget-tree.api';
 
 /**
  * Konten-Verwaltung (Verwaltung → Konten). Konto = Name + IBAN (Freitext); **nicht**
@@ -55,6 +55,14 @@ export class AccountsComponent {
   readonly fName = signal('');
   readonly fIban = signal('');
   readonly fActive = signal(true);
+  // FinTS-Zugangsdaten (#fints). `fPin` ist write-only: leer beim Bearbeiten = unverändert
+  // (sofern schon eine PIN hinterlegt ist), ein gesetzter Wert ersetzt sie.
+  readonly fEndpoint = signal('');
+  readonly fBlz = signal('');
+  readonly fLogin = signal('');
+  readonly fPin = signal('');
+  /** Eine PIN ist bereits (verschlüsselt) hinterlegt → Eingabefeld nur „ändern". */
+  readonly pinStored = signal(false);
   readonly saving = signal(false);
   readonly confirmDelete = signal<Account | null>(null);
 
@@ -74,6 +82,11 @@ export class AccountsComponent {
     this.fName.set('');
     this.fIban.set('');
     this.fActive.set(true);
+    this.fEndpoint.set('');
+    this.fBlz.set('');
+    this.fLogin.set('');
+    this.fPin.set('');
+    this.pinStored.set(false);
     this.dialogOpen.set(true);
   }
 
@@ -82,6 +95,11 @@ export class AccountsComponent {
     this.fName.set(a.name);
     this.fIban.set(a.iban);
     this.fActive.set(a.active);
+    this.fEndpoint.set(a.fintsEndpoint ?? '');
+    this.fBlz.set(a.fintsBlz ?? '');
+    this.fLogin.set(a.fintsLogin ?? '');
+    this.fPin.set('');
+    this.pinStored.set(a.fintsConfigured);
     this.dialogOpen.set(true);
   }
 
@@ -89,7 +107,17 @@ export class AccountsComponent {
     event.preventDefault();
     if (!this.fName().trim() || this.saving()) return;
     this.saving.set(true);
-    const body = { name: this.fName().trim(), iban: this.fIban().trim(), active: this.fActive() };
+    const body: AccountBody = {
+      name: this.fName().trim(),
+      iban: this.fIban().trim(),
+      active: this.fActive(),
+      fintsEndpoint: this.fEndpoint().trim() || null,
+      fintsBlz: this.fBlz().trim() || null,
+      fintsLogin: this.fLogin().trim() || null,
+    };
+    // PIN nur senden, wenn der Nutzer etwas eingegeben hat — sonst bliebe die
+    // gespeicherte PIN beim Bearbeiten unangetastet (leeres Feld ≠ löschen).
+    if (this.fPin().trim()) body.fintsPin = this.fPin().trim();
     const current = this.editing();
     const req = current
       ? this.api.updateAccount(current.id as Uuid, body)
@@ -98,6 +126,8 @@ export class AccountsComponent {
       next: () => {
         this.saving.set(false);
         this.dialogOpen.set(false);
+        // Klartext-PIN nicht im Component-State (Angular DevTools) liegen lassen (#fints-review).
+        this.fPin.set('');
         this.toast.success(this.i18n.translate('admin.accounts.toastSaved'));
         this.reload();
       },

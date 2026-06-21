@@ -29,6 +29,7 @@ import {
 } from '@shared/ui';
 import { ToastService } from '@shared/ui/toast/toast.service';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
+import { BankImportDialogComponent } from './bank-import-dialog.component';
 import { downloadBlob } from '@shared/download.util';
 import {
   type AccountOption,
@@ -71,6 +72,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
     IconComponent,
     SelectComponent,
     CostCentreTreeComponent,
+    BankImportDialogComponent,
   ],
   templateUrl: './expenses.component.html',
   styleUrl: './expenses.component.scss',
@@ -209,6 +211,9 @@ export class ExpensesComponent {
     }
     return opts;
   });
+
+  // --- Bank-Abgleich-Dialog (#fints) ---
+  readonly bankDialogOpen = signal(false);
 
   // --- Übertrag-Dialog ---
   readonly transferOpen = signal(false);
@@ -370,6 +375,11 @@ export class ExpensesComponent {
     this.total.set(0);
     this.loading.set(true);
     this.fetch(true);
+  }
+
+  /** Nach Bank-Abgleich (#fints): Buchungsliste neu laden (Umsatz wurde gebucht). */
+  onBankReconciled(): void {
+    this.reload();
   }
 
   loadMore(): void {

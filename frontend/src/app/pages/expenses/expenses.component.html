@@ -40,8 +40,15 @@
         </app-button>
       }
       @if (canManage()) {
-        <app-button variant="secondary" size="sm" (click)="openTransfer()">{{ 'expenses.transfer' | t }}</app-button>
-        <app-button size="sm" (click)="openCreate()">{{ 'expenses.add' | t }}</app-button>
+        <app-button variant="secondary" size="sm" (click)="bankDialogOpen.set(true)">
+          <span class="inline-flex items-center gap-2"><app-icon name="euro" [size]="16" /> {{ 'fints.button' | t }}</span>
+        </app-button>
+        <app-button variant="secondary" size="sm" (click)="openTransfer()">
+          <span class="inline-flex items-center gap-2"><app-icon name="repeat" [size]="16" /> {{ 'expenses.transfer' | t }}</span>
+        </app-button>
+        <app-button size="sm" (click)="openCreate()">
+          <span class="inline-flex items-center gap-2"><app-icon name="add" [size]="16" /> {{ 'expenses.add' | t }}</span>
+        </app-button>
       }
     </div>
   </div>
@@ -338,3 +345,10 @@
     <app-button [disabled]="!canSubmitTransfer()" [loading]="saving()" (click)="createTransfer($event)">{{ 'expenses.transferConfirm' | t }}</app-button>
   </div>
 </app-dialog>
+
+<!-- Bank-Abgleich (#fints): Umsätze per FinTS/Datei abrufen + buchen -->
+<app-bank-import-dialog
+  [open]="bankDialogOpen()"
+  (closed)="bankDialogOpen.set(false)"
+  (changed)="onBankReconciled()"
+/>

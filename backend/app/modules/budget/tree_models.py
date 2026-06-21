@@ -18,7 +18,7 @@ bereits migrierte Schemata idempotent nach.
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -26,6 +26,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -67,10 +68,6 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     # abgelehnt (→ ausgeschlossen) gelten. Alles andere zählt als »beantragt«.
     accepted_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
     denied_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
-    # Komplett gebunden (#budget): die gesamte Zuteilung der Kostenstelle (inkl.
-    # Unterbaum) gilt je HHJ als gebunden (committed = allocated, verfügbar 0) — echte
-    # Anträge/Ausgaben darauf werden dann nicht zusätzlich gezählt. Rollt zum Parent hoch.
-    fully_bound: Mapped[bool] = mapped_column(Boolean, server_default="false")
     # Im Budget-Tab ausblenden (#budget-hide): reine Anzeige-Einstellung — Werte
     # zählen unverändert in Eltern-Rollups/Export; nur das Dashboard filtert.
     # Python-Default zusätzlich zum Server-Default: auch frisch konstruierte
@@ -252,7 +249,142 @@ class Account(UUIDPkMixin, CreatedAtMixin, Base):
     iban: Mapped[str] = mapped_column(Text, server_default="")
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
+    # — FinTS-Bankabgleich (#fints), alle optional. Ohne ``fints_endpoint``/``fints_blz``/
+    #   ``fints_login`` ist das Konto nicht synchronisierbar. Die PIN liegt **nur
+    #   verschlüsselt** vor (Fernet, ``app.shared.crypto``) und wird nie im Klartext
+    #   zurückgegeben. ``fints_state`` ist der verschlüsselte, serialisierte FinTS-Client-
+    #   Zustand (``system_id`` u. a.) für das ~90-Tage-SCA-Fenster; ``fints_tan_mechanism``
+    #   die zuletzt gewählte TAN-Methode.
+    fints_endpoint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fints_blz: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fints_login: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fints_pin_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fints_tan_mechanism: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fints_state: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fints_last_sync_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     __table_args__ = (Index("ix_account_name", "name"),)
+
+
+class BankStatementLine(UUIDPkMixin, CreatedAtMixin, Base):
+    """Einzelner Kontoumsatz (#fints) — **gestaged**, bevor er zur Buchung wird.
+
+    Aus FinTS-Abruf oder Datei-Import (CAMT.053/MT940). ``idempotency_key`` macht den
+    Re-Import idempotent (``ON CONFLICT DO NOTHING``). ``amount`` ist **vorzeichenbehaftet**
+    (>0 Eingang, <0 Ausgang); beim Bestätigen wird daraus ``budget_expense`` mit
+    ``kind`` aus dem Vorzeichen und ``amount = abs(...)`` (DB-CHECK ``amount > 0``).
+    """
+
+    __tablename__ = "bank_statement_line"
+
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("account.id", ondelete="CASCADE")
+    )
+    idempotency_key: Mapped[str] = mapped_column(Text)
+    raw_payload: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    booking_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    value_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
+    purpose: Mapped[str | None] = mapped_column(Text, nullable=True)
+    counterparty_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    counterparty_iban: Mapped[str | None] = mapped_column(Text, nullable=True)
+    end_to_end_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reference: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 'unmatched' | 'suggested' | 'matched' | 'ignored'.
+    match_state: Mapped[str] = mapped_column(Text, server_default="unmatched")
+    # Matcher-Vorschlag (nur Hinweis für die UI; verbindlich erst beim Bestätigen).
+    suggested_budget_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget.id", ondelete="SET NULL"), nullable=True
+    )
+    suggested_expense_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget_expense.id", ondelete="SET NULL"), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id", "idempotency_key", name="uq_bank_statement_line_idem"
+        ),
+        CheckConstraint(
+            "currency = 'EUR'", name="bank_statement_line_currency_eur"
+        ),
+        CheckConstraint(
+            "match_state IN ('unmatched', 'suggested', 'matched', 'ignored')",
+            name="bank_statement_line_state_valid",
+        ),
+        Index("ix_bank_statement_line_account_id", "account_id"),
+        Index("ix_bank_statement_line_match_state", "match_state"),
+        Index("ix_bank_statement_line_booking_date", "booking_date"),
+    )
+
+
+class BankAllocation(UUIDPkMixin, CreatedAtMixin, Base):
+    """Zuordnung Kontoumsatz ↔ Buchung (N:M — Teil-/Sammelzahlungen).
+
+    Ein Umsatz kann auf mehrere Buchungen aufgeteilt werden und eine Buchung von
+    mehreren Umsätzen bezahlt werden. ``allocated_amount`` ist der zugeordnete Teilbetrag
+    (positiv). CASCADE beidseits: gelöschte Buchung/gelöschter Umsatz löst die Zuordnung.
+    """
+
+    __tablename__ = "bank_allocation"
+
+    statement_line_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("bank_statement_line.id", ondelete="CASCADE")
+    )
+    expense_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("budget_expense.id", ondelete="CASCADE")
+    )
+    allocated_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+
+    __table_args__ = (
+        UniqueConstraint(
+            "statement_line_id", "expense_id", name="uq_bank_allocation_pair"
+        ),
+        CheckConstraint(
+            "allocated_amount > 0", name="bank_allocation_amount_positive"
+        ),
+        Index("ix_bank_allocation_statement_line_id", "statement_line_id"),
+        Index("ix_bank_allocation_expense_id", "expense_id"),
+    )
+
+
+class BankSyncSession(UUIDPkMixin, CreatedAtMixin, Base):
+    """Schwebende FinTS-TAN-Sitzung (#fints) — **kurzlebiger**, verschlüsselter Dialog-
+    Zustand zwischen Start-Sync und TAN-Eingabe.
+
+    ``payload_encrypted`` ist der Fernet-verschlüsselte FinTS-Resume-Zustand
+    (Client-/Dialog-/TAN-Blob). Nach erfolgreicher TAN oder Ablauf (``expires_at``)
+    gelöscht — nichts Sensibles bleibt länger als nötig liegen (security.md)."""
+
+    __tablename__ = "bank_sync_session"
+
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("account.id", ondelete="CASCADE")
+    )
+    payload_encrypted: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_bank_sync_session_account_id", "account_id"),)
+
+
+class CounterpartyMemory(UUIDPkMixin, CreatedAtMixin, Base):
+    """Merkt je Gegen-IBAN die zuletzt gewählte Kostenstelle (#fints-matching).
+
+    Beim nächsten Umsatz desselben Zahlers/Empfängers schlägt der Matcher diese
+    Kostenstelle vor. ``budget_id`` ``SET NULL`` beim Löschen der Kostenstelle."""
+
+    __tablename__ = "counterparty_memory"
+
+    counterparty_iban: Mapped[str] = mapped_column(Text)
+    budget_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget.id", ondelete="SET NULL"), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint("counterparty_iban", name="uq_counterparty_memory_iban"),
+    )
 
 
 class Invoice(UUIDPkMixin, CreatedAtMixin, Base):
@@ -289,4 +421,14 @@ class Invoice(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
-__all__ = ["Account", "Budget", "BudgetAllocation", "BudgetExpense", "FiscalYear"]
+__all__ = [
+    "Account",
+    "BankAllocation",
+    "BankStatementLine",
+    "BankSyncSession",
+    "Budget",
+    "BudgetAllocation",
+    "BudgetExpense",
+    "CounterpartyMemory",
+    "FiscalYear",
+]

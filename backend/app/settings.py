@@ -195,10 +195,33 @@ class Settings(BaseSettings):
     #   `due_at - lead <= now < due_at` (Default 24 h).
     deadline_reminder_lead_minutes: int = 1440
 
+    # --- FinTS-Bankabgleich (#fints) ---------------------------------------- #
+    #   Online-Banking-Abruf (PIN/TAN, z. B. Sparkasse) zum Abgleich echter Kontoumsätze
+    #   mit Buchungen. Ohne ``fints_enc_key`` ist das Feature **aus** (Endpunkte → 503):
+    #   die Bank-PIN wird ausschließlich **verschlüsselt** at-rest gehalten (Fernet, aus
+    #   diesem Secret abgeleitet), daher ist der Schlüssel Pflicht, sobald FinTS genutzt
+    #   wird. ``fints_product_id`` ist die bei der Deutschen Kreditwirtschaft registrierte
+    #   Produkt-Kennung (seit 2019 Pflicht für Produktiv-Zugriff, Registrierung per Mail an
+    #   registrierung@hbci-zka.de); ohne sie nutzt die Lib ihre Default-Kennung (DEV/Sandbox,
+    #   von echten Banken ggf. abgelehnt). Das Secret/die PIN werden **nie** geloggt.
+    fints_enc_key: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
+    fints_product_id: str | None = None
+    # Obergrenze für das Abruf-Fenster (Tage) je Sync. Größere Fenster erzwingen bei vielen
+    # Banken eine frische SCA; 90 Tage = PSD2-Komfortfenster (security.md, #fints-research).
+    fints_max_days: int = 90
+    # Lebensdauer einer schwebenden TAN-Sitzung (zwischen Start-Sync und TAN-Eingabe).
+    fints_tan_session_ttl_seconds: int = 600
+
     @property
     def storage_enabled(self) -> bool:
         """Object-Storage nur aktiv, wenn ein MinIO-Endpunkt gesetzt ist."""
         return bool(self.minio_endpoint)
+
+    @property
+    def fints_enabled(self) -> bool:
+        """FinTS-Bankabgleich nur aktiv, wenn ein Verschlüsselungs-Schlüssel gesetzt ist
+        (die Bank-PIN darf nie unverschlüsselt persistiert werden, #fints)."""
+        return bool(self.fints_enc_key)
 
     @property
     def clamav_enabled(self) -> bool:
@@ -241,6 +264,9 @@ class Settings(BaseSettings):
     rl_magic_link_verify_ip_per_hour: int = 20
     rl_applications_ip_per_hour: int = 10
     rl_attachments_per_hour: int = 30  # POST /attachments: 30/Std/applicant (api.md §7)
+    # FinTS-Sync/TAN/Import: pro Principal/Std. Bremst SSRF-Port-Scan-Versuche + Bank-PIN-
+    # Lockout-Missbrauch über wiederholte Syncs (#fints-review).
+    rl_fints_per_hour: int = 60
     # Default-Limit auf allen *schreibenden* Endpunkten (api.md §7): IP-Schlüssel,
     # großzügig → fängt Endpunkte ohne eigenes (strengeres) Limit ab, Defense-in-Depth.
     rl_default_write_per_hour: int = 100

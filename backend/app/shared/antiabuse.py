@@ -231,6 +231,30 @@ async def rate_limit_attachments(
     )
 
 
+async def rate_limit_fints(
+    request: Request,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """`POST /accounts/*/fints/*` + `/statement/import`: pro Principal/Std (#fints-review).
+
+    Bremst den FinTS-Sync als SSRF-Port-Scan-Orakel und wiederholte Bank-Logins (PIN-
+    Lockout-Missbrauch). Die Auth-Dependency (401/403) läuft separat; hier nur Frequenz."""
+    key = (
+        f"fints:principal:{principal.sub}"
+        if principal is not None
+        else f"fints:ip:{client_ip(request)}"
+    )
+    await _enforce(
+        limiter,
+        key,
+        limit=settings.rl_fints_per_hour,
+        window=_HOUR,
+        detail="Too many bank-sync requests. Try again later.",
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Altcha (400)
 # --------------------------------------------------------------------------- #
