@@ -7,10 +7,16 @@ hängen nur am internen Netz und sind nicht vom Internet erreichbar.
 ## Start
 
 ```bash
+git submodule update --init --recursive   # frontend/vendor/ui-kit (@stupa-makers/ui-kit)
 cp .env.example .env        # Werte einsetzen, NIE committen
 docker compose config -q    # Topologie validieren
 docker compose up -d --build
 ```
+
+> Das Frontend (`web`) bezieht das UI-Kit aus dem Git-Submodule
+> `frontend/vendor/ui-kit`. Vor jedem `--build` muss das Submodule ausgecheckt sein,
+> sonst bricht `npm run build` mit unaufgelöstem `@stupa-makers/ui-kit`-Pfad ab.
+> `deploy/deploy.sh` erledigt das (Submodule-Sync nach `git pull`) automatisch.
 
 ## Services
 

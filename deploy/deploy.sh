@@ -39,6 +39,15 @@ else
   echo "    ${old_head} -> ${new_head}"
 fi
 
+# 1b) Submodule synchronisieren (frontend/vendor/ui-kit = @stupa-makers/ui-kit) ---------
+# Das web-Image baut das Angular-FE aus dem ausgecheckten Submodule-Stand; ohne Init/
+# Update wäre frontend/vendor/ui-kit leer und `npm run build` (deploy/web/Dockerfile)
+# bräche mit unaufgelöstem @stupa-makers/ui-kit-Pfad ab. `sync` zieht eine evtl. geänderte
+# .gitmodules-URL nach, `update --init --recursive` checkt den gepinnten Commit aus.
+echo "==> git submodule sync + update --init --recursive"
+git -C "${ROOT}" submodule sync --recursive
+git -C "${ROOT}" submodule update --init --recursive
+
 # 2) Topologie + build-Service-Liste dynamisch aus compose lesen ------------------------
 echo "==> docker compose config (Validierung)"
 docker compose --profile "${PROFILE}" config -q
