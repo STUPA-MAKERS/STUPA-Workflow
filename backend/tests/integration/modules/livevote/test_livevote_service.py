@@ -276,10 +276,14 @@ async def test_parallel_casts_yield_single_ballot(
     session.add(vote)
     await session.commit()
 
-    # Stimmberechtigung verlangt die ``vote.cast``-Permission UND Gruppen-
-    # Mitgliedschaft (service.cast, fail-closed) — beides setzen, sonst 403.
+    # Stimmberechtigung verlangt die ``vote.cast``-Permission UND die GREMIUM-
+    # Stimm-Mitgliedschaft (service.cast, fail-closed) — der namespaced Key
+    # ``vote:<gremium>`` (AUD-066), den nur eine echte vote.cast-Mitgliedschaft
+    # setzt, nicht der nackte UUID-String; beides setzen, sonst 403.
+    from app.modules.auth.rbac import vote_group_key
+
     principal = Principal(
-        sub="alice", permissions={"vote.cast"}, groups={str(gremium.id)}
+        sub="alice", permissions={"vote.cast"}, groups={vote_group_key(gremium.id)}
     )
     from datetime import UTC, datetime
 

@@ -369,7 +369,12 @@ async def test_assemble_public_redacts_non_public_top() -> None:
     assert "Geheim" in internal_md
     assert "Geheim" not in public_md
     assert "nicht-öffentlicher Tagesordnungspunkt" in public_md
-    assert "# Personalie" in public_md  # Überschrift bleibt (Nummerierung stabil)
+    # AUD-025: der nicht-öffentliche Titel kann den Gegenstand kodieren — er steht intern,
+    # in der öffentlichen Variante ersetzt ihn eine neutrale Überschrift (Nummerierung
+    # bleibt durch das einzelne Top-Level-``#`` stabil).
+    assert "# Personalie" in internal_md
+    assert "# Personalie" not in public_md
+    assert "# Nicht-öffentlicher Tagesordnungspunkt" in public_md
 
 
 async def test_assemble_skips_cancelled_votes_in_query() -> None:
@@ -450,8 +455,9 @@ async def test_quorate_none_when_member_count_query_returns_none() -> None:
 
 async def test_header_meta_returns_empty_without_meeting() -> None:
     svc = _service(FakeSession())
-    protokollant, present, absent = await svc._header_meta(None)
+    protokollant, present, absent, count, datalines = await svc._header_meta(None)
     assert protokollant is None and present == [] and absent == []
+    assert count == 0 and datalines == []
 
 
 async def test_header_meta_resolves_protokollant_name() -> None:
@@ -460,10 +466,30 @@ async def test_header_meta_resolves_protokollant_name() -> None:
     svc = _service(session)
     session.scalar_results = ["Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
-    protokollant, present, absent = await svc._header_meta(cast("Any", meeting))
+    protokollant, present, absent, count, datalines = await svc._header_meta(
+        cast("Any", meeting)
+    )
     assert protokollant == "Frau Schmidt"
     # Anwesenheits-Query wird vom FakeSession kurzgeschlossen → leer.
+    assert present == [] and absent == [] and count == 0 and datalines == []
+
+
+async def test_header_meta_public_redacts_names_keeps_counts() -> None:
+    """AUD-025: ``public=True`` unterdrückt Protokollant + Namenslisten und liefert nur
+    die Zähler als Daten-Zeilen — der wahre ``present_count`` bleibt erhalten."""
+    session = FakeSession()
+    svc = _service(session)
+    session.scalar_results = ["Frau Schmidt"]
+    meeting = _meeting(protokollant_id=uuid4())
+    protokollant, present, absent, count, datalines = await svc._header_meta(
+        cast("Any", meeting), public=True
+    )
+    # kein Protokollant-Name, keine Namenslisten in der öffentlichen Variante.
+    assert protokollant is None
     assert present == [] and absent == []
+    # nur die Zähler als Daten-Zeilen (FakeSession-Attendance ist leer → 0/0).
+    assert count == 0
+    assert datalines == ["Anwesend: 0", "Abwesend: 0"]
 
 
 # ---------------------------------------------------------------------------

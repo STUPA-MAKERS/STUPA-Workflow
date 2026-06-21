@@ -12,8 +12,9 @@ referenzierte Votes/Decisions korrekt ein«):
 pytex-Client (kein Shell). Frontmatter-Skalare werden YAML-quotiert; Snippet-Text
 wird Markdown-escaped — beides wiederverwendet aus :mod:`app.modules.pdf.markdown`
 (keine Duplikation). Der Editor-Body ist nutzer-geschrieben; :func:`sanitize_user_markdown`
-entfernt vor der Ausgabe pytex' ``eval``-Escape (``[//]: # "EXPR"`` → RCE im Container)
-sowie Bilder mit absolutem/``..``-Pfad. Normales Markdown (Überschriften, Listen,
+entschärft vor der Ausgabe pytex' ``eval``-Escape (``[//]: # "EXPR"`` → RCE im Container)
+in JEDER CommonMark-Form (ein-/mehrzeilig, container-verschachtelt, Whitespace im
+Label) sowie Bilder mit absolutem/``..``-Pfad. Normales Markdown (Überschriften, Listen,
 Hervorhebung, echte Links/Bilder) bleibt erhalten. Dieser Sanitizer IST der
 RCE-Schutz: der Service rendert den Body ``trusted`` (Client-Default), weil die
 Protokoll-Variante pytex' Template-Maschinerie braucht — ``untrusted`` würde sie
@@ -32,26 +33,84 @@ from dataclasses import dataclass, field
 from datetime import date as _date
 from datetime import time as _time
 
+try:  # marko ist (über pytex_markdown) im Render-Pfad vorhanden; optional gehärtet.
+    import marko as _marko
+except ImportError:  # pragma: no cover - Primärschutz (Regex) bleibt ohne marko aktiv
+    _marko = None  # type: ignore[assignment]
+
 from app.modules.pdf.markdown import _md_escape, _yaml_scalar
 
 # --- RCE-Defense-in-Depth (security.md §2) ----------------------------------
-# pytex hat im ``trusted``-Modus einen Markdown-``eval``-Escape: eine Zeile der
-# Form ``[//]: # "EXPR"`` (eine Markdown-Link-Referenz-Definition, die im PDF
-# unsichtbar bleibt) führt ``eval(EXPR, {__builtins__})`` IM pytex-Container aus
-# → Remote Code Execution. Der Body ist nutzer-geschrieben (Protokollant). Da die
-# Protokoll-Variante pytex' Template-Maschinerie braucht (und deshalb ``trusted``
-# gerendert wird — ``untrusted`` → 400), ist DIESER Sanitizer der RCE-Schutz: er
-# entfernt den Konstrukt bedingungslos, bevor das Markdown pytex erreicht.
+# pytex hat im ``trusted``-Modus einen Markdown-``eval``-Escape: eine
+# Link-Referenz-Definition der Form ``[//]: # "EXPR"`` (im PDF unsichtbar) führt
+# ``eval(EXPR, pytex_namespace())`` IM pytex-Container aus → Remote Code Execution.
+# pytex feuert das eval AUSSCHLIESSLICH, wenn CommonMark die Definition mit
+# ``label == "//"`` UND ``dest == "#"`` parst (pytex_markdown ``_eval_comment``).
+# Der Body ist nutzer-geschrieben (Protokollant); da die Protokoll-Variante pytex'
+# Template-Maschinerie braucht und deshalb ``trusted`` gerendert wird, ist DIESER
+# Sanitizer der RCE-Schutz.
 #
-# Erkannte Varianten der Link-Referenz-Definition (führender Whitespace erlaubt):
-#   [//]: # "EXPR"      [//]: # 'EXPR'      [//]: # (EXPR)      [//]: # EXPR
-# ``//`` ist die Konvention für »Kommentar«; das Label ist case-insensitiv und der
-# Doppelpunkt kann von beliebigem Whitespace gefolgt sein. Wir matchen defensiv
-# JEDE ``[label]: # …``-Zeile (das ``#``-Ziel ist nie ein echter Link).
-_EVAL_COMMENT_RE = re.compile(
-    r"^[ \t]*\[[^\]]*\]:[ \t]*#.*$",
-    re.MULTILINE,
+# WICHTIG (AUD-001): Eine zeilen-orientierte Regex (``^[ \t]*[...]: #``) ist KEIN
+# verlässlicher Schutz — eine Link-Referenz-Definition ist ein CommonMark-Block,
+# der mehrzeilig (``[//]:\n#\n"EXPR"``), in Containern verschachtelt
+# (``> [//]: # "EXPR"``, ``- [//]: # "EXPR"``, ``1. [//]: # "EXPR"``) und mit
+# Whitespace/Zeilenumbruch im Label (``[ // ]``, ``[//\n]``) auftreten darf und so
+# jede einfache Zeilen-Regex umgeht. Wir entfernen daher die GESAMTE
+# eval-fähige Definition: Kopf ``[label] : #`` (``#``-Ziel exakt — KEIN
+# ``#fragment``) plus optionalen Titel (``"…"``/``'…'``/``(…)``), tolerant
+# gegenüber Whitespace und Zeilenumbruch an jeder von CommonMark erlaubten Stelle.
+# pytex' ``_eval_comment`` feuert ausschließlich für ``label='//'`` + ``dest='#'``;
+# ``dest='#'`` setzt eine bare-``#``-Definition voraus, deren Kopf hier matcht.
+# Echte Referenz-Links (``[foo]: #section``), Inline-Links/Bilder und der
+# Abstimmungs-Callout (``> [!abstimmung]``) bleiben unberührt.
+_EVAL_REFDEF_RE = re.compile(
+    r"\[[^\]]*\]\s*:\s*#"  # Definitions-Kopf, Ziel exakt ``#`` …
+    r"(?=[ \t\r\n\"'(]|$)"  # … bare-``#`` (von WS/Titel-Delimiter/Zeilenende gefolgt)
+    r"[ \t]*"  # Whitespace vor optionalem Titel
+    r"(?:\r?\n[ \t]*)?"  # Titel darf in der mehrzeiligen Form auf der Folgezeile stehen
+    r"""(?:"[^"]*"|'[^']*'|\([^)]*\)|[^\r\n]*)?""",  # optionaler Titel bzw. Resttext
+    re.DOTALL,
 )
+
+
+def _strip_eval_refdefs(markdown: str) -> str:
+    r"""Eval-fähige ``[label]: # "EXPR"``-Definitionen restlos entfernen.
+
+    Streicht Kopf **und** Ausdruck jeder bare-``#``-Link-Referenz-Definition (in
+    jeder CommonMark-Form), sodass pytex' ``_eval_comment``-Trigger gar nicht erst
+    in den Markdown-Baum gelangt. Normales Markdown bleibt unberührt."""
+    return _EVAL_REFDEF_RE.sub("", markdown)
+
+
+def _has_eval_refdef(markdown: str) -> bool:
+    """Parst ``markdown`` mit marko und meldet einen verbleibenden eval-Trigger.
+
+    Strukturelle Verifikation (AUD-001): ein ``LinkRefDef``-Knoten mit
+    ``label == "//"`` und ``dest == "#"`` irgendwo im Baum (oder in
+    ``document.link_ref_defs``) würde pytex' eval auslösen. Ohne installiertes
+    marko greift allein der Regex-Primärschutz; dann gilt der Body als sauber."""
+    if _marko is None:  # pragma: no cover - Regex-Primärschutz deckt alle Vektoren
+        return False
+    document = _marko.Markdown().parse(markdown)
+    refs = getattr(document, "link_ref_defs", {}) or {}
+    if refs.get("//", (None,))[0] == "#":
+        return True
+
+    def _walk(node: object) -> bool:
+        if (
+            type(node).__name__ == "LinkRefDef"
+            and getattr(node, "label", None) == "//"
+            and getattr(node, "dest", None) == "#"
+        ):
+            return True
+        children = getattr(node, "children", None)
+        if isinstance(children, list):
+            return any(_walk(c) for c in children if not isinstance(c, str))
+        return False
+
+    return _walk(document)
+
+
 # pytex' interner Marker für den ausgewerteten Ausdruck: ``\iffalse{pytex(...)}\fi``
 # (LaTeX-``\iffalse``-Block, der die Auswertung kapselt). Im Editor-Body hat er
 # nichts zu suchen → entfernen (auch mehrzeilig, non-greedy).
@@ -91,12 +150,23 @@ def _neutralize_unsafe_image(match: re.Match[str]) -> str:
 def sanitize_user_markdown(markdown: str) -> str:
     """Nutzer-Markdown von pytex-``eval``-Escapes (+ Pfad-Traversal-Bildern) befreien.
 
-    Entfernt RCE-Vektoren (``[//]: # "…"``-Kommentar-Eval, ``\\iffalse{pytex(…)}\\fi``)
-    und entschärft Bilder mit absolutem/``..``-Pfad (FIX 3). **Normales** Markdown
-    (Überschriften, Listen, Hervorhebung, echte Links/Bilder mit relativem Pfad)
-    bleibt vollständig erhalten."""
+    Entfernt RCE-Vektoren (``[//]: # "…"``-Kommentar-Eval in JEDER CommonMark-Form —
+    ein-/mehrzeilig, container-verschachtelt, Whitespace im Label — sowie
+    ``\\iffalse{pytex(…)}\\fi``) und entschärft Bilder mit absolutem/``..``-Pfad
+    (FIX 3). **Normales** Markdown (Überschriften, Listen, Hervorhebung, echte
+    Links/Bilder mit relativem Pfad, Abstimmungs-Callouts) bleibt vollständig
+    erhalten. Der eval-Trigger wird über das marko-Parse strukturell verifiziert
+    (AUD-001): solange ein eval-fähiger ``LinkRefDef`` überlebt, wird erneut
+    entschärft — der Body erreicht pytex garantiert ohne eval-Vektor."""
     cleaned = _PYTEX_IFFALSE_RE.sub("", markdown)
-    cleaned = _EVAL_COMMENT_RE.sub("", cleaned)
+    cleaned = _strip_eval_refdefs(cleaned)
+    # Strukturelle Absicherung: sollte (z. B. durch künftige marko-Versionen) doch
+    # ein eval-fähiger LinkRefDef überleben, erneut entfernen, bis keiner mehr da
+    # ist. Begrenzt, damit die Schleife nicht ewig läuft.
+    for _ in range(3):
+        if not _has_eval_refdef(cleaned):
+            break
+        cleaned = _strip_eval_refdefs(cleaned)
     cleaned = _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, cleaned)
     return cleaned
 

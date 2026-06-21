@@ -168,6 +168,22 @@ describe('renderMarkdown', () => {
     expect(bad).not.toContain('href');
   });
 
+  it('rejects a link whose URL contains a double-quote (no attribute break-out, AUD-064)', () => {
+    const out = renderMarkdown('[x](https://e"x=)');
+    // The quote-bearing URL must not be turned into an href attribute …
+    expect(out).not.toContain('<a ');
+    expect(out).not.toContain('href');
+    // … and no raw double-quote may leak into the rendered HTML.
+    expect(out).not.toContain('"x=');
+    expect(out).toContain('&quot;');
+  });
+
+  it('still renders a legitimate URL with an & query param without double-escaping', () => {
+    expect(renderMarkdown('[ok](https://x.test?a=1&b=2)')).toContain(
+      '<a href="https://x.test?a=1&amp;b=2" target="_blank" rel="noopener noreferrer">ok</a>',
+    );
+  });
+
   it('renders a horizontal rule', () => {
     expect(renderMarkdown('---')).toContain('<hr>');
   });

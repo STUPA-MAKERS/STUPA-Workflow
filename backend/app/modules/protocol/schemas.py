@@ -23,7 +23,9 @@ class _CamelModel(BaseModel):
 class ProtocolPatch(_CamelModel):
     """``PATCH /protocols/{id}`` — Markdown-Body aktualisieren (Entwurf)."""
 
-    markdown: str
+    # Deployment-unabhängige Obergrenze (sauberes 422 statt nginx-413/pytex-Cap):
+    # 512 kB liegen komfortabel unter dem nginx-1-MiB- und dem pytex-4-MiB-Limit.
+    markdown: str = Field(max_length=512_000)
 
 
 class ProtocolVotesBody(_CamelModel):

@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from app.shared.i18n import I18nMap
 
@@ -28,7 +28,10 @@ class DeadlinePolicyCreate(_CamelModel):
     key: str
     label: I18nMap
     kind: DeadlineKind
-    absolute_at: datetime | None = Field(default=None, alias="absoluteAt")
+    # tz-aware (UTC) only: naive Werte würden als timestamptz mit der DB-Session-TZ
+    # interpretiert und könnten so Stunden zu früh/spät feuern (Hausregel: alle
+    # datetimes tz-aware). ``AwareDatetime`` lehnt naive Eingaben am Rand mit 422 ab.
+    absolute_at: AwareDatetime | None = Field(default=None, alias="absoluteAt")
     offset_days: int | None = Field(default=None, alias="offsetDays")
 
 
@@ -37,7 +40,7 @@ class DeadlinePolicyUpdate(_CamelModel):
 
     label: I18nMap | None = None
     kind: DeadlineKind | None = None
-    absolute_at: datetime | None = Field(default=None, alias="absoluteAt")
+    absolute_at: AwareDatetime | None = Field(default=None, alias="absoluteAt")
     offset_days: int | None = Field(default=None, alias="offsetDays")
 
 

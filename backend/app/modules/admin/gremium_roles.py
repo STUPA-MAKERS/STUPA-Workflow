@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership, GremiumRole
@@ -314,7 +315,10 @@ class GremiumRoleService:
                 errors=[{"field": "validUntil", "msg": "must be after validFrom"}],
             )
         # Overlap-Invariante: kein zeitlich überlappender Eintrag desselben Principals
-        # in DIESEM Gremium (genau eine aktive Rolle je Zeitpunkt).
+        # in DIESEM Gremium (genau eine aktive Rolle je Zeitpunkt). Diese Python-Prüfung
+        # ist nur ein Fast-Path mit klarer Fehlermeldung; verbindlich durchgesetzt wird
+        # die Invariante über die EXCLUDE-Constraint ``ex_gremium_membership_no_overlap``
+        # (schließt die TOCTOU-Lücke bei parallelen Inserts, AUD-029).
         existing = (
             await self.session.scalars(
                 select(GremiumMembership).where(
@@ -339,7 +343,17 @@ class GremiumRoleService:
         self.session.add(row)
         await self.session.flush()
         await self._audit(actor, "gremium_membership", row.id)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            # Konkurrierender Insert hat eine überlappende Amtszeit committet, bevor
+            # diese Transaktion committen konnte — die EXCLUDE-Constraint feuert.
+            # 409 statt 500; der Client kann erneut versuchen.
+            await self.session.rollback()
+            raise ConflictError(
+                "overlapping membership for this member in this gremium",
+                code="conflict",
+            ) from exc
         return _membership_out(row)
 
     async def delete_membership(self, membership_id: UUID, actor: str) -> None:

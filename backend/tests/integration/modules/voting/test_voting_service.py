@@ -16,10 +16,16 @@ import pytest
 from sqlalchemy import Engine, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.admin.models import (
+    ApplicationType,
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+)
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import FlowVersion, State, Transition
@@ -367,6 +373,96 @@ async def test_concurrent_cast_same_voter_exactly_one_wins(
         select(func.count()).select_from(Ballot).where(Ballot.vote_id == vote.id)
     )).scalar_one()
     assert count == 1
+
+
+# --------------------------------------------------------------------------- #
+# #AUD-027: Lifecycle (create/open/close/cancel) ist gremium-scoped — symmetrisch
+# zum gescopten Read. Admin / globale vote.manage / per-Gremium vote.manage dürfen;
+# Cross-Tenant (globale vote.manage in fremdem Gremium NICHT) ist fail-closed.
+# --------------------------------------------------------------------------- #
+async def _gremium_member_with_vote_manage(
+    session: AsyncSession, gremium_id: uuid.UUID
+) -> Principal:
+    """Principal, der über eine Gremium-Rolle (nicht global) ``vote.manage`` hält."""
+    row = PrincipalRow(sub=f"gm-{uuid.uuid4()}", display_name="GM", email="gm@x.de")
+    session.add(row)
+    await session.flush()
+    role = GremiumRole(
+        gremium_id=gremium_id,
+        key=f"r-{uuid.uuid4()}",
+        name_i18n={"de": "VS"},
+        permissions=["vote.manage"],
+    )
+    session.add(role)
+    await session.flush()
+    session.add(
+        GremiumMembership(
+            principal_id=row.id, gremium_id=gremium_id, gremium_role_id=role.id
+        )
+    )
+    await session.commit()
+    # `groups` leer + KEINE globale Permission: das Recht stammt allein aus der Rolle.
+    return Principal(sub=row.sub, permissions=set())
+
+
+async def test_assert_can_manage_admin_and_global_pass(session: AsyncSession) -> None:
+    app, _ = await _seed(session)
+    vote = await _make_vote(session, app)
+    svc = VotingService(session)
+    vote_row = await session.get(Vote, vote.id)
+    assert vote_row is not None
+    # Admin und globale vote.manage passieren unabhängig vom Gremium.
+    await svc.assert_can_manage(vote_row, Principal(sub="adm", roles=["admin"]))
+    await svc.assert_can_manage(
+        vote_row, Principal(sub="g", permissions={"vote.manage"})
+    )
+    # Reine vote.cast-Identität ohne manage → fail-closed.
+    with pytest.raises(ForbiddenError):
+        await svc.assert_can_manage(
+            vote_row, Principal(sub="c", permissions={"vote.cast"})
+        )
+
+
+async def test_assert_can_manage_per_gremium_role(session: AsyncSession) -> None:
+    """Per-Gremium ``vote.manage``-Halter darf den Vote SEINES Gremiums verwalten
+    (zuvor durch das global-only Router-Gate ausgesperrt), aber keinen fremden."""
+    app, _ = await _seed(session)
+    # Vote an das Gremium des Antrags binden (eligible_group = Gremium-UUID-als-Text).
+    type_row = await session.get(ApplicationType, app.type_id)
+    assert type_row is not None and type_row.gremium_id is not None
+    gremium_id = type_row.gremium_id
+    vote = Vote(
+        application_id=app.id,
+        eligible_group=str(gremium_id),
+        config=_config(),
+        status="draft",
+    )
+    session.add(vote)
+    await session.commit()
+
+    holder = await _gremium_member_with_vote_manage(session, gremium_id)
+    vote_row = await session.get(Vote, vote.id)
+    assert vote_row is not None
+    # Eigenes Gremium: erlaubt.
+    await VotingService(session).assert_can_manage(vote_row, holder)
+
+    # Fremdes Gremium: derselbe Halter darf einen Vote eines ANDEREN Gremiums nicht
+    # verwalten (Cross-Tenant fail-closed).
+    other = Gremium(name="Other", slug=f"o-{uuid.uuid4()}")
+    session.add(other)
+    await session.flush()
+    foreign_vote = Vote(
+        application_id=None,
+        eligible_group=str(other.id),
+        config=_config(),
+        status="draft",
+    )
+    session.add(foreign_vote)
+    await session.commit()
+    foreign_row = await session.get(Vote, foreign_vote.id)
+    assert foreign_row is not None
+    with pytest.raises(ForbiddenError):
+        await VotingService(session).assert_can_manage(foreign_row, holder)
 
 
 async def test_close_then_get_reports_result(session: AsyncSession) -> None:

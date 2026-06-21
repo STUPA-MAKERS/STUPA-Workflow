@@ -226,6 +226,49 @@ def test_flow_self_loop_rejected() -> None:
         validate_flow_graph(FlowGraph.model_validate(g))
 
 
+def test_flow_automatic_two_state_cycle_rejected() -> None:
+    # #auto-cycle: zwei normale States mit je einem automatischen Übergang zum
+    # anderen bestehen die Erreichbarkeit, würden aber endlos pingpongen.
+    g = _valid_graph_dict()
+    g["transitions"].append({"from": "review", "to": "approved", "automatic": True})
+    g["transitions"].append({"from": "approved", "to": "review", "automatic": True})
+    with pytest.raises(FlowValidationError, match="cycle"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_flow_automatic_longer_cycle_rejected() -> None:
+    # Zyklus über drei States im automatischen Teilgraphen.
+    g = {
+        "states": [
+            {"key": "a", "label": {"de": "A"}, "isInitial": True},
+            {"key": "b", "label": {"de": "B"}},
+            {"key": "c", "label": {"de": "C"}},
+        ],
+        "transitions": [
+            {"from": "a", "to": "b", "automatic": True},
+            {"from": "b", "to": "c", "automatic": True},
+            {"from": "c", "to": "a", "automatic": True},
+        ],
+    }
+    with pytest.raises(FlowValidationError, match="cycle"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_flow_manual_cycle_allowed() -> None:
+    # Ein Zyklus aus MANUELLEN Übergängen ist erlaubt — kein Auto-Pingpong.
+    g = _valid_graph_dict()
+    g["transitions"].append({"from": "approved", "to": "review"})
+    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+
+
+def test_flow_mixed_cycle_with_one_manual_edge_allowed() -> None:
+    # Cron-Pingpong nur, wenn ALLE Kanten des Zyklus automatisch sind.
+    g = _valid_graph_dict()
+    g["transitions"].append({"from": "review", "to": "approved", "automatic": True})
+    g["transitions"].append({"from": "approved", "to": "review"})  # manuell
+    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+
+
 def test_branch_on_non_vote_state_rejected() -> None:
     # Branch-Übergänge feuert nur das Vote-Ergebnis — auf normal-States tote Kanten.
     g = _vote_graph_dict()

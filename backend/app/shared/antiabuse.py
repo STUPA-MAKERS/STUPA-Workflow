@@ -12,6 +12,7 @@ konfigurierbar (api.md §7) und taucht sauber im OpenAPI-Contract auf.
 from __future__ import annotations
 
 import time
+import unicodedata
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
@@ -143,6 +144,28 @@ async def _enforce(
         raise RateLimitedError(detail, retry_after=result.retry_after)
 
 
+def canonical_mail_key(email: str) -> str:
+    """Kanonische Form einer E-Mail für den Per-Mail-Rate-Limit-Schlüssel.
+
+    Faltet Varianten, die an dieselbe Mailbox zustellen, auf **einen** Schlüssel
+    zusammen, damit das 3/Std-pro-Mail-Limit nicht durch Adress-Normalisierung
+    umgangen werden kann (AUD-026):
+
+    - `strip()` + NFC-Normalisierung gegen Unicode-/Whitespace-Varianten,
+    - Domain ge-`casefold`-t (case-insensitiv, IDN-tauglich),
+    - Local-Part ge-`casefold`-t und Provider-Plus-Tag entfernt
+      (`victim+1@host` → `victim@host`).
+
+    Rein für den Drossel-Schlüssel — **keine** Adressvalidierung (das macht der
+    Endpoint via `EmailStr`)."""
+    normalized = unicodedata.normalize("NFC", email).strip()
+    local, sep, domain = normalized.rpartition("@")
+    if not sep:  # kein '@' — Endpoint-Validierung lehnt das ohnehin ab
+        return normalized.casefold()
+    local = local.split("+", 1)[0]
+    return f"{local.casefold()}@{domain.casefold()}"
+
+
 async def _json_field(request: Request, field: str) -> str | None:
     """Feld aus dem (gecachten) JSON-Body lesen — defensiv, ohne hier zu validieren."""
     try:
@@ -171,7 +194,7 @@ async def rate_limit_magic_link(
     if email:
         await _enforce(
             limiter,
-            f"magic-link:mail:{email.lower()}",
+            f"magic-link:mail:{canonical_mail_key(email)}",
             limit=settings.rl_magic_link_mail_per_hour,
             window=_HOUR,
             detail="Too many magic-link requests for this address. Try again later.",

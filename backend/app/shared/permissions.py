@@ -54,6 +54,10 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "account.manage",
     "application.export",
     "webhook.manage",
+    # AUD-019: audit.read ist bewusst GLOBAL (kein Gremium-Scope). Das Audit-Log ist
+    # eine org-weite Forensik-/Integritätssicht (Hash-Kette), die Querschnitts-PII
+    # zeigen kann; sie ist nur Hochprivilegierten zugedacht und nicht pro-Gremium
+    # gefiltert. Wer sie nicht org-weit sehen soll, darf audit.read nicht erhalten.
     "audit.read",
     "audit.verify",
     # #config-versioning: einen Config-Change aus dem Audit-Log zurücknehmen

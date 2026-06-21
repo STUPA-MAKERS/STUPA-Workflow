@@ -1992,6 +1992,7 @@ class _FakeVotingService:
 
     async def create(self, application_id, payload, *, meeting_id, agenda_item_id):  # noqa: ANN001
         self.created.append((application_id, meeting_id, agenda_item_id))
+        self.last_payload = payload
         return self._vote
 
     async def open(self, vote_id, *, now):  # noqa: ANN001
@@ -2310,7 +2311,9 @@ def test_open_vote_application_top_with_quorum_and_eligible(
 ) -> None:
     from types import SimpleNamespace
 
-    # application TOP with explicit quorum_percent + eligible_count.
+    # application TOP with explicit quorum_percent. AUD-042: a client-supplied
+    # ``eligibleCount`` MUST be ignored — the quorum denominator is always derived
+    # from the real roster (the fake's vote_eligible_count returns 7).
     fakes["agenda"].item_row = SimpleNamespace(id=uuid4(), application_id=uuid4())
     fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
     _login(app)
@@ -2319,10 +2322,12 @@ def test_open_vote_application_top_with_quorum_and_eligible(
         json={
             "agendaItemId": str(uuid4()),
             "quorumPercent": 50,
-            "eligibleCount": 9,
+            "eligibleCount": 9,  # attacker override — must be ignored
         },
     )
     assert r.status_code == 200
+    # Server-derived roster size wins over the request body.
+    assert fakes["voting"].last_payload.eligible_count == 7
 
 
 def test_open_vote_application_already_has_vote_conflict(

@@ -62,6 +62,7 @@ from app.modules.admin.schemas import (
     RoleUpdate,
     SiteConfigOut,
     WebhookCreate,
+    WebhookDeliveryStatusOut,
     WebhookOut,
     WebhookUpdate,
 )
@@ -678,6 +679,22 @@ async def update_webhook(
     principal: WebhookAdmin,
 ) -> WebhookOut:
     return await service.update_webhook(webhook_id, payload, principal.sub)
+
+
+@router.get(
+    "/webhooks/delivery-status",
+    response_model=list[WebhookDeliveryStatusOut],
+    dependencies=[_WEBHOOK],
+    responses=_errors(401, 403),
+)
+async def list_webhook_delivery_status(
+    service: ServiceDep,
+) -> list[WebhookDeliveryStatusOut]:
+    """Letzter Auslieferungszustand je Webhook (AUD-062): grober Zustand
+    (``sent``/``pending``/``dead``/``never``) + grobe Fehlerursachen-Klasse, damit
+    ein vertippter/interner Webhook diagnostizierbar ist — ohne aufgelöste interne
+    IPs oder Antwort-Bodies zu leaken."""
+    return await service.list_webhook_delivery_status()
 
 
 # =========================================================================== #

@@ -22,13 +22,65 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership
 from app.modules.applications.models import Applicant
 from app.modules.auth.models import Principal, Role, RoleAssignment, RolePermission
 from app.modules.flow.models import State, Transition
+
+# Admin-Rolle = Alle-Rechte-Bypass (#15), zentraler RBAC-Chokepoint in
+# ``Principal.has`` (auth/principal.py: ``"admin" in self.roles``). HIER gespiegelt,
+# weil die Empfänger-Auflösung mengenbasiert in SQL läuft (nicht über ``has`` pro
+# Principal) — der Schlüssel MUSS mit ``Principal.has`` übereinstimmen, daher
+# als eine Konstante geführt statt als String-Literal in beiden Resolvern.
+ADMIN_ROLE_KEY = "admin"
+
+
+def _active_assignment_window(now: datetime) -> list[ColumnElement[bool]]:
+    """Gültigkeitsfenster einer ``RoleAssignment`` zum Zeitpunkt ``now``."""
+    return [
+        or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
+        or_(RoleAssignment.valid_until.is_(None), RoleAssignment.valid_until > now),
+    ]
+
+
+def principals_with_permission_stmt(
+    perm: str,
+    now: datetime,
+    *,
+    gremium_id: uuid.UUID | None = None,
+) -> Select[tuple[str | None]]:
+    """E-Mails aktiver Principals, die ``perm`` über eine gültige Rollenzuweisung
+    halten — inkl. Admin-Bypass (:data:`ADMIN_ROLE_KEY` zählt immer).
+
+    Einzige Stelle, die die Berechtigten-Mengen-Query baut (Admin-Bypass +
+    RolePermission-Join), damit beide Resolver konsistent mit ``Principal.has``
+    bleiben. ``gremium_id`` (optional) gatet auf globale ODER im Gremium gültige
+    Zuweisungen.
+    """
+    conds: list[ColumnElement[bool]] = [
+        Principal.email.is_not(None),
+        Principal.active.is_(True),
+        *_active_assignment_window(now),
+        or_(RolePermission.permission == perm, Role.key == ADMIN_ROLE_KEY),
+    ]
+    if gremium_id is not None:
+        conds.append(
+            or_(
+                RoleAssignment.gremium_id.is_(None),
+                RoleAssignment.gremium_id == gremium_id,
+            )
+        )
+    return (
+        select(Principal.email)
+        .join(RoleAssignment, RoleAssignment.principal_id == Principal.id)
+        .join(Role, Role.id == RoleAssignment.role_id)
+        .outerjoin(RolePermission, RolePermission.role_id == Role.id)
+        .where(*conds)
+        .distinct()
+    )
 
 
 @dataclass(slots=True)
@@ -124,26 +176,7 @@ class RecipientResolver:
     async def _emails_for_permission(self, perm: str, now: datetime) -> list[str]:
         """Adressen aller aktiven Principals, die ``perm`` über eine gültige
         Rollenzuweisung halten (``admin``-Rolle zählt immer, Admin-Bypass)."""
-        stmt = (
-            select(Principal.email)
-            .join(RoleAssignment, RoleAssignment.principal_id == Principal.id)
-            .join(Role, Role.id == RoleAssignment.role_id)
-            .outerjoin(RolePermission, RolePermission.role_id == Role.id)
-            .where(
-                Principal.email.is_not(None),
-                Principal.active.is_(True),
-                or_(
-                    RoleAssignment.valid_from.is_(None),
-                    RoleAssignment.valid_from <= now,
-                ),
-                or_(
-                    RoleAssignment.valid_until.is_(None),
-                    RoleAssignment.valid_until > now,
-                ),
-                or_(RolePermission.permission == perm, Role.key == "admin"),
-            )
-            .distinct()
-        )
+        stmt = principals_with_permission_stmt(perm, now)
         rows = (await self.session.scalars(stmt)).all()
         return [e for e in rows if e]
 
@@ -179,32 +212,8 @@ async def actionable_principal_emails(
         return []
 
     now = datetime.now(UTC)
-    stmt = (
-        select(Principal.email)
-        .join(RoleAssignment, RoleAssignment.principal_id == Principal.id)
-        .join(Role, Role.id == RoleAssignment.role_id)
-        .outerjoin(RolePermission, RolePermission.role_id == Role.id)
-        .where(
-            Principal.email.is_not(None),
-            Principal.active.is_(True),
-            or_(
-                RoleAssignment.valid_from.is_(None),
-                RoleAssignment.valid_from <= now,
-            ),
-            or_(
-                RoleAssignment.valid_until.is_(None),
-                RoleAssignment.valid_until > now,
-            ),
-            or_(
-                RoleAssignment.gremium_id.is_(None),
-                RoleAssignment.gremium_id == gremium_id,
-            ),
-            or_(
-                RolePermission.permission == "application.transition",
-                Role.key == "admin",
-            ),
-        )
-        .distinct()
+    stmt = principals_with_permission_stmt(
+        "application.transition", now, gremium_id=gremium_id
     )
     rows = (await session.scalars(stmt)).all()
     return sorted({e for e in rows if e})

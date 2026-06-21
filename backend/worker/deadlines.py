@@ -3,9 +3,11 @@
 ``process_deadlines`` läuft periodisch (minütlich, ``worker.main``) und erledigt drei
 idempotente Schritte gegen einen **zeitzonenbewussten** ``now`` (UTC):
 
-1. **Erinnerungen** — Fristen im Lead-Fenster (``due_at-lead <= now < due_at``), die noch
-   nicht erinnert wurden → ``notify(deadline_approaching)`` + ``reminded_at`` setzen
-   (genau einmal).
+1. **Erinnerungen** — Fristen im (oder über das) Lead-Fenster (``due_at <= now+lead``),
+   die noch nicht erinnert wurden → ``notify(deadline_approaching)`` + ``reminded_at``
+   setzen (genau einmal). Keine untere Schranke: nach einem >Lead-Ausfall wird die
+   Erinnerung verspätet, aber genau einmal nachgeholt, statt für immer auszubleiben und
+   die Zeile im Scan-Index zu hinterlassen (AUD-037).
 2. **Auto-Übergänge / Wiedervorlage** — abgelaufene Fristen mit ``action_on_pass`` →
    ``flow.fire`` (Guard ``deadlinePassed``, ``manual=False``); danach ``action_on_pass``
    leeren (Idempotenz-Marker). ``kind="requeue"`` ist der Wiedervorlage-Fall: der Antrag
@@ -33,12 +35,19 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db import get_sessionmaker
 from app.modules.applications.models import Application
 from app.modules.auth.principal import Principal
-from app.modules.deadlines.service import DeadlineService, transition_ref
+from app.modules.deadlines.service import (
+    DEFAULT_SCAN_LIMIT,
+    DeadlineService,
+    transition_ref,
+)
 from app.modules.flow.models import Transition
 from app.modules.flow.service import FlowService
+from app.modules.livevote.broker import RedisBroker
+from app.modules.livevote.service import BrokerPublisher
 from app.modules.notifications.action_dispatcher import build_notify_dispatcher
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.notifications.service import NotificationService
+from app.modules.voting.schemas import VoteClosed
 from app.modules.voting.service import VotingService
 from app.settings import Settings, load_settings
 from app.shared.errors import ConflictError, NotFoundError
@@ -269,13 +278,19 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
     dispatcher = ctx.get("flow_dispatcher") or build_notify_dispatcher(ctx.get("redis"))
     async with maker() as session:
         auto_states = select(Transition.from_state_id).where(Transition.automatic)
+        # Pro Tick begrenzt (älteste zuerst): eine große Auto-Übergangs-Kohorte
+        # drainiert über mehrere Ticks, statt einen Tick über die Kadenz zu ziehen
+        # (AUD-046). Idempotent via optimistischem Locking in ``flow.fire``.
         ids = list(
             (
                 await session.execute(
-                    select(Application.id).where(
+                    select(Application.id)
+                    .where(
                         Application.current_state_id.is_not(None),
                         Application.current_state_id.in_(auto_states),
                     )
+                    .order_by(Application.created_at)
+                    .limit(DEFAULT_SCAN_LIMIT)
                 )
             )
             .scalars()
@@ -325,7 +340,7 @@ async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
             # ``now`` mitgeben, damit ein zeit-gebundener Vote mit abgelaufenem
             # Fenster und unerfülltem Quorum terminal (fail-Branch) schließt statt
             # ewig vom Cron erneut gegriffen zu werden (#stuck-vote).
-            await voting.close(vote.id, _system_principal(), now=now)
+            closed = await voting.close(vote.id, _system_principal(), now=now)
         except ConflictError as exc:
             logger.info("vote %s auto-close skipped: %s", vote_id, exc)
             return False
@@ -333,4 +348,22 @@ async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
             logger.warning("vote %s auto-close — app missing: %s", vote_id, exc)
             return False
     logger.info("vote auto-closed (vote=%s)", vote_id)
+    # Live-Vote (T-16, AUD-045): den ``vote_closed``-Broadcast nachholen, den sonst
+    # nur der REST-Router feuert — sonst zeigen Beamer/Voter den zeit-geschlossenen
+    # Vote bis zum Reload als »offen«. NACH dem Commit (Session-Block verlassen) und
+    # best-effort: ein Broker-Hiccup darf den bereits geschlossenen Vote nicht
+    # nachträglich als fehlgeschlagen markieren. No-op für Standalone-Votes
+    # (``meeting_id is None``).
+    await _broadcast_vote_closed(ctx, closed)
     return True
+
+
+async def _broadcast_vote_closed(ctx: dict[str, Any], closed: VoteClosed) -> None:
+    """``vote_closed`` über den Redis-Broker fan-outen (best effort)."""
+    redis = ctx.get("redis")
+    if redis is None:
+        return
+    try:
+        await BrokerPublisher(RedisBroker(redis)).vote_closed(closed)
+    except Exception as exc:  # noqa: BLE001 — Broadcast ist nicht close-kritisch
+        logger.warning("vote_closed broadcast failed (vote=%s): %s", closed.id, exc)

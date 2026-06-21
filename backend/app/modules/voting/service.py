@@ -32,6 +32,7 @@ from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
+from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.service import voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService
@@ -329,7 +330,9 @@ class VotingService:
                 raise ForbiddenError("Voting right has been delegated to another member.")
             # Eigene Stimme: globales ``vote.cast`` + Gruppen-Mitgliedschaft (der
             # Router gated nur Auth, damit externe Stellvertreter durchkommen).
-            if not principal.has("vote.cast") or not principal.in_group(vote.eligible_group):
+            if not principal.has("vote.cast") or not self._eligible_group_member(
+                principal, vote.eligible_group
+            ):
                 raise ForbiddenError("Not eligible to vote in this ballot.")
             voter_sub = principal.sub
         config = self._config(vote)
@@ -352,6 +355,22 @@ class VotingService:
         if config.secret:
             return await self._cast_secret(vote.id, voter_sub, choice)
         return await self._cast_open(vote.id, voter_sub, choice, config.allow_change)
+
+    @staticmethod
+    def _eligible_group_member(principal: Principal, eligible_group: str) -> bool:
+        """Stimmberechtigung gegen ``eligible_group`` prüfen (AUD-066).
+
+        Ist ``eligible_group`` eine Gremium-UUID (Sitzungs-/Antrags-Votes), MUSS der
+        Cast über den namespaced ``vote:<uuid>``-Key laufen, den nur eine aktive
+        ``vote.cast``-Mitgliedschaft setzt — ein deckungsgleicher OIDC-Gruppen-Claim
+        kann die Gremium-Stimmberechtigung damit nicht fälschlich erfüllen. Für freie
+        (Nicht-UUID-)Gruppen-Keys bleibt es bei der direkten OIDC-Gruppen-Prüfung.
+        """
+        try:
+            UUID(eligible_group)
+        except (ValueError, TypeError):
+            return principal.in_group(eligible_group)
+        return principal.in_group(vote_group_key(eligible_group))
 
     async def _cast_open(
         self, vote_id: UUID, voter_sub: str, choice: str, allow_change: bool
@@ -435,6 +454,72 @@ class VotingService:
         vote = await self._get_vote(vote_id)
         await self.assert_can_read(vote, principal)
         return await self.get(vote_id)
+
+    # ---------------------------------------------------------- manage-scope
+    async def _vote_gremium_id(
+        self, *, meeting_id: UUID | None, eligible_group: str
+    ) -> UUID | None:
+        """Gremium eines Votes auflösen (#sec-audit, AUD-027).
+
+        Sitzungs-gebundene Votes erben das Gremium der Sitzung; sitzungslose
+        (Antrags-)Votes tragen das Gremium als ``eligible_group`` (Gremium-UUID-als-Text,
+        s. ``MeetingRouter`` ``eligibleGroup=str(gremium_id)``). Ist ``eligible_group`` ein
+        freier Gruppen-Key (keine UUID), gibt es kein auflösbares Gremium → ``None`` (dann
+        bleibt nur die globale ``vote.manage`` / ``admin`` als Berechtigung)."""
+        if meeting_id is not None:
+            from app.modules.livevote.models import Meeting
+
+            gid = await self.session.scalar(
+                select(Meeting.gremium_id).where(Meeting.id == meeting_id)
+            )
+            if gid is not None:
+                return gid
+        try:
+            return UUID(eligible_group)
+        except (ValueError, TypeError):
+            return None
+
+    async def assert_can_manage_group(
+        self, eligible_group: str, meeting_id: UUID | None, principal: Principal
+    ) -> None:
+        """Schreib-/Lifecycle-Zugriff (create/open/close/cancel) fail-closed gremium-scopen
+        (#sec-audit, AUD-027), symmetrisch zu :meth:`assert_can_read`.
+
+        Erlaubt für Admin, Halter der GLOBALEN ``vote.manage``-Permission **oder** eine
+        Gremium-Rolle mit ``vote.manage`` für das Gremium des Votes (analog
+        ``MeetingService.can_manage_votes``). Letzteres entsperrt legitime per-Gremium-
+        Verwalter, die zuvor durch das global-only Router-Gate ausgeschlossen waren, und
+        verhindert zugleich, dass ein org-weiter ``vote.manage``-Halter Abstimmungen
+        FREMDER Gremien ohne Mitgliedschaft öffnet/schließt (Cross-Tenant-Mutation)."""
+        if "admin" in principal.roles:
+            return
+        if principal.has("vote.manage"):
+            return
+        gremium_id = await self._vote_gremium_id(
+            meeting_id=meeting_id, eligible_group=eligible_group
+        )
+        if gremium_id is not None:
+            from app.modules.admin.gremium_roles import gremium_ids_with_permission
+
+            if gremium_id in await gremium_ids_with_permission(
+                self.session, principal.sub, "vote.manage"
+            ):
+                return
+        raise ForbiddenError("not allowed to manage this vote")
+
+    async def assert_can_manage(self, vote: Vote, principal: Principal) -> None:
+        """Wie :meth:`assert_can_manage_group`, aber für einen bereits geladenen Vote."""
+        await self.assert_can_manage_group(vote.eligible_group, vote.meeting_id, principal)
+
+    async def assert_can_manage_vote(self, vote_id: UUID, principal: Principal) -> None:
+        """Vote laden (404, falls fehlend) und :meth:`assert_can_manage` prüfen.
+
+        Vom ``/votes/{id}/{open,close,cancel}``-Router VOR dem Lifecycle-Aufruf genutzt,
+        damit open/close/cancel symmetrisch zu ``get_scoped`` fail-closed gremium-gescopt
+        sind (#sec-audit, AUD-027). Der interne Live-Vote-/Cron-Pfad ruft die Lifecycle-
+        Methoden direkt (eigenes Gate) und umgeht diese Prüfung bewusst."""
+        vote = await self._get_vote(vote_id)
+        await self.assert_can_manage(vote, principal)
 
     async def get(self, vote_id: UUID) -> VoteOut:
         """Vote-State + aggregiertes Tally (geheim: nur counts, nie Wähler).

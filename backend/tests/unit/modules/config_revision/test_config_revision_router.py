@@ -157,18 +157,31 @@ def test_audit_revert_requires_audit_revert_permission() -> None:
 
 
 def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    # #AUD-018: der Router reicht den Principal als 3. Argument durch, damit der
+    # RevertService die *granulare* Permission des Original-Vorgangs re-asserten kann.
+    seen: list[Principal | None] = []
+
     class _FakeRevert:
         def __init__(self, _session: Any) -> None: ...
 
-        async def revert(self, entry_id: int, _actor: str) -> RevertResult:
+        async def revert(
+            self, entry_id: int, _actor: str, principal: Principal | None = None
+        ) -> RevertResult:
+            seen.append(principal)
             return RevertResult(entity_type="flow", entity_id="global", reverted_audit_id=entry_id)
 
     monkeypatch.setattr("app.modules.audit.router.RevertService", _FakeRevert)
     app = create_app()
-    app.dependency_overrides[get_current_principal] = lambda: _principal("audit.revert")
+    # Happy-Path: audit.revert (Router-Gate) + die granulare flow.configure (AUD-018).
+    app.dependency_overrides[get_current_principal] = lambda: _principal(
+        "audit.revert", "flow.configure"
+    )
     client = TestClient(app)
     r = client.post("/api/admin/audit/7/revert")
     assert r.status_code == 200
     body = r.json()
     assert body["revertedAuditId"] == 7
     assert body["entityType"] == "flow"
+    # delegiert an den RevertService UND reicht den Principal für die Re-Assertion durch.
+    assert seen and seen[0] is not None
+    assert seen[0].has("flow.configure")

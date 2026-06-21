@@ -411,7 +411,8 @@ async def open_meeting_vote(
     Verwalter/Protokollant/``vote.manage``. Antrags-TOPs erlauben genau **eine**
     Abstimmung (sie feuert beim Schließen den pass/fail-Branch); Freitext-TOPs
     erlauben **mehrere** generische Beschlussfragen. ``eligibleGroup`` = Gremium der
-    Sitzung; ``eligibleCount`` defaultet auf den Roster (Mitglieder mit ``vote.cast``).
+    Sitzung; der Quorum-Nenner (Stimmberechtigte) wird serverseitig aus dem Roster
+    abgeleitet (Mitglieder mit ``vote.cast``) und ist kein Eingabefeld (AUD-042).
     Broadcastet ``vote_opened``."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
@@ -451,9 +452,10 @@ async def open_meeting_vote(
         if default_quorum is not None:
             config_data["quorum"] = {"type": "percent", "value": default_quorum}
     config = VoteConfig.model_validate(config_data)
-    eligible = payload.eligible_count
-    if eligible is None:
-        eligible = await service.vote_eligible_count(meeting.gremium_id)
+    # Der Quorum-Nenner wird IMMER aus dem echten Roster abgeleitet, nie vom Client
+    # übernommen — sonst könnte ein ``canManageVotes``-Inhaber das Quorum manipulieren
+    # (AUD-042).
+    eligible = await service.vote_eligible_count(meeting.gremium_id)
     create = VoteCreate(
         config=config,
         eligibleGroup=str(meeting.gremium_id),

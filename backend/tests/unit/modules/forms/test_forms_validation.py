@@ -208,6 +208,57 @@ def test_positions_min_positions() -> None:
     assert any("at least 2 position" in e.msg for e in errors)
 
 
+def test_positions_engine_max_positions_ceiling() -> None:
+    # Auch ohne maxPositions greift die Engine-Decke (#sec-audit AUD-047).
+    field = _positions_field(validation={"minOffers": 1, "maxPositions": 2})
+    value = [_position(f"P{i}", ("A", 5, True)) for i in range(3)]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("more than 2 position" in e.msg for e in errors)
+
+
+def test_positions_engine_default_max_positions() -> None:
+    field = _positions_field(validation={"minOffers": 1})  # keine maxPositions → Default-Decke
+    value = [_position(f"P{i}", ("A", 5, True)) for i in range(201)]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("more than 200 position" in e.msg for e in errors)
+
+
+def test_positions_engine_max_offers_ceiling() -> None:
+    field = _positions_field(validation={"minOffers": 1, "maxOffers": 2})
+    value = [_position("P", ("A", 5, True), ("B", 6, False), ("C", 7, False))]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("more than 2 comparison offer" in e.msg for e in errors)
+
+
+def test_table_default_max_rows_ceiling() -> None:
+    # Tabelle ohne maxRows: Default-Decke verhindert unbegrenzte Zeilenzahl.
+    f = _field("rows", "table")
+    with pytest.raises(AnswerValidationError):
+        validate_answers([f], {"rows": [{"i": n} for n in range(1001)]})
+
+
+def test_table_explicit_max_rows_zero_rejects_any_row() -> None:
+    # AUD-047-Regression: ein explizit konfiguriertes maxRows=0 (ge=0 ⇒ gültig) MUSS
+    # jede Zeile ablehnen und darf NICHT durch falsy-`or` auf die Default-Decke
+    # (1000) zurückfallen.
+    f = _field("rows", "table", validation={"maxRows": 0})
+    with pytest.raises(AnswerValidationError) as exc:
+        validate_answers([f], {"rows": [{"a": 1}, {"b": 2}, {"c": 3}]})
+    assert "rows" in _errkeys(exc.value)
+    # Eine leere Tabelle bleibt bei maxRows=0 gültig (0 Zeilen ≤ 0).
+    assert validate_answers([f], {"rows": []}) == {"rows": []}
+
+
+def test_table_configured_max_rows_capped_at_engine_ceiling() -> None:
+    # Ein vom Builder gesetzter Wert über der Engine-Decke kann diese nicht aushebeln.
+    f = _field("rows", "table", validation={"maxRows": 100000})
+    with pytest.raises(AnswerValidationError):
+        validate_answers([f], {"rows": [{"i": n} for n in range(1001)]})
+
+
 def test_positions_total_sums_preferred() -> None:
     value = [
         _position("Catering", ("A", 500, True), ("B", 600, False)),
@@ -377,6 +428,15 @@ def test_select_valid_invalid() -> None:
         validate_answers([f], {"s": "z"})
 
 
+@pytest.mark.parametrize("bad", [1, True, 1.0, ["a"], {"a": 1}])
+def test_select_non_string_is_422_not_500(bad: object) -> None:
+    # FieldOption.value ist str; Nicht-Strings (auch unhashbare wie dict/list)
+    # müssen sauber als "ungültige Option" abgelehnt werden, nie ein 500.
+    f = _field("s", "select", options=[{"value": "a", "label": {"de": "A"}}])
+    with pytest.raises(AnswerValidationError):
+        validate_answers([f], {"s": bad})
+
+
 def test_multiselect_valid_invalid() -> None:
     f = _field(
         "m",
@@ -388,6 +448,16 @@ def test_multiselect_valid_invalid() -> None:
         validate_answers([f], {"m": ["a", "z"]})
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"m": "a"})  # not a list
+
+
+def test_multiselect_unhashable_element_is_422_not_500() -> None:
+    # Ein unhashbares Element (dict/list) darf keinen TypeError beim
+    # Membership-Test auslösen, sondern muss als ungültige Option enden.
+    f = _field("m", "multiselect", options=[{"value": "a", "label": {"de": "A"}}])
+    with pytest.raises(AnswerValidationError):
+        validate_answers([f], {"m": ["a", {"nested": 1}]})
+    with pytest.raises(AnswerValidationError):
+        validate_answers([f], {"m": [1, ["x"]]})
 
 
 def test_checkbox_valid_invalid() -> None:

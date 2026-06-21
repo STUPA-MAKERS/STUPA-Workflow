@@ -23,7 +23,13 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.gremium_roles import GremiumRoleService
-from app.modules.admin.models import ApplicationType, Gremium, MailList, Webhook
+from app.modules.admin.models import (
+    ApplicationType,
+    Gremium,
+    MailList,
+    Webhook,
+    WebhookDelivery,
+)
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
     ApplicationTypeOut,
@@ -45,6 +51,7 @@ from app.modules.admin.schemas import (
     RoleOut,
     RoleUpdate,
     WebhookCreate,
+    WebhookDeliveryStatusOut,
     WebhookOut,
     WebhookUpdate,
 )
@@ -58,14 +65,16 @@ from app.modules.config_revision.service import (
     ConfigRevisionService,
 )
 from app.modules.flow.models import FlowVersion, State, Transition
+from app.modules.webhooks.ssrf import SsrfError, assert_allowed_url
 from app.search import escape_like
+from app.settings import get_settings
 from app.shared.config_schemas import (
     EventName,
     FlowGraph,
     FlowValidationError,
     validate_flow_graph,
 )
-from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.errors import BadRequestError, ConflictError, NotFoundError, ValidationProblem
 from app.shared.permissions import PERMISSION_CATALOGUE
 
 
@@ -165,6 +174,23 @@ class ConfigService:
         row = await self.session.get(Gremium, gremium_id)
         if row is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
+        # ``application_type.gremium_id`` kaskadiert, aber ``application.type_id`` ist
+        # RESTRICT: ein Gremium mit Antragsart, die noch Anträge hat, ließe sich nur
+        # unter FK-Verletzung löschen (→ 500). Vorab prüfen und 409 liefern, damit kein
+        # Audit-Eintrag für ein zum Scheitern verurteiltes Löschen geschrieben wird.
+        from app.modules.applications.models import Application
+
+        in_use = await self.session.scalar(
+            select(Application.id)
+            .join(ApplicationType, Application.type_id == ApplicationType.id)
+            .where(ApplicationType.gremium_id == gremium_id)
+            .limit(1)
+        )
+        if in_use is not None:
+            raise ConflictError(
+                "gremium has application types with existing applications "
+                "and cannot be deleted"
+            )
         await self.session.delete(row)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
         await self.session.commit()
@@ -613,13 +639,16 @@ class ConfigService:
         row = await self.session.get(RoleAssignmentRow, assignment_id)
         if row is None:
             raise NotFoundError(f"role assignment {assignment_id} not found")
+        # Selbst-Aussperrung verhindern (#40, AUD-031): JEDE Mutation der eigenen
+        # Admin-Zuweisung ist verboten — sonst kann man sich z. B. via ``valid_until``
+        # in der Vergangenheit selbst die Admin-Rolle ablaufen lassen. Globale
+        # Rollen-Permissions sind bewusst NICHT gremium-gescoped, daher ist ein
+        # Umschreiben der ``gremium_id`` zwar wirkungslos, der Guard greift hier aber
+        # einheitlich für alle Felder (Konsistenz statt Sonderfälle).
+        await self._guard_self_admin_removal(row, actor)
         if payload.role_id is not None:
             if await self.session.get(Role, payload.role_id) is None:
                 raise NotFoundError(f"role {payload.role_id} not found")
-            # Selbst-Aussperrung verhindern (#40): den eigenen Admin nicht auf eine
-            # andere Rolle umschreiben.
-            if payload.role_id != row.role_id:
-                await self._guard_self_admin_removal(row, actor)
             row.role_id = payload.role_id
         if payload.gremium_id is not None:
             row.gremium_id = payload.gremium_id
@@ -783,7 +812,37 @@ class ConfigService:
         ).all()
         return [_webhook_out(r) for r in rows]
 
+    @staticmethod
+    def _assert_webhook_url_advisory(url: str) -> None:
+        """CRUD-Zeit-Advisory gegen den SSRF-Guard (AUD-062).
+
+        Die **autoritative** Prüfung bleibt der Versand-Zeit-Guard im Worker
+        (``webhooks.service`` löst alle A/AAAA auf, blockt nicht-globale Ziele,
+        pinnt die IP). Hier geben wir dem Admin bereits beim Speichern Feedback:
+        ein offensichtlich internes/ungültiges Ziel (falsches Schema, fehlender
+        Host, Allowlist-Verstoß, IP-Literal oder ein zur **Speicher-Zeit** zu
+        einer nicht-globalen IP auflösender Host) wird mit ``400`` abgelehnt,
+        statt still pro Event eine Dead-Letter-Zeile zu erzeugen.
+
+        Best-effort: eine reine DNS-Auflösungs­störung (Host temporär nicht
+        auflösbar) blockiert das Speichern **nicht** — das fängt der Laufzeit-
+        Guard. Damit bleibt das Advisory ohne falsch-positive Blockaden.
+        """
+        allowlist = get_settings().webhook_host_allowlist
+        try:
+            assert_allowed_url(url, allowlist=allowlist)
+        except SsrfError as exc:
+            msg = str(exc)
+            # Transiente DNS-Störung → nicht blockieren (Laufzeit-Guard greift).
+            if msg.startswith("dns resolution failed"):
+                return
+            raise BadRequestError(
+                f"Webhook target is not a permitted external URL: {msg}",
+                title="Invalid webhook URL",
+            ) from exc
+
     async def create_webhook(self, payload: WebhookCreate, actor: str) -> WebhookOut:
+        self._assert_webhook_url_advisory(payload.url)
         row = Webhook(
             name=payload.name,
             url=payload.url,
@@ -806,6 +865,7 @@ class ConfigService:
         if payload.name is not None:
             row.name = payload.name
         if payload.url is not None:
+            self._assert_webhook_url_advisory(payload.url)
             row.url = payload.url
         if payload.events is not None:
             row.events = list(payload.events)
@@ -814,6 +874,36 @@ class ConfigService:
         await self._audit(actor, AuditAction.WEBHOOK_CONFIG, "webhook", row.id)
         await self.session.commit()
         return _webhook_out(row)
+
+    async def list_webhook_delivery_status(self) -> list[WebhookDeliveryStatusOut]:
+        """Letzter Auslieferungszustand je Webhook (Diagnose, AUD-062).
+
+        Für jeden Webhook die **jüngste** ``webhook_delivery`` (per ``last_at``,
+        Fallback Insert-Reihenfolge) auf einen groben Zustand + eine grobe
+        Fehlerursachen-Klasse reduzieren. Leakt **keine** aufgelöste IP / Host-
+        Topologie und keinen Antwort-Body — nur Status-Klasse, HTTP-Statuscode
+        und Versuchszahl. Webhooks ohne jegliche Delivery liefern ``never``.
+
+        Schließt die Diagnose-Lücke des Findings: ein vertippter, aber öffentlich
+        auflösbarer Webhook (den das Speicher-Zeit-Advisory **nicht** fängt)
+        landet still im Dead-Letter — hier wird er sichtbar.
+        """
+        webhooks = (
+            await self.session.scalars(select(Webhook).order_by(Webhook.name))
+        ).all()
+        out: list[WebhookDeliveryStatusOut] = []
+        for hook in webhooks:
+            latest = await self.session.scalar(
+                select(WebhookDelivery)
+                .where(WebhookDelivery.webhook_id == hook.id)
+                .order_by(
+                    WebhookDelivery.last_at.desc().nullslast(),
+                    WebhookDelivery.id.desc(),
+                )
+                .limit(1)
+            )
+            out.append(_delivery_status_out(hook.id, latest))
+        return out
 
     # =================================================================== #
     # intern
@@ -909,4 +999,54 @@ def _webhook_out(row: Webhook) -> WebhookOut:
         url=row.url,
         events=cast("list[EventName]", list(row.events)),
         active=row.active,
+    )
+
+
+def _delivery_reason_class(status: str, response_code: int | None) -> str:
+    """Groben Fehlerursachen-Bucket aus DB-Status + HTTP-Code ableiten (AUD-062).
+
+    Bewusst **grob** und ohne Host/IP-Detail. ``status``/``response_code`` stammen
+    aus dem Versand-Worker (``webhooks.service``): ``response_code is None`` bei
+    ``dead`` heißt entweder SSRF-Block zur Sende-Zeit **oder** Transportfehler
+    (DNS/Connect/Timeout) — beides wird als ``unreachable_or_blocked`` gemeldet,
+    ohne zu verraten, *welche* IP geblockt wurde.
+    """
+    if status == "ok":
+        return "delivered"
+    if status == "pending":
+        return "in_progress"
+    if response_code is None:
+        # failed (Retry läuft) oder dead ohne HTTP-Antwort: Transport/DNS/SSRF-Block.
+        return "transient_transport_error" if status == "failed" else "unreachable_or_blocked"
+    if 400 <= response_code < 500:
+        return "rejected_by_target"
+    if response_code >= 500:
+        return "target_server_error"
+    return "unknown"
+
+
+def _delivery_status_out(
+    webhook_id: UUID, row: WebhookDelivery | None
+) -> WebhookDeliveryStatusOut:
+    """Jüngste Delivery → grobe Diagnose-Sicht (kein IP-/Body-Leak, AUD-062)."""
+    if row is None:
+        return WebhookDeliveryStatusOut(
+            webhook_id=webhook_id,
+            last_state="never",
+            reason_class="no_deliveries",
+        )
+    # DB-Status (pending/ok/failed/dead) → admin-relevanter Dreiklang.
+    if row.status == "ok":
+        last_state = "sent"
+    elif row.status == "dead":
+        last_state = "dead"
+    else:  # pending | failed (Retry in Arbeit)
+        last_state = "pending"
+    return WebhookDeliveryStatusOut(
+        webhook_id=webhook_id,
+        last_state=last_state,
+        reason_class=_delivery_reason_class(row.status, row.response_code),
+        response_code=row.response_code,
+        attempts=row.attempts,
+        last_at=_iso(row.last_at),
     )

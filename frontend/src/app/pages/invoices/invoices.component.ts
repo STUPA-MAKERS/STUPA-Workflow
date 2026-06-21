@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   type ElementRef,
+  type OnDestroy,
   computed,
   effect,
   inject,
@@ -66,7 +67,7 @@ import {
   templateUrl: './invoices.component.html',
   styleUrl: './invoices.component.scss',
 })
-export class InvoicesComponent {
+export class InvoicesComponent implements OnDestroy {
   private readonly api = inject(BudgetTreeApi);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
@@ -157,6 +158,10 @@ export class InvoicesComponent {
   private debouncedReload(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => this.reload(), 400);
+  }
+
+  ngOnDestroy(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
   }
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');

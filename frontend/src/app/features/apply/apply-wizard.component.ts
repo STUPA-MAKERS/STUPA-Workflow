@@ -315,6 +315,12 @@ export class ApplyWizardComponent {
           name: draft.contact.name ?? '',
         });
       }
+      // Sektionen sind vor restoreDraft() gebaut → steps() ist vollständig.
+      // Gespeicherten Schritt wiederherstellen, auf gültigen Bereich begrenzen.
+      if (typeof draft.activeIndex === 'number' && Number.isFinite(draft.activeIndex)) {
+        const max = this.steps().length - 1;
+        this.activeIndex.set(Math.min(Math.max(Math.trunc(draft.activeIndex), 0), max));
+      }
     } catch {
       /* defekter Entwurf — ignorieren */
     }

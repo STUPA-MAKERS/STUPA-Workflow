@@ -808,7 +808,9 @@ class _AppsServiceFake:
             )
         ]
 
-    async def effective_form(self, application_id: Any) -> Any:
+    async def effective_form(
+        self, application_id: Any, *, allow_unconfirmed: bool = True
+    ) -> Any:
         from app.modules.forms.schemas import EffectiveFormOut
 
         self.form_for = application_id

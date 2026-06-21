@@ -12,6 +12,7 @@ from app.middleware import RequestContextMiddleware
 from app.settings import Settings, load_settings
 from app.shared.altcha import AltchaVerifier, InMemoryReplayGuard, create_challenge, solve_challenge
 from app.shared.antiabuse import (
+    canonical_mail_key,
     client_ip,
     enforce_auth_payload_limit,
     get_altcha_verifier,
@@ -151,6 +152,31 @@ def test_rate_limit_mail_blocks() -> None:
     for _ in range(3):
         assert client.post("/ml", json={"email": "same@x.de"}).status_code == 200
     blocked = client.post("/ml", json={"email": "same@x.de"})
+    assert blocked.status_code == 429
+
+
+def test_canonical_mail_key_folds_variants() -> None:
+    # Plus-Tags, Case und Whitespace falten auf denselben Schlüssel (AUD-026).
+    base = canonical_mail_key("victim@gmail.com")
+    assert canonical_mail_key("victim+1@gmail.com") == base
+    assert canonical_mail_key("victim+anything.else@gmail.com") == base
+    assert canonical_mail_key("VICTIM@GMAIL.COM") == base
+    assert canonical_mail_key("  victim@gmail.com  ") == base
+    # Verschiedene Mailboxen bleiben getrennt.
+    assert canonical_mail_key("other@gmail.com") != base
+    # Kein '@' fällt nicht über — gibt eine gefaltete Form zurück.
+    assert canonical_mail_key("NoAt") == "noat"
+
+
+def test_rate_limit_mail_blocks_across_plus_tag_variants() -> None:
+    # Plus-Tag-Varianten derselben Mailbox dürfen das Per-Mail-Limit nicht umgehen.
+    settings = _settings(rl_magic_link_ip_per_hour=99, rl_magic_link_mail_per_hour=3)
+    limiter = InMemoryRateLimiter(now=lambda: 0.0)
+    client = TestClient(_app(settings=settings, limiter=limiter))
+    variants = ["victim@x.de", "victim+1@x.de", "VICTIM@x.de"]
+    for i in range(3):
+        assert client.post("/ml", json={"email": variants[i]}).status_code == 200
+    blocked = client.post("/ml", json={"email": "victim+spam@x.de"})
     assert blocked.status_code == 429
 
 

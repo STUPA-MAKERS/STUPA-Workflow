@@ -116,6 +116,23 @@ def _md_escape(text: str) -> str:
     return text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
 
 
+def _sanitize_applicant_value(text: str) -> str:
+    """Antragsteller-Feldwert vor dem Markdown-Einbau RCE-/Traversal-entschärfen.
+
+    Anträge werden ``trusted`` gerendert (die ``report``-Variante braucht pytex'
+    Template-Maschinerie), und Feldwerte stammen aus dem **öffentlichen**
+    Antragsteller-Eingang — der am wenigsten vertrauenswürdige Pfad. ``_md_escape``
+    kollabiert zwar Zeilenumbrüche, neutralisiert aber den pytex-``eval``-Escape
+    (``[//]: # "EXPR"``) und Bild-Pfad-Traversal (``![a](/abs)``, ``![a](../x)``)
+    NICHT. Wir leiten den Wert daher durch denselben ``sanitize_user_markdown``,
+    der den Protokoll-Body härtet (security.md §2; AUD-006). Funktions-lokaler
+    Import bricht den Modul-Zyklus (``protocol.markdown`` importiert seinerseits
+    ``_md_escape``/``_yaml_scalar`` aus diesem Modul)."""
+    from app.modules.protocol.markdown import sanitize_user_markdown
+
+    return sanitize_user_markdown(text)
+
+
 def _frontmatter(doc: ApplicationDoc) -> list[str]:
     lines = ["---"]
     title = f"{doc.type_name}"
@@ -153,7 +170,7 @@ def build_application_markdown(doc: ApplicationDoc) -> str:
         if f.is_pii:
             continue  # PII bleibt im `applicant`-Record, nicht im Gremium-PDF.
         label = resolve_i18n(f.label, lang, default) or f.key
-        value = _format_value(doc.data.get(f.key))
+        value = _sanitize_applicant_value(_format_value(doc.data.get(f.key)))
         out.append(f"- **{_md_escape(label)}:** {_md_escape(value)}")
     out.append("")
 

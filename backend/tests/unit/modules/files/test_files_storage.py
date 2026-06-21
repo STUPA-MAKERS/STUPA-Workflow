@@ -20,11 +20,19 @@ from app.settings import load_settings
 class _FakeResponse:
     def __init__(self, data: bytes) -> None:
         self._data = data
+        self._pos = 0
         self.closed = False
         self.released = False
 
-    def read(self) -> bytes:
-        return self._data
+    def read(self, amt: int | None = None) -> bytes:
+        # ohne amt: alles (wie urllib3); mit amt: häppchenweise (Stream-Pfad)
+        if amt is None:
+            chunk = self._data[self._pos :]
+            self._pos = len(self._data)
+            return chunk
+        chunk = self._data[self._pos : self._pos + amt]
+        self._pos += len(chunk)
+        return chunk
 
     def close(self) -> None:
         self.closed = True
@@ -102,6 +110,39 @@ async def test_get_returns_bytes_and_closes() -> None:
 async def test_get_error_wrapped() -> None:
     with pytest.raises(StorageError):
         await _storage().get("missing")
+
+
+async def test_get_stream_yields_chunks_and_closes() -> None:
+    client = _FakeMinio(buckets={"attachments"})
+    client.objects["k1"] = b"abcdefghij"
+    stream = await _storage(client).get_stream("k1", chunk_size=4)
+    chunks = [c async for c in stream]
+    assert chunks == [b"abcd", b"efgh", b"ij"]
+    assert b"".join(chunks) == b"abcdefghij"
+
+
+async def test_get_stream_closes_and_releases_connection() -> None:
+    client = _FakeMinio(buckets={"attachments"})
+    client.objects["k1"] = b"payload"
+    captured: dict[str, _FakeResponse] = {}
+    original = client.get_object
+
+    def _spy(bucket: str, key: str) -> _FakeResponse:
+        resp = original(bucket, key)
+        captured["resp"] = resp
+        return resp
+
+    client.get_object = _spy  # type: ignore[method-assign]
+    stream = await _storage(client).get_stream("k1", chunk_size=3)
+    _ = [c async for c in stream]
+    assert captured["resp"].closed is True
+    assert captured["resp"].released is True
+
+
+async def test_get_stream_connect_error_wrapped() -> None:
+    # Objekt fehlt → get_object wirft → StorageError VOR dem Stream-Start (→ 503).
+    with pytest.raises(StorageError):
+        await _storage().get_stream("missing")
 
 
 async def test_remove() -> None:

@@ -25,7 +25,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
@@ -104,6 +104,26 @@ class GremiumMembership(UUIDPkMixin, Base):
     __table_args__ = (
         Index("ix_gremium_membership_principal", "principal_id"),
         Index("ix_gremium_membership_gremium", "gremium_id"),
+        # DB-Backing der Overlap-Invariante (#42, AUD-029): pro (Principal, Gremium)
+        # darf sich kein Amtszeit-Intervall überschneiden. NULL valid_from/valid_until
+        # = ±unendlich (offene Amtszeit). Halboffenes Intervall [from, until) → zwei
+        # Mitgliedschaften, die nur an der Grenze "berühren", sind erlaubt. Schließt
+        # die TOCTOU-Lücke der reinen Python-Prüfung (zwei parallele Inserts). Setzt
+        # die btree_gist-Extension voraus (in der Migration anlegen).
+        ExcludeConstraint(
+            ("principal_id", "="),
+            ("gremium_id", "="),
+            (
+                text(
+                    "tstzrange("
+                    "coalesce(valid_from, '-infinity'), "
+                    "coalesce(valid_until, 'infinity'), '[)')"
+                ),
+                "&&",
+            ),
+            using="gist",
+            name="ex_gremium_membership_no_overlap",
+        ),
     )
 
 

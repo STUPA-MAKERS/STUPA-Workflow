@@ -58,6 +58,18 @@ class _Session:
         self.committed += 1
 
 
+def _stub_audit(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Patch the audit hook to record (kein echtes ``AuditService`` nötig)."""
+    calls: list[dict[str, Any]] = []
+
+    async def _fake(_session: Any, **kwargs: Any) -> Any:
+        calls.append(kwargs)
+        return None
+
+    monkeypatch.setattr(extras_mod, "audit_record", _fake)
+    return calls
+
+
 def _maker(session: _Session) -> Any:
     class _CM:
         async def __aenter__(self) -> _Session:
@@ -195,7 +207,10 @@ async def test_assign_budget_missing_app_or_node_skipped() -> None:
     assert session.committed == 0
 
 
-async def test_assign_budget_sets_single_active_fiscal_year() -> None:
+async def test_assign_budget_sets_single_active_fiscal_year(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_audit(monkeypatch)
     app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
     app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
     node = SimpleNamespace(id=node_id, parent_id=None)  # Top-Level
@@ -208,7 +223,10 @@ async def test_assign_budget_sets_single_active_fiscal_year() -> None:
     assert session.committed == 1
 
 
-async def test_assign_budget_ambiguous_fiscal_year_left_open() -> None:
+async def test_assign_budget_ambiguous_fiscal_year_left_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
     app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
     node = SimpleNamespace(id=node_id, parent_id=None)
@@ -218,6 +236,31 @@ async def test_assign_budget_ambiguous_fiscal_year_left_open() -> None:
     )
     assert app.budget_id == node_id
     assert app.fiscal_year_id is None  # mehrdeutig → offen gelassen
+    assert session.committed == 1
+
+
+async def test_assign_budget_writes_audit_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Geld-Mutation per Flow-Action MUSS einen BUDGET_ASSIGN-Audit-Eintrag schreiben
+    (Hausregel: alle Budget-Mutationen sind im append-only Audit-Trail belegt)."""
+    from app.modules.audit.actions import AuditAction
+
+    calls = _stub_audit(monkeypatch)
+    app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
+    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
+    node = SimpleNamespace(id=node_id, parent_id=None)
+    session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
+    )
+    assert len(calls) == 1
+    rec = calls[0]
+    assert rec["action"] == AuditAction.BUDGET_ASSIGN
+    assert rec["actor"] == extras_mod._FLOW_ACTOR
+    assert rec["target_type"] == "application"
+    assert rec["target_id"] == str(app_id)
+    assert rec["data"]["budgetId"] == str(node_id)
+    assert rec["data"]["fiscalYearId"] == str(fy_id)
+    assert rec["data"]["source"] == "flow"
     assert session.committed == 1
 
 

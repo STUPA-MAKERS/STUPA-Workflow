@@ -232,7 +232,7 @@ class ExpenseCreate(_CamelModel):
       aktive HHJ des Top-Budgets gewählt (mehrdeutig/keins → 422).
     """
 
-    amount: Decimal = Field(gt=0, allow_inf_nan=False)
+    amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
     description: str = Field(min_length=1)
     kind: ExpenseKind = "expense"
     budget_id: UUID | None = Field(default=None, alias="budgetId")
@@ -263,7 +263,7 @@ class ExpenseUpdate(_CamelModel):
     (Buchungsstabilität). Nur gesetzte Felder werden geschrieben; explizites ``null``
     leert ein optionales Feld (``budgetId`` ausgenommen — Pflicht-FK)."""
 
-    amount: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
+    amount: Decimal | None = Field(default=None, gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
     description: str | None = Field(default=None, min_length=1)
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     account_id: UUID | None = Field(default=None, alias="accountId")
@@ -568,7 +568,7 @@ class TransferCreate(_CamelModel):
     from_budget_id: UUID = Field(alias="fromBudgetId")
     to_budget_id: UUID = Field(alias="toBudgetId")
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
-    amount: Decimal = Field(gt=0, allow_inf_nan=False)
+    amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
     description: str = Field(min_length=1)
 
     @model_validator(mode="after")

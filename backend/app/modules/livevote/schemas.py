@@ -233,7 +233,10 @@ class MeetingVoteOpenBody(_CamelModel):
         default="simple", alias="majorityRule"
     )
     secret: bool = False
-    eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
+    # Der Quorum-Nenner (Stimmberechtigte) wird IMMER serverseitig aus dem aktuellen
+    # Roster abgeleitet (``vote_eligible_count``) — er ist KEIN Eingabefeld. Ein vom
+    # Client gelieferter Wert könnte das Quorum gegen das echte Roster manipulieren
+    # (AUD-042), daher bewusst entfernt.
     # Explizites Prozent-Quorum (0–100). ``None`` ⇒ Default des Gremiums (falls gesetzt).
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100

@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   type ElementRef,
+  type OnDestroy,
   computed,
   effect,
   inject,
@@ -57,7 +58,7 @@ import { downloadBlob } from '@shared/download.util';
   templateUrl: './applications-list.component.html',
   styleUrl: './applications-list.component.scss',
 })
-export class ApplicationsListComponent {
+export class ApplicationsListComponent implements OnDestroy {
   private readonly api = inject(ApiClient);
   private readonly budgetApi = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
@@ -279,6 +280,10 @@ export class ApplicationsListComponent {
       () => this.navigate({ q: this.q().trim() || null, offset: null }),
       400,
     );
+  }
+
+  ngOnDestroy(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
   }
 
   applyFilters(): void {

@@ -39,6 +39,8 @@ from app.modules.admin.schemas import (
 from app.modules.admin.service import (
     ConfigService,
     _assignment_out,
+    _delivery_reason_class,
+    _delivery_status_out,
     _gremium_out,
     _iso,
     _mapping_out,
@@ -48,7 +50,12 @@ from app.modules.admin.service import (
     _webhook_out,
 )
 from app.shared.config_schemas import ComparisonOffers, FlowGraph
-from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.errors import (
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+    ValidationProblem,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -801,11 +808,15 @@ async def test_create_role_ok() -> None:
     # scalars(existing None) ; audit(2)
     s, sess = svc([res(), *audit_results()])
     out = await s.create_role(
-        RoleCreate(key="neu", label={"de": "Neu"}, permissions=["a.read", "a.read"]),
+        RoleCreate(
+            key="neu",
+            label={"de": "Neu"},
+            permissions=["application.read", "application.read"],
+        ),
         "admin",
     )
     assert out.key == "neu"
-    assert out.permissions == ["a.read"]
+    assert out.permissions == ["application.read"]
     # eine RolePermission-Zeile (dedupliziert)
     assert sum(type(o).__name__ == "RolePermission" for o in sess.added) == 1
 
@@ -820,28 +831,33 @@ async def test_update_role_label_and_permissions() -> None:
     role = role_row()
     # get(role) ; execute(delete perms) ; audit(2) ; scalars(perms after)
     s, _ = svc(
-        [res(), *audit_results(), res("a.read", "b.read")],
+        [res(), *audit_results(), res("application.read", "application.create")],
         gets=[role],
     )
     out = await s.update_role(
         role.id,
-        RoleUpdate(label={"de": "Neu"}, permissions=["a.read", "b.read"]),
+        RoleUpdate(
+            label={"de": "Neu"},
+            permissions=["application.read", "application.create"],
+        ),
         "admin",
     )
     assert role.name_i18n == {"de": "Neu"}
-    assert out.permissions == ["a.read", "b.read"]
+    assert out.permissions == ["application.create", "application.read"]
 
 
 async def test_update_role_permissions_only_label_none() -> None:
     # label None (Branch 572->574 übersprungen) ; permissions gesetzt
     role = role_row(name_i18n={"de": "Alt"})
     s, _ = svc(
-        [res(), *audit_results(), res("c.read")],
+        [res(), *audit_results(), res("application.create")],
         gets=[role],
     )
-    out = await s.update_role(role.id, RoleUpdate(permissions=["c.read"]), "admin")
+    out = await s.update_role(
+        role.id, RoleUpdate(permissions=["application.create"]), "admin"
+    )
     assert role.name_i18n == {"de": "Alt"}  # unverändert
-    assert out.permissions == ["c.read"]
+    assert out.permissions == ["application.create"]
 
 
 async def test_update_role_no_permissions_change() -> None:
@@ -951,12 +967,14 @@ async def test_update_role_assignment_all_fields_non_admin_role() -> None:
     assert out.delegate_voting is True
 
 
-async def test_update_role_assignment_same_role_no_guard() -> None:
-    # payload.role_id == row.role_id → kein _guard_self_admin_removal-Aufruf
+async def test_update_role_assignment_same_role_guard_runs_non_admin() -> None:
+    # AUD-031: _guard_self_admin_removal läuft jetzt IMMER zuerst. Bei einer
+    # Nicht-Admin-Rolle (editor) kehrt der Guard ohne Konflikt zurück.
+    # gets: get(row) ; guard: get(Role row.role_id=editor) ; existence: get(Role)
     rid = uuid.uuid4()
     row = assignment_row(role_id=rid)
-    new_role = role_row(id=rid)
-    s, _ = svc([*audit_results()], gets=[row, new_role])
+    editor_role = role_row(id=rid)
+    s, _ = svc([*audit_results()], gets=[row, editor_role, editor_role])
     out = await s.update_role_assignment(
         row.id, RoleAssignmentUpdate(roleId=rid), "admin"
     )
@@ -986,8 +1004,8 @@ async def test_update_role_assignment_self_admin_removal_blocked() -> None:
     row = assignment_row(principal_id=principal.id)
     new_role = role_row(key="editor")
     admin_role = role_row(key="admin")
-    # get(row) ; get(new_role existence) ; guard: get(admin_role) ; get(principal)
-    s, _ = svc(gets=[row, new_role, admin_role, principal])
+    # AUD-031: Guard läuft zuerst → get(row) ; guard: get(admin_role) ; get(principal)
+    s, _ = svc(gets=[row, admin_role, principal])
     with pytest.raises(ConflictError):
         await s.update_role_assignment(
             row.id, RoleAssignmentUpdate(roleId=new_role.id), "me"
@@ -999,6 +1017,26 @@ async def test_update_role_assignment_noop() -> None:
     s, _ = svc([*audit_results()], gets=[row])
     out = await s.update_role_assignment(row.id, RoleAssignmentUpdate(), "admin")
     assert out.delegate_voting is False
+
+
+async def test_update_role_assignment_self_admin_valid_until_self_expiry_blocked() -> (
+    None
+):
+    # AUD-031: Eine Nicht-role_id-Mutation (valid_until in der Vergangenheit) der
+    # EIGENEN Admin-Zuweisung darf nicht durchgehen — sonst Selbst-Ablauf des Admins.
+    principal = principal_row(sub="me")
+    row = assignment_row(principal_id=principal.id)
+    admin_role = role_row(key="admin")
+    # get(row) ; guard: get(admin_role) ; get(principal)
+    s, sess = svc(gets=[row, admin_role, principal])
+    with pytest.raises(ConflictError):
+        await s.update_role_assignment(
+            row.id,
+            RoleAssignmentUpdate(validUntil="2000-01-01T00:00:00Z"),
+            "me",
+        )
+    assert sess.committed == 0
+    assert row.valid_until is None  # unverändert
 
 
 async def test_delete_role_assignment_ok() -> None:
@@ -1272,3 +1310,141 @@ async def test_update_webhook_not_found() -> None:
     s, _ = svc(gets=[None])
     with pytest.raises(NotFoundError):
         await s.update_webhook(uuid.uuid4(), WebhookUpdate(name="x"), "admin")
+
+
+# --------------------------------------------------------------------------- #
+# AUD-062: CRUD-Zeit-Advisory SSRF-Prüfung der Webhook-URL
+# --------------------------------------------------------------------------- #
+def test_webhook_url_advisory_blocks_internal_ip_literal() -> None:
+    # Metadaten-IP (link-local) ist nicht global → 400, kein stilles Dead-Letter.
+    with pytest.raises(BadRequestError):
+        ConfigService._assert_webhook_url_advisory("http://169.254.169.254/")
+
+
+def test_webhook_url_advisory_blocks_private_ip_literal() -> None:
+    with pytest.raises(BadRequestError):
+        ConfigService._assert_webhook_url_advisory("http://10.0.0.1/hook")
+
+
+def test_webhook_url_advisory_blocks_bad_scheme() -> None:
+    with pytest.raises(BadRequestError):
+        ConfigService._assert_webhook_url_advisory("ftp://example.com/")
+
+
+def test_webhook_url_advisory_allows_global_ip_literal() -> None:
+    # Globale IP-Literal löst keine Blockade aus (kein DNS).
+    ConfigService._assert_webhook_url_advisory("https://1.1.1.1/hook")
+
+
+def test_webhook_url_advisory_dns_failure_is_non_blocking() -> None:
+    # Nicht auflösbarer Host (.example reserviert) → best-effort, nicht blockieren.
+    ConfigService._assert_webhook_url_advisory("https://x.example/h")
+
+
+# --------------------------------------------------------------------------- #
+# AUD-062 (2. Hälfte): Delivery-Status-Diagnose-Read
+# --------------------------------------------------------------------------- #
+def delivery_row(**kw: Any) -> Any:
+    base = {
+        "id": uuid.uuid4(),
+        "webhook_id": uuid.uuid4(),
+        "status": "pending",
+        "response_code": None,
+        "attempts": 0,
+        "last_at": None,
+    }
+    base.update(kw)
+    return Row(**base)
+
+
+def test_reason_class_buckets() -> None:
+    # ok → delivered; pending → in_progress.
+    assert _delivery_reason_class("ok", 200) == "delivered"
+    assert _delivery_reason_class("pending", None) == "in_progress"
+    # dead ohne HTTP-Code (SSRF-Block ODER Transport/DNS) → unreachable_or_blocked,
+    # OHNE die geblockte IP zu nennen.
+    assert _delivery_reason_class("dead", None) == "unreachable_or_blocked"
+    # failed (Retry läuft) ohne Code → transienter Transportfehler.
+    assert _delivery_reason_class("failed", None) == "transient_transport_error"
+    # 4xx = Ziel lehnt ab; 5xx = Ziel-Serverfehler.
+    assert _delivery_reason_class("dead", 404) == "rejected_by_target"
+    assert _delivery_reason_class("dead", 503) == "target_server_error"
+
+
+def test_delivery_status_out_never_when_no_delivery() -> None:
+    wid = uuid.uuid4()
+    out = _delivery_status_out(wid, None)
+    assert out.webhook_id == wid
+    assert out.last_state == "never"
+    assert out.reason_class == "no_deliveries"
+    assert out.response_code is None
+
+
+def test_delivery_status_out_dead_no_ip_leak() -> None:
+    # Vertippter/interner Webhook → dead ohne HTTP-Code; die Sicht nennt NUR die
+    # grobe Klasse, keine aufgelöste IP / keinen Host.
+    row = delivery_row(status="dead", response_code=None, attempts=5)
+    out = _delivery_status_out(row.webhook_id, row)
+    assert out.last_state == "dead"
+    assert out.reason_class == "unreachable_or_blocked"
+    assert out.attempts == 5
+    # Kein IP-/Host-/Body-Feld im Diagnose-DTO.
+    dumped = out.model_dump()
+    assert "ip" not in dumped
+    assert "host" not in dumped
+    assert "url" not in dumped
+
+
+def test_delivery_status_out_sent_maps_ok() -> None:
+    moment = datetime(2026, 6, 21, tzinfo=UTC)
+    row = delivery_row(status="ok", response_code=200, attempts=1, last_at=moment)
+    out = _delivery_status_out(row.webhook_id, row)
+    assert out.last_state == "sent"
+    assert out.reason_class == "delivered"
+    assert out.response_code == 200
+    assert out.last_at == moment.isoformat()
+
+
+async def test_list_webhook_delivery_status_per_hook() -> None:
+    hook_a = webhook_row(name="a")
+    hook_b = webhook_row(name="b")
+    # Webhook-Liste über scalars-Queue (_results); je Hook eine latest-Delivery
+    # über die scalar-Queue (_scalars), in derselben Reihenfolge.
+    latest_a = delivery_row(webhook_id=hook_a.id, status="dead", response_code=None)
+    s, _ = svc(
+        [res(hook_a, hook_b)],
+        scalars=[latest_a, None],
+    )
+    out = await s.list_webhook_delivery_status()
+    assert len(out) == 2
+    assert out[0].webhook_id == hook_a.id
+    assert out[0].last_state == "dead"
+    assert out[0].reason_class == "unreachable_or_blocked"
+    # Hook ohne Delivery → never.
+    assert out[1].webhook_id == hook_b.id
+    assert out[1].last_state == "never"
+
+
+# --------------------------------------------------------------------------- #
+# AUD-053: Role permission whitelist validation
+# --------------------------------------------------------------------------- #
+def test_role_create_rejects_unknown_permission() -> None:
+    with pytest.raises(ValueError, match="unknown permission"):
+        RoleCreate(key="r", permissions=["application.read", "bogus.key"])
+
+
+def test_role_create_accepts_known_and_dedups() -> None:
+    role = RoleCreate(
+        key="r",
+        permissions=["application.read", "application.read", "application.create"],
+    )
+    assert role.permissions == ["application.read", "application.create"]
+
+
+def test_role_update_rejects_unknown_permission() -> None:
+    with pytest.raises(ValueError, match="unknown permission"):
+        RoleUpdate(permissions=["does.not.exist"])
+
+
+def test_role_update_none_permissions_ok() -> None:
+    assert RoleUpdate(permissions=None).permissions is None

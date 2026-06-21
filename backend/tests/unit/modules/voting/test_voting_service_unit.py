@@ -14,6 +14,7 @@ from uuid import uuid4
 import pytest
 
 from app.modules.auth.principal import Principal
+from app.modules.auth.rbac import vote_group_key
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.modules.voting import service as voting_service
 from app.modules.voting.schemas import VoteCreate
@@ -191,7 +192,11 @@ async def test_cast_nonvoting_delegation_does_not_block_member() -> None:
         result((True, False, _voter().sub)),  # ausgehende NICHT-Stimm-Delegation
         result(SimpleNamespace(inserted=True)),  # ballot insert
     )
-    out = await VotingService(db).cast(vote.id, _voter(group=str(gid)), "yes", now=NOW)
+    # Gremium-Vote: Stimmberechtigung über den namespaced Key (AUD-066), den eine
+    # echte vote.cast-Mitgliedschaft setzt — nicht den nackten UUID-String.
+    out = await VotingService(db).cast(
+        vote.id, _voter(group=vote_group_key(gid)), "yes", now=NOW
+    )
     assert out.status == "cast"
     assert db.committed == 1
 
@@ -227,7 +232,9 @@ async def test_cast_own_vote_unaffected_by_incoming_delegation() -> None:
         result((False, True, "delegator-1")),  # eingehende Stimm-Delegation
         result(SimpleNamespace(inserted=True)),  # ballot insert
     )
-    out = await VotingService(db).cast(vote.id, _voter(group=str(gid)), "yes", now=NOW)
+    out = await VotingService(db).cast(
+        vote.id, _voter(group=vote_group_key(gid)), "yes", now=NOW
+    )
     assert out.status == "cast"
     assert not any(type(a).__name__ == "AuditEntry" for a in db.added)
 

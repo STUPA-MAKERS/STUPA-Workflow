@@ -231,3 +231,72 @@ def test_build_document_applies_sanitizer_to_body() -> None:
     md = build_protocol_document(_doc(markdown='# TOP 1\n[//]: # "evil"\nText.'))
     assert "evil" not in md
     assert "# TOP 1" in md and "Text." in md
+
+
+# ----------------------------------------- AUD-001: Sanitizer-Bypass-Regression
+# Die alte zeilen-orientierte Regex ließ mehrzeilige, container-verschachtelte und
+# whitespace-im-Label-Formen der eval-fähigen Link-Referenz-Definition durch; diese
+# landeten als ``LinkRefDef(label='//', dest='#')`` bei pytex' ``eval`` → RCE.
+def test_sanitizer_strips_multiline_eval_comment() -> None:
+    """Mehrzeilige Form ``[//]:\\n#\\n"EXPR"`` (Ziel/Titel auf Folgezeilen)."""
+    out = sanitize_user_markdown('# TOP\n[//]:\n#\n"__import__(\'os\').system(\'id\')"\nText')
+    assert "__import__" not in out
+    assert "[//]" not in out
+    assert "# TOP" in out and "Text" in out
+
+
+def test_sanitizer_strips_head_then_title_on_next_line() -> None:
+    out = sanitize_user_markdown('[//]: #\n"evil_expr"')
+    assert "evil_expr" not in out
+    assert "[//]" not in out
+
+
+def test_sanitizer_strips_whitespace_inside_label() -> None:
+    for src in ("[ // ]: # \"evil\"", "[//\n]: # \"evil\""):
+        out = sanitize_user_markdown(src)
+        assert "evil" not in out, src
+        assert "[//" not in out and "[ //" not in out, src
+
+
+def test_sanitizer_strips_container_nested_eval_comments() -> None:
+    """Blockquote-/Listen-verschachtelte Definitionen (``>``, ``-``, ``*``, ``1.``)."""
+    for prefix in ("> ", "- ", "* ", "1. "):
+        out = sanitize_user_markdown(f'{prefix}[//]: # "evil"')
+        assert "evil" not in out, prefix
+        assert "[//]" not in out, prefix
+
+
+def test_sanitizer_keeps_anchor_reference_definition() -> None:
+    """Eine echte Anker-Referenz (``[foo]: #section``) ist KEIN eval-Trigger
+    (pytex feuert nur bei ``dest == '#'``) und bleibt unverändert."""
+    src = '[foo]: #section "Title"'
+    assert sanitize_user_markdown(src) == src
+
+
+def test_sanitizer_keeps_vote_callout_intact() -> None:
+    """Der Abstimmungs-Callout (``> [!abstimmung]`` + Tally-Zeile) wird mit dem
+    Body sanitiert (``embed_protocol_votes`` mischt ihn in ``protocol.markdown``)
+    und MUSS unangetastet bleiben — sonst bricht die pytex-Tally-Box."""
+    callout = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
+    assert sanitize_user_markdown(callout) == callout
+
+
+def test_sanitizer_no_eval_refdef_survives_marko_parse() -> None:
+    """Strukturelle Verifikation: nach der Sanitierung parst marko (falls vorhanden)
+    KEINE eval-fähige ``LinkRefDef`` mehr — über alle Bypass-Formen hinweg."""
+    from app.modules.protocol.markdown import _has_eval_refdef
+
+    vectors = [
+        '[//]: # "x"',
+        '[//]:\n#\n"x"',
+        '[//]: #\n"x"',
+        '[ // ]: # "x"',
+        '[//\n]: # "x"',
+        '> [//]: # "x"',
+        '- [//]: # "x"',
+        '1. [//]: # "x"',
+    ]
+    for src in vectors:
+        cleaned = sanitize_user_markdown(src)
+        # Wenn marko installiert ist, darf kein eval-Trigger überleben.
+        assert not _has_eval_refdef(cleaned), src

@@ -147,6 +147,40 @@ def test_list_passes_cursor_filters_to_service() -> None:
     assert service.cursor_kwargs["limit"] == 10
 
 
+def test_list_rejects_naive_since_with_422() -> None:
+    # #AUD-034: naive (tz-loses) since/until darf nicht bis zur timestamptz-Query
+    # durchschlagen (asyncpg DataError → 500); AwareDatetime weist es als 422 ab.
+    service = _FakeService()
+    client = _client(service, _principal("audit.read"))
+    resp = client.get("/api/admin/audit", params={"since": "2026-06-01T00:00:00"})
+    assert resp.status_code == 422
+    assert service.cursor_kwargs is None  # Query erst gar nicht erreicht
+
+
+def test_list_rejects_naive_until_with_422() -> None:
+    service = _FakeService()
+    client = _client(service, _principal("audit.read"))
+    resp = client.get("/api/admin/audit", params={"until": "2026-06-01T00:00:00"})
+    assert resp.status_code == 422
+    assert service.cursor_kwargs is None
+
+
+def test_list_accepts_aware_since_until() -> None:
+    service = _FakeService()
+    client = _client(service, _principal("audit.read"))
+    resp = client.get(
+        "/api/admin/audit",
+        params={
+            "since": "2026-06-01T00:00:00+00:00",
+            "until": "2026-06-30T23:59:59Z",
+        },
+    )
+    assert resp.status_code == 200
+    assert service.cursor_kwargs is not None
+    assert service.cursor_kwargs["since"].tzinfo is not None
+    assert service.cursor_kwargs["until"].tzinfo is not None
+
+
 def test_actors_endpoint_lists_distinct_actors() -> None:
     service = _FakeService()
     service.actors = [("u-1", "User One"), ("sys", None)]

@@ -482,6 +482,32 @@ describe('ApplyWizardComponent', () => {
     expect(comp.model['title']).toBe('Entwurf');
     expect(comp.contactForm.controls.email.value).toBe('draft@b.de');
     expect(comp.contactForm.controls.name.value).toBe('Erika');
+    // AUD-038: der gespeicherte Schritt wird wiederhergestellt, nicht auf 0 zurückgesetzt.
+    expect(comp.activeIndex()).toBe(1);
+  });
+
+  it('clamps a restored activeIndex into the valid step range (AUD-038)', async () => {
+    sessionStorage.setItem(
+      'ap.draft.t1',
+      JSON.stringify({ model: { title: 'X' }, activeIndex: 999 }),
+    );
+    const { fixture } = await setup();
+    const comp = fixture.componentInstance;
+    comp.selectType('t1');
+    // Antragsart + Kontakt + 2 Sektionen + Prüfen = 5 Schritte → max-Index 4.
+    expect(comp.steps().length).toBe(5);
+    expect(comp.activeIndex()).toBe(4);
+  });
+
+  it('ignores a non-numeric restored activeIndex (AUD-038)', async () => {
+    sessionStorage.setItem(
+      'ap.draft.t1',
+      JSON.stringify({ model: { title: 'X' }, activeIndex: 'nope' }),
+    );
+    const { fixture } = await setup();
+    const comp = fixture.componentInstance;
+    comp.selectType('t1');
+    expect(comp.activeIndex()).toBe(0);
   });
 
   it('ignores a corrupt draft payload without throwing', async () => {
@@ -499,6 +525,8 @@ describe('ApplyWizardComponent', () => {
     comp.selectType('t1');
     expect(comp.model).toEqual({});
     expect(comp.contactForm.controls.email.value).toBe('');
+    // Schritt wird trotz fehlendem model/contact wiederhergestellt (AUD-038).
+    expect(comp.activeIndex()).toBe(1);
   });
 
   it('restores a contact-only draft and defaults the missing name to empty', async () => {

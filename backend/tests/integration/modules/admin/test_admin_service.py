@@ -281,8 +281,10 @@ async def test_role_crud_and_listing(session: AsyncSession) -> None:
     assert set(created.permissions) == {"vote.cast", "audit.read"}
     with pytest.raises(ConflictError):
         await svc.create_role(RoleCreate(key=key), _ACTOR)
-    updated = await svc.update_role(created.id, RoleUpdate(permissions=["budget.manage"]), _ACTOR)
-    assert updated.permissions == ["budget.manage"]
+    updated = await svc.update_role(
+        created.id, RoleUpdate(permissions=["budget.structure"]), _ACTOR
+    )
+    assert updated.permissions == ["budget.structure"]
     listed = await svc.list_roles()
     keys = {r.key for r in listed}
     assert key in keys and "admin" in keys  # neue + geseedete Rollen

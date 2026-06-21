@@ -59,6 +59,13 @@ class Config:
             os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
         ) / "antragsplattform-mcp"
         # mode 0700: the dir holds per-URL token caches (secrets) — keep it owner-only.
-        # (exist_ok keeps an existing dir; mode applies only to dirs we create here.)
+        # mkdir's mode applies only on creation and is umask-masked, so it does NOT tighten
+        # a pre-existing (possibly world-listable) dir — chmod afterwards to enforce 0700.
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            os.chmod(root, 0o700)
+        except OSError:
+            # Best effort: a non-owner or exotic FS may reject chmod. The token files
+            # themselves are written 0o600 via os.open+os.replace, so secrets stay safe.
+            pass
         return root / f"token-{key}.json"

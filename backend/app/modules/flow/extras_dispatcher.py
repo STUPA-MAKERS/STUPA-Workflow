@@ -27,6 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
 from app.modules.applications.models import Application
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.livevote.agenda_service import AgendaService
@@ -34,6 +36,11 @@ from app.modules.livevote.models import Meeting
 from app.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("app.flow.actions")
+
+# Actor recorded for money mutations performed by the flow engine itself (no human
+# principal in scope on a transition's side-effect). Mirrors the house rule that all
+# budget mutations leave an audit trail (see BudgetTreeService.assign_budget).
+_FLOW_ACTOR = "system:flow"
 
 
 @dataclass(slots=True)
@@ -134,6 +141,21 @@ class FlowExtrasActionDispatcher:
             # Eindeutiges aktives HHJ → setzen; sonst offen lassen (mehrdeutig/keins).
             if len(active_ids) == 1:
                 app.fiscal_year_id = active_ids[0]
+            # Money mutation → audit trail (Hausregel; spiegelt BudgetTreeService).
+            await audit_record(
+                session,
+                actor=_FLOW_ACTOR,
+                action=AuditAction.BUDGET_ASSIGN,
+                target_type="application",
+                target_id=str(app.id),
+                data={
+                    "budgetId": str(app.budget_id),
+                    "fiscalYearId": (
+                        str(app.fiscal_year_id) if app.fiscal_year_id is not None else None
+                    ),
+                    "source": "flow",
+                },
+            )
             await session.commit()
 
     @staticmethod

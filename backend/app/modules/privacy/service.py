@@ -12,19 +12,26 @@ Benachrichtigungen feuert der Router/Worker best-effort *nach* dem Commit
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import ApplicationType
-from app.modules.applications.models import Applicant, Application, SubmissionVersion
+from app.modules.applications.models import (
+    Applicant,
+    Application,
+    Comment,
+    SubmissionVersion,
+)
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import AuthSession, Principal
+from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.flow.models import State
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
@@ -244,8 +251,9 @@ class AuskunftService:
 
     async def collect(self, email: str, *, locale: str = "de") -> dict[str, Any]:
         """Antragsteller-Datensätze (per Mail), zugehörige Anträge + ``data`` +
-        Versionshistorie und den passenden Principal-Datensatz sammeln. Liefert
-        fertige Reihen für :func:`build_auskunft_workbook`."""
+        Versionshistorie, vom Subjekt einsehbare Kommentare, Anhang-Metadaten und
+        den passenden Principal-Datensatz sammeln. Liefert fertige Reihen für
+        :func:`build_auskunft_workbook` (Art. 15: Vollständigkeit)."""
         applicants = list(
             (
                 await self.session.scalars(
@@ -258,6 +266,8 @@ class AuskunftService:
 
         applications: list[dict[str, Any]] = []
         versions: list[dict[str, Any]] = []
+        comments: list[dict[str, Any]] = []
+        attachments: list[dict[str, Any]] = []
         if app_ids:
             apps = list(
                 (
@@ -326,6 +336,57 @@ class AuskunftService:
                 for v in vrows
             ]
 
+            # Kommentare, die das Subjekt betreffen/einsehen kann: eigene
+            # (author_kind='applicant') sowie öffentliche (für die/den
+            # Antragsteller:in sichtbare) Kommentare. Interne Principal-Notizen
+            # bleiben außen vor (nicht für das Subjekt bestimmt).
+            crows = list(
+                (
+                    await self.session.scalars(
+                        select(Comment)
+                        .where(
+                            Comment.application_id.in_(app_ids),
+                            or_(
+                                Comment.author_kind == "applicant",
+                                Comment.visibility == "public",
+                            ),
+                        )
+                        .order_by(Comment.application_id, Comment.at)
+                    )
+                ).all()
+            )
+            comments = [
+                {
+                    "applicationId": c.application_id,
+                    "authorKind": c.author_kind,
+                    "visibility": c.visibility,
+                    "body": c.body,
+                    "at": c.at,
+                }
+                for c in crows
+            ]
+
+            # Anhang-Metadaten (Dateinamen können PII sein) — ohne das Binär-Objekt.
+            arows = list(
+                (
+                    await self.session.scalars(
+                        select(Attachment)
+                        .where(Attachment.application_id.in_(app_ids))
+                        .order_by(Attachment.application_id, Attachment.created_at)
+                    )
+                ).all()
+            )
+            attachments = [
+                {
+                    "applicationId": at.application_id,
+                    "filename": at.filename,
+                    "mime": at.mime,
+                    "size": at.size,
+                    "createdAt": at.created_at,
+                }
+                for at in arows
+            ]
+
         principal_row = await self.session.scalar(
             select(Principal).where(Principal.email == email)
         )
@@ -344,5 +405,101 @@ class AuskunftService:
             "email": email,
             "applications": applications,
             "versions": versions,
+            "comments": comments,
+            "attachments": attachments,
             "principal": principal,
         }
+
+
+def _fmt_dt(value: datetime | None) -> str:
+    return value.strftime("%Y-%m-%d %H:%M") if value is not None else ""
+
+
+def build_auskunft_workbook(
+    *,
+    email: str,
+    applications: Sequence[Mapping[str, Any]],
+    versions: Sequence[Mapping[str, Any]],
+    principal: Mapping[str, Any] | None,
+    comments: Sequence[Mapping[str, Any]] = (),
+    attachments: Sequence[Mapping[str, Any]] = (),
+) -> bytes:
+    """DSGVO-Auskunft (Art. 15) als ``.xlsx``-Bytes — vollständig.
+
+    Baut auf dem geteilten :func:`app.shared.xlsx.build_auskunft_workbook`
+    (Konto/Anträge/Versionen) auf und ergänzt zwei Blätter für die
+    vom Subjekt einsehbaren **Kommentare** und die **Anhang-Metadaten**
+    (Dateinamen können PII sein), die der Erasure-Pfad bereits als PII
+    behandelt. Reichert die Mappe nachträglich an, statt das geteilte,
+    DB-agnostische Workbook-Modul zu ändern."""
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+
+    from app.shared.xlsx import _safe
+    from app.shared.xlsx import build_auskunft_workbook as _build_base
+
+    base = _build_base(
+        email=email,
+        applications=applications,
+        versions=versions,
+        principal=principal,
+    )
+    wb = load_workbook(BytesIO(base))
+
+    def _add_sheet(
+        title: str,
+        headers: Sequence[str],
+        rows: Sequence[Sequence[Any]],
+    ) -> None:
+        ws = wb.create_sheet(title=title)
+        ws.append([_safe(h) for h in headers])
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+        ws.freeze_panes = "A2"
+        for row in rows:
+            # Formula-Injection neutralisieren (Comment.body / Attachment.filename
+            # sind antragstellerseitig befüllt) — gleicher Schutz wie die geteilten
+            # Basis-Blätter via app.shared.xlsx._safe.
+            ws.append([_safe(cell) for cell in row])
+        widths = [len(str(h)) for h in headers]
+        for r in ws.iter_rows(min_row=2, values_only=True):
+            for i, cell in enumerate(r):
+                widths[i] = max(widths[i], len(str(cell)) if cell is not None else 0)
+        for i, width in enumerate(widths, start=1):
+            ws.column_dimensions[get_column_letter(i)].width = min(width + 2, 60)
+
+    _add_sheet(
+        "Kommentare",
+        ["Antrags-ID", "Autor-Art", "Sichtbarkeit", "Zeitpunkt", "Text"],
+        [
+            [
+                str(c.get("applicationId") or ""),
+                c.get("authorKind") or "",
+                c.get("visibility") or "",
+                _fmt_dt(c.get("at")),
+                c.get("body") or "",
+            ]
+            for c in comments
+        ],
+    )
+    _add_sheet(
+        "Anhänge",
+        ["Antrags-ID", "Dateiname", "Typ", "Größe (Bytes)", "Hochgeladen"],
+        [
+            [
+                str(at.get("applicationId") or ""),
+                at.get("filename") or "",
+                at.get("mime") or "",
+                at.get("size"),
+                _fmt_dt(at.get("createdAt")),
+            ]
+            for at in attachments
+        ],
+    )
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

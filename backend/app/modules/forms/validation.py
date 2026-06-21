@@ -382,7 +382,10 @@ def _option_values(field: FormFieldDef) -> set[str]:
 
 
 def _validate_select(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    if value not in _option_values(field):
+    # FieldOption.value ist als str deklariert; nur Strings können gültige
+    # Optionen sein. Der isinstance-Guard erzwingt die Domäne und verhindert
+    # zugleich einen TypeError beim Membership-Test mit unhashbaren Werten.
+    if not isinstance(value, str) or value not in _option_values(field):
         _err(errors, field.key, "is not a valid option")
 
 
@@ -393,7 +396,9 @@ def _validate_multiselect(
         _err(errors, field.key, "must be a list")
         return
     allowed = _option_values(field)
-    invalid = [v for v in value if v not in allowed]
+    # Pro Element auf str prüfen, bevor wir gegen die (str-)Optionsmenge testen –
+    # sonst löst ein unhashbares Element (dict/list) einen TypeError → 500 aus.
+    invalid = [v for v in value if not isinstance(v, str) or v not in allowed]
     if invalid:
         _err(errors, field.key, f"contains invalid options: {invalid}")
 
@@ -417,8 +422,16 @@ def _validate_table(field: FormFieldDef, value: Any, errors: list[FieldError]) -
         _err(errors, field.key, "must be a list of rows")
         return
     v = field.validation
-    if v is not None and v.max_rows is not None and len(value) > v.max_rows:
-        _err(errors, field.key, f"has more than {v.max_rows} rows")
+    # Engine-Decke (AUD-047): kein falsy-`or` — ein explizit konfiguriertes maxRows=0
+    # (FieldValidation.max_rows hat ge=0, 0 ist gültig) MUSS erhalten bleiben und jede
+    # Zeile ablehnen. Zugleich auf die Engine-Decke kappen, sodass ein vom Builder
+    # gesetzter höherer Wert die obere Schranke nicht aushebeln kann.
+    configured = (
+        v.max_rows if (v is not None and v.max_rows is not None) else _DEFAULT_MAX_ROWS
+    )
+    max_rows = min(configured, _DEFAULT_MAX_ROWS)
+    if len(value) > max_rows:
+        _err(errors, field.key, f"has more than {max_rows} rows")
     for i, row in enumerate(value):
         if not isinstance(row, dict):
             _err(errors, field.key, f"row {i} must be an object")
@@ -427,6 +440,14 @@ def _validate_table(field: FormFieldDef, value: Any, errors: list[FieldError]) -
 # Default-Mindestzahl Vergleichsangebote je Position, falls der Builder nichts setzt.
 _DEFAULT_MIN_OFFERS = 3
 _DEFAULT_MIN_POSITIONS = 1
+
+# Engine-Decken (#sec-audit AUD-047): obere Schranken für Positionen/Angebote/Tabellen-
+# Zeilen, die auch OHNE Builder-Wert greifen — unabhängig vom Body-Cap. Verhindert, dass
+# ein gehobener Body-Cap oder ein authentifizierter Write-Pfad unbegrenzt viele Positionen/
+# Angebote durch `_validate_positions`/`positions_total`/JSONB-Persistenz schleust.
+_DEFAULT_MAX_POSITIONS = 200
+_DEFAULT_MAX_OFFERS = 50
+_DEFAULT_MAX_ROWS = 1000
 
 
 def _offer_value(offer: Mapping[str, Any]) -> Decimal | None:
@@ -452,9 +473,25 @@ def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError
     min_positions = (
         v.min_positions if v and v.min_positions else None
     ) or _DEFAULT_MIN_POSITIONS
+    # Engine-Decke (AUD-047): max_positions/max_offers sind ge=1 (0 unmöglich), aber ein
+    # form.configure-Admin könnte einen Wert über der Default-Decke setzen und so erneut
+    # unbeschränktes Wachstum öffnen. Daher den konfigurierten Wert auf die Engine-Decke
+    # kappen (min), statt ihn nur als Default einzusetzen.
+    configured_positions = (
+        v.max_positions
+        if (v is not None and v.max_positions is not None)
+        else _DEFAULT_MAX_POSITIONS
+    )
+    max_positions = min(configured_positions, _DEFAULT_MAX_POSITIONS)
+    configured_offers = (
+        v.max_offers if (v is not None and v.max_offers is not None) else _DEFAULT_MAX_OFFERS
+    )
+    max_offers = min(configured_offers, _DEFAULT_MAX_OFFERS)
 
     if len(value) < min_positions:
         _err(errors, field.key, f"needs at least {min_positions} position(s)")
+    if len(value) > max_positions:
+        _err(errors, field.key, f"has more than {max_positions} position(s)")
 
     for i, pos in enumerate(value):
         where = f"{field.key}[{i}]"
@@ -469,6 +506,8 @@ def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError
             continue
         if len(offers) < min_offers:
             _err(errors, where, f"needs at least {min_offers} comparison offer(s)")
+        if len(offers) > max_offers:
+            _err(errors, where, f"has more than {max_offers} comparison offer(s)")
         preferred_count = 0
         for j, offer in enumerate(offers):
             owhere = f"{where}.offers[{j}]"

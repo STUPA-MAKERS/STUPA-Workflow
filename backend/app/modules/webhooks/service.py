@@ -17,6 +17,7 @@ Das pro-Webhook-``secret`` wird **nie** geloggt.
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import logging
 from dataclasses import dataclass
@@ -37,6 +38,8 @@ from app.modules.webhooks.ssrf import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import httpx
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -92,7 +95,12 @@ class WebhookService:
         if not webhooks:
             return 0
 
-        existing = await self._existing_keys(event, idempotency_base)
+        candidate_keys = (
+            [f"{idempotency_base}:{hook.id}" for hook in webhooks]
+            if idempotency_base
+            else []
+        )
+        existing = await self._existing_keys(event, candidate_keys)
         body = dict(payload or {})
         created: list[WebhookDelivery] = []
         for hook in webhooks:
@@ -158,7 +166,7 @@ class WebhookService:
             )
             return 0
         key = f"{idempotency_base}:{hook.id}" if idempotency_base else None
-        if key is not None and key in await self._existing_keys(event, idempotency_base):
+        if key is not None and key in await self._existing_keys(event, [key]):
             logger.info("webhook delivery deduped (event=%s hook=%s)", event, hook.id)
             return 0
         delivery = WebhookDelivery(
@@ -181,15 +189,23 @@ class WebhookService:
             await self.queue.enqueue(delivery.id)
         return 1
 
-    async def _existing_keys(self, event: str, base: str | None) -> set[str]:
-        """Bereits vergebene Idempotenz-Keys für dieses Event (Dedup-Vorprüfung)."""
-        if base is None:
+    async def _existing_keys(
+        self, event: str, candidate_keys: Sequence[str]
+    ) -> set[str]:
+        """Bereits vergebene Idempotenz-Keys für dieses Event (Dedup-Vorprüfung).
+
+        Nur auf die **konkreten** Kandidaten-Keys gescopet (``IN``), nicht auf alle
+        je angelegten Deliveries des Events — die Query bleibt O(#Webhooks) statt mit
+        der historischen Delivery-Anzahl zu wachsen (AUD-048). Korrektheit garantiert
+        ohnehin das ``unique(webhook_id, idempotency_key)`` + Savepoint; diese
+        Vorprüfung ist nur eine Optimierung."""
+        if not candidate_keys:
             return set()
         rows = (
             await self.session.scalars(
                 select(WebhookDelivery.idempotency_key).where(
                     WebhookDelivery.event == event,
-                    WebhookDelivery.idempotency_key.is_not(None),
+                    WebhookDelivery.idempotency_key.in_(candidate_keys),
                 )
             )
         ).all()
@@ -265,18 +281,34 @@ class WebhookService:
 
         Der Body wird nie verwertet; wir lesen ihn nur so weit, bis das Limit erreicht
         ist, und schließen dann den Stream. Verbindungs-Reuse bleibt durch das saubere
-        ``aclose`` (über den Context-Manager) intakt."""
-        response = await http_client.send(request, stream=True)
+        ``aclose`` (über den Context-Manager) intakt.
+
+        Das httpx-Timeout ist **pro Read** und wird von jedem Chunk zurückgesetzt; ein
+        bösartiger/„slow-drip“-Empfänger (1 Byte je Intervall) hielte den Stream sonst
+        beliebig lange offen und würde den geteilten arq-Worker-Slot blockieren (DoS,
+        AUD-011). Darum eine **harte Gesamt-Deadline** über alle Reads via
+        :func:`asyncio.timeout`. Ein Überschreiten wird als transienter Transportfehler
+        (``httpx.TimeoutException``) signalisiert → Retry-Pfad in :meth:`deliver`."""
+        import httpx
+
         try:
-            read = 0
-            async for chunk in response.aiter_bytes():
-                read += len(chunk)
-                if read >= _MAX_RESPONSE_BYTES:
-                    # Body zu groß: weiteres Lesen abbrechen — der Statuscode steht fest.
-                    break
-            return response.status_code
-        finally:
-            await response.aclose()
+            async with asyncio.timeout(self.settings.webhook_timeout_seconds):
+                response = await http_client.send(request, stream=True)
+                try:
+                    read = 0
+                    async for chunk in response.aiter_bytes():
+                        read += len(chunk)
+                        if read >= _MAX_RESPONSE_BYTES:
+                            # Body zu groß: Lesen abbrechen — der Statuscode steht fest.
+                            break
+                    return response.status_code
+                finally:
+                    await response.aclose()
+        except TimeoutError as exc:
+            # Gesamt-Deadline gerissen → wie Transport-Timeout behandeln (Retry).
+            raise httpx.TimeoutException(
+                "webhook delivery exceeded total deadline"
+            ) from exc
 
     async def _classify(
         self,

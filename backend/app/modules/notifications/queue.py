@@ -10,7 +10,8 @@ inline (Tests/DEV ohne Redis).
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from collections import OrderedDict
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from app.modules.notifications.mail import MailMessage, MailSender
@@ -18,6 +19,12 @@ from app.modules.notifications.mail import MailMessage, MailSender
 logger = logging.getLogger("app.mail")
 
 MAIL_TASK_NAME = "send_mail"
+
+# Obergrenze des In-Memory-Dedup-Caches von `DirectMailQueue`. Begrenzt den
+# Speicher einer (eigentlich nur für Tests/DEV gedachten) langlebigen Instanz;
+# älteste Keys werden FIFO/LRU verdrängt. Produktiv dedupliziert `ArqMailQueue`
+# über die arq-`_job_id`, nicht über diesen Cache.
+DIRECT_QUEUE_SEEN_MAX = 4096
 
 
 class MailQueue(Protocol):
@@ -46,18 +53,23 @@ class ArqMailQueue:
 class DirectMailQueue:
     """Inline-Versand (Tests/DEV): ruft den Sender direkt, kein Redis.
 
-    Eigene Idempotenz: schon gesehene Keys werden übersprungen.
+    Eigene Idempotenz: schon gesehene Keys werden übersprungen. Der Cache ist auf
+    `max_seen` Einträge begrenzt (LRU-Verdrängung der ältesten Keys), damit eine
+    langlebige Instanz nicht unbegrenzt wächst.
     """
 
     sender: MailSender
-    _seen: set[str] | None = None
+    max_seen: int = DIRECT_QUEUE_SEEN_MAX
+    _seen: OrderedDict[str, None] = field(default_factory=OrderedDict)
 
     async def enqueue(self, msg: MailMessage) -> None:
-        seen = self._seen if self._seen is not None else set()
-        self._seen = seen
-        if msg.idempotency_key and msg.idempotency_key in seen:
-            logger.info("mail enqueue deduped (key=%s)", msg.idempotency_key)
+        key = msg.idempotency_key
+        if key and key in self._seen:
+            self._seen.move_to_end(key)
+            logger.info("mail enqueue deduped (key=%s)", key)
             return
-        if msg.idempotency_key:
-            seen.add(msg.idempotency_key)
+        if key:
+            self._seen[key] = None
+            while len(self._seen) > self.max_seen:
+                self._seen.popitem(last=False)
         await self.sender.send(msg)

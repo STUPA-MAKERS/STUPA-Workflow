@@ -175,6 +175,64 @@ async def test_handle_notify_action_no_recipients_skips() -> None:
     assert queue.messages == []
 
 
+async def test_handle_notify_action_derives_real_kind_from_catalogue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AUD-043: opt-out filter + footer use the catalogue kind, not a substring
+    heuristic. A `comment_team` template (catalogue kind `comment`) must be
+    filtered as `comment` — the old `'deadline' in key else 'status_update'`
+    test always passed `status_update`, so comment opt-outs were ineffective."""
+    import app.modules.notifications.service as svc_mod
+
+    captured: dict[str, str] = {}
+
+    async def _spy(_session: object, recipients: list[str], kind: str) -> list[str]:
+        captured["kind"] = kind
+        return recipients
+
+    monkeypatch.setattr(svc_mod, "filter_recipients_by_preference", _spy)
+
+    session = FakeSession(scalars=[[_template("comment_team")]])
+    queue = FakeQueue()
+    svc = _service(session, queue)
+    svc.resolver = FakeResolver(["a@x.de"])  # type: ignore[assignment]
+    count = await svc.handle_notify_action(
+        {"type": "notify", "templateKey": "comment_team",
+         "recipients": [{"kind": "applicant"}]},
+        context={"status": "Y"},
+    )
+    assert count == 1
+    # Opt-out filter keyed by the real kind, not the old `status_update`.
+    assert captured["kind"] == "comment"
+    # Footer reason text matches the comment kind, not status_update.
+    assert "neuen Kommentar" in queue.messages[0].html
+
+
+async def test_handle_notify_action_unknown_key_defaults_to_status_update(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-catalogue keys fall back to `status_update` (fail-open default)."""
+    import app.modules.notifications.service as svc_mod
+
+    captured: dict[str, str] = {}
+
+    async def _spy(_session: object, recipients: list[str], kind: str) -> list[str]:
+        captured["kind"] = kind
+        return recipients
+
+    monkeypatch.setattr(svc_mod, "filter_recipients_by_preference", _spy)
+
+    session = FakeSession(scalars=[[]])  # no DB template → builtin fallback
+    queue = FakeQueue()
+    svc = _service(session, queue)
+    svc.resolver = FakeResolver(["a@x.de"])  # type: ignore[assignment]
+    await svc.handle_notify_action(
+        {"type": "notify", "templateKey": "custom_unlisted",
+         "recipients": [{"kind": "applicant"}]},
+    )
+    assert captured["kind"] == "status_update"
+
+
 # --------------------------------------------------------------------------- magic link
 async def test_send_magic_link_uses_db_template() -> None:
     tpl = MailTemplate(

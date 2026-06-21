@@ -660,17 +660,29 @@ async def test_patch_concurrent_integrity_error_409(
 # --------------------------------------------------------------------------- #
 async def test_delete_removes_and_commits() -> None:
     app = _app()
-    session = _Session(get_results=[app])
+    # delete() schreibt vor dem Löschen einen APPLICATION_DELETE-Audit-Eintrag (#AUD-002):
+    # zuerst scalar() für version_count, dann audit_record → 2x execute (advisory-lock +
+    # prev-hash-Select via scalar_one_or_none) + add(entry) + flush(). Der Fake liefert
+    # für beide execute() ein leeres _Result (prev_hash None = Genesis), das genügt.
+    session = _Session(get_results=[app], scalar_results=[0])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    await svc.delete(app.id)
+    await svc.delete(app.id, actor="admin")
     assert app in session.deleted
     assert session.committed == 1
+    # Audit-Eintrag wurde angehängt + geflusht (vor dem Delete, gleiche Transaktion).
+    assert any(type(o).__name__ == "AuditEntry" for o in session.added)
+    assert session.flushed == 1
 
 
 async def test_delete_missing_404() -> None:
-    svc = ApplicationsService(_Session(get_results=[None]))  # type: ignore[arg-type]
+    session = _Session(get_results=[None])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
-        await svc.delete(uuid4())
+        await svc.delete(uuid4(), actor="admin")
+    # Fehlender Antrag → kein Audit-Eintrag, kein Delete, kein Commit (404 vor allem).
+    assert session.added == []
+    assert session.deleted == []
+    assert session.committed == 0
 
 
 # --------------------------------------------------------------------------- #

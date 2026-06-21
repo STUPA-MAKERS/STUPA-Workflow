@@ -243,6 +243,21 @@ class LiveVoteConnection:
         except ValidationError:
             await self._send_error("invalid_message")
             return
+        # Defense-in-depth: der Vote MUSS zu der Sitzung gehören, für die diese
+        # Verbindung autorisiert ist. ``VotingService.cast`` prüft Eligibility zwar
+        # erneut am vote-eigenen ``eligible_group``/``meeting_id`` und broadcastet das
+        # Tally in den Kanal des vote-eigenen Meetings — ein Cross-Meeting-Frame wäre
+        # also folgenlos. Wir weisen ihn dennoch vor Lock/DB-Cast ab, damit eine
+        # Verbindung auf Sitzung A keinen Cast gegen einen Vote aus Sitzung B treiben
+        # kann (Kanal-Bindung, security.md). Unbekannter Vote ⇒ derselbe Pfad.
+        try:
+            target = await self.voting.get(msg.vote_id)
+        except AppError:
+            await self._send_error("not_eligible")
+            return
+        if target.meeting_id != self.meeting_id:
+            await self._send_error("not_eligible")
+            return
         # Eigene und Vertretungs-Abgabe getrennt locken (zwei legitime Casts).
         suffix = ":proxy" if msg.as_delegation else ""
         lock_key = f"vote:{msg.vote_id}:cast:{self.principal.sub}{suffix}"

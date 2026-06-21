@@ -17,6 +17,19 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.modules.admin.branding import Branding
 from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
 from app.shared.i18n import I18nMap
+from app.shared.permissions import PERMISSION_CATALOGUE
+
+
+def _validate_permissions(perms: list[str] | None) -> list[str] | None:
+    """Reject any key not in PERMISSION_CATALOGUE (→ 422), preserve order/dedup."""
+    if perms is None:
+        return None
+    catalogue = set(PERMISSION_CATALOGUE)
+    unknown = [p for p in perms if p not in catalogue]
+    if unknown:
+        raise ValueError(f"unknown permission(s): {', '.join(sorted(set(unknown)))}")
+    seen: set[str] = set()
+    return [p for p in perms if not (p in seen or seen.add(p))]
 
 
 class _CamelModel(BaseModel):
@@ -224,10 +237,20 @@ class RoleCreate(_CamelModel):
     label: I18nMap = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
 
+    @field_validator("permissions")
+    @classmethod
+    def _check_permissions(cls, value: list[str]) -> list[str]:
+        return _validate_permissions(value) or []
+
 
 class RoleUpdate(_CamelModel):
     label: I18nMap | None = None
     permissions: list[str] | None = None
+
+    @field_validator("permissions")
+    @classmethod
+    def _check_permissions(cls, value: list[str] | None) -> list[str] | None:
+        return _validate_permissions(value)
 
 
 class RoleAssignmentOut(_CamelModel):
@@ -335,6 +358,29 @@ class WebhookUpdate(_CamelModel):
         if v is not None and not v.lower().startswith(("http://", "https://")):
             raise ValueError("webhook url must be http(s)")
         return v
+
+
+class WebhookDeliveryStatusOut(_CamelModel):
+    """Diagnose-Sicht auf den letzten Auslieferungszustand (AUD-062).
+
+    Aggregiert je Webhook die **jüngste** ``webhook_delivery`` zu einem groben
+    Zustand + einer **groben** Fehlerursachen-Klasse (``reason_class``). Es wird
+    bewusst **keine** aufgelöste IP / Host-Topologie und **kein** Antwort-Body
+    ausgegeben — nur die Status-Klasse, der HTTP-Statuscode (sofern vorhanden) und
+    die Versuchszahl. So lässt sich ein vertippter/interner Webhook diagnostizieren,
+    ohne interne Netz-Details zu leaken.
+
+    ``last_state`` ist auf drei admin-relevante Zustände eingedampft:
+    ``pending`` (in Zustellung/Retry), ``sent`` (zuletzt erfolgreich), ``dead``
+    (endgültig fehlgeschlagen / Dead-Letter).
+    """
+
+    webhook_id: UUID
+    last_state: str
+    reason_class: str
+    response_code: int | None = None
+    attempts: int = 0
+    last_at: str | None = None
 
 
 # --------------------------------------------------------------------------- #

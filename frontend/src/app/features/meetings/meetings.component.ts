@@ -180,6 +180,8 @@ export class MeetingsComponent implements OnDestroy {
   readonly selectedTopId = signal<Uuid | null>(null);
   readonly savingTop = signal(false);
   private bodyTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Noch nicht gespeicherte, debounced TOP-Bearbeitung (itemId + Text), #AUD-012. */
+  private pendingBody: { itemId: Uuid; body: string } | null = null;
   /** Poll-Fallback, solange der Worker das Protokoll rendert (Status »rendering«). */
   private renderPollTimer: ReturnType<typeof setTimeout> | null = null;
   private dragTopIndex: number | null = null;
@@ -1031,6 +1033,11 @@ export class MeetingsComponent implements OnDestroy {
   }
 
   selectTop(id: Uuid): void {
+    // Vor dem TOP-Wechsel eine noch ausstehende Auto-Speicherung des bisherigen
+    // TOP-Textes synchron auslösen, sonst verwirft das clearTimeout in
+    // onTopBodyChange beim Tippen im neuen TOP die noch laufende Speicherung und
+    // protokollrelevante Bearbeitungen gehen still verloren (#AUD-012).
+    this.flushPendingBody();
     this.selectedTopId.set(id);
   }
 
@@ -1039,23 +1046,52 @@ export class MeetingsComponent implements OnDestroy {
     const m = this.meeting();
     if (!m) return;
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
+    // Optimistisch lokal halten: Beim Server-Refresh (rows) bzw. TOP-Wechsel ist
+    // der getippte Text bereits in agenda() präsent (#AUD-012).
+    this.pendingBody = { itemId, body };
+    this.agenda.update((items) =>
+      items.map((a) => (a.id === itemId ? { ...a, body } : a)),
+    );
     this.saveState.set('idle');
     this.bodyTimer = setTimeout(() => {
-      this.bodyTimer = null;
-      this.savingTop.set(true);
-      this.saveState.set('saving');
-      this.api.setAgendaBody(m.id, itemId, body).subscribe({
-        next: (rows) => {
-          this.savingTop.set(false);
-          this.agenda.set(rows);
-          this.saveState.set('saved');
-        },
-        error: () => {
-          this.savingTop.set(false);
-          this.saveState.set('error');
-        },
-      });
+      this.saveBody(m.id, itemId, body);
     }, AUTOSAVE_DELAY_MS);
+  }
+
+  /**
+   * Etwaige ausstehende Auto-Speicherung sofort feuern (z.B. beim TOP-Wechsel
+   * oder Verlassen der Komponente), damit kein protokollrelevanter Text durch
+   * das Debounce-Fenster verloren geht (#AUD-012).
+   */
+  flushPendingBody(): void {
+    if (this.bodyTimer === null || this.pendingBody === null) return;
+    clearTimeout(this.bodyTimer);
+    const m = this.meeting();
+    const { itemId, body } = this.pendingBody;
+    if (!m) {
+      this.bodyTimer = null;
+      this.pendingBody = null;
+      return;
+    }
+    this.saveBody(m.id, itemId, body);
+  }
+
+  private saveBody(meetingId: Uuid, itemId: Uuid, body: string): void {
+    this.bodyTimer = null;
+    this.pendingBody = null;
+    this.savingTop.set(true);
+    this.saveState.set('saving');
+    this.api.setAgendaBody(meetingId, itemId, body).subscribe({
+      next: (rows) => {
+        this.savingTop.set(false);
+        this.agenda.set(rows);
+        this.saveState.set('saved');
+      },
+      error: () => {
+        this.savingTop.set(false);
+        this.saveState.set('error');
+      },
+    });
   }
 
   // --- TOP-Reihenfolge (Drag&Drop) -----------------------------------------

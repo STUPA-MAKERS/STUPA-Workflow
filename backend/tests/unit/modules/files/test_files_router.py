@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from uuid import UUID, uuid4
 
 import pytest
@@ -60,16 +61,31 @@ class _FakeService:
         att.id = attachment_id
         return att
 
-    async def signed_url(self, attachment_id: UUID) -> SignedUrlOut:
+    async def signed_url(
+        self, attachment_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> SignedUrlOut:
         return SignedUrlOut(url=f"/api/attachments/{attachment_id}/download", expiresIn=300)
 
-    async def download_bytes(self, attachment_id: UUID) -> tuple[bytes, str, str]:
+    async def download_bytes(
+        self, attachment_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> tuple[bytes, str, str]:
         return b"PDF-BYTES", "doc.pdf", "application/pdf"
+
+    async def download_stream(
+        self, attachment_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> tuple[AsyncIterator[bytes], str, str, int]:
+        async def _iter() -> AsyncIterator[bytes]:
+            yield b"PDF-"
+            yield b"BYTES"
+
+        return _iter(), "doc.pdf", "application/pdf", len(b"PDF-BYTES")
 
     async def delete(self, attachment_id: UUID, *, actor: str) -> None:
         self.deleted = attachment_id
 
-    async def list_for_application(self, application_id: UUID) -> list[AttachmentOut]:
+    async def list_for_application(
+        self, application_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> list[AttachmentOut]:
         self.listed = application_id
         return [
             AttachmentOut(
@@ -285,6 +301,18 @@ def test_delete_ok_with_manage(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     _as(app, "application.manage")
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 204
+    assert fake_service.deleted == ATT_ID
+
+
+def test_delete_ok_with_edit_any(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # application.edit_any ist ein globales Schreibrecht und muss — wie beim Upload
+    # (require_app_edit) — auch das Löschen erlauben, nicht in ein 404 laufen (#AUD-040).
+    # No-Creator-Stub + keine application.manage: nur der edit_any-Short-Circuit greift.
+    _as(app, "application.edit_any")
     r = client.delete(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 204
     assert fake_service.deleted == ATT_ID

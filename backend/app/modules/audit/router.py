@@ -4,15 +4,25 @@
 * ``GET /api/admin/audit/verify`` — P(``audit.read``); Hash-Ketten-Integrität.
 
 RBAC fail-closed: ohne Session 401, ohne ``audit.read`` 403 (``require_principal``).
-Antworten enthalten keine PII (nur id-Referenzen + Hashes).
+Die rohen ``audit_entry``-Zeilen enthalten nur id-Referenzen + Hashes — aber die
+Lesesicht löst Akteur-``sub``, Ziel- und ``data``-UUIDs serverseitig auf Klarnamen,
+E-Mails und Titel auf (``resolve_actor_names``/``resolve_target_labels``/
+``resolve_data_ids``).
+
+WARNUNG (#AUD-019, Least-Privilege-Hinweis): ``audit.read`` ist eine GLOBALE,
+plattformweite Leseberechtigung OHNE Gremiums-Scoping. Das aufgelöste Log umfasst
+PII (Mitglieder-E-Mails, alle Antragstitel, alle Abstimmungsfragen) GREMIUMS-
+ÜBERGREIFEND. Die Berechtigung NICHT für „scoped"/gremiumsbeschränktes Auditing
+vergeben — es gibt keine solche Eingrenzung; ein Inhaber von ``audit.read`` liest das
+gesamte Plattform-Log. Standardmäßig nur der ``admin``-Rolle zuteilen.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import AwareDatetime
 
 from app.deps import DbSession, Principal, require_principal
 from app.modules.audit.schemas import (
@@ -50,8 +60,11 @@ async def list_audit(
     service: ServiceDep,
     action: Annotated[str | None, Query()] = None,
     actor: Annotated[str | None, Query()] = None,
-    since: Annotated[datetime | None, Query()] = None,
-    until: Annotated[datetime | None, Query()] = None,
+    # tz-aware erzwingen (#AUD-034): die ``at``-Spalte ist ``timestamptz`` — ein
+    # naiver Wert würde vom asyncpg-Codec abgelehnt (DataError → 500). ``AwareDatetime``
+    # lässt Pydantic naive Eingaben schon bei der Validierung mit 422 zurückweisen.
+    since: Annotated[AwareDatetime | None, Query()] = None,
+    until: Annotated[AwareDatetime | None, Query()] = None,
     before: Annotated[int | None, Query(ge=1)] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
 ) -> AuditPageOut:
@@ -142,7 +155,9 @@ async def revert_audit_entry(
 ) -> AuditRevertOut:
     """Den durch ``entry_id`` beschriebenen Config-Change zurücknehmen (Vorgänger-Stand
     wiederherstellen, bei Konflikt 409). Der Revert ist selbst geloggt + revertierbar."""
-    result = await RevertService(session).revert(entry_id, principal.sub)
+    # audit.revert ist die Router-Gatung; RevertService re-asserted zusätzlich die
+    # granulare Permission des Original-Vorgangs (#AUD-018) → principal durchreichen.
+    result = await RevertService(session).revert(entry_id, principal.sub, principal)
     return AuditRevertOut(
         revertedAuditId=result.reverted_audit_id,
         entityType=result.entity_type,
