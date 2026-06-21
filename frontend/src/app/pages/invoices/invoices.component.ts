@@ -25,8 +25,8 @@ import {
   IconComponent,
   SelectComponent,
   type SelectOption,
-} from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+} from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
 import {
   BudgetTreeApi,

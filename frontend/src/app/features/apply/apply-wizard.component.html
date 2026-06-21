@@ -93,7 +93,7 @@
     <div card-footer class="wizard__nav">
       <div class="wizard__nav-left">
         @if (activeIndex() > 0) {
-          <app-button variant="secondary" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
+          <app-button size="sm" variant="secondary" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
         }
         @if (effForm()) {
           <app-button variant="ghost" size="sm" (click)="discardDraft()">
@@ -103,7 +103,7 @@
       </div>
       <div class="wizard__nav-right">
         @if (currentStep() === 'review') {
-          <app-button
+          <app-button size="sm"
             type="button"
             [disabled]="!canSubmit()"
             [loading]="submitting()"
@@ -112,7 +112,7 @@
             {{ 'apply.nav.submit' | t }}
           </app-button>
         } @else {
-          <app-button
+          <app-button size="sm"
             [disabled]="(currentStep() === 'type' && !effForm()) || loadingForm()"
             (click)="next()"
           >

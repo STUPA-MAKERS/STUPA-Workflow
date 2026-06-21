@@ -35,6 +35,11 @@
                 "glob": "**/*",
                 "input": "src/assets",
                 "output": "assets"
+              },
+              {
+                "glob": "**/*",
+                "input": "vendor/ui-kit/src/assets/fonts",
+                "output": "assets/fonts"
               }
             ],
             "styles": [
@@ -42,7 +47,7 @@
               "src/styles.scss"
             ],
             "stylePreprocessorOptions": {
-              "includePaths": ["src/styles"]
+              "includePaths": ["vendor/ui-kit/src/styles"]
             }
           },
           "configurations": {

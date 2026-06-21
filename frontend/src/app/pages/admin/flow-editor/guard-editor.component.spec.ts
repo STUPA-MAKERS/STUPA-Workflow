@@ -1,5 +1,5 @@
 import { render } from '@testing-library/angular';
-import type { SelectOption } from '@shared/ui';
+import type { SelectOption } from '@stupa-makers/ui-kit';
 import type { Guard } from '../admin.models';
 import { GuardEditorComponent } from './guard-editor.component';
 

@@ -10,7 +10,7 @@ import type {
   DelegationRecipient,
   MeetingDelegationContext,
 } from '@core/api/delegations.service';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
 
 const BASE = '/api';

@@ -13,8 +13,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
-import { BadgeComponent } from '@shared/ui/badge/badge.component';
-import { ButtonComponent } from '@shared/ui/button/button.component';
+import { BadgeComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from './vote-bars.component';
 
 /**

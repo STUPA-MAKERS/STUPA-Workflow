@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { FlowGraph, Guard } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { BudgetTreeApi } from '../../budget/budget-tree.api';

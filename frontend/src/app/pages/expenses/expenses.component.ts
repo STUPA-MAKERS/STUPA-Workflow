@@ -26,8 +26,8 @@ import {
   IconComponent,
   SelectComponent,
   type SelectOption,
-} from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+} from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { BankImportDialogComponent } from './bank-import-dialog.component';
 import { downloadBlob } from '@shared/download.util';

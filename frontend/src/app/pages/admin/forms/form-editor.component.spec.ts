@@ -2,7 +2,7 @@ import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { FormFieldDef, I18nMap } from '@core/api/models';
 import { AdminApiService } from '../admin-api.service';
 import type { ApplicationTypeFull, FormDraft } from '../admin.models';

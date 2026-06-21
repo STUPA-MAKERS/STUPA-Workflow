@@ -12,8 +12,9 @@ import {
   DataTableComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { EVENT_NAMES, type EventName, type WebhookConfig } from '../admin.models';
 
@@ -40,6 +41,7 @@ function emptyHook(): WebhookConfig {
     CellDirective,
     DialogComponent,
     IconComponent,
+    InputComponent,
   ],
   templateUrl: './webhooks.component.html',
   styleUrl: './config.shared.scss',

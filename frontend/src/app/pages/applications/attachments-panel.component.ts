@@ -15,12 +15,12 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Attachment, ScanState, Uuid } from '@core/api/models';
-import { BadgeComponent } from '@shared/ui/badge/badge.component';
-import { ButtonComponent } from '@shared/ui/button/button.component';
-import { CardComponent } from '@shared/ui/card/card.component';
-import { CheckboxComponent } from '@shared/ui/checkbox/checkbox.component';
-import { IconComponent } from '@shared/ui/icon/icon.component';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { BadgeComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
+import { CardComponent } from '@stupa-makers/ui-kit';
+import { CheckboxComponent } from '@stupa-makers/ui-kit';
+import { IconComponent } from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { formatBytes, scanBadgeVariant } from './applications.util';
 
 /**

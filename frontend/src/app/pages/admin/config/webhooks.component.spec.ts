@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { WebhookConfig } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { WebhooksComponent } from './webhooks.component';
 
 async function setup(seed: WebhookConfig[] = [], opts: { saveError?: boolean } = {}) {

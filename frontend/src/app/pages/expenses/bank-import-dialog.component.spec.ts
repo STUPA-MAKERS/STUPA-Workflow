@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { render } from '@testing-library/angular';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import {
   type AccountOption,
   BudgetTreeApi,

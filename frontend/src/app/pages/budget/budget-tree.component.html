@@ -106,8 +106,8 @@
     </div>
   }
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="closeLimit()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button [disabled]="!limitValue().trim()" (click)="saveLimit()">{{ 'budget.tree.setLimit' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="closeLimit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!limitValue().trim()" (click)="saveLimit()">{{ 'budget.tree.setLimit' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -147,8 +147,8 @@
     </form>
   }
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="closeEditNode()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button [disabled]="!editKey().trim() || !editName().trim()" (click)="saveEditNode()">{{ 'budget.tree.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="closeEditNode()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!editKey().trim() || !editName().trim()" (click)="saveEditNode()">{{ 'budget.tree.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -174,8 +174,8 @@
     <p class="text-muted bt__form-full">{{ 'budget.tree.stichtagHint' | t }}</p>
   </form>
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button [disabled]="!newTop().key.trim() || !newTop().name.trim()" (click)="createTop($event)">{{ 'budget.tree.add' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!newTop().key.trim() || !newTop().name.trim()" (click)="createTop($event)">{{ 'budget.tree.add' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -193,8 +193,8 @@
     <p class="text-muted bt__form-full">{{ 'budget.tree.fyYearHint' | t }}</p>
   </form>
   <div dialog-footer class="flex gap-3">
-    <app-button variant="ghost" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -227,7 +227,7 @@
     }
   </form>
   <div dialog-footer class="flex gap-3">
-    <app-button (click)="closeStichtag()">{{ 'budget.tree.done' | t }}</app-button>
+    <app-button size="sm" (click)="closeStichtag()">{{ 'budget.tree.done' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -264,6 +264,6 @@
     }
   </div>
   <div dialog-footer class="flex gap-3">
-    <app-button (click)="closeStateConfig()">{{ 'budget.tree.done' | t }}</app-button>
+    <app-button size="sm" (click)="closeStateConfig()">{{ 'budget.tree.done' | t }}</app-button>
   </div>
 </app-dialog>

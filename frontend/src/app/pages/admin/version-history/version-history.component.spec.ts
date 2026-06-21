@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { render } from '@testing-library/angular';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
 import { VersionHistoryComponent } from './version-history.component';

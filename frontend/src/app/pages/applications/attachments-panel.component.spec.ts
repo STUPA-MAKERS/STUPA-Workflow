@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { USE_MOCK_API } from '@core/api/api.config';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { AttachmentOutWire } from '@core/api/models';
 
 const APP_ID = 'app-1';

@@ -10,7 +10,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
-import { BadgeComponent } from '@shared/ui/badge/badge.component';
+import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 
 /** Wie viele Antrags-Zeilen je Panel maximal gezeigt werden. */

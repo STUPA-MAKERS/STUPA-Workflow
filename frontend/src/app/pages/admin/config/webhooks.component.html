@@ -34,14 +34,19 @@
 >
   @if (draft(); as d) {
     <form class="cfg__form" (submit)="$event.preventDefault(); save()">
-      <label class="field">
-        <span class="field__label">{{ 'admin.webhook.name' | t }}</span>
-        <input class="field__control" [ngModel]="d.name" (ngModelChange)="patch('name', $event)" name="name" />
-      </label>
-      <label class="field">
-        <span class="field__label">{{ 'admin.webhook.url' | t }}</span>
-        <input class="field__control" [ngModel]="d.url" (ngModelChange)="patch('url', $event)" name="url" placeholder="https://" />
-      </label>
+      <app-input
+        [label]="'admin.webhook.name' | t"
+        [ngModel]="d.name"
+        (ngModelChange)="patch('name', $event)"
+        name="name"
+      />
+      <app-input
+        [label]="'admin.webhook.url' | t"
+        [ngModel]="d.url"
+        (ngModelChange)="patch('url', $event)"
+        name="url"
+        placeholder="https://"
+      />
       <app-checkbox [ngModel]="d.active" (ngModelChange)="patch('active', $event)" name="active">
         {{ 'admin.webhook.active' | t }}
       </app-checkbox>
@@ -64,7 +69,7 @@
     </form>
   }
   <div dialog-footer class="cfg__dialog-foot">
-    <app-button variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="errors().length > 0" (click)="save()">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="errors().length > 0" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>

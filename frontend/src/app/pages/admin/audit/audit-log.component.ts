@@ -25,8 +25,10 @@ import {
   FilterFieldComponent,
   IconComponent,
   type IconName,
+  SelectComponent,
+  type SelectOption,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditActor, AuditEntry, ConfigRevisionDiff } from '../admin.models';
 
@@ -170,6 +172,7 @@ interface DayGroup {
     FilterFieldComponent,
     DatepickerComponent,
     IconComponent,
+    SelectComponent,
   ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',
@@ -207,7 +210,12 @@ export class AuditLogComponent {
   protected readonly since = signal('');
   protected readonly until = signal('');
 
-  protected readonly actionOptions = computed(() => [...AUDIT_ACTIONS]);
+  protected readonly actionOptions = computed<SelectOption[]>(() =>
+    AUDIT_ACTIONS.map((a) => ({ value: a, label: this.actionLabel(a) })),
+  );
+  protected readonly actorOptions = computed<SelectOption[]>(() =>
+    this.actors().map((a) => ({ value: a.sub, label: a.name || a.sub })),
+  );
   protected readonly activeFilterCount = computed(
     () =>
       (this.action() ? 1 : 0) +

@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
-import { InputComponent } from '../ui/input/input.component';
-import { DatepickerComponent } from '../ui/datepicker/datepicker.component';
-import { CurrencyInputComponent } from '../ui/currency-input/currency-input.component';
+import { CurrencyInputComponent, DatepickerComponent, InputComponent } from '@stupa-makers/ui-kit';
 
 /**
  * Formly-Feldtyp `input`, der das UI-Kit-Input nutzt — Brücke zwischen der

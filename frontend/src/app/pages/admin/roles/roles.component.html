@@ -26,12 +26,9 @@
       <div class="flex flex-col gap-4 p-5">
         <!-- Umbenennen (Anzeigename, #rename): Key bleibt unveränderlich. -->
         <div class="roles__nameEdit">
-          <label class="roles__lbl roles__lbl--key">{{ 'admin.roles.roleKey' | t }}
-            <input [value]="$any(r).key" disabled /></label>
-          <label class="roles__lbl">{{ 'admin.common.labelDe' | t }}
-            <input [ngModel]="nameDraft($any(r)).de" (ngModelChange)="patchName($any(r), 'de', $event)" [name]="$any(r).id + '-nde'" /></label>
-          <label class="roles__lbl">{{ 'admin.common.labelEn' | t }}
-            <input [ngModel]="nameDraft($any(r)).en" (ngModelChange)="patchName($any(r), 'en', $event)" [name]="$any(r).id + '-nen'" /></label>
+          <app-input class="roles__lbl--key" [label]="'admin.roles.roleKey' | t" [ngModel]="$any(r).key" [disabled]="true" [name]="$any(r).id + '-key'" />
+          <app-input [label]="'admin.common.labelDe' | t" [ngModel]="nameDraft($any(r)).de" (ngModelChange)="patchName($any(r), 'de', $event)" [name]="$any(r).id + '-nde'" />
+          <app-input [label]="'admin.common.labelEn' | t" [ngModel]="nameDraft($any(r)).en" (ngModelChange)="patchName($any(r), 'en', $event)" [name]="$any(r).id + '-nen'" />
         </div>
         <div class="flex justify-end gap-3">
           <app-button size="sm" variant="secondary" (click)="renameRole($any(r))">{{ 'action.save' | t }}</app-button>
@@ -68,23 +65,20 @@
     <p>{{ 'admin.roles.deleteConfirm' | t: { role: roleLabel(r) } }}</p>
   }
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="confirmRole.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="confirmDelete()">{{ 'admin.roles.deleteRole' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmRole.set(null)">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="confirmDelete()">{{ 'admin.roles.deleteRole' | t }}</app-button>
   </div>
 </app-dialog>
 
 <!-- Globale Rolle anlegen (Dialog, #21/#19) -->
 <app-dialog [open]="addOpen()" [title]="'admin.roles.addGlobalRole' | t" [closeLabel]="'admin.gremien.cancel' | t" (closed)="addOpen.set(false)">
   <div class="flex flex-col gap-3">
-    <label class="roles__lbl">{{ 'admin.roles.roleKey' | t }}
-      <input [ngModel]="draft().key" (ngModelChange)="patchDraft('key', $event)" name="roleKey" placeholder="z. B. referent" /></label>
-    <label class="roles__lbl">{{ 'admin.common.labelDe' | t }}
-      <input [ngModel]="draft().labelDe" (ngModelChange)="patchDraft('labelDe', $event)" name="roleLabelDe" /></label>
-    <label class="roles__lbl">{{ 'admin.common.labelEn' | t }}
-      <input [ngModel]="draft().labelEn" (ngModelChange)="patchDraft('labelEn', $event)" name="roleLabelEn" /></label>
+    <app-input [label]="'admin.roles.roleKey' | t" [ngModel]="draft().key" (ngModelChange)="patchDraft('key', $event)" name="roleKey" placeholder="z. B. referent" />
+    <app-input [label]="'admin.common.labelDe' | t" [ngModel]="draft().labelDe" (ngModelChange)="patchDraft('labelDe', $event)" name="roleLabelDe" />
+    <app-input [label]="'admin.common.labelEn' | t" [ngModel]="draft().labelEn" (ngModelChange)="patchDraft('labelEn', $event)" name="roleLabelEn" />
   </div>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="addOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button [disabled]="!draft().key.trim()" (click)="createRole()">{{ 'admin.gremien.add' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="addOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!draft().key.trim()" (click)="createRole()">{{ 'admin.gremien.add' | t }}</app-button>
   </div>
 </app-dialog>

@@ -100,10 +100,10 @@
       }
     }
     <div dialog-footer class="flex gap-3">
-      <app-button variant="ghost" (click)="dialogOpen.set(false)">
+      <app-button size="sm" variant="ghost" (click)="dialogOpen.set(false)">
         {{ 'delegation.dialog.cancel' | t }}
       </app-button>
-      <app-button [disabled]="!delegateId()" [loading]="busy()" (click)="create()">
+      <app-button size="sm" [disabled]="!delegateId()" [loading]="busy()" (click)="create()">
         {{ 'delegation.dialog.submit' | t }}
       </app-button>
     </div>

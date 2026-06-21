@@ -3,8 +3,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { BadgeComponent } from '@shared/ui/badge/badge.component';
-import { CardComponent } from '@shared/ui/card/card.component';
+import { BadgeComponent } from '@stupa-makers/ui-kit';
+import { CardComponent } from '@stupa-makers/ui-kit';
 
 /**
  * Bestätigungsseite nach dem Absenden (T-30, flows §1). Bestätigt den Eingang

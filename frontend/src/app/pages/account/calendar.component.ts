@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent } from '@shared/ui';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
 
 /**
  * Konto → Kalender-Abo (#ics): zeigt die persönliche iCal-Feed-URL (Sitzungen der

@@ -51,7 +51,7 @@
                 <p class="status__hint">{{ 'status.actions.lead' | t }}</p>
                 <div class="flex flex-col gap-3 mt-3">
                   @for (t of actions(); track t.id) {
-                    <app-button
+                    <app-button size="sm"
                       [color]="t.color"
                       [block]="true"
                       [loading]="firing() === t.id"
@@ -100,7 +100,7 @@
                 <form>
                   <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
                   <div card-footer class="status__actions">
-                    <app-button [loading]="saving()" [disabled]="saving()" (click)="save()">
+                    <app-button size="sm" [loading]="saving()" [disabled]="saving()" (click)="save()">
                       {{ 'status.data.save' | t }}
                     </app-button>
                   </div>

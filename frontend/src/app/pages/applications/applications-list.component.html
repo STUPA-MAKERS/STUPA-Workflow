@@ -41,14 +41,15 @@
             name="q"
           />
         </app-filter-field>
-        <app-filter-field [label]="'applications.list.filter.type' | t">
-          <select [ngModel]="typeId()" (ngModelChange)="typeId.set($event)" name="type">
-            <option value="">{{ 'applications.list.filter.all' | t }}</option>
-            @for (type of types(); track type.id) {
-              <option [value]="type.id">{{ type.name }}</option>
-            }
-          </select>
-        </app-filter-field>
+        <app-select
+          id="apps-type"
+          name="type"
+          [label]="'applications.list.filter.type' | t"
+          [placeholder]="'applications.list.filter.all' | t"
+          [options]="typeOptions()"
+          [ngModel]="typeId()"
+          (ngModelChange)="typeId.set($event)"
+        />
         <app-select
           id="apps-state"
           name="state"

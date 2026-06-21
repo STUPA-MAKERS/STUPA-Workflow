@@ -5,7 +5,7 @@ import type { NotificationPreference } from '@core/api/models';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
-import { CheckboxComponent } from '@shared/ui';
+import { CheckboxComponent } from '@stupa-makers/ui-kit';
 
 /**
  * Konto → Benachrichtigungen (#4-2): der Nutzer wählt hier ab, welche

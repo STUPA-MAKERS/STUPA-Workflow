@@ -20,7 +20,7 @@ import type {
   ApplicationType,
   Uuid,
 } from '@core/api/models';
-import { ButtonComponent } from '@shared/ui/button/button.component';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
 import {
   CurrencyInputComponent,
   DatepickerComponent,
@@ -30,7 +30,7 @@ import {
   IconComponent,
   SelectComponent,
   type SelectOption,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import {
@@ -147,6 +147,11 @@ export class ApplicationsListComponent {
 
   private readonly typesById = computed(
     () => new Map(this.types().map((t) => [t.id, t.name])),
+  );
+
+  /** Antragstyp-Optionen für den Filter (Wert = Typ-UUID, Label = Typ-Name). */
+  readonly typeOptions = computed<SelectOption[]>(() =>
+    this.types().map((type) => ({ value: type.id, label: type.name })),
   );
 
   /** Antrags-Zeilen für die geteilte Tabelle. */

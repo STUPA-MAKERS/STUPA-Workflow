@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from datetime import date, time
+from datetime import date, time, timedelta
 
 import pytest
 from sqlalchemy import Engine
@@ -66,11 +66,15 @@ async def test_protokollant_persists_and_shows_in_timeline(session: AsyncSession
 
     svc = MeetingService(session)
     admin = Principal(sub="adm", roles=["admin"])
+    # Datum bewusst in der Zukunft (relativ zu „heute"), damit das Meeting im
+    # `direction="upcoming"`-Zweig der Timeline erscheint. Ein hartkodiertes Datum
+    # wäre eine Zeitbombe: sobald es in der Vergangenheit liegt, fällt es aus der
+    # Upcoming-Liste und `next(...)` unten würde mit StopIteration brechen.
     created = await svc.create(
         MeetingCreate(
             gremiumId=gremium.id,
             title="GV",
-            date=date(2026, 6, 20),
+            date=date.today() + timedelta(days=7),
             startTime=time(18, 0),
         ),
         admin,

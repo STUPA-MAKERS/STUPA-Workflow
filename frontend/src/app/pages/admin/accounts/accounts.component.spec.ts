@@ -1,7 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import { I18nService } from '@core/i18n/i18n.service';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { BudgetTreeApi, type Account } from '../../budget/budget-tree.api';
 import { AccountsComponent } from './accounts.component';
 

@@ -11,9 +11,10 @@ import {
   DataTableComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
   RowDetailDirective,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { Role } from '../admin.models';
 
@@ -45,6 +46,7 @@ interface RoleDraft {
     CellDirective,
     RowDetailDirective,
     IconComponent,
+    InputComponent,
   ],
   providers: [CapitalizePipe],
   templateUrl: './roles.component.html',

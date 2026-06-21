@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { ApplicationType, EffectiveForm } from '@core/api/models';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { ApplyWizardComponent } from './apply-wizard.component';

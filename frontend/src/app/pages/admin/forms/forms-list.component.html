@@ -50,14 +50,23 @@
 >
   <form id="fl-form" class="flex flex-col gap-4" (submit)="submit($event)">
     <div class="flex flex-col gap-1">
-      <label class="font-medium text-sm" for="fl-name-de">{{ 'admin.forms.nameDe' | t }}</label>
-      <input id="fl-name-de" class="field__control" name="nameDe" [ngModel]="form().nameDe" (ngModelChange)="patch('nameDe', $event)" required />
+      <app-input
+        [id]="'fl-name-de'"
+        [label]="'admin.forms.nameDe' | t"
+        [required]="true"
+        name="nameDe"
+        [ngModel]="form().nameDe"
+        (ngModelChange)="patch('nameDe', $event)"
+      />
       <p class="m-0 text-xs text-muted">{{ 'admin.common.key' | t }}: <span class="fl__mono">{{ keyPreview() }}</span></p>
     </div>
-    <div class="flex flex-col gap-1">
-      <label class="font-medium text-sm" for="fl-name-en">{{ 'admin.forms.nameEn' | t }}</label>
-      <input id="fl-name-en" class="field__control" name="nameEn" [ngModel]="form().nameEn" (ngModelChange)="patch('nameEn', $event)" />
-    </div>
+    <app-input
+      [id]="'fl-name-en'"
+      [label]="'admin.forms.nameEn' | t"
+      name="nameEn"
+      [ngModel]="form().nameEn"
+      (ngModelChange)="patch('nameEn', $event)"
+    />
     <app-checkbox
       [ngModel]="form().hasBudget"
       (ngModelChange)="patch('hasBudget', $event)"
@@ -66,8 +75,8 @@
     >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
   </form>
   <div dialog-footer class="fl__dialog-foot">
-    <app-button variant="ghost" (click)="closeDialog()">{{ 'admin.common.cancel' | t }}</app-button>
-    <app-button [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
+    <app-button size="sm" variant="ghost" (click)="closeDialog()">{{ 'admin.common.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
       {{ 'admin.forms.add' | t }}
     </app-button>
   </div>
@@ -82,8 +91,8 @@
 >
   <p>{{ 'admin.forms.deleteConfirm' | t: { name: confirmDeleteName() } }}</p>
   <div dialog-footer class="fl__dialog-foot">
-    <app-button variant="ghost" (click)="cancelDelete()">{{ 'admin.common.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="confirmDeleteType()">
+    <app-button size="sm" variant="ghost" (click)="cancelDelete()">{{ 'admin.common.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="deleting()" (click)="confirmDeleteType()">
       {{ 'admin.forms.delete' | t }}
     </app-button>
   </div>

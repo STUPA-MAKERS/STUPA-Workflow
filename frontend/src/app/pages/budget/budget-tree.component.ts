@@ -14,8 +14,8 @@ import {
   RowDetailDirective,
   SelectComponent,
   type SelectOption,
-} from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+} from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin/admin-api.service';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 import { SimplifyPathPipe } from '@shared/budget-path';

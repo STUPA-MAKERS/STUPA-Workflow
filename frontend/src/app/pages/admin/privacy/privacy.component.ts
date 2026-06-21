@@ -14,7 +14,7 @@ import {
   IconComponent,
   InputComponent,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { ErasureRequest } from '../admin.models';
 

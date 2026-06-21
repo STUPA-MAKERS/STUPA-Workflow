@@ -218,8 +218,8 @@
     <textarea id="inv-note" class="inv__input inv__textarea" name="note" rows="3" [ngModel]="newNote()" (ngModelChange)="newNote.set($event)"></textarea>
   </form>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="!canSubmitCreate()" [loading]="saving()" (click)="create($event)">{{ 'invoices.add' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!canSubmitCreate()" [loading]="saving()" (click)="create($event)">{{ 'invoices.add' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -259,8 +259,8 @@
     <textarea id="inv-enote" class="inv__input inv__textarea" name="enote" rows="3" [ngModel]="editNote()" (ngModelChange)="editNote.set($event)"></textarea>
   </form>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="!(editGrossValid())" [loading]="saving()" (click)="saveEdit($event)">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!(editGrossValid())" [loading]="saving()" (click)="saveEdit($event)">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -268,7 +268,7 @@
 <app-dialog [open]="!!confirmDelete()" [title]="'invoices.delete.title' | t" [closeLabel]="'action.cancel' | t" (closed)="confirmDelete.set(null)">
   <p>{{ 'invoices.delete.body' | t: { number: confirmDelete()?.number ?? '' } }}</p>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'invoices.delete.confirm' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'invoices.delete.confirm' | t }}</app-button>
   </div>
 </app-dialog>
