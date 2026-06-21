@@ -11,7 +11,7 @@ import {
   type ColumnDef,
   DataTableComponent,
   IconComponent,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
 import {
@@ -32,7 +32,7 @@ import {
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { PALETTE } from './budget-year-tree.component';
-import { DialogComponent } from '@shared/ui';
+import { DialogComponent } from '@stupa-makers/ui-kit';
 
 /** Eine Baumzeile im Auslastungs-Teil. */
 interface UsageRow {

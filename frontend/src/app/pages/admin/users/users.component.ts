@@ -17,7 +17,7 @@ import {
   SelectComponent,
   type SelectOption,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, Role, RoleAssignment } from '../admin.models';
 

@@ -8,6 +8,9 @@ module.exports = {
   moduleNameMapper: {
     '^@core/(.*)$': '<rootDir>/src/app/core/$1',
     '^@shared/(.*)$': '<rootDir>/src/app/shared/$1',
+    '^@stupa-makers/ui-kit/markdown-editor$':
+      '<rootDir>/vendor/ui-kit/markdown-editor/src/public-api.ts',
+    '^@stupa-makers/ui-kit$': '<rootDir>/vendor/ui-kit/src/public-api.ts',
     '\\.(css|scss)$': '<rootDir>/src/testing/style-mock.js',
   },
   transform: {

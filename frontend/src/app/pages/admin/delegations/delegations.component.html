@@ -57,10 +57,10 @@
 >
   <p>{{ 'admin.deleg.revokeConfirm' | t: { name: confirmRevoke()?.delegateName ?? '' } }}</p>
   <div dialog-footer class="cfg__row-foot">
-    <app-button variant="ghost" (click)="confirmRevoke.set(null)">
+    <app-button size="sm" variant="ghost" (click)="confirmRevoke.set(null)">
       {{ 'admin.deleg.cancel' | t }}
     </app-button>
-    <app-button variant="danger" [loading]="busy()" (click)="revoke()">
+    <app-button size="sm" variant="danger" [loading]="busy()" (click)="revoke()">
       {{ 'admin.deleg.revoke' | t }}
     </app-button>
   </div>

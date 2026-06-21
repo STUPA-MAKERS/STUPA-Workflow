@@ -7,42 +7,171 @@ from datetime import UTC, datetime, timedelta
 from freezegun import freeze_time
 
 from app.modules.auth import sessions
-from app.modules.auth.models import AuthSession
+from app.modules.auth.models import ApplicantSession, AuthSession
 from tests._support.auth_fakes import fake_session, result
 
 SECRET = "session-signing-secret"
 MAX_AGE = 3600
 
 
+def _applicant_row(
+    *, sid: str = "as1", scope: str = "edit", expired: bool = False, revoked: bool = False
+) -> ApplicantSession:
+    now = datetime.now(UTC)
+    row = ApplicantSession(
+        sid=sid,
+        application_id="app-1",
+        scope=scope,
+        expires_at=now - timedelta(seconds=1) if expired else now + timedelta(hours=1),
+    )
+    if revoked:
+        row.revoked_at = now
+    return row
+
+
 # --------------------------------------------------------------------------- #
-# Applicant-Token
+# Applicant-Session (serverseitig, DB via FakeSession) — security.md §1:
+# stateless-Token durch widerrufbare, NICHT allein-aus-Secret-fälschbare Session ersetzt.
 # --------------------------------------------------------------------------- #
-def test_applicant_token_roundtrip() -> None:
-    token = sessions.issue_applicant_token(SECRET, "app-1", "edit")
-    data = sessions.load_applicant_token(SECRET, token, MAX_AGE)
-    assert data == {"aid": "app-1", "scope": "edit"}
+async def test_create_applicant_session_adds_row_and_signs_sid() -> None:
+    db = fake_session()
+    exp = datetime.now(UTC) + timedelta(hours=12)
+    cookie = await sessions.create_applicant_session(
+        db, secret=SECRET, application_id="app-1", scope="edit", expires_at=exp
+    )
+    assert len(db.added) == 1
+    assert isinstance(db.added[0], ApplicantSession)
+    assert db.added[0].scope == "edit"
+    assert db.flushed == 1
+    # Cookie ist signiert; die rohe sid steckt nicht im Klartext.
+    assert db.added[0].sid not in cookie
+    # Die signierte sid ist mit demselben Secret wieder auslesbar.
+    assert sessions._unsign_applicant_sid(SECRET, cookie, MAX_AGE) == db.added[0].sid
 
 
-def test_applicant_token_bad_signature_returns_none() -> None:
-    token = sessions.issue_applicant_token(SECRET, "app-1", "edit")
-    assert sessions.load_applicant_token("wrong-secret", token, MAX_AGE) is None
+async def test_load_applicant_session_valid() -> None:
+    now = datetime.now(UTC)
+    row = _applicant_row()
+    db = fake_session(result(row))
+    cookie = sessions._sign_applicant_sid(SECRET, row.sid)
+    loaded = await sessions.load_applicant_session(
+        db, secret=SECRET, cookie_value=cookie, now=now, max_age=MAX_AGE
+    )
+    assert loaded is row
 
 
-def test_applicant_token_tampered_returns_none() -> None:
-    assert sessions.load_applicant_token(SECRET, "not-a-token", MAX_AGE) is None
+async def test_load_applicant_session_bad_signature() -> None:
+    # Falsches Secret (≈ kein Secret): Signatur scheitert → None, DB nie befragt.
+    db = fake_session()
+    row = _applicant_row()
+    cookie = sessions._sign_applicant_sid(SECRET, row.sid)
+    loaded = await sessions.load_applicant_session(
+        db, secret="wrong-secret", cookie_value=cookie, now=datetime.now(UTC),
+        max_age=MAX_AGE,
+    )
+    assert loaded is None
 
 
-def test_applicant_token_expired_returns_none() -> None:
+async def test_load_applicant_session_tampered() -> None:
+    db = fake_session()
+    loaded = await sessions.load_applicant_session(
+        db, secret=SECRET, cookie_value="not-a-token", now=datetime.now(UTC),
+        max_age=MAX_AGE,
+    )
+    assert loaded is None
+
+
+async def test_load_applicant_session_forged_secret_no_row() -> None:
+    # KERN-REGRESSION: korrekt signierte sid, aber KEINE Zeile → None. Wer nur das
+    # Secret kennt, kann keine Zeile erfinden (security.md §1, Issue ISSUE_TOKEN).
+    db = fake_session(result())  # leeres Ergebnis
+    cookie = sessions._sign_applicant_sid(SECRET, "forged-sid")
+    loaded = await sessions.load_applicant_session(
+        db, secret=SECRET, cookie_value=cookie, now=datetime.now(UTC), max_age=MAX_AGE
+    )
+    assert loaded is None
+
+
+async def test_load_applicant_session_revoked() -> None:
+    now = datetime.now(UTC)
+    row = _applicant_row(revoked=True)
+    db = fake_session(result(row))
+    cookie = sessions._sign_applicant_sid(SECRET, row.sid)
+    loaded = await sessions.load_applicant_session(
+        db, secret=SECRET, cookie_value=cookie, now=now, max_age=MAX_AGE
+    )
+    assert loaded is None
+
+
+async def test_load_applicant_session_expired() -> None:
+    now = datetime.now(UTC)
+    row = _applicant_row(expired=True)
+    db = fake_session(result(row))
+    cookie = sessions._sign_applicant_sid(SECRET, row.sid)
+    loaded = await sessions.load_applicant_session(
+        db, secret=SECRET, cookie_value=cookie, now=now, max_age=MAX_AGE
+    )
+    assert loaded is None
+
+
+async def test_load_applicant_session_signature_expired() -> None:
     with freeze_time("2026-01-01 00:00:00"):
-        token = sessions.issue_applicant_token(SECRET, "app-1", "edit")
+        cookie = sessions._sign_applicant_sid(SECRET, "as1")
     with freeze_time("2026-01-01 02:00:00"):
-        assert sessions.load_applicant_token(SECRET, token, MAX_AGE) is None
+        loaded = await sessions.load_applicant_session(
+            fake_session(), secret=SECRET, cookie_value=cookie,
+            now=datetime.now(UTC), max_age=MAX_AGE,
+        )
+    assert loaded is None
 
 
-def test_applicant_token_wrong_shape_returns_none() -> None:
-    # Gültig signiert, aber kein dict mit aid/scope.
-    bad = sessions._serializer(SECRET, sessions._APPLICANT_SALT).dumps(["not", "a", "dict"])
-    assert sessions.load_applicant_token(SECRET, bad, MAX_AGE) is None
+async def test_delete_applicant_session_ok() -> None:
+    row = _applicant_row()
+    db = fake_session(result(row))
+    cookie = sessions._sign_applicant_sid(SECRET, row.sid)
+    deleted = await sessions.delete_applicant_session(
+        db, secret=SECRET, cookie_value=cookie, max_age=MAX_AGE
+    )
+    assert deleted is row
+    assert db.deleted == [row]
+    assert db.flushed == 1
+
+
+async def test_delete_applicant_session_bad_cookie() -> None:
+    db = fake_session()
+    assert (
+        await sessions.delete_applicant_session(
+            db, secret=SECRET, cookie_value="garbage", max_age=MAX_AGE
+        )
+        is None
+    )
+
+
+async def test_delete_applicant_session_unknown_sid() -> None:
+    db = fake_session(result())
+    cookie = sessions._sign_applicant_sid(SECRET, "as1")
+    assert (
+        await sessions.delete_applicant_session(
+            db, secret=SECRET, cookie_value=cookie, max_age=MAX_AGE
+        )
+        is None
+    )
+
+
+async def test_load_applicant_session_non_str_sid() -> None:
+    # Gültig signiert, aber kein String (Tamper/Programmierfehler) → None vor DB-Lookup.
+    bad = sessions._serializer(SECRET, sessions._APPLICANT_SALT).dumps(["not", "a", "str"])
+    loaded = await sessions.load_applicant_session(
+        fake_session(), secret=SECRET, cookie_value=bad, now=datetime.now(UTC),
+        max_age=MAX_AGE,
+    )
+    assert loaded is None
+
+
+async def test_revoke_applicant_sessions_runs() -> None:
+    # Kill-Switch (Anonymisierung): setzt revoked_at per UPDATE; läuft fehlerfrei.
+    db = fake_session()
+    await sessions.revoke_applicant_sessions(db, "app-1", now=datetime.now(UTC))
 
 
 # --------------------------------------------------------------------------- #

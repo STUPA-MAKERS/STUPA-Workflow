@@ -22,19 +22,19 @@
           [value]="feedUrl"
           (focus)="$any($event.target).select()"
         />
-        <app-button variant="ghost" (click)="copy()">
+        <app-button size="sm" variant="ghost" (click)="copy()">
           {{ (copied() ? 'account.calendar.copied' : 'account.calendar.copy') | t }}
         </app-button>
       </div>
       <div class="cal__actions">
-        <app-button variant="ghost" [loading]="busy()" (click)="rotate()">
+        <app-button size="sm" variant="ghost" [loading]="busy()" (click)="rotate()">
           {{ 'account.calendar.rotate' | t }}
         </app-button>
         <span class="text-muted text-sm">{{ 'account.calendar.rotateHint' | t }}</span>
       </div>
     } @else {
       <p class="text-muted m-0 mb-3">{{ 'account.calendar.none' | t }}</p>
-      <app-button [loading]="busy()" (click)="rotate()">
+      <app-button size="sm" [loading]="busy()" (click)="rotate()">
         {{ 'account.calendar.generate' | t }}
       </app-button>
     }

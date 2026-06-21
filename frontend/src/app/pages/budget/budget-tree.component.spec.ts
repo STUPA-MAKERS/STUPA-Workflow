@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import { I18nService } from '@core/i18n/i18n.service';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin/admin-api.service';
 import { BudgetTreeComponent } from './budget-tree.component';
 import type { BudgetTreeNode, FiscalYear } from './budget-tree.api';

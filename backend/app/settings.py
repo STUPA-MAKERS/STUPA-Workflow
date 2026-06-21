@@ -105,6 +105,11 @@ class Settings(BaseSettings):
     applicant_cookie_name: str = "ap_applicant"
     oidc_tx_cookie_name: str = "ap_oidc_tx"
     session_ttl_hours: int = 12
+    # Applicant-(Magic-Link)-Session: serverseitig (``applicant_session``-Tabelle),
+    # opake signierte ``sid``. Bewusst von ``session_ttl_hours`` ENTKOPPELT, damit das
+    # Antragsteller-Fenster unabhängig von der Principal-Session getunt werden kann
+    # (security.md §1 — kürzer = kleineres Replay-Fenster).
+    applicant_session_ttl_hours: int = 12
     cookie_secure: bool = True
 
     # — OAuth2-AS für native/MCP-Clients (browser-grant + PKCE, RFC 7636) —

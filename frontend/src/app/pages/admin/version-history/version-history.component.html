@@ -58,10 +58,10 @@
   @if (confirmRestore(); as rev) {
     <p>{{ 'admin.config.restore.confirm' | t: { version: rev.version } }}</p>
     <div class="flex gap-2 justify-end mt-4">
-      <app-button variant="ghost" (click)="confirmRestore.set(null)">
+      <app-button size="sm" variant="ghost" (click)="confirmRestore.set(null)">
         {{ 'admin.gremien.cancel' | t }}
       </app-button>
-      <app-button variant="primary" (click)="doRestore()">
+      <app-button size="sm" variant="primary" (click)="doRestore()">
         {{ 'admin.config.history.restore' | t }}
       </app-button>
     </div>

@@ -16,8 +16,13 @@
 const sp = (n) => `var(--space-${n})`;
 
 module.exports = {
-  // HTML + inline-/externe Komponenten-Templates scannen.
-  content: ['./src/**/*.{html,ts}'],
+  // HTML + inline-/externe Komponenten-Templates scannen — inkl. der ausgelagerten
+  // UI-Kit-Library (Submodule), damit deren Utility-Klassen mitgeneriert werden.
+  content: [
+    './src/**/*.{html,ts}',
+    './vendor/ui-kit/src/**/*.{html,ts}',
+    './vendor/ui-kit/markdown-editor/**/*.{html,ts}',
+  ],
   corePlugins: {
     preflight: false,
   },

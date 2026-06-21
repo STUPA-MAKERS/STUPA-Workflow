@@ -1,8 +1,6 @@
 :host { display: block; }
 .acc__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
 .acc__mono { font-variant-numeric: tabular-nums; }
-.acc__label { display: flex; flex-direction: column; gap: var(--space-1); }
-.acc__label input { padding: var(--space-2) var(--space-3); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: inherit; }
 .acc__fints { display: flex; flex-direction: column; gap: var(--space-3); border: var(--border-width) solid var(--color-border); border-style: solid; border-radius: var(--radius-md); padding: var(--space-3); margin: 0; }
 .acc__fintsLegend { padding: 0 var(--space-2); font-weight: 600; font-size: 0.875rem; }
 .acc__hint { margin: 0; font-size: 0.8125rem; color: var(--color-text-muted); }

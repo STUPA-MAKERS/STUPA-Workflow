@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, input, output } from '@angu
 import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { BadgeComponent } from '@shared/ui/badge/badge.component';
+import { BadgeComponent } from '@stupa-makers/ui-kit';
 
 /** Normalisierte Antrags-Zeile für die geteilte Tabelle. */
 export interface ApplicationRow {

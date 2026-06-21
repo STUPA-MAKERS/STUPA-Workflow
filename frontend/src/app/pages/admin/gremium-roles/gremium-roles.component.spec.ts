@@ -1,7 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { GremiumRole } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { GremiumRolesComponent } from './gremium-roles.component';

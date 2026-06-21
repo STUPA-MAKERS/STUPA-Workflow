@@ -42,7 +42,7 @@
             name="fintsAccount"
           />
           @if (!hasPendingTan()) {
-            <app-button [loading]="syncing()" [disabled]="!accountId()" (click)="startSync()">
+            <app-button size="sm" [loading]="syncing()" [disabled]="!accountId()" (click)="startSync()">
               {{ 'fints.sync' | t }}
             </app-button>
           } @else {
@@ -64,12 +64,12 @@
                     name="tan"
                   />
                 </label>
-                <app-button [loading]="tanBusy()" [disabled]="!tanCode().trim()" (click)="submitTan()">
+                <app-button size="sm" [loading]="tanBusy()" [disabled]="!tanCode().trim()" (click)="submitTan()">
                   {{ 'fints.tanConfirm' | t }}
                 </app-button>
               } @else {
                 <p class="bank__hint">{{ 'fints.tanDecoupled' | t }}</p>
-                <app-button [loading]="tanBusy()" (click)="submitTan()">
+                <app-button size="sm" [loading]="tanBusy()" (click)="submitTan()">
                   {{ 'fints.tanPoll' | t }}
                 </app-button>
               }
@@ -100,7 +100,7 @@
             #bankFile
             id="bank-file"
             type="file"
-            class="bank__file"
+            class="sr-only"
             accept=".xml,.sta,.mt940,.txt"
             [disabled]="!accountId() || importing()"
             (change)="onFile($event)"

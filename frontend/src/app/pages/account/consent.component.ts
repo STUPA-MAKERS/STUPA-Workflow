@@ -3,7 +3,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { ConsentRequest } from '@core/api/models';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { IconComponent } from '@shared/ui';
+import { IconComponent } from '@stupa-makers/ui-kit';
 
 /**
  * OAuth-Consent (#MCP): nach dem Login wählt der Nutzer hier, WELCHE Scopes und WELCHE

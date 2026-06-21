@@ -6,7 +6,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import type { Vote } from '@core/api/models';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { VoteCastComponent } from './vote-cast.component';
 
 function vote(overrides: Partial<Vote> = {}): Vote {

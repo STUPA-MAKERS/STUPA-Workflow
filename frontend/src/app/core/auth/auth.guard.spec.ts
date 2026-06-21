@@ -13,7 +13,7 @@ import {
 import { isObservable, type Observable } from 'rxjs';
 import { authGuard } from './auth.guard';
 import { USE_MOCK_API } from '../api/api.config';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { Principal } from '../api/models';
 import { mockWindowLocation, type LocationMock } from '../../../testing/location-mock';
 

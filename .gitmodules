@@ -1,0 +1,3 @@
+[submodule "frontend/vendor/ui-kit"]
+	path = frontend/vendor/ui-kit
+	url = https://github.com/STUPA-MAKERS/ui-kit.git

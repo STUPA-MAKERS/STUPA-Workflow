@@ -11,10 +11,11 @@ import {
   DatepickerComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
   type SelectOption,
   SelectComponent,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 
@@ -52,6 +53,7 @@ function emptyDraft(): PolicyDraft {
     DatepickerComponent,
     DialogComponent,
     IconComponent,
+    InputComponent,
     SelectComponent,
   ],
   templateUrl: './deadlines.component.html',

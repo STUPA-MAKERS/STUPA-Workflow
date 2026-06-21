@@ -2,7 +2,7 @@ import { of, throwError } from 'rxjs';
 import { render, screen, fireEvent } from '@testing-library/angular';
 import type { NotificationSettings } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { NotificationSettingsComponent } from './notification-settings.component';
 
 const SETTINGS: NotificationSettings = {

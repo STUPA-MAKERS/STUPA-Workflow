@@ -7,12 +7,14 @@ import {
   BadgeComponent,
   ButtonComponent,
   CellDirective,
+  CheckboxComponent,
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
   IconComponent,
-} from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+  InputComponent,
+} from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { type Account, type AccountBody, BudgetTreeApi } from '../../budget/budget-tree.api';
 
 /**
@@ -32,6 +34,8 @@ import { type Account, type AccountBody, BudgetTreeApi } from '../../budget/budg
     CellDirective,
     DialogComponent,
     IconComponent,
+    InputComponent,
+    CheckboxComponent,
   ],
   templateUrl: './accounts.component.html',
   styleUrl: './accounts.component.scss',

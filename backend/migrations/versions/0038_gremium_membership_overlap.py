@@ -18,8 +18,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0037_gremium_membership_overlap"
-down_revision: str | None = "0036_drop_fully_bound"
+revision: str = "0038_gremium_membership_overlap"
+down_revision: str | None = "0037_applicant_session"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

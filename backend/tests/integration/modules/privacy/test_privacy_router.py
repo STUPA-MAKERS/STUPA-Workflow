@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import FastAPI
@@ -352,7 +353,16 @@ async def test_applicant_self_service_erasure_request(
     application, _ = await svc.create(_create_payload(app_type.id))
     app_id = str(application.id)
 
-    token = sessions.issue_applicant_token(_SECRET, app_id, "view")
+    # Echte serverseitige Applicant-Session (statt zustandslosem Token): Zeile anlegen
+    # und committen, damit die Request-Session (eigene Transaktion) die sid auflösen kann.
+    token = await sessions.create_applicant_session(
+        session,
+        secret=_SECRET,
+        application_id=application.id,
+        scope="view",
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+    )
+    await session.commit()
 
     # KEIN Principal-Override hier — der Applicant-Pfad (require_app_read) muss greifen.
     r = client.post(

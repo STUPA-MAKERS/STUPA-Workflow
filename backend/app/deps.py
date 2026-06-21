@@ -1,7 +1,7 @@
 """Auth-Dependencies (api.md §1, security.md §1/§2) — reale Auflösung (T-10).
 
 - `get_current_principal`: Session-Cookie → `auth_session` → RBAC-aufgelöster Principal.
-- `get_current_applicant`: signierter Magic-Link-Token (Bearer / `?t=` / Cookie) → Scope.
+- `get_current_applicant`: signierte opake `sid` (Bearer / Cookie) → `applicant_session` → Scope.
 - `require_principal(*perms)` 401/403, `require_group(group)` 401/403,
   `require_applicant(scope)` 401 + Scope-Prüfung.
 
@@ -130,19 +130,28 @@ async def get_current_principal(
 
 async def get_current_applicant(
     request: Request,
+    db: DbSession,
     settings: SettingsDep,
 ) -> Applicant | None:
-    """Signierter Magic-Link-Token → Applicant-Scope (oder `None`)."""
+    """Serverseitige Magic-Link-Session (signierte opake `sid`, Bearer/Cookie) → Applicant.
+
+    Die `sid` wird signaturgeprüft, dann gegen `applicant_session` aufgelöst: kein
+    Zugriff ohne existierende, nicht-widerrufene, nicht-abgelaufene Zeile — ein allein
+    aus `SESSION_SECRET` geschmiedeter Token findet keine Zeile und ergibt `None`."""
     token = _bearer_token(request, settings)
     if not token:
         return None
-    data = sessions.load_applicant_token(
-        settings.session_secret, token, max_age=settings.session_ttl_hours * 3600
+    row = await sessions.load_applicant_session(
+        db,
+        secret=settings.session_secret,
+        cookie_value=token,
+        now=datetime.now(UTC),
+        max_age=settings.applicant_session_ttl_hours * 3600,
     )
-    if data is None or data["scope"] not in ("edit", "view"):
+    if row is None or row.scope not in ("edit", "view"):
         return None
-    scope: ApplicantScope = "edit" if data["scope"] == "edit" else "view"
-    return Applicant(application_id=data["aid"], scope=scope)
+    scope: ApplicantScope = "edit" if row.scope == "edit" else "view"
+    return Applicant(application_id=str(row.application_id), scope=scope)
 
 
 def require_principal(*perms: str) -> Callable[..., Principal]:

@@ -15,8 +15,9 @@ import {
   DataTableComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
   ToastService,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
 
@@ -54,6 +55,7 @@ function emptyForm(): NewForm {
     DataTableComponent,
     CellDirective,
     IconComponent,
+    InputComponent,
   ],
   templateUrl: './forms-list.component.html',
   styleUrl: './forms-list.component.scss',

@@ -12,10 +12,11 @@ import {
   DataTableComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
   SelectComponent,
   type SelectOption,
-} from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+} from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import {
   CD_VARIANTS,
@@ -78,6 +79,7 @@ function parseRecipients(raw: string): string[] {
     TranslatePipe,
     ButtonComponent,
     CheckboxComponent,
+    InputComponent,
     SelectComponent,
     DialogComponent,
     DataTableComponent,

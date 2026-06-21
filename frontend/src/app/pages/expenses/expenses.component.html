@@ -239,8 +239,8 @@
     <textarea id="exp-note" class="exp__input exp__textarea" name="note" rows="3" [ngModel]="newNote()" (ngModelChange)="newNote.set($event)"></textarea>
   </form>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="!canSubmitCreate()" [loading]="saving()" (click)="create($event)">{{ 'expenses.add' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="createOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!canSubmitCreate()" [loading]="saving()" (click)="create($event)">{{ 'expenses.add' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -287,8 +287,8 @@
     <textarea id="exp-enote" class="exp__input exp__textarea" name="enote" rows="3" [ngModel]="editNote()" (ngModelChange)="editNote.set($event)"></textarea>
   </form>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button [loading]="saving()" (click)="saveEdit($event)">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [loading]="saving()" (click)="saveEdit($event)">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -318,8 +318,8 @@
 <app-dialog [open]="!!confirmDelete()" [title]="'expenses.delete.title' | t" [closeLabel]="'action.cancel' | t" (closed)="confirmDelete.set(null)">
   <p>{{ 'expenses.delete.body' | t: { description: confirmDelete()?.description ?? '' } }}</p>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'expenses.delete.confirm' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'expenses.delete.confirm' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -341,8 +341,8 @@
     <input id="exp-tdesc" class="exp__input" [ngModel]="tDescription()" (ngModelChange)="tDescription.set($event)" name="tdesc" [placeholder]="'expenses.field.descriptionPlaceholder' | t" />
   </form>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="transferOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="!canSubmitTransfer()" [loading]="saving()" (click)="createTransfer($event)">{{ 'expenses.transferConfirm' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="transferOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!canSubmitTransfer()" [loading]="saving()" (click)="createTransfer($event)">{{ 'expenses.transferConfirm' | t }}</app-button>
   </div>
 </app-dialog>
 

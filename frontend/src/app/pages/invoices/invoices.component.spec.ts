@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 import { render } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import * as downloadUtil from '@shared/download.util';
 import { InvoicesComponent } from './invoices.component';
 import type {

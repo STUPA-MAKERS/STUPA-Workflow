@@ -3,7 +3,7 @@ import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { ApplicationTypeCreateBody, ApplicationTypeFull } from '../admin.models';
 import { FormsListComponent } from './forms-list.component';
@@ -60,7 +60,7 @@ describe('FormsListComponent', () => {
     const { createApplicationType } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Formular anlegen' }));
 
-    const nameDe = screen.getByLabelText('Titel (DE)');
+    const nameDe = screen.getByLabelText(/Titel \(DE\)/);
     await userEvent.type(nameDe, 'Härtefall Antrag');
 
     const add = screen.getAllByRole('button', { name: 'Formular anlegen' });

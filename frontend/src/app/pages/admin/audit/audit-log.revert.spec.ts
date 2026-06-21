@@ -2,7 +2,7 @@ import { of, throwError } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { render } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditEntry, AuditPage, ConfigRevisionDiff } from '../admin.models';
 import { AuditLogComponent } from './audit-log.component';

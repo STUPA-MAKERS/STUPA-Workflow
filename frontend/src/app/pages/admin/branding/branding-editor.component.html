@@ -210,8 +210,8 @@
     </div>
 
     <footer class="flex justify-end gap-3">
-      <app-button variant="secondary" [disabled]="linkErrors().length > 0" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
-      <app-button [disabled]="!hasDraftChanges() || linkErrors().length > 0" (click)="activate()">{{ 'admin.brand.activate' | t }}</app-button>
+      <app-button size="sm" variant="secondary" [disabled]="linkErrors().length > 0" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
+      <app-button size="sm" [disabled]="!hasDraftChanges() || linkErrors().length > 0" (click)="activate()">{{ 'admin.brand.activate' | t }}</app-button>
     </footer>
 
     <app-version-history

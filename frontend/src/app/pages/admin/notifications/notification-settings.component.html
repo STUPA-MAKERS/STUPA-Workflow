@@ -50,7 +50,7 @@
         </label>
 
         <div class="flex justify-end">
-          <app-button [disabled]="!dirty() || saving()" (click)="save()">
+          <app-button size="sm" [disabled]="!dirty() || saving()" (click)="save()">
             {{ 'action.save' | t }}
           </app-button>
         </div>

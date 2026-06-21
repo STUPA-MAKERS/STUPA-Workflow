@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, CheckboxComponent } from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ButtonComponent, CheckboxComponent } from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AdminApiService } from '../admin-api.service';
 import type { NotificationSettings } from '../admin.models';

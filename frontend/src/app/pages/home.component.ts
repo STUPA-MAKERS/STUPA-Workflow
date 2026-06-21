@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { CardComponent } from '@shared/ui/card/card.component';
+import { CardComponent } from '@stupa-makers/ui-kit';
 
 /** Öffentliche Startseite (Skelett). */
 @Component({

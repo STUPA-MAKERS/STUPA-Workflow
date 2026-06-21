@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of, throwError } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { Branding, SiteConfig } from '../admin.models';
 import { BrandingEditorComponent } from './branding-editor.component';

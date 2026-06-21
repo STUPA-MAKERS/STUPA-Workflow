@@ -14,9 +14,9 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, CheckboxComponent, SelectComponent, type SelectOption } from '@shared/ui';
+import { ButtonComponent, CheckboxComponent, SelectComponent, type SelectOption } from '@stupa-makers/ui-kit';
 import { GuardEditorComponent } from './guard-editor.component';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import { AdminOptionsService } from '../admin-options.service';
@@ -966,6 +966,17 @@ export class FlowEditorComponent {
 
   protected kindLabel(k: string): string {
     return this.i18n.translate(`admin.flow.kind.${k}` as TranslationKey);
+  }
+
+  /** State-Arten als Dropdown-Optionen (#28): normal + vote. */
+  protected readonly kindOptionsSel: SelectOption[] = this.stateKinds.map((k) => ({
+    value: k,
+    label: this.kindLabel(k),
+  }));
+
+  /** Ergebnis-Zweige (pass/fail) des Quell-States als Dropdown-Optionen (#28). */
+  protected branchOptionsSel(fromKey: string): SelectOption[] {
+    return this.branchesFor(fromKey).map((b) => ({ value: b, label: b }));
   }
 
   /** Von/Nach-Optionen als „Klarname (key)" (FE5). */

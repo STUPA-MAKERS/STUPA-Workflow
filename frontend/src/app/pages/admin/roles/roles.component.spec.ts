@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import type { Role } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { AdminRolesComponent } from './roles.component';

@@ -16,8 +16,8 @@ import {
   IconComponent,
   SelectComponent,
   type SelectOption,
-} from '@shared/ui';
-import { ToastService } from '@shared/ui/toast/toast.service';
+} from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { type DelegationSubstitute, DelegationsApiService } from '@core/api/delegations.service';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, Gremium, GremiumMembership, GremiumRole } from '../admin.models';

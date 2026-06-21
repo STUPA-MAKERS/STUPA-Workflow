@@ -23,11 +23,11 @@ import { resolveI18n } from '@shared/forms/i18n-text';
 import { renderMarkdown } from '../meetings/meetings.util';
 import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { isFieldVisible } from '@shared/forms/jsonlogic';
-import { ButtonComponent } from '@shared/ui/button/button.component';
-import { CardComponent } from '@shared/ui/card/card.component';
-import { InputComponent } from '@shared/ui/input/input.component';
-import { StepperComponent, type Step } from '@shared/ui/stepper/stepper.component';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
+import { CardComponent } from '@stupa-makers/ui-kit';
+import { InputComponent } from '@stupa-makers/ui-kit';
+import { StepperComponent, type Step } from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AltchaComponent } from './altcha.component';
 
 interface WizardSection {

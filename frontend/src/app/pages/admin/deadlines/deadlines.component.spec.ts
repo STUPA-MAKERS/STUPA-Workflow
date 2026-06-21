@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { DeadlinePolicy } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
-import { ToastService } from '@shared/ui';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AdminDeadlinesComponent } from './deadlines.component';
 
@@ -48,7 +48,7 @@ describe('AdminDeadlinesComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Frist hinzufügen' }));
     const q = (sel: string) => container.querySelector<HTMLElement>(sel)!;
     // key + relative kind + offset → save enabled.
-    await userEvent.type(q('input[name="key"]'), 'mahnung');
+    await userEvent.type(screen.getByLabelText('Schlüssel'), 'mahnung');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Art' }), 'relative_submitted');
     await userEvent.type(q('input[name="offsetDays"]'), '14');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));

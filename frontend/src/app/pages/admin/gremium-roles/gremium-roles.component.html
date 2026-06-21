@@ -48,36 +48,41 @@
 >
   @if (draft(); as d) {
     <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); save()">
-      <label class="flex flex-col gap-2">
-        <span class="text-sm font-medium">{{ 'admin.common.key' | t }}</span>
-        <input class="field__control" [ngModel]="d.key" (ngModelChange)="patch('key', $event)" name="key" [disabled]="editingId() !== null" placeholder="z. B. vorsitz" />
-      </label>
-      <label class="flex flex-col gap-2">
-        <span class="text-sm font-medium">{{ 'admin.common.labelDe' | t }}</span>
-        <input class="field__control" [ngModel]="d.labelDe" (ngModelChange)="patch('labelDe', $event)" name="labelDe" />
-      </label>
-      <label class="flex flex-col gap-2">
-        <span class="text-sm font-medium">{{ 'admin.common.labelEn' | t }}</span>
-        <input class="field__control" [ngModel]="d.labelEn" (ngModelChange)="patch('labelEn', $event)" name="labelEn" />
-      </label>
+      <app-input
+        [label]="'admin.common.key' | t"
+        [ngModel]="d.key"
+        (ngModelChange)="patch('key', $event)"
+        name="key"
+        placeholder="z. B. vorsitz"
+        [disabled]="editingId() !== null"
+      />
+      <app-input
+        [label]="'admin.common.labelDe' | t"
+        [ngModel]="d.labelDe"
+        (ngModelChange)="patch('labelDe', $event)"
+        name="labelDe"
+      />
+      <app-input
+        [label]="'admin.common.labelEn' | t"
+        [ngModel]="d.labelEn"
+        (ngModelChange)="patch('labelEn', $event)"
+        name="labelEn"
+      />
       <fieldset class="flex flex-col gap-2 border-0 m-0 p-0">
         <legend class="text-sm font-medium">{{ 'admin.gremiumRoles.permissions' | t }}</legend>
         @for (p of allPermissions; track p) {
-          <label class="inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              [checked]="d.permissions.includes(p)"
-              (change)="togglePerm(p, $any($event.target).checked)"
-            />
-            <span>{{ permLabel(p) | t }}</span>
-          </label>
+          <app-checkbox
+            [ngModel]="d.permissions.includes(p)"
+            (ngModelChange)="togglePerm(p, $event)"
+            [name]="'perm-' + p"
+          >{{ permLabel(p) | t }}</app-checkbox>
         }
       </fieldset>
     </form>
   }
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="!draft()?.key?.trim()" (click)="save()">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!draft()?.key?.trim()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -89,7 +94,7 @@
 >
   <p>{{ 'admin.gremiumRoles.deleteConfirm' | t: { name: label(confirmDelete()) } }}</p>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
   </div>
 </app-dialog>

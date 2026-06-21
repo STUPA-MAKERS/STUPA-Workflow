@@ -206,13 +206,12 @@
         </app-checkbox>
 
         <!-- State-Art + kind-spezifische Config (#28) -->
-        <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.kindLabel' | t }}
-          <select [ngModel]="s.kind ?? 'normal'" (ngModelChange)="setStateKind(s.key, $event)">
-            @for (k of stateKinds; track k) {
-              <option [value]="k">{{ kindLabel(k) }}</option>
-            }
-          </select>
-        </label>
+        <app-select
+          [label]="'admin.flow.kindLabel' | t"
+          [options]="kindOptionsSel"
+          [ngModel]="s.kind ?? 'normal'"
+          (ngModelChange)="setStateKind(s.key, $event)"
+        />
 
         @if (s.kind === 'vote') {
           <app-select
@@ -305,14 +304,13 @@
 
         <!-- Ergebnis-Zweig nur für vote/approval-Quell-States (#28): pass/fail bzw. accept/reject. -->
         @if (branchesFor(sel.t.from).length) {
-          <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.branch' | t }}
-            <select [ngModel]="sel.t.branch ?? ''" (ngModelChange)="setTransitionBranch(sel.index, $event)">
-              <option value="">{{ 'admin.flow.branchNone' | t }}</option>
-              @for (b of branchesFor(sel.t.from); track b) {
-                <option [value]="b">{{ b }}</option>
-              }
-            </select>
-          </label>
+          <app-select
+            [label]="'admin.flow.branch' | t"
+            [placeholder]="'admin.flow.branchNone' | t"
+            [options]="branchOptionsSel(sel.t.from)"
+            [ngModel]="sel.t.branch ?? ''"
+            (ngModelChange)="setTransitionBranch(sel.index, $event)"
+          />
         }
 
         <!-- Bedingung (Guard) + Aktionen liegen in eigener Pane unterhalb des Graphen (#28). -->
@@ -445,9 +443,7 @@
                   <span class="text-sm font-medium">{{ 'admin.flow.actRecipients' | t }}</span>
                   @for (r of recipientsOf(act); track $index; let ri = $index) {
                     <div class="fe__recipient">
-                      <select [ngModel]="r.kind" (ngModelChange)="setRecipientKind(sel.index, ai, ri, $event)">
-                        @for (opt of recipientKindOptions(); track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
-                      </select>
+                      <app-select [options]="recipientKindOptions()" [ngModel]="r.kind" (ngModelChange)="setRecipientKind(sel.index, ai, ri, $event)" />
                       @if (recipientNeedsRef(r.kind)) {
                         @if (r.kind === 'gremium') {
                           <app-select [options]="gremiumOptions()" [placeholder]="'admin.flow.cfgGremiumPh' | t" [ngModel]="r.ref ?? ''" (ngModelChange)="setRecipientRef(sel.index, ai, ri, $event)" />
@@ -481,7 +477,7 @@
     <span class="text-sm text-danger" [class.fe__status--ok]="validation().valid">
       {{ (validation().valid ? 'admin.common.valid' : 'admin.common.errors') | t }}
     </span>
-    <app-button [disabled]="!validation().valid" [loading]="saving()" (click)="save()">{{
+    <app-button size="sm" [disabled]="!validation().valid" [loading]="saving()" (click)="save()">{{
       'admin.flow.save' | t
     }}</app-button>
   </footer>
