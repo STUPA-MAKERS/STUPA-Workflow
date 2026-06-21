@@ -149,6 +149,11 @@ export class ApplicationsListComponent {
     () => new Map(this.types().map((t) => [t.id, t.name])),
   );
 
+  /** Antragstyp-Optionen für den Filter (Wert = Typ-UUID, Label = Typ-Name). */
+  readonly typeOptions = computed<SelectOption[]>(() =>
+    this.types().map((type) => ({ value: type.id, label: type.name })),
+  );
+
   /** Antrags-Zeilen für die geteilte Tabelle. */
   readonly tableRows = computed<ApplicationRow[]>(() =>
     this.items().map((item) => ({

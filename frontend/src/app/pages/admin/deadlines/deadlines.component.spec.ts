@@ -48,7 +48,7 @@ describe('AdminDeadlinesComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Frist hinzufügen' }));
     const q = (sel: string) => container.querySelector<HTMLElement>(sel)!;
     // key + relative kind + offset → save enabled.
-    await userEvent.type(q('input[name="key"]'), 'mahnung');
+    await userEvent.type(screen.getByLabelText('Schlüssel'), 'mahnung');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Art' }), 'relative_submitted');
     await userEvent.type(q('input[name="offsetDays"]'), '14');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));

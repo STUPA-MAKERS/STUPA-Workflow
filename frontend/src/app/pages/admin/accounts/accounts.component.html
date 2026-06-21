@@ -22,27 +22,18 @@
 
 <app-dialog [open]="dialogOpen()" [title]="(editing() ? 'admin.accounts.edit' : 'admin.accounts.add') | t" [closeLabel]="'action.cancel' | t" (closed)="dialogOpen.set(false)">
   <form id="acc-form" class="flex flex-col gap-3" (submit)="save($event)">
-    <label class="acc__label" for="acc-name">{{ 'admin.accounts.name' | t }}
-      <input id="acc-name" [ngModel]="fName()" (ngModelChange)="fName.set($event)" name="name" /></label>
-    <label class="acc__label" for="acc-iban">{{ 'admin.accounts.iban' | t }}
-      <input id="acc-iban" [ngModel]="fIban()" (ngModelChange)="fIban.set($event)" name="iban" [placeholder]="'admin.accounts.ibanPlaceholder' | t" /></label>
-    <label class="flex items-center gap-2">
-      <input type="checkbox" [checked]="fActive()" (change)="fActive.set($any($event.target).checked)" />
-      <span>{{ 'admin.accounts.active' | t }}</span>
-    </label>
+    <app-input id="acc-name" [label]="'admin.accounts.name' | t" [ngModel]="fName()" (ngModelChange)="fName.set($event)" name="name" />
+    <app-input id="acc-iban" [label]="'admin.accounts.iban' | t" [ngModel]="fIban()" (ngModelChange)="fIban.set($event)" name="iban" [placeholder]="'admin.accounts.ibanPlaceholder' | t" />
+    <app-checkbox [ngModel]="fActive()" (ngModelChange)="fActive.set($event)" name="active">{{ 'admin.accounts.active' | t }}</app-checkbox>
 
     <!-- FinTS-Bankabgleich (#fints): optionaler Online-Banking-Zugang. PIN write-only. -->
     <fieldset class="acc__fints">
       <legend class="acc__fintsLegend">{{ 'admin.accounts.fintsTitle' | t }}</legend>
       <p class="acc__hint">{{ 'admin.accounts.fintsDesc' | t }}</p>
-      <label class="acc__label" for="acc-fints-endpoint">{{ 'admin.accounts.fintsEndpoint' | t }}
-        <input id="acc-fints-endpoint" [ngModel]="fEndpoint()" (ngModelChange)="fEndpoint.set($event)" name="fintsEndpoint" [placeholder]="'admin.accounts.fintsEndpointPlaceholder' | t" /></label>
-      <label class="acc__label" for="acc-fints-blz">{{ 'admin.accounts.fintsBlz' | t }}
-        <input id="acc-fints-blz" [ngModel]="fBlz()" (ngModelChange)="fBlz.set($event)" name="fintsBlz" inputmode="numeric" /></label>
-      <label class="acc__label" for="acc-fints-login">{{ 'admin.accounts.fintsLogin' | t }}
-        <input id="acc-fints-login" [ngModel]="fLogin()" (ngModelChange)="fLogin.set($event)" name="fintsLogin" autocomplete="off" /></label>
-      <label class="acc__label" for="acc-fints-pin">{{ 'admin.accounts.fintsPin' | t }}
-        <input id="acc-fints-pin" type="password" [ngModel]="fPin()" (ngModelChange)="fPin.set($event)" name="fintsPin" autocomplete="new-password" [placeholder]="(pinStored() ? 'admin.accounts.fintsPinStored' : 'admin.accounts.fintsPinPlaceholder') | t" /></label>
+      <app-input id="acc-fints-endpoint" [label]="'admin.accounts.fintsEndpoint' | t" [ngModel]="fEndpoint()" (ngModelChange)="fEndpoint.set($event)" name="fintsEndpoint" [placeholder]="'admin.accounts.fintsEndpointPlaceholder' | t" />
+      <app-input id="acc-fints-blz" [label]="'admin.accounts.fintsBlz' | t" [ngModel]="fBlz()" (ngModelChange)="fBlz.set($event)" name="fintsBlz" inputmode="numeric" />
+      <app-input id="acc-fints-login" [label]="'admin.accounts.fintsLogin' | t" [ngModel]="fLogin()" (ngModelChange)="fLogin.set($event)" name="fintsLogin" autocomplete="off" />
+      <app-input id="acc-fints-pin" type="password" [label]="'admin.accounts.fintsPin' | t" [ngModel]="fPin()" (ngModelChange)="fPin.set($event)" name="fintsPin" autocomplete="new-password" [placeholder]="(pinStored() ? 'admin.accounts.fintsPinStored' : 'admin.accounts.fintsPinPlaceholder') | t" />
     </fieldset>
   </form>
   <div dialog-footer class="flex gap-3">

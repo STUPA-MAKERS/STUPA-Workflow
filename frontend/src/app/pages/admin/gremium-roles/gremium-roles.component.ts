@@ -8,10 +8,12 @@ import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import {
   ButtonComponent,
   CellDirective,
+  CheckboxComponent,
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -48,6 +50,8 @@ function emptyDraft(): RoleDraft {
     CellDirective,
     DialogComponent,
     IconComponent,
+    InputComponent,
+    CheckboxComponent,
   ],
   templateUrl: './gremium-roles.component.html',
   styleUrl: './gremium-roles.component.scss',

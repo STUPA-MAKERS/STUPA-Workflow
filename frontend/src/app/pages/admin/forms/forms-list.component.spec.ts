@@ -60,7 +60,7 @@ describe('FormsListComponent', () => {
     const { createApplicationType } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Formular anlegen' }));
 
-    const nameDe = screen.getByLabelText('Titel (DE)');
+    const nameDe = screen.getByLabelText(/Titel \(DE\)/);
     await userEvent.type(nameDe, 'Härtefall Antrag');
 
     const add = screen.getAllByRole('button', { name: 'Formular anlegen' });

@@ -968,6 +968,17 @@ export class FlowEditorComponent {
     return this.i18n.translate(`admin.flow.kind.${k}` as TranslationKey);
   }
 
+  /** State-Arten als Dropdown-Optionen (#28): normal + vote. */
+  protected readonly kindOptionsSel: SelectOption[] = this.stateKinds.map((k) => ({
+    value: k,
+    label: this.kindLabel(k),
+  }));
+
+  /** Ergebnis-Zweige (pass/fail) des Quell-States als Dropdown-Optionen (#28). */
+  protected branchOptionsSel(fromKey: string): SelectOption[] {
+    return this.branchesFor(fromKey).map((b) => ({ value: b, label: b }));
+  }
+
   /** Von/Nach-Optionen als „Klarname (key)" (FE5). */
   protected stateOptions(): SelectOption[] {
     return this.graph().states.map((s) => ({ value: s.key, label: `${this.label(s)} (${s.key})` }));

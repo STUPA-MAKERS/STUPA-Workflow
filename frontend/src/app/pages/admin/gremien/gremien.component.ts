@@ -12,6 +12,7 @@ import {
   DataTableComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
   SelectComponent,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
@@ -78,6 +79,7 @@ function parseRecipients(raw: string): string[] {
     TranslatePipe,
     ButtonComponent,
     CheckboxComponent,
+    InputComponent,
     SelectComponent,
     DialogComponent,
     DataTableComponent,

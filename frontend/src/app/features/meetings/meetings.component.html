@@ -577,10 +577,7 @@
         }
       </div>
       <p class="text-text-muted text-sm self-center">{{ 'meetings.vote.optionsFixedHint' | t }}</p>
-      <label class="mtg__voteSecret">
-        <input type="checkbox" [checked]="voteSecret()" (change)="voteSecret.set($any($event.target).checked)" />
-        {{ 'meetings.vote.secret' | t }}
-      </label>
+      <app-checkbox [ngModel]="voteSecret()" (ngModelChange)="voteSecret.set($event)" name="voteSecret">{{ 'meetings.vote.secret' | t }}</app-checkbox>
 
       <app-select
         name="vmaj"

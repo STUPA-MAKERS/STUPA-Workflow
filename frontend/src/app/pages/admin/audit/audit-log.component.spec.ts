@@ -27,7 +27,7 @@ type Cmp = AuditLogComponent & {
   message(e: AuditEntry): string;
   dataPairs(e: AuditEntry): [string, string][];
   activeFilterCount(): number;
-  actionOptions(): string[];
+  actionOptions(): { value: string; label: string }[];
   groups(): { key: string; date: Date; entries: AuditEntry[] }[];
   loadError(): boolean;
   loading(): boolean;
@@ -254,8 +254,9 @@ describe('AuditLogComponent (#45)', () => {
   it('exposes the full action catalog as filter options', async () => {
     const { cmp } = await setup();
     const opts = cmp.actionOptions();
-    expect(opts).toContain('login');
-    expect(opts).toContain('budget_move_fiscal_year');
+    const values = opts.map((o) => o.value);
+    expect(values).toContain('login');
+    expect(values).toContain('budget_move_fiscal_year');
     expect(opts.length).toBeGreaterThan(20);
   });
 

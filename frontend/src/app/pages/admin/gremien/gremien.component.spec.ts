@@ -115,7 +115,7 @@ describe('AdminGremienComponent (#18)', () => {
   it('creates a committee via a dialog with an auto-generated slug', async () => {
     const { http } = await setup([]);
     await userEvent.click(screen.getByRole('button', { name: 'Gremium hinzufügen' }));
-    await userEvent.type(screen.getByLabelText('Name'), 'AStA Vorstand');
+    await userEvent.type(screen.getByLabelText(/^Name/), 'AStA Vorstand');
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     const post = http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'POST');
@@ -165,7 +165,7 @@ describe('AdminGremienComponent (#18)', () => {
     http
       .expectOne((r) => r.url.endsWith('/admin/gremien/g-1/mail-recipients') && r.method === 'GET')
       .flush({ recipients: ['alt@x.de'] });
-    const name = screen.getByLabelText('Name');
+    const name = screen.getByLabelText(/^Name/);
     await userEvent.clear(name);
     await userEvent.type(name, 'StuPa 2026');
     await userEvent.selectOptions(screen.getByLabelText(/Standardsprache/), 'en');
@@ -339,7 +339,7 @@ describe('AdminGremienComponent (#18)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Gremium hinzufügen' }));
     const add = screen.getByRole('button', { name: 'Anlegen' });
     expect(add).toBeDisabled();
-    await userEvent.type(screen.getByLabelText('Name'), 'X');
+    await userEvent.type(screen.getByLabelText(/^Name/), 'X');
     expect(add).toBeEnabled();
   });
 

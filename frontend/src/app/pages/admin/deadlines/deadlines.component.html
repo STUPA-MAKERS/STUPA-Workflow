@@ -33,18 +33,26 @@
 >
   @if (draft(); as d) {
     <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); save()">
-      <label class="flex flex-col gap-2">
-        <span class="text-sm font-medium">{{ 'admin.common.key' | t }}</span>
-        <input class="field__control" [ngModel]="d.key" (ngModelChange)="patch('key', $event)" name="key" [disabled]="editingId() !== null" placeholder="z. B. semester_frist" />
-      </label>
-      <label class="flex flex-col gap-2">
-        <span class="text-sm font-medium">{{ 'admin.common.labelDe' | t }}</span>
-        <input class="field__control" [ngModel]="d.labelDe" (ngModelChange)="patch('labelDe', $event)" name="labelDe" />
-      </label>
-      <label class="flex flex-col gap-2">
-        <span class="text-sm font-medium">{{ 'admin.common.labelEn' | t }}</span>
-        <input class="field__control" [ngModel]="d.labelEn" (ngModelChange)="patch('labelEn', $event)" name="labelEn" />
-      </label>
+      <app-input
+        [label]="'admin.common.key' | t"
+        [ngModel]="d.key"
+        (ngModelChange)="patch('key', $event)"
+        name="key"
+        [disabled]="editingId() !== null"
+        placeholder="z. B. semester_frist"
+      />
+      <app-input
+        [label]="'admin.common.labelDe' | t"
+        [ngModel]="d.labelDe"
+        (ngModelChange)="patch('labelDe', $event)"
+        name="labelDe"
+      />
+      <app-input
+        [label]="'admin.common.labelEn' | t"
+        [ngModel]="d.labelEn"
+        (ngModelChange)="patch('labelEn', $event)"
+        name="labelEn"
+      />
       <app-select
         [label]="'admin.deadlines.kind' | t"
         [options]="kindOptions"
