@@ -48,6 +48,7 @@ from app.modules.applications.schemas import (
     TimelineEventOut,
     VersionOut,
 )
+from app.modules.auth import sessions as auth_sessions
 from app.modules.budget.models import BudgetField
 from app.modules.budget.tree_models import Budget
 from app.modules.files.models import Attachment
@@ -963,6 +964,11 @@ class ApplicationsService:
         # Magic-Links sind ein direkter PII-Zugriffspfad (Mail-Link) → entfernen.
         await self.session.execute(
             delete(MagicLink).where(MagicLink.application_id == application_id)
+        )
+        # Aktive Applicant-Sessions des Antrags widerrufen (Kill-Switch): nach der
+        # Anonymisierung darf kein offener Magic-Link-Token mehr lesen/schreiben.
+        await auth_sessions.revoke_applicant_sessions(
+            self.session, application_id, now=datetime.now(UTC)
         )
         # Anhänge können PII enthalten (Belege/Dateinamen): DB-Zeile + Storage-Objekt
         # über den FilesService entfernen, wenn verfügbar; sonst nur die DB-Zeilen.

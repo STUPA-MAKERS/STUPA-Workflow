@@ -127,6 +127,34 @@ class AuthSession(UUIDPkMixin, CreatedAtMixin, Base):
     __table_args__ = (Index("ix_auth_session_principal_id", "principal_id"),)
 
 
+class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
+    """Server-Session eines Magic-Link-Antragstellers (security.md §1).
+
+    Gegenstück zu :class:`AuthSession` für den A-Pfad: der Browser hält nur eine
+    signierte, **opake** `sid` (HttpOnly-Cookie / Bearer); `application_id`+`scope`
+    liegen serverseitig. Damit ist ein Applicant-Token NICHT mehr allein aus
+    `SESSION_SECRET` fälschbar (es braucht eine existierende Zeile) und serverseitig
+    widerrufbar — per Logout (Zeile gelöscht) oder Kill-Switch (`revoked_at` gesetzt,
+    z. B. bei Anonymisierung). `application_id`-FK `ON DELETE CASCADE` räumt die
+    Sessions mit, wenn der Antrag selbst gelöscht wird."""
+
+    __tablename__ = "applicant_session"
+
+    sid: Mapped[str] = mapped_column(Text, unique=True)
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    scope: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_applicant_session_application_id", "application_id"),
+    )
+
+
 class GroupMapping(UUIDPkMixin, Base):
     """OIDC-Gruppe → Rolle (optional, scope-bar je Gremium)."""
 

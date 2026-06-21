@@ -5,9 +5,11 @@ Zwei Mechanismen:
 - **Principal-Session** (OIDC): serverseitige `auth_session`-Zeile, der Browser hält
   nur die signierte, opake `sid` (HttpOnly+Secure+SameSite=Lax). id/refresh-Token
   bleiben in der DB.
-- **Applicant-Token** (Magic-Link): zustandsloser, signierter Token
-  (`itsdangerous`) mit `application_id`+`scope`; einmal via Magic-Link erzeugt, danach
-  als Bearer/Cookie/`?t=` getauscht. Kein JWT im JS — Cookie ist HttpOnly.
+- **Applicant-Session** (Magic-Link): serverseitige `applicant_session`-Zeile; der
+  Browser hält — wie bei der Principal-Session — nur eine signierte, opake `sid`
+  (HttpOnly-Cookie / Bearer). `application_id`+`scope` liegen serverseitig. Damit ist
+  ein Token nicht mehr allein aus `SESSION_SECRET` fälschbar und serverseitig
+  widerrufbar (Logout / `revoked_at`). Kein JWT im JS — Cookie ist HttpOnly.
 - **OIDC-Transaktion**: signiertes, kurzlebiges Cookie mit `state`/`code_verifier`/
   `nonce` für den Auth-Code+PKCE-Flow (zustandslos, kein Server-Store nötig).
 
@@ -20,10 +22,10 @@ import secrets
 from typing import Any
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.models import AuthSession
+from app.modules.auth.models import ApplicantSession, AuthSession
 
 _APPLICANT_SALT = "applicant-session"
 _OIDC_TX_SALT = "oidc-tx"
@@ -37,24 +39,90 @@ def _serializer(secret: str, salt: str) -> URLSafeTimedSerializer:
 
 
 # --------------------------------------------------------------------------- #
-# Applicant-Token (zustandslos, signiert)
+# Applicant-Session (serverseitig, opake sid im signierten Cookie)
 # --------------------------------------------------------------------------- #
-def issue_applicant_token(secret: str, application_id: str, scope: str) -> str:
-    """Signierten Applicant-Token erzeugen (Scope = genau eine App + edit|view)."""
-    return _serializer(secret, _APPLICANT_SALT).dumps(
-        {"aid": application_id, "scope": scope}
-    )
+def _sign_applicant_sid(secret: str, sid: str) -> str:
+    return _serializer(secret, _APPLICANT_SALT).dumps(sid)
 
 
-def load_applicant_token(secret: str, token: str, max_age: int) -> dict[str, str] | None:
-    """Token verifizieren → `{"aid","scope"}` oder `None` (Signatur/Ablauf ungültig)."""
+def _unsign_applicant_sid(secret: str, value: str, max_age: int) -> str | None:
     try:
-        data = _serializer(secret, _APPLICANT_SALT).loads(token, max_age=max_age)
+        sid = _serializer(secret, _APPLICANT_SALT).loads(value, max_age=max_age)
     except (BadSignature, SignatureExpired):
         return None
-    if not isinstance(data, dict) or "aid" not in data or "scope" not in data:
+    return str(sid) if isinstance(sid, str) else None
+
+
+async def create_applicant_session(
+    db: AsyncSession,
+    *,
+    secret: str,
+    application_id: Any,
+    scope: str,
+    expires_at: Any,
+) -> str:
+    """`applicant_session`-Zeile anlegen; signiertes `sid`-Cookie zurückgeben.
+
+    Spiegelt :func:`create_principal_session`: die opake `sid` ist der einzige Anker —
+    ohne existierende Zeile ist kein Zugriff möglich, auch nicht mit `SESSION_SECRET`."""
+    sid = secrets.token_urlsafe(_SID_BYTES)
+    db.add(
+        ApplicantSession(
+            sid=sid,
+            application_id=application_id,
+            scope=scope,
+            expires_at=expires_at,
+        )
+    )
+    await db.flush()
+    return _sign_applicant_sid(secret, sid)
+
+
+async def load_applicant_session(
+    db: AsyncSession, *, secret: str, cookie_value: str, now: Any, max_age: int
+) -> ApplicantSession | None:
+    """Cookie → `applicant_session`-Zeile (None bei ungültig/abgelaufen/widerrufen)."""
+    sid = _unsign_applicant_sid(secret, cookie_value, max_age)
+    if sid is None:
         return None
-    return {"aid": str(data["aid"]), "scope": str(data["scope"])}
+    row = (
+        await db.execute(select(ApplicantSession).where(ApplicantSession.sid == sid))
+    ).scalar_one_or_none()
+    if row is None or row.revoked_at is not None or row.expires_at <= now:
+        return None
+    return row
+
+
+async def delete_applicant_session(
+    db: AsyncSession, *, secret: str, cookie_value: str, max_age: int
+) -> ApplicantSession | None:
+    """Logout: Applicant-Session-Zeile löschen (idempotent). None, wenn nichts traf."""
+    sid = _unsign_applicant_sid(secret, cookie_value, max_age)
+    if sid is None:
+        return None
+    row = (
+        await db.execute(select(ApplicantSession).where(ApplicantSession.sid == sid))
+    ).scalar_one_or_none()
+    if row is None:
+        return None
+    await db.delete(row)
+    await db.flush()
+    return row
+
+
+async def revoke_applicant_sessions(
+    db: AsyncSession, application_id: Any, *, now: Any
+) -> None:
+    """Kill-Switch: alle aktiven Applicant-Sessions eines Antrags widerrufen
+    (`revoked_at = now`). Idempotent; bei Anonymisierung/Löschung aufgerufen."""
+    await db.execute(
+        update(ApplicantSession)
+        .where(
+            ApplicantSession.application_id == application_id,
+            ApplicantSession.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
 
 
 # --------------------------------------------------------------------------- #
