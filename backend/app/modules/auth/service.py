@@ -159,7 +159,17 @@ async def verify_magic_link(
     )
     scope: ApplicantScope = "edit" if row.scope == "edit" else "view"
     app_id = str(row.application_id)
-    session_token = sessions.issue_applicant_token(settings.session_secret, app_id, scope)
+    # Serverseitige Session anlegen (statt zustandslosem Token): die zurückgegebene
+    # opake `sid` ist nur mit existierender `applicant_session`-Zeile gültig — ein
+    # allein aus `SESSION_SECRET` geschmiedeter Token greift nicht (security.md §1).
+    expires_at = now + timedelta(hours=settings.applicant_session_ttl_hours)
+    session_token = await sessions.create_applicant_session(
+        db,
+        secret=settings.session_secret,
+        application_id=row.application_id,
+        scope=scope,
+        expires_at=expires_at,
+    )
     return app_id, scope, session_token
 
 

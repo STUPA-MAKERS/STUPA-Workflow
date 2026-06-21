@@ -157,6 +157,24 @@ def test_logout_with_cookie_returns_rp_logout_url(
     assert "id_token_hint=idt" in url
 
 
+def test_logout_revokes_applicant_session(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Logout widerruft auch eine vorhandene Applicant-Session + löscht ihr Cookie."""
+    seen: dict[str, object] = {}
+
+    async def _del_ap(*a: object, **k: object) -> None:
+        seen["cookie_value"] = k.get("cookie_value")
+        return None
+
+    monkeypatch.setattr(router_mod.sessions, "delete_applicant_session", _del_ap)
+    enabled_client.cookies.set(ENABLED.applicant_cookie_name, "ap-x")
+    resp = enabled_client.post("/api/auth/logout", headers=_csrf(enabled_client, ENABLED))
+    assert resp.status_code == 200
+    assert seen["cookie_value"] == "ap-x"
+    assert ENABLED.applicant_cookie_name in resp.headers.get("set-cookie", "")
+
+
 def test_logout_disabled_oidc_no_url(
     disabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

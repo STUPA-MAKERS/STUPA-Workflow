@@ -29,7 +29,8 @@ from app.modules.applications.models import (
 )
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.models import AuditEntry
-from app.modules.auth.models import AuthSession, Principal
+from app.modules.auth import sessions
+from app.modules.auth.models import ApplicantSession, AuthSession, Principal
 from app.modules.budget.tree_models import Budget
 from app.modules.files.models import Attachment
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
@@ -172,6 +173,32 @@ async def test_erasure_applicant_execute(session: AsyncSession) -> None:
     # zweites Ausführen → ConflictError (nicht mehr 'open')
     with pytest.raises(ConflictError):
         await erasure.execute(req.id, actor="admin")
+
+
+async def test_anonymize_revokes_applicant_sessions(session: AsyncSession) -> None:
+    """Kill-Switch (ISSUE_TOKEN): Anonymisierung widerruft offene Applicant-Sessions —
+    ein vor der Löschung ausgegebener Magic-Link-Token greift danach nicht mehr."""
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id))
+    await sessions.create_applicant_session(
+        session,
+        secret="x" * 16,
+        application_id=app.id,
+        scope="edit",
+        expires_at=datetime.now(UTC) + timedelta(hours=12),
+    )
+    await session.commit()
+
+    await svc.anonymize(app.id, actor="admin")
+
+    rows = (
+        await session.execute(
+            select(ApplicantSession).where(ApplicantSession.application_id == app.id)
+        )
+    ).scalars().all()
+    assert rows  # Zeile bleibt (Audit), ist aber widerrufen
+    assert all(r.revoked_at is not None for r in rows)
 
 
 # --------------------------------------------------------------------------- #

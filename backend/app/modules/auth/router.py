@@ -136,9 +136,11 @@ async def callback(
 async def logout(
     request: Request, db: DbSession, settings: SettingsDep, response: Response
 ) -> LogoutOut:
-    """Server-Session beenden + Cookie löschen (idempotent). Liefert für OIDC die
-    RP-Initiated-Logout-URL (Keycloak `end_session`, id_token_hint), damit das FE auch
-    die IdP-SSO-Session beendet (security.md §2) — sonst überlebt der SSO-Login."""
+    """Server-Session(en) beenden + Cookies löschen (idempotent). Beendet sowohl die
+    Principal- als auch eine etwaige Applicant-Session (serverseitig widerrufbar,
+    security.md §1). Liefert für OIDC die RP-Initiated-Logout-URL (Keycloak
+    `end_session`, id_token_hint), damit das FE auch die IdP-SSO-Session beendet
+    (security.md §2) — sonst überlebt der SSO-Login."""
     logout_url: str | None = None
     cookie = request.cookies.get(settings.session_cookie_name)
     if cookie:
@@ -148,10 +150,19 @@ async def logout(
             cookie_value=cookie,
             max_age=settings.session_ttl_hours * 3600,
         )
-        await db.commit()
         if settings.oidc_enabled and ended is not None:
             logout_url = oidc.end_session_url(settings, id_token=ended.id_token)
+    ap_cookie = request.cookies.get(settings.applicant_cookie_name)
+    if ap_cookie:
+        await sessions.delete_applicant_session(
+            db,
+            secret=settings.session_secret,
+            cookie_value=ap_cookie,
+            max_age=settings.applicant_session_ttl_hours * 3600,
+        )
+    await db.commit()
     response.delete_cookie(settings.session_cookie_name, path="/")
+    response.delete_cookie(settings.applicant_cookie_name, path="/")
     return LogoutOut(logout_url=logout_url)
 
 
@@ -315,7 +326,7 @@ async def verify_magic_link(
     response.set_cookie(
         settings.applicant_cookie_name,
         token,
-        max_age=settings.session_ttl_hours * 3600,
+        max_age=settings.applicant_session_ttl_hours * 3600,
         **_cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     return MagicLinkVerifyOut(application_id=UUID(app_id), scope=scope)

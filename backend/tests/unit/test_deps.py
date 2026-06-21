@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -18,7 +19,7 @@ from app.deps import (
     require_principal,
 )
 from app.modules.auth import sessions
-from app.modules.auth.models import AuthSession
+from app.modules.auth.models import ApplicantSession, AuthSession
 from app.settings import Settings, load_settings
 from app.shared.errors import ForbiddenError, UnauthorizedError
 from tests._support.auth_fakes import fake_session, result
@@ -96,12 +97,32 @@ def test_require_applicant_ok() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# get_current_applicant (echte signierte Token)
+# get_current_applicant (serverseitige Session: signierte opake sid → DB-Zeile)
 # --------------------------------------------------------------------------- #
+def _applicant_row(
+    *, sid: str = "as1", application_id: str = "a1", scope: str = "edit",
+    expired: bool = False, revoked: bool = False,
+) -> ApplicantSession:
+    now = datetime.now(UTC)
+    row = ApplicantSession(
+        sid=sid,
+        application_id=application_id,
+        scope=scope,
+        expires_at=now - timedelta(seconds=1) if expired else now + timedelta(hours=1),
+    )
+    if revoked:
+        row.revoked_at = now
+    return row
+
+
+def _cookie(sid: str = "as1") -> str:
+    return sessions._sign_applicant_sid(SECRET, sid)
+
+
 async def test_get_current_applicant_bearer() -> None:
-    token = sessions.issue_applicant_token(SECRET, "a1", "edit")
-    req = _request(headers={"Authorization": f"Bearer {token}"})
-    applicant = await get_current_applicant(req, _settings())
+    req = _request(headers={"Authorization": f"Bearer {_cookie()}"})
+    db = fake_session(result(_applicant_row(application_id="a1", scope="edit")))
+    applicant = await get_current_applicant(req, db, _settings())
     assert applicant is not None
     assert applicant.application_id == "a1"
     assert applicant.scope == "edit"
@@ -109,32 +130,43 @@ async def test_get_current_applicant_bearer() -> None:
 
 async def test_get_current_applicant_query_param_not_accepted() -> None:
     # `?t=` wird bewusst NICHT mehr akzeptiert (Query-Token-Leak, security.md §1).
-    token = sessions.issue_applicant_token(SECRET, "a2", "view")
-    req = _request(query=f"t={token}")
-    assert await get_current_applicant(req, _settings()) is None
+    req = _request(query=f"t={_cookie()}")
+    assert await get_current_applicant(req, fake_session(), _settings()) is None
 
 
 async def test_get_current_applicant_cookie() -> None:
-    token = sessions.issue_applicant_token(SECRET, "a3", "edit")
-    req = _request(cookies={_settings().applicant_cookie_name: token})
-    applicant = await get_current_applicant(req, _settings())
+    req = _request(cookies={_settings().applicant_cookie_name: _cookie()})
+    db = fake_session(result(_applicant_row(application_id="a3")))
+    applicant = await get_current_applicant(req, db, _settings())
     assert applicant is not None
     assert applicant.application_id == "a3"
 
 
 async def test_get_current_applicant_no_token() -> None:
-    assert await get_current_applicant(_request(), _settings()) is None
+    assert await get_current_applicant(_request(), fake_session(), _settings()) is None
 
 
 async def test_get_current_applicant_invalid_token() -> None:
     req = _request(headers={"Authorization": "Bearer garbage"})
-    assert await get_current_applicant(req, _settings()) is None
+    assert await get_current_applicant(req, fake_session(), _settings()) is None
+
+
+async def test_get_current_applicant_forged_secret_no_row() -> None:
+    # KERN-REGRESSION (ISSUE_TOKEN): korrekt signierte sid, aber keine DB-Zeile → None.
+    req = _request(headers={"Authorization": f"Bearer {_cookie('forged')}"})
+    assert await get_current_applicant(req, fake_session(result()), _settings()) is None
+
+
+async def test_get_current_applicant_revoked() -> None:
+    req = _request(headers={"Authorization": f"Bearer {_cookie()}"})
+    db = fake_session(result(_applicant_row(revoked=True)))
+    assert await get_current_applicant(req, db, _settings()) is None
 
 
 async def test_get_current_applicant_bad_scope() -> None:
-    token = sessions.issue_applicant_token(SECRET, "a4", "bogus")
-    req = _request(headers={"Authorization": f"Bearer {token}"})
-    assert await get_current_applicant(req, _settings()) is None
+    req = _request(headers={"Authorization": f"Bearer {_cookie()}"})
+    db = fake_session(result(_applicant_row(scope="bogus")))
+    assert await get_current_applicant(req, db, _settings()) is None
 
 
 # --------------------------------------------------------------------------- #
