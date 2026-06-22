@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { SwUpdate, type VersionEvent } from '@angular/service-worker';
 import { Subject } from 'rxjs';
 import { SwUpdateService } from './sw-update.service';
@@ -10,6 +10,7 @@ class FakeSwUpdate {
   isEnabled = true;
   readonly versionUpdates = new Subject<VersionEvent>();
   activateUpdate = jest.fn(() => Promise.resolve(true));
+  checkForUpdate = jest.fn(async () => false);
 }
 
 describe('SwUpdateService', () => {
@@ -68,4 +69,33 @@ describe('SwUpdateService', () => {
     expect(sw.activateUpdate).not.toHaveBeenCalled();
     expect(showSpy).not.toHaveBeenCalled();
   });
+
+  it('actively checks for updates on focus event', fakeAsync(() => {
+    configure(true);
+    svc.init();
+
+    // Verify that checkForUpdate is not called initially
+    expect(sw.checkForUpdate).not.toHaveBeenCalled();
+    
+    // Dispatch focus event
+    window.dispatchEvent(new Event('focus'));
+    tick();
+    
+    // Now checkForUpdate should have been called
+    expect(sw.checkForUpdate).toHaveBeenCalled();
+  }));
+
+  it('actively checks for updates on interval', fakeAsync(() => {
+    configure(true);
+    svc.init();
+
+    // Initially, no check
+    expect(sw.checkForUpdate).not.toHaveBeenCalled();
+    
+    // Advance timers by 5 minutes (300,000 ms)
+    tick(5 * 60 * 1000);
+    
+    // Now checkForUpdate should have been called
+    expect(sw.checkForUpdate).toHaveBeenCalled();
+  }));
 });

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { SwUpdate, type VersionReadyEvent } from '@angular/service-worker';
-import { filter } from 'rxjs';
+import { filter, concatMap } from 'rxjs';
+import { interval, fromEvent } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 
@@ -9,6 +10,11 @@ import { ToastService } from '@stupa-makers/ui-kit';
  * App-Version (`VERSION_READY`), wird sie aktiviert und ein dauerhafter Toast
  * weist auf das nötige Neuladen hin. Ohne SW (Dev-Modus, alte Browser) ist
  * `isEnabled` false und nichts passiert.
+ *
+ * Aktive Aktualisierungserkennung: Der Service prüft auf Updates bei:
+ * - Regelmäßigen Intervallen (alle 5 Minuten)
+ * - Wenn die App in den Vordergrund rückt (focus event)
+ * → Benutzer sehen das Toast "neue Version verfügbar" zeitnah nach Deployments
  */
 @Injectable({ providedIn: 'root' })
 export class SwUpdateService {
@@ -18,6 +24,8 @@ export class SwUpdateService {
 
   init(): void {
     if (!this.updates.isEnabled) return;
+
+    // Höre auf Updates, die bereit zur Aktivierung sind
     this.updates.versionUpdates
       .pipe(filter((e): e is VersionReadyEvent => e.type === 'VERSION_READY'))
       .subscribe(() => {
@@ -25,5 +33,17 @@ export class SwUpdateService {
           this.toast.show(this.i18n.translate('pwa.updateReady'), 'info', 0);
         });
       });
+
+    // Prüfe alle 5 Minuten auf Updates (300.000 ms)
+    interval(5 * 60 * 1000)
+      .pipe(concatMap(() => this.updates.checkForUpdate()))
+      .subscribe();
+
+    // Prüfe auf Updates, wenn die App in den Vordergrund kommt
+    if (typeof window !== 'undefined') {
+      fromEvent(window, 'focus')
+        .pipe(concatMap(() => this.updates.checkForUpdate()))
+        .subscribe();
+    }
   }
 }
