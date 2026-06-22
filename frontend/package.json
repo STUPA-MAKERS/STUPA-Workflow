@@ -46,7 +46,7 @@
     "rxjs": "~7.8.0",
     "tiptap-markdown": "^0.9.0",
     "tslib": "^2.3.0",
-    "zone.js": "~0.15.0"
+    "zone.js": "~0.16.2"
   },
   "devDependencies": {
     "@angular-eslint/builder": "^20.0.0",
