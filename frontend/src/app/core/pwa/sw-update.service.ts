@@ -1,6 +1,6 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, effect } from '@angular/core';
 import { SwUpdate, type VersionReadyEvent } from '@angular/service-worker';
-import { filter, concatMap, delay } from 'rxjs';
+import { filter, concatMap } from 'rxjs';
 import { interval, fromEvent } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -12,15 +12,16 @@ import { ToastService } from '@stupa-makers/ui-kit';
  * `isEnabled` false und nichts passiert.
  *
  * Aktive Aktualisierungserkennung: Der Service prüft auf Updates bei:
- * - SOFORT beim App-Start (boostrap-Deadlock überwinden)
+ * - Nach einer kurzen Verzögerung beim App-Start (boostrap-Deadlock überwinden)
  * - Regelmäßigen Intervallen (alle 5 Minuten)
  * - Wenn die App in den Vordergrund rückt (focus event)
  * → Benutzer sehen das Toast "neue Version verfügbar" zeitnah nach Deployments
  *
  * BOOTSTRAP DEADLOCK FIX: Alte Versionen haben die neue Polling-Logik nicht.
  * Ohne initialen Update-Check beim Start würden sie nie die neue Version
- * laden und damit nie die Polling-Logik bekommen. Daher: checkForUpdate()
- * wird sofort beim init() aufgerufen, auch bevor die alte Version liest.
+ * laden und damit nie die Polling-Logik bekommen. Daher wird checkForUpdate()
+ * nach einer kurzen Verzögerung aufgerufen, um sicherzustellen, dass der
+ * Service Worker bereits registriert ist.
  */
 @Injectable({ providedIn: 'root' })
 export class SwUpdateService {
@@ -40,23 +41,25 @@ export class SwUpdateService {
         });
       });
 
-    // BOOTSTRAP-FIX: Prüfe SOFORT auf Updates beim App-Start (after a short delay
-    // to let the app settle). Dies überwindet das Deadlock-Problem, bei dem alte
-    // Versionen (ohne Polling) nie die neue Version mit Polling-Logik laden würden.
-    // Mit einer kurzen Verzögerung (100ms) geben wir dem Angular-Change-Detection
-    // Zeit, sich zu stabilisieren, bevor wir einen HTTP-Request starten.
-    this.updates
-      .checkForUpdate()
-      .then(() => {
-        // Update check completed; now set up continuous polling
-        this.setupPeriodicPolling();
-        this.setupFocusListener();
-      })
-      .catch(() => {
-        // Even if the initial check fails, set up polling for next time
-        this.setupPeriodicPolling();
-        this.setupFocusListener();
-      });
+    // BOOTSTRAP-FIX: Warte eine kurze Zeit (1 Sekunde), damit der Service Worker
+    // Zeit hat, sich zu registrieren, bevor wir den ersten Update-Check durchführen.
+    // Die registerWhenStable-Strategie registriert den SW nach 30s oder wenn die App
+    // stabil ist. Mit dieser Verzögerung geben wir dem SW Zeit, registriert zu werden,
+    // bevor wir checkForUpdate() aufrufen.
+    setTimeout(() => {
+      this.checkForUpdatesOnce();
+      this.setupPeriodicPolling();
+      this.setupFocusListener();
+    }, 1000);
+  }
+
+  private checkForUpdatesOnce(): void {
+    // Versuche SOFORT einen Update-Check (nachdem der SW registriert ist).
+    // Dies überwindet das Deadlock-Problem, bei dem alte Versionen ohne Polling
+    // nie die neue Version mit Polling-Logik laden würden.
+    void this.updates.checkForUpdate().catch(() => {
+      // Fehler ignorieren und weitermachen
+    });
   }
 
   private setupPeriodicPolling(): void {

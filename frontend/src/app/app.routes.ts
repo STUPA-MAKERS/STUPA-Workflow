@@ -1,5 +1,6 @@
 import type { Routes } from '@angular/router';
 import { authGuard } from '@core/auth/auth.guard';
+import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { ShellComponent } from './layout/shell.component';
 
 /**
@@ -15,6 +16,8 @@ export const routes: Routes = [
     children: [
       {
         path: '',
+        // Angemeldete → /dashboard; offene Landeseite nur für Applicants (#home-applicant).
+        canActivate: [homeRedirectGuard],
         loadComponent: () => import('./pages/home.component').then((m) => m.HomeComponent),
       },
       {

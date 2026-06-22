@@ -24,10 +24,9 @@
 .hero__cta:hover {
   background: var(--color-primary-hover);
 }
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: var(--space-5);
+.hero__note {
+  margin-top: var(--space-6);
+  font-size: var(--fs-sm);
 }
 /* Mobil (≤768px): kompakterer Hero, CTA als volle Tap-Fläche. */
 @media (max-width: 768px) {

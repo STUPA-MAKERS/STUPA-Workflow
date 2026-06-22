@@ -324,16 +324,11 @@ export const de = {
   'role.admin': 'Administrator',
   'role.member': 'Mitglied',
 
-  'home.heading': 'STUPA Workflow',
-  'home.subtitle': 'Anträge, Abstimmungen, Sitzungsprotokolle und Budget — an einem Ort.',
+  'home.heading': 'Antrag stellen',
+  'home.subtitle': 'Kein Konto nötig — stell deinen Antrag in wenigen Minuten.',
   'home.cta': 'Jetzt Antrag stellen',
-  'home.cards.applications.title': 'Anträge',
-  'home.cards.applications.body':
-    'Stelle Anträge an das Studierendenparlament und verfolge ihren Status.',
-  'home.cards.voting.title': 'Live-Vote',
-  'home.cards.voting.body': 'Nimm an Abstimmungen teil und sieh Ergebnisse in Echtzeit.',
-  'home.cards.budget.title': 'Budget',
-  'home.cards.budget.body': 'Behalte Budgets und Mittelvergabe im Blick.',
+  'home.statusNote':
+    'Bereits eingereicht? Den Status verfolgst du über den Link in deiner Bestätigungs-E-Mail.',
 
   'placeholder.fallback': 'Bereich',
   'placeholder.badge': 'In Arbeit',
@@ -2377,16 +2372,11 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'role.admin': 'Administrator',
   'role.member': 'Member',
 
-  'home.heading': 'STUPA Workflow',
-  'home.subtitle': 'Applications, votes, meeting minutes and budget — in one place.',
+  'home.heading': 'Submit an application',
+  'home.subtitle': 'No account needed — submit your application in minutes.',
   'home.cta': 'Submit an application',
-  'home.cards.applications.title': 'Applications',
-  'home.cards.applications.body':
-    'Submit applications to the Student Parliament and track their status.',
-  'home.cards.voting.title': 'Live vote',
-  'home.cards.voting.body': 'Take part in votes and see results in real time.',
-  'home.cards.budget.title': 'Budget',
-  'home.cards.budget.body': 'Keep an eye on budgets and allocations.',
+  'home.statusNote':
+    'Already submitted? Track its status via the link in your confirmation email.',
 
   'placeholder.fallback': 'Section',
   'placeholder.badge': 'In progress',
