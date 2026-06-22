@@ -49,7 +49,12 @@ class _StubStorage:
     async def get_stream(
         self, key: str, *, chunk_size: int = 64 * 1024
     ) -> AsyncIterator[bytes]:
-        yield self._blobs[key]
+        # ``ObjectStorage.get_stream`` ist eine Coroutine, die einen AsyncIterator
+        # ZURÜCKGIBT (kein async-Generator) — daher inneren Generator + ``return``.
+        async def _iter() -> AsyncIterator[bytes]:
+            yield self._blobs[key]
+
+        return _iter()
 
     async def remove(self, key: str) -> None:
         self._blobs.pop(key, None)

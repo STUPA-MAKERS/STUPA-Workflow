@@ -1,6 +1,6 @@
 import { type Observable, Subject, of, throwError } from 'rxjs';
 import { render } from '@testing-library/angular';
-import { ToastService } from '@shared/ui/toast/toast.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin/admin-api.service';
 import { BudgetTreeComponent } from './budget-tree.component';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
