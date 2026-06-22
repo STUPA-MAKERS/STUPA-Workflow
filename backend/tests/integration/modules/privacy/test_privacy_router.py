@@ -335,10 +335,13 @@ async def test_auskunft_xlsx_and_audit_records_subject_email(
     ).all()
     assert len(rows) == 1
     entry = rows[0]
-    # … und er hält die angefragte E-Mail fest (Rechenschaft: WESSEN Daten exportiert).
-    assert entry.target_id == email
+    # … und er hält die KANONISIERTE E-Mail fest (Rechenschaft: WESSEN Daten exportiert).
+    # Der Router kanonisiert die Anfrage-Adresse (Kleinschreibung), damit ein konsistenter
+    # target_id im Audit landet — die Assertion spiegelt diese Kanonisierung.
+    canonical_email = email.lower()
+    assert entry.target_id == canonical_email
     assert entry.data is not None
-    assert entry.data.get("email") == email
+    assert entry.data.get("email") == canonical_email
     assert entry.data.get("hasPrincipal") is False
     assert entry.data.get("applications") == 1
 

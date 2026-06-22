@@ -56,7 +56,13 @@ class Deadline(UUIDPkMixin, Base):
     kind: Mapped[str] = mapped_column(Text)
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # = Transition-/Action-Ref; NULL = reine Erinnerungs-/Anzeige-Frist ohne Auto-Wirkung.
-    action_on_pass: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # ``none_as_null=True``: Python ``None`` MUSS als SQL NULL (nicht als JSONB-Skalar
+    # ``'null'``) gespeichert werden — sonst matcht ``action_on_pass IS NOT NULL`` (Scan +
+    # Partial-Index ``ix_deadline_due_at_action``) auch reine Erinnerungs-Fristen, und
+    # ``mark_fired`` (setzt ``None``) entfernte die Frist nie aus dem Scan (Doppel-Feuern).
+    action_on_pass: Mapped[dict | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
     reminded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

@@ -25,7 +25,12 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import Gremium, MailList
+from app.modules.admin.models import (
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+    MailList,
+)
 from app.modules.auth.models import Principal
 from app.modules.files.storage import ObjectStorage
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
@@ -125,6 +130,31 @@ async def _seed_meeting(
     absent_member = Principal(sub=f"abs-{uuid.uuid4()}", display_name=_ABSENT_NAME)
     session.add_all([protokollant, present_member, absent_member])
     await session.flush()
+    # Gremium-Mitgliedschaften für die beiden Mitglieder, damit die Beschlussfähigkeit
+    # (Anwesende vs. aktive Mitglieder) überhaupt berechenbar ist — sonst liefert
+    # ``_quorate`` ``None`` und die Frontmatter-Zeile fehlt in beiden Varianten.
+    role = GremiumRole(
+        gremium_id=gremium.id,
+        key=f"r-{uuid.uuid4()}",
+        name_i18n={"de": "Mitglied"},
+        permissions=["vote.cast"],
+    )
+    session.add(role)
+    await session.flush()
+    session.add_all(
+        [
+            GremiumMembership(
+                principal_id=present_member.id,
+                gremium_id=gremium.id,
+                gremium_role_id=role.id,
+            ),
+            GremiumMembership(
+                principal_id=absent_member.id,
+                gremium_id=gremium.id,
+                gremium_role_id=role.id,
+            ),
+        ]
+    )
     meeting = Meeting(
         gremium_id=gremium.id,
         title="Sitzung",
