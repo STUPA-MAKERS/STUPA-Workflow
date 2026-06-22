@@ -10,6 +10,7 @@ class FakeSwUpdate {
   isEnabled = true;
   readonly versionUpdates = new Subject<VersionEvent>();
   activateUpdate = jest.fn(() => Promise.resolve(true));
+  checkForUpdate = jest.fn(async () => false);
 }
 
 describe('SwUpdateService', () => {
@@ -34,6 +35,7 @@ describe('SwUpdateService', () => {
     const subscribeSpy = jest.spyOn(sw.versionUpdates, 'subscribe');
     svc.init();
     expect(subscribeSpy).not.toHaveBeenCalled();
+    expect(sw.checkForUpdate).not.toHaveBeenCalled();
     sw.versionUpdates.next({ type: 'VERSION_READY' } as VersionEvent);
     expect(sw.activateUpdate).not.toHaveBeenCalled();
     expect(showSpy).not.toHaveBeenCalled();
@@ -67,5 +69,16 @@ describe('SwUpdateService', () => {
     } as VersionEvent);
     expect(sw.activateUpdate).not.toHaveBeenCalled();
     expect(showSpy).not.toHaveBeenCalled();
+  });
+
+  it('checks for updates immediately on app init (bootstrap deadlock fix)', () => {
+    configure(true);
+    svc.init();
+
+    // The key fix: checkForUpdate is called on init to bootstrap the polling logic.
+    // This overcomes the deadlock where old versions (without polling) would never
+    // load the new version (with polling logic). With this immediate check, the
+    // old version will at least try to load updates once on startup.
+    expect(sw.checkForUpdate).toHaveBeenCalled();
   });
 });
