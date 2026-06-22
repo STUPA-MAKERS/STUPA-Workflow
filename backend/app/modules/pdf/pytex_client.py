@@ -40,7 +40,13 @@ _LIVE_EVAL_TRIGGER_RE = re.compile(
 )
 # Der ausgewertete pytex-Marker (``\iffalse{pytex(...)}\fi``) hat im Body nichts
 # verloren — sein Vorhandensein ist ebenfalls ein nicht-trusted-fähiges Signal.
-_PYTEX_MARKER_RE = re.compile(r"\\iffalse\s*\{?\s*pytex\s*\(", re.DOTALL | re.IGNORECASE)
+# Das optionale ``{`` steht IM optionalen Block ``(?:\{\s*)?`` (statt ``\{?`` zwischen
+# zwei ``\s*``): ohne diesen Anker könnten zwei benachbarte ``\s*`` denselben
+# Whitespace-Lauf auf O(N²)-viele Arten aufteilen (katastrophales Backtracking / ReDoS
+# bei ``\iffalse``+langem Whitespace ohne folgendes ``pytex``).
+_PYTEX_MARKER_RE = re.compile(
+    r"\\iffalse\s*(?:\{\s*)?pytex\s*\(", re.DOTALL | re.IGNORECASE
+)
 
 
 def _markdown_has_eval_trigger(markdown: str) -> bool:

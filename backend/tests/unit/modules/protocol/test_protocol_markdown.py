@@ -185,6 +185,19 @@ def test_sanitizer_strips_iffalse_pytex_marker() -> None:
     assert "vor" in out and "nach" in out
 
 
+def test_sanitizer_is_linear_on_adversarial_open_brackets() -> None:
+    """Regressionsschutz gegen ReDoS: ein langer ``[``-Lauf ohne schließende Klammer
+    ließ den Label-Scan ab jeder ``[``-Position neu laufen → O(N²)-Backtracking
+    (CI-Hang in schemathesis). Muss in Millisekunden statt Minuten durchlaufen."""
+    import time
+
+    adversarial = "[" * 200_000
+    start = time.perf_counter()
+    out = sanitize_user_markdown(adversarial)
+    assert time.perf_counter() - start < 1.0
+    assert out == adversarial  # kein Treffer → unverändert
+
+
 def test_sanitizer_keeps_normal_markdown_intact() -> None:
     src = (
         "# Heading\n\n"

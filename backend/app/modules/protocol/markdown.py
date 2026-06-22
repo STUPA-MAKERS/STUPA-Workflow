@@ -64,7 +64,11 @@ from app.modules.pdf.markdown import _md_escape, _yaml_scalar
 # Echte Referenz-Links (``[foo]: #section``), Inline-Links/Bilder und der
 # Abstimmungs-Callout (``> [!abstimmung]``) bleiben unberührt.
 _EVAL_REFDEF_RE = re.compile(
-    r"\[[^\]]*\]\s*:\s*#"  # Definitions-Kopf, Ziel exakt ``#`` …
+    # Label-Inhalt schließt BEIDE Klammern aus (``[^\][]`` statt ``[^\]]``): eine
+    # CommonMark-Referenz-Definition trägt im Label kein unescaptes ``[``, und ohne
+    # diesen Ausschluss würde ein langer ``[``-Lauf (ohne ``]``) den Label-Scan ab
+    # JEDER ``[``-Position wiederholen → O(N²)-Backtracking (ReDoS, #sec-audit).
+    r"\[[^\][]*\]\s*:\s*#"  # Definitions-Kopf, Ziel exakt ``#`` …
     r"(?=[ \t\r\n\"'(]|$)"  # … bare-``#`` (von WS/Titel-Delimiter/Zeilenende gefolgt)
     r"[ \t]*"  # Whitespace vor optionalem Titel
     r"(?:\r?\n[ \t]*)?"  # Titel darf in der mehrzeiligen Form auf der Folgezeile stehen

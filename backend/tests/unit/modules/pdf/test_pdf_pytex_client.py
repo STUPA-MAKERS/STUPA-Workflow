@@ -10,10 +10,27 @@ import httpx
 import pytest
 import respx
 
-from app.modules.pdf.pytex_client import PytexClient, PytexError, build_pytex_client
+from app.modules.pdf.pytex_client import (
+    PytexClient,
+    PytexError,
+    _markdown_has_eval_trigger,
+    build_pytex_client,
+)
 from app.settings import load_settings
 
 BASE = "http://pytex:8099"
+
+
+def test_eval_trigger_check_is_linear_on_adversarial_marker() -> None:
+    """Regressionsschutz gegen ReDoS: ``\\iffalse`` + langer Whitespace OHNE folgendes
+    ``pytex(`` darf NICHT katastrophal backtracken (vorher O(N²) → CI-Hang). Kein
+    Treffer + in Millisekunden statt Minuten."""
+    import time
+
+    adversarial = "\\iffalse" + " " * 200_000 + "{"
+    start = time.perf_counter()
+    assert _markdown_has_eval_trigger(adversarial) is False
+    assert time.perf_counter() - start < 1.0
 
 
 def _client() -> PytexClient:
