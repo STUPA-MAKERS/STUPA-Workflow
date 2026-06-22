@@ -170,7 +170,7 @@ export const de = {
   'expenses.add': 'Buchung hinzufügen',
   'expenses.export': 'Export',
   'expenses.transfer': 'Übertrag',
-  'expenses.transferTitle': 'Übertrag (Kostenstelle → Kostenstelle)',
+  'expenses.transferTitle': 'Übertrag',
   'expenses.transferFrom': 'Von Kostenstelle',
   'expenses.transferTo': 'Zu Kostenstelle',
   'expenses.transferConfirm': 'Übertragen',
@@ -937,7 +937,7 @@ export const de = {
   'fints.tabFile': 'Datei-Import',
   'fints.account': 'Konto',
   'fints.sync': 'Umsätze abrufen',
-  'fints.noAccounts': 'Kein Konto mit FinTS-Zugang konfiguriert (Verwaltung → Konten).',
+  'fints.noAccounts': 'Kein Konto mit FinTS-Zugang konfiguriert.',
   'fints.tanPrompt': 'Bitte TAN eingeben oder in der Banking-App freigeben.',
   'fints.tan': 'TAN',
   'fints.tanImageAlt': 'TAN-Grafik (photoTAN/QR-TAN) zum Scannen',
@@ -948,7 +948,8 @@ export const de = {
   'fints.file': 'CAMT.053- oder MT940-Datei',
   'fints.fileChoose': 'Datei auswählen',
   'fints.drop': 'Datei hier ablegen',
-  'fints.fileHint': 'Kontoauszug aus dem Online-Banking exportieren (CAMT/CSV-Format CAMT.053 oder MT940).',
+  'fints.fileHint':
+    'Kontoauszug aus dem Online-Banking exportieren (CAMT/CSV-Format CAMT.053 oder MT940).',
   'fints.openLines': 'Offene Umsätze',
   'fints.loading': 'Lädt …',
   'fints.empty': 'Keine offenen Umsätze zum Abgleich.',
@@ -965,8 +966,7 @@ export const de = {
   'fints.errFile': 'Datei ist weder gültiges CAMT.053 noch MT940.',
   'fints.errBook': 'Buchen fehlgeschlagen.',
   'budget.tree.title': 'Budgets & Kostenstellen',
-  'budget.tree.subtitle':
-    'Hierarchische Budgets: Budget → Kostenstellen. Verfügbar = Roll-Down, gebunden = Roll-Up.',
+  'budget.tree.subtitle': 'Budgets und ihnen untergeordnete Kostenstellen als Baum.',
   'budget.tree.budget': 'Budget',
   'budget.tree.budgetPlaceholder': 'Budget wählen …',
   'budget.tree.fyEmpty': 'Noch keine Haushaltsjahre in diesem Budget.',
@@ -1017,7 +1017,7 @@ export const de = {
   'budget.tree.col.color': 'Farbe',
   'budget.tree.stateConfig': 'Beantragt/Gebunden-States',
   'budget.tree.stateConfigHint':
-    'Flow-States, die als angenommen (→ gebunden) bzw. abgelehnt (→ ausgeschlossen) zählen. Alles andere ist beantragt.',
+    'Flow-States, die als angenommen (gebunden) bzw. abgelehnt (ausgeschlossen) zählen. Alles andere ist beantragt.',
   'budget.tree.stateCol': 'Status',
   'budget.tree.accepted': 'Angenommen',
   'budget.tree.denied': 'Abgelehnt',
@@ -1479,21 +1479,20 @@ export const de = {
   'admin.audit.msg.vote_cast': '{actor} hat eine Stimme abgegeben ({target}).',
   'admin.audit.msg.config_change': '{actor} hat die Konfiguration geändert ({target}).',
   'admin.audit.msg.config_activation': '{actor} hat eine Konfiguration aktiviert ({target}).',
-  'admin.audit.msg.config_revert': '{actor} hat eine Konfigurationsänderung zurückgenommen ({target}).',
+  'admin.audit.msg.config_revert':
+    '{actor} hat eine Konfigurationsänderung zurückgenommen ({target}).',
   'admin.audit.revert.action': 'Zurücknehmen',
   'admin.audit.revert.title': 'Änderung zurücknehmen?',
   'admin.audit.revert.confirm':
     'Dieser Vorgang wird auf den Stand davor zurückgesetzt. Die Rücknahme wird selbst protokolliert und ist – wo möglich – umkehrbar.',
   'admin.audit.revert.success': 'Änderung zurückgenommen.',
   'admin.audit.revert.error': 'Rücknahme fehlgeschlagen.',
-  'admin.audit.revert.conflict':
-    'Es gibt eine neuere Änderung — bitte diese zuerst zurücknehmen.',
+  'admin.audit.revert.conflict': 'Es gibt eine neuere Änderung — bitte diese zuerst zurücknehmen.',
   'admin.audit.revert.nothingToRevert':
     'Dies ist der erste Stand — es gibt nichts, worauf zurückgesetzt werden könnte.',
   'admin.audit.revert.alreadyReverted':
     'Bereits zurückgenommen — es gibt nichts mehr zurückzunehmen.',
-  'admin.audit.revert.notRevertable':
-    'Dieser Vorgang kann nicht zurückgenommen werden.',
+  'admin.audit.revert.notRevertable': 'Dieser Vorgang kann nicht zurückgenommen werden.',
   'admin.config.diff.none': 'Keine Feldänderungen.',
   'admin.config.diff.changed': 'Geändert',
   'admin.config.diff.added': 'Hinzugefügt',
@@ -2226,7 +2225,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.add': 'Add booking',
   'expenses.export': 'Export',
   'expenses.transfer': 'Transfer',
-  'expenses.transferTitle': 'Transfer (cost centre → cost centre)',
+  'expenses.transferTitle': 'Transfer',
   'expenses.transferFrom': 'From cost centre',
   'expenses.transferTo': 'To cost centre',
   'expenses.transferConfirm': 'Transfer',
@@ -2981,7 +2980,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'fints.tabFile': 'File import',
   'fints.account': 'Account',
   'fints.sync': 'Fetch transactions',
-  'fints.noAccounts': 'No account with FinTS access configured (Administration → Accounts).',
+  'fints.noAccounts': 'No account with FinTS access configured.',
   'fints.tanPrompt': 'Enter a TAN or approve in your banking app.',
   'fints.tan': 'TAN',
   'fints.tanImageAlt': 'TAN image (photoTAN/QR-TAN) to scan',
@@ -3009,8 +3008,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'fints.errFile': 'File is neither valid CAMT.053 nor MT940.',
   'fints.errBook': 'Booking failed.',
   'budget.tree.title': 'Budgets & cost centres',
-  'budget.tree.subtitle':
-    'Hierarchical budgets: budget → cost centres. Available = roll-down, committed = roll-up.',
+  'budget.tree.subtitle': 'Budgets and cost centers within them.',
   'budget.tree.budget': 'Budget',
   'budget.tree.budgetPlaceholder': 'Choose a budget …',
   'budget.tree.fyEmpty': 'No fiscal years in this budget yet.',
@@ -3061,7 +3059,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.col.color': 'Colour',
   'budget.tree.stateConfig': 'Requested/committed states',
   'budget.tree.stateConfigHint':
-    'Flow states that count as accepted (→ committed) or denied (→ excluded). Everything else is requested.',
+    'Flow states that count as accepted (committed) or denied (excluded). Everything else is requested.',
   'budget.tree.stateCol': 'Status',
   'budget.tree.accepted': 'Accepted',
   'budget.tree.denied': 'Denied',
@@ -3524,17 +3522,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.config_revert': '{actor} reverted a configuration change ({target}).',
   'admin.audit.revert.action': 'Revert',
   'admin.audit.revert.title': 'Revert this change?',
-  'admin.audit.revert.nothingToRevert':
-    'This is the first state — there is nothing to revert to.',
-  'admin.audit.revert.alreadyReverted':
-    'Already reverted — there is nothing left to undo.',
+  'admin.audit.revert.nothingToRevert': 'This is the first state — there is nothing to revert to.',
+  'admin.audit.revert.alreadyReverted': 'Already reverted — there is nothing left to undo.',
   'admin.audit.revert.notRevertable': 'This action cannot be reverted.',
   'admin.audit.revert.confirm':
     'This action will be reset to the state before it. The revert is itself logged and — where possible — can be undone.',
   'admin.audit.revert.success': 'Change reverted.',
   'admin.audit.revert.error': 'Revert failed.',
-  'admin.audit.revert.conflict':
-    'A newer change exists — please revert that one first.',
+  'admin.audit.revert.conflict': 'A newer change exists — please revert that one first.',
   'admin.config.diff.none': 'No field changes.',
   'admin.config.diff.changed': 'Changed',
   'admin.config.diff.added': 'Added',
