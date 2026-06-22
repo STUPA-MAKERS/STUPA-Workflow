@@ -221,7 +221,7 @@ jobs:
         with:
           # @stupa-makers/ui-kit lives at frontend/vendor/ui-kit as a git submodule.
           submodules: recursive
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -265,7 +265,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
