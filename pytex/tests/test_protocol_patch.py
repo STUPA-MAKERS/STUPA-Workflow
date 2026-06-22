@@ -28,5 +28,5 @@ def test_beschlussfaehigkeit_keys_cover_both_spellings() -> None:
 
 
 def test_service_version_matches_installed_pytex() -> None:
-    assert app_module._PYTEX_VERSION == _pkg_version("pytex-preprocessor")
+    assert _pkg_version("pytex-preprocessor") == app_module._PYTEX_VERSION
     assert app_module.app.version == _pkg_version("pytex-preprocessor")

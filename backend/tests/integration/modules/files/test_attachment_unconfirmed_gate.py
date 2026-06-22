@@ -40,14 +40,24 @@ class _StubStorage:
     def __init__(self) -> None:
         self._blobs: dict[str, bytes] = {}
 
-    async def put(self, key: str, data: bytes, mime: str) -> None:
+    async def put(self, key: str, data: bytes, content_type: str) -> None:
         self._blobs[key] = data
 
     async def get(self, key: str) -> bytes:
         return self._blobs[key]
 
+    async def get_stream(
+        self, key: str, *, chunk_size: int = 64 * 1024
+    ) -> AsyncIterator[bytes]:
+        yield self._blobs[key]
+
     async def remove(self, key: str) -> None:
         self._blobs.pop(key, None)
+
+    def presigned_get_url(
+        self, key: str, *, expires_seconds: int, download_name: str | None = None
+    ) -> str:
+        return f"memory://{key}"
 
 
 @pytest.fixture

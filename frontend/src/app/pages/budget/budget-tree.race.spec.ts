@@ -1,4 +1,3 @@
-import { TestBed } from '@angular/core/testing';
 import { type Observable, Subject, of, throwError } from 'rxjs';
 import { render } from '@testing-library/angular';
 import { ToastService } from '@shared/ui/toast/toast.service';

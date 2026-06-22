@@ -34,7 +34,7 @@ from datetime import date as _date
 from datetime import time as _time
 
 try:  # marko ist (über pytex_markdown) im Render-Pfad vorhanden; optional gehärtet.
-    import marko as _marko
+    import marko as _marko  # pyright: ignore[reportMissingImports]
 except ImportError:  # pragma: no cover - Primärschutz (Regex) bleibt ohne marko aktiv
     _marko = None  # type: ignore[assignment]
 

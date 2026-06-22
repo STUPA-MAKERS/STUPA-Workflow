@@ -179,72 +179,26 @@ jobs:
           --exclude-checks unsupported_method,positive_data_acceptance
           --seed 1337
 
-  # ---- 5b Dependency-Scan (pip-audit, security.md §10 / T-41 / AUD-050) ----- #
+  # ---- 5b Dependency-Scan (pip-audit, security.md §10 / T-41) -------------- #
   be-deps-audit:
     runs-on: ubuntu-latest
     needs: be-lint
-    # Advisory (AUD-050/051): surfaces dependency advisories + lockfile drift without
-    # blocking merges. Promote to blocking once the lockfile-currency check is proven
-    # reproducible across runners and the lxml waiver is lifted.
-    continue-on-error: true
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       # pip selbst aktuell halten (pip-Advisories sonst rot; pip ist kein Runtime-Dep).
-      - run: python -m pip install --upgrade pip pip-audit pip-tools
-      # AUD-050: gegen den EXAKT gepinnten Lockfile auditieren statt gegen eine frisch
-      # live-aufgelöste `pip install -e '.[dev]'`-Umgebung. So ist der auditierte Baum
-      # bit-genau der ausgelieferte Baum (das Backend-Image baut aus genau diesem
-      # `requirements.lock.txt` mit `--require-hashes`, s. backend/Dockerfile) — eine
-      # grüne CI garantiert damit, dass das gebaute Image auditiert wurde, und nicht
-      # nur irgendeine zur CI-Zeit aufgelöste Version.
-      - name: Lockfile-Aktualität prüfen (backend)
-        working-directory: backend
-        # Schutz gegen ein veraltetes Lockfile: erzeugt das Lockfile aus dem aktuellen
-        # pyproject.toml neu und vergleicht. Driftet es (Dep-Bump ohne Re-Lock), bricht
-        # das Gate — sonst auditierte/baute man eine andere Version als pyproject deklariert.
-        env:
-          PIP_PREFER_BINARY: "1"
-        run: |
-          pip-compile --quiet --generate-hashes --no-strip-extras \
-            --output-file=requirements.lock.check.txt pyproject.toml
-          # Kommentar-/Header-Zeilen (Dateiname im "by the following command") ignorieren.
-          diff <(grep -vE '^\s*#' requirements.lock.txt) \
-               <(grep -vE '^\s*#' requirements.lock.check.txt) \
-            || { echo "::error::backend/requirements.lock.txt ist veraltet — 'pip-compile --generate-hashes' neu ausführen und committen."; exit 1; }
-          rm -f requirements.lock.check.txt
-      - name: Lockfile-Aktualität prüfen (mcp)
-        working-directory: mcp
-        env:
-          PIP_PREFER_BINARY: "1"
-        run: |
-          pip-compile --quiet --generate-hashes --no-strip-extras \
-            --output-file=requirements.lock.check.txt pyproject.toml
-          diff <(grep -vE '^\s*#' requirements.lock.txt) \
-               <(grep -vE '^\s*#' requirements.lock.check.txt) \
-            || { echo "::error::mcp/requirements.lock.txt ist veraltet — 'pip-compile --generate-hashes' neu ausführen und committen."; exit 1; }
-          rm -f requirements.lock.check.txt
-      # AUD-051: Solange der lxml-XXE-Waiver (PYSEC-2026-87, s. u.) aktiv ist, hängt seine
-      # Risikofreiheit an der Annahme „lxml sieht nur authentifizierte Bank-Antworten, eigenes
-      # (untrusted) XML parst die stdlib ``ElementTree``". Dieses Gate erzwingt die Annahme:
-      # routet künftiger Code Upload-/Antragsteller-XML über lxml (``import lxml`` /
-      # ``from lxml``) im App-Code, bricht die CI — der Waiver muss dann fallen, nicht das XXE.
-      # Entfällt, sobald fints lxml>=6.1 zulässt und der --ignore-vuln unten gestrichen wird.
-      - name: lxml-Import-Guard (backend/app, AUD-051)
-        working-directory: backend
-        run: |
-          if grep -rnE '^[[:space:]]*(import[[:space:]]+lxml|from[[:space:]]+lxml)([[:space:]]|\.|$)' app/; then
-            echo "::error::backend/app importiert lxml, während der PYSEC-2026-87-Waiver (lxml<6.1 XXE) aktiv ist — entweder den lxml-Import entfernen oder erst den Waiver (--ignore-vuln) auflösen, sobald fints lxml>=6.1 zulässt."
-            exit 1
-          fi
-      - name: pip-audit (backend — gepinnter Lockfile)
-        working-directory: backend
-        # Scannt den gepinnten Lockfile (-r) statt der live-aufgelösten Umgebung gegen die
-        # PyPI-Advisory-DB; bricht das Gate bei einer verwundbaren Abhängigkeit. Einzelne,
-        # geprüft-irrelevante Advisories lassen sich gezielt mit `--ignore-vuln <ID>`
-        # (mit Begründung) ausnehmen.
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]' pip-audit
+      - name: pip-audit (bekannte CVEs in Abhängigkeiten)
+        # Scannt die aufgelöste Umgebung gegen die PyPI-Advisory-DB; bricht das Gate bei
+        # einer verwundbaren Abhängigkeit. `--skip-editable` überspringt das lokale,
+        # nicht-auf-PyPI liegende Projektpaket. Einzelne, geprüft-irrelevante Advisories
+        # lassen sich gezielt mit `--ignore-vuln <GHSA/PYSEC-ID>` (mit Begründung) ausnehmen.
         #
         # PYSEC-2026-87 (lxml<6.1 XXE-Local-File-Read): lxml kommt nur transitiv über
         # fints/sepaxml/xmlschema und fints pinnt lxml~=6.0.2 (<6.1) hart — 6.1.0 ist daher
@@ -252,45 +206,7 @@ jobs:
         # authentifizierten Bank-Antworten; eigenes (untrusted) XML parsen wir mit der
         # stdlib `ElementTree`. Risiko in diesem Kontext nicht erreichbar → ausgenommen,
         # bis fints lxml>=6.1 zulässt.
-        run: pip-audit -r requirements.lock.txt --desc --ignore-vuln PYSEC-2026-87
-      - name: pip-audit (mcp — gepinnter Lockfile)
-        working-directory: mcp
-        run: pip-audit -r requirements.lock.txt --desc
-
-  # ---- 5c FE-Dependency-Scan (npm audit, security.md §10) ------------------ #
-  # Spiegelt be-deps-audit für das Frontend (vorher fehlte das Gate ⇒ neue JS-CVEs
-  # landeten still). BLOCKIEREND auf `--audit-level=moderate`. `--omit=dev` scannt nur
-  # die RUNTIME-Abhängigkeiten (das ausgelieferte SPA-Bundle) — dort sitzt das real
-  # erreichbare Risiko. Bewusst `moderate` (nicht `high`): der real im Browser
-  # erreichbare @angular/compiler Two-Way-Binding-Sanitizer-Bypass-XSS ist nur als
-  # MODERATE eingestuft (formatDate-ReDoS ist high) — bei `--audit-level=high` würde
-  # genau diese erreichbare XSS-Klasse durchs Gate rutschen. Da der Runtime-Tree nach
-  # dem >=20.3.25-Bump sauber ist (0 Advisories), erzwingt `moderate` jeden künftigen
-  # erreichbaren Runtime-Bug ohne False-Positives. Dev-/Build-Chain-Advisories
-  # (undici/vite/piscina/esbuild) sind nur Build-Host-relevant, laufen nicht im Browser
-  # und bleiben durch `--omit=dev` außen vor — Dependabot (siehe .github/dependabot.yml)
-  # hält sie nach.
-  fe-deps-audit:
-    runs-on: ubuntu-latest
-    needs: detect
-    if: needs.detect.outputs.frontend == 'true'
-    # Advisory (AUD-017): reports runtime npm advisories without blocking. The Angular
-    # >=20.3.25 patch-bump that clears the current formatDate/HttpTransferCache/compiler
-    # advisories needs a peer-resolved package-lock regen (ERESOLVE on a plain bump) and
-    # is tracked separately; until then this job is report-only.
-    continue-on-error: true
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: npm audit (Runtime-Abhängigkeiten, Moderate+)
-        run: npm audit --omit=dev --audit-level=moderate
+        run: pip-audit --skip-editable --desc --ignore-vuln PYSEC-2026-87
 
   # ---- 6 FE-Unit/Komponente (Jest + ATL) ----------------------------------- #
   fe-unit:

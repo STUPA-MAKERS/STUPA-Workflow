@@ -61,12 +61,13 @@ class _Row:
 
 @pytest.mark.asyncio
 async def test_delete_gremium_with_in_use_type_raises_conflict() -> None:
-    gremium = _Row(id=uuid.uuid4())
+    gid = uuid.uuid4()
+    gremium = _Row(id=gid)
     session = _FakeSession(gremium=gremium, in_use=uuid.uuid4())
     svc = ConfigService(session)  # type: ignore[arg-type]
 
     with pytest.raises(ConflictError):
-        await svc.delete_gremium(gremium.id, "admin")
+        await svc.delete_gremium(gid, "admin")
 
     # Kein Audit-Schreibvorgang, kein delete, kein commit für ein doomed delete.
     assert session.execute_calls == 0
