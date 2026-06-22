@@ -213,23 +213,12 @@ services:
       # (shell-escape) nicht zum Exfiltrations-Kanal (#sec-audit). api/worker erreichen
       # pytex weiterhin über dieses Netz.
       - pytex_net
-    # OS-Sandbox auf DEM Service, der LaTeX/Python ausführt (#sec-audit AUD-009):
-    # härter als altcha/backup, da pytex der einzige Render-/Exec-Pfad ist.
-    # - no-new-privileges: setuid/setgid kann keine Rechte eskalieren.
-    # - cap_drop ALL: kein Linux-Capability bleibt; uvicorn/tectonic brauchen keine.
-    # - read_only Rootfs: Code (/app) + Bundle (/usr/local/bin) unveränderbar; ein
-    #   Compile-Time-Exec-Bypass kann das Image nicht persistent verändern.
-    # Schreibbar bleiben nur: das pytex_cache-Volume (/cache, XDG_CACHE_HOME inkl.
-    # fontconfig-Cache) und zwei tmpfs — /tmp (tectonic kompiliert in /tmp/pytex-api-*)
-    # und /home/pytex (HOME des uid-10001-Users). Beide tmpfs nodev/nosuid/noexec.
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
-    tmpfs:
-      - /tmp:rw,nodev,nosuid,noexec,size=512m
-      - /home/pytex:rw,nodev,nosuid,noexec,size=16m
+    # AUD-009 OS-Sandbox (read_only Rootfs + size-/noexec-tmpfs + cap_drop ALL) wurde
+    # ZURÜCKGEZOGEN: unter read_only Rootfs scheitert tectonic/fontconfig beim Schreiben
+    # des Font-/Build-Caches → »tectonic failed to produce a PDF (exit 1)« → pytex 400 →
+    # Protokoll-Render bricht beim Finalisieren ab. Erneut anlegen erst, wenn die
+    # schreibbaren Pfade (fontconfig-Cache via XDG_CACHE_HOME=/cache, HOME-Größe,
+    # /tmp-Exec) gegen einen echten Protokoll-Render verifiziert sind. (#sec-audit)
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8099/health')\" || exit 1"]
       interval: 15s
