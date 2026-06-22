@@ -1,4 +1,4 @@
-import { Injectable, inject, effect } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { SwUpdate, type VersionReadyEvent } from '@angular/service-worker';
 import { filter, concatMap } from 'rxjs';
 import { interval, fromEvent } from 'rxjs';
