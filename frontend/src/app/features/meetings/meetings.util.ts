@@ -72,9 +72,23 @@ export function insertAt(text: string, snippet: string, caret: number | null): s
   return text.slice(0, caret) + snippet + text.slice(caret);
 }
 
-/** Nur Links mit sicherem Schema (kein `javascript:`-Vektor) durchlassen. */
+/**
+ * Nur Links mit sicherem Schema (kein `javascript:`-Vektor) durchlassen.
+ *
+ * Zweite Verteidigungslinie (Defense-in-Depth, AUD-064): Die URL wird **vor**
+ * der Interpolation in das `href="…"`-Attribut auf Zeichen geprüft, die aus dem
+ * Attribut ausbrechen könnten. Da `inline()` den Text bereits HTML-escapt, kommt
+ * ein rohes `"`/`<`/`>`/`'` hier als Entity (`&quot;` …) an — beide Formen werden
+ * abgewiesen, damit selbst bei Wegfall der Angular-`innerHTML`-Sanitisierung kein
+ * Attribut-Break-out (z. B. `href="…"onmouseover=…`) entstehen kann.
+ */
 function safeUrl(url: string): boolean {
-  return /^(https?:\/\/|mailto:|\/)/i.test(url);
+  if (!/^(https?:\/\/|mailto:|\/)/i.test(url)) return false;
+  // Roh- *und* escapte Form von "<>'  sowie Whitespace/Control-Chars ablehnen.
+  if (/["'<>]|&(?:quot|lt|gt|#39|#x27);/i.test(url)) return false;
+  // eslint-disable-next-line no-control-regex
+  if (/[\s\x00-\x1f\x7f]/.test(url)) return false;
+  return true;
 }
 
 function inline(text: string): string {

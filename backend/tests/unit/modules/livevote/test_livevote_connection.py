@@ -288,3 +288,57 @@ class _StateMeetings:
 
     async def open_vote(self, _meeting_id: UUID) -> object:  # noqa: F821
         return None
+
+
+# --------------------------------------------------------------------------- #
+# AUD-065 — cast bindet vote_id an die autorisierte Sitzung der Verbindung
+# --------------------------------------------------------------------------- #
+class _MeetingBoundVoting:
+    """Fake-VotingService: ``get`` liefert einen Vote mit fester meeting_id,
+    ``cast`` zählt Aufrufe (darf bei Cross-Meeting-Frames NICHT erreicht werden)."""
+
+    def __init__(self, vote_meeting_id: UUID) -> None:
+        self._vote_meeting_id = vote_meeting_id
+        self.cast_calls = 0
+
+    async def get(self, vote_id: UUID) -> Any:
+        return SimpleNamespace(id=vote_id, meeting_id=self._vote_meeting_id)
+
+    async def cast(self, *args: object, **kwargs: object) -> None:
+        self.cast_calls += 1
+
+
+@pytest.mark.asyncio
+async def test_cast_rejects_vote_from_other_meeting() -> None:
+    other_meeting = uuid4()
+    voting = _MeetingBoundVoting(other_meeting)
+    conn = _conn(beamer=False)
+    # conn.meeting_id ist eine eigene uuid4 ≠ other_meeting → Mismatch.
+    conn.voting = voting  # type: ignore[assignment]
+    await conn._handle_cast(
+        {"type": "cast", "voteId": str(uuid4()), "choice": "yes"}
+    )
+    # Frame wird abgewiesen, ohne den DB-Cast/Lock zu erreichen.
+    assert voting.cast_calls == 0
+    assert conn.ws.sent == [{"type": "error", "code": "not_eligible"}]  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_cast_allows_vote_from_own_meeting() -> None:
+    conn = _conn(beamer=False)
+    voting = _MeetingBoundVoting(conn.meeting_id)  # Vote gehört zur eigenen Sitzung
+    conn.voting = voting  # type: ignore[assignment]
+
+    published: list[object] = []
+
+    async def _stub_tally(vote: object) -> None:
+        published.append(vote)
+
+    conn.publisher.vote_tally = _stub_tally  # type: ignore[method-assign]
+    await conn._handle_cast(
+        {"type": "cast", "voteId": str(uuid4()), "choice": "yes"}
+    )
+    # Meeting-Bindung ok → cast wird genau einmal aufgerufen, kein Fehler-Frame.
+    assert voting.cast_calls == 1
+    assert published  # Tally wurde broadcastet
+    assert all(s.get("code") != "not_eligible" for s in conn.ws.sent)  # type: ignore[attr-defined]

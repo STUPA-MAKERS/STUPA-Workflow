@@ -23,6 +23,7 @@ from app.modules.voting.schemas import (
 )
 from app.modules.voting.service import VotingService
 from app.shared.config_schemas import VoteConfig
+from app.shared.errors import ForbiddenError
 
 _CONFIG = VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "simple"})
 _TALLY = TallyOut(counts={"yes": 0, "no": 0}, eligible=0, quorumMet=True)
@@ -43,6 +44,17 @@ def _vote_out(status: str = "draft") -> VoteOut:
 class _FakeService:
     def __init__(self) -> None:
         self.cast_args: dict[str, object] | None = None
+
+    async def assert_can_manage_group(self, eligible_group, meeting_id, principal):  # noqa: ANN001
+        # Spiegelt das echte Service-Gate (#AUD-027) auf dem Router-Pfad: Admin oder
+        # globale vote.manage passieren; die per-Gremium-Auflösung (DB) liegt im
+        # Integrationstest. Sonst fail-closed 403.
+        if "admin" in principal.roles or principal.has("vote.manage"):
+            return
+        raise ForbiddenError("not allowed to manage this vote")
+
+    async def assert_can_manage_vote(self, vote_id, principal):  # noqa: ANN001
+        await self.assert_can_manage_group("stupa", None, principal)
 
     async def create(self, application_id, payload):  # noqa: ANN001
         return _vote_out("draft")
@@ -143,6 +155,21 @@ def test_close_ok(app: FastAPI, client: TestClient) -> None:
 def test_close_missing_perm_403(app: FastAPI, client: TestClient) -> None:
     _as_principal(app, "vote.cast")
     assert client.post(f"/api/votes/{uuid4()}/close").status_code == 403
+
+
+def test_open_missing_perm_403(app: FastAPI, client: TestClient) -> None:
+    # #AUD-027: open ist gremium-scoped — eine reine vote.cast-Identität ohne
+    # (globale oder per-Gremium) vote.manage darf NICHT öffnen.
+    _as_principal(app, "vote.cast")
+    r = client.post(f"/api/votes/{uuid4()}/open")
+    assert r.status_code == 403
+    assert r.headers["content-type"] == "application/problem+json"
+
+
+def test_cancel_missing_perm_403(app: FastAPI, client: TestClient) -> None:
+    # #AUD-027: cancel ist gremium-scoped, symmetrisch zu open/close.
+    _as_principal(app, "vote.cast")
+    assert client.post(f"/api/votes/{uuid4()}/cancel").status_code == 403
 
 
 def test_cancel_ok_broadcasts(app: FastAPI, client: TestClient) -> None:

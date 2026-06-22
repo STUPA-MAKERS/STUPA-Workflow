@@ -1,8 +1,11 @@
 """pytex render service — thin FastAPI wrapper around ``pytex_api.render_blob`` (T-21).
 
-The platform generates Markdown server-side and needs a PDF back; pytex v1.0.0
+The platform generates Markdown server-side and needs a PDF back; pytex
 ships no REST surface, so this container exposes ``POST /render`` (and a
-``/health`` probe) over the blob API.
+``/health`` probe) over the blob API. The exact ``pytex-preprocessor`` version
+that ships is pinned in ``requirements.txt`` / ``pyproject.toml`` and surfaced
+at runtime via ``importlib.metadata`` (see ``_PYTEX_VERSION`` below) so the
+service version string never drifts from the installed renderer.
 
 Blob in / blob out: POST the Markdown source as the raw request body, pick the
 kinds / trust / variant via query params, get an ``application/pdf`` (or
@@ -28,6 +31,8 @@ from __future__ import annotations
 
 import os
 import re
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -66,11 +71,20 @@ _LIMITS = BuildLimits(
     max_input_bytes=_MAX_BODY_BYTES,
 )
 
-# Protokoll-Titelseite: pytex 1.0.6 rendert nur seine fest verdrahteten
+# Protokoll-Titelseite: pytex rendert nur seine fest verdrahteten
 # Frontmatter-Keys als Daten-Zeilen — »Beschlussfähigkeit« kennt es nicht.
 # Die Zeilen-Tabelle ist ein Modul-Tuple, das `_data_lines` zur Laufzeit liest;
 # wir erweitern sie hier (Wrapper-Patch statt Paket-Fork, #protocol-quorum).
 from pytex_markdown.protocol import document as _protocol_document  # noqa: E402
+
+# Fail loud, not silent: if a future pytex bump renames this private attribute
+# the patch must abort container start-up rather than quietly drop the extra
+# title-page rows. The silent existence check below is only a per-label
+# idempotency guard against re-applying on re-import.
+assert hasattr(_protocol_document, "_SCALAR_ROWS"), (
+    "pytex-preprocessor no longer exposes `_protocol_document._SCALAR_ROWS`; "
+    "the protocol title-page patch must be re-validated against the new version"
+)
 
 for _label, _keys in (
     # Gremium als Titelseiten-Daten-Zeile (#14) — pytex kennt den Key nicht nativ.
@@ -83,11 +97,21 @@ for _label, _keys in (
             (_label, _keys),
         )
 
-app = FastAPI(title="pytex render service", version="1.0.0")
+# Surface the installed renderer version so the service version string can never
+# drift from what actually ships (AUD-061). Fall back to "unknown" only if the
+# package metadata is somehow absent (e.g. running from a raw checkout).
+try:
+    _PYTEX_VERSION = _pkg_version("pytex-preprocessor")
+except PackageNotFoundError:  # pragma: no cover - metadata always present in the image
+    _PYTEX_VERSION = "unknown"
+
+app = FastAPI(title="pytex render service", version=_PYTEX_VERSION)
 
 # Strip absolute filesystem paths (/home/..., /tmp/pytex-api-...) out of any
-# error detail before it reaches the client.
-_PATH_RE = re.compile(r"(/[^\s:'\"]+)+")
+# error detail before it reaches the client. Anchored to the known container
+# root prefixes only, so legitimate slash-containing detail (LaTeX command
+# fragments like /linewidth, fractions, URL path segments) survives intact.
+_PATH_RE = re.compile(r"/(?:tmp|app|cache|home|var|usr|root|opt|etc)/[^\s:'\"]*")
 
 
 def _scrub(msg: str) -> str:

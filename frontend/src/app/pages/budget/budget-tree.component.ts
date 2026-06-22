@@ -178,11 +178,17 @@ export class BudgetTreeComponent {
   }
 
   // --- Laden ----------------------------------------------------------------
+  /** Monoton steigende Lade-Sequenz: verwirft veraltete reload()-Fan-out-Antworten,
+   *  die nach einem neueren reload() eintreffen (sonst überschreiben sie HHJ/Auswahl). */
+  private reloadSeq = 0;
+
   private reload(): void {
+    const seq = ++this.reloadSeq;
     this.loading.set(true);
     this.loadError.set(false);
     this.api.tree().subscribe({
       next: (tree) => {
+        if (seq !== this.reloadSeq) return;
         this.tree.set(tree);
         const tops = tree.filter((n) => n.parentId === null);
         const keep = tops.some((t) => t.id === this.selectedTopId());
@@ -194,6 +200,7 @@ export class BudgetTreeComponent {
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
             next: (fys) => {
+              if (seq !== this.reloadSeq) return;
               this.fiscalYearsByBudget.update((m) => ({ ...m, [top.id]: fys }));
               if (top.id === topId) {
                 this.fiscalYears.set(fys);
@@ -207,20 +214,28 @@ export class BudgetTreeComponent {
         this.loading.set(false);
       },
       error: () => {
+        if (seq !== this.reloadSeq) return;
         this.loadError.set(true);
         this.loading.set(false);
       },
     });
   }
 
-  /** HHJ des gewählten Budgets laden (sie leben innerhalb des Budgets). */
+  /** HHJ des gewählten Budgets laden (sie leben innerhalb des Budgets). Bumpt die
+   *  Lade-Sequenz, damit ein noch laufender reload()-Fan-out diese Auswahl nicht
+   *  nachträglich überschreibt — und umgekehrt. */
   private loadFiscalYears(topId: string): void {
+    const seq = ++this.reloadSeq;
     this.api.listFiscalYears(topId as Uuid).subscribe({
       next: (fys) => {
+        if (seq !== this.reloadSeq) return;
         this.fiscalYears.set(fys);
         if (!fys.some((fy) => fy.id === this.selectedFyId())) this.selectedFyId.set(fys[0]?.id ?? '');
       },
-      error: () => this.fiscalYears.set([]),
+      error: () => {
+        if (seq !== this.reloadSeq) return;
+        this.fiscalYears.set([]);
+      },
     });
   }
 
@@ -230,8 +245,11 @@ export class BudgetTreeComponent {
     this.loadFiscalYears(id);
   }
 
-  /** Jahr im linken Baum gewählt → Budget + HHJ setzen. */
+  /** Jahr im linken Baum gewählt → Budget + HHJ setzen. Bumpt die Lade-Sequenz,
+   *  damit ein noch laufender reload()-Fan-out diese Auswahl nicht nachträglich
+   *  überschreibt (analog zu loadFiscalYears/selectTop). */
   onYearPicked(sel: BudgetYearSelection): void {
+    ++this.reloadSeq;
     this.selectedTopId.set(sel.budgetId);
     const fys = this.fiscalYearsByBudget()[sel.budgetId] ?? [];
     this.fiscalYears.set(fys);

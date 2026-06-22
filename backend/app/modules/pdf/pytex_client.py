@@ -13,6 +13,7 @@ außen (security.md §2). 4xx ist ein dauerhafter Eingabe-/Policy-Fehler (kein R
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import httpx
@@ -22,6 +23,37 @@ from app.settings import Settings
 # pytex erkennt PDF am Content-Type; ein anderer Body wäre ein Vertragsbruch.
 _PDF_CONTENT_TYPE = "application/pdf"
 _MAX_ERROR_DETAIL = 300
+
+# Lebender pytex-``eval``-Trigger (AUD-010): pytex' ``_eval_comment`` feuert
+# AUSSCHLIESSLICH für eine Link-Referenz-Definition mit ``label == "//"`` UND
+# bare-``#``-Ziel (``[//]: # "EXPR"``). CommonMark erlaubt Whitespace/Zeilenumbruch
+# innerhalb des Labels und vor/nach dem ``:`` — das Label normalisiert dabei zu
+# ``//`` (Whitespace kollabiert). Wir matchen exakt diesen Kopf, unabhängig vom
+# Regex des Sanitizers, sodass diese Barriere auch ohne installiertes ``marko``
+# greift (der strukturelle Verifizierer dort ist nur eine Zusatzlinie).
+_LIVE_EVAL_TRIGGER_RE = re.compile(
+    r"\[[ \t\r\n]*/[ \t\r\n]*/[ \t\r\n]*\]"  # Label ``//`` (WS/Newline-tolerant)
+    r"[ \t]*(?:\r?\n[ \t]*)?:"  # ``:`` (darf auf der Folgezeile stehen)
+    r"[ \t]*(?:\r?\n[ \t]*)?#"  # bare-``#``-Ziel (ggf. mehrzeilig)
+    r"(?=[ \t\r\n\"'(]|$)",  # … gefolgt von WS/Titel-Delimiter/Zeilenende
+    re.DOTALL,
+)
+# Der ausgewertete pytex-Marker (``\iffalse{pytex(...)}\fi``) hat im Body nichts
+# verloren — sein Vorhandensein ist ebenfalls ein nicht-trusted-fähiges Signal.
+_PYTEX_MARKER_RE = re.compile(r"\\iffalse\s*\{?\s*pytex\s*\(", re.DOTALL | re.IGNORECASE)
+
+
+def _markdown_has_eval_trigger(markdown: str) -> bool:
+    """``True``, wenn ``markdown`` einen lebenden pytex-``eval``-Trigger trägt.
+
+    Zweite, unabhängige RCE-Barriere für ``trusted``-Renders (AUD-010): der
+    Sanitizer (``sanitize_user_markdown``) entfernt eval-fähige
+    ``[//]: # "EXPR"``-Definitionen schon beim Markdown-Aufbau — hier verifizieren
+    wir am Client-Rand mit einer **eigenständigen** Regex, dass keine überlebt hat
+    (und kein ausgewerteter ``\\iffalse{pytex(...)}\\fi``-Marker durchsickert). Greift
+    ohne externe Abhängigkeit (anders als der marko-basierte Struktur-Check). Echte
+    Referenz-Links (``[foo]: #section`` → kein bare-``#``) bleiben unberührt."""
+    return bool(_LIVE_EVAL_TRIGGER_RE.search(markdown) or _PYTEX_MARKER_RE.search(markdown))
 
 
 def _error_detail(response: httpx.Response) -> str:
@@ -66,11 +98,30 @@ class PytexClient:
         ``trusted`` für app-generierte PDFs). Ein expliziter Override gilt **nur** für
         diesen Aufruf — z. B. ``trust_level="untrusted"`` für vom Nutzer geschriebenes
         Markdown (Protokoll/TOP-Bodies), das pytex' Markdown-``eval``-Escape sperrt
-        und den Build sandboxt (RCE-Schutz, security.md §2)."""
+        und den Build sandboxt (RCE-Schutz, security.md §2).
+
+        **Defense-in-Depth (AUD-010):** Die Protokoll-/Report-Varianten müssen
+        ``trusted`` rendern (die Template-Maschinerie sperrt ``untrusted``/``sandboxed``),
+        also ist der einzige TRUSTED-gated RCE-Vektor für ``input_kind=md`` der
+        ``eval``-Kommentar (``[//]: # "EXPR"``). Den entschärfen die Markdown-Builder
+        per ``sanitize_user_markdown`` BEVOR das Markdown hierher kommt — aber dieser
+        Sanitizer war bislang die **einzige** Barriere. Wir verifizieren daher als
+        zweite, unabhängige Linie unmittelbar vor dem ``trusted``-Render strukturell,
+        dass der Body **keinen** lebenden eval-Trigger trägt; ein etwaiger
+        Sanitizer-Bypass wird so zu einem eingedämmten (nicht-retrybaren) Fehler statt
+        zu RCE (fail-closed). Für nicht-``trusted`` Renders übernimmt pytex' Policy."""
+        effective_trust = trust_level if trust_level is not None else self.trust_level
+        if effective_trust == "trusted" and _markdown_has_eval_trigger(markdown):
+            # Fail-closed: ein überlebender eval-Trigger DARF nicht trusted gerendert
+            # werden. Kein Retry — die Eingabe ist dauerhaft policy-verletzend.
+            raise PytexError(
+                "refused to render trusted markdown with a live eval trigger",
+                retryable=False,
+            )
         params: dict[str, str] = {
             "input_kind": "md",
             "output_kind": "pdf",
-            "trust_level": trust_level if trust_level is not None else self.trust_level,
+            "trust_level": effective_trust,
         }
         if variant is not None:
             params["variant"] = variant

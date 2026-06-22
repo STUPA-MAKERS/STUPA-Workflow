@@ -106,3 +106,58 @@ def test_build_pytex_client_from_settings() -> None:
     client = build_pytex_client(settings)
     assert client.base_url == "http://px:1"
     assert client.trust_level == "sandboxed"
+
+
+# --- AUD-010: client-side eval-trigger gate for trusted renders ---------------
+
+# A live pytex eval comment (``[//]: # "EXPR"``) — the only TRUSTED-gated RCE
+# surface for ``input_kind=md``. The Markdown builders strip it via
+# ``sanitize_user_markdown``; the client is the second, independent barrier.
+_EVAL_BODY = '[//]: # "__import__(\'os\').system(\'id\')"\n\n# doc'
+
+
+@respx.mock
+async def test_trusted_render_refuses_live_eval_trigger() -> None:
+    """A surviving eval trigger must NOT be rendered trusted (fail-closed)."""
+    route = respx.post(f"{BASE}/render").mock(
+        return_value=httpx.Response(
+            200, content=b"%PDF", headers={"content-type": "application/pdf"}
+        )
+    )
+    with pytest.raises(PytexError) as ei:
+        await _client().render_pdf(_EVAL_BODY, variant="protocol-stupa")
+    # Permanent policy error, and the body never reached pytex.
+    assert ei.value.retryable is False
+    assert not route.called
+
+
+@respx.mock
+async def test_nontrusted_render_passes_eval_trigger_to_pytex() -> None:
+    """Below trusted, pytex' own policy blocks the eval — the client doesn't gate."""
+    route = respx.post(f"{BASE}/render").mock(
+        return_value=httpx.Response(
+            200, content=b"%PDF", headers={"content-type": "application/pdf"}
+        )
+    )
+    out = await _client().render_pdf(_EVAL_BODY, trust_level="untrusted")
+    assert out == b"%PDF"
+    assert route.called
+
+
+@respx.mock
+async def test_trusted_render_allows_clean_markdown() -> None:
+    """Normal Markdown (real refs, callouts) renders trusted unimpeded."""
+    route = respx.post(f"{BASE}/render").mock(
+        return_value=httpx.Response(
+            200, content=b"%PDF", headers={"content-type": "application/pdf"}
+        )
+    )
+    # A real reference link def (``[foo]: #section`` — NOT a bare ``#`` target) and
+    # an inline anchor must not be mistaken for the eval trigger.
+    clean = (
+        "# Protokoll\n\nSee [section](#intro)\n\n[foo]: #section\n\n"
+        "> [!abstimmung] **Frage**\n"
+    )
+    out = await _client().render_pdf(clean, variant="protocol-stupa")
+    assert out == b"%PDF"
+    assert route.called

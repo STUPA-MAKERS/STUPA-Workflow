@@ -271,7 +271,14 @@ class AuditService:
 
         ``before`` = Keyset-Cursor (nur Einträge mit ``id < before``). Es wird
         ``limit + 1`` gelesen, um ``has_more`` ohne separaten COUNT zu bestimmen
-        (skaliert auf sehr lange Logs)."""
+        (skaliert auf sehr lange Logs).
+
+        Hinweis (#AUD-019): bewusst KEIN Gremiums-Filter — ``audit.read`` ist eine
+        globale, plattformweite Lesesicht. Wer die Berechtigung hält, sieht alle
+        Einträge gremiumsübergreifend (die Resolver hängen anschließend PII an).
+        Falls je echtes gremiumsbeschränktes Auditing nötig wird, müssen hier UND in
+        den Resolvern die Einträge auf die ``GremiumMembership``-Menge des Aufrufers
+        eingegrenzt werden."""
         stmt: Select[tuple[AuditEntry]] = select(AuditEntry)
         if action is not None:
             stmt = stmt.where(AuditEntry.action == action)

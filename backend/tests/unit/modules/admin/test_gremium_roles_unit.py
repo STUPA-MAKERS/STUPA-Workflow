@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.modules.admin.gremium_roles import GremiumRoleService, intervals_overlap
 from app.modules.admin.models import GremiumMembership, GremiumRole
@@ -113,3 +114,40 @@ async def test_create_membership_allows_consecutive_term() -> None:
     out = await GremiumRoleService(db).create_membership(gid, payload, "admin")
     assert out.valid_from is not None
     assert db.committed == 1
+
+
+async def test_create_membership_db_constraint_overlap_409() -> None:
+    # AUD-029: passiert die Python-Fast-Path-Prüfung (keine bekannte Überlappung),
+    # feuert aber bei einem konkurrierenden Insert die EXCLUDE-Constraint beim Commit
+    # → IntegrityError. Muss als ConflictError (409) übersetzt werden, nicht 500.
+    pid, gid = uuid4(), uuid4()
+    db = fake_session(
+        result(),  # keine vorhandenen Mitgliedschaften (Fast-Path: kein Konflikt)
+        result(),  # audit advisory lock
+        result(),  # audit prev-hash
+        gets=[_role(gid), object()],
+    )
+
+    async def _flush_assign() -> None:
+        for o in db.added:
+            if getattr(o, "id", None) is None:
+                o.id = uuid4()
+        db.flushed += 1
+
+    async def _raise_integrity() -> None:
+        raise IntegrityError("INSERT", {}, Exception("ex_gremium_membership_no_overlap"))
+
+    rollbacks = {"n": 0}
+
+    async def _rollback() -> None:
+        rollbacks["n"] += 1
+
+    db.flush = _flush_assign
+    db.commit = _raise_integrity
+    db.rollback = _rollback
+    payload = GremiumMembershipCreate(
+        principalId=pid, gremiumRoleId=uuid4(), validFrom="2026-01-01", validUntil="2027-01-01"
+    )
+    with pytest.raises(ConflictError):
+        await GremiumRoleService(db).create_membership(gid, payload, "admin")
+    assert rollbacks["n"] == 1

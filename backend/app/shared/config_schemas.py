@@ -151,6 +151,11 @@ class FieldValidation(_CamelModel):
     # `positions`: Mindestzahl Vergleichsangebote je Position bzw. Mindestzahl Positionen.
     min_offers: int | None = Field(default=None, alias="minOffers", ge=1)
     min_positions: int | None = Field(default=None, alias="minPositions", ge=1)
+    # `positions`: Höchstzahl Positionen bzw. Vergleichsangebote je Position. Auch ohne
+    # Builder-Wert greift in der Engine eine Default-Decke (#sec-audit AUD-047), damit die
+    # Validierung/`positions_total` nicht allein vom Body-Cap begrenzt werden.
+    max_positions: int | None = Field(default=None, alias="maxPositions", ge=1)
+    max_offers: int | None = Field(default=None, alias="maxOffers", ge=1)
 
     @field_validator("pattern")
     @classmethod
@@ -304,6 +309,7 @@ def validate_flow_graph(graph: FlowGraph) -> None:
 
     _validate_state_kinds(graph, key_set)
     _assert_all_reachable(initials[0], key_set, graph.transitions)
+    _assert_no_automatic_cycle(key_set, graph.transitions)
 
 
 def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
@@ -363,6 +369,46 @@ def _assert_all_reachable(
     unreachable = key_set - seen
     if unreachable:
         raise FlowValidationError(f"unreachable states: {sorted(unreachable)}")
+
+
+def _assert_no_automatic_cycle(
+    key_set: set[str], transitions: list[TransitionDef]
+) -> None:
+    """Im **automatischen** Teilgraphen darf es keinen Zyklus geben (#auto-cycle).
+
+    Eine guard-lose ``automatic``-Transition feuert der Minuten-Cron sofort. Zwei
+    normale States A,B mit je einem automatischen Übergang zum anderen bestehen die
+    Erreichbarkeits-Prüfung, würden aber pro Cron-Lauf endlos hin- und herspringen —
+    je Hop ein StatusEvent + Audit-Row + Mailversand (Mailbomb / Audit-Bloat). Die
+    Selbst-Loops fängt bereits die from==to-Regel ab; hier verbleiben Zyklen über
+    ≥2 States. DFS über die automatischen Kanten, Back-Edge ⇒ Zyklus.
+    """
+    auto_adj: dict[str, list[str]] = {k: [] for k in key_set}
+    for t in transitions:
+        if t.automatic:
+            auto_adj[t.from_].append(t.to)
+
+    WHITE, GREY, BLACK = 0, 1, 2
+    color: dict[str, int] = {k: WHITE for k in key_set}
+
+    def _visit(node: str, path: list[str]) -> None:
+        color[node] = GREY
+        path.append(node)
+        for nxt in auto_adj[node]:
+            if color[nxt] == GREY:
+                cycle = path[path.index(nxt) :] + [nxt]
+                raise FlowValidationError(
+                    "automatic transitions form a cycle "
+                    f"(infinite auto-advance): {' -> '.join(cycle)}"
+                )
+            if color[nxt] == WHITE:
+                _visit(nxt, path)
+        path.pop()
+        color[node] = BLACK
+
+    for key in key_set:
+        if color[key] == WHITE:
+            _visit(key, [])
 
 
 # --------------------------------------------------------------------------- #

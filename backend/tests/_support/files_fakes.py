@@ -8,6 +8,7 @@ festes `ScanVerdict`. Die DB wird über `FakeSession` (aus `notifications_fakes`
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 from typing import Any
 
 from app.modules.files.scanner import ScanVerdict
@@ -30,6 +31,17 @@ class FakeStorage:
     async def get(self, key: str) -> bytes:
         return self.objects[key][0]
 
+    async def get_stream(
+        self, key: str, *, chunk_size: int = 64 * 1024
+    ) -> AsyncIterator[bytes]:
+        data = self.objects[key][0]
+
+        async def _iter() -> AsyncIterator[bytes]:
+            for off in range(0, len(data), chunk_size):
+                yield data[off : off + chunk_size]
+
+        return _iter()
+
     async def remove(self, key: str) -> None:
         self.removed.append(key)
         self.objects.pop(key, None)
@@ -48,6 +60,11 @@ class FailingStorage(FakeStorage):
         raise StorageError("boom")
 
     async def get(self, key: str) -> bytes:
+        raise StorageError("boom")
+
+    async def get_stream(
+        self, key: str, *, chunk_size: int = 64 * 1024
+    ) -> AsyncIterator[bytes]:
         raise StorageError("boom")
 
     async def remove(self, key: str) -> None:

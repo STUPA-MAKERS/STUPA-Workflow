@@ -24,7 +24,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Text, cast, delete, false, func, or_, select
+from sqlalchemy import ColumnElement, Text, cast, delete, false, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,6 +48,8 @@ from app.modules.applications.schemas import (
     TimelineEventOut,
     VersionOut,
 )
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth import sessions as auth_sessions
 from app.modules.budget.models import BudgetField
 from app.modules.budget.tree_models import Budget
@@ -157,9 +159,19 @@ class ApplicationsService:
         self.session = session
 
     # ----------------------------------------------------------------- helpers
-    async def _get_app(self, application_id: UUID) -> Application:
+    async def _get_app(
+        self, application_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> Application:
         app = await self.session.get(Application, application_id)
         if app is None:
+            raise NotFoundError(f"application {application_id} not found")
+        # Unbestätigte Gast-Einreichungen (``email_confirmed_at IS NULL``) bleiben bis zur
+        # Magic-Link-Bestätigung unsichtbar — exakt wie ``list_applications``/``list_tasks``
+        # sie ausblenden. Item-Routen für Principals/Gremium übergeben daher
+        # ``allow_unconfirmed=False`` (Identität ist kein besitzender Magic-Link-Antrag-
+        # steller) und erhalten 404 statt 403, um kein Existenz-Orakel zu liefern
+        # (#AUD-032). Die besitzende Antragstellerin (Magic-Link) liest mit dem Default.
+        if not allow_unconfirmed and app.email_confirmed_at is None:
             raise NotFoundError(f"application {application_id} not found")
         return app
 
@@ -406,13 +418,15 @@ class ApplicationsService:
         return state
 
     # ------------------------------------------------------------------- read
-    async def effective_form(self, application_id: UUID) -> EffectiveFormOut:
+    async def effective_form(
+        self, application_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> EffectiveFormOut:
         """Effektive Form des Antrags aus seiner **gepinnten** Version (+ Topf-Feldern).
 
         So rendert/bearbeitet die Detailansicht denselben Stand, gegen den der Server
         validiert — unabhängig davon, ob die aktive Form-Version inzwischen geändert
         wurde (data-model §1, „laufende Anträge behalten ihre form_version_id")."""
-        app = await self._get_app(application_id)
+        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         return await FormsService(self.session).get_effective_form(
             app.type_id,
             app.budget_pot_id,
@@ -426,8 +440,9 @@ class ApplicationsService:
         include_pii: bool,
         requester_sub: str | None = None,
         requester_can_manage: bool = False,
+        allow_unconfirmed: bool = True,
     ) -> ApplicationOut:
-        app = await self._get_app(application_id)
+        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         is_owner = requester_sub is not None and app.created_by == requester_sub
         can_edit = requester_can_manage or is_owner
         return await self._to_out(
@@ -442,10 +457,11 @@ class ApplicationsService:
         *,
         changed_by: str,
         bypass_state_lock: bool = False,
+        allow_unconfirmed: bool = True,
     ) -> ApplicationOut:
         """``data`` aktualisieren → neue Version + Diff. Gesperrter State → 409,
         außer ``bypass_state_lock`` (Aufrufer mit ``application.edit_any``, #app-edit-any)."""
-        app = await self._get_app(application_id)
+        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         state = await self._get_state(app.current_state_id)
         if state is not None and not state.edit_allowed and not bypass_state_lock:
             raise ConflictError("Application is locked for editing in its current state.")
@@ -499,15 +515,45 @@ class ApplicationsService:
         return await self._to_out(app, include_pii=False)
 
     # ----------------------------------------------------------------- delete
-    async def delete(self, application_id: UUID) -> None:
-        """Antrag löschen (mit abhängigen PII/Versionen/Events/Budget via Cascade)."""
+    async def delete(self, application_id: UUID, *, actor: str | None) -> None:
+        """Antrag löschen (mit abhängigen PII/Versionen/Events/Budget via Cascade).
+
+        Irreversibel und kaskadierend — daher auditiert (#AUD-002): es wird im selben
+        Transaktionsumfang vor dem Löschen ein ``APPLICATION_DELETE``-Eintrag mit
+        ausschließlich id-Referenzen/Metadaten geschrieben (keine rohe PII)."""
         app = await self._get_app(application_id)
+        version_count = await self.session.scalar(
+            select(func.count())
+            .select_from(SubmissionVersion)
+            .where(SubmissionVersion.application_id == application_id)
+        )
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.APPLICATION_DELETE,
+            target_type="application",
+            target_id=str(app.id),
+            data={
+                "typeId": str(app.type_id),
+                "gremiumId": str(app.gremium_id) if app.gremium_id else None,
+                "currentStateId": (
+                    str(app.current_state_id) if app.current_state_id else None
+                ),
+                "fiscalYearId": (
+                    str(app.fiscal_year_id) if app.fiscal_year_id else None
+                ),
+                "budgetId": str(app.budget_id) if app.budget_id else None,
+                "versionCount": int(version_count or 0),
+            },
+        )
         await self.session.delete(app)
         await self.session.commit()
 
     # --------------------------------------------------------------- timeline
-    async def timeline(self, application_id: UUID) -> list[TimelineEventOut]:
-        await self._get_app(application_id)
+    async def timeline(
+        self, application_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> list[TimelineEventOut]:
+        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         events = (
             await self.session.scalars(
                 select(StatusEvent)
@@ -533,8 +579,10 @@ class ApplicationsService:
         return out
 
     # --------------------------------------------------------------- versions
-    async def versions(self, application_id: UUID) -> list[VersionOut]:
-        await self._get_app(application_id)
+    async def versions(
+        self, application_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> list[VersionOut]:
+        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         rows = (
             await self.session.scalars(
                 select(SubmissionVersion)
@@ -682,13 +730,18 @@ class ApplicationsService:
 
     async def _committee_read_clauses(self, sub: str) -> list[ColumnElement[bool]]:
         """Gremium-Lesescope (#committee-read) als SQL-Klauseln (mit dem Owner-Filter
-        ge-OR-t). Zwei Pfade — gespiegelt von ``access._committee_can_read`` (Detail):
+        ge-OR-t). Drei Pfade — gespiegelt von ``access._committee_can_read`` (Detail):
 
         * Kostenstelle (Knoten ODER Vorfahre) mit ``view_gremium_id`` in einem
-          Mitglieds-Gremium → der ganze Teilbaum (``path_key``-Präfix), und
-        * aktueller ``vote``-State mit ``config.gremiumId`` in einem Mitglieds-Gremium.
+          Mitglieds-Gremium → der ganze Teilbaum (``path_key``-Präfix),
+        * aktueller ``vote``-State mit ``config.gremiumId`` in einem Mitglieds-Gremium,
+          **und**
+        * Bestand: in einer Sitzung eines Mitglieds-Gremiums (ab)gestimmt (#vote-read,
+          ``vote → meeting.gremium_id``).
 
-        Ohne aktive Mitgliedschaften leere Liste (kein zusätzlicher Scope)."""
+        Beide Funktionen MÜSSEN dieselben Pfade abdecken, damit ein gelisteter Antrag
+        auch öffenbar ist (und umgekehrt). Ohne aktive Mitgliedschaften leere Liste
+        (kein zusätzlicher Scope)."""
         from app.modules.admin.gremium_roles import gremium_member_ids
 
         member_ids = await gremium_member_ids(self.session, sub)
@@ -729,6 +782,19 @@ class ApplicationsService:
         ]
         if vote_state_ids:
             clauses.append(Application.current_state_id.in_(vote_state_ids))
+
+        # (c) Bestand: in einer Sitzung eines Mitglieds-Gremiums abgestimmt (#vote-read).
+        #     Anträge mit einer ``Vote``, deren ``meeting.gremium_id`` einem der Gremien
+        #     gehört — gespiegelt von ``access._committee_can_read`` (c).
+        from app.modules.livevote.models import Meeting
+        from app.modules.voting.models import Vote
+
+        voted_app_ids = (
+            select(Vote.application_id)
+            .join(Meeting, Meeting.id == Vote.meeting_id)
+            .where(Vote.application_id.is_not(None), Meeting.gremium_id.in_(member_ids))
+        )
+        clauses.append(Application.id.in_(voted_app_ids))
 
         return clauses
 
@@ -870,8 +936,9 @@ class ApplicationsService:
         author_kind: str,
         body: str,
         visibility: str,
+        allow_unconfirmed: bool = True,
     ) -> CommentOut:
-        await self._get_app(application_id)
+        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         comment = Comment(
             application_id=application_id,
             author=author,
@@ -892,9 +959,13 @@ class ApplicationsService:
         )
 
     async def list_comments(
-        self, application_id: UUID, *, include_internal: bool
+        self,
+        application_id: UUID,
+        *,
+        include_internal: bool,
+        allow_unconfirmed: bool = True,
     ) -> list[CommentOut]:
-        await self._get_app(application_id)
+        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         stmt = select(Comment).where(Comment.application_id == application_id)
         if not include_internal:
             stmt = stmt.where(Comment.visibility == "public")
@@ -961,6 +1032,18 @@ class ApplicationsService:
                 if v.diff is not None:
                     v.diff = _scrub_diff(v.diff, pii_keys)
 
+        # Vom Antragsteller selbst verfasste Kommentare (author_kind='applicant')
+        # enthalten Freitext, der personenbezogene Daten tragen kann → Body scrubben
+        # (DSGVO Art. 17). Magic-Links werden gelöscht, aber Staff liest Kommentare
+        # weiterhin über die Timeline/Comments-API.
+        await self.session.execute(
+            update(Comment)
+            .where(
+                Comment.application_id == application_id,
+                Comment.author_kind == "applicant",
+            )
+            .values(body="[anonymisiert]")
+        )
         # Magic-Links sind ein direkter PII-Zugriffspfad (Mail-Link) → entfernen.
         await self.session.execute(
             delete(MagicLink).where(MagicLink.application_id == application_id)

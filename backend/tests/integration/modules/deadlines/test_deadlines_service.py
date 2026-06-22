@@ -230,6 +230,51 @@ async def test_vote_auto_close_fires_branch(
 
 
 # --------------------------------------------------------------------------- #
+# Scan-Obergrenze pro Tick — ältester Rückstau zuerst (AUD-046)
+# --------------------------------------------------------------------------- #
+async def test_due_scans_are_bounded_oldest_first(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """Bei einem Rückstau > ``limit`` liefert jeder Scan höchstens ``limit`` IDs,
+    **älteste ``due_at`` zuerst** — sonst zieht ein Tick die ganze Kohorte sequenziell
+    über die 1-Minuten-Kadenz (AUD-046). Restliche Zeilen bleiben fällig (kein Verlust)."""
+    base = datetime.now(UTC) - timedelta(hours=10)
+    async with maker() as s:
+        app_type, states = await _seed_flow(s)
+        app = await _make_app(s, app_type, states["active"])
+        svc = DeadlineService(s)
+        # 5 fällige Auto-Fristen + 5 fällige Erinnerungs-Fristen, aufsteigend ältester→neuer.
+        for i in range(5):
+            await svc.create(
+                kind="requeue", due_at=base + timedelta(minutes=i),
+                application_id=app.id, action_on_pass={"transitionId": str(uuid.uuid4())},
+            )
+        for i in range(5):
+            await svc.create(
+                kind="vote", due_at=base + timedelta(minutes=i), application_id=app.id,
+            )
+
+    async with maker() as s:
+        svc = DeadlineService(s)
+        now = datetime.now(UTC)
+        # Aktions-Scan auf 3 begrenzt → die 3 ältesten action_on_pass-Fristen.
+        action_ids = await svc.due_action_deadline_ids(now, limit=3)
+        assert len(action_ids) == 3
+        rows = (await s.execute(
+            select(Deadline).where(Deadline.id.in_(action_ids))
+        )).scalars().all()
+        due = sorted(r.due_at for r in rows)
+        assert due == [base + timedelta(minutes=i) for i in range(3)]  # ältester zuerst
+
+        # Erinnerungs-Scan (alle 10 Fristen sind reminded_at IS NULL) auf 4 begrenzt.
+        reminder_ids = await svc.due_reminder_ids(now, timedelta(hours=24), limit=4)
+        assert len(reminder_ids) == 4
+
+        # Ohne Limit-Argument greift die Default-Obergrenze (>> Rückstau hier) → alle 10.
+        assert len(await svc.due_reminder_ids(now, timedelta(hours=24))) == 10
+
+
+# --------------------------------------------------------------------------- #
 # Reminder — exactly once
 # --------------------------------------------------------------------------- #
 async def test_reminder_sent_exactly_once(
@@ -258,6 +303,42 @@ async def test_reminder_sent_exactly_once(
         assert deadline.reminded_at is not None
 
     # Zweiter Lauf: keine zweite Mail (reminded_at gesetzt).
+    out2 = await process_deadlines(_ctx(maker, queue))
+    assert "reminders=0" in out2
+    assert len(sender.sent) == 1
+
+
+# --------------------------------------------------------------------------- #
+# Reminder — verspätet nachgeholt nach >Lead-Ausfall (AUD-037)
+# --------------------------------------------------------------------------- #
+async def test_reminder_sent_late_for_already_passed_deadline(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """Eine bereits **abgelaufene**, noch nicht erinnerte Frist (z. B. der Cron war
+    länger als das Lead-Fenster aus) wird genau einmal — verspätet — erinnert und
+    ``reminded_at`` gesetzt, statt für immer im Scan-Index zu lecken (AUD-037)."""
+    async with maker() as s:
+        app_type, states = await _seed_flow(s)
+        app = await _make_app(s, app_type, states["active"])
+        # due_at liegt in der Vergangenheit (Frist schon abgelaufen) → unter der alten
+        # zweiseitigen Bedingung (due_at > now) wäre sie nie mehr gegriffen worden.
+        await DeadlineService(s).create(
+            kind="vote", due_at=datetime.now(UTC) - timedelta(hours=48),
+            application_id=app.id,
+        )
+
+    sender = CapturingMailSender()
+    queue = DirectMailQueue(sender)
+    out = await process_deadlines(_ctx(maker, queue))
+    assert "reminders=1" in out  # verspätet, aber versandt
+    assert len(sender.sent) == 1
+    assert "a@example.org" in sender.sent[0].to
+
+    async with maker() as s:
+        deadline = (await s.execute(select(Deadline))).scalars().one()
+        assert deadline.reminded_at is not None  # Zeile verlässt den Scan-Index
+
+    # Zweiter Lauf: keine zweite (späte) Mail — genau-einmal-Semantik bleibt erhalten.
     out2 = await process_deadlines(_ctx(maker, queue))
     assert "reminders=0" in out2
     assert len(sender.sent) == 1

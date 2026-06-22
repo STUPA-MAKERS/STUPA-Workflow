@@ -662,14 +662,20 @@ async def test_update_expense_amount_none_skipped() -> None:
     assert out.description == "d2"
 
 
-async def test_update_expense_rebooks_cost_centre() -> None:
-    # Kostenstelle einer eigenständigen Buchung umbuchen (#25): budget_id + Währung
-    # folgen dem neuen Knoten; HHJ bleibt fix.
-    old = _budget(id=uuid.uuid4(), path_key="VS-1", key="1")
-    new = _budget(id=uuid.uuid4(), path_key="VS-2", key="2", currency="EUR")
-    expense = _expense(budget_id=old.id, application_id=None, account_id=None, actor=None)
+async def test_update_expense_rebooks_within_same_top_level() -> None:
+    # Kostenstelle einer eigenständigen Buchung umbuchen (#25), aber NUR innerhalb des
+    # selben Top-Budgets: ``budget_id`` + Währung folgen dem neuen Knoten, das fixe HHJ
+    # gehört weiterhin zum Top-Budget (``_resolve_fiscal_year`` ok, #AUD-036).
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    new = _budget(id=uuid.uuid4(), parent_id=top.id, path_key="VS-2", key="2", currency="CHF")
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id)  # HHJ gehört zum Top → kein Orphan
+    expense = _expense(
+        budget_id=uuid.uuid4(), fy_id=fy.id, application_id=None, account_id=None, actor=None,
+    )
     sess = fake_session(
         result(new),   # _get_node(payload.budget_id) im budget_id-Branch
+        result(top),   # _resolve_fiscal_year → _top_level(new)
+        result(fy),    # _resolve_fiscal_year → _get_fiscal_year(expense.fiscal_year_id)
         result(new),   # _get_node(expense.budget_id) nach commit (Pfad)
         result(),      # _actor_names (kein actor)
         gets=[expense],
@@ -678,7 +684,32 @@ async def test_update_expense_rebooks_cost_centre() -> None:
     out = await svc.update_expense(expense.id, ExpenseUpdate(budgetId=new.id))
     assert out.budget_id == new.id
     assert out.path_key == "VS-2"
-    assert expense.currency == "EUR"
+    assert expense.currency == "CHF"          # Währung folgt der neuen Kostenstelle
+    assert expense.fiscal_year_id == fy.id    # HHJ bleibt fix
+
+
+async def test_update_expense_rebook_across_top_level_rejected() -> None:
+    # #AUD-036: Umbuchen in eine FREMDE Top-Level-Kostenstelle würde das beibehaltene HHJ
+    # verwaisen (orphan FY, Phantom-Zeile). ``_resolve_fiscal_year`` lehnt mit 422 ab,
+    # bevor ``budget_id``/Währung geschrieben oder committet werden.
+    other_top = _budget(id=uuid.uuid4(), path_key="VV", key="VV")
+    new = _budget(id=uuid.uuid4(), parent_id=other_top.id, path_key="VV-2", key="2")
+    fy = _fy(id=uuid.uuid4(), budget_id=uuid.uuid4())  # HHJ eines FREMDEN Top-Budgets
+    expense = _expense(
+        budget_id=uuid.uuid4(), fy_id=fy.id, application_id=None, account_id=None, currency="EUR",
+    )
+    sess = fake_session(
+        result(new),        # _get_node(payload.budget_id) im budget_id-Branch
+        result(other_top),  # _resolve_fiscal_year → _top_level(new)
+        result(fy),         # _get_fiscal_year → fy.budget_id != other_top.id → 422
+        gets=[expense],
+    )
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ValidationProblem):
+        await svc.update_expense(expense.id, ExpenseUpdate(budgetId=new.id))
+    assert expense.budget_id != new.id   # nicht umgebucht
+    assert expense.currency == "EUR"     # Währung unverändert
+    assert sess.committed == 0           # kein Commit beim Guard-Abbruch
 
 
 async def test_update_expense_rebook_unknown_budget_404() -> None:

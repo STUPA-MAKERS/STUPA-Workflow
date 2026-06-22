@@ -10,7 +10,7 @@ requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
-    "pytex-preprocessor==1.0.0",
+    "pytex-preprocessor==1.0.6",
 ]
 
 [project.optional-dependencies]

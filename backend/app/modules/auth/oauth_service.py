@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth import oauth
@@ -111,8 +111,12 @@ async def exchange_code(
 ) -> IssuedTokens:
     """Authorization-Code → Token-Paar. PKCE + Bindung an client/redirect geprüft.
 
-    Einmal-Verwendung: ``used_at`` wird atomar gesetzt (``WHERE used_at IS NULL``-Race
-    über die folgende Prüfung hinaus durch die Transaktion abgedeckt). Fehler →
+    Einmal-Verwendung (RFC 6749 §4.1.2): das Einlösen erfolgt über ein atomares
+    ``UPDATE ... WHERE id=? AND used_at IS NULL RETURNING id`` (spiegelt den
+    Magic-Link-Pfad). Unter ``READ COMMITTED`` serialisiert die DB konkurrierende
+    Einlösungen — nur genau eine beansprucht die Zeile, jede weitere bekommt 0 Zeilen
+    und damit ``invalid_grant``. Validierung (Ablauf/Bindung/PKCE) läuft vorab, damit
+    ein fehlgeschlagener Request den Code nicht verbrennt. Fehler →
     ``OAuthError('invalid_grant')``.
     """
     row = (
@@ -130,7 +134,21 @@ async def exchange_code(
         raise oauth.OAuthError("invalid_grant", "client/redirect mismatch")
     if not oauth.verify_pkce_s256(code_verifier, row.code_challenge):
         raise oauth.OAuthError("invalid_grant", "PKCE verification failed")
-    row.used_at = now
+    # Atomares Beanspruchen: nur die erste nebenläufige Einlösung gewinnt. 0 Zeilen →
+    # der Code wurde zwischen SELECT und UPDATE bereits verbraucht (Double-Spend-Schutz).
+    claimed = (
+        await db.execute(
+            update(OAuthAuthorizationCode)
+            .where(
+                OAuthAuthorizationCode.id == row.id,
+                OAuthAuthorizationCode.used_at.is_(None),
+            )
+            .values(used_at=now)
+            .returning(OAuthAuthorizationCode.id)
+        )
+    ).scalar_one_or_none()
+    if claimed is None:
+        raise oauth.OAuthError("invalid_grant", "code invalid or already used")
     # Die im Consent gewählte Lebensdauer (``access_ttl_seconds``) ist maßgeblich —
     # ``None`` bedeutet »läuft nie ab« (NICHT Default). Refresh läuft dann ebenfalls nie ab.
     consent_ttl = row.access_ttl_seconds
@@ -154,7 +172,15 @@ async def refresh_tokens(
     access_ttl: int,
     refresh_ttl: int,
 ) -> IssuedTokens:
-    """Refresh-Token → neues Paar; altes Token wird widerrufen (Rotation)."""
+    """Refresh-Token → neues Paar; altes Token wird widerrufen (Rotation).
+
+    Rotation läuft über ein atomares ``UPDATE ... WHERE id=? AND revoked_at IS NULL
+    RETURNING id`` — bei nebenläufiger Einlösung gewinnt nur die erste, die zweite
+    sieht 0 Zeilen. Wird ein bereits rotiertes (widerrufenes) Token erneut vorgelegt,
+    deutet das auf Diebstahl/Replay hin: dann wird die gesamte noch aktive Token-Familie
+    dieses Principals + Clients kaskadierend widerrufen (RFC 6819 §5.2.2.3), was eine
+    Neu-Authentisierung erzwingt.
+    """
     row = (
         await db.execute(
             select(OAuthToken).where(
@@ -162,7 +188,19 @@ async def refresh_tokens(
             )
         )
     ).scalar_one_or_none()
-    if row is None or row.revoked_at is not None:
+    if row is None:
+        raise oauth.OAuthError("invalid_grant", "refresh token invalid or revoked")
+    if row.revoked_at is not None:
+        # Replay eines bereits rotierten Tokens → Familie zwangsweise widerrufen.
+        await db.execute(
+            update(OAuthToken)
+            .where(
+                OAuthToken.principal_id == row.principal_id,
+                OAuthToken.client_id == row.client_id,
+                OAuthToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=now)
+        )
         raise oauth.OAuthError("invalid_grant", "refresh token invalid or revoked")
     if row.client_id != client_id:
         raise oauth.OAuthError("invalid_grant", "client mismatch")
@@ -175,7 +213,21 @@ async def refresh_tokens(
     ).scalar_one_or_none()
     if principal is None or principal.active is False:
         raise oauth.OAuthError("invalid_grant", "principal inactive")
-    row.revoked_at = now
+    # Atomares Rotieren: nur die erste nebenläufige Einlösung gewinnt. 0 Zeilen →
+    # das Token wurde zwischen SELECT und UPDATE bereits rotiert (Race-Schutz).
+    rotated = (
+        await db.execute(
+            update(OAuthToken)
+            .where(
+                OAuthToken.id == row.id,
+                OAuthToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=now)
+            .returning(OAuthToken.id)
+        )
+    ).scalar_one_or_none()
+    if rotated is None:
+        raise oauth.OAuthError("invalid_grant", "refresh token invalid or revoked")
     # Gewählte Lebensdauer über die Rotation hinweg beibehalten (``None`` = nie).
     keep_access = row.access_ttl_seconds
     return await _issue_tokens(

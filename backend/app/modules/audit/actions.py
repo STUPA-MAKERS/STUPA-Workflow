@@ -31,6 +31,11 @@ class AuditAction(StrEnum):
     # Sitzung gelöscht (#16) — mit ``finalizedProtocol``-Flag im Datensatz; das
     # Löschen finalisierter Sitzungen verlangt ``meeting.delete_finalized``.
     MEETING_DELETE = "meeting_delete"
+    # Antrag gelöscht (#AUD-002) — irreversibler Admin-Vorgang, kaskadiert auf
+    # Antragsteller-PII/Versionen/Status-Events/Magic-Links/Kommentare sowie 1:1
+    # ``budget_entry`` und ``Vote``-Zeilen. ``data`` trägt nur id-Referenzen/Metadaten
+    # (Typ/Gremium/Status/Versionsanzahl), niemals rohe PII (security.md §4).
+    APPLICATION_DELETE = "application_delete"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"

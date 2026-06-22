@@ -313,7 +313,7 @@ export interface AttachmentOutWire {
   is_comparison_offer: boolean;
 }
 
-/** `SignedUrlOut` (files/schemas.py) — kurzlebige MinIO-URL + Restlaufzeit (s). */
+/** `SignedUrlOut` (files/schemas.py) — app-relative authz-gated /download route; expiresIn is an advisory FE cache hint, not a URL expiry. */
 export interface SignedUrlOutWire {
   url: string;
   expiresIn: number;

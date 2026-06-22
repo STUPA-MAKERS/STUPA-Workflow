@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership, GremiumRole
@@ -314,7 +315,10 @@ class GremiumRoleService:
                 errors=[{"field": "validUntil", "msg": "must be after validFrom"}],
             )
         # Overlap-Invariante: kein zeitlich überlappender Eintrag desselben Principals
-        # in DIESEM Gremium (genau eine aktive Rolle je Zeitpunkt).
+        # in DIESEM Gremium (genau eine aktive Rolle je Zeitpunkt). Diese Python-Prüfung
+        # ist nur ein Fast-Path mit klarer Fehlermeldung; verbindlich durchgesetzt wird
+        # die Invariante über die EXCLUDE-Constraint ``ex_gremium_membership_no_overlap``
+        # (schließt die TOCTOU-Lücke bei parallelen Inserts, AUD-029).
         existing = (
             await self.session.scalars(
                 select(GremiumMembership).where(
@@ -337,9 +341,20 @@ class GremiumRoleService:
             valid_until=new_until,
         )
         self.session.add(row)
-        await self.session.flush()
-        await self._audit(actor, "gremium_membership", row.id)
-        await self.session.commit()
+        # Die EXCLUDE-Constraint wird beim INSERT (flush) geprüft, nicht erst beim
+        # Commit — der konkurrierende Race feuert also bereits hier. flush + Audit +
+        # Commit daher gemeinsam absichern und den IntegrityError in einen 409
+        # übersetzen (statt 500); der Client kann erneut versuchen.
+        try:
+            await self.session.flush()
+            await self._audit(actor, "gremium_membership", row.id)
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ConflictError(
+                "overlapping membership for this member in this gremium",
+                code="conflict",
+            ) from exc
         return _membership_out(row)
 
     async def delete_membership(self, membership_id: UUID, actor: str) -> None:

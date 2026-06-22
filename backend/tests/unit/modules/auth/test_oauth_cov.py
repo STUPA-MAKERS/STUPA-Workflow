@@ -681,16 +681,17 @@ async def test_exchange_code_pkce_fail() -> None:
 async def test_exchange_code_success_with_ttl() -> None:
     verifier = "a" * 64
     row = SimpleNamespace(
-        used_at=None, expires_at=NOW + timedelta(hours=1), client_id=CLIENT_ID,
-        redirect_uri=LOOPBACK, code_challenge=_challenge(verifier),
+        id="code-id", used_at=None, expires_at=NOW + timedelta(hours=1),
+        client_id=CLIENT_ID, redirect_uri=LOOPBACK, code_challenge=_challenge(verifier),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    db = fake_session(result(row))
+    # AUD-003: Einlösen via atomarem ``UPDATE … WHERE used_at IS NULL RETURNING id``.
+    # 1. execute = SELECT (row), 2. execute = Claim → 1 Zeile (id) ⇒ Code beansprucht.
+    db = fake_session(result(row), result(row.id))
     issued = await oauth_service.exchange_code(
         db, code="c", code_verifier=verifier, redirect_uri=LOOPBACK,
         client_id=CLIENT_ID, now=NOW, access_ttl=7200, refresh_ttl=86400,
     )
-    assert row.used_at == NOW
     assert issued.access_token.startswith("apat_")
     assert issued.refresh_token.startswith("aprt_")
     assert issued.expires_in == 3600  # consent-TTL maßgeblich, nicht access_ttl-Param
@@ -702,11 +703,11 @@ async def test_exchange_code_success_with_ttl() -> None:
 async def test_exchange_code_success_never_expires() -> None:
     verifier = "b" * 64
     row = SimpleNamespace(
-        used_at=None, expires_at=NOW + timedelta(hours=1), client_id=CLIENT_ID,
-        redirect_uri=LOOPBACK, code_challenge=_challenge(verifier),
+        id="code-id", used_at=None, expires_at=NOW + timedelta(hours=1),
+        client_id=CLIENT_ID, redirect_uri=LOOPBACK, code_challenge=_challenge(verifier),
         access_ttl_seconds=None, principal_id="pid", scope="read",
     )
-    db = fake_session(result(row))
+    db = fake_session(result(row), result(row.id))  # 2. execute = atomarer Claim
     issued = await oauth_service.exchange_code(
         db, code="c", code_verifier=verifier, redirect_uri=LOOPBACK,
         client_id=CLIENT_ID, now=NOW, access_ttl=7200, refresh_ttl=86400,
@@ -728,13 +729,23 @@ async def test_refresh_tokens_not_found() -> None:
 
 
 async def test_refresh_tokens_revoked() -> None:
-    row = SimpleNamespace(revoked_at=NOW, client_id=CLIENT_ID, refresh_expires_at=None)
+    # AUD-020: ein bereits rotiertes (revoked) Token erneut vorgelegt → Replay-Verdacht;
+    # die Familie (principal_id+client_id) wird kaskadierend widerrufen, dann invalid_grant.
+    row = SimpleNamespace(
+        id="tok-id", revoked_at=NOW, client_id=CLIENT_ID, refresh_expires_at=None,
+        principal_id="pid",
+    )
+    # 1. execute = SELECT (revoked row), 2. execute = Familien-Revoke-UPDATE (Ergebnis ignoriert).
     db = fake_session(result(row))
-    with pytest.raises(oauth.OAuthError):
+    with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
             db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
             access_ttl=3600, refresh_ttl=86400,
         )
+    assert "invalid or revoked" in exc.value.description
+    # kein neues Token-Paar ausgestellt + die Familien-Revoke-Query lief.
+    assert db.added == []
+    assert len(db.statements) == 2
 
 
 async def test_refresh_tokens_client_mismatch() -> None:
@@ -764,26 +775,33 @@ async def test_refresh_tokens_expired() -> None:
 
 async def test_refresh_tokens_success_rotation() -> None:
     row = SimpleNamespace(
-        revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=NOW + timedelta(days=30),
+        id="tok-id", revoked_at=None, client_id=CLIENT_ID,
+        refresh_expires_at=NOW + timedelta(days=30),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    # Zweites Ergebnis: der aktive Principal (Aktiv-Prüfung vor der Rotation).
-    db = fake_session(result(row), result(SimpleNamespace(active=True)))
+    # AUD-020: atomare Rotation via ``UPDATE … WHERE revoked_at IS NULL RETURNING id``.
+    # 1. SELECT (row), 2. SELECT (aktiver Principal), 3. Rotation-Claim → 1 Zeile (id).
+    db = fake_session(
+        result(row), result(SimpleNamespace(active=True)), result(row.id)
+    )
     issued = await oauth_service.refresh_tokens(
         db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
         access_ttl=3600, refresh_ttl=86400,
     )
-    assert row.revoked_at == NOW  # altes Token rotiert
+    # Altes Token rotiert (Claim lieferte eine Zeile) und ein frisches Paar ausgestellt.
+    assert len(db.statements) == 3
     assert issued.expires_in == 3600
     assert db.added[0].refresh_expires_at == NOW + timedelta(seconds=86400)
 
 
 async def test_refresh_tokens_success_never_expires() -> None:
     row = SimpleNamespace(
-        revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=None,
+        id="tok-id", revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=None,
         access_ttl_seconds=None, principal_id="pid", scope="read",
     )
-    db = fake_session(result(row), result(SimpleNamespace(active=True)))
+    db = fake_session(
+        result(row), result(SimpleNamespace(active=True)), result(row.id)
+    )
     issued = await oauth_service.refresh_tokens(
         db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
         access_ttl=3600, refresh_ttl=86400,
@@ -1273,7 +1291,12 @@ async def test_oidc_callback_email_verified_bootstrap(
 # rbac.py — vote.cast membership group
 # =========================================================================== #
 async def test_resolve_principal_membership_grants_vote_group() -> None:
-    """Aktive Gremium-Rolle mit ``vote.cast`` → Gremium-Gruppe in groups (Zeile 113-114)."""
+    """Aktive Gremium-Rolle mit ``vote.cast`` → namespaced Gremium-Stimm-Key in groups.
+
+    AUD-066: der Cast-Key ist ``vote:<gremium_id>`` (``vote_group_key``), NICHT der
+    nackte UUID-String — sonst könnte ein deckungsgleicher OIDC-Gruppen-Claim die
+    Gremium-Stimmberechtigung fälschlich erfüllen.
+    """
     row = PrincipalRow(sub="u9", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
     gid = "44444444-4444-4444-4444-444444444444"
@@ -1283,7 +1306,8 @@ async def test_resolve_principal_membership_grants_vote_group() -> None:
         result((gid, ["vote.cast", "vote.manage"])),  # membership_rows
     )
     p = await rbac.resolve_principal(db, row, NOW)
-    assert gid in p.groups
+    assert rbac.vote_group_key(gid) in p.groups
+    assert gid not in p.groups
 
 
 async def test_resolve_principal_membership_without_vote_cast() -> None:

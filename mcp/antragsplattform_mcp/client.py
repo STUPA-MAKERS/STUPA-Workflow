@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -22,6 +23,34 @@ class ApiError(RuntimeError):
         super().__init__(f"{status}: {message}")
         self.status = status
         self.message = message
+
+
+def _safe_path(path: str) -> str:
+    """Defensively re-encode an API path built from caller-supplied ids.
+
+    Tool paths are plain f-strings like ``/applications/{id}/votes`` where ``{id}``
+    is interpolated raw. httpx does not percent-encode ``/`` inside a segment nor
+    reject ``..``/``?``, so an id such as ``../admin/audit`` or ``x?y=1`` could
+    rewrite the route or smuggle a query string. Query parameters in this client
+    always travel via the ``params=`` kwarg and are never embedded in the path, so
+    every ``?``/``#`` in the path string and every ``.``/``..`` traversal segment is
+    illegitimate. We reject those and percent-encode anything else that does not
+    belong inside a single path segment, leaving the structural ``/`` separators
+    intact. Defense-in-depth: the request is still RBAC-authorized server-side.
+    """
+    if not path.startswith("/"):
+        raise ApiError(400, f"invalid API path (must be absolute): {path!r}")
+    if "?" in path or "#" in path or "\\" in path:
+        raise ApiError(400, f"illegal character in API path segment: {path!r}")
+    segments = path.split("/")
+    encoded: list[str] = []
+    for seg in segments:
+        if seg in {".", ".."}:
+            raise ApiError(400, f"path traversal is not allowed: {path!r}")
+        # quote(safe="") encodes any stray "/", "%", whitespace etc. that an id may
+        # carry while leaving plain route names and UUIDs untouched.
+        encoded.append(quote(seg, safe=""))
+    return "/".join(encoded)
 
 
 class ApiClient:
@@ -40,6 +69,7 @@ class ApiClient:
     async def request(
         self, method: str, path: str, **kwargs: Any
     ) -> Any:
+        path = _safe_path(path)
         token = await self._token()
         headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
         resp = await self._client.request(method, path, headers=headers, **kwargs)

@@ -5,8 +5,10 @@
 
 from __future__ import annotations
 
+import io
 import sys
 import types
+import zipfile
 
 import pytest
 
@@ -18,6 +20,15 @@ from app.modules.files.mime import (
     sniff_mime,
     validate_upload,
 )
+
+
+def _ooxml_zip(top_dir: str) -> bytes:
+    """Minimales, gültiges OOXML-Paket: ``[Content_Types].xml`` + Format-Verzeichnis."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("[Content_Types].xml", "<Types/>")
+        zf.writestr(f"{top_dir}document.xml", "<xml/>")
+    return buf.getvalue()
 
 
 @pytest.fixture
@@ -78,9 +89,40 @@ def test_validate_png_ok(fake_magic: dict[str, str]) -> None:
 
 
 def test_validate_docx_zip_sniff_ok(fake_magic: dict[str, str]) -> None:
-    # OOXML snifft teils als application/zip → für .docx zulässig.
+    # OOXML snifft teils als application/zip → für .docx zulässig, wenn der
+    # Container die OOXML-Struktur trägt.
     fake_magic["mime"] = "application/zip"
-    assert validate_upload("brief.docx", b"PK\x03\x04") == "application/zip"
+    assert validate_upload("brief.docx", _ooxml_zip("word/")) == "application/zip"
+
+
+def test_validate_xlsx_pptx_zip_sniff_ok(fake_magic: dict[str, str]) -> None:
+    fake_magic["mime"] = "application/zip"
+    assert validate_upload("tab.xlsx", _ooxml_zip("xl/")) == "application/zip"
+    assert validate_upload("slides.pptx", _ooxml_zip("ppt/")) == "application/zip"
+
+
+def test_validate_arbitrary_zip_as_docx_rejected(fake_magic: dict[str, str]) -> None:
+    # Beliebiges ZIP ohne OOXML-Struktur, als .docx getarnt → abgelehnt (AUD-021).
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("evil.sh", "rm -rf /")
+    fake_magic["mime"] = "application/zip"
+    with pytest.raises(MimeRejected):
+        validate_upload("brief.docx", buf.getvalue())
+
+
+def test_validate_zip_wrong_format_dir_rejected(fake_magic: dict[str, str]) -> None:
+    # Word-Struktur, aber als .xlsx deklariert → falsches Top-Level-Verzeichnis.
+    fake_magic["mime"] = "application/zip"
+    with pytest.raises(MimeRejected):
+        validate_upload("tab.xlsx", _ooxml_zip("word/"))
+
+
+def test_validate_corrupt_zip_as_docx_rejected(fake_magic: dict[str, str]) -> None:
+    # Nur Magic-Header, kein lesbares ZIP → abgelehnt.
+    fake_magic["mime"] = "application/zip"
+    with pytest.raises(MimeRejected):
+        validate_upload("brief.docx", b"PK\x03\x04")
 
 
 def test_validate_disallowed_type_rejected(fake_magic: dict[str, str]) -> None:

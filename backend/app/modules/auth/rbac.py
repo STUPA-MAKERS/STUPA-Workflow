@@ -19,6 +19,20 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 
 
+def vote_group_key(gremium_id: object) -> str:
+    """Namespaced group key for *gremium voting eligibility*.
+
+    The cast gate must depend on a real ``vote.cast`` Gremium-membership, never on
+    a raw OIDC group claim that merely happens to equal a gremium UUID string
+    (AUD-066). Prefixing the internal key (``vote:<uuid>``) makes it impossible for
+    an arbitrary IdP-emitted group name to collide with — and thereby satisfy —
+    gremium cast eligibility. ``Vote.eligible_group`` stays the bare UUID-as-text
+    (it is parsed back to a UUID for gremium/delegation resolution); the voting
+    service derives this prefixed key from that UUID for the membership check.
+    """
+    return f"vote:{gremium_id}"
+
+
 def _as_aware(dt: datetime | None) -> datetime | None:
     """Naive Werte als UTC interpretieren (defensiv: Alt-Daten/timestamp ohne tz).
 
@@ -93,9 +107,11 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
         )
 
     # Gremium-Mitgliedschaften (#Sessions): wer in einem Gremium eine aktive Rolle mit
-    # ``vote.cast`` hat, ist in der Gremium-Gruppe stimmberechtigt. ``Vote.eligible_group``
-    # = str(gremium_id), daher gatet ``in_group`` damit das »Vote«-Recht der Rolle. Das
-    # bloße Mitlesen einer Sitzung läuft über ``MeetingService.is_member`` (eigene Query).
+    # ``vote.cast`` hat, ist in der Gremium-Gruppe stimmberechtigt. Der Cast-Gate prüft
+    # den NAMESPACED Key ``vote:<gremium_id>`` (``vote_group_key``), nie den nackten
+    # UUID-String — so kann ein deckungsgleicher OIDC-Gruppen-Claim die Gremium-
+    # Stimmberechtigung nicht fälschlich erfüllen (AUD-066). Das bloße Mitlesen einer
+    # Sitzung läuft über ``MeetingService.is_member`` (eigene Query).
     membership_rows = (
         await db.execute(
             select(GremiumMembership.gremium_id, GremiumRole.permissions)
@@ -111,7 +127,7 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
     ).all()
     for gremium_id, perms in membership_rows:
         if "vote.cast" in (perms or []):
-            groups.add(str(gremium_id))
+            groups.add(vote_group_key(gremium_id))
 
     return Principal(
         sub=row.sub,

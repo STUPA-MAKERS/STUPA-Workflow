@@ -505,6 +505,24 @@ describe('ApplicationsListComponent', () => {
     }
   });
 
+  it('cancels a pending debounced search when the component is destroyed', async () => {
+    jest.useFakeTimers();
+    try {
+      const { http, cmp, fixture, router } = await setup();
+      flushTypes(http);
+      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      cmp.onSearch('beamer');
+      // navigating away inside the 400ms window must not fire a stray navigate
+      fixture.destroy();
+      jest.advanceTimersByTime(400);
+      expect(navigate).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('clears the q param when the debounced search is emptied', async () => {
     jest.useFakeTimers();
     try {

@@ -37,9 +37,6 @@ router = APIRouter(tags=["voting"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
-MANAGE_PERMISSION = "vote.manage"
-CAST_PERMISSION = "vote.cast"
-
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
@@ -59,8 +56,10 @@ def get_voting_service(
 
 ServiceDep = Annotated[VotingService, Depends(get_voting_service)]
 PublisherDep = Annotated[MeetingPublisher, Depends(get_meeting_publisher)]
-ManagerDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
-VoterDep = Annotated[Principal, Depends(require_principal(CAST_PERMISSION))]
+# Lifecycle (create/open/close/cancel) ist NICHT mehr global-only gegated (#AUD-027):
+# das Router-Gate verlangt nur Auth (``ReaderDep``); die gremium-genaue ``vote.manage``-
+# Prüfung (admin / globale vote.manage / per-Gremium-Rolle) liegt fail-closed im Service
+# (``assert_can_manage*``), symmetrisch zum gescopten Read (``get_scoped``).
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 
 
@@ -73,9 +72,14 @@ async def create_vote(
     application_id: UUID,
     payload: VoteCreate,
     service: ServiceDep,
-    _principal: ManagerDep,
+    principal: ReaderDep,
 ) -> VoteOut:
-    """Abstimmung (``draft``) zu einem Antrag anlegen."""
+    """Abstimmung (``draft``) zu einem Antrag anlegen.
+
+    Gremium-scoped (#sec-audit, AUD-027): Admin, globale ``vote.manage`` ODER eine
+    Gremium-Rolle mit ``vote.manage`` für das Gremium des ``eligibleGroup`` — kein
+    Anlegen in fremden Gremien."""
+    await service.assert_can_manage_group(payload.eligible_group, None, principal)
     return await service.create(application_id, payload)
 
 
@@ -88,12 +92,15 @@ async def open_vote(
     vote_id: UUID,
     service: ServiceDep,
     publisher: PublisherDep,
-    _principal: ManagerDep,
+    principal: ReaderDep,
 ) -> VoteOut:
     """Abstimmung öffnen (``draft`` → ``open``) → 409, wenn nicht ``draft``.
 
-    Hängt der Vote an einer Sitzung, broadcastet der Publisher ``vote_opened`` auf
-    den Live-Vote-Kanal (T-16); andernfalls no-op."""
+    Gremium-scoped (#sec-audit, AUD-027): Admin, globale ``vote.manage`` ODER eine
+    Gremium-Rolle mit ``vote.manage`` für das Gremium des Votes. Hängt der Vote an
+    einer Sitzung, broadcastet der Publisher ``vote_opened`` auf den Live-Vote-Kanal
+    (T-16); andernfalls no-op."""
+    await service.assert_can_manage_vote(vote_id, principal)
     vote = await service.open(vote_id, now=datetime.now(UTC))
     await publisher.vote_opened(vote)
     return vote
@@ -108,12 +115,15 @@ async def close_vote(
     vote_id: UUID,
     service: ServiceDep,
     publisher: PublisherDep,
-    principal: ManagerDep,
+    principal: ReaderDep,
 ) -> VoteClosed:
     """Abstimmung schließen → auszählen → Ergebnis → ``flow.fire(result_branch)``.
 
-    Live-Vote (T-16): broadcastet ``vote_closed`` auf den Sitzungs-Kanal (no-op ohne
-    Sitzung)."""
+    Gremium-scoped (#sec-audit, AUD-027): Admin, globale ``vote.manage`` ODER eine
+    Gremium-Rolle mit ``vote.manage`` für das Gremium des Votes — kein Cross-Tenant-
+    Schließen (das den Flow des fremden Antrags feuern würde). Live-Vote (T-16):
+    broadcastet ``vote_closed`` auf den Sitzungs-Kanal (no-op ohne Sitzung)."""
+    await service.assert_can_manage_vote(vote_id, principal)
     closed = await service.close(vote_id, principal)
     await publisher.vote_closed(closed)
     return closed
@@ -128,11 +138,15 @@ async def cancel_vote(
     vote_id: UUID,
     service: ServiceDep,
     publisher: PublisherDep,
-    _principal: ManagerDep,
+    principal: ReaderDep,
 ) -> VoteOut:
     """Abstimmung abbrechen (#12): ``open`` → ``cancelled`` — kein Ergebnis, kein
     Branch; der Antrag bleibt im ``vote``-State. Der Ausweg, wenn das Quorum nicht
-    zustande kommt (``close`` ist dann blockiert)."""
+    zustande kommt (``close`` ist dann blockiert).
+
+    Gremium-scoped (#sec-audit, AUD-027): Admin, globale ``vote.manage`` ODER eine
+    Gremium-Rolle mit ``vote.manage`` für das Gremium des Votes."""
+    await service.assert_can_manage_vote(vote_id, principal)
     vote = await service.cancel(vote_id)
     await publisher.vote_cancelled(vote)
     return vote

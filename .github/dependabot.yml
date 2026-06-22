@@ -1,0 +1,45 @@
+# Dependabot — automatische Dependency-Updates + Security-Advisory-PRs.
+# Spiegelt die CI-Audit-Gates (be-deps-audit / fe-deps-audit): neue CVEs sollen
+# nicht still liegen bleiben, sondern als PR auftauchen. security-updates laufen
+# unabhängig vom wöchentlichen version-update-Fenster.
+version: 2
+updates:
+  # Frontend-SPA (npm).
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      angular:
+        patterns:
+          - "@angular/*"
+          - "@angular-eslint/*"
+
+  # Backend (pip / pyproject).
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+
+  # MCP-Server (pip / pyproject).
+  - package-ecosystem: pip
+    directory: /mcp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # pytex-Render-Microservice (pip / pyproject).
+  - package-ecosystem: pip
+    directory: /pytex
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # GitHub-Actions selbst aktuell halten (z.B. setup-node/checkout).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

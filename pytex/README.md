@@ -1,7 +1,7 @@
 # pytex
 
 Render service: a thin FastAPI wrapper around `pytex_api.render_blob`
-(pytex-preprocessor **v1.0.0**). pytex ships no REST surface, so this container
+(pytex-preprocessor **v1.0.6**, pinned in `requirements.txt`). pytex ships no REST surface, so this container
 exposes one over the blob API for the platform's PDF module to call.
 
 Markdown in (raw request body) → PDF out (or `.tex`). Variant

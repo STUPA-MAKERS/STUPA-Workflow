@@ -48,7 +48,7 @@ The platform side must have OIDC configured and register this server's public cl
 |-------|------------------------------------------|
 | `read` | read applications, budgets, votes, meetings, audit, exports |
 | `applications:write` | create / comment / transition applications |
-| `votes:write` | open / close votes, cast ballots |
+| `votes:write` | create / open / close / cancel / manage votes (NEVER cast a ballot — human-only; `vote.cast` is in `FORBIDDEN_PERMISSIONS` and never grantable) |
 | `budget:write` | book expenses, manage accounts |
 | `meetings:write` | manage meetings & agendas |
 
@@ -58,7 +58,7 @@ Auth: `login`, `whoami`, `logout`.
 Applications: `list_applications`, `get_application`, `get_application_timeline`,
 `create_application`, `comment_application`.
 Flow: `list_transitions`, `fire_transition`.
-Votes: `get_vote`, `open_vote`, `close_vote`, `cast_ballot`.
+Votes: `get_vote`, `create_application_vote`, `open_vote`, `close_vote`, `cancel_vote`, `create_meeting_vote`, `delete_meeting_vote` (no `cast_ballot` tool — casting a ballot is human-only).
 Budget: `list_budgets`, `get_budget_applications`, `book_expense`.
 Meetings: `list_meetings`, `get_meeting`.
 

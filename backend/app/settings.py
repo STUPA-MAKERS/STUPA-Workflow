@@ -328,6 +328,13 @@ class Settings(BaseSettings):
                 "only restricted by the SSRF guard, not pinned to known hosts "
                 "(security.md §5)."
             )
+        if self.storage_enabled and not self.clamav_enabled:
+            _log.warning(
+                "MINIO storage is enabled but CLAMAV is disabled: uploaded attachments "
+                "are stored and enqueued for scanning, but the worker has no scanner and "
+                "leaves them scanned=False — downloads stay quarantined (409) forever. "
+                "Configure CLAMAV_HOST or disable MINIO storage (#AUD-071)."
+            )
         return self
 
     @property

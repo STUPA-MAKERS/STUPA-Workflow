@@ -13,7 +13,7 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import Any
 
-from arq import cron
+from arq import cron, func
 from arq.connections import RedisSettings
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -41,6 +41,15 @@ from worker.webhook import on_startup as webhook_on_startup
 async def ping(ctx: dict[str, object]) -> str:
     """Platzhalter-Task."""
     return "pong"
+
+
+# Harte Per-Job-Deadline für ``deliver_webhook`` (AUD-011): ``deliver_webhook`` teilt sich
+# den arq-Worker mit Mail-Versand, Virenscan, PDF-/Protokoll-Render und den Fristen-/
+# Retention-Crons. Ein bösartiges/„slow-drip“-Webhook-Ziel darf einen Slot nicht bis zum
+# arq-Default (300 s) belegen. Der Service deckelt die einzelne Zustellung bereits per
+# ``asyncio.timeout`` auf ``webhook_timeout_seconds`` (Default 10 s); dieses kürzere,
+# HTTP-unabhängige Job-Timeout ist die zweite Schranke — mit Puffer für DB-I/O + ``aclose``.
+_WEBHOOK_JOB_TIMEOUT_SECONDS = 30.0
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
@@ -91,7 +100,9 @@ class WorkerSettings:
         scan_attachment,
         render_pdf,
         render_protocol,
-        deliver_webhook,
+        # Explizit kurzes Per-Job-Timeout, damit eine langsame/feindliche Webhook-Ziel-
+        # adresse keinen geteilten Worker-Slot bis zum arq-Default (300 s) bindet (AUD-011).
+        func(deliver_webhook, timeout=_WEBHOOK_JOB_TIMEOUT_SECONDS),
         process_deadlines,
         process_task_reminders,
         process_retention,

@@ -29,6 +29,29 @@ def _num(value: Decimal | float | None) -> float | None:
     return float(value) if value is not None else None
 
 
+# Zeichen, die am Zellanfang eine aktive Formel (oder DDE) auslösen können, wenn
+# Excel/LibreOffice die Datei öffnet — CSV/XLSX-Formula-Injection.
+_FORMULA_PREFIXES: tuple[str, ...] = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe(value: Any) -> Any:
+    """Formula-Injection neutralisieren.
+
+    Strings, die mit einem gefährlichen Zeichen (``= + - @`` oder Tab/CR)
+    beginnen, werden mit einem führenden Apostroph als Text markiert, sodass
+    Tabellenkalkulationen sie nicht als Formel auswerten. Nicht-Strings (Zahlen,
+    ``None``) bleiben unverändert.
+    """
+    if isinstance(value, str) and value[:1] in _FORMULA_PREFIXES:
+        return "'" + value
+    return value
+
+
+def _append(worksheet: Any, row: Sequence[Any]) -> None:
+    """``ws.append`` mit Formula-Injection-Schutz für **jede** Zelle."""
+    worksheet.append([_safe(cell) for cell in row])
+
+
 def _autosize(worksheet: Any, headers: Sequence[str]) -> None:
     """Spaltenbreite grob an die längste Zelle je Spalte anpassen."""
     widths = [len(str(h)) for h in headers]
@@ -116,9 +139,10 @@ def build_budget_workbook(
                 (a for a in node.by_fiscal_year if a.fiscal_year_id == fy), None
             )
             if alloc is None:
-                ws.append([indented, node.path_key, None, None, None, None, node.currency])
+                _append(ws, [indented, node.path_key, None, None, None, None, node.currency])
             else:
-                ws.append(
+                _append(
+                    ws,
                     [
                         indented,
                         node.path_key,
@@ -181,7 +205,8 @@ def build_applications_workbook(
         if item.state is not None:
             label = item.state.label or {}
             state_label = label.get(locale) or label.get("de") or label.get("en") or ""
-        ws.append(
+        _append(
+            ws,
             [
                 item.title or "",
                 type_names.get(item.type_id, ""),
@@ -191,7 +216,7 @@ def build_applications_workbook(
                 item.currency or "",
                 _fmt_dt(item.created_at),
                 _fmt_dt(item.updated_at),
-            ]
+            ],
         )
 
     _autosize(ws, headers)
@@ -218,7 +243,8 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
     ws.title = "Buchungen"
     _header_row(ws, headers)
     for e in items:
-        ws.append(
+        _append(
+            ws,
             [
                 _fmt_dt(e.created_at),
                 kind_label.get(e.kind, e.kind),
@@ -228,7 +254,7 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
                 e.account_name or "",
                 _num(e.amount),
                 e.currency or "",
-            ]
+            ],
         )
     _autosize(ws, headers)
     buf = BytesIO()
@@ -255,13 +281,13 @@ def build_auskunft_workbook(
     ws_account.title = "Konto"
     acc_headers = ["Feld", "Wert"]
     _header_row(ws_account, acc_headers)
-    ws_account.append(["E-Mail (Anfrage)", email])
+    _append(ws_account, ["E-Mail (Anfrage)", email])
     if principal is not None:
-        ws_account.append(["Login-Subjekt (sub)", principal.get("sub") or ""])
-        ws_account.append(["E-Mail", principal.get("email") or ""])
-        ws_account.append(["Anzeigename", principal.get("displayName") or ""])
-        ws_account.append(["Aktiv", "ja" if principal.get("active") else "nein"])
-        ws_account.append(["Letzter Login", _fmt_dt(principal.get("lastLogin"))])
+        _append(ws_account, ["Login-Subjekt (sub)", principal.get("sub") or ""])
+        _append(ws_account, ["E-Mail", principal.get("email") or ""])
+        _append(ws_account, ["Anzeigename", principal.get("displayName") or ""])
+        _append(ws_account, ["Aktiv", "ja" if principal.get("active") else "nein"])
+        _append(ws_account, ["Letzter Login", _fmt_dt(principal.get("lastLogin"))])
     _autosize(ws_account, acc_headers)
 
     ws_apps = wb.create_sheet(title="Anträge")
@@ -270,7 +296,8 @@ def build_auskunft_workbook(
     ]
     _header_row(ws_apps, app_headers)
     for a in applications:
-        ws_apps.append(
+        _append(
+            ws_apps,
             [
                 str(a.get("id") or ""),
                 a.get("typeName") or "",
@@ -278,7 +305,7 @@ def build_auskunft_workbook(
                 _fmt_dt(a.get("createdAt")),
                 a.get("applicantName") or "",
                 json.dumps(a.get("data") or {}, ensure_ascii=False, sort_keys=True),
-            ]
+            ],
         )
     _autosize(ws_apps, app_headers)
 
@@ -286,14 +313,15 @@ def build_auskunft_workbook(
     v_headers = ["Antrags-ID", "Version", "Geändert von", "Zeitpunkt", "Daten (JSON)"]
     _header_row(ws_versions, v_headers)
     for v in versions:
-        ws_versions.append(
+        _append(
+            ws_versions,
             [
                 str(v.get("applicationId") or ""),
                 v.get("version"),
                 v.get("changedBy") or "",
                 _fmt_dt(v.get("at")),
                 json.dumps(v.get("data") or {}, ensure_ascii=False, sort_keys=True),
-            ]
+            ],
         )
     _autosize(ws_versions, v_headers)
 

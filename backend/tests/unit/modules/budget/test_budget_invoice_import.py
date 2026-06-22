@@ -174,6 +174,32 @@ def test_cii_fallback_unparseable_is_not_zugferd() -> None:
         imp._parse_cii_header(b"<rsm:CrossIndustryInvoice>not closed")
 
 
+def test_cii_fallback_rejects_billion_laughs() -> None:
+    """Internal-entity expansion (billion-laughs) is refused, not expanded (#sec-audit)."""
+    bomb = (
+        b'<?xml version="1.0"?>\n'
+        b"<!DOCTYPE lolz [\n"
+        b' <!ENTITY lol "lol">\n'
+        b' <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">\n'
+        b' <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">\n'
+        b"]>\n"
+        b'<rsm:CrossIndustryInvoice xmlns:rsm="x">&lol3;</rsm:CrossIndustryInvoice>'
+    )
+    with pytest.raises(NotZugferdError):
+        imp._parse_cii_header(bomb)
+
+
+def test_cii_fallback_rejects_dtd_with_external_entity() -> None:
+    """A DTD declaring an external (XXE/SSRF) entity is refused outright (#sec-audit)."""
+    payload = (
+        b'<?xml version="1.0"?>\n'
+        b'<!DOCTYPE foo SYSTEM "file:///etc/passwd">\n'
+        b'<rsm:CrossIndustryInvoice xmlns:rsm="x"/>'
+    )
+    with pytest.raises(NotZugferdError):
+        imp._parse_cii_header(payload)
+
+
 def test_parse_blank_pdf_is_not_zugferd() -> None:
     with pytest.raises(NotZugferdError):
         imp.parse_zugferd_pdf(_blank_pdf())

@@ -14,12 +14,14 @@ DB-CHECK ``invoice_currency_eur``).
 
 from __future__ import annotations
 
+import contextlib
 import io
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
+from xml.parsers import expat as expat_errors
 
 if TYPE_CHECKING:
     from pycheval import MinimumInvoice
@@ -214,6 +216,66 @@ def _map(invoice: MinimumInvoice) -> ParsedInvoice:
     )
 
 
+class _DtdForbiddenError(ValueError):
+    """Das CII-XML enthält eine DTD/Entity-Deklaration — wird abgelehnt."""
+
+
+def _forbid_dtd(*_args: object, **_kwargs: object) -> None:
+    """expat-Callback: jede DOCTYPE-/Entity-Deklaration hart ablehnen.
+
+    Defense-in-depth (#sec-audit): das XML stammt aus einem hochgeladenen,
+    untrusted PDF. ``xml.etree`` blockt externe Entities (kein XXE/SSRF), lässt
+    aber interne Entity-Expansion (Billion-Laughs/quadratic blowup) und DTDs zu.
+    Wir verbieten DTDs komplett — eine echte CII-Rechnung trägt keine."""
+    raise _DtdForbiddenError("DTD/entity declarations are not allowed in invoice XML")
+
+
+def _hardened_fromstring(raw: bytes) -> ET.Element:
+    """``ET.fromstring``-Ersatz ohne DTD-/Entity-Expansion (stdlib-only Hardening).
+
+    Baut einen pyexpat-Parser direkt auf einen :class:`ET.TreeBuilder` und hängt
+    Handler ein, die jede DOCTYPE-/Entity-Deklaration ablehnen. So kann ein
+    bösartiges Rechnungs-PDF weder einen Billion-Laughs-DoS noch eine DTD-
+    Auflösung (XXE/SSRF) auslösen — vgl. ``defusedxml``, aber ohne Zusatz-
+    Abhängigkeit. Namespace-aware (``namespace_separator``) wie ``ET.fromstring``,
+    damit die ``{ns}tag``-Lookups unten weiter greifen.
+
+    :raises _DtdForbiddenError: das XML enthält eine DTD/Entity-Deklaration.
+    :raises expat_errors.ExpatError: das XML ist nicht wohlgeformt.
+    """
+    builder = ET.TreeBuilder()
+    parser = expat_errors.ParserCreate(namespace_separator="}")
+    # ``StartDoctypeDeclHandler`` feuert bereits beim ``<!DOCTYPE`` — damit sind
+    # jede DTD und (mangels DTD) alle Entity-Referenzen/-Expansionen ausgeschlossen.
+    # Die Entity-Decl-Handler sind Defense-in-depth, falls expat das Verhalten ändert.
+    parser.StartDoctypeDeclHandler = _forbid_dtd
+    parser.EntityDeclHandler = _forbid_dtd
+    parser.UnparsedEntityDeclHandler = _forbid_dtd
+    # Keine externen DTDs/Parameter-Entities anfordern (kein Netzwerk/FS-Zugriff).
+    with contextlib.suppress(AttributeError, expat_errors.ExpatError):  # pragma: no cover
+        parser.UseForeignDTD(False)
+
+    def _start(tag: str, attrs: dict[str, str]) -> None:
+        # expat liefert Namespaces als ``ns}local`` → ``{ns}local`` (ET-Konvention).
+        builder.start(_to_qname(tag), {_to_qname(k): v for k, v in attrs.items()})
+
+    parser.StartElementHandler = _start
+    parser.EndElementHandler = lambda tag: builder.end(_to_qname(tag))
+    parser.CharacterDataHandler = builder.data
+
+    try:
+        parser.Parse(raw, True)
+    except expat_errors.ExpatError as exc:
+        # Auf den von der bisherigen Logik erwarteten ParseError abbilden.
+        raise ET.ParseError(str(exc)) from exc
+    return builder.close()
+
+
+def _to_qname(name: str) -> str:
+    """expat-Name (``ns}local`` bei Namespaces) → ET-``{ns}local`` bzw. ``local``."""
+    return f"{{{name}" if "}" in name else name
+
+
 def _qn(ns: str, tag: str) -> str:
     """Qualifizierter ElementTree-Tag-Name ``{ns}tag``."""
     return f"{{{ns}}}{tag}"
@@ -262,9 +324,11 @@ def _parse_cii_header(xml: str | bytes) -> ParsedInvoice:
     """
     # ``ET.fromstring`` lehnt Unicode-Strings mit Encoding-Deklaration ab → Bytes.
     raw = xml.encode("utf-8") if isinstance(xml, str) else xml
+    # Untrusted XML aus hochgeladenem PDF: über :func:`_hardened_fromstring`
+    # parsen, das DTD-/Entity-Expansion (Billion-Laughs/XXE) hart ablehnt.
     try:
-        root = ET.fromstring(raw)  # noqa: S314 - vertrauenswürdige Eigen-Extraktion
-    except ET.ParseError as exc:
+        root = _hardened_fromstring(raw)
+    except (ET.ParseError, _DtdForbiddenError) as exc:
         raise NotZugferdError(f"unparseable CII XML: {exc}") from exc
 
     doc = root.find(_qn(_NS_RSM, "ExchangedDocument"))

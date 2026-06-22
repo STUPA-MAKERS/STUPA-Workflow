@@ -353,6 +353,7 @@ async def get_application(
         requester_can_manage=principal.has("application.manage")
         if principal is not None
         else False,
+        allow_unconfirmed=access.is_owning_applicant,
     )
 
 
@@ -367,7 +368,9 @@ async def get_application_form(
 ) -> EffectiveFormOut:
     """Effektive Form des Antrags aus seiner **gepinnten** Version — so zeigt/bearbeitet
     die Detailansicht denselben Stand, gegen den validiert wird (auch nach Form-Änderung)."""
-    return await service.effective_form(access.application_id)
+    return await service.effective_form(
+        access.application_id, allow_unconfirmed=access.is_owning_applicant
+    )
 
 
 @router.patch(
@@ -388,6 +391,7 @@ async def patch_application(
         payload.data,
         changed_by=access.actor,
         bypass_state_lock=bypass,
+        allow_unconfirmed=access.is_owning_applicant,
     )
 
 
@@ -404,7 +408,7 @@ async def delete_application(
     """Antrag löschen — **nur Admin** (irreversibel; Verwalter:in/Ersteller:in nicht)."""
     if "admin" not in principal.roles:
         raise ForbiddenError("Only an admin may delete applications.")
-    await service.delete(application_id)
+    await service.delete(application_id, actor=principal.sub)
 
 
 @router.get(
@@ -417,7 +421,9 @@ async def get_timeline(
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[TimelineEventOut]:
     """Status-Timeline des Antrags."""
-    return await service.timeline(access.application_id)
+    return await service.timeline(
+        access.application_id, allow_unconfirmed=access.is_owning_applicant
+    )
 
 
 @router.get(
@@ -431,7 +437,9 @@ async def get_versions(
     service: ServiceDep,
 ) -> list[VersionOut]:
     """Versionshistorie + Diff (Principal-only)."""
-    return await service.versions(application_id)
+    # Principal-only Route: unbestätigte Gast-Einreichungen bleiben unsichtbar (404),
+    # spiegelnd zur Listen-Semantik (#AUD-032).
+    return await service.versions(application_id, allow_unconfirmed=False)
 
 
 async def _deliver_comment_mails(
@@ -502,6 +510,7 @@ async def add_comment(
         author_kind=access.author_kind,
         body=payload.body,
         visibility=payload.visibility,
+        allow_unconfirmed=access.is_owning_applicant,
     )
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(
@@ -528,7 +537,9 @@ async def list_comments(
 ) -> list[CommentOut]:
     """Kommentare lesen. Antragsteller sehen nur ``public`` (api.md §3)."""
     return await service.list_comments(
-        access.application_id, include_internal=access.can_see_internal
+        access.application_id,
+        include_internal=access.can_see_internal,
+        allow_unconfirmed=access.is_owning_applicant,
     )
 
 

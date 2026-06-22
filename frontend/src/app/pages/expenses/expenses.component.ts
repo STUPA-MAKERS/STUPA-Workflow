@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   type ElementRef,
+  type OnDestroy,
   computed,
   effect,
   inject,
@@ -77,7 +78,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
   templateUrl: './expenses.component.html',
   styleUrl: './expenses.component.scss',
 })
-export class ExpensesComponent {
+export class ExpensesComponent implements OnDestroy {
   private readonly api = inject(BudgetTreeApi);
   private readonly apps = inject(ApiClient);
   private readonly auth = inject(AuthService);
@@ -367,6 +368,10 @@ export class ExpensesComponent {
   private debouncedReload(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => this.reload(), 400);
+  }
+
+  ngOnDestroy(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
   }
 
   private reload(): void {

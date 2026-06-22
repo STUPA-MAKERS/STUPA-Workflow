@@ -39,9 +39,9 @@ from app.modules.privacy.service import (
     ErasureRequestService,
     PrincipalService,
     PrivacySettingsService,
+    build_auskunft_workbook,
 )
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
-from app.shared.xlsx import build_auskunft_workbook
 from tests.integration.conftest import clear_privacy_tables
 from tests.integration.modules.applications.test_applications_service import (
     _create_payload,

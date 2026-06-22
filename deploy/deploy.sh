@@ -24,8 +24,23 @@ PROFILE="prod"
 cd "${COMPOSE_DIR}"
 
 if [[ ! -f .env ]]; then
-  echo "Kein deploy/.env — kopiere .env.example -> .env (Platzhalterwerte)."
-  cp .env.example .env
+  echo "FEHLER: deploy/.env fehlt." >&2
+  echo "        Lege sie aus der Vorlage an und fülle ALLE Secrets aus," >&2
+  echo "        bevor du deployst:" >&2
+  echo "          cp deploy/.env.example deploy/.env  &&  \$EDITOR deploy/.env" >&2
+  echo "        (Platzhalterwerte führen zu Fail-fast-Abbruch der App-Container.)" >&2
+  exit 1
+fi
+
+# ALTCHA-Sentinel-Adminkonsole nie mit Default-Credential starten: leeres oder
+# "root"-Passwort ist ein bekannter Takeover-Vektor (auch wenn die Konsole nur im
+# internen Netz hängt). Vor allem anderen abbrechen, damit der Operator einen
+# eigenen Wert setzt. Wert direkt aus .env lesen, ohne die Datei zu sourcen.
+altcha_pw="$(sed -n 's/^ALTCHA_ROOT_PASSWORD=//p' .env | head -n1)"
+if [[ -z "${altcha_pw}" || "${altcha_pw}" == "root" ]]; then
+  echo "FEHLER: ALTCHA_ROOT_PASSWORD in deploy/.env ist leer oder 'root'." >&2
+  echo "        Setze ein eigenes, starkes Passwort, bevor du deployst." >&2
+  exit 1
 fi
 
 # 1) Pull -------------------------------------------------------------------------------

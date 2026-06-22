@@ -46,6 +46,24 @@ class _FakeService:
         self.calls: list[str] = []
         self.status = status
         self.session = _FakeSession()
+        # Authz delegiert (per Gremium) an MeetingService; im Router-Unit-Test no-op.
+        # Die echten authz-Pfade prüft der Service-Test (test_protocol_service).
+        self.authz: list[str] = []
+
+    async def authorize_write_meeting(self, meeting_id: UUID, principal: object) -> None:
+        self.authz.append(f"write_meeting:{meeting_id}")
+
+    async def authorize_write(self, protocol_id: UUID, principal: object) -> None:
+        self.authz.append(f"write:{protocol_id}")
+
+    async def authorize_finalize(self, protocol_id: UUID, principal: object) -> None:
+        self.authz.append(f"finalize:{protocol_id}")
+
+    async def authorize_read(self, protocol_id: UUID, principal: object) -> None:
+        self.authz.append(f"read:{protocol_id}")
+
+    async def authorize_read_meeting(self, meeting_id: UUID, principal: object) -> None:
+        self.authz.append(f"read_meeting:{meeting_id}")
 
     def _out(self, *, status: str = "draft", markdown: str = "# md") -> ProtocolOut:
         return ProtocolOut(
@@ -123,9 +141,15 @@ def test_create_protocol_requires_auth_401(client: TestClient) -> None:
     assert client.post(f"/api/meetings/{MEETING_ID}/protocol").status_code == 401
 
 
-def test_create_protocol_forbidden_without_perm(app: FastAPI, client: TestClient) -> None:
-    _writer(app, "vote.cast")  # falsche Permission
-    assert client.post(f"/api/meetings/{MEETING_ID}/protocol").status_code == 403
+def test_create_protocol_authz_delegated_to_service(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """Router gatet nur Authentifizierung; die per-Gremium-Berechtigung delegiert er an
+    den Service (AUD-016) — hier nachgewiesen über den authz-Hook-Aufruf."""
+    _writer(app)  # nur eingeloggt, keine globale Permission
+    r = client.post(f"/api/meetings/{MEETING_ID}/protocol")
+    assert r.status_code == 200
+    assert fake_service.authz == [f"write_meeting:{MEETING_ID}"]
 
 
 def test_patch_protocol_requires_auth_401(client: TestClient) -> None:
@@ -179,6 +203,19 @@ def test_update_protocol(app: FastAPI, client: TestClient, fake_service: _FakeSe
 def test_update_protocol_rejects_empty_body_422(app: FastAPI, client: TestClient) -> None:
     _writer(app, "meeting.manage")
     assert client.patch(f"/api/protocols/{PROTOCOL_ID}", json={}).status_code == 422
+
+
+def test_update_protocol_rejects_oversized_markdown_422(
+    app: FastAPI, client: TestClient
+) -> None:
+    """AUD-060: Markdown ist am API-Rand auf 512 kB begrenzt (deployment-unabhängiges 422)."""
+    _writer(app, "meeting.manage")
+    oversized = "x" * (512_000 + 1)
+    r = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": oversized})
+    assert r.status_code == 422
+    # Knapp unter dem Limit bleibt gültig (Service liefert 200).
+    ok = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": "x" * 512_000})
+    assert ok.status_code == 200
 
 
 def test_embed_votes(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:

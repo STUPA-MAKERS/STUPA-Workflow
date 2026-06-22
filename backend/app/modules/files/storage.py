@@ -2,9 +2,14 @@
 
 Der Service kennt nur das :class:`ObjectStorage`-Protokoll — nie den konkreten Client.
 ``MinioStorage`` kapselt den (synchronen) ``minio``-Client und reicht blockierende Calls
-über ``asyncio.to_thread`` an einen Threadpool (kein Blockieren der Event-Loop). Download
-erfolgt ausschließlich über **kurzlebige signierte GET-URLs** (``presigned_get_url``);
-es gibt keinen direkten Bucket-Zugriff von außen.
+über ``asyncio.to_thread`` an einen Threadpool (kein Blockieren der Event-Loop). Es gibt
+keinen direkten Bucket-Zugriff von außen.
+
+``presigned_get_url`` liefert eine kurzlebige S3v4-signierte GET-URL und wird intern
+genutzt (PDF-Modul). Anhang-**Downloads** der files-API laufen dagegen NICHT über eine
+signierte URL, sondern server-seitig über die authz-gated ``/api/attachments/{id}/download``-
+Route — MinIO liegt im internen Docker-Netz ohne Port-Publish, eine signierte URL wäre vom
+Browser unerreichbar (#AUD-055; s. ``service.signed_url``).
 
 ``minio`` wird **lazy** importiert: ohne Upload-Pfad (Contract-CI) lädt die Lib nie.
 """
@@ -13,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Protocol
@@ -21,6 +27,10 @@ from app.settings import Settings
 
 if TYPE_CHECKING:
     from minio import Minio
+
+# Default-Chunk-Größe für den gestreamten Download (#AUD-073): Objekt wird in Häppchen
+# aus MinIO gelesen, nicht komplett in den Speicher gepuffert.
+STREAM_CHUNK_BYTES = 64 * 1024
 
 
 class StorageError(RuntimeError):
@@ -33,6 +43,10 @@ class ObjectStorage(Protocol):
     async def put(self, key: str, data: bytes, content_type: str) -> None: ...
 
     async def get(self, key: str) -> bytes: ...
+
+    async def get_stream(
+        self, key: str, *, chunk_size: int = STREAM_CHUNK_BYTES
+    ) -> AsyncIterator[bytes]: ...
 
     async def remove(self, key: str) -> None: ...
 
@@ -81,6 +95,35 @@ class MinioStorage:
             return await asyncio.to_thread(_get)
         except Exception as exc:  # noqa: BLE001
             raise StorageError(f"get failed: {type(exc).__name__}") from exc
+
+    async def get_stream(
+        self, key: str, *, chunk_size: int = STREAM_CHUNK_BYTES
+    ) -> AsyncIterator[bytes]:
+        """Objekt chunk-weise aus MinIO streamen statt komplett in den RAM zu lesen
+        (#AUD-073). Die (synchrone) Verbindung wird in einem Threadpool gelesen (kein
+        Blockieren der Event-Loop) und im ``finally`` zuverlässig geschlossen/freigegeben
+        — auch bei Client-Abbruch (``GeneratorExit``) oder Lese-Fehler."""
+        # Verbindung EAGER öffnen, damit ein transienter Storage-Fehler beim Connect als
+        # StorageError VOR dem Response-Start (→ 503) sichtbar wird, nicht mitten im Stream.
+        try:
+            response = await asyncio.to_thread(
+                self.client.get_object, self.bucket, key
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise StorageError(f"get_stream failed: {type(exc).__name__}") from exc
+
+        async def _iter() -> AsyncIterator[bytes]:
+            try:
+                while True:
+                    chunk = await asyncio.to_thread(response.read, chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                await asyncio.to_thread(response.close)
+                await asyncio.to_thread(response.release_conn)
+
+        return _iter()
 
     async def remove(self, key: str) -> None:
         try:

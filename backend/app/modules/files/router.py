@@ -2,8 +2,9 @@
 
 * ``POST /api/applications/{id}/attachments`` — A(edit)/P; Multipart-Upload ≤ 10 MB →
   MIME-Sniff + ClamAV-Scan (async), ``scanned=false`` bis sauber.
-* ``GET  /api/attachments/{id}``             — A/P; kurzlebige signierte MinIO-URL
-  (kein direkter Bucket-Zugriff). 409 solange in Quarantäne, 410 wenn entfernt (Befund).
+* ``GET  /api/attachments/{id}``             — A/P; liefert die app-relative, authz-gated
+  ``/download``-Route (kein direkter Bucket-Zugriff, KEINE signierte MinIO-URL — #AUD-055).
+  409 solange in Quarantäne, 410 wenn entfernt (Befund).
 
 Fehler werden als ``ProblemDetail`` deklariert (problem+json). Storage/Scan sind optionale
 Infra: fehlt MinIO → 503 (Upload), fehlt Redis → Datei bleibt in Quarantäne.
@@ -14,10 +15,12 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.applications.access import (
+    EDIT_ANY_PERMISSION,
     MANAGE_PERMISSION,
     READ_ALL_PERMISSION,
     READ_PERMISSION,
@@ -150,8 +153,14 @@ async def list_attachments(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[AttachmentOut]:
-    """Anhänge eines Antrags auflisten (Panel-Hydration nach Reload). A/P-Zugriff."""
-    return await service.list_for_application(access.application_id)
+    """Anhänge eines Antrags auflisten (Panel-Hydration nach Reload). A/P-Zugriff.
+
+    Eine unbestätigte Gast-Einreichung bleibt für Principals/Gremium unsichtbar (404),
+    nur der besitzende Magic-Link-Antragsteller liest sie — spiegelnd zur
+    Listen-Semantik (#AUD-032)."""
+    return await service.list_for_application(
+        access.application_id, allow_unconfirmed=access.is_owning_applicant
+    )
 
 
 @router.get(
@@ -177,17 +186,22 @@ async def get_attachment_url(
     # (auth, aber kein Lesezugriff) → bewusst 404 statt 403: ein authentifizierter Fremder
     # soll die Existenz eines Anhangs nicht unterscheiden können (kein Existenz-Orakel).
     try:
-        await _resolve_attachment_read(
+        access = await _resolve_attachment_read(
             db, attachment.application_id, principal, applicant
         )
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc
-    return await service.signed_url(attachment_id)
+    # Unbestätigte Gast-Einreichung bleibt für Principals/Gremium unsichtbar (404), nur
+    # der besitzende Magic-Link-Antragsteller liest sie — spiegelnd zur Listen-Semantik
+    # und zum Antrags-Detail-Gate (#AUD-032).
+    return await service.signed_url(
+        attachment_id, allow_unconfirmed=access.is_owning_applicant
+    )
 
 
 @router.get(
     "/attachments/{attachment_id}/download",
-    response_class=Response,
+    response_class=StreamingResponse,
     responses=_errors(401, 404, 409, 410, 503),
 )
 async def download_attachment(
@@ -196,10 +210,13 @@ async def download_attachment(
     db: DbSession,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
-) -> Response:
+) -> StreamingResponse:
     """Anhang-Bytes server-seitig streamen — MinIO liegt im internen Docker-Netz, eine
     presigned S3-URL bindet den internen Host und ist vom Browser unerreichbar. Über
     nginx ``/api/`` ist dieser Endpunkt erreichbar (gleiches Muster wie der Protokoll-PDF).
+
+    Das Objekt wird CHUNK-WEISE aus dem Storage gestreamt (#AUD-073) — der API-Prozess
+    puffert nie die ganze Datei im RAM. ``Content-Length`` aus der gespeicherten Größe.
 
     Zugriff wie :func:`get_attachment_url` (A/P; Cross-Tenant → 404, kein Existenz-Orakel).
     ``Content-Disposition: attachment`` erzwingt Download statt Inline-Render (security.md §6)."""
@@ -207,15 +224,26 @@ async def download_attachment(
         raise UnauthorizedError("Authentication required.")
     attachment = await service.get_attachment(attachment_id)
     try:
-        await _resolve_attachment_read(
+        access = await _resolve_attachment_read(
             db, attachment.application_id, principal, applicant
         )
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc
-    data, filename, mime = await service.download_bytes(attachment_id)
+    # Unbestätigte Gast-Einreichung bleibt für Principals/Gremium unsichtbar (404), nur
+    # der besitzende Magic-Link-Antragsteller lädt sie — spiegelnd zur Listen-Semantik
+    # und zum Antrags-Detail-Gate (#AUD-032). Die Quarantäne-Gates (409/410/503) laufen
+    # im Service VOR dem Stream-Start — der StreamingResponse beginnt erst nach den Gates.
+    stream, filename, mime, size = await service.download_stream(
+        attachment_id, allow_unconfirmed=access.is_owning_applicant
+    )
     disposition = f'attachment; filename="{_safe_disposition(filename)}"'
-    return Response(
-        content=data, media_type=mime, headers={"Content-Disposition": disposition}
+    return StreamingResponse(
+        stream,
+        media_type=mime,
+        headers={
+            "Content-Disposition": disposition,
+            "Content-Length": str(size),
+        },
     )
 
 
@@ -231,11 +259,19 @@ async def delete_attachment(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> None:
-    """Anhang löschen — Principal (``application.manage``)/Antragsteller (edit-Scope)/
-    eingeloggte:r Ersteller:in. Cross-Tenant → 404 (kein Existenz-Orakel)."""
+    """Anhang löschen — Principal (``application.manage`` **oder**
+    ``application.edit_any``)/Antragsteller (edit-Scope)/eingeloggte:r Ersteller:in.
+    Cross-Tenant → 404 (kein Existenz-Orakel).
+
+    Spiegelt bewusst :func:`require_app_edit` (Upload): ``application.edit_any`` ist ein
+    globales Schreibrecht und muss denselben Anhang auch löschen dürfen, sonst wäre RBAC
+    inkonsistent (Upload ja, Delete 404) — #AUD-040."""
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
     attachment = await service.get_attachment(attachment_id)
+    if principal is not None and principal.has(EDIT_ANY_PERMISSION):
+        await service.delete(attachment_id, actor=principal.sub)
+        return
     try:
         access = await _resolve_with_creator(
             db,

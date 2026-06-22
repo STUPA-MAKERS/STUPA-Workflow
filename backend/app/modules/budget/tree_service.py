@@ -994,6 +994,11 @@ class BudgetTreeService:
             # fix; Währung folgt der neuen Kostenstelle (Buchungen erben sie beim
             # Anlegen). ``budgetId`` ist Pflicht-FK → ``null`` ist ein No-op.
             target = await self._get_node(payload.budget_id)
+            # Das beibehaltene HHJ muss zum Top-Budget des Zielknotens passen — sonst
+            # zeigte die umgebuchte Ausgabe auf ein fremdes HHJ (orphan FY + Phantom-Zeile
+            # mit allocated=0/negativem available, #AUD-036). Spiegelt book_expense /
+            # move_fiscal_year: 422 bei Top-Level-Mismatch.
+            await self._resolve_fiscal_year(target, expense.fiscal_year_id)
             expense.budget_id = target.id
             expense.currency = target.currency
         if "account_id" in fields:

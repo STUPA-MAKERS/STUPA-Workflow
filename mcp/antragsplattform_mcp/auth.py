@@ -56,6 +56,27 @@ def _require_secure_base(base_url: str) -> None:
     )
 
 
+def _require_secure_endpoint(label: str, endpoint: str, base_url: str) -> None:
+    """Re-validate a discovery-supplied endpoint before using it for redirects/token POST.
+
+    The discovery body is fetched over the https-validated ``base_url``, but its
+    ``authorization_endpoint``/``token_endpoint`` are otherwise trusted verbatim. A
+    compromised/MITM'd discovery document could point them at ``http://attacker/`` and
+    exfiltrate the auth code+verifier and tokens. Defence-in-depth: each endpoint MUST
+    (1) pass the same scheme rule as the base and (2) be same-origin (scheme+host+port)
+    as ``base_url`` so credentials never leave the platform origin."""
+    _require_secure_base(endpoint)
+    ep = urlparse(endpoint)
+    base = urlparse(base_url)
+    ep_origin = (ep.scheme.lower(), (ep.hostname or "").lower(), ep.port)
+    base_origin = (base.scheme.lower(), (base.hostname or "").lower(), base.port)
+    if ep_origin != base_origin:
+        raise AuthError(
+            f"OAuth {label} {endpoint!r} is not same-origin as the platform URL "
+            f"{base_url!r}; refusing to send credentials cross-origin."
+        )
+
+
 def _pkce_pair() -> tuple[str, str]:
     verifier = secrets.token_urlsafe(64)
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
@@ -82,10 +103,20 @@ def _discover(base_url: str) -> dict:
             continue
         if resp.status_code == 200:
             try:
-                return resp.json()
+                meta = resp.json()
             except ValueError:
                 last = f"non-JSON response at {url}"
                 continue
+            # Re-validate the endpoints the metadata yields BEFORE they are used for the
+            # browser redirect (code+verifier) or token/refresh POST. They must be https
+            # (or loopback) AND same-origin as base_url so credentials can't be sent to a
+            # cleartext/cross-origin endpoint injected via a tampered discovery body.
+            for label in ("authorization_endpoint", "token_endpoint"):
+                value = meta.get(label)
+                if not isinstance(value, str) or not value:
+                    raise AuthError(f"OAuth discovery missing {label}")
+                _require_secure_endpoint(label, value, base_url)
+            return meta
         last = f"{resp.status_code} at {url}"
     raise AuthError(f"OAuth discovery failed: {last}")
 

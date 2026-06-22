@@ -17,6 +17,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
+from pydantic import EmailStr, TypeAdapter, ValidationError
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.audit.actions import AuditAction
@@ -38,11 +39,29 @@ from app.modules.privacy.service import (
     ErasureRequestService,
     PrincipalService,
     PrivacySettingsService,
+    build_auskunft_workbook,
 )
-from app.shared.errors import ProblemDetail
-from app.shared.xlsx import XLSX_MEDIA_TYPE, build_auskunft_workbook
+from app.shared.errors import ProblemDetail, ValidationProblem
+from app.shared.xlsx import XLSX_MEDIA_TYPE
 
 router = APIRouter(prefix="/admin/privacy", tags=["privacy"])
+
+_EMAIL_ADAPTER: TypeAdapter[str] = TypeAdapter(EmailStr)
+
+
+def _canonical_email(raw: str) -> str:
+    """Trim, RFC-validate und normalisieren (lowercase) — sonst 422.
+
+    Die CITEXT-Spalten matchen ohnehin case-insensitiv; die Normalisierung
+    hält den ``pii_export``-Audit-``target_id`` (Art. 30) als gültige,
+    kanonische E-Mail nachvollziehbar und verhindert still leere Exporte
+    auf Tipp-/Formatfehlern."""
+    try:
+        return _EMAIL_ADAPTER.validate_python(raw.strip()).lower()
+    except ValidationError as exc:
+        raise ValidationProblem(
+            "email is not a valid e-mail address", code="invalid_email"
+        ) from exc
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _CONFIG = Depends(require_principal("privacy.manage"))
@@ -191,7 +210,7 @@ async def put_settings(
 
 
 # ------------------------------------------------------------------- Auskunft
-@router.get("/auskunft", dependencies=[_CONFIG], responses=_errors(401, 403))
+@router.get("/auskunft", dependencies=[_CONFIG], responses=_errors(401, 403, 422))
 async def auskunft(
     session: DbSession,
     principal: ConfigPrincipal,
@@ -199,9 +218,12 @@ async def auskunft(
 ) -> Response:
     """DSGVO Art. 15: alle zu ``email`` gespeicherten personenbezogenen Daten als XLSX.
 
-    Auditiert als ``pii_export`` mit der angefragten E-Mail als ``target_id`` —
-    Rechenschaftspflicht (Art. 30): es muss nachvollziehbar bleiben, WESSEN Daten
-    exportiert wurden."""
+    Die E-Mail wird RFC-validiert und kanonisiert (sonst 422), damit weder still
+    leere Exporte auf Tippfehlern entstehen noch ein ungültiger ``target_id`` im
+    Audit landet. Auditiert als ``pii_export`` mit der kanonischen E-Mail als
+    ``target_id`` — Rechenschaftspflicht (Art. 30): es muss nachvollziehbar
+    bleiben, WESSEN Daten exportiert wurden."""
+    email = _canonical_email(email)
     data = await AuskunftService(session).collect(email)
     workbook = build_auskunft_workbook(**data)
     await audit_record(
@@ -213,6 +235,8 @@ async def auskunft(
         data={
             "email": email,
             "applications": len(data["applications"]),
+            "comments": len(data["comments"]),
+            "attachments": len(data["attachments"]),
             "hasPrincipal": data["principal"] is not None,
         },
     )

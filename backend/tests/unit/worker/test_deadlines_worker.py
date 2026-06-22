@@ -219,6 +219,103 @@ async def test_close_due_vote(patched: None) -> None:
 
 
 @freeze_time(FROZEN)
+async def test_close_meeting_vote_broadcasts_vote_closed(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AUD-045: der Cron-Auto-Close holt den ``vote_closed``-Broadcast nach, den
+    sonst nur der REST-Router feuert — sonst hingen Beamer/Voter auf »offen«."""
+    meeting_id = uuid4()
+    closed = SimpleNamespace(
+        id=uuid4(),
+        meeting_id=meeting_id,
+        result="passed",
+        tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+    )
+
+    class _Closing(_VotingFake):
+        async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
+            _VotingFake.calls.append(vote_id)
+            return closed
+
+    monkeypatch.setattr(wd, "VotingService", _Closing)
+
+    published: list[tuple[str, Any]] = []
+
+    class _FakeRedis:
+        async def publish(self, channel: str, message: Any) -> None:
+            published.append((channel, message))
+
+    vote = SimpleNamespace(id=uuid4())
+    ctx = _ctx([FakeSession([[vote]])])
+    ctx["redis"] = _FakeRedis()
+    assert await wd._close_one(ctx, vote.id, NOW) is True
+    # genau ein Broadcast auf dem Sitzungs-Kanal des Votes
+    assert len(published) == 1
+    assert str(meeting_id) in published[0][0]
+
+
+@freeze_time(FROZEN)
+async def test_close_standalone_vote_no_broadcast(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Standalone-Vote (``meeting_id is None``) → kein Live-Vote-Broadcast."""
+    closed = SimpleNamespace(
+        id=uuid4(),
+        meeting_id=None,
+        result="passed",
+        tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+    )
+
+    class _Closing(_VotingFake):
+        async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
+            _VotingFake.calls.append(vote_id)
+            return closed
+
+    monkeypatch.setattr(wd, "VotingService", _Closing)
+
+    published: list[Any] = []
+
+    class _FakeRedis:
+        async def publish(self, channel: str, message: Any) -> None:
+            published.append(channel)
+
+    vote = SimpleNamespace(id=uuid4())
+    ctx = _ctx([FakeSession([[vote]])])
+    ctx["redis"] = _FakeRedis()
+    assert await wd._close_one(ctx, vote.id, NOW) is True
+    assert published == []
+
+
+@freeze_time(FROZEN)
+async def test_close_broadcast_failure_does_not_fail_close(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ein Broker-Hiccup darf den bereits committeten Close nicht umkippen."""
+    closed = SimpleNamespace(
+        id=uuid4(),
+        meeting_id=uuid4(),
+        result="passed",
+        tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+    )
+
+    class _Closing(_VotingFake):
+        async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
+            _VotingFake.calls.append(vote_id)
+            return closed
+
+    monkeypatch.setattr(wd, "VotingService", _Closing)
+
+    class _BoomRedis:
+        async def publish(self, channel: str, message: Any) -> None:
+            raise RuntimeError("redis down")
+
+    vote = SimpleNamespace(id=uuid4())
+    ctx = _ctx([FakeSession([[vote]])])
+    ctx["redis"] = _BoomRedis()
+    assert await wd._close_one(ctx, vote.id, NOW) is True
+
+
+@freeze_time(FROZEN)
 async def test_close_lock_miss(patched: None) -> None:
     assert await wd._close_one(_ctx([FakeSession([[]])]), uuid4(), NOW) is False
     assert _VotingFake.calls == []

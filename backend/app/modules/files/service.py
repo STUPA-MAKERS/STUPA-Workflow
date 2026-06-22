@@ -6,7 +6,8 @@ Ablauf (security.md §6):
    in MinIO (``scanned=false``), Zeile anlegen, Scan-Job enqueuen. Kein synchroner Scan.
 2. Worker scannt, ruft :meth:`finalize_scan` — ``scanned=true`` + Ergebnis; bei Befund
    Objekt löschen + Audit (Quarantäne).
-3. :meth:`signed_url` — kurzlebige MinIO-URL **nur** nach sauberem Scan; sonst 409
+3. :meth:`signed_url` — liefert **nur** nach sauberem Scan die app-relative,
+   authz-geschützte ``/download``-Route (keine Signatur, kein Ablauf); sonst 409
    (läuft noch) / 410 (entfernt). Kein direkter Bucket-Zugriff.
 
 Der Service *enqueued* nur; fehlt die Queue (kein Redis), bleibt die Datei in
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import AsyncIterator
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -140,10 +142,38 @@ class FilesService:
             return
         await self.queue.enqueue(attachment_id)
 
+    async def _assert_app_visible(
+        self, application_id: uuid.UUID, *, allow_unconfirmed: bool
+    ) -> None:
+        """Sichtbarkeit des zugehörigen Antrags spiegeln (#AUD-032): eine unbestätigte
+        Gast-Einreichung (``email_confirmed_at IS NULL``) bleibt — exakt wie
+        ``list_applications``/``list_tasks`` sie ausblenden — für Principals/Gremium
+        unsichtbar. Item-Routen ohne besitzenden Magic-Link-Antragsteller übergeben
+        ``allow_unconfirmed=False`` und erhalten 404 statt 403 (kein Existenz-Orakel);
+        spiegelt die Antrags-Detail-/Timeline-/Versions-/Comment-Gate über
+        ``ApplicationsService._get_app``. Die besitzende Antragstellerin liest mit dem
+        Default (``allow_unconfirmed=True``)."""
+        if allow_unconfirmed:
+            return
+        confirmed = await self.session.scalar(
+            select(Application.email_confirmed_at).where(
+                Application.id == application_id
+            )
+        )
+        if confirmed is None:
+            raise NotFoundError(f"application {application_id} not found")
+
     async def list_for_application(
-        self, application_id: uuid.UUID
+        self, application_id: uuid.UUID, *, allow_unconfirmed: bool = True
     ) -> list[AttachmentOut]:
-        """Alle Anhänge eines Antrags (für das Panel nach Reload). Älteste zuerst."""
+        """Alle Anhänge eines Antrags (für das Panel nach Reload). Älteste zuerst.
+
+        ``allow_unconfirmed=False`` (Principal/Gremium-Read) blendet die Anhänge einer
+        unbestätigten Gast-Einreichung aus (404), spiegelnd zur Listen-Semantik
+        (#AUD-032)."""
+        await self._assert_app_visible(
+            application_id, allow_unconfirmed=allow_unconfirmed
+        )
         rows = (
             await self.session.scalars(
                 select(Attachment)
@@ -178,24 +208,45 @@ class FilesService:
             raise ServiceUnavailableError("Object storage unavailable.")
         return attachment
 
-    async def signed_url(self, attachment_id: uuid.UUID) -> SignedUrlOut:
+    async def signed_url(
+        self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
+    ) -> SignedUrlOut:
         """App-relative Download-URL — nur nach sauberem Scan (sonst 409/410/503).
 
         **Keine** presigned MinIO-URL: MinIO liegt im internen Docker-Netz ohne Port-
         Publish; eine S3v4-signierte URL bindet den (internen) Host in die Signatur →
         vom Browser unerreichbar. Stattdessen streamt der ``/download``-Endpunkt die Bytes
-        server-seitig über nginx ``/api/`` (gleiches Muster wie ``protocol._pdf_path``)."""
+        server-seitig über nginx ``/api/`` (gleiches Muster wie ``protocol._pdf_path``).
+
+        ``allow_unconfirmed=False`` (Principal/Gremium-Read) → 404 für eine unbestätigte
+        Gast-Einreichung, spiegelnd zur Listen-Semantik (#AUD-032). Das Sichtbarkeits-
+        Gate läuft VOR den Quarantäne-Gates, damit ein verborgener Antrag auch nicht über
+        409/410/503 als existent durchscheint (kein Existenz-Orakel)."""
+        attachment = await self.get_attachment(attachment_id)
+        await self._assert_app_visible(
+            attachment.application_id, allow_unconfirmed=allow_unconfirmed
+        )
         await self._ready_attachment(attachment_id)
         return SignedUrlOut(
             url=f"/api/attachments/{attachment_id}/download",
             expiresIn=self.settings.attachment_url_ttl_seconds,
         )
 
-    async def download_bytes(self, attachment_id: uuid.UUID) -> tuple[bytes, str, str]:
+    async def download_bytes(
+        self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
+    ) -> tuple[bytes, str, str]:
         """Anhang-Bytes server-seitig aus dem Storage holen (für den ``/download``-Stream).
 
         Gleiche Quarantäne-Gates wie :meth:`signed_url` (409/410/503); transienter
-        Storage-Fehler → 503. Gibt ``(bytes, filename, mime)`` für die Stream-Antwort."""
+        Storage-Fehler → 503. Gibt ``(bytes, filename, mime)`` für die Stream-Antwort.
+
+        ``allow_unconfirmed=False`` (Principal/Gremium-Read) → 404 für eine unbestätigte
+        Gast-Einreichung, spiegelnd zur Listen-Semantik (#AUD-032); Sichtbarkeits-Gate
+        VOR den Quarantäne-Gates (kein Existenz-Orakel über 409/410/503)."""
+        loaded = await self.get_attachment(attachment_id)
+        await self._assert_app_visible(
+            loaded.application_id, allow_unconfirmed=allow_unconfirmed
+        )
         attachment = await self._ready_attachment(attachment_id)
         # Beides durch _ready_attachment garantiert (sonst 410/503) — für den Typechecker.
         assert attachment.storage_key is not None
@@ -205,6 +256,30 @@ class FilesService:
         except StorageError as exc:
             raise ServiceUnavailableError("Attachment temporarily unavailable.") from exc
         return data, attachment.filename, attachment.mime
+
+    async def download_stream(
+        self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
+    ) -> tuple[AsyncIterator[bytes], str, str, int]:
+        """Wie :meth:`download_bytes`, aber liefert einen **Chunk-Iterator** statt die
+        Bytes komplett in den Speicher zu laden (#AUD-073). Die Quarantäne-Gates
+        (409/410/503) und das Sichtbarkeits-Gate (#AUD-032) laufen unverändert VOR dem
+        Stream-Start; die Storage-Verbindung wird eager geöffnet, ein transienter Fehler
+        wird daher noch als 503 (vor dem Response-Header) sichtbar.
+
+        Gibt ``(iterator, filename, mime, size)`` — ``size`` für ``Content-Length``."""
+        loaded = await self.get_attachment(attachment_id)
+        await self._assert_app_visible(
+            loaded.application_id, allow_unconfirmed=allow_unconfirmed
+        )
+        attachment = await self._ready_attachment(attachment_id)
+        # Beides durch _ready_attachment garantiert (sonst 410/503) — für den Typechecker.
+        assert attachment.storage_key is not None
+        assert self.storage is not None
+        try:
+            stream = await self.storage.get_stream(attachment.storage_key)
+        except StorageError as exc:
+            raise ServiceUnavailableError("Attachment temporarily unavailable.") from exc
+        return stream, attachment.filename, attachment.mime, attachment.size
 
     async def delete(self, attachment_id: uuid.UUID, *, actor: str) -> None:
         """Anhang löschen: DB-Zeile + Storage-Objekt entfernen (+ Audit). 404 fehlt.

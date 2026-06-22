@@ -48,6 +48,15 @@ class Access:
         return self.principal is not None
 
     @property
+    def is_owning_applicant(self) -> bool:
+        """Magic-Link-Antragsteller des eigenen Antrags (kein Principal).
+
+        Nur dieser Zugriff darf eine **unbestätigte** Gast-Einreichung
+        (``email_confirmed_at IS NULL``) per Item-Route lesen — Principals/Gremium
+        nicht, spiegelnd zur unsichtbaren Listen-Semantik (#AUD-032)."""
+        return self.applicant is not None
+
+    @property
     def author_kind(self) -> str:
         return "principal" if self.principal is not None else "applicant"
 

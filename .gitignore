@@ -44,3 +44,6 @@ frontend/.angular/
 !.claude/skills/
 !.claude/memory/
 .claude/settings.local.json
+
+# Internal audit report — kept local per CLAUDE.md, never mirrored into repo
+AUDIT-REPORT.md

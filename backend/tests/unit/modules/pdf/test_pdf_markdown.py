@@ -158,6 +158,40 @@ def test_frontmatter_minimal_without_gremium_cd_date() -> None:
     assert "typ: antrag" in md
 
 
+def test_applicant_values_sanitized_against_eval_and_image_traversal() -> None:
+    # AUD-006: Anträge werden trusted gerendert; öffentliche Antragsteller-Feldwerte
+    # müssen pytex-eval-Escapes und Bild-Pfad-Traversal verlieren (nicht nur Newline-
+    # Kollaps). Der Wert läuft durch denselben Sanitizer wie der Protokoll-Body.
+    doc = _doc(
+        fields=[
+            _field("abs_img", "Absolut"),
+            _field("trav_img", "Traversal"),
+            _field("eval_ref", "Eval"),
+        ],
+        data={
+            "abs_img": "![secret](/etc/passwd)",
+            "trav_img": "![x](../../secrets/key.png)",
+            "eval_ref": "[//]: # \"__import__('os').system('id')\"",
+        },
+    )
+    md = build_application_markdown(doc)
+    assert "/etc/passwd" not in md
+    assert "../../secrets" not in md
+    assert "__import__" not in md
+    assert "Bild entfernt" in md
+
+
+def test_applicant_value_benign_markdown_survives() -> None:
+    # Harmloser relativer Bildpfad / Klartext bleibt erhalten (kein Over-Sanitizing).
+    doc = _doc(
+        fields=[_field("note", "Notiz"), _field("img", "Bild")],
+        data={"note": "Pfad a/b/c ist ok", "img": "![logo](images/logo.png)"},
+    )
+    md = build_application_markdown(doc)
+    assert "Pfad a/b/c ist ok" in md
+    assert "![logo](images/logo.png)" in md
+
+
 def test_lang_fallback_uses_default_lang() -> None:
     doc = _doc(
         lang="en",

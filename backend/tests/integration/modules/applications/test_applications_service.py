@@ -24,7 +24,7 @@ from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
 from app.shared.config_schemas import FormFieldDef
-from app.shared.errors import ConflictError, ValidationProblem
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 pytestmark = pytest.mark.integration
 
@@ -304,6 +304,62 @@ async def test_comment_visibility(session: AsyncSession) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# AUD-032 — unbestätigte Gast-Einreichung bleibt auf Item-Routen für Principals
+#           unsichtbar (404), nur die besitzende Antragstellerin (Magic-Link) liest
+# --------------------------------------------------------------------------- #
+async def test_unconfirmed_guest_app_hidden_from_principal_item_reads(
+    session: AsyncSession,
+) -> None:
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    # actor="applicant" ⇒ ``email_confirmed_at IS NULL`` (unbestätigt, listen-unsichtbar).
+    app, _ = await svc.create(_create_payload(app_type.id))
+    assert app.email_confirmed_at is None
+
+    # Principal/Gremium (Router übergibt ``allow_unconfirmed=False``, weil die Identität
+    # kein besitzender Magic-Link-Antragsteller ist): 404 auf allen Item-Routen,
+    # spiegelnd zur unsichtbaren ``list_applications``-Semantik. Kein Existenz-Orakel.
+    with pytest.raises(NotFoundError):
+        await svc.get(app.id, include_pii=True, allow_unconfirmed=False)
+    with pytest.raises(NotFoundError):
+        await svc.effective_form(app.id, allow_unconfirmed=False)
+    with pytest.raises(NotFoundError):
+        await svc.timeline(app.id, allow_unconfirmed=False)
+    with pytest.raises(NotFoundError):
+        await svc.versions(app.id, allow_unconfirmed=False)
+    with pytest.raises(NotFoundError):
+        await svc.list_comments(app.id, include_internal=True, allow_unconfirmed=False)
+    with pytest.raises(NotFoundError):
+        await svc.patch(
+            app.id, {"title": "neu"}, changed_by="admin", allow_unconfirmed=False
+        )
+
+    # Besitzende Antragstellerin (Magic-Link → allow_unconfirmed=True, der Default):
+    # voller Zugriff auf den eigenen, noch unbestätigten Antrag.
+    out = await svc.get(app.id, include_pii=False)
+    assert out.id == app.id
+    assert (await svc.timeline(app.id)) != []
+    assert (await svc.versions(app.id)) != []
+    await svc.effective_form(app.id)
+    assert (await svc.list_comments(app.id, include_internal=False)) == []
+
+
+async def test_confirmed_app_readable_by_principal_item_reads(
+    session: AsyncSession,
+) -> None:
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    # actor != "applicant" ⇒ sofort bestätigt → für Principals normal lesbar.
+    app, _ = await svc.create(_create_payload(app_type.id), actor="admin")
+    assert app.email_confirmed_at is not None
+
+    out = await svc.get(app.id, include_pii=True)
+    assert out.id == app.id
+    assert (await svc.timeline(app.id)) != []
+    assert (await svc.versions(app.id)) != []
+
+
+# --------------------------------------------------------------------------- #
 # HIGH #1 — unbekannte Keys werden verworfen (nicht persistiert)
 # --------------------------------------------------------------------------- #
 async def test_create_drops_unknown_keys(session: AsyncSession) -> None:
@@ -532,3 +588,47 @@ async def test_anonymize_scrubs_field_marked_pii_in_later_version(
     out = await svc.get(app.id, include_pii=True)
     assert out.data.get("note") is None  # gepinnt-PII
     assert out.data.get("title") is None  # erst später als PII markiert → trotzdem gescrubbt
+
+
+# --------------------------------------------------------------------------- #
+# delete (#AUD-002) — irreversibel, auditiert, id-only-Metadaten (keine PII)
+# --------------------------------------------------------------------------- #
+async def test_delete_writes_audit_entry_without_pii(session: AsyncSession) -> None:
+    from app.modules.audit.actions import AuditAction
+    from app.modules.audit.models import AuditEntry
+
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id), actor="admin")
+    await svc.patch(
+        app.id, {"title": "Neu", "cost": "100.00", "note": "geheim"}, changed_by="admin"
+    )
+    app_id = app.id
+
+    await svc.delete(app_id, actor="admin")
+
+    # Antrag (+ Kaskade) ist weg.
+    assert await session.get(Applicant, app_id) is None
+    versions = await session.scalars(
+        select(SubmissionVersion).where(SubmissionVersion.application_id == app_id)
+    )
+    assert versions.all() == []
+
+    # Genau ein Audit-Eintrag dokumentiert den Vorgang.
+    entry = (
+        await session.scalars(
+            select(AuditEntry).where(
+                AuditEntry.action == AuditAction.APPLICATION_DELETE,
+                AuditEntry.target_id == str(app_id),
+            )
+        )
+    ).one()
+    assert entry.actor == "admin"
+    assert entry.target_type == "application"
+    assert entry.data["typeId"] == str(app_type.id)
+    assert entry.data["versionCount"] == 2
+    # Keine rohe PII im Audit-``data`` (security.md §4).
+    serialized = str(entry.data)
+    assert "geheim" not in serialized
+    assert "Erika" not in serialized
+    assert "Antrag@Example.ORG".lower() not in serialized.lower()

@@ -25,9 +25,15 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import Gremium, MailList
+from app.modules.admin.models import (
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+    MailList,
+)
+from app.modules.auth.models import Principal
 from app.modules.files.storage import ObjectStorage
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.notifications.mail import MailMessage
 from app.modules.pdf.pytex_client import PytexClient
 from app.modules.protocol.models import Protocol
@@ -37,6 +43,16 @@ pytestmark = pytest.mark.integration
 
 _NON_PUBLIC_PLACEHOLDER = "(nicht-öffentlicher Tagesordnungspunkt)"
 _SECRET_BODY = "Personalentscheidung zu Frau Müller — vertraulich."
+# Der nicht-öffentliche TOP-Titel kann den sensiblen Gegenstand kodieren (AUD-025) und
+# darf nicht in der öffentlichen Variante auftauchen.
+_SECRET_TITLE = "Personalangelegenheit"
+_NEUTRAL_HEADING = "Nicht-öffentlicher Tagesordnungspunkt"
+# Die vollständige Anwesenheits-Liste + der Protokollant einer (potenziell
+# nicht-öffentlichen) Sitzung sind Metadaten, die der ``non_public``-Flag schützen soll
+# (AUD-025) — sie dürfen nicht in die an die Verteilerliste gemailte Variante.
+_PRESENT_NAME = "Anna Anwesend"
+_ABSENT_NAME = "Bernd Abwesend"
+_PROTOKOLLANT_NAME = "Petra Protokoll"
 
 
 @pytest.fixture
@@ -101,17 +117,66 @@ class _FakeMailQueue:
 async def _seed_meeting(
     session: AsyncSession, *, secret_body: str = _SECRET_BODY
 ) -> tuple[Meeting, Gremium]:
-    """Sitzung (live) mit zwei TOPs — der zweite nicht-öffentlich mit Body."""
+    """Sitzung (live) mit zwei TOPs — der zweite nicht-öffentlich mit Body.
+
+    Zusätzlich werden ein Protokollant sowie je ein anwesendes/abwesendes Mitglied
+    angelegt, damit die Header-Redaktion der öffentlichen Variante (AUD-025) prüfbar
+    ist: deren Namen dürfen intern, aber nicht öffentlich erscheinen."""
     gremium = Gremium(name="StuPa", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
+    protokollant = Principal(sub=f"prot-{uuid.uuid4()}", display_name=_PROTOKOLLANT_NAME)
+    present_member = Principal(sub=f"pres-{uuid.uuid4()}", display_name=_PRESENT_NAME)
+    absent_member = Principal(sub=f"abs-{uuid.uuid4()}", display_name=_ABSENT_NAME)
+    session.add_all([protokollant, present_member, absent_member])
+    await session.flush()
+    # Gremium-Mitgliedschaften für die beiden Mitglieder, damit die Beschlussfähigkeit
+    # (Anwesende vs. aktive Mitglieder) überhaupt berechenbar ist — sonst liefert
+    # ``_quorate`` ``None`` und die Frontmatter-Zeile fehlt in beiden Varianten.
+    role = GremiumRole(
+        gremium_id=gremium.id,
+        key=f"r-{uuid.uuid4()}",
+        name_i18n={"de": "Mitglied"},
+        permissions=["vote.cast"],
+    )
+    session.add(role)
+    await session.flush()
+    session.add_all(
+        [
+            GremiumMembership(
+                principal_id=present_member.id,
+                gremium_id=gremium.id,
+                gremium_role_id=role.id,
+            ),
+            GremiumMembership(
+                principal_id=absent_member.id,
+                gremium_id=gremium.id,
+                gremium_role_id=role.id,
+            ),
+        ]
+    )
     meeting = Meeting(
         gremium_id=gremium.id,
         title="Sitzung",
         status="live",
+        protokollant_id=protokollant.id,
     )
     session.add(meeting)
     await session.flush()
+    session.add_all(
+        [
+            MeetingAttendance(
+                meeting_id=meeting.id,
+                principal_id=present_member.id,
+                status="present",
+            ),
+            MeetingAttendance(
+                meeting_id=meeting.id,
+                principal_id=absent_member.id,
+                status="absent",
+            ),
+        ]
+    )
     session.add_all(
         [
             MeetingAgendaItem(
@@ -123,7 +188,7 @@ async def _seed_meeting(
             ),
             MeetingAgendaItem(
                 meeting_id=meeting.id,
-                title="Personalangelegenheit",
+                title=_SECRET_TITLE,
                 body=secret_body,
                 position=1,
                 non_public=True,
@@ -154,10 +219,54 @@ async def test_assemble_redacts_non_public_keeps_numbering(session: AsyncSession
     assert _SECRET_BODY not in public
     assert _NON_PUBLIC_PLACEHOLDER in public
 
+    # AUD-025: der nicht-öffentliche TOP-Titel bleibt intern, fehlt aber in der
+    # öffentlichen (an den Verteiler gemailten) Variante; dort steht eine neutrale
+    # Überschrift.
+    assert _SECRET_TITLE in internal
+    assert _SECRET_TITLE not in public
+    assert _NEUTRAL_HEADING in public
+
     # Nummerierung stabil: gleich viele Top-Level-Überschriften in beiden Varianten.
     assert _count_top_headings(internal) == _count_top_headings(public) == 2
 
     assert await svc._has_non_public(meeting.id) is True
+
+
+async def test_build_document_redacts_roster_and_protokollant_in_public(
+    session: AsyncSession,
+) -> None:
+    """AUD-025 (roster vector): _build_document(public=True) darf weder die
+    Anwesenheits-/Abwesenheits-Namen noch den Protokollanten-Namen enthalten — diese
+    Metadaten gehen sonst verbatim an die externe Verteilerliste. Intern bleiben sie."""
+    meeting, gremium = await _seed_meeting(session)
+    protocol = Protocol(
+        meeting_id=meeting.id,
+        gremium_id=gremium.id,
+        markdown="",
+        status="draft",
+    )
+    session.add(protocol)
+    await session.commit()
+
+    svc = ProtocolService(session)
+    internal = await svc._build_document(protocol, public=False)
+    public = await svc._build_document(protocol, public=True)
+
+    # intern: Namen + Protokollant stehen im Header.
+    assert _PRESENT_NAME in internal
+    assert _ABSENT_NAME in internal
+    assert _PROTOKOLLANT_NAME in internal
+
+    # öffentlich: keine Namen, kein Protokollant — nur die Zähler bleiben.
+    assert _PRESENT_NAME not in public
+    assert _ABSENT_NAME not in public
+    assert _PROTOKOLLANT_NAME not in public
+    assert "Anwesend: 1" in public
+    assert "Abwesend: 1" in public
+
+    # Beschlussfähigkeit (zähler-basiert) bleibt in beiden Varianten aussagekräftig.
+    assert "beschlussfaehigkeit" in internal
+    assert "beschlussfaehigkeit" in public
 
 
 async def test_has_non_public_false_without_secret_top(session: AsyncSession) -> None:
@@ -228,6 +337,19 @@ async def test_finalize_dual_render(session: AsyncSession) -> None:
     assert _SECRET_BODY.encode() in internal_bytes
     assert _NON_PUBLIC_PLACEHOLDER.encode() in public_bytes
     assert _SECRET_BODY.encode() not in public_bytes
+
+    # AUD-025: der nicht-öffentliche Titel steht intern, fehlt im gemailten PDF.
+    assert _SECRET_TITLE.encode() in internal_bytes
+    assert _SECRET_TITLE.encode() not in public_bytes
+
+    # AUD-025 (roster vector): Anwesenheits-/Abwesenheits-Namen + Protokollant stehen
+    # intern, fehlen aber im an die Verteilerliste gemailten öffentlichen PDF.
+    assert _PRESENT_NAME.encode() in internal_bytes
+    assert _ABSENT_NAME.encode() in internal_bytes
+    assert _PROTOKOLLANT_NAME.encode() in internal_bytes
+    assert _PRESENT_NAME.encode() not in public_bytes
+    assert _ABSENT_NAME.encode() not in public_bytes
+    assert _PROTOKOLLANT_NAME.encode() not in public_bytes
 
     # genau eine Mail, und ihr Anhang == öffentliche Variante (nie das interne PDF).
     assert len(mail_queue.sent) == 1

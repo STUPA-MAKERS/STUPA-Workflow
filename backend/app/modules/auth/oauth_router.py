@@ -223,6 +223,11 @@ async def token(
         else:
             return _token_error("unsupported_grant_type", f"grant_type={grant_type!r}")
     except oauth.OAuthError as exc:
+        # Refresh-Reuse-Detection kann eine Token-Familie kaskadierend widerrufen,
+        # bevor sie ``invalid_grant`` wirft — diese Schreibvorgänge müssen persistiert
+        # werden. Bei reinen Validierungsfehlern sind keine Änderungen offen, der
+        # Commit ist dann ein No-op.
+        await db.commit()
         return _token_error(exc.error, exc.description)
     await db.commit()
     return JSONResponse(

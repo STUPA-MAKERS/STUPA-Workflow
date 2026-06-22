@@ -22,6 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.voting.models import Vote
 
+# Obergrenze je Cron-Tick (AUD-046): jeder Scan liefert höchstens so viele, **älteste
+# zuerst** (``due_at``/``closes_at`` aufsteigend). So drainiert ein großer Rückstau (z. B.
+# nach Downtime oder einem geteilten absolute-Policy-Rollover über tausende Anträge) über
+# mehrere Ticks, statt dass ein einzelner Tick die gesamte Kohorte sequenziell abarbeitet
+# und über die 1-Minuten-Kadenz hinaus läuft. Korrektheit unberührt (SKIP LOCKED +
+# Idempotenz-Marker): nicht gegriffene Zeilen bleiben fällig und kommen im nächsten Tick.
+DEFAULT_SCAN_LIMIT = 200
+
 
 class DeadlineService:
     """An eine ``AsyncSession`` gebundene Frist-Operationen."""
@@ -53,41 +61,69 @@ class DeadlineService:
         return deadline
 
     # ------------------------------------------------------------------- scans
-    async def due_action_deadline_ids(self, now: datetime) -> list[UUID]:
-        """IDs fälliger Auto-Fristen (``due_at<=now`` ∧ ``action_on_pass`` gesetzt)."""
+    async def due_action_deadline_ids(
+        self, now: datetime, *, limit: int = DEFAULT_SCAN_LIMIT
+    ) -> list[UUID]:
+        """IDs fälliger Auto-Fristen (``due_at<=now`` ∧ ``action_on_pass`` gesetzt).
+
+        Pro Tick auf ``limit`` (älteste ``due_at`` zuerst) begrenzt → großer Rückstau
+        drainiert über mehrere Ticks (AUD-046)."""
         rows = (
             await self.session.execute(
-                select(Deadline.id).where(
+                select(Deadline.id)
+                .where(
                     Deadline.action_on_pass.isnot(None),
                     Deadline.due_at <= now,
                 )
+                .order_by(Deadline.due_at)
+                .limit(limit)
             )
         ).scalars().all()
         return list(rows)
 
-    async def due_reminder_ids(self, now: datetime, lead: timedelta) -> list[UUID]:
-        """IDs anstehender Fristen im Erinnerungsfenster (``due_at-lead <= now < due_at``),
-        die noch nicht erinnert wurden."""
+    async def due_reminder_ids(
+        self, now: datetime, lead: timedelta, *, limit: int = DEFAULT_SCAN_LIMIT
+    ) -> list[UUID]:
+        """IDs anstehender (oder bereits abgelaufener) Fristen, die noch nicht erinnert
+        wurden (``reminded_at IS NULL`` ∧ ``due_at <= now+lead``).
+
+        **Keine untere Schranke** (``due_at > now``): War der Worker länger als das
+        Lead-Fenster aus oder wurde die Frist bereits-überfällig angelegt, würde eine
+        zweiseitige Bedingung die Zeile nie mehr greifen → die Erinnerung bliebe für
+        immer aus und die Zeile leckte im partiellen Index ``ix_deadline_reminder``
+        (AUD-037). So wird genau einmal eine (ggf. verspätete) Erinnerung versandt und
+        ``reminded_at`` gesetzt → die Zeile verlässt den Scan-Index.
+
+        Pro Tick auf ``limit`` (älteste ``due_at`` zuerst) begrenzt (AUD-046)."""
         rows = (
             await self.session.execute(
-                select(Deadline.id).where(
+                select(Deadline.id)
+                .where(
                     Deadline.reminded_at.is_(None),
-                    Deadline.due_at > now,
                     Deadline.due_at <= now + lead,
                 )
+                .order_by(Deadline.due_at)
+                .limit(limit)
             )
         ).scalars().all()
         return list(rows)
 
-    async def due_open_vote_ids(self, now: datetime) -> list[UUID]:
-        """IDs offener Votes mit abgelaufenem Fenster (``closes_at<=now``)."""
+    async def due_open_vote_ids(
+        self, now: datetime, *, limit: int = DEFAULT_SCAN_LIMIT
+    ) -> list[UUID]:
+        """IDs offener Votes mit abgelaufenem Fenster (``closes_at<=now``).
+
+        Pro Tick auf ``limit`` (ältestes ``closes_at`` zuerst) begrenzt (AUD-046)."""
         rows = (
             await self.session.execute(
-                select(Vote.id).where(
+                select(Vote.id)
+                .where(
                     Vote.status == "open",
                     Vote.closes_at.isnot(None),
                     Vote.closes_at <= now,
                 )
+                .order_by(Vote.closes_at)
+                .limit(limit)
             )
         ).scalars().all()
         return list(rows)
@@ -113,14 +149,15 @@ class DeadlineService:
     async def lock_reminder(
         self, deadline_id: UUID, now: datetime, lead: timedelta
     ) -> Deadline | None:
-        """Anstehende, noch nicht erinnerte Frist exklusiv sperren (``SKIP LOCKED``)."""
+        """Anstehende (oder bereits abgelaufene), noch nicht erinnerte Frist exklusiv
+        sperren (``SKIP LOCKED``). Spiegelt :meth:`due_reminder_ids`: keine untere
+        Schranke, damit verspätete Erinnerungen genau einmal versandt werden (AUD-037)."""
         return (
             await self.session.execute(
                 select(Deadline)
                 .where(
                     Deadline.id == deadline_id,
                     Deadline.reminded_at.is_(None),
-                    Deadline.due_at > now,
                     Deadline.due_at <= now + lead,
                 )
                 .with_for_update(skip_locked=True)

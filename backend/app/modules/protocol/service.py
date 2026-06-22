@@ -34,10 +34,13 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.gremium_roles import gremium_ids_with_permission
 from app.modules.admin.models import Gremium, GremiumMembership, MailList
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.livevote.service import MeetingService
 from app.modules.notifications.layout import (
     reason_text,
     render_layout,
@@ -67,6 +70,7 @@ from app.settings import Settings, get_settings
 from app.shared.errors import (
     BadRequestError,
     ConflictError,
+    ForbiddenError,
     NotFoundError,
     ServiceUnavailableError,
 )
@@ -85,6 +89,10 @@ def protocol_public_storage_key(protocol_id: UUID) -> str:
 # Platzhalter für den Body nicht-öffentlicher TOPs im öffentlichen PDF (Nummerierung
 # bleibt erhalten, der Inhalt wird redigiert).
 _NON_PUBLIC_PLACEHOLDER = "*(nicht-öffentlicher Tagesordnungspunkt)*"
+# Neutrale Überschrift für nicht-öffentliche TOPs im öffentlichen PDF: der Original-
+# Titel kann den sensiblen Gegenstand kodieren (AUD-025), darf also nicht in die an die
+# Verteilerliste gemailte Variante. Die Nummerierung (pytex »TOP n«) bleibt erhalten.
+_NON_PUBLIC_HEADING = "Nicht-öffentlicher Tagesordnungspunkt"
 
 
 class ProtocolService:
@@ -115,6 +123,66 @@ class ProtocolService:
         if protocol is None:
             raise NotFoundError(f"protocol {protocol_id} not found")
         return protocol
+
+    # --------------------------------------------------------- authz (per-Gremium)
+    # Das Protokoll montiert die pro-TOP-Bodies, die der Live-Stack (livevote) bereits
+    # PER GREMIUM autorisiert (zugewiesener Protokollant + Gremium-Rollen mit
+    # ``session.manage``/``protocol.write``). Globale ``meeting.manage`` als alleiniges
+    # Gate schloss genau diese per-Gremium-Protokollanten aus (AUD-016). Wir delegieren
+    # deshalb an ``MeetingService`` — identische Scope-Regeln wie ``/api/meetings/…``.
+    def _meeting_service(self) -> MeetingService:
+        return MeetingService(self.session)
+
+    async def _meeting(self, meeting_id: UUID) -> Meeting:
+        meeting = await self.session.get(Meeting, meeting_id)
+        if meeting is None:
+            raise NotFoundError(f"meeting {meeting_id} not found")
+        return meeting
+
+    async def authorize_write_meeting(
+        self, meeting_id: UUID, principal: Principal
+    ) -> None:
+        """Schreibrecht am Protokoll EINER Sitzung (POST …/protocol anlegen/laden).
+
+        Verwalter (``meeting.manage``/Gremium-``session.manage``), zugewiesener
+        Protokollant ODER Gremium-Rolle mit ``protocol.write`` — wie ``can_write``."""
+        meeting = await self._meeting(meeting_id)
+        if not await self._meeting_service().can_write(meeting, principal):
+            raise ForbiddenError("not allowed to write this meeting's minutes")
+
+    async def authorize_write(self, protocol_id: UUID, principal: Principal) -> None:
+        """Schreibrecht an einem bestehenden Protokoll (PATCH / embed votes)."""
+        protocol = await self._get(protocol_id)
+        await self.authorize_write_meeting(protocol.meeting_id, principal)
+
+    async def authorize_finalize(self, protocol_id: UUID, principal: Principal) -> None:
+        """Finalisieren+Versand: Schreibrecht UND ``protocol.finalize`` (global ODER
+        als Gremium-Rolle dieses Gremiums). Strenger als das reine Entwurf-Schreiben."""
+        protocol = await self._get(protocol_id)
+        meeting = await self._meeting(protocol.meeting_id)
+        svc = self._meeting_service()
+        if not await svc.can_write(meeting, principal):
+            raise ForbiddenError("not allowed to write this meeting's minutes")
+        if principal.has("protocol.finalize"):
+            return
+        if meeting.gremium_id in await gremium_ids_with_permission(
+            self.session, principal.sub, "protocol.finalize"
+        ):
+            return
+        raise ForbiddenError("Missing permission(s): protocol.finalize")
+
+    async def authorize_read(self, protocol_id: UUID, principal: Principal) -> None:
+        """Leserecht an einem Protokoll: dieselbe Sichtbarkeit wie die Sitzung
+        (``assert_can_read`` — Mitglieder/Pool-Vertreter des Gremiums, Delegations-
+        Empfänger, sowie globale ``meeting.view_all``/``meeting.manage``/Admin)."""
+        protocol = await self._get(protocol_id)
+        await self._meeting_service().assert_can_read(protocol.meeting_id, principal)
+
+    async def authorize_read_meeting(
+        self, meeting_id: UUID, principal: Principal
+    ) -> None:
+        """Leserecht am Protokoll EINER Sitzung (GET …/protocol)."""
+        await self._meeting_service().assert_can_read(meeting_id, principal)
 
     def _pdf_path(self, protocol: Protocol) -> str | None:
         """App-relativer PDF-Pfad (über nginx /api/ erreichbar, nie ein Bucket-Link).
@@ -386,7 +454,14 @@ class ProtocolService:
         # andernfalls Fallback auf das frei editierte ``protocol.markdown`` (Bestand).
         # ``public=True`` redigiert nicht-öffentliche TOPs (#PII-Re-Add).
         assembled = await self._assemble_from_agenda(protocol.meeting_id, public=public)
-        protokollant, present, absent = await self._header_meta(meeting)
+        # ``public=True`` redigiert auch die Header-Metadaten (AUD-025): in der an die
+        # Verteilerliste gemailte Variante dürfen weder die Namen der Anwesenden/Abwesenden
+        # noch der Protokollant erscheinen. ``_header_meta`` liefert dann leere Namenslisten
+        # + nur die Zähler (als Daten-Zeilen) und keinen Protokollanten-Namen — die
+        # Beschlussfähigkeit (Zähler-basiert) bleibt aussagekräftig.
+        protokollant, present, absent, present_count, datalines = await self._header_meta(
+            meeting, public=public
+        )
         return build_protocol_document(
             ProtocolDoc(
                 title=title,
@@ -400,7 +475,8 @@ class ProtocolService:
                 protokollant=protokollant,
                 present=present,
                 absent=absent,
-                quorate=await self._quorate(gremium, len(present)),
+                datalines=datalines,
+                quorate=await self._quorate(gremium, present_count),
                 markdown=assembled or protocol.markdown,
             )
         )
@@ -441,11 +517,23 @@ class ProtocolService:
         return present_count * 2 > members
 
     async def _header_meta(
-        self, meeting: Meeting | None
-    ) -> tuple[str | None, list[str], list[str]]:
-        """Protokollant + Anwesenheits-Listen (Name oder Sub) für den Protokoll-Header."""
+        self, meeting: Meeting | None, *, public: bool = False
+    ) -> tuple[str | None, list[str], list[str], int, list[str]]:
+        """Protokollant + Anwesenheits-Listen (Name oder Sub) für den Protokoll-Header.
+
+        Liefert ``(protokollant, present, absent, present_count, datalines)``. Der
+        ``present_count`` ist die wahre Zahl der Anwesenden (Quelle für die
+        Beschlussfähigkeit) — auch dann, wenn ``public=True`` die Namenslisten
+        unterdrückt.
+
+        ``public=True`` redigiert für die an die Verteilerliste gemailte Variante die
+        personenbezogenen Header-Metadaten (AUD-025): die vollständige Anwesenheits-/
+        Abwesenheits-Liste einer (potenziell nicht-öffentlichen) Sitzung sowie der
+        Protokollanten-Name dürfen nicht nach extern. Statt der Namen werden nur die
+        Zähler als Daten-Zeilen (``Anwesend: n`` / ``Abwesend: n``) ausgegeben; die
+        Beschlussfähigkeit (zähler-basiert) bleibt erhalten."""
         if meeting is None:
-            return None, [], []
+            return None, [], [], 0, []
         protokollant: str | None = None
         if getattr(meeting, "protokollant_id", None) is not None:
             protokollant = await self.session.scalar(
@@ -465,7 +553,15 @@ class ProtocolService:
         ).all()
         present = [name or sub for status, name, sub in rows if status == "present"]
         absent = [name or sub for status, name, sub in rows if status == "absent"]
-        return protokollant, present, absent
+        present_count = len(present)
+        if public:
+            # Namen + Protokollant raushalten; nur die Zähler als Daten-Zeilen behalten.
+            datalines = [
+                f"Anwesend: {present_count}",
+                f"Abwesend: {len(absent)}",
+            ]
+            return None, [], [], present_count, datalines
+        return protokollant, present, absent, present_count, []
 
     async def _has_non_public(self, meeting_id: UUID) -> bool:
         """Hat die Sitzung mind. einen nicht-öffentlichen TOP? (steuert Dual-Render)."""
@@ -504,12 +600,14 @@ class ProtocolService:
             # Top-Level-``#`` OHNE »TOP n:«-Präfix: pytex nummeriert die Sections
             # selbst als »TOP 1«, »TOP 2«, … (#pdf-format) — ``##`` würde als
             # »TOP 0.1« nummeriert und ein eigenes Präfix doppelt erscheinen.
-            block = [f"# {heading}"]
             if public and item.non_public:
-                # Überschrift bleibt (Nummerierung stabil), Inhalt redigiert.
-                block.append(_NON_PUBLIC_PLACEHOLDER)
+                # Der Original-Titel kann den sensiblen Gegenstand kodieren (AUD-025) und
+                # darf nicht in die an die Verteilerliste gemailte öffentliche Variante.
+                # Neutrale Überschrift + redigierter Inhalt; Nummerierung bleibt stabil.
+                block = [f"# {_NON_PUBLIC_HEADING}", _NON_PUBLIC_PLACEHOLDER]
                 blocks.append("\n\n".join(block))
                 continue
+            block = [f"# {heading}"]
             if item.body and item.body.strip():
                 # Body-Headings eine Ebene absenken: nur die TOP-Überschrift
                 # bleibt Top-Level (sonst zählte jedes ``#`` als eigener TOP).
@@ -553,16 +651,19 @@ class ProtocolService:
             return None
         try:
             variant = protocol_variant_for(protocol.cd_variant)
-            # RCE-Schutz (security.md §2): der nutzer-geschriebene Body (Protokollant)
-            # könnte pytex' Markdown-``eval``-Escape (``[//]: # "EXPR"`` → eval im
-            # Container) tragen. Den entfernt ``sanitize_user_markdown`` BEDINGUNGSLOS
-            # schon beim Zusammenbau (``build_protocol_document``), bevor das Markdown
-            # pytex erreicht — der einzige eval-Vektor ist damit weg; ``\write18``-Shell-
-            # Escape greift unter der tectonic-Engine ohnehin nicht. Darum rendert
-            # dieser Pfad ``trusted`` (Client-Default): die Protokoll-Variante
-            # (``protocol-stupa``/``-asta``) braucht pytex' Template-Maschinerie, die
-            # ``untrusted`` sperrt — untrusted ließ jeden Protokoll-Render mit 400 (pytex
-            # ``TrustError``) scheitern.
+            # RCE-Schutz (security.md §2; AUD-010): der nutzer-geschriebene Body
+            # (Protokollant) könnte pytex' Markdown-``eval``-Escape (``[//]: # "EXPR"``
+            # → eval im Container) tragen. Den entfernt ``sanitize_user_markdown``
+            # BEDINGUNGSLOS schon beim Zusammenbau (``build_protocol_document``), bevor
+            # das Markdown pytex erreicht — der einzige eval-Vektor ist damit weg;
+            # ``\write18``-Shell-Escape greift unter der tectonic-Engine ohnehin nicht.
+            # Darum rendert dieser Pfad ``trusted`` (Client-Default): die Protokoll-
+            # Variante (``protocol-stupa``/``-asta``) braucht pytex' Template-Maschinerie,
+            # die ``untrusted``/``sandboxed`` sperrt — untrusted ließ jeden Protokoll-
+            # Render mit 400 (pytex ``TrustError``) scheitern. Als zweite, unabhängige
+            # Linie (Defense-in-Depth) verifiziert ``PytexClient.render_pdf`` vor dem
+            # ``trusted``-Render strukturell, dass kein eval-Trigger überlebt hat — ein
+            # etwaiger Sanitizer-Bypass wird so zu einem eingedämmten Fehler statt RCE.
             pdf = await self.pytex.render_pdf(markdown, variant=variant)
         except PytexError as exc:
             # 4xx = dauerhafter Eingabe-/Compile-Fehler (z. B. ungültiges LaTeX im

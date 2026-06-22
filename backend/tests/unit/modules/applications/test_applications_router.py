@@ -104,26 +104,37 @@ class _FakeService:
         return _FakeApp(uuid4()), str(payload.applicant_email)
 
     async def get(  # noqa: ANN001
-        self, application_id, *, include_pii, requester_sub=None, requester_can_manage=False
+        self,
+        application_id,
+        *,
+        include_pii,
+        requester_sub=None,
+        requester_can_manage=False,
+        allow_unconfirmed=True,
     ):
         self.last_include_pii = include_pii
+        self.last_allow_unconfirmed = allow_unconfirmed
         return _out(application_id, with_pii=include_pii)
 
-    async def patch(self, application_id, data, *, changed_by, bypass_state_lock=False):  # noqa: ANN001
+    async def patch(  # noqa: ANN001
+        self, application_id, data, *, changed_by, bypass_state_lock=False, allow_unconfirmed=True
+    ):
         self.last_bypass_state_lock = bypass_state_lock
         return _out(application_id, with_pii=False)
 
-    async def delete(self, application_id):  # noqa: ANN001
+    async def delete(self, application_id, *, actor=None):  # noqa: ANN001
         self.deleted = application_id
+        self.deleted_actor = actor
 
-    async def timeline(self, application_id):  # noqa: ANN001
+    async def timeline(self, application_id, *, allow_unconfirmed=True):  # noqa: ANN001
         return [
             TimelineEventOut(
                 fromStateId=None, toStateId=uuid4(), actor="applicant", at=_NOW, note=None
             )
         ]
 
-    async def versions(self, application_id):  # noqa: ANN001
+    async def versions(self, application_id, *, allow_unconfirmed=True):  # noqa: ANN001
+        self.versions_allow_unconfirmed = allow_unconfirmed
         return [VersionOut(version=1, data={"title": "X"}, diff=None, changedBy="x", at=_NOW)]
 
     async def list_applications(self, **kwargs):  # noqa: ANN003
@@ -137,7 +148,9 @@ class _FakeService:
         self.name_maps_called = True
         return {}, {}
 
-    async def add_comment(self, application_id, *, author, author_kind, body, visibility):  # noqa: ANN001
+    async def add_comment(  # noqa: ANN001
+        self, application_id, *, author, author_kind, body, visibility, allow_unconfirmed=True
+    ):
         self.comment_args = {
             "author": author,
             "author_kind": author_kind,
@@ -152,7 +165,9 @@ class _FakeService:
             at=_NOW,
         )
 
-    async def list_comments(self, application_id, *, include_internal):  # noqa: ANN001
+    async def list_comments(  # noqa: ANN001
+        self, application_id, *, include_internal, allow_unconfirmed=True
+    ):
         self.last_include_internal = include_internal
         return []
 

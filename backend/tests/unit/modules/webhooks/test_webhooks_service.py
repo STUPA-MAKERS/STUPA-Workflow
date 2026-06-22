@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
+from collections.abc import AsyncIterator
 
 import httpx
 import pytest
@@ -345,5 +347,45 @@ async def test_deliver_transport_error_retries() -> None:
         outcome = await _svc(session).deliver(
             delivery.id, http_client=client, resolver=_public_resolver
         )
+    assert outcome.kind == "retry"
+    assert delivery.response_code is None
+
+
+class _DripStream(httpx.AsyncByteStream):
+    """Streamt unendlich je 1 Byte mit kurzer Pause — jeder Einzel-Read ist schnell,
+    sodass das httpx-Per-Read-Timeout nie greift; die Summe läuft aber unbegrenzt
+    (slow-drip, AUD-011)."""
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        while True:
+            await asyncio.sleep(0.01)
+            yield b"x"
+
+    async def aclose(self) -> None:  # pragma: no cover - trivial
+        return None
+
+
+async def test_deliver_slow_drip_response_hits_total_deadline() -> None:
+    # Ein „slow-drip“-Empfänger antwortet 2xx und tröpfelt dann den Body endlos. Ohne
+    # Gesamt-Deadline bliebe der (geteilte) Worker-Slot hängen. Der Service deckelt die
+    # Gesamtdauer per asyncio.timeout(webhook_timeout_seconds) → TimeoutException →
+    # Transport-Fehler → Retry (AUD-011).
+    settings = load_settings(webhook_timeout_seconds=0.05)
+
+    def _handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, stream=_DripStream())
+
+    transport = httpx.MockTransport(_handler)
+    hook = _hook(url="https://hook.test/h")
+    session = FakeSession()
+    delivery = _delivery(hook.id, attempts=0)
+    session.store.update({delivery.id: delivery, hook.id: hook})
+    svc = WebhookService(session, settings)  # type: ignore[arg-type]
+    async with httpx.AsyncClient(transport=transport) as client:
+        outcome = await asyncio.wait_for(
+            svc.deliver(delivery.id, http_client=client, resolver=_public_resolver),
+            timeout=5.0,
+        )
+    # Gesamt-Deadline gerissen → als transienter Transportfehler → Retry, kein Hängen.
     assert outcome.kind == "retry"
     assert delivery.response_code is None

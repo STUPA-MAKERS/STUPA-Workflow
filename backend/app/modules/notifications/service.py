@@ -17,6 +17,7 @@ import uuid
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.notifications.kinds import NOTIFICATION_KINDS
@@ -111,7 +112,15 @@ class NotificationService:
             placeholders=payload.placeholders,
         )
         self.session.add(tpl)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            # Nebenläufiges Insert desselben Keys (UNIQUE mail_template.key) hat
+            # zwischen Read und Commit gewonnen — 409 statt 500; Client wiederholt.
+            await self.session.rollback()
+            raise ConflictError(
+                f"mail template {payload.key!r} already exists", code="conflict"
+            ) from exc
         return _template_out(tpl)
 
     async def list_templates(self) -> list[MailTemplateOut]:
@@ -161,6 +170,7 @@ class NotificationService:
                 "Unknown template key.",
                 errors=[{"field": "key", "msg": f"unknown: {payload.key}"}],
             )
+        inserting = existing is None
         if existing is None:
             spec = CATALOGUE_BY_KEY[payload.key]
             existing = MailTemplate(
@@ -175,7 +185,18 @@ class NotificationService:
             existing.subject_i18n = payload.subject_i18n
             existing.body_i18n = payload.body_i18n
             existing.body_html_i18n = payload.body_html_i18n
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            # Nebenläufiges Insert desselben Keys (UNIQUE mail_template.key) hat
+            # zwischen Read und Commit gewonnen — 409 statt 500; Client wiederholt.
+            await self.session.rollback()
+            if inserting:
+                raise ConflictError(
+                    f"mail template {payload.key!r} already exists",
+                    code="conflict",
+                ) from exc
+            raise
         return _template_out(existing, source="override")
 
     async def reset_template(self, key: str) -> MailTemplateOut:
@@ -433,7 +454,13 @@ class NotificationService:
             or action.get("template_key")
             or DEFAULT_NOTIFY_TEMPLATE_KEY
         )
-        reason = "deadline" if "deadline" in str(template_key) else "status_update"
+        # Echte Benachrichtigungs-Art aus dem Katalog ableiten (statt Substring-
+        # Heuristik): bestimmt sowohl den Opt-out-Filter als auch den Footer-Grund.
+        # Unbekannte/DB-only Keys → Default `status_update`.
+        from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
+
+        _spec = CATALOGUE_BY_KEY.get(str(template_key))
+        reason = _spec.kind if _spec is not None else DEFAULT_NOTIFY_TEMPLATE_KEY
         recipients = await self.resolver.resolve(
             _as_specs(action.get("recipients", [])), application_id=application_id
         )
@@ -466,9 +493,7 @@ class NotificationService:
             return int(ok)
         # Template fehlt in der DB → Builtin-Fallback. Katalog-Keys (z. B.
         # ``deadline_approaching``) nutzen ihren eigenen Default, sonst status_update.
-        from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
-
-        spec = CATALOGUE_BY_KEY.get(str(template_key))
+        spec = _spec
         rendered = render_mail(
             subject_i18n=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,
             body_i18n=spec.body_i18n if spec else _BUILTIN_NOTIFY_BODY,
