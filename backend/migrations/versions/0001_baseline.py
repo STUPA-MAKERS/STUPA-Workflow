@@ -109,6 +109,13 @@ def upgrade() -> None:
     # 1. Extensions (vor create_all — Defaults/Typen hängen daran).
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
     op.execute("CREATE EXTENSION IF NOT EXISTS citext")
+    # btree_gist liefert die uuid-/Gleichheits-Operatorklasse für die GIST-EXCLUDE
+    # auf ``gremium_membership`` (``ex_gremium_membership_no_overlap``, #AUD-029).
+    # ``create_all`` emittiert diese Constraint inline aus dem Modell — auf einer
+    # frischen DB MUSS die Extension also schon vor create_all stehen, sonst bricht
+    # das CREATE TABLE mit „data type uuid has no default operator class for gist".
+    # (Bestands-DBs liefen 0001 ohne diese Constraint; dort legt 0038 sie nach.)
+    op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
 
     # 2. Volles Schema aus den Modellen (Single-Source).
     Base.metadata.create_all(bind=bind)
@@ -155,5 +162,6 @@ def downgrade() -> None:
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_budget_usage")
     Base.metadata.drop_all(bind=bind)
     op.execute("DROP FUNCTION IF EXISTS audit_entry_append_only()")
+    op.execute("DROP EXTENSION IF EXISTS btree_gist")
     op.execute("DROP EXTENSION IF EXISTS citext")
     op.execute("DROP EXTENSION IF EXISTS pgcrypto")

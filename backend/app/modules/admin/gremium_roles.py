@@ -341,14 +341,15 @@ class GremiumRoleService:
             valid_until=new_until,
         )
         self.session.add(row)
-        await self.session.flush()
-        await self._audit(actor, "gremium_membership", row.id)
+        # Die EXCLUDE-Constraint wird beim INSERT (flush) geprüft, nicht erst beim
+        # Commit — der konkurrierende Race feuert also bereits hier. flush + Audit +
+        # Commit daher gemeinsam absichern und den IntegrityError in einen 409
+        # übersetzen (statt 500); der Client kann erneut versuchen.
         try:
+            await self.session.flush()
+            await self._audit(actor, "gremium_membership", row.id)
             await self.session.commit()
         except IntegrityError as exc:
-            # Konkurrierender Insert hat eine überlappende Amtszeit committet, bevor
-            # diese Transaktion committen konnte — die EXCLUDE-Constraint feuert.
-            # 409 statt 500; der Client kann erneut versuchen.
             await self.session.rollback()
             raise ConflictError(
                 "overlapping membership for this member in this gremium",

@@ -52,17 +52,31 @@ def upgrade() -> None:
     #    anlegen — dann ist dies ein No-op (vgl. 0027 / pg_trgm).
     op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
 
-    # 3) EXCLUDE-Constraint — exakt wie die ExcludeConstraint im ORM.
+    # 3) EXCLUDE-Constraint — exakt wie die ExcludeConstraint im ORM. Idempotent:
+    #    Auf einer frischen DB hat ``0001`` die Tabelle bereits MIT dieser Constraint
+    #    angelegt (``create_all`` emittiert sie aus dem Modell) — dann ist dies ein
+    #    No-op. Auf Bestands-DBs (0001 lief vor der Modell-Änderung, Tabelle OHNE
+    #    Constraint) legt dieser Schritt sie nach. ``ADD CONSTRAINT`` kennt kein
+    #    ``IF NOT EXISTS``, daher die Existenz-Prüfung über ``pg_constraint``.
     op.execute(
         """
-        ALTER TABLE gremium_membership
-        ADD CONSTRAINT ex_gremium_membership_no_overlap
-        EXCLUDE USING gist (
-            principal_id WITH =,
-            gremium_id WITH =,
-            tstzrange(coalesce(valid_from, '-infinity'),
-                      coalesce(valid_until, 'infinity'), '[)') WITH &&
-        )
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'ex_gremium_membership_no_overlap'
+                  AND conrelid = 'gremium_membership'::regclass
+            ) THEN
+                ALTER TABLE gremium_membership
+                ADD CONSTRAINT ex_gremium_membership_no_overlap
+                EXCLUDE USING gist (
+                    principal_id WITH =,
+                    gremium_id WITH =,
+                    tstzrange(coalesce(valid_from, '-infinity'),
+                              coalesce(valid_until, 'infinity'), '[)') WITH &&
+                );
+            END IF;
+        END $$;
         """
     )
 
