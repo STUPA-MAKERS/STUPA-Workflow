@@ -99,7 +99,10 @@ async def test_assert_can_manage_loaded_vote_delegates() -> None:
     """``assert_can_manage`` delegiert an die Group-Variante (Admin-Kurzschluss)."""
     vote = SimpleNamespace(eligible_group="stupa", meeting_id=None)
     principal = Principal(sub="a", roles=["admin"])
-    await VotingService(fake_session()).assert_can_manage(vote, principal)
+    await VotingService(fake_session()).assert_can_manage(
+        vote,  # pyright: ignore[reportArgumentType]
+        principal,
+    )
 
 
 async def test_assert_can_manage_vote_loads_then_checks() -> None:
