@@ -28,6 +28,7 @@ from app.modules.budget import bank_import, bank_match, fints_client
 from app.modules.budget.fints_client import FintsError
 from app.modules.budget.tree_models import (
     Account,
+    AccountFintsCredential,
     BankAllocation,
     BankStatementLine,
     BankSyncSession,
@@ -41,6 +42,8 @@ from app.modules.budget.tree_schemas import (
     ConfirmLineRequest,
     ExpenseCreate,
     ExpenseOut,
+    FintsCredentialIn,
+    FintsCredentialStatus,
     StatementLineOut,
 )
 from app.modules.budget.tree_service import BudgetTreeService
@@ -67,10 +70,15 @@ class BankService:
         *,
         settings: Settings | None = None,
         actor: str | None = None,
+        principal_id: uuid.UUID | None = None,
     ) -> None:
         self.session = session
         self.settings = settings or get_settings()
         self.actor = actor
+        # Persönliche FinTS-Zugangsdaten + TAN-Sitzungen sind je Bucher getrennt
+        # (#fints-percred); der Sync/Credential-Pfad braucht daher die Principal-Id. Der
+        # Datei-Import (kein Bankzugang) kommt ohne aus.
+        self.principal_id = principal_id
 
     # ----------------------------------------------------------------- helpers
     def _require_enabled(self) -> str:
@@ -79,6 +87,29 @@ class BankService:
         if not key:
             raise ServiceUnavailableError("FinTS is not configured (no encryption key set).")
         return key
+
+    def _require_principal(self) -> uuid.UUID:
+        """Principal-Id des Buchers oder 503 (interne Invariante: der Router liefert sie
+        immer für authentifizierte FinTS-Aufrufe, #fints-percred)."""
+        if self.principal_id is None:
+            raise ServiceUnavailableError("FinTS requires an authenticated principal.")
+        return self.principal_id
+
+    async def _load_credential(self, account_id: uuid.UUID) -> AccountFintsCredential:
+        """Persönliche Zugangsdaten des Buchers für ein Konto laden — oder 422
+        ``fints_no_credential`` (das FE fordert dann das erstmalige Verbinden, #fints-percred)."""
+        cred = await self.session.scalar(
+            select(AccountFintsCredential).where(
+                AccountFintsCredential.account_id == account_id,
+                AccountFintsCredential.principal_id == self._require_principal(),
+            )
+        )
+        if cred is None:
+            raise ValidationProblem(
+                "No personal FinTS login stored for this account — connect first.",
+                code="fints_no_credential",
+            )
+        return cred
 
     async def _account_or_404(self, account_id: uuid.UUID) -> Account:
         acc = await self.session.get(Account, account_id)
@@ -120,22 +151,106 @@ class BankService:
             createdAt=line.created_at,
         )
 
-    # --------------------------------------------------------------- FinTS sync
-    def _credentials(self, acc: Account) -> fints_client.FintsCredentials:
-        """Verbindungs-/Login-Daten eines Kontos lesen, PIN entschlüsseln (nur im Speicher)."""
-        if not (
-            acc.fints_endpoint
-            and acc.fints_blz
-            and acc.fints_login
-            and acc.fints_pin_encrypted
-        ):
+    # ------------------------------------------------------- personal credentials
+    @staticmethod
+    def _credential_status(
+        acc: Account, cred: AccountFintsCredential | None
+    ) -> FintsCredentialStatus:
+        return FintsCredentialStatus(
+            configured=bool(acc.fints_endpoint and acc.fints_blz),
+            hasCredential=cred is not None,
+            fintsLogin=cred.fints_login if cred else None,
+            fintsLastSyncAt=cred.fints_last_sync_at if cred else None,
+        )
+
+    async def credential_status(self, account_id: uuid.UUID) -> FintsCredentialStatus:
+        """Verbindungs-Status des Buchers für ein Konto (#fints-percred): ist das Konto
+        FinTS-fähig und hat *dieser* Nutzer schon eigene Zugangsdaten hinterlegt?"""
+        acc = await self._account_or_404(account_id)
+        cred = await self.session.scalar(
+            select(AccountFintsCredential).where(
+                AccountFintsCredential.account_id == account_id,
+                AccountFintsCredential.principal_id == self._require_principal(),
+            )
+        )
+        return self._credential_status(acc, cred)
+
+    async def set_credential(
+        self, account_id: uuid.UUID, payload: FintsCredentialIn
+    ) -> FintsCredentialStatus:
+        """Persönliche Zugangsdaten des Buchers (Login + PIN) anlegen/ersetzen (#fints-percred).
+
+        Erstes Verbinden im Buchungs-Tab. PIN wird **verschlüsselt** abgelegt; bei einer
+        Änderung wird der bisherige SCA-Zustand/TAN-Mechanismus verworfen (neue Daten →
+        frische SCA). Setzt voraus, dass der Admin die Bank-Verbindung (Endpunkt + BLZ) am
+        Konto gesetzt hat."""
+        acc = await self._account_or_404(account_id)
+        if not (acc.fints_endpoint and acc.fints_blz):
             raise ValidationProblem(
-                "Account has no complete FinTS configuration.",
+                "Account has no FinTS connection configured.",
+                code="fints_not_configured",
+            )
+        key = self._require_enabled()
+        pid = self._require_principal()
+        pin_encrypted = encrypt_secret(payload.fints_pin, key=key)
+        cred = await self.session.scalar(
+            select(AccountFintsCredential).where(
+                AccountFintsCredential.account_id == account_id,
+                AccountFintsCredential.principal_id == pid,
+            )
+        )
+        if cred is None:
+            cred = AccountFintsCredential(
+                id=uuid.uuid4(),
+                account_id=account_id,
+                principal_id=pid,
+                fints_login=payload.fints_login,
+                fints_pin_encrypted=pin_encrypted,
+            )
+            self.session.add(cred)
+        else:
+            cred.fints_login = payload.fints_login
+            cred.fints_pin_encrypted = pin_encrypted
+            # Neue Zugangsdaten → bisheriger Dialog-Zustand ungültig (frische SCA).
+            cred.fints_state = None
+            cred.fints_tan_mechanism = None
+        # Audit **ohne** Login/PIN (security.md §4) — der ``actor`` identifiziert den Bucher.
+        await self._audit(AuditAction.BANK_CREDENTIAL_SET, target_id=str(account_id))
+        await self.session.commit()
+        return self._credential_status(acc, cred)
+
+    async def delete_credential(self, account_id: uuid.UUID) -> None:
+        """Persönliche Zugangsdaten des Buchers für ein Konto löschen (#fints-percred)."""
+        pid = self._require_principal()
+        row = (
+            await self.session.execute(
+                delete(AccountFintsCredential)
+                .where(
+                    AccountFintsCredential.account_id == account_id,
+                    AccountFintsCredential.principal_id == pid,
+                )
+                .returning(AccountFintsCredential.id)
+            )
+        ).first()
+        if row is None:
+            raise NotFoundError("no FinTS credential to delete")
+        await self._audit(AuditAction.BANK_CREDENTIAL_DELETE, target_id=str(account_id))
+        await self.session.commit()
+
+    # --------------------------------------------------------------- FinTS sync
+    def _credentials(
+        self, acc: Account, cred: AccountFintsCredential
+    ) -> fints_client.FintsCredentials:
+        """Bank-Verbindung (Konto) + persönliche Login-Daten (Credential) zusammenführen,
+        PIN entschlüsseln (nur im Speicher, #fints-percred)."""
+        if not (acc.fints_endpoint and acc.fints_blz):
+            raise ValidationProblem(
+                "Account has no FinTS connection configured.",
                 code="fints_not_configured",
             )
         key = self._require_enabled()
         try:
-            pin = decrypt_secret(acc.fints_pin_encrypted, key=key)
+            pin = decrypt_secret(cred.fints_pin_encrypted, key=key)
         except SecretCryptoError as exc:
             raise ValidationProblem(
                 "Stored FinTS PIN could not be decrypted — re-enter it.",
@@ -144,12 +259,12 @@ class BankService:
         return fints_client.FintsCredentials(
             endpoint=acc.fints_endpoint,
             blz=acc.fints_blz,
-            login=acc.fints_login,
+            login=cred.fints_login,
             pin=pin,
             account_iban=acc.iban or None,
             product_id=self.settings.fints_product_id,
-            tan_mechanism=acc.fints_tan_mechanism,
-            state=self._decode_state(acc.fints_state, key=key),
+            tan_mechanism=cred.fints_tan_mechanism,
+            state=self._decode_state(cred.fints_state, key=key),
         )
 
     @staticmethod
@@ -168,8 +283,9 @@ class BankService:
     async def sync_account(self, account_id: uuid.UUID) -> BankSyncResult:
         """Schritt 1 (#fints): FinTS-Sync starten → Umsätze stagen **oder** TAN anfordern."""
         acc = await self._account_or_404(account_id)
+        cred = await self._load_credential(account_id)
         await self._purge_expired_sessions()
-        creds = self._credentials(acc)
+        creds = self._credentials(acc, cred)
         self._revalidate_endpoint(creds.endpoint)
         start = datetime.now(UTC).date() - timedelta(days=self.settings.fints_max_days)
         try:
@@ -180,7 +296,7 @@ class BankService:
             raise ServiceUnavailableError(
                 "FinTS sync failed.", code="fints_sync_failed"
             ) from exc
-        return await self._handle_outcome(acc, outcome)
+        return await self._handle_outcome(acc, cred, outcome)
 
     def _revalidate_endpoint(self, endpoint: str) -> None:
         """SSRF-Endpunkt **erneut zur Abruf-Zeit** prüfen (#fints-review).
@@ -211,12 +327,13 @@ class BankService:
     ) -> BankSyncResult:
         """Schritt 2 (#fints): pausierten Dialog mit TAN fortsetzen (leer = decoupled-Poll)."""
         acc = await self._account_or_404(account_id)
+        cred = await self._load_credential(account_id)
         # Sitzung **atomar beanspruchen** (löschen) BEVOR der Netz-Call läuft (#fints-review):
         # ein zweiter, paralleler Submit mit demselben Token findet nichts mehr → kein Replay
         # des fortgesetzten Dialogs / kein Doppel-Audit. Schlägt der Call fehl, ist die Sitzung
         # weg und der Nutzer startet den Sync neu (TAN-Flows sind kurz).
         pending = await self._claim_session(session_token, account_id)
-        creds = self._credentials(acc)
+        creds = self._credentials(acc, cred)
         self._revalidate_endpoint(creds.endpoint)
         creds.tan_mechanism = pending.tan_mechanism
         try:
@@ -232,10 +349,15 @@ class BankService:
             await self._store_session(acc.id, outcome, token=new_token)
             await self.session.commit()
             return self._needs_tan_result(acc.id, new_token, outcome)
-        return await self._handle_outcome(acc, outcome)
+        return await self._handle_outcome(acc, cred, outcome)
 
-    async def _handle_outcome(self, acc: Account, outcome: FintsOutcome) -> BankSyncResult:
-        """``done`` → Zustand sichern + Umsätze stagen; ``needs_tan`` → Sitzung anlegen."""
+    async def _handle_outcome(
+        self, acc: Account, cred: AccountFintsCredential, outcome: FintsOutcome
+    ) -> BankSyncResult:
+        """``done`` → Zustand sichern + Umsätze stagen; ``needs_tan`` → Sitzung anlegen.
+
+        SCA-Zustand/TAN-Methode/Last-Sync gehören dem **Bucher** (Credential), nicht dem Konto
+        (#fints-percred)."""
         if outcome.status == "needs_tan":
             token = uuid.uuid4()
             await self._store_session(acc.id, outcome, token=token)
@@ -245,12 +367,12 @@ class BankService:
         if outcome.new_state is not None:
             # Client-Zustand (system_id/Dialog-State, SCA-Fenster) **verschlüsselt** ablegen
             # — wie die PIN; nie im Klartext (security.md, #fints-review).
-            acc.fints_state = encrypt_secret(
+            cred.fints_state = encrypt_secret(
                 outcome.new_state.decode("latin-1"), key=self._require_enabled()
             )
         if outcome.tan_mechanism:
-            acc.fints_tan_mechanism = outcome.tan_mechanism
-        acc.fints_last_sync_at = datetime.now(UTC)
+            cred.fints_tan_mechanism = outcome.tan_mechanism
+        cred.fints_last_sync_at = datetime.now(UTC)
         imported, duplicates = await self._stage_lines(acc, outcome.lines)
         await self._audit(
             AuditAction.BANK_SYNC,
@@ -302,6 +424,7 @@ class BankService:
             BankSyncSession(
                 id=token,
                 account_id=account_id,
+                principal_id=self._require_principal(),
                 payload_encrypted=self._encode_outcome(outcome),
                 expires_at=expires,
             )
@@ -312,7 +435,9 @@ class BankService:
     ) -> FintsOutcome:
         """TAN-Sitzung **atomar** entnehmen: per ``DELETE … RETURNING`` löschen + sofort
         committen, damit ein paralleler Submit sie nicht erneut laden kann (Anti-Replay,
-        #fints-review). Abgelaufen/nicht entschlüsselbar → 422 (Sync neu starten), nicht 500."""
+        #fints-review). Auf den startenden Bucher gescopt (#fints-percred) — ein anderer
+        Principal kann eine fremde TAN-Sitzung nicht einreichen. Abgelaufen/nicht
+        entschlüsselbar → 422 (Sync neu starten), nicht 500."""
         from app.modules.budget.fints_client import FintsOutcome
 
         row = (
@@ -321,6 +446,7 @@ class BankService:
                 .where(
                     BankSyncSession.id == token,
                     BankSyncSession.account_id == account_id,
+                    BankSyncSession.principal_id == self._require_principal(),
                 )
                 .returning(
                     BankSyncSession.payload_encrypted, BankSyncSession.expires_at

@@ -871,11 +871,13 @@ async def test_list_accounts() -> None:
 
 
 async def test_list_account_options() -> None:
+    # Zeilenform jetzt (Account, has_credential, last_sync_at) je Bucher (#fints-percred).
     a1 = _account(name="Aktiv")
-    sess = fake_session(result(a1))
-    svc = BudgetTreeService(sess)
+    sess = fake_session(result((a1, True, None)))
+    svc = BudgetTreeService(sess, actor="tester")
     out = await svc.list_account_options()
     assert out[0].name == "Aktiv"
+    assert out[0].fints_has_credential is True
     assert not hasattr(out[0], "iban") or "iban" not in out[0].model_dump()
 
 

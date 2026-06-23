@@ -26,14 +26,13 @@
     <app-input id="acc-iban" [label]="'admin.accounts.iban' | t" [ngModel]="fIban()" (ngModelChange)="fIban.set($event)" name="iban" [placeholder]="'admin.accounts.ibanPlaceholder' | t" />
     <app-checkbox [ngModel]="fActive()" (ngModelChange)="fActive.set($event)" name="active">{{ 'admin.accounts.active' | t }}</app-checkbox>
 
-    <!-- FinTS-Bankabgleich (#fints): optionaler Online-Banking-Zugang. PIN write-only. -->
+    <!-- FinTS-Bank-Verbindung (#fints): nur Endpunkt + BLZ. Persönliche Logins/PINs setzt
+         jeder Bucher selbst im Buchungs-Tab (#fints-percred). -->
     <fieldset class="acc__fints">
       <legend class="acc__fintsLegend">{{ 'admin.accounts.fintsTitle' | t }}</legend>
       <p class="acc__hint">{{ 'admin.accounts.fintsDesc' | t }}</p>
       <app-input id="acc-fints-endpoint" [label]="'admin.accounts.fintsEndpoint' | t" [ngModel]="fEndpoint()" (ngModelChange)="fEndpoint.set($event)" name="fintsEndpoint" [placeholder]="'admin.accounts.fintsEndpointPlaceholder' | t" />
       <app-input id="acc-fints-blz" [label]="'admin.accounts.fintsBlz' | t" [ngModel]="fBlz()" (ngModelChange)="fBlz.set($event)" name="fintsBlz" inputmode="numeric" />
-      <app-input id="acc-fints-login" [label]="'admin.accounts.fintsLogin' | t" [ngModel]="fLogin()" (ngModelChange)="fLogin.set($event)" name="fintsLogin" autocomplete="off" />
-      <app-input id="acc-fints-pin" type="password" [label]="'admin.accounts.fintsPin' | t" [ngModel]="fPin()" (ngModelChange)="fPin.set($event)" name="fintsPin" autocomplete="new-password" [placeholder]="(pinStored() ? 'admin.accounts.fintsPinStored' : 'admin.accounts.fintsPinPlaceholder') | t" />
     </fieldset>
   </form>
   <div dialog-footer class="flex gap-3">

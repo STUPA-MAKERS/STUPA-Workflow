@@ -413,30 +413,26 @@ class InvoiceOut(_CamelModel):
 class AccountCreate(_CamelModel):
     """Konto anlegen — Name + IBAN (Freitext). Nicht an Kostenstellen gebunden.
 
-    Optionale FinTS-Zugangsdaten (#fints): ``fintsPin`` ist **write-only** (wird nur
-    verschlüsselt gespeichert, nie zurückgegeben)."""
+    Die FinTS-**Bank-Verbindung** (``fintsEndpoint`` + ``fintsBlz``) ist optional und für alle
+    Bucher gleich. Die persönlichen Zugangsdaten (Login/PIN) setzt jeder Bucher selbst im
+    Buchungs-Tab (#fints-percred), nicht hier."""
 
     name: str = Field(min_length=1, max_length=200)
     iban: str = Field(default="", max_length=64)
     active: bool = True
     fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint", max_length=500)
     fints_blz: str | None = Field(default=None, alias="fintsBlz", max_length=20)
-    fints_login: str | None = Field(default=None, alias="fintsLogin", max_length=200)
-    fints_pin: str | None = Field(default=None, alias="fintsPin", max_length=200)
 
 
 class AccountUpdate(_CamelModel):
-    """Konto teil-aktualisieren. FinTS-Felder: ``null``/``""`` löscht, gesetzter Wert
-    überschreibt. ``fintsPin=""`` löscht die gespeicherte PIN; ein gesetzter Wert ersetzt
-    sie (write-only)."""
+    """Konto teil-aktualisieren. FinTS-Verbindungsfelder: ``null``/``""`` löscht, gesetzter
+    Wert überschreibt (Login/PIN sind nicht mehr Teil der Konto-Stammdaten, #fints-percred)."""
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
     iban: str | None = Field(default=None, max_length=64)
     active: bool | None = None
     fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint", max_length=500)
     fints_blz: str | None = Field(default=None, alias="fintsBlz", max_length=20)
-    fints_login: str | None = Field(default=None, alias="fintsLogin", max_length=200)
-    fints_pin: str | None = Field(default=None, alias="fintsPin", max_length=200)
 
     @model_validator(mode="after")
     def _at_least_one(self) -> AccountUpdate:
@@ -446,8 +442,9 @@ class AccountUpdate(_CamelModel):
 
 
 class AccountOut(_CamelModel):
-    """Konto-Stammdaten. FinTS-Zugangsdaten ohne PIN (``fintsConfigured`` zeigt, ob eine
-    verschlüsselte PIN hinterlegt ist); die PIN wird **nie** ausgegeben (#fints)."""
+    """Konto-Stammdaten inkl. FinTS-Bank-Verbindung (Endpunkt + BLZ). ``fintsConfigured``
+    zeigt, ob die Verbindung vollständig ist (Konto ist FinTS-fähig); persönliche Logins/PINs
+    erscheinen hier nie (#fints-percred)."""
 
     id: UUID
     name: str
@@ -455,22 +452,47 @@ class AccountOut(_CamelModel):
     active: bool
     fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint")
     fints_blz: str | None = Field(default=None, alias="fintsBlz")
-    fints_login: str | None = Field(default=None, alias="fintsLogin")
-    # True, sobald Endpunkt + BLZ + Login + (verschlüsselte) PIN vorliegen → sync-bereit.
+    # True, sobald Endpunkt + BLZ vorliegen → das Konto ist per FinTS synchronisierbar (sobald
+    # ein Bucher seine persönlichen Zugangsdaten hinterlegt).
     fints_configured: bool = Field(default=False, alias="fintsConfigured")
-    fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
 
 
 class AccountOption(_CamelModel):
     """Minimale Konto-Auswahl (id + Name, **keine IBAN**) für Buchungs-Dropdowns —
     lesbar für Bucher (``budget.book``/``budget.view``), ohne Konten-Stammdaten-Recht (#5-2/#2).
 
-    ``fintsConfigured`` (kein Geheimnis) zeigt dem Bucher, welche Konten per FinTS
-    synchronisierbar sind (#fints) — ohne ``account.manage`` für die vollen Stammdaten."""
+    ``fintsConfigured`` (kein Geheimnis) = Konto ist FinTS-fähig (Endpunkt + BLZ gesetzt);
+    ``fintsHasCredential`` = der **anfragende** Bucher hat bereits eigene Zugangsdaten
+    hinterlegt (#fints-percred) — sonst muss er sich beim ersten Sync verbinden."""
 
     id: UUID
     name: str
     fints_configured: bool = Field(default=False, alias="fintsConfigured")
+    fints_has_credential: bool = Field(default=False, alias="fintsHasCredential")
+    fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
+
+
+class FintsCredentialIn(_CamelModel):
+    """Persönliche FinTS-Zugangsdaten des Buchers für ein Konto (#fints-percred).
+
+    ``fintsPin`` ist **write-only** (nur verschlüsselt gespeichert, nie zurückgegeben). Wird
+    beim ersten Verbinden im Buchungs-Tab gesetzt und bei einer Änderung ersetzt."""
+
+    fints_login: str = Field(alias="fintsLogin", min_length=1, max_length=200)
+    fints_pin: str = Field(alias="fintsPin", min_length=1, max_length=200)
+
+
+class FintsCredentialStatus(_CamelModel):
+    """Verbindungs-Status eines Buchers für ein Konto (#fints-percred).
+
+    ``configured`` = Konto ist FinTS-fähig (Endpunkt + BLZ am Konto). ``hasCredential`` = der
+    anfragende Bucher hat eigene Zugangsdaten hinterlegt; ``login`` ist sein Anmeldename (kein
+    Geheimnis, hilft beim Wiedererkennen), die PIN erscheint nie."""
+
+    configured: bool = False
+    has_credential: bool = Field(default=False, alias="hasCredential")
+    fints_login: str | None = Field(default=None, alias="fintsLogin")
+    fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
 
 
 # ------------------------------------------------------- bank statement (#fints)
@@ -599,6 +621,8 @@ __all__ = [
     "BankSyncStatus",
     "BankTanRequest",
     "ConfirmLineRequest",
+    "FintsCredentialIn",
+    "FintsCredentialStatus",
     "StatementLineOut",
     "TransferCreate",
     "TransferOut",

@@ -8,9 +8,7 @@ import { AccountsComponent } from './accounts.component';
 const FINTS_EMPTY = {
   fintsEndpoint: null,
   fintsBlz: null,
-  fintsLogin: null,
   fintsConfigured: false,
-  fintsLastSyncAt: null,
 } as const;
 
 const ACCOUNTS: Account[] = [
@@ -140,7 +138,6 @@ describe('AccountsComponent', () => {
       active: true,
       fintsEndpoint: null,
       fintsBlz: null,
-      fintsLogin: null,
     });
     expect(cmp.saving()).toBe(false);
     expect(cmp.dialogOpen()).toBe(false);
@@ -160,7 +157,6 @@ describe('AccountsComponent', () => {
       active: true,
       fintsEndpoint: null,
       fintsBlz: null,
-      fintsLogin: null,
     });
     expect(api.createAccount).not.toHaveBeenCalled();
   });

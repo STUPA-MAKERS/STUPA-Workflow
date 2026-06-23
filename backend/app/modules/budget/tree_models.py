@@ -249,23 +249,55 @@ class Account(UUIDPkMixin, CreatedAtMixin, Base):
     iban: Mapped[str] = mapped_column(Text, server_default="")
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
-    # — FinTS-Bankabgleich (#fints), alle optional. Ohne ``fints_endpoint``/``fints_blz``/
-    #   ``fints_login`` ist das Konto nicht synchronisierbar. Die PIN liegt **nur
-    #   verschlüsselt** vor (Fernet, ``app.shared.crypto``) und wird nie im Klartext
-    #   zurückgegeben. ``fints_state`` ist der verschlüsselte, serialisierte FinTS-Client-
-    #   Zustand (``system_id`` u. a.) für das ~90-Tage-SCA-Fenster; ``fints_tan_mechanism``
-    #   die zuletzt gewählte TAN-Methode.
+    # — FinTS-Bankabgleich (#fints): nur die **Bank-Verbindung** (Endpunkt + BLZ) liegt am
+    #   Konto — sie ist für alle Bucher gleich und wird vom Admin gesetzt. Die **persönlichen**
+    #   Zugangsdaten (Login + PIN + TAN-Methode + Client-Zustand) sind je Principal getrennt
+    #   in :class:`AccountFintsCredential` — verschiedene Bucher haben für dasselbe Konto eigene
+    #   Online-Banking-Logins, und der SCA-Client-Zustand (``system_id``) ist an Nutzer+Gerät
+    #   gebunden (geteilter Zustand bräche TAN/SCA, #fints-percred). Ohne ``fints_endpoint`` +
+    #   ``fints_blz`` ist das Konto nicht FinTS-fähig.
     fints_endpoint: Mapped[str | None] = mapped_column(Text, nullable=True)
     fints_blz: Mapped[str | None] = mapped_column(Text, nullable=True)
-    fints_login: Mapped[str | None] = mapped_column(Text, nullable=True)
-    fints_pin_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_account_name", "name"),)
+
+
+class AccountFintsCredential(UUIDPkMixin, CreatedAtMixin, Base):
+    """Persönliche FinTS-Zugangsdaten **eines Principals für ein Konto** (#fints-percred).
+
+    Mehrere Bucher teilen sich dasselbe Bankkonto, haben aber je **eigene** Online-Banking-
+    Logins. Login + PIN gehören daher dem einzelnen Nutzer, nicht dem Konto. Die PIN liegt
+    **nur verschlüsselt** vor (Fernet, ``app.shared.crypto``) und wird nie im Klartext
+    zurückgegeben. ``fints_state`` ist der verschlüsselte, serialisierte FinTS-Client-Zustand
+    (``system_id`` u. a.) für das ~90-Tage-SCA-Fenster — er ist an **Nutzer + Gerät** gebunden,
+    deshalb pro Credential getrennt; ``fints_tan_mechanism`` die zuletzt gewählte TAN-Methode.
+    Beide FKs ``ON DELETE CASCADE``: gelöschtes Konto/gelöschter Principal räumt das Geheimnis
+    mit ab.
+    """
+
+    __tablename__ = "account_fints_credential"
+
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("account.id", ondelete="CASCADE")
+    )
+    principal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE")
+    )
+    fints_login: Mapped[str] = mapped_column(Text)
+    fints_pin_encrypted: Mapped[str] = mapped_column(Text)
     fints_tan_mechanism: Mapped[str | None] = mapped_column(Text, nullable=True)
     fints_state: Mapped[str | None] = mapped_column(Text, nullable=True)
     fints_last_sync_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
-    __table_args__ = (Index("ix_account_name", "name"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id", "principal_id", name="uq_account_fints_credential_owner"
+        ),
+        Index("ix_account_fints_credential_account_id", "account_id"),
+        Index("ix_account_fints_credential_principal_id", "principal_id"),
+    )
 
 
 class BankStatementLine(UUIDPkMixin, CreatedAtMixin, Base):
@@ -356,12 +388,17 @@ class BankSyncSession(UUIDPkMixin, CreatedAtMixin, Base):
 
     ``payload_encrypted`` ist der Fernet-verschlüsselte FinTS-Resume-Zustand
     (Client-/Dialog-/TAN-Blob). Nach erfolgreicher TAN oder Ablauf (``expires_at``)
-    gelöscht — nichts Sensibles bleibt länger als nötig liegen (security.md)."""
+    gelöscht — nichts Sensibles bleibt länger als nötig liegen (security.md). ``principal_id``
+    bindet die Sitzung an den Bucher, der den Sync startete: nur er darf die TAN einreichen
+    (#fints-percred)."""
 
     __tablename__ = "bank_sync_session"
 
     account_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("account.id", ondelete="CASCADE")
+    )
+    principal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE")
     )
     payload_encrypted: Mapped[str] = mapped_column(Text)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

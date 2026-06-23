@@ -115,6 +115,33 @@
   font-weight: var(--fw-semibold);
 }
 
+// Erstes Verbinden / Zugangsdaten ändern (je Bucher, #fints-percred).
+.bank__connect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.bank__connectActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.bank__connected {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.bank__connectedAs {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
 .bank__label {
   display: flex;
   flex-direction: column;

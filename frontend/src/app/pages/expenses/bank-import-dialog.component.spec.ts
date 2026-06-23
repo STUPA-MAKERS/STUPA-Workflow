@@ -5,14 +5,29 @@ import {
   type AccountOption,
   BudgetTreeApi,
   type BankSyncResult,
+  type FintsCredentialStatus,
   type StatementLine,
 } from '../budget/budget-tree.api';
 import { BankImportDialogComponent } from './bank-import-dialog.component';
 
 const ACCOUNTS: AccountOption[] = [
-  { id: 'acc-1', name: 'Giro', fintsConfigured: true },
-  { id: 'acc-2', name: 'Bar', fintsConfigured: false },
+  { id: 'acc-1', name: 'Giro', fintsConfigured: true, fintsHasCredential: true, fintsLastSyncAt: null },
+  { id: 'acc-2', name: 'Bar', fintsConfigured: false, fintsHasCredential: false, fintsLastSyncAt: null },
 ];
+
+const CRED_CONNECTED: FintsCredentialStatus = {
+  configured: true,
+  hasCredential: true,
+  fintsLogin: 'user1',
+  fintsLastSyncAt: null,
+};
+
+const CRED_UNCONNECTED: FintsCredentialStatus = {
+  configured: true,
+  hasCredential: false,
+  fintsLogin: null,
+  fintsLastSyncAt: null,
+};
 
 const TREE = [
   { id: 'b-1', pathKey: 'VS-800', name: 'Referat', children: [] },
@@ -74,6 +89,9 @@ interface Overrides {
   ignoreStatementLine?: jest.Mock;
   listAccountOptions?: jest.Mock;
   tree?: jest.Mock;
+  fintsCredentialStatus?: jest.Mock;
+  setFintsCredential?: jest.Mock;
+  deleteFintsCredential?: jest.Mock;
 }
 
 function makeApi(o: Overrides = {}) {
@@ -86,6 +104,9 @@ function makeApi(o: Overrides = {}) {
     importStatementFile: o.importStatementFile ?? jest.fn(() => of({ accountId: 'acc-1', imported: 1, duplicates: 0 })),
     confirmStatementLine: o.confirmStatementLine ?? jest.fn(() => of({ id: 'e-1' })),
     ignoreStatementLine: o.ignoreStatementLine ?? jest.fn(() => of(void 0)),
+    fintsCredentialStatus: o.fintsCredentialStatus ?? jest.fn(() => of(CRED_CONNECTED)),
+    setFintsCredential: o.setFintsCredential ?? jest.fn(() => of(CRED_CONNECTED)),
+    deleteFintsCredential: o.deleteFintsCredential ?? jest.fn(() => of(void 0)),
   };
 }
 
@@ -332,5 +353,107 @@ describe('BankImportDialogComponent', () => {
     localStorage.setItem('ap.locale', 'en');
     const { cmp } = await setup();
     expect(cmp.money('-5.00')).toMatch(/5/);
+  });
+
+  // ----------------------------------------- persönliche Zugangsdaten (#fints-percred)
+  it('loads the credential status for the selected FinTS account', async () => {
+    const { cmp, api } = await setup();
+    expect(api.fintsCredentialStatus).toHaveBeenCalledWith('acc-1');
+    expect(cmp.connected()).toBe(true);
+    expect(cmp.needsConnect()).toBe(false);
+    expect(cmp.connectedLabel()).toContain('user1');
+  });
+
+  it('shows the connect form when the booker has no credential yet', async () => {
+    const { cmp } = await setup(
+      makeApi({ fintsCredentialStatus: jest.fn(() => of(CRED_UNCONNECTED)) }),
+    );
+    expect(cmp.needsConnect()).toBe(true);
+    expect(cmp.connected()).toBe(false);
+    expect(cmp.showCredForm()).toBe(true);
+  });
+
+  it('saves a credential and flips to connected', async () => {
+    const { cmp, api, toast } = await setup(
+      makeApi({ fintsCredentialStatus: jest.fn(() => of(CRED_UNCONNECTED)) }),
+    );
+    cmp.credLogin.set('user1');
+    cmp.credPin.set('1234');
+    cmp.saveCred();
+    expect(api.setFintsCredential).toHaveBeenCalledWith('acc-1', { fintsLogin: 'user1', fintsPin: '1234' });
+    expect(cmp.connected()).toBe(true);
+    expect(cmp.credPin()).toBe(''); // PIN nicht im State halten
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('saveCred is a no-op without login or pin', async () => {
+    const { cmp, api } = await setup();
+    cmp.credLogin.set('');
+    cmp.credPin.set('');
+    cmp.saveCred();
+    expect(api.setFintsCredential).not.toHaveBeenCalled();
+  });
+
+  it('saveCred surfaces errors', async () => {
+    const { cmp, toast } = await setup(
+      makeApi({
+        fintsCredentialStatus: jest.fn(() => of(CRED_UNCONNECTED)),
+        setFintsCredential: jest.fn(() => throwError(() => ({ error: { code: 'fints_pin_undecryptable' } }))),
+      }),
+    );
+    cmp.credLogin.set('user1');
+    cmp.credPin.set('1234');
+    cmp.saveCred();
+    expect(toast.error).toHaveBeenCalled();
+    expect(cmp.savingCred()).toBe(false);
+  });
+
+  it('edit then cancel toggles the credential form', async () => {
+    const { cmp } = await setup();
+    cmp.editCred();
+    expect(cmp.showCredForm()).toBe(true);
+    expect(cmp.credLogin()).toBe('user1');
+    cmp.cancelEditCred();
+    expect(cmp.editingCred()).toBe(false);
+  });
+
+  it('removes a credential and reloads status', async () => {
+    const api = makeApi({
+      fintsCredentialStatus: jest
+        .fn()
+        .mockReturnValueOnce(of(CRED_CONNECTED))
+        .mockReturnValue(of(CRED_UNCONNECTED)),
+    });
+    const { cmp, toast } = await setup(api);
+    cmp.removeCred();
+    expect(api.deleteFintsCredential).toHaveBeenCalledWith('acc-1');
+    expect(cmp.needsConnect()).toBe(true);
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('removeCred surfaces errors', async () => {
+    const { cmp, toast } = await setup(
+      makeApi({ deleteFintsCredential: jest.fn(() => throwError(() => new Error('x'))) }),
+    );
+    cmp.removeCred();
+    expect(toast.error).toHaveBeenCalled();
+    expect(cmp.savingCred()).toBe(false);
+  });
+
+  it('maps the no-credential sync error to its message', async () => {
+    const api = makeApi({
+      fintsSync: jest.fn(() => throwError(() => ({ error: { code: 'fints_no_credential' } }))),
+    });
+    const { cmp, toast } = await setup(api);
+    cmp.startSync();
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('credential status load error clears the status', async () => {
+    const { cmp } = await setup(
+      makeApi({ fintsCredentialStatus: jest.fn(() => throwError(() => new Error('x'))) }),
+    );
+    expect(cmp.credStatus()).toBeNull();
+    expect(cmp.connected()).toBe(false);
   });
 });

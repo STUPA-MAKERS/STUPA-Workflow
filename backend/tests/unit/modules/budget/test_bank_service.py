@@ -17,14 +17,25 @@ import pytest
 from app.modules.budget import bank_import, bank_service
 from app.modules.budget import fints_client as fc
 from app.modules.budget.bank_service import BankService
-from app.modules.budget.tree_models import Account, BankStatementLine, BudgetExpense
-from app.modules.budget.tree_schemas import ConfirmLineRequest, ExpenseOut
+from app.modules.budget.tree_models import (
+    Account,
+    AccountFintsCredential,
+    BankStatementLine,
+    BudgetExpense,
+)
+from app.modules.budget.tree_schemas import (
+    ConfirmLineRequest,
+    ExpenseOut,
+    FintsCredentialIn,
+)
 from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
 from app.shared.crypto import decrypt_secret, encrypt_secret
 from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
 
 _KEY = "0123456789abcdef-fints-enc-key"
+# Fester Bucher (Principal) für die per-Principal-Zugangsdaten (#fints-percred).
+_PID = uuid.UUID("00000000-0000-0000-0000-0000000000aa")
 
 
 class _Result:
@@ -90,17 +101,41 @@ def _service(session: _Session, monkeypatch: pytest.MonkeyPatch, **over: Any) ->
     monkeypatch.setattr(bank_service, "audit_record", _noop)
     # SSRF-Re-Validierung (DNS) ist separat getestet — im Unit-Test neutralisieren.
     monkeypatch.setattr(fc, "validate_fints_endpoint", lambda _u: None)
-    return BankService(session, settings=_settings(**over), actor="tester")  # type: ignore[arg-type]
+    return BankService(
+        session,  # type: ignore[arg-type]
+        settings=_settings(**over),
+        actor="tester",
+        principal_id=_PID,
+    )
 
 
 def _account(*, configured: bool = True) -> Account:
+    """Konto mit (optionaler) FinTS-**Bank-Verbindung** — Endpunkt + BLZ (#fints-percred)."""
     acc = Account(id=uuid.uuid4(), name="Giro", iban="DE111", active=True)
     if configured:
         acc.fints_endpoint = "https://fints.sparkasse.example/"
         acc.fints_blz = "12345678"
-        acc.fints_login = "user1"
-        acc.fints_pin_encrypted = encrypt_secret("1234", key=_KEY)
     return acc
+
+
+def _cred(
+    *,
+    account_id: uuid.UUID | None = None,
+    login: str = "user1",
+    pin: str = "1234",
+    state: str | None = None,
+    tan: str | None = None,
+) -> AccountFintsCredential:
+    """Persönliche FinTS-Zugangsdaten des Buchers ``_PID`` für ein Konto (#fints-percred)."""
+    return AccountFintsCredential(
+        id=uuid.uuid4(),
+        account_id=account_id or uuid.uuid4(),
+        principal_id=_PID,
+        fints_login=login,
+        fints_pin_encrypted=encrypt_secret(pin, key=_KEY),
+        fints_tan_mechanism=tan,
+        fints_state=state,
+    )
 
 
 def _line(**over: Any) -> BankStatementLine:
@@ -135,26 +170,124 @@ async def test_account_or_404(monkeypatch: pytest.MonkeyPatch) -> None:
 # --------------------------------------------------------------- credentials
 @pytest.mark.asyncio
 async def test_credentials_incomplete(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Konto ohne Bank-Verbindung (Endpunkt/BLZ) → fints_not_configured."""
     svc = _service(_Session(), monkeypatch)
     with pytest.raises(ValidationProblem):
-        svc._credentials(_account(configured=False))
+        svc._credentials(_account(configured=False), _cred())
 
 
 @pytest.mark.asyncio
 async def test_credentials_undecryptable_pin(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _service(_Session(), monkeypatch)
-    acc = _account()
-    acc.fints_pin_encrypted = "garbage"
+    cred = _cred()
+    cred.fints_pin_encrypted = "garbage"
     with pytest.raises(ValidationProblem):
-        svc._credentials(acc)
+        svc._credentials(_account(), cred)
 
 
 @pytest.mark.asyncio
 async def test_credentials_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _service(_Session(), monkeypatch)
-    creds = svc._credentials(_account())
+    creds = svc._credentials(_account(), _cred())
     assert creds.pin == "1234"
     assert creds.blz == "12345678"
+    assert creds.login == "user1"
+
+
+@pytest.mark.asyncio
+async def test_require_principal_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ohne Principal-Id (interne Invariante) → 503."""
+    monkeypatch.setattr(bank_service, "audit_record", lambda *_a, **_k: None)
+    svc = BankService(_Session(), settings=_settings(), principal_id=None)  # type: ignore[arg-type]
+    with pytest.raises(ServiceUnavailableError):
+        svc._require_principal()
+
+
+@pytest.mark.asyncio
+async def test_load_credential_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Kein Credential für den Bucher → fints_no_credential (FE fordert Verbinden)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    session.scalar_q.append(None)
+    with pytest.raises(ValidationProblem):
+        await svc._load_credential(uuid.uuid4())
+
+
+# ----------------------------------------------------- credential CRUD (#fints-percred)
+@pytest.mark.asyncio
+async def test_set_credential_new(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+    session.scalar_q.append(None)  # noch kein Credential
+    out = await svc.set_credential(
+        acc.id, FintsCredentialIn(fintsLogin="user1", fintsPin="1234")
+    )
+    assert out.has_credential is True
+    assert out.fints_login == "user1"
+    cred = next(o for o in session.added if isinstance(o, AccountFintsCredential))
+    assert decrypt_secret(cred.fints_pin_encrypted, key=_KEY) == "1234"
+    assert cred.principal_id == _PID
+
+
+@pytest.mark.asyncio
+async def test_set_credential_existing_resets_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+    cred = _cred(account_id=acc.id, login="old", pin="0000", state="blob", tan="962")
+    session.scalar_q.append(cred)
+    out = await svc.set_credential(
+        acc.id, FintsCredentialIn(fintsLogin="new", fintsPin="9999")
+    )
+    assert out.fints_login == "new"
+    assert cred.fints_login == "new"
+    assert decrypt_secret(cred.fints_pin_encrypted, key=_KEY) == "9999"
+    # Neue Zugangsdaten → bisheriger SCA-Zustand/TAN verworfen.
+    assert cred.fints_state is None
+    assert cred.fints_tan_mechanism is None
+
+
+@pytest.mark.asyncio
+async def test_set_credential_account_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    acc = _account(configured=False)
+    session.put(acc)
+    with pytest.raises(ValidationProblem):
+        await svc.set_credential(acc.id, FintsCredentialIn(fintsLogin="u", fintsPin="1"))
+
+
+@pytest.mark.asyncio
+async def test_credential_status_with_and_without(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+    session.scalar_q.append(_cred(account_id=acc.id))
+    with_cred = await svc.credential_status(acc.id)
+    assert with_cred.configured is True
+    assert with_cred.has_credential is True
+    session.scalar_q.append(None)
+    without = await svc.credential_status(acc.id)
+    assert without.has_credential is False
+    assert without.fints_login is None
+
+
+@pytest.mark.asyncio
+async def test_delete_credential_found_and_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    cred_id = uuid.uuid4()
+    session.execute_q.append(_Result([(cred_id,)]))  # DELETE … RETURNING trifft
+    await svc.delete_credential(uuid.uuid4())
+    assert session.commits == 1
+    # nichts zu löschen → NotFoundError
+    session.execute_q.append(_Result([]))
+    with pytest.raises(NotFoundError):
+        await svc.delete_credential(uuid.uuid4())
 
 
 # --------------------------------------------------------------- staging
@@ -362,17 +495,19 @@ async def test_sync_account_done(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     monkeypatch.setattr(fc, "start_sync", _start)
+    cred = _cred(account_id=acc.id)
+    session.scalar_q.append(cred)  # _load_credential
     session.execute_q.append(_Result([]))  # _purge_expired_sessions
     session.execute_q.extend([_Result([]), _Result([(uuid.uuid4(),)])])
-    session.scalar_q.append(None)
+    session.scalar_q.append(None)  # _memory_budget in _suggest
     res = await svc.sync_account(acc.id)
     assert res.status == "done"
     assert res.imported == 1
-    # fints_state ist verschlüsselt abgelegt (nicht im Klartext) und round-trippt.
-    assert acc.fints_state is not None
-    assert acc.fints_state != "state"
-    assert decrypt_secret(acc.fints_state, key=_KEY) == "state"
-    assert acc.fints_last_sync_at is not None
+    # fints_state liegt verschlüsselt am **Credential** des Buchers (#fints-percred), round-trippt.
+    assert cred.fints_state is not None
+    assert cred.fints_state != "state"
+    assert decrypt_secret(cred.fints_state, key=_KEY) == "state"
+    assert cred.fints_last_sync_at is not None
 
 
 @pytest.mark.asyncio
@@ -395,6 +530,7 @@ async def test_sync_account_needs_tan(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     monkeypatch.setattr(fc, "start_sync", _start)
+    session.scalar_q.append(_cred(account_id=acc.id))  # _load_credential
     session.execute_q.append(_Result([]))  # _purge_expired_sessions
     res = await svc.sync_account(acc.id)
     assert res.status == "needs_tan"
@@ -442,6 +578,8 @@ async def test_submit_tan_done(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     await svc._store_session(acc.id, out, token=token)
     payload = session.added[-1].payload_encrypted
+    cred = _cred(account_id=acc.id)
+    session.scalar_q.append(cred)  # _load_credential
     future = datetime.now(UTC) + timedelta(seconds=60)
     session.execute_q.append(_Result([(payload, future)]))  # _claim_session
 
@@ -454,6 +592,8 @@ async def test_submit_tan_done(monkeypatch: pytest.MonkeyPatch) -> None:
     res = await svc.submit_tan(acc.id, token, "123456")
     assert res.status == "done"
     assert res.imported == 0
+    # SCA-Zustand am Credential des Buchers aktualisiert.
+    assert cred.fints_state is not None
 
 
 # ------------------------------------------------- review round 4 (#fints-review)
@@ -486,6 +626,7 @@ async def test_sync_account_revalidate_blocks(monkeypatch: pytest.MonkeyPatch) -
         raise ValueError("blocked")
 
     monkeypatch.setattr(fc, "validate_fints_endpoint", _blocked)
+    session.scalar_q.append(_cred(account_id=acc.id))  # _load_credential
     session.execute_q.append(_Result([]))  # _purge_expired_sessions
     with pytest.raises(ValidationProblem):
         await svc.sync_account(acc.id)

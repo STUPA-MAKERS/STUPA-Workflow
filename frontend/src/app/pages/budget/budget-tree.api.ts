@@ -67,24 +67,39 @@ export interface Account {
   name: string;
   iban: string;
   active: boolean;
-  // FinTS-Bankabgleich (#fints), ohne PIN. `fintsConfigured` = verschlüsselte PIN + alle
-  // Felder hinterlegt → sync-bereit. Die PIN wird nie ausgegeben (write-only).
+  // FinTS-**Bank-Verbindung** (#fints): nur Endpunkt + BLZ (für alle Bucher gleich, vom Admin
+  // gesetzt). `fintsConfigured` = beide gesetzt → das Konto ist FinTS-fähig. Persönliche
+  // Logins/PINs liegen je Bucher getrennt und erscheinen hier nie (#fints-percred).
   fintsEndpoint: string | null;
   fintsBlz: string | null;
-  fintsLogin: string | null;
   fintsConfigured: boolean;
-  fintsLastSyncAt: string | null;
 }
 
 export interface AccountBody {
   name: string;
   iban?: string;
   active?: boolean;
-  // FinTS (#fints): `fintsPin` ist write-only; `""` löscht die gespeicherte PIN.
+  // FinTS-Bank-Verbindung (#fints): `null`/`""` löscht. Login/PIN sind nicht mehr Teil der
+  // Konto-Stammdaten (#fints-percred) — sie setzt jeder Bucher im Buchungs-Tab.
   fintsEndpoint?: string | null;
   fintsBlz?: string | null;
-  fintsLogin?: string | null;
-  fintsPin?: string | null;
+}
+
+/** Persönliche FinTS-Zugangsdaten des Buchers (#fints-percred); `fintsPin` write-only. */
+export interface FintsCredentialBody {
+  fintsLogin: string;
+  fintsPin: string;
+}
+
+/** Verbindungs-Status eines Buchers für ein Konto (#fints-percred). */
+export interface FintsCredentialStatus {
+  /** Konto ist FinTS-fähig (Endpunkt + BLZ am Konto gesetzt). */
+  configured: boolean;
+  /** Der anfragende Bucher hat eigene Zugangsdaten hinterlegt. */
+  hasCredential: boolean;
+  /** Anmeldename des Buchers (kein Geheimnis); `null` ohne Credential. */
+  fintsLogin: string | null;
+  fintsLastSyncAt: string | null;
 }
 
 /** Gestageter Kontoumsatz (#fints); `amount` vorzeichenbehaftet (>0 Eingang). */
@@ -141,8 +156,11 @@ export interface ConfirmLineBody {
 export interface AccountOption {
   id: Uuid;
   name: string;
-  /** Per FinTS synchronisierbar (kein Geheimnis) — Bucher sieht es ohne account.manage (#fints). */
+  /** Konto ist FinTS-fähig (Endpunkt + BLZ gesetzt) — kein Geheimnis, sichtbar ohne account.manage. */
   fintsConfigured: boolean;
+  /** Der anfragende Bucher hat schon eigene Zugangsdaten hinterlegt (#fints-percred). */
+  fintsHasCredential: boolean;
+  fintsLastSyncAt: string | null;
 }
 
 /** Übertrag Kostenstelle → Kostenstelle (gleiches HHJ). */
@@ -585,6 +603,25 @@ export class BudgetTreeApi {
   }
 
   // ------------------------------------------------------- bank reconcile (#fints)
+  /** Verbindungs-Status des Buchers für ein Konto (#fints-percred): FinTS-fähig + eigene
+   *  Zugangsdaten hinterlegt? Ohne globalen Lade-Overlay (Dialog-internes Laden). */
+  fintsCredentialStatus(accountId: Uuid): Observable<FintsCredentialStatus> {
+    return this.http.get<FintsCredentialStatus>(
+      `${this.base}/accounts/${accountId}/fints/credential`,
+      { context: skipLoading() },
+    );
+  }
+  /** Persönliche FinTS-Zugangsdaten (Login + PIN) anlegen/ersetzen (#fints-percred). */
+  setFintsCredential(accountId: Uuid, body: FintsCredentialBody): Observable<FintsCredentialStatus> {
+    return this.http.put<FintsCredentialStatus>(
+      `${this.base}/accounts/${accountId}/fints/credential`,
+      body,
+    );
+  }
+  /** Eigene FinTS-Zugangsdaten für das Konto löschen (#fints-percred). */
+  deleteFintsCredential(accountId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/accounts/${accountId}/fints/credential`);
+  }
   /** FinTS-Sync starten (#fints): Umsätze stagen oder TAN anfordern (`needs_tan`). */
   fintsSync(accountId: Uuid): Observable<BankSyncResult> {
     return this.http.post<BankSyncResult>(`${this.base}/accounts/${accountId}/fints/sync`, {});

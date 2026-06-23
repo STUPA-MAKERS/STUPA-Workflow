@@ -41,11 +41,62 @@
             (ngModelChange)="accountId.set($event)"
             name="fintsAccount"
           />
-          @if (!hasPendingTan()) {
-            <app-button size="sm" [loading]="syncing()" [disabled]="!accountId()" (click)="startSync()">
-              {{ 'fints.sync' | t }}
-            </app-button>
-          } @else {
+
+          @if (showCredForm()) {
+            <!-- Erstmaliges Verbinden / Zugangsdaten ändern (je Bucher, #fints-percred) -->
+            <div class="bank__connect">
+              <p class="bank__hint">{{ 'fints.connectHint' | t }}</p>
+              <label class="bank__label" for="bank-cred-login">{{ 'fints.login' | t }}
+                <input
+                  id="bank-cred-login"
+                  autocomplete="username"
+                  [ngModel]="credLogin()"
+                  (ngModelChange)="credLogin.set($event)"
+                  name="credLogin"
+                />
+              </label>
+              <label class="bank__label" for="bank-cred-pin">{{ 'fints.pin' | t }}
+                <input
+                  id="bank-cred-pin"
+                  type="password"
+                  autocomplete="off"
+                  [ngModel]="credPin()"
+                  (ngModelChange)="credPin.set($event)"
+                  name="credPin"
+                />
+              </label>
+              <div class="bank__connectActions">
+                <app-button
+                  size="sm"
+                  [loading]="savingCred()"
+                  [disabled]="!credLogin().trim() || !credPin()"
+                  (click)="saveCred()"
+                >
+                  {{ 'fints.connect' | t }}
+                </app-button>
+                @if (connected()) {
+                  <app-button variant="ghost" size="sm" (click)="cancelEditCred()">
+                    {{ 'action.cancel' | t }}
+                  </app-button>
+                }
+              </div>
+            </div>
+          } @else if (connected()) {
+            <!-- Verbunden: Identität anzeigen, Sync auslösen -->
+            <div class="bank__connected">
+              <span class="bank__connectedAs">{{ connectedLabel() }}</span>
+              <app-button variant="ghost" size="sm" (click)="editCred()">
+                {{ 'fints.changeLogin' | t }}
+              </app-button>
+              <app-button variant="ghost" size="sm" [disabled]="savingCred()" (click)="removeCred()">
+                {{ 'fints.disconnect' | t }}
+              </app-button>
+            </div>
+            @if (!hasPendingTan()) {
+              <app-button size="sm" [loading]="syncing()" [disabled]="!accountId()" (click)="startSync()">
+                {{ 'fints.sync' | t }}
+              </app-button>
+            } @else {
             <!-- TAN-Schritt (PSD2/SCA) -->
             <div class="bank__tan">
               <p class="bank__tanMsg">{{ challenge() || ('fints.tanPrompt' | t) }}</p>
@@ -74,6 +125,7 @@
                 </app-button>
               }
             </div>
+            }
           }
         } @else {
           <p class="bank__notice">{{ 'fints.noAccounts' | t }}</p>
