@@ -15,7 +15,7 @@ from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from sqlalchemy import Text as _Text
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
@@ -30,6 +30,7 @@ from app.modules.budget.invoice_import import parse_zugferd_pdf
 from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree_models import (
     Account,
+    AccountFintsCredential,
     Budget,
     BudgetAllocation,
     BudgetExpense,
@@ -72,7 +73,6 @@ from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.flow.models import State
 from app.search import dialect_of, trigram_rank
 from app.settings import Settings, get_settings
-from app.shared.crypto import encrypt_secret
 from app.shared.errors import (
     ConflictError,
     NotFoundError,
@@ -1242,28 +1242,18 @@ class BudgetTreeService:
             active=a.active,
             fintsEndpoint=a.fints_endpoint,
             fintsBlz=a.fints_blz,
-            fintsLogin=a.fints_login,
-            # Sync-bereit erst mit Endpunkt + BLZ + Login + (verschlüsselter) PIN.
-            fintsConfigured=bool(
-                a.fints_endpoint and a.fints_blz and a.fints_login and a.fints_pin_encrypted
-            ),
-            fintsLastSyncAt=a.fints_last_sync_at,
+            # FinTS-fähig mit Endpunkt + BLZ; persönliche Logins/PINs liegen je Principal
+            # getrennt (#fints-percred) und gehören nicht in die Konto-Stammdaten.
+            fintsConfigured=bool(a.fints_endpoint and a.fints_blz),
         )
 
-    def _require_fints_key(self) -> str:
-        """Verschlüsselungs-Schlüssel oder 503 (PIN darf nie unverschlüsselt liegen, #fints)."""
-        key = self.settings.fints_enc_key
-        if not key:
-            raise ServiceUnavailableError("FinTS is not configured (no encryption key set).")
-        return key
-
     def _apply_fints_config(self, acc: Account, payload: AccountCreate | AccountUpdate) -> bool:
-        """FinTS-Felder aus dem Payload anwenden (PIN verschlüsseln). Liefert, ob sich
-        Zugangsdaten geändert haben — dann wird der persistente Dialog-Zustand verworfen
-        (erzwingt eine frische SCA mit den neuen Daten)."""
+        """FinTS-**Bank-Verbindung** (Endpunkt + BLZ) aus dem Payload anwenden. Liefert, ob sich
+        die Verbindung geändert hat — dann werden die persistenten Dialog-Zustände aller Bucher
+        verworfen (das Konto zeigt jetzt auf eine andere Bank → frische SCA nötig)."""
         fields = payload.model_fields_set
         changed = False
-        for col in ("fints_endpoint", "fints_blz", "fints_login"):
+        for col in ("fints_endpoint", "fints_blz"):
             if col in fields:
                 value = getattr(payload, col) or None
                 if col == "fints_endpoint" and value:
@@ -1276,38 +1266,58 @@ class BudgetTreeService:
                         ) from exc
                 setattr(acc, col, value)
                 changed = True
-        if "fints_pin" in fields:
-            if payload.fints_pin:
-                acc.fints_pin_encrypted = encrypt_secret(
-                    payload.fints_pin, key=self._require_fints_key()
-                )
-            else:
-                acc.fints_pin_encrypted = None
-            changed = True
-        if changed:
-            acc.fints_state = None
         return changed
+
+    async def _reset_fints_states(self, account_id: UUID) -> None:
+        """Persistierten SCA-Zustand **aller** Bucher dieses Kontos verwerfen (#fints-percred):
+        eine geänderte Bank-Verbindung macht jeden ``system_id``/Dialog-State ungültig → der
+        nächste Sync jedes Buchers erzwingt eine frische SCA."""
+        await self.session.execute(
+            update(AccountFintsCredential)
+            .where(AccountFintsCredential.account_id == account_id)
+            .values(fints_state=None)
+        )
 
     async def list_accounts(self) -> list[AccountOut]:
         rows = (await self.session.scalars(select(Account).order_by(Account.name))).all()
         return [self._account_out(a) for a in rows]
 
     async def list_account_options(self) -> list[AccountOption]:
-        """Aktive Konten als id+Name (ohne IBAN) für Buchungs-Dropdowns (#5-2/#2)."""
+        """Aktive Konten als id+Name (ohne IBAN) für Buchungs-Dropdowns (#5-2/#2).
+
+        ``fintsHasCredential``/``fintsLastSyncAt`` sind **je anfragendem Bucher** aufgelöst
+        (#fints-percred): ein Konto kann FinTS-fähig sein, ohne dass *dieser* Nutzer schon
+        eigene Zugangsdaten hinterlegt hat."""
+        from app.modules.auth.models import Principal as PrincipalRow
+
+        pid = select(PrincipalRow.id).where(PrincipalRow.sub == self.actor).scalar_subquery()
         rows = (
-            await self.session.scalars(
-                select(Account).where(Account.active.is_(True)).order_by(Account.name)
+            await self.session.execute(
+                select(
+                    Account,
+                    AccountFintsCredential.fints_pin_encrypted.isnot(None),
+                    AccountFintsCredential.fints_last_sync_at,
+                )
+                .outerjoin(
+                    AccountFintsCredential,
+                    and_(
+                        AccountFintsCredential.account_id == Account.id,
+                        AccountFintsCredential.principal_id == pid,
+                    ),
+                )
+                .where(Account.active.is_(True))
+                .order_by(Account.name)
             )
         ).all()
         return [
             AccountOption(
                 id=a.id,
                 name=a.name,
-                fintsConfigured=bool(
-                    a.fints_endpoint and a.fints_blz and a.fints_login and a.fints_pin_encrypted
-                ),
+                fintsConfigured=bool(a.fints_endpoint and a.fints_blz),
+                fintsHasCredential=bool(has_cred),
+                fintsLastSyncAt=last_sync,
             )
-            for a in rows
+            for a, has_cred, last_sync in rows
         ]
 
     async def _audit_fints_config(self, acc: Account) -> None:
@@ -1336,6 +1346,8 @@ class BudgetTreeService:
             if field in payload.model_fields_set and getattr(payload, field) is not None:
                 setattr(acc, field, getattr(payload, field))
         if self._apply_fints_config(acc, payload):
+            # Geänderte Bank-Verbindung → alle hinterlegten SCA-Zustände verwerfen.
+            await self._reset_fints_states(acc.id)
             await self._audit_fints_config(acc)
         await self.session.commit()
         return self._account_out(acc)

@@ -20,7 +20,15 @@ from app.settings import load_settings
 from app.shared.crypto import encrypt_secret
 from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
 
-from .test_bank_service import _KEY, _account, _line, _Result, _Session  # Wiederverwendung
+from .test_bank_service import (  # Wiederverwendung
+    _KEY,
+    _PID,
+    _account,
+    _cred,
+    _line,
+    _Result,
+    _Session,
+)
 
 
 # ----------------------------------------------------------- bank_import helpers
@@ -106,7 +114,7 @@ def _svc(session: _Session, monkeypatch: pytest.MonkeyPatch) -> BankService:
     # SSRF-Re-Validierung (DNS) im Unit-Test neutralisieren — separat getestet.
     monkeypatch.setattr(fc, "validate_fints_endpoint", lambda _u: None)
     settings = load_settings(fints_enc_key=_KEY)
-    return BankService(session, settings=settings, actor="t")  # type: ignore[arg-type]
+    return BankService(session, settings=settings, actor="t", principal_id=_PID)  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
@@ -209,6 +217,7 @@ async def test_sync_done_without_new_state(monkeypatch: pytest.MonkeyPatch) -> N
         return fc.FintsOutcome(status="done", new_state=None, lines=[])
 
     monkeypatch.setattr(fc, "start_sync", _start)
+    session.scalar_q.append(_cred(account_id=acc.id))  # _load_credential
     session.execute_q.append(_Result([]))  # _purge_expired_sessions
     res = await svc.sync_account(acc.id)
     assert res.status == "done"
@@ -230,6 +239,7 @@ async def test_submit_tan_still_needs_tan(monkeypatch: pytest.MonkeyPatch) -> No
     )
     await svc._store_session(acc.id, out, token=token)
     payload = session.added[-1].payload_encrypted
+    session.scalar_q.append(_cred(account_id=acc.id))  # _load_credential
     future = datetime.now(UTC) + timedelta(seconds=60)
     session.execute_q.append(_Result([(payload, future)]))  # _claim_session
 
@@ -305,6 +315,7 @@ async def test_sync_account_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> 
         raise fc.FintsError("connection refused")
 
     monkeypatch.setattr(fc, "start_sync", _boom)
+    session.scalar_q.append(_cred(account_id=acc.id))  # _load_credential
     session.execute_q.append(_Result([]))  # _purge_expired_sessions
     with pytest.raises(ServiceUnavailableError):
         await svc.sync_account(acc.id)
@@ -322,6 +333,7 @@ async def test_submit_tan_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> No
     )
     await svc._store_session(acc.id, out, token=token)
     payload = session.added[-1].payload_encrypted
+    session.scalar_q.append(_cred(account_id=acc.id))  # _load_credential
     future = datetime.now(UTC) + timedelta(seconds=60)
     session.execute_q.append(_Result([(payload, future)]))  # _claim_session
 

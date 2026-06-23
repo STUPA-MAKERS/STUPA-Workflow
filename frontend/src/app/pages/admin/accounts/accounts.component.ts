@@ -59,14 +59,10 @@ export class AccountsComponent {
   readonly fName = signal('');
   readonly fIban = signal('');
   readonly fActive = signal(true);
-  // FinTS-Zugangsdaten (#fints). `fPin` ist write-only: leer beim Bearbeiten = unverändert
-  // (sofern schon eine PIN hinterlegt ist), ein gesetzter Wert ersetzt sie.
+  // FinTS-**Bank-Verbindung** (#fints): nur Endpunkt + BLZ — für alle Bucher gleich. Die
+  // persönlichen Logins/PINs setzt jeder Bucher selbst im Buchungs-Tab (#fints-percred).
   readonly fEndpoint = signal('');
   readonly fBlz = signal('');
-  readonly fLogin = signal('');
-  readonly fPin = signal('');
-  /** Eine PIN ist bereits (verschlüsselt) hinterlegt → Eingabefeld nur „ändern". */
-  readonly pinStored = signal(false);
   readonly saving = signal(false);
   readonly confirmDelete = signal<Account | null>(null);
 
@@ -88,9 +84,6 @@ export class AccountsComponent {
     this.fActive.set(true);
     this.fEndpoint.set('');
     this.fBlz.set('');
-    this.fLogin.set('');
-    this.fPin.set('');
-    this.pinStored.set(false);
     this.dialogOpen.set(true);
   }
 
@@ -101,9 +94,6 @@ export class AccountsComponent {
     this.fActive.set(a.active);
     this.fEndpoint.set(a.fintsEndpoint ?? '');
     this.fBlz.set(a.fintsBlz ?? '');
-    this.fLogin.set(a.fintsLogin ?? '');
-    this.fPin.set('');
-    this.pinStored.set(a.fintsConfigured);
     this.dialogOpen.set(true);
   }
 
@@ -117,11 +107,7 @@ export class AccountsComponent {
       active: this.fActive(),
       fintsEndpoint: this.fEndpoint().trim() || null,
       fintsBlz: this.fBlz().trim() || null,
-      fintsLogin: this.fLogin().trim() || null,
     };
-    // PIN nur senden, wenn der Nutzer etwas eingegeben hat — sonst bliebe die
-    // gespeicherte PIN beim Bearbeiten unangetastet (leeres Feld ≠ löschen).
-    if (this.fPin().trim()) body.fintsPin = this.fPin().trim();
     const current = this.editing();
     const req = current
       ? this.api.updateAccount(current.id as Uuid, body)
@@ -130,8 +116,6 @@ export class AccountsComponent {
       next: () => {
         this.saving.set(false);
         this.dialogOpen.set(false);
-        // Klartext-PIN nicht im Component-State (Angular DevTools) liegen lassen (#fints-review).
-        this.fPin.set('');
         this.toast.success(this.i18n.translate('admin.accounts.toastSaved'));
         this.reload();
       },

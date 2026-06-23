@@ -60,6 +60,8 @@ from app.modules.budget.tree_schemas import (
     ExpenseKind,
     ExpenseOut,
     ExpenseUpdate,
+    FintsCredentialIn,
+    FintsCredentialStatus,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
@@ -108,13 +110,23 @@ def get_budget_tree_service(
 ServiceDep = Annotated[BudgetTreeService, Depends(get_budget_tree_service)]
 
 
-def get_bank_service(
+async def get_bank_service(
     session: DbSession,
     settings: SettingsDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> BankService:
-    """FinTS-Bankabgleich (#fints) — ``actor`` = Principal-``sub`` für den Audit-Trail."""
-    return BankService(session, settings=settings, actor=principal.sub)
+    """FinTS-Bankabgleich (#fints) — ``actor`` = Principal-``sub`` für den Audit-Trail;
+    ``principal_id`` scopt die persönlichen Zugangsdaten + TAN-Sitzungen (#fints-percred)."""
+    from sqlalchemy import select
+
+    from app.modules.auth.models import Principal as PrincipalRow
+
+    principal_id = await session.scalar(
+        select(PrincipalRow.id).where(PrincipalRow.sub == principal.sub)
+    )
+    return BankService(
+        session, settings=settings, actor=principal.sub, principal_id=principal_id
+    )
 
 
 BankServiceDep = Annotated[BankService, Depends(get_bank_service)]
@@ -688,7 +700,50 @@ async def delete_account(account_id: UUID, service: ServiceDep) -> None:
 
 # -------------------------------------------------------- bank reconcile (#fints)
 # Abruf/Import/Buchen bewegen Geld → ``budget.book``; Lesen der Staging-Liste wie die
-# Buchungsliste (jede Budget-Rolle, #5-2). Konto-Stammdaten/FinTS-Zugang = account.manage.
+# Buchungsliste (jede Budget-Rolle, #5-2). Die Bank-Verbindung (Endpunkt/BLZ) am Konto setzt
+# der Admin (account.manage); die **persönlichen** Zugangsdaten setzt jeder Bucher selbst
+# (budget.book) je Konto (#fints-percred).
+@router.get(
+    "/accounts/{account_id}/fints/credential",
+    response_model=FintsCredentialStatus,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(401, 403, 404),
+)
+async def fints_credential_status(
+    account_id: UUID, service: BankServiceDep
+) -> FintsCredentialStatus:
+    """Hat der Bucher schon eigene FinTS-Zugangsdaten für das Konto (#fints-percred)?"""
+    return await service.credential_status(account_id)
+
+
+@router.put(
+    "/accounts/{account_id}/fints/credential",
+    response_model=FintsCredentialStatus,
+    dependencies=[
+        Depends(require_principal("budget.book")),
+        Depends(rate_limit_fints),
+    ],
+    responses=_errors(401, 403, 404, 422, 429, 503),
+)
+async def set_fints_credential(
+    account_id: UUID, payload: FintsCredentialIn, service: BankServiceDep
+) -> FintsCredentialStatus:
+    """Persönliche FinTS-Zugangsdaten (Login + PIN) anlegen/ersetzen (#fints-percred) —
+    erstes Verbinden im Buchungs-Tab. PIN write-only, verschlüsselt."""
+    return await service.set_credential(account_id, payload)
+
+
+@router.delete(
+    "/accounts/{account_id}/fints/credential",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(401, 403, 404),
+)
+async def delete_fints_credential(account_id: UUID, service: BankServiceDep) -> None:
+    """Eigene FinTS-Zugangsdaten für das Konto löschen (#fints-percred)."""
+    await service.delete_credential(account_id)
+
+
 @router.post(
     "/accounts/{account_id}/fints/sync",
     response_model=BankSyncResult,

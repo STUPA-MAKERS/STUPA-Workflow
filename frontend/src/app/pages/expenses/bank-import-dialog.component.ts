@@ -26,6 +26,7 @@ import {
   type AccountOption,
   type BankSyncResult,
   BudgetTreeApi,
+  type FintsCredentialStatus,
   type StatementLine,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
@@ -86,6 +87,29 @@ export class BankImportDialogComponent {
   readonly dragActive = signal(false);
   private dragDepth = 0;
 
+  // --- FinTS persönliche Zugangsdaten (#fints-percred) ---
+  /** Verbindungs-Status des Buchers für das gewählte Konto (`null` = noch nicht geladen). */
+  readonly credStatus = signal<FintsCredentialStatus | null>(null);
+  /** Login/PIN-Formular sichtbar (erstes Verbinden oder Zugangsdaten ändern). */
+  readonly editingCred = signal(false);
+  readonly credLogin = signal('');
+  readonly credPin = signal('');
+  readonly savingCred = signal(false);
+
+  /** Konto FinTS-fähig, aber dieser Bucher hat noch keine eigenen Zugangsdaten. */
+  readonly needsConnect = computed(() => {
+    const s = this.credStatus();
+    return !!s && s.configured && !s.hasCredential;
+  });
+  /** Dieser Bucher ist mit eigenen Zugangsdaten verbunden. */
+  readonly connected = computed(() => !!this.credStatus()?.hasCredential);
+  /** Login/PIN-Formular zeigen (erstes Verbinden erzwungen oder manuell geöffnet). */
+  readonly showCredForm = computed(() => this.editingCred() || this.needsConnect());
+  /** „Verbunden als <login>" für den Status-Hinweis. */
+  readonly connectedLabel = computed(() =>
+    this.i18n.translate('fints.connectedAs', { login: this.credStatus()?.fintsLogin ?? '' }),
+  );
+
   // --- FinTS-TAN-Schritt ---
   readonly sessionToken = signal<string>('');
   readonly challenge = signal<string>('');
@@ -115,6 +139,11 @@ export class BankImportDialogComponent {
     // Beim Öffnen: Konten + Kostenstellen-Baum + offene Umsätze laden.
     effect(() => {
       if (this.open()) this.onOpen();
+    });
+    // FinTS-Lasche + Konto gewählt → persönlichen Verbindungs-Status laden (#fints-percred).
+    effect(() => {
+      const acc = this.accountId();
+      if (this.open() && this.tab() === 'fints' && acc) this.loadCredStatus(acc);
     });
   }
 
@@ -149,6 +178,69 @@ export class BankImportDialogComponent {
       error: () => {
         this.lines.set([]);
         this.loadingLines.set(false);
+      },
+    });
+  }
+
+  // ---------------------------------------------- persönliche Zugangsdaten (#fints-percred)
+  private loadCredStatus(accountId: string): void {
+    this.api.fintsCredentialStatus(accountId as Uuid).subscribe({
+      next: (s) => {
+        this.credStatus.set(s);
+        this.credLogin.set(s.fintsLogin ?? '');
+        this.credPin.set('');
+        this.editingCred.set(false);
+      },
+      error: () => this.credStatus.set(null),
+    });
+  }
+
+  editCred(): void {
+    this.credLogin.set(this.credStatus()?.fintsLogin ?? '');
+    this.credPin.set('');
+    this.editingCred.set(true);
+  }
+
+  cancelEditCred(): void {
+    this.editingCred.set(false);
+    this.credPin.set('');
+  }
+
+  saveCred(): void {
+    const acc = this.accountId();
+    const login = this.credLogin().trim();
+    const pin = this.credPin();
+    if (!acc || !login || !pin || this.savingCred()) return;
+    this.savingCred.set(true);
+    this.api.setFintsCredential(acc as Uuid, { fintsLogin: login, fintsPin: pin }).subscribe({
+      next: (s) => {
+        this.savingCred.set(false);
+        this.credStatus.set(s);
+        this.credPin.set('');
+        this.editingCred.set(false);
+        this.toast.success(this.i18n.translate('fints.credSaved'));
+      },
+      error: (e) => {
+        this.savingCred.set(false);
+        this.toast.error(this.syncError(e));
+      },
+    });
+  }
+
+  removeCred(): void {
+    const acc = this.accountId();
+    if (!acc || this.savingCred()) return;
+    this.savingCred.set(true);
+    this.api.deleteFintsCredential(acc as Uuid).subscribe({
+      next: () => {
+        this.savingCred.set(false);
+        this.resetTan();
+        this.loadCredStatus(acc);
+        this.toast.success(this.i18n.translate('fints.credRemoved'));
+      },
+      error: () => {
+        this.savingCred.set(false);
+        this.toast.error(this.i18n.translate('fints.errBook'));
       },
     });
   }
@@ -225,6 +317,7 @@ export class BankImportDialogComponent {
   private syncError(e: unknown): string {
     const code = (e as { error?: { code?: string } })?.error?.code;
     if (code === 'fints_not_configured') return this.i18n.translate('fints.errNotConfigured');
+    if (code === 'fints_no_credential') return this.i18n.translate('fints.errNoCredential');
     if (code === 'fints_pin_undecryptable') return this.i18n.translate('fints.errPin');
     if (code === 'fints_tan_expired') return this.i18n.translate('fints.errTanExpired');
     return this.i18n.translate('fints.errSync');
@@ -342,8 +435,10 @@ export class BankImportDialogComponent {
 
   close(): void {
     // Einmal-TAN + Challenge nicht über das Schließen hinaus im (dauerhaft gemounteten)
-    // Component-State liegen lassen (#fints-review).
+    // Component-State liegen lassen (#fints-review). Ebenso die eingetippte PIN.
     this.resetTan();
+    this.editingCred.set(false);
+    this.credPin.set('');
     this.closed.emit();
   }
 }

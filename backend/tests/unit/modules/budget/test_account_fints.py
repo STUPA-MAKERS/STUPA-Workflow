@@ -1,7 +1,9 @@
 """FinTS-Konto-Konfiguration (#fints): tree_service-Zweige + Schema-Validatoren.
 
 Deckt die durch den Bankabgleich neu hinzugekommenen Branches der kritischen
-Budget-Module (100 %-Branch-Gate) ab — DB-lose Fake-Session, Audit gemockt."""
+Budget-Module (100 %-Branch-Gate) ab — DB-lose Fake-Session, Audit gemockt. Login/PIN
+liegen seit #fints-percred je Principal getrennt (siehe ``test_bank_service``); hier bleibt
+nur die **Bank-Verbindung** (Endpunkt + BLZ) am Konto."""
 
 from __future__ import annotations
 
@@ -20,8 +22,7 @@ from app.modules.budget.tree_schemas import (
 )
 from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
-from app.shared.crypto import decrypt_secret
-from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
+from app.shared.errors import NotFoundError, ValidationProblem
 
 from .test_bank_service import _KEY, _Session
 
@@ -55,21 +56,9 @@ def test_confirm_line_request_validation() -> None:
     assert ConfirmLineRequest(matchExpenseId=uuid.uuid4()).match_expense_id is not None
 
 
-# --------------------------------------------------------------- require key
-def test_require_fints_key_raises_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    svc = _svc(_Session(), monkeypatch, key=None)
-    with pytest.raises(ServiceUnavailableError):
-        svc._require_fints_key()
-
-
-def test_require_fints_key_returns_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    svc = _svc(_Session(), monkeypatch)
-    assert svc._require_fints_key() == _KEY
-
-
 # --------------------------------------------------------------- create_account
 @pytest.mark.asyncio
-async def test_create_account_with_fints(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_create_account_with_fints_connection(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _svc(session, monkeypatch)
     # SSRF-Validator (DNS) ist separat getestet; hier neutralisieren, kein Netz im Unit-Test.
@@ -80,14 +69,13 @@ async def test_create_account_with_fints(monkeypatch: pytest.MonkeyPatch) -> Non
             iban="DE1",
             fintsEndpoint="https://fints.example/",
             fintsBlz="12345678",
-            fintsLogin="user1",
-            fintsPin="1234",
         )
     )
+    # Endpunkt + BLZ → FinTS-fähig (persönliche Logins kommen je Bucher dazu).
     assert out.fints_configured is True
     acc = next(o for o in session.added if isinstance(o, Account))
-    assert acc.fints_pin_encrypted and decrypt_secret(acc.fints_pin_encrypted, key=_KEY) == "1234"
-    assert acc.fints_state is None  # bei Zugangsdaten-Änderung verworfen
+    assert acc.fints_endpoint == "https://fints.example/"
+    assert acc.fints_blz == "12345678"
 
 
 @pytest.mark.asyncio
@@ -97,7 +85,7 @@ async def test_create_account_without_fints(monkeypatch: pytest.MonkeyPatch) -> 
     out = await svc.create_account(AccountCreate(name="Bar"))
     assert out.fints_configured is False
     acc = next(o for o in session.added if isinstance(o, Account))
-    assert acc.fints_pin_encrypted is None
+    assert acc.fints_endpoint is None
 
 
 # --------------------------------------------------------------- update_account
@@ -112,20 +100,42 @@ async def test_update_account_name_only(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 @pytest.mark.asyncio
-async def test_update_account_sets_then_clears_pin(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_update_account_connection_resets_states(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Geänderte Bank-Verbindung → alle hinterlegten SCA-Zustände werden verworfen."""
     session = _Session()
     svc = _svc(session, monkeypatch)
     monkeypatch.setattr(ts_mod, "validate_fints_endpoint", lambda _u: None)  # kein DNS im Unit-Test
     acc = Account(id=uuid.uuid4(), name="Giro", iban="DE1", active=True)
     session.put(acc)
+    captured: dict[str, Any] = {}
+
+    async def _reset(_self: Any, account_id: uuid.UUID) -> None:
+        captured["account_id"] = account_id
+
+    monkeypatch.setattr(BudgetTreeService, "_reset_fints_states", _reset)
     await svc.update_account(
-        acc.id,
-        AccountUpdate(fintsEndpoint="https://x/", fintsBlz="123", fintsLogin="u", fintsPin="9999"),
+        acc.id, AccountUpdate(fintsEndpoint="https://x/", fintsBlz="123")
     )
-    assert acc.fints_pin_encrypted is not None
-    # leere PIN löscht die gespeicherte PIN (else-Zweig)
-    await svc.update_account(acc.id, AccountUpdate(fintsPin=""))
-    assert acc.fints_pin_encrypted is None
+    assert acc.fints_endpoint == "https://x/"
+    assert captured["account_id"] == acc.id
+
+
+@pytest.mark.asyncio
+async def test_reset_fints_states_issues_update(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_reset_fints_states`` setzt den Zustand aller Credentials des Kontos auf NULL."""
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    seen: list[Any] = []
+    original = session.execute
+
+    async def _spy(stmt: Any) -> Any:
+        seen.append(stmt)
+        return await original(stmt)
+
+    monkeypatch.setattr(session, "execute", _spy)
+    await svc._reset_fints_states(uuid.uuid4())
+    # ein UPDATE gegen account_fints_credential wurde abgesetzt (Aufrufer committet).
+    assert seen and "account_fints_credential" in str(seen[0]).lower()
 
 
 @pytest.mark.asyncio
