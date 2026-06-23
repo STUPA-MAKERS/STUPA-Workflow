@@ -46,25 +46,21 @@
             <!-- Erstmaliges Verbinden / Zugangsdaten ändern (je Bucher, #fints-percred) -->
             <div class="bank__connect">
               <p class="bank__hint">{{ 'fints.connectHint' | t }}</p>
-              <label class="bank__label" for="bank-cred-login">{{ 'fints.login' | t }}
-                <input
-                  id="bank-cred-login"
-                  autocomplete="username"
-                  [ngModel]="credLogin()"
-                  (ngModelChange)="credLogin.set($event)"
-                  name="credLogin"
-                />
-              </label>
-              <label class="bank__label" for="bank-cred-pin">{{ 'fints.pin' | t }}
-                <input
-                  id="bank-cred-pin"
-                  type="password"
-                  autocomplete="off"
-                  [ngModel]="credPin()"
-                  (ngModelChange)="credPin.set($event)"
-                  name="credPin"
-                />
-              </label>
+              <app-input
+                id="bank-cred-login"
+                [label]="'fints.login' | t"
+                [ngModel]="credLogin()"
+                (ngModelChange)="credLogin.set($event)"
+                name="credLogin"
+              />
+              <app-input
+                id="bank-cred-pin"
+                type="password"
+                [label]="'fints.pin' | t"
+                [ngModel]="credPin()"
+                (ngModelChange)="credPin.set($event)"
+                name="credPin"
+              />
               <div class="bank__connectActions">
                 <app-button
                   size="sm"

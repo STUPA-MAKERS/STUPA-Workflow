@@ -18,6 +18,7 @@ import {
   ButtonComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
   SelectComponent,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
@@ -53,6 +54,7 @@ import {
     ButtonComponent,
     DialogComponent,
     IconComponent,
+    InputComponent,
     SelectComponent,
   ],
   templateUrl: './bank-import-dialog.component.html',
