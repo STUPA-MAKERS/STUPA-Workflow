@@ -315,6 +315,28 @@ describe('BudgetTreeApi', () => {
   });
 
   describe('bank reconcile (#fints)', () => {
+    it('fintsCredentialStatus GETs /accounts/:id/fints/credential', () => {
+      api.fintsCredentialStatus('a-1').subscribe();
+      const req = http.expectOne(`${BASE}/accounts/a-1/fints/credential`);
+      expect(req.request.method).toBe('GET');
+      req.flush({ configured: true, hasCredential: false, fintsLogin: null, fintsLastSyncAt: null });
+    });
+
+    it('setFintsCredential PUTs the login+pin to /accounts/:id/fints/credential', () => {
+      api.setFintsCredential('a-1', { fintsLogin: 'user1', fintsPin: '1234' }).subscribe();
+      const req = http.expectOne(`${BASE}/accounts/a-1/fints/credential`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ fintsLogin: 'user1', fintsPin: '1234' });
+      req.flush({ configured: true, hasCredential: true, fintsLogin: 'user1', fintsLastSyncAt: null });
+    });
+
+    it('deleteFintsCredential DELETEs /accounts/:id/fints/credential', () => {
+      api.deleteFintsCredential('a-1').subscribe();
+      const req = http.expectOne(`${BASE}/accounts/a-1/fints/credential`);
+      expect(req.request.method).toBe('DELETE');
+      req.flush(null);
+    });
+
     it('fintsSync POSTs /accounts/:id/fints/sync', () => {
       api.fintsSync('a-1').subscribe();
       const req = http.expectOne(`${BASE}/accounts/a-1/fints/sync`);
