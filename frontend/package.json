@@ -58,7 +58,7 @@
     "@angular/cli": "^20.3.27",
     "@angular/compiler-cli": "^20.3.0",
     "@eslint/js": "^9.16.0",
-    "@playwright/test": "^1.49.1",
+    "@playwright/test": "^1.61.0",
     "@testing-library/angular": "^17.3.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.0",
