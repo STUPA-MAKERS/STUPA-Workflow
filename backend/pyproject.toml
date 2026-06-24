@@ -83,7 +83,7 @@ dev = [
     # Fälle; ohne festen Versions- + Seed-Pin (s. CI `--seed`) wäre `be-contract`
     # nichtdeterministisch (mal grün, mal rot am selben Commit). Exakt pinnen, damit ein
     # roter Lauf reproduzierbar ist und nicht durch Tool-Updates wandert.
-    "schemathesis==4.21.1",
+    "schemathesis==4.21.10",
     "hypothesis==6.155.2",
     "ruff>=0.9",
     "basedpyright>=1.28",
