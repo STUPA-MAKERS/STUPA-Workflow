@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   effect,
   inject,
@@ -16,7 +17,11 @@ import type { Uuid } from '@core/api/models';
 import {
   BadgeComponent,
   ButtonComponent,
+  CurrencyInputComponent,
   DialogComponent,
+  FilterBarComponent,
+  FilterFieldComponent,
+  FilterRangeComponent,
   IconComponent,
   InputComponent,
   SelectComponent,
@@ -27,6 +32,7 @@ import {
   type AccountOption,
   type BankSyncResult,
   BudgetTreeApi,
+  type ExpenseKind,
   type FintsCredentialStatus,
   type StatementLine,
   flattenBudgetOptions,
@@ -52,7 +58,11 @@ import {
     LocalizedDatePipe,
     BadgeComponent,
     ButtonComponent,
+    CurrencyInputComponent,
     DialogComponent,
+    FilterBarComponent,
+    FilterFieldComponent,
+    FilterRangeComponent,
     IconComponent,
     InputComponent,
     SelectComponent,
@@ -64,6 +74,7 @@ export class BankImportDialogComponent {
   private readonly api = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** Sichtbarkeit (vom Eltern-Tab gesteuert). */
   readonly open = input(false);
@@ -132,8 +143,68 @@ export class BankImportDialogComponent {
   readonly tanCode = signal('');
   readonly tanBusy = signal(false);
 
+  // --- TAN-OTP-Eingabe (#fints): 6 Boxen mit Auto-Advance/Paste; Fallback ein Freitextfeld,
+  //     falls die Bank eine TAN abweichender Länge schickt (otpMode=false). ---
+  readonly otpLength = 6;
+  readonly otpSlots = Array.from({ length: 6 }, (_, i) => i);
+  readonly otpDigits = signal<string[]>(Array.from({ length: 6 }, () => ''));
+  readonly otpMode = signal(true);
+  /** TAN absendebereit: im OTP-Modus alle Stellen gefüllt, sonst irgendein Wert. */
+  readonly tanReady = computed(() => {
+    const t = this.tanCode().trim();
+    return this.otpMode() ? t.length === this.otpLength : t.length > 0;
+  });
+
   private readonly costOptionsSig = signal<SelectOption[]>([]);
   readonly costCentreOptions = computed<SelectOption[]>(() => this.costOptionsSig());
+
+  // --- Staging-Filter/Sortierung (#fints): clientseitig — die offenen Umsätze sind bereits
+  //     vollständig geladen, also keine Server-Roundtrips nötig. ---
+  readonly filterKind = signal<'' | ExpenseKind>('');
+  readonly searchQ = signal('');
+  readonly amountMin = signal('');
+  readonly amountMax = signal('');
+  readonly sortField = signal<'date' | 'amount'>('date');
+  readonly sortOrder = signal<'asc' | 'desc'>('desc');
+
+  readonly activeFilterCount = computed(
+    () =>
+      [
+        this.filterKind(),
+        this.searchQ().trim(),
+        this.amountMin().trim(),
+        this.amountMax().trim(),
+      ].filter(Boolean).length,
+  );
+
+  /** Gefilterte + sortierte Umsätze für die Tabelle. */
+  readonly filteredLines = computed<StatementLine[]>(() => {
+    const kind = this.filterKind();
+    const q = this.searchQ().trim().toLowerCase();
+    const min = this.amountMin().trim() ? Number(this.amountMin()) : null;
+    const max = this.amountMax().trim() ? Number(this.amountMax()) : null;
+    const rows = this.lines().filter((l) => {
+      if (kind && l.kind !== kind) return false;
+      const abs = Math.abs(Number(l.amount));
+      if (min !== null && abs < min) return false;
+      if (max !== null && abs > max) return false;
+      if (q && !`${l.counterpartyName ?? ''} ${l.purpose ?? ''}`.toLowerCase().includes(q)) {
+        return false;
+      }
+      return true;
+    });
+    const dir = this.sortOrder() === 'asc' ? 1 : -1;
+    const field = this.sortField();
+    return [...rows].sort((a, b) =>
+      field === 'amount'
+        ? (Math.abs(Number(a.amount)) - Math.abs(Number(b.amount))) * dir
+        : this._lineDate(a).localeCompare(this._lineDate(b)) * dir,
+    );
+  });
+
+  private _lineDate(l: StatementLine): string {
+    return l.valueDate || l.bookingDate || '';
+  }
 
   /** Konten für die FinTS-Lasche: nur sync-fähige (`fintsConfigured`). */
   readonly fintsAccountOptions = computed<SelectOption[]>(() =>
@@ -337,6 +408,8 @@ export class BankImportDialogComponent {
     this.challengeImage.set('');
     this.decoupled.set(false);
     this.tanCode.set('');
+    this.resetOtp();
+    this.otpMode.set(true);
   }
 
   private syncError(e: unknown): string {
@@ -450,6 +523,107 @@ export class BankImportDialogComponent {
         this.toast.error(this.i18n.translate('fints.errBook'));
       },
     });
+  }
+
+  // ----------------------------------------------------- Filter/Sortierung
+  setKind(k: '' | ExpenseKind): void {
+    this.filterKind.set(k);
+  }
+
+  onSearch(value: string): void {
+    this.searchQ.set(value);
+  }
+
+  onAmountFilter(which: 'min' | 'max', value: string): void {
+    (which === 'min' ? this.amountMin : this.amountMax).set(value);
+  }
+
+  resetFilters(): void {
+    this.filterKind.set('');
+    this.searchQ.set('');
+    this.amountMin.set('');
+    this.amountMax.set('');
+  }
+
+  onSort(field: 'date' | 'amount'): void {
+    if (this.sortField() === field) {
+      this.sortOrder.update((o) => (o === 'desc' ? 'asc' : 'desc'));
+    } else {
+      this.sortField.set(field);
+      this.sortOrder.set('desc');
+    }
+  }
+
+  sortInd(field: 'date' | 'amount'): string {
+    if (this.sortField() !== field) return '';
+    return this.sortOrder() === 'asc' ? ' ↑' : ' ↓';
+  }
+
+  ariaSort(field: 'date' | 'amount'): 'ascending' | 'descending' | 'none' {
+    if (this.sortField() !== field) return 'none';
+    return this.sortOrder() === 'asc' ? 'ascending' : 'descending';
+  }
+
+  // ---------------------------------------------------------- TAN-OTP-Eingabe
+  onOtpInput(i: number, ev: Event): void {
+    const el = ev.target as HTMLInputElement;
+    const digit = el.value.replace(/\D/g, '').slice(-1);
+    this.otpDigits.update((d) => {
+      const n = [...d];
+      n[i] = digit;
+      return n;
+    });
+    el.value = digit;
+    this.syncTanFromDigits();
+    if (digit && i < this.otpLength - 1) this.focusOtp(i + 1);
+  }
+
+  onOtpKeydown(i: number, ev: KeyboardEvent): void {
+    if (ev.key === 'Backspace' && !this.otpDigits()[i] && i > 0) {
+      ev.preventDefault();
+      this.otpDigits.update((d) => {
+        const n = [...d];
+        n[i - 1] = '';
+        return n;
+      });
+      this.syncTanFromDigits();
+      this.focusOtp(i - 1);
+    } else if (ev.key === 'ArrowLeft' && i > 0) {
+      this.focusOtp(i - 1);
+    } else if (ev.key === 'ArrowRight' && i < this.otpLength - 1) {
+      this.focusOtp(i + 1);
+    }
+  }
+
+  onOtpPaste(ev: ClipboardEvent): void {
+    const digits = (ev.clipboardData?.getData('text') ?? '').replace(/\D/g, '');
+    if (!digits) return;
+    ev.preventDefault();
+    const chars = digits.slice(0, this.otpLength).split('');
+    this.otpDigits.set(Array.from({ length: this.otpLength }, (_, k) => chars[k] ?? ''));
+    this.syncTanFromDigits();
+    this.focusOtp(Math.min(chars.length, this.otpLength) - 1);
+  }
+
+  /** Fallback aktivieren, falls die Bank eine TAN ≠ 6 Stellen schickt (#fints). */
+  useSingleTanField(): void {
+    this.otpMode.set(false);
+    this.tanCode.set('');
+    this.resetOtp();
+  }
+
+  private syncTanFromDigits(): void {
+    this.tanCode.set(this.otpDigits().join(''));
+  }
+
+  private resetOtp(): void {
+    this.otpDigits.set(Array.from({ length: this.otpLength }, () => ''));
+  }
+
+  private focusOtp(i: number): void {
+    this.host.nativeElement
+      .querySelector<HTMLInputElement>(`[data-otp="${i}"]`)
+      ?.focus();
   }
 
   money(amount: string): string {

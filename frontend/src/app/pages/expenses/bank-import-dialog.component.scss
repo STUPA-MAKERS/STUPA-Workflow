@@ -153,11 +153,70 @@
   border-radius: var(--radius-md);
 }
 
-.bank__label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+.bank__tanLabel {
   font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+// OTP-Eingabe: 6 quadratische Boxen (#fints).
+.bank__otp {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.bank__otpBox {
+  width: 2.75rem;
+  height: 3.25rem;
+  text-align: center;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+}
+
+// „TAN hat andere Länge?" — Fallback auf ein einzelnes Feld.
+.bank__otpAlt {
+  align-self: flex-start;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  text-decoration: underline;
+
+  &:hover {
+    color: var(--color-primary);
+  }
+}
+
+.bank__tanInput {
+  width: 100%;
+  max-width: 12rem;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-md);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3em;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
 }
 
 .bank__hint {
@@ -177,38 +236,120 @@
   font-size: var(--fs-md);
 }
 
-.bank__lines {
+// Staging-Tabelle (#fints) — Muster wie die Buchungen-Tabelle (exp__table).
+.bank__kindToggle {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-height: 22rem;
-  overflow-y: auto;
+  gap: var(--space-1);
 }
 
-.bank__line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+.bank__search {
+  width: 100%;
+  min-width: 12rem;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+  }
 }
 
-.bank__lineMain {
-  flex: 1 1 16rem;
-  min-width: 0;
+.bank__tableWrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 26rem;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
 }
 
-.bank__lineTop {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.bank__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.bank__table th,
+.bank__table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.bank__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.bank__table tbody tr:hover {
+  background: var(--color-surface-sunken);
+}
+
+.bank__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  background: var(--color-surface-sunken);
+}
+
+.bank__sort {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+
+  &:hover {
+    color: var(--color-primary);
+  }
+}
+
+.bank__num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bank__cellDate {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.bank__cellCp {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bank__cellPurpose {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+.bank__cellCc {
+  min-width: 12rem;
 }
 
 .bank__amount {
-  font-variant-numeric: tabular-nums;
   font-weight: var(--fw-semibold);
 
   &--income {
@@ -216,28 +357,76 @@
   }
 }
 
-.bank__date {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
+.bank__actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
 }
 
-.bank__lineMeta {
-  display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-
-.bank__purpose {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bank__lineActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex: 0 0 auto;
+// Mobile: Tabelle → Karten (#mobile-cards), wie die Buchungen-Tabelle.
+@media (max-width: 768px) {
+  .bank__tableWrap {
+    overflow-x: visible;
+    max-height: none;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+  .bank__table,
+  .bank__table tbody {
+    display: block;
+  }
+  .bank__table thead {
+    display: none;
+  }
+  .bank__table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+  .bank__table tbody tr:last-child {
+    margin-bottom: 0;
+  }
+  .bank__table td {
+    padding: 0;
+    border-bottom: none;
+  }
+  .bank__cellCp {
+    flex: 1 1 100%;
+    max-width: none;
+    order: -3;
+    font-weight: var(--fw-medium);
+  }
+  .bank__cellKind {
+    order: -2;
+  }
+  .bank__amount {
+    order: -1;
+    margin-left: auto;
+    font-size: var(--fs-md);
+  }
+  .bank__cellPurpose,
+  .bank__cellDate {
+    flex: 1 1 100%;
+    max-width: none;
+    order: 1;
+    font-size: var(--fs-xs);
+  }
+  .bank__cellCc {
+    flex: 1 1 100%;
+    order: 2;
+  }
+  .bank__num:has(.bank__actions) {
+    order: 3;
+    flex: 1 1 100%;
+  }
+  .bank__actions {
+    margin-left: auto;
+  }
 }
