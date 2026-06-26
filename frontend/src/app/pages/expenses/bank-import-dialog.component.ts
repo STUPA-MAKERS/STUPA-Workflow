@@ -111,6 +111,17 @@ export class BankImportDialogComponent {
   readonly connectedLabel = computed(() =>
     this.i18n.translate('fints.connectedAs', { login: this.credStatus()?.fintsLogin ?? '' }),
   );
+  /** Sperr-Cooldown aktiv (#fints-review): der Server lehnt jeden Sync ab → Button sperren
+   *  und warnen, NICHT erneut zu versuchen (sonst droht die Bank-Vollsperre). */
+  readonly locked = computed(() => {
+    const until = this.credStatus()?.fintsLockedUntil;
+    return !!until && new Date(until).getTime() > Date.now();
+  });
+  /** Lokalisierter „bis <Zeitpunkt>" für den Sperr-Hinweis. */
+  readonly lockedUntilLabel = computed(() => {
+    const until = this.credStatus()?.fintsLockedUntil;
+    return until ? new Date(until).toLocaleString() : '';
+  });
 
   // --- FinTS-TAN-Schritt ---
   readonly sessionToken = signal<string>('');
@@ -250,7 +261,7 @@ export class BankImportDialogComponent {
   // ------------------------------------------------------------------ FinTS
   startSync(): void {
     const acc = this.accountId();
-    if (!acc || this.syncing()) return;
+    if (!acc || this.syncing() || this.locked()) return;
     this.resetTan();
     this.syncing.set(true);
     this.api.fintsSync(acc as Uuid).subscribe({
@@ -261,6 +272,7 @@ export class BankImportDialogComponent {
       error: (e) => {
         this.syncing.set(false);
         this.toast.error(this.syncError(e));
+        this.refreshOnLock(e);
       },
     });
   }
@@ -284,8 +296,19 @@ export class BankImportDialogComponent {
       error: (e) => {
         this.tanBusy.set(false);
         this.toast.error(this.syncError(e));
+        this.refreshOnLock(e);
       },
     });
+  }
+
+  /** Nach Sperr-/Ablehnungsfehler den Verbindungs-Status neu laden, damit der Cooldown
+   *  (``fintsLockedUntil``) den Abruf-Button sperrt (#fints-review). */
+  private refreshOnLock(e: unknown): void {
+    const code = (e as { error?: { code?: string } })?.error?.code;
+    const acc = this.accountId();
+    if (acc && (code === 'fints_bank_locked' || code === 'fints_auth_rejected')) {
+      this.loadCredStatus(acc);
+    }
   }
 
   private handleSync(res: BankSyncResult): void {
@@ -322,6 +345,8 @@ export class BankImportDialogComponent {
     if (code === 'fints_no_credential') return this.i18n.translate('fints.errNoCredential');
     if (code === 'fints_pin_undecryptable') return this.i18n.translate('fints.errPin');
     if (code === 'fints_tan_expired') return this.i18n.translate('fints.errTanExpired');
+    if (code === 'fints_bank_locked') return this.i18n.translate('fints.errBankLocked');
+    if (code === 'fints_auth_rejected') return this.i18n.translate('fints.errAuthRejected');
     return this.i18n.translate('fints.errSync');
   }
 

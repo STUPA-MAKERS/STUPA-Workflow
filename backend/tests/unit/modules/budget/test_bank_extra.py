@@ -18,7 +18,12 @@ from app.modules.budget.tree_models import BudgetExpense
 from app.modules.budget.tree_schemas import ConfirmLineRequest
 from app.settings import load_settings
 from app.shared.crypto import encrypt_secret
-from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
+from app.shared.errors import (
+    ConflictError,
+    NotFoundError,
+    ServiceUnavailableError,
+    ValidationProblem,
+)
 
 from .test_bank_service import (  # Wiederverwendung
     _KEY,
@@ -322,6 +327,93 @@ async def test_sync_account_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 @pytest.mark.asyncio
+async def test_sync_account_bank_locked_sets_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bank-Sperre → 409 fints_bank_locked + Cooldown am Credential gesetzt (#fints-review)."""
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+
+    def _locked(creds: Any, *, start_date: Any) -> Any:
+        raise fc.FintsBankLockedError("locked")
+
+    monkeypatch.setattr(fc, "start_sync", _locked)
+    cred = _cred(account_id=acc.id)
+    session.scalar_q.append(cred)  # _load_credential
+    session.execute_q.append(_Result([]))  # _purge_expired_sessions
+    with pytest.raises(ConflictError) as ei:
+        await svc.sync_account(acc.id)
+    assert ei.value.code == "fints_bank_locked"
+    assert cred.fints_locked_until is not None  # Cooldown gesetzt …
+    assert session.commits >= 1  # … und persistiert
+
+
+@pytest.mark.asyncio
+async def test_sync_account_auth_rejected_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Signatur/PIN-Ablehnung → 409 fints_auth_rejected (nicht generischer 503)."""
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+
+    def _rejected(creds: Any, *, start_date: Any) -> Any:
+        raise fc.FintsAuthRejectedError("rejected")
+
+    monkeypatch.setattr(fc, "start_sync", _rejected)
+    session.scalar_q.append(_cred(account_id=acc.id))
+    session.execute_q.append(_Result([]))
+    with pytest.raises(ConflictError) as ei:
+        await svc.sync_account(acc.id)
+    assert ei.value.code == "fints_auth_rejected"
+
+
+@pytest.mark.asyncio
+async def test_sync_account_blocked_while_locked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Vorab gesperrtes Credential → 409 OHNE Netz-Call (der eigentliche Anti-Hammer-Schutz)."""
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+    calls = {"n": 0}
+
+    def _must_not_run(creds: Any, *, start_date: Any) -> Any:
+        calls["n"] += 1
+        raise AssertionError("network must not be hit while locked")
+
+    monkeypatch.setattr(fc, "start_sync", _must_not_run)
+    cred = _cred(account_id=acc.id)
+    cred.fints_locked_until = datetime.now(UTC) + timedelta(minutes=10)
+    session.scalar_q.append(cred)  # _load_credential
+    with pytest.raises(ConflictError) as ei:
+        await svc.sync_account(acc.id)
+    assert ei.value.code == "fints_bank_locked"
+    assert calls["n"] == 0
+
+
+@pytest.mark.asyncio
+async def test_sync_account_expired_lock_allows_and_clears(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Abgelaufener Cooldown blockt nicht; erfolgreicher Sync räumt ihn weg (#fints-review)."""
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+
+    def _done(creds: Any, *, start_date: Any) -> Any:
+        return fc.FintsOutcome(status="done", lines=[], new_state=b"st")
+
+    monkeypatch.setattr(fc, "start_sync", _done)
+    cred = _cred(account_id=acc.id)
+    cred.fints_locked_until = datetime.now(UTC) - timedelta(minutes=1)  # abgelaufen
+    session.scalar_q.append(cred)  # _load_credential
+    session.execute_q.append(_Result([]))  # _purge_expired_sessions
+    res = await svc.sync_account(acc.id)
+    assert res.status == "done"
+    assert cred.fints_locked_until is None  # geräumt
+
+
+@pytest.mark.asyncio
 async def test_submit_tan_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _svc(session, monkeypatch)
@@ -343,6 +435,34 @@ async def test_submit_tan_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(fc, "submit_tan", _boom)
     with pytest.raises(ServiceUnavailableError):
         await svc.submit_tan(acc.id, token, "123456")
+
+
+@pytest.mark.asyncio
+async def test_submit_tan_bank_locked_sets_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bank-Sperre während TAN-Submit → 409 + Cooldown (#fints-review)."""
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+    token = uuid.uuid4()
+    out = fc.FintsOutcome(
+        status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d", tan_data=b"t",
+    )
+    await svc._store_session(acc.id, out, token=token)
+    payload = session.added[-1].payload_encrypted
+    cred = _cred(account_id=acc.id)
+    session.scalar_q.append(cred)  # _load_credential
+    future = datetime.now(UTC) + timedelta(seconds=60)
+    session.execute_q.append(_Result([(payload, future)]))  # _claim_session
+
+    def _locked(creds: Any, pending: Any, tan: str) -> Any:
+        raise fc.FintsBankLockedError("locked")
+
+    monkeypatch.setattr(fc, "submit_tan", _locked)
+    with pytest.raises(ConflictError) as ei:
+        await svc.submit_tan(acc.id, token, "123456")
+    assert ei.value.code == "fints_bank_locked"
+    assert cred.fints_locked_until is not None
 
 
 @pytest.mark.asyncio

@@ -290,6 +290,12 @@ class AccountFintsCredential(UUIDPkMixin, CreatedAtMixin, Base):
     fints_last_sync_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Sperr-Cooldown (#fints-review): nach einer Bank-Sperre/Signatur-Ablehnung gesetzt; bis
+    # zu diesem Zeitpunkt verweigert der Service jeden Sync, damit wiederholte Versuche nicht
+    # auf das Bank-Fehlversuchskonto einzahlen und die Sperre verschärfen.
+    fints_locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         UniqueConstraint(

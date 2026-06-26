@@ -493,6 +493,9 @@ class FintsCredentialStatus(_CamelModel):
     has_credential: bool = Field(default=False, alias="hasCredential")
     fints_login: str | None = Field(default=None, alias="fintsLogin")
     fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
+    # Cooldown nach Bank-Sperre/Signatur-Ablehnung (#fints-review): bis dahin lehnt der Server
+    # jeden Sync ab. Das FE deaktiviert solange den Abruf-Button und warnt vor Wiederholung.
+    fints_locked_until: datetime | None = Field(default=None, alias="fintsLockedUntil")
 
 
 # ------------------------------------------------------- bank statement (#fints)

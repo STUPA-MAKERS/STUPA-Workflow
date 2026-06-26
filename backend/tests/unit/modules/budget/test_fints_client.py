@@ -116,3 +116,17 @@ def test_validate_fints_endpoint_rejects() -> None:
     # Öffentlicher Name, der auf eine interne IP auflöst → vom DNS-Guard geblockt.
     with pytest.raises(ValueError):
         fc.validate_fints_endpoint("https://evil.example/x", resolver=_internal_resolver)
+
+
+def test_classify_maps_bank_errors() -> None:
+    """Bank-Sperre/Ablehnung → eigene Fehlertypen; alles andere bleibt generisch (#fints-review)."""
+    from fints.exceptions import FinTSClientPINError, FinTSClientTemporaryAuthError
+
+    assert isinstance(
+        fc._classify(FinTSClientTemporaryAuthError("locked")), fc.FintsBankLockedError
+    )
+    assert isinstance(
+        fc._classify(FinTSClientPINError("rejected")), fc.FintsAuthRejectedError
+    )
+    generic = fc._classify(RuntimeError("connection refused"))
+    assert type(generic) is fc.FintsError  # nicht als Sperre/Ablehnung fehlklassifiziert

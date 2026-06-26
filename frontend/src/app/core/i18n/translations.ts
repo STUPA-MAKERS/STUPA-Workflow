@@ -968,6 +968,12 @@ export const de = {
     'Du hast für dieses Konto noch keine eigenen Zugangsdaten hinterlegt — bitte zuerst verbinden.',
   'fints.errPin': 'Die gespeicherte PIN konnte nicht entschlüsselt werden — bitte neu eingeben.',
   'fints.errTanExpired': 'TAN-Sitzung abgelaufen — bitte den Abruf erneut starten.',
+  'fints.errBankLocked':
+    'Die Bank hat den Zugang gesperrt. NICHT erneut versuchen — jeder weitere Versuch kann die Sperre verschärfen. Bitte den Zugang im Online-Banking bzw. bei der Bank entsperren.',
+  'fints.errAuthRejected':
+    'Die Bank hat die Anmeldung abgelehnt. Bitte Zugangsdaten/TAN-Verfahren prüfen und NICHT mehrfach hintereinander erneut versuchen (sonst droht die Sperre).',
+  'fints.lockedBanner':
+    'Abruf gesperrt bis {until}. Die Bank hat den Zugang abgelehnt/gesperrt — bitte nicht erneut versuchen, sonst droht die Vollsperre.',
   'fints.errFile': 'Datei ist weder gültiges CAMT.053 noch MT940.',
   'fints.errBook': 'Buchen fehlgeschlagen.',
   'budget.tree.title': 'Budgets & Kostenstellen',
@@ -3015,6 +3021,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'You have not stored your own credentials for this account yet — please connect first.',
   'fints.errPin': 'The stored PIN could not be decrypted — please re-enter it.',
   'fints.errTanExpired': 'TAN session expired — please start the sync again.',
+  'fints.errBankLocked':
+    'The bank has locked this access. Do NOT retry — each further attempt can tighten the lock. Please unlock the access via online banking or your bank.',
+  'fints.errAuthRejected':
+    'The bank rejected the login. Check your credentials/TAN method and do NOT retry repeatedly (you risk a lockout).',
+  'fints.lockedBanner':
+    'Sync locked until {until}. The bank rejected/locked this access — please do not retry, or you risk a full lockout.',
   'fints.errFile': 'File is neither valid CAMT.053 nor MT940.',
   'fints.errBook': 'Booking failed.',
   'budget.tree.title': 'Budgets & cost centres',

@@ -41,6 +41,38 @@ class FintsError(RuntimeError):
     """FinTS-Abruf fehlgeschlagen (Verbindung, Login, Protokoll)."""
 
 
+class FintsBankLockedError(FintsError):
+    """Bank hat den Zugang gesperrt (z. B. nach 3 Fehlversuchen, FinTS-Code 3938).
+
+    **NICHT** automatisch erneut versuchen — jeder weitere Login zählt auf das Bank-
+    Fehlversuchskonto ein und kann die Sperre verschärfen, bis sie nur noch von der Bank
+    (Hotline/Filiale bzw. Online-Banking-Entsperrung) aufgehoben werden kann (#fints-review)."""
+
+
+class FintsAuthRejectedError(FintsError):
+    """Bank hat Anmeldung/Signatur abgelehnt (FinTS-Codes 9340/9910/9930/9931/9942).
+
+    python-fints meldet diese irreführend als „PIN falsch" und **sperrt danach die PIN-
+    Instanz**. Ursache ist oft die Signatur (falsches/fehlendes TAN-Verfahren, fehlende
+    Produkt-ID), nicht zwingend die PIN. Vor Wiederholung Ursache klären — sonst droht nach
+    wenigen Versuchen die Bank-Sperre (#fints-review)."""
+
+
+def _classify(exc: Exception) -> FintsError:
+    """Lib-/Bank-Fehler auf unsere Fehlertypen abbilden (Bank-Sperre erkennen, #fints-review).
+
+    Der Klartext der Lib-/Bank-Meldung wird **nicht** übernommen (kann Request-/Antwort-
+    Fragmente bzw. PIN/TAN tragen); nur der Fehler*typ* entscheidet. ``fints`` ist lazy
+    importiert, damit der reine Contract-Pfad die Lib nicht braucht."""
+    from fints.exceptions import FinTSClientPINError, FinTSClientTemporaryAuthError
+
+    if isinstance(exc, FinTSClientTemporaryAuthError):
+        return FintsBankLockedError("FinTS access is temporarily locked by the bank.")
+    if isinstance(exc, FinTSClientPINError):
+        return FintsAuthRejectedError("FinTS authentication was rejected by the bank.")
+    return FintsError("FinTS sync failed.")
+
+
 # Erlaubte MIME-Typen für den optischen TAN-Challenge (photoTAN/QR-TAN als ``<img>``).
 _ALLOWED_TAN_IMAGE_MIME = frozenset(
     {"image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"}
@@ -211,6 +243,14 @@ def start_sync(creds: FintsCredentials, *, start_date: date) -> FintsOutcome:  #
     creds.start_date = start_date
     client = _build_client(creds)
     try:
+        # WICHTIG (#fints-percred): TAN-Verfahren erst über das NETZ holen
+        # (``fetch_tan_mechanisms``) — das befüllt BPD + erlaubte Sicherheitsfunktionen +
+        # system_id. Das reine ``get_tan_mechanisms`` liest nur aus der bei frischem Client
+        # (``from_data=None`` — nach jedem Credential-Setzen der Fall) LEEREN BPD und liefert
+        # ``{}`` → es würde KEIN Zwei-Schritt-Verfahren gewählt und python-fints signierte mit
+        # Ein-Schritt-PIN. Sparkassen (PSD2) lehnen das mit „9340 Ungültige Signatur" ab — von
+        # der Lib irreführend als „PIN falsch" gemeldet, was nach 3 Versuchen die Bank sperrt.
+        client.fetch_tan_mechanisms()
         mechanisms = client.get_tan_mechanisms()
         mechanism = _pick_tan_mechanism(dict(mechanisms), creds.tan_mechanism)
         if mechanism:
@@ -227,7 +267,7 @@ def start_sync(creds: FintsCredentials, *, start_date: date) -> FintsOutcome:  #
         # Original-Fehler NUR serverseitig loggen — der Lib-/Bank-Text kann Request-/
         # Antwort-Fragmente enthalten und PIN/TAN sind hier im Scope (#fints-review).
         logger.warning("FinTS sync failed", exc_info=exc)
-        raise FintsError("FinTS sync failed.") from exc
+        raise _classify(exc) from exc
 
 
 def submit_tan(  # pragma: no cover
@@ -259,4 +299,4 @@ def submit_tan(  # pragma: no cover
         raise
     except Exception as exc:  # noqa: BLE001
         logger.warning("FinTS TAN submission failed", exc_info=exc)
-        raise FintsError("FinTS TAN submission failed.") from exc
+        raise _classify(exc) from exc

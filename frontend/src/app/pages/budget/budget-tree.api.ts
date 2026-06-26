@@ -100,6 +100,12 @@ export interface FintsCredentialStatus {
   /** Anmeldename des Buchers (kein Geheimnis); `null` ohne Credential. */
   fintsLogin: string | null;
   fintsLastSyncAt: string | null;
+  /**
+   * Sperr-Cooldown (#fints-review): ISO-Zeitpunkt, bis zu dem der Server jeden Sync ablehnt
+   * (nach Bank-Sperre/Signatur-Ablehnung). `null` = nicht gesperrt. Das FE deaktiviert solange
+   * den Abruf-Button und warnt, NICHT erneut zu versuchen (Bank-Vollsperre droht).
+   */
+  fintsLockedUntil: string | null;
 }
 
 /** Gestageter Kontoumsatz (#fints); `amount` vorzeichenbehaftet (>0 Eingang). */

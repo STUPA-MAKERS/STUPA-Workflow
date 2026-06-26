@@ -751,7 +751,7 @@ async def delete_fints_credential(account_id: UUID, service: BankServiceDep) -> 
         Depends(require_principal("budget.book")),
         Depends(rate_limit_fints),
     ],
-    responses=_errors(401, 403, 404, 422, 429, 503),
+    responses=_errors(401, 403, 404, 409, 422, 429, 503),
 )
 async def fints_sync(account_id: UUID, service: BankServiceDep) -> BankSyncResult:
     """FinTS-Sync starten (#fints): Umsätze stagen **oder** TAN anfordern (``needs_tan``)."""
@@ -765,7 +765,7 @@ async def fints_sync(account_id: UUID, service: BankServiceDep) -> BankSyncResul
         Depends(require_principal("budget.book")),
         Depends(rate_limit_fints),
     ],
-    responses=_errors(401, 403, 404, 422, 429, 503),
+    responses=_errors(401, 403, 404, 409, 422, 429, 503),
 )
 async def fints_submit_tan(
     account_id: UUID,

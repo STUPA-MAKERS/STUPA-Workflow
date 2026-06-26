@@ -216,6 +216,12 @@ class Settings(BaseSettings):
     fints_max_days: int = 90
     # Lebensdauer einer schwebenden TAN-Sitzung (zwischen Start-Sync und TAN-Eingabe).
     fints_tan_session_ttl_seconds: int = 600
+    # Sperr-Cooldown (#fints-review): Nach einer Bank-Sperre (FinTS 3938) oder Signatur-/PIN-
+    # Ablehnung (9340 u. a.) verweigert der Service für so viele Minuten jeden weiteren Sync
+    # dieses Buchers für das Konto. Schützt vor selbst-verschuldeter Eskalation der Sperre
+    # (3 Fehlversuche → Vollsperre). Die bankseitige Sperre selbst kann länger gelten und ggf.
+    # nur über die Bank (Online-Banking-Entsperrung/Hotline) aufgehoben werden.
+    fints_lock_cooldown_minutes: int = 30
 
     @property
     def storage_enabled(self) -> bool:

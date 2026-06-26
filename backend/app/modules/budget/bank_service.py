@@ -25,7 +25,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import bank_import, bank_match, fints_client
-from app.modules.budget.fints_client import FintsError
+from app.modules.budget.fints_client import (
+    FintsAuthRejectedError,
+    FintsBankLockedError,
+    FintsError,
+)
 from app.modules.budget.tree_models import (
     Account,
     AccountFintsCredential,
@@ -49,7 +53,12 @@ from app.modules.budget.tree_schemas import (
 from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import Settings, get_settings
 from app.shared.crypto import SecretCryptoError, decrypt_secret, encrypt_secret
-from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
+from app.shared.errors import (
+    ConflictError,
+    NotFoundError,
+    ServiceUnavailableError,
+    ValidationProblem,
+)
 
 # Obergrenze für die Zeilenzahl eines Imports/Abrufs (Anti-DoS): ein 10-MiB-MT940 kann
 # zehntausende Umsätze tragen; jede Zeile macht im Staging 1-2 Queries (#fints-review).
@@ -161,6 +170,7 @@ class BankService:
             hasCredential=cred is not None,
             fintsLogin=cred.fints_login if cred else None,
             fintsLastSyncAt=cred.fints_last_sync_at if cred else None,
+            fintsLockedUntil=cred.fints_locked_until if cred else None,
         )
 
     async def credential_status(self, account_id: uuid.UUID) -> FintsCredentialStatus:
@@ -280,16 +290,58 @@ class BankService:
         except SecretCryptoError:
             return None
 
+    def _guard_not_locked(self, cred: AccountFintsCredential) -> None:
+        """Sync ablehnen, solange ein Sperr-Cooldown läuft (#fints-review).
+
+        Nach einer Bank-Sperre/Signatur-Ablehnung zahlt **jeder** weitere Login auf das Bank-
+        Fehlversuchskonto ein und kann die Sperre verschärfen. Der serverseitige Cooldown ist
+        die maßgebliche Bremse (das FE deaktiviert den Button nur zusätzlich)."""
+        until = cred.fints_locked_until
+        if until is None:
+            return
+        now = datetime.now(UTC)
+        if until > now:
+            raise ConflictError(
+                "FinTS access is locked — do not retry until the cooldown elapses.",
+                code="fints_bank_locked",
+                headers={"Retry-After": str(int((until - now).total_seconds()))},
+            )
+
+    async def _record_lock(self, cred: AccountFintsCredential) -> None:
+        """Sperr-Cooldown setzen + persistieren (#fints-review) — Folgeversuche werden bis zum
+        Ablauf von :meth:`_guard_not_locked` abgewiesen."""
+        cred.fints_locked_until = datetime.now(UTC) + timedelta(
+            minutes=self.settings.fints_lock_cooldown_minutes
+        )
+        await self.session.commit()
+
+    @staticmethod
+    def _lock_code(exc: FintsError) -> str:
+        return (
+            "fints_bank_locked"
+            if isinstance(exc, FintsBankLockedError)
+            else "fints_auth_rejected"
+        )
+
     async def sync_account(self, account_id: uuid.UUID) -> BankSyncResult:
         """Schritt 1 (#fints): FinTS-Sync starten → Umsätze stagen **oder** TAN anfordern."""
         acc = await self._account_or_404(account_id)
         cred = await self._load_credential(account_id)
+        self._guard_not_locked(cred)
         await self._purge_expired_sessions()
         creds = self._credentials(acc, cred)
         self._revalidate_endpoint(creds.endpoint)
         start = datetime.now(UTC).date() - timedelta(days=self.settings.fints_max_days)
         try:
             outcome = fints_client.start_sync(creds, start_date=start)
+        except (FintsBankLockedError, FintsAuthRejectedError) as exc:
+            # Bank hat gesperrt/abgelehnt → Cooldown setzen und als 409 (NICHT wiederholen)
+            # melden, statt als generischer 503 (der zum erneuten Klick verleitet).
+            await self._record_lock(cred)
+            raise ConflictError(
+                "FinTS access was rejected or locked by the bank — do not retry.",
+                code=self._lock_code(exc),
+            ) from exc
         except FintsError as exc:
             # Lib-/Bank-Fehlertext NICHT an den Client durchreichen (kann Sensibles tragen,
             # #fints-review) — fints_client hat ihn bereits serverseitig geloggt.
@@ -328,6 +380,7 @@ class BankService:
         """Schritt 2 (#fints): pausierten Dialog mit TAN fortsetzen (leer = decoupled-Poll)."""
         acc = await self._account_or_404(account_id)
         cred = await self._load_credential(account_id)
+        self._guard_not_locked(cred)
         # Sitzung **atomar beanspruchen** (löschen) BEVOR der Netz-Call läuft (#fints-review):
         # ein zweiter, paralleler Submit mit demselben Token findet nichts mehr → kein Replay
         # des fortgesetzten Dialogs / kein Doppel-Audit. Schlägt der Call fehl, ist die Sitzung
@@ -338,10 +391,18 @@ class BankService:
         creds.tan_mechanism = pending.tan_mechanism
         try:
             outcome = fints_client.submit_tan(creds, pending, tan)
+        except (FintsBankLockedError, FintsAuthRejectedError) as exc:
+            await self._record_lock(cred)
+            raise ConflictError(
+                "FinTS access was rejected or locked by the bank — do not retry.",
+                code=self._lock_code(exc),
+            ) from exc
         except FintsError as exc:
             raise ServiceUnavailableError(
                 "FinTS TAN submission failed.", code="fints_tan_failed"
             ) from exc
+        # Netz-Call lief durch (Login akzeptiert) → etwaigen Sperr-Cooldown aufheben.
+        cred.fints_locked_until = None
         if outcome.status == "needs_tan":
             # decoupled noch nicht freigegeben → **neues** Token (das alte ist verbraucht,
             # nicht wiederverwendbar) anlegen und erneut anfordern.
@@ -358,6 +419,8 @@ class BankService:
 
         SCA-Zustand/TAN-Methode/Last-Sync gehören dem **Bucher** (Credential), nicht dem Konto
         (#fints-percred)."""
+        # Netz-Call lief durch (Login akzeptiert) → etwaigen Sperr-Cooldown aufheben.
+        cred.fints_locked_until = None
         if outcome.status == "needs_tan":
             token = uuid.uuid4()
             await self._store_session(acc.id, outcome, token=token)

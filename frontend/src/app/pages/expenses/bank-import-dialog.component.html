@@ -88,8 +88,19 @@
                 {{ 'fints.disconnect' | t }}
               </app-button>
             </div>
+            @if (locked()) {
+              <!-- Sperr-Cooldown (#fints-review): Bank hat abgelehnt/gesperrt → NICHT erneut -->
+              <p class="bank__locked" role="alert">
+                {{ 'fints.lockedBanner' | t: { until: lockedUntilLabel() } }}
+              </p>
+            }
             @if (!hasPendingTan()) {
-              <app-button size="sm" [loading]="syncing()" [disabled]="!accountId()" (click)="startSync()">
+              <app-button
+                size="sm"
+                [loading]="syncing()"
+                [disabled]="!accountId() || locked()"
+                (click)="startSync()"
+              >
                 {{ 'fints.sync' | t }}
               </app-button>
             } @else {
