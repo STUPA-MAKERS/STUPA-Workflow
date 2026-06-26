@@ -678,6 +678,24 @@ export class BankImportDialogComponent {
       ?.focus();
   }
 
+  /** Gegenkonto in Name + IBAN trennen (#fints). Manche Bank-MT940-Felder liefern beides in
+   *  EINEM Feld ohne Trenner ("DE70…808Quentin Walz") und ein leeres IBAN-Feld → führende IBAN
+   *  (Ländercode + Ziffern) abspalten, damit Name und IBAN je auf eigener Zeile stehen. */
+  counterparty(l: StatementLine): { name: string; iban: string } {
+    let iban = (l.counterpartyIban ?? '').trim();
+    let name = (l.counterpartyName ?? '').trim();
+    if (iban && name.startsWith(iban)) {
+      name = name.slice(iban.length).trim();
+    } else if (!iban) {
+      const m = /^([A-Z]{2}\d{13,30})(.*)$/.exec(name);
+      if (m) {
+        iban = m[1];
+        name = m[2].trim();
+      }
+    }
+    return { name, iban };
+  }
+
   money(amount: string): string {
     const n = Math.abs(Number(amount));
     return n.toLocaleString(this.i18n.locale() === 'en' ? 'en-US' : 'de-DE', {

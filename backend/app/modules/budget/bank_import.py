@@ -13,6 +13,7 @@ Service leitet daraus ``kind`` + ``abs(amount)`` für die Buchung ab.
 from __future__ import annotations
 
 import hashlib
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import date
@@ -110,14 +111,17 @@ def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
     elif status in ("C", "RD"):
         raw_amount = abs(raw_amount)
     amount = _sane_amount(raw_amount)
+    cp_name, cp_iban = _split_leading_iban(
+        d.get("applicant_name") or d.get("recipient_name"), d.get("applicant_iban")
+    )
     return StatementLine(
         amount=amount,
         currency=str(getattr(amount_obj, "currency", None) or d.get("currency") or "EUR"),
         booking_date=_as_date(d.get("entry_date") or d.get("guessed_entry_date")),
         value_date=_as_date(d.get("date")),
         purpose=_clean(d.get("purpose")),
-        counterparty_name=_clean(d.get("applicant_name") or d.get("recipient_name")),
-        counterparty_iban=_clean(d.get("applicant_iban")),
+        counterparty_name=cp_name,
+        counterparty_iban=cp_iban,
         end_to_end_id=_clean(d.get("end_to_end_reference")),
         reference=_clean(d.get("customer_reference")),
         bank_ref=_clean(d.get("bank_reference")),
@@ -269,6 +273,33 @@ def _skip_notprovided(value: str | None) -> str | None:
     if value and value.strip().upper() == "NOTPROVIDED":
         return None
     return value
+
+
+# Manche Bank-MT940-Felder packen Gegen-IBAN + Name OHNE Trenner in EIN Feld
+# ("DE70…808Quentin Walz") und lassen das IBAN-Feld leer. Führende IBAN = Ländercode +
+# ≥13 Ziffern (DE = 2 + 20). Nur Ziffern nach dem Ländercode, damit der Name (beginnt i. d. R.
+# mit Buchstaben) nicht angeknabbert wird (#fints).
+_LEADING_IBAN = re.compile(r"^([A-Z]{2}\d{13,30})(.*)$")
+
+
+def _split_leading_iban(
+    name: object | None, iban: object | None
+) -> tuple[str | None, str | None]:
+    """``(name, iban)`` normalisieren: führende/wiederholte IBAN aus dem Namen lösen.
+
+    Verbessert sowohl die Anzeige (Name + IBAN getrennt) als auch den IBAN-Abgleich (sonst
+    bleibt ``counterparty_iban`` leer und das Matching greift nicht)."""
+    clean_name = _clean(name)
+    clean_iban = _clean(iban)
+    if clean_name is None:
+        return None, clean_iban
+    if clean_iban and clean_name.startswith(clean_iban):
+        return _clean(clean_name[len(clean_iban) :]), clean_iban
+    if clean_iban is None:
+        match = _LEADING_IBAN.match(clean_name)
+        if match:
+            return _clean(match.group(2)), match.group(1)
+    return clean_name, clean_iban
 
 
 def _as_date(value: object | None) -> date | None:

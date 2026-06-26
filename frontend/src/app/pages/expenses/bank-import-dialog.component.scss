@@ -358,9 +358,21 @@
   white-space: nowrap;
 }
 
-// Gegenkonto/IBAN: NIE abschneiden — immer vollständig (Tabelle scrollt sonst horizontal).
+// Gegenkonto: Name + IBAN je auf eigener Zeile; IBAN NIE abschneiden — immer vollständig
+// (Tabelle scrollt sonst horizontal).
 .bank__cellCp {
   white-space: nowrap;
+}
+
+.bank__cpName {
+  display: block;
+}
+
+.bank__cpIban {
+  display: block;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
 }
 
 // „ART"-Spalte: Kopf + Badge zentriert.

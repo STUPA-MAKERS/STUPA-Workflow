@@ -297,7 +297,12 @@
                     <td class="bank__cellKind">
                       <app-badge [variant]="line.kind === 'income' ? 'success' : 'neutral'">{{ (line.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
                     </td>
-                    <td class="bank__cellCp">{{ line.counterpartyName || '—' }}</td>
+                    <td class="bank__cellCp">
+                      @let cp = counterparty(line);
+                      @if (cp.name) { <span class="bank__cpName">{{ cp.name }}</span> }
+                      @if (cp.iban) { <span class="bank__cpIban">{{ cp.iban }}</span> }
+                      @if (!cp.name && !cp.iban) { <span>—</span> }
+                    </td>
                     <td class="bank__cellPurpose" [title]="line.purpose || ''">{{ line.purpose || '—' }}</td>
                     <td class="bank__num bank__amount" [class.bank__amount--income]="line.kind === 'income'">{{ line.kind === 'income' ? '+' : '−' }}{{ money(line.amount) }}</td>
                     <td class="bank__cellCc">

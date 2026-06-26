@@ -169,3 +169,30 @@ def test_camt_sub_cent_rejected() -> None:
 </Ntry></Stmt></Document>"""
     with pytest.raises(bi.StatementParseError):
         bi.parse_camt053(xml)
+
+
+def test_split_leading_iban() -> None:
+    """Gegen-IBAN + Name in einem Feld trennen (#fints)."""
+    # IBAN-Feld leer, Name = IBAN+Name ohne Trenner → abgespalten.
+    assert bi._split_leading_iban("DE70120300001076878808Quentin Walz", None) == (
+        "Quentin Walz",
+        "DE70120300001076878808",
+    )
+    # Name = nur IBAN (kein Name) → Name None, IBAN gesetzt.
+    assert bi._split_leading_iban("DE85780608960006017", None) == (
+        None,
+        "DE85780608960006017",
+    )
+    # IBAN-Feld da und im Namen wiederholt → Präfix entfernen.
+    assert bi._split_leading_iban("DE111Heldenwerbung", "DE111") == (
+        "Heldenwerbung",
+        "DE111",
+    )
+    # Saubere getrennte Felder bleiben unverändert.
+    assert bi._split_leading_iban("Quentin Walz", "DE70120300001076878808") == (
+        "Quentin Walz",
+        "DE70120300001076878808",
+    )
+    # Kein Name → (None, IBAN); reiner Name ohne IBAN bleibt unverändert.
+    assert bi._split_leading_iban(None, "DE111") == (None, "DE111")
+    assert bi._split_leading_iban("Plain Name", None) == ("Plain Name", None)
