@@ -466,6 +466,26 @@ async def test_submit_tan_bank_locked_sets_cooldown(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.asyncio
+async def test_tan_session_roundtrip_preserves_login_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``tan_for_login`` übersteht encode→store→claim (#fints login-SCA) — sonst weiß submit_tan
+    nach der Login-TAN nicht, dass es noch Umsätze holen muss."""
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    acc = _account()
+    token = uuid.uuid4()
+    out = fc.FintsOutcome(
+        status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d",
+        tan_data=b"t", tan_for_login=True,
+    )
+    await svc._store_session(acc.id, out, token=token)
+    payload = session.added[-1].payload_encrypted
+    future = datetime.now(UTC) + timedelta(seconds=60)
+    session.execute_q.append(_Result([(payload, future)]))  # _claim_session
+    restored = await svc._claim_session(token, acc.id)
+    assert restored.tan_for_login is True
+
+
+@pytest.mark.asyncio
 async def test_stage_lines_too_many(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _svc(_Session(), monkeypatch)
     lines = [

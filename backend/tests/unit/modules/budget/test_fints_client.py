@@ -130,3 +130,18 @@ def test_classify_maps_bank_errors() -> None:
     )
     generic = fc._classify(RuntimeError("connection refused"))
     assert type(generic) is fc.FintsError  # nicht als Sperre/Ablehnung fehlklassifiziert
+
+
+def test_classify_walks_exception_chain() -> None:
+    """Maskierte Bank-Ablehnung erkennen (#fints-review): python-fints sperrt bei 9340 die PIN,
+    der ``with client:``-Teardown wirft dann ``Exception('Refusing to use PIN after block')`` und
+    maskiert den ``FinTSClientPINError`` — der muss über ``__context__`` gefunden werden."""
+    from fints.exceptions import FinTSClientPINError
+
+    try:
+        try:
+            raise FinTSClientPINError("PIN wrong?")
+        finally:
+            raise Exception("Refusing to use PIN after block")  # noqa: B012,TRY002,TRY301
+    except Exception as exc:  # noqa: BLE001
+        assert isinstance(fc._classify(exc), fc.FintsAuthRejectedError)

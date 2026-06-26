@@ -58,18 +58,29 @@ class FintsAuthRejectedError(FintsError):
     wenigen Versuchen die Bank-Sperre (#fints-review)."""
 
 
-def _classify(exc: Exception) -> FintsError:
+def _classify(exc: BaseException) -> FintsError:
     """Lib-/Bank-Fehler auf unsere Fehlertypen abbilden (Bank-Sperre erkennen, #fints-review).
+
+    **Die ganze Ausnahme-Kette** (``__cause__``/``__context__``) wird durchsucht, NICHT nur die
+    äußerste Ausnahme: python-fints sperrt bei 9340 u. a. die PIN-Instanz und der ``with
+    client:``-Teardown wirft daraufhin beim Schluss-Signieren ``Exception("Refusing to use PIN
+    after block")`` — diese **maskiert** den eigentlichen ``FinTSClientPINError``. Ohne den
+    Kettendurchlauf würde die Bank-Ablehnung als generischer 503 statt als 409+Cooldown gemeldet.
 
     Der Klartext der Lib-/Bank-Meldung wird **nicht** übernommen (kann Request-/Antwort-
     Fragmente bzw. PIN/TAN tragen); nur der Fehler*typ* entscheidet. ``fints`` ist lazy
     importiert, damit der reine Contract-Pfad die Lib nicht braucht."""
     from fints.exceptions import FinTSClientPINError, FinTSClientTemporaryAuthError
 
-    if isinstance(exc, FinTSClientTemporaryAuthError):
-        return FintsBankLockedError("FinTS access is temporarily locked by the bank.")
-    if isinstance(exc, FinTSClientPINError):
-        return FintsAuthRejectedError("FinTS authentication was rejected by the bank.")
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, FinTSClientTemporaryAuthError):
+            return FintsBankLockedError("FinTS access is temporarily locked by the bank.")
+        if isinstance(cur, FinTSClientPINError):
+            return FintsAuthRejectedError("FinTS authentication was rejected by the bank.")
+        cur = cur.__cause__ or cur.__context__
     return FintsError("FinTS sync failed.")
 
 
@@ -118,6 +129,10 @@ class FintsOutcome:
     # zum direkten Anzeigen im ``<img>`` (#fints-qrtan).
     challenge_image: str | None = None
     decoupled: bool = False
+    # True, wenn die TAN für die **Anmeldung selbst** (SCA bei frischer system_id) gebraucht
+    # wird — dann muss ``submit_tan`` nach der TAN-Bestätigung erst noch Konten + Umsätze holen
+    # (bei einer Daten-TAN liefert ``send_tan`` die Umsätze direkt). (#fints login-SCA)
+    tan_for_login: bool = False
 
 
 @dataclass(slots=True)
@@ -199,7 +214,11 @@ def _matrix_data_url(response: object) -> str | None:
 
 
 def _needs_tan(
-    client: FinTS3PinTanClient, response: NeedTANResponse, mechanism: str | None
+    client: FinTS3PinTanClient,
+    response: NeedTANResponse,
+    mechanism: str | None,
+    *,
+    for_login: bool = False,
 ) -> FintsOutcome:  # pragma: no cover
     """Dialog pausieren + alles für den späteren Resume einsammeln."""
     dialog_data = client.pause_dialog()
@@ -213,6 +232,7 @@ def _needs_tan(
         challenge_html=str(getattr(response, "challenge_html", "") or "") or None,
         challenge_image=_matrix_data_url(response),
         decoupled=bool(getattr(response, "decoupled", False)),
+        tan_for_login=for_login,
     )
 
 
@@ -250,13 +270,35 @@ def start_sync(creds: FintsCredentials, *, start_date: date) -> FintsOutcome:  #
         # ``{}`` → es würde KEIN Zwei-Schritt-Verfahren gewählt und python-fints signierte mit
         # Ein-Schritt-PIN. Sparkassen (PSD2) lehnen das mit „9340 Ungültige Signatur" ab — von
         # der Lib irreführend als „PIN falsch" gemeldet, was nach 3 Versuchen die Bank sperrt.
+        from fints.client import NeedTANResponse
+
         client.fetch_tan_mechanisms()
         mechanisms = client.get_tan_mechanisms()
         mechanism = _pick_tan_mechanism(dict(mechanisms), creds.tan_mechanism)
+        # Diagnose (#fints, KEINE Geheimnisse): Anzahl TAN-Verfahren + gewählte Sicherheits-
+        # funktion. Leer/None ⇒ python-fints signiert Ein-Schritt ⇒ Sparkasse-„9340". So ist
+        # ein einziger Live-Test eindeutig auswertbar, ohne blind Fehlversuche zu riskieren.
+        logger.info(
+            "FinTS start_sync: %d TAN mechanism(s) available, selected=%s",
+            len(mechanisms),
+            mechanism,
+        )
         if mechanism:
             client.set_tan_mechanism(mechanism)
         with client:
-            outcome = _fetch(client, creds, mechanism)
+            # Bei frischer ``system_id`` (nach jedem Credential-Setzen) verlangt die Bank SCA
+            # für die **Anmeldung selbst**: python-fints setzt dann ``init_tan_response`` im
+            # Dialog-Init. Ohne diese Bestätigung läuft ``get_sepa_accounts`` auf einer NICHT
+            # stark-authentifizierten Anmeldung → „9340 Ungültige Signatur". Also zuerst die
+            # Login-TAN anfordern; die Umsätze holt dann ``submit_tan`` nach der Bestätigung.
+            login_tan = client.init_tan_response
+            logger.info(
+                "FinTS start_sync: login SCA required=%s", isinstance(login_tan, NeedTANResponse)
+            )
+            if isinstance(login_tan, NeedTANResponse):
+                outcome = _needs_tan(client, login_tan, mechanism, for_login=True)
+            else:
+                outcome = _fetch(client, creds, mechanism)
         # Dialog ist (sofern nicht pausiert) zu — persistenten Zustand sichern.
         if outcome.status == "done":
             outcome.new_state = client.deconstruct(including_private=True)
@@ -287,7 +329,17 @@ def submit_tan(  # pragma: no cover
         with client.resume_dialog(pending.dialog_data):
             result = client.send_tan(tan_response, tan)
             if isinstance(result, NeedTANResponse):
-                return _needs_tan(client, result, pending.tan_mechanism)
+                # Erneute TAN nötig (z. B. decoupled noch nicht freigegeben) — Flag erhalten.
+                return _needs_tan(
+                    client, result, pending.tan_mechanism, for_login=pending.tan_for_login
+                )
+            if pending.tan_for_login:
+                # Login-SCA bestätigt → JETZT erst Konten + Umsätze holen (der Daten-Schritt
+                # kann seinerseits erneut eine TAN verlangen → dann Daten-TAN, for_login=False).
+                outcome = _fetch(client, creds, pending.tan_mechanism)
+                if outcome.status == "done":
+                    outcome.new_state = client.deconstruct(including_private=True)
+                return outcome
             lines = lines_from_mt940_transactions(result)
         return FintsOutcome(
             status="done",

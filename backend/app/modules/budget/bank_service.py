@@ -389,6 +389,9 @@ class BankService:
         creds = self._credentials(acc, cred)
         self._revalidate_endpoint(creds.endpoint)
         creds.tan_mechanism = pending.tan_mechanism
+        # Bei Login-SCA holt submit_tan nach der TAN erst die Umsätze → Abruf-Fenster setzen
+        # (wie beim Start-Sync); bei einer Daten-TAN ist das unschädlich (#fints login-SCA).
+        creds.start_date = datetime.now(UTC).date() - timedelta(days=self.settings.fints_max_days)
         try:
             outcome = fints_client.submit_tan(creds, pending, tan)
         except (FintsBankLockedError, FintsAuthRejectedError) as exc:
@@ -472,6 +475,7 @@ class BankService:
             "challenge": outcome.challenge,
             "challenge_html": outcome.challenge_html,
             "decoupled": outcome.decoupled,
+            "tan_for_login": outcome.tan_for_login,
         }
         return encrypt_secret(json.dumps(payload), key=self._require_enabled())
 
@@ -541,6 +545,7 @@ class BankService:
             challenge=data.get("challenge"),
             challenge_html=data.get("challenge_html"),
             decoupled=bool(data.get("decoupled")),
+            tan_for_login=bool(data.get("tan_for_login")),
         )
 
     # --------------------------------------------------------- file import (D)
