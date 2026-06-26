@@ -10,3 +10,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+// Bank-Abgleich-Dialog (#fints): auf dem Desktop breiter als `lg` (44rem), damit die
+// Umsatz-Tabelle Platz hat. Bewusst global statt über eine ui-kit-`xl`-Größe gelöst, um
+// keine Submodul-Release-Kopplung einzuführen. Mobil (≤768px) bleibt der Dialog vollflächig
+// (eigene ui-kit-Media-Regel), darum erst ab 769px greifen.
+@media (min-width: 769px) {
+  .dialog:has(.bank) {
+    max-width: 64rem;
+  }
+}
