@@ -86,11 +86,11 @@
         <table class="exp__table">
           <thead>
             <tr>
-              <th scope="col" [attr.aria-sort]="ariaSort('invoiceDate')">
-                <button type="button" class="exp__sort" (click)="onSort('invoiceDate')">{{ 'expenses.col.invoiceDate' | t }}{{ sortInd('invoiceDate') }}</button>
-              </th>
               <th scope="col" [attr.aria-sort]="ariaSort('paymentDate')">
                 <button type="button" class="exp__sort" (click)="onSort('paymentDate')">{{ 'expenses.col.paymentDate' | t }}{{ sortInd('paymentDate') }}</button>
+              </th>
+              <th scope="col" [attr.aria-sort]="ariaSort('invoiceDate')">
+                <button type="button" class="exp__sort" (click)="onSort('invoiceDate')">{{ 'expenses.col.invoiceDate' | t }}{{ sortInd('invoiceDate') }}</button>
               </th>
               <th scope="col">{{ 'expenses.col.kind' | t }}</th>
               <th scope="col">{{ 'expenses.col.description' | t }}</th>
@@ -105,12 +105,22 @@
           <tbody>
             @for (e of items(); track e.id) {
               <tr [class.exp__tr--income]="e.kind === 'income'" [attr.title]="e.actor ? ('expenses.bookedBy' | t: { actor: e.actorName ?? e.actor }) : null">
-                <td class="exp__cellDate">{{ e.invoiceDate ? (e.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellDate">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</td>
+                <td class="exp__cellDate">{{ e.invoiceDate ? (e.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellKind">
                   <app-badge [variant]="e.kind === 'income' ? 'success' : 'neutral'">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
                 </td>
-                <td class="exp__cellDesc">{{ e.description }}</td>
+                <td class="exp__cellDesc">
+                  @if (isDescLong(e.description) && !descExpanded(e.id)) {
+                    {{ e.description.slice(0, DESC_LIMIT) }}…
+                    <button type="button" class="exp__more" (click)="toggleDesc(e.id)">{{ 'action.more' | t }}</button>
+                  } @else {
+                    {{ e.description }}
+                    @if (isDescLong(e.description)) {
+                      <button type="button" class="exp__more" (click)="toggleDesc(e.id)">{{ 'action.less' | t }}</button>
+                    }
+                  }
+                </td>
                 <td class="exp__cellMeta">{{ e.correspondent || '—' }}</td>
                 <td class="exp__mono exp__cellMeta">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
                 <td class="exp__num exp__amount" [class.exp__amount--income]="e.kind === 'income'">{{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}</td>

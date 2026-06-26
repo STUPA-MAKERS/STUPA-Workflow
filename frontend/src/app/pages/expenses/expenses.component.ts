@@ -106,9 +106,13 @@ export class ExpensesComponent implements OnDestroy {
   /** Mobil: Baum hinter einklappbarem Toggle (Desktop immer sichtbar). */
   readonly treeOpen = signal(false);
   readonly sortField = signal<'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate'>(
-    'invoiceDate',
+    'paymentDate',
   );
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
+
+  // Beschreibungen kürzen + per Klick aufklappen (#expenses-ux).
+  readonly DESC_LIMIT = 90;
+  readonly expandedDesc = signal<ReadonlySet<string>>(new Set());
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Zahl aktiver Filter (für den Indikator am Filter-Button). */
@@ -268,6 +272,23 @@ export class ExpensesComponent implements OnDestroy {
       );
       obs.observe(el);
       onCleanup(() => obs.disconnect());
+    });
+  }
+
+  isDescLong(desc: string): boolean {
+    return desc.length > this.DESC_LIMIT;
+  }
+
+  descExpanded(id: string): boolean {
+    return this.expandedDesc().has(id);
+  }
+
+  toggleDesc(id: string): void {
+    this.expandedDesc.update((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   }
 

@@ -163,6 +163,8 @@ export const de = {
   'action.edit': 'Bearbeiten',
   'action.delete': 'Löschen',
   'action.confirm': 'Bestätigen',
+  'action.more': 'mehr',
+  'action.less': 'weniger',
 
   // Ausgaben/Einnahmen (#25)
   'expenses.title': 'Buchungen',
@@ -2239,6 +2241,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'action.edit': 'Edit',
   'action.delete': 'Delete',
   'action.confirm': 'Confirm',
+  'action.more': 'more',
+  'action.less': 'less',
   'action.close': 'Close',
 
   // Expenses/Income (#25)

@@ -412,7 +412,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(p.get('amountMax')).toBe('99');
     expect(p.get('createdFrom')).toBe('2026-01-01');
     expect(p.get('createdTo')).toBe('2026-12-31');
-    expect(p.get('sort')).toBe('invoiceDate');
+    expect(p.get('sort')).toBe('paymentDate');
     expect(p.get('order')).toBe('desc');
     req.flush(page([]));
   });
@@ -470,13 +470,13 @@ describe('ExpensesComponent (unit)', () => {
 
   it('onSort toggles direction on same field and resets to desc on new field', () => {
     const { cmp, http } = build();
-    // gleiche Spalte (default invoiceDate desc) → asc
-    cmp.onSort('invoiceDate');
-    expect(cmp.sortField()).toBe('invoiceDate');
+    // gleiche Spalte (default paymentDate desc) → asc
+    cmp.onSort('paymentDate');
+    expect(cmp.sortField()).toBe('paymentDate');
     expect(cmp.sortOrder()).toBe('asc');
     flushList(http, page([]));
     // erneut → wieder desc
-    cmp.onSort('invoiceDate');
+    cmp.onSort('paymentDate');
     expect(cmp.sortOrder()).toBe('desc');
     flushList(http, page([]));
     // neue Spalte → desc
@@ -488,14 +488,14 @@ describe('ExpensesComponent (unit)', () => {
 
   it('sortInd and ariaSort describe the active sort column', () => {
     const { cmp } = build();
-    // default: invoiceDate desc
-    expect(cmp.sortInd('invoiceDate')).toBe(' ↓');
+    // default: paymentDate desc
+    expect(cmp.sortInd('paymentDate')).toBe(' ↓');
     expect(cmp.sortInd('amount')).toBe('');
-    expect(cmp.ariaSort('invoiceDate')).toBe('descending');
+    expect(cmp.ariaSort('paymentDate')).toBe('descending');
     expect(cmp.ariaSort('amount')).toBe('none');
     cmp.sortOrder.set('asc');
-    expect(cmp.sortInd('invoiceDate')).toBe(' ↑');
-    expect(cmp.ariaSort('invoiceDate')).toBe('ascending');
+    expect(cmp.sortInd('paymentDate')).toBe(' ↑');
+    expect(cmp.ariaSort('paymentDate')).toBe('ascending');
   });
 
   it('loadMore appends the next page and advances the offset', () => {

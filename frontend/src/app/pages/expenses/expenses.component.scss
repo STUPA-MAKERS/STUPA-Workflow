@@ -126,6 +126,29 @@ input.exp__input {
 .exp__cellDesc {
   font-weight: var(--fw-medium);
   min-width: 12rem;
+  max-width: 22rem;
+  overflow-wrap: anywhere;
+}
+// Gekürzte Beschreibung aufklappen (#expenses-ux): inline-Link „mehr"/„weniger".
+.exp__more {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin-inline-start: var(--space-1);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+.exp__more:hover {
+  text-decoration: underline;
+}
+// Empfänger/Zahler (+ Kostenstelle) umbrechen statt überlaufen (#expenses-ux): lange
+// Namen/IBANs ohne Leerzeichen müssen brechen dürfen.
+.exp__cellMeta {
+  max-width: 14rem;
+  overflow-wrap: anywhere;
 }
 .exp__mono {
   font-variant-numeric: tabular-nums;
@@ -258,6 +281,7 @@ input.exp__input {
   .exp__cellDesc {
     flex: 1 1 100%;
     min-width: 0;
+    max-width: none;
     order: -3;
     font-weight: var(--fw-medium);
   }
@@ -274,6 +298,7 @@ input.exp__input {
   .exp__cellDate,
   .exp__cellMeta {
     flex: 0 1 auto;
+    max-width: none;
     order: 1;
     font-size: var(--fs-xs);
     color: var(--color-text-muted);
