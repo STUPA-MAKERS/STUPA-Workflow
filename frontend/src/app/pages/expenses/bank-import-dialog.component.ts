@@ -105,6 +105,8 @@ export class BankImportDialogComponent {
   readonly credStatus = signal<FintsCredentialStatus | null>(null);
   /** Login/PIN-Formular sichtbar (erstes Verbinden oder Zugangsdaten ändern). */
   readonly editingCred = signal(false);
+  /** Verbindungs-/Login-Bereich eingeklappt (mehr Platz für die Umsatz-Tabelle). */
+  readonly connectCollapsed = signal(false);
   readonly credLogin = signal('');
   readonly credPin = signal('');
   readonly savingCred = signal(false);
@@ -179,11 +181,13 @@ export class BankImportDialogComponent {
 
   /** Gefilterte + sortierte Umsätze für die Tabelle. */
   readonly filteredLines = computed<StatementLine[]>(() => {
+    const acc = this.accountId();
     const kind = this.filterKind();
     const q = this.searchQ().trim().toLowerCase();
     const min = this.amountMin().trim() ? Number(this.amountMin()) : null;
     const max = this.amountMax().trim() ? Number(this.amountMax()) : null;
     const rows = this.lines().filter((l) => {
+      if (acc && l.accountId !== acc) return false;
       if (kind && l.kind !== kind) return false;
       const abs = Math.abs(Number(l.amount));
       if (min !== null && abs < min) return false;
@@ -283,6 +287,11 @@ export class BankImportDialogComponent {
     this.credLogin.set(this.credStatus()?.fintsLogin ?? '');
     this.credPin.set('');
     this.editingCred.set(true);
+    this.connectCollapsed.set(false);
+  }
+
+  toggleConnect(): void {
+    this.connectCollapsed.update((v) => !v);
   }
 
   cancelEditCred(): void {

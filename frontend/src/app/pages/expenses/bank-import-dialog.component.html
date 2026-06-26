@@ -43,39 +43,51 @@
           />
 
           @if (showCredForm()) {
-            <!-- Erstmaliges Verbinden / Zugangsdaten ändern (je Bucher, #fints-percred) -->
+            <!-- Erstmaliges Verbinden / Zugangsdaten ändern (je Bucher, #fints-percred).
+                 Einklappbar → mehr Platz für die Umsatz-Tabelle. -->
             <div class="bank__connect">
-              <p class="bank__hint">{{ 'fints.connectHint' | t }}</p>
-              <app-input
-                id="bank-cred-login"
-                [label]="'fints.login' | t"
-                [ngModel]="credLogin()"
-                (ngModelChange)="credLogin.set($event)"
-                name="credLogin"
-              />
-              <app-input
-                id="bank-cred-pin"
-                type="password"
-                [label]="'fints.pin' | t"
-                [ngModel]="credPin()"
-                (ngModelChange)="credPin.set($event)"
-                name="credPin"
-              />
-              <div class="bank__connectActions">
-                <app-button
-                  size="sm"
-                  [loading]="savingCred()"
-                  [disabled]="!credLogin().trim() || !credPin()"
-                  (click)="saveCred()"
-                >
-                  {{ 'fints.connect' | t }}
-                </app-button>
-                @if (connected()) {
-                  <app-button variant="ghost" size="sm" (click)="cancelEditCred()">
-                    {{ 'action.cancel' | t }}
+              <button
+                type="button"
+                class="bank__collapseHead"
+                (click)="toggleConnect()"
+                [attr.aria-expanded]="!connectCollapsed()"
+              >
+                <app-icon [name]="connectCollapsed() ? 'chevron-down' : 'chevron-up'" [size]="16" />
+                <span>{{ 'fints.connectTitle' | t }}</span>
+              </button>
+              @if (!connectCollapsed()) {
+                <p class="bank__hint">{{ 'fints.connectHint' | t }}</p>
+                <app-input
+                  id="bank-cred-login"
+                  [label]="'fints.login' | t"
+                  [ngModel]="credLogin()"
+                  (ngModelChange)="credLogin.set($event)"
+                  name="credLogin"
+                />
+                <app-input
+                  id="bank-cred-pin"
+                  type="password"
+                  [label]="'fints.pin' | t"
+                  [ngModel]="credPin()"
+                  (ngModelChange)="credPin.set($event)"
+                  name="credPin"
+                />
+                <div class="bank__connectActions">
+                  <app-button
+                    size="sm"
+                    [loading]="savingCred()"
+                    [disabled]="!credLogin().trim() || !credPin()"
+                    (click)="saveCred()"
+                  >
+                    {{ 'fints.connect' | t }}
                   </app-button>
-                }
-              </div>
+                  @if (connected()) {
+                    <app-button variant="ghost" size="sm" (click)="cancelEditCred()">
+                      {{ 'action.cancel' | t }}
+                    </app-button>
+                  }
+                </div>
+              }
             </div>
           } @else if (connected()) {
             <!-- Verbunden: Identität anzeigen, Sync auslösen -->
@@ -216,43 +228,43 @@
 
     <!-- Abgleich: gestagete Umsätze -->
     <section class="bank__reconcile">
-      <h3 class="bank__h3">{{ 'fints.openLines' | t }}</h3>
-      @if (loadingLines()) {
-        <p class="bank__hint" aria-live="polite">{{ 'fints.loading' | t }}</p>
-      } @else if (!lines().length) {
+      <div class="bank__reconcileHead">
+        <h3 class="bank__h3">{{ 'fints.openLines' | t }}</h3>
+        @if (lines().length) {
+          <!-- Filter/Sortierung clientseitig (wie die Buchungen-Tabelle) -->
+          <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+            <app-filter-field [label]="'expenses.filter.kind' | t">
+              <div class="bank__kindToggle">
+                <app-button [variant]="filterKind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
+                <app-button [variant]="filterKind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
+                <app-button [variant]="filterKind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+              </div>
+            </app-filter-field>
+            <app-filter-field [label]="'fints.filter.search' | t">
+              <input
+                class="bank__search"
+                type="search"
+                [placeholder]="'fints.filter.searchPlaceholder' | t"
+                [ngModel]="searchQ()"
+                (ngModelChange)="onSearch($event)"
+                name="bankSearch"
+                [attr.aria-label]="'fints.filter.search' | t"
+              />
+            </app-filter-field>
+            <app-filter-field [label]="'expenses.filter.amountRange' | t">
+              <app-filter-range>
+                <app-currency-input start [placeholder]="'expenses.filter.amountMin' | t" [ariaLabel]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
+                <app-currency-input end [placeholder]="'expenses.filter.amountMax' | t" [ariaLabel]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
+              </app-filter-range>
+            </app-filter-field>
+          </app-filter-bar>
+        }
+      </div>
+      @if (!loadingLines() && !lines().length) {
         <p class="empty-state">{{ 'fints.empty' | t }}</p>
+      } @else if (!loadingLines() && !filteredLines().length) {
+        <p class="empty-state">{{ 'fints.emptyFiltered' | t }}</p>
       } @else {
-        <!-- Filter/Sortierung clientseitig (wie die Buchungen-Tabelle) -->
-        <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-          <app-filter-field [label]="'expenses.filter.kind' | t">
-            <div class="bank__kindToggle">
-              <app-button [variant]="filterKind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
-              <app-button [variant]="filterKind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
-              <app-button [variant]="filterKind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
-            </div>
-          </app-filter-field>
-          <app-filter-field [label]="'fints.filter.search' | t">
-            <input
-              class="bank__search"
-              type="search"
-              [placeholder]="'fints.filter.searchPlaceholder' | t"
-              [ngModel]="searchQ()"
-              (ngModelChange)="onSearch($event)"
-              name="bankSearch"
-              [attr.aria-label]="'fints.filter.search' | t"
-            />
-          </app-filter-field>
-          <app-filter-field [label]="'expenses.filter.amountRange' | t">
-            <app-filter-range>
-              <app-currency-input start [placeholder]="'expenses.filter.amountMin' | t" [ariaLabel]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
-              <app-currency-input end [placeholder]="'expenses.filter.amountMax' | t" [ariaLabel]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
-            </app-filter-range>
-          </app-filter-field>
-        </app-filter-bar>
-
-        @if (!filteredLines().length) {
-          <p class="empty-state">{{ 'fints.emptyFiltered' | t }}</p>
-        } @else {
           <div class="bank__tableWrap">
             <table class="bank__table">
               <thead>
@@ -271,6 +283,14 @@
                 </tr>
               </thead>
               <tbody>
+                @if (loadingLines()) {
+                  <!-- Lade-Marker IN der Tabelle (Tabelle bleibt sichtbar). -->
+                  <tr>
+                    <td class="bank__loadingCell" [attr.colspan]="7" aria-live="polite">
+                      {{ 'fints.loading' | t }}
+                    </td>
+                  </tr>
+                } @else {
                 @for (line of filteredLines(); track line.id) {
                   <tr [class.bank__tr--income]="line.kind === 'income'">
                     <td class="bank__cellDate">{{ (line.valueDate || line.bookingDate) ? ((line.valueDate || line.bookingDate) | ldate: 'mediumDate') : '—' }}</td>
@@ -298,10 +318,10 @@
                     </td>
                   </tr>
                 }
+                }
               </tbody>
             </table>
           </div>
-        }
       }
     </section>
   </div>

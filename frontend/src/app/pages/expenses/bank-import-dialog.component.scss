@@ -236,6 +236,34 @@
   font-size: var(--fs-md);
 }
 
+// Kopfzeile „Offene Umsätze" + rechtsbündiger Filter-Button auf einer Zeile.
+.bank__reconcileHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+// Einklapp-Kopf des Verbindungs-/Login-Bereichs.
+.bank__collapseHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--color-text);
+
+  &:hover {
+    color: var(--color-primary);
+  }
+}
+
 // Staging-Tabelle (#fints) — Muster wie die Buchungen-Tabelle (exp__table).
 .bank__kindToggle {
   display: flex;
@@ -361,6 +389,14 @@
   display: inline-flex;
   gap: var(--space-1);
   justify-content: flex-end;
+}
+
+// Lade-Marker als Tabellenzeile (Tabelle/Kopf bleiben sichtbar).
+.bank__loadingCell {
+  padding: var(--space-6) var(--space-3);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
 }
 
 // Mobile: Tabelle → Karten (#mobile-cards), wie die Buchungen-Tabelle.

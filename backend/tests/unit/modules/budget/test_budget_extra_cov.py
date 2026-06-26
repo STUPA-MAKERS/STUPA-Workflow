@@ -715,12 +715,17 @@ def test_export_expenses_requires_permission(fake: _FakeService) -> None:
     assert resp.status_code == 403
 
 
-def test_list_expenses_paged_sort_amount(fake: _FakeService) -> None:
-    """``sort=amount`` wird durchgereicht; ``sort=invoiceDate`` fällt auf createdAt."""
+def test_list_expenses_paged_sort_passthrough(fake: _FakeService) -> None:
+    """``sort`` wird unverändert an den Service durchgereicht — inkl. Datums-Spalten.
+
+    Früher kollabierte der Router invoiceDate/paymentDate fälschlich auf createdAt → die
+    Datums-Sortierung im Buchungen-Tab war wirkungslos (Regressionstest)."""
     _client(fake).get("/api/expenses?sort=amount&order=desc")
     assert fake.calls["list_expenses_paged"]["sort"] == "amount"
     _client(fake).get("/api/expenses?sort=invoiceDate")
-    assert fake.calls["list_expenses_paged"]["sort"] == "createdAt"
+    assert fake.calls["list_expenses_paged"]["sort"] == "invoiceDate"
+    _client(fake).get("/api/expenses?sort=paymentDate&order=asc")
+    assert fake.calls["list_expenses_paged"]["sort"] == "paymentDate"
 
 
 # =====================================================================

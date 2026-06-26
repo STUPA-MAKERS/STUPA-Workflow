@@ -391,7 +391,11 @@ async def list_expenses(
         amount_max=amount_max,
         created_from=created_from,
         created_to=created_to,
-        sort="amount" if sort == "amount" else "createdAt",
+        # ``sort`` ist bereits per ``Literal`` validiert (createdAt/amount/invoiceDate/
+        # paymentDate) — unverändert an den Service durchreichen, dessen ``sort_map`` alle
+        # vier Spalten kennt. (Früher hier fälschlich auf amount/createdAt kollabiert → Datums-
+        # Sortierung wirkungslos.)
+        sort=sort,
         order=order,
         limit=limit,
         offset=offset,

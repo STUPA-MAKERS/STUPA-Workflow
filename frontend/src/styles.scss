@@ -15,8 +15,12 @@
 // Umsatz-Tabelle Platz hat. Bewusst global statt über eine ui-kit-`xl`-Größe gelöst, um
 // keine Submodul-Release-Kopplung einzuführen. Mobil (≤768px) bleibt der Dialog vollflächig
 // (eigene ui-kit-Media-Regel), darum erst ab 769px greifen.
+//
+// Der `.dialog__backdrop`-Vorfahre hebt die Spezifität bewusst über die per
+// View-Encapsulation attributierte `.dialog--lg`-Regel des ui-kit (sonst Gleichstand →
+// Quell-Reihenfolge entscheidet und 44rem gewinnt).
 @media (min-width: 769px) {
-  .dialog:has(.bank) {
+  .dialog__backdrop .dialog:has(.bank) {
     max-width: 64rem;
   }
 }

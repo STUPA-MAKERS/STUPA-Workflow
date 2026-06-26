@@ -932,6 +932,7 @@ export const de = {
   'fints.noAccounts': 'Kein Konto mit FinTS-Zugang konfiguriert.',
   'fints.login': 'Anmeldename / Benutzerkennung',
   'fints.pin': 'PIN',
+  'fints.connectTitle': 'Online-Banking-Zugang',
   'fints.connectHint':
     'Verbinde dich erstmalig mit deinem persönlichen Online-Banking-Zugang. Die PIN wird nur ' +
     'verschlüsselt gespeichert und nie angezeigt.',
@@ -2996,6 +2997,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'fints.noAccounts': 'No account with FinTS access configured.',
   'fints.login': 'Login / user ID',
   'fints.pin': 'PIN',
+  'fints.connectTitle': 'Online banking login',
   'fints.connectHint':
     'Connect with your personal online-banking login for the first time. The PIN is stored ' +
     'encrypted only and never shown.',
