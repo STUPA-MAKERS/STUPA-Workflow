@@ -265,14 +265,14 @@
       } @else if (!loadingLines() && !filteredLines().length) {
         <p class="empty-state">{{ 'fints.emptyFiltered' | t }}</p>
       } @else {
-          <div class="bank__tableWrap">
+          <div class="bank__tableWrap" #tableScroll>
             <table class="bank__table">
               <thead>
                 <tr>
                   <th scope="col" [attr.aria-sort]="ariaSort('date')">
                     <button type="button" class="bank__sort" (click)="onSort('date')">{{ 'fints.col.date' | t }}{{ sortInd('date') }}</button>
                   </th>
-                  <th scope="col">{{ 'fints.col.kind' | t }}</th>
+                  <th scope="col" class="bank__colKind">{{ 'fints.col.kind' | t }}</th>
                   <th scope="col">{{ 'fints.col.counterparty' | t }}</th>
                   <th scope="col">{{ 'fints.col.purpose' | t }}</th>
                   <th scope="col" class="bank__num" [attr.aria-sort]="ariaSort('amount')">
@@ -291,7 +291,7 @@
                     </td>
                   </tr>
                 } @else {
-                @for (line of filteredLines(); track line.id) {
+                @for (line of pagedLines(); track line.id) {
                   <tr [class.bank__tr--income]="line.kind === 'income'">
                     <td class="bank__cellDate">{{ (line.valueDate || line.bookingDate) ? ((line.valueDate || line.bookingDate) | ldate: 'mediumDate') : '—' }}</td>
                     <td class="bank__cellKind">
@@ -321,6 +321,10 @@
                 }
               </tbody>
             </table>
+            @if (!loadingLines() && hasMoreLines()) {
+              <!-- Infinite-Scroll-Sentinel: sichtbar werden → nächste Seite rendern. -->
+              <div #linesSentinel class="bank__sentinel" aria-hidden="true"></div>
+            }
           </div>
       }
     </section>

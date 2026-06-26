@@ -20,7 +20,9 @@
 // View-Encapsulation attributierte `.dialog--lg`-Regel des ui-kit (sonst Gleichstand →
 // Quell-Reihenfolge entscheidet und 44rem gewinnt).
 @media (min-width: 769px) {
-  .dialog__backdrop .dialog:has(.bank) {
+  // Child-Kombinator statt freiem `:has(.bank)`: die Style-Neubewertung beim Ein-/Ausklappen
+  // muss so nur die direkten Kinder prüfen, nicht den ganzen (großen) Tabellen-Teilbaum.
+  .dialog__backdrop .dialog:has(> .dialog__body > .bank) {
     max-width: 64rem;
   }
 }

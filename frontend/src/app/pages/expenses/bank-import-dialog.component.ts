@@ -8,6 +8,7 @@ import {
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -210,6 +211,22 @@ export class BankImportDialogComponent {
     return l.valueDate || l.bookingDate || '';
   }
 
+  // --- Inkrementelles Rendern (#fints): pro Zeile steckt ein vollständiges Kostenstellen-
+  //     <app-select> → bei vielen Umsätzen friert die UI ein. Daher nur ``visibleCount`` Zeilen
+  //     rendern und beim Scrollen ans Ende nachladen (Infinite Scroll, alles clientseitig). ---
+  private readonly PAGE = 25;
+  readonly visibleCount = signal(25);
+  readonly pagedLines = computed<StatementLine[]>(() =>
+    this.filteredLines().slice(0, this.visibleCount()),
+  );
+  readonly hasMoreLines = computed(() => this.filteredLines().length > this.visibleCount());
+  private readonly linesSentinel = viewChild<ElementRef<HTMLElement>>('linesSentinel');
+  private readonly tableScroll = viewChild<ElementRef<HTMLElement>>('tableScroll');
+
+  loadMoreLines(): void {
+    if (this.hasMoreLines()) this.visibleCount.update((n) => n + this.PAGE);
+  }
+
   /** Konten für die FinTS-Lasche: nur sync-fähige (`fintsConfigured`). */
   readonly fintsAccountOptions = computed<SelectOption[]>(() =>
     this.accounts()
@@ -232,6 +249,32 @@ export class BankImportDialogComponent {
     effect(() => {
       const acc = this.accountId();
       if (this.open() && this.tab() === 'fints' && acc) this.loadCredStatus(acc);
+    });
+    // Filter/Konto/Sortierung geändert → Seitenfenster zurücksetzen (sonst rendert man nach
+    // einem Filterwechsel weiter alle zuvor aufgedeckten Zeilen).
+    effect(() => {
+      this.accountId();
+      this.filterKind();
+      this.searchQ();
+      this.amountMin();
+      this.amountMax();
+      this.sortField();
+      this.sortOrder();
+      this.visibleCount.set(this.PAGE);
+    });
+    // Infinite Scroll: Sentinel am Tabellenende beobachten (Root = scrollbarer Wrapper).
+    effect((onCleanup) => {
+      const sentinel = this.linesSentinel()?.nativeElement;
+      const root = this.tableScroll()?.nativeElement ?? null;
+      if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+      const obs = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) this.loadMoreLines();
+        },
+        { root, rootMargin: '200px' },
+      );
+      obs.observe(sentinel);
+      onCleanup(() => obs.disconnect());
     });
   }
 

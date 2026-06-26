@@ -358,11 +358,15 @@
   white-space: nowrap;
 }
 
+// Gegenkonto/IBAN: NIE abschneiden — immer vollständig (Tabelle scrollt sonst horizontal).
 .bank__cellCp {
-  max-width: 12rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+// „ART"-Spalte: Kopf + Badge zentriert.
+.bank__colKind,
+.bank__cellKind {
+  text-align: center;
 }
 
 .bank__cellPurpose {
@@ -397,6 +401,11 @@
   text-align: center;
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
+}
+
+// Infinite-Scroll-Sentinel: unsichtbarer Trigger am Tabellenende.
+.bank__sentinel {
+  height: 1px;
 }
 
 // Mobile: Tabelle → Karten (#mobile-cards), wie die Buchungen-Tabelle.
