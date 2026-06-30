@@ -413,6 +413,7 @@ class AdminApp:
         radio: RadioList = RadioList(values=list(values), default=default if default in keys else None)
         if fill:
             radio.window.dont_extend_height = to_filter(False)
+            radio.window.dont_extend_width = to_filter(False)
         return radio, radio
 
     # ------------------------------------------------------------------ master-detail shell
@@ -429,10 +430,12 @@ class AdminApp:
                 DynamicContainer(self._detail_body),
             ]
         )
+        # Left list holds the long rows → give it the bulk of the width; the detail pane is short,
+        # so cap it so it doesn't leave a dead zone on wide terminals.
         body = VSplit(
             [
-                Frame(left_content, title=left_title, width=D(weight=2, min=30)),
-                Frame(right, title="Details", width=D(weight=3)),
+                Frame(left_content, title=left_title, width=D(weight=1, min=40)),
+                Frame(right, title="Details", width=D(min=42, max=64)),
             ],
             padding=0,
         )
@@ -598,6 +601,7 @@ class AdminApp:
         cb: CheckboxList = CheckboxList(values=values)
         cb.current_values = sorted(current)
         cb.window.dont_extend_height = to_filter(False)
+        cb.window.dont_extend_width = to_filter(False)
         self._perm_cb = cb
 
         def save() -> None:
