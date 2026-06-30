@@ -14,6 +14,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from prompt_toolkit.application import Application
+from prompt_toolkit.filters import to_filter
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.bindings.focus import focus_next, focus_previous
 from prompt_toolkit.layout import (
@@ -401,14 +402,17 @@ class AdminApp:
                 pass
 
     def _list_or_empty(
-        self, values: Sequence[tuple[Any, str]], default: Any = None
+        self, values: Sequence[tuple[Any, str]], default: Any = None, *, fill: bool = False
     ) -> tuple[Any, Any]:
-        """Return (control, focus_target). RadioList needs ≥1 entry."""
+        """Return (control, focus_target). RadioList needs ≥1 entry. ``fill`` lets the list grow
+        to consume the available vertical space (its base widget is dont_extend_height by default)."""
         if not values:
             label = Label(text="  (no entries)")
-            return label, label
+            return HSplit([label, Window()]), label
         keys = [v[0] for v in values]
         radio: RadioList = RadioList(values=list(values), default=default if default in keys else None)
+        if fill:
+            radio.window.dont_extend_height = to_filter(False)
         return radio, radio
 
     # ------------------------------------------------------------------ master-detail shell
@@ -450,7 +454,7 @@ class AdminApp:
 
     @staticmethod
     def _placeholder(text: str) -> Any:
-        return Box(Label(text=text), padding=1)
+        return HSplit([Box(Label(text=text), padding=1), Window()])
 
     @staticmethod
     def _heading(text: str) -> Any:
@@ -467,12 +471,12 @@ class AdminApp:
         rows = ops.list_users(self.db, getattr(self, "_user_search", None))
         self._users = rows
         values = [(r["id"], self._user_label(r)) for r in rows]
-        ctrl, focus = self._list_or_empty(values, self._selected.get("users"))
+        ctrl, focus = self._list_or_empty(values, self._selected.get("users"), fill=True)
         self._left_ctrl = ctrl
         search = getattr(self, "_user_search", None)
         title = f"Users ({len(rows)})" + (f" · filter “{search}”" if search else "")
         search_btn = Button("Search / filter…", self._user_search_dialog, width=22)
-        left = HSplit([Box(search_btn, padding=0), Window(height=1), Box(ctrl, padding=0)])
+        left = HSplit([search_btn, Window(height=1), ctrl])
         self._master_detail(left, focus, left_title=title)
 
     def _user_search_dialog(self) -> None:
@@ -494,7 +498,7 @@ class AdminApp:
             (a["id"], f"{a['role_key']}" + (f" @ {a['gremium']}" if a["gremium"] else " (global)"))
             for a in rows
         ]
-        ctrl, _focus = self._list_or_empty(values)
+        ctrl, _focus = self._list_or_empty(values, fill=True)
 
         def add() -> None:
             self.guard_write(lambda: self._add_role_flow(uid))
@@ -511,7 +515,7 @@ class AdminApp:
         buttons = VSplit([Button("Add…", add, width=9), Button("Revoke", revoke, width=10)], padding=1)
         return HSplit([
             self._heading(f"Role assignments ({len(rows)})"),
-            Box(ctrl, padding=0),
+            ctrl,
             Window(height=1),
             buttons,
         ])
@@ -550,7 +554,7 @@ class AdminApp:
              Button("Delete", delete, width=10)],
             padding=1,
         )
-        return HSplit([self._heading("User"), Box(Label(info), padding=0), Window(height=1), buttons])
+        return HSplit([self._heading("User"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
 
     def _add_role_flow(self, principal_id: str) -> None:
         roles = ops.list_roles_simple(self.db)
@@ -576,10 +580,10 @@ class AdminApp:
         rows = ops.list_roles(self.db)
         self._roles = rows
         values = [(r["id"], f"{r['key']}   ({r['perms']}p · {r['assignments']}a)") for r in rows]
-        ctrl, focus = self._list_or_empty(values, self._selected.get("roles"))
+        ctrl, focus = self._list_or_empty(values, self._selected.get("roles"), fill=True)
         self._left_ctrl = ctrl
         new_btn = Button("New role…", self._new_role, width=22)
-        left = HSplit([Box(new_btn, padding=0), Window(height=1), Box(ctrl, padding=0)])
+        left = HSplit([new_btn, Window(height=1), ctrl])
         self._master_detail(left, focus, left_title=f"Roles ({len(rows)})")
 
     def _role_key(self, rid: Any) -> str:
@@ -593,6 +597,7 @@ class AdminApp:
         values = [(k, k + ("  ⚠ human-only" if k in FORBIDDEN_PERMISSIONS else "")) for k in keys]
         cb: CheckboxList = CheckboxList(values=values)
         cb.current_values = sorted(current)
+        cb.window.dont_extend_height = to_filter(False)
         self._perm_cb = cb
 
         def save() -> None:
@@ -624,7 +629,7 @@ class AdminApp:
             )
             for a in rows
         ]
-        ctrl, _focus = self._list_or_empty(values)
+        ctrl, _focus = self._list_or_empty(values, fill=True)
 
         def revoke() -> None:
             aid = getattr(ctrl, "current_value", None)
@@ -637,7 +642,7 @@ class AdminApp:
 
         return HSplit([
             self._heading(f"Principals with “{self._role_key(rid)}” ({len(rows)})"),
-            Box(ctrl, padding=0),
+            ctrl,
             Window(height=1),
             VSplit([Button("Revoke", revoke, width=10)], padding=1),
         ])
@@ -669,7 +674,7 @@ class AdminApp:
              Button("Delete", delete, width=10)],
             padding=1,
         )
-        return HSplit([self._heading("Role actions"), Box(Label(info), padding=0), Window(height=1), buttons])
+        return HSplit([self._heading("Role actions"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
 
     def _new_role(self) -> None:
         self.guard_write(lambda: self.ask_input(
@@ -687,10 +692,10 @@ class AdminApp:
              + (f" @ {r['gremium']}" if r["gremium"] else " (global)"))
             for r in rows
         ]
-        ctrl, focus = self._list_or_empty(values, self._selected.get("oidc"))
+        ctrl, focus = self._list_or_empty(values, self._selected.get("oidc"), fill=True)
         self._left_ctrl = ctrl
         new_btn = Button("New mapping…", lambda: self.guard_write(lambda: self._mapping_flow(None)), width=22)
-        left = HSplit([Box(new_btn, padding=0), Window(height=1), Box(ctrl, padding=0)])
+        left = HSplit([new_btn, Window(height=1), ctrl])
         self._master_detail(left, focus, left_title=f"OIDC mappings ({len(rows)})")
 
     def _detail_oidc_actions(self, mid: Any) -> Any:
@@ -718,7 +723,7 @@ class AdminApp:
              Button("Edit", edit, width=8), Button("Delete", delete, width=10)],
             padding=1,
         )
-        return HSplit([self._heading("Mapping actions"), Box(Label(info), padding=0), Window(height=1), buttons])
+        return HSplit([self._heading("Mapping actions"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
 
     def _mapping_flow(self, existing: dict[str, Any] | None) -> None:
         roles = ops.list_roles_simple(self.db)
