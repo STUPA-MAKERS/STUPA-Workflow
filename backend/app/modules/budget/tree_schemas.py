@@ -312,6 +312,11 @@ class ExpenseOut(_CamelModel):
     category: str | None = None
     invoice_id: UUID | None = Field(default=None, alias="invoiceId")
     invoice_number: str | None = Field(default=None, alias="invoiceNumber")
+    # Unterbuchungen (#subbookings): ``parentExpenseId`` gesetzt → diese Buchung IST eine
+    # Unterbuchung. ``childCount`` > 0 → die Buchung HAT Unterbuchungen (aufklappbar; ihr
+    # ``amount`` = Σ der Kinder und ist dann schreibgeschützt).
+    parent_expense_id: UUID | None = Field(default=None, alias="parentExpenseId")
+    child_count: int = Field(default=0, alias="childCount")
     created_at: datetime = Field(alias="createdAt")
 
 

@@ -31,6 +31,7 @@ import {
 import { ToastService } from '@stupa-makers/ui-kit';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { downloadBlob } from '@shared/download.util';
+import type { Uuid } from '@core/api/models';
 import {
   type AccountOption,
   BudgetTreeApi,
@@ -114,6 +115,12 @@ export class ExpensesComponent implements OnDestroy {
   readonly DESC_LIMIT = 90;
   readonly expandedDesc = signal<ReadonlySet<string>>(new Set());
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Unterbuchungen (#subbookings): aufgeklappte Buchungen + geladene Kinder + Lade-/Import-Status.
+  readonly expandedSub = signal<ReadonlySet<string>>(new Set());
+  readonly subRows = signal<ReadonlyMap<string, Expense[]>>(new Map());
+  readonly loadingSub = signal<ReadonlySet<string>>(new Set());
+  readonly subImporting = signal<ReadonlySet<string>>(new Set());
 
   /** Zahl aktiver Filter (für den Indikator am Filter-Button). */
   readonly activeFilterCount = computed(
@@ -299,6 +306,87 @@ export class ExpensesComponent implements OnDestroy {
     return Number(amount).toLocaleString(this.i18n.locale() === 'en' ? 'en-US' : 'de-DE', {
       style: 'currency',
       currency: 'EUR',
+    });
+  }
+
+  // ----------------------------------------------------- sub-bookings (#subbookings)
+  isSubExpanded(id: string): boolean {
+    return this.expandedSub().has(id);
+  }
+  subOf(id: string): Expense[] {
+    return this.subRows().get(id) ?? [];
+  }
+  isLoadingSub(id: string): boolean {
+    return this.loadingSub().has(id);
+  }
+  isSubImporting(id: string): boolean {
+    return this.subImporting().has(id);
+  }
+  toggleSub(e: Expense): void {
+    const open = new Set(this.expandedSub());
+    if (open.has(e.id)) {
+      open.delete(e.id);
+      this.expandedSub.set(open);
+      return;
+    }
+    open.add(e.id);
+    this.expandedSub.set(open);
+    if (!this.subRows().has(e.id)) this.loadSub(e.id);
+  }
+  private loadSub(id: string): void {
+    this.loadingSub.update((s) => new Set(s).add(id));
+    this.api.listSubBookings(id as Uuid).subscribe({
+      next: (rows) => {
+        this.subRows.update((m) => new Map(m).set(id, rows));
+        this.loadingSub.update((s) => {
+          const n = new Set(s);
+          n.delete(id);
+          return n;
+        });
+      },
+      error: () => {
+        this.loadingSub.update((s) => {
+          const n = new Set(s);
+          n.delete(id);
+          return n;
+        });
+        this.toast.error(this.i18n.translate('expenses.sub.loadError'));
+      },
+    });
+  }
+  onSubFile(e: Expense, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    this.subImporting.update((s) => new Set(s).add(e.id));
+    this.api.importSubBookings(e.id as Uuid, file).subscribe({
+      next: (children) => {
+        this.subRows.update((m) => new Map(m).set(e.id, children));
+        this.expandedSub.update((s) => new Set(s).add(e.id));
+        this.subImporting.update((s) => {
+          const n = new Set(s);
+          n.delete(e.id);
+          return n;
+        });
+        this.toast.success(
+          this.i18n.translate('expenses.sub.imported', { count: String(children.length) }),
+        );
+        this.reload(); // Eltern-Betrag = Σ Kinder hat sich geändert
+      },
+      error: (err) => {
+        this.subImporting.update((s) => {
+          const n = new Set(s);
+          n.delete(e.id);
+          return n;
+        });
+        const code = (err as { error?: { code?: string } })?.error?.code;
+        this.toast.error(
+          this.i18n.translate(
+            code === 'bank_statement_unparseable' ? 'fints.errFile' : 'expenses.sub.importError',
+          ),
+        );
+      },
     });
   }
 
@@ -724,9 +812,12 @@ export class ExpensesComponent implements OnDestroy {
     // vom Antrag (#25). Nur senden, wenn tatsächlich geändert → kein Audit-Rauschen.
     const budgetChanged =
       !e.applicationId && !!this.editBudgetId() && this.editBudgetId() !== e.budgetId;
+    // Betrag nur senden, wenn geändert: bei einer Eltern-Buchung (childCount>0) ist er = Σ der
+    // Unterbuchungen und serverseitig schreibgeschützt (#subbookings) — unverändert nicht senden.
+    const amountChanged = this.editAmount() !== e.amount;
     this.api
       .updateExpense(e.id, {
-        amount: this.editAmount(),
+        ...(amountChanged ? { amount: this.editAmount() } : {}),
         description: this.editDescription().trim(),
         ...(budgetChanged ? { budgetId: this.editBudgetId() } : {}),
         accountId: this.editAccountId() || null,
@@ -767,8 +858,14 @@ export class ExpensesComponent implements OnDestroy {
       next: () => {
         this.saving.set(false);
         this.confirmDelete.set(null);
-        this.items.update((list) => list.filter((x) => x.id !== e.id));
-        this.total.update((t) => Math.max(0, t - 1));
+        if (e.parentExpenseId) {
+          // Unterbuchung gelöscht (#subbookings): Eltern-Panel + Eltern-Betrag aktualisieren.
+          this.loadSub(e.parentExpenseId);
+          this.reload();
+        } else {
+          this.items.update((list) => list.filter((x) => x.id !== e.id));
+          this.total.update((t) => Math.max(0, t - 1));
+        }
         this.toast.success(this.i18n.translate('expenses.toast.deleted'));
       },
       error: () => {

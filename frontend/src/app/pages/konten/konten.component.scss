@@ -1,194 +1,257 @@
-// Konten-Tab (#fints-konten): zweispaltig — Konto-Liste links, Tabelle rechts (wie Buchungen).
-.kon {
-  display: flex;
-  gap: var(--space-5);
-  align-items: flex-start;
-}
+// Konten-Tab (#fints-konten): pixelgleich zum Buchungen-Tab — exp__-Klassen 1:1 übernommen,
+// Konto-Selektor links im Stil des Budget-Selektors (cct__), TAN/OTP im Dialog (bank__).
+:host { display: block; }
 
-.kon__sidebar {
-  flex: 0 0 16rem;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.kon__sidebarTitle {
-  margin: 0;
-  font-size: var(--fs-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-}
-
-.kon__accList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.kon__acc {
-  width: 100%;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
+/* Kopf auf normale Body-Breite zentrieren (wie Anträge); Baum im linken Rand. */
+.exp__head { width: 100%; max-width: var(--layout-max-width); margin: 0 auto var(--space-5); }
+.exp__title { margin: 0; }
+.exp__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
+.exp__search, .exp__input {
   padding: var(--space-2) var(--space-3);
-  font: inherit;
-  text-align: start;
-  color: var(--color-text);
-  background: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+input.exp__input {
+  height: var(--control-height);
+  box-sizing: border-box;
+}
+.exp__search { min-width: 14rem; height: 2.25rem; }
+.exp__layout {
+  display: grid;
+  grid-template-columns:
+    minmax(12rem, 1fr)
+    minmax(0, var(--layout-max-width))
+    minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.exp__tree {
+  justify-self: end;
+  width: 100%;
+  max-width: 16rem;
+  position: sticky;
+  top: calc(var(--layout-header-height) + var(--space-4));
+  align-self: start;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+.exp__main { min-width: 0; }
+@media (max-width: 60rem) {
+  .exp__layout { grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr); }
+  .exp__head { max-width: none; }
+}
+@media (max-width: 40rem) {
+  .exp__layout { grid-template-columns: 1fr; }
+  .exp__tree { position: static; max-height: none; }
+}
+.exp__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
+.exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
+.exp__amount--income { color: var(--color-success, #2e7d32); }
+.exp__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+.exp__sentinel { height: 1px; }
+/* --- Tabelle --- */
+.exp__tableWrap {
+  overflow-x: auto;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.exp__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.exp__table th,
+.exp__table td {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  text-align: start;
+  vertical-align: middle;
+}
+.exp__table tbody tr:last-child td { border-bottom: none; }
+.exp__table tbody tr:hover { background: var(--color-surface-sunken); }
+.exp__table th {
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-sunken);
+}
+.exp__sort {
+  background: transparent;
+  border: 0;
+  padding: 0;
   cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+.exp__sort:hover { color: var(--color-primary); }
+.exp__num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.exp__cellDate {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.exp__cellDesc {
+  font-weight: var(--fw-medium);
+  min-width: 12rem;
+  max-width: 22rem;
+  overflow-wrap: anywhere;
+}
+.exp__cellMeta {
+  max-width: 14rem;
+  overflow-wrap: anywhere;
+}
+.exp__mono {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+.exp__amount { font-weight: var(--fw-semibold); }
+.exp__amount--income { color: var(--color-success, #2e7d32); }
+.exp__actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+.block { display: block; }
 
-  &:hover {
-    background: var(--color-surface-sunken);
+/* Mobil: Baum hinter einklappbarem Toggle, eine Spalte (wie Buchungen). */
+.exp__treeToggle { display: none; }
+@media (max-width: 768px) {
+  .exp__layout { grid-template-columns: 1fr; }
+  .exp__tree {
+    position: static;
+    max-height: none;
+    max-width: none;
+    justify-self: stretch;
   }
+  .exp__treeToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--space-2) var(--space-3);
+    font: inherit;
+    font-weight: var(--fw-medium);
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+  .exp__treeBody { display: none; padding-top: var(--space-3); }
+  .exp__treeBody--open { display: block; }
+}
+@media (max-width: 768px) {
+  .exp__search { flex: 1 1 100%; min-width: 0; }
+  .exp__tableWrap {
+    overflow-x: visible;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+  .exp__table,
+  .exp__table tbody { display: block; }
+  .exp__table thead { display: none; }
+  .exp__table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+  .exp__table tbody tr:last-child { margin-bottom: 0; }
+  .exp__table th,
+  .exp__table td { padding: 0; border-bottom: none; }
+  .exp__cellDesc {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+    order: -3;
+    font-weight: var(--fw-medium);
+  }
+  .exp__cellKind { order: -2; }
+  .exp__amount {
+    order: -1;
+    margin-left: auto;
+    font-size: var(--fs-md);
+    font-weight: var(--fw-semibold);
+  }
+  .exp__cellDate,
+  .exp__cellMeta {
+    flex: 0 1 auto;
+    max-width: none;
+    order: 1;
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+  }
+  .exp__actions { margin-left: auto; }
+  .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
 }
 
-.kon__acc--active,
-.kon__acc--active:hover {
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
-  border-color: var(--color-primary);
+/* --- Konto-Selektor links: gleiche Optik wie der Budget-Selektor (cct__) --- */
+.cct__node {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: start;
+  background: transparent;
+  border: 0;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
 }
-
-.kon__accName {
+.cct__node:hover { background: var(--color-surface-sunken); }
+.cct__node--top { font-weight: var(--fw-semibold); }
+.cct__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  align-self: center;
+}
+.cct__key {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+.cct__node--active .cct__key { color: inherit; }
+.cct__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cct__node--active {
+  background: color-mix(in srgb, var(--color-success, #5fb37a) 22%, transparent);
+  color: var(--color-text);
   font-weight: var(--fw-medium);
 }
 
-.kon__accBal {
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
-.kon__accBal--neg {
-  color: var(--color-danger);
-}
-
-.kon__main {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.kon__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.kon__title {
-  margin: 0;
-  font-size: var(--fs-xl);
-}
-
-.kon__asOf {
-  margin: var(--space-1) 0 0;
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-
-.kon__balance {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-.kon__balanceLabel {
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-}
-.kon__balanceVal {
-  font-size: var(--fs-xl);
-  font-weight: var(--fw-semibold);
-  font-variant-numeric: tabular-nums;
-}
-.kon__balance--neg .kon__balanceVal {
-  color: var(--color-danger);
-}
-
-.kon__toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.kon__txHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.kon__filters {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.kon__cellStatus {
-  white-space: nowrap;
-}
-.kon__open {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-
-.kon__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-block-end: var(--space-3);
-}
-.kon__formAmount {
-  margin: 0;
-  font-weight: var(--fw-semibold);
-  font-variant-numeric: tabular-nums;
-}
-.kon__formActions {
-  display: flex;
-  gap: var(--space-2);
-}
-
-// ---- aus dem Bankabgleich-Dialog übernommen (#fints): Tabelle, TAN/OTP, Connect, Sperre ----
-.bank__h3 {
-  margin: 0;
-  font-size: var(--fs-md);
-}
-.bank__hint {
-  margin: 0;
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-.bank__connect {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  flex: 1 1 100%;
-}
-.bank__connectActions {
-  display: flex;
-  gap: var(--space-2);
-}
-.bank__connectedAs {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
+/* --- TAN/OTP + Sperr-Banner im Dialog (aus dem Bankabgleich übernommen, #fints) --- */
+.bank__hint { margin: 0; font-size: var(--fs-xs); color: var(--color-text-muted); }
 .bank__locked {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -202,14 +265,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
 }
-.bank__tanMsg {
-  margin: 0;
-  font-weight: var(--fw-semibold);
-}
+.bank__tanMsg { margin: 0; font-weight: var(--fw-semibold); }
 .bank__tanImg {
   align-self: center;
   max-width: 16rem;
@@ -220,14 +277,8 @@
   background: #fff;
   padding: var(--space-2);
 }
-.bank__tanLabel {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-}
-.bank__otp {
-  display: flex;
-  gap: var(--space-2);
-}
+.bank__tanLabel { font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+.bank__otp { display: flex; gap: var(--space-2); }
 .bank__otpBox {
   width: 2.75rem;
   height: 3.25rem;
@@ -257,9 +308,7 @@
   color: var(--color-text-muted);
   text-decoration: underline;
 
-  &:hover {
-    color: var(--color-primary);
-  }
+  &:hover { color: var(--color-primary); }
 }
 .bank__tanInput {
   width: 100%;
@@ -273,191 +322,5 @@
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
 
-  &:focus {
-    outline: none;
-    border-color: var(--color-primary);
-  }
-}
-.bank__search {
-  min-width: 12rem;
-  padding: var(--space-2) var(--space-3);
-  font: inherit;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  &:focus {
-    outline: none;
-    border-color: var(--color-primary);
-  }
-}
-.bank__tableWrap {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 32rem;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-}
-.bank__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-sm);
-}
-.bank__table th,
-.bank__table td {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: var(--border-width) solid var(--color-border);
-  text-align: start;
-  vertical-align: middle;
-}
-.bank__table tbody tr:last-child td {
-  border-bottom: none;
-}
-.bank__table tbody tr:hover {
-  background: var(--color-surface-sunken);
-}
-.bank__table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
-  background: var(--color-surface-sunken);
-}
-.bank__sort {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-
-  &:hover {
-    color: var(--color-primary);
-  }
-}
-.bank__num {
-  text-align: end;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.bank__cellDate {
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-.bank__cellCp {
-  white-space: nowrap;
-}
-.bank__cpName {
-  display: block;
-}
-.bank__cpIban {
-  display: block;
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
-.bank__colKind,
-.bank__cellKind {
-  text-align: center;
-}
-.bank__cellPurpose {
-  max-width: 18rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--color-text-muted);
-}
-.bank__amount {
-  font-weight: var(--fw-semibold);
-
-  &--income {
-    color: var(--color-success);
-  }
-}
-.bank__actions {
-  display: inline-flex;
-  gap: var(--space-1);
-  justify-content: flex-end;
-}
-
-// Mobil: Sidebar oben, Tabelle → Karten.
-@media (max-width: 768px) {
-  .kon {
-    flex-direction: column;
-  }
-  .kon__sidebar {
-    flex: 1 1 auto;
-    width: 100%;
-  }
-  .bank__tableWrap {
-    overflow-x: visible;
-    max-height: none;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-  }
-  .bank__table,
-  .bank__table tbody {
-    display: block;
-  }
-  .bank__table thead {
-    display: none;
-  }
-  .bank__table tbody tr {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-    padding: var(--space-4);
-    margin-bottom: var(--space-3);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-lg);
-  }
-  .bank__table tbody tr:last-child {
-    margin-bottom: 0;
-  }
-  .bank__table td {
-    padding: 0;
-    border-bottom: none;
-  }
-  .bank__cellCp {
-    flex: 1 1 100%;
-    order: -3;
-    font-weight: var(--fw-medium);
-  }
-  .bank__cellKind {
-    order: -2;
-  }
-  .bank__amount {
-    order: -1;
-    margin-left: auto;
-    font-size: var(--fs-md);
-  }
-  .bank__cellPurpose,
-  .bank__cellDate,
-  .kon__cellStatus {
-    flex: 1 1 100%;
-    max-width: none;
-    order: 1;
-    font-size: var(--fs-xs);
-  }
-  .bank__num:has(.bank__actions) {
-    order: 2;
-    flex: 1 1 100%;
-  }
-  .bank__actions {
-    margin-left: auto;
-  }
+  &:focus { outline: none; border-color: var(--color-primary); }
 }

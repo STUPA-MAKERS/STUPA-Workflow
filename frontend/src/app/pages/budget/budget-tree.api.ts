@@ -58,6 +58,11 @@ export interface Expense {
   // Verknüpfte Rechnung (#invoices): 1 Rechnung : N Buchungen.
   invoiceId: Uuid | null;
   invoiceNumber: string | null;
+  // Unterbuchungen (#subbookings): `parentExpenseId` gesetzt → diese Buchung IST eine
+  // Unterbuchung. `childCount` > 0 → sie HAT Unterbuchungen (aufklappbar; `amount` = Σ Kinder,
+  // dann schreibgeschützt).
+  parentExpenseId: Uuid | null;
+  childCount: number;
   createdAt: string;
 }
 
@@ -532,6 +537,20 @@ export class BudgetTreeApi {
   /** Buchung löschen (#25). Teil eines Übertrags → beide Buchungen weg. */
   deleteExpense(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budget-expenses/${id}`);
+  }
+
+  /** Unterbuchungen einer Buchung (#subbookings) — Aufklappen im Buchungen-Tab. */
+  listSubBookings(expenseId: Uuid): Observable<Expense[]> {
+    return this.http.get<Expense[]>(`${this.base}/budget-expenses/${expenseId}/sub-bookings`);
+  }
+  /** Unterbuchungen aus CAMT.053/MT940-Datei anlegen (#subbookings) — erben Konto/KoSt/HHJ/Art. */
+  importSubBookings(expenseId: Uuid, file: File): Observable<Expense[]> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<Expense[]>(
+      `${this.base}/budget-expenses/${expenseId}/sub-bookings/import`,
+      form,
+    );
   }
 
   /** Übertrag Kostenstelle → Kostenstelle (Ausgabe + Einnahme, gleiches HHJ). */

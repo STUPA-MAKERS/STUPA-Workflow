@@ -14,8 +14,8 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
+from sqlalchemy import ColumnElement, and_, exists, func, or_, select, update
 from sqlalchemy import Text as _Text
-from sqlalchemy import and_, exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
@@ -25,6 +25,11 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import tree_rules
+from app.modules.budget.bank_import import (
+    StatementParseError,
+    parse_statement_full,
+    split_leading_iban,
+)
 from app.modules.budget.fints_client import validate_fints_endpoint
 from app.modules.budget.invoice_import import parse_zugferd_pdf
 from app.modules.budget.models import BudgetEntry
@@ -832,6 +837,7 @@ class BudgetTreeService:
         account_name: str | None = None,
         invoice_number: str | None = None,
         actor_name: str | None = None,
+        child_count: int = 0,
     ) -> ExpenseOut:
         return ExpenseOut(
             id=e.id,
@@ -858,6 +864,8 @@ class BudgetTreeService:
             category=e.category,
             invoiceId=e.invoice_id,
             invoiceNumber=invoice_number,
+            parentExpenseId=e.parent_expense_id,
+            childCount=child_count,
             createdAt=e.created_at,
         )
 
@@ -984,6 +992,25 @@ class BudgetTreeService:
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
         fields = payload.model_fields_set
+        # Unterbuchungs-Invarianten (#subbookings): den Eltern-Betrag NICHT direkt setzen, wenn
+        # Kinder existieren (er ist = Σ Kinder). Zählung nur abfragen, wenn wirklich ein Betrag
+        # gesetzt wird (sonst kein Extra-Query).
+        child_n = 0
+        if "amount" in fields and payload.amount is not None:
+            child_n = (await self._child_counts([expense_id])).get(expense_id, 0)
+            if child_n > 0:
+                raise ValidationProblem(
+                    "The amount of a booking with sub-bookings is the sum of its sub-bookings.",
+                    code="subbooking_parent_amount_readonly",
+                )
+        if expense.parent_expense_id is not None and (
+            "budget_id" in fields or "account_id" in fields
+        ):
+            # Kinder erben Kostenstelle/Konto vom Eltern — nicht einzeln umbuchbar.
+            raise ValidationProblem(
+                "A sub-booking inherits cost-centre and account from its parent.",
+                code="subbooking_inherited_field",
+            )
         # Vorzustand der gepatchten Felder für den Audit-Log-Revert (#config-versioning).
         before: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
         if "amount" in fields and payload.amount is not None:
@@ -1037,6 +1064,10 @@ class BudgetTreeService:
                 "after": after,
             },
         )
+        # Kind-Betrag geändert (#subbookings) → Eltern-Betrag = Σ Kinder neu berechnen.
+        if expense.parent_expense_id is not None and "amount" in fields:
+            await self.session.flush()
+            await self._recompute_parent_amount(expense.parent_expense_id)
         await self.session.commit()
         node = await self._get_node(expense.budget_id)
         app_title: str | None = None
@@ -1053,7 +1084,12 @@ class BudgetTreeService:
         acc_name = acc.name if acc is not None else None
         names = await self._actor_names({expense.actor} if expense.actor else set())
         return self._expense_out(
-            expense, node.path_key, app_title, acc_name, actor_name=names.get(expense.actor or "")
+            expense,
+            node.path_key,
+            app_title,
+            acc_name,
+            actor_name=names.get(expense.actor or ""),
+            child_count=child_n,
         )
 
     async def list_expenses(
@@ -1088,7 +1124,9 @@ class BudgetTreeService:
 
         ``budget_id`` schränkt auf die Kostenstelle **und ihren Unterbaum** ein.
         """
-        filters = []
+        # Nur Top-Level-Buchungen listen — Unterbuchungen (#subbookings) erscheinen beim
+        # Aufklappen der Eltern-Buchung, nicht als eigene Zeilen (und nicht als Link-Kandidaten).
+        filters: list[ColumnElement[bool]] = [BudgetExpense.parent_expense_id.is_(None)]
         if budget_id is not None:
             node = await self._get_node(budget_id)
             subtree = select(Budget.id).where(
@@ -1192,6 +1230,8 @@ class BudgetTreeService:
         ).all()
         # Buchenden-UUIDs (#no-uuids-in-ui) gesammelt → Klarnamen in einem Query.
         names = await self._actor_names({row[0].actor for row in rows if row[0].actor})
+        # Unterbuchungs-Anzahl je Zeile (#subbookings) in EINER gruppierten Query.
+        child_counts = await self._child_counts([row[0].id for row in rows])
         items = [
             self._expense_out(
                 e,
@@ -1200,10 +1240,24 @@ class BudgetTreeService:
                 acc_name,
                 inv_number,
                 actor_name=names.get(e.actor or ""),
+                child_count=child_counts.get(e.id, 0),
             )
             for (e, path_key, data, acc_name, inv_number) in rows
         ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def _child_counts(self, parent_ids: list[UUID]) -> dict[UUID, int]:
+        """Anzahl Unterbuchungen je Eltern-Id (#subbookings) — eine gruppierte Query."""
+        if not parent_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(BudgetExpense.parent_expense_id, func.count())
+                .where(BudgetExpense.parent_expense_id.in_(parent_ids))
+                .group_by(BudgetExpense.parent_expense_id)
+            )
+        ).all()
+        return {pid: n for pid, n in rows if pid is not None}
 
     async def delete_expense(self, expense_id: UUID) -> None:
         """Ausgabe löschen (#25). Teil eines Übertrags → beide Buchungen löschen."""
@@ -1224,6 +1278,7 @@ class BudgetTreeService:
                 "transferId": str(expense.transfer_id) if expense.transfer_id else None,
             },
         )
+        parent_id = expense.parent_expense_id
         if expense.transfer_id is not None:
             pair = (
                 (
@@ -1240,7 +1295,110 @@ class BudgetTreeService:
                 await self.session.delete(e)
         else:
             await self.session.delete(expense)
+        # Unterbuchung gelöscht (#subbookings) → Eltern-Betrag neu = Σ verbleibender Kinder.
+        if parent_id is not None:
+            await self.session.flush()
+            await self._recompute_parent_amount(parent_id)
         await self.session.commit()
+
+    async def _recompute_parent_amount(self, parent_id: UUID) -> None:
+        """Eltern-Betrag = Σ Unterbuchungen (#subbookings). Hat das Eltern **keine** Kinder mehr,
+        bleibt sein ``amount`` unverändert (es wird wieder eine eigenständige Buchung — ``amount``
+        > 0 bleibt erfüllt)."""
+        total = await self.session.scalar(
+            select(func.coalesce(func.sum(BudgetExpense.amount), 0)).where(
+                BudgetExpense.parent_expense_id == parent_id
+            )
+        )
+        if total and Decimal(total) > 0:
+            parent = await self.session.get(BudgetExpense, parent_id)
+            if parent is not None:
+                parent.amount = Decimal(total)
+
+    async def list_sub_expenses(self, parent_id: UUID) -> list[ExpenseOut]:
+        """Unterbuchungen einer Buchung (#subbookings), älteste zuerst."""
+        parent = await self.session.get(BudgetExpense, parent_id)
+        if parent is None:
+            raise NotFoundError(f"budget expense {parent_id} not found")
+        rows = (
+            await self.session.execute(
+                select(BudgetExpense, Budget.path_key, Account.name)
+                .join(Budget, Budget.id == BudgetExpense.budget_id)
+                .outerjoin(Account, Account.id == BudgetExpense.account_id)
+                .where(BudgetExpense.parent_expense_id == parent_id)
+                .order_by(BudgetExpense.created_at.asc())
+            )
+        ).all()
+        names = await self._actor_names({e.actor for (e, _pk, _an) in rows if e.actor})
+        return [
+            self._expense_out(
+                e, path_key, account_name=acc_name, actor_name=names.get(e.actor or "")
+            )
+            for (e, path_key, acc_name) in rows
+        ]
+
+    async def import_sub_bookings(
+        self, parent_id: UUID, data: bytes, *, filename: str | None, actor: str
+    ) -> list[ExpenseOut]:
+        """Unterbuchungen aus CAMT.053/MT940-Datei anlegen (#subbookings). Jede Umsatzzeile wird
+        eine Unterbuchung, die Konto/Kostenstelle/HHJ/Art vom Eltern **erbt** (kopiert) und nur
+        Betrag/Beschreibung/Daten/Beleg trägt. Danach Eltern-Betrag = Σ aller Kinder.
+
+        :raises ValidationProblem: Datei nicht parsebar, Eltern ist selbst Unterbuchung, oder
+            Datei-Größe über Limit."""
+        parent = await self.session.get(BudgetExpense, parent_id)
+        if parent is None:
+            raise NotFoundError(f"budget expense {parent_id} not found")
+        if parent.parent_expense_id is not None:
+            raise ValidationProblem(
+                "Sub-bookings cannot be nested.", code="subbooking_nested"
+            )
+        if len(data) > self.settings.attachment_max_bytes:
+            raise ValidationProblem(
+                f"File exceeds {self.settings.attachment_max_bytes} bytes.", code="file_too_large"
+            )
+        try:
+            lines, _balance = parse_statement_full(data, filename=filename)
+        except StatementParseError as exc:
+            raise ValidationProblem(
+                "File is neither valid CAMT.053 nor MT940.", code="bank_statement_unparseable"
+            ) from exc
+        created: list[BudgetExpense] = []
+        for line in lines:
+            name, iban = split_leading_iban(line.counterparty_name, line.counterparty_iban)
+            child = BudgetExpense(
+                # vom Eltern geerbt (kopiert, damit Rollup/Queries greifen)
+                budget_id=parent.budget_id,
+                fiscal_year_id=parent.fiscal_year_id,
+                account_id=parent.account_id,
+                kind=parent.kind,
+                currency=parent.currency,
+                parent_expense_id=parent.id,
+                # eigene Werte aus der Umsatzzeile
+                amount=abs(line.amount),
+                description=_subbooking_description(line.purpose, name),
+                correspondent=name or None,
+                payment_date=line.value_date or line.booking_date,
+                reference_number=line.end_to_end_id or line.reference or None,
+                actor=actor,
+            )
+            self.session.add(child)
+            created.append(child)
+        await self.session.flush()
+        await self._recompute_parent_amount(parent_id)
+        await self._audit(
+            AuditAction.BUDGET_EXPENSE_CREATE,
+            target_type="budget_expense",
+            target_id=str(parent_id),
+            data={"subBookingsImported": len(created), "source": "file"},
+        )
+        await self.session.commit()
+        path_key = (await self._get_node(parent.budget_id)).path_key
+        names = await self._actor_names({actor})
+        return [
+            self._expense_out(c, path_key, actor_name=names.get(actor))
+            for c in created
+        ]
 
     # --------------------------------------------------------------- accounts
     @staticmethod
@@ -1994,7 +2152,11 @@ class BudgetTreeService:
                     BudgetExpense.amount,
                     BudgetExpense.kind,
                     BudgetExpense.application_id,
-                ).join(Budget, Budget.id == BudgetExpense.budget_id)
+                )
+                .join(Budget, Budget.id == BudgetExpense.budget_id)
+                # Unterbuchungen (#subbookings) NICHT mitzählen — der Eltern-Betrag (= Σ Kinder)
+                # ist bereits enthalten; sonst doppelt.
+                .where(BudgetExpense.parent_expense_id.is_(None))
             )
         ).all()
 
@@ -2077,3 +2239,10 @@ class BudgetTreeService:
         if visible_gremium_ids is not None:
             forest = tree_rules.scope_forest(forest, set(visible_gremium_ids))
         return [BudgetTreeNodeOut.model_validate(d) for d in forest]
+
+
+def _subbooking_description(purpose: str | None, name: str | None) -> str:
+    """Beschreibung einer Datei-importierten Unterbuchung (#subbookings): Verwendungszweck, sonst
+    Gegenpartei, sonst Platzhalter. ``description`` ist NOT NULL → nie leer."""
+    text = (purpose or "").strip() or (name or "").strip()
+    return text or "Unterbuchung"

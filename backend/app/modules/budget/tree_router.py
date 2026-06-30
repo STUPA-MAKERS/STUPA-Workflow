@@ -334,6 +334,44 @@ async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
     await service.delete_expense(expense_id)
 
 
+# ---------------------------------------------------- sub-bookings (#subbookings)
+@router.get(
+    "/budget-expenses/{expense_id}/sub-bookings",
+    response_model=list[ExpenseOut],
+    dependencies=[
+        Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
+    ],
+    responses=_errors(401, 403, 404),
+)
+async def list_sub_bookings(expense_id: UUID, service: ServiceDep) -> list[ExpenseOut]:
+    """Unterbuchungen einer Buchung (#subbookings) — Aufklappen im Buchungen-Tab."""
+    return await service.list_sub_expenses(expense_id)
+
+
+@router.post(
+    "/budget-expenses/{expense_id}/sub-bookings/import",
+    response_model=list[ExpenseOut],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(require_principal("budget.book")),
+        Depends(_enforce_invoice_body),
+    ],
+    responses=_errors(401, 403, 404, 413, 422),
+)
+async def import_sub_bookings(
+    expense_id: UUID,
+    service: ServiceDep,
+    file: Annotated[UploadFile, File()],
+    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
+) -> list[ExpenseOut]:
+    """Unterbuchungen aus CAMT.053/MT940-Datei anlegen (#subbookings). Kinder erben
+    Konto/Kostenstelle/HHJ/Art vom Eltern; Eltern-Betrag = Σ Kinder."""
+    data = await file.read()
+    return await service.import_sub_bookings(
+        expense_id, data, filename=file.filename, actor=principal.sub
+    )
+
+
 # --------------------------------------------------- expenses (flat, #25 tab)
 @router.post(
     "/expenses",

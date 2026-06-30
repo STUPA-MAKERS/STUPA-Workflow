@@ -1,227 +1,251 @@
-<div class="kon">
-  <!-- Konten links (wie Budgets auswählbar) -->
-  <aside class="kon__sidebar">
-    <h2 class="kon__sidebarTitle">{{ 'konten.accounts' | t }}</h2>
-    @if (!accounts().length) {
-      <p class="empty-state">{{ 'konten.noAccounts' | t }}</p>
-    } @else {
-      <ul class="kon__accList">
-        @for (a of accounts(); track a.id) {
-          <li>
-            <button
-              type="button"
-              class="kon__acc"
-              [class.kon__acc--active]="a.id === accountId()"
-              (click)="selectAccount(a.id)"
-            >
-              <span class="kon__accName">{{ a.name }}</span>
-              @if (a.fintsLastBalance !== null) {
-                <span class="kon__accBal" [class.kon__accBal--neg]="+a.fintsLastBalance < 0">
-                  {{ money(a.fintsLastBalance) }}
-                </span>
-              }
-            </button>
-          </li>
-        }
-      </ul>
-    }
-  </aside>
-
-  <!-- Hauptbereich: Kopf + Toolbar + Transaktionstabelle (Layout wie Buchungen) -->
-  <section class="kon__main">
-    @if (selectedAccount(); as acc) {
-      <header class="kon__head">
-        <div>
-          <h1 class="kon__title">{{ acc.name }}</h1>
-          @if (acc.fintsBalanceAt) {
-            <p class="kon__asOf">{{ 'konten.balanceAsOf' | t: { date: (acc.fintsBalanceAt | ldate: 'medium') } }}</p>
-          }
-        </div>
+<header class="exp__head">
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="exp__title">{{ 'konten.title' | t }}</h1>
+      @if (selectedAccount(); as acc) {
         @if (acc.fintsLastBalance !== null) {
-          <div class="kon__balance" [class.kon__balance--neg]="+acc.fintsLastBalance < 0">
-            <span class="kon__balanceLabel">{{ 'konten.balance' | t }}</span>
-            <span class="kon__balanceVal">{{ money(acc.fintsLastBalance) }}</span>
-          </div>
-        }
-      </header>
-
-      <!-- Verbindung / Sync / Datei-Import -->
-      <div class="kon__toolbar">
-        @if (!acc.fintsConfigured) {
-          <p class="bank__hint">{{ 'konten.notConfigured' | t }}</p>
-        } @else if (showCredForm()) {
-          <div class="bank__connect">
-            <p class="bank__hint">{{ 'fints.connectHint' | t }}</p>
-            <app-input id="kon-login" [label]="'fints.login' | t" [ngModel]="credLogin()" (ngModelChange)="credLogin.set($event)" name="login" />
-            <app-input id="kon-pin" type="password" [label]="'fints.pin' | t" [ngModel]="credPin()" (ngModelChange)="credPin.set($event)" name="pin" />
-            <div class="bank__connectActions">
-              <app-button size="sm" [loading]="savingCred()" [disabled]="!credLogin().trim() || !credPin()" (click)="saveCred()">{{ 'fints.connect' | t }}</app-button>
-              @if (connected()) {
-                <app-button variant="ghost" size="sm" (click)="cancelEditCred()">{{ 'action.cancel' | t }}</app-button>
-              }
-            </div>
-          </div>
-        } @else if (connected() && !hasPendingTan()) {
-          <span class="bank__connectedAs">{{ connectedLabel() }}</span>
-          <app-button size="sm" [loading]="syncing()" [disabled]="locked()" (click)="startSync()">{{ 'fints.sync' | t }}</app-button>
-          <app-button variant="ghost" size="sm" (click)="editCred()">{{ 'fints.changeLogin' | t }}</app-button>
-          <app-button variant="ghost" size="sm" [disabled]="savingCred()" (click)="removeCred()">{{ 'fints.disconnect' | t }}</app-button>
-        }
-        <!-- Datei-Import (CAMT.053/MT940) — immer möglich, auch ohne FinTS-Login -->
-        @if (acc.fintsConfigured && !hasPendingTan()) {
-          <input #file id="kon-file" type="file" class="sr-only" accept=".xml,.sta,.mt940,.txt" [disabled]="importing()" (change)="onFile($event)" [attr.aria-label]="'fints.fileChoose' | t" />
-          <app-button variant="ghost" size="sm" [loading]="importing()" (click)="file.click()">
-            <span class="inline-flex items-center gap-2"><app-icon name="upload" [size]="16" /> {{ 'konten.importFile' | t }}</span>
-          </app-button>
-        }
-      </div>
-
-      @if (locked()) {
-        <p class="bank__locked" role="alert">{{ 'fints.lockedBanner' | t: { until: lockedUntilLabel() } }}</p>
-      }
-
-      <!-- TAN-Schritt (PSD2/SCA) -->
-      @if (hasPendingTan()) {
-        <div class="bank__tan">
-          <p class="bank__tanMsg">{{ challenge() || ('fints.tanPrompt' | t) }}</p>
-          @if (challengeImage()) {
-            <img class="bank__tanImg" [src]="challengeImage()" [alt]="'fints.tanImageAlt' | t" />
-          }
-          @if (!decoupled()) {
-            <span class="bank__tanLabel" id="kon-tan-label">{{ 'fints.tan' | t }}</span>
-            @if (otpMode()) {
-              <div class="bank__otp" role="group" aria-labelledby="kon-tan-label" (paste)="onOtpPaste($event)">
-                @for (i of otpSlots; track i) {
-                  <input class="bank__otpBox" [attr.data-otp]="i" type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code" [attr.aria-label]="'fints.tanDigit' | t: { n: i + 1 }" [value]="otpDigits()[i]" (input)="onOtpInput(i, $event)" (keydown)="onOtpKeydown(i, $event)" />
-                }
-              </div>
-              <button type="button" class="bank__otpAlt" (click)="useSingleTanField()">{{ 'fints.tanOtherLength' | t }}</button>
-            } @else {
-              <input id="kon-tan" class="bank__tanInput" inputmode="numeric" autocomplete="one-time-code" aria-labelledby="kon-tan-label" [ngModel]="tanCode()" (ngModelChange)="tanCode.set($event)" name="tan" />
+          <p class="exp__subtitle">
+            {{ 'konten.balance' | t }}: <strong>{{ money(acc.fintsLastBalance) }}</strong>
+            @if (acc.fintsBalanceAt) {
+              · {{ 'konten.balanceAsOf' | t: { date: (acc.fintsBalanceAt | ldate: 'medium') } }}
             }
-            <app-button size="sm" [loading]="tanBusy()" [disabled]="!tanReady()" (click)="submitTan()">{{ 'fints.tanConfirm' | t }}</app-button>
-          } @else {
-            <p class="bank__hint">{{ 'fints.tanDecoupled' | t }}</p>
-            <app-button size="sm" [loading]="tanBusy()" (click)="submitTan()">{{ 'fints.tanPoll' | t }}</app-button>
-          }
-        </div>
+          </p>
+        } @else {
+          <p class="exp__subtitle">{{ 'konten.subtitle' | t }}</p>
+        }
+      } @else {
+        <p class="exp__subtitle">{{ 'konten.subtitle' | t }}</p>
       }
-
-      <!-- Transaktionen -->
-      <div class="kon__txHead">
-        <h3 class="bank__h3">{{ 'konten.transactions' | t }}</h3>
-        @if (lines().length) {
-          <div class="kon__filters">
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <input
+        class="exp__search"
+        type="search"
+        [placeholder]="'fints.filter.searchPlaceholder' | t"
+        [ngModel]="searchQ()"
+        (ngModelChange)="onSearch($event)"
+        [attr.aria-label]="'fints.filter.search' | t"
+      />
+      <app-filter-bar [live]="true" [activeCount]="filterState() ? 1 : 0" (reset)="setState('')">
+        <app-filter-field [label]="'konten.filter.status' | t">
+          <div class="inline-flex gap-1">
             <app-button [variant]="filterState() === '' ? 'primary' : 'ghost'" size="sm" (click)="setState('')">{{ 'expenses.filter.all' | t }}</app-button>
             <app-button [variant]="filterState() === 'open' ? 'primary' : 'ghost'" size="sm" (click)="setState('open')">{{ 'konten.filter.open' | t }}</app-button>
             <app-button [variant]="filterState() === 'linked' ? 'primary' : 'ghost'" size="sm" (click)="setState('linked')">{{ 'konten.filter.linked' | t }}</app-button>
-            <input class="bank__search" type="search" [placeholder]="'fints.filter.searchPlaceholder' | t" [ngModel]="searchQ()" (ngModelChange)="onSearch($event)" name="q" [attr.aria-label]="'fints.filter.search' | t" />
           </div>
-        }
-      </div>
-
-      @if (loadingLines()) {
-        <p class="bank__hint" aria-live="polite">{{ 'fints.loading' | t }}</p>
-      } @else if (!lines().length) {
-        <p class="empty-state">{{ 'konten.empty' | t }}</p>
-      } @else if (!filtered().length) {
-        <p class="empty-state">{{ 'fints.emptyFiltered' | t }}</p>
-      } @else {
-        <div class="bank__tableWrap">
-          <table class="bank__table">
-            <thead>
-              <tr>
-                <th scope="col" [attr.aria-sort]="sortField() === 'date' ? (sortOrder() === 'asc' ? 'ascending' : 'descending') : 'none'">
-                  <button type="button" class="bank__sort" (click)="onSort('date')">{{ 'fints.col.date' | t }}{{ sortInd('date') }}</button>
-                </th>
-                <th scope="col" class="bank__colKind">{{ 'fints.col.kind' | t }}</th>
-                <th scope="col">{{ 'fints.col.counterparty' | t }}</th>
-                <th scope="col">{{ 'fints.col.purpose' | t }}</th>
-                <th scope="col" class="bank__num" [attr.aria-sort]="sortField() === 'amount' ? (sortOrder() === 'asc' ? 'ascending' : 'descending') : 'none'">
-                  <button type="button" class="bank__sort" (click)="onSort('amount')">{{ 'fints.col.amount' | t }}{{ sortInd('amount') }}</button>
-                </th>
-                <th scope="col">{{ 'konten.col.booking' | t }}</th>
-                <th scope="col" class="bank__num"></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (line of filtered(); track line.id) {
-                <tr [class.bank__tr--income]="line.kind === 'income'">
-                  <td class="bank__cellDate">{{ (line.valueDate || line.bookingDate) ? ((line.valueDate || line.bookingDate) | ldate: 'mediumDate') : '—' }}</td>
-                  <td class="bank__cellKind">
-                    <app-badge [variant]="line.kind === 'income' ? 'success' : 'neutral'">{{ (line.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
-                  </td>
-                  <td class="bank__cellCp">
-                    @let cp = counterparty(line);
-                    @if (cp.name) { <span class="bank__cpName">{{ cp.name }}</span> }
-                    @if (cp.iban) { <span class="bank__cpIban">{{ cp.iban }}</span> }
-                    @if (!cp.name && !cp.iban) { <span>—</span> }
-                  </td>
-                  <td class="bank__cellPurpose" [title]="line.purpose || ''">{{ line.purpose || '—' }}</td>
-                  <td class="bank__num bank__amount" [class.bank__amount--income]="line.kind === 'income'">{{ signedMoney(line) }}</td>
-                  <td class="kon__cellStatus">
-                    @if (line.matchState === 'matched') {
-                      <app-badge variant="success">{{ 'konten.linked' | t }}</app-badge>
-                    } @else {
-                      <span class="kon__open">{{ 'konten.open' | t }}</span>
-                    }
-                  </td>
-                  <td class="bank__num">
-                    <span class="bank__actions">
-                      @if (line.matchState === 'matched') {
-                        <app-button variant="ghost" size="sm" [disabled]="booking()" (click)="unlink(line)">{{ 'konten.action.unlink' | t }}</app-button>
-                      } @else {
-                        <app-button variant="ghost" size="sm" [disabled]="booking()" (click)="openLink(line)">{{ 'konten.action.link' | t }}</app-button>
-                        <app-button size="sm" [disabled]="booking()" (click)="openImport(line)">{{ 'konten.action.import' | t }}</app-button>
-                      }
-                    </span>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
+        </app-filter-field>
+      </app-filter-bar>
+      @if (selectedAccount()) {
+        <app-button variant="secondary" size="sm" [loading]="syncing()" [disabled]="locked()" (click)="startSync()">
+          <span class="inline-flex items-center gap-2"><app-icon name="repeat" [size]="16" /> {{ 'fints.sync' | t }}</span>
+        </app-button>
+        <app-button variant="secondary" size="sm" (click)="openConnect()">
+          <span class="inline-flex items-center gap-2"><app-icon name="key" [size]="16" /> {{ 'konten.connection' | t }}</span>
+        </app-button>
       }
+    </div>
+  </div>
+</header>
+
+<div class="exp__layout">
+  <!-- Konten links (wie Budget-Selektor); mobil einklappbar wie der Buchungen-Baum. -->
+  <aside class="exp__tree">
+    <button type="button" class="exp__treeToggle" [attr.aria-expanded]="treeOpen()" (click)="treeOpen.set(!treeOpen())">
+      {{ 'konten.accounts' | t }}
+      <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="14" />
+    </button>
+    <div class="exp__treeBody" [class.exp__treeBody--open]="treeOpen()">
+      @if (!accounts().length) {
+        <p class="text-muted text-xs px-2">{{ 'konten.noAccounts' | t }}</p>
+      } @else {
+        <nav class="flex flex-col gap-1 text-sm" [attr.aria-label]="'konten.accounts' | t">
+          @for (a of accounts(); track a.id; let i = $index) {
+            <button
+              type="button"
+              class="cct__node cct__node--top"
+              [class.cct__node--active]="a.id === accountId()"
+              (click)="selectAccount(a.id); treeOpen.set(false)"
+            >
+              <span class="cct__dot" [style.background]="dotColor(i)"></span>
+              <span class="cct__label">{{ a.name }}</span>
+              @if (accountBalance(a); as bal) { <span class="cct__key">{{ bal }}</span> }
+            </button>
+          }
+        </nav>
+      }
+    </div>
+  </aside>
+
+  <div class="exp__main">
+    @if (loadingLines()) {
+      <p class="exp__status" aria-live="polite">{{ 'fints.loading' | t }}</p>
+    } @else if (!selectedAccount()) {
+      <div class="empty-state">{{ 'konten.pickAccount' | t }}</div>
+    } @else if (!lines().length) {
+      <div class="empty-state">{{ 'konten.empty' | t }}</div>
+    } @else if (!filtered().length) {
+      <div class="empty-state">{{ 'fints.emptyFiltered' | t }}</div>
     } @else {
-      <p class="empty-state">{{ 'konten.pickAccount' | t }}</p>
+      <div class="exp__tableWrap">
+        <table class="exp__table">
+          <thead>
+            <tr>
+              <th scope="col" [attr.aria-sort]="ariaSort('date')">
+                <button type="button" class="exp__sort" (click)="onSort('date')">{{ 'fints.col.date' | t }}{{ sortInd('date') }}</button>
+              </th>
+              <th scope="col">{{ 'fints.col.kind' | t }}</th>
+              <th scope="col">{{ 'fints.col.counterparty' | t }}</th>
+              <th scope="col">{{ 'fints.col.purpose' | t }}</th>
+              <th scope="col">{{ 'konten.col.booking' | t }}</th>
+              <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
+                <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'fints.col.amount' | t }}{{ sortInd('amount') }}</button>
+              </th>
+              <th scope="col" class="exp__num"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of filtered(); track line.id) {
+              <tr [class.exp__tr--income]="line.kind === 'income'">
+                <td class="exp__cellDate">{{ (line.valueDate || line.bookingDate) ? ((line.valueDate || line.bookingDate) | ldate: 'mediumDate') : '—' }}</td>
+                <td class="exp__cellKind">
+                  <app-badge [variant]="line.kind === 'income' ? 'success' : 'neutral'">{{ (line.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
+                </td>
+                <td class="exp__cellMeta">
+                  @let cp = counterparty(line);
+                  @if (cp.name) { <span class="block">{{ cp.name }}</span> }
+                  @if (cp.iban) { <span class="exp__mono block">{{ cp.iban }}</span> }
+                  @if (!cp.name && !cp.iban) { — }
+                </td>
+                <td class="exp__cellDesc">{{ line.purpose || '—' }}</td>
+                <td class="exp__cellMeta">
+                  @if (line.matchState === 'matched') {
+                    <app-badge variant="success">{{ 'konten.linked' | t }}</app-badge>
+                  } @else {
+                    <span class="text-muted text-xs">{{ 'konten.open' | t }}</span>
+                  }
+                </td>
+                <td class="exp__num exp__amount" [class.exp__amount--income]="line.kind === 'income'">{{ signedMoney(line) }}</td>
+                <td class="exp__num">
+                  <span class="exp__actions">
+                    @if (line.matchState === 'matched') {
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.unlink' | t" [title]="'konten.action.unlink' | t" (click)="unlink(line)"><app-icon name="remove" /></app-button>
+                    } @else {
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.link' | t" [title]="'konten.action.link' | t" (click)="openLink(line)"><app-icon name="paperclip" /></app-button>
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.import' | t" [title]="'konten.action.import' | t" (click)="openImport(line)"><app-icon name="add" /></app-button>
+                    }
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     }
-  </section>
+  </div>
 </div>
 
+<!-- Verbindung (Zugangsdaten / Status / Trennen) — im Dialog, nicht inline -->
+<app-dialog [open]="connectOpen()" [title]="'konten.connection' | t" [closeLabel]="'action.close' | t" (closed)="closeConnect()">
+  <div class="flex flex-col gap-3">
+    @if (!configured()) {
+      <p class="text-sm text-muted m-0">{{ 'konten.notConfigured' | t }}</p>
+    } @else {
+      @if (connected()) {
+        <p class="text-sm text-muted m-0">{{ 'fints.credActive' | t }}</p>
+        @if (credStatus()?.fintsLastSyncAt; as last) {
+          <p class="text-sm text-muted m-0">{{ 'konten.lastSync' | t: { date: (last | ldate: 'medium') } }}</p>
+        }
+      }
+      @if (locked()) {
+        <p class="bank__locked" role="alert">{{ 'fints.lockedBanner' | t: { until: lockedUntilLabel() } }}</p>
+      }
+      <app-input id="kon-login" [label]="'fints.login' | t" [ngModel]="credLogin()" (ngModelChange)="credLogin.set($event)" name="login" />
+      <app-input id="kon-pin" type="password" [label]="'fints.pin' | t" [ngModel]="credPin()" (ngModelChange)="credPin.set($event)" name="pin" />
+    }
+  </div>
+  <div dialog-footer class="flex justify-between gap-3">
+    @if (connected()) {
+      <app-button size="sm" variant="ghost" [disabled]="savingCred()" (click)="removeCred()">{{ 'fints.disconnect' | t }}</app-button>
+    } @else {
+      <span></span>
+    }
+    <div class="flex gap-3">
+      <app-button size="sm" variant="ghost" (click)="closeConnect()">{{ 'action.cancel' | t }}</app-button>
+      @if (configured()) {
+        <app-button size="sm" [loading]="savingCred()" [disabled]="!credLogin().trim() || !credPin()" (click)="saveCred()">{{ 'fints.connect' | t }}</app-button>
+      }
+    </div>
+  </div>
+</app-dialog>
+
+<!-- TAN (PSD2/SCA) -->
+<app-dialog [open]="hasPendingTan()" [title]="'fints.tan' | t" [closeLabel]="'action.cancel' | t" (closed)="closeTan()">
+  <div class="bank__tan">
+    <p class="bank__tanMsg">{{ challenge() || ('fints.tanPrompt' | t) }}</p>
+    @if (challengeImage()) {
+      <img class="bank__tanImg" [src]="challengeImage()" [alt]="'fints.tanImageAlt' | t" />
+    }
+    @if (!decoupled()) {
+      <span class="bank__tanLabel" id="kon-tan-label">{{ 'fints.tan' | t }}</span>
+      @if (otpMode()) {
+        <div class="bank__otp" role="group" aria-labelledby="kon-tan-label" (paste)="onOtpPaste($event)">
+          @for (i of otpSlots; track i) {
+            <input class="bank__otpBox" [attr.data-otp]="i" type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code" [attr.aria-label]="'fints.tanDigit' | t: { n: i + 1 }" [value]="otpDigits()[i]" (input)="onOtpInput(i, $event)" (keydown)="onOtpKeydown(i, $event)" />
+          }
+        </div>
+        <button type="button" class="bank__otpAlt" (click)="useSingleTanField()">{{ 'fints.tanOtherLength' | t }}</button>
+      } @else {
+        <input id="kon-tan" class="bank__tanInput" inputmode="numeric" autocomplete="one-time-code" aria-labelledby="kon-tan-label" [ngModel]="tanCode()" (ngModelChange)="tanCode.set($event)" name="tan" />
+      }
+    } @else {
+      <p class="bank__hint">{{ 'fints.tanDecoupled' | t }}</p>
+    }
+  </div>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeTan()">{{ 'action.cancel' | t }}</app-button>
+    @if (decoupled()) {
+      <app-button size="sm" [loading]="tanBusy()" (click)="submitTan()">{{ 'fints.tanPoll' | t }}</app-button>
+    } @else {
+      <app-button size="sm" [loading]="tanBusy()" [disabled]="!tanReady()" (click)="submitTan()">{{ 'fints.tanConfirm' | t }}</app-button>
+    }
+  </div>
+</app-dialog>
+
 <!-- Import: neue Buchung aus Transaktion -->
-<app-dialog [open]="!!importLine()" [title]="'konten.importTitle' | t" [closeLabel]="'action.close' | t" (closed)="closeImport()">
+<app-dialog [open]="!!importLine()" [title]="'konten.importTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeImport()">
   @if (importLine(); as line) {
-    <div class="kon__form">
-      <p class="kon__formAmount">{{ signedMoney(line) }} · {{ counterparty(line).name || counterparty(line).iban || '—' }}</p>
+    <form class="flex flex-col gap-2">
+      <p class="font-semibold m-0">{{ signedMoney(line) }} · {{ counterparty(line).name || counterparty(line).iban || '—' }}</p>
       <app-select name="impcc" [label]="'expenses.field.costCentre' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="impBudgetId()" (ngModelChange)="onPickImportBudget($event)" />
       @if (fiscalYearOptions().length) {
         <app-select name="impfy" [label]="'expenses.field.fiscalYear' | t" [placeholder]="'expenses.field.fiscalYearPlaceholder' | t" [options]="fiscalYearOptions()" [ngModel]="impFiscalYearId()" (ngModelChange)="impFiscalYearId.set($event)" />
       }
-      <app-input id="imp-desc" [label]="'expenses.field.description' | t" [ngModel]="impDescription()" (ngModelChange)="impDescription.set($event)" name="impdesc" />
-      <div class="kon__formActions">
-        <app-button [loading]="booking()" [disabled]="!impBudgetId()" (click)="confirmImport()">{{ 'fints.book' | t }}</app-button>
-        <app-button variant="ghost" (click)="closeImport()">{{ 'action.cancel' | t }}</app-button>
-      </div>
-    </div>
+      <label class="text-sm font-medium mt-2" for="imp-desc">{{ 'expenses.field.description' | t }}</label>
+      <input id="imp-desc" class="exp__input" [ngModel]="impDescription()" (ngModelChange)="impDescription.set($event)" name="impdesc" />
+    </form>
   }
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeImport()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [loading]="booking()" [disabled]="!impBudgetId()" (click)="confirmImport()">{{ 'fints.book' | t }}</app-button>
+  </div>
 </app-dialog>
 
 <!-- Link: an bestehende Buchung -->
-<app-dialog [open]="!!linkLine()" [title]="'konten.linkTitle' | t" [closeLabel]="'action.close' | t" (closed)="closeLink()">
+<app-dialog [open]="!!linkLine()" [title]="'konten.linkTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeLink()">
   @if (linkLine(); as line) {
-    <div class="kon__form">
-      <p class="kon__formAmount">{{ signedMoney(line) }} · {{ counterparty(line).name || counterparty(line).iban || '—' }}</p>
+    <div class="flex flex-col gap-2">
+      <p class="font-semibold m-0">{{ signedMoney(line) }} · {{ counterparty(line).name || counterparty(line).iban || '—' }}</p>
       @if (linkLoading()) {
-        <p class="bank__hint">{{ 'fints.loading' | t }}</p>
+        <p class="text-sm text-muted m-0">{{ 'fints.loading' | t }}</p>
       } @else if (!linkCandidates().length) {
-        <p class="empty-state">{{ 'konten.noLinkCandidates' | t }}</p>
+        <div class="empty-state">{{ 'konten.noLinkCandidates' | t }}</div>
       } @else {
         <app-select name="linkexp" [label]="'konten.linkBooking' | t" [placeholder]="'konten.linkBookingPlaceholder' | t" [options]="linkCandidateOptions()" [required]="true" [ngModel]="linkExpenseId()" (ngModelChange)="linkExpenseId.set($event)" />
-        <div class="kon__formActions">
-          <app-button [loading]="booking()" [disabled]="!linkExpenseId()" (click)="confirmLink()">{{ 'konten.action.link' | t }}</app-button>
-          <app-button variant="ghost" (click)="closeLink()">{{ 'action.cancel' | t }}</app-button>
-        </div>
       }
     </div>
   }
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeLink()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [loading]="booking()" [disabled]="!linkExpenseId()" (click)="confirmLink()">{{ 'konten.action.link' | t }}</app-button>
+  </div>
 </app-dialog>

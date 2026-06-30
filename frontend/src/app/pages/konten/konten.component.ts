@@ -16,6 +16,8 @@ import {
   BadgeComponent,
   ButtonComponent,
   DialogComponent,
+  FilterBarComponent,
+  FilterFieldComponent,
   IconComponent,
   InputComponent,
   SelectComponent,
@@ -31,6 +33,7 @@ import {
   type StatementLine,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
+import { PALETTE } from '../budget/budget-year-tree.component';
 
 /**
  * Konten-Tab (#fints-konten): pro Bankkonto **alle** abgerufenen Transaktionen + Kontostand;
@@ -52,6 +55,8 @@ import {
     BadgeComponent,
     ButtonComponent,
     DialogComponent,
+    FilterBarComponent,
+    FilterFieldComponent,
     IconComponent,
     InputComponent,
     SelectComponent,
@@ -103,21 +108,17 @@ export class KontenComponent {
     return rows;
   });
 
-  // --- FinTS credential / connect (je Bucher) ---
+  // Linker Baum mobil einklappbar (wie Buchungen-Tab).
+  readonly treeOpen = signal(false);
+
+  // --- FinTS credential / connect (je Bucher) — in Verbindungs-Dialog, nicht inline ---
   readonly credStatus = signal<FintsCredentialStatus | null>(null);
-  readonly editingCred = signal(false);
+  readonly connectOpen = signal(false);
   readonly credLogin = signal('');
   readonly credPin = signal('');
   readonly savingCred = signal(false);
-  readonly needsConnect = computed(() => {
-    const s = this.credStatus();
-    return !!s && s.configured && !s.hasCredential;
-  });
+  readonly configured = computed(() => !!this.credStatus()?.configured);
   readonly connected = computed(() => !!this.credStatus()?.hasCredential);
-  readonly showCredForm = computed(() => this.editingCred() || this.needsConnect());
-  readonly connectedLabel = computed(() =>
-    this.i18n.translate('fints.connectedAs', { login: this.credStatus()?.fintsLogin ?? '' }),
-  );
   readonly locked = computed(() => {
     const until = this.credStatus()?.fintsLockedUntil;
     return !!until && new Date(until).getTime() > Date.now();
@@ -129,7 +130,6 @@ export class KontenComponent {
 
   // --- sync / TAN ---
   readonly syncing = signal(false);
-  readonly importing = signal(false);
   readonly sessionToken = signal<string>('');
   readonly challenge = signal<string>('');
   readonly challengeImage = signal<string>('');
@@ -276,26 +276,38 @@ export class KontenComponent {
     if (this.sortField() !== field) return '';
     return this.sortOrder() === 'asc' ? ' ↑' : ' ↓';
   }
+  ariaSort(field: 'date' | 'amount'): 'ascending' | 'descending' | 'none' {
+    if (this.sortField() !== field) return 'none';
+    return this.sortOrder() === 'asc' ? 'ascending' : 'descending';
+  }
 
-  // ----------------------------------------------------- credential / connect
+  // ----------------------------------------------------- account selector look
+  /** Farbpunkt je Konto wie im Budget-Selektor (#fints-konten) — Index-rotiert. */
+  dotColor(index: number): string {
+    return PALETTE[((index % PALETTE.length) + PALETTE.length) % PALETTE.length];
+  }
+  accountBalance(a: AccountOption): string {
+    return a.fintsLastBalance !== null ? this.money(a.fintsLastBalance) : '';
+  }
+
+  // ----------------------------------------------------- credential / connect (dialog)
   private loadCredStatus(accountId: string): void {
     this.api.fintsCredentialStatus(accountId as Uuid).subscribe({
       next: (s) => {
         this.credStatus.set(s);
         this.credLogin.set(s.fintsLogin ?? '');
         this.credPin.set('');
-        this.editingCred.set(false);
       },
       error: () => this.credStatus.set(null),
     });
   }
-  editCred(): void {
+  openConnect(): void {
     this.credLogin.set(this.credStatus()?.fintsLogin ?? '');
     this.credPin.set('');
-    this.editingCred.set(true);
+    this.connectOpen.set(true);
   }
-  cancelEditCred(): void {
-    this.editingCred.set(false);
+  closeConnect(): void {
+    this.connectOpen.set(false);
     this.credPin.set('');
   }
   saveCred(): void {
@@ -308,8 +320,7 @@ export class KontenComponent {
       next: (s) => {
         this.savingCred.set(false);
         this.credStatus.set(s);
-        this.credPin.set('');
-        this.editingCred.set(false);
+        this.closeConnect();
         this.toast.success(this.i18n.translate('fints.credSaved'));
       },
       error: (e) => {
@@ -326,6 +337,7 @@ export class KontenComponent {
       next: () => {
         this.savingCred.set(false);
         this.resetTan();
+        this.closeConnect();
         this.loadCredStatus(acc);
         this.toast.success(this.i18n.translate('fints.credRemoved'));
       },
@@ -340,6 +352,11 @@ export class KontenComponent {
   startSync(): void {
     const acc = this.accountId();
     if (!acc || this.syncing() || this.locked()) return;
+    if (!this.connected()) {
+      // Noch keine Zugangsdaten → Verbindungs-Dialog statt Fehler.
+      this.openConnect();
+      return;
+    }
     this.resetTan();
     this.syncing.set(true);
     this.api.fintsSync(acc as Uuid).subscribe({
@@ -420,6 +437,10 @@ export class KontenComponent {
     this.resetOtp();
     this.otpMode.set(true);
   }
+  /** TAN-Dialog abbrechen (#fints-konten) — laufende Sitzung verwerfen. */
+  closeTan(): void {
+    this.resetTan();
+  }
 
   // OTP handlers (wie Dialog)
   onOtpInput(i: number, ev: Event): void {
@@ -468,36 +489,6 @@ export class KontenComponent {
   }
   private focusOtp(i: number): void {
     this.host.nativeElement.querySelector<HTMLInputElement>(`[data-otp="${i}"]`)?.focus();
-  }
-
-  // ----------------------------------------------------- file import (MT940/CAMT)
-  onFile(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (file) this.uploadFile(file);
-    input.value = '';
-  }
-  private uploadFile(file: File): void {
-    const acc = this.accountId();
-    if (!acc || this.importing()) return;
-    this.importing.set(true);
-    this.api.importStatementFile(acc as Uuid, file).subscribe({
-      next: (res) => {
-        this.importing.set(false);
-        this.toast.success(
-          this.i18n.translate('fints.imported', {
-            imported: String(res.imported),
-            duplicates: String(res.duplicates),
-          }),
-        );
-        this.reloadLines();
-        this.loadCredStatus(acc);
-      },
-      error: () => {
-        this.importing.set(false);
-        this.toast.error(this.i18n.translate('fints.errFile'));
-      },
-    });
   }
 
   // ----------------------------------------------------- per-row: Import

@@ -213,6 +213,10 @@ class _FakeService:
     async def delete_expense(self, expense_id: uuid.UUID) -> None:
         self.calls["delete_expense"] = expense_id
 
+    async def list_sub_expenses(self, expense_id: uuid.UUID) -> list[ExpenseOut]:
+        self.calls["list_sub_expenses"] = expense_id
+        return [_expense_out()]
+
     async def create_fiscal_year(self, budget_id: uuid.UUID, payload: Any) -> FiscalYearOut:
         self.calls["create_fy"] = budget_id
         return _fy_out()
@@ -453,6 +457,13 @@ def test_delete_budget_expense(fake: _FakeService) -> None:
     resp = _client(fake).delete(f"/api/budget-expenses/{_EID}")
     assert resp.status_code == 204
     assert fake.calls["delete_expense"] == _EID
+
+
+def test_list_sub_bookings_route(fake: _FakeService) -> None:
+    resp = _client(fake).get(f"/api/budget-expenses/{_EID}/sub-bookings")
+    assert resp.status_code == 200
+    assert resp.json()[0]["id"]
+    assert fake.calls["list_sub_expenses"] == _EID
 
 
 def test_create_fiscal_year(fake: _FakeService) -> None:

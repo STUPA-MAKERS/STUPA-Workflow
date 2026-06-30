@@ -215,6 +215,14 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     payment_method: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Kategorie/Tag (Freitext) zur Gruppierung jenseits der Kostenstelle.
     category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Unterbuchung (#subbookings): zeigt auf die Eltern-Buchung. Kinder ERBEN Konto/Kostenstelle/
+    # HHJ/Art vom Eltern (dieselben Spaltenwerte werden kopiert, damit Rollup/Queries greifen) und
+    # tragen nur eigenen Betrag/Beschreibung/Daten/Beleg/Bank-Link. Der Eltern-Betrag ist die
+    # Summe der Kinder. **Budget-Rollup zählt nur Eltern** (parent_expense_id IS NULL) — Kinder
+    # sind reine Aufschlüsselung. CASCADE: gelöschtes Eltern löscht seine Kinder.
+    parent_expense_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget_expense.id", ondelete="CASCADE"), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="budget_expense_amount_positive"),
@@ -234,6 +242,7 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
         Index("ix_budget_expense_transfer_id", "transfer_id"),
         Index("ix_budget_expense_invoice_date", "invoice_date"),
         Index("ix_budget_expense_invoice_id", "invoice_id"),
+        Index("ix_budget_expense_parent_expense_id", "parent_expense_id"),
     )
 
 

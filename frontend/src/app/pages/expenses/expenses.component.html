@@ -135,6 +135,9 @@
                 @if (canManage()) {
                   <td class="exp__num">
                     <span class="exp__actions">
+                      <app-button variant="ghost" size="sm" [title]="'expenses.sub.toggle' | t" [ariaLabel]="'expenses.sub.toggle' | t" (click)="toggleSub(e)">
+                        <span class="inline-flex items-center gap-1"><app-icon [name]="isSubExpanded(e.id) ? 'chevron-up' : 'chevron-down'" [size]="14" />@if (e.childCount) {<span class="exp__subCount">{{ e.childCount }}</span>}</span>
+                      </app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!e.invoiceId" [ariaLabel]="'expenses.action.viewInvoice' | t" [title]="'expenses.action.viewInvoice' | t" (click)="openInvoiceDialog(e)"><app-icon name="document" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(e)"><app-icon name="edit" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(e)"><app-icon name="delete" /></app-button>
@@ -142,6 +145,44 @@
                   </td>
                 }
               </tr>
+              @if (canManage() && isSubExpanded(e.id)) {
+                <tr class="exp__subRow">
+                  <td colspan="8">
+                    <div class="exp__sub">
+                      <div class="exp__subHead">
+                        <span class="exp__subTitle">{{ 'expenses.sub.title' | t }}</span>
+                        <span>
+                          <input #subfile type="file" class="sr-only" accept=".xml,.sta,.mt940,.txt" (change)="onSubFile(e, $event)" [attr.aria-label]="'expenses.sub.import' | t" />
+                          <app-button variant="secondary" size="sm" [loading]="isSubImporting(e.id)" (click)="subfile.click()">
+                            <span class="inline-flex items-center gap-2"><app-icon name="upload" [size]="14" /> {{ 'expenses.sub.import' | t }}</span>
+                          </app-button>
+                        </span>
+                      </div>
+                      @if (isLoadingSub(e.id)) {
+                        <p class="exp__status">{{ 'expenses.loading' | t }}</p>
+                      } @else if (!subOf(e.id).length) {
+                        <p class="text-sm text-muted m-0">{{ 'expenses.sub.empty' | t }}</p>
+                      } @else {
+                        <table class="exp__subTable">
+                          <tbody>
+                            @for (c of subOf(e.id); track c.id) {
+                              <tr>
+                                <td class="exp__cellDate">{{ c.paymentDate ? (c.paymentDate | ldate: 'mediumDate') : '—' }}</td>
+                                <td class="exp__cellDesc">{{ c.description }}</td>
+                                <td class="exp__cellMeta">{{ c.correspondent || '—' }}</td>
+                                <td class="exp__num exp__amount">{{ money(c.amount) }}</td>
+                                <td class="exp__num">
+                                  <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(c)"><app-icon name="delete" /></app-button>
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
             }
           </tbody>
         </table>
@@ -268,7 +309,12 @@
     <label class="text-sm font-medium mt-2" for="exp-edesc">{{ 'expenses.field.description' | t }}</label>
     <input id="exp-edesc" class="exp__input" [ngModel]="editDescription()" (ngModelChange)="editDescription.set($event)" name="edesc" />
     <label class="text-sm font-medium mt-2" for="exp-eamount">{{ 'expenses.field.amount' | t }}</label>
-    <app-currency-input name="eamount" [ngModel]="editAmount()" (ngModelChange)="editAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
+    @if ((editing()?.childCount ?? 0) > 0) {
+      <!-- Eltern-Betrag = Σ der Unterbuchungen → schreibgeschützt (#subbookings). -->
+      <p class="text-sm text-muted m-0">{{ 'expenses.sub.parentAmount' | t }}: <strong>{{ money(editing()!.amount) }}</strong></p>
+    } @else {
+      <app-currency-input name="eamount" [ngModel]="editAmount()" (ngModelChange)="editAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
+    }
 
     @if (!editing()?.applicationId) {
       <app-select name="ecc" [label]="'expenses.field.costCentre' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="editBudgetId()" (ngModelChange)="editBudgetId.set($event)" />
