@@ -455,6 +455,9 @@ class AccountOut(_CamelModel):
     # True, sobald Endpunkt + BLZ vorliegen → das Konto ist per FinTS synchronisierbar (sobald
     # ein Bucher seine persönlichen Zugangsdaten hinterlegt).
     fints_configured: bool = Field(default=False, alias="fintsConfigured")
+    # Letzter bekannter Bank-Kontostand + Stichtag (#fints-konten); null = nie synchronisiert.
+    fints_last_balance: Decimal | None = Field(default=None, alias="fintsLastBalance")
+    fints_balance_at: datetime | None = Field(default=None, alias="fintsBalanceAt")
 
 
 class AccountOption(_CamelModel):
@@ -470,6 +473,9 @@ class AccountOption(_CamelModel):
     fints_configured: bool = Field(default=False, alias="fintsConfigured")
     fints_has_credential: bool = Field(default=False, alias="fintsHasCredential")
     fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
+    # Letzter Bank-Kontostand + Stichtag (#fints-konten) für den Konten-Tab.
+    fints_last_balance: Decimal | None = Field(default=None, alias="fintsLastBalance")
+    fints_balance_at: datetime | None = Field(default=None, alias="fintsBalanceAt")
 
 
 class FintsCredentialIn(_CamelModel):

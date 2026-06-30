@@ -527,14 +527,54 @@ async def test_import_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _service(session, monkeypatch)
     acc = _account()
     session.put(acc)
-    def _parse(data: Any, filename: Any = None) -> Any:
-        return [bank_import.StatementLine(amount=Decimal("10.00"), bank_ref="a")]
+    def _parse(data: Any, *, filename: Any = None) -> Any:
+        return (
+            [bank_import.StatementLine(amount=Decimal("10.00"), bank_ref="a")],
+            bank_import.StatementBalance(amount=Decimal("1234.56"), as_of=date(2026, 6, 30)),
+        )
 
-    monkeypatch.setattr(bank_service.bank_import, "parse_statement", _parse)
+    monkeypatch.setattr(bank_service.bank_import, "parse_statement_full", _parse)
     session.execute_q.extend([_Result([]), _Result([(uuid.uuid4(),)])])
     session.scalar_q.append(None)
     res = await svc.import_file(acc.id, b"data", filename="x.sta")
     assert res.imported == 1
+    # Schlusssaldo aus der Datei landet am Konto (#fints-konten).
+    assert acc.fints_last_balance == Decimal("1234.56")
+
+
+def test_apply_balance() -> None:
+    acc = _account()
+    BankService._apply_balance(acc, None)  # kein Saldo → unverändert
+    assert acc.fints_last_balance is None
+    BankService._apply_balance(
+        acc, bank_import.StatementBalance(amount=Decimal("99.00"), as_of=date(2026, 6, 30))
+    )
+    assert acc.fints_last_balance == Decimal("99.00")
+    assert acc.fints_balance_at is not None
+    # ohne Stichtag → now() (nur Nicht-None geprüft, Wert variabel)
+    BankService._apply_balance(acc, bank_import.StatementBalance(amount=Decimal("5.00")))
+    assert acc.fints_last_balance == Decimal("5.00")
+
+
+@pytest.mark.asyncio
+async def test_unlink_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unlink löst die Allocation + setzt den Umsatz wieder offen; Buchung bleibt."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    line = _line()
+    line.match_state = "matched"
+    session.put(line)
+    session.execute_q.append(_Result([]))  # DELETE bank_allocation
+    out = await svc.unlink_line(line.id)
+    assert out.match_state == "unmatched"
+    assert line.match_state == "unmatched"
+
+
+@pytest.mark.asyncio
+async def test_unlink_line_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    svc = _service(_Session(), monkeypatch)
+    with pytest.raises(NotFoundError):
+        await svc.unlink_line(uuid.uuid4())
 
 
 @pytest.mark.asyncio

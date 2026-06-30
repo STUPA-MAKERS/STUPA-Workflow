@@ -167,6 +167,9 @@ export interface AccountOption {
   /** Der anfragende Bucher hat schon eigene Zugangsdaten hinterlegt (#fints-percred). */
   fintsHasCredential: boolean;
   fintsLastSyncAt: string | null;
+  /** Letzter Bank-Kontostand + Stichtag (#fints-konten); `null` = nie synchronisiert. */
+  fintsLastBalance: string | null;
+  fintsBalanceAt: string | null;
 }
 
 /** Übertrag Kostenstelle → Kostenstelle (gleiches HHJ). */
@@ -329,6 +332,8 @@ export interface ExpenseQuery {
   budget?: Uuid;
   fiscalYear?: Uuid;
   account?: Uuid;
+  /** Nur Buchungen ohne Bank-Zuordnung (Link-Kandidaten im Konten-Tab, #fints-konten). */
+  unallocated?: boolean;
   kind?: ExpenseKind;
   applicationId?: Uuid;
   q?: string;
@@ -665,6 +670,10 @@ export class BudgetTreeApi {
   /** Umsatz als irrelevant markieren (#fints). */
   ignoreStatementLine(lineId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/statement-lines/${lineId}/ignore`, {});
+  }
+  /** Zuordnung Umsatz↔Buchung lösen (#fints-konten) — Buchung bleibt, Umsatz wieder offen. */
+  unlinkStatementLine(lineId: Uuid): Observable<StatementLine> {
+    return this.http.post<StatementLine>(`${this.base}/statement-lines/${lineId}/unlink`, {});
   }
 
   /** Gefilterte Buchungen als ``.xlsx`` (P(``budget.export``)) — Inhalt wie die Liste. */

@@ -30,7 +30,6 @@ import {
 } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
-import { BankImportDialogComponent } from './bank-import-dialog.component';
 import { downloadBlob } from '@shared/download.util';
 import {
   type AccountOption,
@@ -73,7 +72,6 @@ import { SimplifyPathPipe } from '@shared/budget-path';
     IconComponent,
     SelectComponent,
     CostCentreTreeComponent,
-    BankImportDialogComponent,
   ],
   templateUrl: './expenses.component.html',
   styleUrl: './expenses.component.scss',
@@ -224,9 +222,6 @@ export class ExpensesComponent implements OnDestroy {
     }
     return opts;
   });
-
-  // --- Bank-Abgleich-Dialog (#fints) ---
-  readonly bankDialogOpen = signal(false);
 
   // --- Übertrag-Dialog ---
   readonly transferOpen = signal(false);
@@ -415,11 +410,6 @@ export class ExpensesComponent implements OnDestroy {
     this.total.set(0);
     this.loading.set(true);
     this.fetch(true);
-  }
-
-  /** Nach Bank-Abgleich (#fints): Buchungsliste neu laden (Umsatz wurde gebucht). */
-  onBankReconciled(): void {
-    this.reload();
   }
 
   loadMore(): void {

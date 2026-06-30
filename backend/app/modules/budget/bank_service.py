@@ -139,6 +139,19 @@ class BankService:
         )
 
     @staticmethod
+    def _apply_balance(acc: Account, balance: bank_import.StatementBalance | None) -> None:
+        """Bank-Kontostand + Stichtag am Konto ablegen (#fints-konten). Nur überschreiben, wenn
+        ein Saldo geliefert wurde (HKSAL/`:62F:`/CLBD); sonst bleibt der letzte bekannte Stand."""
+        if balance is None:
+            return
+        acc.fints_last_balance = balance.amount
+        acc.fints_balance_at = (
+            datetime.combine(balance.as_of, datetime.min.time(), tzinfo=UTC)
+            if balance.as_of is not None
+            else datetime.now(UTC)
+        )
+
+    @staticmethod
     def _line_out(line: BankStatementLine, suggested_path_key: str | None) -> StatementLineOut:
         return StatementLineOut(
             id=line.id,
@@ -439,6 +452,7 @@ class BankService:
         if outcome.tan_mechanism:
             cred.fints_tan_mechanism = outcome.tan_mechanism
         cred.fints_last_sync_at = datetime.now(UTC)
+        self._apply_balance(acc, outcome.balance)
         imported, duplicates = await self._stage_lines(acc, outcome.lines)
         await self._audit(
             AuditAction.BANK_SYNC,
@@ -558,11 +572,12 @@ class BankService:
         if len(data) > max_bytes:
             raise ValidationProblem(f"File exceeds {max_bytes} bytes.", code="file_too_large")
         try:
-            lines = bank_import.parse_statement(data, filename=filename)
+            lines, balance = bank_import.parse_statement_full(data, filename=filename)
         except bank_import.StatementParseError as exc:
             raise ValidationProblem(
                 "File is neither valid CAMT.053 nor MT940.", code="bank_statement_unparseable"
             ) from exc
+        self._apply_balance(acc, balance)
         imported, duplicates = await self._stage_lines(acc, lines)
         await self._audit(
             AuditAction.BANK_STATEMENT_IMPORT,
@@ -931,3 +946,19 @@ class BankService:
             )
         await self._audit(AuditAction.BANK_LINE_IGNORE, target_id=str(line_id))
         await self.session.commit()
+
+    async def unlink_line(self, line_id: uuid.UUID) -> StatementLineOut:
+        """Zuordnung Umsatz↔Buchung lösen (#fints-konten): die ``bank_allocation`` entfernen und
+        den Umsatz wieder auf ``unmatched`` setzen. Die **Buchung bleibt** bestehen (sie ist der
+        Geld-Datensatz; nur die Bank-Verknüpfung wird gelöst)."""
+        line = await self.session.get(BankStatementLine, line_id)
+        if line is None:
+            raise NotFoundError(f"statement line {line_id} not found")
+        await self.session.execute(
+            delete(BankAllocation).where(BankAllocation.statement_line_id == line_id)
+        )
+        line.match_state = "unmatched"
+        await self._audit(AuditAction.BANK_LINE_UNLINK, target_id=str(line_id))
+        await self.session.commit()
+        # FE lädt die Liste nach dem Unlink neu (inkl. Vorschlag) → hier kein path-key nötig.
+        return self._line_out(line, None)

@@ -162,6 +162,66 @@ def test_camt_direction_edges() -> None:
     assert lines[1].amount == Decimal("-30.00")  # negativer <Amt> → abs, dann DBIT
 
 
+def test_parse_statement_full_mt940_balance() -> None:
+    """MT940-Schlusssaldo (:62F:) wird mitgeliefert (#fints-konten)."""
+    lines, bal = bi.parse_statement_full(_MT940)
+    assert len(lines) == 2
+    assert bal is not None
+    assert bal.amount == Decimal("1150.00")
+    assert bal.currency == "EUR"
+    assert bal.as_of == date(2024, 1, 3)
+
+
+def test_camt_closing_balance_clbd_signed() -> None:
+    """CAMT-Schlusssaldo aus CLBD; Vorzeichen aus CdtDbtInd (DBIT → negativ)."""
+    xml = b"""<?xml version="1.0"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
+ <Bal><Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp><Amt Ccy="EUR">2500.00</Amt>
+  <CdtDbtInd>DBIT</CdtDbtInd><Dt><Dt>2026-06-30</Dt></Dt></Bal>
+ <Ntry><Amt Ccy="EUR">50.00</Amt><CdtDbtInd>DBIT</CdtDbtInd></Ntry>
+</Stmt></Document>"""
+    _lines, bal = bi.parse_statement_full(xml)
+    assert bal is not None
+    assert bal.amount == Decimal("-2500.00")  # DBIT → Soll-Saldo
+    assert bal.as_of == date(2026, 6, 30)
+
+
+def test_camt_no_balance() -> None:
+    """Ohne <Bal>-Element → kein Saldo (Liste trotzdem geparst)."""
+    lines, bal = bi.parse_statement_full(_CAMT)
+    assert len(lines) == 2
+    assert bal is None
+
+
+def test_balance_from_mt940_handles_missing() -> None:
+    assert bi.balance_from_mt940(object()) is None  # kein .amount
+
+
+def test_camt_balance_clav_fallback_and_skips_codeless() -> None:
+    """Ohne CLBD → Fallback auf CLAV; <Bal> ohne Code wird übersprungen."""
+    xml = b"""<?xml version="1.0"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
+ <Bal><Amt Ccy="EUR">1.00</Amt></Bal>
+ <Bal><Tp><CdOrPrtry><Cd>CLAV</Cd></CdOrPrtry></Tp><Amt Ccy="EUR">300.00</Amt>
+  <CdtDbtInd>CRDT</CdtDbtInd></Bal>
+ <Ntry><Amt Ccy="EUR">50.00</Amt><CdtDbtInd>DBIT</CdtDbtInd></Ntry>
+</Stmt></Document>"""
+    _lines, bal = bi.parse_statement_full(xml)
+    assert bal is not None
+    assert bal.amount == Decimal("300.00")
+
+
+def test_camt_balance_unparseable_amount_ignored() -> None:
+    """CLBD ohne brauchbaren Betrag → kein Saldo (Liste bleibt geparst)."""
+    xml = b"""<?xml version="1.0"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
+ <Bal><Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp></Bal>
+ <Ntry><Amt Ccy="EUR">50.00</Amt><CdtDbtInd>DBIT</CdtDbtInd></Ntry>
+</Stmt></Document>"""
+    _lines, bal = bi.parse_statement_full(xml)
+    assert bal is None
+
+
 def test_camt_sub_cent_rejected() -> None:
     xml = b"""<?xml version="1.0"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt><Ntry>

@@ -15,7 +15,7 @@ from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from sqlalchemy import Text as _Text
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
@@ -31,6 +31,7 @@ from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree_models import (
     Account,
     AccountFintsCredential,
+    BankAllocation,
     Budget,
     BudgetAllocation,
     BudgetExpense,
@@ -1072,6 +1073,7 @@ class BudgetTreeService:
         account_id: UUID | None = None,
         kind: str | None = None,
         application_id: UUID | None = None,
+        unallocated: bool = False,
         q: str | None = None,
         amount_min: Decimal | None = None,
         amount_max: Decimal | None = None,
@@ -1102,6 +1104,11 @@ class BudgetTreeService:
             filters.append(BudgetExpense.account_id == account_id)
         if kind is not None:
             filters.append(BudgetExpense.kind == kind)
+        if unallocated:
+            # Nur Buchungen OHNE Bank-Zuordnung (Link-Kandidaten im Konten-Tab, #fints-konten).
+            filters.append(
+                ~exists().where(BankAllocation.expense_id == BudgetExpense.id)
+            )
         if application_id is not None:
             filters.append(BudgetExpense.application_id == application_id)
         # Fuzzy-Suche (#3): Trigram-Ranking über die Freitext-Felder der Buchung +
@@ -1248,6 +1255,8 @@ class BudgetTreeService:
             # FinTS-fähig mit Endpunkt + BLZ; persönliche Logins/PINs liegen je Principal
             # getrennt (#fints-percred) und gehören nicht in die Konto-Stammdaten.
             fintsConfigured=bool(a.fints_endpoint and a.fints_blz),
+            fintsLastBalance=a.fints_last_balance,
+            fintsBalanceAt=a.fints_balance_at,
         )
 
     def _apply_fints_config(self, acc: Account, payload: AccountCreate | AccountUpdate) -> bool:
@@ -1319,6 +1328,8 @@ class BudgetTreeService:
                 fintsConfigured=bool(a.fints_endpoint and a.fints_blz),
                 fintsHasCredential=bool(has_cred),
                 fintsLastSyncAt=last_sync,
+                fintsLastBalance=a.fints_last_balance,
+                fintsBalanceAt=a.fints_balance_at,
             )
             for a, has_cred, last_sync in rows
         ]

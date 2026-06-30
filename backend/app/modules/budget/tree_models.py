@@ -258,6 +258,15 @@ class Account(UUIDPkMixin, CreatedAtMixin, Base):
     #   ``fints_blz`` ist das Konto nicht FinTS-fähig.
     fints_endpoint: Mapped[str | None] = mapped_column(Text, nullable=True)
     fints_blz: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Letzter bekannter **Kontostand** (#fints-konten): aus dem Bank-Schlusssaldo eines Syncs
+    # (HKSAL) bzw. dem ``:62F:``/CLBD-Saldo eines Datei-Imports. ``fints_balance_at`` = Stichtag
+    # des Saldos. Reiner Anzeige-/Abgleich-Wert (nicht in die Budget-Rechnung einbezogen).
+    fints_last_balance: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2), nullable=True
+    )
+    fints_balance_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (Index("ix_account_name", "name"),)
 

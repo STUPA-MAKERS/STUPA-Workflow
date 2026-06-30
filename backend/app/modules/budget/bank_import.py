@@ -50,6 +50,15 @@ class StatementLine:
     raw: dict[str, str] = field(default_factory=dict)
 
 
+@dataclass(slots=True)
+class StatementBalance:
+    """Schluss-/Kontostand eines Auszugs (#fints-konten). ``amount`` vorzeichenbehaftet."""
+
+    amount: Decimal
+    currency: str = "EUR"
+    as_of: date | None = None
+
+
 def _sane_amount(value: Decimal) -> Decimal:
     """Betrag auf gültigen Bereich + Cent-Granularität prüfen (Vorzeichen bleibt erhalten)."""
     if not value.is_finite() or abs(value) > _MAX_AMOUNT:
@@ -212,18 +221,102 @@ def parse_camt053(data: bytes) -> list[StatementLine]:
     return lines
 
 
+def _looks_like_xml(data: bytes, filename: str | None) -> bool:
+    head = data.lstrip()[:512]
+    looks_xml = head.startswith(b"<?xml") or (head.startswith(b"<") and b"Document" in data[:4096])
+    return looks_xml or (filename or "").lower().endswith(".xml")
+
+
 def parse_statement(data: bytes, *, filename: str | None = None) -> list[StatementLine]:
     """Auszug parsen — Format aus Inhalt (XML vs. nicht-XML) bzw. Endung erraten.
 
     :raises StatementParseError: keine der beiden Quellen passt."""
+    return parse_statement_full(data, filename=filename)[0]
+
+
+def parse_statement_full(
+    data: bytes, *, filename: str | None = None
+) -> tuple[list[StatementLine], StatementBalance | None]:
+    """Wie :func:`parse_statement`, liefert zusätzlich den **Schlusssaldo** (#fints-konten),
+    falls der Auszug einen trägt (MT940 ``:62F:`` / CAMT ``CLBD``). Parst nur einmal."""
     if not data:
         raise StatementParseError("empty file")
-    head = data.lstrip()[:512]
-    looks_xml = head.startswith(b"<?xml") or head.startswith(b"<") and b"Document" in data[:4096]
-    name = (filename or "").lower()
-    if looks_xml or name.endswith(".xml"):
-        return parse_camt053(data)
-    return parse_mt940(data)
+    if _looks_like_xml(data, filename):
+        lines = parse_camt053(data)
+        return lines, _camt_closing_balance(data)
+    import mt940  # lazy (transitiv über fints)
+
+    try:
+        transactions = mt940.models.Transactions()
+        transactions.parse(_decode(data))
+    except Exception as exc:  # pragma: no cover - mt940 wirft diverse Fehler
+        raise StatementParseError(f"unparseable MT940: {exc}") from exc
+    lines = lines_from_mt940_transactions(transactions)
+    if not lines:
+        raise StatementParseError("MT940 contained no transactions")
+    return lines, _mt940_closing_balance(transactions)
+
+
+def balance_from_mt940(bal: object) -> StatementBalance | None:
+    """``mt940.models.Balance`` → :class:`StatementBalance` (Datei-Schlusssaldo **und** der
+    HKSAL-Live-Saldo des FinTS-Clients liefern dieselbe Struktur). Die ``mt940``-Lib signiert den
+    Betrag bereits über den C/D-Status."""
+    amount_obj = getattr(bal, "amount", None)
+    magnitude = getattr(amount_obj, "amount", None)
+    if magnitude is None:
+        return None
+    try:
+        amount = _sane_amount(Decimal(str(magnitude)))
+    except StatementParseError:
+        return None
+    return StatementBalance(
+        amount=amount,
+        currency=str(getattr(amount_obj, "currency", None) or "EUR"),
+        as_of=_as_date(getattr(bal, "date", None)),
+    )
+
+
+def _mt940_closing_balance(transactions: object) -> StatementBalance | None:
+    """MT940-Schlusssaldo (``:62F:`` → ``final_closing_balance``)."""
+    data = getattr(transactions, "data", None)
+    if not isinstance(data, dict):
+        return None
+    bal = data.get("final_closing_balance") or data.get("final_opening_balance")
+    return balance_from_mt940(bal) if bal is not None else None
+
+
+def _camt_closing_balance(data: bytes) -> StatementBalance | None:
+    """CAMT-Schlusssaldo: ``<Bal>`` mit Code ``CLBD`` (Closing Booked); Vorzeichen aus
+    ``CdtDbtInd``. Fällt auf ``CLAV`` (Closing Available) zurück, wenn kein CLBD da ist."""
+    try:
+        root = ET.fromstring(data)  # noqa: S314 - eigener Auszug, keine externen Entities
+    except ET.ParseError:
+        return None
+    by_code: dict[str, ET.Element] = {}
+    for bal in _findall_local(root, "Bal"):
+        code = (_find_text_local(bal, "Cd") or "").upper()
+        if code:
+            by_code.setdefault(code, bal)
+    # `Element or Element` triggert die ElementTree-Truthiness-Deprecation → explizit prüfen.
+    chosen = by_code.get("CLBD")
+    if chosen is None:
+        chosen = by_code.get("CLAV")
+    if chosen is None:
+        return None
+    amt_el = _find_local(chosen, "Amt")
+    if amt_el is None or not (amt_el.text or "").strip():
+        return None
+    try:
+        magnitude = _sane_amount(Decimal((amt_el.text or "").strip()))
+    except (InvalidOperation, ValueError, StatementParseError):
+        return None
+    ind = (_find_text_local(chosen, "CdtDbtInd") or "").upper()
+    amount = -abs(magnitude) if ind.startswith("DBIT") else abs(magnitude)
+    return StatementBalance(
+        amount=amount,
+        currency=(amt_el.get("Ccy") or "EUR").upper(),
+        as_of=_camt_date(_find_local(chosen, "Dt")),
+    )
 
 
 # ------------------------------------------------------------------ idempotency

@@ -367,6 +367,7 @@ async def list_expenses(
     account_id: Annotated[UUID | None, Query(alias="account")] = None,
     kind: Annotated[ExpenseKind | None, Query()] = None,
     application_id: Annotated[UUID | None, Query(alias="applicationId")] = None,
+    unallocated: Annotated[bool, Query()] = False,
     q: Annotated[str | None, Query()] = None,
     amount_min: Annotated[Decimal | None, Query(alias="amountMin", ge=0)] = None,
     amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
@@ -388,6 +389,7 @@ async def list_expenses(
         account_id=account_id,
         kind=kind,
         application_id=application_id,
+        unallocated=unallocated,
         q=q,
         amount_min=amount_min,
         amount_max=amount_max,
@@ -845,6 +847,18 @@ async def confirm_statement_line(
 async def ignore_statement_line(line_id: UUID, service: BankServiceDep) -> None:
     """Umsatz als irrelevant markieren (#fints) — bleibt erhalten (idempotenter Import)."""
     await service.ignore_line(line_id)
+
+
+@router.post(
+    "/statement-lines/{line_id}/unlink",
+    response_model=StatementLineOut,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(401, 403, 404),
+)
+async def unlink_statement_line(line_id: UUID, service: BankServiceDep) -> StatementLineOut:
+    """Zuordnung Umsatz↔Buchung lösen (#fints-konten): Allocation entfernen, Umsatz wieder offen.
+    Die Buchung bleibt bestehen."""
+    return await service.unlink_line(line_id)
 
 
 # ---------------------------------------------------------------- fiscal years

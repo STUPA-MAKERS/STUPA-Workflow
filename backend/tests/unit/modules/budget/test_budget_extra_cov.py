@@ -726,6 +726,10 @@ def test_list_expenses_paged_sort_passthrough(fake: _FakeService) -> None:
     assert fake.calls["list_expenses_paged"]["sort"] == "invoiceDate"
     _client(fake).get("/api/expenses?sort=paymentDate&order=asc")
     assert fake.calls["list_expenses_paged"]["sort"] == "paymentDate"
+    # account + unallocated filter (Link-Kandidaten im Konten-Tab, #fints-konten).
+    _client(fake).get(f"/api/expenses?account={_BID}&unallocated=true")
+    assert fake.calls["list_expenses_paged"]["account_id"] == _BID
+    assert fake.calls["list_expenses_paged"]["unallocated"] is True
 
 
 # =====================================================================

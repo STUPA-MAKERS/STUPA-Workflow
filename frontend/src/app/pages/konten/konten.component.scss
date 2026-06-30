@@ -1,169 +1,233 @@
-:host {
-  display: contents;
-}
-
-/* Dialog-Inhalt: klare vertikale Rhythmik statt gequetschter Blöcke (#fints).
-   ``padding-block-end`` gibt unten Luft (Dialog-Body-Maske frisst sonst den Rand). */
-.bank {
+// Konten-Tab (#fints-konten): zweispaltig — Konto-Liste links, Tabelle rechts (wie Buchungen).
+.kon {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding-block-end: var(--space-4);
-}
-
-/* Quell-Umschalter wie der Budget-Übersicht-Toggle (segmentierte Pills, kein Underline). */
-.bank__tabs {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-1);
-  margin: 0;
-}
-
-.bank__tab {
-  padding: var(--space-2) var(--space-3);
-  font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--color-text-muted);
-  background: none;
-  border: none;
-  border-radius: var(--radius-md);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.bank__tab:hover {
-  color: var(--color-text);
-  background: var(--color-surface-sunken);
-}
-
-/* Aktiver Tab behält seinen Hintergrund auch beim Hover (Spezifität, vgl. bd__ovTab). */
-.bank__tab--active,
-.bank__tab--active:hover {
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
-}
-
-/* Quell-Panel (FinTS bzw. Datei): KEIN eingerücktes Karten-Padding — Inhalt fluchtet
-   bündig mit Überschriften/Umsatz-Liste (sonst Versatz). ``relative`` trägt das Drop-Overlay. */
-.bank__panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.bank__notice {
-  margin: 0;
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
-/* Datei-Upload: kleiner Button + Hinweis; ganze Karte ist Drop-Ziel (wie Anhänge-Panel). */
-.bank__upload {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-5);
   align-items: flex-start;
 }
 
-.bank__dropOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg));
-  border: 2px dashed var(--color-primary);
-  border-radius: var(--radius-lg);
-  pointer-events: none;
-}
-
-.bank__dropInner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-primary);
-  font-weight: var(--fw-semibold);
-}
-
-.bank__tan {
+.kon__sidebar {
+  flex: 0 0 16rem;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
 }
 
-.bank__tanImg {
-  align-self: center;
-  max-width: 16rem;
-  max-height: 16rem;
-  image-rendering: pixelated; // QR-/Matrix-Codes scharf skalieren
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: #fff; // weißer Hintergrund — QR auch im Dark-Mode scanbar
-  padding: var(--space-2);
-}
-
-.bank__tanMsg {
+.kon__sidebarTitle {
   margin: 0;
-  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
 }
 
-// Erstes Verbinden / Zugangsdaten ändern (je Bucher, #fints-percred).
-.bank__connect {
+.kon__accList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  gap: var(--space-1);
 }
 
-.bank__connectActions {
+.kon__acc {
+  width: 100%;
   display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  text-align: start;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
 }
 
-.bank__connected {
+.kon__acc--active,
+.kon__acc--active:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+}
+
+.kon__accName {
+  font-weight: var(--fw-medium);
+}
+
+.kon__accBal {
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+.kon__accBal--neg {
+  color: var(--color-danger);
+}
+
+.kon__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.kon__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.kon__title {
+  margin: 0;
+  font-size: var(--fs-xl);
+}
+
+.kon__asOf {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.kon__balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.kon__balanceLabel {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+.kon__balanceVal {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.kon__balance--neg .kon__balanceVal {
+  color: var(--color-danger);
+}
+
+.kon__toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
 
+.kon__txHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.kon__filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.kon__cellStatus {
+  white-space: nowrap;
+}
+.kon__open {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.kon__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block-end: var(--space-3);
+}
+.kon__formAmount {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.kon__formActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+// ---- aus dem Bankabgleich-Dialog übernommen (#fints): Tabelle, TAN/OTP, Connect, Sperre ----
+.bank__h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.bank__hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.bank__connect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  flex: 1 1 100%;
+}
+.bank__connectActions {
+  display: flex;
+  gap: var(--space-2);
+}
 .bank__connectedAs {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
 }
-
-// Sperr-Hinweis (#fints-review): Bank hat abgelehnt/gesperrt → deutlich warnen.
 .bank__locked {
   margin: 0;
   padding: var(--space-2) var(--space-3);
   font-size: var(--fs-sm);
   color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 10%, var(--color-bg));
-  border: 1px solid var(--color-danger);
+  border: var(--border-width) solid var(--color-danger);
   border-radius: var(--radius-md);
 }
-
+.bank__tan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.bank__tanMsg {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+}
+.bank__tanImg {
+  align-self: center;
+  max-width: 16rem;
+  max-height: 16rem;
+  image-rendering: pixelated;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: var(--space-2);
+}
 .bank__tanLabel {
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
 }
-
-// OTP-Eingabe: 6 quadratische Boxen (#fints).
 .bank__otp {
   display: flex;
   gap: var(--space-2);
 }
-
 .bank__otpBox {
   width: 2.75rem;
   height: 3.25rem;
@@ -182,8 +246,6 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
   }
 }
-
-// „TAN hat andere Länge?" — Fallback auf ein einzelnes Feld.
 .bank__otpAlt {
   align-self: flex-start;
   background: transparent;
@@ -199,7 +261,6 @@
     color: var(--color-primary);
   }
 }
-
 .bank__tanInput {
   width: 100%;
   max-width: 12rem;
@@ -215,63 +276,9 @@
   &:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
   }
 }
-
-.bank__hint {
-  margin: 0;
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-
-.bank__reconcile {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.bank__h3 {
-  margin: 0;
-  font-size: var(--fs-md);
-}
-
-// Kopfzeile „Offene Umsätze" + rechtsbündiger Filter-Button auf einer Zeile.
-.bank__reconcileHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-// Einklapp-Kopf des Verbindungs-/Login-Bereichs.
-.bank__collapseHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
-  font-weight: var(--fw-medium);
-  color: var(--color-text);
-
-  &:hover {
-    color: var(--color-primary);
-  }
-}
-
-// Staging-Tabelle (#fints) — Muster wie die Buchungen-Tabelle (exp__table).
-.bank__kindToggle {
-  display: flex;
-  gap: var(--space-1);
-}
-
 .bank__search {
-  width: 100%;
   min-width: 12rem;
   padding: var(--space-2) var(--space-3);
   font: inherit;
@@ -285,22 +292,19 @@
     border-color: var(--color-primary);
   }
 }
-
 .bank__tableWrap {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 26rem;
+  max-height: 32rem;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
-
 .bank__table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-sm);
 }
-
 .bank__table th,
 .bank__table td {
   padding: var(--space-2) var(--space-3);
@@ -308,15 +312,12 @@
   text-align: start;
   vertical-align: middle;
 }
-
 .bank__table tbody tr:last-child td {
   border-bottom: none;
 }
-
 .bank__table tbody tr:hover {
   background: var(--color-surface-sunken);
 }
-
 .bank__table th {
   position: sticky;
   top: 0;
@@ -329,7 +330,6 @@
   white-space: nowrap;
   background: var(--color-surface-sunken);
 }
-
 .bank__sort {
   background: transparent;
   border: 0;
@@ -346,53 +346,38 @@
     color: var(--color-primary);
   }
 }
-
 .bank__num {
   text-align: end;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-
 .bank__cellDate {
   color: var(--color-text-muted);
   white-space: nowrap;
 }
-
-// Gegenkonto: Name + IBAN je auf eigener Zeile; IBAN NIE abschneiden — immer vollständig
-// (Tabelle scrollt sonst horizontal).
 .bank__cellCp {
   white-space: nowrap;
 }
-
 .bank__cpName {
   display: block;
 }
-
 .bank__cpIban {
   display: block;
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
 }
-
-// „ART"-Spalte: Kopf + Badge zentriert.
 .bank__colKind,
 .bank__cellKind {
   text-align: center;
 }
-
 .bank__cellPurpose {
-  max-width: 16rem;
+  max-width: 18rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-text-muted);
 }
-
-.bank__cellCc {
-  min-width: 12rem;
-}
-
 .bank__amount {
   font-weight: var(--fw-semibold);
 
@@ -400,28 +385,21 @@
     color: var(--color-success);
   }
 }
-
 .bank__actions {
   display: inline-flex;
   gap: var(--space-1);
   justify-content: flex-end;
 }
 
-// Lade-Marker als Tabellenzeile (Tabelle/Kopf bleiben sichtbar).
-.bank__loadingCell {
-  padding: var(--space-6) var(--space-3);
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
-// Infinite-Scroll-Sentinel: unsichtbarer Trigger am Tabellenende.
-.bank__sentinel {
-  height: 1px;
-}
-
-// Mobile: Tabelle → Karten (#mobile-cards), wie die Buchungen-Tabelle.
+// Mobil: Sidebar oben, Tabelle → Karten.
 @media (max-width: 768px) {
+  .kon {
+    flex-direction: column;
+  }
+  .kon__sidebar {
+    flex: 1 1 auto;
+    width: 100%;
+  }
   .bank__tableWrap {
     overflow-x: visible;
     max-height: none;
@@ -456,7 +434,6 @@
   }
   .bank__cellCp {
     flex: 1 1 100%;
-    max-width: none;
     order: -3;
     font-weight: var(--fw-medium);
   }
@@ -469,18 +446,15 @@
     font-size: var(--fs-md);
   }
   .bank__cellPurpose,
-  .bank__cellDate {
+  .bank__cellDate,
+  .kon__cellStatus {
     flex: 1 1 100%;
     max-width: none;
     order: 1;
     font-size: var(--fs-xs);
   }
-  .bank__cellCc {
-    flex: 1 1 100%;
-    order: 2;
-  }
   .bank__num:has(.bank__actions) {
-    order: 3;
+    order: 2;
     flex: 1 1 100%;
   }
   .bank__actions {

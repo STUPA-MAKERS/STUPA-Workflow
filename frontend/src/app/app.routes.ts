@@ -185,6 +185,14 @@ export const routes: Routes = [
           import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),
       },
       {
+        // Konten-Abgleich (#fints-konten): Transaktionen ↔ Buchungen je Konto + Kontostand.
+        path: 'konten',
+        data: { title: 'nav.konten', permission: ['budget.view', 'budget.structure', 'budget.book'], wide: true },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/konten/konten.component').then((m) => m.KontenComponent),
+      },
+      {
         // Kostenstellen-Baum in der Verwaltung (#9) — ersetzt die flache Töpfe-Liste.
         path: 'admin/budget-pots',
         data: { title: 'budget.tree.title', permission: 'budget.structure', parent: ['admin'], wide: true },

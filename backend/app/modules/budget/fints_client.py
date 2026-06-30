@@ -28,7 +28,12 @@ from datetime import date
 from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlsplit
 
-from app.modules.budget.bank_import import StatementLine, lines_from_mt940_transactions
+from app.modules.budget.bank_import import (
+    StatementBalance,
+    StatementLine,
+    balance_from_mt940,
+    lines_from_mt940_transactions,
+)
 from app.modules.webhooks.ssrf import Resolver, SsrfError, assert_allowed_url, default_resolver
 
 if TYPE_CHECKING:
@@ -119,6 +124,8 @@ class FintsOutcome:
     # status == 'done':
     lines: list[StatementLine] = field(default_factory=list)
     new_state: bytes | None = None  # client.deconstruct() → persistieren
+    # Live-Kontostand (HKSAL) zum Abruf-Zeitpunkt — best effort (#fints-konten).
+    balance: StatementBalance | None = None
     # status == 'needs_tan' (alle für den Resume nötig):
     client_data: bytes | None = None
     dialog_data: bytes | None = None
@@ -255,7 +262,24 @@ def _fetch(
         status="done",
         tan_mechanism=mechanism,
         lines=lines_from_mt940_transactions(response),
+        balance=_live_balance(client, account),
     )
+
+
+def _live_balance(  # pragma: no cover
+    client: FinTS3PinTanClient, account: object
+) -> StatementBalance | None:
+    """HKSAL-Kontostand best-effort holen — Fehler/TAN-Bedarf werden geschluckt (der Saldo ist
+    optional; die Umsätze haben Vorrang). (#fints-konten)"""
+    from fints.client import NeedTANResponse
+
+    try:
+        bal = client.get_balance(account)  # type: ignore[arg-type]
+    except Exception:  # noqa: BLE001 - Saldo ist optional, nie den Abruf scheitern lassen
+        return None
+    if isinstance(bal, NeedTANResponse) or bal is None:
+        return None
+    return balance_from_mt940(bal)
 
 
 def start_sync(creds: FintsCredentials, *, start_date: date) -> FintsOutcome:  # pragma: no cover
