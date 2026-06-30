@@ -144,6 +144,15 @@ async def _enforce(
         raise RateLimitedError(detail, retry_after=result.retry_after)
 
 
+def _is_oauth_principal(principal: Principal | None) -> bool:
+    """Über ein OAuth-Access-Token authentifiziert (MCP)? (#mcp)
+
+    Nur der OAuth-Grant-Pfad setzt ``scope_permissions`` (am Consent auf ``mcp.use`` gegated);
+    Browser-Sessions lassen es ``None``. Der angemeldete MCP ist ein vertrauenswürdiger First-
+    Party-Client (kein anonymer Abuser) → die Frequenz-Drosseln werden für ihn übersprungen."""
+    return principal is not None and principal.scope_permissions is not None
+
+
 def canonical_mail_key(email: str) -> str:
     """Kanonische Form einer E-Mail für den Per-Mail-Rate-Limit-Schlüssel.
 
@@ -215,9 +224,14 @@ async def rate_limit_magic_link_verify(
 
 
 async def rate_limit_applications(
-    request: Request, settings: SettingsDep, limiter: RateLimiterDep
+    request: Request,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
 ) -> None:
     """`POST /applications`: 10/Std/IP (api.md §7)."""
+    if _is_oauth_principal(principal):
+        return  # angemeldeter MCP → keine Drossel (#mcp)
     await _enforce(
         limiter,
         f"applications:ip:{client_ip(request)}",
@@ -239,6 +253,8 @@ async def rate_limit_attachments(
     Schlüssel folgt der Identität: Principal-``sub`` bzw. (Antragsteller) die gebundene
     ``application_id``; ohne Identität IP-Fallback. Die Auth-Dependency (401/403) läuft
     separat — dieser Check drosselt nur die Frequenz."""
+    if _is_oauth_principal(principal):
+        return  # angemeldeter MCP → keine Drossel (#mcp)
     if principal is not None:
         key = f"attachments:principal:{principal.sub}"
     elif applicant is not None:
@@ -264,6 +280,8 @@ async def rate_limit_fints(
 
     Bremst den FinTS-Sync als SSRF-Port-Scan-Orakel und wiederholte Bank-Logins (PIN-
     Lockout-Missbrauch). Die Auth-Dependency (401/403) läuft separat; hier nur Frequenz."""
+    if _is_oauth_principal(principal):
+        return  # angemeldeter MCP → keine Drossel (#mcp)
     key = (
         f"fints:principal:{principal.sub}"
         if principal is not None

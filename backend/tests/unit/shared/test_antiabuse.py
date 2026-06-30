@@ -19,9 +19,11 @@ from app.shared.antiabuse import (
     get_rate_limiter,
     now_unix,
     rate_limit_applications,
+    rate_limit_fints,
     rate_limit_magic_link,
     verify_altcha,
 )
+from app.shared.errors import RateLimitedError
 from app.shared.ratelimit import InMemoryRateLimiter, NullRateLimiter, RedisRateLimiter
 
 ALTCHA_SECRET = "altcha-test-secret-0123"
@@ -196,6 +198,24 @@ def test_applications_rate_limit_blocks() -> None:
     assert client.post("/apps").status_code == 200
     assert client.post("/apps").status_code == 200
     assert client.post("/apps").status_code == 429
+
+
+async def test_rate_limit_fints_bypassed_for_oauth_principal() -> None:
+    """Angemeldeter MCP (OAuth-Token → scope_permissions gesetzt) umgeht die Drossel (#mcp)."""
+    import pytest
+
+    from app.modules.auth.principal import Principal
+
+    settings = _settings(rl_fints_per_hour=0)  # würde jeden blocken
+    limiter = InMemoryRateLimiter(now=lambda: 0.0)
+    req = SimpleNamespace(client=SimpleNamespace(host="1.2.3.4"), headers={})
+    mcp = Principal(sub="u-mcp", scope_permissions=frozenset({"budget.book"}))
+    # OAuth/MCP → kein Raise trotz Limit 0.
+    await rate_limit_fints(req, settings, limiter, mcp)  # type: ignore[arg-type]
+    # Session-Principal (scope_permissions None) → wird gedrosselt.
+    session = Principal(sub="u-web")
+    with pytest.raises(RateLimitedError):
+        await rate_limit_fints(req, settings, limiter, session)  # type: ignore[arg-type]
 
 
 def test_rate_limit_disabled_never_blocks() -> None:

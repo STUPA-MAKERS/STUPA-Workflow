@@ -1386,7 +1386,9 @@ class BudgetTreeService:
             )
         ).all()
 
-        def _key(amount: Decimal, pay: date | None, desc: str, ref: str | None) -> tuple[object, ...]:
+        def _key(
+            amount: Decimal, pay: date | None, desc: str, ref: str | None
+        ) -> tuple[object, ...]:
             return (amount, pay, desc, ref)
 
         seen = {_key(c.amount, c.payment_date, c.description, c.reference_number) for c in existing}

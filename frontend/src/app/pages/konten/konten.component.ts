@@ -169,17 +169,19 @@ export class KontenComponent implements OnDestroy {
   readonly impDescription = signal('');
   readonly booking = signal(false);
 
-  // --- Link dialog ---
+  // --- Link dialog: Typeahead wie der Mitglieder-Picker (/admin/gremien) ---
   readonly linkLine = signal<StatementLine | null>(null);
+  readonly linkQuery = signal('');
   readonly linkCandidates = signal<Expense[]>([]);
-  readonly linkExpenseId = signal('');
+  readonly linkSelected = signal<Expense | null>(null);
   readonly linkLoading = signal(false);
-  readonly linkCandidateOptions = computed<SelectOption[]>(() =>
-    this.linkCandidates().map((e) => ({
-      value: e.id,
-      label: `${e.description} · ${this.money(e.amount)}${e.correspondent ? ' · ' + e.correspondent : ''}`,
-    })),
-  );
+  private linkTimer: ReturnType<typeof setTimeout> | null = null;
+  candidateLabel(e: Expense): string {
+    const parts = [e.description, this.money(e.amount)];
+    if (e.correspondent) parts.push(e.correspondent);
+    if (e.pathKey) parts.push(e.pathKey);
+    return parts.join(' · ');
+  }
 
   readonly accountOptions = computed<SelectOption[]>(() =>
     this.accounts().map((a) => ({ value: a.id, label: a.name })),
@@ -222,6 +224,7 @@ export class KontenComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
+    if (this.linkTimer) clearTimeout(this.linkTimer);
   }
 
   /** Konten-Liste (inkl. aktuellem Kontostand) laden/auffrischen, Auswahl beibehalten (#review). */
@@ -630,21 +633,36 @@ export class KontenComponent implements OnDestroy {
       });
   }
 
-  // ----------------------------------------------------- per-row: Link
+  // ----------------------------------------------------- per-row: Link (Typeahead)
   openLink(line: StatementLine): void {
     this.linkLine.set(line);
-    this.linkExpenseId.set('');
+    this.linkQuery.set('');
+    this.linkSelected.set(null);
     this.linkCandidates.set([]);
+    // Vorschlag: gleicher Betrag + Art (häufigster Treffer) — danach frei durchsuchbar.
+    this.searchLinkCandidates('', line, Math.abs(Number(line.amount)));
+  }
+  onLinkSearch(q: string): void {
+    this.linkQuery.set(q);
+    this.linkSelected.set(null);
+    const line = this.linkLine();
+    if (!line) return;
+    if (this.linkTimer) clearTimeout(this.linkTimer);
+    this.linkTimer = setTimeout(() => this.searchLinkCandidates(q.trim(), line), 300);
+  }
+  private searchLinkCandidates(q: string, line: StatementLine, amount?: number): void {
     this.linkLoading.set(true);
-    const amount = Math.abs(Number(line.amount)).toFixed(2);
     this.api
       .listExpenses({
         account: this.accountId() as Uuid,
         kind: line.kind,
-        amountMin: Number(amount),
-        amountMax: Number(amount),
         unallocated: true,
-        limit: 50,
+        q: q || undefined,
+        // Ohne Suchtext auf den exakten Betrag eingrenzen (offensichtliche Treffer zuerst);
+        // sobald gesucht wird, frei über alle offenen Buchungen des Kontos.
+        amountMin: q ? undefined : amount,
+        amountMax: q ? undefined : amount,
+        limit: 10,
       })
       .subscribe({
         next: (page) => {
@@ -657,15 +675,22 @@ export class KontenComponent implements OnDestroy {
         },
       });
   }
+  pickLinkCandidate(e: Expense): void {
+    this.linkSelected.set(e);
+    this.linkCandidates.set([]);
+    this.linkQuery.set(this.candidateLabel(e));
+  }
   closeLink(): void {
     this.linkLine.set(null);
+    if (this.linkTimer) clearTimeout(this.linkTimer);
   }
   confirmLink(): void {
     const line = this.linkLine();
-    if (!line || !this.linkExpenseId() || this.booking()) return;
+    const sel = this.linkSelected();
+    if (!line || !sel || this.booking()) return;
     this.booking.set(true);
     this.api
-      .confirmStatementLine(line.id, { matchExpenseId: this.linkExpenseId() as Uuid })
+      .confirmStatementLine(line.id, { matchExpenseId: sel.id as Uuid })
       .subscribe({
         next: () => {
           this.booking.set(false);

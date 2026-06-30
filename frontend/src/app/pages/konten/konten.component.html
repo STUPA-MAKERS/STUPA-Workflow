@@ -232,15 +232,20 @@
 <!-- Import: neue Buchung aus Transaktion -->
 <app-dialog [open]="!!importLine()" [title]="'konten.importTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeImport()">
   @if (importLine(); as line) {
-    <form class="flex flex-col gap-2">
-      <p class="font-semibold m-0">{{ signedMoney(line) }} · {{ counterparty(line).name || counterparty(line).iban || '—' }}</p>
+    <div class="kon__dlg">
+      <p class="kon__dlgSummary">
+        <span class="kon__dlgAmount" [class.kon__dlgAmount--income]="line.kind === 'income'">{{ signedMoney(line) }}</span>
+        <span>{{ counterparty(line).name || counterparty(line).iban || '—' }}</span>
+      </p>
       <app-select name="impcc" [label]="'expenses.field.costCentre' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="impBudgetId()" (ngModelChange)="onPickImportBudget($event)" />
       @if (fiscalYearOptions().length) {
         <app-select name="impfy" [label]="'expenses.field.fiscalYear' | t" [placeholder]="'expenses.field.fiscalYearPlaceholder' | t" [options]="fiscalYearOptions()" [ngModel]="impFiscalYearId()" (ngModelChange)="impFiscalYearId.set($event)" />
       }
-      <label class="text-sm font-medium mt-2" for="imp-desc">{{ 'expenses.field.description' | t }}</label>
-      <input id="imp-desc" class="exp__input" [ngModel]="impDescription()" (ngModelChange)="impDescription.set($event)" name="impdesc" />
-    </form>
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium" for="imp-desc">{{ 'expenses.field.description' | t }}</label>
+        <input id="imp-desc" class="exp__input" [ngModel]="impDescription()" (ngModelChange)="impDescription.set($event)" name="impdesc" />
+      </div>
+    </div>
   }
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="closeImport()">{{ 'action.cancel' | t }}</app-button>
@@ -248,22 +253,52 @@
   </div>
 </app-dialog>
 
-<!-- Link: an bestehende Buchung -->
+<!-- Link: an bestehende Buchung (Typeahead wie der Mitglieder-Picker) -->
 <app-dialog [open]="!!linkLine()" [title]="'konten.linkTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeLink()">
   @if (linkLine(); as line) {
-    <div class="flex flex-col gap-2">
-      <p class="font-semibold m-0">{{ signedMoney(line) }} · {{ counterparty(line).name || counterparty(line).iban || '—' }}</p>
+    <div class="kon__dlg">
+      <p class="kon__dlgSummary">
+        <span class="kon__dlgAmount" [class.kon__dlgAmount--income]="line.kind === 'income'">{{ signedMoney(line) }}</span>
+        <span>{{ counterparty(line).name || counterparty(line).iban || '—' }}</span>
+      </p>
+      <div class="relative flex flex-col gap-1">
+        <label class="text-sm font-medium" for="link-search">{{ 'konten.linkBooking' | t }}</label>
+        <input
+          id="link-search"
+          class="exp__input"
+          type="search"
+          autocomplete="off"
+          role="combobox"
+          [attr.aria-expanded]="linkCandidates().length > 0"
+          aria-autocomplete="list"
+          [placeholder]="'konten.linkBookingPlaceholder' | t"
+          [ngModel]="linkQuery()"
+          (ngModelChange)="onLinkSearch($event)"
+          (focus)="onLinkSearch(linkQuery())"
+          name="linksearch"
+        />
+        @if (linkCandidates().length) {
+          <ul class="exp__suggest" role="listbox">
+            @for (c of linkCandidates(); track c.id) {
+              <li>
+                <button type="button" class="exp__suggestItem" (click)="pickLinkCandidate(c)">{{ candidateLabel(c) }}</button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
       @if (linkLoading()) {
         <p class="text-sm text-muted m-0">{{ 'fints.loading' | t }}</p>
-      } @else if (!linkCandidates().length) {
-        <div class="empty-state">{{ 'konten.noLinkCandidates' | t }}</div>
-      } @else {
-        <app-select name="linkexp" [label]="'konten.linkBooking' | t" [placeholder]="'konten.linkBookingPlaceholder' | t" [options]="linkCandidateOptions()" [required]="true" [ngModel]="linkExpenseId()" (ngModelChange)="linkExpenseId.set($event)" />
+      } @else if (linkQuery() && !linkSelected() && !linkCandidates().length) {
+        <p class="text-sm text-muted m-0">{{ 'konten.noLinkCandidates' | t }}</p>
+      }
+      @if (linkSelected(); as s) {
+        <p class="m-0 text-sm">{{ 'konten.linkPicked' | t }}: <strong>{{ candidateLabel(s) }}</strong></p>
       }
     </div>
   }
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="closeLink()">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" [loading]="booking()" [disabled]="!linkExpenseId()" (click)="confirmLink()">{{ 'konten.action.link' | t }}</app-button>
+    <app-button size="sm" [loading]="booking()" [disabled]="!linkSelected()" (click)="confirmLink()">{{ 'konten.action.link' | t }}</app-button>
   </div>
 </app-dialog>

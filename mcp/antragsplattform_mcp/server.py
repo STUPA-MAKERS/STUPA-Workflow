@@ -1068,11 +1068,29 @@ async def import_statement_file(account_id: str, file_path: str) -> dict:
 async def list_statement_lines(
     account: str | None = None,
     state: Literal["unmatched", "suggested", "matched", "ignored"] | None = None,
+    linked: bool | None = None,
+    kind: Literal["expense", "income"] | None = None,
+    q: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    sort: Literal["date", "amount"] | None = None,
+    order: Literal["asc", "desc"] | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> dict:
-    """List staged bank transactions (newest first), optionally by account/state. Each carries a
-    signed amount and a suggested cost centre. Requires budget.view/.book."""
+    """List staged bank transactions, filtered + offset-paginated. Returns a page
+    ``{items, total, limit, offset}``; each item carries a signed amount, decoded counterparty
+    and a suggested cost centre. Filters: ``account``, ``state``, ``linked`` (true = already
+    booked, false = open), ``kind`` (expense/income), ``q`` (counterparty/IBAN/purpose),
+    ``date_from``/``date_to`` (YYYY-MM-DD over value/booking date); ``sort`` = date|amount.
+    Requires budget.view/.book."""
     return await _api().get(
-        "/statement-lines", params=_params(account=account, state=state)
+        "/statement-lines",
+        params=_params(
+            account=account, state=state, linked=linked, kind=kind, q=q,
+            dateFrom=date_from, dateTo=date_to, sort=sort, order=order,
+            limit=limit, offset=offset,
+        ),
     )
 
 
@@ -1089,6 +1107,33 @@ async def confirm_statement_line(line_id: str, confirm: S.ConfirmLineRequest) ->
 async def ignore_statement_line(line_id: str) -> dict:
     """Mark a staged transaction as irrelevant (kept for idempotent re-import). Requires budget.book."""
     return await _api().post(f"/statement-lines/{line_id}/ignore")
+
+
+@mcp.tool()
+async def unlink_statement_line(line_id: str) -> dict:
+    """Undo a transaction↔booking link (#konten): removes the allocation and reopens the
+    transaction (``unmatched``). The booking itself is kept. Requires budget.book."""
+    return await _api().post(f"/statement-lines/{line_id}/unlink")
+
+
+# ---------------------------------------------------------- sub-bookings (#subbookings)
+@mcp.tool()
+async def list_sub_bookings(expense_id: str) -> dict:
+    """List the sub-bookings of a booking (#subbookings). A booking can be broken down into
+    sub-bookings (same schema); they inherit cost-centre/account/fiscal-year/kind from the
+    parent and the parent amount equals their sum. Requires budget.view/.book."""
+    return await _api().get(f"/budget-expenses/{expense_id}/sub-bookings")
+
+
+@mcp.tool()
+async def import_sub_bookings(expense_id: str, file_path: str) -> dict:
+    """Add sub-bookings to a booking from a local CAMT.053/MT940 file (#subbookings). Each
+    same-direction line becomes a child inheriting the parent's cost-centre/account/fiscal-year/
+    kind; the parent amount is recomputed to their sum. Idempotent (re-upload skips duplicates);
+    EUR-only; transfer/sub-booking parents are rejected. Requires budget.book."""
+    return await _api().post(
+        f"/budget-expenses/{expense_id}/sub-bookings/import", files=_file_part(file_path)
+    )
 
 
 # ============================================================ admin: gremien

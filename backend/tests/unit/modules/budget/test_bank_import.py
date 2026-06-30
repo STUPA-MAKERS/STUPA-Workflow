@@ -218,6 +218,28 @@ def test_normalize_then_split_strips_datum_suffix() -> None:
     assert time == "15:54"
 
 
+def test_canonical_purpose_key_ignores_spacing_and_punct() -> None:
+    """Kanonischer Schlüssel ist gegen Leerzeichen/Interpunktion invariant (#fints-dedup)."""
+    assert bi.canonical_purpose_key("DATEI-NR. 0000794247ANZAHL 00000002") == (
+        bi.canonical_purpose_key("DATEI-NR. 0000794247 ANZAHL 00000002")
+    )
+
+
+def test_assign_keys_stable_across_purpose_normalization() -> None:
+    """Derselbe Umsatz mit verklebtem vs. normalisiertem Zweck → GLEICHER Idempotenz-Schlüssel."""
+    glued = bi.StatementLine(
+        amount=Decimal("-1.00"), value_date=date(2026, 1, 1),
+        purpose="Re DATEI-NR. 0000794247ANZAHL 2",
+    )
+    spaced = bi.StatementLine(
+        amount=Decimal("-1.00"), value_date=date(2026, 1, 1),
+        purpose="Re DATEI-NR. 0000794247 ANZAHL 2",
+    )
+    bi.assign_keys("acc", [glued])
+    bi.assign_keys("acc", [spaced])
+    assert glued.idempotency_key == spaced.idempotency_key
+
+
 def test_mt940_counterparty_drops_krzl_placeholder() -> None:
     """„KRZL"-Platzhalter (Sammel-/Dateibuchung) wird nicht als Gegenkonto übernommen."""
     name, iban = bi.mt940_counterparty(

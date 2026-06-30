@@ -321,6 +321,13 @@ def _camt_closing_balance(data: bytes) -> StatementBalance | None:
 
 
 # ------------------------------------------------------------------ idempotency
+def canonical_purpose_key(purpose: str | None) -> str:
+    """Zweck → stabiler Idempotenz-Bestandteil (#fints-dedup): nur Alphanumerik, großgeschrieben,
+    auf 140 Zeichen gekürzt. Unabhängig von Leerzeichen/Interpunktion, damit kosmetische
+    Parser-Normalisierungen denselben Umsatz nicht doppelt importieren lassen."""
+    return re.sub(r"[^0-9A-Za-z]+", "", purpose or "").upper()[:140]
+
+
 def assign_keys(account_scope: str, lines: list[StatementLine]) -> None:
     """Idempotenz-Schlüssel je Umsatz **in-place** setzen (#fints-research).
 
@@ -342,7 +349,10 @@ def assign_keys(account_scope: str, lines: list[StatementLine]) -> None:
             str(ln.amount),
             ln.counterparty_iban or "",
             ln.end_to_end_id or "",
-            (ln.purpose or "")[:140],
+            # KANONISCH (#fints-dedup): nur Alphanumerik, großgeschrieben — kosmetische Zweck-
+            # Normalisierung (Leerzeichen vor Subfeldern, DATUM-Zusatz) verschiebt den Schlüssel
+            # damit NICHT mehr → kein Re-Import-Duplikat nach Parser-Änderungen.
+            canonical_purpose_key(ln.purpose),
         )
         seq = seen.get(base, 0)
         seen[base] = seq + 1
