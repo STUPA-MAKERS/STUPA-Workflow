@@ -272,6 +272,16 @@ def test_resolve_from_raw_helpers() -> None:
     assert bi.resolve_purpose({"creditDebit": "CRDT"}) is None
 
 
+def test_mt940_counterparty_drops_krzl_glued_to_iban() -> None:
+    """Reale Sammelbuchung: ``applicant_name`` = „<IBAN>KRZL" (kein eigenes ?31). Erst IBAN lösen,
+    DANN „KRZL" verwerfen → (None, IBAN), nicht „KRZL" (#fints-raw)."""
+    name, iban = bi.mt940_counterparty(
+        {"applicant_name": "DE79640500000100083958KRZL"}, credit=False
+    )
+    assert name is None
+    assert iban == "DE79640500000100083958"
+
+
 def test_mt940_counterparty_drops_krzl_placeholder() -> None:
     """„KRZL"-Platzhalter (Sammel-/Dateibuchung) wird nicht als Gegenkonto übernommen."""
     name, iban = bi.mt940_counterparty(

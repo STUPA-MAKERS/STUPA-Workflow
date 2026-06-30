@@ -552,11 +552,14 @@ def mt940_counterparty(
         or _clean(d.get("applicant_name"))
         or _clean(d.get("recipient_name"))
     )
-    # Platzhalter (z. B. „KRZL" bei Sammel-/Dateibuchungen) ist kein echtes Gegenkonto → verwerfen
-    # (dann zeigt die UI die IBAN bzw. „—" statt des Kürzels).
-    if name is not None and name.upper() in _PLACEHOLDER_NAMES:
-        name = None
-    return split_leading_iban(name, iban)
+    # ERST die ggf. verschmolzene IBAN abtrennen, DANN Platzhalter prüfen: Sammelbuchungen liefern
+    # ``applicant_name`` als „<IBAN>KRZL" (IBAN + Kürzel zusammengeklebt, keine eigene ?31-IBAN).
+    # Ein Check VOR dem Split würde „<IBAN>KRZL" nicht als Platzhalter erkennen und „KRZL" stehen
+    # lassen (#fints-raw).
+    clean_name, clean_iban = split_leading_iban(name, iban)
+    if clean_name is not None and clean_name.upper() in _PLACEHOLDER_NAMES:
+        clean_name = None
+    return clean_name, clean_iban
 
 
 def split_leading_iban(
