@@ -1,9 +1,10 @@
 """Full-screen prompt_toolkit TUI (mouse + keyboard).
 
-Layout: header · [ left menu | section body ] · footer. The body is swapped per section
-(Users / Roles / OIDC mappings / Audit). Modal dialogs (confirm / input / choose / checkboxes)
-are pushed as floats. Every mutation goes through a confirm dialog. DB writes bypass the API →
-no audit entry, no RBAC guards (shown in the footer).
+Layout: header · top tab bar (Users / Roles / OIDC / Audit) · master-detail body · footer.
+Each section is a left **list** of items + a right **detail** pane whose sub-tabs depend on the
+selected item (user → Roles / Actions; role → Permissions / Users / Actions; mapping → Actions).
+Audit is a single full-width formatted, paged table. Pickers (add role, choose scope) still use
+modal floats. DB writes bypass the API → no audit entry, no RBAC guards (shown in the footer).
 """
 
 from __future__ import annotations
@@ -56,19 +57,26 @@ _STYLE = Style.from_dict(
         # structural frames + rules
         "frame.border": _LINE,
         "frame.label": f"{_CORAL} bold",
+        "rule": _LINE,
         # header / brand bar
         "header": f"bg:{_INK} {_FG}",
         "header.brand": f"bg:{_INK} {_CORAL} bold",
         "header.dim": f"bg:{_INK} {_DIM}",
-        # tab strip
+        # top tab strip
         "tabbar": f"bg:{_INK}",
         "tab": f"bg:{_INK} {_DIM}",
         "tab.active": f"bg:{_CORAL} {_INK} bold",
+        # detail sub-tabs
+        "subtab": f"bg:{_INK} {_DIM}",
+        "subtab.active": f"bg:{_INK} {_CORAL} bold",
         # footer / status line
         "footer": "bg:#222222 #9e9e9e",
         "footer.ro": "bg:#1f3a2a #87d7af bold",
         "footer.warn": "bg:#5a2310 #ffd7af bold",
         "footer.key": "bg:#222222 #d7d7d7 bold",
+        # detail headings
+        "detail.head": f"{_CORAL} bold",
+        "detail.dim": _DIM,
         # interactive widgets
         "button": _FG,
         "button.focused": f"bg:{_CORAL} {_INK} bold",
@@ -89,9 +97,20 @@ _STYLE = Style.from_dict(
 
 _SECTIONS = [("users", "Users"), ("roles", "Roles"), ("oidc", "OIDC mappings"), ("audit", "Audit log")]
 
+# Sub-tabs shown in the right detail pane, per section. Audit has none (full-width table).
+_SUBTABS: dict[str, list[tuple[str, str]]] = {
+    "users": [("roles", "Roles"), ("actions", "Actions")],
+    "roles": [("perms", "Permissions"), ("users", "Users"), ("actions", "Actions")],
+    "oidc": [("actions", "Actions")],
+}
+
 
 def _fmt(value: Any) -> str:
     return "" if value is None else str(value)
+
+
+def _truthy(value: Any) -> bool:
+    return str(value) in ("True", "t", "true")
 
 
 class AdminApp:
@@ -103,10 +122,28 @@ class AdminApp:
         self._body: Any = Window()
         self._focus_target: Any = None
         self._status = ""
+        # master-detail state
+        self._subtab: dict[str, str] = {"users": "roles", "roles": "perms", "oidc": "actions"}
+        self._selected: dict[str, Any] = {}
+        self._left_ctrl: Any = None
+        self._detail_cache: tuple[tuple[Any, ...], Any] | None = None
+        # per-section caches populated by the builders
+        self._users: list[dict[str, Any]] = []
+        self._roles: list[dict[str, Any]] = []
+        self._mappings: list[dict[str, Any]] = []
+        self._perm_cb: CheckboxList | None = None
         # audit paging state
-        self._audit_before: int | None = None
         self._audit_action: str | None = None
         self._audit_rows: list[dict[str, Any]] = []
+
+        self._detail = {
+            ("users", "roles"): self._detail_users_roles,
+            ("users", "actions"): self._detail_users_actions,
+            ("roles", "perms"): self._detail_roles_perms,
+            ("roles", "users"): self._detail_roles_users,
+            ("roles", "actions"): self._detail_roles_actions,
+            ("oidc", "actions"): self._detail_oidc_actions,
+        }
 
         root = FloatContainer(
             content=HSplit(
@@ -117,7 +154,7 @@ class AdminApp:
                         height=1,
                         style="class:tabbar",
                     ),
-                    Frame(DynamicContainer(lambda: self._body)),
+                    DynamicContainer(lambda: self._body),
                     Window(FormattedTextControl(self._footer_text), height=1, style="class:footer"),
                 ]
             ),
@@ -153,6 +190,21 @@ class AdminApp:
             cls = "class:tab.active" if active else "class:tab"
             frags.append((cls, f"  {label}  ", handler))
             frags.append(("class:tabbar", " "))
+        return frags
+
+    def _subtab_fragments(self) -> Any:
+        cur = self._subtab.get(self.section)
+        frags: list[Any] = [("class:subtab", " ")]
+        for key, label in _SUBTABS.get(self.section, []):
+            active = key == cur
+
+            def handler(mouse_event: MouseEvent, target: str = key) -> None:
+                if mouse_event.event_type == MouseEventType.MOUSE_UP:
+                    self._goto_subtab(target)
+
+            cls = "class:subtab.active" if active else "class:subtab"
+            frags.append((cls, f" {'▸ ' if active else ''}{label} ", handler))
+            frags.append(("class:subtab", " "))
         return frags
 
     def _footer_text(self) -> Any:
@@ -326,6 +378,11 @@ class AdminApp:
         self.section = section
         self.refresh()
 
+    def _goto_subtab(self, key: str) -> None:
+        self._subtab[self.section] = key
+        self._detail_cache = None
+        self.app.invalidate()
+
     def refresh(self) -> None:
         try:
             {"users": self._build_users, "roles": self._build_roles,
@@ -343,118 +400,157 @@ class AdminApp:
             except Exception:  # noqa: BLE001
                 pass
 
-    def _list_or_empty(self, values: Sequence[tuple[Any, str]]) -> tuple[Any, Any]:
+    def _list_or_empty(
+        self, values: Sequence[tuple[Any, str]], default: Any = None
+    ) -> tuple[Any, Any]:
         """Return (control, focus_target). RadioList needs ≥1 entry."""
         if not values:
             label = Label(text="  (no entries)")
             return label, label
-        radio: RadioList = RadioList(values=list(values))
+        keys = [v[0] for v in values]
+        radio: RadioList = RadioList(values=list(values), default=default if default in keys else None)
         return radio, radio
 
+    # ------------------------------------------------------------------ master-detail shell
+    def _master_detail(self, left_content: Any, focus: Any, *, left_title: str) -> None:
+        self._detail_cache = None
+        right = HSplit(
+            [
+                Window(
+                    FormattedTextControl(self._subtab_fragments, focusable=False),
+                    height=1,
+                    style="class:subtab",
+                ),
+                Window(height=1, char="─", style="class:rule"),
+                DynamicContainer(self._detail_body),
+            ]
+        )
+        body = VSplit(
+            [
+                Frame(left_content, title=left_title, width=D(weight=2, min=30)),
+                Frame(right, title="Details", width=D(weight=3)),
+            ],
+            padding=0,
+        )
+        self._set_body(body, focus)
+
+    def _detail_body(self) -> Any:
+        section = self.section
+        sel = getattr(self._left_ctrl, "current_value", None)
+        if sel is not None:
+            self._selected[section] = sel
+        sub = self._subtab.get(section)
+        key = (section, sub, sel)
+        if self._detail_cache is not None and self._detail_cache[0] == key:
+            return self._detail_cache[1]
+        builder = self._detail.get((section, sub or ""))
+        container = builder(sel) if builder else Box(Label("—"))
+        self._detail_cache = (key, container)
+        return container
+
+    @staticmethod
+    def _placeholder(text: str) -> Any:
+        return Box(Label(text=text), padding=1)
+
+    @staticmethod
+    def _heading(text: str) -> Any:
+        return Window(FormattedTextControl([("class:detail.head", text)]), height=1)
+
     # ------------------------------------------------------------------ USERS
+    def _user_label(self, r: dict[str, Any]) -> str:
+        dot = "●" if _truthy(r["active"]) else "○"
+        name = _fmt(r["email"]) or _fmt(r["display_name"]) or _fmt(r["sub"])
+        roles = f"   [{r['roles']}]" if r["roles"] else "   [—]"
+        return f"{dot} {name}{roles}"
+
     def _build_users(self) -> None:
-        rows = ops.list_users(self.db, self._user_search if hasattr(self, "_user_search") else None)
+        rows = ops.list_users(self.db, getattr(self, "_user_search", None))
         self._users = rows
+        values = [(r["id"], self._user_label(r)) for r in rows]
+        ctrl, focus = self._list_or_empty(values, self._selected.get("users"))
+        self._left_ctrl = ctrl
+        search = getattr(self, "_user_search", None)
+        title = f"Users ({len(rows)})" + (f" · filter “{search}”" if search else "")
+        search_btn = Button("Search / filter…", self._user_search_dialog, width=22)
+        left = HSplit([Box(search_btn, padding=0), Window(height=1), Box(ctrl, padding=0)])
+        self._master_detail(left, focus, left_title=title)
+
+    def _user_search_dialog(self) -> None:
+        self.ask_input(
+            "Search users", "email / name / sub contains:",
+            getattr(self, "_user_search", None) or "", self._do_user_search,
+        )
+
+    def _do_user_search(self, term: str) -> None:
+        self._user_search = term or None
+        self._selected.pop("users", None)
+        self.refresh()
+
+    def _detail_users_roles(self, uid: Any) -> Any:
+        if not uid:
+            return self._placeholder("Select a user on the left to manage its roles.")
+        rows = ops.list_user_roles(self.db, uid)
         values = [
-            (
-                r["id"],
-                f"{'●' if str(r['active']) in ('True', 't', 'true') else '○'} "
-                f"{_fmt(r['email']) or _fmt(r['display_name']) or _fmt(r['sub'])}"
-                + (f"   [{r['roles']}]" if r["roles"] else "   [—]"),
-            )
-            for r in rows
+            (a["id"], f"{a['role_key']}" + (f" @ {a['gremium']}" if a["gremium"] else " (global)"))
+            for a in rows
         ]
-        control, focus = self._list_or_empty(values)
-        self._users_list = control
+        ctrl, _focus = self._list_or_empty(values)
 
-        def selected_id() -> str | None:
-            return getattr(control, "current_value", None)
+        def add() -> None:
+            self.guard_write(lambda: self._add_role_flow(uid))
 
-        def search() -> None:
-            self.ask_input("Search users", "email / name / sub contains:", "", self._do_user_search)
+        def revoke() -> None:
+            aid = getattr(ctrl, "current_value", None)
+            if not aid:
+                return
+            self.guard_write(lambda: self.confirm(
+                "Revoke this role assignment?",
+                lambda: self.run_write(lambda: ops.revoke_assignment(self.db, aid), "assignment revoked"),
+            ))
 
-        def roles() -> None:
-            uid = selected_id()
-            if uid:
-                self._user_roles_dialog(uid)
+        buttons = VSplit([Button("Add…", add, width=9), Button("Revoke", revoke, width=10)], padding=1)
+        return HSplit([
+            self._heading(f"Role assignments ({len(rows)})"),
+            Box(ctrl, padding=0),
+            Window(height=1),
+            buttons,
+        ])
+
+    def _detail_users_actions(self, uid: Any) -> Any:
+        if not uid:
+            return self._placeholder("Select a user on the left.")
+        row = next((u for u in self._users if u["id"] == uid), None)
+        if row is None:
+            return self._placeholder("User not found — refresh.")
+        active = _truthy(row["active"])
+        label = _fmt(row["email"] or row["display_name"] or row["sub"])
+        info = "\n".join([
+            f"Name   {label}",
+            f"Sub    {_fmt(row['sub'])}",
+            f"Active {'yes' if active else 'no'}",
+            f"Roles  {_fmt(row['roles']) or '—'}",
+            f"Last   {_fmt(row['last_login'])[:19] or 'never'}",
+        ])
 
         def toggle() -> None:
-            uid = selected_id()
-            if not uid:
-                return
-            row = next((u for u in rows if u["id"] == uid), None)
-            active = str(row["active"]) in ("True", "t", "true") if row else False
-            label = _fmt(row["email"] or row["display_name"] or row["sub"]) if row else uid
             self.guard_write(lambda: self.confirm(
                 f"{'Deactivate' if active else 'Activate'} {label}?",
                 lambda: self.run_write(lambda: ops.set_user_active(self.db, uid, not active), "user updated"),
             ))
 
         def delete() -> None:
-            uid = selected_id()
-            if not uid:
-                return
-            row = next((u for u in rows if u["id"] == uid), None)
-            label = _fmt(row["email"] or row["display_name"] or row["sub"]) if row else uid
             self.guard_write(lambda: self.confirm(
-                f"DELETE principal {label}?\nThis cascades sessions + role assignments. Irreversible.",
+                f"DELETE principal {label}?\nCascades sessions + role assignments. Irreversible.",
                 lambda: self.run_write(lambda: ops.delete_user(self.db, uid), "user deleted"),
                 title="Delete user",
             ))
 
         buttons = VSplit(
-            [
-                Button("Search", search, width=10),
-                Button("Roles…", roles, width=10),
-                Button("Toggle active", toggle, width=16),
-                Button("Delete", delete, width=10),
-            ],
+            [Button("Activate" if not active else "Deactivate", toggle, width=14),
+             Button("Delete", delete, width=10)],
             padding=1,
         )
-        body = HSplit([Box(control, padding=0), Window(height=1), buttons])
-        self._set_body(body, focus)
-
-    def _do_user_search(self, term: str) -> None:
-        self._user_search = term or None
-        self.refresh()
-
-    def _user_roles_dialog(self, principal_id: str) -> None:
-        assignments = ops.list_user_roles(self.db, principal_id)
-        values = [
-            (
-                a["id"],
-                f"{a['role_key']}" + (f" @ {a['gremium']}" if a["gremium"] else " (global)"),
-            )
-            for a in assignments
-        ]
-        radio_control, focus = self._list_or_empty(values)
-
-        def revoke() -> None:
-            aid = getattr(radio_control, "current_value", None)
-            if not aid:
-                return
-
-            def do() -> None:
-                self._close()  # close the roles dialog
-                self.run_write(lambda: ops.revoke_assignment(self.db, aid), "assignment revoked")
-                self._user_roles_dialog(principal_id)  # reopen, refreshed
-
-            self.guard_write(lambda: self.confirm("Revoke this role assignment?", do))
-
-        def add() -> None:
-            self._add_role_flow(principal_id)
-
-        body = HSplit([Label(text="Assignments:"), radio_control], height=D(max=20))
-        self._open(
-            Dialog(
-                title="User roles",
-                body=body,
-                buttons=[Button("Add…", add), Button("Revoke", revoke), Button("Close", self._close)],
-                modal=True,
-                width=D(min=50),
-            ),
-            focus=focus,
-        )
+        return HSplit([self._heading("User"), Box(Label(info), padding=0), Window(height=1), buttons])
 
     def _add_role_flow(self, principal_id: str) -> None:
         roles = ops.list_roles_simple(self.db)
@@ -466,11 +562,10 @@ class AdminApp:
             g_values += [(g["id"], _fmt(g["name"])) for g in gremien]
 
             def pick_gremium(gremium_id: Any) -> None:
-                self.guard_write(lambda: self.run_write(
+                self.run_write(
                     lambda: ops.grant_role(self.db, principal_id, role_id, gremium_id),
                     "role granted",
-                ))
-                self._user_roles_dialog(principal_id)
+                )
 
             self.ask_choice("Scope", g_values, pick_gremium, label="Gremium (or global):")
 
@@ -479,32 +574,81 @@ class AdminApp:
     # ------------------------------------------------------------------ ROLES
     def _build_roles(self) -> None:
         rows = ops.list_roles(self.db)
+        self._roles = rows
+        values = [(r["id"], f"{r['key']}   ({r['perms']}p · {r['assignments']}a)") for r in rows]
+        ctrl, focus = self._list_or_empty(values, self._selected.get("roles"))
+        self._left_ctrl = ctrl
+        new_btn = Button("New role…", self._new_role, width=22)
+        left = HSplit([Box(new_btn, padding=0), Window(height=1), Box(ctrl, padding=0)])
+        self._master_detail(left, focus, left_title=f"Roles ({len(rows)})")
+
+    def _role_key(self, rid: Any) -> str:
+        return next((r["key"] for r in self._roles if r["id"] == rid), "")
+
+    def _detail_roles_perms(self, rid: Any) -> Any:
+        if not rid:
+            return self._placeholder("Select a role on the left.")
+        current = set(ops.list_role_permissions(self.db, rid))
+        keys = list(dict.fromkeys([*PERMISSION_CATALOGUE, *sorted(current)]))
+        values = [(k, k + ("  ⚠ human-only" if k in FORBIDDEN_PERMISSIONS else "")) for k in keys]
+        cb: CheckboxList = CheckboxList(values=values)
+        cb.current_values = sorted(current)
+        self._perm_cb = cb
+
+        def save() -> None:
+            chosen = [str(c) for c in cb.current_values]
+
+            def do() -> int:
+                ops.set_role_permissions(self.db, rid, chosen)
+                return len(chosen)
+
+            self.guard_write(lambda: self.run_write(do, "permissions saved"))
+
+        return HSplit([
+            self._heading(f"Permissions · {self._role_key(rid)}"),
+            Window(FormattedTextControl([("class:detail.dim", "Space toggles · Save to apply")]), height=1),
+            cb,
+            Window(height=1),
+            VSplit([Button("Save", save, width=9)], padding=1),
+        ])
+
+    def _detail_roles_users(self, rid: Any) -> Any:
+        if not rid:
+            return self._placeholder("Select a role on the left.")
+        rows = ops.list_role_users(self.db, rid)
         values = [
-            (r["id"], f"{r['key']}   ({r['perms']} perms, {r['assignments']} assignments)")
-            for r in rows
+            (
+                a["assignment_id"],
+                f"{_fmt(a['email']) or _fmt(a['display_name']) or _fmt(a['sub'])}"
+                + (f" @ {a['gremium']}" if a["gremium"] else " (global)"),
+            )
+            for a in rows
         ]
-        control, focus = self._list_or_empty(values)
+        ctrl, _focus = self._list_or_empty(values)
 
-        def sel() -> Any:
-            return getattr(control, "current_value", None)
-
-        def perms() -> None:
-            rid = sel()
-            if rid:
-                self._role_perms_dialog(rid, next((r["key"] for r in rows if r["id"] == rid), ""))
-
-        def new() -> None:
-            self.guard_write(lambda: self.ask_input(
-                "New role", "Role key (e.g. treasurer):", "",
-                lambda key: key and self.run_write(
-                    lambda: ops.create_role(self.db, key, key), "role created"),
+        def revoke() -> None:
+            aid = getattr(ctrl, "current_value", None)
+            if not aid:
+                return
+            self.guard_write(lambda: self.confirm(
+                "Revoke this principal's assignment of this role?",
+                lambda: self.run_write(lambda: ops.revoke_assignment(self.db, aid), "assignment revoked"),
             ))
 
+        return HSplit([
+            self._heading(f"Principals with “{self._role_key(rid)}” ({len(rows)})"),
+            Box(ctrl, padding=0),
+            Window(height=1),
+            VSplit([Button("Revoke", revoke, width=10)], padding=1),
+        ])
+
+    def _detail_roles_actions(self, rid: Any) -> Any:
+        cur = self._role_key(rid)
+        info = f"Selected role: {cur}" if rid else "No role selected — “New role” still works."
+
         def rename() -> None:
-            rid = sel()
             if not rid:
                 return
-            cur = next((r["key"] for r in rows if r["id"] == rid), "")
             self.guard_write(lambda: self.ask_input(
                 "Rename role", "New key:", cur,
                 lambda key: key and self.run_write(
@@ -512,10 +656,8 @@ class AdminApp:
             ))
 
         def delete() -> None:
-            rid = sel()
             if not rid:
                 return
-            cur = next((r["key"] for r in rows if r["id"] == rid), "")
             self.guard_write(lambda: self.confirm(
                 f"DELETE role '{cur}'?\nCascades its permissions, assignments and OIDC mappings.",
                 lambda: self.run_write(lambda: ops.delete_role(self.db, rid), "role deleted"),
@@ -523,52 +665,47 @@ class AdminApp:
             ))
 
         buttons = VSplit(
-            [Button("Permissions…", perms, width=15), Button("New", new, width=8),
-             Button("Rename", rename, width=10), Button("Delete", delete, width=10)],
+            [Button("New…", self._new_role, width=9), Button("Rename", rename, width=10),
+             Button("Delete", delete, width=10)],
             padding=1,
         )
-        self._set_body(HSplit([Box(control, padding=0), Window(height=1), buttons]), focus)
+        return HSplit([self._heading("Role actions"), Box(Label(info), padding=0), Window(height=1), buttons])
 
-    def _role_perms_dialog(self, role_id: str, role_key: str) -> None:
-        current = set(ops.list_role_permissions(self.db, role_id))
-        keys = list(dict.fromkeys([*PERMISSION_CATALOGUE, *sorted(current)]))
-        values = [
-            (k, k + ("  ⚠ human-only" if k in FORBIDDEN_PERMISSIONS else "")) for k in keys
-        ]
-
-        def save(chosen: list[Any]) -> None:
-            def do() -> int:
-                perms = [str(c) for c in chosen]
-                ops.set_role_permissions(self.db, role_id, perms)
-                return len(perms)
-
-            self.guard_write(lambda: self.run_write(do, "permissions saved"))
-
-        self.ask_checkboxes(f"Permissions · {role_key}", values, sorted(current), save)
+    def _new_role(self) -> None:
+        self.guard_write(lambda: self.ask_input(
+            "New role", "Role key (e.g. treasurer):", "",
+            lambda key: key and self.run_write(
+                lambda: ops.create_role(self.db, key, key), "role created"),
+        ))
 
     # ------------------------------------------------------------------ OIDC mappings
     def _build_oidc(self) -> None:
         rows = ops.list_mappings(self.db)
+        self._mappings = rows
         values = [
             (r["id"], f"{r['oidc_group']} → {r['role_key']}"
              + (f" @ {r['gremium']}" if r["gremium"] else " (global)"))
             for r in rows
         ]
-        control, focus = self._list_or_empty(values)
+        ctrl, focus = self._list_or_empty(values, self._selected.get("oidc"))
+        self._left_ctrl = ctrl
+        new_btn = Button("New mapping…", lambda: self.guard_write(lambda: self._mapping_flow(None)), width=22)
+        left = HSplit([Box(new_btn, padding=0), Window(height=1), Box(ctrl, padding=0)])
+        self._master_detail(left, focus, left_title=f"OIDC mappings ({len(rows)})")
 
-        def sel() -> Any:
-            return getattr(control, "current_value", None)
-
-        def new() -> None:
-            self.guard_write(lambda: self._mapping_flow(None))
+    def _detail_oidc_actions(self, mid: Any) -> Any:
+        row = next((m for m in self._mappings if m["id"] == mid), None)
+        if row is not None:
+            scope = f" @ {row['gremium']}" if row["gremium"] else " (global)"
+            info = f"{row['oidc_group']} → {row['role_key']}{scope}"
+        else:
+            info = "No mapping selected — “New” still works."
 
         def edit() -> None:
-            mid = sel()
-            if mid:
-                self.guard_write(lambda: self._mapping_flow(next((r for r in rows if r["id"] == mid), None)))
+            if row is not None:
+                self.guard_write(lambda: self._mapping_flow(row))
 
         def delete() -> None:
-            mid = sel()
             if not mid:
                 return
             self.guard_write(lambda: self.confirm(
@@ -577,10 +714,11 @@ class AdminApp:
             ))
 
         buttons = VSplit(
-            [Button("New", new, width=8), Button("Edit", edit, width=8), Button("Delete", delete, width=10)],
+            [Button("New…", lambda: self.guard_write(lambda: self._mapping_flow(None)), width=9),
+             Button("Edit", edit, width=8), Button("Delete", delete, width=10)],
             padding=1,
         )
-        self._set_body(HSplit([Box(control, padding=0), Window(height=1), buttons]), focus)
+        return HSplit([self._heading("Mapping actions"), Box(Label(info), padding=0), Window(height=1), buttons])
 
     def _mapping_flow(self, existing: dict[str, Any] | None) -> None:
         roles = ops.list_roles_simple(self.db)
@@ -616,9 +754,9 @@ class AdminApp:
             "OIDC group name:", default_group, got_group,
         )
 
-    # ------------------------------------------------------------------ AUDIT
+    # ------------------------------------------------------------------ AUDIT (full width)
     def _build_audit(self) -> None:
-        if self._audit_before is None:
+        if not self._audit_rows:
             self._audit_rows = ops.list_audit(self.db, action=self._audit_action, limit=100)
         text = self._format_audit(self._audit_rows)
         area = TextArea(text=text, read_only=True, scrollbar=True, focus_on_click=True, wrap_lines=False)
@@ -638,12 +776,14 @@ class AdminApp:
                 self._do_audit_filter,
             )
 
+        title = "Audit log" + (f" · action “{self._audit_action}”" if self._audit_action else "")
         buttons = VSplit(
             [Button("Load more", more, width=12), Button("Filter…", filt, width=10),
              Button("Reset", self._reset_audit, width=8)],
             padding=1,
         )
-        self._set_body(HSplit([area, Window(height=1), buttons]), area)
+        body = Frame(HSplit([area, Window(height=1), buttons]), title=title)
+        self._set_body(body, area)
 
     def _do_audit_filter(self, term: str) -> None:
         self._audit_action = term or None
@@ -657,18 +797,21 @@ class AdminApp:
 
     @staticmethod
     def _format_audit(rows: list[dict[str, Any]]) -> str:
+        head = f"  {'#':>8}  {'WHEN (UTC)':<19}  {'ACTOR':<26}  {'ACTION':<24}  TARGET"
+        sep = "  " + "─" * 96
         if not rows:
-            return "(no audit entries)"
-        out = []
+            return f"{head}\n{sep}\n  (no audit entries)"
+        out = [head, sep]
         for r in rows:
-            tgt = f" {r['target_type']}:{r['target_id']}" if r["target_type"] else ""
+            tgt = f"{r['target_type']}:{r['target_id']}" if r["target_type"] else "—"
+            actor = (_fmt(r["actor"]) or "—")[:26]
+            action = _fmt(r["action"])[:24]
             out.append(
-                f"#{r['id']:>8}  {_fmt(r['at'])[:19]}  {_fmt(r['actor']) or '—':<28} "
-                f"{_fmt(r['action'])}{tgt}"
+                f"  {_fmt(r['id']):>8}  {_fmt(r['at'])[:19]:<19}  {actor:<26}  {action:<24}  {tgt}"
             )
             data = _fmt(r["data"])
             if data and data not in ("{}", "null"):
-                out.append(f"           {data}")
+                out.append(f"            ↳ {data[:140]}")
         return "\n".join(out)
 
     def run(self) -> None:

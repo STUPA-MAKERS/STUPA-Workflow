@@ -73,6 +73,23 @@ def revoke_assignment(db: Db, assignment_id: str) -> int:
     return db.execute("DELETE FROM role_assignment WHERE id = %s", (assignment_id,))
 
 
+def list_role_users(db: Db, role_id: str) -> list[dict[str, Any]]:
+    """Principals holding the given role (one row per assignment)."""
+    return db.query(
+        """
+        SELECT ra.id AS assignment_id, p.id AS principal_id,
+               p.email, p.display_name, p.sub,
+               ra.gremium_id, g.name AS gremium
+          FROM role_assignment ra
+          JOIN principal p ON p.id = ra.principal_id
+          LEFT JOIN gremium g ON g.id = ra.gremium_id
+         WHERE ra.role_id = %s
+         ORDER BY p.email NULLS LAST, p.display_name NULLS LAST
+        """,
+        (role_id,),
+    )
+
+
 # --------------------------------------------------------------------------------- roles
 def list_roles(db: Db) -> list[dict[str, Any]]:
     return db.query(

@@ -28,9 +28,16 @@ From the repo root, on the host that runs the stack:
 The wrapper creates/updates a dedicated venv in `admin-cli/.venv` on first run (and whenever
 `pyproject.toml` changes), then launches the installed `antragsplattform-admin` console script.
 
+### Layout
+Top tab bar switches section (Users / Roles / OIDC mappings / Audit). Users/Roles/OIDC are
+**master-detail**: a left list of items + a right pane whose sub-tabs depend on the selection
+(user → Roles / Actions; role → Permissions / Users / Actions; mapping → Actions). Moving the
+list cursor updates the right pane live. Audit is a single full-width, paged, formatted table.
+
 ### Keys / mouse
-- Click anything. `Tab`/`Shift-Tab` move focus, `↑/↓` within lists, `Enter`/`Space` activate,
-  mouse wheel scrolls the audit log. `F5` refresh, `Ctrl-Q` quit.
+- Click anything (tabs, sub-tabs, list rows, buttons). `Ctrl-←`/`Ctrl-→` switch section tabs,
+  `Tab`/`Shift-Tab` move focus, `↑/↓` within lists, `Enter`/`Space` activate, mouse wheel scrolls
+  the audit log. `F5` refresh, `Ctrl-Q` quit.
 
 ## Database access (auto-selected)
 
