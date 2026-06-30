@@ -1,0 +1,21 @@
+[project]
+name = "antragsplattform-admin"
+version = "0.1.0"
+description = "Admin TUI for the antragsplattform platform — manage users, roles & permissions, OIDC group-mappings, and view the audit log, straight against the Dockerised Postgres."
+requires-python = ">=3.11"
+dependencies = [
+    "prompt_toolkit>=3.0.43",
+    # Only used when DATABASE_URL is set (direct connection); docker-exec mode shells out to
+    # psql and never imports it. Binary wheel → no compiler needed on Linux/macOS.
+    "psycopg[binary]>=3.1",
+]
+
+[project.scripts]
+antragsplattform-admin = "antragsplattform_admin.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["antragsplattform_admin*"]
