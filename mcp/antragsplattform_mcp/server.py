@@ -18,6 +18,8 @@ over resending the whole JSON.
 
 from __future__ import annotations
 
+import mimetypes
+from pathlib import Path
 from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
@@ -60,7 +62,22 @@ TYPICAL FLOWS:
   `finalize_protocol`. Finalize is ASYNC: re-fetch until `status` is `final`, a fall back to
   `draft` means the render failed.
 - Budget: `list_budgets` (tree), `update_budget`, `book_expense`, `set_allocation`,
-  `create_budget_transfer`; bind an application via `assign_application_budget`.
+  `create_budget_transfer`; bind an application via `assign_application_budget`. Browse all
+  bookings flat/filtered with `list_expenses`.
+- Invoices (#invoices): `list_invoices`/`get_invoice`/`create_invoice`/`update_invoice`/
+  `delete_invoice`. To attach an original PDF: `parse_invoice(file_path)` (ZUGFeRD/Factur-X →
+  extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`
+  to `create_invoice`.
+- Bank reconcile (#fints): the admin sets a Konto's FinTS connection (endpoint+BLZ) via
+  `update_account`; each booker stores their personal login with
+  `set_fints_credential(account_id, {fintsLogin, fintsPin})`. Then either
+  `import_statement_file(account_id, file_path)` (CAMT.053/MT940 — no bank/TAN) OR
+  `fints_sync(account_id)` (live). `fints_sync` may return `status='needs_tan'` (sessionToken +
+  challenge) — PSD2/SCA needs a HUMAN to approve/enter the TAN; relay it, then
+  `fints_submit_tan(account_id, session_token, tan)` (empty tan = decoupled pushTAN poll). A 409
+  means the bank locked the access — do NOT retry. Review staged rows with
+  `list_statement_lines` → book each via `confirm_statement_line(line_id, {budgetId})` (or
+  `{matchExpenseId}` to attach to an existing booking) or drop it with `ignore_statement_line`.
 
 SCHEMAS: tool parameters are typed and mirror the API (camelCase keys). For guard/action
 shapes and form-field types call `get_config_schemas` (authoritative JSON-Schemas).
@@ -786,15 +803,26 @@ async def book_expense(
     fiscal_year_id: str | None = None,
     application_id: str | None = None,
     account_id: str | None = None,
+    invoice_date: str | None = None,
+    payment_date: str | None = None,
+    correspondent: str | None = None,
+    note: str | None = None,
+    reference_number: str | None = None,
+    payment_method: Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"] | None = None,
+    category: str | None = None,
+    invoice_id: str | None = None,
 ) -> dict:
-    """Book an expense/income on a cost centre. amount = decimal string; optionally
-    linked to an application and a bank account. Requires budget.manage."""
+    """Book an expense/income on a cost centre. amount = decimal string; dates ISO. Optionally
+    linked to an application, a bank account and an invoice, plus metadata (correspondent, note,
+    reference number, payment method, category, invoice/payment dates). Requires budget.manage."""
     return await _api().post(
         f"/budgets/{budget_id}/expenses",
         json=_params(
             amount=amount, description=description, kind=kind,
             fiscalYearId=fiscal_year_id, applicationId=application_id,
-            accountId=account_id,
+            accountId=account_id, invoiceDate=invoice_date, paymentDate=payment_date,
+            correspondent=correspondent, note=note, referenceNumber=reference_number,
+            paymentMethod=payment_method, category=category, invoiceId=invoice_id,
         ),
     )
 
@@ -867,6 +895,200 @@ async def move_application_fiscal_year(application_id: str, fiscal_year_id: str)
         f"/applications/{application_id}/move-fiscal-year",
         json={"fiscalYearId": fiscal_year_id},
     )
+
+
+# ===================================== budget: flat expenses · invoices · bank reconcile (#fints/#invoices)
+def _file_part(file_path: str) -> dict[str, Any]:
+    """Read a local file into an httpx multipart ``files=`` dict (backend field name ``file``)."""
+    p = Path(file_path).expanduser()
+    if not p.is_file():
+        raise ApiError(400, f"file not found: {file_path!r}")
+    mime = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
+    return {"file": (p.name, p.read_bytes(), mime)}
+
+
+@mcp.tool()
+async def list_expenses(
+    budget: str | None = None,
+    fiscal_year: str | None = None,
+    application_id: str | None = None,
+    kind: Literal["expense", "income"] | None = None,
+    q: str | None = None,
+    amount_min: str | None = None,
+    amount_max: str | None = None,
+    created_from: str | None = None,
+    created_to: str | None = None,
+    sort: Literal["createdAt", "amount", "invoiceDate", "paymentDate"] | None = None,
+    order: Literal["asc", "desc"] | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    """List bookings across all cost centres (flat, filtered, offset-paged). ``budget`` includes
+    the subtree; dates are ISO; amounts are decimal strings. Requires budget.view."""
+    return await _api().get(
+        "/expenses",
+        params=_params(
+            budget=budget, fiscalYear=fiscal_year, applicationId=application_id,
+            kind=kind, q=q, amountMin=amount_min, amountMax=amount_max,
+            createdFrom=created_from, createdTo=created_to, sort=sort, order=order,
+            limit=limit, offset=offset,
+        ),
+    )
+
+
+@mcp.tool()
+async def list_account_options() -> dict:
+    """List accounts as id+name for booking dropdowns (no IBAN). Shows ``fintsConfigured`` and
+    whether the requesting booker already has personal FinTS credentials. Readable for bookers
+    (budget.book/budget.view) without account-master rights."""
+    return await _api().get("/accounts/options")
+
+
+# ---------------------------------------------------------------- invoices (#invoices)
+@mcp.tool()
+async def list_invoices(
+    q: str | None = None,
+    status: Literal["open", "paid"] | None = None,
+    gross_min: str | None = None,
+    gross_max: str | None = None,
+    issue_from: str | None = None,
+    issue_to: str | None = None,
+    due_from: str | None = None,
+    due_to: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    """List invoices (fuzzy ``q`` over number/supplier/note; filter status/gross-range/date;
+    offset-paged, newest issue date first). Requires budget.view/.book."""
+    return await _api().get(
+        "/invoices",
+        params=_params(
+            q=q, status=status, grossMin=gross_min, grossMax=gross_max,
+            issueFrom=issue_from, issueTo=issue_to, dueFrom=due_from, dueTo=due_to,
+            limit=limit, offset=offset,
+        ),
+    )
+
+
+@mcp.tool()
+async def get_invoice(invoice_id: str) -> dict:
+    """Fetch one invoice (header data + whether an original file is attached)."""
+    return await _api().get(f"/invoices/{invoice_id}")
+
+
+@mcp.tool()
+async def create_invoice(invoice: S.InvoiceCreate) -> dict:
+    """Create an invoice (grossAmount required). ``fileToken`` from parse_invoice /
+    upload_invoice_file links the stored original PDF. Requires budget.book."""
+    return await _api().post("/invoices", json=dump_create(invoice))
+
+
+@mcp.tool()
+async def update_invoice(invoice_id: str, patch: S.InvoiceUpdate) -> dict:
+    """Patch an invoice (amount/status/dates/supplier/note). Requires budget.book."""
+    return await _api().patch(f"/invoices/{invoice_id}", json=dump_patch(patch))
+
+
+@mcp.tool()
+async def delete_invoice(invoice_id: str) -> dict:
+    """Delete an invoice. Requires budget.book."""
+    return await _api().delete(f"/invoices/{invoice_id}")
+
+
+@mcp.tool()
+async def parse_invoice(file_path: str) -> dict:
+    """Parse a local ZUGFeRD/Factur-X PDF: extract header fields + store the original. Returns the
+    parsed fields plus a ``fileToken`` to pass to create_invoice. Requires budget.book."""
+    return await _api().post("/invoices/parse", files=_file_part(file_path))
+
+
+@mcp.tool()
+async def upload_invoice_file(file_path: str) -> dict:
+    """Upload a local invoice document (non-ZUGFeRD also fine); returns a ``fileToken`` for
+    create_invoice. Requires budget.book."""
+    return await _api().post("/invoices/file", files=_file_part(file_path))
+
+
+# ---------------------------------------------------------- FinTS bank reconcile (#fints)
+# NOTE: FinTS acts under the booker's PERSONAL online-banking login. ``fints_sync`` may return
+# status='needs_tan' — completing PSD2/SCA needs a HUMAN (TAN from their device); an agent
+# cannot finish a TAN flow alone. File import (import_statement_file) needs no bank/TAN.
+@mcp.tool()
+async def get_fints_credential(account_id: str) -> dict:
+    """Connection status for the requesting booker on an account: FinTS-capable? personal login
+    stored? lock cooldown? Requires budget.book."""
+    return await _api().get(f"/accounts/{account_id}/fints/credential")
+
+
+@mcp.tool()
+async def set_fints_credential(account_id: str, credential: S.FintsCredentialIn) -> dict:
+    """Store/replace the booker's personal FinTS login+PIN for an account (PIN write-only, stored
+    encrypted). The account must already have a FinTS connection (endpoint+BLZ, set via
+    update_account). Requires budget.book."""
+    return await _api().put(
+        f"/accounts/{account_id}/fints/credential", json=dump_create(credential)
+    )
+
+
+@mcp.tool()
+async def delete_fints_credential(account_id: str) -> dict:
+    """Remove the booker's personal FinTS credential for an account. Requires budget.book."""
+    return await _api().delete(f"/accounts/{account_id}/fints/credential")
+
+
+@mcp.tool()
+async def fints_sync(account_id: str) -> dict:
+    """Start a FinTS transaction sync. Returns status='done' (imported/duplicates staged) OR
+    status='needs_tan' (sessionToken + challenge → a human approves/enters the TAN, then call
+    fints_submit_tan). 409 means the access is locked — do not retry. Requires budget.book +
+    a stored credential."""
+    return await _api().post(f"/accounts/{account_id}/fints/sync")
+
+
+@mcp.tool()
+async def fints_submit_tan(account_id: str, session_token: str, tan: str = "") -> dict:
+    """Resume a pending FinTS sync with the TAN (empty ``tan`` = decoupled pushTAN poll: 'approved
+    in the app yet?'). Returns done or needs_tan again. Requires budget.book."""
+    return await _api().post(
+        f"/accounts/{account_id}/fints/sessions/{session_token}/tan", json={"tan": tan}
+    )
+
+
+@mcp.tool()
+async def import_statement_file(account_id: str, file_path: str) -> dict:
+    """Import a local CAMT.053/MT940 statement file for an account → stages transactions
+    (idempotent). Returns imported/duplicates. No bank/TAN needed. Requires budget.book."""
+    return await _api().post(
+        f"/accounts/{account_id}/statement/import", files=_file_part(file_path)
+    )
+
+
+# -------------------------------------------- staged statement lines → bookings (#fints)
+@mcp.tool()
+async def list_statement_lines(
+    account: str | None = None,
+    state: Literal["unmatched", "suggested", "matched", "ignored"] | None = None,
+) -> dict:
+    """List staged bank transactions (newest first), optionally by account/state. Each carries a
+    signed amount and a suggested cost centre. Requires budget.view/.book."""
+    return await _api().get(
+        "/statement-lines", params=_params(account=account, state=state)
+    )
+
+
+@mcp.tool()
+async def confirm_statement_line(line_id: str, confirm: S.ConfirmLineRequest) -> dict:
+    """Book a staged transaction into a booking: new booking on ``budgetId`` OR attach to an
+    existing ``matchExpenseId`` (kind derives from the sign). Requires budget.book."""
+    return await _api().post(
+        f"/statement-lines/{line_id}/confirm", json=dump_create(confirm)
+    )
+
+
+@mcp.tool()
+async def ignore_statement_line(line_id: str) -> dict:
+    """Mark a staged transaction as irrelevant (kept for idempotent re-import). Requires budget.book."""
+    return await _api().post(f"/statement-lines/{line_id}/ignore")
 
 
 # ============================================================ admin: gremien

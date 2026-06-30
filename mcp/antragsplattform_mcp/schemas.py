@@ -311,6 +311,16 @@ class BudgetNodeUpdate(WireModel):
 class ExpenseUpdate(WireModel):
     amount: str | None = Field(default=None, description="Decimal string > 0")
     description: str | None = None
+    budgetId: str | None = Field(default=None, description="Move the booking to another cost centre")
+    accountId: str | None = Field(default=None, description="Bank account; null clears")
+    invoiceDate: str | None = Field(default=None, description="ISO date; null clears")
+    paymentDate: str | None = Field(default=None, description="ISO date; null clears")
+    correspondent: str | None = None
+    note: str | None = None
+    referenceNumber: str | None = None
+    paymentMethod: Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"] | None = None
+    category: str | None = None
+    invoiceId: str | None = Field(default=None, description="Linked invoice; null clears")
 
 
 class TransferCreate(WireModel):
@@ -325,12 +335,67 @@ class AccountCreate(WireModel):
     name: str
     iban: str = ""
     active: bool = True
+    # FinTS bank connection (shared by all bookers). Personal login/PIN are set per booker
+    # via set_fints_credential, not here (#fints-percred).
+    fintsEndpoint: str | None = Field(default=None, description="FinTS server URL (https)")
+    fintsBlz: str | None = Field(default=None, description="Bank code (BLZ)")
 
 
 class AccountUpdate(WireModel):
     name: str | None = None
     iban: str | None = None
     active: bool | None = None
+    fintsEndpoint: str | None = Field(default=None, description="FinTS server URL; null/'' clears")
+    fintsBlz: str | None = Field(default=None, description="Bank code (BLZ); null/'' clears")
+
+
+# -------------------------------------------------------- bank reconcile (#fints)
+class FintsCredentialIn(WireModel):
+    """Personal FinTS login of the requesting booker for one account (#fints-percred).
+    fintsPin is write-only (stored encrypted, never returned)."""
+
+    fintsLogin: str
+    fintsPin: str
+
+
+class ConfirmLineRequest(WireModel):
+    """Confirm a staged bank transaction into a booking. Provide EITHER budgetId
+    (new booking on that cost centre) OR matchExpenseId (attach to existing booking)."""
+
+    budgetId: str | None = None
+    fiscalYearId: str | None = None
+    matchExpenseId: str | None = None
+    description: str | None = Field(default=None, description="Overrides the default (purpose)")
+
+
+class InvoiceCreate(WireModel):
+    """Create an invoice (#invoices). grossAmount required; the rest optional. fileToken
+    links a previously uploaded/parsed original PDF (from parse_invoice/upload_invoice_file)."""
+
+    grossAmount: str = Field(description="Decimal string >= 0")
+    number: str | None = None
+    issueDate: str | None = Field(default=None, description="ISO date")
+    dueDate: str | None = Field(default=None, description="ISO date")
+    supplier: str | None = None
+    netAmount: str | None = None
+    taxAmount: str | None = None
+    note: str | None = None
+    status: Literal["open", "paid"] = "open"
+    fileToken: str | None = None
+    fileName: str | None = None
+    fileMime: str | None = None
+
+
+class InvoiceUpdate(WireModel):
+    number: str | None = None
+    issueDate: str | None = None
+    dueDate: str | None = None
+    supplier: str | None = None
+    netAmount: str | None = None
+    taxAmount: str | None = None
+    grossAmount: str | None = None
+    note: str | None = None
+    status: Literal["open", "paid"] | None = None
 
 
 # ============================================================ meetings/votes

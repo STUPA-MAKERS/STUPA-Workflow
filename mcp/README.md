@@ -49,7 +49,7 @@ The platform side must have OIDC configured and register this server's public cl
 | `read` | read applications, budgets, votes, meetings, audit, exports |
 | `applications:write` | create / comment / transition applications |
 | `votes:write` | create / open / close / cancel / manage votes (NEVER cast a ballot — human-only; `vote.cast` is in `FORBIDDEN_PERMISSIONS` and never grantable) |
-| `budget:write` | book expenses, manage accounts |
+| `budget:write` | book expenses, manage accounts, invoices & FinTS bank reconciliation |
 | `meetings:write` | manage meetings & agendas |
 
 ## Tools
@@ -59,7 +59,9 @@ Applications: `list_applications`, `get_application`, `get_application_timeline`
 `create_application`, `comment_application`.
 Flow: `list_transitions`, `fire_transition`.
 Votes: `get_vote`, `create_application_vote`, `open_vote`, `close_vote`, `cancel_vote`, `create_meeting_vote`, `delete_meeting_vote` (no `cast_ballot` tool — casting a ballot is human-only).
-Budget: `list_budgets`, `get_budget_applications`, `book_expense`.
+Budget: `list_budgets`, `get_budget_applications`, `book_expense`, `list_expenses`, accounts (`list_accounts`/`list_account_options`/`create_account`/`update_account` incl. FinTS endpoint+BLZ).
+Invoices: `list_invoices`, `get_invoice`, `create_invoice`, `update_invoice`, `delete_invoice`, `parse_invoice` (ZUGFeRD/Factur-X PDF → fields + fileToken), `upload_invoice_file`.
+Bank reconcile (#fints): `get_/set_/delete_fints_credential`, `fints_sync` (may return `needs_tan` — human approves the TAN), `fints_submit_tan`, `import_statement_file` (CAMT.053/MT940), `list_statement_lines`, `confirm_statement_line`, `ignore_statement_line`.
 Meetings: `list_meetings`, `get_meeting`.
 
 ## Token cache
