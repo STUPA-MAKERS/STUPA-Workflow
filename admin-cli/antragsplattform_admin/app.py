@@ -463,6 +463,13 @@ class AdminApp:
     def _heading(text: str) -> Any:
         return Window(FormattedTextControl([("class:detail.head", text)]), height=1)
 
+    @staticmethod
+    def _button_row(*buttons: Any) -> Any:
+        """A row of fixed-width buttons + a trailing filler. The filler is essential: prompt_toolkit
+        sizes a vertical stack by its most-constrained child's max width, so a bare fixed-width
+        button row would collapse the whole pane to the buttons' width. The Window() lets it extend."""
+        return VSplit([*buttons, Window()], padding=1)
+
     # ------------------------------------------------------------------ USERS
     def _user_label(self, r: dict[str, Any]) -> str:
         dot = "●" if _truthy(r["active"]) else "○"
@@ -479,7 +486,7 @@ class AdminApp:
         search = getattr(self, "_user_search", None)
         title = f"Users ({len(rows)})" + (f" · filter “{search}”" if search else "")
         search_btn = Button("Search / filter…", self._user_search_dialog, width=22)
-        left = HSplit([search_btn, Window(height=1), ctrl])
+        left = HSplit([self._button_row(search_btn), Window(height=1), ctrl])
         self._master_detail(left, focus, left_title=title)
 
     def _user_search_dialog(self) -> None:
@@ -515,7 +522,7 @@ class AdminApp:
                 lambda: self.run_write(lambda: ops.revoke_assignment(self.db, aid), "assignment revoked"),
             ))
 
-        buttons = VSplit([Button("Add…", add, width=9), Button("Revoke", revoke, width=10)], padding=1)
+        buttons = self._button_row(Button("Add…", add, width=9), Button("Revoke", revoke, width=10))
         return HSplit([
             self._heading(f"Role assignments ({len(rows)})"),
             ctrl,
@@ -552,10 +559,9 @@ class AdminApp:
                 title="Delete user",
             ))
 
-        buttons = VSplit(
-            [Button("Activate" if not active else "Deactivate", toggle, width=14),
-             Button("Delete", delete, width=10)],
-            padding=1,
+        buttons = self._button_row(
+            Button("Activate" if not active else "Deactivate", toggle, width=14),
+            Button("Delete", delete, width=10),
         )
         return HSplit([self._heading("User"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
 
@@ -586,7 +592,7 @@ class AdminApp:
         ctrl, focus = self._list_or_empty(values, self._selected.get("roles"), fill=True)
         self._left_ctrl = ctrl
         new_btn = Button("New role…", self._new_role, width=22)
-        left = HSplit([new_btn, Window(height=1), ctrl])
+        left = HSplit([self._button_row(new_btn), Window(height=1), ctrl])
         self._master_detail(left, focus, left_title=f"Roles ({len(rows)})")
 
     def _role_key(self, rid: Any) -> str:
@@ -618,7 +624,7 @@ class AdminApp:
             Window(FormattedTextControl([("class:detail.dim", "Space toggles · Save to apply")]), height=1),
             cb,
             Window(height=1),
-            VSplit([Button("Save", save, width=9)], padding=1),
+            self._button_row(Button("Save", save, width=9)),
         ])
 
     def _detail_roles_users(self, rid: Any) -> Any:
@@ -648,7 +654,7 @@ class AdminApp:
             self._heading(f"Principals with “{self._role_key(rid)}” ({len(rows)})"),
             ctrl,
             Window(height=1),
-            VSplit([Button("Revoke", revoke, width=10)], padding=1),
+            self._button_row(Button("Revoke", revoke, width=10)),
         ])
 
     def _detail_roles_actions(self, rid: Any) -> Any:
@@ -673,10 +679,9 @@ class AdminApp:
                 title="Delete role",
             ))
 
-        buttons = VSplit(
-            [Button("New…", self._new_role, width=9), Button("Rename", rename, width=10),
-             Button("Delete", delete, width=10)],
-            padding=1,
+        buttons = self._button_row(
+            Button("New…", self._new_role, width=9), Button("Rename", rename, width=10),
+            Button("Delete", delete, width=10),
         )
         return HSplit([self._heading("Role actions"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
 
@@ -699,7 +704,7 @@ class AdminApp:
         ctrl, focus = self._list_or_empty(values, self._selected.get("oidc"), fill=True)
         self._left_ctrl = ctrl
         new_btn = Button("New mapping…", lambda: self.guard_write(lambda: self._mapping_flow(None)), width=22)
-        left = HSplit([new_btn, Window(height=1), ctrl])
+        left = HSplit([self._button_row(new_btn), Window(height=1), ctrl])
         self._master_detail(left, focus, left_title=f"OIDC mappings ({len(rows)})")
 
     def _detail_oidc_actions(self, mid: Any) -> Any:
@@ -722,10 +727,9 @@ class AdminApp:
                 lambda: self.run_write(lambda: ops.delete_mapping(self.db, mid), "mapping deleted"),
             ))
 
-        buttons = VSplit(
-            [Button("New…", lambda: self.guard_write(lambda: self._mapping_flow(None)), width=9),
-             Button("Edit", edit, width=8), Button("Delete", delete, width=10)],
-            padding=1,
+        buttons = self._button_row(
+            Button("New…", lambda: self.guard_write(lambda: self._mapping_flow(None)), width=9),
+            Button("Edit", edit, width=8), Button("Delete", delete, width=10),
         )
         return HSplit([self._heading("Mapping actions"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
 
@@ -786,10 +790,9 @@ class AdminApp:
             )
 
         title = "Audit log" + (f" · action “{self._audit_action}”" if self._audit_action else "")
-        buttons = VSplit(
-            [Button("Load more", more, width=12), Button("Filter…", filt, width=10),
-             Button("Reset", self._reset_audit, width=8)],
-            padding=1,
+        buttons = self._button_row(
+            Button("Load more", more, width=12), Button("Filter…", filt, width=10),
+            Button("Reset", self._reset_audit, width=8),
         )
         body = Frame(HSplit([area, Window(height=1), buttons]), title=title)
         self._set_body(body, area)
