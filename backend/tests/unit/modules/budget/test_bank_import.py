@@ -221,25 +221,25 @@ def test_mt940_counterparty_prefers_sepa_fields() -> None:
         "deviate_recipient": "Max Mustermann",
         "gvc_applicant_iban": "DE70120300001076878808",
     }
-    assert bi._mt940_counterparty(salary, credit=False) == (
+    assert bi.mt940_counterparty(salary, credit=False) == (
         "Max Mustermann",
         "DE70120300001076878808",
     )
     # Eingang: abweichender Auftraggeber (ABWA+) wird bevorzugt.
     incoming = {"applicant_name": "KRZL", "deviate_applicant": "ACME GmbH"}
-    assert bi._mt940_counterparty(incoming, credit=True) == ("ACME GmbH", None)
+    assert bi.mt940_counterparty(incoming, credit=True) == ("ACME GmbH", None)
     # Ohne abweichende Felder: Fallback auf ?32 (+ ?31 vor IBAN+).
     plain = {
         "applicant_name": "Quentin Walz",
         "applicant_iban": "DE89370400440532013000",
         "gvc_applicant_iban": "DE111",
     }
-    assert bi._mt940_counterparty(plain, credit=False) == (
+    assert bi.mt940_counterparty(plain, credit=False) == (
         "Quentin Walz",
         "DE89370400440532013000",
     )
     # Komplett leer → (None, None).
-    assert bi._mt940_counterparty({}, credit=False) == (None, None)
+    assert bi.mt940_counterparty({}, credit=False) == (None, None)
 
 
 def test_split_booking_time() -> None:

@@ -736,12 +736,18 @@ class BankService:
                 "A zero-amount transaction cannot be booked.", code="line_zero_amount"
             )
 
-        # Gegenkonto bereinigen (#fints): vor dem Parser-Fix gestagete Umsätze tragen IBAN+Name
-        # in EINEM Feld. Beim Buchen Name/IBAN trennen, damit Empfänger, Beschreibung, Notiz und
-        # Counterparty-Memory saubere Daten bekommen — unabhängig vom Stage-Zeitpunkt.
-        clean_name, clean_iban = bank_import.split_leading_iban(
-            line.counterparty_name, line.counterparty_iban
+        # Gegenkonto bereinigen (#fints): primär aus den SEPA-Rohfeldern (``raw_payload``:
+        # ABWE+/ABWA+/IBAN+) neu ableiten — so bekommen auch VOR dem Parser-Fix gestagete Umsätze
+        # (Name nur „KRZL", keine ?31-IBAN) beim Buchen sauberen Empfänger/IBAN. Liefert das nichts
+        # (z. B. CAMT-/Datei-Import ohne GVC-Felder), die gespeicherten Werte (ggf. IBAN aus dem
+        # Namen lösen) verwenden.
+        clean_name, clean_iban = bank_import.mt940_counterparty(
+            line.raw_payload or {}, credit=line.amount > 0
         )
+        if not clean_name and not clean_iban:
+            clean_name, clean_iban = bank_import.split_leading_iban(
+                line.counterparty_name, line.counterparty_iban
+            )
 
         # Ziel **vor** dem Claim validieren, damit der Claim nur erfolgt, wenn das Buchen
         # auch durchgeht (minimiert das Orphan-Fenster: matched ohne Buchung).

@@ -111,7 +111,7 @@ def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
     elif status in ("C", "RD"):
         raw_amount = abs(raw_amount)
     amount = _sane_amount(raw_amount)
-    cp_name, cp_iban = _mt940_counterparty(d, credit=raw_amount > 0)
+    cp_name, cp_iban = mt940_counterparty(d, credit=raw_amount > 0)
     # Sparkassen-MT940 hängt die Buchungs-Uhrzeit als ``…DATUM dd.mm.yyyy, hh.mm UHR`` an den
     # Verwendungszweck — vom eigentlichen Zweck lösen (sauberer Zweck) und die Zeit für die
     # spätere Buchungs-Anmerkung in ``raw`` ablegen (#fints).
@@ -334,7 +334,7 @@ def _detect_leading_iban(text: str) -> tuple[str, str] | None:
     return candidate, text[length:]
 
 
-def _mt940_counterparty(
+def mt940_counterparty(
     d: dict[str, object], *, credit: bool
 ) -> tuple[str | None, str | None]:
     """Gegenkonto (Name, IBAN) aus einer ``mt940``-Transaktion gewinnen (#fints).

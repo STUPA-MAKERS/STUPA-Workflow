@@ -407,6 +407,40 @@ async def test_confirm_line_cleans_mashed_counterparty(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
+async def test_confirm_line_derives_counterparty_from_raw(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Vor dem Parser-Fix gestagete Gehaltszeile (Name nur „KRZL", keine IBAN; echter Empfänger
+    in den SEPA-Rohfeldern ABWE+/IBAN+ im raw_payload) → Buchung bekommt sauberen Empfänger +
+    IBAN aus dem raw_payload (#fints)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    line = _line(
+        counterparty_name="KRZL",
+        counterparty_iban=None,
+        purpose="Gehalt 06/26",
+        raw_payload={
+            "applicant_name": "KRZL",
+            "deviate_recipient": "Max Mustermann",
+            "gvc_applicant_iban": "DE70120300001076878808",
+        },
+    )
+    session.put(line)
+    captured: dict[str, Any] = {}
+
+    async def _book(self: Any, payload: Any, *, actor: str, commit: bool = True) -> ExpenseOut:
+        captured["payload"] = payload
+        return _canned_expense("expense")
+
+    monkeypatch.setattr(BudgetTreeService, "book_expense", _book)
+    session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim, remember
+    await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
+    payload = captured["payload"]
+    assert payload.correspondent == "Max Mustermann"  # aus ABWE+, nicht „KRZL"
+    assert "DE70 1203 0000 1076 8788 08" in (payload.note or "")  # IBAN aus IBAN+
+
+
+@pytest.mark.asyncio
 async def test_confirm_line_match_existing(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _service(session, monkeypatch)
