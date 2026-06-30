@@ -51,10 +51,11 @@ def upgrade() -> None:
         bank_ref = str(raw.get("bank_reference") or raw.get("AcctSvcrRef") or "").strip()
         if bank_ref:
             continue  # stabil per Referenz verschlüsselt → nicht anfassen
+        # Base wie assign_keys: OHNE counterparty_iban (parser-instabil) — sonst gruppiert die
+        # alt-geparste gebuchte Zeile (iban="") nicht mit der neu-geparsten Dublette (iban gesetzt).
         base = (
             str(r.value_date or ""),
             str(r.amount),
-            r.counterparty_iban or "",
             r.end_to_end_id or "",
             canonical_purpose_key(r.purpose),
         )

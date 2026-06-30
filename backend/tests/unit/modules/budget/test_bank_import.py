@@ -240,6 +240,24 @@ def test_assign_keys_stable_across_purpose_normalization() -> None:
     assert glued.idempotency_key == spaced.idempotency_key
 
 
+def test_assign_keys_stable_when_iban_extracted_from_name() -> None:
+    """Derselbe Umsatz alt-geparst (IBAN im Namen, counterparty_iban leer) vs. neu-geparst (IBAN
+    gelöst) → GLEICHER Schlüssel; sonst dupliziert ein Re-Import die bereits gebuchte Zeile."""
+    old = bi.StatementLine(
+        amount=Decimal("-1377.27"), value_date=date(2026, 6, 26),
+        counterparty_name="DE85780608960006017410oikos Bayreuth e.V.",
+        counterparty_iban=None, purpose="oikos Spende",
+    )
+    new = bi.StatementLine(
+        amount=Decimal("-1377.27"), value_date=date(2026, 6, 26),
+        counterparty_name="oikos Bayreuth e.V.",
+        counterparty_iban="DE85780608960006017410", purpose="oikos Spende",
+    )
+    bi.assign_keys("acc", [old])
+    bi.assign_keys("acc", [new])
+    assert old.idempotency_key == new.idempotency_key
+
+
 def test_mt940_counterparty_drops_krzl_placeholder() -> None:
     """„KRZL"-Platzhalter (Sammel-/Dateibuchung) wird nicht als Gegenkonto übernommen."""
     name, iban = bi.mt940_counterparty(

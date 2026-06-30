@@ -31,10 +31,12 @@ def upgrade() -> None:
     )
 
     conn = op.get_bind()
+    # Alle Zeilen (auch gebuchte): Gegenkonto/Zweck sind reine Anzeige der gestageten Zeile; die
+    # zugehörige Buchung trägt ihre eigenen Werte. Saubere Anzeige auch für ``matched``.
     rows = conn.execute(
         sa.text(
             "SELECT id, raw_payload, amount, purpose, counterparty_name, counterparty_iban "
-            "FROM bank_statement_line WHERE match_state IN ('unmatched', 'suggested')"
+            "FROM bank_statement_line"
         )
     ).all()
     for row in rows:

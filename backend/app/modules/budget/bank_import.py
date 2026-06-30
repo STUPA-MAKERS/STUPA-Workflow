@@ -344,14 +344,17 @@ def assign_keys(account_scope: str, lines: list[StatementLine]) -> None:
         if ln.bank_ref:
             ln.idempotency_key = _sha(f"{account_scope}|ref|{ln.bank_ref}")
             continue
+        # Schlüssel NUR aus parser-STABILEN Feldern (#fints-dedup): Wertstellung, Betrag, E2E-Ref
+        # und der KANONISCHE Zweck (nur Alphanumerik, großgeschrieben). Bewusst OHNE
+        # ``counterparty_iban``/``-name`` — die leitet der Parser aus denselben Rohfeldern ab und
+        # ändert sich mit Parser-Verbesserungen (IBAN aus dem Namen lösen, KRZL verwerfen); flösse
+        # sie ein, würde derselbe Umsatz nach einem Parser-Update als neuer Schlüssel doppelt
+        # importiert (genau der beobachtete Fall). Der kanonische Zweck trägt die DATEI-NR und
+        # unterscheidet dadurch echte Sammelbuchungen.
         base: tuple[object, ...] = (
             ln.value_date.isoformat() if ln.value_date else "",
             str(ln.amount),
-            ln.counterparty_iban or "",
             ln.end_to_end_id or "",
-            # KANONISCH (#fints-dedup): nur Alphanumerik, großgeschrieben — kosmetische Zweck-
-            # Normalisierung (Leerzeichen vor Subfeldern, DATUM-Zusatz) verschiebt den Schlüssel
-            # damit NICHT mehr → kein Re-Import-Duplikat nach Parser-Änderungen.
             canonical_purpose_key(ln.purpose),
         )
         seq = seen.get(base, 0)
