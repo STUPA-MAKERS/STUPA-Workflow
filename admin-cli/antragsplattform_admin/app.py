@@ -25,6 +25,7 @@ from prompt_toolkit.layout import (
     Layout,
     VSplit,
     Window,
+    WindowAlign,
 )
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.dimension import D
@@ -64,6 +65,10 @@ _STYLE = Style.from_dict(
         "header": f"bg:{_INK} {_FG}",
         "header.brand": f"bg:{_INK} {_CORAL} bold",
         "header.dim": f"bg:{_INK} {_DIM}",
+        "header.warn": f"bg:{_INK} #ff9d5c bold",
+        "header.ro": f"bg:{_INK} #87d7af bold",
+        # pane title row (minimal-divider layout, no boxes)
+        "pane.title": f"bg:{_INK} {_CORAL} bold",
         # top tab strip
         "tabbar": f"bg:{_INK}",
         "tab": f"bg:{_INK} {_DIM}",
@@ -71,11 +76,13 @@ _STYLE = Style.from_dict(
         # detail sub-tabs
         "subtab": f"bg:{_INK} {_DIM}",
         "subtab.active": f"bg:{_INK} {_CORAL} bold",
+        # full-width selection bar on lists
+        "cursor-line": "bg:#33302b",
         # footer / status line
-        "footer": "bg:#222222 #9e9e9e",
-        "footer.ro": "bg:#1f3a2a #87d7af bold",
-        "footer.warn": "bg:#5a2310 #ffd7af bold",
-        "footer.key": "bg:#222222 #d7d7d7 bold",
+        "footer": f"bg:{_INK} {_DIM}",
+        "footer.key": f"bg:{_INK} {_FG} bold",
+        "footer.chip": f"bg:{_INK} {_DIM}",
+        "footer.status": f"bg:{_INK} {_CORAL}",
         # detail headings
         "detail.head": f"{_CORAL} bold",
         "detail.dim": _DIM,
@@ -151,16 +158,29 @@ class AdminApp:
             ("oidc", "actions"): self._detail_oidc_actions,
         }
 
+        header = VSplit(
+            [
+                Window(FormattedTextControl(self._header_left), height=1, style="class:header"),
+                Window(
+                    FormattedTextControl(self._header_right),
+                    height=1,
+                    style="class:header",
+                    align=WindowAlign.RIGHT,
+                ),
+            ]
+        )
         root = FloatContainer(
             content=HSplit(
                 [
-                    Window(FormattedTextControl(self._header_text), height=1, style="class:header"),
+                    header,
                     Window(
                         FormattedTextControl(self._tabbar_fragments, focusable=False),
                         height=1,
                         style="class:tabbar",
                     ),
+                    Window(height=1, char="─", style="class:rule"),
                     DynamicContainer(lambda: self._body),
+                    Window(height=1, char="─", style="class:rule"),
                     Window(FormattedTextControl(self._footer_text), height=1, style="class:footer"),
                 ]
             ),
@@ -177,11 +197,23 @@ class AdminApp:
         self.goto("users")
 
     # ------------------------------------------------------------------ chrome
-    def _header_text(self) -> Any:
+    def _header_left(self) -> Any:
         return [
-            ("class:header.brand", " ✻ "),
-            ("class:header", "antragsplattform "),
-            ("class:header.dim", f"admin-cli v{__version__}"),
+            ("class:header.brand", " antragsplattform "),
+            ("class:header.dim", "admin"),
+            ("class:header", "  ›  "),
+            ("class:header", dict(_SECTIONS)[self.section]),
+        ]
+
+    def _header_right(self) -> Any:
+        if self.cfg.read_only:
+            badge = ("class:header.ro", "● read-only")
+        else:
+            badge = ("class:header.warn", "⚠ direct db")
+        return [
+            ("class:header.dim", f"db={self.cfg.mode_label}   "),
+            badge,
+            ("class:header.dim", f"   v{__version__} "),
         ]
 
     def _tabbar_fragments(self) -> Any:
@@ -214,17 +246,15 @@ class AdminApp:
         return frags
 
     def _footer_text(self) -> Any:
-        if self.cfg.read_only:
-            badge = ("class:footer.ro", " ● READ-ONLY ")
-        else:
-            badge = ("class:footer.warn", " ⚠ DIRECT DB — no audit, no guards ")
-        msg = self._status or "^←/^→ tabs · Tab/↑↓ move · Enter/click select · F5 refresh · ^Q quit"
-        return [
-            badge,
-            ("class:footer", f"  db={self.cfg.mode_label}  "),
-            ("class:footer.key", "·"),
-            ("class:footer", f"  {msg} "),
-        ]
+        if self._status:
+            return [("class:footer.status", f"  {self._status} ")]
+        chips = [("^←/→", "tabs"), ("↑↓", "move"), ("⏎", "select"),
+                 ("F5", "refresh"), ("^Q", "quit")]
+        frags: list[Any] = [("class:footer", " ")]
+        for key, act in chips:
+            frags += [("class:footer.key", key), ("class:footer.chip", f" {act}"),
+                      ("class:footer", "    ")]
+        return frags
 
     def set_status(self, text: str) -> None:
         self._status = text
@@ -415,15 +445,31 @@ class AdminApp:
             label = Label(text="  (no entries)")
             return HSplit([label, Window()]), label
         keys = [v[0] for v in values]
-        radio: RadioList = RadioList(values=list(values), default=default if default in keys else None)
+        radio: RadioList = RadioList(
+            values=list(values),
+            default=default if default in keys else None,
+            # clean marker: a ▸ caret on the active row, no (*)/( ) brackets
+            open_character="", select_character="▸", close_character="",  # type: ignore[call-arg]
+        )
+        # full-width selection bar (the cursor sits on the selected entry)
+        radio.window.cursorline = to_filter(True)
         if fill:
             radio.window.dont_extend_height = to_filter(False)
             radio.window.dont_extend_width = to_filter(False)
         return radio, radio
 
     # ------------------------------------------------------------------ master-detail shell
+    @staticmethod
+    def _title_row(text: str) -> Any:
+        return Window(FormattedTextControl([("class:pane.title", f" {text}")]),
+                      height=1, style="class:pane.title")
+
     def _master_detail(self, left_content: Any, focus: Any, *, left_title: str) -> None:
         self._detail_cache = None
+        # Minimal-divider layout: no boxes. Left = title row + content; a single vertical rule;
+        # right = sub-tab strip + detail. Left list holds the long rows → give it the bulk of the
+        # width; the detail pane is short → cap it so it doesn't leave a dead zone on wide terminals.
+        left = HSplit([self._title_row(left_title), left_content], width=D(weight=1, min=40))
         right = HSplit(
             [
                 Window(
@@ -431,19 +477,11 @@ class AdminApp:
                     height=1,
                     style="class:subtab",
                 ),
-                Window(height=1, char="─", style="class:rule"),
                 DynamicContainer(self._detail_body),
-            ]
-        )
-        # Left list holds the long rows → give it the bulk of the width; the detail pane is short,
-        # so cap it so it doesn't leave a dead zone on wide terminals.
-        body = VSplit(
-            [
-                Frame(left_content, title=left_title, width=D(weight=1, min=40)),
-                Frame(right, title="Details", width=D(min=42, max=64)),
             ],
-            padding=0,
+            width=D(min=44, max=66),
         )
+        body = VSplit([left, Window(width=1, char="│", style="class:rule"), right], padding=0)
         self._set_body(body, focus)
 
     def _detail_body(self) -> Any:
@@ -663,12 +701,11 @@ class AdminApp:
         ])
 
     def _detail_roles_actions(self, rid: Any) -> Any:
+        if not rid:
+            return self._placeholder("Select a role on the left.")
         cur = self._role_key(rid)
-        info = f"Selected role: {cur}" if rid else "No role selected — “New role” still works."
 
         def rename() -> None:
-            if not rid:
-                return
             self.guard_write(lambda: self.ask_input(
                 "Rename role", "New key:", cur,
                 lambda key: key and self.run_write(
@@ -676,19 +713,15 @@ class AdminApp:
             ))
 
         def delete() -> None:
-            if not rid:
-                return
             self.guard_write(lambda: self.confirm(
                 f"DELETE role '{cur}'?\nCascades its permissions, assignments and OIDC mappings.",
                 lambda: self.run_write(lambda: ops.delete_role(self.db, rid), "role deleted"),
                 title="Delete role",
             ))
 
-        buttons = self._button_row(
-            Button("New…", self._new_role, width=9), Button("Rename", rename, width=10),
-            Button("Delete", delete, width=10),
-        )
-        return HSplit([self._heading("Role actions"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
+        buttons = self._button_row(Button("Rename", rename, width=10), Button("Delete", delete, width=10))
+        return HSplit([self._heading(f"Role · {cur}"), Box(Label(f"Key: {cur}"), padding=0),
+                       Window(height=1), buttons, Window()])
 
     def _new_role(self) -> None:
         self.guard_write(lambda: self.ask_input(
@@ -714,29 +747,22 @@ class AdminApp:
 
     def _detail_oidc_actions(self, mid: Any) -> Any:
         row = next((m for m in self._mappings if m["id"] == mid), None)
-        if row is not None:
-            scope = f" @ {row['gremium']}" if row["gremium"] else " (global)"
-            info = f"{row['oidc_group']} → {row['role_key']}{scope}"
-        else:
-            info = "No mapping selected — “New” still works."
+        if row is None:
+            return self._placeholder("Select a mapping on the left.")
+        scope = f" @ {row['gremium']}" if row["gremium"] else " (global)"
+        info = f"{row['oidc_group']} → {row['role_key']}{scope}"
 
         def edit() -> None:
-            if row is not None:
-                self.guard_write(lambda: self._mapping_flow(row))
+            self.guard_write(lambda: self._mapping_flow(row))
 
         def delete() -> None:
-            if not mid:
-                return
             self.guard_write(lambda: self.confirm(
                 "Delete this OIDC group-mapping?",
                 lambda: self.run_write(lambda: ops.delete_mapping(self.db, mid), "mapping deleted"),
             ))
 
-        buttons = self._button_row(
-            Button("New…", lambda: self.guard_write(lambda: self._mapping_flow(None)), width=9),
-            Button("Edit", edit, width=8), Button("Delete", delete, width=10),
-        )
-        return HSplit([self._heading("Mapping actions"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
+        buttons = self._button_row(Button("Edit", edit, width=8), Button("Delete", delete, width=10))
+        return HSplit([self._heading("Mapping"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
 
     def _mapping_flow(self, existing: dict[str, Any] | None) -> None:
         roles = ops.list_roles_simple(self.db)
@@ -794,12 +820,13 @@ class AdminApp:
                 self._do_audit_filter,
             )
 
-        title = "Audit log" + (f" · action “{self._audit_action}”" if self._audit_action else "")
+        title = f"Audit log ({len(self._audit_rows)})" + (
+            f" · action “{self._audit_action}”" if self._audit_action else "")
         buttons = self._button_row(
             Button("Load more", more, width=12), Button("Filter…", filt, width=10),
             Button("Reset", self._reset_audit, width=8),
         )
-        body = Frame(HSplit([area, Window(height=1), buttons]), title=title)
+        body = HSplit([self._title_row(title), area, Window(height=1), buttons])
         self._set_body(body, area)
 
     def _do_audit_filter(self, term: str) -> None:
