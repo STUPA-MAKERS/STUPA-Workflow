@@ -172,6 +172,12 @@ def test_line_out_resolves_counterparty_purpose_from_raw() -> None:
     out2 = BankService._line_out(camt, None)
     assert out2.counterparty_name == "ACME"
     assert out2.purpose == "Rechnung"
+    # Platzhalter „KRZL" wird auch im Fallback (Rohfelder leer) verworfen.
+    krzl = _line(
+        amount=Decimal("-10.00"), counterparty_name="KRZL", counterparty_iban="DE79",
+        purpose="DATEI-NR. 1", raw_payload={"creditDebit": "DBIT"},
+    )
+    assert BankService._line_out(krzl, None).counterparty_name is None
 
 
 # --------------------------------------------------------------- feature gate

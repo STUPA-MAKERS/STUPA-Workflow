@@ -341,6 +341,16 @@ _CP_RAW_KEYS = (
 )
 
 
+def clean_counterparty_name(name: object | None) -> str | None:
+    """Platzhalter-„Namen" (z. B. „KRZL" bei Sammel-/Dateibuchungen) verwerfen — egal aus welcher
+    Quelle (#fints-raw). Greift auch im Fallback auf die gespeicherte Spalte, falls die Rohfelder
+    den echten Namen nicht hergeben."""
+    cleaned = _clean(name)
+    if cleaned is not None and cleaned.upper() in _PLACEHOLDER_NAMES:
+        return None
+    return cleaned
+
+
 def resolve_counterparty(raw: object, *, credit: bool) -> tuple[str | None, str | None]:
     """Gegenkonto **aus den Rohdaten** auflösen (#fints-raw). MT940/FinTS: über die GVC-Rohfelder
     (:func:`mt940_counterparty`, verwirft Platzhalter wie ``KRZL``, löst geklebte IBAN). CAMT-Roh

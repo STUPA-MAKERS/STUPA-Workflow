@@ -169,7 +169,9 @@ class BankService:
         # die Rohfelder ein sauberes Ergebnis; CAMT-Roh trägt sie nicht → Fallback auf die Spalte.
         name, iban = bank_import.resolve_counterparty(line.raw_payload, credit=line.amount > 0)
         if not name and not iban:
-            name, iban = line.counterparty_name, line.counterparty_iban
+            # Fallback auf die gespeicherte Spalte (CAMT/alt) — Platzhalter trotzdem verwerfen.
+            name = bank_import.clean_counterparty_name(line.counterparty_name)
+            iban = line.counterparty_iban
         purpose = bank_import.resolve_purpose(line.raw_payload)
         if purpose is None:
             purpose = line.purpose
