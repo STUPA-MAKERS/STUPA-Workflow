@@ -21,6 +21,17 @@
             <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
           </div>
         </app-filter-field>
+        @if (accountOptions().length) {
+          <app-filter-field [label]="'expenses.filter.account' | t">
+            <app-select
+              [options]="accountFilterOptions()"
+              [ngModel]="accountId()"
+              (ngModelChange)="selectAccount($event)"
+              name="accountFilter"
+              [ariaLabel]="'expenses.filter.account' | t"
+            />
+          </app-filter-field>
+        }
         <app-filter-field [label]="'expenses.filter.amountRange' | t">
           <app-filter-range>
             <app-currency-input start [placeholder]="'expenses.filter.amountMin' | t" [ariaLabel]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />

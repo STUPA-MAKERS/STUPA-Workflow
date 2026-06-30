@@ -364,6 +364,7 @@ async def list_expenses(
     service: ServiceDep,
     budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
+    account_id: Annotated[UUID | None, Query(alias="account")] = None,
     kind: Annotated[ExpenseKind | None, Query()] = None,
     application_id: Annotated[UUID | None, Query(alias="applicationId")] = None,
     q: Annotated[str | None, Query()] = None,
@@ -384,6 +385,7 @@ async def list_expenses(
     return await service.list_expenses_paged(
         budget_id=budget_id,
         fiscal_year_id=fiscal_year_id,
+        account_id=account_id,
         kind=kind,
         application_id=application_id,
         q=q,

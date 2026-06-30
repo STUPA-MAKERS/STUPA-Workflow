@@ -1069,6 +1069,7 @@ class BudgetTreeService:
         *,
         budget_id: UUID | None = None,
         fiscal_year_id: UUID | None = None,
+        account_id: UUID | None = None,
         kind: str | None = None,
         application_id: UUID | None = None,
         q: str | None = None,
@@ -1097,6 +1098,8 @@ class BudgetTreeService:
             filters.append(BudgetExpense.budget_id.in_(subtree))
         if fiscal_year_id is not None:
             filters.append(BudgetExpense.fiscal_year_id == fiscal_year_id)
+        if account_id is not None:
+            filters.append(BudgetExpense.account_id == account_id)
         if kind is not None:
             filters.append(BudgetExpense.kind == kind)
         if application_id is not None:

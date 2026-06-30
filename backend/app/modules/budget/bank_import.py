@@ -111,9 +111,7 @@ def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
     elif status in ("C", "RD"):
         raw_amount = abs(raw_amount)
     amount = _sane_amount(raw_amount)
-    cp_name, cp_iban = split_leading_iban(
-        d.get("applicant_name") or d.get("recipient_name"), d.get("applicant_iban")
-    )
+    cp_name, cp_iban = _mt940_counterparty(d, credit=raw_amount > 0)
     # Sparkassen-MT940 hängt die Buchungs-Uhrzeit als ``…DATUM dd.mm.yyyy, hh.mm UHR`` an den
     # Verwendungszweck — vom eigentlichen Zweck lösen (sauberer Zweck) und die Zeit für die
     # spätere Buchungs-Anmerkung in ``raw`` ablegen (#fints).
@@ -334,6 +332,34 @@ def _detect_leading_iban(text: str) -> tuple[str, str] | None:
     if not _iban_mod97_ok(candidate):
         return None
     return candidate, text[length:]
+
+
+def _mt940_counterparty(
+    d: dict[str, object], *, credit: bool
+) -> tuple[str | None, str | None]:
+    """Gegenkonto (Name, IBAN) aus einer ``mt940``-Transaktion gewinnen (#fints).
+
+    Die ``mt940``-Lib füllt für SEPA-Umsätze außer dem strukturierten ``?32`` (``applicant_name``)
+    und ``?31`` (``applicant_iban``) auch die GVC-Felder aus dem Verwendungszweck:
+    ``IBAN+`` → ``gvc_applicant_iban``, ``ABWA+`` (abweichender Auftraggeber) →
+    ``deviate_applicant``, ``ABWE+`` (abweichender Empfänger) → ``deviate_recipient``.
+
+    Gerade **Gehalts-/SEPA-Zahlungen** tragen im ``?32`` oft nur ein Kürzel (z. B. „KRZL") und
+    KEINE ``?31``-IBAN — der echte Gegenpart steht dann in ``ABWE+``/``ABWA+`` und die IBAN in
+    ``IBAN+``. Daher: bei Eingang den abweichenden **Auftraggeber**, bei Ausgang den abweichenden
+    **Empfänger** bevorzugen (sonst der jeweils andere, sonst ``?32``); die IBAN aus ``?31``,
+    sonst aus ``IBAN+``. ``split_leading_iban`` trennt eine ggf. im Namen verschmolzene IBAN ab.
+    """
+    iban = _clean(d.get("applicant_iban")) or _clean(d.get("gvc_applicant_iban"))
+    deviate_primary = "deviate_applicant" if credit else "deviate_recipient"
+    deviate_secondary = "deviate_recipient" if credit else "deviate_applicant"
+    name = (
+        _clean(d.get(deviate_primary))
+        or _clean(d.get(deviate_secondary))
+        or _clean(d.get("applicant_name"))
+        or _clean(d.get("recipient_name"))
+    )
+    return split_leading_iban(name, iban)
 
 
 def split_leading_iban(

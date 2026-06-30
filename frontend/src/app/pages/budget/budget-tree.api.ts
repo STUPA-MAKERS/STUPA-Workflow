@@ -328,6 +328,7 @@ export interface InvoicePage {
 export interface ExpenseQuery {
   budget?: Uuid;
   fiscalYear?: Uuid;
+  account?: Uuid;
   kind?: ExpenseKind;
   applicationId?: Uuid;
   q?: string;

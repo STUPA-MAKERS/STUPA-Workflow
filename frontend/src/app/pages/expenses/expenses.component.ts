@@ -103,6 +103,8 @@ export class ExpensesComponent implements OnDestroy {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
+  /** Konto-Filter (#expenses-ux): leer = alle Konten. */
+  readonly accountId = signal('');
   /** Mobil: Baum hinter einklappbarem Toggle (Desktop immer sichtbar). */
   readonly treeOpen = signal(false);
   readonly sortField = signal<'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate'>(
@@ -120,6 +122,7 @@ export class ExpensesComponent implements OnDestroy {
     () =>
       [
         this.kind(),
+        this.accountId(),
         this.amountMin().trim(),
         this.amountMax().trim(),
         this.createdFrom(),
@@ -185,6 +188,11 @@ export class ExpensesComponent implements OnDestroy {
   readonly accountOptions = computed<SelectOption[]>(() =>
     this.accounts().map((a) => ({ value: a.id, label: a.name })),
   );
+  /** Konto-Filter-Optionen inkl. „Alle Konten" (Wert ''). */
+  readonly accountFilterOptions = computed<SelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('expenses.filter.allAccounts') },
+    ...this.accountOptions(),
+  ]);
   readonly newAccountId = signal('');
 
   // --- Rechnungs-Verknüpfung (#invoices): 1 Rechnung : N Buchungen. ---
@@ -334,6 +342,11 @@ export class ExpensesComponent implements OnDestroy {
     this.reload();
   }
 
+  selectAccount(id: string): void {
+    this.accountId.set(id);
+    this.reload();
+  }
+
   selectBudget(id: string): void {
     this.budgetId.set(id);
     this.reload();
@@ -356,6 +369,7 @@ export class ExpensesComponent implements OnDestroy {
 
   resetFilters(): void {
     this.kind.set('');
+    this.accountId.set('');
     this.amountMin.set('');
     this.amountMax.set('');
     this.createdFrom.set('');
@@ -427,6 +441,7 @@ export class ExpensesComponent implements OnDestroy {
     this.api
       .listExpenses({
         budget: this.budgetId() || undefined,
+        account: this.accountId() || undefined,
         kind: this.kind() || undefined,
         q: this.q().trim() || undefined,
         amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,

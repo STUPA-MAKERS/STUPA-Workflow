@@ -211,6 +211,37 @@ def test_split_leading_iban() -> None:
     assert bi.split_leading_iban("Plain Name", None) == ("Plain Name", None)
 
 
+def test_mt940_counterparty_prefers_sepa_fields() -> None:
+    """Gehalts-/SEPA-Umsätze: echten Gegenpart aus ABWE+/ABWA+ + IBAN+ ziehen, nicht aus dem
+    Kürzel in ?32 (#fints)."""
+    # Ausgang (Gehalt): ?32 nur Kürzel, ?31 leer; echter Empfänger in ABWE+, IBAN in IBAN+.
+    salary = {
+        "applicant_name": "KRZL",
+        "applicant_iban": None,
+        "deviate_recipient": "Max Mustermann",
+        "gvc_applicant_iban": "DE70120300001076878808",
+    }
+    assert bi._mt940_counterparty(salary, credit=False) == (
+        "Max Mustermann",
+        "DE70120300001076878808",
+    )
+    # Eingang: abweichender Auftraggeber (ABWA+) wird bevorzugt.
+    incoming = {"applicant_name": "KRZL", "deviate_applicant": "ACME GmbH"}
+    assert bi._mt940_counterparty(incoming, credit=True) == ("ACME GmbH", None)
+    # Ohne abweichende Felder: Fallback auf ?32 (+ ?31 vor IBAN+).
+    plain = {
+        "applicant_name": "Quentin Walz",
+        "applicant_iban": "DE89370400440532013000",
+        "gvc_applicant_iban": "DE111",
+    }
+    assert bi._mt940_counterparty(plain, credit=False) == (
+        "Quentin Walz",
+        "DE89370400440532013000",
+    )
+    # Komplett leer → (None, None).
+    assert bi._mt940_counterparty({}, credit=False) == (None, None)
+
+
 def test_split_booking_time() -> None:
     """Sparkassen-Suffix „… DATUM dd.mm.yyyy, hh.mm UHR" vom Zweck lösen (#fints)."""
     assert bi._split_booking_time(

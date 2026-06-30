@@ -808,8 +808,8 @@ async def test_list_expenses_paged_all_filters_and_search() -> None:
     )
     svc = BudgetTreeService(sess)
     page = await svc.list_expenses_paged(
-        budget_id=node.id, fiscal_year_id=uuid.uuid4(), kind="expense",
-        application_id=uuid.uuid4(), q="rechnung", amount_min=Decimal("1"),
+        budget_id=node.id, fiscal_year_id=uuid.uuid4(), account_id=uuid.uuid4(),
+        kind="expense", application_id=uuid.uuid4(), q="rechnung", amount_min=Decimal("1"),
         amount_max=Decimal("100"), created_from="2026-01-01", created_to="2026-12-31",
         sort="invoiceDate", order="asc", limit=10, offset=0,
     )
