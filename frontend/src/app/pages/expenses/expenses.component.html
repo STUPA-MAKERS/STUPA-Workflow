@@ -135,9 +135,12 @@
                 @if (canManage()) {
                   <td class="exp__num">
                     <span class="exp__actions">
-                      <app-button variant="ghost" size="sm" [title]="'expenses.sub.toggle' | t" [ariaLabel]="'expenses.sub.toggle' | t" (click)="toggleSub(e)">
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!e.childCount" [title]="'expenses.sub.toggle' | t" [ariaLabel]="'expenses.sub.toggle' | t" (click)="toggleSub(e)">
                         <span class="inline-flex items-center gap-1"><app-icon [name]="isSubExpanded(e.id) ? 'chevron-up' : 'chevron-down'" [size]="14" />@if (e.childCount) {<span class="exp__subCount">{{ e.childCount }}</span>}</span>
                       </app-button>
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'expenses.sub.add' | t" [title]="'expenses.sub.add' | t" (click)="openCreateSub(e)"><app-icon name="add" /></app-button>
+                      <input #subfile type="file" class="sr-only" accept=".xml,.sta,.mt940,.txt" (change)="onSubFile(e, $event)" [attr.aria-label]="'expenses.sub.import' | t" />
+                      <app-button variant="ghost" size="sm" [iconOnly]="true" [loading]="isSubImporting(e.id)" [ariaLabel]="'expenses.sub.import' | t" [title]="'expenses.sub.import' | t" (click)="subfile.click()"><app-icon name="upload" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!e.invoiceId" [ariaLabel]="'expenses.action.viewInvoice' | t" [title]="'expenses.action.viewInvoice' | t" (click)="openInvoiceDialog(e)"><app-icon name="document" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(e)"><app-icon name="edit" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(e)"><app-icon name="delete" /></app-button>
@@ -145,43 +148,30 @@
                   </td>
                 }
               </tr>
+              <!-- Unterbuchungen (#subbookings): volle Zeilen wie die Eltern, nur eingefärbt. -->
               @if (canManage() && isSubExpanded(e.id)) {
-                <tr class="exp__subRow">
-                  <td colspan="8">
-                    <div class="exp__sub">
-                      <div class="exp__subHead">
-                        <span class="exp__subTitle">{{ 'expenses.sub.title' | t }}</span>
-                        <span>
-                          <input #subfile type="file" class="sr-only" accept=".xml,.sta,.mt940,.txt" (change)="onSubFile(e, $event)" [attr.aria-label]="'expenses.sub.import' | t" />
-                          <app-button variant="secondary" size="sm" [loading]="isSubImporting(e.id)" (click)="subfile.click()">
-                            <span class="inline-flex items-center gap-2"><app-icon name="upload" [size]="14" /> {{ 'expenses.sub.import' | t }}</span>
-                          </app-button>
-                        </span>
-                      </div>
-                      @if (isLoadingSub(e.id)) {
-                        <p class="exp__status">{{ 'expenses.loading' | t }}</p>
-                      } @else if (!subOf(e.id).length) {
-                        <p class="text-sm text-muted m-0">{{ 'expenses.sub.empty' | t }}</p>
-                      } @else {
-                        <table class="exp__subTable">
-                          <tbody>
-                            @for (c of subOf(e.id); track c.id) {
-                              <tr>
-                                <td class="exp__cellDate">{{ c.paymentDate ? (c.paymentDate | ldate: 'mediumDate') : '—' }}</td>
-                                <td class="exp__cellDesc">{{ c.description }}</td>
-                                <td class="exp__cellMeta">{{ c.correspondent || '—' }}</td>
-                                <td class="exp__num exp__amount">{{ money(c.amount) }}</td>
-                                <td class="exp__num">
-                                  <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(c)"><app-icon name="delete" /></app-button>
-                                </td>
-                              </tr>
-                            }
-                          </tbody>
-                        </table>
-                      }
-                    </div>
-                  </td>
-                </tr>
+                @for (c of subOf(e.id); track c.id) {
+                  <tr class="exp__subRow" [class.exp__tr--income]="c.kind === 'income'">
+                    <td class="exp__cellDate">{{ c.paymentDate ? (c.paymentDate | ldate: 'mediumDate') : '—' }}</td>
+                    <td class="exp__cellDate">{{ c.invoiceDate ? (c.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
+                    <td class="exp__cellKind">
+                      <app-badge [variant]="c.kind === 'income' ? 'success' : 'neutral'">{{ (c.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
+                    </td>
+                    <td class="exp__cellDesc">{{ c.description }}</td>
+                    <td class="exp__cellMeta">{{ c.correspondent || '—' }}</td>
+                    <td class="exp__mono exp__cellMeta">{{ c.pathKey ? (c.pathKey | simplifyPath) : '—' }}</td>
+                    <td class="exp__num exp__amount" [class.exp__amount--income]="c.kind === 'income'">{{ c.kind === 'income' ? '+' : '−' }}{{ money(c.amount) }}</td>
+                    <td class="exp__num">
+                      <span class="exp__actions">
+                        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(c)"><app-icon name="edit" /></app-button>
+                        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(c)"><app-icon name="delete" /></app-button>
+                      </span>
+                    </td>
+                  </tr>
+                }
+                @if (isLoadingSub(e.id)) {
+                  <tr class="exp__subRow"><td colspan="8" class="exp__status">{{ 'expenses.loading' | t }}</td></tr>
+                }
               }
             }
           </tbody>
@@ -316,11 +306,12 @@
       <app-currency-input name="eamount" [ngModel]="editAmount()" (ngModelChange)="editAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
     }
 
-    @if (!editing()?.applicationId) {
+    <!-- Unterbuchungen erben Kostenstelle/Konto vom Eltern → nicht einzeln änderbar (#subbookings). -->
+    @if (!editing()?.applicationId && !editing()?.parentExpenseId) {
       <app-select name="ecc" [label]="'expenses.field.costCentre' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="editBudgetId()" (ngModelChange)="editBudgetId.set($event)" />
     }
 
-    @if (accountOptions().length) {
+    @if (accountOptions().length && !editing()?.parentExpenseId) {
       <app-select name="eaccount" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="editAccountId()" (ngModelChange)="editAccountId.set($event)" />
     }
 
@@ -353,6 +344,30 @@
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="editing.set(null)">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" [loading]="saving()" (click)="saveEdit($event)">{{ 'action.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Unterbuchung manuell anlegen (#subbookings) -->
+<app-dialog [open]="!!subParent()" [title]="'expenses.sub.addTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeCreateSub()">
+  @if (subParent(); as p) {
+    <form id="exp-sub" class="flex flex-col gap-2" (submit)="createSub($event)">
+      <p class="text-sm text-muted m-0">{{ 'expenses.sub.inherits' | t: { parent: p.description } }}</p>
+      <label class="text-sm font-medium mt-2" for="exp-sub-desc">{{ 'expenses.field.description' | t }}</label>
+      <input id="exp-sub-desc" class="exp__input" [ngModel]="subDescription()" (ngModelChange)="subDescription.set($event)" name="subdesc" [placeholder]="'expenses.field.descriptionPlaceholder' | t" />
+      <label class="text-sm font-medium mt-2" for="exp-sub-amount">{{ 'expenses.field.amount' | t }}</label>
+      <app-currency-input name="subamount" [ngModel]="subAmount()" (ngModelChange)="subAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
+      <div class="exp__grid2">
+        <app-datepicker name="subpay" [label]="'expenses.field.paymentDate' | t" [ngModel]="subPaymentDate()" (ngModelChange)="subPaymentDate.set($event)" />
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium mt-2" for="exp-sub-corr">{{ 'expenses.field.correspondent' | t }}</label>
+          <input id="exp-sub-corr" class="exp__input" name="subcorr" [ngModel]="subCorrespondent()" (ngModelChange)="subCorrespondent.set($event)" />
+        </div>
+      </div>
+    </form>
+  }
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeCreateSub()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!canSubmitSub()" [loading]="saving()" (click)="createSub($event)">{{ 'expenses.sub.add' | t }}</app-button>
   </div>
 </app-dialog>
 

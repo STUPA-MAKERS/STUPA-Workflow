@@ -73,6 +73,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceUpdate,
     MoveFiscalYearRequest,
     StatementLineOut,
+    SubBookingCreate,
     TransferCreate,
     TransferOut,
 )
@@ -346,6 +347,22 @@ async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
 async def list_sub_bookings(expense_id: UUID, service: ServiceDep) -> list[ExpenseOut]:
     """Unterbuchungen einer Buchung (#subbookings) — Aufklappen im Buchungen-Tab."""
     return await service.list_sub_expenses(expense_id)
+
+
+@router.post(
+    "/budget-expenses/{expense_id}/sub-bookings",
+    response_model=ExpenseOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 404, 422),
+)
+async def create_sub_booking(
+    expense_id: UUID,
+    payload: SubBookingCreate,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
+) -> ExpenseOut:
+    """Unterbuchung manuell anlegen (#subbookings) — erbt Konto/Kostenstelle/HHJ/Art vom Eltern."""
+    return await service.create_sub_booking(expense_id, payload, actor=principal.sub)
 
 
 @router.post(

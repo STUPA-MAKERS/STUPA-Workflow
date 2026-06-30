@@ -47,6 +47,7 @@ from app.modules.budget.tree_schemas import (
     FiscalYearCreate,
     InvoiceCreate,
     InvoiceUpdate,
+    SubBookingCreate,
     TransferCreate,
 )
 from app.modules.budget.tree_service import (
@@ -1871,6 +1872,34 @@ async def test_import_sub_bookings_parent_missing() -> None:
     svc = BudgetTreeService(fake_session(gets=[None]))
     with pytest.raises(NotFoundError):
         await svc.import_sub_bookings(uuid.uuid4(), b"d", filename=None, actor="u")
+
+
+async def test_create_sub_booking_inherits_parent() -> None:
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    parent = _expense(id=uuid.uuid4(), budget_id=node.id, kind="expense", amount="0.00")
+    sess = fake_session(
+        result(Decimal("12.00")),   # _recompute_parent_amount
+        result(node),               # _get_node
+        result(),                   # _actor_names
+        gets=[parent, parent],      # _subbooking_parent_or_error + recompute get
+    )
+    svc = BudgetTreeService(sess)
+    out = await svc.create_sub_booking(
+        parent.id, SubBookingCreate(amount=Decimal("12.00"), description="Teil"), actor="u"
+    )
+    assert out.parent_expense_id == parent.id
+    assert out.amount == Decimal("12.00")
+    assert out.description == "Teil"
+    assert parent.amount == Decimal("12.00")   # Eltern = Σ Kinder
+
+
+async def test_create_sub_booking_on_transfer_rejected() -> None:
+    parent = _expense(id=uuid.uuid4(), transfer_id=uuid.uuid4())
+    svc = BudgetTreeService(fake_session(gets=[parent]))
+    with pytest.raises(ValidationProblem):
+        await svc.create_sub_booking(
+            parent.id, SubBookingCreate(amount=Decimal("1.00"), description="x"), actor="u"
+        )
 
 
 async def test_import_sub_bookings_nested_rejected() -> None:

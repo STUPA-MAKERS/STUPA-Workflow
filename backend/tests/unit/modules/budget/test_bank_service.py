@@ -153,6 +153,27 @@ def _line(**over: Any) -> BankStatementLine:
     return line
 
 
+def test_line_out_resolves_counterparty_purpose_from_raw() -> None:
+    """_line_out löst Gegenkonto/Zweck aus den Rohdaten auf (#fints-raw); CAMT-Roh ohne die
+    Felder → Fallback auf die gespeicherten Spalten."""
+    mt = _line(
+        amount=Decimal("-10.00"), counterparty_name="STALE", counterparty_iban=None,
+        purpose="stale",
+        raw_payload={"applicant_name": "oikos", "applicant_iban": "DE85", "purpose": "Spende"},
+    )
+    out = BankService._line_out(mt, None)
+    assert out.counterparty_name == "oikos"
+    assert out.counterparty_iban == "DE85"
+    assert out.purpose == "Spende"
+    camt = _line(
+        amount=Decimal("-10.00"), counterparty_name="ACME", counterparty_iban="DE99",
+        purpose="Rechnung", raw_payload={"creditDebit": "DBIT"},
+    )
+    out2 = BankService._line_out(camt, None)
+    assert out2.counterparty_name == "ACME"
+    assert out2.purpose == "Rechnung"
+
+
 # --------------------------------------------------------------- feature gate
 def test_require_enabled_off_raises() -> None:
     svc = BankService(_Session(), settings=load_settings())  # type: ignore[arg-type]

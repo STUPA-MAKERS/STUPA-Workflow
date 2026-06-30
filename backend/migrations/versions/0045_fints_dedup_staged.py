@@ -1,21 +1,17 @@
-"""fints_dedup_staged: bestehende doppelte Staging-Umsätze zusammenfassen + neu verschlüsseln.
+"""fints_dedup_staged: re-importierte Dubletten gestageter Umsätze aus den ROHDATEN auflösen.
 
-Vor dem stabilen Idempotenz-Schlüssel (#fints-dedup) floss der **normalisierte Zweck** in den
-Inhalts-Hash ein. Die Zweck-Normalisierung (Subfelder entkleben, ``DATUM…UHR`` entfernen) hat den
-Hash verschoben → ein erneuter Abruf legte denselben Umsatz ein **zweites Mal** an.
+Vor dem rohdaten-basierten Idempotenz-Schlüssel (#fints-raw) flossen parser-abgeleitete Felder
+(``counterparty_iban``, normalisierter Zweck) in den Hash ein. Eine Parser-Verbesserung verschob
+ihn → ein erneuter Abruf legte denselben Bank-Umsatz erneut an (typisch: gebuchte ``matched``-Zeile
++ neu geparste ``unmatched``-Dublette).
 
-Diese Migration räumt das einmalig auf, **nur für inhaltsgehashte** Zeilen (ohne bank-vergebene
-Referenz):
-
-* Gruppen gleicher (Konto, Wertstellung, Betrag, Gegen-IBAN, E2E, **kanonischer** Zweck) werden
-  zusammengefasst — Dubletten im Zustand ``unmatched``/``suggested`` werden gelöscht (gebuchte
-  ``matched``-Zeilen NIE).
-* Die behaltene Zeile bekommt den **neuen kanonischen** Schlüssel (seq 0) → der nächste Abruf
-  erkennt sie als bekannt (``ON CONFLICT DO NOTHING``) und dupliziert nicht erneut.
-
-Konservativ: ref-verschlüsselte Zeilen (stabile Bank-Referenz) bleiben unangetastet; echte
-Mehrfachzahlungen mit identischem Inhalt heilen beim nächsten Abruf von selbst wieder hoch
-(seq 1+). Down-Migration: No-Op.
+Diese Migration vergleicht ausschließlich über ``raw_dedup_base`` (Wertstellung, Betrag, E2E,
+kanonischer Roh-Zweck, kanonischer Roh-Gegenkonto-Block — alles parser-unabhängig aus
+``raw_payload``). Zeilen mit gleicher Roh-Basis sind derselbe Umsatz: die **gebuchte** Zeile bleibt
+(Buchung unberührt; die Anzeige wird ohnehin live aus den Rohdaten aufgelöst), sonst die älteste;
+ungebuchte Kopien werden gelöscht. Gruppen ohne gebuchte Zeile UND ohne echte Roh-Dublette bleiben
+unangetastet — fünf echte 80-€-Zahlungen am selben Tag haben unterschiedliche Roh-Auftraggeber und
+kollabieren NICHT. Die behaltene Zeile bekommt den neuen Roh-Schlüssel. Down-Migration: No-Op.
 """
 
 from __future__ import annotations
@@ -32,14 +28,13 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    from app.modules.budget.bank_import import _sha, canonical_purpose_key
+    from app.modules.budget.bank_import import _sha, raw_dedup_base
 
     conn = op.get_bind()
     rows = conn.execute(
         sa.text(
-            "SELECT l.id, l.account_id, l.value_date, l.amount, l.counterparty_iban, "
-            "l.end_to_end_id, l.purpose, l.match_state, l.created_at, l.raw_payload, "
-            "a.iban AS acc_iban "
+            "SELECT l.id, l.account_id, l.value_date, l.amount, l.end_to_end_id, "
+            "l.match_state, l.created_at, l.raw_payload, a.iban AS acc_iban "
             "FROM bank_statement_line l JOIN account a ON a.id = l.account_id "
             "ORDER BY l.account_id, l.created_at"
         )
@@ -47,40 +42,28 @@ def upgrade() -> None:
 
     groups: dict[tuple[object, ...], list[sa.Row]] = {}
     for r in rows:
-        raw = r.raw_payload if isinstance(r.raw_payload, dict) else {}
-        bank_ref = str(raw.get("bank_reference") or raw.get("AcctSvcrRef") or "").strip()
-        if bank_ref:
-            continue  # stabil per Referenz verschlüsselt → nicht anfassen
-        # Base wie assign_keys: OHNE counterparty_iban (parser-instabil) — sonst gruppiert die
-        # alt-geparste gebuchte Zeile (iban="") nicht mit der neu-geparsten Dublette (iban gesetzt).
-        base = (
-            str(r.value_date or ""),
-            str(r.amount),
-            r.end_to_end_id or "",
-            canonical_purpose_key(r.purpose),
-        )
+        base = raw_dedup_base(r.value_date, r.amount, r.end_to_end_id, r.raw_payload)
         groups.setdefault((r.account_id, *base), []).append(r)
 
     for key, grp in groups.items():
-        account_id = key[0]
-        base = key[1:]
-        scope = grp[0].acc_iban or str(account_id)
-        new_key = _sha(f"{scope}|{'|'.join(map(str, base))}|0")
+        if len(grp) < 2:
+            continue  # eindeutiger Umsatz — nichts zu tun
         matched = [g for g in grp if g.match_state == "matched"]
         non_matched = [g for g in grp if g.match_state != "matched"]
-        if matched:
-            keeper_id = matched[0].id
-            to_delete = non_matched  # Dubletten einer gebuchten Zeile
-        else:
-            keeper_id = non_matched[0].id
-            to_delete = non_matched[1:]
-        for d in to_delete:
+        if not non_matched:
+            continue  # nur gebuchte (kein Re-Import) — nicht anfassen
+        keeper = matched[0] if matched else non_matched[0]
+        for g in non_matched:
+            if g.id == keeper.id:
+                continue
             conn.execute(
-                sa.text("DELETE FROM bank_statement_line WHERE id = :id"), {"id": d.id}
+                sa.text("DELETE FROM bank_statement_line WHERE id = :id"), {"id": g.id}
             )
+        scope = keeper.acc_iban or str(keeper.account_id)
+        new_key = _sha(f"{scope}|{'|'.join(str(p) for p in key[1:])}|0")
         conn.execute(
             sa.text("UPDATE bank_statement_line SET idempotency_key = :k WHERE id = :id"),
-            {"k": new_key, "id": keeper_id},
+            {"k": new_key, "id": keeper.id},
         )
 
 

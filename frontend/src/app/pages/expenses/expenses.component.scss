@@ -308,51 +308,20 @@ input.exp__input {
   .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
 }
 
-/* --- Unterbuchungen (#subbookings): aufgeklappte Zeile unter der Eltern-Buchung --- */
+/* --- Unterbuchungen (#subbookings): volle Zeilen wie die Eltern, nur eingefärbt --- */
 .exp__subCount {
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
   font-weight: var(--fw-semibold);
 }
+/* Identische Zell-Geometrie wie normale Zeilen (gleiche td-Regeln greifen); nur Hintergrund +
+   ein dezenter linker Akzent kennzeichnen die Unterbuchung. */
 .exp__subRow > td {
   background: var(--color-surface-sunken);
-  padding: var(--space-3) var(--space-4);
 }
-.exp__sub {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+.exp__subRow > td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-primary-subtle, var(--color-border));
 }
-.exp__subHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.exp__subTitle {
-  font-weight: var(--fw-semibold);
-  font-size: var(--fs-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-}
-.exp__subTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-sm);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-.exp__subTable td {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: var(--border-width) solid var(--color-border);
-  vertical-align: middle;
-}
-.exp__subTable tr:last-child td { border-bottom: none; }
-@media (max-width: 768px) {
-  /* Aufklapp-Zeile auf Mobil normal lassen (nicht als Karte umbrechen). */
-  .exp__subRow { display: table-row; }
-  .exp__subRow > td { display: table-cell; padding: var(--space-3); }
+.exp__subRow:hover > td {
+  background: var(--color-surface-sunken);
 }

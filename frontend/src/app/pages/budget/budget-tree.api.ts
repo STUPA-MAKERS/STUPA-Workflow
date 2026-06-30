@@ -235,6 +235,12 @@ export interface ExpenseUpdate extends ExpenseMetadata {
   accountId?: Uuid | null;
 }
 
+/** Unterbuchung manuell anlegen (#subbookings) — nur eigene Felder; Rest vom Eltern geerbt. */
+export interface SubBookingBody extends ExpenseMetadata {
+  amount: string;
+  description: string;
+}
+
 // ------------------------------------------------------------------ invoices
 /** Status einer Rechnung (#invoices). */
 export type InvoiceStatus = 'open' | 'paid';
@@ -550,6 +556,10 @@ export class BudgetTreeApi {
   /** Unterbuchungen einer Buchung (#subbookings) — Aufklappen im Buchungen-Tab. */
   listSubBookings(expenseId: Uuid): Observable<Expense[]> {
     return this.http.get<Expense[]>(`${this.base}/budget-expenses/${expenseId}/sub-bookings`);
+  }
+  /** Unterbuchung manuell anlegen (#subbookings) — erbt Konto/Kostenstelle/HHJ/Art vom Eltern. */
+  createSubBooking(expenseId: Uuid, body: SubBookingBody): Observable<Expense> {
+    return this.http.post<Expense>(`${this.base}/budget-expenses/${expenseId}/sub-bookings`, body);
   }
   /** Unterbuchungen aus CAMT.053/MT940-Datei anlegen (#subbookings) — erben Konto/KoSt/HHJ/Art. */
   importSubBookings(expenseId: Uuid, file: File): Observable<Expense[]> {

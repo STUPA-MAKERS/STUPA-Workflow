@@ -217,6 +217,12 @@ class _FakeService:
         self.calls["list_sub_expenses"] = expense_id
         return [_expense_out()]
 
+    async def create_sub_booking(
+        self, expense_id: uuid.UUID, payload: Any, *, actor: str
+    ) -> ExpenseOut:
+        self.calls["create_sub_booking"] = (expense_id, payload, actor)
+        return _expense_out()
+
     async def create_fiscal_year(self, budget_id: uuid.UUID, payload: Any) -> FiscalYearOut:
         self.calls["create_fy"] = budget_id
         return _fy_out()
@@ -464,6 +470,15 @@ def test_list_sub_bookings_route(fake: _FakeService) -> None:
     assert resp.status_code == 200
     assert resp.json()[0]["id"]
     assert fake.calls["list_sub_expenses"] == _EID
+
+
+def test_create_sub_booking_route(fake: _FakeService) -> None:
+    resp = _client(fake).post(
+        f"/api/budget-expenses/{_EID}/sub-bookings",
+        json={"amount": "12.00", "description": "Teil"},
+    )
+    assert resp.status_code == 201
+    assert fake.calls["create_sub_booking"][0] == _EID
 
 
 def test_create_fiscal_year(fake: _FakeService) -> None:

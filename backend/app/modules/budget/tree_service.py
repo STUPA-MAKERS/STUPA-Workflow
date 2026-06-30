@@ -70,6 +70,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceParseResult,
     InvoiceUpdate,
     MoveFiscalYearRequest,
+    SubBookingCreate,
     TransferCreate,
     TransferOut,
 )
@@ -1337,6 +1338,59 @@ class BudgetTreeService:
             for (e, path_key, acc_name) in rows
         ]
 
+    async def _subbooking_parent_or_error(self, parent_id: UUID) -> BudgetExpense:
+        """Eltern-Buchung für Unterbuchungen laden + Invarianten prüfen (#subbookings)."""
+        parent = await self.session.get(BudgetExpense, parent_id)
+        if parent is None:
+            raise NotFoundError(f"budget expense {parent_id} not found")
+        if parent.parent_expense_id is not None:
+            raise ValidationProblem("Sub-bookings cannot be nested.", code="subbooking_nested")
+        if parent.transfer_id is not None:
+            # Übertrags-Buchung muss ihren gepaarten Betrag behalten (sonst netto ≠ 0).
+            raise ValidationProblem(
+                "A transfer booking cannot be split into sub-bookings.",
+                code="subbooking_on_transfer",
+            )
+        return parent
+
+    async def create_sub_booking(
+        self, parent_id: UUID, payload: SubBookingCreate, *, actor: str
+    ) -> ExpenseOut:
+        """Unterbuchung manuell anlegen (#subbookings): erbt Konto/Kostenstelle/HHJ/Art vom Eltern,
+        trägt eigenen Betrag/Beschreibung/Metadaten; danach Eltern-Betrag = Σ Kinder."""
+        parent = await self._subbooking_parent_or_error(parent_id)
+        child = BudgetExpense(
+            budget_id=parent.budget_id,
+            fiscal_year_id=parent.fiscal_year_id,
+            account_id=parent.account_id,
+            kind=parent.kind,
+            currency=parent.currency,
+            parent_expense_id=parent.id,
+            amount=payload.amount,
+            description=payload.description,
+            invoice_date=payload.invoice_date,
+            payment_date=payload.payment_date,
+            correspondent=payload.correspondent,
+            note=payload.note,
+            reference_number=payload.reference_number,
+            payment_method=payload.payment_method,
+            category=payload.category,
+            actor=actor,
+        )
+        self.session.add(child)
+        await self.session.flush()
+        await self._recompute_parent_amount(parent_id)
+        await self._audit(
+            AuditAction.BUDGET_EXPENSE_CREATE,
+            target_type="budget_expense",
+            target_id=str(child.id),
+            data={"parentExpenseId": str(parent_id), "amount": str(child.amount)},
+        )
+        await self.session.commit()
+        path_key = (await self._get_node(parent.budget_id)).path_key
+        names = await self._actor_names({actor})
+        return self._expense_out(child, path_key, actor_name=names.get(actor))
+
     async def import_sub_bookings(
         self, parent_id: UUID, data: bytes, *, filename: str | None, actor: str
     ) -> list[ExpenseOut]:
@@ -1346,21 +1400,7 @@ class BudgetTreeService:
 
         :raises ValidationProblem: Datei nicht parsebar, Eltern ist selbst Unterbuchung, oder
             Datei-Größe über Limit."""
-        parent = await self.session.get(BudgetExpense, parent_id)
-        if parent is None:
-            raise NotFoundError(f"budget expense {parent_id} not found")
-        if parent.parent_expense_id is not None:
-            raise ValidationProblem(
-                "Sub-bookings cannot be nested.", code="subbooking_nested"
-            )
-        if parent.transfer_id is not None:
-            # Eine Übertrags-Buchung muss ihren mit dem Gegenstück gepaarten Betrag behalten —
-            # sie darf nicht in Unterbuchungen aufgeteilt werden (sonst divergieren die Legs, der
-            # Übertrag netto ≠ 0 → Budget-Korruption, #subbookings-review).
-            raise ValidationProblem(
-                "A transfer booking cannot be split into sub-bookings.",
-                code="subbooking_on_transfer",
-            )
+        parent = await self._subbooking_parent_or_error(parent_id)
         if len(data) > self.settings.attachment_max_bytes:
             raise ValidationProblem(
                 f"File exceeds {self.settings.attachment_max_bytes} bytes.", code="file_too_large"

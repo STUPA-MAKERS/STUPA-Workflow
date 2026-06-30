@@ -163,6 +163,16 @@ class BankService:
 
     @staticmethod
     def _line_out(line: BankStatementLine, suggested_path_key: str | None) -> StatementLineOut:
+        # Gegenkonto + Zweck IMMER aus den Rohdaten auflösen (#fints-raw) — nie aus den
+        # gespeicherten counterparty_*/purpose-Spalten (die könnten von einer älteren Parser-
+        # Version stammen, z. B. „KRZL"/geklebte IBAN/verklebter Zweck). MT940/FinTS liefert über
+        # die Rohfelder ein sauberes Ergebnis; CAMT-Roh trägt sie nicht → Fallback auf die Spalte.
+        name, iban = bank_import.resolve_counterparty(line.raw_payload, credit=line.amount > 0)
+        if not name and not iban:
+            name, iban = line.counterparty_name, line.counterparty_iban
+        purpose = bank_import.resolve_purpose(line.raw_payload)
+        if purpose is None:
+            purpose = line.purpose
         return StatementLineOut(
             id=line.id,
             accountId=line.account_id,
@@ -171,9 +181,9 @@ class BankService:
             currency=line.currency,
             bookingDate=line.booking_date,
             valueDate=line.value_date,
-            purpose=line.purpose,
-            counterpartyName=line.counterparty_name,
-            counterpartyIban=line.counterparty_iban,
+            purpose=purpose,
+            counterpartyName=name,
+            counterpartyIban=iban,
             endToEndId=line.end_to_end_id,
             reference=line.reference,
             matchState=line.match_state,  # type: ignore[arg-type]

@@ -121,6 +121,12 @@ export class ExpensesComponent implements OnDestroy {
   readonly subRows = signal<ReadonlyMap<string, Expense[]>>(new Map());
   readonly loadingSub = signal<ReadonlySet<string>>(new Set());
   readonly subImporting = signal<ReadonlySet<string>>(new Set());
+  // Manuelles Anlegen einer Unterbuchung (Dialog).
+  readonly subParent = signal<Expense | null>(null);
+  readonly subAmount = signal('');
+  readonly subDescription = signal('');
+  readonly subPaymentDate = signal('');
+  readonly subCorrespondent = signal('');
 
   /** Zahl aktiver Filter (für den Indikator am Filter-Button). */
   readonly activeFilterCount = computed(
@@ -390,6 +396,47 @@ export class ExpensesComponent implements OnDestroy {
         );
       },
     });
+  }
+
+  openCreateSub(parent: Expense): void {
+    this.subParent.set(parent);
+    this.subAmount.set('');
+    this.subDescription.set('');
+    this.subPaymentDate.set('');
+    this.subCorrespondent.set('');
+  }
+  closeCreateSub(): void {
+    this.subParent.set(null);
+  }
+  canSubmitSub(): boolean {
+    return !!this.subAmount().trim() && !!this.subDescription().trim();
+  }
+  createSub(event?: Event): void {
+    event?.preventDefault();
+    const parent = this.subParent();
+    if (!parent || !this.canSubmitSub() || this.saving()) return;
+    this.saving.set(true);
+    this.api
+      .createSubBooking(parent.id as Uuid, {
+        amount: this.subAmount(),
+        description: this.subDescription().trim(),
+        paymentDate: this.subPaymentDate() || null,
+        correspondent: this.subCorrespondent().trim() || null,
+      })
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.closeCreateSub();
+          this.expandedSub.update((s) => new Set(s).add(parent.id));
+          this.loadSub(parent.id);
+          this.toast.success(this.i18n.translate('expenses.sub.added'));
+          this.reload(); // Eltern-Betrag = Σ Kinder
+        },
+        error: () => {
+          this.saving.set(false);
+          this.toast.error(this.i18n.translate('expenses.toast.failed'));
+        },
+      });
   }
 
   /** Rechnungs-Label fürs Dropdown: Nummer · Lieferant · Brutto. */
@@ -836,10 +883,16 @@ export class ExpensesComponent implements OnDestroy {
         next: (updated) => {
           this.saving.set(false);
           this.editing.set(null);
-          // childCount/parentExpenseId stehen in der Einzel-Antwort nicht zuverlässig (BE
-          // berechnet sie nur im Betrags-Pfad) → aus der bekannten Zeile erhalten (#review).
-          const merged = { ...updated, childCount: e.childCount, parentExpenseId: e.parentExpenseId };
-          this.items.update((list) => list.map((x) => (x.id === merged.id ? merged : x)));
+          if (e.parentExpenseId) {
+            // Unterbuchung bearbeitet (#subbookings): Eltern-Panel + Eltern-Betrag aktualisieren.
+            this.loadSub(e.parentExpenseId);
+            this.reload();
+          } else {
+            // childCount/parentExpenseId stehen in der Einzel-Antwort nicht zuverlässig (BE
+            // berechnet sie nur im Betrags-Pfad) → aus der bekannten Zeile erhalten (#review).
+            const merged = { ...updated, childCount: e.childCount, parentExpenseId: e.parentExpenseId };
+            this.items.update((list) => list.map((x) => (x.id === merged.id ? merged : x)));
+          }
           this.toast.success(this.i18n.translate('expenses.toast.saved'));
           this.loadInvoices();
         },

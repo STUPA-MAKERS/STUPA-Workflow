@@ -225,37 +225,51 @@ def test_canonical_purpose_key_ignores_spacing_and_punct() -> None:
     )
 
 
-def test_assign_keys_stable_across_purpose_normalization() -> None:
-    """Derselbe Umsatz mit verklebtem vs. normalisiertem Zweck → GLEICHER Idempotenz-Schlüssel."""
-    glued = bi.StatementLine(
-        amount=Decimal("-1.00"), value_date=date(2026, 1, 1),
-        purpose="Re DATEI-NR. 0000794247ANZAHL 2",
-    )
-    spaced = bi.StatementLine(
-        amount=Decimal("-1.00"), value_date=date(2026, 1, 1),
-        purpose="Re DATEI-NR. 0000794247 ANZAHL 2",
-    )
-    bi.assign_keys("acc", [glued])
-    bi.assign_keys("acc", [spaced])
-    assert glued.idempotency_key == spaced.idempotency_key
-
-
-def test_assign_keys_stable_when_iban_extracted_from_name() -> None:
-    """Derselbe Umsatz alt-geparst (IBAN im Namen, counterparty_iban leer) vs. neu-geparst (IBAN
-    gelöst) → GLEICHER Schlüssel; sonst dupliziert ein Re-Import die bereits gebuchte Zeile."""
-    old = bi.StatementLine(
+def test_assign_keys_from_raw_stable_across_parser_versions() -> None:
+    """Schlüssel kommt aus den ROHDATEN (#fints-raw): identisches ``raw`` → GLEICHER Schlüssel,
+    egal wie die abgeleiteten ``purpose``/``counterparty_*`` aussehen (alte vs. neue Parser-
+    Version). Sonst dupliziert ein Re-Import die bereits gebuchte Zeile."""
+    raw = {"purpose": "oikos Spende", "applicant_name": "oikos Bayreuth e.V.",
+           "applicant_iban": "DE85780608960006017410"}
+    old = bi.StatementLine(  # alt geparst: IBAN im Namen verklebt, abweichender Zweck
         amount=Decimal("-1377.27"), value_date=date(2026, 6, 26),
         counterparty_name="DE85780608960006017410oikos Bayreuth e.V.",
-        counterparty_iban=None, purpose="oikos Spende",
+        counterparty_iban=None, purpose="oikos SpendeDATUM 01.01.2026, 10.00 UHR", raw=dict(raw),
     )
-    new = bi.StatementLine(
+    new = bi.StatementLine(  # neu geparst: sauber — aber GLEICHES raw
         amount=Decimal("-1377.27"), value_date=date(2026, 6, 26),
         counterparty_name="oikos Bayreuth e.V.",
-        counterparty_iban="DE85780608960006017410", purpose="oikos Spende",
+        counterparty_iban="DE85780608960006017410", purpose="oikos Spende", raw=dict(raw),
     )
     bi.assign_keys("acc", [old])
     bi.assign_keys("acc", [new])
     assert old.idempotency_key == new.idempotency_key
+
+
+def test_assign_keys_distinct_for_different_raw_counterparty() -> None:
+    """Echte Einzelzahlungen (anderer Roh-Auftraggeber) → UNTERSCHIEDLICHE Schlüssel (kein
+    fälschliches Zusammenfassen, #fints-raw)."""
+    a = bi.StatementLine(amount=Decimal("-80.00"), value_date=date(2026, 5, 26),
+                         purpose="Aufwand", raw={"purpose": "Aufwand", "applicant_name": "Alice"})
+    b = bi.StatementLine(amount=Decimal("-80.00"), value_date=date(2026, 5, 26),
+                         purpose="Aufwand", raw={"purpose": "Aufwand", "applicant_name": "Bob"})
+    bi.assign_keys("acc", [a, b])
+    assert a.idempotency_key != b.idempotency_key
+
+
+def test_resolve_from_raw_helpers() -> None:
+    """resolve_* arbeiten auf den Rohdaten; Nicht-Dict/fehlende Felder → Fallback-Signale."""
+    # MT940-Roh → sauberes Gegenkonto (KRZL verworfen) + entklebter/ge-stripter Zweck
+    name, iban = bi.resolve_counterparty(
+        {"applicant_name": "KRZL", "gvc_applicant_iban": "DE79640500000100083958"}, credit=False
+    )
+    assert name is None and iban == "DE79640500000100083958"
+    assert bi.resolve_purpose({"purpose": "Re 0000794247ANZAHL 2"}) == "Re 0000794247 ANZAHL 2"
+    # CAMT-Roh / kein Dict / kein purpose → None-Signale (Aufrufer nutzt die Spalte)
+    assert bi.resolve_counterparty(None, credit=True) == (None, None)
+    assert bi.resolve_counterparty({"creditDebit": "CRDT"}, credit=True) == (None, None)
+    assert bi.resolve_purpose(None) is None
+    assert bi.resolve_purpose({"creditDebit": "CRDT"}) is None
 
 
 def test_mt940_counterparty_drops_krzl_placeholder() -> None:

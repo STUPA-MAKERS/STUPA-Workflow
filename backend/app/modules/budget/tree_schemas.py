@@ -256,6 +256,21 @@ class ExpenseCreate(_CamelModel):
         return self
 
 
+class SubBookingCreate(_CamelModel):
+    """Unterbuchung manuell anlegen (#subbookings): Konto/Kostenstelle/HHJ/Art werden vom Eltern
+    geerbt — hier nur die eigenen Werte (Betrag, Beschreibung, optionale Metadaten)."""
+
+    amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
+    description: str = Field(min_length=1)
+    invoice_date: date | None = Field(default=None, alias="invoiceDate")
+    payment_date: date | None = Field(default=None, alias="paymentDate")
+    correspondent: str | None = Field(default=None)
+    note: str | None = Field(default=None)
+    reference_number: str | None = Field(default=None, alias="referenceNumber")
+    payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
+    category: str | None = Field(default=None)
+
+
 class ExpenseUpdate(_CamelModel):
     """Gebuchte Ausgabe/Einnahme ändern. Betrag, Beschreibung, Bankkonto, Kostenstelle
     und die Zusatz-Metadaten (Daten, Empfänger/Zahler, Anmerkungen, Belegnummer,

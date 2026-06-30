@@ -328,6 +328,55 @@ def canonical_purpose_key(purpose: str | None) -> str:
     return re.sub(r"[^0-9A-Za-z]+", "", purpose or "").upper()[:140]
 
 
+# ?86-Rohfelder der ``mt940``-Lib, aus denen das Gegenkonto stammt — parser-UNABHÄNGIG (die Lib
+# füllt sie aus dem Auszug; unser Code leitet daraus nur die Anzeige ab). Vergleich/Dedup MUSS auf
+# diesen Rohfeldern fußen, NICHT auf den abgeleiteten counterparty_*-Spalten (#fints-raw).
+_CP_RAW_KEYS = (
+    "applicant_name",
+    "recipient_name",
+    "applicant_iban",
+    "gvc_applicant_iban",
+    "deviate_applicant",
+    "deviate_recipient",
+)
+
+
+def resolve_counterparty(raw: object, *, credit: bool) -> tuple[str | None, str | None]:
+    """Gegenkonto **aus den Rohdaten** auflösen (#fints-raw). MT940/FinTS: über die GVC-Rohfelder
+    (:func:`mt940_counterparty`, verwirft Platzhalter wie ``KRZL``, löst geklebte IBAN). CAMT-Roh
+    trägt diese Felder nicht → ``(None, None)`` (Aufrufer nutzt dann die gespeicherte Spalte)."""
+    if not isinstance(raw, dict):
+        return None, None
+    return mt940_counterparty(raw, credit=credit)
+
+
+def resolve_purpose(raw: object) -> str | None:
+    """Verwendungszweck **aus den Rohdaten** auflösen (#fints-raw): Roh-``purpose`` entkleben +
+    ``DATUM…UHR`` lösen. CAMT-Roh ohne ``purpose`` → ``None`` (Aufrufer nutzt die Spalte)."""
+    if not isinstance(raw, dict) or raw.get("purpose") is None:
+        return None
+    return _split_booking_time(_normalize_purpose(_clean(raw.get("purpose"))))[0]
+
+
+def raw_dedup_base(
+    value_date: date | None, amount: Decimal, end_to_end: str | None, raw: object
+) -> tuple[str, ...]:
+    """Stabiler Vergleichs-/Dedup-Schlüssel **rein aus parser-unabhängigen Werten** (#fints-raw):
+    Wertstellung + Betrag (Fakten) + E2E-Ref + kanonischer Roh-Zweck + kanonischer Roh-Gegenkonto-
+    Block. Eine Parser-Verbesserung (IBAN lösen, KRZL verwerfen, Zweck entkleben) ändert ihn NICHT
+    mehr → derselbe Bank-Umsatz bekommt nie einen neuen Schlüssel. Echte Einzelzahlungen (anderer
+    Auftraggeber/Zweck im Roh-?86) bleiben unterscheidbar."""
+    d = raw if isinstance(raw, dict) else {}
+    cp_blob = " ".join(str(d.get(k) or "") for k in _CP_RAW_KEYS)
+    return (
+        value_date.isoformat() if value_date else "",
+        str(amount),
+        end_to_end or "",
+        canonical_purpose_key(str(d.get("purpose") or "")),
+        canonical_purpose_key(cp_blob),
+    )
+
+
 def assign_keys(account_scope: str, lines: list[StatementLine]) -> None:
     """Idempotenz-Schlüssel je Umsatz **in-place** setzen (#fints-research).
 
@@ -339,27 +388,18 @@ def assign_keys(account_scope: str, lines: list[StatementLine]) -> None:
     bei vorgemerkten Umsätzen erst null und später gesetzt; sonst gälte derselbe Umsatz
     pending vs. gebucht als zwei verschiedene und würde doppelt importiert.
     """
-    seen: dict[tuple[object, ...], int] = {}
+    seen: dict[tuple[str, ...], int] = {}
     for ln in lines:
         if ln.bank_ref:
             ln.idempotency_key = _sha(f"{account_scope}|ref|{ln.bank_ref}")
             continue
-        # Schlüssel NUR aus parser-STABILEN Feldern (#fints-dedup): Wertstellung, Betrag, E2E-Ref
-        # und der KANONISCHE Zweck (nur Alphanumerik, großgeschrieben). Bewusst OHNE
-        # ``counterparty_iban``/``-name`` — die leitet der Parser aus denselben Rohfeldern ab und
-        # ändert sich mit Parser-Verbesserungen (IBAN aus dem Namen lösen, KRZL verwerfen); flösse
-        # sie ein, würde derselbe Umsatz nach einem Parser-Update als neuer Schlüssel doppelt
-        # importiert (genau der beobachtete Fall). Der kanonische Zweck trägt die DATEI-NR und
-        # unterscheidet dadurch echte Sammelbuchungen.
-        base: tuple[object, ...] = (
-            ln.value_date.isoformat() if ln.value_date else "",
-            str(ln.amount),
-            ln.end_to_end_id or "",
-            canonical_purpose_key(ln.purpose),
-        )
+        # Schlüssel rein aus den ROHDATEN (#fints-raw): parser-unabhängig → derselbe Umsatz behält
+        # seinen Schlüssel über Parser-Verbesserungen hinweg (keine Re-Import-Dubletten mehr). Der
+        # Lauf-Index trennt mehrere im selben Import wirklich identische Roh-Datensätze.
+        base = raw_dedup_base(ln.value_date, ln.amount, ln.end_to_end_id, ln.raw)
         seq = seen.get(base, 0)
         seen[base] = seq + 1
-        ln.idempotency_key = _sha(f"{account_scope}|{'|'.join(map(str, base))}|{seq}")
+        ln.idempotency_key = _sha(f"{account_scope}|{'|'.join(base)}|{seq}")
 
 
 def _sha(value: str) -> str:
