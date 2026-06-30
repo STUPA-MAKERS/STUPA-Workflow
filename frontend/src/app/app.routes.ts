@@ -186,7 +186,8 @@ export const routes: Routes = [
       },
       {
         // Konten-Abgleich (#fints-konten): Transaktionen ↔ Buchungen je Konto + Kontostand.
-        path: 'konten',
+        // Pfad englisch (/accounts) für Konsistenz mit /expenses, /invoices, /budget.
+        path: 'accounts',
         data: { title: 'nav.konten', permission: ['budget.view', 'budget.structure', 'budget.book'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>

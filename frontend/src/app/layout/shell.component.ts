@@ -159,7 +159,7 @@ export class ShellComponent {
       permissions: ['budget.view', 'budget.structure', 'budget.book'],
     },
     {
-      path: '/konten',
+      path: '/accounts',
       labelKey: 'nav.konten',
       permissions: ['budget.view', 'budget.structure', 'budget.book'],
     },
