@@ -303,7 +303,8 @@
                       @if (cp.iban) { <span class="bank__cpIban">{{ cp.iban }}</span> }
                       @if (!cp.name && !cp.iban) { <span>—</span> }
                     </td>
-                    <td class="bank__cellPurpose" [title]="line.purpose || ''">{{ line.purpose || '—' }}</td>
+                    @let purposeText = purposeClean(line.purpose);
+                    <td class="bank__cellPurpose" [title]="purposeText">{{ purposeText || '—' }}</td>
                     <td class="bank__num bank__amount" [class.bank__amount--income]="line.kind === 'income'">{{ line.kind === 'income' ? '+' : '−' }}{{ money(line.amount) }}</td>
                     <td class="bank__cellCc">
                       <app-select

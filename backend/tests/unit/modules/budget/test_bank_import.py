@@ -173,16 +173,29 @@ def test_camt_sub_cent_rejected() -> None:
 
 def test_split_leading_iban() -> None:
     """Gegen-IBAN + Name in einem Feld trennen (#fints)."""
-    # IBAN-Feld leer, Name = IBAN+Name ohne Trenner → abgespalten.
+    # IBAN-Feld leer, Name = IBAN+Name ohne Trenner → abgespalten (volle, gültige DE-IBAN).
     assert bi._split_leading_iban("DE70120300001076878808Quentin Walz", None) == (
         "Quentin Walz",
         "DE70120300001076878808",
     )
-    # Name = nur IBAN (kein Name) → Name None, IBAN gesetzt.
-    assert bi._split_leading_iban("DE85780608960006017", None) == (
-        None,
-        "DE85780608960006017",
+    # NL-IBAN mit Buchstaben in der BBAN (CITI) — die alte „nur Ziffern"-Heuristik scheiterte
+    # hier; Längen-Tabelle + Prüfsumme trennt korrekt (#fints).
+    assert bi._split_leading_iban("NL70CITI2032329018Stichting Mollie Payments", None) == (
+        "Stichting Mollie Payments",
+        "NL70CITI2032329018",
     )
+    # Name = nur IBAN (kein Name) → Name None, IBAN gesetzt.
+    assert bi._split_leading_iban("DE89370400440532013000", None) == (
+        None,
+        "DE89370400440532013000",
+    )
+    # Ungültige Prüfsumme / zu kurz → NICHT als IBAN gedeutet, Name bleibt unangetastet.
+    assert bi._split_leading_iban("DE85780608960006017", None) == (
+        "DE85780608960006017",
+        None,
+    )
+    # Referenz, die nur wie eine IBAN aussieht (kein gültiger Ländercode) → kein Split.
+    assert bi._split_leading_iban("RF1234567890Acme", None) == ("RF1234567890Acme", None)
     # IBAN-Feld da und im Namen wiederholt → Präfix entfernen.
     assert bi._split_leading_iban("DE111Heldenwerbung", "DE111") == (
         "Heldenwerbung",
@@ -196,3 +209,64 @@ def test_split_leading_iban() -> None:
     # Kein Name → (None, IBAN); reiner Name ohne IBAN bleibt unverändert.
     assert bi._split_leading_iban(None, "DE111") == (None, "DE111")
     assert bi._split_leading_iban("Plain Name", None) == ("Plain Name", None)
+
+
+def test_split_booking_time() -> None:
+    """Sparkassen-Suffix „… DATUM dd.mm.yyyy, hh.mm UHR" vom Zweck lösen (#fints)."""
+    assert bi._split_booking_time(
+        "AStA-Aufwandsentschädigung 03/26DATUM 03.04.2026, 09.15 UHR"
+    ) == ("AStA-Aufwandsentschädigung 03/26", "09:15")
+    # Uhrzeit mit Doppelpunkt + Kleinschreibung ebenfalls erkannt.
+    assert bi._split_booking_time("Miete Mai datum 01.05.2026 08:00 uhr") == (
+        "Miete Mai",
+        "08:00",
+    )
+    # Ohne Suffix unverändert; None bleibt None.
+    assert bi._split_booking_time("Mitgliedsbeitrag 2024") == ("Mitgliedsbeitrag 2024", None)
+    assert bi._split_booking_time(None) == (None, None)
+
+
+def test_format_iban() -> None:
+    assert bi.format_iban("DE70120300001076878808") == "DE70 1203 0000 1076 8788 08"
+    assert bi.format_iban("nl70citi2032329018") == "NL70 CITI 2032 3290 18"
+    assert bi.format_iban(None) is None
+
+
+def test_build_short_description() -> None:
+    assert (
+        bi.build_short_description("Quentin Walz", "AStA-Aufwandsentschädigung 03/26")
+        == "AStA-Aufwandsentschädigung 03/26 – Quentin Walz"
+    )
+    assert bi.build_short_description("Quentin Walz", None) == "Quentin Walz"
+    assert bi.build_short_description(None, "Spende") == "Spende"
+    assert bi.build_short_description(None, None) == "Bankumsatz"
+
+
+def test_build_booking_note() -> None:
+    note = bi.build_booking_note(
+        name="Quentin Walz",
+        iban="DE70120300001076878808",
+        purpose="AStA-Aufwandsentschädigung 03/26",
+        kind="expense",
+        when=date(2026, 4, 3),
+        booking_time="09:15",
+    )
+    assert note == (
+        "Empfänger: Quentin Walz\n"
+        "IBAN: DE70 1203 0000 1076 8788 08\n"
+        "Zweck: AStA-Aufwandsentschädigung 03/26\n"
+        "Buchung: 03.04.2026, 09:15 Uhr"
+    )
+    # income → „Absender"; ohne Uhrzeit nur Datum.
+    income = bi.build_booking_note(
+        name="oikos Bayreuth e.V.",
+        iban=None,
+        purpose="Spende",
+        kind="income",
+        when=date(2026, 6, 16),
+        booking_time=None,
+    )
+    assert income == "Absender: oikos Bayreuth e.V.\nZweck: Spende\nBuchung: 16.06.2026"
+    assert bi.build_booking_note(
+        name=None, iban=None, purpose=None, kind="expense", when=None
+    ) is None

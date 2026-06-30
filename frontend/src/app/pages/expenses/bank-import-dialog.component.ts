@@ -678,22 +678,71 @@ export class BankImportDialogComponent {
       ?.focus();
   }
 
-  /** Gegenkonto in Name + IBAN trennen (#fints). Manche Bank-MT940-Felder liefern beides in
-   *  EINEM Feld ohne Trenner ("DE70…808Quentin Walz") und ein leeres IBAN-Feld → führende IBAN
-   *  (Ländercode + Ziffern) abspalten, damit Name und IBAN je auf eigener Zeile stehen. */
+  /** IBAN-Längen je Land (ISO 13616) — Spiegel der Backend-Tabelle. Eine an den Namen geklebte
+   *  Gegen-IBAN wird über die feste Länge abgespalten, daher klappt das auch für NL/GB & Co.,
+   *  deren BBAN Buchstaben enthält (z. B. ``NL70CITI…``) — eine reine „Ziffern"-Regel scheiterte. */
+  private static readonly IBAN_LEN: Record<string, number> = {
+    AD: 24, AT: 20, BE: 16, BG: 22, CH: 21, CY: 28, CZ: 24, DE: 22, DK: 18, EE: 20,
+    ES: 24, FI: 18, FR: 27, GB: 22, GR: 27, HR: 21, HU: 28, IE: 22, IS: 26, IT: 27,
+    LI: 21, LT: 20, LU: 20, LV: 21, MC: 27, MT: 31, NL: 18, NO: 15, PL: 28, PT: 25,
+    RO: 24, SE: 24, SI: 19, SK: 24, SM: 27,
+  };
+
+  /** ISO-13616-mod-97-Prüfung (stückweise, ohne BigInt): erste 4 Zeichen ans Ende, Buchstaben
+   *  → Zahl (A=10…Z=35), fortlaufend mod 97 — Ergebnis muss 1 sein. */
+  private static ibanMod97Ok(iban: string): boolean {
+    let rem = 0;
+    const r = iban.slice(4) + iban.slice(0, 4);
+    for (const ch of r) {
+      const v = Number.parseInt(ch, 36);
+      if (Number.isNaN(v)) return false;
+      rem = (rem * (v > 9 ? 100 : 10) + v) % 97;
+    }
+    return rem === 1;
+  }
+
+  /** Führende (an den Namen geklebte) IBAN erkennen → `{ iban, rest }` oder `null`. */
+  private detectIban(text: string): { iban: string; rest: string } | null {
+    const m = /^[A-Z]{2}\d{2}[A-Z0-9]+/.exec(text);
+    if (!m) return null;
+    const len = BankImportDialogComponent.IBAN_LEN[text.slice(0, 2)];
+    if (!len || m[0].length < len) return null;
+    const cand = text.slice(0, len);
+    if (!BankImportDialogComponent.ibanMod97Ok(cand)) return null;
+    return { iban: cand, rest: text.slice(len).trim() };
+  }
+
+  /** IBAN in Vierergruppen darstellen (`DE70 1203 0000 1076 8788 08`). */
+  formatIban(iban: string): string {
+    const compact = iban.replace(/\s+/g, '').toUpperCase();
+    return (compact.match(/.{1,4}/g) ?? [compact]).join(' ');
+  }
+
+  /** Sparkassen-Zusatz „… DATUM dd.mm.yyyy, hh.mm UHR" für die Anzeige vom Zweck lösen.
+   *  Neu importierte Umsätze sind bereits sauber; das greift nur für vor dem Parser-Fix
+   *  gestagete Altbestände. */
+  purposeClean(purpose: string | null | undefined): string {
+    return (purpose ?? '')
+      .replace(/\s*DATUM\s+\d{2}\.\d{2}\.\d{4},?\s+\d{2}[.:]\d{2}\s*UHR\s*$/i, '')
+      .trim();
+  }
+
+  /** Gegenkonto in Name + (gruppierte) IBAN trennen (#fints). Manche Bank-Felder liefern beides
+   *  in EINEM Feld ohne Trenner ("DE70…808Quentin Walz") und ein leeres IBAN-Feld → führende
+   *  IBAN abspalten, damit Name und IBAN je auf eigener Zeile stehen. */
   counterparty(l: StatementLine): { name: string; iban: string } {
     let iban = (l.counterpartyIban ?? '').trim();
     let name = (l.counterpartyName ?? '').trim();
     if (iban && name.startsWith(iban)) {
       name = name.slice(iban.length).trim();
     } else if (!iban) {
-      const m = /^([A-Z]{2}\d{13,30})(.*)$/.exec(name);
-      if (m) {
-        iban = m[1];
-        name = m[2].trim();
+      const det = this.detectIban(name);
+      if (det) {
+        iban = det.iban;
+        name = det.rest;
       }
     }
-    return { name, iban };
+    return { name, iban: iban ? this.formatIban(iban) : '' };
   }
 
   money(amount: string): string {

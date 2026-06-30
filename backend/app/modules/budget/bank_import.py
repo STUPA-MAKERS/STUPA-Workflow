@@ -114,18 +114,25 @@ def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
     cp_name, cp_iban = _split_leading_iban(
         d.get("applicant_name") or d.get("recipient_name"), d.get("applicant_iban")
     )
+    # Sparkassen-MT940 hängt die Buchungs-Uhrzeit als ``…DATUM dd.mm.yyyy, hh.mm UHR`` an den
+    # Verwendungszweck — vom eigentlichen Zweck lösen (sauberer Zweck) und die Zeit für die
+    # spätere Buchungs-Anmerkung in ``raw`` ablegen (#fints).
+    purpose, booking_time = _split_booking_time(_clean(d.get("purpose")))
+    raw = {k: str(v) for k, v in d.items() if v is not None}
+    if booking_time:
+        raw["booking_time"] = booking_time
     return StatementLine(
         amount=amount,
         currency=str(getattr(amount_obj, "currency", None) or d.get("currency") or "EUR"),
         booking_date=_as_date(d.get("entry_date") or d.get("guessed_entry_date")),
         value_date=_as_date(d.get("date")),
-        purpose=_clean(d.get("purpose")),
+        purpose=purpose,
         counterparty_name=cp_name,
         counterparty_iban=cp_iban,
         end_to_end_id=_clean(d.get("end_to_end_reference")),
         reference=_clean(d.get("customer_reference")),
         bank_ref=_clean(d.get("bank_reference")),
-        raw={k: str(v) for k, v in d.items() if v is not None},
+        raw=raw,
     )
 
 
@@ -178,25 +185,27 @@ def parse_camt053(data: bytes) -> list[StatementLine]:
         party_tag, acct_tag = ("Dbtr", "DbtrAcct") if orig_credit else ("Cdtr", "CdtrAcct")
         party = _find_local(scope, party_tag)
         acct = _find_local(scope, acct_tag)
+        cp_name, cp_iban = _split_leading_iban(
+            _find_text_local(party, "Nm") if party is not None else None,
+            _find_text_local(acct, "IBAN") if acct is not None else None,
+        )
+        purpose, booking_time = _split_booking_time(_clean(_find_text_local(scope, "Ustrd")))
         lines.append(
             StatementLine(
                 amount=amount,
                 currency=(amt_el.get("Ccy") or "EUR").upper(),
                 booking_date=_camt_date(_find_local(ntry, "BookgDt")),
                 value_date=_camt_date(_find_local(ntry, "ValDt")),
-                purpose=_clean(_find_text_local(scope, "Ustrd")),
-                counterparty_name=_clean(
-                    _find_text_local(party, "Nm") if party is not None else None
-                ),
-                counterparty_iban=_clean(
-                    _find_text_local(acct, "IBAN") if acct is not None else None
-                ),
+                purpose=purpose,
+                counterparty_name=cp_name,
+                counterparty_iban=cp_iban,
                 end_to_end_id=_clean(_skip_notprovided(_find_text_local(scope, "EndToEndId"))),
                 reference=_clean(_find_text_local(scope, "InstrId")),
                 bank_ref=_clean(_find_text_local(ntry, "AcctSvcrRef")),
                 raw={
                     "creditDebit": "CRDT" if orig_credit else "DBIT",
                     **({"reversal": "true"} if reversal else {}),
+                    **({"booking_time": booking_time} if booking_time else {}),
                 },
             )
         )
@@ -275,11 +284,56 @@ def _skip_notprovided(value: str | None) -> str | None:
     return value
 
 
-# Manche Bank-MT940-Felder packen Gegen-IBAN + Name OHNE Trenner in EIN Feld
-# ("DE70…808Quentin Walz") und lassen das IBAN-Feld leer. Führende IBAN = Ländercode +
-# ≥13 Ziffern (DE = 2 + 20). Nur Ziffern nach dem Ländercode, damit der Name (beginnt i. d. R.
-# mit Buchstaben) nicht angeknabbert wird (#fints).
-_LEADING_IBAN = re.compile(r"^([A-Z]{2}\d{13,30})(.*)$")
+# Manche Bank-MT940/CAMT-Felder packen Gegen-IBAN + Name OHNE Trenner in EIN Feld
+# ("DE70…808Quentin Walz") und lassen das IBAN-Feld leer. Eine IBAN ist Ländercode (2
+# Buchstaben) + 2 Prüfziffern + **alphanumerische** BBAN — bei NL/GB/… enthält die BBAN
+# Buchstaben (z. B. ``NL70CITI2032329018``), daher reicht „nur Ziffern" NICHT (#fints). Statt
+# über die Zeichenklasse zu raten, wo die IBAN endet, nutzen wir die **feste Länge je Land**
+# (ISO 13616) plus die mod-97-Prüfsumme — so wird der Name nicht angeknabbert und ein bloßer
+# Verwendungszweck/Referenz ("RF…") nicht fälschlich als IBAN erkannt.
+_IBAN_LENGTHS = {
+    "AD": 24, "AT": 20, "BE": 16, "BG": 22, "CH": 21, "CY": 28, "CZ": 24, "DE": 22,
+    "DK": 18, "EE": 20, "ES": 24, "FI": 18, "FR": 27, "GB": 22, "GR": 27, "HR": 21,
+    "HU": 28, "IE": 22, "IS": 26, "IT": 27, "LI": 21, "LT": 20, "LU": 20, "LV": 21,
+    "MC": 27, "MT": 31, "NL": 18, "NO": 15, "PL": 28, "PT": 25, "RO": 24, "SE": 24,
+    "SI": 19, "SK": 24, "SM": 27,
+}
+# Führender IBAN-Kandidat: Ländercode + 2 Prüfziffern + BBAN (Großbuchstaben/Ziffern, ohne
+# Leerzeichen — Bank-Glue-Felder trennen IBAN und Name nie durch ein Space).
+_IBAN_HEAD = re.compile(r"^[A-Z]{2}\d{2}[A-Z0-9]+")
+# Sparkassen-Zusatz am Zweck-Ende: „… DATUM 03.04.2026, 09.15 UHR" (Uhrzeit mit . oder :).
+_DATUM_SUFFIX = re.compile(
+    r"\s*DATUM\s+\d{2}\.\d{2}\.\d{4},?\s+(\d{2})[.:](\d{2})\s*UHR\s*$",
+    re.IGNORECASE,
+)
+
+
+def _iban_mod97_ok(iban: str) -> bool:
+    """ISO 13616 mod-97-Prüfung: die ersten 4 Zeichen ans Ende, Buchstaben → Zahl (A=10…Z=35),
+    Rest mod 97 muss 1 sein."""
+    rearranged = iban[4:] + iban[:4]
+    try:
+        digits = "".join(str(int(ch, 36)) for ch in rearranged)
+    except ValueError:
+        return False
+    return int(digits) % 97 == 1
+
+
+def _detect_leading_iban(text: str) -> tuple[str, str] | None:
+    """``text`` mit führender (an den Namen geklebter) IBAN → ``(iban, rest)`` oder ``None``.
+
+    Schneidet exakt die für das Land erwartete IBAN-Länge ab und validiert die Prüfsumme —
+    nur dann wird gesplittet (sonst bliebe der Name unangetastet)."""
+    match = _IBAN_HEAD.match(text)
+    if match is None:
+        return None
+    length = _IBAN_LENGTHS.get(text[:2])
+    if length is None or len(match.group(0)) < length:
+        return None
+    candidate = text[:length]
+    if not _iban_mod97_ok(candidate):
+        return None
+    return candidate, text[length:]
 
 
 def _split_leading_iban(
@@ -296,10 +350,73 @@ def _split_leading_iban(
     if clean_iban and clean_name.startswith(clean_iban):
         return _clean(clean_name[len(clean_iban) :]), clean_iban
     if clean_iban is None:
-        match = _LEADING_IBAN.match(clean_name)
-        if match:
-            return _clean(match.group(2)), match.group(1)
+        detected = _detect_leading_iban(clean_name)
+        if detected:
+            return _clean(detected[1]), detected[0]
     return clean_name, clean_iban
+
+
+def _split_booking_time(purpose: str | None) -> tuple[str | None, str | None]:
+    """Sparkassen-Suffix „… DATUM dd.mm.yyyy, hh.mm UHR" vom Zweck lösen.
+
+    Liefert ``(sauberer_zweck, "HH:MM")`` — die Uhrzeit speist die ``Buchung:``-Zeile der
+    Buchungs-Anmerkung; CAMT/andere Banken ohne diesen Zusatz → ``(zweck, None)``."""
+    if not purpose:
+        return purpose, None
+    match = _DATUM_SUFFIX.search(purpose)
+    if match is None:
+        return purpose, None
+    clean = purpose[: match.start()].rstrip(" -–—,")
+    return (clean or None), f"{match.group(1)}:{match.group(2)}"
+
+
+def format_iban(iban: str | None) -> str | None:
+    """IBAN in Vierergruppen darstellen (``DE70 1203 0000 1076 8788 08``)."""
+    if not iban:
+        return iban
+    compact = re.sub(r"\s+", "", iban).upper()
+    return " ".join(compact[i : i + 4] for i in range(0, len(compact), 4))
+
+
+def build_short_description(name: str | None, purpose: str | None) -> str:
+    """Kurzform für die Buchungs-Beschreibung: ``<Zweck> – <Name>`` (Gedankenstrich).
+
+    Fehlt der Zweck → nur Name; fehlt beides → ``Bankumsatz``. Der **volle** Zweck steht
+    zusätzlich in der Anmerkung (:func:`build_booking_note`)."""
+    name = _clean(name)
+    purpose = _clean(purpose)
+    if purpose and name:
+        return f"{purpose} – {name}"
+    return purpose or name or "Bankumsatz"
+
+
+def build_booking_note(
+    *,
+    name: str | None,
+    iban: str | None,
+    purpose: str | None,
+    kind: str,
+    when: date | None,
+    booking_time: str | None = None,
+) -> str | None:
+    """Strukturierte Anmerkung (Empfänger/Absender · IBAN · Zweck · Buchung) für eine Buchung
+    aus einem Kontoumsatz — gleiches Format wie die kuratierten Bestandsbuchungen (#fints)."""
+    name = _clean(name)
+    purpose = _clean(purpose)
+    rows: list[str] = []
+    if name:
+        rows.append(f"{'Absender' if kind == 'income' else 'Empfänger'}: {name}")
+    formatted_iban = format_iban(iban)
+    if formatted_iban:
+        rows.append(f"IBAN: {formatted_iban}")
+    if purpose:
+        rows.append(f"Zweck: {purpose}")
+    if when:
+        stamp = f"{when.day:02d}.{when.month:02d}.{when.year}"
+        if booking_time:
+            stamp = f"{stamp}, {booking_time} Uhr"
+        rows.append(f"Buchung: {stamp}")
+    return "\n".join(rows) or None
 
 
 def _as_date(value: object | None) -> date | None:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections import deque
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -432,8 +432,31 @@ async def test_confirm_line_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_default_description() -> None:
-    assert BankService._default_description(_line(counterparty_name="A", purpose="B")) == "A — B"
+    # Kurzform jetzt „<Zweck> – <Name>" (Gedankenstrich), Fallback Name bzw. Bankumsatz.
+    assert (
+        BankService._default_description(_line(counterparty_name="A", purpose="B")) == "B – A"
+    )
+    assert BankService._default_description(_line(counterparty_name="A")) == "A"
     assert BankService._default_description(_line()) == "Bankumsatz"
+
+
+def test_booking_note_format() -> None:
+    note = BankService._booking_note(
+        _line(
+            counterparty_name="Quentin Walz",
+            counterparty_iban="DE70120300001076878808",
+            purpose="AStA-Aufwandsentschädigung 03/26",
+            value_date=date(2026, 4, 3),
+            raw_payload={"booking_time": "09:15"},
+        ),
+        "expense",
+    )
+    assert note == (
+        "Empfänger: Quentin Walz\n"
+        "IBAN: DE70 1203 0000 1076 8788 08\n"
+        "Zweck: AStA-Aufwandsentschädigung 03/26\n"
+        "Buchung: 03.04.2026, 09:15 Uhr"
+    )
 
 
 # --------------------------------------------------------------- file import

@@ -456,4 +456,34 @@ describe('BankImportDialogComponent', () => {
     expect(cmp.credStatus()).toBeNull();
     expect(cmp.connected()).toBe(false);
   });
+
+  it('splits a leading DE IBAN glued to the name and groups it', async () => {
+    const { cmp } = await setup();
+    const cp = cmp.counterparty(
+      line({ counterpartyIban: null, counterpartyName: 'DE70120300001076878808Quentin Walz' }),
+    );
+    expect(cp).toEqual({ name: 'Quentin Walz', iban: 'DE70 1203 0000 1076 8788 08' });
+  });
+
+  it('splits a NL IBAN whose BBAN contains letters (CITI)', async () => {
+    const { cmp } = await setup();
+    const cp = cmp.counterparty(
+      line({ counterpartyIban: null, counterpartyName: 'NL70CITI2032329018Stichting Mollie Payments' }),
+    );
+    expect(cp).toEqual({ name: 'Stichting Mollie Payments', iban: 'NL70 CITI 2032 3290 18' });
+  });
+
+  it('leaves a non-IBAN reference untouched', async () => {
+    const { cmp } = await setup();
+    const cp = cmp.counterparty(line({ counterpartyIban: null, counterpartyName: 'RF1234567890Acme' }));
+    expect(cp).toEqual({ name: 'RF1234567890Acme', iban: '' });
+  });
+
+  it('strips the Sparkassen "DATUM … UHR" suffix from the purpose', async () => {
+    const { cmp } = await setup();
+    expect(cmp.purposeClean('AStA-Aufwandsentschädigung 03/26DATUM 03.04.2026, 09.15 UHR')).toBe(
+      'AStA-Aufwandsentschädigung 03/26',
+    );
+    expect(cmp.purposeClean('Miete Mai')).toBe('Miete Mai');
+  });
 });

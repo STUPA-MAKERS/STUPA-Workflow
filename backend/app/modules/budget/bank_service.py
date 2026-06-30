@@ -812,6 +812,7 @@ class BankService:
                         budgetId=payload.budget_id,
                         fiscalYearId=payload.fiscal_year_id,
                         correspondent=line.counterparty_name,
+                        note=self._booking_note(line, kind),
                         paymentDate=line.value_date or line.booking_date,
                         referenceNumber=line.end_to_end_id or line.reference,
                         paymentMethod="ueberweisung",
@@ -847,8 +848,25 @@ class BankService:
 
     @staticmethod
     def _default_description(line: BankStatementLine) -> str:
-        parts = [p for p in (line.counterparty_name, line.purpose) if p]
-        return " — ".join(parts) if parts else "Bankumsatz"
+        """Kurzform-Beschreibung ``<Zweck> – <Name>`` (gleiches Format wie die kuratierten
+        Bestandsbuchungen) — die volle, formatierte Beschreibung steht in der Anmerkung."""
+        return bank_import.build_short_description(line.counterparty_name, line.purpose)
+
+    @staticmethod
+    def _booking_note(line: BankStatementLine, kind: str) -> str | None:
+        """Strukturierte Anmerkung (Empfänger/Absender · IBAN · Zweck · Buchung) zum Umsatz.
+
+        Die Sparkassen-Buchungsuhrzeit (``DATUM … UHR``) wurde beim Parsen nach
+        ``raw_payload['booking_time']`` gelöst; CAMT/andere Banken liefern nur das Datum."""
+        booking_time = (line.raw_payload or {}).get("booking_time")
+        return bank_import.build_booking_note(
+            name=line.counterparty_name,
+            iban=line.counterparty_iban,
+            purpose=line.purpose,
+            kind=kind,
+            when=line.value_date or line.booking_date,
+            booking_time=booking_time if isinstance(booking_time, str) else None,
+        )
 
     async def _remember_counterparty(
         self, counterparty_iban: str | None, budget_id: uuid.UUID
