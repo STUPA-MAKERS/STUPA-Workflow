@@ -165,11 +165,12 @@ async def test_list_lines_with_filters(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _svc(session, monkeypatch)
     line = _line(amount=Decimal("-9.00"))  # kind expense, kein suggested budget
+    session.scalar_q.append(1)  # count
     session.scalars_q.append(_Result([line]))
-    out = await svc.list_lines(account_id=uuid.uuid4(), state="unmatched")
-    assert len(out) == 1
-    assert out[0].kind == "expense"
-    assert out[0].suggested_path_key is None
+    page = await svc.list_lines_paged(account_id=uuid.uuid4(), state="unmatched")
+    assert len(page.items) == 1
+    assert page.items[0].kind == "expense"
+    assert page.items[0].suggested_path_key is None
 
 
 @pytest.mark.asyncio

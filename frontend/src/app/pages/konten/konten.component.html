@@ -5,9 +5,9 @@
       @if (selectedAccount(); as acc) {
         @if (acc.fintsLastBalance !== null) {
           <p class="exp__subtitle">
-            {{ 'konten.balance' | t }}: <strong>{{ money(acc.fintsLastBalance) }}</strong>
+            {{ 'konten.balance' | t }}: <strong>{{ balanceMoney(acc.fintsLastBalance) }}</strong>
             @if (acc.fintsBalanceAt) {
-              · {{ 'konten.balanceAsOf' | t: { date: (acc.fintsBalanceAt | ldate: 'medium') } }}
+              · {{ 'konten.balanceAsOf' | t: { date: (acc.fintsBalanceAt | ldate: 'mediumDate') } }}
             }
           </p>
         } @else {
@@ -26,7 +26,7 @@
         (ngModelChange)="onSearch($event)"
         [attr.aria-label]="'fints.filter.search' | t"
       />
-      <app-filter-bar [live]="true" [activeCount]="filterState() ? 1 : 0" (reset)="setState('')">
+      <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
         <app-filter-field [label]="'konten.filter.status' | t">
           <div class="inline-flex gap-1">
             <app-button [variant]="filterState() === '' ? 'primary' : 'ghost'" size="sm" (click)="setState('')">{{ 'expenses.filter.all' | t }}</app-button>
@@ -34,13 +34,26 @@
             <app-button [variant]="filterState() === 'linked' ? 'primary' : 'ghost'" size="sm" (click)="setState('linked')">{{ 'konten.filter.linked' | t }}</app-button>
           </div>
         </app-filter-field>
+        <app-filter-field [label]="'expenses.filter.kind' | t">
+          <div class="inline-flex gap-1">
+            <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
+            <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+            <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
+          </div>
+        </app-filter-field>
+        <app-filter-field [label]="'expenses.filter.dateRange' | t">
+          <app-filter-range>
+            <app-datepicker start [ariaLabel]="'expenses.filter.dateFrom' | t" [ngModel]="dateFrom()" (ngModelChange)="onDateFilter('from', $event)" />
+            <app-datepicker end [ariaLabel]="'expenses.filter.dateTo' | t" [ngModel]="dateTo()" (ngModelChange)="onDateFilter('to', $event)" />
+          </app-filter-range>
+        </app-filter-field>
       </app-filter-bar>
-      @if (selectedAccount()) {
-        <app-button variant="secondary" size="sm" [loading]="syncing()" [disabled]="locked()" (click)="startSync()">
-          <span class="inline-flex items-center gap-2"><app-icon name="repeat" [size]="16" /> {{ 'fints.sync' | t }}</span>
-        </app-button>
+      @if (selectedAccount() && canBook()) {
         <app-button variant="secondary" size="sm" (click)="openConnect()">
           <span class="inline-flex items-center gap-2"><app-icon name="key" [size]="16" /> {{ 'konten.connection' | t }}</span>
+        </app-button>
+        <app-button size="sm" [loading]="syncing()" [disabled]="locked()" (click)="startSync()">
+          <span class="inline-flex items-center gap-2"><app-icon name="repeat" [size]="16" /> {{ 'fints.sync' | t }}</span>
         </app-button>
       }
     </div>
@@ -82,9 +95,7 @@
     } @else if (!selectedAccount()) {
       <div class="empty-state">{{ 'konten.pickAccount' | t }}</div>
     } @else if (!lines().length) {
-      <div class="empty-state">{{ 'konten.empty' | t }}</div>
-    } @else if (!filtered().length) {
-      <div class="empty-state">{{ 'fints.emptyFiltered' | t }}</div>
+      <div class="empty-state">{{ (activeFilterCount() || searchQ() ? 'fints.emptyFiltered' : 'konten.empty') | t }}</div>
     } @else {
       <div class="exp__tableWrap">
         <table class="exp__table">
@@ -96,7 +107,6 @@
               <th scope="col">{{ 'fints.col.kind' | t }}</th>
               <th scope="col">{{ 'fints.col.counterparty' | t }}</th>
               <th scope="col">{{ 'fints.col.purpose' | t }}</th>
-              <th scope="col">{{ 'konten.col.booking' | t }}</th>
               <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
                 <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'fints.col.amount' | t }}{{ sortInd('amount') }}</button>
               </th>
@@ -104,7 +114,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (line of filtered(); track line.id) {
+            @for (line of lines(); track line.id) {
               <tr [class.exp__tr--income]="line.kind === 'income'">
                 <td class="exp__cellDate">{{ (line.valueDate || line.bookingDate) ? ((line.valueDate || line.bookingDate) | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellKind">
@@ -117,29 +127,37 @@
                   @if (!cp.name && !cp.iban) { — }
                 </td>
                 <td class="exp__cellDesc">{{ line.purpose || '—' }}</td>
-                <td class="exp__cellMeta">
-                  @if (line.matchState === 'matched') {
-                    <app-badge variant="success">{{ 'konten.linked' | t }}</app-badge>
-                  } @else {
-                    <span class="text-muted text-xs">{{ 'konten.open' | t }}</span>
-                  }
-                </td>
                 <td class="exp__num exp__amount" [class.exp__amount--income]="line.kind === 'income'">{{ signedMoney(line) }}</td>
                 <td class="exp__num">
-                  <span class="exp__actions">
-                    @if (line.matchState === 'matched') {
-                      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.unlink' | t" [title]="'konten.action.unlink' | t" (click)="unlink(line)"><app-icon name="remove" /></app-button>
-                    } @else {
-                      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.link' | t" [title]="'konten.action.link' | t" (click)="openLink(line)"><app-icon name="paperclip" /></app-button>
-                      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.import' | t" [title]="'konten.action.import' | t" (click)="openImport(line)"><app-icon name="add" /></app-button>
-                    }
-                  </span>
+                  @if (canBook()) {
+                    <span class="exp__actions">
+                      @if (line.matchState === 'matched') {
+                        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.unlink' | t" [title]="'konten.action.unlink' | t" (click)="unlink(line)"><app-icon name="remove" /></app-button>
+                      } @else {
+                        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.link' | t" [title]="'konten.action.link' | t" (click)="openLink(line)"><app-icon name="paperclip" /></app-button>
+                        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.import' | t" [title]="'konten.action.import' | t" (click)="openImport(line)"><app-icon name="add" /></app-button>
+                      }
+                    </span>
+                  }
                 </td>
               </tr>
             }
           </tbody>
         </table>
       </div>
+      @if (hasMore()) {
+        <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
+        <div class="flex justify-center mt-4">
+          @if (loadingMore()) {
+            <span class="exp__status">{{ 'expenses.loadingMore' | t }}</span>
+          } @else {
+            <app-button variant="secondary" size="sm" (click)="loadMore()">{{ 'expenses.loadMore' | t }}</app-button>
+          }
+        </div>
+      }
+      @if (total() > 0) {
+        <p class="text-center text-muted text-sm mt-3">{{ 'expenses.count' | t: { count: lines().length, total: total() } }}</p>
+      }
     }
   </div>
 </div>

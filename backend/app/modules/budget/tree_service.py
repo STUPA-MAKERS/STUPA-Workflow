@@ -1353,6 +1353,14 @@ class BudgetTreeService:
             raise ValidationProblem(
                 "Sub-bookings cannot be nested.", code="subbooking_nested"
             )
+        if parent.transfer_id is not None:
+            # Eine Übertrags-Buchung muss ihren mit dem Gegenstück gepaarten Betrag behalten —
+            # sie darf nicht in Unterbuchungen aufgeteilt werden (sonst divergieren die Legs, der
+            # Übertrag netto ≠ 0 → Budget-Korruption, #subbookings-review).
+            raise ValidationProblem(
+                "A transfer booking cannot be split into sub-bookings.",
+                code="subbooking_on_transfer",
+            )
         if len(data) > self.settings.attachment_max_bytes:
             raise ValidationProblem(
                 f"File exceeds {self.settings.attachment_max_bytes} bytes.", code="file_too_large"
@@ -1363,8 +1371,36 @@ class BudgetTreeService:
             raise ValidationProblem(
                 "File is neither valid CAMT.053 nor MT940.", code="bank_statement_unparseable"
             ) from exc
+        # Ledger ist EUR-only (#subbookings-review): Fremdwährungs-Auszüge ablehnen, sonst käme der
+        # abs(Betrag) einer Fremdwährungszeile als EUR ins Budget.
+        if any((line.currency or "EUR").upper() != "EUR" for line in lines):
+            raise ValidationProblem(
+                "Only EUR statements are supported.", code="subbooking_currency_unsupported"
+            )
+        # Idempotenz (#subbookings-review): erneuter Upload derselben Datei darf KEINE Dubletten
+        # anlegen (sonst verdoppelt sich der Eltern-Betrag = Σ Kinder). Inhalts-Dedup gegen die
+        # bereits vorhandenen Kinder über (Betrag, Zahldatum, Beschreibung, Beleg).
+        existing = (
+            await self.session.scalars(
+                select(BudgetExpense).where(BudgetExpense.parent_expense_id == parent.id)
+            )
+        ).all()
+
+        def _key(amount: Decimal, pay: date | None, desc: str, ref: str | None) -> tuple[object, ...]:
+            return (amount, pay, desc, ref)
+
+        seen = {_key(c.amount, c.payment_date, c.description, c.reference_number) for c in existing}
+        parent_is_income = parent.kind == "income"
         created: list[BudgetExpense] = []
         for line in lines:
+            magnitude = abs(line.amount)
+            # 0-Beträge würden die CHECK-Constraint amount>0 verletzen → überspringen.
+            if magnitude == 0:
+                continue
+            # Unterbuchungen erben die Richtung des Eltern (#subbookings): nur gleichgerichtete
+            # Zeilen aufnehmen (eine Gegenbuchung würde den Eltern-Betrag = Σ Kinder verfälschen).
+            if (line.amount > 0) != parent_is_income:
+                continue
             name, iban = split_leading_iban(line.counterparty_name, line.counterparty_iban)
             child = BudgetExpense(
                 # vom Eltern geerbt (kopiert, damit Rollup/Queries greifen)
@@ -1375,13 +1411,17 @@ class BudgetTreeService:
                 currency=parent.currency,
                 parent_expense_id=parent.id,
                 # eigene Werte aus der Umsatzzeile
-                amount=abs(line.amount),
+                amount=magnitude,
                 description=_subbooking_description(line.purpose, name),
                 correspondent=name or None,
                 payment_date=line.value_date or line.booking_date,
                 reference_number=line.end_to_end_id or line.reference or None,
                 actor=actor,
             )
+            key = _key(child.amount, child.payment_date, child.description, child.reference_number)
+            if key in seen:
+                continue  # bereits importiert → überspringen (idempotent)
+            seen.add(key)
             self.session.add(child)
             created.append(child)
         await self.session.flush()

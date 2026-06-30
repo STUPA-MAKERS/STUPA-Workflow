@@ -362,8 +362,10 @@ export class ExpensesComponent implements OnDestroy {
     this.subImporting.update((s) => new Set(s).add(e.id));
     this.api.importSubBookings(e.id as Uuid, file).subscribe({
       next: (children) => {
-        this.subRows.update((m) => new Map(m).set(e.id, children));
+        // Vollständige Kinderliste neu laden (Antwort enthält nur den Import-Batch) + Eltern
+        // aufklappen; Eltern-Betrag/childCount via reload aktualisieren.
         this.expandedSub.update((s) => new Set(s).add(e.id));
+        this.loadSub(e.id);
         this.subImporting.update((s) => {
           const n = new Set(s);
           n.delete(e.id);
@@ -834,7 +836,10 @@ export class ExpensesComponent implements OnDestroy {
         next: (updated) => {
           this.saving.set(false);
           this.editing.set(null);
-          this.items.update((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+          // childCount/parentExpenseId stehen in der Einzel-Antwort nicht zuverlässig (BE
+          // berechnet sie nur im Betrags-Pfad) → aus der bekannten Zeile erhalten (#review).
+          const merged = { ...updated, childCount: e.childCount, parentExpenseId: e.parentExpenseId };
+          this.items.update((list) => list.map((x) => (x.id === merged.id ? merged : x)));
           this.toast.success(this.i18n.translate('expenses.toast.saved'));
           this.loadInvoices();
         },

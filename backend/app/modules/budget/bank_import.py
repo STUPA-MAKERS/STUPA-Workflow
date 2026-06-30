@@ -124,7 +124,7 @@ def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
     # Sparkassen-MT940 hängt die Buchungs-Uhrzeit als ``…DATUM dd.mm.yyyy, hh.mm UHR`` an den
     # Verwendungszweck — vom eigentlichen Zweck lösen (sauberer Zweck) und die Zeit für die
     # spätere Buchungs-Anmerkung in ``raw`` ablegen (#fints).
-    purpose, booking_time = _split_booking_time(_clean(d.get("purpose")))
+    purpose, booking_time = _split_booking_time(_normalize_purpose(_clean(d.get("purpose"))))
     raw = {k: str(v) for k, v in d.items() if v is not None}
     if booking_time:
         raw["booking_time"] = booking_time
@@ -296,7 +296,8 @@ def _camt_closing_balance(data: bytes) -> StatementBalance | None:
     for bal in _findall_local(root, "Bal"):
         code = (_find_text_local(bal, "Cd") or "").upper()
         if code:
-            by_code.setdefault(code, bal)
+            # Bei mehreren <Stmt> (mehrtägiger Export) gewinnt der LETZTE Schlusssaldo (#review).
+            by_code[code] = bal
     # `Element or Element` triggert die ElementTree-Truthiness-Deprecation → explizit prüfen.
     chosen = by_code.get("CLBD")
     if chosen is None:
@@ -398,6 +399,42 @@ _DATUM_SUFFIX = re.compile(
     re.IGNORECASE,
 )
 
+# Strukturierte ?86-Tags, die die ``mt940``-Lib bei manchen Banken OHNE Trenner an den
+# vorigen Zweck-Teil klebt (z. B. „…0000794247ANZAHL 00000002") → Leerzeichen davor einfügen.
+_GLUE_TOKENS = (
+    "DATEI-NR.",
+    "ANZAHL",
+    "DATUM",
+    "EREF+",
+    "KREF+",
+    "MREF+",
+    "CRED+",
+    "DEBT+",
+    "SVWZ+",
+    "ABWA+",
+    "ABWE+",
+    "IBAN+",
+    "BIC+",
+)
+_GLUE_RE = re.compile(r"(?<=\S)(" + "|".join(re.escape(t) for t in _GLUE_TOKENS) + r")")
+# Datum direkt an ein folgendes Wort geklebt: „30.06.2026siehe" → „30.06.2026 siehe".
+_DATE_GLUE_RE = re.compile(r"(\d{2}\.\d{2}\.\d{4})(?=[A-Za-zÄÖÜäöü])")
+# Platzhalter-„Namen", die manche Sparkassen im ?32 statt eines echten Gegenkontos liefern
+# (Sammel-/Dateibuchungen) — nicht als Gegenkonto anzeigen.
+_PLACEHOLDER_NAMES = frozenset({"KRZL"})
+
+
+def _normalize_purpose(text: str | None) -> str | None:
+    """Verklebte ?86-Subfelder wieder trennen (#fints): Leerzeichen vor strukturierte Tags und
+    zwischen Datum + Folgewort, Mehrfach-Leerzeichen kollabieren. Reine Darstellungs-/Lesbarkeit;
+    der :func:`_split_booking_time`-Schritt entfernt danach den ``DATUM …UHR``-Zusatz."""
+    if not text:
+        return text
+    text = _GLUE_RE.sub(r" \1", text)
+    text = _DATE_GLUE_RE.sub(r"\1 ", text)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    return text or None
+
 
 def _iban_mod97_ok(iban: str) -> bool:
     """ISO 13616 mod-97-Prüfung: die ersten 4 Zeichen ans Ende, Buchstaben → Zahl (A=10…Z=35),
@@ -452,6 +489,10 @@ def mt940_counterparty(
         or _clean(d.get("applicant_name"))
         or _clean(d.get("recipient_name"))
     )
+    # Platzhalter (z. B. „KRZL" bei Sammel-/Dateibuchungen) ist kein echtes Gegenkonto → verwerfen
+    # (dann zeigt die UI die IBAN bzw. „—" statt des Kürzels).
+    if name is not None and name.upper() in _PLACEHOLDER_NAMES:
+        name = None
     return split_leading_iban(name, iban)
 
 

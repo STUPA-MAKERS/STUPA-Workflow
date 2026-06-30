@@ -194,6 +194,14 @@ export interface ExpensePage {
   offset: number;
 }
 
+/** Seite gestageter Kontoumsätze (#fints-konten). */
+export interface StatementLinePage {
+  items: StatementLine[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 /** Zusatz-Metadaten einer Buchung (#1-1/#1-2/#3/#4) — beim Anlegen & Ändern. */
 export interface ExpenseMetadata {
   invoiceDate?: string | null;
@@ -675,12 +683,35 @@ export class BudgetTreeApi {
       form,
     );
   }
-  /** Gestagete Umsätze auflisten (#fints), optional je Konto/Status. */
-  listStatementLines(opts: { account?: Uuid; state?: string } = {}): Observable<StatementLine[]> {
+  /** Gestagete Umsätze gefiltert + paginiert (#fints-konten). */
+  listStatementLines(
+    opts: {
+      account?: Uuid;
+      state?: string;
+      linked?: boolean;
+      kind?: ExpenseKind;
+      q?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      sort?: 'date' | 'amount';
+      order?: 'asc' | 'desc';
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Observable<StatementLinePage> {
     const params: Record<string, string> = {};
     if (opts.account) params['account'] = opts.account;
     if (opts.state) params['state'] = opts.state;
-    return this.http.get<StatementLine[]>(`${this.base}/statement-lines`, { params });
+    if (opts.linked !== undefined) params['linked'] = String(opts.linked);
+    if (opts.kind) params['kind'] = opts.kind;
+    if (opts.q) params['q'] = opts.q;
+    if (opts.dateFrom) params['dateFrom'] = opts.dateFrom;
+    if (opts.dateTo) params['dateTo'] = opts.dateTo;
+    if (opts.sort) params['sort'] = opts.sort;
+    if (opts.order) params['order'] = opts.order;
+    params['limit'] = String(opts.limit ?? 50);
+    params['offset'] = String(opts.offset ?? 0);
+    return this.http.get<StatementLinePage>(`${this.base}/statement-lines`, { params });
   }
   /** Umsatz buchen (#fints). */
   confirmStatementLine(lineId: Uuid, body: ConfirmLineBody): Observable<Expense> {

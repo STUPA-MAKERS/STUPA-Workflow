@@ -2,12 +2,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  type OnDestroy,
   computed,
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -15,9 +18,11 @@ import type { Uuid } from '@core/api/models';
 import {
   BadgeComponent,
   ButtonComponent,
+  DatepickerComponent,
   DialogComponent,
   FilterBarComponent,
   FilterFieldComponent,
+  FilterRangeComponent,
   IconComponent,
   InputComponent,
   SelectComponent,
@@ -29,6 +34,7 @@ import {
   type BankSyncResult,
   BudgetTreeApi,
   type Expense,
+  type ExpenseKind,
   type FintsCredentialStatus,
   type StatementLine,
   flattenBudgetOptions,
@@ -54,9 +60,11 @@ import { PALETTE } from '../budget/budget-year-tree.component';
     LocalizedDatePipe,
     BadgeComponent,
     ButtonComponent,
+    DatepickerComponent,
     DialogComponent,
     FilterBarComponent,
     FilterFieldComponent,
+    FilterRangeComponent,
     IconComponent,
     InputComponent,
     SelectComponent,
@@ -64,11 +72,15 @@ import { PALETTE } from '../budget/budget-year-tree.component';
   templateUrl: './konten.component.html',
   styleUrl: './konten.component.scss',
 })
-export class KontenComponent {
+export class KontenComponent implements OnDestroy {
   private readonly api = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly auth = inject(AuthService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  // Schreibrechte (#review): Sync/Import/Link/Unlink nur mit budget.book; View-only blendet sie aus.
+  readonly canBook = computed(() => this.auth.can('budget.book'));
 
   // --- accounts (left list) ---
   readonly accounts = signal<AccountOption[]>([]);
@@ -77,36 +89,31 @@ export class KontenComponent {
     () => this.accounts().find((a) => a.id === this.accountId()) ?? null,
   );
 
-  // --- transactions ---
+  // --- transactions (serverseitig gefiltert + paginiert, #fints-konten) ---
+  private readonly PAGE = 30;
   readonly lines = signal<StatementLine[]>([]);
   readonly loadingLines = signal(false);
+  readonly loadingMore = signal(false);
+  readonly total = signal(0);
+  private nextOffset = 0;
+  readonly hasMore = computed(() => this.lines().length < this.total());
+  readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
-  // --- filter/sort (clientseitig, wie Buchungen) ---
+  // --- filter/sort (serverseitig) ---
   readonly filterState = signal<'' | 'open' | 'linked'>('');
+  readonly kind = signal<'' | ExpenseKind>('');
   readonly searchQ = signal('');
+  readonly dateFrom = signal('');
+  readonly dateTo = signal('');
   readonly sortField = signal<'date' | 'amount'>('date');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
-
-  readonly filtered = computed<StatementLine[]>(() => {
-    const state = this.filterState();
-    const q = this.searchQ().trim().toLowerCase();
-    let rows = this.lines().filter((l) => {
-      const linked = l.matchState === 'matched';
-      if (state === 'open' && linked) return false;
-      if (state === 'linked' && !linked) return false;
-      if (q && !`${l.counterpartyName ?? ''} ${l.purpose ?? ''} ${l.counterpartyIban ?? ''}`
-        .toLowerCase().includes(q)) return false;
-      return true;
-    });
-    const dir = this.sortOrder() === 'asc' ? 1 : -1;
-    const field = this.sortField();
-    rows = [...rows].sort((a, b) =>
-      field === 'amount'
-        ? (Math.abs(Number(a.amount)) - Math.abs(Number(b.amount))) * dir
-        : ((a.valueDate || a.bookingDate || '').localeCompare(b.valueDate || b.bookingDate || '')) * dir,
-    );
-    return rows;
-  });
+  readonly activeFilterCount = computed(
+    () =>
+      (this.filterState() ? 1 : 0) +
+      (this.kind() ? 1 : 0) +
+      (this.dateFrom() || this.dateTo() ? 1 : 0),
+  );
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Linker Baum mobil einklappbar (wie Buchungen-Tab).
   readonly treeOpen = signal(false);
@@ -179,13 +186,7 @@ export class KontenComponent {
   );
 
   constructor() {
-    this.api.listAccountOptions().subscribe({
-      next: (accs) => {
-        this.accounts.set(accs);
-        if (!this.accountId() && accs.length) this.accountId.set(accs[0].id);
-      },
-      error: () => this.accounts.set([]),
-    });
+    this.refreshAccounts();
     this.api.tree().subscribe({
       next: (tree) => {
         this.costOptionsSig.set(flattenBudgetOptions(tree));
@@ -207,6 +208,31 @@ export class KontenComponent {
         this.loadCredStatus(acc);
       }
     });
+    // Infinite Scroll: Sentinel am Tabellenende sichtbar → nächste Seite (wie Buchungen).
+    effect((onCleanup) => {
+      const el = this.sentinel()?.nativeElement;
+      if (!el || typeof IntersectionObserver === 'undefined') return;
+      const obs = new IntersectionObserver((entries) => {
+        if (entries.some((e) => e.isIntersecting)) this.loadMore();
+      });
+      obs.observe(el);
+      onCleanup(() => obs.disconnect());
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+  }
+
+  /** Konten-Liste (inkl. aktuellem Kontostand) laden/auffrischen, Auswahl beibehalten (#review). */
+  private refreshAccounts(): void {
+    this.api.listAccountOptions().subscribe({
+      next: (accs) => {
+        this.accounts.set(accs);
+        if (!this.accountId() && accs.length) this.accountId.set(accs[0].id);
+      },
+      error: () => this.accounts.set([]),
+    });
   }
 
   selectAccount(id: string): void {
@@ -215,25 +241,65 @@ export class KontenComponent {
     this.resetTan();
   }
 
+  /** Erste Seite (neu) laden — nach Konto-/Filterwechsel. */
   reloadLines(): void {
-    const acc = this.accountId();
-    if (!acc) return;
+    if (!this.accountId()) return;
+    this.nextOffset = 0;
+    this.lines.set([]);
+    this.total.set(0);
     this.loadingLines.set(true);
-    this.api.listStatementLines({ account: acc as Uuid }).subscribe({
-      next: (rows) => {
-        this.lines.set(rows);
-        this.loadingLines.set(false);
-      },
-      error: () => {
-        this.lines.set([]);
-        this.loadingLines.set(false);
-      },
-    });
+    this.fetch(true);
+  }
+
+  loadMore(): void {
+    if (this.loadingMore() || this.loadingLines() || !this.hasMore()) return;
+    this.loadingMore.set(true);
+    this.fetch(false);
+  }
+
+  private fetch(initial: boolean): void {
+    const linked =
+      this.filterState() === 'linked' ? true : this.filterState() === 'open' ? false : undefined;
+    this.api
+      .listStatementLines({
+        account: this.accountId() as Uuid,
+        linked,
+        kind: this.kind() || undefined,
+        q: this.searchQ().trim() || undefined,
+        dateFrom: this.dateFrom() || undefined,
+        dateTo: this.dateTo() || undefined,
+        sort: this.sortField(),
+        order: this.sortOrder(),
+        limit: this.PAGE,
+        offset: this.nextOffset,
+      })
+      .subscribe({
+        next: (page) => {
+          this.total.set(page.total);
+          this.lines.update((cur) => (initial ? page.items : [...cur, ...page.items]));
+          this.nextOffset = page.offset + page.items.length;
+          this.loadingLines.set(false);
+          this.loadingMore.set(false);
+        },
+        error: () => {
+          if (initial) this.lines.set([]);
+          this.loadingLines.set(false);
+          this.loadingMore.set(false);
+        },
+      });
   }
 
   money(amount: string): string {
     const n = Math.abs(Number(amount));
     return n.toLocaleString(this.i18n.locale() === 'en' ? 'en-US' : 'de-DE', {
+      style: 'currency',
+      currency: 'EUR',
+    });
+  }
+
+  /** Kontostand **mit Vorzeichen** (negativ = überzogen) — #review: nicht abs() wie money(). */
+  balanceMoney(amount: string): string {
+    return Number(amount).toLocaleString(this.i18n.locale() === 'en' ? 'en-US' : 'de-DE', {
       style: 'currency',
       currency: 'EUR',
     });
@@ -258,12 +324,30 @@ export class KontenComponent {
     return { name, iban };
   }
 
-  // ----------------------------------------------------- filter/sort
+  // ----------------------------------------------------- filter/sort (serverseitig)
   setState(s: '' | 'open' | 'linked'): void {
     this.filterState.set(s);
+    this.reloadLines();
+  }
+  setKind(k: '' | ExpenseKind): void {
+    this.kind.set(k);
+    this.reloadLines();
+  }
+  onDateFilter(which: 'from' | 'to', value: string): void {
+    (which === 'from' ? this.dateFrom : this.dateTo).set(value || '');
+    this.reloadLines();
+  }
+  resetFilters(): void {
+    this.filterState.set('');
+    this.kind.set('');
+    this.dateFrom.set('');
+    this.dateTo.set('');
+    this.reloadLines();
   }
   onSearch(v: string): void {
     this.searchQ.set(v);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.reloadLines(), 400);
   }
   onSort(field: 'date' | 'amount'): void {
     if (this.sortField() === field) this.sortOrder.update((o) => (o === 'desc' ? 'asc' : 'desc'));
@@ -271,6 +355,7 @@ export class KontenComponent {
       this.sortField.set(field);
       this.sortOrder.set('desc');
     }
+    this.reloadLines();
   }
   sortInd(field: 'date' | 'amount'): string {
     if (this.sortField() !== field) return '';
@@ -287,7 +372,7 @@ export class KontenComponent {
     return PALETTE[((index % PALETTE.length) + PALETTE.length) % PALETTE.length];
   }
   accountBalance(a: AccountOption): string {
-    return a.fintsLastBalance !== null ? this.money(a.fintsLastBalance) : '';
+    return a.fintsLastBalance !== null ? this.balanceMoney(a.fintsLastBalance) : '';
   }
 
   // ----------------------------------------------------- credential / connect (dialog)
@@ -409,7 +494,8 @@ export class KontenComponent {
       }),
     );
     this.reloadLines();
-    this.loadCredStatus(this.accountId()); // refresh balance/last-sync
+    this.loadCredStatus(this.accountId());
+    this.refreshAccounts(); // Kontostand/Anzeige nach Sync aktualisieren (#review)
   }
   private refreshOnLock(e: unknown): void {
     const code = (e as { error?: { code?: string } })?.error?.code;

@@ -845,7 +845,7 @@ async def import_statement_file(
 
 @router.get(
     "/statement-lines",
-    response_model=list[StatementLineOut],
+    response_model=Page[StatementLineOut],
     dependencies=[
         Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
     ],
@@ -857,9 +857,32 @@ async def list_statement_lines(
     state: Annotated[
         Literal["unmatched", "suggested", "matched", "ignored"] | None, Query()
     ] = None,
-) -> list[StatementLineOut]:
-    """Gestagete Kontoumsätze (#fints), optional je Konto/Status; neueste zuerst."""
-    return await service.list_lines(account_id=account_id, state=state)
+    linked: Annotated[bool | None, Query()] = None,
+    kind: Annotated[ExpenseKind | None, Query()] = None,
+    q: Annotated[str | None, Query()] = None,
+    date_from: Annotated[str | None, Query(alias="dateFrom")] = None,
+    date_to: Annotated[str | None, Query(alias="dateTo")] = None,
+    sort: Annotated[Literal["date", "amount"] | None, Query()] = None,
+    order: Annotated[Literal["asc", "desc"] | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[StatementLineOut]:
+    """Gestagete Kontoumsätze (#fints) gefiltert + offset-paginiert. Filter: ``account``,
+    ``state``, ``kind`` (income/expense), ``q`` (Gegenkonto/IBAN/Zweck), Datumsbereich
+    (``dateFrom``/``dateTo``); ``sort`` = date/amount."""
+    return await service.list_lines_paged(
+        account_id=account_id,
+        state=state,
+        linked=linked,
+        kind=kind,
+        q=q,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+        order=order,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post(

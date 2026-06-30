@@ -317,12 +317,30 @@ async def test_list_lines(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _service(session, monkeypatch)
     bid = uuid.uuid4()
     line = _line(amount=Decimal("200.00"), suggested_budget_id=bid)
+    session.scalar_q.append(1)  # count
     session.scalars_q.append(_Result([line]))
     session.execute_q.append(_Result([(bid, "VS-800")]))  # _path_keys
-    out = await svc.list_lines(account_id=None, state=None)
-    assert len(out) == 1
-    assert out[0].kind == "income"
-    assert out[0].suggested_path_key == "VS-800"
+    page = await svc.list_lines_paged(account_id=None, state=None)
+    assert page.total == 1
+    assert len(page.items) == 1
+    assert page.items[0].kind == "income"
+    assert page.items[0].suggested_path_key == "VS-800"
+
+
+@pytest.mark.asyncio
+async def test_list_lines_paged_filters(monkeypatch: pytest.MonkeyPatch) -> None:
+    """kind/q/Datums-Filter + amount-Sort laufen durch (Filter-Zweige abgedeckt)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    session.scalar_q.append(0)  # count
+    session.scalars_q.append(_Result([]))
+    page = await svc.list_lines_paged(
+        account_id=uuid.uuid4(), state="unmatched", kind="expense", q="miete",
+        date_from="2026-01-01", date_to="2026-12-31", sort="amount", order="asc",
+        limit=10, offset=0,
+    )
+    assert page.total == 0
+    assert page.items == []
 
 
 # --------------------------------------------------------------- ignore

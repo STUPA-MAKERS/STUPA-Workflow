@@ -19,7 +19,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.modules.audit.actions import AuditAction
@@ -59,6 +59,7 @@ from app.shared.errors import (
     ServiceUnavailableError,
     ValidationProblem,
 )
+from app.shared.paging import Page
 
 # Obergrenze für die Zeilenzahl eines Imports/Abrufs (Anti-DoS): ein 10-MiB-MT940 kann
 # zehntausende Umsätze tragen; jede Zeile macht im Staging 1-2 Queries (#fints-review).
@@ -144,12 +145,21 @@ class BankService:
         ein Saldo geliefert wurde (HKSAL/`:62F:`/CLBD); sonst bleibt der letzte bekannte Stand."""
         if balance is None:
             return
-        acc.fints_last_balance = balance.amount
-        acc.fints_balance_at = (
+        as_of = (
             datetime.combine(balance.as_of, datetime.min.time(), tzinfo=UTC)
             if balance.as_of is not None
             else datetime.now(UTC)
         )
+        # Recency-Guard (#review): einen neueren Stand NICHT durch einen älteren Datei-Import
+        # überschreiben. Bei gleichem/keinem Stichtag (None) immer aktualisieren.
+        if (
+            acc.fints_balance_at is not None
+            and balance.as_of is not None
+            and as_of < acc.fints_balance_at
+        ):
+            return
+        acc.fints_last_balance = balance.amount
+        acc.fints_balance_at = as_of
 
     @staticmethod
     def _line_out(line: BankStatementLine, suggested_path_key: str | None) -> StatementLineOut:
@@ -655,6 +665,9 @@ class BankService:
                     BudgetExpense.amount == amount,
                     BudgetExpense.kind == kind,
                     BudgetExpense.id.not_in(allocated),
+                    # Nur Top-Level-Buchungen als Reconcile-Kandidaten (#subbookings-review):
+                    # eine Unterbuchung darf nicht eigenständig einem Umsatz zugeordnet werden.
+                    BudgetExpense.parent_expense_id.is_(None),
                 )
                 # Deterministische Kandidaten-Reihenfolge (#fints-review): ohne ORDER BY
                 # entschiede die DB-Zeilenfolge bei gleichwertigen Treffern.
@@ -695,29 +708,86 @@ class BankService:
         )
 
     # -------------------------------------------------------------- listing
-    async def list_lines(
-        self, *, account_id: uuid.UUID | None, state: str | None
-    ) -> list[StatementLineOut]:
-        """Gestagete Umsätze auflisten (optional je Konto / Status), neueste zuerst."""
-        stmt = select(BankStatementLine)
+    async def list_lines_paged(
+        self,
+        *,
+        account_id: uuid.UUID | None,
+        state: str | None,
+        linked: bool | None = None,
+        kind: str | None = None,
+        q: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        sort: str | None = None,
+        order: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Page[StatementLineOut]:
+        """Gestagete Umsätze gefiltert + offset-paginiert (#fints-konten).
+
+        Filter: ``account``, ``state``, ``kind`` (income = Betrag > 0, expense < 0), Datumsbereich
+        (Valuta, sonst Buchungsdatum) und Volltext (``q``) über Gegenkonto/IBAN/Zweck. ``sort`` =
+        ``date`` (Default) | ``amount``."""
+        filters = []
         if account_id is not None:
-            stmt = stmt.where(BankStatementLine.account_id == account_id)
+            filters.append(BankStatementLine.account_id == account_id)
         if state is not None:
-            stmt = stmt.where(BankStatementLine.match_state == state)
-        stmt = stmt.order_by(
-            BankStatementLine.booking_date.desc().nullslast(),
-            BankStatementLine.created_at.desc(),
+            filters.append(BankStatementLine.match_state == state)
+        if linked is True:
+            filters.append(BankStatementLine.match_state == "matched")
+        elif linked is False:
+            # „offen" = noch nicht gebucht (ungematcht/Vorschlag), ohne als irrelevant Markierte.
+            filters.append(BankStatementLine.match_state.in_(("unmatched", "suggested")))
+        if kind == "income":
+            filters.append(BankStatementLine.amount > 0)
+        elif kind == "expense":
+            filters.append(BankStatementLine.amount < 0)
+        eff_date = func.coalesce(BankStatementLine.value_date, BankStatementLine.booking_date)
+        if date_from:
+            filters.append(eff_date >= date_from)
+        if date_to:
+            filters.append(eff_date <= date_to)
+        if q and q.strip():
+            like = f"%{q.strip()}%"
+            filters.append(
+                or_(
+                    BankStatementLine.counterparty_name.ilike(like),
+                    BankStatementLine.counterparty_iban.ilike(like),
+                    BankStatementLine.purpose.ilike(like),
+                )
+            )
+        where = and_(*filters) if filters else None
+        count_stmt = select(func.count()).select_from(BankStatementLine)
+        if where is not None:
+            count_stmt = count_stmt.where(where)
+        total = await self.session.scalar(count_stmt)
+        if sort == "amount":
+            primary = (
+                BankStatementLine.amount.asc()
+                if order == "asc"
+                else BankStatementLine.amount.desc()
+            )
+        else:
+            primary = eff_date.asc().nullslast() if order == "asc" else eff_date.desc().nullslast()
+        stmt = select(BankStatementLine)
+        if where is not None:
+            stmt = stmt.where(where)
+        stmt = (
+            stmt.order_by(primary, BankStatementLine.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
         rows = (await self.session.scalars(stmt)).all()
         paths = await self._path_keys(
             {r.suggested_budget_id for r in rows if r.suggested_budget_id}
         )
-        return [
+        items = [
             self._line_out(
                 r, paths.get(r.suggested_budget_id) if r.suggested_budget_id else None
             )
             for r in rows
         ]
+        return Page(items=items, total=total or 0, limit=limit, offset=offset)
 
     async def _path_keys(self, budget_ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
         if not budget_ids:

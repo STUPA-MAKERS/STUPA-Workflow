@@ -197,6 +197,37 @@ def test_balance_from_mt940_handles_missing() -> None:
     assert bi.balance_from_mt940(object()) is None  # kein .amount
 
 
+def test_normalize_purpose_unglues_subfields() -> None:
+    """Verklebte ?86-Subfelder werden wieder getrennt (#fints)."""
+    assert bi._normalize_purpose("DATEI-NR. 0000794247ANZAHL 00000002") == (
+        "DATEI-NR. 0000794247 ANZAHL 00000002"
+    )
+    assert bi._normalize_purpose("Abrechnung 30.06.2026siehe Anlage") == (
+        "Abrechnung 30.06.2026 siehe Anlage"
+    )
+    assert bi._normalize_purpose(None) is None
+    assert bi._normalize_purpose("   ") is None
+
+
+def test_normalize_then_split_strips_datum_suffix() -> None:
+    """Auch ohne Leerzeichen vor ``DATUM`` wird der Zeit-Zusatz gelöst."""
+    purpose, time = bi._split_booking_time(
+        bi._normalize_purpose("Asta-Aufwandsentschädigung 05/2026DATUM 09.06.2026, 15.54 UHR")
+    )
+    assert purpose == "Asta-Aufwandsentschädigung 05/2026"
+    assert time == "15:54"
+
+
+def test_mt940_counterparty_drops_krzl_placeholder() -> None:
+    """„KRZL"-Platzhalter (Sammel-/Dateibuchung) wird nicht als Gegenkonto übernommen."""
+    name, iban = bi.mt940_counterparty(
+        {"applicant_name": "KRZL", "gvc_applicant_iban": "DE79640500000100083958"},
+        credit=False,
+    )
+    assert name is None
+    assert iban == "DE79640500000100083958"
+
+
 def test_camt_balance_clav_fallback_and_skips_codeless() -> None:
     """Ohne CLBD → Fallback auf CLAV; <Bal> ohne Code wird übersprungen."""
     xml = b"""<?xml version="1.0"?>

@@ -1850,6 +1850,7 @@ async def test_import_sub_bookings_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ts_mod, "parse_statement_full",
                         lambda data, *, filename=None: (lines, None))
     sess = fake_session(
+        result(),                       # existing children (Dedup) — keine
         result(Decimal("50.00")),       # _recompute_parent_amount → Σ
         result(node),                   # _get_node nach commit
         result(("u-1", "Bob", None)),   # _actor_names
@@ -1887,6 +1888,58 @@ async def test_import_sub_bookings_too_large() -> None:
     )
     with pytest.raises(ValidationProblem):
         await svc.import_sub_bookings(parent.id, b"too big", filename=None, actor="u")
+
+
+async def test_import_sub_bookings_transfer_rejected() -> None:
+    """Eine Übertrags-Buchung darf NICHT in Unterbuchungen aufgeteilt werden (#review)."""
+    parent = _expense(id=uuid.uuid4(), transfer_id=uuid.uuid4())
+    svc = BudgetTreeService(fake_session(gets=[parent]))
+    with pytest.raises(ValidationProblem):
+        await svc.import_sub_bookings(parent.id, b"d", filename=None, actor="u")
+
+
+async def test_import_sub_bookings_foreign_currency_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    parent = _expense(id=uuid.uuid4())
+    lines = [StatementLine(amount=Decimal("-10.00"), currency="USD", purpose="x")]
+    monkeypatch.setattr(ts_mod, "parse_statement_full", lambda d, *, filename=None: (lines, None))
+    svc = BudgetTreeService(fake_session(gets=[parent]))
+    with pytest.raises(ValidationProblem):
+        await svc.import_sub_bookings(parent.id, b"d", filename=None, actor="u")
+
+
+async def test_import_sub_bookings_skips_dupe_zero_and_wrong_direction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Idempotenz + 0-Betrag + Gegenrichtung werden übersprungen (#review)."""
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    parent = _expense(id=uuid.uuid4(), budget_id=node.id, kind="expense", amount="30.00")
+    dupe = _expense(amount="30.00")  # bereits vorhandenes Kind (gleicher Schlüssel)
+    dupe.payment_date = date(2026, 2, 1)
+    dupe.description = "Miete"
+    dupe.reference_number = None
+    lines = [
+        # Dublette (gleicher Schlüssel wie dupe) → übersprungen
+        StatementLine(amount=Decimal("-30.00"), purpose="Miete", value_date=date(2026, 2, 1)),
+        StatementLine(amount=Decimal("0.00"), purpose="Null", value_date=date(2026, 2, 2)),  # 0
+        # Gutschrift (income) unter Ausgabe-Eltern → übersprungen
+        StatementLine(amount=Decimal("5.00"), purpose="Gutschrift", value_date=date(2026, 2, 3)),
+        StatementLine(amount=Decimal("-12.00"), purpose="Neu", value_date=date(2026, 2, 4)),  # ok
+    ]
+    monkeypatch.setattr(ts_mod, "parse_statement_full", lambda d, *, filename=None: (lines, None))
+    sess = fake_session(
+        result(dupe),                # existing children (Dedup)
+        result(Decimal("42.00")),    # _recompute
+        result(node),                # _get_node
+        result(),                    # _actor_names
+        gets=[parent, parent],
+    )
+    svc = BudgetTreeService(sess)
+    out = await svc.import_sub_bookings(parent.id, b"d", filename=None, actor="u")
+    assert len(out) == 1  # nur "Neu" (dupe/0/Gegenrichtung übersprungen)
+    assert out[0].description == "Neu"
+    assert out[0].amount == Decimal("12.00")
 
 
 async def test_import_sub_bookings_unparseable(monkeypatch: pytest.MonkeyPatch) -> None:
