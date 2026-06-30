@@ -26,6 +26,7 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.dimension import D
+from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import (
     Box,
@@ -43,16 +44,46 @@ from .config import Config, load
 from .db import Db, DbError, connect
 from .permissions import FORBIDDEN_PERMISSIONS, PERMISSION_CATALOGUE
 
+# Claude-Code-inspired palette: signature coral accent on a near-black neutral base.
+_CORAL = "#d97757"
+_INK = "#1a1a1a"
+_FG = "#e8e6e3"
+_DIM = "#8a8a8a"
+_LINE = "#3a3a3a"
+
 _STYLE = Style.from_dict(
     {
-        "frame.border": "#5f87af",
-        "header": "bg:#005f87 #ffffff bold",
-        "footer": "bg:#262626 #b2b2b2",
-        "footer.warn": "bg:#262626 #ffaf00",
-        "menu.btn": "#d0d0d0",
-        "dialog.body": "#d0d0d0",
-        "dialog frame.label": "#ffaf00 bold",
-        "button.focused": "bg:#005f87 #ffffff",
+        # structural frames + rules
+        "frame.border": _LINE,
+        "frame.label": f"{_CORAL} bold",
+        # header / brand bar
+        "header": f"bg:{_INK} {_FG}",
+        "header.brand": f"bg:{_INK} {_CORAL} bold",
+        "header.dim": f"bg:{_INK} {_DIM}",
+        # tab strip
+        "tabbar": f"bg:{_INK}",
+        "tab": f"bg:{_INK} {_DIM}",
+        "tab.active": f"bg:{_CORAL} {_INK} bold",
+        # footer / status line
+        "footer": "bg:#222222 #9e9e9e",
+        "footer.ro": "bg:#1f3a2a #87d7af bold",
+        "footer.warn": "bg:#5a2310 #ffd7af bold",
+        "footer.key": "bg:#222222 #d7d7d7 bold",
+        # interactive widgets
+        "button": _FG,
+        "button.focused": f"bg:{_CORAL} {_INK} bold",
+        "button.arrow": _DIM,
+        "radio": _FG,
+        "radio-selected": f"{_CORAL} bold",
+        "radio-checked": f"{_CORAL} bold",
+        "checkbox": _FG,
+        "checkbox-selected": f"{_CORAL} bold",
+        "checkbox-checked": f"{_CORAL} bold",
+        # dialogs / floats
+        "dialog": f"bg:{_INK}",
+        "dialog.body": _FG,
+        "dialog frame.label": f"{_CORAL} bold",
+        "dialog shadow": "bg:#000000",
     }
 )
 
@@ -77,30 +108,16 @@ class AdminApp:
         self._audit_action: str | None = None
         self._audit_rows: list[dict[str, Any]] = []
 
-        menu = Box(
-            HSplit(
-                [Button(text=label, handler=lambda s=key: self.goto(s), width=18) for key, label in _SECTIONS]
-                + [
-                    Window(height=1),
-                    Button(text="Refresh (F5)", handler=self.refresh, width=18),
-                    Button(text="Quit (^Q)", handler=self.exit, width=18),
-                ],
-                padding=0,
-            ),
-            padding=1,
-            style="class:menu.btn",
-        )
         root = FloatContainer(
             content=HSplit(
                 [
                     Window(FormattedTextControl(self._header_text), height=1, style="class:header"),
-                    VSplit(
-                        [
-                            Frame(menu, width=24),
-                            Frame(DynamicContainer(lambda: self._body)),
-                        ],
-                        padding=0,
+                    Window(
+                        FormattedTextControl(self._tabbar_fragments, focusable=False),
+                        height=1,
+                        style="class:tabbar",
                     ),
+                    Frame(DynamicContainer(lambda: self._body)),
                     Window(FormattedTextControl(self._footer_text), height=1, style="class:footer"),
                 ]
             ),
@@ -118,16 +135,37 @@ class AdminApp:
 
     # ------------------------------------------------------------------ chrome
     def _header_text(self) -> Any:
-        return [("class:header", f" antragsplattform admin-cli {__version__} — "
-                 f"{dict(_SECTIONS)[self.section]} ")]
+        return [
+            ("class:header.brand", " ✻ "),
+            ("class:header", "antragsplattform "),
+            ("class:header.dim", f"admin-cli v{__version__}"),
+        ]
+
+    def _tabbar_fragments(self) -> Any:
+        frags: list[Any] = [("class:tabbar", " ")]
+        for key, label in _SECTIONS:
+            active = key == self.section
+
+            def handler(mouse_event: MouseEvent, target: str = key) -> None:
+                if mouse_event.event_type == MouseEventType.MOUSE_UP:
+                    self.goto(target)
+
+            cls = "class:tab.active" if active else "class:tab"
+            frags.append((cls, f"  {label}  ", handler))
+            frags.append(("class:tabbar", " "))
+        return frags
 
     def _footer_text(self) -> Any:
-        warn = " READ-ONLY " if self.cfg.read_only else " DIRECT DB: no audit, no guards "
-        cls = "class:footer" if self.cfg.read_only else "class:footer.warn"
-        msg = self._status or "Tab/↑↓ move · Enter/click select · F5 refresh · ^Q quit"
+        if self.cfg.read_only:
+            badge = ("class:footer.ro", " ● READ-ONLY ")
+        else:
+            badge = ("class:footer.warn", " ⚠ DIRECT DB — no audit, no guards ")
+        msg = self._status or "^←/^→ tabs · Tab/↑↓ move · Enter/click select · F5 refresh · ^Q quit"
         return [
-            (cls, warn),
-            ("class:footer", f" db={self.cfg.mode_label} · {msg} "),
+            badge,
+            ("class:footer", f"  db={self.cfg.mode_label}  "),
+            ("class:footer.key", "·"),
+            ("class:footer", f"  {msg} "),
         ]
 
     def set_status(self, text: str) -> None:
@@ -145,10 +183,22 @@ class AdminApp:
             event.app.exit()
 
         @kb.add("f5")
-        def _(event: Any) -> None:
+        def _(_event: Any) -> None:
             self.refresh()
 
+        @kb.add("c-right")
+        def _(_event: Any) -> None:
+            self._cycle(1)
+
+        @kb.add("c-left")
+        def _(_event: Any) -> None:
+            self._cycle(-1)
+
         return kb
+
+    def _cycle(self, delta: int) -> None:
+        keys = [k for k, _ in _SECTIONS]
+        self.goto(keys[(keys.index(self.section) + delta) % len(keys)])
 
     def exit(self) -> None:
         self.app.exit()
