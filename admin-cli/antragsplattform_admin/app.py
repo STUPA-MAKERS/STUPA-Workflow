@@ -49,6 +49,7 @@ from .permissions import FORBIDDEN_PERMISSIONS, PERMISSION_CATALOGUE
 # Claude-Code-inspired palette: signature coral accent on a near-black neutral base.
 _CORAL = "#d97757"
 _INK = "#1a1a1a"
+_PANEL = "#262626"
 _FG = "#e8e6e3"
 _DIM = "#8a8a8a"
 _LINE = "#3a3a3a"
@@ -88,10 +89,14 @@ _STYLE = Style.from_dict(
         "checkbox": _FG,
         "checkbox-selected": f"{_CORAL} bold",
         "checkbox-checked": f"{_CORAL} bold",
-        # dialogs / floats
-        "dialog": f"bg:{_INK}",
-        "dialog.body": _FG,
-        "dialog frame.label": f"{_CORAL} bold",
+        # dialogs / floats — default theme makes dialog.body a WHITE panel; override the bg too or
+        # the light text washes out. Dark raised panel (#262626) + light text instead.
+        "dialog": "bg:#000000",
+        "dialog.body": f"bg:{_PANEL} {_FG}",
+        "dialog.body text-area": f"bg:{_INK} {_FG}",
+        "dialog.body text-area last-line": "underline",
+        "dialog.body label": f"bg:{_PANEL} {_FG}",
+        "dialog frame.label": f"bg:{_PANEL} {_CORAL} bold",
         "dialog shadow": "bg:#000000",
     }
 )
