@@ -76,8 +76,8 @@ _STYLE = Style.from_dict(
         # detail sub-tabs
         "subtab": f"bg:{_INK} {_DIM}",
         "subtab.active": f"bg:{_INK} {_CORAL} bold",
-        # full-width selection bar on lists
-        "cursor-line": "bg:#33302b",
+        # full-width selection bar on lists (default cursor-line is underlined → turn that off)
+        "cursor-line": "bg:#33302b nounderline",
         # footer / status line
         "footer": f"bg:{_INK} {_DIM}",
         "footer.key": f"bg:{_INK} {_FG} bold",
