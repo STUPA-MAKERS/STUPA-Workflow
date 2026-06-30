@@ -398,6 +398,7 @@ async def test_confirm_line_cleans_mashed_counterparty(monkeypatch: pytest.Monke
     session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim, remember
     await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
     payload = captured["payload"]
+    assert payload.account_id == line.account_id  # Konto des Umsatzes übernommen
     assert payload.correspondent == "Quentin Walz"  # IBAN abgespalten
     assert payload.description == "Erstattung – Quentin Walz"
     # Notiz trägt Name + (gruppierte) IBAN, nicht den verschmolzenen Rohwert.
