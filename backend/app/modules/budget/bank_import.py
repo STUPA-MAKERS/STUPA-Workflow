@@ -111,7 +111,7 @@ def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
     elif status in ("C", "RD"):
         raw_amount = abs(raw_amount)
     amount = _sane_amount(raw_amount)
-    cp_name, cp_iban = _split_leading_iban(
+    cp_name, cp_iban = split_leading_iban(
         d.get("applicant_name") or d.get("recipient_name"), d.get("applicant_iban")
     )
     # Sparkassen-MT940 hängt die Buchungs-Uhrzeit als ``…DATUM dd.mm.yyyy, hh.mm UHR`` an den
@@ -185,7 +185,7 @@ def parse_camt053(data: bytes) -> list[StatementLine]:
         party_tag, acct_tag = ("Dbtr", "DbtrAcct") if orig_credit else ("Cdtr", "CdtrAcct")
         party = _find_local(scope, party_tag)
         acct = _find_local(scope, acct_tag)
-        cp_name, cp_iban = _split_leading_iban(
+        cp_name, cp_iban = split_leading_iban(
             _find_text_local(party, "Nm") if party is not None else None,
             _find_text_local(acct, "IBAN") if acct is not None else None,
         )
@@ -336,7 +336,7 @@ def _detect_leading_iban(text: str) -> tuple[str, str] | None:
     return candidate, text[length:]
 
 
-def _split_leading_iban(
+def split_leading_iban(
     name: object | None, iban: object | None
 ) -> tuple[str | None, str | None]:
     """``(name, iban)`` normalisieren: führende/wiederholte IBAN aus dem Namen lösen.

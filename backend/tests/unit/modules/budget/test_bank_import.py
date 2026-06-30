@@ -174,41 +174,41 @@ def test_camt_sub_cent_rejected() -> None:
 def test_split_leading_iban() -> None:
     """Gegen-IBAN + Name in einem Feld trennen (#fints)."""
     # IBAN-Feld leer, Name = IBAN+Name ohne Trenner → abgespalten (volle, gültige DE-IBAN).
-    assert bi._split_leading_iban("DE70120300001076878808Quentin Walz", None) == (
+    assert bi.split_leading_iban("DE70120300001076878808Quentin Walz", None) == (
         "Quentin Walz",
         "DE70120300001076878808",
     )
     # NL-IBAN mit Buchstaben in der BBAN (CITI) — die alte „nur Ziffern"-Heuristik scheiterte
     # hier; Längen-Tabelle + Prüfsumme trennt korrekt (#fints).
-    assert bi._split_leading_iban("NL70CITI2032329018Stichting Mollie Payments", None) == (
+    assert bi.split_leading_iban("NL70CITI2032329018Stichting Mollie Payments", None) == (
         "Stichting Mollie Payments",
         "NL70CITI2032329018",
     )
     # Name = nur IBAN (kein Name) → Name None, IBAN gesetzt.
-    assert bi._split_leading_iban("DE89370400440532013000", None) == (
+    assert bi.split_leading_iban("DE89370400440532013000", None) == (
         None,
         "DE89370400440532013000",
     )
     # Ungültige Prüfsumme / zu kurz → NICHT als IBAN gedeutet, Name bleibt unangetastet.
-    assert bi._split_leading_iban("DE85780608960006017", None) == (
+    assert bi.split_leading_iban("DE85780608960006017", None) == (
         "DE85780608960006017",
         None,
     )
     # Referenz, die nur wie eine IBAN aussieht (kein gültiger Ländercode) → kein Split.
-    assert bi._split_leading_iban("RF1234567890Acme", None) == ("RF1234567890Acme", None)
+    assert bi.split_leading_iban("RF1234567890Acme", None) == ("RF1234567890Acme", None)
     # IBAN-Feld da und im Namen wiederholt → Präfix entfernen.
-    assert bi._split_leading_iban("DE111Heldenwerbung", "DE111") == (
+    assert bi.split_leading_iban("DE111Heldenwerbung", "DE111") == (
         "Heldenwerbung",
         "DE111",
     )
     # Saubere getrennte Felder bleiben unverändert.
-    assert bi._split_leading_iban("Quentin Walz", "DE70120300001076878808") == (
+    assert bi.split_leading_iban("Quentin Walz", "DE70120300001076878808") == (
         "Quentin Walz",
         "DE70120300001076878808",
     )
     # Kein Name → (None, IBAN); reiner Name ohne IBAN bleibt unverändert.
-    assert bi._split_leading_iban(None, "DE111") == (None, "DE111")
-    assert bi._split_leading_iban("Plain Name", None) == ("Plain Name", None)
+    assert bi.split_leading_iban(None, "DE111") == (None, "DE111")
+    assert bi.split_leading_iban("Plain Name", None) == ("Plain Name", None)
 
 
 def test_split_booking_time() -> None:

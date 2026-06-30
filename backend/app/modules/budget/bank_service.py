@@ -736,6 +736,13 @@ class BankService:
                 "A zero-amount transaction cannot be booked.", code="line_zero_amount"
             )
 
+        # Gegenkonto bereinigen (#fints): vor dem Parser-Fix gestagete Umsätze tragen IBAN+Name
+        # in EINEM Feld. Beim Buchen Name/IBAN trennen, damit Empfänger, Beschreibung, Notiz und
+        # Counterparty-Memory saubere Daten bekommen — unabhängig vom Stage-Zeitpunkt.
+        clean_name, clean_iban = bank_import.split_leading_iban(
+            line.counterparty_name, line.counterparty_iban
+        )
+
         # Ziel **vor** dem Claim validieren, damit der Claim nur erfolgt, wenn das Buchen
         # auch durchgeht (minimiert das Orphan-Fenster: matched ohne Buchung).
         expense: BudgetExpense | None = None
@@ -803,7 +810,9 @@ class BankService:
                 expense_out = tree._expense_out(expense, None)
                 expense_id = expense.id
             else:
-                description = payload.description or self._default_description(line)
+                description = payload.description or self._default_description(
+                    clean_name, line.purpose
+                )
                 created = await tree.book_expense(
                     ExpenseCreate(
                         amount=amount,
@@ -811,8 +820,8 @@ class BankService:
                         kind=kind,  # type: ignore[arg-type]
                         budgetId=payload.budget_id,
                         fiscalYearId=payload.fiscal_year_id,
-                        correspondent=line.counterparty_name,
-                        note=self._booking_note(line, kind),
+                        correspondent=clean_name,
+                        note=self._booking_note(line, kind, name=clean_name, iban=clean_iban),
                         paymentDate=line.value_date or line.booking_date,
                         referenceNumber=line.end_to_end_id or line.reference,
                         paymentMethod="ueberweisung",
@@ -832,7 +841,7 @@ class BankService:
                 )
             )
             if payload.budget_id is not None:
-                await self._remember_counterparty(line.counterparty_iban, payload.budget_id)
+                await self._remember_counterparty(clean_iban, payload.budget_id)
             await self._audit(
                 AuditAction.BANK_LINE_RECONCILE,
                 target_id=str(line.id),
@@ -847,21 +856,25 @@ class BankService:
         return expense_out
 
     @staticmethod
-    def _default_description(line: BankStatementLine) -> str:
+    def _default_description(name: str | None, purpose: str | None) -> str:
         """Kurzform-Beschreibung ``<Zweck> – <Name>`` (gleiches Format wie die kuratierten
-        Bestandsbuchungen) — die volle, formatierte Beschreibung steht in der Anmerkung."""
-        return bank_import.build_short_description(line.counterparty_name, line.purpose)
+        Bestandsbuchungen) — die volle, formatierte Beschreibung steht in der Anmerkung.
+        ``name`` ist bereits bereinigt (IBAN abgespalten, #fints)."""
+        return bank_import.build_short_description(name, purpose)
 
     @staticmethod
-    def _booking_note(line: BankStatementLine, kind: str) -> str | None:
+    def _booking_note(
+        line: BankStatementLine, kind: str, *, name: str | None, iban: str | None
+    ) -> str | None:
         """Strukturierte Anmerkung (Empfänger/Absender · IBAN · Zweck · Buchung) zum Umsatz.
+        ``name``/``iban`` sind bereits bereinigt (IBAN aus dem Namen gelöst, #fints).
 
         Die Sparkassen-Buchungsuhrzeit (``DATUM … UHR``) wurde beim Parsen nach
         ``raw_payload['booking_time']`` gelöst; CAMT/andere Banken liefern nur das Datum."""
         booking_time = (line.raw_payload or {}).get("booking_time")
         return bank_import.build_booking_note(
-            name=line.counterparty_name,
-            iban=line.counterparty_iban,
+            name=name,
+            iban=iban,
             purpose=line.purpose,
             kind=kind,
             when=line.value_date or line.booking_date,

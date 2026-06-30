@@ -379,6 +379,33 @@ async def test_confirm_line_new_booking(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 @pytest.mark.asyncio
+async def test_confirm_line_cleans_mashed_counterparty(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Vor dem Parser-Fix gestageter Umsatz (IBAN+Name in EINEM Feld, leeres IBAN-Feld) →
+    die Buchung bekommt sauberen Empfänger/Beschreibung/Notiz (#fints)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    line = _line(
+        counterparty_name="DE70120300001076878808Quentin Walz", purpose="Erstattung"
+    )
+    session.put(line)
+    captured: dict[str, Any] = {}
+
+    async def _book(self: Any, payload: Any, *, actor: str, commit: bool = True) -> ExpenseOut:
+        captured["payload"] = payload
+        return _canned_expense("expense")
+
+    monkeypatch.setattr(BudgetTreeService, "book_expense", _book)
+    session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim, remember
+    await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
+    payload = captured["payload"]
+    assert payload.correspondent == "Quentin Walz"  # IBAN abgespalten
+    assert payload.description == "Erstattung – Quentin Walz"
+    # Notiz trägt Name + (gruppierte) IBAN, nicht den verschmolzenen Rohwert.
+    assert "Empfänger: Quentin Walz" in (payload.note or "")
+    assert "DE70 1203 0000 1076 8788 08" in (payload.note or "")
+
+
+@pytest.mark.asyncio
 async def test_confirm_line_match_existing(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _service(session, monkeypatch)
@@ -433,23 +460,22 @@ async def test_confirm_line_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_default_description() -> None:
     # Kurzform jetzt „<Zweck> – <Name>" (Gedankenstrich), Fallback Name bzw. Bankumsatz.
-    assert (
-        BankService._default_description(_line(counterparty_name="A", purpose="B")) == "B – A"
-    )
-    assert BankService._default_description(_line(counterparty_name="A")) == "A"
-    assert BankService._default_description(_line()) == "Bankumsatz"
+    # Name/Zweck kommen bereits bereinigt (IBAN abgespalten) herein.
+    assert BankService._default_description("A", "B") == "B – A"
+    assert BankService._default_description("A", None) == "A"
+    assert BankService._default_description(None, None) == "Bankumsatz"
 
 
 def test_booking_note_format() -> None:
     note = BankService._booking_note(
         _line(
-            counterparty_name="Quentin Walz",
-            counterparty_iban="DE70120300001076878808",
             purpose="AStA-Aufwandsentschädigung 03/26",
             value_date=date(2026, 4, 3),
             raw_payload={"booking_time": "09:15"},
         ),
         "expense",
+        name="Quentin Walz",
+        iban="DE70120300001076878808",
     )
     assert note == (
         "Empfänger: Quentin Walz\n"
