@@ -182,7 +182,6 @@ export class ExpensesComponent implements OnDestroy {
   readonly editAmount = signal('');
   readonly editDescription = signal('');
   readonly editBudgetId = signal('');
-  readonly editAccountId = signal('');
   readonly editInvoiceDate = signal('');
   readonly editPaymentDate = signal('');
   readonly editCorrespondent = signal('');
@@ -204,7 +203,6 @@ export class ExpensesComponent implements OnDestroy {
     { value: '', label: this.i18n.translate('expenses.filter.allAccounts') },
     ...this.accountOptions(),
   ]);
-  readonly newAccountId = signal('');
 
   // --- Rechnungs-Verknüpfung (#invoices): 1 Rechnung : N Buchungen. ---
   readonly invoices = signal<Invoice[]>([]);
@@ -603,7 +601,6 @@ export class ExpensesComponent implements OnDestroy {
     this.newBudgetId.set(this.budgetId() || '');
     this.newFiscalYearId.set('');
     this.newApplicationId.set('');
-    this.newAccountId.set('');
     this.newInvoiceId.set('');
     this.newInvoiceDate.set('');
     this.newPaymentDate.set('');
@@ -777,7 +774,6 @@ export class ExpensesComponent implements OnDestroy {
         applicationId: linked ? this.newApplicationId() : null,
         budgetId: linked ? null : this.newBudgetId() || null,
         fiscalYearId: linked ? null : this.newFiscalYearId() || null,
-        accountId: this.newAccountId() || null,
         invoiceId: this.newInvoiceId() || null,
         invoiceDate: this.newInvoiceDate() || null,
         paymentDate: this.newPaymentDate() || null,
@@ -841,7 +837,6 @@ export class ExpensesComponent implements OnDestroy {
     this.editAmount.set(e.amount);
     this.editDescription.set(e.description);
     this.editBudgetId.set(e.budgetId);
-    this.editAccountId.set(e.accountId ?? '');
     this.editInvoiceId.set(e.invoiceId ?? '');
     this.editInvoiceDate.set(e.invoiceDate ?? '');
     this.editPaymentDate.set(e.paymentDate ?? '');
@@ -869,7 +864,6 @@ export class ExpensesComponent implements OnDestroy {
         ...(amountChanged ? { amount: this.editAmount() } : {}),
         description: this.editDescription().trim(),
         ...(budgetChanged ? { budgetId: this.editBudgetId() } : {}),
-        accountId: this.editAccountId() || null,
         invoiceId: this.editInvoiceId() || null,
         invoiceDate: this.editInvoiceDate() || null,
         paymentDate: this.editPaymentDate() || null,

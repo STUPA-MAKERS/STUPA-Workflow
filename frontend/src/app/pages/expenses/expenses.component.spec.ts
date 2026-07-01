@@ -620,7 +620,6 @@ describe('ExpensesComponent (unit)', () => {
     cmp.newAmount.set('12.50');
     cmp.newBudgetId.set('b-1');
     cmp.newFiscalYearId.set('fy-1');
-    cmp.newAccountId.set('a-1');
     cmp.newCorrespondent.set(' Bäckerei ');
     cmp.newReferenceNumber.set(' R-1 ');
     cmp.newPaymentMethod.set('bar');
@@ -635,7 +634,6 @@ describe('ExpensesComponent (unit)', () => {
       applicationId: null,
       budgetId: 'b-1',
       fiscalYearId: 'fy-1',
-      accountId: 'a-1',
       correspondent: 'Bäckerei',
       referenceNumber: 'R-1',
       paymentMethod: 'bar',
@@ -662,7 +660,6 @@ describe('ExpensesComponent (unit)', () => {
       applicationId: 'app-9',
       budgetId: null,
       fiscalYearId: null,
-      accountId: null,
       invoiceId: null,
       correspondent: null,
       referenceNumber: null,
@@ -849,7 +846,6 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.editing()).toBe(e);
     expect(cmp.editAmount()).toBe(e.amount);
     expect(cmp.editDescription()).toBe(e.description);
-    expect(cmp.editAccountId()).toBe('');
     expect(cmp.editInvoiceId()).toBe('');
     expect(cmp.editInvoiceDate()).toBe('');
     expect(cmp.editPaymentDate()).toBe('');
@@ -863,7 +859,6 @@ describe('ExpensesComponent (unit)', () => {
   it('openEdit keeps populated metadata fields', () => {
     const { cmp } = build();
     cmp.openEdit({ ...EXPENSE, accountId: 'a-1', invoiceId: 'inv-1' });
-    expect(cmp.editAccountId()).toBe('a-1');
     expect(cmp.editInvoiceId()).toBe('inv-1');
     expect(cmp.editPaymentMethod()).toBe('ueberweisung');
     expect(cmp.editCategory()).toBe('Werbung');
@@ -875,7 +870,6 @@ describe('ExpensesComponent (unit)', () => {
     cmp.openEdit(EXPENSE);
     cmp.editAmount.set('200');
     cmp.editDescription.set('  Neu  ');
-    cmp.editAccountId.set('a-2');
     cmp.editInvoiceId.set('inv-9');
     cmp.editCorrespondent.set(' X ');
     cmp.editReferenceNumber.set(' Y ');
@@ -887,7 +881,6 @@ describe('ExpensesComponent (unit)', () => {
     expect(req.request.body).toMatchObject({
       amount: '200',
       description: 'Neu',
-      accountId: 'a-2',
       invoiceId: 'inv-9',
       correspondent: 'X',
       referenceNumber: 'Y',
@@ -906,7 +899,6 @@ describe('ExpensesComponent (unit)', () => {
   it('saveEdit nulls blank metadata fields', () => {
     const { cmp, http } = build();
     cmp.openEdit(EXPENSE);
-    cmp.editAccountId.set('');
     cmp.editInvoiceId.set('');
     cmp.editInvoiceDate.set('');
     cmp.editPaymentDate.set('');
@@ -918,7 +910,6 @@ describe('ExpensesComponent (unit)', () => {
     cmp.saveEdit(new Event('submit'));
     const req = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH');
     expect(req.request.body).toMatchObject({
-      accountId: null,
       invoiceId: null,
       invoiceDate: null,
       paymentDate: null,

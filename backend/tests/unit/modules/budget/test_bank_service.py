@@ -410,7 +410,9 @@ async def test_confirm_line_new_booking(monkeypatch: pytest.MonkeyPatch) -> None
     line = _line(counterparty_iban="DEXP")
     session.put(line)
 
-    async def _book(self: Any, payload: Any, *, actor: str, commit: bool = True) -> ExpenseOut:
+    async def _book(
+        self: Any, payload: Any, *, actor: str, commit: bool = True, account_id: Any = None
+    ) -> ExpenseOut:
         assert payload.kind == "expense"
         assert commit is False  # Bankabgleich bucht in gemeinsamer Transaktion
         return _canned_expense("expense")
@@ -435,15 +437,18 @@ async def test_confirm_line_cleans_mashed_counterparty(monkeypatch: pytest.Monke
     session.put(line)
     captured: dict[str, Any] = {}
 
-    async def _book(self: Any, payload: Any, *, actor: str, commit: bool = True) -> ExpenseOut:
+    async def _book(
+        self: Any, payload: Any, *, actor: str, commit: bool = True, account_id: Any = None
+    ) -> ExpenseOut:
         captured["payload"] = payload
+        captured["account_id"] = account_id
         return _canned_expense("expense")
 
     monkeypatch.setattr(BudgetTreeService, "book_expense", _book)
     session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim, remember
     await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
     payload = captured["payload"]
-    assert payload.account_id == line.account_id  # Konto des Umsatzes übernommen
+    assert captured["account_id"] == line.account_id  # Konto des Umsatzes übernommen (Parameter)
     assert payload.correspondent == "Quentin Walz"  # IBAN abgespalten
     assert payload.description == "Erstattung – Quentin Walz"
     # Notiz trägt Name + (gruppierte) IBAN, nicht den verschmolzenen Rohwert.
@@ -473,7 +478,9 @@ async def test_confirm_line_derives_counterparty_from_raw(
     session.put(line)
     captured: dict[str, Any] = {}
 
-    async def _book(self: Any, payload: Any, *, actor: str, commit: bool = True) -> ExpenseOut:
+    async def _book(
+        self: Any, payload: Any, *, actor: str, commit: bool = True, account_id: Any = None
+    ) -> ExpenseOut:
         captured["payload"] = payload
         return _canned_expense("expense")
 

@@ -357,17 +357,13 @@ input.exp__input {
   list-style: none;
   margin: var(--space-1) 0 0;
   padding: var(--space-1);
-  position: absolute;
-  z-index: 10;
-  left: 0;
-  right: 0;
-  top: 100%;
-  max-height: 16rem;
+  /* Im Fluss (nicht absolut) → wächst den Dialog auf, statt am kurzen Dialog-Rand
+     abgeschnitten zu werden (#review). Eigener Scroll bei vielen Treffern. */
+  max-height: 14rem;
   overflow-y: auto;
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.3));
 }
 .exp__suggestItem {
   display: block;

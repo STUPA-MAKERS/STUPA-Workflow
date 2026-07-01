@@ -223,16 +223,16 @@ export interface ExpenseCreate extends ExpenseMetadata {
   budgetId?: Uuid | null;
   fiscalYearId?: Uuid | null;
   applicationId?: Uuid | null;
-  accountId?: Uuid | null;
+  // Kein `accountId`: Konto ist kein manuelles Buchungs-Feld, es wird nur vom Konten-Abgleich
+  // gesetzt (#fints-konten).
 }
 
-/** Buchung ändern: Betrag, Beschreibung, Kostenstelle, Bankkonto + Zusatz-Metadaten (#1-1/#2/#3/#4). */
+/** Buchung ändern: Betrag, Beschreibung, Kostenstelle + Zusatz-Metadaten (#1-1/#2/#3/#4). */
 export interface ExpenseUpdate extends ExpenseMetadata {
   amount?: string;
   description?: string;
   /** Kostenstelle umbuchen (#25); HHJ bleibt fix. */
   budgetId?: Uuid;
-  accountId?: Uuid | null;
 }
 
 /** Unterbuchung manuell anlegen (#subbookings) — nur eigene Felder; Rest vom Eltern geerbt. */

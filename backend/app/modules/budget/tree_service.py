@@ -879,7 +879,12 @@ class BudgetTreeService:
         )
 
     async def book_expense(
-        self, payload: ExpenseCreate, *, actor: str, commit: bool = True
+        self,
+        payload: ExpenseCreate,
+        *,
+        actor: str,
+        commit: bool = True,
+        account_id: UUID | None = None,
     ) -> ExpenseOut:
         """Ausgabe/Einnahme buchen (#25).
 
@@ -907,13 +912,15 @@ class BudgetTreeService:
                 )
             node = await self._get_node(payload.budget_id)
             fy_id = await self._resolve_fiscal_year(node, payload.fiscal_year_id)
-        account_name = await self._validate_account(payload.account_id)
+        # Konto ist KEIN manuelles Buchungs-Feld mehr — es wird ausschließlich vom Konten-
+        # Abgleich gesetzt (confirm_line übergibt ``account_id`` explizit, #fints-konten).
+        account_name = await self._validate_account(account_id)
         expense = BudgetExpense(
             id=uuid.uuid4(),
             budget_id=node.id,
             fiscal_year_id=fy_id,
             application_id=payload.application_id,
-            account_id=payload.account_id,
+            account_id=account_id,
             kind=payload.kind,
             amount=payload.amount,
             currency=node.currency,
@@ -1004,12 +1011,10 @@ class BudgetTreeService:
                     "The amount of a booking with sub-bookings is the sum of its sub-bookings.",
                     code="subbooking_parent_amount_readonly",
                 )
-        if expense.parent_expense_id is not None and (
-            "budget_id" in fields or "account_id" in fields
-        ):
-            # Kinder erben Kostenstelle/Konto vom Eltern — nicht einzeln umbuchbar.
+        if expense.parent_expense_id is not None and "budget_id" in fields:
+            # Kinder erben Kostenstelle vom Eltern — nicht einzeln umbuchbar.
             raise ValidationProblem(
-                "A sub-booking inherits cost-centre and account from its parent.",
+                "A sub-booking inherits its cost-centre from its parent.",
                 code="subbooking_inherited_field",
             )
         # Vorzustand der gepatchten Felder für den Audit-Log-Revert (#config-versioning).
@@ -1030,9 +1035,6 @@ class BudgetTreeService:
             await self._resolve_fiscal_year(target, expense.fiscal_year_id)
             expense.budget_id = target.id
             expense.currency = target.currency
-        if "account_id" in fields:
-            await self._validate_account(payload.account_id)  # 404, falls unbekannt
-            expense.account_id = payload.account_id
         if "invoice_date" in fields:
             expense.invoice_date = payload.invoice_date
         if "payment_date" in fields:

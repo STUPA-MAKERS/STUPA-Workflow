@@ -312,7 +312,6 @@ class ExpenseUpdate(WireModel):
     amount: str | None = Field(default=None, description="Decimal string > 0")
     description: str | None = None
     budgetId: str | None = Field(default=None, description="Move the booking to another cost centre")
-    accountId: str | None = Field(default=None, description="Bank account; null clears")
     invoiceDate: str | None = Field(default=None, description="ISO date; null clears")
     paymentDate: str | None = Field(default=None, description="ISO date; null clears")
     correspondent: str | None = None

@@ -238,7 +238,8 @@ class ExpenseCreate(_CamelModel):
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    account_id: UUID | None = Field(default=None, alias="accountId")
+    # Kein ``accountId`` mehr: das Konto ist kein manuelles Buchungs-Feld, es wird nur vom
+    # Konten-Abgleich gesetzt (#fints-konten).
     # Zusatz-Metadaten (#1-1/#1-2/#3/#4), alle optional.
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
     payment_date: date | None = Field(default=None, alias="paymentDate")
@@ -281,7 +282,6 @@ class ExpenseUpdate(_CamelModel):
     amount: Decimal | None = Field(default=None, gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
     description: str | None = Field(default=None, min_length=1)
     budget_id: UUID | None = Field(default=None, alias="budgetId")
-    account_id: UUID | None = Field(default=None, alias="accountId")
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
     payment_date: date | None = Field(default=None, alias="paymentDate")
     correspondent: str | None = Field(default=None)

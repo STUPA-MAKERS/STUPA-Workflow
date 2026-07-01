@@ -257,9 +257,6 @@
       }
     }
 
-    @if (accountOptions().length) {
-      <app-select name="account" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="newAccountId()" (ngModelChange)="newAccountId.set($event)" />
-    }
 
     @if (invoiceOptions().length) {
       <app-select name="invoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="invoiceOptions()" [ngModel]="newInvoiceId()" (ngModelChange)="onPickInvoice($event)" />
@@ -311,9 +308,6 @@
       <app-select name="ecc" [label]="'expenses.field.costCentre' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="editBudgetId()" (ngModelChange)="editBudgetId.set($event)" />
     }
 
-    @if (accountOptions().length && !editing()?.parentExpenseId) {
-      <app-select name="eaccount" [label]="'expenses.field.account' | t" [placeholder]="'expenses.field.accountPlaceholder' | t" [options]="accountOptions()" [ngModel]="editAccountId()" (ngModelChange)="editAccountId.set($event)" />
-    }
 
     @if (editInvoiceOptions().length) {
       <app-select name="einvoice" [label]="'expenses.field.invoice' | t" [placeholder]="'expenses.field.invoicePlaceholder' | t" [options]="editInvoiceOptions()" [ngModel]="editInvoiceId()" (ngModelChange)="onPickEditInvoice($event)" />

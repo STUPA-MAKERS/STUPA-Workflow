@@ -802,7 +802,6 @@ async def book_expense(
     kind: Literal["expense", "income"] = "expense",
     fiscal_year_id: str | None = None,
     application_id: str | None = None,
-    account_id: str | None = None,
     invoice_date: str | None = None,
     payment_date: str | None = None,
     correspondent: str | None = None,
@@ -813,14 +812,15 @@ async def book_expense(
     invoice_id: str | None = None,
 ) -> dict:
     """Book an expense/income on a cost centre. amount = decimal string; dates ISO. Optionally
-    linked to an application, a bank account and an invoice, plus metadata (correspondent, note,
-    reference number, payment method, category, invoice/payment dates). Requires budget.manage."""
+    linked to an application and an invoice, plus metadata (correspondent, note, reference number,
+    payment method, category, invoice/payment dates). Requires budget.manage. (Das Bankkonto ist
+    kein Buchungs-Feld mehr — es wird nur beim Konten-Abgleich gesetzt, #fints-konten.)"""
     return await _api().post(
         f"/budgets/{budget_id}/expenses",
         json=_params(
             amount=amount, description=description, kind=kind,
             fiscalYearId=fiscal_year_id, applicationId=application_id,
-            accountId=account_id, invoiceDate=invoice_date, paymentDate=payment_date,
+            invoiceDate=invoice_date, paymentDate=payment_date,
             correspondent=correspondent, note=note, referenceNumber=reference_number,
             paymentMethod=payment_method, category=category, invoiceId=invoice_id,
         ),

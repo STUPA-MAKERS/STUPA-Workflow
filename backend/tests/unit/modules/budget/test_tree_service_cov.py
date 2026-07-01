@@ -452,11 +452,9 @@ async def test_book_expense_standalone_with_account_and_actor() -> None:
         gets=[acc],                   # session.get(Account, ...)
     )
     svc = BudgetTreeService(sess)
-    payload = ExpenseCreate(
-        amount=Decimal("42.00"), description="Rechnung", budgetId=node.id,
-        accountId=acc.id,
-    )
-    out = await svc.book_expense(payload, actor="u-1")
+    payload = ExpenseCreate(amount=Decimal("42.00"), description="Rechnung", budgetId=node.id)
+    # Konto ist kein Payload-Feld mehr → als expliziter Parameter (wie confirm_line, #fints-konten).
+    out = await svc.book_expense(payload, actor="u-1", account_id=acc.id)
     assert out.amount == Decimal("42.00")
     assert out.account_name == "Bank"
     assert out.actor_name == "Alice"   # display_name aufgelöst
@@ -611,18 +609,17 @@ async def test_update_expense_all_fields_with_app_and_account() -> None:
     inv = _invoice(id=uuid.uuid4())  # offen → wird beim Verknüpfen auf bezahlt gesetzt
     expense = _expense(budget_id=node.id, application_id=app.id, account_id=acc.id,
                        actor="u-1")
-    # gets: BudgetExpense, Account(validate in account_id branch), Invoice(mark paid),
-    #   then after commit: _get_node(execute), Application(get), Account(get),
-    #   _actor_names(execute)
+    # gets: BudgetExpense, Invoice(mark paid), dann nach commit: Application(get),
+    #   Account(get, Anzeige) — Konto ist KEIN Update-Feld mehr (kein Validate-get).
     sess = fake_session(
         result(),                         # _child_counts (#subbookings) — keine Kinder
         result(node),                     # _get_node(expense.budget_id) after commit
         result(("u-1", None, "bob@x")),   # _actor_names → display_name None → email
-        gets=[expense, acc, inv, app, acc],
+        gets=[expense, inv, app, acc],
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseUpdate(
-        amount=Decimal("99.00"), description="neu", accountId=acc.id,
+        amount=Decimal("99.00"), description="neu",
         invoiceDate=date(2026, 1, 2), paymentDate=date(2026, 1, 3),
         correspondent="ACME", note="n", referenceNumber="R9",
         paymentMethod="bar", category="Reise", invoiceId=inv.id,
@@ -638,14 +635,14 @@ async def test_update_expense_all_fields_with_app_and_account() -> None:
 async def test_update_expense_clears_account_no_app() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     expense = _expense(budget_id=node.id, application_id=None, account_id=None, actor=None)
-    # account_id set to None in payload → _validate_account(None) returns None (no get)
+    # Konto ist kein Update-Feld mehr → kein Validate-get; Buchung ohne Konto bleibt kontolos.
     sess = fake_session(
         result(node),   # _get_node after commit
         result(),       # _actor_names (no actor)
         gets=[expense],
     )
     svc = BudgetTreeService(sess)
-    payload = ExpenseUpdate(accountId=None, note=None)
+    payload = ExpenseUpdate(note=None)
     out = await svc.update_expense(expense.id, payload)
     assert out.account_id is None
     assert out.account_name is None

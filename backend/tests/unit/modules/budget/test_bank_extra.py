@@ -186,7 +186,9 @@ async def test_confirm_line_description_override(monkeypatch: pytest.MonkeyPatch
     session.put(line)
     seen: dict[str, Any] = {}
 
-    async def _book(self: Any, payload: Any, *, actor: str, commit: bool = True) -> ExpenseOut:
+    async def _book(
+        self: Any, payload: Any, *, actor: str, commit: bool = True, account_id: Any = None
+    ) -> ExpenseOut:
         seen["description"] = payload.description
         return ExpenseOut(
             id=uuid.uuid4(), budgetId=uuid.uuid4(), fiscalYearId=uuid.uuid4(),
@@ -567,7 +569,9 @@ async def test_confirm_line_booking_failure_reverts_claim(monkeypatch: pytest.Mo
     line = _line()
     session.put(line)
 
-    async def _boom(self: Any, payload: Any, *, actor: str, commit: bool = True) -> Any:
+    async def _boom(
+        self: Any, payload: Any, *, actor: str, commit: bool = True, account_id: Any = None
+    ) -> Any:
         raise RuntimeError("budget gone")
 
     monkeypatch.setattr(BudgetTreeService, "book_expense", _boom)

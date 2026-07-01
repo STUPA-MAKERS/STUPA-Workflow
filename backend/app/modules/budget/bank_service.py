@@ -923,9 +923,6 @@ class BankService:
                         kind=kind,  # type: ignore[arg-type]
                         budgetId=payload.budget_id,
                         fiscalYearId=payload.fiscal_year_id,
-                        # Konto des Umsatzes auf die Buchung übernehmen (#fints) — sonst bleibt
-                        # das Feld „Konto" leer, obwohl der Umsatz von einem Bankkonto stammt.
-                        accountId=line.account_id,
                         correspondent=clean_name,
                         note=self._booking_note(line, kind, name=clean_name, iban=clean_iban),
                         paymentDate=line.value_date or line.booking_date,
@@ -933,6 +930,9 @@ class BankService:
                         paymentMethod="ueberweisung",
                     ),
                     actor=self.actor or "",
+                    # Konto des Umsatzes auf die Buchung übernehmen (#fints) — kein manuelles Feld
+                    # mehr, daher explizit hier durchgereicht.
+                    account_id=line.account_id,
                     commit=False,  # gemeinsame Transaktion — der Commit unten ist der einzige
                 )
                 expense_out = created
