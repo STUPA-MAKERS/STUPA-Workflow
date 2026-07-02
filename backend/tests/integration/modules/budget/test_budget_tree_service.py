@@ -151,7 +151,8 @@ async def test_account_and_transfer(session: AsyncSession) -> None:
     b = await svc.create_node(BudgetNodeCreate(key="02", name="B", parentId=top.id))
     fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
 
-    # Konto (Name + IBAN-Freitext), nicht an Kostenstellen gebunden.
+    # Konto (Name + IBAN-Freitext), nicht an Kostenstellen gebunden. Kein manuelles
+    # Buchungs-Feld mehr: das Konto wird nur vom Konten-Abgleich gesetzt (#fints-konten).
     acc = await svc.create_account(AccountCreate(name="Giro", iban="DE-frei-text"))
     assert acc.name == "Giro"
     booking = await svc.book_expense(
@@ -160,11 +161,10 @@ async def test_account_and_transfer(session: AsyncSession) -> None:
             fiscalYearId=fy.id,
             amount=Decimal("50"),
             description="mit Konto",
-            accountId=acc.id,
         ),
         actor="tester",
     )
-    assert booking.account_id == acc.id and booking.account_name == "Giro"
+    assert booking.account_id is None and booking.account_name is None
 
     # Übertrag A → B (200): Ausgabe auf A + Einnahme auf B, gleiches HHJ.
     transfer = await svc.create_transfer(

@@ -7,9 +7,17 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from app.modules.budget.bank_maintenance import dedup_staged_lines
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Connection
+
+
+def _dedup(conn: _FakeConn) -> int:
+    """Den Stub als synchrone ``Connection`` durchreichen (Duck-Typing, nur ``execute``)."""
+    return dedup_staged_lines(cast("Connection", conn))
 
 
 class _Result:
@@ -61,7 +69,7 @@ def test_dedup_collapses_matched_unmatched_twin_keeps_booked() -> None:
         _row("b1", "unmatched", {"purpose": "Aufwand", "applicant_name": "Bob"}, acc=acc),
     ]
     conn = _FakeConn(rows)
-    deleted = dedup_staged_lines(conn)
+    deleted = _dedup(conn)
     assert deleted == 1
     assert conn.deleted == ["u1"]            # ungebuchte Dublette gelöscht
     assert [u[0] for u in conn.updated] == ["m1"]  # gebuchte behalten + neu verschlüsselt
@@ -77,7 +85,7 @@ def test_dedup_keeps_oldest_when_no_matched() -> None:
         _row("new", "suggested", {**raw, "booking_time": "11:15"}, acc=acc, created=2),
     ]
     conn = _FakeConn(rows)
-    assert dedup_staged_lines(conn) == 1
+    assert _dedup(conn) == 1
     assert conn.deleted == ["new"]           # jüngere Dublette weg, älteste bleibt
     assert [u[0] for u in conn.updated] == ["old"]
 
@@ -86,5 +94,5 @@ def test_dedup_noop_without_duplicates() -> None:
     acc = uuid.uuid4()
     rows = [_row("x", "matched", {"purpose": "X", "applicant_name": "Solo"}, acc=acc)]
     conn = _FakeConn(rows)
-    assert dedup_staged_lines(conn) == 0
+    assert _dedup(conn) == 0
     assert conn.deleted == []
