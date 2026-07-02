@@ -808,7 +808,7 @@ async def test_actionable_vote_state_with_gremium() -> None:
     state = State(kind="vote", config={"gremiumId": gid})
     session = FakeSession(scalars=[["v@x.de"]])
     out = await actionable_principal_emails(
-        cast(AsyncSession, session), state=state, gremium_id=None
+        cast(AsyncSession, session), application_id=uuid.uuid4(), state=state
     )
     assert out == ["v@x.de"]
 
@@ -818,7 +818,7 @@ async def test_actionable_vote_state_without_gremium_returns_empty() -> None:
 
     state = State(kind="vote", config={})  # kein gremiumId
     out = await actionable_principal_emails(
-        cast(AsyncSession, FakeSession()), state=state, gremium_id=None
+        cast(AsyncSession, FakeSession()), application_id=uuid.uuid4(), state=state
     )
     assert out == []
 
@@ -828,29 +828,9 @@ async def test_actionable_vote_state_config_not_dict() -> None:
 
     state = State(kind="vote", config=None)  # config kein dict → {}
     out = await actionable_principal_emails(
-        cast(AsyncSession, FakeSession()), state=state, gremium_id=None
+        cast(AsyncSession, FakeSession()), application_id=uuid.uuid4(), state=state
     )
     assert out == []
-
-
-async def test_actionable_non_vote_state_queries_roles() -> None:
-    from app.modules.flow.models import State
-
-    state = State(kind="normal", config={})
-    session = FakeSession(scalars=[["t@x.de", "T@X.de", None]])
-    out = await actionable_principal_emails(
-        cast(AsyncSession, session), state=state, gremium_id=uuid.uuid4()
-    )
-    # dedupliziert (case-sensitiv set) + sortiert, leere raus.
-    assert out == ["T@X.de", "t@x.de"]
-
-
-async def test_actionable_state_none_falls_through_to_role_query() -> None:
-    session = FakeSession(scalars=[["x@x.de"]])
-    out = await actionable_principal_emails(
-        cast(AsyncSession, session), state=None, gremium_id=None
-    )
-    assert out == ["x@x.de"]
 
 
 async def test_state_actionable_none_false() -> None:

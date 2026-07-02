@@ -200,16 +200,14 @@ async def _remind_one(
 ) -> bool:
     app_row = (
         await session.execute(
-            select(Application.data, Application.gremium_id).where(
-                Application.id == application_id
-            )
+            select(Application.data).where(Application.id == application_id)
         )
     ).first()
     if app_row is None:
         return False
-    data, gremium_id = app_row
+    (data,) = app_row
     recipients = await actionable_principal_emails(
-        session, state=state, gremium_id=gremium_id
+        session, application_id=application_id, state=state
     )
     if not recipients:
         return False

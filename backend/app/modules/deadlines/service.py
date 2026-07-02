@@ -13,7 +13,7 @@ Wiederholung über Worker-Neustarts hinweg.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -191,6 +191,26 @@ class DeadlineService:
         """Erinnerung als versandt markieren (``reminded_at=now``) + committen."""
         deadline.reminded_at = now
         await self.session.commit()
+
+
+async def flow_deadline_passed(session: AsyncSession, application_id: UUID) -> bool:
+    """Return whether a (possibly already consumed) flow deadline is due.
+
+    Flow deadlines always belong to the application's current state — the flow
+    engine clears them on every state change (``schedule_state_deadline``), so a
+    due row means the *current* state's deadline has passed. Shared by
+    ``FlowService._deadline_passed`` and the task-mail recipient resolution.
+    """
+    row = await session.scalar(
+        select(Deadline.id)
+        .where(
+            Deadline.application_id == application_id,
+            Deadline.kind == "flow_deadline",
+            Deadline.due_at <= datetime.now(UTC),
+        )
+        .limit(1)
+    )
+    return row is not None
 
 
 def resolve_due_at(

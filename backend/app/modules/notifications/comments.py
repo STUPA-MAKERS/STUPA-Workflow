@@ -6,8 +6,8 @@ Zwei Richtungen, je nach Autor des Kommentars:
   (interne Kommentare lösen bewusst NICHTS aus — Antragsteller sehen sie nie).
 * **Antragsteller kommentiert** → Mail an alle, die am aktuellen State handeln
   können (Task-Semantik, #64): bei ``vote``-States die Mitglieder des
-  abstimmenden Gremiums, sonst Inhaber:innen einer Rolle mit
-  ``application.transition`` (global oder im Gremium des Antrags) sowie Admins.
+  abstimmenden Gremiums, sonst genau die Principals, für die mindestens ein
+  manueller ``requires_action``-Übergang tatsächlich feuerbar ist.
 
 Beide Wege respektieren die Abwahl der Art ``comment`` (#4-2) und nutzen die
 DB-Templates ``comment_applicant``/``comment_team`` (Builtin-Fallback).
@@ -93,13 +93,12 @@ async def send_comment_notifications(
             select(
                 Application.data,
                 Application.current_state_id,
-                Application.gremium_id,
             ).where(Application.id == application_id)
         )
     ).first()
     if app_row is None:
         return 0
-    data, state_id, gremium_id = app_row
+    data, state_id = app_row
     title = (data or {}).get("title")
     service = NotificationService(session, queue=queue, settings=settings)
 
@@ -128,7 +127,7 @@ async def send_comment_notifications(
         builtin = (_BUILTIN_APPLICANT_SUBJECT, _BUILTIN_APPLICANT_BODY)
     else:
         recipients = await actionable_principal_emails(
-            session, state=state, gremium_id=gremium_id
+            session, application_id=application_id, state=state
         )
         template_key = TEAM_TEMPLATE_KEY
         builtin = (_BUILTIN_TEAM_SUBJECT, _BUILTIN_TEAM_BODY)

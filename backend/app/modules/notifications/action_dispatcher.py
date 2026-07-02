@@ -114,13 +114,12 @@ class NotificationActionDispatcher:
                     select(
                         Application.data,
                         Application.current_state_id,
-                        Application.gremium_id,
                     ).where(Application.id == action.application_id)
                 )
             ).first()
             if row is None:
                 return
-            data, state_id, gremium_id = row
+            data, state_id = row
             state = (
                 await session.scalar(select(State).where(State.id == state_id))
                 if state_id is not None
@@ -132,7 +131,7 @@ class NotificationActionDispatcher:
             if not await state_actionable(session, state):
                 return
             recipients = await actionable_principal_emails(
-                session, state=state, gremium_id=gremium_id
+                session, application_id=action.application_id, state=state
             )
             if not recipients:
                 return

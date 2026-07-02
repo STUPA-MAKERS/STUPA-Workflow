@@ -59,7 +59,9 @@ def _ctx(session: FakeSession, queue: FakeQueue) -> dict[str, Any]:
 
 @pytest.fixture(autouse=True)
 def _patch_recipients(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_actionable(session: Any, *, state: Any, gremium_id: Any) -> list[str]:
+    async def fake_actionable(
+        session: Any, *, application_id: Any, state: Any
+    ) -> list[str]:
         return ["team@x.de"]
 
     monkeypatch.setattr(mod, "actionable_principal_emails", fake_actionable)
@@ -80,7 +82,7 @@ async def test_stale_application_gets_reminder() -> None:
     session = FakeSession(
         executes=[
             [(app_id, state.id, entered)],  # due-Kandidaten
-            [({"title": "Beamer"}, None)],  # _remind_one: Antrag
+            [({"title": "Beamer"},)],  # _remind_one: Antrag
         ],
         scalars=[
             [state],  # States
@@ -140,7 +142,7 @@ async def test_repeat_mode_reminds_again_after_interval() -> None:
     session = FakeSession(
         executes=[
             [(app_id, state.id, NOW - timedelta(days=20))],
-            [({"title": "Beamer"}, None)],
+            [({"title": "Beamer"},)],
         ],
         scalars=[[state], [log], [], []],
         scalar=[1, event_id],
@@ -159,7 +161,7 @@ async def test_vote_state_counts_as_actionable() -> None:
     session = FakeSession(
         executes=[
             [(app_id, state.id, NOW - timedelta(days=6))],
-            [({}, None)],
+            [({},)],
         ],
         # vote-State → kein Transition-Count-scalar nötig
         scalars=[[state], [], [], []],

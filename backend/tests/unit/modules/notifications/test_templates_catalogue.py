@@ -12,6 +12,8 @@ from app.modules.notifications import action_dispatcher, auto, comments
 from app.modules.notifications import service as svc
 from app.modules.notifications.templates_catalogue import (
     CATALOGUE_BY_KEY,
+    STATUS_UPDATE_TEAM_BODY,
+    STATUS_UPDATE_TEAM_SUBJECT,
     TEMPLATE_CATALOGUE,
 )
 
@@ -38,6 +40,18 @@ def test_builtins_are_shared_objects() -> None:
     assert CATALOGUE_BY_KEY["role_revoked"].body_i18n is auto._BUILTIN_ROLE_REVOKED_BODY  # noqa: SLF001
 
 
+def test_status_update_team_mirrors_status_update() -> None:
+    # Committee-facing default of the notify action (bug #2): same kind and
+    # placeholder set as `status_update`, backed by the single-source builtins.
+    team = CATALOGUE_BY_KEY["status_update_team"]
+    base = CATALOGUE_BY_KEY["status_update"]
+    assert team.kind == "status_update"
+    assert set(team.placeholders) == set(base.placeholders)
+    assert team.subject_i18n is STATUS_UPDATE_TEAM_SUBJECT
+    assert team.body_i18n is STATUS_UPDATE_TEAM_BODY
+    assert team.key == svc.TEAM_NOTIFY_TEMPLATE_KEY
+
+
 def test_worker_reminder_uses_catalogue() -> None:
     import worker.task_reminders as tr
 
@@ -48,6 +62,7 @@ def test_all_sent_keys_are_catalogued() -> None:
     # Jeder real versendete template_key (siehe Versender) muss editierbar sein.
     sent = {
         "status_update",
+        "status_update_team",
         "task_new",
         "task_reminder",
         "deadline_approaching",

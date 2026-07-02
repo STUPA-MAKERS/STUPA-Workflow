@@ -47,7 +47,7 @@ def _patch_service(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _app_row(title: str | None = "Beamer") -> list[Any]:
     data = {"title": title} if title else {}
-    return [(data, None, None)]
+    return [(data, None)]
 
 
 async def test_principal_public_comment_mails_applicant() -> None:
@@ -93,7 +93,9 @@ async def test_internal_comment_sends_nothing() -> None:
 async def test_applicant_comment_mails_actionable_team(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_actionable(session: Any, *, state: Any, gremium_id: Any) -> list[str]:
+    async def fake_actionable(
+        session: Any, *, application_id: Any, state: Any
+    ) -> list[str]:
         return ["team@x.de", "vorstand@x.de"]
 
     monkeypatch.setattr(mod, "actionable_principal_emails", fake_actionable)

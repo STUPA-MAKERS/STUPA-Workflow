@@ -16,6 +16,7 @@ Antrag + auslösendem Principal + abgeleiteten Fakten (#28-Redesign):
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -116,6 +117,67 @@ async def _field_types(session: AsyncSession, app: Application) -> dict[str, str
     return types
 
 
+async def build_base_context(
+    session: AsyncSession,
+    app: Application,
+    *,
+    manual: bool,
+    deadline_passed: bool = False,
+) -> GuardContext:
+    """Build the actor-free part of the guard context from DB + application (I/O).
+
+    Contains every fact derived from the application alone (applicant, budget,
+    fields, deadline). Actor fields stay at their empty defaults — overlay them
+    per actor with :func:`with_actor`.
+    """
+    raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
+    applicant_roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
+    applicant_committees = await _committees_for_sub(session, app.created_by)
+    # Fields (built-in amount + form data).
+    field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}
+    field_values["amount"] = app.amount
+    field_types = await _field_types(session, app)
+
+    return GuardContext(
+        manual=manual,
+        deadline_passed=deadline_passed,
+        applicant_roles=applicant_roles,
+        applicant_committees=applicant_committees,
+        budget_id=str(app.budget_id) if app.budget_id is not None else None,
+        budget_fits=await _budget_fits(session, app),
+        field_values=field_values,
+        field_types=field_types,
+    )
+
+
+def with_actor(
+    ctx: GuardContext,
+    *,
+    roles: frozenset[str],
+    committees: frozenset[str],
+    is_applicant: bool,
+) -> GuardContext:
+    """Overlay actor facts on a base context (pure, no I/O).
+
+    Actor gates only apply to manual transitions: on a non-manual context the
+    actor fields stay empty regardless of the arguments (fail-closed, same
+    semantics as the former monolithic ``build_context``).
+    """
+    if not ctx.manual:
+        return replace(
+            ctx,
+            roles=frozenset(),
+            actor_committees=frozenset(),
+            actor_is_applicant=False,
+        )
+    return replace(
+        ctx,
+        roles=roles,
+        actor_committees=committees,
+        actor_is_applicant=is_applicant,
+    )
+
+
 async def build_context(
     session: AsyncSession,
     app: Application,
@@ -130,34 +192,19 @@ async def build_context(
     ``as_applicant=True`` markiert den Magic-Link-Antragsteller als Akteur
     (``actorIsApplicant`` greift), unabhängig von ``created_by`` — der Link-Inhaber
     *ist* die Antragsteller:in für genau diesen Antrag (#applicant-actions)."""
+    base = await build_base_context(
+        session, app, manual=manual, deadline_passed=deadline_passed
+    )
     # Akteur (nur manuelle Übergänge nutzen die Akteur-Gates).
     actor_committees = (
         await _committees_for_sub(session, principal.sub) if manual else frozenset()
     )
-    # Antragsteller.
-    raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
-    applicant_roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
-    applicant_committees = await _committees_for_sub(session, app.created_by)
     # Akteur ist Antragsteller:in: Magic-Link-Inhaber:in (as_applicant) **oder**
     # eingeloggte:r Ersteller:in, die/der selbst auslöst (#guard).
-    actor_is_applicant = manual and (
-        as_applicant or (app.created_by is not None and principal.sub == app.created_by)
-    )
-    # Felder (Built-in amount + Formulardaten).
-    field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}
-    field_values["amount"] = app.amount
-    field_types = await _field_types(session, app)
-
-    return GuardContext(
-        manual=manual,
-        deadline_passed=deadline_passed,
-        actor_is_applicant=actor_is_applicant,
-        roles=frozenset(principal.roles) if manual else frozenset(),
-        actor_committees=actor_committees,
-        applicant_roles=applicant_roles,
-        applicant_committees=applicant_committees,
-        budget_id=str(app.budget_id) if app.budget_id is not None else None,
-        budget_fits=await _budget_fits(session, app),
-        field_values=field_values,
-        field_types=field_types,
+    return with_actor(
+        base,
+        roles=frozenset(principal.roles),
+        committees=actor_committees,
+        is_applicant=as_applicant
+        or (app.created_by is not None and principal.sub == app.created_by),
     )
