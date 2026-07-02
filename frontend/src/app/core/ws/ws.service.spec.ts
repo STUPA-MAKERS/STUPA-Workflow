@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { WsService } from './ws.service';
 import type { ServerMessage } from './ws-messages';
+import { createLocationMock, provideLocationMock } from '../../../testing/location-mock';
 
 /** Minimaler WebSocket-Mock, der Event-Listener erfasst und manuell feuert. */
 class MockWebSocket {
@@ -47,7 +48,11 @@ describe('WsService', () => {
     MockWebSocket.instances = [];
     MockWebSocket.startState = MockWebSocket.OPEN;
     (globalThis as { WebSocket: unknown }).WebSocket = MockWebSocket;
-    svc = TestBed.configureTestingModule({}).inject(WsService);
+    // `LOCATION` per DI mocken (#jest30) — jsdom ≥26 lässt `window.location`
+    // nicht mehr umdefinieren. Default: http://localhost.
+    svc = TestBed.configureTestingModule({
+      providers: [provideLocationMock(createLocationMock())],
+    }).inject(WsService);
   });
 
   afterEach(() => {
@@ -142,25 +147,21 @@ describe('WsService', () => {
     expect(closeSpy).toHaveBeenCalled();
   });
 
+  /** Frischer Service mit eigener `LOCATION` (Protokoll/Host pro Test). */
+  function serviceAt(protocol: string, host: string): WsService {
+    TestBed.resetTestingModule();
+    return TestBed.configureTestingModule({
+      providers: [provideLocationMock(createLocationMock({ protocol, host }))],
+    }).inject(WsService);
+  }
+
   it('uses the wss scheme on https origins', () => {
-    const original = window.location;
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { ...original, protocol: 'https:', host: 'example.org' },
-    });
-    svc.connectMeeting('m-secure');
+    serviceAt('https:', 'example.org').connectMeeting('m-secure');
     expect(MockWebSocket.instances[0].url).toBe('wss://example.org/api/ws/meetings/m-secure');
-    Object.defineProperty(window, 'location', { configurable: true, value: original });
   });
 
   it('uses the ws scheme on http origins', () => {
-    const original = window.location;
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { ...original, protocol: 'http:', host: 'example.org' },
-    });
-    svc.connectMeeting('m-plain');
+    serviceAt('http:', 'example.org').connectMeeting('m-plain');
     expect(MockWebSocket.instances[0].url).toBe('ws://example.org/api/ws/meetings/m-plain');
-    Object.defineProperty(window, 'location', { configurable: true, value: original });
   });
 });

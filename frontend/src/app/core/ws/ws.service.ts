@@ -1,5 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
+import { LOCATION } from '../browser/location.token';
 import type { ClientMessage, ServerMessage } from './ws-messages';
 
 /** Stellt eine offene Live-Vote-Verbindung dar (api.md §4). */
@@ -18,6 +19,8 @@ export interface MeetingChannel {
  */
 @Injectable({ providedIn: 'root' })
 export class WsService {
+  private readonly location = inject(LOCATION);
+
   /** Öffnet `/api/ws/meetings/{id}` (oder `…/beamer` read-only). */
   connectMeeting(meetingId: string, beamer = false): MeetingChannel {
     const suffix = beamer ? '/beamer' : '';
@@ -61,7 +64,7 @@ export class WsService {
 
   /** Baut die ws(s)-URL relativ zum aktuellen Origin. */
   private url(path: string): string {
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${proto}://${window.location.host}${path}`;
+    const proto = this.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${proto}://${this.location.host}${path}`;
   }
 }

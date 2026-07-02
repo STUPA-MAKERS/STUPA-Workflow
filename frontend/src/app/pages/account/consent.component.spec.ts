@@ -2,7 +2,11 @@ import { of, throwError } from 'rxjs';
 import { render, screen, fireEvent } from '@testing-library/angular';
 import { ApiClient } from '@core/api/api-client.service';
 import type { ConsentRequest } from '@core/api/models';
-import { mockWindowLocation, type LocationMock } from '../../../testing/location-mock';
+import {
+  createLocationMock,
+  provideLocationMock,
+  type LocationMock,
+} from '../../../testing/location-mock';
 import { OAuthConsentComponent } from './consent.component';
 
 const REQ: ConsentRequest = {
@@ -31,9 +35,11 @@ function makeApi(o: ApiOverrides = {}) {
   };
 }
 
+let loc: LocationMock;
+
 async function setup(api = makeApi()) {
   const view = await render(OAuthConsentComponent, {
-    providers: [{ provide: ApiClient, useValue: api }],
+    providers: [{ provide: ApiClient, useValue: api }, provideLocationMock(loc)],
   });
   await view.fixture.whenStable();
   view.fixture.detectChanges();
@@ -42,12 +48,10 @@ async function setup(api = makeApi()) {
 }
 
 describe('OAuthConsentComponent (#MCP)', () => {
-  let loc: LocationMock;
   beforeEach(() => {
     localStorage.setItem('ap.locale', 'de');
-    loc = mockWindowLocation();
+    loc = createLocationMock();
   });
-  afterEach(() => loc.restore());
 
   it('loads the request, preselects every requested scope and the default lifetime', async () => {
     const { api, cmp } = await setup();

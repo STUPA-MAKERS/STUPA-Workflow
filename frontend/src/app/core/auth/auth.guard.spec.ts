@@ -15,7 +15,11 @@ import { authGuard } from './auth.guard';
 import { USE_MOCK_API } from '../api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { Principal } from '../api/models';
-import { mockWindowLocation, type LocationMock } from '../../../testing/location-mock';
+import {
+  createLocationMock,
+  provideLocationMock,
+  type LocationMock,
+} from '../../../testing/location-mock';
 
 const MEMBER: Principal = {
   sub: '1',
@@ -32,22 +36,22 @@ describe('authGuard', () => {
   let assign: jest.Mock<void, [string]>;
 
   beforeEach(() => {
+    location = createLocationMock();
+    assign = location.assign;
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
+        provideLocationMock(location),
       ],
     });
     http = TestBed.inject(HttpTestingController);
-    location = mockWindowLocation();
-    assign = location.assign;
   });
 
   afterEach(() => {
     http.verify();
-    location.restore();
   });
 
   /** Führt den Guard aus, flusht den `/me`-Probe und liefert das Ergebnis. */

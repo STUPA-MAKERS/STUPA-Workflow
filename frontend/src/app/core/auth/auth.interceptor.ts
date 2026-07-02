@@ -2,6 +2,7 @@ import { type HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http'
 import { inject } from '@angular/core';
 import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { LOCATION } from '../browser/location.token';
 import { AuthService } from './auth.service';
 
 /** Double-Submit-CSRF: Cookie (lesbar) → gespiegelt im Header (security.md §10). */
@@ -14,12 +15,12 @@ const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * würden Credentials an Fremd-Hosts leaken. Relative URLs (`/api/...`) sind per
  * Definition same-origin; absolute URLs müssen den Browser-Origin exakt treffen.
  */
-function isSameOriginApi(url: string): boolean {
+function isSameOriginApi(url: string, origin: string): boolean {
   if (url.startsWith('/api/')) return true;
   if (/^https?:\/\//i.test(url)) {
     try {
       const parsed = new URL(url);
-      return parsed.origin === window.location.origin && parsed.pathname.startsWith('/api/');
+      return parsed.origin === origin && parsed.pathname.startsWith('/api/');
     } catch {
       return false;
     }
@@ -49,7 +50,7 @@ function readCookie(name: string): string | null {
  * Fremd-Origins bleiben unangetastet — keine Credentials/Header nach außen.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  if (!isSameOriginApi(req.url)) return next(req);
+  if (!isSameOriginApi(req.url, inject(LOCATION).origin)) return next(req);
 
   const auth = inject(AuthService);
   const csrfToken = UNSAFE_METHODS.has(req.method) ? readCookie(CSRF_COOKIE) : null;

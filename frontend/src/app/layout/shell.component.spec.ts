@@ -13,6 +13,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { Principal } from '@core/api/models';
+import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
 
 const MEMBER: Principal = {
   sub: '1',
@@ -37,12 +38,16 @@ const wideRoutes = [
 ];
 
 async function setup() {
+  // `LOCATION` per DI mocken (#jest30): ein Pfad zu `location.reload()` darf
+  // nie das echte (unveränderliche) jsdom-Location treffen.
+  const location = createLocationMock();
   const view = await render(ShellComponent, {
     providers: [
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
+      provideLocationMock(location),
     ],
   });
   const auth = view.fixture.debugElement.injector.get(AuthService);
@@ -59,7 +64,7 @@ async function setup() {
         hasDraftChanges: false,
       }),
     );
-  return { ...view, auth, http };
+  return { ...view, auth, http, location };
 }
 
 /** Authentifiziert den Principal und triggert die Nav-Sichtbarkeit. */
@@ -165,6 +170,7 @@ describe('ShellComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
+        provideLocationMock(createLocationMock()),
       ],
     });
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
@@ -283,6 +289,7 @@ describe('ShellComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
+        provideLocationMock(createLocationMock()),
       ],
     });
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
@@ -321,6 +328,7 @@ describe('ShellComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
+        provideLocationMock(createLocationMock()),
       ],
     });
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
@@ -342,6 +350,7 @@ describe('ShellComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
+        provideLocationMock(createLocationMock()),
       ],
     });
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
@@ -360,17 +369,10 @@ describe('ShellComponent', () => {
   });
 
   it('reloadForLocale reloads when window is available', async () => {
-    const { fixture, http } = await setup();
+    const { fixture, http, location } = await setup();
     const cmp = fixture.componentInstance as unknown as { reloadForLocale: () => void };
-    const reloadFn = jest.fn();
-    const original = window.location;
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { ...original, reload: reloadFn },
-    });
     cmp.reloadForLocale();
-    expect(reloadFn).toHaveBeenCalled();
-    Object.defineProperty(window, 'location', { configurable: true, value: original });
+    expect(location.reload).toHaveBeenCalled();
     http.verify();
   });
 });

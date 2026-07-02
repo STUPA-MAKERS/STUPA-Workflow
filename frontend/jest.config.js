@@ -3,6 +3,11 @@ module.exports = {
   preset: 'jest-preset-angular',
   setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
   testEnvironment: 'jsdom',
+  // Jest 30 + jsdom 26 brauchen deutlich mehr RAM pro Worker (#jest30). Kappen,
+  // sonst frisst die volle Suite auf breiten Maschinen den Speicher (OOM):
+  // halbe Kernzahl + Worker-Neustart oberhalb 1 GB Leerlauf-RSS.
+  maxWorkers: '50%',
+  workerIdleMemoryLimit: '1GB',
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.spec.ts'],
   moduleNameMapper: {
