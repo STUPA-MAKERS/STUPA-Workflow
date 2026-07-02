@@ -697,7 +697,9 @@ def _tr_ctx(session: Any, queue: FakeQueue) -> dict[str, Any]:
 
 @pytest.fixture
 def _patch_recipients(monkeypatch: pytest.MonkeyPatch) -> Any:
-    async def fake_actionable(_session: Any, *, state: Any, gremium_id: Any) -> list[str]:
+    async def fake_actionable(
+        _session: Any, *, application_id: Any, state: Any
+    ) -> list[str]:
         return ["team@x.de"]
 
     monkeypatch.setattr(wtr, "actionable_principal_emails", fake_actionable)
@@ -784,7 +786,7 @@ async def test_tr_remind_one_app_missing(_patch_recipients: None) -> None:
 
 async def test_tr_remind_one_no_recipients(monkeypatch: pytest.MonkeyPatch) -> None:
     # actionable_principal_emails liefert [] → _remind_one False (Zeile 215).
-    async def empty(_s: Any, *, state: Any, gremium_id: Any) -> list[str]:
+    async def empty(_s: Any, *, application_id: Any, state: Any) -> list[str]:
         return []
 
     monkeypatch.setattr(wtr, "actionable_principal_emails", empty)
@@ -793,7 +795,7 @@ async def test_tr_remind_one_no_recipients(monkeypatch: pytest.MonkeyPatch) -> N
     session = NotifFakeSession(
         executes=[
             [(app_id, state.id, NOW - timedelta(days=6))],
-            [({"title": "X"}, None)],  # Antrag (data, gremium_id)
+            [({"title": "X"},)],  # Antrag (data,)
         ],
         scalars=[[state], []],
         scalar=[1, event_id],
@@ -810,7 +812,7 @@ async def test_tr_label_fallback_other_lang(_patch_recipients: None) -> None:
     session = NotifFakeSession(
         executes=[
             [(app_id, state.id, NOW - timedelta(days=6))],
-            [({"title": "Beamer"}, None)],
+            [({"title": "Beamer"},)],
         ],
         scalars=[[state], [], [], []],
         scalar=[1, event_id],
@@ -828,7 +830,7 @@ async def test_tr_empty_label_i18n_no_status(_patch_recipients: None) -> None:
     session = NotifFakeSession(
         executes=[
             [(app_id, state.id, NOW - timedelta(days=6))],
-            [({"title": "Beamer"}, None)],
+            [({"title": "Beamer"},)],
         ],
         scalars=[[state], [], [], []],
         scalar=[1, event_id],
@@ -845,7 +847,7 @@ async def test_tr_non_string_title(_patch_recipients: None) -> None:
     session = NotifFakeSession(
         executes=[
             [(app_id, state.id, NOW - timedelta(days=6))],
-            [({"title": 123}, None)],
+            [({"title": 123},)],
         ],
         scalars=[[state], [], [], []],
         scalar=[1, event_id],
@@ -860,7 +862,9 @@ async def test_tr_per_app_failure_isolated(monkeypatch: pytest.MonkeyPatch) -> N
     async def boom(*_a: Any, **_k: Any) -> bool:
         raise RuntimeError("remind broke")
 
-    async def fake_actionable(_s: Any, *, state: Any, gremium_id: Any) -> list[str]:
+    async def fake_actionable(
+        _s: Any, *, application_id: Any, state: Any
+    ) -> list[str]:
         return ["team@x.de"]
 
     monkeypatch.setattr(wtr, "actionable_principal_emails", fake_actionable)
@@ -882,7 +886,7 @@ async def test_tr_loads_settings_and_default_now(monkeypatch: pytest.MonkeyPatch
     # ctx ohne settings + now=None → load_settings() + datetime.now(UTC)-Pfade.
     monkeypatch.setattr(wtr, "load_settings", lambda: SETTINGS)
 
-    async def empty(_s: Any, *, state: Any, gremium_id: Any) -> list[str]:
+    async def empty(_s: Any, *, application_id: Any, state: Any) -> list[str]:
         return []
 
     monkeypatch.setattr(wtr, "actionable_principal_emails", empty)
@@ -927,7 +931,7 @@ async def test_tr_repeat_mode_updates_existing_log(_patch_recipients: None) -> N
     session = NotifFakeSession(
         executes=[
             [(app_id, state.id, NOW - timedelta(days=20))],
-            [({"title": "Beamer"}, None)],
+            [({"title": "Beamer"},)],
         ],
         scalars=[[state], [log], [], []],
         scalar=[1, event_id],

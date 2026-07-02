@@ -69,6 +69,9 @@ _BUILTIN_MAGIC_LINK_BODY = {
 # Flow-Editor speichert die Action oft nur mit Empfängern). Existiert das Template
 # nicht, greift der var-freie Builtin-Fallback (StrictUndefined-sicher).
 DEFAULT_NOTIFY_TEMPLATE_KEY = "status_update"
+# Committee-facing default for non-applicant recipients of a `notify` action
+# without an explicit templateKey (bug #2) — applicants keep `status_update`.
+TEAM_NOTIFY_TEMPLATE_KEY = "status_update_team"
 _BUILTIN_NOTIFY_SUBJECT = {
     "de": "Aktualisierung zu Ihrem Antrag",
     "en": "Update on your application",
@@ -446,24 +449,66 @@ class NotificationService:
 
         Ad-hoc-Modus: ``{"type":"notify","templateKey":"...","recipients":[...]}``.
         """
-        # Ohne explizites `templateKey` (Flow-Editor speichert die Action häufig nur mit
-        # Empfängern) das Default-Template `status_update` nutzen — sonst würde jede
-        # notify-Action still verworfen (Ursache »keine Mails«).
-        template_key = (
-            action.get("templateKey")
-            or action.get("template_key")
-            or DEFAULT_NOTIFY_TEMPLATE_KEY
-        )
+        specs = _as_specs(action.get("recipients", []))
+        # Builtin-/Status-Templates referenzieren Titel + Status; nicht jeder
+        # Aufrufer (Deadline-Worker, Alt-Flows) liefert sie → leere Defaults,
+        # damit StrictUndefined nicht den Versand kippt.
+        context = dict(context or {})
+        context.setdefault("applicationTitle", "")
+        context.setdefault("status", "")
+        template_key = action.get("templateKey") or action.get("template_key")
+        if template_key:
+            return await self._notify_send(
+                template_key=str(template_key),
+                specs=specs,
+                application_id=application_id,
+                context=context,
+                lang=lang,
+                idempotency_base=idempotency_base,
+            )
+        # No explicit templateKey (the flow editor often stores the action with
+        # recipients only): applicants get the applicant-facing default, every
+        # other recipient kind the committee-facing wording (bug #2). The
+        # template key is part of the idempotency parts, so the two sends get
+        # distinct keys.
+        applicant_specs = [s for s in specs if s.get("kind") == "applicant"]
+        team_specs = [s for s in specs if s.get("kind") != "applicant"]
+        count = 0
+        for partition_key, partition in (
+            (DEFAULT_NOTIFY_TEMPLATE_KEY, applicant_specs),
+            (TEAM_NOTIFY_TEMPLATE_KEY, team_specs),
+        ):
+            if not partition:
+                continue
+            count += await self._notify_send(
+                template_key=partition_key,
+                specs=partition,
+                application_id=application_id,
+                context=context,
+                lang=lang,
+                idempotency_base=idempotency_base,
+            )
+        return count
+
+    async def _notify_send(
+        self,
+        *,
+        template_key: str,
+        specs: list[dict[str, Any]],
+        application_id: uuid.UUID | None,
+        context: dict[str, Any],
+        lang: str | None,
+        idempotency_base: str | None,
+    ) -> int:
+        """Resolve, filter and enqueue one `notify` send for ``template_key``."""
         # Echte Benachrichtigungs-Art aus dem Katalog ableiten (statt Substring-
         # Heuristik): bestimmt sowohl den Opt-out-Filter als auch den Footer-Grund.
         # Unbekannte/DB-only Keys → Default `status_update`.
         from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 
-        _spec = CATALOGUE_BY_KEY.get(str(template_key))
-        reason = _spec.kind if _spec is not None else DEFAULT_NOTIFY_TEMPLATE_KEY
-        recipients = await self.resolver.resolve(
-            _as_specs(action.get("recipients", [])), application_id=application_id
-        )
+        spec = CATALOGUE_BY_KEY.get(template_key)
+        reason = spec.kind if spec is not None else DEFAULT_NOTIFY_TEMPLATE_KEY
+        recipients = await self.resolver.resolve(specs, application_id=application_id)
         # Abgewählte Benachrichtigungs-Arten respektieren (#4-2).
         recipients = await filter_recipients_by_preference(
             self.session, recipients, reason
@@ -471,16 +516,10 @@ class NotificationService:
         if not recipients:
             logger.info("notify action resolved no recipients — skipped")
             return 0
-        # Builtin-/Status-Templates referenzieren Titel + Status; nicht jeder
-        # Aufrufer (Deadline-Worker, Alt-Flows) liefert sie → leere Defaults,
-        # damit StrictUndefined nicht den Versand kippt.
-        context = dict(context or {})
-        context.setdefault("applicationTitle", "")
-        context.setdefault("status", "")
         idem = _idem_parts(
-            idempotency_base, "notify", str(application_id or ""), str(template_key)
+            idempotency_base, "notify", str(application_id or ""), template_key
         )
-        tpl = await self._get_template_by_key(str(template_key))
+        tpl = await self._get_template_by_key(template_key)
         if tpl is not None:
             ok = await self._render_and_enqueue(
                 tpl,
@@ -493,7 +532,6 @@ class NotificationService:
             return int(ok)
         # Template fehlt in der DB → Builtin-Fallback. Katalog-Keys (z. B.
         # ``deadline_approaching``) nutzen ihren eigenen Default, sonst status_update.
-        spec = _spec
         rendered = render_mail(
             subject_i18n=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,
             body_i18n=spec.body_i18n if spec else _BUILTIN_NOTIFY_BODY,

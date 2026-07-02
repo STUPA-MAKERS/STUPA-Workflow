@@ -55,6 +55,25 @@ DEADLINE_APPROACHING_BODY: dict[str, str] = {
     '{% if applicationTitle %} for the application "{{ applicationTitle }}"{% endif %} '
     "is approaching{% if dueAt %} (due: {{ dueAt }}){% endif %}.\n",
 }
+# status_update_team: committee-facing default for flow `notify` actions without
+# an explicit templateKey and non-applicant recipients (bug #2) — the applicant
+# default (`status_update`) reads "Your application" and is wrong for the team.
+STATUS_UPDATE_TEAM_SUBJECT: dict[str, str] = {
+    "de": "Statuswechsel: Antrag"
+    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
+    "en": "Status change: application"
+    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
+}
+STATUS_UPDATE_TEAM_BODY: dict[str, str] = {
+    "de": "Hallo,\n\nder Antrag"
+    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} ist in einen "
+    "neuen Status gewechselt{% if status %}: {{ status }}{% endif %}.\n\n"
+    "Ggf. ist eine Aktion oder Abstimmung erforderlich.\n",
+    "en": "Hello,\n\nthe application"
+    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %} moved to a '
+    "new state{% if status %}: {{ status }}{% endif %}.\n\n"
+    "An action or vote may be required.\n",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +94,17 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         "status_update",
         _svc._BUILTIN_NOTIFY_SUBJECT,  # noqa: SLF001 — gemeinsamer Builtin
         _svc._BUILTIN_NOTIFY_BODY,  # noqa: SLF001
+        {
+            "applicationTitle": "Titel des Antrags",
+            "status": "Neuer Status",
+            "applicationId": "ID des Antrags",
+        },
+    ),
+    MailTemplateSpec(
+        "status_update_team",
+        "status_update",
+        STATUS_UPDATE_TEAM_SUBJECT,
+        STATUS_UPDATE_TEAM_BODY,
         {
             "applicationTitle": "Titel des Antrags",
             "status": "Neuer Status",

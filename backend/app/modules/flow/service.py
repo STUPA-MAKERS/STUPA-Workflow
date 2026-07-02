@@ -17,7 +17,6 @@ prüft das und liefert 409 (inline behandelt, nicht dispatcht).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -32,6 +31,7 @@ from app.modules.deadlines.models import Deadline
 from app.modules.deadlines.service import (
     DeadlinePolicyService,
     DeadlineService,
+    flow_deadline_passed,
     resolve_due_at,
 )
 from app.modules.flow import context as flow_context
@@ -212,20 +212,9 @@ class FlowService:
     async def _deadline_passed(self, app: Application) -> bool:
         """Echtes ``deadline_passed`` des aktuellen States aus der DB ableiten.
 
-        ``True``, wenn eine (ggf. schon konsumierte) Flow-Frist des Antrags abgelaufen
-        ist. Fristen gehören immer zum aktuellen State — beim State-Wechsel räumt
-        :meth:`schedule_state_deadline` alle alten ab. Für manuelle Pfade (Router),
-        damit ``deadlinePassed``-Guards nicht nur für den Worker funktionieren."""
-        row = await self.session.scalar(
-            select(Deadline.id)
-            .where(
-                Deadline.application_id == app.id,
-                Deadline.kind == "flow_deadline",
-                Deadline.due_at <= datetime.now(UTC),
-            )
-            .limit(1)
-        )
-        return row is not None
+        Delegiert an :func:`flow_deadline_passed` (deadlines-Service) — dieselbe
+        Ableitung nutzt auch die Task-Mail-Empfänger-Auflösung (#64)."""
+        return await flow_deadline_passed(self.session, app.id)
 
     # ------------------------------------------------------- available_transitions
     async def available_transitions(
