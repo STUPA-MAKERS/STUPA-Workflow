@@ -1,8 +1,8 @@
-"""Unit (ohne DB): neue RBAC-Service-Pfade (#72) — Principal-Suche, Revoke, Katalog.
+"""Unit (no DB): RBAC service paths — principal search, revoke, permission catalogue.
 
-DB ohne Docker via ``fake_session`` (``scalars``/``get``-Queues). Beweist Mapping,
-den Assignment-Join (kein N+1), die Leerpfad-Branch der Suche und den 404-/Erfolgs-
-Branch des Revoke.
+DB-free via ``fake_session`` (``scalars``/``get`` queues). Proves the mapping,
+the assignment join (no N+1), the empty-path branch of the search and the
+404/success branches of the revoke.
 """
 
 from __future__ import annotations
@@ -11,7 +11,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.modules.admin.service import ConfigService, _principal_out
+from app.modules.admin.service import ConfigService
+from app.modules.admin.service.rbac import _principal_out
 from app.modules.auth.models import Principal, Role, RoleAssignment
 from app.shared.errors import ConflictError, NotFoundError
 from app.shared.permissions import PERMISSION_CATALOGUE
