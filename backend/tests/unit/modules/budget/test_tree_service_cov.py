@@ -1995,6 +1995,22 @@ async def test_delete_expense_child_recomputes_parent() -> None:
     assert parent.amount == Decimal("30.00")
 
 
+async def test_delete_expense_child_parent_vanished_no_update() -> None:
+    """Σ der Kinder > 0, aber die Eltern-Buchung ist per ``get`` nicht mehr ladbar
+    (paralleles Löschen) → kein Betrags-Update, kein Fehler (#subbookings)."""
+    child = _expense(id=uuid.uuid4(), amount="20.00")
+    child.parent_expense_id = uuid.uuid4()
+    sess = fake_session(
+        result(child),               # select Buchung zum Löschen
+        result(Decimal("30.00")),    # _recompute Σ verbleibender Kinder > 0
+        gets=[],                     # get(parent) → None (Eltern weg)
+    )
+    svc = BudgetTreeService(sess)
+    await svc.delete_expense(child.id)
+    assert child in sess.deleted
+    assert sess.committed == 1
+
+
 async def test_delete_last_child_keeps_parent_amount() -> None:
     parent = _expense(id=uuid.uuid4(), amount="50.00")
     child = _expense(id=uuid.uuid4(), amount="50.00")

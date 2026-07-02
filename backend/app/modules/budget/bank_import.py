@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import re
 import xml.etree.ElementTree as ET
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -528,7 +529,7 @@ def _detect_leading_iban(text: str) -> tuple[str, str] | None:
 
 
 def mt940_counterparty(
-    d: dict[str, object], *, credit: bool
+    d: Mapping[str, object], *, credit: bool
 ) -> tuple[str | None, str | None]:
     """Gegenkonto (Name, IBAN) aus einer ``mt940``-Transaktion gewinnen (#fints).
 

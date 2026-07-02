@@ -1,865 +1,1079 @@
-"""Full-screen prompt_toolkit TUI (mouse + keyboard).
+"""The orchestrator that owns the DB connection and wires the UI together.
 
-Layout: header · top tab bar (Users / Roles / OIDC / Audit) · master-detail body · footer.
-Each section is a left **list** of items + a right **detail** pane whose sub-tabs depend on the
-selected item (user → Roles / Actions; role → Permissions / Users / Actions; mapping → Actions).
-Audit is a single full-width formatted, paged table. Pickers (add role, choose scope) still use
-modal floats. DB writes bypass the API → no audit entry, no RBAC guards (shown in the footer).
+:class:`AdminCLI` drives the slash-commands (users / roles / OIDC mappings /
+audit log), holds the inline selector, and satisfies the protocols the pieces
+depend on: :class:`~antragsplattform_admin.protocols.CompleterHost` for the
+completer, :class:`AppContext` for the log / form components, and
+:class:`AppView` for the layout and key bindings. The log model and rendering
+live in :class:`~antragsplattform_admin.log_panel.LogPanel`, domain-row
+formatting in :mod:`~antragsplattform_admin.views`, the form dialog in
+:class:`~antragsplattform_admin.form.FormController`; this coordinates them.
+
+DB writes bypass the API → no audit entry, no RBAC guards (rows are tagged
+``granted_by = 'admin-cli'``); every mutation asks for confirmation.
 """
 
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import Any
 
 from prompt_toolkit.application import Application
-from prompt_toolkit.filters import to_filter
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.key_binding.bindings.focus import focus_next, focus_previous
-from prompt_toolkit.layout import (
-    DynamicContainer,
-    Float,
-    FloatContainer,
-    HSplit,
-    Layout,
-    VSplit,
-    Window,
-    WindowAlign,
-)
-from prompt_toolkit.layout.controls import FormattedTextControl
-from prompt_toolkit.layout.dimension import D
+from prompt_toolkit.application.current import get_app
+from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.formatted_text import StyleAndTextTuples
+from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
-from prompt_toolkit.styles import Style
-from prompt_toolkit.widgets import (
-    Box,
-    Button,
-    CheckboxList,
-    Dialog,
-    Frame,
-    Label,
-    RadioList,
-    TextArea,
-)
 
-from . import __version__, ops
-from .config import Config, load
-from .db import Db, DbError, connect
+from . import __version__, layout, ops, views
+from .commands import (
+    AUDIT_KEYS,
+    BASE_COMMANDS,
+    HELP_LINES,
+    MAPPING_ACTIONS,
+    ROLE_ACTIONS,
+    USER_ACTIONS,
+)
+from .completion import CommandCompleter
+from .config import Config, resolve
+from .db import Db, DbError, connect_auto
+from .form import FormController
+from .log_panel import LogPanel
+from .models import Choices, Form, FormField, LogEntry, Selector
+from .panels import selector_fragments as render_selector
 from .permissions import FORBIDDEN_PERMISSIONS, PERMISSION_CATALOGUE
+from .protocols import Handler, MouseHandler
 
-# Claude-Code-inspired palette: signature coral accent on a near-black neutral base.
-_CORAL = "#d97757"
-_INK = "#1a1a1a"
-_PANEL = "#262626"
-_FG = "#e8e6e3"
-_DIM = "#8a8a8a"
-_LINE = "#3a3a3a"
-
-_STYLE = Style.from_dict(
-    {
-        # structural frames + rules
-        "frame.border": _LINE,
-        "frame.label": f"{_CORAL} bold",
-        "rule": _LINE,
-        # header / brand bar
-        "header": f"bg:{_INK} {_FG}",
-        "header.brand": f"bg:{_INK} {_CORAL} bold",
-        "header.dim": f"bg:{_INK} {_DIM}",
-        "header.warn": f"bg:{_INK} #ff9d5c bold",
-        "header.ro": f"bg:{_INK} #87d7af bold",
-        # pane title row (minimal-divider layout, no boxes)
-        "pane.title": f"bg:{_INK} {_CORAL} bold",
-        # top tab strip
-        "tabbar": f"bg:{_INK}",
-        "tab": f"bg:{_INK} {_DIM}",
-        "tab.active": f"bg:{_CORAL} {_INK} bold",
-        # detail sub-tabs
-        "subtab": f"bg:{_INK} {_DIM}",
-        "subtab.active": f"bg:{_INK} {_CORAL} bold",
-        # full-width selection bar on lists (default cursor-line is underlined → turn that off)
-        "cursor-line": "bg:#33302b nounderline",
-        # footer / status line
-        "footer": f"bg:{_INK} {_DIM}",
-        "footer.key": f"bg:{_INK} {_FG} bold",
-        "footer.chip": f"bg:{_INK} {_DIM}",
-        "footer.status": f"bg:{_INK} {_CORAL}",
-        # detail headings
-        "detail.head": f"{_CORAL} bold",
-        "detail.dim": _DIM,
-        # interactive widgets
-        "button": _FG,
-        "button.focused": f"bg:{_CORAL} {_INK} bold",
-        "button.arrow": _DIM,
-        "radio": _FG,
-        "radio-selected": f"{_CORAL} bold",
-        "radio-checked": f"{_CORAL} bold",
-        "checkbox": _FG,
-        "checkbox-selected": f"{_CORAL} bold",
-        "checkbox-checked": f"{_CORAL} bold",
-        # dialogs / floats — default theme makes dialog.body a WHITE panel; override the bg too or
-        # the light text washes out. Dark raised panel (#262626) + light text instead.
-        "dialog": "bg:#000000",
-        "dialog.body": f"bg:{_PANEL} {_FG}",
-        "dialog.body text-area": f"bg:{_INK} {_FG}",
-        "dialog.body text-area last-line": "underline",
-        "dialog.body label": f"bg:{_PANEL} {_FG}",
-        "dialog frame.label": f"bg:{_PANEL} {_CORAL} bold",
-        "dialog shadow": "bg:#000000",
-    }
-)
-
-_SECTIONS = [("users", "Users"), ("roles", "Roles"), ("oidc", "OIDC mappings"), ("audit", "Audit log")]
-
-# Sub-tabs shown in the right detail pane, per section. Audit has none (full-width table).
-_SUBTABS: dict[str, list[tuple[str, str]]] = {
-    "users": [("roles", "Roles"), ("actions", "Actions")],
-    "roles": [("perms", "Permissions"), ("users", "Users"), ("actions", "Actions")],
-    "oidc": [("actions", "Actions")],
-}
+# Options shown at once in the inline selector; matches the selector panel height.
+_SELECTOR_ROWS = 12
+# Audit entries fetched per page (/audit and each /more).
+_AUDIT_PAGE = 50
 
 
-def _fmt(value: Any) -> str:
-    return "" if value is None else str(value)
+class AdminCLI:
+    """Drives the admin console from a full-screen prompt_toolkit UI."""
 
-
-def _truthy(value: Any) -> bool:
-    return str(value) in ("True", "t", "true")
-
-
-class AdminApp:
-    def __init__(self, db: Db, cfg: Config) -> None:
-        self.db = db
+    def __init__(self, cfg: Config, db: Db | None, startup_notes: list[str]) -> None:
         self.cfg = cfg
-        self.section = "users"
-        self._floats: list[Float] = []
-        self._body: Any = Window()
-        self._focus_target: Any = None
-        self._status = ""
-        # master-detail state
-        self._subtab: dict[str, str] = {"users": "roles", "roles": "perms", "oidc": "actions"}
-        self._selected: dict[str, Any] = {}
-        self._left_ctrl: Any = None
-        self._detail_cache: tuple[tuple[Any, ...], Any] | None = None
-        # per-section caches populated by the builders
-        self._users: list[dict[str, Any]] = []
-        self._roles: list[dict[str, Any]] = []
-        self._mappings: list[dict[str, Any]] = []
-        self._perm_cb: CheckboxList | None = None
-        # audit paging state
-        self._audit_action: str | None = None
-        self._audit_rows: list[dict[str, Any]] = []
+        self.db = db
+        self._startup_notes = startup_notes
+        self._selector: Selector | None = None
+        self._counts: dict[str, Any] = {}
+        self._users_cache: list[dict[str, Any]] = []
+        self._roles_cache: list[dict[str, Any]] = []
+        self._mappings_cache: list[dict[str, Any]] = []
+        # audit paging state: active filters, the oldest id already shown, and
+        # the last rendered date (so /more does not repeat the day heading)
+        self._audit_filters: dict[str, str] = {}
+        self._audit_oldest: int | None = None
+        self._audit_last_date = ""
 
-        self._detail = {
-            ("users", "roles"): self._detail_users_roles,
-            ("users", "actions"): self._detail_users_actions,
-            ("roles", "perms"): self._detail_roles_perms,
-            ("roles", "users"): self._detail_roles_users,
-            ("roles", "actions"): self._detail_roles_actions,
-            ("oidc", "actions"): self._detail_oidc_actions,
-        }
+        self._buffer = Buffer(
+            completer=CommandCompleter(self),
+            complete_while_typing=True,
+            multiline=False,
+            history=InMemoryHistory(),
+            accept_handler=self._accept,
+        )
+        self._log_panel = LogPanel(self)
+        self._form = FormController(self)
+        self._app: Application = layout.build_app(self)
 
-        header = VSplit(
-            [
-                Window(FormattedTextControl(self._header_left), height=1, style="class:header"),
-                Window(
-                    FormattedTextControl(self._header_right),
-                    height=1,
-                    style="class:header",
-                    align=WindowAlign.RIGHT,
-                ),
-            ]
-        )
-        root = FloatContainer(
-            content=HSplit(
-                [
-                    header,
-                    Window(
-                        FormattedTextControl(self._tabbar_fragments, focusable=False),
-                        height=1,
-                        style="class:tabbar",
-                    ),
-                    Window(height=1, char="─", style="class:rule"),
-                    DynamicContainer(lambda: self._body),
-                    Window(height=1, char="─", style="class:rule"),
-                    Window(FormattedTextControl(self._footer_text), height=1, style="class:footer"),
-                ]
-            ),
-            floats=self._floats,
-        )
-        self.kb = self._key_bindings()
-        self.app: Application = Application(
-            layout=Layout(root),
-            key_bindings=self.kb,
-            style=_STYLE,
-            mouse_support=True,
-            full_screen=True,
-        )
-        self.goto("users")
+    # ------------------------------------------------------------------ AppContext
+    @property
+    def buffer(self) -> Buffer:
+        return self._buffer
 
-    # ------------------------------------------------------------------ chrome
-    def _header_left(self) -> Any:
+    def info(self, text: str) -> None:
+        """Append an informational line to the log."""
+        self._log_panel.append(LogEntry(fragments=[("class:info", f"· {text}\n")]))
+
+    def error(self, text: str) -> None:
+        """Append an error line to the log."""
+        self._log_panel.append(LogEntry(fragments=[("class:error", f"✗ {text}\n")]))
+
+    def warn(self, text: str) -> None:
+        """Append a warning line to the log."""
+        self._log_panel.append(LogEntry(fragments=[("class:warn", f"⚠ {text}\n")]))
+
+    def invalidate(self) -> None:
+        """Request a repaint via the concrete app."""
+        self._app.invalidate()
+
+    # ------------------------------------------------------------------ AppView
+    @property
+    def logs(self) -> LogPanel:
+        """The log panel as rendered by the layout."""
+        return self._log_panel
+
+    @property
+    def form_panel(self) -> FormController:
+        """The form dialog panel as driven by the key bindings."""
+        return self._form
+
+    def open_form(self, form: Form) -> None:
+        """Open *form* in the shared form dialog."""
+        self._form.open(form)
+
+    def line_prefix(self, line_number: int, wrap_count: int) -> StyleAndTextTuples:
+        if line_number == 0 and wrap_count == 0:
+            return [("class:prompt", "› ")]
+        return [("class:cont", "… ")]
+
+    def scroll_button_fragments(self) -> StyleAndTextTuples:
         return [
-            ("class:header.brand", " antragsplattform "),
-            ("class:header.dim", "admin"),
-            ("class:header", "  ›  "),
-            ("class:header", dict(_SECTIONS)[self.section]),
-        ]
-
-    def _header_right(self) -> Any:
-        if self.cfg.read_only:
-            badge = ("class:header.ro", "● read-only")
-        else:
-            badge = ("class:header.warn", "⚠ direct db")
-        return [
-            ("class:header.dim", f"db={self.cfg.mode_label}   "),
-            badge,
-            ("class:header.dim", f"   v{__version__} "),
-        ]
-
-    def _tabbar_fragments(self) -> Any:
-        frags: list[Any] = [("class:tabbar", " ")]
-        for key, label in _SECTIONS:
-            active = key == self.section
-
-            def handler(mouse_event: MouseEvent, target: str = key) -> None:
-                if mouse_event.event_type == MouseEventType.MOUSE_UP:
-                    self.goto(target)
-
-            cls = "class:tab.active" if active else "class:tab"
-            frags.append((cls, f"  {label}  ", handler))
-            frags.append(("class:tabbar", " "))
-        return frags
-
-    def _subtab_fragments(self) -> Any:
-        cur = self._subtab.get(self.section)
-        frags: list[Any] = [("class:subtab", " ")]
-        for key, label in _SUBTABS.get(self.section, []):
-            active = key == cur
-
-            def handler(mouse_event: MouseEvent, target: str = key) -> None:
-                if mouse_event.event_type == MouseEventType.MOUSE_UP:
-                    self._goto_subtab(target)
-
-            cls = "class:subtab.active" if active else "class:subtab"
-            frags.append((cls, f" {'▸ ' if active else ''}{label} ", handler))
-            frags.append(("class:subtab", " "))
-        return frags
-
-    def _footer_text(self) -> Any:
-        if self._status:
-            return [("class:footer.status", f"  {self._status} ")]
-        chips = [("^←/→", "tabs"), ("↑↓", "move"), ("⏎", "select"),
-                 ("F5", "refresh"), ("^Q", "quit")]
-        frags: list[Any] = [("class:footer", " ")]
-        for key, act in chips:
-            frags += [("class:footer.key", key), ("class:footer.chip", f" {act}"),
-                      ("class:footer", "    ")]
-        return frags
-
-    def set_status(self, text: str) -> None:
-        self._status = text
-        self.app.invalidate()
-
-    def _key_bindings(self) -> KeyBindings:
-        kb = KeyBindings()
-        kb.add("tab")(focus_next)
-        kb.add("s-tab")(focus_previous)
-
-        @kb.add("c-q")
-        @kb.add("c-c")
-        def _(event: Any) -> None:
-            event.app.exit()
-
-        @kb.add("f5")
-        def _(_event: Any) -> None:
-            self.refresh()
-
-        @kb.add("c-right")
-        def _(_event: Any) -> None:
-            self._cycle(1)
-
-        @kb.add("c-left")
-        def _(_event: Any) -> None:
-            self._cycle(-1)
-
-        return kb
-
-    def _cycle(self, delta: int) -> None:
-        keys = [k for k, _ in _SECTIONS]
-        self.goto(keys[(keys.index(self.section) + delta) % len(keys)])
-
-    def exit(self) -> None:
-        self.app.exit()
-
-    # ------------------------------------------------------------------ floats / dialogs
-    def _open(self, dialog: Dialog, focus: Any = None) -> None:
-        flt = Float(content=dialog)
-        self._floats.append(flt)
-        self.app.layout.focus(focus or dialog)
-        self.app.invalidate()
-
-    def _close(self) -> None:
-        if self._floats:
-            self._floats.pop()
-        target = self._focus_target
-        if self._floats:
-            self.app.layout.focus(self._floats[-1].content)
-        elif target is not None:
-            try:
-                self.app.layout.focus(target)
-            except Exception:  # noqa: BLE001 - focus target may have been rebuilt
-                pass
-        self.app.invalidate()
-
-    def message(self, text: str, title: str = "Info") -> None:
-        self._open(Dialog(title=title, body=Label(text=text), buttons=[Button("OK", self._close)], modal=True))
-
-    def confirm(self, text: str, on_yes: Callable[[], Any], title: str = "Confirm") -> None:
-        def yes() -> None:
-            self._close()
-            on_yes()
-
-        self._open(
-            Dialog(
-                title=title,
-                body=Label(text=text),
-                buttons=[Button("Yes", yes), Button("No", self._close)],
-                modal=True,
+            (
+                "class:scroll-btn",
+                " ↓ latest ",
+                self._click(self._log_panel.scroll_to_bottom),
             )
+        ]
+
+    def toolbar(self) -> StyleAndTextTuples:
+        connected = self.db is not None
+        status: tuple[str, str, MouseHandler] = (
+            ("class:on", f"● {self.db.label}  ", self._click(lambda: self._cmd_status([])))
+            if self.db is not None
+            else ("class:off", "○ disconnected  ", self._click(lambda: self._cmd_connect([])))
         )
-
-    def ask_input(
-        self, title: str, label: str, default: str, on_ok: Callable[[str], Any]
-    ) -> None:
-        area = TextArea(text=default, multiline=False, width=D(min=30))
-
-        def ok() -> None:
-            value = area.text.strip()
-            self._close()
-            on_ok(value)
-
-        body = HSplit([Label(text=label), Frame(area)])
-        self._open(
-            Dialog(title=title, body=body, buttons=[Button("OK", ok), Button("Cancel", self._close)], modal=True),
-            focus=area,
-        )
-
-    def ask_choice(
-        self,
-        title: str,
-        values: Sequence[tuple[Any, str]],
-        on_ok: Callable[[Any], Any],
-        *,
-        label: str = "Select:",
-    ) -> None:
-        if not values:
-            self.message("Nothing to choose from.")
-            return
-        radio: RadioList = RadioList(values=list(values))
-
-        def ok() -> None:
-            value = radio.current_value
-            self._close()
-            on_ok(value)
-
-        body = HSplit([Label(text=label), radio])
-        self._open(
-            Dialog(title=title, body=body, buttons=[Button("OK", ok), Button("Cancel", self._close)], modal=True),
-            focus=radio,
-        )
-
-    def ask_checkboxes(
-        self,
-        title: str,
-        values: Sequence[tuple[Any, str]],
-        preselected: Sequence[Any],
-        on_ok: Callable[[list[Any]], Any],
-    ) -> None:
-        cb: CheckboxList = CheckboxList(values=list(values))
-        cb.current_values = list(preselected)
-
-        def ok() -> None:
-            chosen = list(cb.current_values)
-            self._close()
-            on_ok(chosen)
-
-        self._open(
-            Dialog(
-                title=title,
-                body=HSplit([Label(text="Space toggles · Enter on OK saves"), cb], height=D(max=24)),
-                buttons=[Button("OK", ok), Button("Cancel", self._close)],
-                modal=True,
-                width=D(min=48),
-            ),
-            focus=cb,
-        )
-
-    def guard_write(self, action: Callable[[], None]) -> None:
+        fragments: StyleAndTextTuples = [status]
+        if connected and self._counts:
+            for key, label, command in (
+                ("users", "users", "/users"),
+                ("roles", "roles", "/roles"),
+                ("mappings", "maps", "/mappings"),
+            ):
+                count = views.fmt(self._counts.get(key))
+                fragments.append(("class:bottom-toolbar", "·  "))
+                fragments.append(
+                    (
+                        "class:bottom-toolbar",
+                        f"{label}:{count}  ",
+                        self._click(lambda cmd=command: self._handle_line(cmd)),
+                    )
+                )
+            head = views.fmt(self._counts.get("audit_head"))
+            fragments.append(("class:bottom-toolbar", "·  "))
+            fragments.append(
+                (
+                    "class:bottom-toolbar",
+                    f"audit:#{head}  ",
+                    self._click(lambda: self._handle_line("/audit")),
+                )
+            )
         if self.cfg.read_only:
-            self.message("Started in --read-only mode; writes are disabled.")
-            return
-        action()
+            fragments.append(("class:bottom-toolbar", "·  "))
+            fragments.append(("class:ro", "read-only  "))
+        elif connected:
+            fragments.append(("class:bottom-toolbar", "·  "))
+            fragments.append(("class:ro", "⚠ direct db  "))
+        fragments.append(("class:bottom-toolbar", "·  "))
+        fragments.append(
+            ("class:bottom-toolbar", "/help", self._click(lambda: self._cmd_help([])))
+        )
+        return fragments
 
-    def run_write(self, do: Callable[[], int], success: str) -> None:
-        try:
-            n = do()
-        except DbError as exc:
-            self.message(str(exc), title="DB error")
-            return
-        self.set_status(f"{success} ({n} row(s))")
-        self.refresh()
+    def _click(self, action: Callable[[], None]) -> MouseHandler:
+        def handler(mouse_event: MouseEvent) -> object:
+            if mouse_event.event_type == MouseEventType.MOUSE_UP:
+                self._log_panel.close_detail()
+                self._guard(action)
+                get_app().invalidate()
+            elif mouse_event.event_type == MouseEventType.MOUSE_MOVE:
+                self._log_panel.set_hover(None)
+            else:
+                return NotImplemented
+            return None
 
-    # ------------------------------------------------------------------ navigation
-    def goto(self, section: str) -> None:
-        self.section = section
-        self.refresh()
+        return handler
 
-    def _goto_subtab(self, key: str) -> None:
-        self._subtab[self.section] = key
-        self._detail_cache = None
-        self.app.invalidate()
-
-    def refresh(self) -> None:
-        try:
-            {"users": self._build_users, "roles": self._build_roles,
-             "oidc": self._build_oidc, "audit": self._build_audit}[self.section]()
-        except DbError as exc:
-            self._body = Box(Label(text=f"DB error:\n{exc}"))
-        self.app.invalidate()
-
-    def _set_body(self, container: Any, focus: Any) -> None:
-        self._body = container
-        self._focus_target = focus
-        if not self._floats:
-            try:
-                self.app.layout.focus(focus)
-            except Exception:  # noqa: BLE001
-                pass
-
-    def _list_or_empty(
-        self, values: Sequence[tuple[Any, str]], default: Any = None, *, fill: bool = False
-    ) -> tuple[Any, Any]:
-        """Return (control, focus_target). RadioList needs ≥1 entry. ``fill`` lets the list grow
-        to consume the available vertical space (its base widget is dont_extend_height by default)."""
+    # ------------------------------------------------------------------ selector
+    def choose(
+        self,
+        title: str,
+        values: Choices,
+        on_choose: Callable[[str | None], None],
+        *,
+        searchable: bool = False,
+    ) -> None:
+        """Open an inline selector, calling *on_choose* with the picked key or ``None``."""
         if not values:
-            label = Label(text="  (no entries)")
-            return HSplit([label, Window()]), label
-        keys = [v[0] for v in values]
-        radio: RadioList = RadioList(
-            values=list(values),
-            default=default if default in keys else None,
-            # clean marker: a ▸ caret on the active row, no (*)/( ) brackets
-            open_character="", select_character="▸", close_character="",  # type: ignore[call-arg]
+            self.error(f"{title.lower()}: nothing to select")
+            self._guard(lambda: on_choose(None))
+            return
+        self._selector = Selector(
+            title=title, values=values, on_choose=on_choose, searchable=searchable
         )
-        # full-width selection bar (the cursor sits on the selected entry)
-        radio.window.cursorline = to_filter(True)
-        if fill:
-            radio.window.dont_extend_height = to_filter(False)
-            radio.window.dont_extend_width = to_filter(False)
-        return radio, radio
+        self.invalidate()
 
-    # ------------------------------------------------------------------ master-detail shell
-    @staticmethod
-    def _title_row(text: str) -> Any:
-        return Window(FormattedTextControl([("class:pane.title", f" {text}")]),
-                      height=1, style="class:pane.title")
+    def confirm(self, question: str, on_yes: Callable[[], None]) -> None:
+        """Ask an explicit yes/no through the selector; No is the default."""
+        self.choose(
+            question,
+            [("no", "no — cancel"), ("yes", "yes — do it")],
+            lambda key: on_yes() if key == "yes" else self.info("cancelled"),
+        )
 
-    def _master_detail(self, left_content: Any, focus: Any, *, left_title: str) -> None:
-        self._detail_cache = None
-        # Minimal-divider layout: no boxes. Left = title row + content; a single vertical rule;
-        # right = sub-tab strip + detail. Left list holds the long rows → give it the bulk of the
-        # width; the detail pane is short → cap it so it doesn't leave a dead zone on wide terminals.
-        left = HSplit([self._title_row(left_title), left_content], width=D(weight=1, min=40))
-        right = HSplit(
+    def selector_fragments(self) -> StyleAndTextTuples:
+        selector = self._selector
+        if selector is None:
+            return []
+        count = len(selector.visible())
+        # Keep the scroll window following the cursor so long lists stay
+        # navigable instead of overflowing the panel.
+        selector.cursor = min(selector.cursor, max(0, count - 1))
+        if selector.cursor < selector.scroll:
+            selector.scroll = selector.cursor
+        elif selector.cursor >= selector.scroll + _SELECTOR_ROWS:
+            selector.scroll = selector.cursor - _SELECTOR_ROWS + 1
+        selector.scroll = max(0, min(selector.scroll, max(0, count - _SELECTOR_ROWS)))
+        return render_selector(selector, self._selector_option, _SELECTOR_ROWS)
+
+    def selector_title(self) -> str:
+        return self._selector.title if self._selector else ""
+
+    def showing_selector(self) -> bool:
+        return self._selector is not None
+
+    def selector_searchable(self) -> bool:
+        return self._selector is not None and self._selector.searchable
+
+    def selector_move(self, delta: int) -> None:
+        if self._selector is not None:
+            count = len(self._selector.visible())
+            if count:
+                self._selector.cursor = (self._selector.cursor + delta) % count
+                self.invalidate()
+
+    def selector_type(self, text: str) -> None:
+        selector = self._selector
+        if selector is None or not selector.searchable:
+            return
+        if len(text) == 1 and text.isprintable():
+            selector.query += text
+            selector.cursor = 0
+            selector.scroll = 0
+            self.invalidate()
+
+    def selector_backspace(self) -> None:
+        selector = self._selector
+        if selector is None or not selector.searchable or not selector.query:
+            return
+        selector.query = selector.query[:-1]
+        selector.cursor = 0
+        selector.scroll = 0
+        self.invalidate()
+
+    def selector_pick_visible(self, position: int) -> None:
+        if self._selector is not None:
+            self.selector_pick(self._selector.scroll + position)
+
+    def selector_pick(self, index: int | None = None) -> None:
+        selector = self._selector
+        if selector is None:
+            return
+        options = selector.visible()
+        position = selector.cursor if index is None else index
+        if position >= len(options):
+            return
+        chosen = options[position][0]
+        self._selector = None
+        self.invalidate()
+        self._guard(lambda: selector.on_choose(chosen))
+
+    def selector_cancel(self) -> None:
+        selector = self._selector
+        if selector is None:
+            return
+        self._selector = None
+        self.invalidate()
+        self._guard(lambda: selector.on_choose(None))
+
+    def _selector_option(self, index: int) -> MouseHandler:
+        def handler(mouse_event: MouseEvent) -> object:
+            event_type = mouse_event.event_type
+            if event_type == MouseEventType.MOUSE_UP:
+                self.selector_pick(index)
+            elif event_type == MouseEventType.MOUSE_MOVE:
+                if self._selector is not None and self._selector.cursor != index:
+                    self._selector.cursor = index
+                    self.invalidate()
+            elif event_type == MouseEventType.SCROLL_UP:
+                self.selector_move(-1)
+            elif event_type == MouseEventType.SCROLL_DOWN:
+                self.selector_move(1)
+            else:
+                return NotImplemented
+            return None
+
+        return handler
+
+    # ------------------------------------------------------------------ CompleterHost
+    def command_names(self) -> list[str]:
+        return list(BASE_COMMANDS)
+
+    def argument_options(self, parts: list[str]) -> list[str]:
+        command = parts[0]
+        if command == "/user":
+            if len(parts) == 2:
+                # Single-token handles only (email, else sub) — a display name
+                # with spaces would not survive the whitespace-split parser.
+                return [
+                    handle
+                    for r in self._users_cache
+                    if (handle := views.fmt(r.get("email")) or views.fmt(r.get("sub")))
+                    and " " not in handle
+                ]
+            if len(parts) == 3:
+                return list(USER_ACTIONS)
+        if command == "/role":
+            if len(parts) == 2:
+                return [views.fmt(r.get("key")) for r in self._roles_cache]
+            if len(parts) == 3:
+                return list(ROLE_ACTIONS)
+        if command == "/mapping":
+            if len(parts) == 2:
+                return [views.fmt(r.get("oidc_group")) for r in self._mappings_cache]
+            if len(parts) == 3:
+                return list(MAPPING_ACTIONS)
+        if command == "/audit":
+            return list(AUDIT_KEYS)
+        return []
+
+    # ------------------------------------------------------------------ plumbing
+    def _guard(self, action: Callable[[], object]) -> None:
+        """Run *action*, surfacing any exception in the log instead of crashing."""
+        try:
+            _ = action()
+        except DbError as error:
+            self.error(str(error))
+        except Exception as error:  # noqa: BLE001 — a handler must never kill the UI
+            self.error(f"{type(error).__name__}: {error}")
+
+    def _accept(self, buffer: Buffer) -> bool:
+        text = buffer.text.strip()
+        if text:
+            self._handle_line(text)
+        return False
+
+    def _handle_line(self, line: str) -> None:
+        self._log_panel.append(LogEntry(fragments=[("class:prompt", f"› {line}\n")]))
+        try:
+            if not line.startswith("/"):
+                self.error("commands start with / — try /help")
+                return
+            if not self._dispatch(line):
+                get_app().exit()
+        except DbError as error:
+            self.error(str(error))
+        except Exception as error:  # noqa: BLE001 — never let a command crash the UI
+            self.error(f"{type(error).__name__}: {error}")
+
+    def _dispatch(self, line: str) -> bool:
+        name, *args = line.split()
+        if name in ("/quit", "/exit"):
+            return False
+        handlers: dict[str, Handler] = {
+            "/users": self._cmd_users,
+            "/user": self._cmd_user,
+            "/roles": self._cmd_roles,
+            "/role": self._cmd_role,
+            "/new-role": self._cmd_new_role,
+            "/mappings": self._cmd_mappings,
+            "/mapping": self._cmd_mapping,
+            "/new-mapping": self._cmd_new_mapping,
+            "/audit": self._cmd_audit,
+            "/more": self._cmd_more,
+            "/status": self._cmd_status,
+            "/connect": self._cmd_connect,
+            "/clear": lambda _args: self._log_panel.clear(),
+            "/help": self._cmd_help,
+        }
+        handler = handlers.get(name)
+        if handler is None:
+            self.error(f"unknown command {name} — /help")
+        else:
+            handler(args)
+        return True
+
+    def _require_db(self) -> Db | None:
+        if self.db is None:
+            self.error("not connected — /connect first")
+        return self.db
+
+    def _writable(self) -> Db | None:
+        if self.cfg.read_only:
+            self.error("started with --read-only; writes are disabled")
+            return None
+        return self._require_db()
+
+    def _run_write(self, do: Callable[[Db], int], success: str) -> None:
+        db = self._writable()
+        if db is None:
+            return
+        try:
+            n = do(db)
+        except DbError as exc:
+            self.error(str(exc))
+            return
+        self.info(f"{success} ({n} row(s))")
+        self._refresh_caches()
+
+    def _refresh_caches(self) -> None:
+        """Refresh the completion caches and toolbar counts (best-effort)."""
+        db = self.db
+        if db is None:
+            return
+        try:
+            self._users_cache = ops.list_users(db)
+            self._roles_cache = ops.list_roles(db)
+            self._mappings_cache = ops.list_mappings(db)
+            self._counts = ops.counts(db)
+        except DbError as exc:
+            self.error(f"cache refresh failed: {exc}")
+
+    # ------------------------------------------------------------------ /connect /status
+    def _cmd_connect(self, _args: list[str]) -> None:
+        fresh, notes = connect_auto(self.cfg)
+        for note in notes:
+            (self.info if fresh is not None else self.error)(note)
+        if fresh is None:
+            if self.db is not None:
+                self.info("keeping the existing connection")
+            return
+        if self.db is not None:
+            self.db.close()
+        self.db = fresh
+        self._refresh_caches()
+
+    def _cmd_status(self, _args: list[str]) -> None:
+        self.info(f"mode:        {self.db.label if self.db else 'disconnected'}")
+        self.info(f"dsn:         {self.cfg.display_url}")
+        self.info(f"compose:     {self.cfg.compose_file} (service {self.cfg.service})")
+        self.info(f"read-only:   {self.cfg.read_only}")
+        if self._counts:
+            self.info(
+                "entities:    "
+                f"{views.fmt(self._counts.get('users'))} users · "
+                f"{views.fmt(self._counts.get('roles'))} roles · "
+                f"{views.fmt(self._counts.get('mappings'))} mappings · "
+                f"audit head #{views.fmt(self._counts.get('audit_head'))}"
+            )
+        if not self.cfg.read_only and self.db is not None:
+            self.warn("writes bypass the API: no audit entry, no RBAC guards")
+
+    def _cmd_help(self, _args: list[str]) -> None:
+        for line in HELP_LINES:
+            self.info(line)
+
+    # ------------------------------------------------------------------ /users /user
+    def _cmd_users(self, args: list[str]) -> None:
+        db = self._require_db()
+        if db is None:
+            return
+        search = " ".join(args) if args else None
+        rows = ops.list_users(db, search)
+        self._users_cache = rows if not search else self._users_cache
+        title = f"users ({len(rows)})" + (f" · “{search}”" if search else "")
+        self._log_panel.append(LogEntry(fragments=views.separator(title)))
+        if not rows:
+            self.info("no matches")
+        for row in views.user_rows(rows):
+            self._log_panel.append_record(row)
+
+    def _resolve_user(
+        self, term: str | None, then: Callable[[dict[str, Any]], None]
+    ) -> None:
+        """Find one principal by *term* (or via a searchable selector)."""
+        db = self._require_db()
+        if db is None:
+            return
+        rows = ops.list_users(db, term)
+        if term and len(rows) == 1:
+            # Substring match — say who it resolved to before acting on it.
+            self.info(f"user → {views.user_name(rows[0])}")
+            then(rows[0])
+            return
+        if term and not rows:
+            self.error(f"no user matches {term!r}")
+            return
+        by_id = {views.fmt(r["id"]): r for r in rows}
+        self.choose(
+            "User",
             [
-                Window(
-                    FormattedTextControl(self._subtab_fragments, focusable=False),
-                    height=1,
-                    style="class:subtab",
-                ),
-                DynamicContainer(self._detail_body),
+                (views.fmt(r["id"]), f"{'●' if views.truthy(r['active']) else '○'} "
+                 f"{views.user_name(r)}  [{views.fmt(r.get('roles')) or '—'}]")
+                for r in rows
             ],
-            width=D(min=44, max=66),
-        )
-        body = VSplit([left, Window(width=1, char="│", style="class:rule"), right], padding=0)
-        self._set_body(body, focus)
-
-    def _detail_body(self) -> Any:
-        section = self.section
-        sel = getattr(self._left_ctrl, "current_value", None)
-        if sel is not None:
-            self._selected[section] = sel
-        sub = self._subtab.get(section)
-        key = (section, sub, sel)
-        if self._detail_cache is not None and self._detail_cache[0] == key:
-            return self._detail_cache[1]
-        builder = self._detail.get((section, sub or ""))
-        container = builder(sel) if builder else Box(Label("—"))
-        self._detail_cache = (key, container)
-        return container
-
-    @staticmethod
-    def _placeholder(text: str) -> Any:
-        return HSplit([Box(Label(text=text), padding=1), Window()])
-
-    @staticmethod
-    def _heading(text: str) -> Any:
-        return Window(FormattedTextControl([("class:detail.head", text)]), height=1)
-
-    @staticmethod
-    def _button_row(*buttons: Any) -> Any:
-        """A row of fixed-width buttons + a trailing filler. The filler is essential: prompt_toolkit
-        sizes a vertical stack by its most-constrained child's max width, so a bare fixed-width
-        button row would collapse the whole pane to the buttons' width. The Window() lets it extend."""
-        return VSplit([*buttons, Window()], padding=1)
-
-    # ------------------------------------------------------------------ USERS
-    def _user_label(self, r: dict[str, Any]) -> str:
-        dot = "●" if _truthy(r["active"]) else "○"
-        name = _fmt(r["email"]) or _fmt(r["display_name"]) or _fmt(r["sub"])
-        roles = f"   [{r['roles']}]" if r["roles"] else "   [—]"
-        return f"{dot} {name}{roles}"
-
-    def _build_users(self) -> None:
-        rows = ops.list_users(self.db, getattr(self, "_user_search", None))
-        self._users = rows
-        values = [(r["id"], self._user_label(r)) for r in rows]
-        ctrl, focus = self._list_or_empty(values, self._selected.get("users"), fill=True)
-        self._left_ctrl = ctrl
-        search = getattr(self, "_user_search", None)
-        title = f"Users ({len(rows)})" + (f" · filter “{search}”" if search else "")
-        search_btn = Button("Search / filter…", self._user_search_dialog, width=22)
-        left = HSplit([self._button_row(search_btn), Window(height=1), ctrl])
-        self._master_detail(left, focus, left_title=title)
-
-    def _user_search_dialog(self) -> None:
-        self.ask_input(
-            "Search users", "email / name / sub contains:",
-            getattr(self, "_user_search", None) or "", self._do_user_search,
+            lambda key: then(by_id[key]) if key else None,
+            searchable=True,
         )
 
-    def _do_user_search(self, term: str) -> None:
-        self._user_search = term or None
-        self._selected.pop("users", None)
-        self.refresh()
+    def _cmd_user(self, args: list[str]) -> None:
+        # Last token is the action when it names one; everything before is the
+        # search term (display names may contain spaces).
+        action: str | None = None
+        if args and args[-1].lower() in USER_ACTIONS:
+            action = args[-1].lower()
+            args = args[:-1]
+        term = " ".join(args) if args else None
+        self._resolve_user(term, lambda row: self._user_action(row, action))
 
-    def _detail_users_roles(self, uid: Any) -> Any:
-        if not uid:
-            return self._placeholder("Select a user on the left to manage its roles.")
-        rows = ops.list_user_roles(self.db, uid)
-        values = [
-            (a["id"], f"{a['role_key']}" + (f" @ {a['gremium']}" if a["gremium"] else " (global)"))
+    def _user_action(self, row: dict[str, Any], action: str | None) -> None:
+        if action is None:
+            active = views.truthy(row.get("active"))
+            options: Choices = [
+                ("show", "show — full record"),
+                ("roles", "roles — list assignments"),
+                ("grant", "grant — add a role"),
+                ("revoke", "revoke — remove an assignment"),
+                (
+                    "deactivate" if active else "activate",
+                    "deactivate — disable login" if active else "activate — enable login",
+                ),
+                ("delete", "delete — remove the principal (cascades!)"),
+            ]
+            self.choose(
+                views.user_name(row),
+                options,
+                lambda key: self._user_action(row, key) if key else None,
+            )
+            return
+        dispatch: dict[str, Callable[[dict[str, Any]], None]] = {
+            "show": self._user_show,
+            "roles": self._user_roles,
+            "grant": self._user_grant,
+            "revoke": self._user_revoke,
+            "activate": lambda r: self._user_set_active(r, True),
+            "deactivate": lambda r: self._user_set_active(r, False),
+            "delete": self._user_delete,
+        }
+        dispatch[action](row)
+
+    def _assignment_labels(self, principal_id: str) -> tuple[Choices, int]:
+        db = self._require_db()
+        if db is None:
+            return [], 0
+        rows = ops.list_user_roles(db, principal_id)
+        values: Choices = [
+            (
+                views.fmt(a["id"]),
+                f"{views.fmt(a['role_key'])}"
+                + (f" @ {views.fmt(a['gremium'])}" if a.get("gremium") else " (global)"),
+            )
             for a in rows
         ]
-        ctrl, _focus = self._list_or_empty(values, fill=True)
+        return values, len(rows)
 
-        def add() -> None:
-            self.guard_write(lambda: self._add_role_flow(uid))
+    def _user_show(self, row: dict[str, Any]) -> None:
+        values, _count = self._assignment_labels(views.fmt(row["id"]))
+        # Replace the aggregated roles column with the precise per-scope list.
+        assignments = ", ".join(label for _key, label in values)
+        rendered = views.user_rows([{**row, "roles": assignments}])
+        if rendered:
+            self._log_panel.pop_out(rendered[0][1], rendered[0][2])
 
-        def revoke() -> None:
-            aid = getattr(ctrl, "current_value", None)
-            if not aid:
+    def _user_roles(self, row: dict[str, Any]) -> None:
+        values, count = self._assignment_labels(views.fmt(row["id"]))
+        self.info(f"{views.user_name(row)} — {count} assignment(s)")
+        for _key, label in values:
+            self._log_panel.append(
+                LogEntry(fragments=[("class:value", f"  {label}\n")])
+            )
+
+    def _user_grant(self, row: dict[str, Any]) -> None:
+        db = self._writable()
+        if db is None:
+            return
+        roles = ops.list_roles_simple(db)
+        role_by_id = {views.fmt(r["id"]): r for r in roles}
+
+        def picked_role(role_id: str | None) -> None:
+            if not role_id:
                 return
-            self.guard_write(lambda: self.confirm(
-                "Revoke this role assignment?",
-                lambda: self.run_write(lambda: ops.revoke_assignment(self.db, aid), "assignment revoked"),
-            ))
+            gremien = ops.list_gremien(db)
+            values: Choices = [("", "(global)")]
+            values += [(views.fmt(g["id"]), views.fmt(g["name"])) for g in gremien]
 
-        buttons = self._button_row(Button("Add…", add, width=9), Button("Revoke", revoke, width=10))
-        return HSplit([
-            self._heading(f"Role assignments ({len(rows)})"),
-            ctrl,
-            Window(height=1),
-            buttons,
-        ])
-
-    def _detail_users_actions(self, uid: Any) -> Any:
-        if not uid:
-            return self._placeholder("Select a user on the left.")
-        row = next((u for u in self._users if u["id"] == uid), None)
-        if row is None:
-            return self._placeholder("User not found — refresh.")
-        active = _truthy(row["active"])
-        label = _fmt(row["email"] or row["display_name"] or row["sub"])
-        info = "\n".join([
-            f"Name   {label}",
-            f"Sub    {_fmt(row['sub'])}",
-            f"Active {'yes' if active else 'no'}",
-            f"Roles  {_fmt(row['roles']) or '—'}",
-            f"Last   {_fmt(row['last_login'])[:19] or 'never'}",
-        ])
-
-        def toggle() -> None:
-            self.guard_write(lambda: self.confirm(
-                f"{'Deactivate' if active else 'Activate'} {label}?",
-                lambda: self.run_write(lambda: ops.set_user_active(self.db, uid, not active), "user updated"),
-            ))
-
-        def delete() -> None:
-            self.guard_write(lambda: self.confirm(
-                f"DELETE principal {label}?\nCascades sessions + role assignments. Irreversible.",
-                lambda: self.run_write(lambda: ops.delete_user(self.db, uid), "user deleted"),
-                title="Delete user",
-            ))
-
-        buttons = self._button_row(
-            Button("Activate" if not active else "Deactivate", toggle, width=14),
-            Button("Delete", delete, width=10),
-        )
-        return HSplit([self._heading("User"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
-
-    def _add_role_flow(self, principal_id: str) -> None:
-        roles = ops.list_roles_simple(self.db)
-        role_values = [(r["id"], r["key"]) for r in roles]
-
-        def pick_role(role_id: Any) -> None:
-            gremien = ops.list_gremien(self.db)
-            g_values: list[tuple[Any, str]] = [(None, "(global)")]
-            g_values += [(g["id"], _fmt(g["name"])) for g in gremien]
-
-            def pick_gremium(gremium_id: Any) -> None:
-                self.run_write(
-                    lambda: ops.grant_role(self.db, principal_id, role_id, gremium_id),
-                    "role granted",
+            def picked_scope(gremium_id: str | None) -> None:
+                if gremium_id is None:
+                    return
+                self._run_write(
+                    lambda d: ops.grant_role(
+                        d, views.fmt(row["id"]), role_id, gremium_id or None
+                    ),
+                    f"granted {views.fmt(role_by_id[role_id]['key'])} to {views.user_name(row)}",
                 )
 
-            self.ask_choice("Scope", g_values, pick_gremium, label="Gremium (or global):")
+            self.choose("Scope", values, picked_scope)
 
-        self.ask_choice("Add role", role_values, pick_role, label="Role:")
+        self.choose(
+            "Role",
+            [(views.fmt(r["id"]), views.fmt(r["key"])) for r in roles],
+            picked_role,
+            searchable=len(roles) > _SELECTOR_ROWS,
+        )
 
-    # ------------------------------------------------------------------ ROLES
-    def _build_roles(self) -> None:
-        rows = ops.list_roles(self.db)
-        self._roles = rows
-        values = [(r["id"], f"{r['key']}   ({r['perms']}p · {r['assignments']}a)") for r in rows]
-        ctrl, focus = self._list_or_empty(values, self._selected.get("roles"), fill=True)
-        self._left_ctrl = ctrl
-        new_btn = Button("New role…", self._new_role, width=22)
-        left = HSplit([self._button_row(new_btn), Window(height=1), ctrl])
-        self._master_detail(left, focus, left_title=f"Roles ({len(rows)})")
+    def _user_revoke(self, row: dict[str, Any]) -> None:
+        if self._writable() is None:
+            return
+        values, _count = self._assignment_labels(views.fmt(row["id"]))
 
-    def _role_key(self, rid: Any) -> str:
-        return next((r["key"] for r in self._roles if r["id"] == rid), "")
+        def picked(assignment_id: str | None) -> None:
+            if not assignment_id:
+                return
+            label = next(lbl for key, lbl in values if key == assignment_id)
+            self.confirm(
+                f"Revoke {label} from {views.user_name(row)}?",
+                lambda: self._run_write(
+                    lambda d: ops.revoke_assignment(d, assignment_id),
+                    "assignment revoked",
+                ),
+            )
 
-    def _detail_roles_perms(self, rid: Any) -> Any:
-        if not rid:
-            return self._placeholder("Select a role on the left.")
-        current = set(ops.list_role_permissions(self.db, rid))
-        keys = list(dict.fromkeys([*PERMISSION_CATALOGUE, *sorted(current)]))
-        values = [(k, k + ("  ⚠ human-only" if k in FORBIDDEN_PERMISSIONS else "")) for k in keys]
-        cb: CheckboxList = CheckboxList(values=values)
-        cb.current_values = sorted(current)
-        cb.window.dont_extend_height = to_filter(False)
-        cb.window.dont_extend_width = to_filter(False)
-        self._perm_cb = cb
+        self.choose("Revoke assignment", values, picked)
 
-        def save() -> None:
-            chosen = [str(c) for c in cb.current_values]
+    def _user_set_active(self, row: dict[str, Any], active: bool) -> None:
+        if self._writable() is None:
+            return
+        verb = "Activate" if active else "Deactivate"
+        self.confirm(
+            f"{verb} {views.user_name(row)}?",
+            lambda: self._run_write(
+                lambda d: ops.set_user_active(d, views.fmt(row["id"]), active),
+                f"user {'activated' if active else 'deactivated'}",
+            ),
+        )
 
-            def do() -> int:
-                ops.set_role_permissions(self.db, rid, chosen)
-                return len(chosen)
+    def _user_delete(self, row: dict[str, Any]) -> None:
+        if self._writable() is None:
+            return
+        self.confirm(
+            f"DELETE principal {views.user_name(row)}? "
+            "Cascades sessions + role assignments — irreversible.",
+            lambda: self._run_write(
+                lambda d: ops.delete_user(d, views.fmt(row["id"])), "user deleted"
+            ),
+        )
 
-            self.guard_write(lambda: self.run_write(do, "permissions saved"))
+    # ------------------------------------------------------------------ /roles /role
+    def _cmd_roles(self, _args: list[str]) -> None:
+        db = self._require_db()
+        if db is None:
+            return
+        rows = ops.list_roles(db)
+        self._roles_cache = rows
+        self._log_panel.append(LogEntry(fragments=views.separator(f"roles ({len(rows)})")))
+        for row in views.role_rows(rows):
+            self._log_panel.append_record(row)
 
-        return HSplit([
-            self._heading(f"Permissions · {self._role_key(rid)}"),
-            Window(FormattedTextControl([("class:detail.dim", "Space toggles · Save to apply")]), height=1),
-            cb,
-            Window(height=1),
-            self._button_row(Button("Save", save, width=9)),
-        ])
+    def _resolve_role(
+        self, term: str | None, then: Callable[[dict[str, Any]], None]
+    ) -> None:
+        db = self._require_db()
+        if db is None:
+            return
+        rows = ops.list_roles(db)
+        self._roles_cache = rows
+        if term:
+            match = next(
+                (r for r in rows if views.fmt(r["key"]).lower() == term.lower()), None
+            )
+            if match is not None:
+                then(match)
+                return
+            self.error(f"unknown role {term!r}")
+            return
+        by_id = {views.fmt(r["id"]): r for r in rows}
+        self.choose(
+            "Role",
+            [
+                (views.fmt(r["id"]),
+                 f"{views.fmt(r['key'])}  ({views.fmt(r['perms'])}p · {views.fmt(r['assignments'])}a)")
+                for r in rows
+            ],
+            lambda key: then(by_id[key]) if key else None,
+            searchable=len(rows) > _SELECTOR_ROWS,
+        )
 
-    def _detail_roles_users(self, rid: Any) -> Any:
-        if not rid:
-            return self._placeholder("Select a role on the left.")
-        rows = ops.list_role_users(self.db, rid)
-        values = [
+    def _cmd_role(self, args: list[str]) -> None:
+        term = args[0] if args else None
+        action = args[1].lower() if len(args) > 1 else None
+        if action is not None and action not in ROLE_ACTIONS:
+            self.error(f"unknown action {action!r} — {' · '.join(ROLE_ACTIONS)}")
+            return
+        self._resolve_role(term, lambda row: self._role_action(row, action))
+
+    def _role_action(self, row: dict[str, Any], action: str | None) -> None:
+        if action is None:
+            self.choose(
+                views.fmt(row["key"]),
+                [
+                    ("show", "show — permissions + holders"),
+                    ("perms", "perms — edit the permission set"),
+                    ("rename", "rename — change the role key"),
+                    ("delete", "delete — remove the role (cascades!)"),
+                ],
+                lambda key: self._role_action(row, key) if key else None,
+            )
+            return
+        dispatch: dict[str, Callable[[dict[str, Any]], None]] = {
+            "show": self._role_show,
+            "perms": self._role_perms,
+            "rename": self._role_rename,
+            "delete": self._role_delete,
+        }
+        dispatch[action](row)
+
+    def _role_show(self, row: dict[str, Any]) -> None:
+        db = self._require_db()
+        if db is None:
+            return
+        role_id = views.fmt(row["id"])
+        permissions = ops.list_role_permissions(db, role_id)
+        holders = [
             (
-                a["assignment_id"],
-                f"{_fmt(a['email']) or _fmt(a['display_name']) or _fmt(a['sub'])}"
-                + (f" @ {a['gremium']}" if a["gremium"] else " (global)"),
+                views.fmt(a.get("email"))
+                or views.fmt(a.get("display_name"))
+                or views.fmt(a.get("sub"))
             )
-            for a in rows
+            + (f" @ {views.fmt(a['gremium'])}" if a.get("gremium") else " (global)")
+            for a in ops.list_role_users(db, role_id)
         ]
-        ctrl, _focus = self._list_or_empty(values, fill=True)
+        self._log_panel.pop_out(
+            views.role_detail(views.fmt(row["key"]), permissions, holders),
+            f"role {views.fmt(row['key'])}",
+        )
 
-        def revoke() -> None:
-            aid = getattr(ctrl, "current_value", None)
-            if not aid:
+    def _role_perms(self, row: dict[str, Any]) -> None:
+        db = self._writable()
+        if db is None:
+            return
+        role_id = views.fmt(row["id"])
+        current = set(ops.list_role_permissions(db, role_id))
+        keys = list(dict.fromkeys([*PERMISSION_CATALOGUE, *sorted(current)]))
+        fields = [
+            FormField(
+                key=key,
+                label=key,
+                kind="bool",
+                choice_index=1 if key in current else 0,
+                hint="⚠ human-only" if key in FORBIDDEN_PERMISSIONS else "",
+            )
+            for key in keys
+        ]
+
+        def submit(form: Form) -> None:
+            chosen = [f.key for f in form.fields if f.choice_index]
+            granted_forbidden = [k for k in chosen if k in FORBIDDEN_PERMISSIONS]
+
+            def apply() -> None:
+                self._run_write(
+                    lambda d: (ops.set_role_permissions(d, role_id, chosen), len(chosen))[1],
+                    f"permissions of {views.fmt(row['key'])} saved",
+                )
+
+            if granted_forbidden and not current.intersection(granted_forbidden):
+                self.confirm(
+                    f"{', '.join(granted_forbidden)} is human-only (never grantable "
+                    "via the API). Grant anyway?",
+                    apply,
+                )
+            else:
+                apply()
+
+        self.open_form(
+            Form(title=f"permissions · {views.fmt(row['key'])}", fields=fields, on_submit=submit)
+        )
+
+    def _role_rename(self, row: dict[str, Any]) -> None:
+        if self._writable() is None:
+            return
+
+        def submit(form: Form) -> None:
+            key = form.by_key()["key"].text.strip()
+            if not key:
+                self.error("empty role key — not renamed")
                 return
-            self.guard_write(lambda: self.confirm(
-                "Revoke this principal's assignment of this role?",
-                lambda: self.run_write(lambda: ops.revoke_assignment(self.db, aid), "assignment revoked"),
-            ))
+            self._run_write(
+                lambda d: ops.rename_role(d, views.fmt(row["id"]), key),
+                f"role renamed to {key}",
+            )
 
-        return HSplit([
-            self._heading(f"Principals with “{self._role_key(rid)}” ({len(rows)})"),
-            ctrl,
-            Window(height=1),
-            self._button_row(Button("Revoke", revoke, width=10)),
-        ])
+        self.open_form(
+            Form(
+                title=f"rename · {views.fmt(row['key'])}",
+                fields=[FormField(key="key", label="key", kind="text", text=views.fmt(row["key"]))],
+                on_submit=submit,
+            )
+        )
 
-    def _detail_roles_actions(self, rid: Any) -> Any:
-        if not rid:
-            return self._placeholder("Select a role on the left.")
-        cur = self._role_key(rid)
+    def _role_delete(self, row: dict[str, Any]) -> None:
+        if self._writable() is None:
+            return
+        self.confirm(
+            f"DELETE role {views.fmt(row['key'])}? "
+            "Cascades its permissions, assignments and OIDC mappings.",
+            lambda: self._run_write(
+                lambda d: ops.delete_role(d, views.fmt(row["id"])), "role deleted"
+            ),
+        )
 
-        def rename() -> None:
-            self.guard_write(lambda: self.ask_input(
-                "Rename role", "New key:", cur,
-                lambda key: key and self.run_write(
-                    lambda: ops.rename_role(self.db, rid, key, key), "role renamed"),
-            ))
+    def _cmd_new_role(self, args: list[str]) -> None:
+        if self._writable() is None:
+            return
 
-        def delete() -> None:
-            self.guard_write(lambda: self.confirm(
-                f"DELETE role '{cur}'?\nCascades its permissions, assignments and OIDC mappings.",
-                lambda: self.run_write(lambda: ops.delete_role(self.db, rid), "role deleted"),
-                title="Delete role",
-            ))
+        def create(key: str) -> None:
+            key = key.strip()
+            if not key:
+                self.error("empty role key — not created")
+                return
+            self._run_write(lambda d: ops.create_role(d, key, key), f"role {key} created")
 
-        buttons = self._button_row(Button("Rename", rename, width=10), Button("Delete", delete, width=10))
-        return HSplit([self._heading(f"Role · {cur}"), Box(Label(f"Key: {cur}"), padding=0),
-                       Window(height=1), buttons, Window()])
+        if args:
+            create(args[0])
+            return
+        self.open_form(
+            Form(
+                title="new role",
+                fields=[FormField(key="key", label="key (e.g. treasurer)", kind="text")],
+                on_submit=lambda form: create(form.by_key()["key"].text),
+            )
+        )
 
-    def _new_role(self) -> None:
-        self.guard_write(lambda: self.ask_input(
-            "New role", "Role key (e.g. treasurer):", "",
-            lambda key: key and self.run_write(
-                lambda: ops.create_role(self.db, key, key), "role created"),
-        ))
+    # ------------------------------------------------------------------ /mappings /mapping
+    def _cmd_mappings(self, _args: list[str]) -> None:
+        db = self._require_db()
+        if db is None:
+            return
+        rows = ops.list_mappings(db)
+        self._mappings_cache = rows
+        self._log_panel.append(
+            LogEntry(fragments=views.separator(f"OIDC mappings ({len(rows)})"))
+        )
+        for row in views.mapping_rows(rows):
+            self._log_panel.append_record(row)
 
-    # ------------------------------------------------------------------ OIDC mappings
-    def _build_oidc(self) -> None:
-        rows = ops.list_mappings(self.db)
-        self._mappings = rows
-        values = [
-            (r["id"], f"{r['oidc_group']} → {r['role_key']}"
-             + (f" @ {r['gremium']}" if r["gremium"] else " (global)"))
-            for r in rows
-        ]
-        ctrl, focus = self._list_or_empty(values, self._selected.get("oidc"), fill=True)
-        self._left_ctrl = ctrl
-        new_btn = Button("New mapping…", lambda: self.guard_write(lambda: self._mapping_flow(None)), width=22)
-        left = HSplit([self._button_row(new_btn), Window(height=1), ctrl])
-        self._master_detail(left, focus, left_title=f"OIDC mappings ({len(rows)})")
+    def _resolve_mapping(
+        self, term: str | None, then: Callable[[dict[str, Any]], None]
+    ) -> None:
+        db = self._require_db()
+        if db is None:
+            return
+        rows = ops.list_mappings(db)
+        self._mappings_cache = rows
+        if term:
+            matches = [
+                r for r in rows if term.lower() in views.fmt(r["oidc_group"]).lower()
+            ]
+            if len(matches) == 1:
+                then(matches[0])
+                return
+            if not matches:
+                self.error(f"no mapping matches {term!r}")
+                return
+            rows = matches
+        by_id = {views.fmt(r["id"]): r for r in rows}
+        self.choose(
+            "Mapping",
+            [(views.fmt(r["id"]), views.mapping_label(r)) for r in rows],
+            lambda key: then(by_id[key]) if key else None,
+            searchable=len(rows) > _SELECTOR_ROWS,
+        )
 
-    def _detail_oidc_actions(self, mid: Any) -> Any:
-        row = next((m for m in self._mappings if m["id"] == mid), None)
-        if row is None:
-            return self._placeholder("Select a mapping on the left.")
-        scope = f" @ {row['gremium']}" if row["gremium"] else " (global)"
-        info = f"{row['oidc_group']} → {row['role_key']}{scope}"
+    def _cmd_mapping(self, args: list[str]) -> None:
+        term = args[0] if args else None
+        action = args[1].lower() if len(args) > 1 else None
+        if action is not None and action not in MAPPING_ACTIONS:
+            self.error(f"unknown action {action!r} — {' · '.join(MAPPING_ACTIONS)}")
+            return
+        self._resolve_mapping(term, lambda row: self._mapping_action(row, action))
 
-        def edit() -> None:
-            self.guard_write(lambda: self._mapping_flow(row))
+    def _mapping_action(self, row: dict[str, Any], action: str | None) -> None:
+        if action is None:
+            self.choose(
+                views.mapping_label(row),
+                [
+                    ("show", "show — full record"),
+                    ("edit", "edit — group / role / scope"),
+                    ("delete", "delete — remove the mapping"),
+                ],
+                lambda key: self._mapping_action(row, key) if key else None,
+            )
+            return
+        if action == "show":
+            rendered = views.mapping_rows([row])
+            if rendered:
+                self._log_panel.pop_out(rendered[0][1], "mapping")
+            return
+        if action == "edit":
+            self._mapping_form(row)
+            return
+        self.confirm(
+            f"Delete mapping {views.mapping_label(row)}?",
+            lambda: self._run_write(
+                lambda d: ops.delete_mapping(d, views.fmt(row["id"])), "mapping deleted"
+            ),
+        )
 
-        def delete() -> None:
-            self.guard_write(lambda: self.confirm(
-                "Delete this OIDC group-mapping?",
-                lambda: self.run_write(lambda: ops.delete_mapping(self.db, mid), "mapping deleted"),
-            ))
+    def _cmd_new_mapping(self, _args: list[str]) -> None:
+        self._mapping_form(None)
 
-        buttons = self._button_row(Button("Edit", edit, width=8), Button("Delete", delete, width=10))
-        return HSplit([self._heading("Mapping"), Box(Label(info), padding=0), Window(height=1), buttons, Window()])
+    def _mapping_form(self, existing: dict[str, Any] | None) -> None:
+        db = self._writable()
+        if db is None:
+            return
+        roles = ops.list_roles_simple(db)
+        if not roles:
+            self.error("no roles exist yet — /new-role first")
+            return
+        gremien = ops.list_gremien(db)
+        role_keys = [views.fmt(r["key"]) for r in roles]
+        role_ids = [views.fmt(r["id"]) for r in roles]
+        scope_labels = ["(global)"] + [views.fmt(g["name"]) for g in gremien]
+        scope_ids: list[str | None] = [None, *(views.fmt(g["id"]) for g in gremien)]
 
-    def _mapping_flow(self, existing: dict[str, Any] | None) -> None:
-        roles = ops.list_roles_simple(self.db)
-        role_values = [(r["id"], r["key"]) for r in roles]
-        mapping_id: Any = existing["id"] if existing else None
-        default_group = _fmt(existing["oidc_group"]) if existing else ""
+        role_index = 0
+        scope_index = 0
+        if existing is not None:
+            existing_role = views.fmt(existing.get("role_id"))
+            if existing_role in role_ids:
+                role_index = role_ids.index(existing_role)
+            existing_scope = views.fmt(existing.get("gremium_id")) or None
+            if existing_scope in scope_ids:
+                scope_index = scope_ids.index(existing_scope)
 
-        def got_group(group: str) -> None:
+        def submit(form: Form) -> None:
+            fields = form.by_key()
+            group = fields["group"].text.strip()
             if not group:
+                self.error("empty OIDC group — not saved")
                 return
+            role_id = role_ids[fields["role"].choice_index]
+            gremium_id = scope_ids[fields["scope"].choice_index]
+            if existing is not None:
+                mapping_id = views.fmt(existing["id"])
+                self._run_write(
+                    lambda d: ops.update_mapping(d, mapping_id, group, role_id, gremium_id),
+                    "mapping updated",
+                )
+            else:
+                self._run_write(
+                    lambda d: ops.create_mapping(d, group, role_id, gremium_id),
+                    "mapping created",
+                )
 
-            def got_role(role_id: Any) -> None:
-                gremien = ops.list_gremien(self.db)
-                g_values: list[tuple[Any, str]] = [(None, "(global)")]
-                g_values += [(g["id"], _fmt(g["name"])) for g in gremien]
-
-                def got_gremium(gremium_id: Any) -> None:
-                    if mapping_id is not None:
-                        self.run_write(
-                            lambda: ops.update_mapping(self.db, mapping_id, group, role_id, gremium_id),
-                            "mapping updated")
-                    else:
-                        self.run_write(
-                            lambda: ops.create_mapping(self.db, group, role_id, gremium_id),
-                            "mapping created")
-
-                self.ask_choice("Scope", g_values, got_gremium, label="Gremium (or global):")
-
-            self.ask_choice("Role", role_values, got_role, label="Maps to role:")
-
-        self.ask_input(
-            "OIDC mapping" + (" (edit)" if existing else " (new)"),
-            "OIDC group name:", default_group, got_group,
-        )
-
-    # ------------------------------------------------------------------ AUDIT (full width)
-    def _build_audit(self) -> None:
-        if not self._audit_rows:
-            self._audit_rows = ops.list_audit(self.db, action=self._audit_action, limit=100)
-        text = self._format_audit(self._audit_rows)
-        area = TextArea(text=text, read_only=True, scrollbar=True, focus_on_click=True, wrap_lines=False)
-
-        def more() -> None:
-            if not self._audit_rows:
-                return
-            last_id = int(self._audit_rows[-1]["id"])
-            extra = ops.list_audit(self.db, before_id=last_id, action=self._audit_action, limit=100)
-            self._audit_rows += extra
-            self.refresh()
-            self.set_status(f"loaded {len(self._audit_rows)} entries")
-
-        def filt() -> None:
-            self.ask_input(
-                "Filter audit", "action contains (empty = all):", self._audit_action or "",
-                self._do_audit_filter,
+        self.open_form(
+            Form(
+                title="edit mapping" if existing else "new mapping",
+                fields=[
+                    FormField(
+                        key="group",
+                        label="OIDC group",
+                        kind="text",
+                        text=views.fmt(existing["oidc_group"]) if existing else "",
+                    ),
+                    FormField(
+                        key="role",
+                        label="role",
+                        kind="choice",
+                        choices=role_keys,
+                        choice_index=role_index,
+                    ),
+                    FormField(
+                        key="scope",
+                        label="scope",
+                        kind="choice",
+                        choices=scope_labels,
+                        choice_index=scope_index,
+                    ),
+                ],
+                on_submit=submit,
             )
-
-        title = f"Audit log ({len(self._audit_rows)})" + (
-            f" · action “{self._audit_action}”" if self._audit_action else "")
-        buttons = self._button_row(
-            Button("Load more", more, width=12), Button("Filter…", filt, width=10),
-            Button("Reset", self._reset_audit, width=8),
         )
-        body = HSplit([self._title_row(title), area, Window(height=1), buttons])
-        self._set_body(body, area)
 
-    def _do_audit_filter(self, term: str) -> None:
-        self._audit_action = term or None
-        self._audit_rows = []
-        self.refresh()
+    # ------------------------------------------------------------------ /audit /more
+    def _cmd_audit(self, args: list[str]) -> None:
+        db = self._require_db()
+        if db is None:
+            return
+        filters: dict[str, str] = {}
+        for token in args:
+            key, separator, value = token.partition("=")
+            if not separator:
+                filters["action"] = token
+                continue
+            if key not in ("action", "actor", "target", "limit"):
+                self.error(f"unknown audit filter {key!r} — action= actor= target= limit=")
+                return
+            filters[key] = value
+        self._audit_filters = filters
+        self._audit_oldest = None
+        self._audit_last_date = ""
+        self._fetch_audit(db, first_page=True)
 
-    def _reset_audit(self) -> None:
-        self._audit_action = None
-        self._audit_rows = []
-        self.refresh()
+    def _cmd_more(self, _args: list[str]) -> None:
+        db = self._require_db()
+        if db is None:
+            return
+        if self._audit_oldest is None:
+            self.error("no audit page loaded — /audit first")
+            return
+        self._fetch_audit(db, first_page=False)
 
-    @staticmethod
-    def _format_audit(rows: list[dict[str, Any]]) -> str:
-        head = f"  {'#':>8}  {'WHEN (UTC)':<19}  {'ACTOR':<26}  {'ACTION':<24}  TARGET"
-        sep = "  " + "─" * 96
+    def _audit_limit(self) -> int:
+        raw = self._audit_filters.get("limit", "")
+        try:
+            return max(1, min(500, int(raw)))
+        except ValueError:
+            return _AUDIT_PAGE
+
+    def _fetch_audit(self, db: Db, *, first_page: bool) -> None:
+        filters = self._audit_filters
+        rows = ops.list_audit(
+            db,
+            before_id=None if first_page else self._audit_oldest,
+            action=filters.get("action"),
+            actor=filters.get("actor"),
+            target=filters.get("target"),
+            limit=self._audit_limit(),
+        )
+        if first_page:
+            active = "  ".join(f"{k}={v}" for k, v in filters.items())
+            title = f"audit log{' · ' + active if active else ''}"
+            self._log_panel.append(LogEntry(fragments=views.separator(title)))
         if not rows:
-            return f"{head}\n{sep}\n  (no audit entries)"
-        out = [head, sep]
-        for r in rows:
-            tgt = f"{r['target_type']}:{r['target_id']}" if r["target_type"] else "—"
-            actor = (_fmt(r["actor"]) or "—")[:26]
-            action = _fmt(r["action"])[:24]
-            out.append(
-                f"  {_fmt(r['id']):>8}  {_fmt(r['at'])[:19]:<19}  {actor:<26}  {action:<24}  {tgt}"
-            )
-            data = _fmt(r["data"])
-            if data and data not in ("{}", "null"):
-                out.append(f"            ↳ {data[:140]}")
-        return "\n".join(out)
+            self.info("no (further) audit entries")
+            return
+        for row in views.audit_rows(rows, self._audit_last_date):
+            self._log_panel.append_record(row)
+        self._audit_last_date = views.dt_parts(rows[-1].get("at"))[0]
+        self._audit_oldest = int(views.fmt(rows[-1]["id"]))
+        more = LogEntry(
+            fragments=[
+                ("class:dim", f"  {len(rows)} entries · oldest #{self._audit_oldest} · "),
+                ("class:info", "/more", self._click(lambda: self._handle_line("/more"))),
+                ("class:dim", " for older\n"),
+            ]
+        )
+        self._log_panel.append(more)
 
+    # ------------------------------------------------------------------ lifecycle
     def run(self) -> None:
-        self.app.run()
+        """Show the startup summary and run the UI until the user quits."""
+        self.info(f"antragsplattform admin v{__version__} — /help for commands")
+        for note in self._startup_notes:
+            (self.info if self.db is not None else self.error)(note)
+        if self.db is None:
+            self.error("not connected — check the stack / port forward, then /connect")
+        else:
+            self._refresh_caches()
+            if self.cfg.read_only:
+                self.info("read-only mode: writes are disabled")
+            else:
+                self.warn("writes bypass the API: no audit entry, no RBAC guards")
+        self._app.run()
 
 
 def _print(msg: str) -> None:
@@ -873,34 +1087,36 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if "-h" in args or "--help" in args:
         print(
-            "antragsplattform admin-cli — manage users/roles/OIDC mappings + view audit log.\n\n"
+            "antragsplattform admin-cli — manage users/roles/OIDC mappings + view the audit log.\n\n"
             "Usage: antragsplattform-admin [--read-only] [--check] [--version]\n\n"
-            "DB access: set DATABASE_URL for a direct connection, otherwise the running stack is\n"
-            "reached via `docker compose -f $COMPOSE_FILE exec postgres psql` (default compose file\n"
-            "deploy/docker-compose.yml). Env: COMPOSE_FILE, POSTGRES_SERVICE, POSTGRES_USER, POSTGRES_DB."
+            "DB access is resolved automatically: $DATABASE_URL if set, otherwise the\n"
+            "DSN from deploy/.env rewritten to localhost:<port published in the compose\n"
+            "file> (works on the VM and through an SSH port-forward), otherwise\n"
+            "`docker compose exec postgres psql` against the running stack.\n"
+            "Env overrides: DATABASE_URL, COMPOSE_FILE, ENV_FILE, POSTGRES_SERVICE,\n"
+            "POSTGRES_USER, POSTGRES_DB."
         )
         return 0
 
-    cfg = load(read_only="--read-only" in args)
-    try:
-        db = connect(cfg)
-    except DbError as exc:
-        _print(f"error: {exc}")
-        return 2
+    cfg = resolve(read_only="--read-only" in args)
+    db, notes = connect_auto(cfg)
 
     if "--check" in args:
-        try:
-            rows = db.query("SELECT count(*) AS n FROM principal")
-            _print(f"ok: connected via {cfg.mode_label}; {rows[0]['n']} principals.")
-            return 0
-        except DbError as exc:
-            _print(f"error: {exc}")
+        for note in notes:
+            _print(("ok: " if db is not None else "--  ") + note)
+        if db is None:
+            _print("error: no database reachable")
             return 2
-        finally:
-            db.close()
-
-    try:
-        AdminApp(db, cfg).run()
-    finally:
+        rows = db.query("SELECT count(*) AS n FROM principal")
+        _print(f"ok: {rows[0]['n']} principals.")
         db.close()
+        return 0
+
+    cli = AdminCLI(cfg, db, notes)
+    try:
+        cli.run()
+    finally:
+        # /connect may have swapped the backend — close whatever the UI holds now.
+        if cli.db is not None:
+            cli.db.close()
     return 0

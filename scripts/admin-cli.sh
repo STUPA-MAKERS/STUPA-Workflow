@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Launch the antragsplattform admin TUI (./admin-cli).
+# Launch the antragsplattform admin REPL (./admin-cli).
 #
 # Creates/updates a dedicated venv on first run (or when pyproject.toml changes) and starts the
 # installed console script with the right interpreter. Runs from the repo root so the default
 # relative compose file (deploy/docker-compose.yml) resolves.
 #
-# Usage (from the repo root, on the host that runs the stack):
-#   ./scripts/admin-cli.sh                # full-screen TUI
+# Usage (from the repo root, or anywhere with the postgres port forwarded):
+#   ./scripts/admin-cli.sh                # full-screen command REPL
 #   ./scripts/admin-cli.sh --read-only    # writes disabled
 #   ./scripts/admin-cli.sh --check        # just test DB connectivity
 #
-# DB access: set DATABASE_URL for a direct connection; otherwise the running stack is reached via
-# `docker compose -f $COMPOSE_FILE exec postgres psql` (same model as remove-admin-role.sh).
+# DB access is resolved automatically: $DATABASE_URL if set; otherwise the DSN from deploy/.env
+# rewritten to localhost:<host port published in the compose file> (127.0.0.1:5433:5432 → 5433,
+# works through `ssh -L 5433:127.0.0.1:5433 <vm>`); otherwise `docker compose exec postgres psql`.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

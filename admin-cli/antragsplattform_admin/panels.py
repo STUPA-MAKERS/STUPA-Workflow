@@ -1,0 +1,225 @@
+"""Fragment builders for the floating panels and the completion menu.
+
+All pure: each takes the data to show plus the mouse handlers to attach, and
+returns prompt_toolkit fragments. The pop-out detail simply re-emits an entry's
+pre-rendered record view with a close hint; the selector and form renderers
+window their rows around the cursor.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from prompt_toolkit.completion import Completion
+from prompt_toolkit.formatted_text import StyleAndTextTuples
+
+from .models import Form, FormField, LogEntry, Selector
+from .protocols import MouseHandler
+
+
+def detail_fragments(
+    entry: LogEntry, consume: MouseHandler, close: MouseHandler
+) -> StyleAndTextTuples:
+    """Popped-out record view: the entry's pre-rendered detail plus a close hint.
+
+    Args:
+        entry: The clicked log entry (must carry a detail view).
+        consume: Handler attached to every fragment so clicks inside the panel
+            keep it open.
+        close: Handler attached to the "esc to close" line so clicking it also
+            dismisses the panel.
+    """
+    if entry.detail is None:
+        return []
+    fragments: StyleAndTextTuples = [
+        (style, text, consume) for style, text, *_ in entry.detail
+    ]
+    fragments.append(("class:select-hint", "\nesc to close", close))
+    return fragments
+
+
+def selector_fragments(
+    selector: Selector, option_handler: Callable[[int], MouseHandler], rows: int
+) -> StyleAndTextTuples:
+    """Render a scrolled window of the selector around its cursor.
+
+    Only *rows* options are shown at once (the caller keeps ``selector.scroll``
+    following the cursor); the first/last visible row gets a ``↑``/``↓`` marker
+    when more options lie off-screen, and the digit keys pick visible rows.
+    """
+    options = selector.visible()
+    start = selector.scroll
+    total = len(options)
+    window = options[start : start + rows]
+    fragments: StyleAndTextTuples = []
+    if selector.searchable:
+        fragments.append(("class:select-key", "search: "))
+        fragments.append(("class:select-active", f"{selector.query}▏\n"))
+    for offset, (_value, label) in enumerate(window):
+        index = start + offset
+        active = index == selector.cursor
+        handler = option_handler(index)
+        if offset == 0 and start > 0:
+            marker = "↑"
+        elif offset == len(window) - 1 and start + len(window) < total:
+            marker = "↓"
+        else:
+            marker = " "
+        key = "  " if selector.searchable else f"{offset + 1}." if offset < 9 else "  "
+        fragments.append(
+            ("class:select-pointer", f"{marker} ❯ ", handler)
+            if active
+            else ("class:select-hint", f"{marker}   ", handler)
+        )
+        fragments.append(("class:select-key", f"{key} ", handler))
+        fragments.append(
+            ("class:select-active" if active else "", f"{label}\n", handler)
+        )
+    if not window:
+        fragments.append(("class:select-hint", "  no matches\n"))
+    hint = (
+        "type to search · ↑/↓ · enter · esc"
+        if selector.searchable
+        else f"↑/↓ · {selector.cursor + 1}/{max(total, 1)} · enter · esc"
+    )
+    fragments.append(("class:select-hint", hint))
+    return fragments
+
+
+# Builds the mouse handler that cycles the field at an index by a step (±1).
+ArrowHandler = Callable[[int, int], MouseHandler]
+
+
+def _form_value(field: FormField, active: bool) -> tuple[str, str]:
+    """The ``(style, text)`` shown for a form row's current value."""
+    if field.kind == "bool":
+        return (
+            "class:on" if field.choice_index else "class:select-key",
+            "on " if field.choice_index else "off",
+        )
+    if field.kind == "choice":
+        return (
+            "class:select-active" if active else "",
+            field.choices[field.choice_index] if field.choices else "(none)",
+        )
+    caret = "▏" if active else ""
+    return (
+        "class:select-active" if active else "class:value",
+        f"{field.text}{caret}",
+    )
+
+
+def _form_hint(field: FormField) -> str:
+    """A short hint describing what the focused form row accepts."""
+    base = (
+        "space/←/→"
+        if field.kind == "bool"
+        else "←/→"
+        if field.kind == "choice"
+        else "type to edit"
+    )
+    return f"{base}   {field.hint}" if field.hint else base
+
+
+def form_fragments(
+    form: Form,
+    focus: Callable[[int], MouseHandler],
+    arrow: ArrowHandler,
+    rows: int,
+) -> StyleAndTextTuples:
+    """Render a form dialog: a scrolled window of field rows plus a key hint.
+
+    Only *rows* fields show at once (the caller keeps ``form.scroll`` following
+    the cursor); the first/last visible row gets a ``↑``/``↓`` marker when more
+    fields lie off-screen.
+    """
+    name_width = max((len(field.label) for field in form.fields), default=0)
+    start = form.scroll
+    total = len(form.fields)
+    window = form.fields[start : start + rows]
+    fragments: StyleAndTextTuples = []
+    for offset, field in enumerate(window):
+        index = start + offset
+        active = index == form.cursor
+        cyclable = field.kind in ("bool", "choice")
+        focus_handler = focus(index)
+        value_handler = arrow(index, 1) if cyclable else focus_handler
+        if offset == 0 and start > 0:
+            marker = "↑"
+        elif offset == len(window) - 1 and start + len(window) < total:
+            marker = "↓"
+        else:
+            marker = " "
+        fragments.append(
+            ("class:select-pointer", f"{marker} ❯ ", focus_handler)
+            if active
+            else ("class:select-hint", f"{marker}   ", focus_handler)
+        )
+        fragments.append(
+            ("class:dim", f"{field.label:<{name_width}}  ", focus_handler)
+        )
+        value_style, value_text = _form_value(field, active)
+        if active and cyclable:
+            fragments.append(("class:select-hint", "◀ ", arrow(index, -1)))
+            fragments.append((value_style, value_text, value_handler))
+            fragments.append(("class:select-hint", " ▶", arrow(index, 1)))
+        else:
+            fragments.append((value_style, value_text, value_handler))
+        if active:
+            fragments.append(
+                ("class:select-hint", f"   {_form_hint(field)}", focus_handler)
+            )
+        fragments.append(("", "\n", focus_handler))
+    scrolled = total > rows
+    position = f" · {form.cursor + 1}/{total}" if scrolled else ""
+    fragments.append(
+        (
+            "class:select-hint",
+            f"↑/↓ move{position} · ←/→ change · type · enter apply · esc",
+        )
+    )
+    return fragments
+
+
+def completion_fragments(
+    completions: list[Completion],
+    selected_index: int | None,
+    click: Callable[[Completion], MouseHandler],
+    total: int,
+    start: int,
+) -> StyleAndTextTuples:
+    """Render a (possibly scrolled) slice of the completion menu.
+
+    *completions* is the visible window of a larger list of *total* entries
+    starting at *start*; edge rows get a ``↑``/``↓`` marker when more entries
+    lie off-screen. The selected entry is reversed and each entry is clickable.
+    """
+    last = len(completions) - 1
+    fragments: StyleAndTextTuples = []
+    for index, completion in enumerate(completions):
+        if index == 0 and start > 0:
+            marker = "↑"
+        elif index == last and start + len(completions) < total:
+            marker = "↓"
+        else:
+            marker = " "
+        fragments.append(
+            (
+                "class:comp-sel" if index == selected_index else "class:comp",
+                f"{marker} {completion.text} ",
+                click(completion),
+            )
+        )
+        meta = completion.display_meta_text
+        if meta:
+            fragments.append(("class:select-hint", f" {meta}", click(completion)))
+        fragments.append(("", "\n", click(completion)))
+    return fragments
+
+
+__all__ = [
+    "detail_fragments",
+    "selector_fragments",
+    "form_fragments",
+    "completion_fragments",
+]

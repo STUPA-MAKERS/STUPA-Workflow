@@ -370,6 +370,21 @@ async def test_list_lines_paged_filters(monkeypatch: pytest.MonkeyPatch) -> None
     assert page.items == []
 
 
+@pytest.mark.asyncio
+async def test_list_lines_paged_linked_and_income_filters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """linked=True (gebucht) / linked=False (offen) / kind=income — restliche Filter-Zweige."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    for linked, kind in ((True, "income"), (False, None)):
+        session.scalar_q.append(0)  # count
+        session.scalars_q.append(_Result([]))
+        page = await svc.list_lines_paged(account_id=None, state=None, linked=linked, kind=kind)
+        assert page.total == 0
+        assert page.items == []
+
+
 # --------------------------------------------------------------- ignore
 @pytest.mark.asyncio
 async def test_ignore_line(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -606,6 +621,25 @@ def test_apply_balance() -> None:
     # ohne Stichtag → now() (nur Nicht-None geprüft, Wert variabel)
     BankService._apply_balance(acc, bank_import.StatementBalance(amount=Decimal("5.00")))
     assert acc.fints_last_balance == Decimal("5.00")
+
+
+def test_apply_balance_recency_guard() -> None:
+    """Recency-Guard (#review): ein ÄLTERER Datei-Saldo überschreibt einen neueren
+    bekannten Stand nicht; gleicher Stichtag aktualisiert weiterhin."""
+    acc = _account()
+    BankService._apply_balance(
+        acc, bank_import.StatementBalance(amount=Decimal("99.00"), as_of=date(2026, 6, 30))
+    )
+    BankService._apply_balance(
+        acc, bank_import.StatementBalance(amount=Decimal("11.00"), as_of=date(2026, 6, 1))
+    )
+    assert acc.fints_last_balance == Decimal("99.00")  # älterer Import ignoriert
+    assert acc.fints_balance_at == datetime(2026, 6, 30, tzinfo=UTC)
+    # gleicher Stichtag → Update greift (Guard nur bei ECHT älterem Stand).
+    BankService._apply_balance(
+        acc, bank_import.StatementBalance(amount=Decimal("77.00"), as_of=date(2026, 6, 30))
+    )
+    assert acc.fints_last_balance == Decimal("77.00")
 
 
 @pytest.mark.asyncio

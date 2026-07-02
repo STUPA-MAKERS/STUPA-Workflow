@@ -187,6 +187,33 @@ describe('BudgetTreeApi', () => {
     req.flush(null);
   });
 
+  describe('sub-bookings (#subbookings)', () => {
+    it('listSubBookings GETs /budget-expenses/:id/sub-bookings', () => {
+      api.listSubBookings('e-1').subscribe();
+      const req = http.expectOne(`${BASE}/budget-expenses/e-1/sub-bookings`);
+      expect(req.request.method).toBe('GET');
+      req.flush([]);
+    });
+
+    it('createSubBooking POSTs the body to /budget-expenses/:id/sub-bookings', () => {
+      api.createSubBooking('e-1', { amount: '5', description: 'Teil' }).subscribe();
+      const req = http.expectOne(`${BASE}/budget-expenses/e-1/sub-bookings`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ amount: '5', description: 'Teil' });
+      req.flush({});
+    });
+
+    it('importSubBookings POSTs a multipart form to /sub-bookings/import', () => {
+      const file = new File(['x'], 'kontoauszug.sta');
+      api.importSubBookings('e-1', file).subscribe();
+      const req = http.expectOne(`${BASE}/budget-expenses/e-1/sub-bookings/import`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body instanceof FormData).toBe(true);
+      expect((req.request.body as FormData).get('file')).toBe(file);
+      req.flush([]);
+    });
+  });
+
   it('createTransfer POSTs /budget-transfers', () => {
     api
       .createTransfer({
@@ -227,6 +254,13 @@ describe('BudgetTreeApi', () => {
       expect(req.request.params.get('limit')).toBe('200');
       req.flush({ items: [{ id: 'inv-1' }], total: 1, limit: 200, offset: 0 });
       expect(items).toEqual([{ id: 'inv-1' }]);
+    });
+
+    it('getInvoice GETs /invoices/:id', () => {
+      api.getInvoice('inv-1').subscribe();
+      const req = http.expectOne(`${BASE}/invoices/inv-1`);
+      expect(req.request.method).toBe('GET');
+      req.flush({ id: 'inv-1' });
     });
 
     it('createInvoice POSTs /invoices', () => {
@@ -368,10 +402,12 @@ describe('BudgetTreeApi', () => {
       req.flush([]);
     });
 
-    it('listStatementLines GETs /statement-lines without filters', () => {
+    it('listStatementLines GETs /statement-lines with only paging defaults', () => {
       api.listStatementLines().subscribe();
-      const req = http.expectOne(`${BASE}/statement-lines`);
-      expect(req.request.params.keys().length).toBe(0);
+      const req = http.expectOne((r) => r.url === `${BASE}/statement-lines`);
+      expect(req.request.params.keys().sort()).toEqual(['limit', 'offset']);
+      expect(req.request.params.get('limit')).toBe('50');
+      expect(req.request.params.get('offset')).toBe('0');
       req.flush([]);
     });
 
@@ -383,11 +419,49 @@ describe('BudgetTreeApi', () => {
       req.flush({ id: 'e-1' });
     });
 
+    it('listStatementLines maps every filter + paging option onto params', () => {
+      api
+        .listStatementLines({
+          account: 'a-1',
+          state: 'matched',
+          linked: false,
+          kind: 'income',
+          q: 'miete',
+          dateFrom: '2026-01-01',
+          dateTo: '2026-06-30',
+          sort: 'amount',
+          order: 'desc',
+          limit: 25,
+          offset: 75,
+        })
+        .subscribe();
+      const req = http.expectOne((r) => r.url === `${BASE}/statement-lines`);
+      // linked=false ist gesetzt (nicht undefined) → als String übertragen.
+      expect(req.request.params.get('linked')).toBe('false');
+      expect(req.request.params.get('kind')).toBe('income');
+      expect(req.request.params.get('q')).toBe('miete');
+      expect(req.request.params.get('dateFrom')).toBe('2026-01-01');
+      expect(req.request.params.get('dateTo')).toBe('2026-06-30');
+      expect(req.request.params.get('sort')).toBe('amount');
+      expect(req.request.params.get('order')).toBe('desc');
+      expect(req.request.params.get('limit')).toBe('25');
+      expect(req.request.params.get('offset')).toBe('75');
+      req.flush({ items: [], total: 0, limit: 25, offset: 75 });
+    });
+
     it('ignoreStatementLine POSTs /statement-lines/:id/ignore', () => {
       api.ignoreStatementLine('l-1').subscribe();
       const req = http.expectOne(`${BASE}/statement-lines/l-1/ignore`);
       expect(req.request.method).toBe('POST');
       req.flush(null);
+    });
+
+    it('unlinkStatementLine POSTs /statement-lines/:id/unlink', () => {
+      api.unlinkStatementLine('l-1').subscribe();
+      const req = http.expectOne(`${BASE}/statement-lines/l-1/unlink`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({});
+      req.flush({ id: 'l-1', matchState: 'unmatched' });
     });
   });
 

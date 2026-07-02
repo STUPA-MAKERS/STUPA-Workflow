@@ -114,11 +114,9 @@ def create_role(db: Db, key: str, name_de: str | None) -> int:
     )
 
 
-def rename_role(db: Db, role_id: str, key: str, name_de: str | None) -> int:
-    return db.execute(
-        "UPDATE role SET key = %s, name_i18n = jsonb_build_object('de', %s::text) WHERE id = %s",
-        (key, name_de or key, role_id),
-    )
+def rename_role(db: Db, role_id: str, key: str) -> int:
+    """Change only the role key; the i18n display names stay untouched."""
+    return db.execute("UPDATE role SET key = %s WHERE id = %s", (key, role_id))
 
 
 def delete_role(db: Db, role_id: str) -> int:
@@ -193,21 +191,57 @@ def list_gremien(db: Db) -> list[dict[str, Any]]:
 
 # --------------------------------------------------------------------------------- audit log
 def list_audit(
-    db: Db, *, before_id: int | None = None, action: str | None = None, limit: int = 100
+    db: Db,
+    *,
+    before_id: int | None = None,
+    action: str | None = None,
+    actor: str | None = None,
+    target: str | None = None,
+    limit: int = 50,
 ) -> list[dict[str, Any]]:
+    """Audit entries newest-first, with the actor resolved to a principal.
+
+    ``actor`` matches the raw sub as well as the resolved email/display name;
+    ``target`` matches ``target_type`` and ``target_id``.
+    """
     clauses, params = [], []
     if before_id is not None:
-        clauses.append("id < %s")
+        clauses.append("a.id < %s")
         params.append(before_id)
     if action and action.strip():
-        clauses.append("action ILIKE %s")
+        clauses.append("a.action ILIKE %s")
         params.append(f"%{action.strip()}%")
+    if actor and actor.strip():
+        like = f"%{actor.strip()}%"
+        clauses.append("(a.actor ILIKE %s OR p.email ILIKE %s OR p.display_name ILIKE %s)")
+        params += [like, like, like]
+    if target and target.strip():
+        like = f"%{target.strip()}%"
+        clauses.append("(a.target_type ILIKE %s OR a.target_id ILIKE %s)")
+        params += [like, like]
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     sql = f"""
-        SELECT id, at, actor, action, target_type, target_id, data::text AS data
-          FROM audit_entry
+        SELECT a.id, a.at, a.actor, a.action, a.target_type, a.target_id,
+               a.data::text AS data,
+               p.email AS actor_email, p.display_name AS actor_name
+          FROM audit_entry a
+          LEFT JOIN principal p ON p.sub = a.actor
           {where}
-         ORDER BY id DESC
+         ORDER BY a.id DESC
          LIMIT %s
     """
     return db.query(sql, (*params, limit))
+
+
+# --------------------------------------------------------------------------------- counts
+def counts(db: Db) -> dict[str, Any]:
+    """Entity counts for the status toolbar (one round-trip)."""
+    rows = db.query(
+        """
+        SELECT (SELECT count(*) FROM principal)      AS users,
+               (SELECT count(*) FROM role)           AS roles,
+               (SELECT count(*) FROM group_mapping)  AS mappings,
+               (SELECT coalesce(max(id), 0) FROM audit_entry) AS audit_head
+        """
+    )
+    return rows[0] if rows else {}
