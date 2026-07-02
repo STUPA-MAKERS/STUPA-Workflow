@@ -368,10 +368,12 @@ describe('BudgetTreeApi', () => {
       req.flush([]);
     });
 
-    it('listStatementLines GETs /statement-lines without filters', () => {
+    it('listStatementLines GETs /statement-lines with only paging defaults', () => {
       api.listStatementLines().subscribe();
-      const req = http.expectOne(`${BASE}/statement-lines`);
-      expect(req.request.params.keys().length).toBe(0);
+      const req = http.expectOne((r) => r.url === `${BASE}/statement-lines`);
+      expect(req.request.params.keys().sort()).toEqual(['limit', 'offset']);
+      expect(req.request.params.get('limit')).toBe('50');
+      expect(req.request.params.get('offset')).toBe('0');
       req.flush([]);
     });
 
