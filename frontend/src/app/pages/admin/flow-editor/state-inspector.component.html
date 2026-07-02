@@ -1,0 +1,80 @@
+<h2 class="text-md font-semibold m-0">{{ 'admin.flow.stateInspector' | t }}</h2>
+<label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.key' | t }}
+  <input [ngModel]="state().key" (ngModelChange)="keyChange.emit($event)" autocomplete="off" /></label>
+<label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.labelDe' | t }}
+  <input [ngModel]="state().label['de']" (ngModelChange)="labelChange.emit({ lang: 'de', value: $event })" /></label>
+<label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.labelEn' | t }}
+  <input [ngModel]="state().label['en']" (ngModelChange)="labelChange.emit({ lang: 'en', value: $event })" /></label>
+<label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.color' | t }}
+  <span class="fe__color-row">
+    <input
+      type="color"
+      [ngModel]="state().color || '#6b7280'"
+      (ngModelChange)="colorChange.emit($event)"
+    />
+    @if (state().color) {
+      <button type="button" class="border-0 bg-transparent text-muted cursor-pointer text-xs" (click)="colorChange.emit('')">
+        {{ 'admin.flow.colorClear' | t }}
+      </button>
+    }
+  </span>
+</label>
+<app-checkbox [ngModel]="state().isInitial" (ngModelChange)="$event && makeInitial.emit()">
+  {{ 'admin.flow.initial' | t }}
+</app-checkbox>
+<app-checkbox [ngModel]="state().editAllowed !== false" (ngModelChange)="editAllowedChange.emit($event)">
+  {{ 'admin.flow.editAllowed' | t }}
+</app-checkbox>
+<app-checkbox [ngModel]="state().isTerminal === true" (ngModelChange)="terminalChange.emit($event)">
+  {{ 'admin.flow.terminal' | t }}
+</app-checkbox>
+
+<app-select
+  [label]="'admin.flow.kindLabel' | t"
+  [options]="kindOptions()"
+  [ngModel]="state().kind ?? 'normal'"
+  (ngModelChange)="kindChange.emit($event)"
+/>
+
+@if (state().kind === 'vote') {
+  <app-select
+    [label]="'admin.flow.cfgGremium' | t"
+    [placeholder]="'admin.flow.cfgGremiumPh' | t"
+    [options]="gremiumOptions()"
+    [ngModel]="state().config?.gremiumId ?? ''"
+    (ngModelChange)="gremiumChange.emit($event)"
+  />
+}
+@if (state().kind === 'vote') {
+  <p class="text-xs text-muted m-0">{{ 'admin.flow.branchHint' | t }}</p>
+}
+
+<!-- Referencing a named deadline policy: the server creates the deadline on
+     state entry; the deadlinePassed transition fires when it lapses. -->
+<app-select
+  [label]="'admin.flow.cfgDeadline' | t"
+  [placeholder]="'admin.flow.cfgDeadlinePh' | t"
+  [options]="deadlinePolicyOptions()"
+  [ngModel]="state().config?.deadlinePolicyKey ?? ''"
+  (ngModelChange)="deadlinePolicyChange.emit($event)"
+/>
+<p class="text-xs text-muted m-0">{{ 'admin.flow.cfgDeadlineHint' | t }}</p>
+
+<!-- One connector dot per guard; the stack order is the evaluation order
+     (first matching guard wins). Only meaningful from two groups on. -->
+@if ((state().kind ?? 'normal') === 'normal' && guardGroups().length > 1) {
+  <div class="flex flex-col gap-2">
+    <span class="text-sm font-medium">{{ 'admin.flow.guardPriority' | t }}</span>
+    @for (g of guardGroups(); track g.sig; let first = $first; let last = $last; let i = $index) {
+      <div class="flex items-center gap-2">
+        <span class="fe__guard-rank">{{ i + 1 }}</span>
+        <span class="fe__guard-name">{{ g.label }}</span>
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="first" [ariaLabel]="'admin.flow.moveUp' | t" (click)="guardMove.emit({ sig: g.sig, dir: -1 })">↑</app-button>
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="'admin.flow.moveDown' | t" (click)="guardMove.emit({ sig: g.sig, dir: 1 })">↓</app-button>
+      </div>
+    }
+    <span class="text-xs text-muted m-0">{{ 'admin.flow.guardPriorityHint' | t }}</span>
+  </div>
+}
+
+<app-button variant="danger" size="sm" (click)="remove.emit()">{{ 'admin.flow.removeState' | t }}</app-button>

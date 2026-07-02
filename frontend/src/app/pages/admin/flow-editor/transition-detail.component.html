@@ -1,0 +1,90 @@
+<section class="border border-solid border-line rounded-lg bg-surface p-4 flex flex-col gap-4" [attr.aria-label]="'admin.flow.transitionInspector' | t">
+  <header class="flex items-center justify-between gap-4 flex-wrap">
+    <div class="flex items-baseline gap-3 flex-wrap">
+      <h2 class="text-md font-semibold m-0">{{ 'admin.flow.transitionInspector' | t }}</h2>
+      <span class="text-sm text-muted">{{ transition().label?.['de'] || transition().label?.['en'] || (transition().from + ' → ' + transition().to) }}</span>
+    </div>
+  </header>
+
+  <!-- Boolean guard tree (and/or/not + leaf operators). -->
+  <div class="flex flex-col gap-2 pb-3 border-0 border-b border-solid border-line">
+    <h3 class="m-0 text-md">{{ 'admin.flow.guard' | t }}</h3>
+    <p class="text-xs text-muted m-0">{{ 'admin.flow.guardHelp' | t }}</p>
+    <app-guard-editor
+      [guard]="transition().guard ?? null"
+      [roleOptions]="roleOptions()"
+      [gremiumOptions]="gremiumOptions()"
+      [automatic]="!!transition().automatic"
+      (guardChange)="guardChange.emit($event)"
+    />
+  </div>
+
+  <div class="flex items-center justify-between gap-3">
+    <h3 class="m-0 text-md">{{ 'admin.flow.actions' | t }}</h3>
+    <select class="fe__actionsPane-add" #asel (change)="actionAdd.emit(asel.value); asel.value = ''">
+      <option value="">{{ 'admin.flow.addAction' | t }}</option>
+      @for (opt of actionOptions(); track opt.value) {
+        <option [value]="opt.value">{{ opt.label }}</option>
+      }
+    </select>
+  </div>
+
+  @if ((transition().actions ?? []).length) {
+    <div class="fe__actions-grid">
+      @for (act of transition().actions ?? []; track $index; let ai = $index) {
+        <div class="flex flex-col gap-2 p-3 border border-solid border-line rounded-md bg-surface-sunken">
+          <div class="flex items-center justify-between gap-2">
+            <strong>{{ actionLabel(act.type) }}</strong>
+            <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="actionRemove.emit(ai)">✕</app-button>
+          </div>
+          @switch (act.type) {
+            @case ('webhook') {
+              <app-select
+                [label]="'admin.flow.actWebhook' | t"
+                [placeholder]="'admin.flow.actWebhookPh' | t"
+                [options]="webhookOptions()"
+                [ngModel]="actionParam(act, 'webhookId')"
+                (ngModelChange)="actionParamChange.emit({ ai, key: 'webhookId', value: $event })"
+              />
+            }
+            @case ('addToNextSession') {
+              <app-select
+                [label]="'admin.flow.cfgGremium' | t"
+                [placeholder]="'admin.flow.cfgGremiumPh' | t"
+                [options]="gremiumOptions()"
+                [ngModel]="actionParam(act, 'gremiumId')"
+                (ngModelChange)="actionParamChange.emit({ ai, key: 'gremiumId', value: $event })"
+              />
+              <p class="text-xs text-muted">{{ 'admin.flow.actSessionHint' | t }}</p>
+            }
+            @case ('assignBudget') {
+              <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.actBudget' | t }}
+                <input [ngModel]="actionParam(act, 'budgetId')" (ngModelChange)="actionParamChange.emit({ ai, key: 'budgetId', value: $event })" [attr.placeholder]="'admin.flow.actBudgetPh' | t" /></label>
+            }
+            @case ('notify') {
+              <span class="text-sm font-medium">{{ 'admin.flow.actRecipients' | t }}</span>
+              @for (r of recipientsOf(act); track $index; let ri = $index) {
+                <div class="fe__recipient">
+                  <app-select [options]="recipientKindOptions()" [ngModel]="r.kind" (ngModelChange)="recipientKindChange.emit({ ai, ri, kind: $event })" />
+                  @if (recipientNeedsRef(r.kind)) {
+                    @if (r.kind === 'gremium') {
+                      <app-select [options]="gremiumOptions()" [placeholder]="'admin.flow.cfgGremiumPh' | t" [ngModel]="r.ref ?? ''" (ngModelChange)="recipientRefChange.emit({ ai, ri, ref: $event })" />
+                    } @else if (r.kind === 'role') {
+                      <app-select [options]="roleOptions()" [placeholder]="'admin.flow.cfgRolePh' | t" [ngModel]="r.ref ?? ''" (ngModelChange)="recipientRefChange.emit({ ai, ri, ref: $event })" />
+                    } @else {
+                      <input [ngModel]="r.ref ?? ''" (ngModelChange)="recipientRefChange.emit({ ai, ri, ref: $event })" [attr.placeholder]="'admin.flow.actEmailPh' | t" />
+                    }
+                  }
+                  <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="recipientRemove.emit({ ai, ri })">✕</app-button>
+                </div>
+              }
+              <app-button variant="ghost" size="sm" (click)="recipientAdd.emit(ai)">+ {{ 'admin.flow.addRecipient' | t }}</app-button>
+            }
+          }
+        </div>
+      }
+    </div>
+  } @else {
+    <p class="text-muted text-sm m-0">{{ 'admin.flow.actionsEmpty' | t }}</p>
+  }
+</section>

@@ -1,0 +1,21 @@
+<h2 class="text-md font-semibold m-0">{{ 'admin.flow.group.inspector' | t }}</h2>
+<label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.group.name' | t }}
+  <input [ngModel]="group().name" (ngModelChange)="nameChange.emit($event)" autocomplete="off" /></label>
+<label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.color' | t }}
+  <span class="fe__color-row">
+    <input
+      type="color"
+      [ngModel]="group().color || '#6b7280'"
+      (ngModelChange)="colorChange.emit($event)"
+    />
+    @if (group().color) {
+      <button type="button" class="border-0 bg-transparent text-muted cursor-pointer text-xs" (click)="colorChange.emit('')">
+        {{ 'admin.flow.colorClear' | t }}
+      </button>
+    }
+  </span>
+</label>
+<p class="text-xs text-muted m-0">{{ group().stateKeys.length }} {{ 'admin.flow.group.members' | t }}@if (group().groupIds?.length) {, {{ group().groupIds?.length }} {{ 'admin.flow.group.subgroups' | t }}}</p>
+<app-button variant="danger" size="sm" (click)="dissolve.emit()">{{ 'admin.flow.group.dissolve' | t }}</app-button>
+<p class="text-xs text-muted m-0">{{ 'admin.flow.group.dissolveHint' | t }}</p>
+<p class="text-xs text-muted m-0">{{ 'admin.flow.group.multiHint' | t }}</p>
