@@ -11,7 +11,6 @@ import {
 } from '@angular/core';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { FormsModule } from '@angular/forms';
-import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -26,32 +25,21 @@ import {
   FilterRangeComponent,
   IconComponent,
   SelectComponent,
-  type SelectOption,
 } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
-import { downloadBlob } from '@shared/download.util';
-import type { Uuid } from '@core/api/models';
-import {
-  type AccountOption,
-  BudgetTreeApi,
-  type BudgetTreeNode,
-  type Expense,
-  type ExpenseKind,
-  type FiscalYear,
-  type Invoice,
-  type PaymentMethod,
-  flattenBudgetOptions,
-} from '../budget/budget-tree.api';
+import type { Expense, ExpenseKind, Invoice } from '../budget/budget-tree.api';
+import { ariaSortDir, formatEur, sortIndicator } from '../budget/expense-display.util';
 import { SimplifyPathPipe } from '@shared/budget-path';
+import { ExpenseDialogsState } from './expense-dialogs.state';
+import { ExpenseSubBookingsState } from './expense-sub-bookings.state';
+import { ExpensesListState, type ExpenseSortField } from './expenses-list.state';
 
 /**
- * Ausgaben/Einnahmen-Tab (#25): tatsächliche Buchungen sehen/anlegen/verwalten.
- *
- * Eine Buchung ist **eigenständig** (Kostenstelle + HHJ wählbar) oder an einen
- * **Antrag gebunden** (ersetzt dessen gebundenen Betrag anteilig; Kostenstelle + HHJ
- * werden vom Antrag geerbt). Links filtert ein Kostenstellen-Baum (wie die Antragsliste);
- * die Liste lädt serverseitig per Infinite-Scroll nach.
+ * Bookings tab: view/create/manage actual expense/income bookings. A booking is
+ * either standalone (cost centre + fiscal year picked) or bound to an
+ * application (inherits both). Thin facade over the state modules below; its
+ * public surface also drives the specs.
  */
 @Component({
   selector: 'app-expenses',
@@ -78,203 +66,105 @@ import { SimplifyPathPipe } from '@shared/budget-path';
   styleUrl: './expenses.component.scss',
 })
 export class ExpensesComponent implements OnDestroy {
-  private readonly api = inject(BudgetTreeApi);
-  private readonly apps = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
+  // Referenced via the same root instance by the state modules; specs spy here.
   private readonly toast = inject(ToastService);
 
+  private readonly list = new ExpensesListState();
+  private readonly sub = new ExpenseSubBookingsState(this.list);
+  private readonly dialogs = new ExpenseDialogsState(this.list, this.sub);
+
   readonly canManage = computed(() => this.auth.can('budget.book'));
+  readonly canExport = computed(() => this.auth.can('budget.export'));
 
-  private readonly PAGE = 20;
-  readonly budgetTree = signal<BudgetTreeNode[]>([]);
-  readonly items = signal<Expense[]>([]);
-  readonly total = signal(0);
-  private nextOffset = 0;
-  readonly loading = signal(true);
-  readonly loadingMore = signal(false);
-  readonly hasMore = computed(() => this.items().length < this.total());
+  // --- list state (ExpensesListState) ---------------------------------------
+  readonly budgetTree = this.list.budgetTree;
+  readonly items = this.list.items;
+  readonly total = this.list.total;
+  readonly loading = this.list.loading;
+  readonly loadingMore = this.list.loadingMore;
+  readonly hasMore = this.list.hasMore;
+  readonly saving = this.list.saving;
+  readonly kind = this.list.kind;
+  readonly q = this.list.q;
+  readonly amountMin = this.list.amountMin;
+  readonly amountMax = this.list.amountMax;
+  readonly createdFrom = this.list.createdFrom;
+  readonly createdTo = this.list.createdTo;
+  readonly budgetId = this.list.budgetId;
+  readonly accountId = this.list.accountId;
+  readonly sortField = this.list.sortField;
+  readonly sortOrder = this.list.sortOrder;
+  readonly activeFilterCount = this.list.activeFilterCount;
+  readonly costCentreOptions = this.list.costCentreOptions;
+  readonly accounts = this.list.accounts;
+  readonly accountOptions = this.list.accountOptions;
+  readonly accountFilterOptions = this.list.accountFilterOptions;
+  readonly exporting = this.list.exporting;
 
-  readonly kind = signal<'' | ExpenseKind>('');
-  readonly q = signal('');
-  readonly amountMin = signal('');
-  readonly amountMax = signal('');
-  readonly createdFrom = signal('');
-  readonly createdTo = signal('');
-  readonly budgetId = signal('');
-  /** Konto-Filter (#expenses-ux): leer = alle Konten. */
-  readonly accountId = signal('');
-  /** Mobil: Baum hinter einklappbarem Toggle (Desktop immer sichtbar). */
+  // --- dialog state (ExpenseDialogsState) ------------------------------------
+  readonly createOpen = this.dialogs.createOpen;
+  readonly newKind = this.dialogs.newKind;
+  readonly newAmount = this.dialogs.newAmount;
+  readonly newDescription = this.dialogs.newDescription;
+  readonly newBudgetId = this.dialogs.newBudgetId;
+  readonly newFiscalYearId = this.dialogs.newFiscalYearId;
+  readonly newApplicationId = this.dialogs.newApplicationId;
+  readonly appQuery = this.dialogs.appQuery;
+  readonly appCandidates = this.dialogs.appCandidates;
+  readonly fiscalYearOptions = this.dialogs.fiscalYearOptions;
+  readonly newInvoiceDate = this.dialogs.newInvoiceDate;
+  readonly newPaymentDate = this.dialogs.newPaymentDate;
+  readonly newCorrespondent = this.dialogs.newCorrespondent;
+  readonly newReferenceNumber = this.dialogs.newReferenceNumber;
+  readonly newPaymentMethod = this.dialogs.newPaymentMethod;
+  readonly newCategory = this.dialogs.newCategory;
+  readonly newNote = this.dialogs.newNote;
+  readonly paymentMethodOptions = this.dialogs.paymentMethodOptions;
+  readonly editing = this.dialogs.editing;
+  readonly editAmount = this.dialogs.editAmount;
+  readonly editDescription = this.dialogs.editDescription;
+  readonly editBudgetId = this.dialogs.editBudgetId;
+  readonly editInvoiceDate = this.dialogs.editInvoiceDate;
+  readonly editPaymentDate = this.dialogs.editPaymentDate;
+  readonly editCorrespondent = this.dialogs.editCorrespondent;
+  readonly editReferenceNumber = this.dialogs.editReferenceNumber;
+  readonly editPaymentMethod = this.dialogs.editPaymentMethod;
+  readonly editCategory = this.dialogs.editCategory;
+  readonly editNote = this.dialogs.editNote;
+  readonly confirmDelete = this.dialogs.confirmDelete;
+  readonly invoices = this.dialogs.invoices;
+  readonly newInvoiceId = this.dialogs.newInvoiceId;
+  readonly editInvoiceId = this.dialogs.editInvoiceId;
+  readonly viewingInvoice = this.dialogs.viewingInvoice;
+  readonly invoiceOptions = this.dialogs.invoiceOptions;
+  readonly editInvoiceOptions = this.dialogs.editInvoiceOptions;
+  readonly transferOpen = this.dialogs.transferOpen;
+  readonly tFromId = this.dialogs.tFromId;
+  readonly tToId = this.dialogs.tToId;
+  readonly tFiscalYearId = this.dialogs.tFiscalYearId;
+  readonly tAmount = this.dialogs.tAmount;
+  readonly tDescription = this.dialogs.tDescription;
+  readonly transferFyOptions = this.dialogs.transferFyOptions;
+  readonly canSubmitTransfer = this.dialogs.canSubmitTransfer;
+  readonly canSubmitCreate = this.dialogs.canSubmitCreate;
+
+  // --- sub-booking state (ExpenseSubBookingsState) ----------------------------
+  readonly subParent = this.sub.subParent;
+  readonly subAmount = this.sub.subAmount;
+  readonly subDescription = this.sub.subDescription;
+  readonly subPaymentDate = this.sub.subPaymentDate;
+  readonly subCorrespondent = this.sub.subCorrespondent;
+
+  // --- local UI state -----------------------------------------------------------
+  /** Mobile only: tree behind a collapsible toggle (always visible on desktop). */
   readonly treeOpen = signal(false);
-  readonly sortField = signal<'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate'>(
-    'paymentDate',
-  );
-  readonly sortOrder = signal<'asc' | 'desc'>('desc');
-
-  // Beschreibungen kürzen + per Klick aufklappen (#expenses-ux).
   readonly DESC_LIMIT = 90;
   readonly expandedDesc = signal<ReadonlySet<string>>(new Set());
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
-
-  // Unterbuchungen (#subbookings): aufgeklappte Buchungen + geladene Kinder + Lade-/Import-Status.
-  readonly expandedSub = signal<ReadonlySet<string>>(new Set());
-  readonly subRows = signal<ReadonlyMap<string, Expense[]>>(new Map());
-  readonly loadingSub = signal<ReadonlySet<string>>(new Set());
-  readonly subImporting = signal<ReadonlySet<string>>(new Set());
-  // Manuelles Anlegen einer Unterbuchung (Dialog).
-  readonly subParent = signal<Expense | null>(null);
-  readonly subAmount = signal('');
-  readonly subDescription = signal('');
-  readonly subPaymentDate = signal('');
-  readonly subCorrespondent = signal('');
-
-  /** Zahl aktiver Filter (für den Indikator am Filter-Button). */
-  readonly activeFilterCount = computed(
-    () =>
-      [
-        this.kind(),
-        this.accountId(),
-        this.amountMin().trim(),
-        this.amountMax().trim(),
-        this.createdFrom(),
-        this.createdTo(),
-      ].filter((v) => String(v ?? '').trim() !== '').length,
-  );
-
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
-  readonly costCentreOptions = computed<SelectOption[]>(() =>
-    flattenBudgetOptions(this.budgetTree()),
-  );
-
-  // --- Anlegen-Dialog ---
-  readonly createOpen = signal(false);
-  readonly newKind = signal<ExpenseKind>('expense');
-  readonly newAmount = signal('');
-  readonly newDescription = signal('');
-  readonly newBudgetId = signal('');
-  readonly newFiscalYearId = signal('');
-  readonly newApplicationId = signal('');
-  readonly appQuery = signal('');
-  /** Antrags-Treffer der Typeahead-Suche (max. 8). */
-  readonly appCandidates = signal<{ id: string; title: string }[]>([]);
-  readonly fiscalYearOptions = signal<SelectOption[]>([]);
-  readonly saving = signal(false);
-  // Zusatz-Metadaten im Anlegen-Dialog (#1-1/#1-2/#3/#4).
-  readonly newInvoiceDate = signal('');
-  readonly newPaymentDate = signal('');
-  readonly newCorrespondent = signal('');
-  readonly newReferenceNumber = signal('');
-  readonly newPaymentMethod = signal('');
-  readonly newCategory = signal('');
-  readonly newNote = signal('');
-
-  /** Zahlungsmethode-Auswahl (#1-2); leerer Wert = keine Angabe. */
-  readonly paymentMethodOptions = computed<SelectOption[]>(() =>
-    (['ueberweisung', 'bar', 'lastschrift', 'karte', 'paypal'] as const).map((v) => ({
-      value: v,
-      label: this.i18n.translate(`expenses.paymentMethod.${v}`),
-    })),
-  );
-
-  // --- Bearbeiten/Löschen ---
-  readonly editing = signal<Expense | null>(null);
-  readonly editAmount = signal('');
-  readonly editDescription = signal('');
-  readonly editBudgetId = signal('');
-  readonly editInvoiceDate = signal('');
-  readonly editPaymentDate = signal('');
-  readonly editCorrespondent = signal('');
-  readonly editReferenceNumber = signal('');
-  readonly editPaymentMethod = signal('');
-  readonly editCategory = signal('');
-  readonly editNote = signal('');
-  readonly confirmDelete = signal<Expense | null>(null);
-
-  // --- Export + Konten ---
-  readonly canExport = computed(() => this.auth.can('budget.export'));
-  readonly exporting = signal(false);
-  readonly accounts = signal<AccountOption[]>([]);
-  readonly accountOptions = computed<SelectOption[]>(() =>
-    this.accounts().map((a) => ({ value: a.id, label: a.name })),
-  );
-  /** Konto-Filter-Optionen inkl. „Alle Konten" (Wert ''). */
-  readonly accountFilterOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('expenses.filter.allAccounts') },
-    ...this.accountOptions(),
-  ]);
-
-  // --- Rechnungs-Verknüpfung (#invoices): 1 Rechnung : N Buchungen. ---
-  readonly invoices = signal<Invoice[]>([]);
-  readonly newInvoiceId = signal('');
-  readonly editInvoiceId = signal('');
-  /** Detail-Dialog der verknüpften Rechnung einer Buchung (#invoices, read-only). */
-  readonly viewingInvoice = signal<Invoice | null>(null);
-  /** Offene Rechnungen nach Rechnungsdatum (neueste zuerst, ohne Datum zuletzt). Beim
-   *  Buchen wird die gewählte Rechnung serverseitig auf „bezahlt" gesetzt → eine bezahlte
-   *  Rechnung darf nicht erneut verknüpft werden, taucht also nicht mehr im Dropdown auf. */
-  private readonly openInvoices = computed<Invoice[]>(() =>
-    this.invoices()
-      .filter((i) => i.status === 'open')
-      .sort((a, b) => (b.issueDate ?? '').localeCompare(a.issueDate ?? '')),
-  );
-  /** Anlegen-Dialog: nur offene Rechnungen. */
-  readonly invoiceOptions = computed<SelectOption[]>(() =>
-    this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) })),
-  );
-  /** Bearbeiten-Dialog: offene Rechnungen + die aktuell verknüpfte (ggf. bereits
-   *  bezahlte), damit die bestehende Auswahl nicht aus dem Dropdown verschwindet. */
-  readonly editInvoiceOptions = computed<SelectOption[]>(() => {
-    const opts = this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) }));
-    const linkedId = this.editInvoiceId();
-    if (linkedId && !opts.some((o) => o.value === linkedId)) {
-      const inv = this.invoices().find((i) => i.id === linkedId);
-      if (inv) opts.unshift({ value: inv.id, label: this.invoiceLabel(inv) });
-    }
-    return opts;
-  });
-
-  // --- Übertrag-Dialog ---
-  readonly transferOpen = signal(false);
-  readonly tFromId = signal('');
-  readonly tToId = signal('');
-  readonly tFiscalYearId = signal('');
-  readonly tAmount = signal('');
-  readonly tDescription = signal('');
-  readonly transferFyOptions = signal<SelectOption[]>([]);
-  readonly canSubmitTransfer = computed(
-    () =>
-      !!this.tFromId() &&
-      !!this.tToId() &&
-      this.tFromId() !== this.tToId() &&
-      !!this.tFiscalYearId() &&
-      Number(this.tAmount()) > 0 &&
-      !!this.tDescription().trim(),
-  );
-
-  readonly canSubmitCreate = computed(() => {
-    if (!this.newDescription().trim() || !(Number(this.newAmount()) > 0)) return false;
-    // Gebunden: Kostenstelle + HHJ werden vom Antrag geerbt.
-    if (this.newApplicationId()) return true;
-    // Eigenständig: Kostenstelle **und** HHJ explizit erforderlich (sonst 422).
-    return !!this.newBudgetId() && !!this.newFiscalYearId();
-  });
-
   constructor() {
-    this.api.tree().subscribe({
-      next: (tree) => this.budgetTree.set(tree),
-      error: () => this.budgetTree.set([]),
-    });
-    // Konten-Auswahl (id+Name) für die Bankkonto-Zuordnung — Bucher dürfen das ohne
-    // account.manage (#5-2/#2). Server liefert bereits nur aktive Konten.
-    this.api.listAccountOptions().subscribe({
-      next: (accs) => this.accounts.set(accs),
-      error: () => this.accounts.set([]),
-    });
-    // Rechnungen für das Verknüpfungs-Dropdown (#invoices) — Bucher dürfen lesen.
-    this.loadInvoices();
-    this.reload();
-
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
       if (!el || typeof IntersectionObserver === 'undefined') return;
@@ -287,6 +177,15 @@ export class ExpensesComponent implements OnDestroy {
       obs.observe(el);
       onCleanup(() => obs.disconnect());
     });
+  }
+
+  ngOnDestroy(): void {
+    this.list.dispose();
+  }
+
+  // --- display helpers -------------------------------------------------------------
+  money(amount: string): string {
+    return formatEur(Number(amount), this.i18n.locale());
   }
 
   isDescLong(desc: string): boolean {
@@ -306,624 +205,166 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  money(amount: string): string {
-    return Number(amount).toLocaleString(this.i18n.locale() === 'en' ? 'en-US' : 'de-DE', {
-      style: 'currency',
-      currency: 'EUR',
-    });
+  sortInd(field: ExpenseSortField): string {
+    return sortIndicator(this.sortField() === field, this.sortOrder());
   }
 
-  // ----------------------------------------------------- sub-bookings (#subbookings)
-  isSubExpanded(id: string): boolean {
-    return this.expandedSub().has(id);
-  }
-  subOf(id: string): Expense[] {
-    return this.subRows().get(id) ?? [];
-  }
-  isLoadingSub(id: string): boolean {
-    return this.loadingSub().has(id);
-  }
-  isSubImporting(id: string): boolean {
-    return this.subImporting().has(id);
-  }
-  toggleSub(e: Expense): void {
-    const open = new Set(this.expandedSub());
-    if (open.has(e.id)) {
-      open.delete(e.id);
-      this.expandedSub.set(open);
-      return;
-    }
-    open.add(e.id);
-    this.expandedSub.set(open);
-    if (!this.subRows().has(e.id)) this.loadSub(e.id);
-  }
-  private loadSub(id: string): void {
-    this.loadingSub.update((s) => new Set(s).add(id));
-    this.api.listSubBookings(id as Uuid).subscribe({
-      next: (rows) => {
-        this.subRows.update((m) => new Map(m).set(id, rows));
-        this.loadingSub.update((s) => {
-          const n = new Set(s);
-          n.delete(id);
-          return n;
-        });
-      },
-      error: () => {
-        this.loadingSub.update((s) => {
-          const n = new Set(s);
-          n.delete(id);
-          return n;
-        });
-        this.toast.error(this.i18n.translate('expenses.sub.loadError'));
-      },
-    });
-  }
-  onSubFile(e: Expense, event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    this.subImporting.update((s) => new Set(s).add(e.id));
-    this.api.importSubBookings(e.id as Uuid, file).subscribe({
-      next: (children) => {
-        // Vollständige Kinderliste neu laden (Antwort enthält nur den Import-Batch) + Eltern
-        // aufklappen; Eltern-Betrag/childCount via reload aktualisieren.
-        this.expandedSub.update((s) => new Set(s).add(e.id));
-        this.loadSub(e.id);
-        this.subImporting.update((s) => {
-          const n = new Set(s);
-          n.delete(e.id);
-          return n;
-        });
-        this.toast.success(
-          this.i18n.translate('expenses.sub.imported', { count: String(children.length) }),
-        );
-        this.reload(); // Eltern-Betrag = Σ Kinder hat sich geändert
-      },
-      error: (err) => {
-        this.subImporting.update((s) => {
-          const n = new Set(s);
-          n.delete(e.id);
-          return n;
-        });
-        const code = (err as { error?: { code?: string } })?.error?.code;
-        this.toast.error(
-          this.i18n.translate(
-            code === 'bank_statement_unparseable' ? 'fints.errFile' : 'expenses.sub.importError',
-          ),
-        );
-      },
-    });
+  ariaSort(field: ExpenseSortField): 'ascending' | 'descending' | 'none' {
+    return ariaSortDir(this.sortField() === field, this.sortOrder());
   }
 
-  openCreateSub(parent: Expense): void {
-    this.subParent.set(parent);
-    this.subAmount.set('');
-    this.subDescription.set('');
-    this.subPaymentDate.set('');
-    this.subCorrespondent.set('');
-  }
-  closeCreateSub(): void {
-    this.subParent.set(null);
-  }
-  canSubmitSub(): boolean {
-    return !!this.subAmount().trim() && !!this.subDescription().trim();
-  }
-  createSub(event?: Event): void {
-    event?.preventDefault();
-    const parent = this.subParent();
-    if (!parent || !this.canSubmitSub() || this.saving()) return;
-    this.saving.set(true);
-    this.api
-      .createSubBooking(parent.id as Uuid, {
-        amount: this.subAmount(),
-        description: this.subDescription().trim(),
-        paymentDate: this.subPaymentDate() || null,
-        correspondent: this.subCorrespondent().trim() || null,
-      })
-      .subscribe({
-        next: () => {
-          this.saving.set(false);
-          this.closeCreateSub();
-          this.expandedSub.update((s) => new Set(s).add(parent.id));
-          this.loadSub(parent.id);
-          this.toast.success(this.i18n.translate('expenses.sub.added'));
-          this.reload(); // Eltern-Betrag = Σ Kinder
-        },
-        error: () => {
-          this.saving.set(false);
-          this.toast.error(this.i18n.translate('expenses.toast.failed'));
-        },
-      });
-  }
-
-  /** Rechnungs-Label fürs Dropdown: Nummer · Lieferant · Brutto. */
-  private invoiceLabel(i: Invoice): string {
-    return [i.number, i.supplier, this.money(i.grossAmount)]
-      .filter((p) => !!p)
-      .join(' · ');
-  }
-
-  /** Rechnung im Anlegen-Dialog wählen → relevante Felder aus der Rechnung
-   *  übernehmen (Betrag, Empfänger/Zahler, Belegnummer, Rechnungsdatum) (#invoices). */
-  onPickInvoice(id: string): void {
-    this.newInvoiceId.set(id);
-    const inv = this.invoices().find((i) => i.id === id);
-    if (!inv) return;
-    this.newAmount.set(inv.grossAmount ?? '');
-    if (inv.supplier) this.newCorrespondent.set(inv.supplier);
-    if (inv.number) this.newReferenceNumber.set(inv.number);
-    if (inv.issueDate) this.newInvoiceDate.set(inv.issueDate);
-  }
-
-  /** Wie {@link onPickInvoice}, aber für den Bearbeiten-Dialog. */
-  onPickEditInvoice(id: string): void {
-    this.editInvoiceId.set(id);
-    const inv = this.invoices().find((i) => i.id === id);
-    if (!inv) return;
-    this.editAmount.set(inv.grossAmount ?? '');
-    if (inv.supplier) this.editCorrespondent.set(inv.supplier);
-    if (inv.number) this.editReferenceNumber.set(inv.number);
-    if (inv.issueDate) this.editInvoiceDate.set(inv.issueDate);
-  }
-
+  // --- list delegates ------------------------------------------------------------
   setKind(k: '' | ExpenseKind): void {
-    this.kind.set(k);
-    this.reload();
+    this.list.setKind(k);
   }
 
   selectAccount(id: string): void {
-    this.accountId.set(id);
-    this.reload();
+    this.list.selectAccount(id);
   }
 
   selectBudget(id: string): void {
-    this.budgetId.set(id);
-    this.reload();
+    this.list.selectBudget(id);
   }
 
   onSearch(value: string): void {
-    this.q.set(value);
-    this.debouncedReload();
+    this.list.onSearch(value);
   }
 
   onAmountFilter(which: 'min' | 'max', value: string): void {
-    (which === 'min' ? this.amountMin : this.amountMax).set(value);
-    this.debouncedReload();
+    this.list.onAmountFilter(which, value);
   }
 
   onDateFilter(which: 'from' | 'to', value: string): void {
-    (which === 'from' ? this.createdFrom : this.createdTo).set(value);
-    this.debouncedReload();
+    this.list.onDateFilter(which, value);
   }
 
   resetFilters(): void {
-    this.kind.set('');
-    this.accountId.set('');
-    this.amountMin.set('');
-    this.amountMax.set('');
-    this.createdFrom.set('');
-    this.createdTo.set('');
-    this.reload();
+    this.list.resetFilters();
   }
 
-  /** Spalten-Sortierung umschalten (gleiche Spalte → Richtung kippen). */
-  onSort(field: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate'): void {
-    if (this.sortField() === field) {
-      this.sortOrder.update((o) => (o === 'desc' ? 'asc' : 'desc'));
-    } else {
-      this.sortField.set(field);
-      this.sortOrder.set('desc');
-    }
-    this.reload();
-  }
-
-  sortInd(field: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate'): string {
-    if (this.sortField() !== field) return '';
-    return this.sortOrder() === 'asc' ? ' ↑' : ' ↓';
-  }
-
-  ariaSort(
-    field: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate',
-  ): 'ascending' | 'descending' | 'none' {
-    if (this.sortField() !== field) return 'none';
-    return this.sortOrder() === 'asc' ? 'ascending' : 'descending';
-  }
-
-  private debouncedReload(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reload(), 400);
-  }
-
-  ngOnDestroy(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-  }
-
-  private reload(): void {
-    this.nextOffset = 0;
-    this.items.set([]);
-    this.total.set(0);
-    this.loading.set(true);
-    this.fetch(true);
+  onSort(field: ExpenseSortField): void {
+    this.list.onSort(field);
   }
 
   loadMore(): void {
-    if (this.loadingMore() || this.loading() || !this.hasMore()) return;
-    this.loadingMore.set(true);
-    this.fetch(false);
+    this.list.loadMore();
   }
 
-  /** Rechnungsliste (neu) laden — nach dem Buchen wechselt eine verknüpfte Rechnung
-   *  serverseitig auf „bezahlt" und fällt damit aus dem Offen-Dropdown. */
-  private loadInvoices(): void {
-    this.api.listInvoices().subscribe({
-      next: (rows) => this.invoices.set(rows),
-      error: () => this.invoices.set([]),
-    });
-  }
-
-  private fetch(initial: boolean): void {
-    this.api
-      .listExpenses({
-        budget: this.budgetId() || undefined,
-        account: this.accountId() || undefined,
-        kind: this.kind() || undefined,
-        q: this.q().trim() || undefined,
-        amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,
-        amountMax: this.amountMax().trim() ? Number(this.amountMax()) : undefined,
-        createdFrom: this.createdFrom() || undefined,
-        createdTo: this.createdTo() || undefined,
-        sort: this.sortField(),
-        order: this.sortOrder(),
-        limit: this.PAGE,
-        offset: this.nextOffset,
-      })
-      .subscribe({
-        next: (page) => {
-          this.total.set(page.total);
-          this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
-          this.nextOffset = page.offset + page.items.length;
-          this.loading.set(false);
-          this.loadingMore.set(false);
-        },
-        error: () => {
-          this.loading.set(false);
-          this.loadingMore.set(false);
-        },
-      });
-  }
-
-  // --- create ---
-  openCreate(): void {
-    this.newKind.set('expense');
-    this.newAmount.set('');
-    this.newDescription.set('');
-    this.newBudgetId.set(this.budgetId() || '');
-    this.newFiscalYearId.set('');
-    this.newApplicationId.set('');
-    this.newInvoiceId.set('');
-    this.newInvoiceDate.set('');
-    this.newPaymentDate.set('');
-    this.newCorrespondent.set('');
-    this.newReferenceNumber.set('');
-    this.newPaymentMethod.set('');
-    this.newCategory.set('');
-    this.newNote.set('');
-    this.appQuery.set('');
-    this.appCandidates.set([]);
-    this.fiscalYearOptions.set([]);
-    if (this.budgetId()) this.loadFiscalYears(this.budgetId());
-    this.createOpen.set(true);
-  }
-
-  // --- Export ---
   onExport(): void {
-    if (this.exporting()) return;
-    this.exporting.set(true);
-    this.api
-      .exportExpensesXlsx({
-        budget: this.budgetId() || undefined,
-        kind: this.kind() || undefined,
-        q: this.q().trim() || undefined,
-        amountMin: this.amountMin().trim() || undefined,
-        amountMax: this.amountMax().trim() || undefined,
-        createdFrom: this.createdFrom() || undefined,
-        createdTo: this.createdTo() || undefined,
-      })
-      .subscribe({
-        next: (blob) => {
-          downloadBlob(blob, 'buchungen.xlsx');
-          this.exporting.set(false);
-        },
-        error: () => this.exporting.set(false),
-      });
+    this.list.onExport();
   }
 
-  // --- Übertrag ---
-  openTransfer(): void {
-    this.tFromId.set(this.budgetId() || '');
-    this.tToId.set('');
-    this.tFiscalYearId.set('');
-    this.tAmount.set('');
-    this.tDescription.set('');
-    this.transferFyOptions.set([]);
-    if (this.tFromId()) this.loadTransferFy(this.tFromId());
-    this.transferOpen.set(true);
+  // --- sub-booking delegates ---------------------------------------------------------
+  isSubExpanded(id: string): boolean {
+    return this.sub.isSubExpanded(id);
   }
 
-  onTransferFrom(id: string): void {
-    this.tFromId.set(id);
-    this.tFiscalYearId.set('');
-    this.transferFyOptions.set([]);
-    if (id) this.loadTransferFy(id);
+  subOf(id: string): Expense[] {
+    return this.sub.subOf(id);
   }
 
-  private loadTransferFy(budgetId: string): void {
-    const top = this.findTop(this.budgetTree(), budgetId);
-    if (!top) return;
-    this.api.listFiscalYears(top.id).subscribe({
-      next: (fys: FiscalYear[]) => {
-        this.transferFyOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
-        const active = fys.filter((f) => f.active);
-        if (active.length === 1) this.tFiscalYearId.set(active[0].id);
-      },
-      error: () => this.transferFyOptions.set([]),
-    });
+  isLoadingSub(id: string): boolean {
+    return this.sub.isLoadingSub(id);
   }
 
-  createTransfer(event: Event): void {
-    event.preventDefault();
-    if (!this.canSubmitTransfer() || this.saving()) return;
-    this.saving.set(true);
-    this.api
-      .createTransfer({
-        fromBudgetId: this.tFromId(),
-        toBudgetId: this.tToId(),
-        fiscalYearId: this.tFiscalYearId(),
-        amount: this.tAmount(),
-        description: this.tDescription().trim(),
-      })
-      .subscribe({
-        next: () => {
-          this.saving.set(false);
-          this.transferOpen.set(false);
-          this.toast.success(this.i18n.translate('expenses.transferToast'));
-          this.reload();
-        },
-        error: (err) => {
-          this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
-        },
-      });
+  isSubImporting(id: string): boolean {
+    return this.sub.isSubImporting(id);
   }
 
-  setNewKindIncome(): void {
-    this.newKind.set('income');
-    // Einnahmen sind nicht an Anträge bindbar.
-    this.clearApp();
+  toggleSub(e: Expense): void {
+    this.sub.toggleSub(e);
   }
 
-  /** Antrags-Typeahead (wie die Nutzersuche): Treffer als Vorschlagsliste. */
-  onAppSearch(value: string): void {
-    this.appQuery.set(value);
-    const q = value.trim();
-    if (!q) {
-      this.appCandidates.set([]);
-      return;
-    }
-    this.apps.listApplications({ q, limit: 8 }).subscribe({
-      next: (page) =>
-        this.appCandidates.set(
-          page.items.map((a) => ({ id: a.id, title: a.title || a.id })),
-        ),
-      error: () => this.appCandidates.set([]),
-    });
+  onSubFile(e: Expense, event: Event): void {
+    this.sub.onSubFile(e, event);
   }
 
-  pickApp(a: { id: string; title: string }): void {
-    this.newApplicationId.set(a.id);
-    this.appQuery.set(a.title);
-    this.appCandidates.set([]);
+  openCreateSub(parent: Expense): void {
+    this.sub.openCreateSub(parent);
   }
 
-  clearApp(): void {
-    this.newApplicationId.set('');
-    this.appQuery.set('');
-    this.appCandidates.set([]);
+  closeCreateSub(): void {
+    this.sub.closeCreateSub();
   }
 
-  onPickBudget(id: string): void {
-    this.newBudgetId.set(id);
-    this.newFiscalYearId.set('');
-    this.fiscalYearOptions.set([]);
-    if (id) this.loadFiscalYears(id);
+  canSubmitSub(): boolean {
+    return this.sub.canSubmitSub();
   }
 
-  /** Top-Level-Knoten finden, dessen Unterbaum ``budgetId`` enthält, und HHJ laden. */
-  private loadFiscalYears(budgetId: string): void {
-    const top = this.findTop(this.budgetTree(), budgetId);
-    if (!top) return;
-    this.api.listFiscalYears(top.id).subscribe({
-      next: (fys: FiscalYear[]) => {
-        // Alle HHJ anbieten (Backend lässt explizite, auch inaktive HHJ zu); ein
-        // einzelnes aktives HHJ wird vorausgewählt.
-        this.fiscalYearOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
-        const active = fys.filter((f) => f.active);
-        if (active.length === 1) this.newFiscalYearId.set(active[0].id);
-      },
-      error: () => this.fiscalYearOptions.set([]),
-    });
+  createSub(event?: Event): void {
+    this.sub.createSub(event);
   }
 
-  private findTop(nodes: BudgetTreeNode[], targetId: string): BudgetTreeNode | null {
-    const contains = (n: BudgetTreeNode): boolean =>
-      n.id === targetId || n.children.some(contains);
-    return nodes.find((root) => contains(root)) ?? null;
+  // --- dialog delegates -----------------------------------------------------------
+  openCreate(): void {
+    this.dialogs.openCreate();
   }
 
   create(event: Event): void {
-    event.preventDefault();
-    if (!this.canSubmitCreate() || this.saving()) return;
-    const linked = !!this.newApplicationId();
-    this.saving.set(true);
-    this.api
-      .bookExpense({
-        amount: this.newAmount(),
-        description: this.newDescription().trim(),
-        kind: this.newKind(),
-        applicationId: linked ? this.newApplicationId() : null,
-        budgetId: linked ? null : this.newBudgetId() || null,
-        fiscalYearId: linked ? null : this.newFiscalYearId() || null,
-        invoiceId: this.newInvoiceId() || null,
-        invoiceDate: this.newInvoiceDate() || null,
-        paymentDate: this.newPaymentDate() || null,
-        correspondent: this.newCorrespondent().trim() || null,
-        referenceNumber: this.newReferenceNumber().trim() || null,
-        paymentMethod: (this.newPaymentMethod() as PaymentMethod) || null,
-        category: this.newCategory().trim() || null,
-        note: this.newNote().trim() || null,
-      })
-      .subscribe({
-        next: () => {
-          this.saving.set(false);
-          this.createOpen.set(false);
-          this.toast.success(this.i18n.translate('expenses.toast.created'));
-          this.loadInvoices();
-          this.reload();
-        },
-        error: (err) => {
-          this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
-        },
-      });
+    this.dialogs.create(event);
   }
 
-  /** Lesbaren Fehlertext aus dem problem+json (``detail``) ziehen, sonst generisch. */
-  private problemDetail(err: unknown): string {
-    const detail = (err as { error?: { detail?: string } } | null)?.error?.detail;
-    return detail || this.i18n.translate('expenses.toast.failed');
+  setNewKindIncome(): void {
+    this.dialogs.setNewKindIncome();
   }
 
-  // --- verknüpfte Rechnung anzeigen (#invoices) ---
-  /** Detail-Dialog zur verknüpften Rechnung öffnen. Die volle Rechnung steckt im
-   *  bereits geladenen ``invoices()``-Cache (1 Rechnung : N Buchungen); ohne
-   *  ``invoiceId`` ist der Button ohnehin deaktiviert. */
+  onAppSearch(value: string): void {
+    this.dialogs.onAppSearch(value);
+  }
+
+  pickApp(a: { id: string; title: string }): void {
+    this.dialogs.pickApp(a);
+  }
+
+  clearApp(): void {
+    this.dialogs.clearApp();
+  }
+
+  onPickBudget(id: string): void {
+    this.dialogs.onPickBudget(id);
+  }
+
+  onPickInvoice(id: string): void {
+    this.dialogs.onPickInvoice(id);
+  }
+
+  onPickEditInvoice(id: string): void {
+    this.dialogs.onPickEditInvoice(id);
+  }
+
   openInvoiceDialog(e: Expense): void {
-    if (!e.invoiceId) return;
-    const cached = this.invoices().find((i) => i.id === e.invoiceId);
-    if (cached) {
-      this.viewingInvoice.set(cached);
-      return;
-    }
-    // Verknüpfte Rechnung (oft bezahlt/älter) kann außerhalb des 200er-Caches
-    // liegen → gezielt per ID nachladen, statt den Button stumm verpuffen zu lassen.
-    this.api.getInvoice(e.invoiceId).subscribe({
-      next: (inv) => this.viewingInvoice.set(inv),
-      error: (err) => this.toast.error(this.problemDetail(err)),
-    });
+    this.dialogs.openInvoiceDialog(e);
   }
 
-  /** Beleg-PDF streamen + herunterladen (MinIO nur intern erreichbar → Blob). */
   openInvoiceFile(inv: Invoice): void {
-    this.api.invoiceFileBlob(inv.id).subscribe({
-      next: (blob) => downloadBlob(blob, inv.fileName || 'beleg.pdf'),
-      error: (err) => this.toast.error(this.problemDetail(err)),
-    });
+    this.dialogs.openInvoiceFile(inv);
   }
 
-  // --- edit ---
   openEdit(e: Expense): void {
-    this.editing.set(e);
-    this.editAmount.set(e.amount);
-    this.editDescription.set(e.description);
-    this.editBudgetId.set(e.budgetId);
-    this.editInvoiceId.set(e.invoiceId ?? '');
-    this.editInvoiceDate.set(e.invoiceDate ?? '');
-    this.editPaymentDate.set(e.paymentDate ?? '');
-    this.editCorrespondent.set(e.correspondent ?? '');
-    this.editReferenceNumber.set(e.referenceNumber ?? '');
-    this.editPaymentMethod.set(e.paymentMethod ?? '');
-    this.editCategory.set(e.category ?? '');
-    this.editNote.set(e.note ?? '');
+    this.dialogs.openEdit(e);
   }
 
   saveEdit(event: Event): void {
-    event.preventDefault();
-    const e = this.editing();
-    if (!e || this.saving()) return;
-    this.saving.set(true);
-    // Kostenstelle nur bei eigenständigen Buchungen umbuchbar; gebundene erben sie
-    // vom Antrag (#25). Nur senden, wenn tatsächlich geändert → kein Audit-Rauschen.
-    const budgetChanged =
-      !e.applicationId && !!this.editBudgetId() && this.editBudgetId() !== e.budgetId;
-    // Betrag nur senden, wenn geändert: bei einer Eltern-Buchung (childCount>0) ist er = Σ der
-    // Unterbuchungen und serverseitig schreibgeschützt (#subbookings) — unverändert nicht senden.
-    const amountChanged = this.editAmount() !== e.amount;
-    this.api
-      .updateExpense(e.id, {
-        ...(amountChanged ? { amount: this.editAmount() } : {}),
-        description: this.editDescription().trim(),
-        ...(budgetChanged ? { budgetId: this.editBudgetId() } : {}),
-        invoiceId: this.editInvoiceId() || null,
-        invoiceDate: this.editInvoiceDate() || null,
-        paymentDate: this.editPaymentDate() || null,
-        correspondent: this.editCorrespondent().trim() || null,
-        referenceNumber: this.editReferenceNumber().trim() || null,
-        paymentMethod: (this.editPaymentMethod() as PaymentMethod) || null,
-        category: this.editCategory().trim() || null,
-        note: this.editNote().trim() || null,
-      })
-      .subscribe({
-        next: (updated) => {
-          this.saving.set(false);
-          this.editing.set(null);
-          if (e.parentExpenseId) {
-            // Unterbuchung bearbeitet (#subbookings): Eltern-Panel + Eltern-Betrag aktualisieren.
-            this.loadSub(e.parentExpenseId);
-            this.reload();
-          } else {
-            // childCount/parentExpenseId stehen in der Einzel-Antwort nicht zuverlässig (BE
-            // berechnet sie nur im Betrags-Pfad) → aus der bekannten Zeile erhalten (#review).
-            const merged = { ...updated, childCount: e.childCount, parentExpenseId: e.parentExpenseId };
-            this.items.update((list) => list.map((x) => (x.id === merged.id ? merged : x)));
-          }
-          this.toast.success(this.i18n.translate('expenses.toast.saved'));
-          this.loadInvoices();
-        },
-        error: () => {
-          this.saving.set(false);
-          this.toast.error(this.i18n.translate('expenses.toast.failed'));
-        },
-      });
+    this.dialogs.saveEdit(event);
   }
 
-  // --- delete ---
   askDelete(e: Expense): void {
-    this.confirmDelete.set(e);
+    this.dialogs.askDelete(e);
   }
 
   doDelete(): void {
-    const e = this.confirmDelete();
-    if (!e || this.saving()) return;
-    this.saving.set(true);
-    this.api.deleteExpense(e.id).subscribe({
-      next: () => {
-        this.saving.set(false);
-        this.confirmDelete.set(null);
-        if (e.parentExpenseId) {
-          // Unterbuchung gelöscht (#subbookings): Eltern-Panel + Eltern-Betrag aktualisieren.
-          this.loadSub(e.parentExpenseId);
-          this.reload();
-        } else {
-          this.items.update((list) => list.filter((x) => x.id !== e.id));
-          this.total.update((t) => Math.max(0, t - 1));
-        }
-        this.toast.success(this.i18n.translate('expenses.toast.deleted'));
-      },
-      error: () => {
-        this.saving.set(false);
-        this.toast.error(this.i18n.translate('expenses.toast.failed'));
-      },
-    });
+    this.dialogs.doDelete();
+  }
+
+  openTransfer(): void {
+    this.dialogs.openTransfer();
+  }
+
+  onTransferFrom(id: string): void {
+    this.dialogs.onTransferFrom(id);
+  }
+
+  createTransfer(event: Event): void {
+    this.dialogs.createTransfer(event);
   }
 }

@@ -61,7 +61,7 @@
 </header>
 
 <div class="exp__layout">
-  <!-- Konten links (wie Budget-Selektor); mobil einklappbar wie der Buchungen-Baum. -->
+  <!-- Account list on the left; collapsible on mobile. -->
   <aside class="exp__tree">
     <button type="button" class="exp__treeToggle" [attr.aria-expanded]="treeOpen()" (click)="treeOpen.set(!treeOpen())">
       {{ 'konten.accounts' | t }}
@@ -162,7 +162,7 @@
   </div>
 </div>
 
-<!-- Verbindung (Zugangsdaten / Status / Trennen) — im Dialog, nicht inline -->
+<!-- Connection dialog (credentials / status / disconnect) -->
 <app-dialog [open]="connectOpen()" [title]="'konten.connection' | t" [closeLabel]="'action.close' | t" (closed)="closeConnect()">
   <div class="flex flex-col gap-3">
     @if (!configured()) {
@@ -229,7 +229,7 @@
   </div>
 </app-dialog>
 
-<!-- Import: neue Buchung aus Transaktion -->
+<!-- Import: new booking from a transaction -->
 <app-dialog [open]="!!importLine()" [title]="'konten.importTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeImport()">
   @if (importLine(); as line) {
     <div class="kon__dlg">
@@ -253,7 +253,7 @@
   </div>
 </app-dialog>
 
-<!-- Link: an bestehende Buchung (Typeahead wie der Mitglieder-Picker) -->
+<!-- Link to an existing booking (typeahead) -->
 <app-dialog [open]="!!linkLine()" [title]="'konten.linkTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeLink()">
   @if (linkLine(); as line) {
     <div class="kon__dlg">
