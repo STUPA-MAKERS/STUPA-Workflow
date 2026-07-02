@@ -42,7 +42,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceCreate,
     TransferCreate,
 )
-from app.modules.budget.tree_service import BudgetTreeService
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.config_revision.revert import RevertService
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.flow.service import FlowService

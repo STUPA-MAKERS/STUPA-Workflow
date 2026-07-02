@@ -212,7 +212,7 @@ class RevertService:
         self, entry: AuditEntry, actor: str, principal: Principal | None
     ) -> RevertResult:
         """Budget-/Geld-Mutation zurücknehmen (Inverse je Aktionstyp)."""
-        from app.modules.budget.tree_service import BudgetTreeService
+        from app.modules.budget.tree.service import BudgetTreeService
 
         perm = _BUDGET_REVERT_PERM.get(AuditAction(entry.action))
         if perm is None:  # pragma: no cover - durch REVERTABLE_BUDGET_ACTIONS gedeckt

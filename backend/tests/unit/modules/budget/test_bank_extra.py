@@ -176,8 +176,8 @@ async def test_list_lines_with_filters(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_confirm_line_description_override(monkeypatch: pytest.MonkeyPatch) -> None:
     from datetime import UTC, datetime
 
+    from app.modules.budget.tree.service import BudgetTreeService
     from app.modules.budget.tree_schemas import ConfirmLineRequest, ExpenseOut
-    from app.modules.budget.tree_service import BudgetTreeService
 
     session = _Session()
     svc = _svc(session, monkeypatch)
@@ -561,7 +561,7 @@ async def test_confirm_line_already_allocated(monkeypatch: pytest.MonkeyPatch) -
 
 @pytest.mark.asyncio
 async def test_confirm_line_booking_failure_reverts_claim(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.budget.tree_service import BudgetTreeService
+    from app.modules.budget.tree.service import BudgetTreeService
 
     session = _Session()
     svc = _svc(session, monkeypatch)

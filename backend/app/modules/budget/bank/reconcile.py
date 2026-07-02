@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.bank import normalize
 from app.modules.budget.bank.service_base import BankServiceBase
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import (
     BankAllocation,
     BankStatementLine,
@@ -27,7 +28,6 @@ from app.modules.budget.tree_schemas import (
     ExpenseOut,
     StatementLineOut,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.shared.errors import NotFoundError, ValidationProblem
 
 

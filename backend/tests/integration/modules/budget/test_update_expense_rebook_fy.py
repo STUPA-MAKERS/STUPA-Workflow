@@ -27,7 +27,7 @@ from app.modules.budget.tree_schemas import (
     ExpenseUpdate,
     FiscalYearCreate,
 )
-from app.modules.budget.tree_service import BudgetTreeService
+from app.modules.budget.tree.service import BudgetTreeService
 from app.shared.errors import ValidationProblem
 
 pytestmark = pytest.mark.integration

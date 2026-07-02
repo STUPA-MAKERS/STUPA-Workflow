@@ -35,7 +35,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceCreate,
     TransferCreate,
 )
-from app.modules.budget.tree_service import BudgetTreeService
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.models import FormVersion
 from app.shared.errors import ConflictError, ValidationProblem

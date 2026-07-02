@@ -30,7 +30,7 @@ from app.modules.budget.tree_schemas import (
     ExpenseCreate,
     FiscalYearCreate,
 )
-from app.modules.budget.tree_service import BudgetTreeService
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.config_revision.revert import RevertService
 from app.modules.config_revision.service import ENTITY_FORM, ConfigRevisionService
 from app.modules.flow.models import FlowVersion, State, Transition

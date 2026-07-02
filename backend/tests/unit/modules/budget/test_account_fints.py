@@ -1,4 +1,4 @@
-"""FinTS-Konto-Konfiguration (#fints): tree_service-Zweige + Schema-Validatoren.
+"""FinTS-Konto-Konfiguration (#fints): tree/accounts-Zweige + Schema-Validatoren.
 
 Deckt die durch den Bankabgleich neu hinzugekommenen Branches der kritischen
 Budget-Module (100 %-Branch-Gate) ab — DB-lose Fake-Session, Audit gemockt. Login/PIN
@@ -13,14 +13,15 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from app.modules.budget import tree_service as ts_mod
+from app.modules.budget.tree import accounts as accounts_mod
+from app.modules.budget.tree import service_base as base_mod
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import Account
 from app.modules.budget.tree_schemas import (
     AccountCreate,
     AccountUpdate,
     ConfirmLineRequest,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
 from app.shared.errors import NotFoundError, ValidationProblem
 
@@ -33,7 +34,7 @@ def _svc(
     async def _noop(*_a: Any, **_k: Any) -> None:
         return None
 
-    monkeypatch.setattr(ts_mod, "audit_record", _noop)
+    monkeypatch.setattr(base_mod, "audit_record", _noop)
     settings = load_settings(fints_enc_key=key) if key else load_settings()
     return BudgetTreeService(session, settings=settings, actor="tester")  # type: ignore[arg-type]
 
@@ -62,7 +63,7 @@ async def test_create_account_with_fints_connection(monkeypatch: pytest.MonkeyPa
     session = _Session()
     svc = _svc(session, monkeypatch)
     # SSRF-Validator (DNS) ist separat getestet; hier neutralisieren, kein Netz im Unit-Test.
-    monkeypatch.setattr(ts_mod, "validate_fints_endpoint", lambda _u: None)
+    monkeypatch.setattr(accounts_mod, "validate_fints_endpoint", lambda _u: None)
     out = await svc.create_account(
         AccountCreate(
             name="Giro",
@@ -104,7 +105,9 @@ async def test_update_account_connection_resets_states(monkeypatch: pytest.Monke
     """Geänderte Bank-Verbindung → alle hinterlegten SCA-Zustände werden verworfen."""
     session = _Session()
     svc = _svc(session, monkeypatch)
-    monkeypatch.setattr(ts_mod, "validate_fints_endpoint", lambda _u: None)  # kein DNS im Unit-Test
+    monkeypatch.setattr(
+        accounts_mod, "validate_fints_endpoint", lambda _u: None
+    )  # kein DNS im Unit-Test
     acc = Account(id=uuid.uuid4(), name="Giro", iban="DE1", active=True)
     session.put(acc)
     captured: dict[str, Any] = {}

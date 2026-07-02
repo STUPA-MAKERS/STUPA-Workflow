@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
 from app.modules.auth.principal import Principal
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_router import ServiceDep, get_budget_tree_service
 from app.modules.budget.tree_schemas import (
     AccountOption,
@@ -29,7 +30,6 @@ from app.modules.budget.tree_schemas import (
     FiscalYearOut,
     InvoiceOut,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
 from app.shared.paging import Page
 

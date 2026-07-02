@@ -127,7 +127,7 @@ async def _committee_can_read(
         select(Application.budget_id).where(Application.id == application_id)
     )
     if budget_id is not None:
-        from app.modules.budget.tree_service import BudgetTreeService
+        from app.modules.budget.tree.service import BudgetTreeService
 
         if await BudgetTreeService(db).can_view_node(budget_id, gremien):
             return True

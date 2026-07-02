@@ -38,6 +38,7 @@ from app.modules.budget.invoice_import import (
     NotZugferdError,
     UnsupportedInvoiceCurrencyError,
 )
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_schemas import (
     AccountCreate,
     AccountOption,
@@ -77,7 +78,6 @@ from app.modules.budget.tree_schemas import (
     TransferCreate,
     TransferOut,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.shared.antiabuse import body_cap, rate_limit_fints
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
 from app.shared.paging import Page
@@ -690,7 +690,7 @@ async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
 
     Sicherheits-Härtung (#sec-audit): das vom Client beim Upload übergebene
     ``file_mime`` wird auf dem Serve-Pfad **nicht** vertraut. Uploads erzwingen
-    bereits ``application/pdf`` (``tree_service``), daher wird hier hart auf
+    bereits ``application/pdf`` (``tree.invoices``), daher wird hier hart auf
     ``application/pdf`` gesetzt und mit ``Content-Disposition: attachment``
     ausgeliefert — so kann ein als PDF abgelegtes HTML-Polyglot nicht im
     App-Origin rendern (vgl. ``files/router.py`` Download)."""

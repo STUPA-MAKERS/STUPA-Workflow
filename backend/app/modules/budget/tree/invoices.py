@@ -1,0 +1,364 @@
+"""Invoice CRUD, ZUGFeRD/Factur-X import and invoice file storage."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import uuid
+from decimal import Decimal
+from uuid import UUID
+
+from sqlalchemy import func, select
+
+from app.modules.audit.actions import AuditAction
+from app.modules.budget.invoice_import import parse_zugferd_pdf
+from app.modules.budget.tree.service_base import BudgetTreeServiceBase
+from app.modules.budget.tree_models import Invoice
+from app.modules.budget.tree_schemas import (
+    InvoiceCreate,
+    InvoiceFileResult,
+    InvoiceOut,
+    InvoiceParseResult,
+    InvoiceUpdate,
+)
+from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
+from app.modules.files.scanner import ScannerError, build_scanner
+from app.modules.files.storage import StorageError
+from app.search import dialect_of, trigram_rank
+from app.shared.errors import (
+    NotFoundError,
+    PayloadTooLargeError,
+    ServiceUnavailableError,
+    UnsupportedMediaTypeError,
+    ValidationProblem,
+)
+from app.shared.paging import Page
+
+logger = logging.getLogger("app.budget")
+
+# Invoice file tokens are always server-generated keys under this prefix; reject
+# anything else so a client cannot point ``fileObjectKey`` at a foreign bucket object.
+_INVOICE_FILE_PREFIX = "invoices/"
+
+
+def _validate_invoice_file_token(token: str) -> str:
+    if not token.startswith(_INVOICE_FILE_PREFIX) or ".." in token:
+        raise ValidationProblem("invalid invoice file token")
+    return token
+
+
+class InvoiceOps(BudgetTreeServiceBase):
+    """Invoice CRUD plus ZUGFeRD parse/import and file streaming."""
+
+    @staticmethod
+    def _invoice_out(inv: Invoice) -> InvoiceOut:
+        return InvoiceOut(
+            id=inv.id,
+            number=inv.number,
+            issueDate=inv.issue_date,
+            dueDate=inv.due_date,
+            supplier=inv.supplier,
+            netAmount=inv.net_amount,
+            taxAmount=inv.tax_amount,
+            grossAmount=inv.gross_amount,
+            currency=inv.currency,
+            note=inv.note,
+            status=inv.status,  # type: ignore[arg-type]
+            fileName=inv.file_name,
+            hasFile=inv.file_object_key is not None,
+            actor=inv.actor,
+            createdAt=inv.created_at,
+        )
+
+    async def list_invoices(self) -> list[InvoiceOut]:
+        """(Compat) All invoices (newest issue date first) — for the booking-link
+        dropdown, which needs the full list."""
+        page = await self.list_invoices_paged(limit=10_000, offset=0)
+        return page.items
+
+    async def list_invoices_paged(
+        self,
+        *,
+        q: str | None = None,
+        status: str | None = None,
+        gross_min: Decimal | None = None,
+        gross_max: Decimal | None = None,
+        issue_from: str | None = None,
+        issue_to: str | None = None,
+        due_from: str | None = None,
+        due_to: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Page[InvoiceOut]:
+        """Invoices filtered + fuzzy-searched + offset-paginated.
+
+        Mirrors :meth:`~.expenses.ExpenseOps.list_expenses_paged`: the
+        search/filter predicates live in a SHARED ``filters`` list that goes
+        identically into the count AND the row query (no total/hit drift on
+        infinite scroll). With ``q`` the trigram rank orders hits by relevance
+        before the usual "newest issue date first".
+        """
+        filters = []
+        # Fuzzy search: trigram ranking over number/supplier/note (GIN indexes).
+        # On non-Postgres the ILIKE substring fallback applies.
+        rank_expr = None
+        if q and q.strip():
+            where, rank_expr = trigram_rank(
+                q,
+                [Invoice.number, Invoice.supplier, Invoice.note],
+                dialect=dialect_of(self.session),
+            )
+            filters.append(where)
+        if status is not None:
+            filters.append(Invoice.status == status)
+        if gross_min is not None:
+            filters.append(Invoice.gross_amount >= gross_min)
+        if gross_max is not None:
+            filters.append(Invoice.gross_amount <= gross_max)
+        # Nullable date columns: an invoice without a date falls out of any set
+        # range. ``func.date`` parses the ISO string from the FE datepicker into
+        # a real date — Postgres would otherwise reject ``date >= varchar``; on
+        # SQLite it is a no-op (ISO stays ISO).
+        if issue_from:
+            filters.append(Invoice.issue_date >= func.date(issue_from))
+        if issue_to:
+            filters.append(Invoice.issue_date <= func.date(issue_to))
+        if due_from:
+            filters.append(Invoice.due_date >= func.date(due_from))
+        if due_to:
+            filters.append(Invoice.due_date <= func.date(due_to))
+
+        total = await self.session.scalar(
+            select(func.count()).select_from(Invoice).where(*filters)
+        )
+        ordering = Invoice.issue_date.desc().nulls_last()
+        order_by = (rank_expr.desc(), ordering) if rank_expr is not None else (ordering,)
+        rows = (
+            await self.session.scalars(
+                select(Invoice).where(*filters).order_by(*order_by).limit(limit).offset(offset)
+            )
+        ).all()
+        return Page(
+            items=[self._invoice_out(i) for i in rows],
+            total=total or 0,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def get_invoice(self, invoice_id: UUID) -> InvoiceOut:
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        return self._invoice_out(inv)
+
+    async def create_invoice(self, payload: InvoiceCreate, *, actor: str) -> InvoiceOut:
+        inv = Invoice(
+            number=payload.number,
+            issue_date=payload.issue_date,
+            due_date=payload.due_date,
+            supplier=payload.supplier,
+            net_amount=payload.net_amount,
+            tax_amount=payload.tax_amount,
+            gross_amount=payload.gross_amount,
+            note=payload.note,
+            status=payload.status,
+            actor=actor,
+        )
+        if payload.file_token is not None:
+            # Take over the file from the ZUGFeRD import — the token is the
+            # already stored MinIO key (prefix-validated against foreign objects).
+            inv.file_object_key = _validate_invoice_file_token(payload.file_token)
+            inv.file_name = payload.file_name
+            inv.file_mime = payload.file_mime
+        self.session.add(inv)
+        await self.session.flush()  # generate the id for the audit entry
+        await self._audit(
+            AuditAction.BUDGET_INVOICE_CREATE,
+            target_type="invoice",
+            target_id=str(inv.id),
+            data={"number": inv.number, "gross": str(inv.gross_amount)},
+        )
+        await self.session.commit()
+        return self._invoice_out(inv)
+
+    async def _validate_scan_store(
+        self, data: bytes, *, filename: str | None
+    ) -> tuple[str, str, str]:
+        """Validate a PDF (size/MIME/AV scan) and store it → (token, safe_name, mime).
+
+        Shared path for ZUGFeRD parse and manual invoice-file upload.
+        """
+        max_bytes = self.settings.attachment_max_bytes
+        if len(data) > max_bytes:
+            raise PayloadTooLargeError(f"Invoice exceeds {max_bytes} bytes.")
+        if not data:
+            raise UnsupportedMediaTypeError("Empty file.")
+        try:
+            mime = validate_upload(filename, data)
+        except MimeRejected as exc:
+            raise UnsupportedMediaTypeError(str(exc)) from exc
+        if mime != "application/pdf":
+            raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
+
+        await self._scan_or_raise(data)
+        safe_name = sanitize_filename(filename)
+        storage_key = await self._store_invoice_file(data, mime, safe_name)
+        return storage_key, safe_name, mime
+
+    async def store_invoice_file(self, data: bytes, *, filename: str | None) -> InvoiceFileResult:
+        """Validate + store an invoice PDF (no ZUGFeRD parse) — for manual files.
+
+        Allows attaching an original to non-ZUGFeRD invoices: returns the same
+        ``fileToken`` that ``POST /invoices`` expects.
+        """
+        storage_key, safe_name, mime = await self._validate_scan_store(data, filename=filename)
+        return InvoiceFileResult(fileToken=storage_key, fileName=safe_name, fileMime=mime)
+
+    async def parse_invoice_file(self, data: bytes, *, filename: str | None) -> InvoiceParseResult:
+        """Validate the PDF (MIME + AV scan), parse ZUGFeRD, store the original.
+
+        Deliberate order: scan → parse → store only afterwards, so a
+        non-ZUGFeRD PDF (the common case) leaves NO orphaned object behind.
+        """
+        max_bytes = self.settings.attachment_max_bytes
+        if len(data) > max_bytes:
+            raise PayloadTooLargeError(f"Invoice exceeds {max_bytes} bytes.")
+        if not data:
+            raise UnsupportedMediaTypeError("Empty file.")
+        try:
+            mime = validate_upload(filename, data)
+        except MimeRejected as exc:
+            raise UnsupportedMediaTypeError(str(exc)) from exc
+        if mime != "application/pdf":
+            raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
+
+        await self._scan_or_raise(data)
+        # Parsing is synchronous/CPU-bound → thread pool (no loop blocking).
+        parsed = await asyncio.to_thread(parse_zugferd_pdf, data)
+
+        safe_name = sanitize_filename(filename)
+        storage_key = await self._store_invoice_file(data, mime, safe_name)
+        return InvoiceParseResult(
+            number=parsed.number,
+            issueDate=parsed.issue_date,
+            dueDate=parsed.due_date,
+            supplier=parsed.supplier,
+            netAmount=parsed.net_amount,
+            taxAmount=parsed.tax_amount,
+            grossAmount=parsed.gross_amount,
+            currency=parsed.currency,
+            fileToken=storage_key,
+            fileName=safe_name,
+            fileMime=mime,
+            duplicate=await self._invoice_number_exists(parsed.number),
+        )
+
+    async def _invoice_number_exists(self, number: str | None) -> bool:
+        """Does an invoice with this number already exist? (duplicate warning)."""
+        if not number:
+            return False
+        existing = await self.session.scalars(
+            select(Invoice.id).where(Invoice.number == number).limit(1)
+        )
+        return existing.first() is not None
+
+    async def invoice_file_bytes(self, invoice_id: UUID) -> tuple[bytes, str, str]:
+        """Load the original file server-side → (data, mime, filename).
+
+        Deliberately NO presigned URL: MinIO lives only on the internal Docker
+        network, an S3v4-signed URL binds the internal host and is unreachable
+        from the browser — like the protocol PDF we stream via the API.
+        """
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        if inv.file_object_key is None:
+            raise NotFoundError("invoice has no stored file")
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        try:
+            data = await self.storage.get(inv.file_object_key)
+        except StorageError as exc:
+            raise ServiceUnavailableError("Could not read invoice file.") from exc
+        return data, inv.file_mime or "application/pdf", inv.file_name or "beleg.pdf"
+
+    async def _scan_or_raise(self, data: bytes) -> None:
+        """Synchronous AV scan. Skipped without ClamAV (DEV/contract CI) — but
+        fail-closed in ``production``: never store an unscanned invoice PDF when
+        the scanner is missing (consistent with the files quarantine)."""
+        scanner = build_scanner(self.settings)
+        if scanner is None:
+            if self.settings.environment == "production":
+                raise ServiceUnavailableError("Virus scan unavailable.")
+            return
+        try:
+            verdict = await scanner.scan(data)
+        except ScannerError as exc:
+            raise ServiceUnavailableError("Virus scan unavailable.") from exc
+        if not verdict.clean:
+            raise UnsupportedMediaTypeError(
+                f"File rejected by virus scan: {verdict.signature or 'unknown'}"
+            )
+
+    async def _store_invoice_file(self, data: bytes, mime: str, safe_name: str) -> str:
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        storage_key = f"invoices/{uuid.uuid4().hex}/{safe_name}"
+        try:
+            await self.storage.put(storage_key, data, mime)
+        except StorageError as exc:
+            raise ServiceUnavailableError("Object storage write failed.") from exc
+        return storage_key
+
+    async def update_invoice(self, invoice_id: UUID, payload: InvoiceUpdate) -> InvoiceOut:
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        fields = payload.model_fields_set
+        if "number" in fields:
+            inv.number = payload.number
+        if "issue_date" in fields:
+            inv.issue_date = payload.issue_date
+        if "due_date" in fields:
+            inv.due_date = payload.due_date
+        if "supplier" in fields:
+            inv.supplier = payload.supplier
+        if "net_amount" in fields:
+            inv.net_amount = payload.net_amount
+        if "tax_amount" in fields:
+            inv.tax_amount = payload.tax_amount
+        if "gross_amount" in fields and payload.gross_amount is not None:
+            inv.gross_amount = payload.gross_amount
+        if "note" in fields:
+            inv.note = payload.note
+        if "status" in fields and payload.status is not None:
+            inv.status = payload.status
+        await self._audit(
+            AuditAction.BUDGET_INVOICE_UPDATE,
+            target_type="invoice",
+            target_id=str(invoice_id),
+            data={"fields": sorted(fields)},
+        )
+        await self.session.commit()
+        return self._invoice_out(inv)
+
+    async def delete_invoice(self, invoice_id: UUID) -> None:
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        # Bookings keep invoice_id=NULL (FK SET NULL).
+        storage_key = inv.file_object_key
+        await self._audit(
+            AuditAction.BUDGET_INVOICE_DELETE,
+            target_type="invoice",
+            target_id=str(invoice_id),
+            data={"number": inv.number, "gross": str(inv.gross_amount)},
+        )
+        await self.session.delete(inv)
+        await self.session.commit()
+        if storage_key is not None and self.storage is not None:
+            # Remove the original best-effort (if already gone, deletion stands).
+            try:
+                await self.storage.remove(storage_key)
+            except StorageError:
+                logger.warning("could not remove file for deleted invoice %s", invoice_id)
