@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.modules.budget import fints_client as fc
+from app.modules.budget.bank import client as fc
 
 
 class _Mech:

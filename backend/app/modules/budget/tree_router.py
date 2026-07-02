@@ -33,7 +33,7 @@ from app.deps import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.budget.bank_service import BankService
+from app.modules.budget.bank.service import BankService
 from app.modules.budget.invoice_import import (
     NotZugferdError,
     UnsupportedInvoiceCurrencyError,

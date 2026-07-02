@@ -1,4 +1,4 @@
-"""Unit-Tests für :func:`bank_maintenance.dedup_staged_lines` (#fints-dedup) — mit einer
+"""Unit-Tests für :func:`bank.maintenance.dedup_staged_lines` (#fints-dedup) — mit einer
 synchronen Fake-Connection, ohne DB."""
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
-from app.modules.budget.bank_maintenance import dedup_staged_lines
+from app.modules.budget.bank.maintenance import dedup_staged_lines
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection

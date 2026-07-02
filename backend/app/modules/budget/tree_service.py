@@ -25,12 +25,9 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import tree_rules
-from app.modules.budget.bank_import import (
-    StatementParseError,
-    parse_statement_full,
-    split_leading_iban,
-)
-from app.modules.budget.fints_client import validate_fints_endpoint
+from app.modules.budget.bank.client import validate_fints_endpoint
+from app.modules.budget.bank.normalize import split_leading_iban
+from app.modules.budget.bank.statement import StatementParseError, parse_statement_full
 from app.modules.budget.invoice_import import parse_zugferd_pdf
 from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree_models import (

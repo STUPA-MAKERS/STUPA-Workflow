@@ -10,10 +10,9 @@ from typing import Any
 
 import pytest
 
-from app.modules.budget import bank_import as bi
-from app.modules.budget import bank_service
-from app.modules.budget import fints_client as fc
-from app.modules.budget.bank_service import BankService
+from app.modules.budget.bank import camt_parse, mt940_parse, normalize, service_base, statement
+from app.modules.budget.bank import client as fc
+from app.modules.budget.bank.service import BankService
 from app.modules.budget.tree_models import BudgetExpense
 from app.modules.budget.tree_schemas import ConfirmLineRequest
 from app.settings import load_settings
@@ -38,29 +37,29 @@ from .test_bank_service import (  # Wiederverwendung
 
 # ----------------------------------------------------------- bank_import helpers
 def test_clean_and_skip_notprovided() -> None:
-    assert bi._clean(None) is None
-    assert bi._clean("  x ") == "x"
-    assert bi._clean("   ") is None
-    assert bi._skip_notprovided("NOTPROVIDED") is None
-    assert bi._skip_notprovided("RF99") == "RF99"
-    assert bi._skip_notprovided(None) is None
+    assert normalize.clean(None) is None
+    assert normalize.clean("  x ") == "x"
+    assert normalize.clean("   ") is None
+    assert normalize.skip_notprovided("NOTPROVIDED") is None
+    assert normalize.skip_notprovided("RF99") == "RF99"
+    assert normalize.skip_notprovided(None) is None
 
 
 def test_as_date_and_camt_date() -> None:
-    assert bi._as_date(None) is None
-    assert bi._as_date("not a date") is None
-    assert bi._as_date(date(2024, 1, 2)) == date(2024, 1, 2)
-    assert bi._camt_date(None) is None
+    assert mt940_parse.as_date(None) is None
+    assert mt940_parse.as_date("not a date") is None
+    assert mt940_parse.as_date(date(2024, 1, 2)) == date(2024, 1, 2)
+    assert camt_parse._camt_date(None) is None
     el = ET.fromstring("<ValDt><Dt>2024-03-04</Dt></ValDt>")
-    assert bi._camt_date(el) == date(2024, 3, 4)
+    assert camt_parse._camt_date(el) == date(2024, 3, 4)
     bad = ET.fromstring("<ValDt><Dt>nope</Dt></ValDt>")
-    assert bi._camt_date(bad) is None
+    assert camt_parse._camt_date(bad) is None
     empty = ET.fromstring("<ValDt></ValDt>")
-    assert bi._camt_date(empty) is None
+    assert camt_parse._camt_date(empty) is None
 
 
 def test_line_from_mt940_data_no_amount() -> None:
-    assert bi._line_from_mt940_data({}) is None
+    assert mt940_parse._line_from_mt940_data({}) is None
 
 
 def test_lines_from_mt940_skips_amountless() -> None:
@@ -72,23 +71,23 @@ def test_lines_from_mt940_skips_amountless() -> None:
         def __init__(self, data: dict[str, Any]) -> None:
             self.data = data
 
-    out = bi.lines_from_mt940_transactions([_Tx({}), _Tx({"amount": _Amt()})])
+    out = mt940_parse.lines_from_mt940_transactions([_Tx({}), _Tx({"amount": _Amt()})])
     assert len(out) == 1  # die amount-lose Transaktion wird übersprungen
 
 
 def test_find_local_none() -> None:
-    assert bi._find_local(None, "X") is None
+    assert camt_parse._find_local(None, "X") is None
 
 
 def test_camt_date_invalid_calendar_date() -> None:
     # len >= 10, aber kein gültiges Datum → ValueError-Zweig.
     el = ET.fromstring("<ValDt><Dt>2024-13-45</Dt></ValDt>")
-    assert bi._camt_date(el) is None
+    assert camt_parse._camt_date(el) is None
 
 
 def test_decode_latin1_fallback() -> None:
     # 0xFF ist kein gültiges UTF-8 → latin-1-Fallback greift.
-    assert "ÿ" in bi._decode(b"\xff")
+    assert "ÿ" in statement.decode_bytes(b"\xff")
 
 
 def test_camt_skips_entries_without_usable_amount() -> None:
@@ -97,8 +96,8 @@ def test_camt_skips_entries_without_usable_amount() -> None:
  <Ntry><CdtDbtInd>CRDT</CdtDbtInd></Ntry>
  <Ntry><Amt Ccy="EUR">nope</Amt><CdtDbtInd>CRDT</CdtDbtInd></Ntry>
 </Stmt></Document>"""
-    with pytest.raises(bi.StatementParseError):
-        bi.parse_camt053(xml)
+    with pytest.raises(statement.StatementParseError):
+        camt_parse.parse_camt(xml)
 
 
 def test_parse_statement_mt940_without_filename() -> None:
@@ -106,7 +105,7 @@ def test_parse_statement_mt940_without_filename() -> None:
         b":20:X\n:25:1/2\n:60F:C240101EUR0,00\n"
         b":61:2401010101CR1,00NTRFNONREF\n:86:051?20Test\n:62F:C240101EUR1,00\n-"
     )
-    lines = bi.parse_statement(mt)
+    lines = statement.parse_statement(mt)
     assert lines and lines[0].amount == Decimal("1.00")
 
 
@@ -115,7 +114,7 @@ def _svc(session: _Session, monkeypatch: pytest.MonkeyPatch) -> BankService:
     async def _noop(*_a: Any, **_k: Any) -> None:
         return None
 
-    monkeypatch.setattr(bank_service, "audit_record", _noop)
+    monkeypatch.setattr(service_base, "audit_record", _noop)
     # SSRF-Re-Validierung (DNS) im Unit-Test neutralisieren — separat getestet.
     monkeypatch.setattr(fc, "validate_fints_endpoint", lambda _u: None)
     settings = load_settings(fints_enc_key=_KEY)
@@ -133,7 +132,7 @@ async def test_suggest_matches_existing_expense(monkeypatch: pytest.MonkeyPatch)
     exp.payment_date = date(2024, 1, 2)
     exp.reference_number = "RG-1"
     session.execute_q.append(_Result([exp]))  # _suggest candidate query
-    line = bi.StatementLine(
+    line = statement.StatementLine(
         amount=Decimal("-50.00"), value_date=date(2024, 1, 2), reference="RG1"
     )
     budget_id, expense_id = await svc._suggest(line)
@@ -148,7 +147,7 @@ async def test_suggest_falls_back_to_memory(monkeypatch: pytest.MonkeyPatch) -> 
     mem_budget = uuid.uuid4()
     session.execute_q.append(_Result([]))  # keine Buchungs-Kandidaten
     session.scalar_q.append(mem_budget)  # Gegen-IBAN-Gedächtnis
-    line = bi.StatementLine(amount=Decimal("10.00"), counterparty_iban="DEXP")
+    line = statement.StatementLine(amount=Decimal("10.00"), counterparty_iban="DEXP")
     budget_id, expense_id = await svc._suggest(line)
     assert expense_id is None
     assert budget_id == mem_budget
@@ -214,7 +213,7 @@ def test_line_out_income_kind() -> None:
 
 @pytest.mark.asyncio
 async def test_sync_done_without_new_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.budget import fints_client as fc
+    from app.modules.budget.bank import client as fc
 
     session = _Session()
     svc = _svc(session, monkeypatch)
@@ -234,7 +233,7 @@ async def test_sync_done_without_new_state(monkeypatch: pytest.MonkeyPatch) -> N
 
 @pytest.mark.asyncio
 async def test_submit_tan_still_needs_tan(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.budget import fints_client as fc
+    from app.modules.budget.bank import client as fc
 
     session = _Session()
     svc = _svc(session, monkeypatch)
@@ -266,7 +265,7 @@ async def test_submit_tan_still_needs_tan(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_matcher_far_date_branch() -> None:
-    from app.modules.budget import bank_match as bm
+    from app.modules.budget.bank import match as bm
 
     cand = bm.ExpenseCandidate(
         expense_id="e", budget_id="b", amount=Decimal("50.00"), when=date(2023, 1, 1),
@@ -280,7 +279,7 @@ def test_matcher_far_date_branch() -> None:
 
 
 def test_matcher_wide_window_branch() -> None:
-    from app.modules.budget import bank_match as bm
+    from app.modules.budget.bank import match as bm
 
     # delta = 4 Tage: zwischen _TIGHT_DAYS(2) und _WIDE_DAYS(5) → mittlerer Datums-Score.
     cand = bm.ExpenseCandidate(
@@ -492,8 +491,8 @@ async def test_tan_session_roundtrip_preserves_login_flag(monkeypatch: pytest.Mo
 async def test_stage_lines_too_many(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _svc(_Session(), monkeypatch)
     lines = [
-        bi.StatementLine(amount=Decimal("1.00"))
-        for _ in range(bank_service._MAX_STATEMENT_LINES + 1)
+        statement.StatementLine(amount=Decimal("1.00"))
+        for _ in range(service_base.MAX_STATEMENT_LINES + 1)
     ]
     with pytest.raises(ValidationProblem):
         await svc._stage_lines(_account(), lines)
@@ -502,7 +501,7 @@ async def test_stage_lines_too_many(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.asyncio
 async def test_stage_lines_rejects_non_eur(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _svc(_Session(), monkeypatch)
-    lines = [bi.StatementLine(amount=Decimal("1.00"), currency="USD")]
+    lines = [statement.StatementLine(amount=Decimal("1.00"), currency="USD")]
     with pytest.raises(ValidationProblem):
         await svc._stage_lines(_account(), lines)
 

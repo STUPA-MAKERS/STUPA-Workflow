@@ -10,12 +10,18 @@ vom Menschen kommt:
 * :func:`submit_tan`  — pausierten Dialog fortsetzen und die TAN (oder bei *decoupled*
   pushTAN eine leere TAN zum Pollen) senden. Wieder ``done`` oder erneut ``needs_tan``.
 
+Umsätze werden **bevorzugt als CAMT** geholt (HKCAZ, ``get_transactions_xml``): nur CAMT
+trägt bei Sammelbuchungen (Sparkasse „DATEI-NR. … ANZAHL …") die Einzeltransaktionen
+(``TxDtls``), die :mod:`.camt_parse` in Einzelumsätze auflöst (#fints-batch). Banken ohne
+HKCAZ (oder mit unbrauchbarem CAMT) fallen automatisch auf MT940 (HKKAZ) zurück.
+
 Der **persistente** Client-Zustand (``deconstruct()``: ``system_id`` u. a.) wird nach
 erfolgreichem Sync zurückgegeben und vom Service **verschlüsselt** am Konto abgelegt —
 das hält das ~90-Tage-SCA-Fenster offen (security.md / #fints-research).
 
 Die Netz-Interaktion ist ohne echte Bank nicht testbar (``# pragma: no cover``); die reine
-Logik (TAN-Mechanismus-Wahl, Konto-Auswahl, Umsatz-Normalisierung) bleibt geprüft.
+Logik (TAN-Mechanismus-Wahl, Konto-Auswahl, Umsatz-Normalisierung, Ergebnis-Form) bleibt
+geprüft.
 """
 
 from __future__ import annotations
@@ -28,11 +34,15 @@ from datetime import date
 from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlsplit
 
-from app.modules.budget.bank_import import (
-    StatementBalance,
-    StatementLine,
+from app.modules.budget.bank.camt_parse import parse_camt
+from app.modules.budget.bank.mt940_parse import (
     balance_from_mt940,
     lines_from_mt940_transactions,
+)
+from app.modules.budget.bank.statement import (
+    StatementBalance,
+    StatementLine,
+    StatementParseError,
 )
 from app.modules.webhooks.ssrf import Resolver, SsrfError, assert_allowed_url, default_resolver
 
@@ -185,6 +195,42 @@ def _select_account(accounts: Sequence[object], iban: str | None):  # type: igno
     return accounts[0]
 
 
+def lines_from_camt_documents(documents: Sequence[bytes]) -> list[StatementLine]:
+    """CAMT-Dokumente eines HKCAZ-Abrufs → Umsätze (#fints-batch).
+
+    Ein wohlgeformtes Dokument **ohne** Einträge (leerer Tag/leeres Abruf-Fenster) zählt
+    als 0 Umsätze; kaputtes XML wirft :class:`StatementParseError` (der Client fällt dann
+    auf MT940 zurück)."""
+    lines: list[StatementLine] = []
+    for doc in documents:
+        if not doc:
+            continue
+        try:
+            lines.extend(parse_camt(doc))
+        except StatementParseError as exc:
+            if "no entries" in str(exc) or "no usable entries" in str(exc):
+                continue
+            raise
+    return lines
+
+
+def lines_from_fetch_result(result: object) -> list[StatementLine]:
+    """Abruf-Ergebnis der ``fints``-Lib → Umsätze, form-agnostisch (#fints-batch).
+
+    ``get_transactions_xml`` liefert ``(booked_xml_docs, pending)``; ``get_transactions``
+    (und ``send_tan`` für einen MT940-Job) liefert ``mt940``-Transaktionen. ``send_tan``
+    reicht das Ergebnis des **ursprünglichen** Jobs durch, daher muss der TAN-Resume beide
+    Formen akzeptieren."""
+    if (
+        isinstance(result, tuple)
+        and len(result) == 2
+        and isinstance(result[0], (list, tuple))
+    ):
+        booked = [doc for doc in result[0] if isinstance(doc, (bytes, bytearray))]
+        return lines_from_camt_documents([bytes(doc) for doc in booked])
+    return lines_from_mt940_transactions(result)
+
+
 # --------------------------------------------------------------------- network
 def _build_client(creds: FintsCredentials) -> FinTS3PinTanClient:  # pragma: no cover
     from fints.client import FinTS3PinTanClient
@@ -243,6 +289,37 @@ def _needs_tan(
     )
 
 
+def _fetch_lines(
+    client: FinTS3PinTanClient, account: object, start: date
+) -> object:  # pragma: no cover
+    """Umsätze holen: CAMT (HKCAZ) bevorzugt, MT940 (HKKAZ) als Fallback (#fints-batch).
+
+    Liefert entweder die fertigen Zeilen (``list[StatementLine]``) oder die
+    ``NeedTANResponse`` des Abrufs."""
+    from fints.client import NeedTANResponse
+    from fints.exceptions import FinTSUnsupportedOperation
+
+    end = date.today()
+    try:
+        response = client.get_transactions_xml(account, start, end)  # type: ignore[arg-type]
+    except FinTSUnsupportedOperation:
+        logger.info("FinTS: bank does not support HKCAZ (camt) — falling back to MT940")
+        response = None
+    if response is not None:
+        if isinstance(response, NeedTANResponse):
+            return response
+        try:
+            return lines_from_fetch_result(response)
+        except StatementParseError:
+            # Kaputtes CAMT → lieber MT940 als gar kein Abruf; NICHT loggen, was drinstand
+            # (Umsatzdaten). Der Fallback normalisiert über denselben StatementLine-Pfad.
+            logger.warning("FinTS: camt statements unparseable — falling back to MT940")
+    response = client.get_transactions(account, start, end)  # type: ignore[arg-type]
+    if isinstance(response, NeedTANResponse):
+        return response
+    return lines_from_mt940_transactions(response)
+
+
 def _fetch(
     client: FinTS3PinTanClient, creds: FintsCredentials, mechanism: str | None
 ) -> FintsOutcome:  # pragma: no cover
@@ -255,13 +332,13 @@ def _fetch(
     account = _select_account(list(accounts), creds.account_iban)
     # Abruf-Fenster: ab ``start_date`` (vom Service begrenzt) bis heute.
     start = creds.start_date or date.today()
-    response = client.get_transactions(account, start, date.today())  # type: ignore[arg-type]
-    if isinstance(response, NeedTANResponse):
-        return _needs_tan(client, response, mechanism)
+    result = _fetch_lines(client, account, start)
+    if isinstance(result, NeedTANResponse):
+        return _needs_tan(client, result, mechanism)
     return FintsOutcome(
         status="done",
         tan_mechanism=mechanism,
-        lines=lines_from_mt940_transactions(response),
+        lines=list(result),  # type: ignore[arg-type]
         balance=_live_balance(client, account),
     )
 
@@ -364,7 +441,9 @@ def submit_tan(  # pragma: no cover
                 if outcome.status == "done":
                     outcome.new_state = client.deconstruct(including_private=True)
                 return outcome
-            lines = lines_from_mt940_transactions(result)
+            # ``send_tan`` liefert das Ergebnis des pausierten Jobs — CAMT-Tupel oder
+            # MT940-Transaktionen, je nachdem, welcher Abruf die TAN verlangt hat.
+            lines = lines_from_fetch_result(result)
         return FintsOutcome(
             status="done",
             tan_mechanism=pending.tan_mechanism,
