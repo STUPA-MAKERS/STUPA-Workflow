@@ -1174,6 +1174,400 @@ describe('ExpensesComponent (unit)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Unterbuchungen (#subbookings), Konto-Filter, Beschreibungs-Aufklappen und
+// Rechnungs-Detail-Dialog (#invoices) — die neueren Konten-/Sub-Booking-Pfade.
+// ---------------------------------------------------------------------------
+
+/** Eltern-Buchung mit Kindern (amount = Σ Kinder, serverseitig schreibgeschützt). */
+const PARENT: Expense = { ...EXPENSE, id: 'parent-1', parentExpenseId: null, childCount: 2 };
+/** Unterbuchung (parentExpenseId gesetzt). */
+const SUB: Expense = {
+  ...EXPENSE,
+  id: 'sub-1',
+  parentExpenseId: 'parent-1',
+  childCount: 0,
+  description: 'Teilzahlung',
+};
+
+/** Change-Event eines File-Inputs nachbauen (jsdom erlaubt kein programmatisches files-Set). */
+function fileEvent(file: File | null): Event {
+  const input = document.createElement('input');
+  input.type = 'file';
+  Object.defineProperty(input, 'files', { value: file ? [file] : [], configurable: true });
+  return { target: input } as unknown as Event;
+}
+
+function toastSpies(cmp: ExpensesComponent): { success: jest.SpyInstance; error: jest.SpyInstance } {
+  const toast = (cmp as unknown as { toast: { success: (m: string) => void; error: (m: string) => void } }).toast;
+  return { success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
+}
+
+describe('ExpensesComponent (descriptions & account filter)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => {
+    try {
+      TestBed.inject(HttpTestingController).verify();
+    } catch {
+      /* module bereits zurückgesetzt */
+    }
+  });
+
+  it('isDescLong flags only descriptions beyond the limit', () => {
+    const { cmp } = build();
+    expect(cmp.isDescLong('kurz')).toBe(false);
+    expect(cmp.isDescLong('x'.repeat(cmp.DESC_LIMIT))).toBe(false);
+    expect(cmp.isDescLong('x'.repeat(cmp.DESC_LIMIT + 1))).toBe(true);
+  });
+
+  it('toggleDesc expands and collapses a description', () => {
+    const { cmp } = build();
+    expect(cmp.descExpanded('e-1')).toBe(false);
+    cmp.toggleDesc('e-1');
+    expect(cmp.descExpanded('e-1')).toBe(true);
+    // andere Zeilen bleiben unberührt
+    expect(cmp.descExpanded('e-2')).toBe(false);
+    cmp.toggleDesc('e-1');
+    expect(cmp.descExpanded('e-1')).toBe(false);
+  });
+
+  it('selectAccount reloads with the account filter param', () => {
+    const { cmp, http } = build();
+    cmp.selectAccount('a-1');
+    const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    expect(req.request.params.get('account')).toBe('a-1');
+    req.flush(page([]));
+    expect(cmp.accountId()).toBe('a-1');
+  });
+
+  it('accountFilterOptions prepends the "all accounts" option', () => {
+    const { cmp } = build({ accounts: [{ id: 'a-1', name: 'Hauptkonto' }] });
+    expect(cmp.accountFilterOptions()).toEqual([
+      { value: '', label: 'Alle Konten' },
+      { value: 'a-1', label: 'Hauptkonto' },
+    ]);
+  });
+});
+
+describe('ExpensesComponent (sub-bookings #subbookings)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => {
+    try {
+      TestBed.inject(HttpTestingController).verify();
+    } catch {
+      /* module bereits zurückgesetzt */
+    }
+  });
+
+  it('toggleSub expands a parent, loads children once and collapses again', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    expect(cmp.isSubExpanded('parent-1')).toBe(false);
+    expect(cmp.subOf('parent-1')).toEqual([]);
+    cmp.toggleSub(PARENT);
+    expect(cmp.isSubExpanded('parent-1')).toBe(true);
+    expect(cmp.isLoadingSub('parent-1')).toBe(true);
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .flush([SUB]);
+    expect(cmp.isLoadingSub('parent-1')).toBe(false);
+    expect(cmp.subOf('parent-1')).toEqual([SUB]);
+    // Zuklappen → kein Request
+    cmp.toggleSub(PARENT);
+    expect(cmp.isSubExpanded('parent-1')).toBe(false);
+    http.expectNone((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings'));
+    // Wieder aufklappen → Kinder aus dem Cache, kein erneuter Load
+    cmp.toggleSub(PARENT);
+    expect(cmp.isSubExpanded('parent-1')).toBe(true);
+    http.expectNone((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings'));
+  });
+
+  it('loadSub clears the loading flag and toasts on error', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    const { error } = toastSpies(cmp);
+    cmp.toggleSub(PARENT);
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .error(new ProgressEvent('err'));
+    expect(cmp.isLoadingSub('parent-1')).toBe(false);
+    expect(error).toHaveBeenCalledWith('Unterbuchungen konnten nicht geladen werden.');
+  });
+
+  it('onSubFile without a file is a no-op', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.onSubFile(PARENT, fileEvent(null));
+    expect(cmp.isSubImporting('parent-1')).toBe(false);
+    http.expectNone((r) => r.url.includes('/sub-bookings'));
+  });
+
+  it('onSubFile imports, expands the parent, reloads children + list and toasts the count', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    const { success } = toastSpies(cmp);
+    const file = new File(['camt'], 'auszug.xml', { type: 'text/xml' });
+    cmp.onSubFile(PARENT, fileEvent(file));
+    expect(cmp.isSubImporting('parent-1')).toBe(true);
+    const req = http.expectOne(
+      (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings/import') && r.method === 'POST',
+    );
+    expect(req.request.body).toBeInstanceOf(FormData);
+    req.flush([SUB, { ...SUB, id: 'sub-2' }]);
+    expect(cmp.isSubImporting('parent-1')).toBe(false);
+    expect(cmp.isSubExpanded('parent-1')).toBe(true);
+    expect(success).toHaveBeenCalledWith('2 Unterbuchung(en) importiert.');
+    // Antwort ist nur der Import-Batch → volle Kinderliste + Eltern-Betrag neu laden.
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .flush([SUB, { ...SUB, id: 'sub-2' }]);
+    flushList(http, page([PARENT], 1));
+    expect(cmp.subOf('parent-1').length).toBe(2);
+  });
+
+  it('onSubFile maps bank_statement_unparseable to the FinTS file error, otherwise generic', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    const { error } = toastSpies(cmp);
+    const file = new File(['?'], 'kaputt.bin');
+    cmp.onSubFile(PARENT, fileEvent(file));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings/import'))
+      .flush({ code: 'bank_statement_unparseable' }, { status: 422, statusText: 'Unprocessable' });
+    expect(cmp.isSubImporting('parent-1')).toBe(false);
+    expect(error).toHaveBeenCalledWith('Datei ist weder gültiges CAMT.053 noch MT940.');
+
+    cmp.onSubFile(PARENT, fileEvent(file));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings/import'))
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    expect(error).toHaveBeenLastCalledWith('Import der Unterbuchungen fehlgeschlagen.');
+  });
+
+  it('openCreateSub seeds an empty dialog; closeCreateSub clears the parent', () => {
+    const { cmp } = build();
+    cmp.subAmount.set('stale');
+    cmp.subDescription.set('stale');
+    cmp.subPaymentDate.set('stale');
+    cmp.subCorrespondent.set('stale');
+    cmp.openCreateSub(PARENT);
+    expect(cmp.subParent()).toBe(PARENT);
+    expect(cmp.subAmount()).toBe('');
+    expect(cmp.subDescription()).toBe('');
+    expect(cmp.subPaymentDate()).toBe('');
+    expect(cmp.subCorrespondent()).toBe('');
+    cmp.closeCreateSub();
+    expect(cmp.subParent()).toBeNull();
+  });
+
+  it('canSubmitSub requires amount and description', () => {
+    const { cmp } = build();
+    expect(cmp.canSubmitSub()).toBe(false);
+    cmp.subAmount.set('10');
+    expect(cmp.canSubmitSub()).toBe(false);
+    cmp.subDescription.set('  ');
+    expect(cmp.canSubmitSub()).toBe(false);
+    cmp.subDescription.set('Teil');
+    expect(cmp.canSubmitSub()).toBe(true);
+  });
+
+  it('createSub posts the sub-booking, expands the parent, reloads and toasts', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    const { success } = toastSpies(cmp);
+    cmp.openCreateSub(PARENT);
+    cmp.subAmount.set('10');
+    cmp.subDescription.set('  Teil  ');
+    cmp.subPaymentDate.set('2026-06-01');
+    cmp.subCorrespondent.set('  Bank  ');
+    cmp.createSub(new Event('submit'));
+    const req = http.expectOne(
+      (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST',
+    );
+    expect(req.request.body).toEqual({
+      amount: '10',
+      description: 'Teil',
+      paymentDate: '2026-06-01',
+      correspondent: 'Bank',
+    });
+    req.flush(SUB);
+    expect(cmp.saving()).toBe(false);
+    expect(cmp.subParent()).toBeNull();
+    expect(cmp.isSubExpanded('parent-1')).toBe(true);
+    expect(success).toHaveBeenCalledWith('Unterbuchung hinzugefügt.');
+    // Kinderliste + Eltern-Betrag (Σ Kinder) neu laden.
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .flush([SUB]);
+    flushList(http, page([PARENT], 1));
+  });
+
+  it('createSub nulls blank payment date and correspondent', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.openCreateSub(PARENT);
+    cmp.subAmount.set('5');
+    cmp.subDescription.set('Teil');
+    // createSub ohne Event → optional-chaining-Zweig ohne preventDefault.
+    cmp.createSub();
+    const req = http.expectOne(
+      (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST',
+    );
+    expect(req.request.body).toEqual({
+      amount: '5',
+      description: 'Teil',
+      paymentDate: null,
+      correspondent: null,
+    });
+    req.flush(SUB);
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .flush([SUB]);
+    flushList(http, page([PARENT], 1));
+  });
+
+  it('createSub is a no-op without a parent, when invalid or while saving', () => {
+    const { cmp, http } = build();
+    cmp.subAmount.set('10');
+    cmp.subDescription.set('Teil');
+    cmp.createSub(new Event('submit')); // kein Eltern-Dialog offen
+    http.expectNone((r) => r.url.includes('/sub-bookings'));
+    cmp.openCreateSub(PARENT); // Dialog offen, aber Felder zurückgesetzt → invalid
+    cmp.createSub(new Event('submit'));
+    http.expectNone((r) => r.url.includes('/sub-bookings'));
+    cmp.subAmount.set('10');
+    cmp.subDescription.set('Teil');
+    cmp.saving.set(true);
+    cmp.createSub(new Event('submit'));
+    http.expectNone((r) => r.url.includes('/sub-bookings'));
+  });
+
+  it('createSub toasts a generic failure on error', () => {
+    const { cmp, http } = build();
+    const { error } = toastSpies(cmp);
+    cmp.openCreateSub(PARENT);
+    cmp.subAmount.set('10');
+    cmp.subDescription.set('Teil');
+    cmp.createSub(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST')
+      .error(new ProgressEvent('err'));
+    expect(cmp.saving()).toBe(false);
+    // Dialog bleibt offen für Korrektur.
+    expect(cmp.subParent()).toBe(PARENT);
+    expect(error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
+  });
+
+  it('saveEdit on a sub-booking refreshes the parent panel and the list', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.openEdit(SUB);
+    cmp.editDescription.set('Teil neu');
+    cmp.saveEdit(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'PATCH')
+      .flush({ ...SUB, description: 'Teil neu' });
+    expect(cmp.editing()).toBeNull();
+    // parentExpenseId gesetzt → Eltern-Panel + Liste (Eltern-Betrag) neu laden.
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .flush([{ ...SUB, description: 'Teil neu' }]);
+    flushList(http, page([PARENT], 1));
+    expect(cmp.subOf('parent-1')[0].description).toBe('Teil neu');
+  });
+
+  it('saveEdit sends budgetId only for a changed standalone cost centre and preserves childCount', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.openEdit(PARENT);
+    cmp.editBudgetId.set('b-2'); // eigenständig + geändert → wird gesendet
+    cmp.saveEdit(new Event('submit'));
+    const req = http.expectOne((r) => r.url.endsWith('/budget-expenses/parent-1') && r.method === 'PATCH');
+    expect(req.request.body).toMatchObject({ budgetId: 'b-2' });
+    // Betrag unverändert (Eltern-Betrag = Σ Kinder, schreibgeschützt) → nicht gesendet.
+    expect((req.request.body as Record<string, unknown>)['amount']).toBeUndefined();
+    req.flush({ ...PARENT, budgetId: 'b-2', childCount: undefined as unknown as number });
+    // childCount aus der bekannten Zeile erhalten (Einzel-Antwort liefert ihn nicht zuverlässig).
+    expect(cmp.items().find((x) => x.id === 'parent-1')?.childCount).toBe(2);
+  });
+
+  it('doDelete on a sub-booking refreshes the parent panel and the list', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.askDelete(SUB);
+    cmp.doDelete();
+    http.expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE').flush(null);
+    expect(cmp.confirmDelete()).toBeNull();
+    // Eltern-Zeile bleibt in der Liste; stattdessen Panel + Liste neu laden.
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .flush([]);
+    flushList(http, page([PARENT], 1));
+    expect(cmp.items().map((x) => x.id)).toEqual(['parent-1']);
+  });
+});
+
+describe('ExpensesComponent (invoice detail #invoices)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => {
+    try {
+      TestBed.inject(HttpTestingController).verify();
+    } catch {
+      /* module bereits zurückgesetzt */
+    }
+  });
+
+  it('openInvoiceDialog is a no-op without a linked invoice', () => {
+    const { cmp, http } = build();
+    cmp.openInvoiceDialog({ ...EXPENSE, invoiceId: null });
+    expect(cmp.viewingInvoice()).toBeNull();
+    http.expectNone((r) => r.url.includes('/invoices/'));
+  });
+
+  it('openInvoiceDialog serves a cached invoice without a request', () => {
+    const { cmp, http } = build({ invoices: [INVOICE] });
+    cmp.openInvoiceDialog({ ...EXPENSE, invoiceId: 'inv-1' });
+    expect(cmp.viewingInvoice()).toEqual(INVOICE);
+    http.expectNone((r) => r.url.includes('/invoices/'));
+  });
+
+  it('openInvoiceDialog fetches an uncached (paid/old) invoice by id', () => {
+    const { cmp, http } = build({ invoices: [INVOICE] });
+    cmp.openInvoiceDialog({ ...EXPENSE, invoiceId: 'inv-paid' });
+    const paid: Invoice = { ...INVOICE, id: 'inv-paid', status: 'paid' };
+    http.expectOne((r) => r.url.endsWith('/invoices/inv-paid') && r.method === 'GET').flush(paid);
+    expect(cmp.viewingInvoice()).toEqual(paid);
+  });
+
+  it('openInvoiceDialog surfaces the problem detail when the fetch fails', () => {
+    const { cmp, http } = build();
+    const { error } = toastSpies(cmp);
+    cmp.openInvoiceDialog({ ...EXPENSE, invoiceId: 'inv-gone' });
+    http
+      .expectOne((r) => r.url.endsWith('/invoices/inv-gone'))
+      .flush({ detail: 'Rechnung nicht gefunden' }, { status: 404, statusText: 'Not Found' });
+    expect(cmp.viewingInvoice()).toBeNull();
+    expect(error).toHaveBeenCalledWith('Rechnung nicht gefunden');
+  });
+
+  it('openInvoiceFile streams the file blob and downloads it (fileName fallback)', () => {
+    (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
+    (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
+    const createObjSpy = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
+    const revokeSpy = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const { cmp, http } = build();
+    // fileName null → Fallback 'beleg.pdf'
+    cmp.openInvoiceFile({ ...INVOICE, fileName: null });
+    http.expectOne((r) => r.url.endsWith('/invoices/inv-1/file') && r.method === 'GET').flush(new Blob(['pdf']));
+    expect(createObjSpy).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    createObjSpy.mockRestore();
+    revokeSpy.mockRestore();
+    clickSpy.mockRestore();
+  });
+
+  it('openInvoiceFile toasts the problem detail on error', () => {
+    const { cmp, http } = build();
+    const { error } = toastSpies(cmp);
+    cmp.openInvoiceFile(INVOICE);
+    http
+      .expectOne((r) => r.url.endsWith('/invoices/inv-1/file'))
+      .flush(new Blob(['nope']), { status: 500, statusText: 'Server Error' });
+    expect(error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
+  });
+});
+
 // IntersectionObserver-Zweig: vorhandener Observer ruft loadMore beim Sichtbar-
 // werden. Wir shimmen IO und triggern den Callback manuell.
 describe('ExpensesComponent (infinite scroll)', () => {
