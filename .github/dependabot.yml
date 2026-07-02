@@ -15,6 +15,27 @@ updates:
         patterns:
           - "@angular/*"
           - "@angular-eslint/*"
+    # Angular-22-gekoppelte Majors bewusst ausgeblendet (2026-07): das Upgrade ist ein
+    # eigenes Projekt (inkl. @stupa-makers/ui-kit-Release, peers ^20.0.0) — bis dahin
+    # erzeugen diese PRs nur Rot. Bei der Angular-22-Migration Einträge entfernen.
+    ignore:
+      - dependency-name: "@angular/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@angular-eslint/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "zone.js"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "jest-preset-angular"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@testing-library/angular"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
+      # Tailwind 4 = neues Config-Modell (CSS-first); Migration separat planen.
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
 
   # Backend (pip / pyproject).
   - package-ecosystem: pip
