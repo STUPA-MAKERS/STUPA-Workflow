@@ -59,35 +59,50 @@ def render(sql: str, params: tuple[Any, ...]) -> str:
 
 # --------------------------------------------------------------------------- direct (psycopg)
 class DirectDb:
-    def __init__(self, dsn: str) -> None:
+    def __init__(self, dsn: str, *, connect_timeout: int = 5, label: str = "direct") -> None:
+        self._label = label
         try:
             import psycopg
             from psycopg.rows import dict_row
         except ImportError as exc:  # pragma: no cover - optional dep
             raise DbError(
-                "DATABASE_URL is set but psycopg is not installed (pip install 'psycopg[binary]')."
+                "direct mode needs psycopg (pip install 'psycopg[binary]')."
             ) from exc
         try:
-            self._conn = psycopg.connect(dsn, autocommit=True, row_factory=dict_row)
+            self._conn = psycopg.connect(
+                dsn,
+                autocommit=True,
+                row_factory=dict_row,
+                connect_timeout=connect_timeout,
+            )
         except Exception as exc:  # pragma: no cover - needs a live DB
-            raise DbError(f"could not connect to DATABASE_URL: {exc}") from exc
+            raise DbError(f"could not connect: {exc}") from exc
 
     @property
     def label(self) -> str:
-        return "direct"
+        return self._label
 
     def query(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
-        with self._conn.cursor() as cur:
-            cur.execute(sql, params)
-            return list(cur.fetchall())
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute(sql, params)
+                return list(cur.fetchall())
+        except Exception as exc:  # psycopg errors → the DbError contract callers rely on
+            raise DbError(str(exc).strip() or type(exc).__name__) from exc
 
     def execute(self, sql: str, params: tuple[Any, ...] = ()) -> int:
-        with self._conn.cursor() as cur:
-            cur.execute(sql, params)
-            return cur.rowcount
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute(sql, params)
+                return cur.rowcount
+        except Exception as exc:  # psycopg errors → the DbError contract callers rely on
+            raise DbError(str(exc).strip() or type(exc).__name__) from exc
 
     def close(self) -> None:
-        self._conn.close()
+        try:
+            self._conn.close()
+        except Exception:  # noqa: BLE001 — closing a broken connection must not raise
+            pass
 
 
 # ----------------------------------------------------------------------- docker exec / psql
@@ -156,7 +171,37 @@ class DockerDb:
         pass
 
 
-def connect(config: Config) -> Db:
-    if config.direct and config.database_url:
-        return DirectDb(config.database_url)
-    return DockerDb(config)
+def connect_auto(config: Config) -> tuple[Db | None, list[str]]:
+    """Try the resolved direct DSN first, then the docker-exec fallback.
+
+    Returns the connected backend (or ``None`` when both fail) plus the log
+    lines describing what happened. Each candidate is probed with a real query
+    so a half-working path (port forwarded but stack down, docker present but
+    stack stopped) is caught here rather than on the first command.
+    """
+    notes = list(config.notes)
+    if config.database_url:
+        from urllib.parse import urlsplit
+
+        from .config import mask_dsn
+
+        try:
+            netloc = urlsplit(config.database_url).netloc.rpartition("@")[2]
+        except ValueError:
+            netloc = "?"
+        try:
+            db = DirectDb(config.database_url, label=f"direct {netloc}")
+            db.query("SELECT 1")
+        except DbError as exc:
+            notes.append(f"direct {mask_dsn(config.database_url)}: {exc}")
+        else:
+            notes.append(f"connected · direct · {mask_dsn(config.database_url)}")
+            return db, notes
+    try:
+        docker = DockerDb(config)
+        docker.query("SELECT 1")
+    except DbError as exc:
+        notes.append(f"docker exec {config.service}: {exc}")
+        return None, notes
+    notes.append(f"connected · docker exec · {docker.label}")
+    return docker, notes
