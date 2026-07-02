@@ -19,6 +19,7 @@ import {
 import { filter } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
+import { LOCATION } from '@core/browser/location.token';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ThemeService } from '@core/theme/theme.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -72,6 +73,7 @@ export class ShellComponent {
   readonly branding = inject(BrandingService);
   private readonly admin = inject(AdminApiService);
   private readonly router = inject(Router);
+  private readonly location = inject(LOCATION);
   private readonly route = inject(ActivatedRoute);
 
   /** Inhalt volle Breite (Route-Data `wide`) — z. B. Budget-Tab mit zwei Sidebars. */
@@ -202,7 +204,7 @@ export class ShellComponent {
   /** Seiten-Reload nach Sprachwechsel (in Tests überschreib-/spionierbar). */
   protected reloadForLocale(): void {
     if (typeof window !== 'undefined') {
-      window.location.reload();
+      this.location.reload();
     }
   }
 

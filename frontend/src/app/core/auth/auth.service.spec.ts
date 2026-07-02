@@ -7,7 +7,11 @@ import {
 import { AuthService } from './auth.service';
 import { USE_MOCK_API } from '../api/api.config';
 import type { Principal } from '../api/models';
-import { mockWindowLocation, type LocationMock } from '../../../testing/location-mock';
+import {
+  createLocationMock,
+  provideLocationMock,
+  type LocationMock,
+} from '../../../testing/location-mock';
 
 const PRINCIPAL: Principal = {
   sub: '1',
@@ -26,22 +30,22 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     sessionStorage.clear();
+    location = createLocationMock();
+    assign = location.assign;
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
+        provideLocationMock(location),
       ],
     });
     auth = TestBed.inject(AuthService);
     http = TestBed.inject(HttpTestingController);
-    location = mockWindowLocation();
-    assign = location.assign;
   });
 
   afterEach(() => {
     http.verify();
-    location.restore();
   });
 
   it('loads the principal once and exposes permission checks', () => {

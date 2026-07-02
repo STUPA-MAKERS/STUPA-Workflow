@@ -3,6 +3,7 @@ import { type Observable, of, shareReplay, tap } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { ApiClient } from '../api/api-client.service';
 import type { Principal } from '../api/models';
+import { LOCATION } from '../browser/location.token';
 
 /**
  * Auth-State. Principal aus GET /api/auth/me (Session-Cookie, OIDC). RBAC ist
@@ -20,6 +21,7 @@ export class AuthService {
   // sonst zieht der root-`AuthService` HttpClient in jede Komponente, die ihn nur
   // für `can()`/`roles()` injiziert, und deren Specs scheitern an NG0201.
   private readonly injector = inject(Injector);
+  private readonly location = inject(LOCATION);
   private get api(): ApiClient {
     return this.injector.get(ApiClient);
   }
@@ -91,7 +93,7 @@ export class AuthService {
 
   /** Startet den OIDC-Login (Full-Redirect zu Keycloak via Backend). */
   login(): void {
-    window.location.assign('/api/auth/login');
+    this.location.assign('/api/auth/login');
   }
 
   /**
@@ -105,7 +107,7 @@ export class AuthService {
       .subscribe((res) => {
         this._principal.set(null);
         this.principal$ = undefined;
-        window.location.assign(res.logout_url ?? '/');
+        this.location.assign(res.logout_url ?? '/');
       });
   }
 

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
+import { LOCATION } from '@core/browser/location.token';
 import type { ConsentRequest } from '@core/api/models';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -20,6 +21,7 @@ import { IconComponent } from '@stupa-makers/ui-kit';
 })
 export class OAuthConsentComponent {
   private readonly api = inject(ApiClient);
+  private readonly location = inject(LOCATION);
 
   readonly req = signal<ConsentRequest | null>(null);
   readonly loading = signal(true);
@@ -86,7 +88,7 @@ export class OAuthConsentComponent {
     this.api.submitConsent({ approve, scopes, lifetime: this.lifetime() }).subscribe({
       next: (r) => {
         // Zurück zum lokalen Loopback-Callback des MCP-Clients (bzw. mit error=…).
-        window.location.assign(r.redirect);
+        this.location.assign(r.redirect);
       },
       error: () => {
         this.error.set('account.consent.error');

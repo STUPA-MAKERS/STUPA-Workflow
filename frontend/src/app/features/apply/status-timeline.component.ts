@@ -6,6 +6,7 @@ import { FormGroup } from '@angular/forms';
 import { catchError, forkJoin, of } from 'rxjs';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
+import { LOCATION } from '@core/browser/location.token';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
@@ -64,6 +65,7 @@ interface ReadonlyRow {
 })
 export class StatusTimelineComponent {
   private readonly api = inject(ApiClient);
+  private readonly location = inject(LOCATION);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
@@ -149,7 +151,7 @@ export class StatusTimelineComponent {
   private stripTokenFromUrl(appId: string): void {
     if (typeof window === 'undefined' || typeof history === 'undefined') return;
     try {
-      const url = new URL(window.location.href);
+      const url = new URL(this.location.href);
       const frag = new URLSearchParams(url.hash.replace(/^#/, ''));
       if (!url.searchParams.has('t') && !frag.has('t')) return;
       url.searchParams.delete('t'); // Query-Form
