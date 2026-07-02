@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.modules.budget import bank_match as bm
+from app.modules.budget.bank import match as bm
 
 
 def _cand(eid: str, amount: str, when: date | None, ref: str | None) -> bm.ExpenseCandidate:

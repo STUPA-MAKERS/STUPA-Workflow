@@ -28,7 +28,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.budget import tree_service as ts_mod
-from app.modules.budget.bank_import import StatementLine
+from app.modules.budget.bank.statement import StatementLine
 from app.modules.budget.invoice_import import ParsedInvoice
 from app.modules.budget.tree_models import (
     Account,

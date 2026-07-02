@@ -1,6 +1,6 @@
 """Einmalige Aufräum-Routinen für gestagete Bank-Umsätze (#fints-dedup).
 
-Getrennt von :mod:`bank_service` (async ORM), weil Migrationen mit einer **synchronen**
+Getrennt vom Service (async ORM), weil Migrationen mit einer **synchronen**
 ``Connection`` (``op.get_bind()``) arbeiten. Reine, idempotente Daten-Korrektur — von den
 Migrationen 0045/0046 aufgerufen (eine Logik, kein dupliziertes Migrations-Skript)."""
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 def dedup_staged_lines(conn: Connection) -> int:
     """Re-importierte Dubletten gestageter Umsätze zusammenfassen — Vergleich **rein über die
-    Rohdaten** (:func:`bank_import.raw_dedup_base`, parser-unabhängig).
+    Rohdaten** (:func:`~.dedup.raw_dedup_base`, parser-unabhängig).
 
     Pro Konto + gleicher Roh-Basis: ist eine **gebuchte** (``matched``) Zeile dabei (oder, ohne
     gebuchte, die älteste), bleibt sie erhalten; die übrigen **ungebuchten** exakten Dubletten
@@ -25,7 +25,7 @@ def dedup_staged_lines(conn: Connection) -> int:
     unangetastet (echte Einzelzahlungen mit unterschiedlichem Roh-Auftraggeber/-Zweck/-Zeitstempel
     fallen NICHT zusammen). Idempotent. Liefert die Anzahl gelöschter Zeilen.
     """
-    from app.modules.budget.bank_import import _sha, raw_dedup_base
+    from app.modules.budget.bank.dedup import raw_dedup_base, sha256_hex
 
     rows = conn.execute(
         text(
@@ -58,7 +58,7 @@ def dedup_staged_lines(conn: Connection) -> int:
             )
             deleted += 1
         scope = keeper.acc_iban or str(keeper.account_id)
-        new_key = _sha(f"{scope}|{'|'.join(str(p) for p in key[1:])}|0")
+        new_key = sha256_hex(f"{scope}|{'|'.join(str(p) for p in key[1:])}|0")
         conn.execute(
             text("UPDATE bank_statement_line SET idempotency_key = :k WHERE id = :id"),
             {"k": new_key, "id": keeper.id},
