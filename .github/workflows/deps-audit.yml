@@ -1,0 +1,48 @@
+# Dependency-Scan (pip-audit, security.md §10 / T-41) — aus dem PR-Gate
+# herausgelöst (CI-Diät 2026-07): neue Advisories erscheinen unabhängig vom
+# PR-Inhalt, darum reicht wöchentlich + jeder main-Push. Rot ⇒ Issue/Fix,
+# blockiert aber keine unbeteiligten PRs mehr.
+name: deps-audit
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # montags 06:00 UTC
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.13"
+  PIP_ONLY_BINARY: "clamd,text-unidecode"
+  PIP_PREFER_BINARY: "1"
+
+jobs:
+  be-deps-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      # pip selbst aktuell halten (pip-Advisories sonst rot; pip ist kein Runtime-Dep).
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]' pip-audit
+      - name: pip-audit (bekannte CVEs in Abhängigkeiten)
+        # Scannt die aufgelöste Umgebung gegen die PyPI-Advisory-DB. Einzelne,
+        # geprüft-irrelevante Advisories mit `--ignore-vuln <ID>` (mit Begründung).
+        #
+        # PYSEC-2026-87 (lxml<6.1 XXE-Local-File-Read): lxml kommt nur transitiv über
+        # fints/sepaxml/xmlschema und fints pinnt lxml~=6.0.2 (<6.1) hart — 6.1.0 ist
+        # daher nicht installierbar (#fints). lxml verarbeitet hier ausschließlich die
+        # authentifizierten Bank-Antworten; eigenes (untrusted) XML parsen wir mit der
+        # stdlib `ElementTree`. Risiko in diesem Kontext nicht erreichbar → ausgenommen,
+        # bis fints lxml>=6.1 zulässt.
+        run: pip-audit --skip-editable --desc --ignore-vuln PYSEC-2026-87
