@@ -44,7 +44,7 @@ jobs:
     outputs:
       frontend: ${{ steps.check.outputs.frontend }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - id: check
         run: |
           if [ -f frontend/package.json ]; then
@@ -60,7 +60,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -79,7 +79,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -96,7 +96,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -106,7 +106,7 @@ jobs:
       - name: Pytest (Unit) + Coverage
         # fail_under (pyproject [tool.coverage.report]) bricht hier bereits.
         run: pytest --cov --cov-report=xml --cov-report=term-missing
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: backend-coverage
           path: backend/coverage.xml
@@ -119,7 +119,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -155,7 +155,7 @@ jobs:
       SESSION_SECRET: "ci-session-secret"
       MAGIC_LINK_SECRET: "ci-magic-link-secret"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -198,11 +198,11 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # @stupa-makers/ui-kit lives at frontend/vendor/ui-kit as a git submodule.
           submodules: recursive
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -237,10 +237,10 @@ jobs:
         || vars.RUN_E2E == 'true'
       )
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -254,7 +254,7 @@ jobs:
         run: scripts/e2e.sh
       - name: Playwright-Report (immer — Beweis >0 Tests)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: frontend/playwright-report
@@ -268,11 +268,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: be-unit
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: backend-coverage
           path: backend
@@ -293,7 +293,7 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
       || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Backend-Image bauen
         run: docker build -t antrag-backend:ci backend
       - name: Container-Smoke (/api/health)
@@ -318,7 +318,7 @@ jobs:
       run:
         working-directory: pytex
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -338,7 +338,7 @@ jobs:
   compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Validate docker-compose
         working-directory: deploy
         run: |
@@ -359,7 +359,7 @@ jobs:
       || contains(github.event.pull_request.labels.*.name, 'run-restore-smoke')
       || vars.RUN_RESTORE_SMOKE == 'true'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Restore-Smoke (backup -> wipe -> restore -> verify)
         run: scripts/restore-smoke.sh
 
@@ -379,6 +379,6 @@ jobs:
       || contains(github.event.pull_request.labels.*.name, 'run-real-stack-smoke')
       || vars.RUN_REAL_STACK_SMOKE == 'true'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Real-Stack-Smoke (compose up -> HTTP/WS-Kernflüsse)
         run: scripts/smoke-real-stack.sh
