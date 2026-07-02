@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Applicant, Application, StatusEvent
-from app.modules.applications.service import _field_from_row
+from app.modules.applications.service.service_base import _field_from_row
 from app.modules.files.storage import ObjectStorage
 from app.modules.flow.models import State
 from app.modules.forms.models import FormField

@@ -15,8 +15,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.applications.service import (
-    ApplicationsService,
+from app.modules.applications.service import ApplicationsService
+from app.modules.applications.service.service_base import (
     _amount_currency,
     _scrub_diff,
     _state_out,

@@ -10,7 +10,7 @@ from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy import Text as _Text
 
 from app.modules.applications.models import Application
-from app.modules.applications.service import _title_of
+from app.modules.applications.service.service_base import _title_of
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _json_safe
 from app.modules.budget.tree_models import (

@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import or_, select
 
 from app.modules.applications.models import Application
-from app.modules.applications.service import _title_of
+from app.modules.applications.service.service_base import _title_of
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase
