@@ -33,6 +33,10 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
+      # @types/node folgt der CI-/Runtime-Node-Major (setup-node: 22) — Majors darüber
+      # hinaus sind falsch, bis Node selbst angehoben wird.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
       # Tailwind 4 = neues Config-Modell (CSS-first); Migration separat planen.
       - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
