@@ -90,6 +90,21 @@ def test_dedup_keeps_oldest_when_no_matched() -> None:
     assert [u[0] for u in conn.updated] == ["old"]
 
 
+def test_dedup_all_matched_group_untouched() -> None:
+    """Gruppe mit NUR gebuchten Zeilen (kein Re-Import-Fall) → nicht anfassen: nichts
+    gelöscht, kein Schlüssel-Update."""
+    acc = uuid.uuid4()
+    raw = {"purpose": "ASTA 05/26", "applicant_name": "Clara Schweiker"}
+    rows = [
+        _row("m1", "matched", dict(raw), acc=acc, created=1),
+        _row("m2", "matched", dict(raw), acc=acc, created=2),
+    ]
+    conn = _FakeConn(rows)
+    assert _dedup(conn) == 0
+    assert conn.deleted == []
+    assert conn.updated == []
+
+
 def test_dedup_noop_without_duplicates() -> None:
     acc = uuid.uuid4()
     rows = [_row("x", "matched", {"purpose": "X", "applicant_name": "Solo"}, acc=acc)]

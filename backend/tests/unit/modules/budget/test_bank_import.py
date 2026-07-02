@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
@@ -145,6 +146,63 @@ def test_mt940_sign_from_status() -> None:
     # Unbekannter/leerer Status → Vorzeichen der Lib beibehalten (hier negativ vorgegeben).
     neg = bi.lines_from_mt940_transactions([_Tx({"amount": _Amt("-7.00")})])[0]
     assert neg.amount == Decimal("-7.00")
+
+
+def test_mt940_booking_time_lands_in_raw() -> None:
+    """Sparkassen-``DATUM … UHR``-Zusatz: Zweck wird bereinigt, die Uhrzeit wandert nach
+    ``raw['booking_time']`` (speist die ``Buchung:``-Zeile der Anmerkung, #fints)."""
+    line = bi.lines_from_mt940_transactions(
+        [_Tx({
+            "amount": _Amt("50.00"),
+            "status": "C",
+            "purpose": "Miete Mai DATUM 03.04.2026, 09.15 UHR",
+        })]
+    )[0]
+    assert line.purpose == "Miete Mai"
+    assert line.raw.get("booking_time") == "09:15"
+
+
+def test_balance_from_mt940_out_of_range_amount() -> None:
+    """Saldo außerhalb des gültigen Betragsbereichs → verworfen (None), kein Crash."""
+    bal = SimpleNamespace(amount=_Amt("99999999999.00"), date=None)
+    assert bi.balance_from_mt940(bal) is None
+
+
+def test_mt940_closing_balance_non_dict_data() -> None:
+    """``transactions.data`` kein Dict (unerwartete Lib-Struktur) → kein Saldo."""
+    assert bi._mt940_closing_balance(SimpleNamespace(data=["kein", "dict"])) is None
+
+
+def test_camt_closing_balance_unparseable_xml() -> None:
+    """Kaputtes XML im Saldo-Pfad → None (der Zeilen-Parser meldet den Fehler separat)."""
+    assert bi._camt_closing_balance(b"<<<not xml") is None
+
+
+def test_camt_closing_balance_non_decimal_amount() -> None:
+    """CLBD mit nicht-numerischem <Amt>-Text → kein Saldo (Zeilen bleiben geparst)."""
+    xml = b"""<?xml version="1.0"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
+ <Bal><Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp><Amt Ccy="EUR">abc</Amt>
+  <CdtDbtInd>CRDT</CdtDbtInd></Bal>
+ <Ntry><Amt Ccy="EUR">50.00</Amt><CdtDbtInd>DBIT</CdtDbtInd></Ntry>
+</Stmt></Document>"""
+    lines, bal = bi.parse_statement_full(xml)
+    assert len(lines) == 1
+    assert bal is None
+
+
+def test_iban_mod97_rejects_non_base36_chars() -> None:
+    """Nicht-Base36-Zeichen im Kandidaten (Umlaute o. Ä.) → keine gültige IBAN (False)."""
+    assert bi._iban_mod97_ok("DE12ÄÖÜ4050000010008395") is False
+
+
+def test_split_leading_iban_full_length_bad_checksum() -> None:
+    """Volle DE-IBAN-Länge, aber mod-97-Prüfsumme falsch (DE00… ist nie gültig) →
+    kein Split, der Name bleibt unangetastet."""
+    assert bi.split_leading_iban("DE00120300001076878808Quentin Walz", None) == (
+        "DE00120300001076878808Quentin Walz",
+        None,
+    )
 
 
 def test_camt_direction_edges() -> None:
