@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   type ElementRef,
   type OnDestroy,
   computed,
@@ -15,66 +14,75 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { forkJoin } from 'rxjs';
-import { ApiClient } from '@core/api/api-client.service';
-import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
 import type {
   AgendaItem,
-  AssignableApplication,
   Attendance,
   AttendanceStatus,
   I18nMap,
   Meeting,
-  MeetingMember,
   MeetingVote,
-  Protocol,
   Uuid,
 } from '@core/api/models';
-import { WsService, type MeetingChannel } from '@core/ws/ws.service';
-import type { ServerMessage } from '@core/ws/ws-messages';
-import { BadgeComponent, type BadgeVariant } from '@stupa-makers/ui-kit';
-import { ButtonComponent } from '@stupa-makers/ui-kit';
-import { CardComponent } from '@stupa-makers/ui-kit';
+import type { BadgeVariant } from '@stupa-makers/ui-kit';
 import {
+  BadgeComponent,
+  ButtonComponent,
+  CardComponent,
   CheckboxComponent,
   DatepickerComponent,
   DialogComponent,
   IconComponent,
   type IconName,
   SelectComponent,
-  type SelectOption,
   TimeInputComponent,
 } from '@stupa-makers/ui-kit';
-import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
-import { ToastService } from '@stupa-makers/ui-kit';
-import { AdminOptionsService } from '../../pages/admin/admin-options.service';
+import type { TranslationKey } from '@core/i18n/translations';
+import { MeetingAgendaService } from './meeting-agenda.service';
+import { MeetingAttendanceTableComponent } from './meeting-attendance-table.component';
+import { MeetingBeamerComponent } from './meeting-beamer.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
+import { MeetingDialogsService } from './meeting-dialogs.service';
+import { MeetingFollowViewComponent } from './meeting-follow-view.component';
+import { MeetingProtocolPaneComponent } from './meeting-protocol-pane.component';
+import { MeetingSessionService } from './meeting-session.service';
+import { MeetingsTimelineService } from './meetings-timeline.service';
 import { renderMarkdown } from './meetings.util';
-
-/** Wartezeit nach der letzten Eingabe, bevor das Protokoll automatisch gespeichert wird (#56). */
-const AUTOSAVE_DELAY_MS = 1000;
+import {
+  FIXED_VOTE_OPTIONS,
+  attendanceBadgeVariant,
+  attendanceButtonVariant,
+  attendanceIcon,
+  attendanceKey,
+  countEntries,
+  meetingStatusKey,
+  meetingStatusVariant,
+  resolveI18n,
+  voteOptionLabel,
+  voteOptionsFor,
+  voteResultKey,
+  voteResultVariant,
+  voteStatusKey,
+  voteStatusVariant,
+} from './meetings-display.util';
 
 /**
- * Sitzungssteuerung + Protokoll-Editor (T-33, flows §5/§7).
- *
- *  - **Sitzungssteuerung** (RBAC `meeting.manage`): aktiven Antrag setzen, Votes
- *    live öffnen/schließen, Sitzungs-Status (live/geschlossen). Der Live-Stream
- *    (`/ws/meetings/{id}`) hält Status/Tally/Ergebnis ohne Reload aktuell und
- *    synchronisiert mit dem Beamer (api.md §4).
- *  - **Protokoll-Editor** (RBAC `protocol.write`): Markdown mit Snippet-Einfügen
- *    für Anträge/Abstimmungen (pytex-Shortcodes) + Live-Vorschau; `finalize`
- *    löst PDF/Versand aus (status `final` + Link).
- *
- * RBAC ist hier UX-Gating (nicht autoritativ) — der Server prüft jede Aktion.
+ * Meetings page: overview timeline (`/meetings`) and the 3-column session
+ * detail view (`/meetings/:id`). This component is a thin facade over the
+ * component-scoped services below; its public surface also drives the specs.
  */
 @Component({
   selector: 'app-meetings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [
+    MeetingAgendaService,
+    MeetingSessionService,
+    MeetingsTimelineService,
+    MeetingDialogsService,
+  ],
   imports: [
     FormsModule,
     RouterLink,
@@ -88,436 +96,76 @@ const AUTOSAVE_DELAY_MS = 1000;
     TimeInputComponent,
     DialogComponent,
     IconComponent,
-    MarkdownEditorComponent,
     LocalizedDatePipe,
     MeetingDelegationCardComponent,
+    MeetingAttendanceTableComponent,
+    MeetingBeamerComponent,
+    MeetingFollowViewComponent,
+    MeetingProtocolPaneComponent,
     NgTemplateOutlet,
   ],
   templateUrl: './meetings.component.html',
   styleUrl: './meetings.component.scss',
 })
 export class MeetingsComponent implements OnDestroy {
-  private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
-  private readonly toast = inject(ToastService);
-  private readonly ws = inject(WsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly useMock = inject(USE_MOCK_API);
-  private readonly options = inject(AdminOptionsService);
+  private readonly session = inject(MeetingSessionService);
+  private readonly agendaSvc = inject(MeetingAgendaService);
+  private readonly timeline = inject(MeetingsTimelineService);
+  private readonly dialogs = inject(MeetingDialogsService);
 
-  readonly loading = signal(false);
-  readonly error = signal(false);
-  readonly meeting = signal<Meeting | null>(null);
-  readonly protocol = signal<Protocol | null>(null);
-  /** Detail-Route (`/meetings/:id`) vs. Übersicht (`/meetings`). */
+  /** Detail route (`/meetings/:id`) vs. overview (`/meetings`). */
   readonly detailMode = signal(false);
+  /** Beamer display (only current question + live result, no dialogs). */
+  readonly beamerMode = signal(false);
+  /** Confirmation dialog for (irrevocably) closing the session. */
+  readonly closeConfirmOpen = signal(false);
 
-  /** Anwesenheits-Roster der Sitzung (#Meetings/#55/#56). */
-  readonly attendance = signal<Attendance[]>([]);
-  /** Live-Zuschauer der Sitzungs-Seite (#live-viewers, via WS `viewers`). */
-  readonly viewers = signal<string[]>([]);
-  readonly savingAttendance = signal(false);
-  readonly attendanceStatuses: readonly AttendanceStatus[] = ['present', 'excused', 'absent'];
+  // --- session state (MeetingSessionService) --------------------------------
+  readonly loading = this.session.loading;
+  readonly error = this.session.error;
+  readonly meeting = this.session.meeting;
+  readonly protocol = this.session.protocol;
+  readonly attendance = this.session.attendance;
+  readonly viewers = this.session.viewers;
+  readonly savingAttendance = this.session.savingAttendance;
+  readonly planDate = this.session.planDate;
+  readonly planTime = this.session.planTime;
+  readonly savingDate = this.session.savingDate;
+  readonly finalizing = this.session.finalizing;
+  readonly casting = this.session.casting;
+  readonly deletingVote = this.session.deletingVote;
+  protected readonly myChoices = this.session.myChoices;
+  readonly voteDialogOpen = this.session.voteDialogOpen;
+  readonly voteQuestion = this.session.voteQuestion;
+  readonly voteSecret = this.session.voteSecret;
+  readonly voteMajorityRule = this.session.voteMajorityRule;
+  readonly majorityRuleOptions = this.session.majorityRuleOptions;
+  readonly openingVote = this.session.openingVote;
+  readonly looseVotes = this.session.looseVotes;
+  readonly beamerVote = this.session.beamerVote;
+  readonly FIXED_VOTE_OPTIONS = FIXED_VOTE_OPTIONS;
 
-  /** Tagesordnung + zuweisbare Abstimmungs-Anträge (#10/#58). */
-  readonly agenda = signal<AgendaItem[]>([]);
-  readonly assignable = signal<AssignableApplication[]>([]);
-  readonly savingAgenda = signal(false);
-  readonly agendaPick = signal<string>('');
-  readonly agendaFreetext = signal<string>('');
-  /** Inline-Umbenennen eines Freitext-TOP: aktiver TOP + Eingabe-Entwurf (#Sessions). */
-  readonly renamingTopId = signal<Uuid | null>(null);
-  readonly renameDraft = signal<string>('');
-
-  /** Live-Abstimmung öffnen (#Meetings): Dialog-Zustand + Beschlussfrage/Optionen. */
-  readonly voteDialogOpen = signal(false);
-  private readonly voteItem = signal<AgendaItem | null>(null);
-  readonly voteQuestion = signal<string>('');
-  /** Feste Stimm-Optionen (kanonische Keys) — Pass/Fail braucht yes/no/abstain. */
-  readonly FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
-  readonly voteSecret = signal(false);
-  // Beschluss-Parameter beim Öffnen: nur die Mehrheitsregel. Quorum/Stimmberechtigte
-  // kommen aus der Gremium-Konfiguration (kein manuelles Setzen pro Vote).
-  readonly voteMajorityRule = signal<'simple' | 'absolute' | 'two_thirds'>('simple');
-  readonly majorityRuleOptions = computed<SelectOption[]>(() =>
-    (['simple', 'absolute', 'two_thirds'] as const).map((v) => ({
-      value: v,
-      label: this.i18n.translate(`vote.majority.${v}`),
-    })),
-  );
-  readonly openingVote = signal(false);
-  /** Anzeige-Label einer Stimm-Option (yes→Ja …); unbekannte roh. */
-  voteOptionLabel(opt: string): string {
-    const key = `vote.option.${opt}` as TranslationKey;
-    const label = this.i18n.translate(key);
-    return label === key ? opt : label;
-  }
-  readonly assignableOptions = computed<SelectOption[]>(() =>
-    this.assignable().map((a) => {
-      const title = a.title || a.applicationId;
-      const state = this.stateLabelOf(a.stateLabel);
-      // Status mit anzeigen (#5-4): welcher Antrag in welchem Abstimmungs-State.
-      return { value: a.applicationId, label: state ? `${title} (${state})` : title };
-    }),
-  );
-
-  /** Lokalisierter Flow-State-Name aus einer I18nMap (#5-4). */
-  stateLabelOf(map: I18nMap | null | undefined): string {
-    if (!map) return '';
-    return map[this.i18n.locale()] ?? map['de'] ?? Object.values(map)[0] ?? '';
-  }
-
-  /** Initiales Laden der Übersicht-Timeline (erste Seite beider Richtungen). */
-  readonly loadingList = signal(false);
-
-  readonly saving = signal(false);
-  /** Auto-Speichern-Status des aktuellen TOP-Texts (#56/#58). */
-  readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  /** Aktuell im rechten Editor gewählter TOP. */
-  readonly selectedTopId = signal<Uuid | null>(null);
-  readonly savingTop = signal(false);
-  private bodyTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Noch nicht gespeicherte, debounced TOP-Bearbeitung (itemId + Text), #AUD-012. */
-  private pendingBody: { itemId: Uuid; body: string } | null = null;
-  /** Poll-Fallback, solange der Worker das Protokoll rendert (Status »rendering«). */
-  private renderPollTimer: ReturnType<typeof setTimeout> | null = null;
-  private dragTopIndex: number | null = null;
-  readonly finalizing = signal(false);
-  readonly creating = signal(false);
-  readonly newTitle = signal('');
-  /** Optionales geplantes Datum für die neue Sitzung (#7), `YYYY-MM-DD`. */
-  readonly newDate = signal('');
-  /** Optionale geplante Uhrzeit (#34), `HH:mm`. */
-  readonly newTime = signal('');
-  /** Optionale geplante End-Uhrzeit (#ics), `HH:mm` — muss nach `newTime` liegen. */
-  readonly newEndTime = signal('');
-  /** Datums-/Zeit-Editor einer bereits angelegten, geplanten Sitzung (#7/#34). */
-  readonly planDate = signal('');
-  readonly planTime = signal('');
-  readonly savingDate = signal(false);
-  /** Pflicht-Gremium für die neue Sitzung (#68); leer ⇒ Submit gesperrt. */
-  readonly newGremiumId = signal('');
-  /** Protokollant der neuen Sitzung — wählbar beim Anlegen, Pflicht spätestens vor
-   *  dem Start. Kandidaten = aktuelle Mitglieder des gewählten Gremiums. */
-  readonly newProtokollant = signal('');
-  readonly createMembers = signal<MeetingMember[]>([]);
-  readonly createProtokollantOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('meetings.protokollant.none') },
-    ...this.createMembers().map((m) => ({
-      value: m.principalId,
-      label: m.displayName || m.email || m.principalId,
-    })),
-  ]);
-  /** Gremien als Dropdown-Optionen (echte Liste, `/gremien`). */
-  readonly gremiumOptions = signal<SelectOption[]>([]);
-  /** Gremium-Filter der Übersicht (''=alle). Quelle: Gremien mit mind. einer
-   *  SICHTBAREN Sitzung (read-Recht), nicht die Mitglieds-Gremien (#meetings-filter). */
-  readonly gremiumFilter = signal<string>('');
-  /** Gremien mit mind. einer lesbaren Sitzung — vom Backend (`/meetings/gremien`). */
-  readonly filterGremien = signal<{ id: string; name: string }[]>([]);
-  readonly filterGremiumOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('meetings.list.allCommittees') },
-    ...this.filterGremien().map((g) => ({ value: g.id, label: g.name })),
-  ]);
-  /** Sitzung-anlegen-Dialog offen (#27). */
-  readonly createOpen = signal(false);
-  /** Schritt des zweistufigen Anlegen-Dialogs (#6-1): 1 = Gremium/Datum/Zeit,
-   *  2 = Name + Protokollant. Beim (Wieder-)Öffnen/Schließen auf 1 zurückgesetzt. */
-  readonly createStep = signal<1 | 2>(1);
-  /** Zuletzt automatisch vorbelegter Titel (#6-1): nur überschreiben, solange der
-   *  Nutzer den Vorschlag nicht von Hand geändert hat — kein Clobbern. */
-  private lastAutoPrefill = '';
-
-  // --- Timeline (#104) — server-seitiges Keyset-Lazy-Loading ----------------
-  /** Seitengröße je Nachlade-Schritt (beide Richtungen). */
-  private readonly PAGE = 15;
-
-  /** Anstehende Sitzungen, chronologisch vorwärts (frühestes oben). */
-  readonly upcomingItems = signal<Meeting[]>([]);
-  /** Vergangene Sitzungen, chronologisch (ältestes oben, jüngstes am „jetzt"). */
-  readonly pastItems = signal<Meeting[]>([]);
-  /** Cursor der jeweils nächsten Seite (``null`` ⇒ Richtung erschöpft). */
-  private upcomingCursor: string | null = null;
-  private pastCursor: string | null = null;
-  readonly upcomingHasMore = signal(false);
-  readonly pastHasMore = signal(false);
-  readonly loadingUpcoming = signal(false);
-  readonly loadingPast = signal(false);
-  private didInitialScroll = false;
-
-  // --- Such-Modus (#3/#4) --------------------------------------------------
-  /** Aktive Suchanfrage (leer ⇒ normale Past/Upcoming-Timeline). */
-  readonly searchQuery = signal('');
-  /** Aktiv, sobald ``searchQuery`` (getrimmt) nicht leer ist → kollabierte Liste. */
-  readonly searchActive = computed(() => this.searchQuery().trim().length > 0);
-  /** Relevanz-sortierte Treffer (kollabiert, kein Past/Upcoming-Split, kein Jetzt-Marker). */
-  readonly searchItems = signal<Meeting[]>([]);
-  private searchCursor: string | null = null;
-  readonly searchHasMore = signal(false);
-  readonly loadingSearch = signal(false);
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Lauf-Nummer der Such-Fetches (verspätete Antworten alter Queries verwerfen). */
-  private searchSeq = 0;
-
-  readonly timelineScroll = viewChild<ElementRef<HTMLElement>>('tlScroll');
-  readonly nowMarker = viewChild<ElementRef<HTMLElement>>('nowMarker');
-
-  /** „Frühere Sitzungen laden"-Affordanz (oben). */
-  readonly hasMorePast = computed(() => this.pastHasMore());
-  /** Übersicht leer (nach dem Laden keine Sitzung in beiden Richtungen). */
-  readonly timelineEmpty = computed(
-    () => !this.upcomingItems().length && !this.pastItems().length,
-  );
-  /** Such-Treffer leer (nach dem Laden keine Sitzung) — eigener Leerzustand. */
-  readonly searchEmpty = computed(
-    () => this.searchActive() && !this.loadingSearch() && !this.searchItems().length,
-  );
-
-  /**
-   * Scroll-getriebenes Nachladen: nahe dem oberen Rand ⇒ ältere Vergangenheit,
-   * nahe dem unteren Rand ⇒ weitere Zukunft. Beide serverseitig per Cursor.
-   * Im Such-Modus (kollabierte Liste) lädt der untere Rand die nächste Offset-Seite.
-   */
-  onTimelineScroll(el: HTMLElement): void {
-    if (this.searchActive()) {
-      if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreSearch();
-      return;
-    }
-    if (el.scrollTop <= 80) this.loadMorePast(el);
-    if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreUpcoming();
-  }
-
-  /** Header-Suche (#3/#4): debounced ~400 ms; bei Änderung Cursor/Listen leeren
-   *  und neu laden. Leere Query ⇒ zurück zur normalen Timeline. */
-  onSearch(value: string): void {
-    this.searchQuery.set(value);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.runSearch(), 400);
-  }
-
-  /** Suche (neu) ausführen: Treffer-Liste leeren + erste relevanz-sortierte Seite
-   *  laden. Bei leerer Query auf die normale Timeline zurückfallen. */
-  private runSearch(): void {
-    const q = this.searchQuery().trim();
-    this.searchCursor = null;
-    this.searchItems.set([]);
-    this.searchHasMore.set(false);
-    if (!q) {
-      // Zurück zur normalen Timeline: einmalig neu laden + Jetzt-Marker re-positionieren.
-      this.loadList();
-      return;
-    }
-    this.loadingSearch.set(true);
-    this.fetchSearch(true);
-  }
-
-  /** Nächste Such-Seite laden (Offset-Cursor; Relevanz ⇒ kein Keyset). */
-  loadMoreSearch(): void {
-    if (this.loadingSearch() || !this.searchHasMore() || this.searchCursor === null) return;
-    this.loadingSearch.set(true);
-    this.fetchSearch(false);
-  }
-
-  /** Eine Such-Seite holen. ``initial`` ersetzt die Liste, sonst anhängen. */
-  private fetchSearch(initial: boolean): void {
-    const seq = ++this.searchSeq;
-    this.api
-      .listMeetingsTimeline({
-        direction: 'upcoming', // im Such-Modus bedeutungslos (Backend kollabiert)
-        cursor: this.searchCursor,
-        limit: this.PAGE,
-        gremiumId: this.gremiumFilter() || undefined,
-        q: this.searchQuery().trim(),
-      })
-      .subscribe({
-        next: (page) => {
-          if (seq !== this.searchSeq) return;
-          this.searchItems.update((cur) => (initial ? page.items : [...cur, ...page.items]));
-          this.searchCursor = page.nextCursor;
-          this.searchHasMore.set(page.nextCursor !== null);
-          this.loadingSearch.set(false);
-        },
-        error: () => {
-          if (seq !== this.searchSeq) return;
-          this.loadingSearch.set(false);
-        },
-      });
-  }
-
-  /** Gremium-Filter umschalten → Timeline (bzw. Suche) neu laden (#meetings-filter). */
-  selectGremiumFilter(id: string): void {
-    this.gremiumFilter.set(id);
-    if (this.searchActive()) {
-      this.runSearch();
-      return;
-    }
-    this.loadList();
-  }
-
-  /** Nächste Vergangenheits-Seite laden + Scroll-Position über die neue Höhe halten. */
-  loadMorePast(el: HTMLElement): void {
-    if (this.loadingPast() || !this.pastHasMore() || this.pastCursor === null) return;
-    this.loadingPast.set(true);
-    const prevHeight = el.scrollHeight;
-    this.api
-      .listMeetingsTimeline({
-        direction: 'past',
-        cursor: this.pastCursor,
-        limit: this.PAGE,
-        gremiumId: this.gremiumFilter() || undefined,
-      })
-      .subscribe({
-        next: (page) => {
-          this.loadingPast.set(false);
-          // Seite ist neueste-zuerst ⇒ umgedreht oben anfügen (älteste bleiben oben).
-          this.pastItems.update((cur) => [...[...page.items].reverse(), ...cur]);
-          this.pastCursor = page.nextCursor;
-          this.pastHasMore.set(page.nextCursor !== null);
-          requestAnimationFrame(() => {
-            el.scrollTop += el.scrollHeight - prevHeight;
-          });
-        },
-        error: () => this.loadingPast.set(false),
-      });
-  }
-
-  /** Nächste Zukunfts-Seite laden + unten anfügen. */
-  loadMoreUpcoming(): void {
-    if (this.loadingUpcoming() || !this.upcomingHasMore() || this.upcomingCursor === null)
-      return;
-    this.loadingUpcoming.set(true);
-    this.api
-      .listMeetingsTimeline({
-        direction: 'upcoming',
-        cursor: this.upcomingCursor,
-        limit: this.PAGE,
-        gremiumId: this.gremiumFilter() || undefined,
-      })
-      .subscribe({
-        next: (page) => {
-          this.loadingUpcoming.set(false);
-          this.upcomingItems.update((cur) => [...cur, ...page.items]);
-          this.upcomingCursor = page.nextCursor;
-          this.upcomingHasMore.set(page.nextCursor !== null);
-        },
-        error: () => this.loadingUpcoming.set(false),
-      });
-  }
-
-  /** Eine geänderte Sitzung in beiden Richtungen ersetzen (Settings-Save). */
-  private replaceInTimeline(updated: Meeting): void {
-    const repl = (list: Meeting[]): Meeting[] =>
-      list.map((x) => (x.id === updated.id ? updated : x));
-    this.upcomingItems.update(repl);
-    this.pastItems.update(repl);
-  }
-
-  /** Eine gelöschte Sitzung aus beiden Richtungen entfernen. */
-  private removeFromTimeline(id: Uuid): void {
-    const rm = (list: Meeting[]): Meeting[] => list.filter((x) => x.id !== id);
-    this.upcomingItems.update(rm);
-    this.pastItems.update(rm);
-  }
-
-  openCreate(): void {
-    this.newProtokollant.set('');
-    this.createMembers.set([]);
-    // Zweistufiger Dialog (#6-1): immer auf Schritt 1 starten + Prefill-Merker leeren.
-    this.createStep.set(1);
-    this.lastAutoPrefill = '';
-    // Vorbelegtes Gremium (z. B. aus dem Übersichtsfilter): direkt Mitglieder laden.
-    if (this.newGremiumId()) this.loadCreateMembers(this.newGremiumId());
-    this.createOpen.set(true);
-  }
-
-  /** Anlegen-Dialog schließen (X/Abbrechen) → Schritt zurücksetzen (#6-1). */
-  closeCreate(): void {
-    this.createOpen.set(false);
-    this.createStep.set(1);
-  }
-
-  /** Schritt-1-Pflichtfelder vollständig (#6-1): Gremium + Datum + Uhrzeit gesetzt. */
-  readonly createStep1Valid = computed(
-    () => !!this.newGremiumId() && !!this.newDate().trim() && !!this.newTime().trim(),
-  );
-
-  /** Langes deutsches Datum (»14. Juni 2026«) für den Namens-Vorschlag (#6-1) —
-   *  spiegelt den `ldate`-Pipe (`dateStyle: 'long'`, locale-abhängig). */
-  private longDate(isoDate: string): string {
-    const date = new Date(isoDate);
-    if (Number.isNaN(date.getTime())) return isoDate;
-    const locale = this.i18n.locale() === 'en' ? 'en-US' : 'de-DE';
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date);
-  }
-
-  /** Von Schritt 1 zu Schritt 2 (#6-1): Namen vorbelegen (»Sitzung des <Gremium>
-   *  am <Datum>«), ohne eine manuelle Eingabe zu überschreiben. */
-  goToCreateStep2(): void {
-    if (!this.createStep1Valid()) return;
-    const committee =
-      this.gremiumOptions().find((o) => o.value === this.newGremiumId())?.label ?? '';
-    const suggestion = this.i18n.translate('meetings.create.namePrefill', {
-      committee,
-      date: this.longDate(this.newDate().trim()),
-    });
-    // Nur vorbelegen, wenn das Feld leer ist ODER noch der vorige Auto-Vorschlag
-    // drinsteht — eine vom Nutzer geänderte Eingabe bleibt unangetastet (#6-1).
-    const current = this.newTitle();
-    if (!current.trim() || current === this.lastAutoPrefill) {
-      this.newTitle.set(suggestion);
-      this.lastAutoPrefill = suggestion;
-    }
-    this.createStep.set(2);
-  }
-
-  /** Zurück zu Schritt 1 (#6-1). */
-  backToCreateStep1(): void {
-    this.createStep.set(1);
-  }
-
-  /** Gremium im Anlegen-Dialog wechseln → Protokollant-Kandidaten neu laden. */
-  onCreateGremiumChange(gremiumId: string): void {
-    this.newGremiumId.set(gremiumId);
-    this.newProtokollant.set('');
-    this.createMembers.set([]);
-    if (gremiumId) this.loadCreateMembers(gremiumId);
-  }
-
-  private loadCreateMembers(gremiumId: string): void {
-    this.api.listMeetingMembers(gremiumId).subscribe({
-      next: (rows) => this.createMembers.set(rows),
-      error: () => this.createMembers.set([]),
-    });
-  }
-
-  /** Globale Verwalter-Rechte — Gating der Übersicht/Anlegen (ohne geladene Sitzung). */
-  readonly canManageAny = computed(() => this.auth.can('meeting.manage'));
-  /** Sitzung anlegen: globale `meeting.manage` ODER Vorstand/Manager (Gremium-Rolle
-   *  mit `session.manage`) in mindestens einem Gremium — gremium-genau wie das
-   *  Backend (`MeetingService.can_manage`). */
+  // --- permission flags -------------------------------------------------------
+  readonly canManageAny = this.session.canManageAny;
+  readonly canManage = this.session.canManage;
+  readonly canWrite = this.session.canWrite;
+  readonly canManageVotes = this.session.canManageVotes;
+  readonly canVote = this.session.canVote;
+  readonly canViewAll = this.session.canViewAll;
+  readonly isProtokollant = this.session.isProtokollant;
+  readonly isFollower = this.session.isFollower;
+  /** Create: global `meeting.manage` OR board/manager in at least one committee. */
   readonly canCreate = computed(
     () => this.canManageAny() || this.auth.sessionManageGremien().length > 0,
   );
-  /** Per-Sitzung-Flags aus der geladenen Sitzung (Backend, gremium-genau). */
-  readonly canManage = computed(() => this.meeting()?.canManage ?? this.canManageAny());
-  readonly canWrite = computed(() => this.meeting()?.canWrite ?? false);
-  readonly canManageVotes = computed(() => this.meeting()?.canManageVotes ?? false);
-  readonly canVote = computed(() => this.meeting()?.canVote ?? false);
   readonly canWriteGlobal = computed(() => this.auth.can('protocol.write'));
-  /** Globale, rein additive LESE-Permission (#meeting-view-all): sieht JEDE Sitzung.
-   *  Solche Nur-Leser bekommen die Protokollant-3-Spalten-Ansicht statt der Live-
-   *  Verfolgung, aber komplett read-only — `canWrite`/`canManage` sind false, also
-   *  Editor disabled und alle Edit-Controls ausgeblendet, exakt wie nach dem
-   *  Finalisieren (#meeting-view-all). */
-  readonly canViewAll = computed(() => this.auth.can('meeting.view_all'));
-  /** Mitglied irgendeines Gremiums → darf die (gefilterte) Sitzungsübersicht sehen. */
   readonly inAnyCommittee = computed(() => this.auth.gremien().length > 0);
-  /** Stellvertreter-Pool-Mitglied → darf die (gefilterte) Timeline sehen (#7). */
   readonly inSubstitutePool = computed(() => this.auth.inSubstitutePool());
-  /** Darf die (serverseitig gefilterte) Sitzungsübersicht/Timeline sehen. */
+  /** May see the (server-side filtered) overview timeline. */
   readonly showOverview = computed(
     () =>
       this.canManageAny() ||
@@ -525,8 +173,6 @@ export class MeetingsComponent implements OnDestroy {
       this.inAnyCommittee() ||
       this.inSubstitutePool(),
   );
-  /** Übersicht ohne Detail-Route, ohne Verwalter-/Schreibrecht, ohne Gremium-
-   *  Mitgliedschaft **und** ohne Pool-Zugehörigkeit ⇒ keine Berechtigung (#sessions/#7). */
   readonly showForbidden = computed(
     () =>
       !this.detailMode() &&
@@ -535,116 +181,96 @@ export class MeetingsComponent implements OnDestroy {
       !this.inAnyCommittee() &&
       !this.inSubstitutePool(),
   );
-  /** Ist der angemeldete Nutzer der für DIESE Sitzung gewählte Protokollant?
-   *  Serverseitig aufgelöst (`isProtokollant`): das FE kennt nur `principal.sub`,
-   *  nicht die interne `principal_id`, mit der `protokollantId` verglichen werden
-   *  müsste — ein FE-seitiger Vergleich schlug daher immer fehl (#protokollant-view). */
-  readonly isProtokollant = computed(() => this.meeting()?.isProtokollant ?? false);
-  /** Live-Verfolgung (Protokoll lesen + offene Abstimmungen mitstimmen) statt
-   *  Edit-/Manager-View. Sobald ein Protokollant gewählt ist, bekommt **nur**
-   *  dieser den Manager-View — alle anderen (auch Verwalter) die Live-Ansicht.
-   *  Ohne gewählten Protokollant greift das alte Schreib-/Verwaltungs-Gate,
-   *  damit eine frisch angelegte Sitzung vor dem Start nicht in einer Sackgasse
-   *  landet (Zuweisung erfolgt dann aus der Übersicht). */
-  readonly isFollower = computed(() => {
-    const m = this.meeting();
-    if (!m) return false;
-    // Globale Nur-Leser (#meeting-view-all) sehen die volle 3-Spalten-Ansicht
-    // read-only statt der Live-Verfolgung — aber NUR, wenn sie auf dieser Sitzung
-    // sonst keinerlei Schreib-/Verwaltungsrecht haben. Sonst (z. B. Admin mit
-    // view_all + meeting.manage) griffe die Protokollant-Exklusivität unten nicht
-    // mehr und ein Nicht-Protokollant könnte parallel zum gewählten Protokollanten
-    // editieren (#meeting-view-all).
-    if (this.canViewAll() && !m.canWrite && !m.canManage) return false;
-    if (m.protokollantId) return !this.isProtokollant();
-    return !m.canWrite && !m.canManage;
-  });
-  /** Beamer-Anzeige (nur aktuelle Frage + Live-Ergebnis, keine Dialoge). */
-  readonly beamerMode = signal(false);
 
-  /** Einstellungs-Dialog (Protokollant + Datum/Zeit) — aus Toolbar ODER Listen-Edit. */
-  readonly settingsMeeting = signal<Meeting | null>(null);
-  readonly settingsRoster = signal<Attendance[]>([]);
-  readonly settingsProtokollant = signal<string>('');
-  readonly settingsDate = signal<string>('');
-  readonly settingsTime = signal<string>('');
-  readonly settingsEndTime = signal<string>('');
-  readonly savingSettings = signal(false);
-  /** Geschlossene Sitzung (#15): Einstellungen KOMPLETT gesperrt — gilt auch im
-   *  Listen-Edit (der Status reist im Meeting-Objekt mit). */
-  readonly settingsLocked = computed(() => this.settingsMeeting()?.status === 'closed');
-  /** Protokollant zusätzlich gesperrt, sobald das Protokoll finalisiert ist (#15);
-   *  Protokoll-Status ist nur in der Detail-Ansicht der offenen Sitzung bekannt. */
-  readonly protokollantLocked = computed(
-    () =>
-      this.meeting()?.id === this.settingsMeeting()?.id && !!this.protocol()?.isFinal,
-  );
-  /** Protokollant-Auswahl aus dem Anwesenheits-Roster (alle Gremium-Mitglieder). */
-  readonly protokollantOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('meetings.protokollant.none') },
-    ...this.settingsRoster().map((a) => ({
-      value: a.principalId,
-      label: a.displayName || a.email || a.principalId,
-    })),
-  ]);
-  /** Löschen-Bestätigung (Toolbar ODER Listen-Zeile). */
-  readonly confirmDeleteMeeting = signal<Meeting | null>(null);
-  readonly deletingMeeting = signal(false);
-  /** Bestätigungs-Dialog fürs (unwiderrufliche) Schließen der Sitzung. */
-  readonly closeConfirmOpen = signal(false);
-  /** Casting-Status je Vote (für Mitglied/Protokollant-Stimmabgabe). */
-  readonly casting = signal<Uuid | null>(null);
-  readonly deletingVote = signal<Uuid | null>(null);
-  /** Eigene Stimmwahl je Vote (lokal, fürs Hervorheben der gewählten Option). */
-  private readonly myChoices = signal<Record<string, string>>({});
-  myChoice(voteId: Uuid): string | null {
-    return this.myChoices()[voteId] ?? null;
-  }
+  // --- agenda state (MeetingAgendaService) --------------------------------------
+  readonly agenda = this.agendaSvc.agenda;
+  readonly assignable = this.agendaSvc.assignable;
+  readonly savingAgenda = this.agendaSvc.savingAgenda;
+  readonly agendaPick = this.agendaSvc.agendaPick;
+  readonly agendaFreetext = this.agendaSvc.agendaFreetext;
+  readonly renamingTopId = this.agendaSvc.renamingTopId;
+  readonly renameDraft = this.agendaSvc.renameDraft;
+  readonly selectedTopId = this.agendaSvc.selectedTopId;
+  readonly savingTop = this.agendaSvc.savingTop;
+  readonly saveState = this.agendaSvc.saveState;
+  readonly selectedTop = this.agendaSvc.selectedTop;
+  readonly selectedIndex = this.agendaSvc.selectedIndex;
+  readonly assignableOptions = this.agendaSvc.assignableOptions;
 
-  /** Votes eines TOP (gruppiert über agendaItemId). */
-  votesForTop(topId: Uuid): MeetingVote[] {
-    return (this.meeting()?.votes ?? []).filter((v) => v.agendaItemId === topId);
-  }
-  /** Sitzungs-Votes ohne TOP-Bindung (Bestand/aktiv) — in der Steuerung gelistet. */
-  readonly looseVotes = computed<MeetingVote[]>(() =>
-    (this.meeting()?.votes ?? []).filter((v) => !v.agendaItemId),
-  );
+  // --- timeline state (MeetingsTimelineService) ------------------------------------
+  readonly loadingList = this.timeline.loadingList;
+  readonly upcomingItems = this.timeline.upcomingItems;
+  readonly pastItems = this.timeline.pastItems;
+  readonly upcomingHasMore = this.timeline.upcomingHasMore;
+  readonly pastHasMore = this.timeline.pastHasMore;
+  readonly loadingUpcoming = this.timeline.loadingUpcoming;
+  readonly loadingPast = this.timeline.loadingPast;
+  readonly gremiumFilter = this.timeline.gremiumFilter;
+  readonly filterGremien = this.timeline.filterGremien;
+  readonly filterGremiumOptions = this.timeline.filterGremiumOptions;
+  readonly searchQuery = this.timeline.searchQuery;
+  readonly searchActive = this.timeline.searchActive;
+  readonly searchItems = this.timeline.searchItems;
+  readonly searchHasMore = this.timeline.searchHasMore;
+  readonly loadingSearch = this.timeline.loadingSearch;
+  readonly hasMorePast = this.timeline.hasMorePast;
+  readonly timelineEmpty = this.timeline.timelineEmpty;
+  readonly searchEmpty = this.timeline.searchEmpty;
 
-  /** Aktuell gewählter TOP (rechter Editor) + sein 0-basierter Index. */
-  readonly selectedTop = computed<AgendaItem | null>(
-    () => this.agenda().find((a) => a.id === this.selectedTopId()) ?? null,
-  );
-  readonly selectedIndex = computed(() =>
-    this.agenda().findIndex((a) => a.id === this.selectedTopId()),
-  );
+  // --- dialog state (MeetingDialogsService) -------------------------------------------
+  readonly createOpen = this.dialogs.createOpen;
+  readonly createStep = this.dialogs.createStep;
+  readonly creating = this.dialogs.creating;
+  readonly newTitle = this.dialogs.newTitle;
+  readonly newDate = this.dialogs.newDate;
+  readonly newTime = this.dialogs.newTime;
+  readonly newEndTime = this.dialogs.newEndTime;
+  readonly newGremiumId = this.dialogs.newGremiumId;
+  readonly newProtokollant = this.dialogs.newProtokollant;
+  readonly createMembers = this.dialogs.createMembers;
+  readonly createProtokollantOptions = this.dialogs.createProtokollantOptions;
+  readonly gremiumOptions = this.dialogs.gremiumOptions;
+  readonly createStep1Valid = this.dialogs.createStep1Valid;
+  readonly settingsMeeting = this.dialogs.settingsMeeting;
+  readonly settingsRoster = this.dialogs.settingsRoster;
+  readonly settingsProtokollant = this.dialogs.settingsProtokollant;
+  readonly settingsDate = this.dialogs.settingsDate;
+  readonly settingsTime = this.dialogs.settingsTime;
+  readonly settingsEndTime = this.dialogs.settingsEndTime;
+  readonly savingSettings = this.dialogs.savingSettings;
+  readonly settingsLocked = this.dialogs.settingsLocked;
+  readonly protokollantLocked = this.dialogs.protokollantLocked;
+  readonly protokollantOptions = this.dialogs.protokollantOptions;
+  readonly confirmDeleteMeeting = this.dialogs.confirmDeleteMeeting;
+  readonly deletingMeeting = this.dialogs.deletingMeeting;
 
-  private channel: MeetingChannel | null = null;
+  readonly timelineScroll = viewChild<ElementRef<HTMLElement>>('tlScroll');
+  readonly nowMarker = viewChild<ElementRef<HTMLElement>>('nowMarker');
 
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       const id = pm.get('id');
       this.detailMode.set(!!id);
       if (id) {
-        this.loadMeeting(id);
+        this.session.loadMeeting(id);
       } else {
-        // Übersichts-Route `/meetings`: einzelne Sitzung lösen + Liste laden (#104).
         this.meeting.set(null);
-        this.loadList();
+        this.timeline.loadList();
       }
     });
-    // Timeline (#104): einmalig auf den „jetzt"-Marker positionieren, sobald die
-    // Liste geladen + gerendert ist — Anstehendes sichtbar, Vergangenes per Hochscrollen.
+    // Position the timeline once on the "now" marker as soon as the list is
+    // loaded + rendered — upcoming visible, past reachable by scrolling up.
     effect(() => {
       const marker = this.nowMarker()?.nativeElement;
       const scroller = this.timelineScroll()?.nativeElement;
-      // Abhängigkeiten: neu positionieren, sobald beide Richtungen eingetroffen sind.
+      // Dependencies: reposition once both directions have arrived.
       this.pastItems();
       this.upcomingItems();
-      if (marker && scroller && !this.didInitialScroll && !this.loadingList()) {
-        this.didInitialScroll = true;
-        // Doppeltes rAF: erst nach Layout + Höhen-Messung positionieren. Position über
-        // getBoundingClientRect (nicht offsetTop) — robust unabhängig vom offsetParent,
-        // sonst landet die Liste fälschlich bei der ältesten Sitzung statt bei „Jetzt".
+      if (marker && scroller && !this.timeline.didInitialScroll && !this.loadingList()) {
+        this.timeline.didInitialScroll = true;
+        // Double rAF: measure after layout. getBoundingClientRect (not
+        // offsetTop) is robust regardless of the offsetParent — otherwise the
+        // list lands on the oldest meeting instead of "now".
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             const m = this.nowMarker()?.nativeElement;
@@ -657,11 +283,11 @@ export class MeetingsComponent implements OnDestroy {
         });
       }
     });
-    // Timeline-Höhe auf den freien Viewport-Rest setzen, sobald sie (neu) erscheint
-    // bzw. ihr Inhalt wächst (#sitzungen-100vh). Resize triggert separat (Listener).
+    // Size the timeline to the free viewport rest whenever it (re)appears or
+    // its content grows. Window resizes trigger separately (listener).
     effect(() => {
       const el = this.timelineScroll();
-      // Abhängigkeiten: (Wieder-)Erscheinen + Inhaltsmenge (inkl. Such-Treffer).
+      // Dependencies: (re)appearance + content amount (incl. search hits).
       this.timelineEmpty();
       this.loadingList();
       this.pastItems();
@@ -670,54 +296,20 @@ export class MeetingsComponent implements OnDestroy {
       if (el) this.scheduleMeasure();
     });
     window.addEventListener('resize', this.onResize, { passive: true });
-    // Gremien-Liste für den Übersichts-FILTER (#meetings-filter): alle Gremien, in
-    // denen der Nutzer mind. eine LESBARE Sitzung hat — read-Recht, nicht
-    // Mitgliedschaft. Jeder Leser darf filtern, daher ungated geladen.
-    this.api
-      .listMeetingFilterGremien()
-      .pipe(takeUntilDestroyed())
-      .subscribe({
-        next: (gs) => this.filterGremien.set(gs),
-        error: () => this.filterGremien.set([]),
-      });
-    // Gremien-Liste für das Anlege-Dropdown (#68) — nur wer Sitzungen verwalten
-    // darf. Ohne globale `meeting.manage` werden nur die SELBST verwalteten
-    // Gremien angeboten (Vorstand/Manager via Gremium-Rolle) — alles andere
-    // würde der Server beim Anlegen ohnehin mit 403 ablehnen.
-    if (this.canCreate()) {
-      this.options
-        .gremiumOptions()
-        .pipe(takeUntilDestroyed())
-        .subscribe({
-          next: (opts) => {
-            if (this.canManageAny()) {
-              this.gremiumOptions.set(opts);
-              return;
-            }
-            const managed = new Set(this.auth.sessionManageGremien());
-            this.gremiumOptions.set(opts.filter((o) => managed.has(o.value)));
-          },
-          error: () => this.gremiumOptions.set([]),
-        });
-    }
   }
 
   ngOnDestroy(): void {
-    this.channel?.close();
-    if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
-    if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
-    if (this.searchTimer !== null) clearTimeout(this.searchTimer);
     window.removeEventListener('resize', this.onResize);
     if (this.measureRaf !== null) cancelAnimationFrame(this.measureRaf);
   }
 
-  // --- Timeline-Höhe (#sitzungen-100vh) ------------------------------------
-  /** Mindesthöhe der Timeline (px), falls der Viewport sehr klein ist. */
+  // --- timeline height ----------------------------------------------------------
+  /** Minimum timeline height (px) for very small viewports. */
   private readonly TIMELINE_MIN_PX = 192;
   private measureRaf: number | null = null;
   private readonly onResize = (): void => this.scheduleMeasure();
 
-  /** Messung gebündelt auf den nächsten Frame (Layout muss gesetzt sein). */
+  /** Batch the measurement onto the next frame (layout must be settled). */
   private scheduleMeasure(): void {
     if (this.measureRaf !== null) cancelAnimationFrame(this.measureRaf);
     this.measureRaf = requestAnimationFrame(() => {
@@ -727,10 +319,10 @@ export class MeetingsComponent implements OnDestroy {
   }
 
   /**
-   * Timeline-Höhe = Viewport − alles darüber (Header/Breadcrumb/H1/Toolbar) −
-   * alles darunter (Footer + Main-Unterrand). Scroll-unabhängig gemessen
-   * (`rect.top + scrollY` = absoluter Layout-Offset), damit die Seite selbst
-   * nicht scrollt und nur die Timeline intern scrollt.
+   * Timeline height = viewport − everything above (header/breadcrumb/h1/
+   * toolbar) − everything below (footer + main bottom padding). Measured
+   * scroll-independently (`rect.top + scrollY` = absolute layout offset) so
+   * the page itself does not scroll — only the timeline does.
    */
   private measureTimeline(): void {
     const el = this.timelineScroll()?.nativeElement;
@@ -746,977 +338,281 @@ export class MeetingsComponent implements OnDestroy {
     el.style.height = `${Math.max(this.TIMELINE_MIN_PX, Math.round(avail))}px`;
   }
 
-  // --- laden / anlegen -----------------------------------------------------
-  private loadMeeting(id: Uuid): void {
-    this.loading.set(true);
-    this.error.set(false);
-    this.api.getMeeting(id).subscribe({
-      next: (m) => {
-        this.loading.set(false);
-        this.adoptMeeting(m);
-      },
-      error: () => {
-        this.loading.set(false);
-        this.error.set(true);
-      },
-    });
+  // --- timeline / search delegates -------------------------------------------------
+  onTimelineScroll(el: HTMLElement): void {
+    this.timeline.onScroll(el);
   }
 
-  private adoptMeeting(m: Meeting): void {
-    this.meeting.set(m);
-    this.planDate.set(m.date ?? '');
-    this.planTime.set(m.startTime ?? '');
-    this.connectLive(m.id);
-    // Bestehendes Protokoll per GET lesen (kein Write-Rate-Limit, #429);
-    // angelegt wird nur explizit über den Button (POST, loadProtocol).
-    if (m.protocolId && (this.canWrite() || this.canViewAll())) this.refreshProtocol();
-    this.loadAttendance(m.id);
-    this.loadAgenda(m.id);
+  onSearch(value: string): void {
+    this.timeline.onSearch(value);
   }
 
-  /**
-   * Timeline initial laden (#104): erste Zukunfts- **und** Vergangenheits-Seite
-   * parallel, danach wird einmalig auf „jetzt" gescrollt (Effect oben).
-   */
-  private loadList(): void {
-    // Auch reine Gremium-Mitglieder sehen die (serverseitig auf ihre Gremien
-    // gefilterte) Timeline — das alte canManage/canWrite-Gate ließ Mitglieder
-    // ohne Schreibrecht vor einer leeren Seite stehen (#sessions-visibility).
-    if (!this.canManageAny() && !this.canWriteGlobal() && !this.inAnyCommittee()) return;
-    this.didInitialScroll = false;
-    this.upcomingItems.set([]);
-    this.pastItems.set([]);
-    this.upcomingCursor = null;
-    this.pastCursor = null;
-    this.upcomingHasMore.set(false);
-    this.pastHasMore.set(false);
-    this.loadingList.set(true);
-    forkJoin({
-      upcoming: this.api.listMeetingsTimeline({
-        direction: 'upcoming',
-        limit: this.PAGE,
-        gremiumId: this.gremiumFilter() || undefined,
-      }),
-      past: this.api.listMeetingsTimeline({
-        direction: 'past',
-        limit: this.PAGE,
-        gremiumId: this.gremiumFilter() || undefined,
-      }),
-    }).subscribe({
-      next: ({ upcoming, past }) => {
-        this.loadingList.set(false);
-        this.upcomingItems.set(upcoming.items);
-        this.upcomingCursor = upcoming.nextCursor;
-        this.upcomingHasMore.set(upcoming.nextCursor !== null);
-        // „past" kommt neueste-zuerst ⇒ umdrehen: ältestes oben, jüngstes am „jetzt".
-        this.pastItems.set([...past.items].reverse());
-        this.pastCursor = past.nextCursor;
-        this.pastHasMore.set(past.nextCursor !== null);
-      },
-      error: () => {
-        this.loadingList.set(false);
-        this.upcomingItems.set([]);
-        this.pastItems.set([]);
-      },
-    });
+  loadMoreSearch(): void {
+    this.timeline.loadMoreSearch();
   }
 
-  create(event: Event): void {
-    event.preventDefault();
-    const title = this.newTitle().trim();
-    const gremiumId = this.newGremiumId();
-    const date = this.newDate().trim();
-    const startTime = this.newTime().trim();
-    const endTime = this.newEndTime().trim();
-    // Datum + Uhrzeit sind Pflicht (Termin der Sitzung); Submit ist sonst gesperrt.
-    if (!title || !gremiumId || !date || !startTime || this.creating()) return;
-    // End-Uhrzeit (falls gesetzt) muss nach der Start-Uhrzeit liegen (HH:mm lexikografisch).
-    if (endTime && endTime <= startTime) {
-      this.toast.error(this.i18n.translate('meetings.create.endBeforeStart'));
-      return;
-    }
-    this.creating.set(true);
-    this.api
-      .createMeeting({
-        title,
-        gremiumId,
-        date,
-        startTime,
-        endTime: endTime || null,
-        protokollantId: this.newProtokollant() || null,
-      })
-      .subscribe({
-      next: (m) => {
-        this.creating.set(false);
-        this.newTitle.set('');
-        this.newGremiumId.set('');
-        this.newDate.set('');
-        this.newTime.set('');
-        this.newEndTime.set('');
-        this.newProtokollant.set('');
-        this.createMembers.set([]);
-        this.createOpen.set(false);
-        this.createStep.set(1);
-        this.lastAutoPrefill = '';
-        this.toast.success(this.i18n.translate('meetings.toast.created'));
-        // Auf die Detail-Route navigieren, damit die Sitzung wiederauffindbar ist (#104).
-        void this.router.navigate(['/meetings', m.id]);
-      },
-      error: () => {
-        this.creating.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.createFailed'));
-      },
-    });
+  selectGremiumFilter(id: string): void {
+    this.timeline.selectGremiumFilter(id);
   }
 
-  /** Eine Sitzung aus der Liste öffnen → Detail-Route (#104). */
+  loadMorePast(el: HTMLElement): void {
+    this.timeline.loadMorePast(el);
+  }
+
+  loadMoreUpcoming(): void {
+    this.timeline.loadMoreUpcoming();
+  }
+
+  /** Open a meeting from the list → detail route. */
   openMeeting(id: Uuid): void {
     void this.router.navigate(['/meetings', id]);
   }
 
-  // --- Sitzungssteuerung ---------------------------------------------------
+  // --- create / settings / delete dialogs ---------------------------------------------
+  openCreate(): void {
+    this.dialogs.openCreate();
+  }
+
+  closeCreate(): void {
+    this.dialogs.closeCreate();
+  }
+
+  goToCreateStep2(): void {
+    this.dialogs.goToCreateStep2();
+  }
+
+  backToCreateStep1(): void {
+    this.dialogs.backToCreateStep1();
+  }
+
+  onCreateGremiumChange(gremiumId: string): void {
+    this.dialogs.onCreateGremiumChange(gremiumId);
+  }
+
+  create(event: Event): void {
+    event.preventDefault();
+    this.dialogs.create();
+  }
+
+  openSettings(m: Meeting): void {
+    this.dialogs.openSettings(m);
+  }
+
+  closeSettings(): void {
+    this.dialogs.closeSettings();
+  }
+
+  saveSettings(): void {
+    this.dialogs.saveSettings();
+  }
+
+  askDeleteMeeting(m: Meeting): void {
+    this.dialogs.askDeleteMeeting(m);
+  }
+
+  doDeleteMeeting(): void {
+    this.dialogs.doDeleteMeeting();
+  }
+
+  // --- session control -------------------------------------------------------------
   setStatus(status: 'live' | 'closed'): void {
-    const m = this.meeting();
-    if (!m) return;
-    // »closed« ist terminal — keine Wiedereröffnung (der Server lehnt es ohnehin ab).
-    if (m.status === 'closed') return;
-    // Start verlangt einen Protokollanten (Schriftführung des Protokolls). Vorab
-    // prüfen, damit der 409 des Servers nicht erst nach dem Klick auftaucht.
-    if (status === 'live' && !m.protokollantId) {
-      this.toast.error(this.i18n.translate('meetings.toast.protokollantRequired'));
-      return;
-    }
-    this.api.patchMeeting(m.id, { status }).subscribe({
-      next: (updated) => {
-        this.meeting.set(updated);
-        // Protokoll entsteht beim Start (Backend) — direkt per GET nachladen.
-        if (updated.status === 'live' && updated.protocolId && this.canWrite()) {
-          this.refreshProtocol();
-        }
-      },
-      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
-    });
+    this.session.setStatus(status);
   }
 
-  /** Sitzung unwiderruflich schließen → Status closed + Protokoll finalisieren. */
   closeMeeting(): void {
-    const m = this.meeting();
-    if (!m || this.finalizing()) return;
-    this.api.patchMeeting(m.id, { status: 'closed' }).subscribe({
-      next: (updated) => {
-        this.meeting.set(updated);
-        const proto = this.protocol();
-        // Finalisieren passiert implizit: PDF rendern + an MAIL_LIST versenden.
-        if (proto && !proto.isLocked) {
-          this.finalize();
-        }
-      },
-      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
-    });
+    this.session.closeMeeting();
   }
 
-  /** Geplantes Datum einer (geplanten) Sitzung vorab setzen (#7, PATCH date). */
   savePlannedDate(): void {
-    const m = this.meeting();
-    const date = this.planDate().trim();
-    if (!m || !date || this.savingDate()) return;
-    this.savingDate.set(true);
-    this.api.patchMeeting(m.id, { date, startTime: this.planTime().trim() || null }).subscribe({
-      next: (updated) => {
-        this.savingDate.set(false);
-        this.meeting.set(updated);
-        this.toast.success(this.i18n.translate('meetings.toast.dateSaved'));
-      },
-      error: () => {
-        this.savingDate.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-      },
-    });
+    this.session.savePlannedDate();
   }
 
   setActive(applicationId: Uuid): void {
-    const m = this.meeting();
-    if (!m) return;
-    this.api.patchMeeting(m.id, { activeApplicationId: applicationId }).subscribe({
-      next: (updated) => this.meeting.set(updated),
-      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
-    });
+    this.session.setActive(applicationId);
   }
 
   openVote(voteId: Uuid): void {
-    this.api.openVote(voteId).subscribe({
-      next: () => this.patchVote(voteId, { status: 'open' }),
-      error: (err: unknown) => this.voteActionFailed(err),
-    });
+    this.session.openVote(voteId);
   }
 
   closeVote(voteId: Uuid): void {
-    this.api.closeVote(voteId).subscribe({
-      next: () => this.patchVote(voteId, { status: 'closed' }),
-      error: (err: unknown) => this.voteActionFailed(err),
-    });
+    this.session.closeVote(voteId);
   }
 
-  /** Abstimmung abbrechen (#12): open → cancelled, kein Ergebnis/Branch — der
-   *  Ausweg, wenn das Quorum nicht zustande kommt (Schließen ist dann blockiert). */
   cancelVote(voteId: Uuid): void {
-    this.api.cancelVote(voteId).subscribe({
-      next: () => this.patchVote(voteId, { status: 'cancelled' }),
-      error: (err: unknown) => this.voteActionFailed(err),
-    });
+    this.session.cancelVote(voteId);
   }
 
-  /** Vote-Aktion fehlgeschlagen: konkreten Server-Grund zeigen (z. B. 409 »Antrag
-      nicht im vote-State« / »Vote storniert«) statt eines generischen Toasts, und
-      den Sitzungs-State nachladen — der Vote kann serverseitig z. B. auf
-      ``cancelled`` geflippt sein (#abort-vote). */
-  private voteActionFailed(err: unknown): void {
-    const detail = this.errorDetail(err);
-    const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.error(detail ? `${base}: ${detail}` : base);
-    const m = this.meeting();
-    if (m) {
-      this.api.getMeeting(m.id, { quiet: true }).subscribe({
-        next: (updated) => this.meeting.set(updated),
-        error: () => {},
-      });
-    }
+  cast(voteId: Uuid, choice: string): void {
+    this.session.cast(voteId, choice);
   }
 
-  // --- Protokoll: TOPs links, pro-TOP-Editor rechts (#58) ------------------
-  /** Bestehendes Protokoll per GET nachladen (kein Write-Rate-Limit, #429). */
-  private refreshProtocol(): void {
-    const m = this.meeting();
-    if (!m) return;
-    this.api.getProtocol(m.id, { quiet: true }).subscribe({
-      next: (proto) => {
-        this.protocol.set(proto);
-        this.watchRendering(proto);
-      },
-      error: () => {},
-    });
+  deleteVote(voteId: Uuid): void {
+    this.session.deleteVote(voteId);
   }
 
-  /** Status-Flip nach dem Hintergrund-Render anwenden (+ Toast final/fehlgeschlagen).
-
-      `rendering → draft` heißt: der Worker hat den Render aufgegeben und
-      zurückgerollt — das Protokoll ist wieder editier- und finalisierbar. */
-  private applyProtocolUpdate(updated: Protocol): void {
-    const prev = this.protocol();
-    this.protocol.set(updated);
-    if (prev?.status === 'rendering') {
-      if (updated.isFinal) {
-        this.toast.success(this.i18n.translate('meetings.toast.finalized'));
-      } else if (updated.status === 'draft') {
-        this.toast.error(this.i18n.translate('meetings.toast.finalizeFailed'));
-      }
-    }
-    this.watchRendering(updated);
+  myChoice(voteId: Uuid): string | null {
+    return this.myChoices()[voteId] ?? null;
   }
 
-  /** Solange `rendering`: Protokoll zyklisch nachladen — Fallback, falls der
-      `meeting_state`-Broadcast des Workers verloren geht. */
-  private watchRendering(proto: Protocol): void {
-    if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
-    if (proto.status !== 'rendering' || (!this.canWrite() && !this.canViewAll())) return;
-    this.renderPollTimer = setTimeout(() => {
-      this.renderPollTimer = null;
-      const m = this.meeting();
-      if (!m) return;
-      // GET statt POST: der Poll darf das Default-Write-Rate-Limit nicht
-      // aufbrauchen (429 nach wenigen Minuten, #429).
-      this.api.getProtocol(m.id, { quiet: true }).subscribe({
-        next: (updated) => this.applyProtocolUpdate(updated),
-        error: () => this.watchRendering(proto),
-      });
-    }, 4000);
-  }
-
-  selectTop(id: Uuid): void {
-    // Vor dem TOP-Wechsel eine noch ausstehende Auto-Speicherung des bisherigen
-    // TOP-Textes synchron auslösen, sonst verwirft das clearTimeout in
-    // onTopBodyChange beim Tippen im neuen TOP die noch laufende Speicherung und
-    // protokollrelevante Bearbeitungen gehen still verloren (#AUD-012).
-    this.flushPendingBody();
-    this.selectedTopId.set(id);
-  }
-
-  /** Markdown-Text eines TOP debounced an den Server (PATCH …/agenda/{id}). */
-  onTopBodyChange(itemId: Uuid, body: string): void {
-    const m = this.meeting();
-    if (!m) return;
-    if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
-    // Optimistisch lokal halten: Beim Server-Refresh (rows) bzw. TOP-Wechsel ist
-    // der getippte Text bereits in agenda() präsent (#AUD-012).
-    this.pendingBody = { itemId, body };
-    this.agenda.update((items) =>
-      items.map((a) => (a.id === itemId ? { ...a, body } : a)),
-    );
-    this.saveState.set('idle');
-    this.bodyTimer = setTimeout(() => {
-      this.saveBody(m.id, itemId, body);
-    }, AUTOSAVE_DELAY_MS);
-  }
-
-  /**
-   * Etwaige ausstehende Auto-Speicherung sofort feuern (z.B. beim TOP-Wechsel
-   * oder Verlassen der Komponente), damit kein protokollrelevanter Text durch
-   * das Debounce-Fenster verloren geht (#AUD-012).
-   */
-  flushPendingBody(): void {
-    if (this.bodyTimer === null || this.pendingBody === null) return;
-    clearTimeout(this.bodyTimer);
-    const m = this.meeting();
-    const { itemId, body } = this.pendingBody;
-    if (!m) {
-      this.bodyTimer = null;
-      this.pendingBody = null;
-      return;
-    }
-    this.saveBody(m.id, itemId, body);
-  }
-
-  private saveBody(meetingId: Uuid, itemId: Uuid, body: string): void {
-    this.bodyTimer = null;
-    this.pendingBody = null;
-    this.savingTop.set(true);
-    this.saveState.set('saving');
-    this.api.setAgendaBody(meetingId, itemId, body).subscribe({
-      next: (rows) => {
-        this.savingTop.set(false);
-        this.agenda.set(rows);
-        this.saveState.set('saved');
-      },
-      error: () => {
-        this.savingTop.set(false);
-        this.saveState.set('error');
-      },
-    });
-  }
-
-  // --- TOP-Reihenfolge (Drag&Drop) -----------------------------------------
-  onTopDragStart(index: number): void {
-    this.dragTopIndex = index;
-  }
-
-  onTopDragOver(event: DragEvent): void {
-    if (this.dragTopIndex !== null) event.preventDefault();
-  }
-
-  onTopDrop(index: number): void {
-    const from = this.dragTopIndex;
-    this.dragTopIndex = null;
-    const m = this.meeting();
-    if (from === null || from === index || !m) return;
-    const items = [...this.agenda()];
-    const [moved] = items.splice(from, 1);
-    items.splice(index, 0, moved);
-    this.agenda.set(items); // optimistisch
-    this.api.reorderAgenda(m.id, items.map((i) => i.id)).subscribe({
-      next: (rows) => this.agenda.set(rows),
-      error: () => {
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-        if (m) this.loadAgenda(m.id);
-      },
-    });
-  }
-
-  /** Protokoll-Markdown aus den geordneten TOPs zusammensetzen (#58). */
-  private assembleMarkdown(): string {
-    return this.agenda()
-      .map((t) => {
-        // Top-level `#` → pytex' Protokoll-Variante nummeriert es selbst als „TOP n"
-        // (\thesection). Daher KEIN manuelles „TOP n:"-Präfix und kein `##` (das würde
-        // als „0.n" nummeriert + „TOP n:" doppelt). Frontmatter-`title` verhindert, dass
-        // das erste `#` als Titelseite verbraucht wird.
-        const heading = `# ${t.title?.trim() || 'Tagesordnungspunkt'}`;
-        const ref = t.applicationId ? `\n\n:::antrag{#${t.applicationId}}\n:::` : '';
-        const body = t.body?.trim() ? `\n\n${t.body.trim()}` : '';
-        return `${heading}${ref}${body}`;
-      })
-      .join('\n\n');
+  votesForTop(topId: Uuid): MeetingVote[] {
+    return this.session.votesForTop(topId);
   }
 
   finalize(): void {
-    const proto = this.protocol();
-    // `isLocked` deckt auch »rendering« ab: kein zweiter Anstoß, kein 409 beim PATCH.
-    if (!proto || proto.isLocked || this.finalizing() || this.savingTop()) return;
-    this.finalizing.set(true);
-    // Erst die TOP-Texte zum Protokoll-Markdown zusammensetzen + speichern,
-    // dann finalisieren/rendern.
-    this.api.updateProtocol(proto.id, this.assembleMarkdown()).subscribe({
-      next: (saved) => {
-        this.protocol.set(saved);
-        this.doFinalize(saved.id);
-      },
-      error: () => {
-        this.finalizing.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.saveFailed'));
-      },
-    });
+    this.session.finalize();
   }
 
-  private doFinalize(protocolId: Uuid): void {
-    this.api.finalizeProtocol(protocolId).subscribe({
-      next: (updated) => {
-        this.finalizing.set(false);
-        this.protocol.set(updated);
-        if (updated.isFinal) {
-          // Sync-Pfad (DEV ohne Redis): direkt final.
-          this.toast.success(this.i18n.translate('meetings.toast.finalized'));
-        } else {
-          // Async-Pfad: der Worker rendert im Hintergrund — Tag zeigt »Wird gerendert«,
-          // der Abschluss kommt per WS-Broadcast bzw. Poll-Fallback.
-          this.toast.success(this.i18n.translate('meetings.toast.renderQueued'));
-          this.watchRendering(updated);
-        }
-      },
-      error: (err: unknown) => {
-        this.finalizing.set(false);
-        // Render-/Compile-Fehler (400) tragen einen konkreten Grund — anzeigen.
-        const detail = this.errorDetail(err);
-        this.toast.error(
-          detail
-            ? `${this.i18n.translate('meetings.toast.finalizeFailed')}: ${detail}`
-            : this.i18n.translate('meetings.toast.finalizeFailed'),
-        );
-      },
-    });
-  }
-
-  /** Konkrete `problem+json`-`detail`-Meldung aus einem HTTP-Fehler (oder leer). */
-  private errorDetail(err: unknown): string {
-    const body = (err as { error?: { detail?: string } } | null)?.error;
-    return typeof body?.detail === 'string' ? body.detail : '';
-  }
-
-  // --- Anwesenheit (#Meetings/#55/#56) -------------------------------------
-  private loadAttendance(meetingId: Uuid): void {
-    this.api.listAttendance(meetingId).subscribe({
-      next: (rows) => this.attendance.set(rows),
-      error: () => this.attendance.set([]),
-    });
+  protected refreshProtocol(): void {
+    this.session.refreshProtocol();
   }
 
   setAttendance(member: Attendance, status: AttendanceStatus): void {
+    this.session.setAttendance(member, status);
+  }
+
+  // --- vote dialog ---------------------------------------------------------------------
+  canAddVote(item: AgendaItem): boolean {
+    return this.session.canAddVote(item);
+  }
+
+  openVoteDialog(item: AgendaItem): void {
+    this.session.openVoteDialog(item);
+  }
+
+  closeVoteDialog(): void {
+    this.session.closeVoteDialog();
+  }
+
+  submitVote(): void {
+    this.session.submitVote();
+  }
+
+  // --- agenda / TOP editing --------------------------------------------------------------
+  selectTop(id: Uuid): void {
+    this.agendaSvc.selectTop(this.meeting()?.id ?? null, id);
+  }
+
+  onTopBodyChange(itemId: Uuid, body: string): void {
     const m = this.meeting();
-    if (!m || this.savingAttendance() || member.status === status) return;
-    this.savingAttendance.set(true);
-    // Eigene Anwesenheit als »self« markieren; Mitglieder setzt die Leitung.
-    const req = member.isSelf
-      ? this.api.setOwnAttendance(m.id, status)
-      : this.api.setMemberAttendance(m.id, member.principalId, status);
-    req.subscribe({
-      next: (rows) => {
-        this.savingAttendance.set(false);
-        this.attendance.set(rows);
-      },
-      error: () => {
-        this.savingAttendance.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-      },
-    });
+    if (!m) return;
+    this.agendaSvc.onTopBodyChange(m.id, itemId, body);
   }
 
-  attendanceKey(status: AttendanceStatus | 'unknown'): TranslationKey {
-    return `meetings.attendance.${status}` as TranslationKey;
+  flushPendingBody(): void {
+    this.agendaSvc.flushPendingBody(this.meeting()?.id ?? null);
   }
 
-  attBtnVariant(status: AttendanceStatus): 'primary' | 'secondary' | 'danger' {
-    return status === 'present' ? 'primary' : status === 'excused' ? 'secondary' : 'danger';
+  onTopDragStart(index: number): void {
+    this.agendaSvc.onTopDragStart(index);
   }
 
-  /** Kompaktes Icon je Anwesenheits-Status: anwesend check, entschuldigt halb, abwesend remove. */
-  attendanceIcon(status: AttendanceStatus): IconName {
-    return status === 'present' ? 'check' : status === 'excused' ? 'half' : 'remove';
+  onTopDragOver(event: DragEvent): void {
+    this.agendaSvc.onTopDragOver(event);
   }
 
-  attBadgeVariant(status: AttendanceStatus): BadgeVariant {
-    return status === 'present' ? 'success' : status === 'excused' ? 'warning' : 'danger';
-  }
-
-  // --- Tagesordnung (#10/#58) ----------------------------------------------
-  private loadAgenda(meetingId: Uuid): void {
-    // Erst-Load ist durch loadAttendance' Overlay abgedeckt; alle weiteren Aufrufe
-    // sind Refreshes (WS-Event, Drag&Drop-Recovery) → keinen Overlay aufblitzen.
-    this.api.listAgenda(meetingId, { quiet: true }).subscribe({
-      next: (rows) => {
-        this.agenda.set(rows);
-        // Bleibt der gewählte TOP gültig? Sonst den ersten wählen.
-        const sel = this.selectedTopId();
-        if (!sel || !rows.some((r) => r.id === sel)) {
-          this.selectedTopId.set(rows[0]?.id ?? null);
-        }
-      },
-      error: () => this.agenda.set([]),
-    });
-    if (this.canManage()) this.refreshAssignable(meetingId);
-  }
-
-  private refreshAssignable(meetingId: Uuid): void {
-    this.api.listAssignableApplications(meetingId).subscribe({
-      next: (rows) => this.assignable.set(rows),
-      error: () => this.assignable.set([]),
-    });
+  onTopDrop(index: number): void {
+    this.agendaSvc.onTopDrop(this.meeting()?.id ?? null, index, this.canManage());
   }
 
   addToAgenda(): void {
     const m = this.meeting();
-    const appId = this.agendaPick();
-    if (!m || !appId || this.savingAgenda()) return;
-    this.savingAgenda.set(true);
-    this.api.addAgendaItem(m.id, appId).subscribe({
-      next: (rows) => {
-        this.savingAgenda.set(false);
-        this.agenda.set(rows);
-        this.agendaPick.set('');
-        this.refreshAssignable(m.id);
-      },
-      error: () => {
-        this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-      },
-    });
+    if (!m) return;
+    this.agendaSvc.addToAgenda(m.id);
   }
 
   addFreetext(): void {
     const m = this.meeting();
-    const title = this.agendaFreetext().trim();
-    if (!m || !title || this.savingAgenda()) return;
-    this.savingAgenda.set(true);
-    this.api.addAgendaFreetext(m.id, title).subscribe({
-      next: (rows) => {
-        this.savingAgenda.set(false);
-        this.agenda.set(rows);
-        this.agendaFreetext.set('');
-      },
-      error: () => {
-        this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-      },
-    });
+    if (!m) return;
+    this.agendaSvc.addFreetext(m.id);
   }
 
   removeFromAgenda(itemId: Uuid): void {
     const m = this.meeting();
-    if (!m || this.savingAgenda()) return;
-    this.savingAgenda.set(true);
-    this.api.removeAgendaItem(m.id, itemId).subscribe({
-      next: (rows) => {
-        this.savingAgenda.set(false);
-        this.agenda.set(rows);
-        this.refreshAssignable(m.id);
-      },
-      error: () => {
-        this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-      },
-    });
+    if (!m) return;
+    this.agendaSvc.removeFromAgenda(m.id, itemId);
   }
 
-  /** Inline-Umbenennen eines Freitext-TOP starten (nur ohne Antrags-Bindung). */
   startRename(item: AgendaItem): void {
-    if (item.applicationId) return;
-    this.renamingTopId.set(item.id);
-    this.renameDraft.set(item.title ?? '');
+    this.agendaSvc.startRename(item);
   }
 
   cancelRename(): void {
-    this.renamingTopId.set(null);
-    this.renameDraft.set('');
+    this.agendaSvc.cancelRename();
   }
 
-  /** Neuen Titel eines Freitext-TOP speichern (PATCH …/agenda/{id} { title }). */
   renameTop(item: AgendaItem): void {
-    // Bereits abgebrochen/umgeschaltet? Nichts tun (verhindert doppelten Blur-Save).
-    if (this.renamingTopId() !== item.id) return;
-    const m = this.meeting();
-    const title = this.renameDraft().trim();
-    // Leer oder unverändert ⇒ nur schließen, kein Request.
-    if (!m || item.applicationId || !title || title === (item.title ?? '')) {
-      this.cancelRename();
-      return;
-    }
-    this.renamingTopId.set(null);
-    this.savingAgenda.set(true);
-    this.api.renameAgendaItem(m.id, item.id, title).subscribe({
-      next: (rows) => {
-        this.savingAgenda.set(false);
-        this.agenda.set(rows);
-        this.renameDraft.set('');
-      },
-      error: () => {
-        this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-      },
-    });
+    this.agendaSvc.renameTop(this.meeting()?.id ?? null, item);
   }
 
-  /** TOP als (nicht-)öffentlich markieren (#PII-Re-Add) — im öffentlichen PDF redigiert. */
   setNonPublic(item: AgendaItem, nonPublic: boolean): void {
     const m = this.meeting();
     if (!m) return;
-    this.savingAgenda.set(true);
-    this.api.setAgendaNonPublic(m.id, item.id, nonPublic).subscribe({
-      next: (rows) => {
-        this.savingAgenda.set(false);
-        this.agenda.set(rows);
-      },
-      error: () => {
-        this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-      },
-    });
+    this.agendaSvc.setNonPublic(m.id, item, nonPublic);
   }
 
-
-  // --- Live-Abstimmung/Beschlussfrage öffnen (#Sessions) -------------------
-  /** App-TOP: genau eine Abstimmung; Freitext-TOP: beliebig viele Beschlussfragen. */
-  canAddVote(item: AgendaItem): boolean {
-    return !item.applicationId || this.votesForTop(item.id).length === 0;
+  // --- display helpers (pure, see meetings-display.util) -----------------------------------
+  stateLabelOf(map: I18nMap | null | undefined): string {
+    return resolveI18n(map, this.i18n.locale());
   }
 
-  openVoteDialog(item: AgendaItem): void {
-    this.voteItem.set(item);
-    // Antrags-TOP (#6-2): Beschlussfrage mit dem Antragsnamen vorbelegen — der
-    // TOP-`title` IST bei antragsgebundenen TOPs der Antragstitel (Backend
-    // `agenda_service`). Editierbarer Vorschlag; ein Freitext-TOP behält sein
-    // bisheriges Verhalten (TOP-Titel als Frage).
-    this.voteQuestion.set(
-      item.applicationId
-        ? this.i18n.translate('meetings.vote.questionPrefill', { name: item.title ?? '' })
-        : (item.title ?? ''),
-    );
-    this.voteSecret.set(false);
-    this.voteMajorityRule.set('simple');
-    this.voteDialogOpen.set(true);
-  }
-
-  closeVoteDialog(): void {
-    this.voteDialogOpen.set(false);
-  }
-
-  submitVote(): void {
-    const m = this.meeting();
-    const item = this.voteItem();
-    const options = [...this.FIXED_VOTE_OPTIONS];
-    if (!m || !item || this.openingVote()) return;
-    this.openingVote.set(true);
-    this.api
-      .openMeetingVote(m.id, {
-        agendaItemId: item.id,
-        question: this.voteQuestion().trim() || null,
-        options,
-        secret: this.voteSecret(),
-        majorityRule: this.voteMajorityRule(),
-        // eligibleCount/quorumPercent bewusst weggelassen → Server nutzt die
-        // Gremium-Defaults (kein manuelles Setzen pro Vote).
-      })
-      .subscribe({
-        next: (updated) => {
-          this.openingVote.set(false);
-          this.voteDialogOpen.set(false);
-          this.meeting.set(updated);
-          this.toast.success(this.i18n.translate('meetings.toast.voteOpened'));
-        },
-        error: (err: unknown) => {
-          this.openingVote.set(false);
-          // Konkreten Grund zeigen (z. B. 409 »Antrag nicht im vote-State«).
-          const detail = this.errorDetail(err);
-          const base = this.i18n.translate('meetings.toast.actionFailed');
-          this.toast.error(detail ? `${base}: ${detail}` : base);
-        },
-      });
-  }
-
-  /** i18n-Map (z. B. State-Label) für die aktuelle Sprache auflösen. */
   resolveLabel(map: I18nMap): string {
-    return map[this.i18n.locale()] ?? map['de'] ?? Object.values(map)[0] ?? '';
+    return resolveI18n(map, this.i18n.locale());
   }
 
-  // --- Einstellungen (Protokollant + Datum) / Löschen / Stimmabgabe / Beamer ----
-  /** Einstellungs-Dialog öffnen (aus Toolbar oder Listen-Edit) + Roster laden. */
-  openSettings(m: Meeting): void {
-    this.settingsMeeting.set(m);
-    this.settingsProtokollant.set(m.protokollantId ?? '');
-    this.settingsDate.set(m.date ?? '');
-    this.settingsTime.set(m.startTime ?? '');
-    this.settingsEndTime.set(m.endTime ?? '');
-    this.settingsRoster.set([]);
-    this.api.listAttendance(m.id, { quiet: true }).subscribe({
-      next: (rows) => {
-        this.settingsRoster.set(rows);
-        // Auswahl erst NACH dem Laden der Optionen (erneut) setzen — sonst snappt
-        // das native <select> auf „niemand", weil die Option noch fehlte.
-        this.settingsProtokollant.set(m.protokollantId ?? '');
-      },
-      error: () => this.settingsRoster.set([]),
-    });
+  voteOptionLabel(opt: string): string {
+    return voteOptionLabel(opt, (key) => this.i18n.translate(key));
   }
 
-  closeSettings(): void {
-    this.settingsMeeting.set(null);
-  }
-
-  /** Protokollant + Datum/Zeit in einem Zug speichern (PATCH). */
-  saveSettings(): void {
-    const m = this.settingsMeeting();
-    // Geschlossene Sitzung: komplett gesperrt (#15) — Backend lehnt ohnehin ab.
-    if (!m || this.savingSettings() || this.settingsLocked()) return;
-    // Datum + Uhrzeit sind Pflicht (wie im Anlegen-Dialog) — nicht leer speicherbar.
-    if (!this.settingsDate().trim() || !this.settingsTime().trim()) {
-      this.toast.error(this.i18n.translate('meetings.toast.dateTimeRequired'));
-      return;
-    }
-    const settingsEnd = this.settingsEndTime().trim();
-    if (settingsEnd && settingsEnd <= this.settingsTime().trim()) {
-      this.toast.error(this.i18n.translate('meetings.create.endBeforeStart'));
-      return;
-    }
-    this.savingSettings.set(true);
-    // Protokollant nach Finalisierung gesperrt (#15) — Feld ist disabled, der
-    // Wert wird gar nicht erst mitgesendet (Backend würde mit 409 ablehnen).
-    this.api
-      .patchMeeting(m.id, {
-        ...(this.protokollantLocked()
-          ? {}
-          : { protokollantId: this.settingsProtokollant() || null }),
-        date: this.settingsDate().trim() || null,
-        startTime: this.settingsTime().trim() || null,
-        endTime: this.settingsEndTime().trim() || null,
-      })
-      .subscribe({
-        next: (updated) => {
-          this.savingSettings.set(false);
-          this.settingsMeeting.set(null);
-          if (this.meeting()?.id === updated.id) this.meeting.set(updated);
-          this.replaceInTimeline(updated);
-          this.toast.success(this.i18n.translate('meetings.toast.settingsSaved'));
-        },
-        error: () => {
-          this.savingSettings.set(false);
-          this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-        },
-      });
-  }
-
-  askDeleteMeeting(m: Meeting): void {
-    this.confirmDeleteMeeting.set(m);
-  }
-
-  doDeleteMeeting(): void {
-    const m = this.confirmDeleteMeeting();
-    if (!m || this.deletingMeeting()) return;
-    this.deletingMeeting.set(true);
-    this.api.deleteMeeting(m.id).subscribe({
-      next: () => {
-        this.deletingMeeting.set(false);
-        this.confirmDeleteMeeting.set(null);
-        this.removeFromTimeline(m.id);
-        this.toast.success(this.i18n.translate('meetings.toast.deleted'));
-        // Aus der Detailansicht zurück zur Übersicht.
-        if (this.meeting()?.id === m.id) void this.router.navigate(['/meetings']);
-      },
-      error: () => {
-        this.deletingMeeting.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-      },
-    });
-  }
-
-  /** Stimme abgeben (Protokollant/Mitglied mit `vote.cast`). */
-  cast(voteId: Uuid, choice: string): void {
-    if (this.casting()) return;
-    this.casting.set(voteId);
-    this.api.castBallot(voteId, choice).subscribe({
-      next: () => {
-        this.casting.set(null);
-        this.myChoices.update((m) => ({ ...m, [voteId]: choice }));
-        this.toast.success(this.i18n.translate('meetings.toast.voteCast'));
-      },
-      error: (err: unknown) => {
-        this.casting.set(null);
-        this.voteActionFailed(err);
-      },
-    });
-  }
-
-  /** Beschlussfrage (inkl. Stimmen) löschen — nur Vote-Verwalter. */
-  deleteVote(voteId: Uuid): void {
-    const m = this.meeting();
-    if (!m || this.deletingVote()) return;
-    this.deletingVote.set(voteId);
-    this.api.deleteMeetingVote(m.id, voteId).subscribe({
-      next: (updated) => {
-        this.deletingVote.set(null);
-        this.meeting.set(updated);
-        this.toast.success(this.i18n.translate('meetings.toast.voteDeleted'));
-      },
-      error: () => {
-        this.deletingVote.set(null);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-      },
-    });
-  }
-
-  /** Auswahl-Optionen einer Abstimmung (Fallback: Zähl-Schlüssel). */
-  voteOptionsFor(vote: MeetingVote): string[] {
-    return vote.options.length ? vote.options : Object.keys(vote.counts ?? {});
-  }
-
-  /** TOP-Markdown für die Live-/Beamer-Ansicht rendern (sanitisiert via [innerHTML]). */
-  renderBody(body: string): string {
-    return renderMarkdown(body);
-  }
-
-  /** Beamer: aktuell offene Abstimmung, sonst die zuletzt geschlossene (persistiert). */
-  readonly beamerVote = computed<MeetingVote | null>(() => {
-    const votes = this.meeting()?.votes ?? [];
-    return (
-      votes.find((v) => v.status === 'open') ??
-      [...votes].reverse().find((v) => v.status === 'closed') ??
-      null
-    );
-  });
-
-  // --- Live (WebSocket) ----------------------------------------------------
-  private connectLive(meetingId: Uuid): void {
-    this.viewers.set([]); // Stand der vorigen Sitzung verwerfen (#live-viewers)
-    // Im Mock-Betrieb (FE-Dev/Harness) gibt es keinen WS-Server → kein Live-Kanal,
-    // sonst scheitert der Handshake und verrauscht die Konsole.
-    if (this.useMock) return;
-    this.channel?.close();
-    this.channel = this.ws.connectMeeting(meetingId);
-    this.channel.messages$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((msg) => this.onLive(msg));
-  }
-
-  private onLive(msg: ServerMessage): void {
-    const m = this.meeting();
-    if (!m) return;
-    switch (msg.type) {
-      case 'meeting_state':
-        this.meeting.set({
-          ...m,
-          status: (msg.status as Meeting['status']) ?? m.status,
-          activeApplicationId: msg.activeApplicationId,
-        });
-        // TOP-Texte/Tagesordnung können sich (ohne Vote) geändert haben → neu laden,
-        // damit Live-Follower den aktuellen Protokoll-Stand sehen (#live-refresh).
-        this.loadAgenda(m.id);
-        // Protokoll-Status kann geflippt sein (rendering → final/draft): der Worker
-        // broadcastet meeting_state nach dem Hintergrund-Render (#async-finalize).
-        // GET statt POST — Broadcast-Bursts dürfen das Write-Rate-Limit nicht
-        // aufbrauchen (#429).
-        if (
-          (this.canWrite() || this.canViewAll()) &&
-          this.protocol() &&
-          !this.protocol()!.isFinal
-        ) {
-          this.api.getProtocol(m.id, { quiet: true }).subscribe({
-            next: (proto) => this.applyProtocolUpdate(proto),
-            error: () => {},
-          });
-        }
-        break;
-      case 'vote_opened':
-        if (m.votes.some((v) => v.id === msg.voteId)) {
-          this.patchVote(msg.voteId, { status: 'open', closesAt: msg.closesAt });
-        } else {
-          // Live geöffnete Abstimmung, die beim Laden noch nicht existierte (Follower).
-          this.meeting.set({
-            ...m,
-            votes: [
-              ...m.votes,
-              {
-                id: msg.voteId,
-                applicationId: msg.applicationId ?? null,
-                agendaItemId: msg.agendaItemId ?? null,
-                title: null,
-                question: msg.question ?? null,
-                options: msg.options ?? [],
-                status: 'open',
-                result: null,
-                counts: null,
-                leading: null,
-                closesAt: msg.closesAt,
-                voted: 0,
-                present: 0,
-                revealed: false,
-                failedReason: null,
-              },
-            ],
-          });
-        }
-        break;
-      case 'vote_tally':
-        this.patchVote(msg.voteId, {
-          counts: msg.counts,
-          leading: msg.leading,
-          voted: msg.cast ?? 0,
-          present: msg.present ?? 0,
-          revealed: msg.revealed ?? true,
-        });
-        break;
-      case 'vote_closed':
-        this.patchVote(msg.voteId, {
-          status: 'closed',
-          result: msg.result,
-          counts: msg.counts,
-          failedReason: msg.failedReason ?? null,
-        });
-        break;
-      case 'viewers':
-        // Wer hat die Sitzungs-Seite gerade offen (#live-viewers).
-        this.viewers.set(msg.viewers);
-        break;
-      default:
-        break;
-    }
-  }
-
-  /** Ein einzelnes Vote im Sitzungs-State immutabel patchen. */
-  private patchVote(voteId: Uuid, patch: Partial<MeetingVote>): void {
-    const m = this.meeting();
-    if (!m) return;
-    this.meeting.set({
-      ...m,
-      votes: m.votes.map((v) => (v.id === voteId ? { ...v, ...patch } : v)),
-    });
-  }
-
-  // --- Anzeige-Helfer ------------------------------------------------------
   statusVariant(status: Meeting['status']): BadgeVariant {
-    return status === 'live' ? 'success' : status === 'closed' ? 'neutral' : 'info';
+    return meetingStatusVariant(status);
+  }
+
+  statusKey(status: Meeting['status']): TranslationKey {
+    return meetingStatusKey(status);
   }
 
   voteVariant(status: MeetingVote['status']): BadgeVariant {
-    if (status === 'open') return 'success';
-    if (status === 'closed') return 'neutral';
-    return status === 'cancelled' ? 'danger' : 'warning';
-  }
-
-  /** Typsichere i18n-Keys aus dem dynamischen Status (strictTemplates). */
-  statusKey(status: Meeting['status']): TranslationKey {
-    return `meetings.status.${status}` as TranslationKey;
+    return voteStatusVariant(status);
   }
 
   voteStatusKey(status: MeetingVote['status']): TranslationKey {
-    return `meetings.voteStatus.${status}` as TranslationKey;
+    return voteStatusKey(status);
   }
 
-  /** Übersetztes Label des Abstimmungs-Ergebnisses (Angenommen/Abgelehnt/…). */
   voteResultKey(result: string | null | undefined): TranslationKey {
-    return `vote.result.${result ?? 'tie'}` as TranslationKey;
+    return voteResultKey(result);
   }
 
-  /** Ergebnis-Farbe: angenommen → grün, abgelehnt → rot, sonst neutral. */
   voteResultVariant(result: string | null | undefined): BadgeVariant {
-    return result === 'passed' ? 'success' : result === 'rejected' ? 'danger' : 'neutral';
+    return voteResultVariant(result);
   }
 
   countEntries(vote: MeetingVote): { key: string; value: number }[] {
-    return Object.entries(vote.counts ?? {}).map(([key, value]) => ({ key, value }));
+    return countEntries(vote);
+  }
+
+  voteOptionsFor(vote: MeetingVote): string[] {
+    return voteOptionsFor(vote);
+  }
+
+  attendanceKey(status: AttendanceStatus | 'unknown'): TranslationKey {
+    return attendanceKey(status);
+  }
+
+  attBtnVariant(status: AttendanceStatus): 'primary' | 'secondary' | 'danger' {
+    return attendanceButtonVariant(status);
+  }
+
+  attendanceIcon(status: AttendanceStatus): IconName {
+    return attendanceIcon(status);
+  }
+
+  attBadgeVariant(status: AttendanceStatus): BadgeVariant {
+    return attendanceBadgeVariant(status);
+  }
+
+  renderBody(body: string): string {
+    return renderMarkdown(body);
   }
 }

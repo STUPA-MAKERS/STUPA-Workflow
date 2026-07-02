@@ -24,15 +24,13 @@ import {
 import { ToastService } from '@stupa-makers/ui-kit';
 
 /**
- * »Vertretung« einer Sitzung (#delegation-rework): Karte auf der Sitzungsseite.
+ * Delegation ("Vertretung") card on the meeting page.
  *
- * Zeigt die eigene ausgehende Vertretung (inkl. Widerruf bis Sitzungsbeginn) und
- * an mich gerichtete Delegationen; der »Vertretung einrichten«-Dialog wählt den
- * Empfänger aus Gremium-Mitgliedern + Stellvertreter-Pool (Dropdown; bei
- * freigeschalteten Externen zusätzlich serverseitige Namenssuche). Stimmrecht
- * mit übertragen nur, wenn der Betreiber es global freigeschaltet hat. Alle
- * Regeln (Deadline, Empfänger-Kreis, Ketten) erzwingt der Server — die Karte
- * blendet nur offensichtlich Unzulässiges aus.
+ * Shows the own outgoing delegation (revocable until meeting start) and
+ * delegations directed at me; the setup dialog picks the recipient from
+ * committee members + the substitute pool (plus server-side name search when
+ * externals are enabled). All rules (deadline, recipient set, chains) are
+ * enforced by the server — the card only hides the obviously invalid.
  */
 @Component({
   selector: 'app-meeting-delegation-card',
@@ -57,7 +55,6 @@ export class MeetingDelegationCardComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  /** Sitzung, auf die sich die Vertretung bezieht. */
   readonly meetingId = input.required<Uuid>();
 
   protected readonly ctx = signal<MeetingDelegationContext | null>(null);
@@ -66,19 +63,20 @@ export class MeetingDelegationCardComponent {
   protected readonly delegateId = signal<Uuid | ''>('');
   protected readonly delegateVoting = signal(false);
   protected readonly query = signal('');
-  /** Suchergebnisse der serverseitigen Namenssuche (nur bei Externen-Flag). */
+  /** Results of the server-side name search (externals flag only). */
   protected readonly searched = signal<DelegationRecipient[] | null>(null);
   private readonly query$ = new Subject<string>();
 
-  /** Karte zeigen, sobald Delegation im Gremium aktiv und für mich relevant ist. */
+  /** Show the card once delegation is active in the committee and relevant to me. */
   protected readonly visible = computed(() => {
     const c = this.ctx();
     if (!c || !c.allowVoteDelegation) return false;
     return c.canDelegate || c.myDelegation !== null || c.incoming.length > 0;
   });
 
-  /** Einrichten möglich: berechtigt + Sitzung geplant + (Pool- oder normale) Frist offen.
-   *  Pool-Empfänger gehen bis Sitzungsbeginn — daher blockt nur `meetingStarted` hart. */
+  /** Setup possible: entitled + meeting planned + an open (pool or normal)
+   *  window. Pool recipients work until meeting start — only `meetingStarted`
+   *  blocks hard. */
   protected readonly canCreate = computed(() => {
     const c = this.ctx();
     return Boolean(c && c.canDelegate && !c.meetingStarted && this.hasOpenWindow(c));
@@ -119,8 +117,8 @@ export class MeetingDelegationCardComponent {
       .subscribe((list) => this.searched.set(list));
   }
 
-  /** Nach Deadline sind nur noch Pool-Empfänger zulässig — Fenster gilt als offen,
-   *  solange es mindestens einen wählbaren Empfänger gibt. */
+  /** Past the deadline only pool recipients are allowed — the window counts
+   *  as open while at least one selectable recipient remains. */
   private hasOpenWindow(c: MeetingDelegationContext): boolean {
     if (!c.deadlinePassed) return true;
     return c.recipients.some((r) => r.viaPool);

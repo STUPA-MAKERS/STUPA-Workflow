@@ -1,0 +1,67 @@
+/* Shared vote-block styles. Emulated encapsulation scopes styles per
+   component, so every component showing vote blocks @use's its own copy. */
+.mtg__vote {
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.mtg__vote--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+.mtg__voteHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.mtg__tally {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  flex-wrap: wrap;
+}
+.mtg__tally > div {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.mtg__tally > div dt::after {
+  content: ':';
+}
+.mtg__tally > div dd {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+}
+.mtg__tally--leading dd {
+  color: var(--color-primary);
+}
+.mtg__voteActions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  /* Ballot buttons stay reachable while scrolling. */
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+@media (max-width: 48rem) {
+  /* Ballot buttons: full width + comfortable touch targets. */
+  .mtg__voteActions app-button {
+    flex: 1 1 auto;
+  }
+  .mtg__voteActions app-button ::ng-deep .btn {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+}

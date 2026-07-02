@@ -1,3 +1,5 @@
+@use 'vote-block';
+
 :host {
   display: flex;
   flex-direction: column;
@@ -9,10 +11,8 @@
   gap: var(--space-2);
   width: 100%;
 }
-/* Nur in der DETAIL-Ansicht (Sitzung geladen): Titel/Meta auf Body-Breite zentrieren
-   wie die Toolbar (#mtg__toolbar) + Shell-Mittelspalte — sonst sässe nur der Titel
-   links am vollen Rand der wide-Seite. In der LISTEN-Ansicht bleibt der Titel links
-   (sonst wirkt er mittig), daher per Klasse statt global (#8a). */
+/* Detail view only: center title/meta on body width like toolbar + shell
+   center column. The list view keeps the title left-aligned. */
 .mtg__head--detail {
   max-width: var(--layout-max-width);
   margin-inline: auto;
@@ -24,8 +24,6 @@
   gap: var(--space-4);
   flex-wrap: wrap;
 }
-/* Gremium-Filter + »Neue Sitzung« in einer Zeile, vertikal zentriert. Button
-   im sm-Stil wie »Rechnung hinzufügen« im Rechnungen-Tab. */
 .mtg__headActions {
   display: flex;
   align-items: center;
@@ -35,7 +33,7 @@
 .mtg__headFilter {
   min-width: 12rem;
 }
-/* Header-Live-Suche (#3/#4): gleiche Höhe wie Filter/Button daneben. */
+/* Header live search: same height as the filter/button next to it. */
 .mtg__headSearch {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -71,16 +69,6 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.mtg__listHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-.mtg__listH {
-  margin: 0;
-  font-size: var(--fs-lg);
-}
 .mtg__openIcon {
   transform: rotate(-90deg);
 }
@@ -88,12 +76,6 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
-}
-.mtg__statusActions {
-  display: flex;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-  flex-wrap: wrap;
 }
 .mtg__votes {
   list-style: none;
@@ -103,96 +85,6 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.mtg__vote {
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.mtg__vote--active {
-  border-color: var(--color-primary);
-  background: var(--color-primary-subtle);
-}
-.mtg__voteHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.mtg__tally {
-  display: flex;
-  gap: var(--space-4);
-  margin: 0;
-  flex-wrap: wrap;
-}
-.mtg__tally > div {
-  display: flex;
-  gap: var(--space-2);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-.mtg__tally > div dt::after {
-  content: ':';
-}
-.mtg__tally > div dd {
-  margin: 0;
-  font-weight: var(--fw-semibold);
-  color: var(--color-text);
-}
-.mtg__tally--leading dd {
-  color: var(--color-primary);
-}
-.mtg__voteActions {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  /* Stimm-Buttons bleiben beim Scrollen erreichbar (#Meetings). */
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  margin-top: var(--space-2);
-  padding: var(--space-2);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-.mtg__protoMeta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-.mtg__snippets {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-}
-.mtg__snippetsLabel {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--color-text-muted);
-}
-.mtg__editor {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
-}
-@media (max-width: 48rem) {
-  .mtg__editor {
-    grid-template-columns: 1fr;
-  }
-}
-.mtg__pane {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.mtg__textarea,
 .mtg__input {
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface);
@@ -202,128 +94,15 @@
   font-size: var(--fs-md);
   font-family: inherit;
 }
-.mtg__textarea {
-  resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  line-height: 1.5;
-}
-/* Abstimmungsfrage (#19): mehrzeilig, normale Schrift, vertikal resizebar. */
+/* Decision questions are often longer than one line. */
 .mtg__voteQuestion {
   resize: vertical;
   min-height: 6rem;
   line-height: 1.5;
 }
-.mtg__textarea:focus-visible,
 .mtg__input:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;
-}
-.mtg__preview {
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-sunken);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow-wrap: anywhere;
-  min-height: 8rem;
-}
-.mtg__preview :first-child {
-  margin-top: 0;
-}
-.mtg__preview blockquote {
-  margin: var(--space-2) 0;
-  padding-left: var(--space-3);
-  border-left: 3px solid var(--color-border-strong);
-  color: var(--color-text-muted);
-}
-.mtg__preview code {
-  background: var(--color-bg);
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
-  font-size: 0.9em;
-}
-.mtg__preview .callout {
-  margin: var(--space-2) 0;
-  padding: var(--space-2) var(--space-3);
-  border-left: 4px solid var(--callout-color, var(--color-border-strong));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--callout-color, var(--color-border-strong)) 8%, transparent);
-}
-.mtg__preview .callout :last-child {
-  margin-bottom: 0;
-}
-.mtg__preview .callout__title {
-  font-weight: var(--fw-semibold);
-  color: var(--callout-color, var(--color-text));
-  margin: 0 0 var(--space-1);
-}
-.mtg__preview .callout--note { --callout-color: #1f6feb; }
-.mtg__preview .callout--tip { --callout-color: #1a7f37; }
-.mtg__preview .callout--important { --callout-color: #8250df; }
-.mtg__preview .callout--warning { --callout-color: #9a6700; }
-.mtg__preview .callout--caution { --callout-color: #cf222e; }
-.mtg__preview a {
-  color: var(--color-primary);
-  text-decoration: underline;
-}
-.mtg__preview ul,
-.mtg__preview ol {
-  margin: var(--space-2) 0;
-  padding-left: var(--space-5);
-}
-.mtg__preview hr {
-  border: 0;
-  border-top: var(--border-width) solid var(--color-border);
-  margin: var(--space-3) 0;
-}
-.mtg__preview table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: var(--space-2) 0;
-  font-size: var(--fs-sm);
-}
-.mtg__preview th,
-.mtg__preview td {
-  border: var(--border-width) solid var(--color-border);
-  padding: var(--space-1) var(--space-2);
-  text-align: start;
-}
-.mtg__preview thead th {
-  background: var(--color-surface);
-  font-weight: var(--fw-semibold);
-}
-.mtg__protoActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-  flex-wrap: wrap;
-}
-.mtg__saveState {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  min-width: 8rem;
-}
-.mtg__saveState[data-state='saved'] {
-  color: var(--color-success);
-}
-.mtg__saveState[data-state='error'] {
-  color: var(--color-danger);
-}
-.mtg__tops {
-  display: grid;
-  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: start;
-}
-@media (max-width: 52rem) {
-  .mtg__tops {
-    grid-template-columns: 1fr;
-  }
-}
-.mtg__toc {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 .mtg__tocList {
   list-style: none;
@@ -363,8 +142,7 @@
   white-space: nowrap;
   font-size: var(--fs-sm);
 }
-// NÖ-Badge (nicht-öffentlicher TOP): rechtsbündig (``mtg__tocTitle`` flex:1 schiebt
-// es ans Zeilenende) und nie gestaucht.
+/* Non-public badge: right-aligned (tocTitle flex:1 pushes it) and never squeezed. */
 .mtg__tocNpBadge {
   flex-shrink: 0;
   margin-inline-start: auto;
@@ -413,126 +191,7 @@
 .mtg__tocAdd > app-button {
   align-self: stretch;
 }
-.mtg__topEditor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.mtg__topHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.mtg__topEmpty {
-  display: grid;
-  place-items: center;
-  min-height: 12rem;
-  margin: 0;
-  padding: var(--space-5);
-  text-align: center;
-  border: var(--border-width) dashed var(--color-border);
-  border-radius: var(--radius-md);
-}
 .mtg__viewerDot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--color-success); flex: none; }
-.mtg__attTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-sm);
-}
-.mtg__attRow td {
-  padding: var(--space-1) var(--space-1);
-  border-bottom: var(--border-width) solid var(--color-border);
-  vertical-align: middle;
-}
-.mtg__attRow:last-child td {
-  border-bottom: none;
-}
-.mtg__attStatus {
-  text-align: end;
-  white-space: nowrap;
-}
-.mtg__attBtns {
-  display: inline-flex;
-  gap: 3px;
-}
-.mtg__attBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  padding: 0;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-.mtg__attBtn:hover:not(:disabled) {
-  background: var(--color-surface-sunken);
-}
-.mtg__attBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.mtg__attBtn--on.mtg__attBtn--present {
-  background: var(--color-success);
-  border-color: var(--color-success);
-  color: #fff;
-}
-.mtg__attBtn--on.mtg__attBtn--excused {
-  background: var(--color-warning);
-  border-color: var(--color-warning);
-  color: #1a1a1a;
-}
-.mtg__attBtn--on.mtg__attBtn--absent {
-  background: var(--color-danger);
-  border-color: var(--color-danger);
-  color: #fff;
-}
-.mtg__agendaAdd {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-  flex-wrap: wrap;
-}
-.mtg__agenda {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.mtg__agendaRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  flex-wrap: wrap;
-}
-.mtg__agendaTop {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-.mtg__agendaTitle {
-  font-weight: var(--fw-medium);
-  color: var(--color-text);
-  text-decoration: none;
-  margin-right: auto;
-}
-.mtg__agendaTitle:hover {
-  color: var(--color-primary);
-  text-decoration: underline;
-}
 .mtg__voteForm {
   display: flex;
   flex-direction: column;
@@ -550,119 +209,8 @@
   gap: var(--space-3);
   max-width: 28rem;
 }
-.mtg__planRow {
-  display: flex;
-  align-items: end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.mtg__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.mtg__listItem {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-.mtg__listTitle {
-  font-weight: var(--fw-medium);
-  margin-right: auto;
-}
 .mtg__beamerToggle {
   margin-left: auto;
-}
-.mtg__topVotes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-/* Live-/Verfolgungs-Ansicht: Karten auf Body-Breite zentrieren (wie Toolbar +
-   3-Spalten-Shell), sonst füllt das Protokoll die volle wide-Seite (#meeting-view-all). */
-.mtg__follow {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
-}
-.mtg__followTop {
-  padding: var(--space-3) 0;
-  border-bottom: var(--border-width) solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.mtg__danger {
-  border-top: var(--border-width) solid var(--color-danger);
-  padding-top: var(--space-3);
-  margin-top: var(--space-4);
-}
-.mtg__beamer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-6);
-  padding: clamp(var(--space-6), 6vw, var(--space-8)) var(--space-4);
-  text-align: center;
-}
-.mtg__beamerQ {
-  font-size: clamp(1.75rem, 4vw, 3rem);
-  font-weight: var(--fw-bold, 700);
-  margin: 0;
-  max-width: 24ch;
-}
-.mtg__beamerTally {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-4);
-  margin: 0;
-}
-.mtg__beamerOpt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 7rem;
-  padding: var(--space-4) var(--space-5);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-.mtg__beamerOpt dd {
-  margin: 0;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  font-weight: var(--fw-bold, 700);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-.mtg__beamerOpt dt {
-  color: var(--color-text-muted);
-  font-size: var(--fs-md);
-}
-.mtg__beamerOpt--lead {
-  border-color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 14%, var(--color-surface));
-}
-.mtg__beamerOpt--lead dt {
-  color: var(--color-success);
-}
-.mtg__beamerResult {
-  font-size: var(--fs-lg);
-}
-.mtg__beamerIdle {
-  color: var(--color-text-muted);
-  font-size: var(--fs-lg);
-  padding: var(--space-8) 0;
 }
 .mtg__toolbar {
   display: flex;
@@ -680,8 +228,8 @@
 .mtg__toolbarSpacer {
   margin-left: auto;
 }
-/* Breakout-Grid: Tagesordnung im linken Rand, Anwesenheit im rechten Rand,
-   Protokoll-Body zentriert auf Body-Breite (analog Budget-Dashboard). */
+/* Breakout grid: agenda in the left margin, attendance right, protocol body
+   centered on body width. */
 .mtg__shell {
   display: grid;
   grid-template-columns:
@@ -713,7 +261,7 @@
   justify-self: start;
   max-width: 18rem;
 }
-/* Schmaler: Anwesenheit unter den Body, Tagesordnung bleibt links. */
+/* Narrower: attendance below the body, agenda stays left. */
 @media (max-width: 60rem) {
   .mtg__shell {
     grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
@@ -748,26 +296,15 @@
   gap: var(--space-3);
   min-width: 0;
 }
-/* Pro-TOP-Editor: deutlich höhere Schreibfläche (#Sessions). Der Editor
-   kapselt seine Styles, daher ::ng-deep auf Host + ProseMirror-Fläche. */
-.mtg__main app-markdown-editor {
-  display: block;
-}
-.mtg__main app-markdown-editor ::ng-deep .mde__host {
-  min-height: 24rem;
-}
-.mtg__main app-markdown-editor ::ng-deep .mde__host .ProseMirror {
-  min-height: 22rem;
-}
 .mtg__rowActions {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   justify-content: flex-end;
 }
-/* --- Timeline (#104) --- */
+/* --- Timeline --- */
 .mtg__timeline {
-  /* Fade oben/unten in den Seitenhintergrund (#10). */
+  /* Fade top/bottom into the page background. */
   --fade: linear-gradient(
     to bottom,
     transparent,
@@ -776,11 +313,9 @@
     transparent
   );
   position: relative;
-  /* Höhe wird per JS (measureTimeline) exakt auf den freien Viewport-Rest
-     gesetzt — Header/Breadcrumb/H1/Toolbar oben, Footer/Main-Padding unten —
-     damit die Seite NICHT scrollt und nur die Timeline intern scrollt
-     (#sitzungen-100vh). Statisches calc() reichte nicht, weil der Footer
-     unter main die Seite immer über 100vh schob. Floor als Fallback. */
+  /* Height is set by JS (measureTimeline) to exactly the free viewport rest
+     so the page itself does not scroll — a static calc() cannot account for
+     the footer below main. The floor is a fallback. */
   min-height: 12rem;
   overflow-y: auto;
   display: flex;
@@ -801,7 +336,7 @@
   border-radius: 999px;
   background-clip: padding-box;
 }
-/* durchgehende Rail-Linie hinter den Punkten */
+/* Continuous rail line behind the dots. */
 .mtg__timeline::before {
   content: '';
   position: absolute;
@@ -898,11 +433,9 @@
   padding-left: var(--space-6);
   margin: var(--space-1) 0;
 }
-/* Rail-Segment durch den Jetzt-Marker (#timeline-rail-now): die durchgehende
-   Container-Linie (.mtg__timeline::before) liegt durch den z-index-Stacking-
-   Context dieses Markers unter ihm und „bricht" optisch oberhalb von JETZT.
-   Dieses Segment zeichnet die Linie an gleicher x-Position weiter und über-
-   brückt die Margins/Gaps ober- und unterhalb, sodass JETZT auf der Linie sitzt. */
+/* Rail segment through the "now" marker: the container line breaks visually
+   above it (z-index stacking context); this segment continues it at the same
+   x-position and bridges the margins/gaps above and below. */
 .mtg__tlNow::before {
   content: '';
   position: absolute;
@@ -930,9 +463,8 @@
 .mtg__tlNoUp {
   padding-left: var(--space-6);
 }
-/* --- Mobil (≤48rem): 3-Spalten-Shell vertikal gestapelt — aktiver TOP
-   zuerst, dann Anwesenheit/Abstimmungen, dann Tagesordnung; Sticky-Panes
-   lösen sich, Touch-Ziele werden bequemer. Nur additiv, Desktop bleibt. */
+/* Mobile (≤48rem): 3-column shell stacked vertically — active TOP first, then
+   attendance/votes, then agenda. Sticky panes release. Desktop unchanged. */
 @media (max-width: 48rem) {
   .mtg__shell {
     grid-template-columns: 1fr;
@@ -955,31 +487,5 @@
     max-width: none;
     justify-self: stretch;
     overflow-y: visible;
-  }
-  /* Editor kompakter, damit Anwesenheit/Agenda ohne Mammut-Scroll folgen. */
-  .mtg__main app-markdown-editor ::ng-deep .mde__host {
-    min-height: 16rem;
-  }
-  .mtg__main app-markdown-editor ::ng-deep .mde__host .ProseMirror {
-    min-height: 14rem;
-  }
-  /* Stimm-Buttons: volle Breite + bequeme Touch-Ziele (≥2.75rem). */
-  .mtg__voteActions app-button {
-    flex: 1 1 auto;
-  }
-  .mtg__voteActions app-button ::ng-deep .btn {
-    width: 100%;
-    min-height: 2.75rem;
-  }
-  /* Anwesenheits-Toggles: größere Touch-Ziele. */
-  .mtg__attBtn {
-    width: 2.75rem;
-    height: 2.75rem;
-  }
-  /* Markdown-Tabellen im Protokoll scrollen horizontal statt überzulaufen. */
-  .mtg__preview table {
-    display: block;
-    max-width: 100%;
-    overflow-x: auto;
   }
 }

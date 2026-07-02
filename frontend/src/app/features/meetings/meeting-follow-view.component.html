@@ -1,0 +1,66 @@
+<div class="mtg__follow">
+  <app-card [heading]="'meetings.follow.title' | t">
+    <p class="text-text-muted mb-3">{{ 'meetings.follow.lead' | t }}</p>
+    @for (item of agenda(); track item.id; let i = $index) {
+      <article class="mtg__followTop">
+        <h3 class="m-0 text-base">
+          {{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || ('meetings.agenda.untitled' | t) }}
+          @if (stateLabelOf(item.stateLabel); as st) {
+            <app-badge variant="neutral">{{ st }}</app-badge>
+          }
+        </h3>
+        @if (item.applicationId) {
+          <a class="text-primary text-sm font-medium" [routerLink]="['/applications', item.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
+        }
+        @if (item.body) { <div class="mtg__preview" [innerHTML]="renderBody(item.body)"></div> }
+        @for (vote of votesForTop(item.id); track vote.id) {
+          <div class="mtg__vote">
+            <div class="mtg__voteHead">
+              <span class="font-medium mr-auto">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
+              <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
+              @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
+              @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
+                <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
+              }
+            </div>
+            @if (vote.status === 'open' && meeting().canVote) {
+              <div class="mtg__voteActions">
+                @for (opt of voteOptionsFor(vote); track opt) {
+                  <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="castVote.emit({ voteId: vote.id, choice: opt })">{{ optionLabel(opt) }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
+                }
+              </div>
+            }
+            @if (vote.status === 'open') {
+              <p class="mtg__voteProgress">{{ 'meetings.vote.progress' | t: { voted: vote.voted, present: vote.present } }}</p>
+            }
+            @if (vote.revealed && vote.counts) {
+              <dl class="mtg__tally">
+                @for (entry of countEntries(vote); track entry.key) {
+                  <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
+                }
+              </dl>
+            } @else if (vote.status === 'open') {
+              <p class="mtg__voteHidden text-text-muted">{{ 'meetings.vote.progressHidden' | t }}</p>
+            }
+          </div>
+        }
+      </article>
+    } @empty {
+      <p class="text-text-muted">{{ 'meetings.follow.noTops' | t }}</p>
+    }
+  </app-card>
+
+  <!-- Attendance also in the follow view (own status settable). -->
+  <app-card [heading]="'meetings.attendance.title' | t">
+    <app-meeting-attendance-table
+      [rows]="attendance()"
+      [editAll]="false"
+      [locked]="meeting().status === 'closed'"
+      [saving]="savingAttendance()"
+      (statusChange)="attendanceChange.emit($event)"
+    />
+  </app-card>
+
+  <!-- Delegation for this meeting. -->
+  <app-meeting-delegation-card [meetingId]="meeting().id" />
+</div>
