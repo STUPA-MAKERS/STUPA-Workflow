@@ -1,13 +1,11 @@
-"""Öffentliche Fassade des Bankabgleichs (#fints).
+"""Public facade of the bank reconciliation.
 
-:class:`BankService` bündelt die Teilbereiche — der Router (``tree_router``) hängt an
-genau dieser Klasse. Die Implementierung liegt in den Teilklassen:
-
-* :class:`~.credentials.CredentialOps` — persönliche FinTS-Zugangsdaten (#fints-percred)
-* :class:`~.sync.SyncOps` — Live-Abruf + TAN-Sitzungen (erbt den Staging-Pfad)
-* :class:`~.staging.StagingOps` — Datei-Import + idempotentes Einspielen (#fints-batch)
-* :class:`~.reconcile.ReconcileOps` — bestätigen / ignorieren / lösen
-* :class:`~.listing.ListingOps` — gefilterte Liste
+:class:`BankService` bundles the sub-areas — the router hangs off exactly this
+class. Implementation lives in the mixins: :class:`~.credentials.CredentialOps`
+(personal FinTS credentials), :class:`~.sync.SyncOps` (live fetch + TAN
+sessions), :class:`~.staging.StagingOps` (file import + idempotent staging),
+:class:`~.reconcile.ReconcileOps` (confirm/ignore/unlink) and
+:class:`~.listing.ListingOps` (filtered list).
 """
 
 from __future__ import annotations
@@ -19,4 +17,4 @@ from app.modules.budget.bank.sync import SyncOps
 
 
 class BankService(CredentialOps, SyncOps, ReconcileOps, ListingOps):
-    """FinTS-/Datei-gestützter Kontoabgleich (an eine Session gebunden)."""
+    """FinTS-/file-based account reconciliation (bound to a session)."""

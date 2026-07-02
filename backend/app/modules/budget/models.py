@@ -1,9 +1,7 @@
-"""Budget: budget_pot, budget_field, budget_entry (data-model §1 »Organisation & Config«).
+"""Legacy budget tables: budget_pot, budget_field, budget_entry.
 
-T-06 lieferte ``budget_pot``/``budget_field`` (nur Tabellen). T-17 ergänzt
-``budget_entry`` (Lebenszyklus ``requested→reserved→approved→paid``, SDS-A1) und die
-Reservier-/Buch-/Statistik-Logik (Service/Rules). Genau **ein** Topf je Antrag
-(SDS-A2) → ``budget_entry.application_id`` ist UNIQUE (1:1).
+``budget_entry`` tracks the lifecycle ``requested→reserved→approved→paid``.
+Exactly one pot per application: ``budget_entry.application_id`` is UNIQUE (1:1).
 """
 
 from __future__ import annotations
@@ -26,8 +24,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
-# Budget-Lebenszyklus-Stufen (SDS-A1, overview §6). Reihenfolge = Vorwärtsrichtung;
-# per Config kürzbar (Stufen überspringbar). Single Source für Modell-CHECK + Rules.
+# Budget lifecycle stages. Order = forward direction; stages may be skipped via
+# config. Single source for the model CHECK constraint and the rules.
 STAGES: tuple[str, ...] = ("requested", "reserved", "approved", "paid")
 
 
@@ -47,7 +45,7 @@ class BudgetPot(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class BudgetField(UUIDPkMixin, Base):
-    """Extra-Feld eines Topfs (= eine FormFieldDef, config_schemas §5.7)."""
+    """Extra field of a pot (one FormFieldDef)."""
 
     __tablename__ = "budget_field"
 
@@ -59,11 +57,11 @@ class BudgetField(UUIDPkMixin, Base):
 
 
 class BudgetEntry(UUIDPkMixin, TimestampMixin, Base):
-    """Budget-Bindung eines Antrags an einen Topf (Lebenszyklus, T-17).
+    """Budget binding of an application to a pot (lifecycle).
 
-    1:1 zum Antrag (``application_id`` UNIQUE, SDS-A2). ``amount`` wird aus dem
-    promoted ``application.amount`` synchronisiert; ``stage`` durchläuft :data:`STAGES`
-    (``reserved``/``approved``/``paid`` = gebunden → zählen gegen ``budget_pot.total``).
+    1:1 with the application (``application_id`` UNIQUE). ``amount`` syncs from
+    the promoted ``application.amount``; ``stage`` walks :data:`STAGES` —
+    ``reserved``/``approved``/``paid`` count against ``budget_pot.total``.
     """
 
     __tablename__ = "budget_entry"

@@ -1,14 +1,10 @@
-"""Config-Revision-Service: append-only Snapshot-Kette + Diff (#config-versioning).
+"""Config-revision service: append-only snapshot chain plus diff.
 
-* :meth:`record` — neuen Snapshot anhängen **und** den verlinkten Audit-Eintrag
-  schreiben (``data.revisionId`` — nur id-Referenz, security.md §4). Vor dem Lesen des
-  Kopf-Standes wird ein **Transaktions-Advisory-Lock** je Entität genommen → konkurrierende
-  Appends serialisieren, ``version``/``prev`` bleiben konsistent.
-* :meth:`list_for` — Versions-Sidebar-Feed (neueste zuerst).
-* :meth:`diff` — Feld-Diff zweier aufeinanderfolgender Snapshots (wie Antrags-Detail,
-  :func:`app.modules.applications.diff.compute_diff`).
-
-Kein Commit — die aufrufende Transaktion committet (atomar mit der Config-Mutation).
+:meth:`record` appends a snapshot and writes the linked audit entry
+(``data.revisionId`` — id reference only). A per-entity transaction advisory
+lock is taken before reading the head, so concurrent appends serialize and
+``version``/``prev`` stay consistent. No commit — the caller's transaction
+commits atomically with the config mutation.
 """
 
 from __future__ import annotations
@@ -26,22 +22,21 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.config_revision.models import ConfigRevision
 
-# Stabile ``entity_type``-Schlüssel (= Audit ``target_type``).
+# Stable ``entity_type`` keys (= audit ``target_type``).
 ENTITY_FORM = "form"
 ENTITY_FLOW = "flow"
 ENTITY_SITE_CONFIG = "site_config"
 
-# Globale (typ-unabhängige) Entitäten teilen sich diese ``entity_id``.
+# Global (type-independent) entities share this ``entity_id``.
 GLOBAL_ID = "global"
 
 
 def _lock_key(entity_type: str, entity_id: str) -> int:
-    """Stabiler 64-Bit-Advisory-Lock-Schlüssel je Entität (prozess-/host-stabil).
+    """Stable 64-bit advisory-lock key per entity (process-/host-stable).
 
-    ``pg_advisory_xact_lock`` braucht für dieselbe Entität in konkurrierenden Backends
-    denselben Schlüssel → kein ``hash()`` (per Prozess randomisiert), sondern ein
-    deterministischer BLAKE2b-Digest, als **signed bigint** (Postgres-Range) eingebettet.
-    Reine Integer-Konstante im SQL → kein Bind-Param nötig, injection-sicher.
+    Concurrent backends need the same key for the same entity, so no ``hash()``
+    (randomized per process) — a deterministic BLAKE2b digest embedded as a
+    signed bigint. Pure integer constant in SQL, injection-safe without a bind.
     """
     digest = hashlib.blake2b(
         f"{entity_type}:{entity_id}".encode(), digest_size=8
@@ -50,12 +45,11 @@ def _lock_key(entity_type: str, entity_id: str) -> int:
 
 
 def _flatten(entity_type: str, snapshot: dict[str, Any]) -> dict[str, Any]:
-    """Snapshot → flache ``{identität: wert}``-Map für den Feld-Diff.
+    """Flatten a snapshot into an ``{identity: value}`` map for the field diff.
 
-    Die natürliche Snapshot-Form (Felder-Liste / FlowGraph / Branding-Dict) wird auf
-    stabile, identitäts-getragene Schlüssel abgebildet, damit
-    :func:`compute_diff` ein sinnvolles added/removed/changed pro Feld/State/Transition
-    liefert (statt eines opaken Listen-Vergleichs).
+    Maps the natural snapshot shape (field list / FlowGraph / branding dict) to
+    stable identity keys so :func:`compute_diff` yields per-field
+    added/removed/changed instead of an opaque list comparison.
     """
     if entity_type == ENTITY_FORM:
         flat: dict[str, Any] = {}
@@ -80,19 +74,19 @@ def _flatten(entity_type: str, snapshot: dict[str, Any]) -> dict[str, Any]:
             flat["meta:layout"] = snapshot["layout"]
         return flat
     if entity_type == ENTITY_SITE_CONFIG:
-        # Branding ist bereits eine flache (verschachtelte) Top-Level-Map.
+        # Branding is already a flat (nested) top-level map.
         return dict(snapshot)
     return dict(snapshot)
 
 
 class ConfigRevisionService:
-    """An eine ``AsyncSession`` gebundener Revision-Service."""
+    """Revision service bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
     async def head(self, entity_type: str, entity_id: str) -> ConfigRevision | None:
-        """Aktueller (jüngster) Snapshot einer Entität — ``None``, wenn keiner existiert."""
+        """Return the newest snapshot of an entity, or ``None``."""
         return await self.session.scalar(
             select(ConfigRevision)
             .where(
@@ -114,7 +108,7 @@ class ConfigRevisionService:
     async def list_for(
         self, entity_type: str, entity_id: str
     ) -> list[ConfigRevision]:
-        """Alle Snapshots einer Entität (neueste zuerst) — Versions-Sidebar."""
+        """List all snapshots of an entity (newest first)."""
         return list(
             (
                 await self.session.scalars(
@@ -138,13 +132,13 @@ class ConfigRevisionService:
         action: AuditAction = AuditAction.CONFIG_CHANGE,
         extra_data: dict[str, Any] | None = None,
     ) -> ConfigRevision:
-        """Snapshot anhängen + verlinkten Audit-Eintrag schreiben (kein Commit).
+        """Append a snapshot and write the linked audit entry (no commit).
 
-        ``snapshot`` darf **nur Config** enthalten (keine Principal-PII). Der Audit-
-        Eintrag trägt ``data.revisionId`` (id-Referenz) plus ``extra_data``.
+        ``snapshot`` must contain config only (no principal PII). The audit entry
+        carries ``data.revisionId`` (id reference) plus ``extra_data``.
         """
-        # Append je Entität serialisieren (version/prev konsistent). Schlüssel ist eine
-        # deterministische int-Konstante (kein User-Input) → direkt eingebettet, kein Bind.
+        # Serialize appends per entity (version/prev consistent). The key is a
+        # deterministic int constant (no user input), embedded directly, no bind.
         await self.session.execute(
             text(f"SELECT pg_advisory_xact_lock({_lock_key(entity_type, entity_id)})")
         )
@@ -174,7 +168,7 @@ class ConfigRevisionService:
         return revision
 
     async def diff(self, revision: ConfigRevision) -> DataDiff:
-        """Feld-Diff dieses Snapshots gegen seinen Vorgänger (leer → erster Stand)."""
+        """Field diff of this snapshot against its predecessor (empty for the first state)."""
         prev_snapshot: dict[str, Any] = {}
         if revision.prev_revision_id is not None:
             prev = await self.session.get(ConfigRevision, revision.prev_revision_id)
@@ -188,5 +182,5 @@ class ConfigRevisionService:
     async def resolve_versions(
         self, revisions: Sequence[ConfigRevision]
     ) -> dict[UUID, int]:
-        """``revision_id`` → ``version`` (für die Sidebar-Diff-Beschriftung)."""
+        """Map ``revision_id`` to ``version`` (for the sidebar diff labels)."""
         return {r.id: r.version for r in revisions}

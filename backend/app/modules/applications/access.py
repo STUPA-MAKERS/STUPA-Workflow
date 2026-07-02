@@ -1,13 +1,12 @@
-"""Zugriffsauflösung für Antrags-Endpunkte (T-12, api.md §1/§3).
+"""Access resolution for application endpoints.
 
-Antrags-Routen sind ``A/P``: erreichbar entweder vom **Principal** (Session +
-Permission) **oder** vom **Antragsteller** (Magic-Link-Token, auf genau eine
-``application_id`` + Scope gebunden). Diese Dependencies vereinen beide Identitäten
-zu einem :class:`Access`-Objekt und erzwingen 401 (keine Identität) / 403 (Identität
-ohne ausreichendes Recht).
+Application routes are reachable either by a principal (session + permission)
+or by the applicant (magic-link token bound to exactly one ``application_id``
+plus scope). These dependencies unify both identities into an :class:`Access`
+object and enforce 401 (no identity) / 403 (insufficient rights).
 
-Sichtbarkeit interner Kommentare hängt allein an :attr:`Access.can_see_internal`
-(nur Principal) — der Antragsteller sieht ausschließlich ``public`` (api.md §3).
+Internal-comment visibility hangs solely on :attr:`Access.can_see_internal`
+(principals only) — applicants see ``public`` comments exclusively.
 """
 
 from __future__ import annotations
@@ -27,16 +26,15 @@ from app.shared.errors import ForbiddenError, UnauthorizedError
 
 READ_PERMISSION = "application.read"
 MANAGE_PERMISSION = "application.manage"
-# Globale Sonderrechte (#app-read-all / #app-edit-any): jeden Antrag lesen bzw. in
-# jedem Flow-State bearbeiten (Letzteres hebt zusätzlich den State-Edit-Lock im
-# Service auf).
+# Global special rights: read any application, or edit in any flow state
+# (the latter also lifts the state edit lock in the service).
 READ_ALL_PERMISSION = "application.read_all"
 EDIT_ANY_PERMISSION = "application.edit_any"
 
 
 @dataclass(slots=True)
 class Access:
-    """Aufgelöster Zugriff auf genau einen Antrag (Principal **oder** Applicant)."""
+    """Resolved access to exactly one application (principal OR applicant)."""
 
     application_id: UUID
     principal: Principal | None
@@ -44,16 +42,16 @@ class Access:
 
     @property
     def can_see_internal(self) -> bool:
-        """Nur Principals sehen interne Kommentare/PII; Antragsteller nie."""
+        """Only principals see internal comments/PII; applicants never do."""
         return self.principal is not None
 
     @property
     def is_owning_applicant(self) -> bool:
-        """Magic-Link-Antragsteller des eigenen Antrags (kein Principal).
+        """Magic-link applicant of the own application (no principal).
 
-        Nur dieser Zugriff darf eine **unbestätigte** Gast-Einreichung
-        (``email_confirmed_at IS NULL``) per Item-Route lesen — Principals/Gremium
-        nicht, spiegelnd zur unsichtbaren Listen-Semantik (#AUD-032)."""
+        Only this access may read an unconfirmed guest submission
+        (``email_confirmed_at IS NULL``) via the item route — principals/committee
+        may not, mirroring the invisible-in-lists semantics."""
         return self.applicant is not None
 
     @property
@@ -62,7 +60,7 @@ class Access:
 
     @property
     def actor(self) -> str:
-        """Audit-Akteur: Principal-``sub`` bzw. ``'applicant'``."""
+        """Audit actor: principal ``sub``, or ``'applicant'``."""
         return self.principal.sub if self.principal is not None else "applicant"
 
 
@@ -74,10 +72,10 @@ def resolve_access(
     perm: str,
     scope: ApplicantScope,
 ) -> Access:
-    """Principal-Permission **oder** Applicant-Scope gegen den Antrag prüfen.
+    """Check principal permission OR applicant scope against the application.
 
-    Öffentlich, damit angrenzende Module (z. B. files/T-13, deren Pfad nur die
-    ``attachment_id`` trägt) denselben A/P-Zugriffspfad nutzen, statt ihn zu duplizieren."""
+    Public so adjacent modules (e.g. files, whose path only carries the
+    ``attachment_id``) reuse the same access path instead of duplicating it."""
     if principal is not None:
         if principal.has(perm):
             return Access(application_id, principal, None)
@@ -92,7 +90,7 @@ def resolve_access(
 
 
 async def _is_creator(db: AsyncSession, application_id: UUID, principal: Principal) -> bool:
-    """Ist dieser Principal der/die eingeloggte Ersteller:in des Antrags (#24)?"""
+    """Check whether this principal is the logged-in creator of the application."""
     created_by = await db.scalar(
         select(Application.created_by).where(Application.id == application_id)
     )
@@ -102,27 +100,24 @@ async def _is_creator(db: AsyncSession, application_id: UUID, principal: Princip
 async def _committee_can_read(
     db: AsyncSession, application_id: UUID, principal: Principal
 ) -> bool:
-    """Gremium-Mitglied darf den Antrag **lesen** (#committee-read) — rein lesend,
-    keine Schreib-/Transitionsrechte. Wahr, wenn der Antrag
+    """Check committee read access (read-only, no write/transition rights).
 
-    * in einer Kostenstelle (Knoten ODER Vorfahre) liegt, deren ``view_gremium_id``
-      einem seiner Gremien zugeordnet ist (#budget-scope), **oder**
-    * aktuell in einem ``vote``-State steht, dessen ``config.gremiumId`` einem seiner
-      Gremien gehört, **oder**
-    * in einer Sitzung eines seiner Gremien (ab)gestimmt wurde/steht (Bestand,
-      #vote-read, ``vote → meeting.gremium_id``).
+    True if the application sits in a cost centre (node or ancestor) whose
+    ``view_gremium_id`` belongs to one of the member's gremien, is currently in
+    a ``vote`` state whose ``config.gremiumId`` matches, or was voted on in a
+    meeting of one of their gremien.
 
-    Spiegelt die SQL-Sammelvariante ``ApplicationsService._committee_read_clauses``
-    (Anträge-Liste): beide MÜSSEN dieselben Pfade abdecken, damit ein gelisteter
-    Antrag auch in der Detailansicht öffenbar ist (und umgekehrt)."""
+    Mirrors ``ApplicationsService._committee_read_clauses`` (list query): both
+    MUST cover the same paths so a listed application is openable in detail and
+    vice versa."""
     from app.modules.admin.gremium_roles import gremium_member_ids
 
     gremien = await gremium_member_ids(db, principal.sub)
     if not gremien:
         return False
 
-    # (a) Kostenstelle (Knoten/Vorfahre) mit Sicht-Gremium — kanonische Ahnen-Logik
-    #     des Budget-Baums wiederverwendet (statt die Prefix-Query zu duplizieren).
+    # (a) Cost centre (node/ancestor) with a view gremium — reuses the budget
+    #     tree's canonical ancestor logic instead of duplicating the prefix query.
     budget_id = await db.scalar(
         select(Application.budget_id).where(Application.id == application_id)
     )
@@ -132,8 +127,8 @@ async def _committee_can_read(
         if await BudgetTreeService(db).can_view_node(budget_id, gremien):
             return True
 
-    # (b) Aktueller ``vote``-State für eines der Gremien (``config.gremiumId``). JSONB
-    #     in Python ausgewertet (dialekt-neutral, wie ``ApplicationsService.list_tasks``).
+    # (b) Current ``vote`` state for one of the gremien (``config.gremiumId``).
+    #     JSONB evaluated in Python (dialect-neutral, like ``ApplicationsService.list_tasks``).
     from app.modules.flow.models import State
 
     row = (
@@ -149,7 +144,7 @@ async def _committee_can_read(
         if isinstance(gid, str) and gid and UUID(gid) in gremien:
             return True
 
-    # (c) Bestand: in einer Sitzung eines Mitglieds-Gremiums abgestimmt (#vote-read).
+    # (c) Historical: voted on in a meeting of a member gremium.
     from app.modules.livevote.models import Meeting
     from app.modules.voting.models import Vote
 
@@ -171,8 +166,8 @@ async def _resolve_with_creator(
     perm: str,
     scope: ApplicantScope,
 ) -> Access:
-    """Wie :func:`resolve_access`, lässt aber den eingeloggten Ersteller (created_by ==
-    principal.sub) auch ohne ``perm`` zu — für den eigenen Antrag (#24)."""
+    """Like :func:`resolve_access`, but also admits the logged-in creator
+    (``created_by == principal.sub``) without ``perm`` — for their own application."""
     try:
         return resolve_access(application_id, principal, applicant, perm=perm, scope=scope)
     except ForbiddenError:
@@ -187,13 +182,11 @@ async def require_app_read(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Access:
-    """Lesezugriff: Principal mit ``application.read``, ``view``-Antragsteller,
-    eingeloggte:r Ersteller:in (#24) **oder** Gremium-Mitglied im Lesescope
-    (#committee-read, nur lesend): Antrag in einer Sicht-Kostenstelle des Gremiums,
-    in einem ``vote``-State für das Gremium oder darin (ab)gestimmt.
+    """Read access: principal with ``application.read``, ``view`` applicant,
+    logged-in creator, or committee member in read scope.
 
-    ``application.read_all`` (#app-read-all) gewährt globalen Lesezugriff unabhängig
-    von Gremium/Eigentum."""
+    ``application.read_all`` grants global read access regardless of
+    gremium/ownership."""
     if principal is not None and principal.has(READ_ALL_PERMISSION):
         return Access(application_id, principal, None)
     try:
@@ -214,12 +207,12 @@ async def require_app_edit(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Access:
-    """Schreibzugriff: Principal mit ``application.manage``, ``edit``-Antragsteller oder
-    eingeloggte:r Ersteller:in des eigenen Antrags (#24).
+    """Write access: principal with ``application.manage``, ``edit`` applicant,
+    or the logged-in creator of the own application.
 
-    Der Edit-Lock (``state.editAllowed``) wird **zusätzlich** im Service geprüft (409),
-    unabhängig von der Identität. ``application.edit_any`` (#app-edit-any) gewährt
-    Schreibzugriff und hebt den State-Lock im Service auf."""
+    The edit lock (``state.editAllowed``) is additionally checked in the service
+    (409) regardless of identity; ``application.edit_any`` grants write access
+    and lifts that lock."""
     if principal is not None and principal.has(EDIT_ANY_PERMISSION):
         return Access(application_id, principal, None)
     return await _resolve_with_creator(

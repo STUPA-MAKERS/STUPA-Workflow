@@ -1,15 +1,11 @@
-"""Abgleich Kontoumsatz ↔ bestehende Buchung (#fints-matching) — reine Bewertung.
+"""Match statement line vs. existing booking — pure scoring, no DB.
 
-Liefert für einen Umsatz einen **Vorschlag**, mit welcher bereits erfassten Buchung er
-zusammengehört. Verbindlich wird nichts — der Schatzmeister bestätigt im Review-Dialog.
-Die DB-Abfragen (Kandidaten, Gegen-IBAN-Gedächtnis) macht der Service; hier nur die
-deterministische, testbare Bewertung.
+Produces a suggestion only; the treasurer confirms in the review dialog. The
+service does the DB queries (candidates, counterparty-IBAN memory).
 
-Kaskade (höchste Präzision zuerst):
-* **Referenz** — gleiche ``end_to_end_id`` / Belegnummer (exakt nach Normalisierung).
-* **Betrag + Datum** — gleicher Betrag, Datum im Fenster (eng = hoch, weit = prüfen).
-
-Schwellen (vgl. #fints-research): ≥ 90 = starker Vorschlag, 70–89 = Vorschlag, < 70 verworfen.
+Cascade (highest precision first): reference (same ``end_to_end_id``/receipt
+number after normalization), then amount + date window (tight = high, wide =
+review). Thresholds: >= 90 strong suggestion, 70-89 suggestion, < 70 discarded.
 """
 
 from __future__ import annotations
@@ -19,29 +15,29 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-# Datums-Fenster (Tage) zwischen Umsatz und Buchung: eng (Buchungs-/Wertstellungsversatz)
-# vs. großzügig (manuell mit grobem Datum erfasst).
+# Date windows (days) between line and booking: tight (booking/value-date skew)
+# vs. generous (manually entered with a rough date).
 _TIGHT_DAYS = 2
 _WIDE_DAYS = 5
 
-# Score-Schwelle, ab der ein Vorschlag überhaupt zurückgegeben wird.
+# Minimum score for a suggestion to be returned at all.
 SUGGEST_THRESHOLD = 70
 
 
 @dataclass(slots=True)
 class ExpenseCandidate:
-    """Minimal-Sicht einer bestehenden, noch nicht abgeglichenen Buchung."""
+    """Minimal view of an existing, not-yet-reconciled booking."""
 
     expense_id: object  # UUID
     budget_id: object  # UUID
-    amount: Decimal  # immer > 0 (DB-CHECK)
-    when: date | None  # payment_date ?? invoice_date ?? created_at-Datum
-    reference: str | None  # Belegnummer / Referenz
+    amount: Decimal  # always > 0 (DB CHECK)
+    when: date | None  # payment_date ?? invoice_date ?? created_at date
+    reference: str | None  # receipt number / reference
 
 
 @dataclass(slots=True)
 class MatchResult:
-    """Bester Treffer (oder leer): Buchung + Score + Begründung."""
+    """Best hit (or empty): booking + score + reason."""
 
     expense_id: object | None = None
     budget_id: object | None = None
@@ -50,14 +46,14 @@ class MatchResult:
 
 
 def _norm_ref(value: str | None) -> str:
-    """Referenz normalisieren: nur alphanumerisch, uppercase (RF-/E2E-tolerant)."""
+    """Normalize a reference: alphanumerics only, uppercase (RF-/E2E-tolerant)."""
     if not value:
         return ""
     return re.sub(r"[^A-Z0-9]", "", value.upper())
 
 
 def _date_score(line_when: date | None, cand_when: date | None) -> tuple[int, str]:
-    """Datums-Nähe bewerten (kein Datum auf einer Seite → schwacher Teil-Score)."""
+    """Score date proximity (missing date on either side yields a weak partial score)."""
     if line_when is None or cand_when is None:
         return 10, "kein Datum"
     delta = abs((line_when - cand_when).days)
@@ -76,12 +72,12 @@ def score_candidate(
     line_e2e: str | None,
     candidate: ExpenseCandidate,
 ) -> MatchResult:
-    """Einen Kandidaten gegen den Umsatz bewerten. ``line_amount`` vorzeichenbehaftet."""
-    # Betrag muss exakt (Beträge in Cent) passen — sonst ist es nicht dieselbe Zahlung.
+    """Score one candidate against the line. ``line_amount`` is signed."""
+    # The amount must match exactly (cent amounts) — otherwise it is not the same payment.
     if abs(line_amount) != candidate.amount:
         return MatchResult()
 
-    score = 60  # exakter Betrag = solide Basis
+    score = 60  # exact amount = solid base
     reasons = ["Betrag exakt"]
 
     refs = {_norm_ref(line_ref), _norm_ref(line_e2e)} - {""}
@@ -94,8 +90,8 @@ def score_candidate(
     score += date_pts
     reasons.append(date_reason)
 
-    # Score **ungekappt** zurückgeben → ``best_match`` kann auch bei zwei „vollen"
-    # Treffern den präziseren (mit Referenz) wählen; gekappt wird erst der Sieger.
+    # Return the score uncapped so ``best_match`` can pick the more precise hit
+    # (with reference) between two "full" matches; only the winner is capped.
     return MatchResult(
         expense_id=candidate.expense_id,
         budget_id=candidate.budget_id,
@@ -112,11 +108,10 @@ def best_match(
     line_e2e: str | None,
     candidates: list[ExpenseCandidate],
 ) -> MatchResult:
-    """Besten Kandidaten über der Schwelle wählen (sonst leeres :class:`MatchResult`).
+    """Pick the best candidate above the threshold (else an empty :class:`MatchResult`).
 
-    Ein **mehrdeutiger** Spitzenwert (zwei gleichauf führende Buchungen) liefert *keinen*
-    Vorschlag — sonst entschiede die (undeterministische) DB-Zeilenreihenfolge, welche der
-    gleichwertigen Buchungen vorgeschlagen wird (#fints-review)."""
+    An ambiguous top score (two bookings tied) yields NO suggestion — otherwise
+    the nondeterministic DB row order would decide which one gets suggested."""
     scored = [
         score_candidate(
             line_amount=line_amount,
@@ -135,7 +130,7 @@ def best_match(
         return MatchResult()
     winners = [r for r in real if r.score == top]
     if len(winners) != 1:
-        return MatchResult()  # gleichauf → mehrdeutig, kein Vorschlag
+        return MatchResult()  # tied -> ambiguous, no suggestion
     best = winners[0]
-    best.score = min(best.score, 100)  # erst der Sieger wird für die Anzeige gekappt
+    best.score = min(best.score, 100)  # only the winner is capped for display
     return best

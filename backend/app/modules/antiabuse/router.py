@@ -1,10 +1,9 @@
-"""Altcha-Challenge-Endpunkt (security.md §7, Issue #23).
+"""ALTCHA challenge endpoint.
 
-`GET /api/altcha/challenge` liefert eine frische, HMAC-signierte PoW-Challenge. Das FE
-löst sie und sendet die Lösung im `altcha`-Feld der öffentlichen POSTs; der Server
-verifiziert sie dort serverseitig (`app.shared.antiabuse.require_altcha`).
-
-Ohne konfiguriertes `ALTCHA_HMAC_SECRET` ist Altcha **aus** → 404 (kein Captcha-Flow).
+`GET /api/altcha/challenge` issues a fresh HMAC-signed PoW challenge; the frontend
+solves it and public POSTs verify the solution server-side
+(`app.shared.antiabuse.require_altcha`). Without `ALTCHA_HMAC_SECRET` the feature
+is off and the endpoint returns 404.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
 class AltchaChallengeOut(BaseModel):
-    """Altcha-PoW-Challenge (altcha-lib-Format) für das FE."""
+    """ALTCHA PoW challenge in altcha-lib format."""
 
     algorithm: str
     challenge: str
@@ -35,7 +34,7 @@ class AltchaChallengeOut(BaseModel):
 
 @router.get("/altcha/challenge", response_model=AltchaChallengeOut, responses={404: _PROBLEM})
 def altcha_challenge(settings: SettingsDep) -> AltchaChallengeOut:
-    """Frische PoW-Challenge ausgeben (404, wenn Altcha nicht konfiguriert)."""
+    """Issue a fresh PoW challenge (404 if ALTCHA is not configured)."""
     if not settings.altcha_enabled:
         raise NotFoundError("Altcha is not configured.")
     assert settings.altcha_hmac_secret is not None

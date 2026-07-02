@@ -1,10 +1,8 @@
-"""Anträge: application, applicant, submission_version, status_event (data-model §1).
+"""Application tables: application, applicant, submission_version, status_event.
 
-Nur Tabellen (T-06). CRUD/Diff/Timeline: T-12.
-
-PII liegt in `applicant` (R14.3, ausgelagert); `application.data` möglichst ohne PII.
-Anonymisierung (nicht Hard-Delete) ist der Default-Löschweg → `applicant`-FK CASCADE
-greift nur bei tatsächlichem Antrags-Delete.
+PII lives in `applicant` (split out); `application.data` should stay PII-free.
+Anonymization (not hard delete) is the default erasure path — the `applicant`
+FK CASCADE only fires on an actual application delete.
 """
 
 from __future__ import annotations
@@ -34,8 +32,8 @@ from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
 
 class Application(UUIDPkMixin, TimestampMixin, Base):
-    """Antrag. `data` = aktuelle Feldwerte (JSONB, GIN-indiziert); promoted
-    `amount`/`currency` werden vom Service aus `data` synchronisiert (data-model §2)."""
+    """Application. `data` holds the current field values (JSONB, GIN-indexed);
+    promoted `amount`/`currency` are synced from `data` by the service."""
 
     __tablename__ = "application"
 
@@ -51,9 +49,9 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     budget_pot_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget_pot.id"), nullable=True
     )
-    # Kostenstelle (Budget-Baum, i.d.R. Leaf) + Haushaltsjahr [CR R7.1e]. HHJ wird bei
-    # der Budget-Zuordnung gesetzt (nicht bei Antragstellung); verschiebbar via
-    # `move-fiscal-year`. Beide additiv zum flachen `budget_pot_id` (T-17).
+    # Cost centre (budget tree, usually a leaf) plus fiscal year. The fiscal year
+    # is set at budget assignment (not at submission) and movable via
+    # `move-fiscal-year`. Both are additive to the flat `budget_pot_id`.
     budget_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget.id"), nullable=True
     )
@@ -64,13 +62,13 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     currency: Mapped[str | None] = mapped_column(CHAR(3), nullable=True)
     data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     lang: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # OIDC-``sub`` der/des erstellenden Principals (eingeloggte Antragstellung, #24).
-    # ``None`` bei anonymer Einreichung. Erlaubt Lesen/Bearbeiten/Löschen des eigenen
-    # Antrags ohne ``application.manage``.
+    # OIDC ``sub`` of the creating principal; ``None`` for anonymous submissions.
+    # Allows reading/editing/deleting the own application without
+    # ``application.manage``.
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Zeitpunkt der E-Mail-Bestätigung (Gast-Einreichung): bis dahin ist der Antrag
-    # **unsichtbar** und wird nach 12 h verworfen. Eingeloggte Anträge sind sofort
-    # bestätigt (OIDC-Mail vertrauenswürdig); Gäste bestätigen per Magic-Link-Verify.
+    # Email-confirmation timestamp (guest submissions): until set, the application
+    # is invisible and discarded after 12 h. Logged-in submissions are confirmed
+    # immediately (OIDC mail is trusted); guests confirm via magic-link verify.
     email_confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -93,8 +91,8 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
 
 
 class Applicant(UUIDPkMixin, Base):
-    """Ausgelagerte PII (1:1 zum Antrag). Anonymisieren = email/name → NULL +
-    `anonymized_at` setzen (Antrag bleibt)."""
+    """Split-out PII (1:1 with the application). Anonymize = NULL email/name and
+    set `anonymized_at` (the application stays)."""
 
     __tablename__ = "applicant"
 
@@ -109,7 +107,7 @@ class Applicant(UUIDPkMixin, Base):
 
 
 class SubmissionVersion(UUIDPkMixin, Base):
-    """Versionierter Snapshot der Antwortdaten + Diff."""
+    """Versioned snapshot of the answer data plus diff."""
 
     __tablename__ = "submission_version"
 
@@ -128,7 +126,7 @@ class SubmissionVersion(UUIDPkMixin, Base):
 
 
 class StatusEvent(UUIDPkMixin, Base):
-    """Status-Timeline-Eintrag (Übergang)."""
+    """Status-timeline entry (one transition)."""
 
     __tablename__ = "status_event"
 
@@ -152,11 +150,12 @@ class StatusEvent(UUIDPkMixin, Base):
 
 
 class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
-    """Magic-Link für Antragsteller (security.md §1).
+    """Magic link for applicants.
 
-    DB hält **nur** `sha256(token||pepper)` — der Klartext-Token existiert allein im
-    Mail-Link. Scope bindet an genau eine `application_id` + `edit|view`; Expiry +
-    `single_use` (`used_at`) erzwingen Einmal-/Ablauf-Logik (Verify → 410)."""
+    The DB holds only `sha256(token||pepper)` — the plaintext token exists solely
+    in the mail link. Scope binds to exactly one `application_id` plus
+    `edit|view`; expiry and `single_use` (`used_at`) enforce one-shot/expiry
+    logic (verify answers 410)."""
 
     __tablename__ = "magic_link"
 
@@ -173,17 +172,18 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         CheckConstraint("scope IN ('edit','view')", name="magic_link_scope"),
-        # UNIQUE: trägt die atomare Single-Use-Einlösung (UPDATE … WHERE used_at IS
-        # NULL) + verhindert Hash-Kollisions-Mehrdeutigkeit (security.md §1).
+        # UNIQUE: backs the atomic single-use redemption (UPDATE ... WHERE used_at
+        # IS NULL) and prevents hash-collision ambiguity.
         Index("ix_magic_link_token_hash", "token_hash", unique=True),
     )
 
 
 class Comment(UUIDPkMixin, Base):
-    """Antrags-Kommentar (data-model §1 »comment«).
+    """Application comment.
 
-    `visibility='internal'` sehen nur Principals (RBAC); `'public'` auch der
-    Antragsteller (Magic-Link). `author_kind` trennt Principal- von Applicant-Autor."""
+    `visibility='internal'` is visible to principals only (RBAC); `'public'`
+    also to the applicant (magic link). `author_kind` separates principal from
+    applicant authors."""
 
     __tablename__ = "comment"
 

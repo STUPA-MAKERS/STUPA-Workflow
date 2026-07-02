@@ -1,8 +1,7 @@
-"""Budget-Rollup-Statistik (T-17, data-model §3): Refresh der materialized views.
+"""Budget rollup stats: refresh of the materialized views.
 
-Die nächtliche/statuswechsel-getriebene Aktualisierung der MVs ``mv_budget_usage``
-und ``mv_status_distribution`` läuft per Worker (``CONCURRENTLY``) bzw. nicht-
-concurrent im selben Request/Test.
+``mv_budget_usage`` and ``mv_status_distribution`` are refreshed by the worker
+(``CONCURRENTLY``) or non-concurrently within the same request/test.
 """
 
 from __future__ import annotations
@@ -14,16 +13,17 @@ _REFRESH_VIEWS = ("mv_budget_usage", "mv_status_distribution")
 
 
 class BudgetStatsService:
-    """MV-Refresh (an eine ``AsyncSession`` gebunden)."""
+    """Materialized-view refresh bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
     async def refresh(self, *, concurrently: bool = False) -> None:
-        """Beide Rollup-MVs neu berechnen.
+        """Recompute both rollup materialized views.
 
-        ``concurrently=True`` (Worker) erfordert eine AUTOCOMMIT-Verbindung + Unique-Index
-        je MV; ``False`` (Request/Test) läuft transaktional und sperrt die MV kurz.
+        ``concurrently=True`` (worker) requires an AUTOCOMMIT connection plus a
+        unique index per view; ``False`` runs transactionally and briefly locks
+        the view.
         """
         keyword = "CONCURRENTLY " if concurrently else ""
         for view in _REFRESH_VIEWS:

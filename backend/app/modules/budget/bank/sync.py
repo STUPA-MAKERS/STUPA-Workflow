@@ -1,9 +1,9 @@
-"""FinTS-Sync-Orchestrierung: Abruf starten, TAN fortsetzen, Sitzung verwalten (#fints).
+"""FinTS sync orchestration: start fetch, resume with TAN, manage sessions.
 
-Die PIN wird **verschlüsselt** geladen und nur im Speicher entschlüsselt; der pausierte
-TAN-Dialog liegt verschlüsselt + kurzlebig in ``bank_sync_session`` (security.md).
-Erbt den Staging-Pfad (:class:`~.staging.StagingOps`) — ein erfolgreicher Sync spielt
-die Umsätze direkt ein.
+The PIN is loaded encrypted and decrypted only in memory; the paused TAN dialog
+is stored encrypted and short-lived in ``bank_sync_session``. Inherits the
+staging path (:class:`~.staging.StagingOps`) — a successful sync stages the
+transactions directly.
 """
 
 from __future__ import annotations
@@ -36,13 +36,13 @@ from app.shared.errors import (
 
 
 class SyncOps(StagingOps):
-    """FinTS-Live-Abruf (Option A) inkl. SCA-/TAN-Sitzungs-Handling."""
+    """FinTS live fetch incl. SCA/TAN session handling."""
 
     def _credentials(
         self, acc: Account, cred: AccountFintsCredential
     ) -> fints_client.FintsCredentials:
-        """Bank-Verbindung (Konto) + persönliche Login-Daten (Credential) zusammenführen,
-        PIN entschlüsseln (nur im Speicher, #fints-percred)."""
+        """Merge bank connection (account) + personal login data (credential),
+        decrypting the PIN in memory only."""
         if not (acc.fints_endpoint and acc.fints_blz):
             raise ValidationProblem(
                 "Account has no FinTS connection configured.",
@@ -69,10 +69,10 @@ class SyncOps(StagingOps):
 
     @staticmethod
     def _decode_state(stored: str | None, *, key: str) -> bytes | None:
-        """Persistierten FinTS-Client-Zustand entschlüsseln → Bytes (sonst ``None``).
+        """Decrypt the persisted FinTS client state to bytes (else ``None``).
 
-        Ein nicht entschlüsselbarer Zustand (Key-Rotation/Korruption) wird wie »kein
-        Zustand« behandelt → der nächste Sync erzwingt einfach eine frische SCA."""
+        An undecryptable state (key rotation/corruption) is treated as "no state"
+        — the next sync simply forces a fresh SCA."""
         if not stored:
             return None
         try:
@@ -81,11 +81,12 @@ class SyncOps(StagingOps):
             return None
 
     def _guard_not_locked(self, cred: AccountFintsCredential) -> None:
-        """Sync ablehnen, solange ein Sperr-Cooldown läuft (#fints-review).
+        """Reject the sync while a lock cooldown is running.
 
-        Nach einer Bank-Sperre/Signatur-Ablehnung zahlt **jeder** weitere Login auf das Bank-
-        Fehlversuchskonto ein und kann die Sperre verschärfen. Der serverseitige Cooldown ist
-        die maßgebliche Bremse (das FE deaktiviert den Button nur zusätzlich)."""
+        After a bank lock/signature rejection, EVERY further login counts against
+        the bank's failed-attempt account and can escalate the lock. The
+        server-side cooldown is the authoritative brake (the frontend merely
+        disables the button as well)."""
         until = cred.fints_locked_until
         if until is None:
             return
@@ -98,8 +99,8 @@ class SyncOps(StagingOps):
             )
 
     async def _record_lock(self, cred: AccountFintsCredential) -> None:
-        """Sperr-Cooldown setzen + persistieren (#fints-review) — Folgeversuche werden bis zum
-        Ablauf von :meth:`_guard_not_locked` abgewiesen."""
+        """Set and persist the lock cooldown — follow-up attempts are rejected by
+        :meth:`_guard_not_locked` until it elapses."""
         cred.fints_locked_until = datetime.now(UTC) + timedelta(
             minutes=self.settings.fints_lock_cooldown_minutes
         )
@@ -114,7 +115,7 @@ class SyncOps(StagingOps):
         )
 
     async def sync_account(self, account_id: uuid.UUID) -> BankSyncResult:
-        """Schritt 1 (#fints): FinTS-Sync starten → Umsätze stagen **oder** TAN anfordern."""
+        """Step 1: start the FinTS sync — stage transactions or request a TAN."""
         acc = await self._account_or_404(account_id)
         cred = await self._load_credential(account_id)
         self._guard_not_locked(cred)
@@ -125,30 +126,29 @@ class SyncOps(StagingOps):
         try:
             outcome = fints_client.start_sync(creds, start_date=start)
         except (FintsBankLockedError, FintsAuthRejectedError) as exc:
-            # Bank hat gesperrt/abgelehnt → Cooldown setzen und als 409 (NICHT wiederholen)
-            # melden, statt als generischer 503 (der zum erneuten Klick verleitet).
+            # Bank locked/rejected: set the cooldown and report as 409 (do NOT
+            # retry) instead of a generic 503 that invites another click.
             await self._record_lock(cred)
             raise ConflictError(
                 "FinTS access was rejected or locked by the bank — do not retry.",
                 code=self._lock_code(exc),
             ) from exc
         except FintsError as exc:
-            # Lib-/Bank-Fehlertext NICHT an den Client durchreichen (kann Sensibles tragen,
-            # #fints-review) — der Client hat ihn bereits serverseitig geloggt.
+            # Do NOT pass the lib/bank error text to the client (may carry
+            # sensitive data) — the client already logged it server-side.
             raise ServiceUnavailableError(
                 "FinTS sync failed.", code="fints_sync_failed"
             ) from exc
         return await self._handle_outcome(acc, cred, outcome)
 
     def _revalidate_endpoint(self, endpoint: str) -> None:
-        """SSRF-Endpunkt **erneut zur Abruf-Zeit** prüfen (#fints-review).
+        """Re-check the endpoint against SSRF at fetch time.
 
-        Die Validierung bei der Konto-Konfiguration allein genügt nicht: zwischen Setzen und
-        Abruf kann der DNS-Eintrag auf eine interne IP umgebogen werden (Rebinding), und
-        ``account.manage`` (setzt Endpunkt) ≠ ``budget.book`` (löst Sync aus). Hier erneut
-        auflösen + gegen den SSRF-Guard prüfen verkürzt das Fenster drastisch. **Restrisiko**
-        (von der Egress-Firewall abzufangen): ``python-fints`` löst beim Verbinden selbst noch
-        einmal auf und folgt Redirects — IP-Pinning des Connects ist Folge-Arbeit."""
+        Validation at account configuration alone is not enough: DNS can be
+        rebound to an internal IP between set and fetch, and the setter
+        permission differs from the sync permission. Residual risk (for the
+        egress firewall): ``python-fints`` resolves again on connect and follows
+        redirects — IP pinning of the connect is follow-up work."""
         try:
             fints_client.validate_fints_endpoint(endpoint)
         except ValueError as exc:
@@ -157,9 +157,9 @@ class SyncOps(StagingOps):
             ) from exc
 
     async def _purge_expired_sessions(self) -> None:
-        """Abgelaufene TAN-Sitzungen global aufräumen (#fints-review) — sonst bleiben
-        abgebrochene SCA-Dialoge (verschlüsselt) unbegrenzt liegen; der lazy Lösch-Pfad in
-        :meth:`_claim_session` greift nur für genau das angefragte Token."""
+        """Purge expired TAN sessions globally — otherwise aborted SCA dialogs
+        (encrypted) linger indefinitely; the lazy delete in :meth:`_claim_session`
+        only covers the exact requested token."""
         await self.session.execute(
             delete(BankSyncSession).where(BankSyncSession.expires_at < datetime.now(UTC))
         )
@@ -167,20 +167,20 @@ class SyncOps(StagingOps):
     async def submit_tan(
         self, account_id: uuid.UUID, session_token: uuid.UUID, tan: str
     ) -> BankSyncResult:
-        """Schritt 2 (#fints): pausierten Dialog mit TAN fortsetzen (leer = decoupled-Poll)."""
+        """Step 2: resume the paused dialog with the TAN (empty = decoupled poll)."""
         acc = await self._account_or_404(account_id)
         cred = await self._load_credential(account_id)
         self._guard_not_locked(cred)
-        # Sitzung **atomar beanspruchen** (löschen) BEVOR der Netz-Call läuft (#fints-review):
-        # ein zweiter, paralleler Submit mit demselben Token findet nichts mehr → kein Replay
-        # des fortgesetzten Dialogs / kein Doppel-Audit. Schlägt der Call fehl, ist die Sitzung
-        # weg und der Nutzer startet den Sync neu (TAN-Flows sind kurz).
+        # Claim (delete) the session atomically BEFORE the network call: a second
+        # parallel submit with the same token finds nothing — no replay of the
+        # resumed dialog, no double audit. If the call fails, the session is gone
+        # and the user restarts the sync (TAN flows are short).
         pending = await self._claim_session(session_token, account_id)
         creds = self._credentials(acc, cred)
         self._revalidate_endpoint(creds.endpoint)
         creds.tan_mechanism = pending.tan_mechanism
-        # Bei Login-SCA holt submit_tan nach der TAN erst die Umsätze → Abruf-Fenster setzen
-        # (wie beim Start-Sync); bei einer Daten-TAN ist das unschädlich (#fints login-SCA).
+        # With login SCA, submit_tan fetches the transactions only after the TAN,
+        # so set the fetch window (as in start_sync); harmless for a data TAN.
         creds.start_date = datetime.now(UTC).date() - timedelta(days=self.settings.fints_max_days)
         try:
             outcome = fints_client.submit_tan(creds, pending, tan)
@@ -194,11 +194,11 @@ class SyncOps(StagingOps):
             raise ServiceUnavailableError(
                 "FinTS TAN submission failed.", code="fints_tan_failed"
             ) from exc
-        # Netz-Call lief durch (Login akzeptiert) → etwaigen Sperr-Cooldown aufheben.
+        # The network call went through (login accepted) — clear any lock cooldown.
         cred.fints_locked_until = None
         if outcome.status == "needs_tan":
-            # decoupled noch nicht freigegeben → **neues** Token (das alte ist verbraucht,
-            # nicht wiederverwendbar) anlegen und erneut anfordern.
+            # Decoupled not yet approved: create a NEW token (the old one is
+            # consumed, not reusable) and request again.
             new_token = uuid.uuid4()
             await self._store_session(acc.id, outcome, token=new_token)
             await self.session.commit()
@@ -208,11 +208,11 @@ class SyncOps(StagingOps):
     async def _handle_outcome(
         self, acc: Account, cred: AccountFintsCredential, outcome: FintsOutcome
     ) -> BankSyncResult:
-        """``done`` → Zustand sichern + Umsätze stagen; ``needs_tan`` → Sitzung anlegen.
+        """``done``: save state + stage transactions; ``needs_tan``: create a session.
 
-        SCA-Zustand/TAN-Methode/Last-Sync gehören dem **Bucher** (Credential), nicht dem Konto
-        (#fints-percred)."""
-        # Netz-Call lief durch (Login akzeptiert) → etwaigen Sperr-Cooldown aufheben.
+        SCA state/TAN method/last sync belong to the BOOKKEEPER (credential), not
+        the account."""
+        # The network call went through (login accepted) — clear any lock cooldown.
         cred.fints_locked_until = None
         if outcome.status == "needs_tan":
             token = uuid.uuid4()
@@ -221,8 +221,8 @@ class SyncOps(StagingOps):
             return self._needs_tan_result(acc.id, token, outcome)
 
         if outcome.new_state is not None:
-            # Client-Zustand (system_id/Dialog-State, SCA-Fenster) **verschlüsselt** ablegen
-            # — wie die PIN; nie im Klartext (security.md, #fints-review).
+            # Store the client state (system_id/dialog state, SCA window)
+            # encrypted — like the PIN, never in plaintext.
             cred.fints_state = encrypt_secret(
                 outcome.new_state.decode("latin-1"), key=self._require_enabled()
             )
@@ -262,7 +262,7 @@ class SyncOps(StagingOps):
 
     # ----------------------------------------------------------- TAN sessions
     def _encode_outcome(self, outcome: FintsOutcome) -> str:
-        """needs_tan-Zustand → verschlüsselter JSON-Blob (Bytes base64-kodiert)."""
+        """Encode the needs_tan state as an encrypted JSON blob (bytes base64-encoded)."""
         payload = {
             "client_data": base64.b64encode(outcome.client_data or b"").decode("ascii"),
             "dialog_data": base64.b64encode(outcome.dialog_data or b"").decode("ascii"),
@@ -278,8 +278,8 @@ class SyncOps(StagingOps):
     async def _store_session(
         self, account_id: uuid.UUID, outcome: FintsOutcome, *, token: uuid.UUID
     ) -> None:
-        # Token sind immer frisch (initialer ``needs_tan`` und decoupled-Re-Poll erzeugen je
-        # ein neues UUID) → reines Insert, kein Update-Pfad nötig (#fints-review).
+        # Tokens are always fresh (initial ``needs_tan`` and decoupled re-poll each
+        # create a new UUID) — pure insert, no update path needed.
         expires = datetime.now(UTC) + timedelta(
             seconds=self.settings.fints_tan_session_ttl_seconds
         )
@@ -296,11 +296,10 @@ class SyncOps(StagingOps):
     async def _claim_session(
         self, token: uuid.UUID, account_id: uuid.UUID
     ) -> FintsOutcome:
-        """TAN-Sitzung **atomar** entnehmen: per ``DELETE … RETURNING`` löschen + sofort
-        committen, damit ein paralleler Submit sie nicht erneut laden kann (Anti-Replay,
-        #fints-review). Auf den startenden Bucher gescopt (#fints-percred) — ein anderer
-        Principal kann eine fremde TAN-Sitzung nicht einreichen. Abgelaufen/nicht
-        entschlüsselbar → 422 (Sync neu starten), nicht 500."""
+        """Take the TAN session atomically: ``DELETE … RETURNING`` plus immediate
+        commit so a parallel submit cannot load it again (anti-replay). Scoped to
+        the starting bookkeeper — another principal cannot submit a foreign TAN
+        session. Expired/undecryptable yields 422 (restart the sync), not 500."""
         row = (
             await self.session.execute(
                 delete(BankSyncSession)
@@ -314,7 +313,7 @@ class SyncOps(StagingOps):
                 )
             )
         ).first()
-        # Claim sofort sichtbar machen → ein zeitgleicher zweiter Submit findet nichts mehr.
+        # Make the claim visible immediately — a simultaneous second submit finds nothing.
         await self.session.commit()
         if row is None:
             raise NotFoundError("TAN session not found")

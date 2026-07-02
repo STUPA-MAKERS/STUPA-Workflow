@@ -1,15 +1,8 @@
-"""Config-Revision-Modul (#config-versioning).
+"""Config-revision module.
 
-Universelle, **append-only** Snapshot-Historie der versionierten Configs (Forms,
-Flow, Branding). Jede Config-Mutation der in-scope-Module hängt einen unveränderlichen
-``config_revision``-Snapshot an die Kette (pro ``entity_type``/``entity_id``) und
-verlinkt ihn vom Audit-Eintrag (``data.revisionId`` — nur id-Referenz, keine PII).
-
-Trägt drei FE-Fähigkeiten:
-
-* **Versions-Sidebar** — frühere Stände eines Configs auflisten und wiederherstellen
-  (``restore``; nie löschbar).
-* **Diff** — Feld-Diff zweier aufeinanderfolgender Snapshots (wie Antrags-Detail).
-* **Revert** — aus dem Audit-Log einen Config-Change zurücknehmen (``audit.revert``,
-  Konflikt-geschützt) — der Revert ist selbst geloggt und revertierbar.
+Append-only snapshot history of versioned configs (forms, flow, branding). Every
+config mutation appends an immutable ``config_revision`` snapshot per
+``entity_type``/``entity_id`` and links it from the audit entry
+(``data.revisionId`` — id reference only, no PII). Backs the version sidebar
+(list/restore), the field diff, and the audit-log revert.
 """

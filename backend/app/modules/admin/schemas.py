@@ -1,11 +1,8 @@
-"""API-Schemata des Admin-/Config-Moduls (T-24, api.md »admin«).
+"""API schemas for the admin/config module.
 
-camelCase im JSON (per-Name befüllbar, Out-Modelle via ``serialization_alias``).
-Quelle der Wahrheit ist ``api.md``; die DTO-Form ist 1:1 das, wogegen das Admin-FE
-(T-34, #54) gebaut ist, damit dessen ``TODO(T-24)``-Mock-Grenzen scharf schalten.
-
-Feld-/Flow-/Comparison-Definitionen sind die ``config_schemas``-Modelle (Single
-Source). Branding ist ``admin.branding.Branding``.
+camelCase in JSON (populatable by name, out models via ``serialization_alias``).
+Field/flow/comparison definitions come from the ``config_schemas`` models;
+branding is ``admin.branding.Branding``.
 """
 
 from __future__ import annotations
@@ -33,7 +30,7 @@ def _validate_permissions(perms: list[str] | None) -> list[str] | None:
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields populatable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -48,15 +45,15 @@ class GremiumOut(_CamelModel):
     cd_variant: str = Field(serialization_alias="cdVariant")
     default_lang: str = Field(serialization_alias="defaultLang")
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
-    # Vorlauf (Minuten vor Sitzungsbeginn) für Nicht-Pool-Delegationen; 0 = bis Beginn.
+    # Lead time (minutes before meeting start) for non-pool delegations; 0 = until start.
     delegation_lead_minutes: int = Field(
         default=0, serialization_alias="delegationLeadMinutes"
     )
-    # Delegation an Nutzer außerhalb von Gremium & Stellvertreter-Pool erlauben.
+    # Allow delegation to users outside gremium & substitute pool.
     delegation_allow_external: bool = Field(
         default=False, serialization_alias="delegationAllowExternal"
     )
-    # Default-Quorum in % der Stimmberechtigten (0–100); None = keiner.
+    # Default quorum in % of eligible voters (0-100); None = none.
     quorum_percent: int | None = Field(
         default=None, serialization_alias="quorumPercent"
     )
@@ -97,10 +94,10 @@ class GremiumUpdate(_CamelModel):
 
 
 class GremiumMailRecipients(_CamelModel):
-    """Zusätzliche Protokoll-Empfänger eines Gremiums (#protocol-recipients).
+    """Additional protocol recipients of a gremium.
 
-    Diese Adressen erhalten finalisierte Protokolle **zusätzlich** zu den aktiven
-    Gremium-Mitgliedern. Leichte Plausibilitätsprüfung statt voller RFC-Validierung."""
+    These addresses receive finalized protocols in addition to active gremium
+    members. Light plausibility check instead of full RFC validation."""
 
     recipients: list[str] = Field(default_factory=list)
 
@@ -115,23 +112,23 @@ class GremiumMailRecipients(_CamelModel):
             if "@" not in addr[1:-1] or " " in addr:
                 raise ValueError(f"not a plausible email address: {addr!r}")
             cleaned.append(addr)
-        # Reihenfolge erhalten, Duplikate (case-insensitiv) verwerfen.
+        # Preserve order, drop duplicates (case-insensitive).
         seen: set[str] = set()
         return [a for a in cleaned if not (a.lower() in seen or seen.add(a.lower()))]
 
 
 # --------------------------------------------------------------------------- #
-# Gremium-Rollen + Mitgliedschaften (#42)
+# Gremium roles + memberships
 # --------------------------------------------------------------------------- #
 class GremiumRoleOut(_CamelModel):
     id: UUID
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     key: str
     name: I18nMap
-    # Pflichtrollen (Vorstand/Manager/Mitglied) sind in jedem Gremium vorhanden und
-    # nicht löschbar; das FE blendet die Löschen-Aktion dafür aus (#Meetings).
+    # Forced roles exist in every gremium and are not deletable; the frontend
+    # hides the delete action for them.
     forced: bool = False
-    # Granulare Sitzungs-Berechtigungen dieser Rolle (session.manage/vote.manage/
+    # Granular meeting permissions of this role (session.manage/vote.manage/
     # vote.cast/protocol.write).
     permissions: list[str] = Field(default_factory=list)
 
@@ -205,17 +202,17 @@ class ApplicationTypeUpdate(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# Flow-Version (mirror der Form-Version, T-11)
+# Flow version
 # --------------------------------------------------------------------------- #
 class FlowVersionCreate(_CamelModel):
-    """Neue Flow-Version anlegen (Graph wird ``validate_flow_graph``-geprüft)."""
+    """Create a new flow version (graph checked via ``validate_flow_graph``)."""
 
     graph: FlowGraph
     activate: bool = True
 
 
 class FlowVersionOut(_CamelModel):
-    """Der globale Flow (#28) — Typ-Flows sind komplett entfernt."""
+    """The single global flow — per-type flows no longer exist."""
 
     id: UUID
     version: int
@@ -223,7 +220,7 @@ class FlowVersionOut(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# Rollen / RBAC
+# Roles / RBAC
 # --------------------------------------------------------------------------- #
 class RoleOut(_CamelModel):
     id: UUID
@@ -282,7 +279,7 @@ class RoleAssignmentUpdate(_CamelModel):
 
 
 class PrincipalOut(_CamelModel):
-    """OIDC-Principal + dessen Rollenzuweisungen (Rollen-/Rechte-UI, #72)."""
+    """OIDC principal plus its role assignments (roles/permissions UI)."""
 
     id: UUID
     sub: str
@@ -294,7 +291,7 @@ class PrincipalOut(_CamelModel):
 
 
 class PrincipalUpdate(_CamelModel):
-    """``PATCH /admin/principals/{id}`` — aktivieren/deaktivieren (#30)."""
+    """``PATCH /admin/principals/{id}`` — activate/deactivate."""
 
     active: bool
 
@@ -319,7 +316,7 @@ class GroupMappingUpdate(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# Webhooks (api.md `webhook.manage`)
+# Webhooks (`webhook.manage`)
 # --------------------------------------------------------------------------- #
 class WebhookOut(_CamelModel):
     id: UUID
@@ -330,11 +327,11 @@ class WebhookOut(_CamelModel):
 
 
 class WebhookCreate(_CamelModel):
-    """Neuer Webhook. Ein vom FE mitgesendetes leeres ``id`` wird ignoriert."""
+    """New webhook. An empty ``id`` sent by the frontend is ignored."""
 
     name: str = Field(min_length=1)
     url: str = Field(min_length=1)
-    # Trigger sind optional (TASKS #6) — sie kommen i. d. R. aus dem Flow-Graph.
+    # Triggers are optional — they usually come from the flow graph.
     events: list[EventName] = Field(default_factory=list)
     active: bool = True
 
@@ -361,18 +358,12 @@ class WebhookUpdate(_CamelModel):
 
 
 class WebhookDeliveryStatusOut(_CamelModel):
-    """Diagnose-Sicht auf den letzten Auslieferungszustand (AUD-062).
+    """Diagnostic view of the latest delivery state per webhook.
 
-    Aggregiert je Webhook die **jüngste** ``webhook_delivery`` zu einem groben
-    Zustand + einer **groben** Fehlerursachen-Klasse (``reason_class``). Es wird
-    bewusst **keine** aufgelöste IP / Host-Topologie und **kein** Antwort-Body
-    ausgegeben — nur die Status-Klasse, der HTTP-Statuscode (sofern vorhanden) und
-    die Versuchszahl. So lässt sich ein vertippter/interner Webhook diagnostizieren,
-    ohne interne Netz-Details zu leaken.
-
-    ``last_state`` ist auf drei admin-relevante Zustände eingedampft:
-    ``pending`` (in Zustellung/Retry), ``sent`` (zuletzt erfolgreich), ``dead``
-    (endgültig fehlgeschlagen / Dead-Letter).
+    Deliberately exposes no resolved IP/host topology and no response body —
+    only the status class, HTTP status code (if any) and attempt count, so a
+    mistyped/internal webhook can be diagnosed without leaking network details.
+    ``last_state`` is condensed to ``pending``/``sent``/``dead``.
     """
 
     webhook_id: UUID
@@ -384,10 +375,10 @@ class WebhookDeliveryStatusOut(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# Site-Config / Branding (#21) — Draft/Activate-Semantik wie vom T-34-FE erwartet
+# Site config / branding — draft/activate semantics
 # --------------------------------------------------------------------------- #
 class SiteConfigOut(_CamelModel):
-    """Aktive Branding-Config + aktueller Draft + Änderungsflag (FE-Kontrakt)."""
+    """Active branding config plus current draft plus change flag."""
 
     version: int
     active: Branding
@@ -396,7 +387,7 @@ class SiteConfigOut(_CamelModel):
 
 
 class PublicSiteConfigOut(_CamelModel):
-    """Öffentliche (auth-freie) aktive Branding-Config fürs FE-Rendering (#21)."""
+    """Public (auth-free) active branding config for frontend rendering."""
 
     version: int
     branding: Branding

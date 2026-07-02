@@ -1,12 +1,9 @@
-"""Kalender-Feed: Token-Verwaltung + Sitzungs-Datenzugriff (#ics).
+"""Calendar feed: token management plus meeting data access.
 
-Der Feed-Token (``principal.calendar_token``) authentifiziert die ``.ics``-URL
-ohne Session/OIDC. Er wird über ``/calendar/me/rotate`` erzeugt/rotiert (alte URL
-wird ungültig). Klartext-Speicherung ist hier vertretbar: der Token exponiert
-ausschließlich Sitzungstitel/-zeiten der eigenen Gremien (low-sensitivity).
-
-Alle Funktionen sind an ``principal.sub`` gebunden (der aufgelöste ``Principal``
-trägt nur ``sub``, nicht die DB-``id``) und committen **nicht** selbst.
+The feed token authenticates the ``.ics`` URL without a session/OIDC. Plaintext
+storage is acceptable here: the token only exposes meeting titles/times of the
+own gremien (low sensitivity). All functions bind to ``principal.sub`` and never
+commit themselves.
 """
 
 from __future__ import annotations
@@ -21,12 +18,12 @@ from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.models import Meeting
 
-# 32 Byte → ~43 Zeichen URL-safe; nicht erratbar, kein Rate-Limit nötig.
+# 32 bytes -> ~43 URL-safe chars; unguessable, so no rate limit needed.
 _TOKEN_BYTES = 32
 
 
 def generate_calendar_token() -> str:
-    """Neuen, nicht erratbaren Feed-Token erzeugen (URL-safe, ohne ``.``/``/``)."""
+    """Generate a fresh unguessable feed token (URL-safe)."""
     return secrets.token_urlsafe(_TOKEN_BYTES)
 
 
@@ -37,15 +34,15 @@ async def _row_by_sub(db: AsyncSession, sub: str) -> PrincipalRow | None:
 
 
 async def get_calendar_token(db: AsyncSession, sub: str) -> str | None:
-    """Aktuellen Feed-Token des Principals lesen (``None`` = noch keiner erzeugt)."""
+    """Read the principal's current feed token (``None`` if none generated yet)."""
     row = await _row_by_sub(db, sub)
     return row.calendar_token if row is not None else None
 
 
 async def rotate_calendar_token(db: AsyncSession, sub: str) -> str | None:
-    """Feed-Token neu erzeugen (alte Subscription-URL wird ungültig). Committet nicht.
+    """Regenerate the feed token (old URL becomes invalid). Does not commit.
 
-    ``None`` nur, wenn der Principal nicht (mehr) existiert.
+    Returns ``None`` only if the principal no longer exists.
     """
     row = await _row_by_sub(db, sub)
     if row is None:
@@ -58,10 +55,10 @@ async def rotate_calendar_token(db: AsyncSession, sub: str) -> str | None:
 async def principal_by_calendar_token(
     db: AsyncSession, token: str
 ) -> PrincipalRow | None:
-    """Aktiven Principal zu einem Feed-Token auflösen (oder ``None``).
+    """Resolve an active principal by feed token (or ``None``).
 
-    Leerer Token bzw. deaktivierter/​unbekannter Principal ⇒ ``None`` (der Feed
-    antwortet dann 404, ohne »falscher Token« von »deaktiviert« zu unterscheiden).
+    Empty token or deactivated/unknown principal yields ``None``; the feed then
+    answers 404 without distinguishing "wrong token" from "deactivated".
     """
     if not token:
         return None
@@ -76,10 +73,10 @@ async def principal_by_calendar_token(
 
 
 async def member_meetings(db: AsyncSession, sub: str) -> list[tuple[Meeting, str]]:
-    """Datierte Sitzungen der Gremien, in denen ``sub`` Mitglied ist.
+    """List dated meetings of the gremien ``sub`` is a member of.
 
-    Liefert ``(Meeting, gremium_name)``-Paare nach Datum/Startzeit sortiert. Sitzungen
-    ohne Datum werden ausgelassen (nicht im Kalender platzierbar).
+    Returns ``(Meeting, gremium_name)`` pairs sorted by date/start time;
+    undated meetings are skipped.
     """
     gremium_ids = await gremium_member_ids(db, sub)
     if not gremium_ids:

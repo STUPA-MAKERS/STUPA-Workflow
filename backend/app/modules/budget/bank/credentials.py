@@ -1,7 +1,7 @@
-"""Persönliche FinTS-Zugangsdaten je Bucher + Konto (#fints-percred).
+"""Personal FinTS credentials per bookkeeper and account.
 
-Anlegen/Ersetzen/Löschen der verschlüsselten Login-Daten und der Verbindungs-Status
-fürs FE (Konto FinTS-fähig? Eigene Zugangsdaten hinterlegt? Cooldown aktiv?).
+Create/replace/delete the encrypted login data plus the connection status for
+the frontend (account FinTS-capable? own credentials stored? cooldown active?).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from app.shared.errors import NotFoundError, ValidationProblem
 
 
 class CredentialOps(BankServiceBase):
-    """Verwaltung der persönlichen FinTS-Zugangsdaten (#fints-percred)."""
+    """Management of personal FinTS credentials."""
 
     @staticmethod
     def _credential_status(
@@ -34,8 +34,8 @@ class CredentialOps(BankServiceBase):
         )
 
     async def credential_status(self, account_id: uuid.UUID) -> FintsCredentialStatus:
-        """Verbindungs-Status des Buchers für ein Konto (#fints-percred): ist das Konto
-        FinTS-fähig und hat *dieser* Nutzer schon eigene Zugangsdaten hinterlegt?"""
+        """Return the bookkeeper's connection status for an account: is it
+        FinTS-capable and has *this* user stored their own credentials?"""
         acc = await self._account_or_404(account_id)
         cred = await self.session.scalar(
             select(AccountFintsCredential).where(
@@ -48,12 +48,11 @@ class CredentialOps(BankServiceBase):
     async def set_credential(
         self, account_id: uuid.UUID, payload: FintsCredentialIn
     ) -> FintsCredentialStatus:
-        """Persönliche Zugangsdaten des Buchers (Login + PIN) anlegen/ersetzen (#fints-percred).
+        """Create/replace the bookkeeper's personal credentials (login + PIN).
 
-        Erstes Verbinden im Buchungs-Tab. PIN wird **verschlüsselt** abgelegt; bei einer
-        Änderung wird der bisherige SCA-Zustand/TAN-Mechanismus verworfen (neue Daten →
-        frische SCA). Setzt voraus, dass der Admin die Bank-Verbindung (Endpunkt + BLZ) am
-        Konto gesetzt hat."""
+        The PIN is stored encrypted; on change, the prior SCA state/TAN mechanism
+        is discarded (new data forces fresh SCA). Requires the admin to have set
+        the bank connection (endpoint + BLZ) on the account."""
         acc = await self._account_or_404(account_id)
         if not (acc.fints_endpoint and acc.fints_blz):
             raise ValidationProblem(
@@ -81,16 +80,16 @@ class CredentialOps(BankServiceBase):
         else:
             cred.fints_login = payload.fints_login
             cred.fints_pin_encrypted = pin_encrypted
-            # Neue Zugangsdaten → bisheriger Dialog-Zustand ungültig (frische SCA).
+            # New credentials invalidate the prior dialog state (fresh SCA).
             cred.fints_state = None
             cred.fints_tan_mechanism = None
-        # Audit **ohne** Login/PIN (security.md §4) — der ``actor`` identifiziert den Bucher.
+        # Audit WITHOUT login/PIN — the ``actor`` identifies the bookkeeper.
         await self._audit(AuditAction.BANK_CREDENTIAL_SET, target_id=str(account_id))
         await self.session.commit()
         return self._credential_status(acc, cred)
 
     async def delete_credential(self, account_id: uuid.UUID) -> None:
-        """Persönliche Zugangsdaten des Buchers für ein Konto löschen (#fints-percred)."""
+        """Delete the bookkeeper's personal credentials for an account."""
         pid = self._require_principal()
         row = (
             await self.session.execute(

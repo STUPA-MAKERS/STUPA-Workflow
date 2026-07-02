@@ -1,9 +1,7 @@
-"""application-types-Service (T-25): Antragstypen auflisten (DB-Schicht).
+"""Application-types service (DB layer).
 
-Öffentlich werden nur **anbietbare** Typen gelistet (es existiert eine aktive
-Form-Version, ``active_form_version_id IS NOT NULL``) — ohne aktive Form lässt sich
-kein Antrag stellen. Ein berechtigter Principal (``form.configure``) sieht zusätzlich
-inaktive Typen sowie die Admin-Zusatzfelder (``key``/``gremiumId``).
+Publicly only offerable types are listed (an active form version exists);
+``form.configure`` additionally reveals inactive types and admin fields.
 """
 
 from __future__ import annotations
@@ -20,7 +18,7 @@ from app.shared.paging import Page
 
 
 class ApplicationTypesService:
-    """DB-gestützte Antragstyp-Abfragen (an eine ``AsyncSession`` gebunden)."""
+    """DB-backed application-type queries bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -34,7 +32,7 @@ class ApplicationTypesService:
         include_inactive: bool = False,
         admin: bool = False,
     ) -> Page[ApplicationTypeListItem]:
-        """Antragstypen gepagt auflisten (öffentlich: nur anbietbare Typen)."""
+        """List application types, paged (public: offerable types only)."""
         stmt: Select[tuple[ApplicationType]] = select(ApplicationType)
         if not include_inactive:
             stmt = stmt.where(ApplicationType.active_form_version_id.is_not(None))
@@ -51,7 +49,7 @@ class ApplicationTypesService:
 
     @staticmethod
     def _to_item(row: ApplicationType, *, lang: str, admin: bool) -> ApplicationTypeListItem:
-        """ORM-``application_type``-Zeile → Listen-DTO (i18n-Name aufgelöst)."""
+        """Map an ORM row to the list DTO with resolved i18n name."""
         active_form_version_id: UUID | None = row.active_form_version_id
         return ApplicationTypeListItem(
             id=row.id,

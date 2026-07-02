@@ -1,19 +1,14 @@
-"""Session-/Token-Handling (security.md §1/§2).
+"""Session/token handling.
 
-Zwei Mechanismen:
+Principal session (OIDC) and applicant session (magic link) are server-side
+rows; the browser holds only a signed, opaque `sid` in an HttpOnly cookie.
+Tokens are thus not forgeable from `SESSION_SECRET` alone (a row must exist)
+and are server-side revocable (logout / `revoked_at`). The OIDC transaction is
+a signed short-lived cookie with `state`/`code_verifier`/`nonce` for the
+auth-code+PKCE flow (stateless, no server store).
 
-- **Principal-Session** (OIDC): serverseitige `auth_session`-Zeile, der Browser hält
-  nur die signierte, opake `sid` (HttpOnly+Secure+SameSite=Lax). id/refresh-Token
-  bleiben in der DB.
-- **Applicant-Session** (Magic-Link): serverseitige `applicant_session`-Zeile; der
-  Browser hält — wie bei der Principal-Session — nur eine signierte, opake `sid`
-  (HttpOnly-Cookie / Bearer). `application_id`+`scope` liegen serverseitig. Damit ist
-  ein Token nicht mehr allein aus `SESSION_SECRET` fälschbar und serverseitig
-  widerrufbar (Logout / `revoked_at`). Kein JWT im JS — Cookie ist HttpOnly.
-- **OIDC-Transaktion**: signiertes, kurzlebiges Cookie mit `state`/`code_verifier`/
-  `nonce` für den Auth-Code+PKCE-Flow (zustandslos, kein Server-Store nötig).
-
-Signaturfehler/Ablauf → `None` (Aufrufer mappt auf 401/410), nie Exception nach außen.
+Signature errors/expiry return `None` (caller maps to 401/410), never an
+exception to the outside.
 """
 
 from __future__ import annotations
@@ -38,9 +33,7 @@ def _serializer(secret: str, salt: str) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(secret, salt=salt)
 
 
-# --------------------------------------------------------------------------- #
-# Applicant-Session (serverseitig, opake sid im signierten Cookie)
-# --------------------------------------------------------------------------- #
+# --- applicant session (server-side, opaque sid in a signed cookie) ---
 def _sign_applicant_sid(secret: str, sid: str) -> str:
     return _serializer(secret, _APPLICANT_SALT).dumps(sid)
 
@@ -61,10 +54,11 @@ async def create_applicant_session(
     scope: str,
     expires_at: Any,
 ) -> str:
-    """`applicant_session`-Zeile anlegen; signiertes `sid`-Cookie zurückgeben.
+    """Create an `applicant_session` row; return the signed `sid` cookie.
 
-    Spiegelt :func:`create_principal_session`: die opake `sid` ist der einzige Anker —
-    ohne existierende Zeile ist kein Zugriff möglich, auch nicht mit `SESSION_SECRET`."""
+    Mirrors :func:`create_principal_session`: the opaque `sid` is the only
+    anchor — without an existing row there is no access, even with
+    `SESSION_SECRET`."""
     sid = secrets.token_urlsafe(_SID_BYTES)
     db.add(
         ApplicantSession(
@@ -81,7 +75,7 @@ async def create_applicant_session(
 async def load_applicant_session(
     db: AsyncSession, *, secret: str, cookie_value: str, now: Any, max_age: int
 ) -> ApplicantSession | None:
-    """Cookie → `applicant_session`-Zeile (None bei ungültig/abgelaufen/widerrufen)."""
+    """Resolve a cookie to its `applicant_session` row (None if invalid/expired/revoked)."""
     sid = _unsign_applicant_sid(secret, cookie_value, max_age)
     if sid is None:
         return None
@@ -96,7 +90,7 @@ async def load_applicant_session(
 async def delete_applicant_session(
     db: AsyncSession, *, secret: str, cookie_value: str, max_age: int
 ) -> ApplicantSession | None:
-    """Logout: Applicant-Session-Zeile löschen (idempotent). None, wenn nichts traf."""
+    """Logout: delete the applicant-session row (idempotent). None if nothing matched."""
     sid = _unsign_applicant_sid(secret, cookie_value, max_age)
     if sid is None:
         return None
@@ -113,8 +107,8 @@ async def delete_applicant_session(
 async def revoke_applicant_sessions(
     db: AsyncSession, application_id: Any, *, now: Any
 ) -> None:
-    """Kill-Switch: alle aktiven Applicant-Sessions eines Antrags widerrufen
-    (`revoked_at = now`). Idempotent; bei Anonymisierung/Löschung aufgerufen."""
+    """Kill switch: revoke all active applicant sessions of an application
+    (`revoked_at = now`). Idempotent; called on anonymization/deletion."""
     await db.execute(
         update(ApplicantSession)
         .where(
@@ -125,9 +119,7 @@ async def revoke_applicant_sessions(
     )
 
 
-# --------------------------------------------------------------------------- #
-# OIDC-Transaktions-Cookie (state + PKCE-verifier + nonce)
-# --------------------------------------------------------------------------- #
+# --- OIDC transaction cookie (state + PKCE verifier + nonce) ---
 def issue_oidc_tx(secret: str, state: str, verifier: str, nonce: str) -> str:
     return _serializer(secret, _OIDC_TX_SALT).dumps(
         {"state": state, "verifier": verifier, "nonce": nonce}
@@ -144,14 +136,12 @@ def load_oidc_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None
     return {k: str(data[k]) for k in ("state", "verifier", "nonce")}
 
 
-# --------------------------------------------------------------------------- #
-# OAuth-AS-Transaktions-Cookie (MCP-Login: authorize-Request über den OIDC-Hop)
-# --------------------------------------------------------------------------- #
+# --- OAuth AS transaction cookie (MCP login: authorize request across the OIDC hop) ---
 _OAUTH_TX_FIELDS = ("client_id", "redirect_uri", "code_challenge", "scope", "state")
 
 
 def issue_oauth_tx(secret: str, data: dict[str, str]) -> str:
-    """Authorize-Request (client_id/redirect_uri/challenge/scope/state) signiert ablegen."""
+    """Sign and store the authorize request (client_id/redirect_uri/challenge/scope/state)."""
     return _serializer(secret, _OAUTH_TX_SALT).dumps(
         {k: data.get(k, "") for k in _OAUTH_TX_FIELDS}
     )
@@ -171,9 +161,7 @@ def load_oauth_tx(secret: str, value: str, max_age: int) -> dict[str, str] | Non
     return {k: str(data.get(k, "")) for k in _OAUTH_TX_FIELDS}
 
 
-# --------------------------------------------------------------------------- #
-# Principal-Session (serverseitig, opake sid im signierten Cookie)
-# --------------------------------------------------------------------------- #
+# --- principal session (server-side, opaque sid in a signed cookie) ---
 def _sign_sid(secret: str, sid: str) -> str:
     return _serializer(secret, _SID_SALT).dumps(sid)
 
@@ -195,7 +183,7 @@ async def create_principal_session(
     refresh_token: str | None,
     id_token: str | None,
 ) -> str:
-    """`auth_session`-Zeile anlegen; signiertes `sid`-Cookie zurückgeben."""
+    """Create an `auth_session` row; return the signed `sid` cookie."""
     sid = secrets.token_urlsafe(_SID_BYTES)
     db.add(
         AuthSession(
@@ -213,7 +201,7 @@ async def create_principal_session(
 async def load_principal_session(
     db: AsyncSession, *, secret: str, cookie_value: str, now: Any, max_age: int
 ) -> AuthSession | None:
-    """Cookie → `auth_session`-Zeile (None bei ungültig/abgelaufen)."""
+    """Resolve a cookie to its `auth_session` row (None if invalid/expired)."""
     sid = _unsign_sid(secret, cookie_value, max_age)
     if sid is None:
         return None
@@ -228,7 +216,7 @@ async def load_principal_session(
 async def delete_principal_session(
     db: AsyncSession, *, secret: str, cookie_value: str, max_age: int
 ) -> AuthSession | None:
-    """Session-Zeile löschen (Logout). Gibt die gelöschte Zeile (id_token-Hint) zurück."""
+    """Delete the session row (logout). Returns the deleted row (id_token hint)."""
     sid = _unsign_sid(secret, cookie_value, max_age)
     if sid is None:
         return None

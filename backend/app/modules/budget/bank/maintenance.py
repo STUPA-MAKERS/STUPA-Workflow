@@ -1,8 +1,8 @@
-"""Einmalige Aufräum-Routinen für gestagete Bank-Umsätze (#fints-dedup).
+"""One-off cleanup routines for staged bank statement lines.
 
-Getrennt vom Service (async ORM), weil Migrationen mit einer **synchronen**
-``Connection`` (``op.get_bind()``) arbeiten. Reine, idempotente Daten-Korrektur — von den
-Migrationen 0045/0046 aufgerufen (eine Logik, kein dupliziertes Migrations-Skript)."""
+Separate from the service (async ORM) because migrations work with a
+synchronous ``Connection`` (``op.get_bind()``). Pure, idempotent data fixes —
+called from migrations 0045/0046 (one logic, no duplicated migration script)."""
 
 from __future__ import annotations
 
@@ -15,15 +15,13 @@ if TYPE_CHECKING:
 
 
 def dedup_staged_lines(conn: Connection) -> int:
-    """Re-importierte Dubletten gestageter Umsätze zusammenfassen — Vergleich **rein über die
-    Rohdaten** (:func:`~.dedup.raw_dedup_base`, parser-unabhängig).
+    """Collapse re-imported duplicates of staged lines, comparing purely on raw data.
 
-    Pro Konto + gleicher Roh-Basis: ist eine **gebuchte** (``matched``) Zeile dabei (oder, ohne
-    gebuchte, die älteste), bleibt sie erhalten; die übrigen **ungebuchten** exakten Dubletten
-    werden gelöscht. Die behaltene Zeile bekommt den neuen Roh-Schlüssel, damit der nächste Abruf
-    sie als bekannt erkennt. Gebuchte Zeilen werden nie gelöscht; Gruppen ohne Dublette bleiben
-    unangetastet (echte Einzelzahlungen mit unterschiedlichem Roh-Auftraggeber/-Zweck/-Zeitstempel
-    fallen NICHT zusammen). Idempotent. Liefert die Anzahl gelöschter Zeilen.
+    Per account + identical raw base: a matched line (or, absent one, the oldest)
+    is kept; the remaining unbooked exact duplicates are deleted. The keeper gets
+    the new raw key so the next fetch recognizes it. Matched lines are never
+    deleted; groups without duplicates stay untouched. Idempotent; returns the
+    number of deleted lines.
     """
     from app.modules.budget.bank.dedup import raw_dedup_base, sha256_hex
 
@@ -47,7 +45,7 @@ def dedup_staged_lines(conn: Connection) -> int:
             continue
         non_matched = [g for g in grp if g.match_state != "matched"]
         if not non_matched:
-            continue  # nur gebuchte (kein Re-Import) — nicht anfassen
+            continue  # only matched lines (no re-import) — leave untouched
         matched = [g for g in grp if g.match_state == "matched"]
         keeper = matched[0] if matched else non_matched[0]
         for g in non_matched:

@@ -1,8 +1,8 @@
-"""Reine Text-/IBAN-/Gegenkonto-Normalisierung für Kontoumsätze (#fints).
+"""Pure text/IBAN/counterparty normalization for statement lines.
 
-Alles hier ist frei von I/O und quellen-agnostisch einsetzbar: Zweck entkleben,
-Sparkassen-Zeitstempel lösen, IBAN aus verschmolzenen Namensfeldern trennen,
-Platzhalter-Gegenkonten verwerfen und Anzeige-/Buchungstexte bauen.
+Everything here is I/O-free and source-agnostic: unglue purposes, detach
+Sparkasse timestamps, split IBANs out of merged name fields, drop placeholder
+counterparties, and build display/booking texts.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from datetime import date
 
 
 def clean(value: object | None) -> str | None:
-    """``str(value).strip()`` — leere Ergebnisse und ``None`` → ``None``."""
+    """``str(value).strip()`` — empty results and ``None`` become ``None``."""
     if value is None:
         return None
     text = str(value).strip()
@@ -21,19 +21,18 @@ def clean(value: object | None) -> str | None:
 
 
 def skip_notprovided(value: str | None) -> str | None:
-    """``NOTPROVIDED`` (SEPA-Platzhalter) wie leer behandeln."""
+    """Treat ``NOTPROVIDED`` (SEPA placeholder) as empty."""
     if value and value.strip().upper() == "NOTPROVIDED":
         return None
     return value
 
 
-# Manche Bank-MT940/CAMT-Felder packen Gegen-IBAN + Name OHNE Trenner in EIN Feld
-# ("DE70…808Quentin Walz") und lassen das IBAN-Feld leer. Eine IBAN ist Ländercode (2
-# Buchstaben) + 2 Prüfziffern + **alphanumerische** BBAN — bei NL/GB/… enthält die BBAN
-# Buchstaben (z. B. ``NL70CITI2032329018``), daher reicht „nur Ziffern" NICHT (#fints). Statt
-# über die Zeichenklasse zu raten, wo die IBAN endet, nutzen wir die **feste Länge je Land**
-# (ISO 13616) plus die mod-97-Prüfsumme — so wird der Name nicht angeknabbert und ein bloßer
-# Verwendungszweck/Referenz ("RF…") nicht fälschlich als IBAN erkannt.
+# Some bank MT940/CAMT fields pack counterparty IBAN + name WITHOUT separator into
+# ONE field ("DE70…808Quentin Walz") and leave the IBAN field empty. A BBAN is
+# alphanumeric (e.g. ``NL70CITI2032329018``), so "digits only" is not enough to
+# find the boundary — use the fixed per-country length (ISO 13616) plus the
+# mod-97 checksum instead, so names are not nibbled and a mere reference ("RF…")
+# is not misdetected as an IBAN.
 _IBAN_LENGTHS = {
     "AD": 24, "AT": 20, "BE": 16, "BG": 22, "CH": 21, "CY": 28, "CZ": 24, "DE": 22,
     "DK": 18, "EE": 20, "ES": 24, "FI": 18, "FR": 27, "GB": 22, "GR": 27, "HR": 21,
@@ -41,17 +40,17 @@ _IBAN_LENGTHS = {
     "MC": 27, "MT": 31, "NL": 18, "NO": 15, "PL": 28, "PT": 25, "RO": 24, "SE": 24,
     "SI": 19, "SK": 24, "SM": 27,
 }  # fmt: skip
-# Führender IBAN-Kandidat: Ländercode + 2 Prüfziffern + BBAN (Großbuchstaben/Ziffern, ohne
-# Leerzeichen — Bank-Glue-Felder trennen IBAN und Name nie durch ein Space).
+# Leading IBAN candidate: country code + 2 check digits + BBAN (uppercase/digits,
+# no spaces — bank glue fields never separate IBAN and name with a space).
 _IBAN_HEAD = re.compile(r"^[A-Z]{2}\d{2}[A-Z0-9]+")
-# Sparkassen-Zusatz am Zweck-Ende: „… DATUM 03.04.2026, 09.15 UHR" (Uhrzeit mit . oder :).
+# Sparkasse suffix at the purpose end: "… DATUM 03.04.2026, 09.15 UHR" (time with . or :).
 _DATUM_SUFFIX = re.compile(
     r"\s*DATUM\s+\d{2}\.\d{2}\.\d{4},?\s+(\d{2})[.:](\d{2})\s*UHR\s*$",
     re.IGNORECASE,
 )
 
-# Strukturierte ?86-Tags, die die ``mt940``-Lib bei manchen Banken OHNE Trenner an den
-# vorigen Zweck-Teil klebt (z. B. „…0000794247ANZAHL 00000002") → Leerzeichen davor einfügen.
+# Structured ?86 tags that the ``mt940`` lib glues to the preceding purpose part
+# at some banks (e.g. "…0000794247ANZAHL 00000002") — insert a space before them.
 _GLUE_TOKENS = (
     "DATEI-NR.",
     "ANZAHL",
@@ -68,15 +67,15 @@ _GLUE_TOKENS = (
     "BIC+",
 )
 _GLUE_RE = re.compile(r"(?<=\S)(" + "|".join(re.escape(t) for t in _GLUE_TOKENS) + r")")
-# Datum direkt an ein folgendes Wort geklebt: „30.06.2026siehe" → „30.06.2026 siehe".
+# Date glued directly to a following word: "30.06.2026siehe" -> "30.06.2026 siehe".
 _DATE_GLUE_RE = re.compile(r"(\d{2}\.\d{2}\.\d{4})(?=[A-Za-zÄÖÜäöü])")
-# Platzhalter-„Namen", die manche Sparkassen im ?32 statt eines echten Gegenkontos liefern
-# (Sammel-/Dateibuchungen) — nicht als Gegenkonto anzeigen.
+# Placeholder "names" some Sparkassen put in ?32 instead of a real counterparty
+# (batch/file bookings) — do not display as counterparty.
 _PLACEHOLDER_NAMES = frozenset({"KRZL"})
 
-# Sparkassen-Sammel-/Dateibuchung: der Zweck besteht nur aus Datei-Nummer + Posten-Zahl
-# („DATEI-NR. 0000794247 ANZAHL 00000002"). Für die Anzeige menschenlesbar machen —
-# gespeicherte/rohe Zwecke bleiben unverändert (Dedup fußt auf den Rohdaten, #fints-raw).
+# Sparkasse batch/file booking: the purpose is just file number + item count
+# ("DATEI-NR. 0000794247 ANZAHL 00000002"). Prettified for display only —
+# stored/raw purposes stay unchanged (dedup rests on raw data).
 _BATCH_PURPOSE_RE = re.compile(
     r"DATEI-NR\.?\s*0*(\d+)\s+ANZAHL\s+0*(\d+)",
     re.IGNORECASE,
@@ -84,9 +83,9 @@ _BATCH_PURPOSE_RE = re.compile(
 
 
 def normalize_purpose(text: str | None) -> str | None:
-    """Verklebte ?86-Subfelder wieder trennen (#fints): Leerzeichen vor strukturierte Tags und
-    zwischen Datum + Folgewort, Mehrfach-Leerzeichen kollabieren. Reine Darstellungs-/Lesbarkeit;
-    der :func:`split_booking_time`-Schritt entfernt danach den ``DATUM …UHR``-Zusatz."""
+    """Re-separate glued ?86 subfields: spaces before structured tags and between
+    date + following word, collapse repeated spaces. Display/readability only;
+    :func:`split_booking_time` removes the ``DATUM …UHR`` suffix afterwards."""
     if not text:
         return text
     text = _GLUE_RE.sub(r" \1", text)
@@ -96,10 +95,10 @@ def normalize_purpose(text: str | None) -> str | None:
 
 
 def prettify_purpose(text: str | None) -> str | None:
-    """Sparkassen-Sammelbuchungszweck menschenlesbar machen (Anzeige, #fints-batch).
+    """Make a Sparkasse batch-booking purpose human-readable (display only).
 
-    „DATEI-NR. 0000794247 ANZAHL 00000002" → „Sammelbuchung Datei-Nr. 794247 (2 Posten)";
-    umgebender Text bleibt erhalten. Zwecke ohne das Muster kommen unverändert zurück."""
+    "DATEI-NR. 0000794247 ANZAHL 00000002" becomes "Sammelbuchung Datei-Nr.
+    794247 (2 Posten)"; surrounding text is kept, non-matching purposes pass through."""
     if not text:
         return text
 
@@ -112,10 +111,10 @@ def prettify_purpose(text: str | None) -> str | None:
 
 
 def split_booking_time(purpose: str | None) -> tuple[str | None, str | None]:
-    """Sparkassen-Suffix „… DATUM dd.mm.yyyy, hh.mm UHR" vom Zweck lösen.
+    """Detach the Sparkasse suffix "… DATUM dd.mm.yyyy, hh.mm UHR" from the purpose.
 
-    Liefert ``(sauberer_zweck, "HH:MM")`` — die Uhrzeit speist die ``Buchung:``-Zeile der
-    Buchungs-Anmerkung; CAMT/andere Banken ohne diesen Zusatz → ``(zweck, None)``."""
+    Returns ``(clean_purpose, "HH:MM")`` — the time feeds the booking-note
+    ``Buchung:`` row; CAMT/other banks without the suffix yield ``(purpose, None)``."""
     if not purpose:
         return purpose, None
     match = _DATUM_SUFFIX.search(purpose)
@@ -126,8 +125,8 @@ def split_booking_time(purpose: str | None) -> tuple[str | None, str | None]:
 
 
 def _iban_mod97_ok(iban: str) -> bool:
-    """ISO 13616 mod-97-Prüfung: die ersten 4 Zeichen ans Ende, Buchstaben → Zahl (A=10…Z=35),
-    Rest mod 97 muss 1 sein."""
+    """ISO 13616 mod-97 check: first 4 chars moved to the end, letters mapped
+    A=10…Z=35, remainder mod 97 must be 1."""
     rearranged = iban[4:] + iban[:4]
     try:
         digits = "".join(str(int(ch, 36)) for ch in rearranged)
@@ -137,10 +136,10 @@ def _iban_mod97_ok(iban: str) -> bool:
 
 
 def _detect_leading_iban(text: str) -> tuple[str, str] | None:
-    """``text`` mit führender (an den Namen geklebter) IBAN → ``(iban, rest)`` oder ``None``.
+    """Split ``text`` with a leading (name-glued) IBAN into ``(iban, rest)`` or ``None``.
 
-    Schneidet exakt die für das Land erwartete IBAN-Länge ab und validiert die Prüfsumme —
-    nur dann wird gesplittet (sonst bliebe der Name unangetastet)."""
+    Cuts exactly the country's expected IBAN length and validates the checksum —
+    only then is the split applied (otherwise the name stays untouched)."""
     match = _IBAN_HEAD.match(text)
     if match is None:
         return None
@@ -156,10 +155,10 @@ def _detect_leading_iban(text: str) -> tuple[str, str] | None:
 def split_leading_iban(
     name: object | None, iban: object | None
 ) -> tuple[str | None, str | None]:
-    """``(name, iban)`` normalisieren: führende/wiederholte IBAN aus dem Namen lösen.
+    """Normalize ``(name, iban)``: detach a leading/repeated IBAN from the name.
 
-    Verbessert sowohl die Anzeige (Name + IBAN getrennt) als auch den IBAN-Abgleich (sonst
-    bleibt ``counterparty_iban`` leer und das Matching greift nicht)."""
+    Improves both display (name + IBAN separated) and IBAN matching (otherwise
+    ``counterparty_iban`` stays empty and matching never fires)."""
     clean_name = clean(name)
     clean_iban = clean(iban)
     if clean_name is None:
@@ -174,9 +173,8 @@ def split_leading_iban(
 
 
 def clean_counterparty_name(name: object | None) -> str | None:
-    """Platzhalter-„Namen" (z. B. „KRZL" bei Sammel-/Dateibuchungen) verwerfen — egal aus welcher
-    Quelle (#fints-raw). Greift auch im Fallback auf die gespeicherte Spalte, falls die Rohfelder
-    den echten Namen nicht hergeben."""
+    """Drop placeholder "names" (e.g. "KRZL" on batch/file bookings) from any source.
+    Also applies on the stored-column fallback when raw fields lack the real name."""
     cleaned = clean(name)
     if cleaned is not None and cleaned.upper() in _PLACEHOLDER_NAMES:
         return None
@@ -186,18 +184,16 @@ def clean_counterparty_name(name: object | None) -> str | None:
 def mt940_counterparty(
     d: Mapping[str, object], *, credit: bool
 ) -> tuple[str | None, str | None]:
-    """Gegenkonto (Name, IBAN) aus einer ``mt940``-Transaktion gewinnen (#fints).
+    """Extract the counterparty (name, IBAN) from an ``mt940`` transaction.
 
-    Die ``mt940``-Lib füllt für SEPA-Umsätze außer dem strukturierten ``?32`` (``applicant_name``)
-    und ``?31`` (``applicant_iban``) auch die GVC-Felder aus dem Verwendungszweck:
-    ``IBAN+`` → ``gvc_applicant_iban``, ``ABWA+`` (abweichender Auftraggeber) →
-    ``deviate_applicant``, ``ABWE+`` (abweichender Empfänger) → ``deviate_recipient``.
-
-    Gerade **Gehalts-/SEPA-Zahlungen** tragen im ``?32`` oft nur ein Kürzel (z. B. „KRZL") und
-    KEINE ``?31``-IBAN — der echte Gegenpart steht dann in ``ABWE+``/``ABWA+`` und die IBAN in
-    ``IBAN+``. Daher: bei Eingang den abweichenden **Auftraggeber**, bei Ausgang den abweichenden
-    **Empfänger** bevorzugen (sonst der jeweils andere, sonst ``?32``); die IBAN aus ``?31``,
-    sonst aus ``IBAN+``. :func:`split_leading_iban` trennt eine ggf. im Namen verschmolzene IBAN ab.
+    Besides the structured ``?32`` (``applicant_name``) and ``?31``
+    (``applicant_iban``), the lib fills GVC fields from the purpose: ``IBAN+`` ->
+    ``gvc_applicant_iban``, ``ABWA+`` -> ``deviate_applicant``, ``ABWE+`` ->
+    ``deviate_recipient``. Salary/SEPA payments often carry only a placeholder in
+    ``?32`` and no ``?31`` IBAN — the real counterparty is in ``ABWE+``/``ABWA+``
+    and the IBAN in ``IBAN+``. Hence: on income prefer the deviating originator,
+    on outflow the deviating recipient (then the other, then ``?32``); IBAN from
+    ``?31``, else ``IBAN+``. :func:`split_leading_iban` detaches a name-glued IBAN.
     """
     iban = clean(d.get("applicant_iban")) or clean(d.get("gvc_applicant_iban"))
     deviate_primary = "deviate_applicant" if credit else "deviate_recipient"
@@ -208,10 +204,9 @@ def mt940_counterparty(
         or clean(d.get("applicant_name"))
         or clean(d.get("recipient_name"))
     )
-    # ERST die ggf. verschmolzene IBAN abtrennen, DANN Platzhalter prüfen: Sammelbuchungen liefern
-    # ``applicant_name`` als „<IBAN>KRZL" (IBAN + Kürzel zusammengeklebt, keine eigene ?31-IBAN).
-    # Ein Check VOR dem Split würde „<IBAN>KRZL" nicht als Platzhalter erkennen und „KRZL" stehen
-    # lassen (#fints-raw).
+    # Detach the glued IBAN FIRST, THEN check placeholders: batch bookings deliver
+    # ``applicant_name`` as "<IBAN>KRZL" (no separate ?31 IBAN). Checking before
+    # the split would not recognize "<IBAN>KRZL" as a placeholder and leave "KRZL".
     clean_name, clean_iban = split_leading_iban(name, iban)
     if clean_name is not None and clean_name.upper() in _PLACEHOLDER_NAMES:
         clean_name = None
@@ -219,24 +214,24 @@ def mt940_counterparty(
 
 
 def resolve_counterparty(raw: object, *, credit: bool) -> tuple[str | None, str | None]:
-    """Gegenkonto **aus den Rohdaten** auflösen (#fints-raw). MT940/FinTS: über die GVC-Rohfelder
-    (:func:`mt940_counterparty`, verwirft Platzhalter wie ``KRZL``, löst geklebte IBAN). CAMT-Roh
-    trägt diese Felder nicht → ``(None, None)`` (Aufrufer nutzt dann die gespeicherte Spalte)."""
+    """Resolve the counterparty from raw data. MT940/FinTS: via the GVC raw fields
+    (:func:`mt940_counterparty`). CAMT raw lacks these fields, so ``(None, None)``
+    (the caller then uses the stored column)."""
     if not isinstance(raw, dict):
         return None, None
     return mt940_counterparty(raw, credit=credit)
 
 
 def resolve_purpose(raw: object) -> str | None:
-    """Verwendungszweck **aus den Rohdaten** auflösen (#fints-raw): Roh-``purpose`` entkleben +
-    ``DATUM…UHR`` lösen. Roh ohne ``purpose`` → ``None`` (Aufrufer nutzt die Spalte)."""
+    """Resolve the purpose from raw data: unglue raw ``purpose`` and detach
+    ``DATUM…UHR``. Raw without ``purpose`` yields ``None`` (caller uses the column)."""
     if not isinstance(raw, dict) or raw.get("purpose") is None:
         return None
     return split_booking_time(normalize_purpose(clean(raw.get("purpose"))))[0]
 
 
 def format_iban(iban: str | None) -> str | None:
-    """IBAN in Vierergruppen darstellen (``DE70 1203 0000 1076 8788 08``)."""
+    """Format an IBAN in groups of four (``DE70 1203 0000 1076 8788 08``)."""
     if not iban:
         return iban
     compact = re.sub(r"\s+", "", iban).upper()
@@ -244,10 +239,10 @@ def format_iban(iban: str | None) -> str | None:
 
 
 def build_short_description(name: str | None, purpose: str | None) -> str:
-    """Kurzform für die Buchungs-Beschreibung: ``<Zweck> – <Name>`` (Gedankenstrich).
+    """Short form for the booking description: ``<purpose> – <name>`` (en dash).
 
-    Fehlt der Zweck → nur Name; fehlt beides → ``Bankumsatz``. Der **volle** Zweck steht
-    zusätzlich in der Anmerkung (:func:`build_booking_note`)."""
+    Purpose missing: name only; both missing: ``Bankumsatz``. The full purpose is
+    additionally in the note (:func:`build_booking_note`)."""
     name = clean(name)
     purpose = prettify_purpose(clean(purpose))
     if purpose and name:
@@ -264,8 +259,8 @@ def build_booking_note(
     when: date | None,
     booking_time: str | None = None,
 ) -> str | None:
-    """Strukturierte Anmerkung (Empfänger/Absender · IBAN · Zweck · Buchung) für eine Buchung
-    aus einem Kontoumsatz — gleiches Format wie die kuratierten Bestandsbuchungen (#fints)."""
+    """Build the structured note (recipient/sender · IBAN · purpose · booking) for a
+    booking from a statement line — same format as the curated existing bookings."""
     name = clean(name)
     purpose = prettify_purpose(clean(purpose))
     rows: list[str] = []

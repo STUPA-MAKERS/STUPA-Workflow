@@ -1,13 +1,9 @@
-"""Snapshot → Live-Config wieder anwenden (Restore/Revert-Kern, #config-versioning).
+"""Reapply a snapshot to the live config (restore/revert core).
 
-Ein gespeicherter ``config_revision``-Snapshot wird in seiner natürlichen Form in den
-zuständigen Config-Service zurückgespielt. Das geht über den **normalen Speicher-Pfad**
-(neue, unveränderliche Version + verlinkter ``config_revision`` + Audit) — der einzige
-Unterschied zu einem gewöhnlichen Edit ist die ``action``/``extra_data`` des Audit-
-Eintrags (``config_change`` bei Sidebar-Restore, ``config_revert`` aus dem Audit-Log).
-
-Lazy-Importe der Config-Services vermeiden Import-Zyklen (admin/forms importieren das
-config_revision-Modul nicht zur Modulzeit).
+A stored snapshot is replayed through the responsible config service via the
+normal save path (new immutable version + linked ``config_revision`` + audit);
+only the audit ``action``/``extra_data`` differ from an ordinary edit. Config
+services are imported lazily to avoid import cycles.
 """
 
 from __future__ import annotations
@@ -36,10 +32,10 @@ async def reapply_snapshot(
     action: AuditAction,
     extra_data: dict[str, Any] | None = None,
 ) -> None:
-    """``snapshot`` als neue aktive Version der Entität zurückspielen.
+    """Replay ``snapshot`` as the new active version of the entity.
 
-    Schreibt über den jeweiligen Config-Service eine neue Version **und** den
-    verlinkten ``config_revision``/Audit-Eintrag (Action/Extra wie übergeben).
+    Writes a new version via the responsible config service plus the linked
+    ``config_revision``/audit entry (action/extra as given).
     """
     if entity_type == ENTITY_FLOW:
         from app.modules.admin.schemas import FlowVersionCreate
@@ -72,7 +68,7 @@ async def reapply_snapshot(
         await SiteConfigService(session).restore_branding(
             branding, actor, action=action, extra_data=extra_data
         )
-    else:  # pragma: no cover - defensiv; entity_type stammt aus geschlossener Liste
+    else:  # pragma: no cover - defensive; entity_type comes from a closed list
         raise ValidationProblem(
             "Unsupported config entity for restore.",
             errors=[{"field": "entityType", "msg": entity_type}],

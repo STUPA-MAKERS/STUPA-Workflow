@@ -1,20 +1,15 @@
-"""Admin-/Config-API-Router (T-24, api.md »admin«).
+"""Admin/config API router.
 
-Endpunkte für versionierte Config-CRUD (gremien, application-types, **flow-versions**),
-RBAC (roles/role-assignments/group-mappings), webhooks, ``config-schemas`` und
-**site-config/Branding** (#21) + ein öffentlicher, auth-freier Branding-Read.
+Endpoints for versioned config CRUD (gremien, application types, the global
+flow), RBAC (roles/role-assignments/group-mappings), webhooks, config-schemas
+and site-config/branding, plus a public auth-free branding read.
 
-RBAC ist serverseitig **autoritativ** (``require_principal`` → 401/403); das FE ist
-nur UX-Gate. Permissions je Bereich (#6-Granularität):
-``admin.gremien`` (Gremien), ``admin.types`` (Antragstypen/Forms/Flows),
-``admin.site`` (Branding/Site-Config), ``admin.roles`` (RBAC),
-``webhook.manage`` (Webhooks).
-Fehler werden als ``ProblemDetail`` deklariert (T-10-Hook → problem+json),
-``400`` = malformed JSON body, ``422`` = Schema-Validierung.
+RBAC is server-side authoritative (``require_principal`` -> 401/403); the
+frontend is only a UX gate. Per-area permissions: ``admin.gremien``,
+``admin.types``, ``admin.site``, ``admin.roles``, ``webhook.manage``.
 
-``notification-rules``/``mail-templates`` (api.md) liegen im notifications-Modul
-(T-18), ``/admin/audit`` im audit-Modul (T-23); ``/admin/application-types/{id}/
-form-versions`` im forms-Modul (T-11) — hier nicht dupliziert.
+``notification-rules``/``mail-templates`` live in the notifications module,
+``/admin/audit`` in audit, form versions in forms — not duplicated here.
 """
 
 from __future__ import annotations
@@ -78,9 +73,9 @@ from app.shared.errors import ProblemDetail
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 public_router = APIRouter(tags=["admin"])
-# Authentifiziert (irgendein Principal), aber **ohne** Admin-Recht: Stammdaten-
-# Reads, die mehrere Rollen als Dropdown-Quelle brauchen (#68 Sitzung anlegen,
-# Budget-Topf, Antragstyp). Eigener Router, da ohne `/admin`-Prefix gemountet.
+# Authenticated (any principal) but WITHOUT admin rights: master-data reads that
+# several roles need as dropdown sources. Own router, mounted without the
+# `/admin` prefix.
 authed_router = APIRouter(tags=["gremien"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
@@ -108,23 +103,22 @@ GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_s
 
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 
-# Permission-Gates (Principal-Objekt injiziert für den Audit-actor). #6:
-# ``admin.config`` ist in drei Bereichs-Rechte aufgeteilt (Migration 0017).
+# Permission gates (principal object injected for the audit actor).
 GremienAdmin = Annotated[Principal, Depends(require_principal("admin.gremien"))]
 TypesAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
-# Löschen von Antragsarten ist destruktiv → eigene Permission, getrennt von admin.types.
+# Deleting application types is destructive: own permission, separate from admin.types.
 TypesDeleteAdmin = Annotated[Principal, Depends(require_principal("admin.types_delete"))]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
 RolesAdmin = Annotated[Principal, Depends(require_principal("admin.roles"))]
 WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))]
-# #per-page-admin: die zuvor von ``admin.roles`` mitgegatete Personen-/Zugriffs-
-# verwaltung ist je Admin-Seite getrennt. ``admin.roles`` = /admin/roles (Rollen-
-# Definition); die Schreib-Operationen der übrigen Seiten gaten auf eigene Keys.
+# Per-page admin RBAC: user/access management is gated per admin page.
+# ``admin.roles`` covers /admin/roles (role definitions); the other pages'
+# write operations gate on their own keys.
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
 GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
 GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
 
-# Alle Admin-Bereichs-Rechte (für ANY-of-Reads + Admin-Landing).
+# All admin area permissions (for ANY-of reads plus the admin landing page).
 _ALL_ADMIN_AREAS = (
     "admin.site",
     "admin.gremien",
@@ -144,23 +138,22 @@ _ROLES = Depends(require_principal("admin.roles"))
 _USERS = Depends(require_principal("admin.users"))
 _GROUP_MAPPINGS = Depends(require_principal("admin.group_mappings"))
 _WEBHOOK = Depends(require_principal("webhook.manage"))
-# Geteilte Reads, die mehrere Admin-Bereiche bedienen (ANY-of).
+# Shared reads serving several admin areas (ANY-of).
 _ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
-# Gremium-Mitglieder-Subseite (admin.gremien) braucht lesenden Zugriff auf
-# Gremium-Rollen (Rollen-Dropdown) bzw. Principals (Namen + Typeahead), ohne dass
-# der Gremien-Admin die jeweilige Schreib-Permission besitzen muss (#5-3).
+# The gremium-members subpage (admin.gremien) needs read access to gremium roles
+# (role dropdown) and principals (names + typeahead) without holding the
+# respective write permission.
 _GREMIEN_OR_GREMIUM_ROLES = Depends(require_any_permission("admin.gremien", "admin.gremium_roles"))
 _GREMIEN_OR_USERS = Depends(require_any_permission("admin.gremien", "admin.users"))
-# Lese-Gates für Seiten, die fremde Bereichsdaten nur als Auswahl-/Anzeigequelle
-# brauchen (#5-2). Schreiben bleibt jeweils auf dem strengen Recht.
-#   * Flow-Editor (flow.configure) liest globalen Flow, Rollen, Webhooks, Fristen.
-#   * Budget-Baum (budget.structure) liest den globalen Flow (Status-Dropdowns).
-#   * Form-Editor (form.configure) liest Antragstypen.
+# Read gates for pages that need foreign area data only as a selection/display
+# source; writes stay on the strict permission. Flow editor reads the global
+# flow, roles, webhooks, deadlines; budget tree reads the global flow; form
+# editor reads application types.
 _FLOW_READABLE = Depends(
     require_any_permission("admin.types", "flow.configure", "budget.structure")
 )
-# Rollen-Liste: gebraucht von der Rollen-Seite, der Benutzer-Seite (Zuweisungs-
-# Dropdown) und diversen Konfig-Editoren als Anzeigequelle.
+# Role list: needed by the roles page, the users page (assignment dropdown) and
+# several config editors as a display source.
 _ROLES_READ = Depends(
     require_any_permission(
         "admin.site",
@@ -175,9 +168,7 @@ _WEBHOOK_OR_FLOW = Depends(require_any_permission("webhook.manage", "flow.config
 _TYPES_OR_FORM = Depends(require_any_permission("admin.types", "form.configure"))
 
 
-# =========================================================================== #
-# config-schemas (JSON-Schema-Export für die FE-Editoren)
-# =========================================================================== #
+# --- config-schemas (JSON-schema export for the frontend editors) ---
 @router.get(
     "/config-schemas",
     response_model=dict[str, dict[str, Any]],
@@ -185,13 +176,11 @@ _TYPES_OR_FORM = Depends(require_any_permission("admin.types", "form.configure")
     responses=_errors(401, 403),
 )
 async def get_config_schemas() -> dict[str, dict[str, Any]]:
-    """JSON-Schemas (Form/Flow/Voting/Branding/…) für die Config-Editoren."""
+    """JSON schemas (form/flow/voting/branding/...) for the config editors."""
     return export_json_schemas()
 
 
-# =========================================================================== #
-# Gremien
-# =========================================================================== #
+# --- Gremien ---
 @router.get(
     "/gremien",
     response_model=list[GremiumOut],
@@ -245,7 +234,7 @@ async def delete_gremium(gremium_id: UUID, service: ServiceDep, principal: Gremi
 async def get_gremium_mail_recipients(
     gremium_id: UUID, service: ServiceDep, _principal: GremienAdmin
 ) -> GremiumMailRecipients:
-    """Zusätzliche Protokoll-Empfänger des Gremiums (#protocol-recipients)."""
+    """Read the gremium's additional protocol recipients."""
     return await service.get_gremium_mail_recipients(gremium_id)
 
 
@@ -260,14 +249,12 @@ async def set_gremium_mail_recipients(
     service: ServiceDep,
     principal: GremienAdmin,
 ) -> GremiumMailRecipients:
-    """Zusätzliche Protokoll-Empfänger ersetzen (idempotentes PUT). Diese Adressen
-    erhalten finalisierte Protokolle zusätzlich zu den aktiven Gremium-Mitgliedern."""
+    """Replace the additional protocol recipients (idempotent PUT). These addresses
+    receive finalized protocols in addition to active gremium members."""
     return await service.set_gremium_mail_recipients(gremium_id, payload, principal.sub)
 
 
-# =========================================================================== #
-# Gremium-Rollen (#42) — eigener Rollensatz + zeitbegrenzte Mitgliedschaften
-# =========================================================================== #
+# --- Gremium roles: own role set + time-bound memberships ---
 @router.get(
     "/gremien/{gremium_id}/roles",
     response_model=list[GremiumRoleOut],
@@ -352,9 +339,7 @@ async def delete_gremium_membership(
     await service.delete_membership(membership_id, principal.sub)
 
 
-# =========================================================================== #
-# Gremien (authentifiziert, ohne Admin-Recht) — Dropdown-Quelle (#68)
-# =========================================================================== #
+# --- Gremien (authenticated, no admin right) as dropdown source ---
 @authed_router.get(
     "/gremien",
     response_model=list[GremiumOut],
@@ -364,15 +349,13 @@ async def list_gremien_authed(
     service: ServiceDep,
     _principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[GremiumOut]:
-    """Gremien als Stammdaten für jeden eingeloggten Principal (#68): Quelle der
-    Gremium-Auswahl in »Sitzung anlegen«, Budget-Topf und Antragstyp. Reine
-    Lese-Stammdaten (id/Name/Variante) — Anlegen/Ändern bleibt ``admin.gremien``."""
+    """List gremien as master data for any logged-in principal (dropdown source).
+
+    Read-only master data (id/name/variant) — create/update stays ``admin.gremien``."""
     return await service.list_gremien()
 
 
-# =========================================================================== #
-# Application-Types
-# =========================================================================== #
+# --- Application types ---
 @router.get(
     "/application-types",
     response_model=list[ApplicationTypeOut],
@@ -417,14 +400,12 @@ async def update_application_type(
 async def delete_application_type(
     type_id: UUID, service: ServiceDep, principal: TypesDeleteAdmin
 ) -> None:
-    """Antragsart löschen — eigene Permission ``admin.types_delete``. 409, wenn noch
-    Anträge dieser Art existieren (die hängen an Formular-/Flow-Versionen)."""
+    """Delete an application type — own permission ``admin.types_delete``. 409 while
+    applications of this type still exist."""
     await service.delete_application_type(type_id, principal.sub)
 
 
-# =========================================================================== #
-# Globaler Flow (#28: es gibt genau EINEN Flow für alle Antragstypen)
-# =========================================================================== #
+# --- Global flow (exactly ONE flow for all application types) ---
 @router.get(
     "/flow-versions/global",
     response_model=FlowGraph | None,
@@ -432,7 +413,7 @@ async def delete_application_type(
     responses=_errors(401, 403),
 )
 async def get_global_flow(service: ServiceDep) -> FlowGraph | None:
-    """Graph des aktiven globalen Flows (#28) — ``null``, wenn keiner existiert."""
+    """Graph of the active global flow — ``null`` if none exists."""
     return await service.get_active_global_flow()
 
 
@@ -445,13 +426,11 @@ async def get_global_flow(service: ServiceDep) -> FlowGraph | None:
 async def create_global_flow(
     payload: FlowVersionCreate, service: ServiceDep, principal: TypesAdmin
 ) -> FlowVersionOut:
-    """Globalen Flow als neue Version anlegen (#28; gilt für ALLE Antragstypen)."""
+    """Create the global flow as a new version (applies to ALL application types)."""
     return await service.create_global_flow_version(payload, principal.sub)
 
 
-# =========================================================================== #
-# Rollen / RBAC + Vertretung
-# =========================================================================== #
+# --- Roles / RBAC ---
 @router.get(
     "/principals",
     response_model=list[PrincipalOut],
@@ -461,7 +440,7 @@ async def create_global_flow(
 async def list_principals(
     service: ServiceDep, q: Annotated[str | None, Query()] = None
 ) -> list[PrincipalOut]:
-    """Benutzer (OIDC-Principals) auflisten/suchen (per `sub`/Name/E-Mail) — #72."""
+    """List/search users (OIDC principals) by `sub`/name/e-mail."""
     return await service.search_principals(q)
 
 
@@ -473,7 +452,7 @@ async def list_principals(
 async def patch_principal(
     principal_id: UUID, payload: PrincipalUpdate, service: ServiceDep, principal: UsersAdmin
 ) -> PrincipalOut:
-    """Benutzer aktivieren/deaktivieren (#30)."""
+    """Activate/deactivate a user."""
     return await service.set_principal_active(principal_id, payload.active, principal.sub)
 
 
@@ -484,7 +463,7 @@ async def patch_principal(
     responses=_errors(401, 403),
 )
 async def list_permissions(service: ServiceDep) -> list[str]:
-    """Katalog wählbarer Permission-Keys fürs Rollen-/Rechte-UI (api.md §1)."""
+    """Catalog of selectable permission keys for the roles UI."""
     return service.list_permissions()
 
 
@@ -525,7 +504,7 @@ async def update_role(
     responses=_errors(401, 403, 404, 409),
 )
 async def delete_role(role_id: UUID, service: ServiceDep, principal: RolesAdmin) -> None:
-    """Rolle löschen (#38); ``admin``/``member`` sind geschützt (409)."""
+    """Delete a role; ``admin``/``member`` are protected (409)."""
     await service.delete_role(role_id, principal.sub)
 
 
@@ -555,7 +534,7 @@ async def create_role_assignment(
     mailer: AutoMailerDep,
 ) -> RoleAssignmentOut:
     out = await service.create_role_assignment(payload, principal.sub)
-    # Betroffene:n informieren (#4-3, Art role_change/delegation, abwählbar #4-2).
+    # Notify the affected user (opt-out via notification preferences).
     info = await assignment_mail_info(getattr(service, "session", None), out.id)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(mailer.assignment_changed, settings, info, granted=True, pool=pool)
@@ -590,8 +569,8 @@ async def delete_role_assignment(
     request: Request,
     mailer: AutoMailerDep,
 ) -> Response:
-    """Rolle entziehen (#72): Zuweisung löschen (idempotent → 204; unbekannt → 404)."""
-    # Mail-Daten VOR dem Löschen einsammeln (#4-3) — danach ist die Zeile weg.
+    """Revoke a role: delete the assignment (idempotent -> 204; unknown -> 404)."""
+    # Collect mail data BEFORE deleting — the row is gone afterwards.
     info = await assignment_mail_info(getattr(service, "session", None), assignment_id)
     await service.delete_role_assignment(assignment_id, principal.sub)
     pool = getattr(request.app.state, "arq_pool", None)
@@ -642,9 +621,7 @@ async def delete_group_mapping(
     await service.delete_group_mapping(mapping_id, principal.sub)
 
 
-# =========================================================================== #
-# Webhooks (P webhook.manage)
-# =========================================================================== #
+# --- Webhooks (webhook.manage) ---
 @router.get(
     "/webhooks",
     response_model=list[WebhookOut],
@@ -690,16 +667,14 @@ async def update_webhook(
 async def list_webhook_delivery_status(
     service: ServiceDep,
 ) -> list[WebhookDeliveryStatusOut]:
-    """Letzter Auslieferungszustand je Webhook (AUD-062): grober Zustand
-    (``sent``/``pending``/``dead``/``never``) + grobe Fehlerursachen-Klasse, damit
-    ein vertippter/interner Webhook diagnostizierbar ist — ohne aufgelöste interne
-    IPs oder Antwort-Bodies zu leaken."""
+    """Latest delivery state per webhook: coarse state
+    (``sent``/``pending``/``dead``/``never``) plus a coarse failure class — lets a
+    mistyped/internal webhook be diagnosed without leaking resolved internal IPs
+    or response bodies."""
     return await service.list_webhook_delivery_status()
 
 
-# =========================================================================== #
-# Site-Config / Branding (#21) — Draft/Activate (FE-Kontrakt T-34)
-# =========================================================================== #
+# --- Site config / branding: draft/activate ---
 @router.get(
     "/site-config",
     response_model=SiteConfigOut,
@@ -707,7 +682,7 @@ async def list_webhook_delivery_status(
     responses=_errors(401, 403),
 )
 async def get_site_config(service: SiteServiceDep) -> SiteConfigOut:
-    """Aktive Branding-Config + aktueller Draft + Änderungsflag."""
+    """Active branding config plus current draft plus change flag."""
     return await service.get()
 
 
@@ -719,7 +694,7 @@ async def get_site_config(service: SiteServiceDep) -> SiteConfigOut:
 async def put_site_config_draft(
     payload: Branding, service: SiteServiceDep, principal: SiteAdmin
 ) -> SiteConfigOut:
-    """Branding-Draft setzen (Bild-only-Logos, kein Inline-SVG; ungültig → 422)."""
+    """Set the branding draft (image-only logos, no inline SVG; invalid -> 422)."""
     return await service.put_draft(payload, principal.sub)
 
 
@@ -729,29 +704,26 @@ async def put_site_config_draft(
     responses=_errors(400, 401, 403, 409),
 )
 async def activate_site_config(service: SiteServiceDep, principal: SiteAdmin) -> SiteConfigOut:
-    """Draft aktivieren → neue aktive Version (Versionssprung, auditiert)."""
+    """Activate the draft as a new active version (version bump, audited)."""
     return await service.activate(principal.sub)
 
 
-# =========================================================================== #
-# Öffentliche Branding-Config (auth-frei, fürs FE-Rendering, #21)
-# =========================================================================== #
+# --- Public branding config (auth-free, for frontend rendering) ---
 @public_router.get("/site-config", response_model=PublicSiteConfigOut)
 async def get_public_site_config(
     service: SiteServiceDep, response: Response
 ) -> PublicSiteConfigOut:
-    """Aktive Branding-Config ohne Auth (Logos-URLs, Footer, Texte)."""
+    """Active branding config without auth (logo URLs, footer, texts)."""
     response.headers["Cache-Control"] = "public, max-age=300"
     return await service.public()
 
 
-# Dynamisches PWA-Manifest (auth-frei, Single Source of Truth = aktive Site-Config).
-# Der Edge-Proxy (nginx) mappt das vom Browser verlinkte ``/manifest.webmanifest``
-# (frontend/src/index.html) auf diese Route, damit name/short_name dem konfigurierten
-# App-Namen folgen. Alle übrigen Felder sind statisch (Icons, theme_color, scope …).
+# Dynamic PWA manifest (auth-free; source of truth = active site config). The
+# edge proxy (nginx) maps the browser-linked ``/manifest.webmanifest`` to this
+# route so name/short_name follow the configured app name.
 @public_router.get("/manifest.webmanifest", include_in_schema=False)
 async def get_manifest(service: SiteServiceDep) -> Response:
-    """PWA-Manifest aus der aktiven Branding-Config (application/manifest+json)."""
+    """PWA manifest from the active branding config (application/manifest+json)."""
     import json
 
     body = json.dumps(await service.manifest(), ensure_ascii=False)

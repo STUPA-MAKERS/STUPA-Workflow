@@ -1,17 +1,17 @@
-"""Bankabgleich (#fints) — FinTS-Abruf, Auszug-Parser, Staging, Reconcile.
+"""Bank reconciliation — FinTS fetch, statement parsers, staging, reconcile.
 
-Aufbau:
+Layout:
 
-* :mod:`.statement`   — quellen-agnostische Datentypen + Format-Erkennung (Einstieg
-  für Datei-Importe: :func:`~.statement.parse_statement_full`).
-* :mod:`.mt940_parse` — MT940 (``.sta``) → :class:`~.statement.StatementLine`.
-* :mod:`.camt_parse`  — CAMT.052/053 (XML) → StatementLine, inkl. Aufteilung von
-  Sammelbuchungen (ein ``Ntry``, n ``TxDtls``) in Einzelumsätze.
-* :mod:`.normalize`   — reine Text-/IBAN-/Gegenkonto-Normalisierung.
-* :mod:`.dedup`       — Idempotenz-Schlüssel + roh-basierte Dedup-Grundlage.
-* :mod:`.client`      — FinTS-Netz-Client (PIN/TAN-SCA, CAMT-bevorzugter Abruf).
-* :mod:`.match`       — Bewertung Umsatz ↔ bestehende Buchung.
-* :mod:`.service`     — :class:`~.service.BankService` (HTTP-Fassade, DB-Orchestrierung),
-  zusammengesetzt aus ``credentials``/``sync``/``staging``/``reconcile``/``listing``.
-* :mod:`.maintenance` — idempotente Aufräum-Routinen für Migrationen.
+* :mod:`.statement`   — source-agnostic data types + format detection (file-import
+  entry point: :func:`~.statement.parse_statement_full`).
+* :mod:`.mt940_parse` — MT940 (``.sta``) to :class:`~.statement.StatementLine`.
+* :mod:`.camt_parse`  — CAMT.052/053 (XML) to StatementLine, incl. splitting batch
+  bookings (one ``Ntry``, n ``TxDtls``) into single transactions.
+* :mod:`.normalize`   — pure text/IBAN/counterparty normalization.
+* :mod:`.dedup`       — idempotency keys + raw-based dedup base.
+* :mod:`.client`      — FinTS network client (PIN/TAN SCA, CAMT-preferred fetch).
+* :mod:`.match`       — scoring of transaction vs. existing booking.
+* :mod:`.service`     — :class:`~.service.BankService` (HTTP facade, DB orchestration),
+  composed of ``credentials``/``sync``/``staging``/``reconcile``/``listing``.
+* :mod:`.maintenance` — idempotent cleanup routines for migrations.
 """
