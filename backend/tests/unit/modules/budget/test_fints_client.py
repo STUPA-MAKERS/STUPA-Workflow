@@ -14,8 +14,9 @@ class _Mech:
 
 
 class _Acct:
-    def __init__(self, iban: str) -> None:
+    def __init__(self, iban: str, accountnumber: str = "") -> None:
         self.iban = iban
+        self.accountnumber = accountnumber
 
 
 def test_pick_mechanism_prefers_stored() -> None:
@@ -33,16 +34,55 @@ def test_pick_mechanism_fallback_first_and_empty() -> None:
     assert fc._pick_tan_mechanism({}, None) is None
 
 
-def test_select_account_by_iban_then_first() -> None:
+def test_select_account_by_iban() -> None:
     accs = [_Acct("DE111"), _Acct("DE 2 2 2")]
     assert fc._select_account(accs, "de222") is accs[1]  # IBAN-Treffer (normalisiert)
-    assert fc._select_account(accs, None) is accs[0]  # ohne IBAN → erstes
-    assert fc._select_account(accs, "DE999") is accs[0]  # kein Treffer → erstes
+
+
+def test_select_account_by_number_when_bank_omits_iban() -> None:
+    """Sparkasse: SEPA-Konten OHNE IBAN — Match über die im DE-IBAN steckende KTO."""
+    # DE + 2 Prüf + 8 BLZ + 10 KTO. KTO 0001234567 → "1234567".
+    iban = "DE00123456780001234567"
+    accs = [_Acct("", accountnumber="9999999"), _Acct("", accountnumber="1234567")]
+    assert fc._select_account(accs, iban) is accs[1]
+
+
+def test_select_account_single_returns_it_regardless() -> None:
+    only = _Acct("", accountnumber="55")
+    assert fc._select_account([only], None) is only
+    assert fc._select_account([only], "DE00123456780000000042") is only
+
+
+def test_select_account_ambiguous_raises() -> None:
+    """Mehrere Konten, keiner passt → klarer Fehler statt still falsches Konto."""
+    accs = [_Acct("DE111", "1"), _Acct("DE222", "2")]
+    with pytest.raises(fc.FintsAccountSelectionError):
+        fc._select_account(accs, None)  # keine IBAN konfiguriert
+    with pytest.raises(fc.FintsAccountSelectionError):
+        fc._select_account(accs, "DE00123456789999999999")  # nichts trifft
 
 
 def test_select_account_empty_raises() -> None:
     with pytest.raises(fc.FintsError):
         fc._select_account([], None)
+
+
+def test_kto_from_de_iban() -> None:
+    assert fc._kto_from_de_iban("DE00123456780001234567") == "1234567"
+    assert fc._kto_from_de_iban("FR761234567890") == ""  # nicht-DE
+    assert fc._kto_from_de_iban("DE12") == ""  # zu kurz
+
+
+def test_account_scope_includes_iban_and_number() -> None:
+    """Scope enthält IBAN + KTO (Bank + aus DB-IBAN abgeleitet), führende Nullen weg."""
+    acc = _Acct("", accountnumber="0001234567")
+    creds = fc.FintsCredentials(
+        endpoint="https://x", blz="1", login="u", pin="p",
+        account_iban="DE00123456780001234567",
+    )
+    scope = fc._account_scope(acc, creds)
+    assert "DE00123456780001234567" in scope  # konfigurierte IBAN
+    assert "1234567" in scope  # KTO (aus Bank-accountnumber + IBAN), Nullen entfernt
 
 
 def test_outcome_dataclass_defaults() -> None:

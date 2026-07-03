@@ -784,6 +784,27 @@ async def test_sync_account_done(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_sync_account_ambiguous_account(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Konto nicht eindeutig zuordenbar → 422 (fints_account_ambiguous), KEIN Lock."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+
+    def _start(creds: Any, *, start_date: Any) -> fc.FintsOutcome:
+        raise fc.FintsAccountSelectionError("no match")
+
+    monkeypatch.setattr(fc, "start_sync", _start)
+    cred = _cred(account_id=acc.id)
+    session.scalar_q.append(cred)  # _load_credential
+    session.execute_q.append(_Result([]))  # _purge_expired_sessions
+    with pytest.raises(ValidationProblem) as ei:
+        await svc.sync_account(acc.id)
+    assert ei.value.code == "fints_account_ambiguous"
+    assert cred.fints_locked_until is None  # nicht als Bank-Fehler gewertet
+
+
+@pytest.mark.asyncio
 async def test_sync_account_needs_tan(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _service(session, monkeypatch)

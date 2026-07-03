@@ -61,6 +61,13 @@ class FintsBankLockedError(FintsError):
     (hotline/branch or online-banking unlock) can lift it."""
 
 
+class FintsAccountSelectionError(FintsError):
+    """The configured account could not be matched among the bank's SEPA accounts
+    (and the login has more than one), so the correct account is ambiguous. Not a
+    bank/auth error — surfaced to the user as "set the IBAN on this account",
+    never a lock. Do NOT fall back to fetching an arbitrary account."""
+
+
 class FintsAuthRejectedError(FintsError):
     """Bank rejected login/signature (FinTS codes 9340/9910/9930/9931/9942).
 
@@ -179,16 +186,50 @@ def _pick_tan_mechanism(mechanisms: Mapping[str, object], preferred: str | None)
     return next(iter(mechanisms))
 
 
+def _norm_iban(value: object) -> str:
+    return str(value or "").replace(" ", "").upper()
+
+
+def _kto_from_de_iban(iban: str) -> str:
+    """The account number embedded in a German IBAN (leading zeros stripped).
+
+    ``DEkk BBBBBBBB KKKKKKKKKK`` — the last 10 digits are the account number.
+    Empty for non-DE / malformed IBANs (nothing to match by)."""
+    return iban[12:22].lstrip("0") if len(iban) == 22 and iban.startswith("DE") else ""
+
+
+def _norm_kto(value: object) -> str:
+    return str(value or "").strip().lstrip("0")
+
+
 def _select_account(accounts: Sequence[object], iban: str | None):  # type: ignore[no-untyped-def]  # noqa: ANN202
-    """Pick the SEPA account by IBAN (else the first). Empty list raises ``FintsError``."""
-    if not accounts:
+    """Pick the SEPA account matching the configured ``iban``.
+
+    Matches by IBAN, then — because Sparkasse & co. frequently return SEPA
+    accounts with an EMPTY iban (only KTO/BLZ) — by the account number embedded
+    in the German IBAN vs the account's ``accountnumber``. With a single account
+    on the login the choice is unambiguous and returned regardless. With several
+    accounts and no confident match we raise instead of silently fetching a
+    random account (which would stage a FOREIGN account's bookings under this
+    one). Empty account list raises ``FintsError``."""
+    accs = list(accounts)
+    if not accs:
         raise FintsError("bank returned no SEPA accounts")
-    if iban:
-        norm = iban.replace(" ", "").upper()
-        for acc in accounts:
-            if str(getattr(acc, "iban", "") or "").replace(" ", "").upper() == norm:
+    want = _norm_iban(iban)
+    if want:
+        for acc in accs:
+            if _norm_iban(getattr(acc, "iban", None)) == want:
                 return acc
-    return accounts[0]
+        kto = _kto_from_de_iban(want)
+        if kto:
+            for acc in accs:
+                if _norm_kto(getattr(acc, "accountnumber", None)) == kto:
+                    return acc
+    if len(accs) == 1:
+        return accs[0]
+    raise FintsAccountSelectionError(
+        "could not match the configured account among the bank's SEPA accounts"
+    )
 
 
 def lines_from_camt_documents(
@@ -294,15 +335,20 @@ def _needs_tan(
 
 def _account_scope(account: object, creds: FintsCredentials) -> frozenset[str]:
     """Identifiers the fetch is scoped to: the selected SEPA account's IBAN AND
-    account number (bank ground truth), plus the configured account IBAN. The
-    number is included because older Sparkasse SEPA accounts expose no IBAN — an
-    IBAN-only scope would then be empty and let every account's bookings through."""
-    values = (
-        getattr(account, "iban", None),
-        getattr(account, "accountnumber", None),
-        creds.account_iban,
-    )
-    return frozenset(n for v in values if (n := str(v or "").replace(" ", "").upper()))
+    account number (bank ground truth), plus the configured account IBAN and the
+    number embedded in it. The number is included because older Sparkasse SEPA
+    accounts expose no IBAN — an IBAN-only scope would then be empty and let every
+    account's bookings through. Account numbers are matched with leading zeros
+    stripped (as in the CAMT statement)."""
+    ids: set[str] = set()
+    for iban in (getattr(account, "iban", None), creds.account_iban):
+        if n := _norm_iban(iban):
+            ids.add(n)
+    if kto := _norm_kto(getattr(account, "accountnumber", None)):
+        ids.add(kto)
+    if kto := _kto_from_de_iban(_norm_iban(creds.account_iban)):
+        ids.add(kto)
+    return frozenset(ids)
 
 
 def _mask_id(value: str) -> str:
@@ -368,7 +414,21 @@ def _fetch(
     accounts = client.get_sepa_accounts()
     if isinstance(accounts, NeedTANResponse):
         return _needs_tan(client, accounts, mechanism)
-    account = _select_account(list(accounts), creds.account_iban)
+    acct_list = list(accounts)
+    # Diagnostics (masked, last-4 only): the accounts the bank returned (IBAN|KTO)
+    # and the configured account — reveals a wrong-account selection at a glance.
+    available = [
+        f"{_mask_id(_norm_iban(getattr(a, 'iban', None)))}"
+        f"|{_mask_id(_norm_kto(getattr(a, 'accountnumber', None)))}"
+        for a in acct_list
+    ]
+    logger.info(
+        "FinTS: %d SEPA account(s) returned; configured=%s; available=%s",
+        len(acct_list),
+        _mask_id(_norm_iban(creds.account_iban)),
+        available,
+    )
+    account = _select_account(acct_list, creds.account_iban)
     # Fetch window: from ``start_date`` (capped by the service) until today.
     start = creds.start_date or date.today()
     result = _fetch_lines(client, account, start, _account_scope(account, creds))

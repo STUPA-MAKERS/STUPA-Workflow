@@ -1001,6 +1001,8 @@ export const de = {
     'Die Bank hat den Zugang gesperrt. NICHT erneut versuchen — jeder weitere Versuch kann die Sperre verschärfen. Bitte den Zugang im Online-Banking bzw. bei der Bank entsperren.',
   'fints.errAuthRejected':
     'Die Bank hat die Anmeldung abgelehnt. Bitte Zugangsdaten/TAN-Verfahren prüfen und NICHT mehrfach hintereinander erneut versuchen (sonst droht die Sperre).',
+  'fints.errAccountAmbiguous':
+    'Dieses Konto konnte bei der Bank nicht eindeutig zugeordnet werden. Bitte die IBAN am Konto hinterlegen (Verwaltung → Konten), damit der Abruf das richtige Konto trifft.',
   'fints.lockedBanner':
     'Abruf gesperrt bis {until}. Die Bank hat den Zugang abgelehnt/gesperrt — bitte nicht erneut versuchen, sonst droht die Vollsperre.',
   'fints.errFile': 'Datei ist weder gültiges CAMT.053 noch MT940.',
@@ -3138,6 +3140,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'The bank has locked this access. Do NOT retry — each further attempt can tighten the lock. Please unlock the access via online banking or your bank.',
   'fints.errAuthRejected':
     'The bank rejected the login. Check your credentials/TAN method and do NOT retry repeatedly (you risk a lockout).',
+  'fints.errAccountAmbiguous':
+    'This account could not be matched at the bank. Please set its IBAN (Admin → Accounts) so the sync targets the right account.',
   'fints.lockedBanner':
     'Sync locked until {until}. The bank rejected/locked this access — please do not retry, or you risk a full lockout.',
   'fints.errFile': 'File is neither valid CAMT.053 nor MT940.',
