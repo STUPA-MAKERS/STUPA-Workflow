@@ -10,6 +10,7 @@ to the entry amount; otherwise conservatively keep one line with the total.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -28,15 +29,21 @@ from app.modules.budget.bank.statement import (
 )
 
 
-def parse_camt(data: bytes, iban: str | None = None) -> list[StatementLine]:
+def parse_camt(
+    data: bytes,
+    iban: str | None = None,
+    account_ids: Collection[str] | None = None,
+) -> list[StatementLine]:
     """Parse a CAMT statement (report ``camt.052`` or statement ``camt.053``).
 
-    ``iban`` (optional) scopes the result to one account: a single HKCAZ fetch can
-    return a COMBINED camt.053 with one ``<Stmt>`` per account of the login, and
-    without scoping every account's bookings would be merged (and staged under the
-    one selected account). When ``iban`` is set, statements identifying a
-    DIFFERENT account are skipped; statements without an identifiable IBAN (and
-    ``iban=None``) are always kept, so file imports and minimal docs are unaffected.
+    ``iban``/``account_ids`` (optional) scope the result to one account: a single
+    HKCAZ fetch can return a COMBINED camt.053 with one ``<Stmt>`` per account of
+    the login, and without scoping every account's bookings would be merged (and
+    staged under the one selected account). Statements identifying a DIFFERENT
+    account (by IBAN OR proprietary account number) are skipped; statements
+    without an identifiable account, and an empty scope (file imports), keep all —
+    so nothing regresses. ``account_ids`` allows scoping by account number when
+    the bank exposes no IBAN (older Sparkasse SEPA accounts).
 
     :raises StatementParseError: missing/broken CAMT XML or no usable entries."""
     try:
@@ -44,7 +51,8 @@ def parse_camt(data: bytes, iban: str | None = None) -> list[StatementLine]:
     except ET.ParseError as exc:
         raise StatementParseError(f"unparseable CAMT XML: {exc}") from exc
 
-    entries = _scoped_entries(root, iban)
+    want = {n for n in (_norm_id(x) for x in _scope_values(iban, account_ids)) if n}
+    entries = _scoped_entries(root, want)
     if not entries:
         raise StatementParseError("CAMT XML contained no entries (Ntry)")
 
@@ -56,27 +64,61 @@ def parse_camt(data: bytes, iban: str | None = None) -> list[StatementLine]:
     return lines
 
 
-def _scoped_entries(root: ET.Element, iban: str | None) -> list[ET.Element]:
-    """The ``Ntry`` elements, limited to the statement(s) of ``iban`` when given.
+def _scope_values(iban: str | None, account_ids: Collection[str] | None) -> list[str]:
+    return [iban or "", *(account_ids or ())]
+
+
+def _norm_id(value: str | None) -> str:
+    """Normalise an account identifier (IBAN/number) for comparison."""
+    return (value or "").replace(" ", "").upper()
+
+
+def statement_account_ids(data: bytes) -> list[str]:
+    """The account identifiers (IBAN or number) of every statement in a CAMT doc.
+
+    Diagnostic helper: reveals which accounts a fetched document actually carries,
+    so an all-accounts fetch can be told apart from an empty scope. Broken XML
+    yields ``[]``."""
+    try:
+        root = ET.fromstring(data)  # noqa: S314 - own statement, no external entities
+    except ET.ParseError:
+        return []
+    ids: list[str] = []
+    for stmt in _findall_local(root, "Stmt") + _findall_local(root, "Rpt"):
+        ids.extend(sorted(_stmt_account_ids(stmt)))
+    return ids
+
+
+def _stmt_account_ids(stmt: ET.Element) -> set[str]:
+    """The identifiers of a statement's OWN account: IBAN and/or the proprietary
+    account number (``<Acct>/<Id>/<Othr>/<Id>``). Empty when unidentifiable.
+
+    The statement account is the first ``<Acct>`` in document order; counterparty
+    accounts are ``<DbtrAcct>``/``<CdtrAcct>``, not ``<Acct>``."""
+    acct = _find_local(stmt, "Acct")
+    if acct is None:
+        return set()
+    ids = {_norm_id(_find_text_local(acct, "IBAN"))}
+    ids.add(_norm_id(_find_text_local(_find_local(acct, "Othr"), "Id")))
+    return {i for i in ids if i}
+
+
+def _scoped_entries(root: ET.Element, want: set[str]) -> list[ET.Element]:
+    """The ``Ntry`` elements, limited to the statement(s) matching ``want``.
 
     camt.053 groups bookings under one ``<Stmt>`` per account (camt.052 under
-    ``<Rpt>``), each carrying its own ``<Acct>/<IBAN>``. Drop a statement only when
-    it has an IBAN that does NOT match — never when the IBAN is absent or no
-    scope was requested (avoids an empty fetch if a bank omits/varies the IBAN).
-    A doc without any statement container falls back to a flat ``Ntry`` scan."""
-    want = (iban or "").replace(" ", "").upper()
+    ``<Rpt>``). Drop a statement only when it identifies a DIFFERENT account —
+    never when its account is unidentifiable or ``want`` is empty (avoids an empty
+    fetch if a bank omits/varies the identifier). A doc without any statement
+    container falls back to a flat ``Ntry`` scan."""
     statements = _findall_local(root, "Stmt") + _findall_local(root, "Rpt")
     if not statements:
         return _findall_local(root, "Ntry")
     entries: list[ET.Element] = []
     for stmt in statements:
         if want:
-            # The statement's own account is the first <Acct> in document order;
-            # counterparty accounts are <DbtrAcct>/<CdtrAcct>, not <Acct>.
-            stmt_iban = (
-                _find_text_local(_find_local(stmt, "Acct"), "IBAN") or ""
-            ).replace(" ", "").upper()
-            if stmt_iban and stmt_iban != want:
+            ids = _stmt_account_ids(stmt)
+            if ids and ids.isdisjoint(want):
                 continue
         entries.extend(_findall_local(stmt, "Ntry"))
     return entries

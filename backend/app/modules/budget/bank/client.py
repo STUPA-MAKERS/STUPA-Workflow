@@ -25,13 +25,13 @@ from __future__ import annotations
 
 import base64
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlsplit
 
-from app.modules.budget.bank.camt_parse import parse_camt
+from app.modules.budget.bank.camt_parse import parse_camt, statement_account_ids
 from app.modules.budget.bank.mt940_parse import (
     balance_from_mt940,
     lines_from_mt940_transactions,
@@ -192,21 +192,21 @@ def _select_account(accounts: Sequence[object], iban: str | None):  # type: igno
 
 
 def lines_from_camt_documents(
-    documents: Sequence[bytes], iban: str | None = None
+    documents: Sequence[bytes], account_ids: Collection[str] = ()
 ) -> list[StatementLine]:
     """Convert CAMT documents of an HKCAZ fetch into lines.
 
-    ``iban`` scopes each document to the selected account (a combined camt.053 can
-    carry several accounts' statements). A well-formed document WITHOUT entries
-    (empty day/fetch window, or all statements filtered out) counts as 0 lines;
-    broken XML raises :class:`StatementParseError` (the client then falls back to
-    MT940)."""
+    ``account_ids`` scopes each document to the selected account (a combined
+    camt.053 can carry several accounts' statements). A well-formed document
+    WITHOUT entries (empty day/fetch window, or all statements filtered out)
+    counts as 0 lines; broken XML raises :class:`StatementParseError` (the client
+    then falls back to MT940)."""
     lines: list[StatementLine] = []
     for doc in documents:
         if not doc:
             continue
         try:
-            lines.extend(parse_camt(doc, iban=iban))
+            lines.extend(parse_camt(doc, account_ids=account_ids))
         except StatementParseError as exc:
             if "no entries" in str(exc) or "no usable entries" in str(exc):
                 continue
@@ -214,13 +214,15 @@ def lines_from_camt_documents(
     return lines
 
 
-def lines_from_fetch_result(result: object, iban: str | None = None) -> list[StatementLine]:
+def lines_from_fetch_result(
+    result: object, account_ids: Collection[str] = ()
+) -> list[StatementLine]:
     """Convert a ``fints`` fetch result into lines, shape-agnostic.
 
     ``get_transactions_xml`` returns ``(booked_xml_docs, pending)``;
     ``get_transactions`` (and ``send_tan`` for an MT940 job) returns ``mt940``
     transactions. ``send_tan`` passes through the ORIGINAL job's result, so the
-    TAN resume must accept both shapes. ``iban`` scopes the CAMT path to one
+    TAN resume must accept both shapes. ``account_ids`` scopes the CAMT path to one
     account; the MT940 live fetch (HKKAZ) is already per-account."""
     if (
         isinstance(result, tuple)
@@ -228,7 +230,7 @@ def lines_from_fetch_result(result: object, iban: str | None = None) -> list[Sta
         and isinstance(result[0], (list, tuple))
     ):
         booked = [doc for doc in result[0] if isinstance(doc, (bytes, bytearray))]
-        return lines_from_camt_documents([bytes(doc) for doc in booked], iban=iban)
+        return lines_from_camt_documents([bytes(doc) for doc in booked], account_ids)
     return lines_from_mt940_transactions(result)
 
 
@@ -290,24 +292,37 @@ def _needs_tan(
     )
 
 
-def _account_iban(account: object, creds: FintsCredentials) -> str | None:
-    """IBAN to scope the fetch to: the selected SEPA account's IBAN (ground truth
-    from the bank), falling back to the configured account IBAN."""
-    return str(getattr(account, "iban", "") or "").strip() or (creds.account_iban or None)
+def _account_scope(account: object, creds: FintsCredentials) -> frozenset[str]:
+    """Identifiers the fetch is scoped to: the selected SEPA account's IBAN AND
+    account number (bank ground truth), plus the configured account IBAN. The
+    number is included because older Sparkasse SEPA accounts expose no IBAN — an
+    IBAN-only scope would then be empty and let every account's bookings through."""
+    values = (
+        getattr(account, "iban", None),
+        getattr(account, "accountnumber", None),
+        creds.account_iban,
+    )
+    return frozenset(n for v in values if (n := str(v or "").replace(" ", "").upper()))
+
+
+def _mask_id(value: str) -> str:
+    """Mask an account identifier for logs — last 4 chars only, never the full IBAN."""
+    return f"…{value[-4:]}" if len(value) >= 4 else "…"
 
 
 def _fetch_lines(
-    client: FinTS3PinTanClient, account: object, start: date, iban: str | None
+    client: FinTS3PinTanClient, account: object, start: date, account_ids: Collection[str]
 ) -> object:  # pragma: no cover
     """Fetch transactions: CAMT (HKCAZ) preferred, MT940 (HKKAZ) as fallback.
 
-    ``iban`` scopes the CAMT result to the selected account (a combined camt.053
-    may carry several accounts). Returns either the finished lines
+    ``account_ids`` scopes the CAMT result to the selected account (a combined
+    camt.053 may carry several accounts). Returns either the finished lines
     (``list[StatementLine]``) or the fetch's ``NeedTANResponse``."""
     from fints.client import NeedTANResponse
     from fints.exceptions import FinTSUnsupportedOperation
 
     end = date.today()
+    logger.info("FinTS fetch scope (masked): %s", sorted(_mask_id(i) for i in account_ids) or "ALL")
     try:
         response = client.get_transactions_xml(account, start, end)  # type: ignore[arg-type]
     except FinTSUnsupportedOperation:
@@ -316,8 +331,9 @@ def _fetch_lines(
     if response is not None:
         if isinstance(response, NeedTANResponse):
             return response
+        _log_camt_accounts(response)
         try:
-            return lines_from_fetch_result(response, iban)
+            return lines_from_fetch_result(response, account_ids)
         except StatementParseError:
             # Broken CAMT: better MT940 than no fetch; do NOT log the contents
             # (transaction data). The fallback normalizes via the same path.
@@ -326,6 +342,21 @@ def _fetch_lines(
     if isinstance(response, NeedTANResponse):
         return response
     return lines_from_mt940_transactions(response)
+
+
+def _log_camt_accounts(response: object) -> None:  # pragma: no cover
+    """Log which accounts the fetched CAMT actually contains (masked ids) — makes
+    an all-accounts fetch vs an empty scope conclusive from a single live run."""
+    if not (
+        isinstance(response, tuple)
+        and len(response) == 2
+        and isinstance(response[0], (list, tuple))
+    ):
+        return
+    for doc in response[0]:
+        if isinstance(doc, (bytes, bytearray)):
+            ids = [_mask_id(i) for i in statement_account_ids(bytes(doc))]
+            logger.info("FinTS camt document statement accounts (masked): %s", ids)
 
 
 def _fetch(
@@ -340,7 +371,7 @@ def _fetch(
     account = _select_account(list(accounts), creds.account_iban)
     # Fetch window: from ``start_date`` (capped by the service) until today.
     start = creds.start_date or date.today()
-    result = _fetch_lines(client, account, start, _account_iban(account, creds))
+    result = _fetch_lines(client, account, start, _account_scope(account, creds))
     if isinstance(result, NeedTANResponse):
         return _needs_tan(client, result, mechanism)
     return FintsOutcome(
@@ -463,7 +494,9 @@ def submit_tan(  # pragma: no cover
             # transactions, depending on which fetch demanded the TAN. Scope the
             # CAMT path to the configured account IBAN (the selected SEPAAccount is
             # not re-resolved on resume).
-            lines = lines_from_fetch_result(result, creds.account_iban)
+            lines = lines_from_fetch_result(
+                result, [creds.account_iban] if creds.account_iban else []
+            )
         return FintsOutcome(
             status="done",
             tan_mechanism=pending.tan_mechanism,
