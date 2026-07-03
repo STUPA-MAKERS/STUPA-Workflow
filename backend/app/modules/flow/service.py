@@ -17,6 +17,7 @@ checks it and returns 409 (handled inline, not dispatched).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -150,7 +151,10 @@ class FlowService:
             await self.session.commit()
             return
         due_at = resolve_due_at(
-            policy, submitted_at=app.created_at, changed_at=app.updated_at
+            policy,
+            now=datetime.now(UTC),
+            submitted_at=app.created_at,
+            changed_at=app.updated_at,
         )
         if due_at is None:
             await self.session.commit()

@@ -65,11 +65,56 @@
           <span class="text-sm font-medium">{{ 'admin.deadlines.date' | t }}</span>
           <app-datepicker [ngModel]="d.absoluteAt" (ngModelChange)="patch('absoluteAt', $event)" name="absoluteAt" />
         </label>
+      } @else if (d.kind === 'recurring') {
+        <div class="flex flex-col gap-2">
+          <span class="text-sm font-medium">{{ 'admin.deadlines.dates' | t }}</span>
+          <p class="text-muted text-xs m-0">{{ 'admin.deadlines.datesHint' | t }}</p>
+          @for (dt of d.dates; track $index) {
+            <div class="flex items-end gap-2">
+              <app-datepicker
+                class="flex-1"
+                [ngModel]="dt"
+                (ngModelChange)="setDate($index, $event)"
+                [name]="'date-' + $index"
+                [ariaLabel]="'admin.deadlines.date' | t"
+              />
+              <app-button
+                variant="ghost"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'admin.deadlines.removeDate' | t"
+                (click)="removeDate($index)"
+              >
+                <app-icon name="delete" />
+              </app-button>
+            </div>
+          }
+          <app-button variant="ghost" size="sm" (click)="addDate()">
+            <app-icon name="add" />
+            {{ 'admin.deadlines.addDate' | t }}
+          </app-button>
+        </div>
       } @else {
         <label class="flex flex-col gap-2">
           <span class="text-sm font-medium">{{ 'admin.deadlines.offsetDays' | t }}</span>
           <input class="field__control" type="number" min="0" [ngModel]="d.offsetDays" (ngModelChange)="patch('offsetDays', $event)" name="offsetDays" />
         </label>
+      }
+
+      <label class="flex flex-col gap-2">
+        <span class="text-sm font-medium">{{ 'admin.deadlines.atTime' | t }}</span>
+        <input class="field__control" type="time" [ngModel]="d.atTime" (ngModelChange)="patch('atTime', $event)" name="atTime" />
+        <span class="text-muted text-xs">{{ 'admin.deadlines.atTimeHint' | t }}</span>
+      </label>
+
+      @if (d.atTime || d.kind === 'recurring') {
+        <app-select
+          [label]="'admin.deadlines.timezone' | t"
+          [options]="timezoneOptions"
+          [ngModel]="d.timezone"
+          (ngModelChange)="patch('timezone', $event)"
+          name="timezone"
+        />
       }
     </form>
   }
