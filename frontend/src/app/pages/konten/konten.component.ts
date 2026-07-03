@@ -10,6 +10,9 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { from } from 'rxjs';
+import { concatMap } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
@@ -18,6 +21,7 @@ import type { Uuid } from '@core/api/models';
 import {
   BadgeComponent,
   ButtonComponent,
+  CheckboxComponent,
   DatepickerComponent,
   DialogComponent,
   FilterBarComponent,
@@ -40,6 +44,7 @@ import {
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { PALETTE } from '../budget/budget-year-tree.component';
+import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
 
 /**
  * Konten-Tab (#fints-konten): pro Bankkonto **alle** abgerufenen Transaktionen + Kontostand;
@@ -60,6 +65,7 @@ import { PALETTE } from '../budget/budget-year-tree.component';
     LocalizedDatePipe,
     BadgeComponent,
     ButtonComponent,
+    CheckboxComponent,
     DatepickerComponent,
     DialogComponent,
     FilterBarComponent,
@@ -68,6 +74,8 @@ import { PALETTE } from '../budget/budget-year-tree.component';
     IconComponent,
     InputComponent,
     SelectComponent,
+    HScrollSyncDirective,
+    RouterLink,
   ],
   templateUrl: './konten.component.html',
   styleUrl: './konten.component.scss',
@@ -93,11 +101,36 @@ export class KontenComponent implements OnDestroy {
   private readonly PAGE = 30;
   readonly lines = signal<StatementLine[]>([]);
   readonly loadingLines = signal(false);
+  /** Nach-Mutations-Refresh läuft: Liste bleibt sichtbar, nur `aria-busy` (#expenses-ux). */
+  readonly refreshing = signal(false);
   readonly loadingMore = signal(false);
   readonly total = signal(0);
   private nextOffset = 0;
   readonly hasMore = computed(() => this.lines().length < this.total());
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
+
+  // --- Batch / Sammel-Aktionen (#expenses-ux) ---
+  readonly selected = signal<ReadonlySet<Uuid>>(new Set());
+  readonly bulkBusy = signal(false);
+  readonly selectedCount = computed(() => this.selected().size);
+  readonly allSelected = computed(() => {
+    const list = this.lines();
+    return list.length > 0 && list.every((l) => this.selected().has(l.id));
+  });
+  /** Auswahl-Teilmengen nach Match-Zustand → steuern, welcher Sammel-Button aktiv ist. */
+  readonly selectedMatched = computed(
+    () =>
+      this.lines().filter((l) => this.selected().has(l.id) && l.matchState === 'matched').length,
+  );
+  readonly selectedIgnorable = computed(
+    () =>
+      this.lines().filter(
+        (l) =>
+          this.selected().has(l.id) &&
+          (l.matchState === 'unmatched' || l.matchState === 'suggested'),
+      ).length,
+  );
+  readonly bulkConfirm = signal<null | 'unlink' | 'ignore'>(null);
 
   // --- filter/sort (serverseitig) ---
   readonly filterState = signal<'' | 'open' | 'linked'>('');
@@ -251,6 +284,7 @@ export class KontenComponent implements OnDestroy {
     this.lines.set([]);
     this.total.set(0);
     this.loadingLines.set(true);
+    this.selected.set(new Set()); // neuer Datensatz / Kontowechsel → Auswahl verwerfen
     this.fetch(true);
   }
 
@@ -260,22 +294,46 @@ export class KontenComponent implements OnDestroy {
     this.fetch(false);
   }
 
-  private fetch(initial: boolean): void {
+  /** Nach einer Mutation: das AKTUELL geladene Fenster (offset 0, EIN Request) neu holen
+   *  und die Liste atomar ersetzen — kein clear, kein `loadingLines`-Flip → Tabelle bleibt
+   *  gemountet, Scroll-Position bleibt erhalten (#expenses-ux). */
+  private refresh(): void {
+    if (!this.accountId() || this.refreshing()) return;
+    const windowLimit = Math.max(this.PAGE, Math.ceil(this.lines().length / this.PAGE) * this.PAGE);
+    this.refreshing.set(true);
+    this.api
+      .listStatementLines({ ...this.lineParams(), limit: windowLimit, offset: 0 })
+      .subscribe({
+        next: (page) => {
+          this.total.set(page.total);
+          this.lines.set(page.items);
+          this.nextOffset = page.offset + page.items.length;
+          this.pruneSelection();
+          this.refreshing.set(false);
+        },
+        error: () => this.refreshing.set(false),
+      });
+  }
+
+  /** Aktive Filter als Query-Teil — Basis für {@link fetch} und {@link refresh}. */
+  private lineParams() {
     const linked =
       this.filterState() === 'linked' ? true : this.filterState() === 'open' ? false : undefined;
+    return {
+      account: this.accountId() as Uuid,
+      linked,
+      kind: this.kind() || undefined,
+      q: this.searchQ().trim() || undefined,
+      dateFrom: this.dateFrom() || undefined,
+      dateTo: this.dateTo() || undefined,
+      sort: this.sortField(),
+      order: this.sortOrder(),
+    };
+  }
+
+  private fetch(initial: boolean): void {
     this.api
-      .listStatementLines({
-        account: this.accountId() as Uuid,
-        linked,
-        kind: this.kind() || undefined,
-        q: this.searchQ().trim() || undefined,
-        dateFrom: this.dateFrom() || undefined,
-        dateTo: this.dateTo() || undefined,
-        sort: this.sortField(),
-        order: this.sortOrder(),
-        limit: this.PAGE,
-        offset: this.nextOffset,
-      })
+      .listStatementLines({ ...this.lineParams(), limit: this.PAGE, offset: this.nextOffset })
       .subscribe({
         next: (page) => {
           this.total.set(page.total);
@@ -496,7 +554,7 @@ export class KontenComponent implements OnDestroy {
         duplicates: String(res.duplicates),
       }),
     );
-    this.reloadLines();
+    this.refresh();
     this.loadCredStatus(this.accountId());
     this.refreshAccounts(); // Kontostand/Anzeige nach Sync aktualisieren (#review)
   }
@@ -580,6 +638,15 @@ export class KontenComponent implements OnDestroy {
     this.host.nativeElement.querySelector<HTMLInputElement>(`[data-otp="${i}"]`)?.focus();
   }
 
+  /** Deep-Link zu der Buchung eines gematchten Umsatzes (#expenses-ux, best-effort):
+   *  Buchungen-Tab, auf das Konto gefiltert + Referenz/Verwendungszweck als Suchtext. */
+  bookingLink(line: StatementLine): { account: string; q: string | null } {
+    return {
+      account: line.accountId,
+      q: line.reference || line.endToEndId || line.purpose || null,
+    };
+  }
+
   // ----------------------------------------------------- per-row: Import
   openImport(line: StatementLine): void {
     this.importLine.set(line);
@@ -624,7 +691,7 @@ export class KontenComponent implements OnDestroy {
           this.booking.set(false);
           this.closeImport();
           this.toast.success(this.i18n.translate('fints.booked'));
-          this.reloadLines();
+          this.refresh();
         },
         error: (e) => {
           this.booking.set(false);
@@ -696,7 +763,7 @@ export class KontenComponent implements OnDestroy {
           this.booking.set(false);
           this.closeLink();
           this.toast.success(this.i18n.translate('fints.linked'));
-          this.reloadLines();
+          this.refresh();
         },
         error: (e) => {
           this.booking.set(false);
@@ -713,12 +780,83 @@ export class KontenComponent implements OnDestroy {
       next: () => {
         this.booking.set(false);
         this.toast.success(this.i18n.translate('fints.unlinked'));
-        this.reloadLines();
+        this.refresh();
       },
       error: () => {
         this.booking.set(false);
         this.toast.error(this.i18n.translate('fints.errBook'));
       },
     });
+  }
+
+  // ----------------------------------------------------- batch (#expenses-ux)
+  isSelected(id: Uuid): boolean {
+    return this.selected().has(id);
+  }
+  toggleSelect(id: Uuid, checked: boolean): void {
+    this.selected.update((cur) => {
+      const next = new Set(cur);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+  toggleSelectAll(checked: boolean): void {
+    this.selected.set(checked ? new Set(this.lines().map((l) => l.id)) : new Set());
+  }
+  /** Auswahl auf noch vorhandene Zeilen eindampfen (nach refresh/Sammel-Aktion);
+   *  fehlgeschlagene bleiben markiert (Retry möglich). */
+  private pruneSelection(): void {
+    const ids = new Set(this.lines().map((l) => l.id));
+    this.selected.update((cur) => new Set([...cur].filter((x) => ids.has(x))));
+  }
+
+  askBulk(kind: 'unlink' | 'ignore'): void {
+    const n = kind === 'unlink' ? this.selectedMatched() : this.selectedIgnorable();
+    if (!n) return;
+    this.bulkConfirm.set(kind);
+  }
+  runBulk(): void {
+    const kind = this.bulkConfirm();
+    if (!kind || this.bulkBusy()) return;
+    const eligible = this.lines()
+      .filter(
+        (l) =>
+          this.selected().has(l.id) &&
+          (kind === 'unlink'
+            ? l.matchState === 'matched'
+            : l.matchState === 'unmatched' || l.matchState === 'suggested'),
+      )
+      .map((l) => l.id);
+    if (!eligible.length) {
+      this.bulkConfirm.set(null);
+      return;
+    }
+    this.bulkBusy.set(true);
+    let done = 0;
+    from(eligible)
+      .pipe(
+        concatMap((id) =>
+          kind === 'unlink' ? this.api.unlinkStatementLine(id) : this.api.ignoreStatementLine(id),
+        ),
+      )
+      .subscribe({
+        next: () => {
+          done++;
+        },
+        error: () => this.afterBulk(kind, done, true),
+        complete: () => this.afterBulk(kind, done, false),
+      });
+  }
+  private afterBulk(kind: 'unlink' | 'ignore', count: number, failed: boolean): void {
+    this.bulkBusy.set(false);
+    this.bulkConfirm.set(null);
+    this.refresh(); // Server-Wahrheit + Auswahl auf Überlebende eindampfen
+    if (failed) {
+      this.toast.error(this.i18n.translate('konten.bulk.error'));
+    } else {
+      const key = kind === 'unlink' ? 'konten.bulk.unlinkDone' : 'konten.bulk.ignoreDone';
+      this.toast.success(this.i18n.translate(key, { count: String(count) }));
+    }
   }
 }

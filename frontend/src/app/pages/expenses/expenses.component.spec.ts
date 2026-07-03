@@ -4,7 +4,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -237,6 +237,8 @@ function build(
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
+      provideRouter([]),
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: new Map() } } },
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book', 'budget.export']) },
     ],

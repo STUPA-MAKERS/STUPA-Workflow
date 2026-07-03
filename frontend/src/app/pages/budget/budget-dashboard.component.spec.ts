@@ -179,8 +179,11 @@ describe('BudgetDashboardComponent (#17)', () => {
     // stateLabel resolved in the active locale (de).
     expect(rows[0].stateLabel).toBe('Angenommen');
     expect(rows[0].stateColor).toBe('#0a0');
-    const link = screen.getAllByRole('link')[0] as HTMLAnchorElement;
-    expect(link.getAttribute('href')).toContain('/applications/');
+    // Neben dem Antrags-Link gibt es jetzt auch Kostenstellen→Buchungen-Links (#expenses-ux),
+    // daher gezielt den Antrags-Link suchen statt „ersten Link".
+    const links = screen.getAllByRole('link') as HTMLAnchorElement[];
+    const appLink = links.find((a) => a.getAttribute('href')?.includes('/applications/'));
+    expect(appLink).toBeTruthy();
   });
 
   it('toggleNav flips the mobile nav flag', async () => {

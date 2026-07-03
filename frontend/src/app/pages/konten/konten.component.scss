@@ -51,6 +51,8 @@ input.exp__input {
 .exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
 .exp__amount--income { color: var(--color-success, #2e7d32); }
 .exp__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+.exp__appLink { color: var(--color-primary); text-decoration: none; font-size: var(--fs-xs); }
+.exp__appLink:hover { text-decoration: underline; }
 .exp__sentinel { height: 1px; }
 /* --- Tabelle --- */
 .exp__tableWrap {
@@ -379,4 +381,51 @@ input.exp__input {
 }
 .exp__suggestItem:hover {
   background: var(--color-primary-subtle);
+}
+
+/* --- Sticky Action-Spalte (#expenses-ux) — analog Buchungen-Tab ---
+   Rechteste Spalte angepinnt; nur Desktop (mobil greift der Karten-Reflow oben). */
+@media (min-width: 769px) {
+  .exp__table th.exp__stickyCol,
+  .exp__table td.exp__stickyCol {
+    position: sticky;
+    right: 0;
+    box-shadow: -6px 0 6px -6px color-mix(in srgb, var(--color-text) 22%, transparent);
+  }
+  .exp__table td.exp__stickyCol {
+    background: var(--color-surface);
+    z-index: 1;
+  }
+  .exp__table th.exp__stickyCol {
+    background: var(--color-surface-sunken);
+    z-index: 2;
+  }
+  .exp__table tbody tr:hover td.exp__stickyCol {
+    background: var(--color-surface-sunken);
+  }
+}
+
+/* --- Batch / Sammel-Aktionen (#expenses-ux) --- */
+.exp__bulkbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.exp__bulkcount {
+  font-weight: var(--fw-semibold);
+  margin-inline-end: auto;
+}
+.exp__check {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+@media (max-width: 768px) {
+  .exp__check { order: -4; flex: 0 0 auto; }
 }

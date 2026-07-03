@@ -258,6 +258,23 @@
   text-decoration: underline;
 }
 
+/* Cross-Link zur gefilterten Buchungsliste neben der Kostenstelle (#expenses-ux). */
+.bd__nodeCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.bd__ksLink {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+.bd__ksLink:hover {
+  color: var(--color-primary);
+  opacity: 1;
+}
+
 .bd__path {
   font-family: var(--font-mono, monospace);
   font-weight: var(--fw-semibold);

@@ -736,6 +736,19 @@ def test_export_expenses_xlsx(fake: _FakeService) -> None:
     assert fake.calls["list_expenses_paged"]["limit"] == 10_000
 
 
+def test_export_expenses_ids_filter(fake: _FakeService) -> None:
+    """``ids`` schränkt den Export auf die gewählten Buchungen ein (#expenses-ux)."""
+    client = _client(fake, ("budget.export",))
+    # Passende ID → Buchung bleibt (1 Zeile).
+    resp = client.get("/api/expenses/export.xlsx", params={"ids": str(_EID)})
+    assert resp.status_code == 200
+    assert fake.session.entries[-1].data["rows"] == 1
+    # Fremde ID → keine Zeile im Export.
+    resp = client.get("/api/expenses/export.xlsx", params={"ids": str(uuid.uuid4())})
+    assert resp.status_code == 200
+    assert fake.session.entries[-1].data["rows"] == 0
+
+
 def test_export_expenses_requires_permission(fake: _FakeService) -> None:
     resp = _client(fake, ("budget.view",)).get("/api/expenses/export.xlsx")
     assert resp.status_code == 403

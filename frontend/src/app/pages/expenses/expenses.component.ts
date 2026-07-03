@@ -11,13 +11,17 @@ import {
 } from '@angular/core';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { from } from 'rxjs';
+import { concatMap } from 'rxjs/operators';
 import {
   BadgeComponent,
   ButtonComponent,
+  CheckboxComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   DialogComponent,
@@ -38,12 +42,14 @@ import {
   type BudgetTreeNode,
   type Expense,
   type ExpenseKind,
+  type ExpenseUpdate,
   type FiscalYear,
   type Invoice,
   type PaymentMethod,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { SimplifyPathPipe } from '@shared/budget-path';
+import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
 
 /**
  * Ausgaben/Einnahmen-Tab (#25): tatsächliche Buchungen sehen/anlegen/verwalten.
@@ -64,6 +70,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
     SimplifyPathPipe,
     BadgeComponent,
     ButtonComponent,
+    CheckboxComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     DialogComponent,
@@ -73,6 +80,8 @@ import { SimplifyPathPipe } from '@shared/budget-path';
     IconComponent,
     SelectComponent,
     CostCentreTreeComponent,
+    HScrollSyncDirective,
+    RouterLink,
   ],
   templateUrl: './expenses.component.html',
   styleUrl: './expenses.component.scss',
@@ -83,6 +92,8 @@ export class ExpensesComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
@@ -93,6 +104,8 @@ export class ExpensesComponent implements OnDestroy {
   private nextOffset = 0;
   readonly loading = signal(true);
   readonly loadingMore = signal(false);
+  /** Nach-Mutations-Refresh läuft: Liste bleibt sichtbar, nur `aria-busy` (#expenses-ux). */
+  readonly refreshing = signal(false);
   readonly hasMore = computed(() => this.items().length < this.total());
 
   readonly kind = signal<'' | ExpenseKind>('');
@@ -191,6 +204,24 @@ export class ExpensesComponent implements OnDestroy {
   readonly editNote = signal('');
   readonly confirmDelete = signal<Expense | null>(null);
 
+  // --- Batch / Sammel-Aktionen (#expenses-ux) ---
+  readonly selected = signal<ReadonlySet<Uuid>>(new Set());
+  readonly bulkBusy = signal(false);
+  readonly selectedCount = computed(() => this.selected().size);
+  readonly allSelected = computed(() => {
+    const list = this.items();
+    return list.length > 0 && list.every((e) => this.selected().has(e.id));
+  });
+  /** Sammel-Bestätigung: null = zu, sonst die auszuführende Ja/Nein-Aktion. */
+  readonly bulkConfirm = signal<null | 'delete' | 'export'>(null);
+  // Sammel-Umbuchung (Kostenstelle/Kategorie) im eigenen Dialog.
+  readonly bulkReassignOpen = signal(false);
+  readonly bulkBudgetId = signal('');
+  readonly bulkCategory = signal('');
+  readonly canSubmitReassign = computed(
+    () => !!this.bulkBudgetId() || !!this.bulkCategory().trim(),
+  );
+
   // --- Export + Konten ---
   readonly canExport = computed(() => this.auth.can('budget.export'));
   readonly exporting = signal(false);
@@ -273,6 +304,9 @@ export class ExpensesComponent implements OnDestroy {
     });
     // Rechnungen für das Verknüpfungs-Dropdown (#invoices) — Bucher dürfen lesen.
     this.loadInvoices();
+    // Filter aus der URL übernehmen (teilbar + überlebt echten Reload; Ziel von
+    // Budget-/Konten-Cross-Links, #expenses-ux) — vor dem ersten reload().
+    this.applyQueryParams();
     this.reload();
 
     effect((onCleanup) => {
@@ -378,7 +412,7 @@ export class ExpensesComponent implements OnDestroy {
         this.toast.success(
           this.i18n.translate('expenses.sub.imported', { count: String(children.length) }),
         );
-        this.reload(); // Eltern-Betrag = Σ Kinder hat sich geändert
+        this.refresh(); // Eltern-Betrag = Σ Kinder hat sich geändert
       },
       error: (err) => {
         this.subImporting.update((s) => {
@@ -428,7 +462,7 @@ export class ExpensesComponent implements OnDestroy {
           this.expandedSub.update((s) => new Set(s).add(parent.id));
           this.loadSub(parent.id);
           this.toast.success(this.i18n.translate('expenses.sub.added'));
-          this.reload(); // Eltern-Betrag = Σ Kinder
+          this.refresh(); // Eltern-Betrag = Σ Kinder
         },
         error: () => {
           this.saving.set(false);
@@ -544,7 +578,66 @@ export class ExpensesComponent implements OnDestroy {
     this.items.set([]);
     this.total.set(0);
     this.loading.set(true);
+    this.selected.set(new Set()); // neuer Datensatz → Auswahl verwerfen
+    this.syncUrl(); // Filter in die URL spiegeln (teilbar + reload-fest)
     this.fetch(true);
+  }
+
+  /** Filter beim Laden aus den Query-Params übernehmen (#expenses-ux): Ziel von
+   *  Budget-/Konten-Cross-Links und macht die Filter teilbar. */
+  private applyQueryParams(): void {
+    const qp = this.route.snapshot.queryParamMap;
+    const budget = qp.get('budget');
+    const account = qp.get('account');
+    const kind = qp.get('kind');
+    const q = qp.get('q');
+    if (budget) this.budgetId.set(budget);
+    if (account) this.accountId.set(account);
+    if (kind === 'expense' || kind === 'income') this.kind.set(kind);
+    if (q) this.q.set(q);
+  }
+
+  /** Aktive Filter in die URL schreiben (merge + replaceUrl), analog Budget-Dashboard. */
+  private syncUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        budget: this.budgetId() || null,
+        account: this.accountId() || null,
+        kind: this.kind() || null,
+        q: this.q().trim() || null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /** Deep-Link-Ziel für die Kostenstellen-Zelle → Budget-Tab, auf diese KS gedrillt
+   *  (#expenses-ux). Top-Budget wird aus dem geladenen Baum aufgelöst; HHJ steckt in der Zeile. */
+  ksLink(e: Expense): { budget: string | null; ks: string; fy: string } {
+    const top = this.findTop(this.budgetTree(), e.budgetId);
+    return { budget: top?.id ?? null, ks: e.budgetId, fy: e.fiscalYearId };
+  }
+
+  /** Nach einer Mutation: das AKTUELL geladene Fenster (offset 0, EIN Request) neu holen
+   *  und die Liste atomar ersetzen — kein clear, kein `loading`-Flip → Tabelle bleibt
+   *  gemountet, Scroll-Position + alle per Infinite-Scroll geladenen Seiten bleiben (#expenses-ux). */
+  private refresh(): void {
+    if (this.refreshing()) return;
+    const windowLimit = Math.max(this.PAGE, Math.ceil(this.items().length / this.PAGE) * this.PAGE);
+    this.refreshing.set(true);
+    this.api
+      .listExpenses({ ...this.filterParams(), limit: windowLimit, offset: 0 })
+      .subscribe({
+        next: (page) => {
+          this.total.set(page.total);
+          this.items.set(page.items);
+          this.nextOffset = page.offset + page.items.length;
+          this.pruneSelection();
+          this.refreshing.set(false);
+        },
+        error: () => this.refreshing.set(false),
+      });
   }
 
   loadMore(): void {
@@ -562,22 +655,25 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
+  /** Aktive Filter als Query-Teil — Basis für {@link fetch} und {@link refresh}. */
+  private filterParams() {
+    return {
+      budget: this.budgetId() || undefined,
+      account: this.accountId() || undefined,
+      kind: this.kind() || undefined,
+      q: this.q().trim() || undefined,
+      amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,
+      amountMax: this.amountMax().trim() ? Number(this.amountMax()) : undefined,
+      createdFrom: this.createdFrom() || undefined,
+      createdTo: this.createdTo() || undefined,
+      sort: this.sortField(),
+      order: this.sortOrder(),
+    };
+  }
+
   private fetch(initial: boolean): void {
     this.api
-      .listExpenses({
-        budget: this.budgetId() || undefined,
-        account: this.accountId() || undefined,
-        kind: this.kind() || undefined,
-        q: this.q().trim() || undefined,
-        amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,
-        amountMax: this.amountMax().trim() ? Number(this.amountMax()) : undefined,
-        createdFrom: this.createdFrom() || undefined,
-        createdTo: this.createdTo() || undefined,
-        sort: this.sortField(),
-        order: this.sortOrder(),
-        limit: this.PAGE,
-        offset: this.nextOffset,
-      })
+      .listExpenses({ ...this.filterParams(), limit: this.PAGE, offset: this.nextOffset })
       .subscribe({
         next: (page) => {
           this.total.set(page.total);
@@ -688,7 +784,7 @@ export class ExpensesComponent implements OnDestroy {
           this.saving.set(false);
           this.transferOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.transferToast'));
-          this.reload();
+          this.refresh();
         },
         error: (err) => {
           this.saving.set(false);
@@ -789,7 +885,7 @@ export class ExpensesComponent implements OnDestroy {
           this.createOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.toast.created'));
           this.loadInvoices();
-          this.reload();
+          this.refresh();
         },
         error: (err) => {
           this.saving.set(false);
@@ -880,7 +976,7 @@ export class ExpensesComponent implements OnDestroy {
           if (e.parentExpenseId) {
             // Unterbuchung bearbeitet (#subbookings): Eltern-Panel + Eltern-Betrag aktualisieren.
             this.loadSub(e.parentExpenseId);
-            this.reload();
+            this.refresh();
           } else {
             // childCount/parentExpenseId stehen in der Einzel-Antwort nicht zuverlässig (BE
             // berechnet sie nur im Betrags-Pfad) → aus der bekannten Zeile erhalten (#review).
@@ -913,7 +1009,7 @@ export class ExpensesComponent implements OnDestroy {
         if (e.parentExpenseId) {
           // Unterbuchung gelöscht (#subbookings): Eltern-Panel + Eltern-Betrag aktualisieren.
           this.loadSub(e.parentExpenseId);
-          this.reload();
+          this.refresh();
         } else {
           this.items.update((list) => list.filter((x) => x.id !== e.id));
           this.total.update((t) => Math.max(0, t - 1));
@@ -925,5 +1021,122 @@ export class ExpensesComponent implements OnDestroy {
         this.toast.error(this.i18n.translate('expenses.toast.failed'));
       },
     });
+  }
+
+  // ----------------------------------------------------- batch (#expenses-ux)
+  isSelected(id: Uuid): boolean {
+    return this.selected().has(id);
+  }
+  toggleSelect(id: Uuid, checked: boolean): void {
+    this.selected.update((cur) => {
+      const next = new Set(cur);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+  toggleSelectAll(checked: boolean): void {
+    this.selected.set(checked ? new Set(this.items().map((e) => e.id)) : new Set());
+  }
+  /** Auswahl auf noch vorhandene Zeilen eindampfen (nach refresh/Sammel-Aktion);
+   *  fehlgeschlagene bleiben markiert (Retry möglich). */
+  private pruneSelection(): void {
+    const ids = new Set(this.items().map((e) => e.id));
+    this.selected.update((cur) => new Set([...cur].filter((x) => ids.has(x))));
+  }
+
+  askBulk(kind: 'delete' | 'export'): void {
+    if (!this.selectedCount()) return;
+    this.bulkConfirm.set(kind);
+  }
+  runBulk(): void {
+    if (this.bulkBusy()) return;
+    if (this.bulkConfirm() === 'delete') this.runBulkDelete();
+    else if (this.bulkConfirm() === 'export') this.runBulkExport();
+  }
+
+  private runBulkDelete(): void {
+    const ids = [...this.selected()];
+    if (!ids.length) return;
+    this.bulkBusy.set(true);
+    let done = 0;
+    from(ids)
+      .pipe(concatMap((id) => this.api.deleteExpense(id)))
+      .subscribe({
+        next: () => {
+          done++;
+        },
+        error: () => this.afterBulk('delete', done, true),
+        complete: () => this.afterBulk('delete', done, false),
+      });
+  }
+
+  /** Nur die ausgewählten Buchungen als .xlsx (Server schränkt per ``ids`` ein). */
+  private runBulkExport(): void {
+    const ids = [...this.selected()];
+    if (!ids.length) return;
+    this.bulkBusy.set(true);
+    this.api.exportExpensesXlsx({ ids }).subscribe({
+      next: (blob) => {
+        downloadBlob(blob, 'buchungen-auswahl.xlsx');
+        this.bulkBusy.set(false);
+        this.bulkConfirm.set(null);
+      },
+      error: (err) => {
+        this.bulkBusy.set(false);
+        this.bulkConfirm.set(null);
+        this.toast.error(this.problemDetail(err));
+      },
+    });
+  }
+
+  openBulkReassign(): void {
+    if (!this.selectedCount()) return;
+    this.bulkBudgetId.set('');
+    this.bulkCategory.set('');
+    this.bulkReassignOpen.set(true);
+  }
+  runBulkReassign(): void {
+    const ids = [...this.selected()];
+    if (!ids.length || this.bulkBusy() || !this.canSubmitReassign()) return;
+    const byId = new Map(this.items().map((e) => [e.id, e]));
+    const budgetId = this.bulkBudgetId();
+    const category = this.bulkCategory().trim();
+    this.bulkBusy.set(true);
+    let done = 0;
+    from(ids)
+      .pipe(
+        concatMap((id) => {
+          const e = byId.get(id);
+          const patch: ExpenseUpdate = {};
+          if (category) patch.category = category;
+          // KS nur für eigenständige Buchungen (gebundene/Unterbuchungen erben sie).
+          if (budgetId && e && !e.applicationId && !e.parentExpenseId) {
+            patch.budgetId = budgetId as Uuid;
+          }
+          return this.api.updateExpense(id, patch);
+        }),
+      )
+      .subscribe({
+        next: () => {
+          done++;
+        },
+        error: () => this.afterBulk('reassign', done, true),
+        complete: () => this.afterBulk('reassign', done, false),
+      });
+  }
+
+  private afterBulk(kind: 'delete' | 'reassign', count: number, failed: boolean): void {
+    this.bulkBusy.set(false);
+    this.bulkConfirm.set(null);
+    this.bulkReassignOpen.set(false);
+    this.refresh(); // Server-Wahrheit (z.B. Transfer-Legs) + Auswahl auf Überlebende eindampfen
+    if (failed) {
+      const key = kind === 'delete' ? 'expenses.bulk.deleteError' : 'expenses.bulk.reassignError';
+      this.toast.error(this.i18n.translate(key));
+    } else {
+      const key = kind === 'delete' ? 'expenses.bulk.deleteDone' : 'expenses.bulk.reassignDone';
+      this.toast.success(this.i18n.translate(key, { count: String(count) }));
+    }
   }
 }

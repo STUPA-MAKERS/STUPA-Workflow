@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { skipLoading } from '@core/loading/loading.interceptor';
 import type { Observable } from 'rxjs';
@@ -736,10 +736,26 @@ export class BudgetTreeApi {
     return this.http.post<StatementLine>(`${this.base}/statement-lines/${lineId}/unlink`, {});
   }
 
-  /** Gefilterte Buchungen als ``.xlsx`` (P(``budget.export``)) — Inhalt wie die Liste. */
-  exportExpensesXlsx(opts: Record<string, string | undefined> = {}): Observable<Blob> {
-    const params: Record<string, string> = {};
-    for (const [k, v] of Object.entries(opts)) if (v) params[k] = v;
+  /** Gefilterte Buchungen als ``.xlsx`` (P(``budget.export``)) — Inhalt wie die Liste.
+   *  ``ids`` (optional) exportiert genau die gewählten Buchungen (#expenses-ux: Sammel-Export). */
+  exportExpensesXlsx(
+    opts: {
+      budget?: string;
+      kind?: string;
+      q?: string;
+      amountMin?: string;
+      amountMax?: string;
+      createdFrom?: string;
+      createdTo?: string;
+      ids?: string[];
+    } = {},
+  ): Observable<Blob> {
+    let params = new HttpParams();
+    for (const [k, v] of Object.entries(opts)) {
+      if (k === 'ids' || v === undefined || v === null || v === '') continue;
+      params = params.set(k, String(v));
+    }
+    for (const id of opts.ids ?? []) params = params.append('ids', id);
     return this.http.get(`${this.base}/expenses/export.xlsx`, { params, responseType: 'blob' });
   }
 

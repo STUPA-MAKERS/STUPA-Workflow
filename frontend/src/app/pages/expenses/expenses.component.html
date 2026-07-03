@@ -87,13 +87,29 @@
   </aside>
 
   <div class="exp__main">
-    @if (loading()) {
+    @if (loading() && !items().length) {
       <p class="exp__status" aria-live="polite">{{ 'expenses.loading' | t }}</p>
     } @else if (items().length) {
-      <div class="exp__tableWrap">
+      @if (canManage() && selectedCount()) {
+        <div class="exp__bulkbar">
+          <span class="exp__bulkcount">{{ 'expenses.bulk.selectedCount' | t: { count: selectedCount() } }}</span>
+          <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="openBulkReassign()">{{ 'expenses.bulk.reassign' | t }}</app-button>
+          @if (canExport()) {
+            <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="askBulk('export')">{{ 'expenses.bulk.exportSelected' | t }}</app-button>
+          }
+          <app-button variant="danger" size="sm" [loading]="bulkBusy()" [disabled]="bulkBusy()" (click)="askBulk('delete')">{{ 'expenses.bulk.deleteSelected' | t }}</app-button>
+          <app-button variant="ghost" size="sm" (click)="toggleSelectAll(false)">{{ 'expenses.bulk.clear' | t }}</app-button>
+        </div>
+      }
+      <div class="exp__tableWrap" appHScrollSync [attr.aria-busy]="refreshing()">
         <table class="exp__table">
           <thead>
             <tr>
+              @if (canManage()) {
+                <th scope="col" class="exp__check">
+                  <app-checkbox [ngModel]="allSelected()" (ngModelChange)="toggleSelectAll($event)" [attr.aria-label]="'expenses.bulk.selectAll' | t" />
+                </th>
+              }
               <th scope="col" [attr.aria-sort]="ariaSort('paymentDate')">
                 <button type="button" class="exp__sort" (click)="onSort('paymentDate')">{{ 'expenses.col.paymentDate' | t }}{{ sortInd('paymentDate') }}</button>
               </th>
@@ -107,12 +123,17 @@
               <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
                 <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'expenses.col.amount' | t }}{{ sortInd('amount') }}</button>
               </th>
-              @if (canManage()) { <th scope="col" class="exp__num"></th> }
+              @if (canManage()) { <th scope="col" class="exp__num exp__stickyCol"></th> }
             </tr>
           </thead>
           <tbody>
             @for (e of items(); track e.id) {
               <tr [class.exp__tr--income]="e.kind === 'income'" [attr.title]="e.actor ? ('expenses.bookedBy' | t: { actor: e.actorName ?? e.actor }) : null">
+                @if (canManage()) {
+                  <td class="exp__check">
+                    <app-checkbox [ngModel]="isSelected(e.id)" (ngModelChange)="toggleSelect(e.id, $event)" [attr.aria-label]="e.description" />
+                  </td>
+                }
                 <td class="exp__cellDate">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellDate">{{ e.invoiceDate ? (e.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellKind">
@@ -128,12 +149,21 @@
                       <button type="button" class="exp__more" (click)="toggleDesc(e.id)">{{ 'action.less' | t }}</button>
                     }
                   }
+                  @if (e.applicationId) {
+                    <a class="exp__appLink block" [routerLink]="['/applications', e.applicationId]">{{ e.applicationTitle || ('expenses.col.application' | t) }}</a>
+                  }
                 </td>
                 <td class="exp__cellMeta">{{ e.correspondent || '—' }}</td>
-                <td class="exp__mono exp__cellMeta">{{ e.pathKey ? (e.pathKey | simplifyPath) : '—' }}</td>
+                <td class="exp__mono exp__cellMeta">
+                  @if (e.pathKey) {
+                    <a class="exp__appLink" [routerLink]="['/budget']" [queryParams]="ksLink(e)">{{ e.pathKey | simplifyPath }}</a>
+                  } @else {
+                    —
+                  }
+                </td>
                 <td class="exp__num exp__amount" [class.exp__amount--income]="e.kind === 'income'">{{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}</td>
                 @if (canManage()) {
-                  <td class="exp__num">
+                  <td class="exp__num exp__stickyCol">
                     <span class="exp__actions">
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!e.childCount" [title]="'expenses.sub.toggle' | t" [ariaLabel]="'expenses.sub.toggle' | t" (click)="toggleSub(e)">
                         <span class="inline-flex items-center gap-1"><app-icon [name]="isSubExpanded(e.id) ? 'chevron-up' : 'chevron-down'" [size]="14" />@if (e.childCount) {<span class="exp__subCount">{{ e.childCount }}</span>}</span>
@@ -152,6 +182,7 @@
               @if (canManage() && isSubExpanded(e.id)) {
                 @for (c of subOf(e.id); track c.id) {
                   <tr class="exp__subRow" [class.exp__tr--income]="c.kind === 'income'">
+                    <td class="exp__check"></td>
                     <td class="exp__cellDate">{{ c.paymentDate ? (c.paymentDate | ldate: 'mediumDate') : '—' }}</td>
                     <td class="exp__cellDate">{{ c.invoiceDate ? (c.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
                     <td class="exp__cellKind">
@@ -159,9 +190,15 @@
                     </td>
                     <td class="exp__cellDesc">{{ c.description }}</td>
                     <td class="exp__cellMeta">{{ c.correspondent || '—' }}</td>
-                    <td class="exp__mono exp__cellMeta">{{ c.pathKey ? (c.pathKey | simplifyPath) : '—' }}</td>
+                    <td class="exp__mono exp__cellMeta">
+                      @if (c.pathKey) {
+                        <a class="exp__appLink" [routerLink]="['/budget']" [queryParams]="ksLink(c)">{{ c.pathKey | simplifyPath }}</a>
+                      } @else {
+                        —
+                      }
+                    </td>
                     <td class="exp__num exp__amount" [class.exp__amount--income]="c.kind === 'income'">{{ c.kind === 'income' ? '+' : '−' }}{{ money(c.amount) }}</td>
-                    <td class="exp__num">
+                    <td class="exp__num exp__stickyCol">
                       <span class="exp__actions">
                         <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(c)"><app-icon name="edit" /></app-button>
                         <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(c)"><app-icon name="delete" /></app-button>
@@ -170,7 +207,7 @@
                   </tr>
                 }
                 @if (isLoadingSub(e.id)) {
-                  <tr class="exp__subRow"><td colspan="8" class="exp__status">{{ 'expenses.loading' | t }}</td></tr>
+                  <tr class="exp__subRow"><td colspan="9" class="exp__status">{{ 'expenses.loading' | t }}</td></tr>
                 }
               }
             }
@@ -416,5 +453,37 @@
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="transferOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" [disabled]="!canSubmitTransfer()" [loading]="saving()" (click)="createTransfer($event)">{{ 'expenses.transferConfirm' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Sammel-Löschung (Bestätigung) -->
+<app-dialog [open]="bulkConfirm() === 'delete'" [title]="'expenses.bulk.deleteTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="bulkConfirm.set(null)">
+  <p>{{ 'expenses.bulk.deleteBody' | t: { count: selectedCount() } }}</p>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="bulkConfirm.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="bulkBusy()" (click)="runBulk()">{{ 'expenses.bulk.deleteConfirm' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Sammel-Export (Bestätigung) -->
+<app-dialog [open]="bulkConfirm() === 'export'" [title]="'expenses.bulk.exportTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="bulkConfirm.set(null)">
+  <p>{{ 'expenses.bulk.exportBody' | t: { count: selectedCount() } }}</p>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="bulkConfirm.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [loading]="bulkBusy()" (click)="runBulk()">{{ 'expenses.bulk.exportConfirm' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Sammel-Umbuchung (Kostenstelle/Kategorie) -->
+<app-dialog [open]="bulkReassignOpen()" [title]="'expenses.bulk.reassignTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="bulkReassignOpen.set(false)">
+  <form class="flex flex-col gap-2" (submit)="$event.preventDefault(); runBulkReassign()">
+    <p class="text-sm text-muted m-0">{{ 'expenses.bulk.reassignHint' | t: { count: selectedCount() } }}</p>
+    <app-select name="bcc" [label]="'expenses.field.costCentre' | t" [placeholder]="'expenses.bulk.keepValue' | t" [options]="costCentreOptions()" [ngModel]="bulkBudgetId()" (ngModelChange)="bulkBudgetId.set($event)" />
+    <label class="text-sm font-medium mt-2" for="exp-bcat">{{ 'expenses.field.category' | t }}</label>
+    <input id="exp-bcat" class="exp__input" name="bcat" [ngModel]="bulkCategory()" (ngModelChange)="bulkCategory.set($event)" [placeholder]="'expenses.bulk.keepValue' | t" />
+  </form>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="bulkReassignOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!canSubmitReassign()" [loading]="bulkBusy()" (click)="runBulkReassign()">{{ 'expenses.bulk.reassignConfirm' | t }}</app-button>
   </div>
 </app-dialog>
