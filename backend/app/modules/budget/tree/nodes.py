@@ -8,10 +8,11 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.modules.admin.models import Gremium
+from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _json_safe
-from app.modules.budget.tree_models import Budget, BudgetAllocation
+from app.modules.budget.tree_models import Budget, BudgetExpense
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import BudgetNodeCreate, BudgetNodeOut, BudgetNodeUpdate
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
@@ -193,7 +194,17 @@ class NodeOps(BudgetTreeServiceBase):
             d.path_key = new_path + d.path_key[len(old_path) :]
 
     async def delete_node(self, budget_id: UUID) -> None:
-        """Delete a cost centre — only without children/allocations (409 otherwise)."""
+        """Delete a cost centre.
+
+        Blocked (409) only by data that must not be silently lost or orphaned:
+        child cost centres, bookings on this centre, or applications still
+        assigned to it. The node's own :class:`BudgetAllocation` rows are just
+        planning figures (the available sum per fiscal year) and are removed
+        together with the node via the FK cascade — they are deliberately NOT a
+        reason to refuse deletion. Otherwise a childless leaf that ever had an
+        allocation set could never be deleted, since setting it back to 0 keeps
+        the row and there is no separate "remove allocation" action.
+        """
         node = await self._get_node(budget_id)
         child = (
             await self.session.execute(
@@ -202,13 +213,22 @@ class NodeOps(BudgetTreeServiceBase):
         ).scalar_one_or_none()
         if child is not None:
             raise ConflictError("budget has child cost-centers; delete them first")
-        alloc = (
+        booking = (
             await self.session.execute(
-                select(BudgetAllocation.id).where(BudgetAllocation.budget_id == budget_id).limit(1)
+                select(BudgetExpense.id).where(BudgetExpense.budget_id == budget_id).limit(1)
             )
         ).scalar_one_or_none()
-        if alloc is not None:
-            raise ConflictError("budget has allocations; remove them first")
+        if booking is not None:
+            raise ConflictError("budget has bookings; remove them first")
+        assigned = (
+            await self.session.execute(
+                select(Application.id).where(Application.budget_id == budget_id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if assigned is not None:
+            raise ConflictError(
+                "budget has assigned applications; reassign them first"
+            )
         await self._audit(
             AuditAction.BUDGET_NODE_DELETE,
             target_type="budget",
