@@ -425,6 +425,14 @@ def submit_tan(  # pragma: no cover
         if pending.tan_mechanism:
             client.set_tan_mechanism(pending.tan_mechanism)
         tan_response = NeedRetryResponse.from_data(pending.tan_data)
+        # python-fints' get_data()/from_data() does NOT round-trip the decoupled
+        # flag (NeedTANResponse._from_data_v1 rebuilds with decoupled=False). We
+        # persist it ourselves (FintsOutcome.decoupled) and MUST restore it here:
+        # otherwise send_tan() takes the non-decoupled branch and submits our empty
+        # poll TAN as a normal process-'2' TAN, which the bank rejects ("9xxx") —
+        # misreported as an auth rejection + lock cooldown on every pushTAN poll.
+        if pending.decoupled and isinstance(tan_response, NeedTANResponse):
+            tan_response.decoupled = True
         with client.resume_dialog(pending.dialog_data):
             result = client.send_tan(tan_response, tan)
             if isinstance(result, NeedTANResponse):
