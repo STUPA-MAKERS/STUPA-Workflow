@@ -5,7 +5,7 @@ import { LIVE_VOTE_SOURCE, type LiveVoteSource } from './live-vote.source';
 import type { MeetingChannel } from './ws.service';
 import type { ClientMessage, ServerMessage } from './ws-messages';
 
-/** Steuerbarer Kanal: Tests pushen Server-Frames und lesen gesendete Frames. */
+/** Controllable channel: tests push server frames and read sent frames. */
 class FakeChannel implements MeetingChannel {
   readonly subject = new Subject<ServerMessage>();
   readonly messages$ = this.subject.asObservable();
@@ -50,7 +50,7 @@ describe('LiveVoteService', () => {
   it('opens the beamer stream read-only when requested', () => {
     const s = svc.open('m-1', { beamer: true });
     expect(source.lastBeamer).toBe(true);
-    // Beamer-Modus sendet keine cast-Frames.
+    // Beamer mode sends no cast frames.
     source.channels[0].subject.next({
       type: 'vote_opened',
       voteId: 'v1',
@@ -122,7 +122,7 @@ describe('LiveVoteService', () => {
     ch.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 7, no: 1 } });
     expect(s.result()?.result).toBe('passed');
     expect(s.tally()?.counts['yes']).toBe(7);
-    expect(s.tally()?.eligible).toBe(12); // aus vorheriger Tally übernommen
+    expect(s.tally()?.eligible).toBe(12); // carried over from the previous tally
   });
 
   it('mirrors closing counts with default tally fields when no prior tally exists', () => {
@@ -182,7 +182,7 @@ describe('LiveVoteService', () => {
     jest.useFakeTimers();
     const s = svc.open('m-1', { reconnectMs: 500 });
     expect(s.connection()).toBe('open');
-    source.channels[0].subject.complete(); // Socket schließt
+    source.channels[0].subject.complete(); // socket closes
     expect(s.connection()).toBe('reconnecting');
     jest.advanceTimersByTime(500);
     expect(source.channels).toHaveLength(2);
@@ -198,7 +198,7 @@ describe('LiveVoteService', () => {
     expect(source.channels[0].closed).toBe(true);
     expect(s.connection()).toBe('closed');
     jest.advanceTimersByTime(2000);
-    expect(source.channels).toHaveLength(1); // kein Reconnect
+    expect(source.channels).toHaveLength(1); // no reconnect
     jest.useRealTimers();
   });
 

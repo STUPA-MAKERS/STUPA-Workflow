@@ -13,21 +13,16 @@ import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/
 import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 
-/** Wie viele Antrags-Zeilen je Panel maximal gezeigt werden. */
+/** Max number of application rows shown per panel. */
 const PREVIEW_ROWS = 5;
 
 /**
- * Rollenbasierte Startseite (overview §4). Drei distinkte Bereiche statt
- * redundanter Zähl-Kacheln:
- *  - **Antrag stellen** – primäre CTA in den Apply-Wizard (`/apply`).
- *  - **Offene Aufgaben** – Anträge, die auf Bearbeitung/Prüfung warten
- *    (nicht-abgeschlossene Status), mit Deep-Link.
- *  - **Meine Anträge** – die (lesbaren) Anträge des Nutzers mit Status + Deep-Link.
- * Darunter RBAC-gegatete Schnellzugriffe (Abstimmungen/Sitzungen/Budget/Verwaltung).
- *
- * Datenquelle ist `GET /applications` (real bei Mock-aus, sonst Mock). Eine
- * applicant-skopierte „nur meine"-Filterung liefert das Backend noch nicht;
- * TODO(wiring): eigenen Filter nutzen, sobald vorhanden.
+ * Role-based home page. Three distinct areas instead of redundant count tiles:
+ *  - **Submit application** – primary CTA into the apply wizard (`/apply`).
+ *  - **Open tasks** – applications awaiting processing/review (non-final states),
+ *    with a deep link.
+ *  - **My applications** – the user's (readable) applications with status + deep link.
+ * Below, RBAC-gated quick links (votes/meetings/budget/administration).
  */
 @Component({
   selector: 'app-dashboard',
@@ -41,15 +36,15 @@ export class DashboardComponent {
   readonly auth = inject(AuthService);
   private readonly api = inject(ApiClient);
 
-  /** „Meine Anträge": ausschließlich die EIGENEN Anträge — `mine=true` erzwingt
-   *  den Owner-Filter auch für Principals mit `application.read` (sonst zeigte
-   *  die Karte Berechtigten alle Anträge). */
+  /** "My applications": only the user's OWN applications — `mine=true` forces
+   *  the owner filter even for principals with `application.read` (otherwise the
+   *  card would show all applications to entitled users). */
   private readonly applications = toSignal(
     this.api.listApplications({ mine: true }).pipe(catchError(() => of(null))),
     { initialValue: undefined },
   );
 
-  /** „Offene Aufgaben": echte offene Entscheidungen (GET /applications/tasks). */
+  /** "Open tasks": real open decisions (GET /applications/tasks). */
   private readonly tasks = toSignal(
     this.api.listTasks().pipe(catchError(() => of([] as ApplicationListItem[]))),
     { initialValue: [] as ApplicationListItem[] },
@@ -64,15 +59,15 @@ export class DashboardComponent {
     return (id: Uuid): string => map.get(id) ?? id;
   });
 
-  /** `true`, solange der Antrags-Endpunkt noch nicht geantwortet hat. */
+  /** `true` while the applications endpoint has not responded yet. */
   readonly loading = computed(() => this.applications() === undefined);
-  /** `true`, wenn der Antrags-Endpunkt fehlschlug. */
+  /** `true` if the applications endpoint failed. */
   readonly error = computed(() => this.applications() === null);
 
   private readonly items = computed<ApplicationListItem[]>(() => this.applications()?.items ?? []);
   readonly total = computed(() => this.applications()?.total ?? 0);
 
-  /** Offene Aufgaben: Anträge mit einer für mich offenen Entscheidung. */
+  /** Open tasks: applications with a decision open for me. */
   readonly openTasks = computed(() => this.tasks());
 
   readonly taskRows = computed(() => this.openTasks().slice(0, PREVIEW_ROWS));
@@ -82,7 +77,7 @@ export class DashboardComponent {
     return this.typeName()(item.typeId);
   }
 
-  /** Antragstitel (System-Titelfeld) mit Fallback auf den Antragstyp. */
+  /** Application title (system title field) with fallback to the application type. */
   titleOf(item: ApplicationListItem): string {
     return item.title?.trim() || this.typeName()(item.typeId);
   }
@@ -91,15 +86,15 @@ export class DashboardComponent {
     return item.createdAt ?? null;
   }
 
-  /** Antrags-Panels nur, wenn der Nutzer Anträge lesen darf. */
+  /** Application panels only if the user may read applications. */
   readonly canReadApplications = computed(() => this.auth.canAny('application.read'));
 
-  // --- Sitzungs-Shortcuts: laufende/anstehende Sitzungen prominent (#Sessions) ---
+  // --- Meeting shortcuts: running/upcoming meetings shown prominently ---
   private readonly meetings = toSignal(
     this.api.listMeetings().pipe(catchError(() => of([] as Meeting[]))),
     { initialValue: [] as Meeting[] },
   );
-  /** Laufende zuerst, dann geplante (nächste Termine), max. 4 — große Shortcuts. */
+  /** Running first, then planned (next dates), max 4 — large shortcuts. */
   readonly sessionShortcuts = computed<Meeting[]>(() => {
     const rank = (m: Meeting): number => (m.status === 'live' ? 0 : m.status === 'planned' ? 1 : 2);
     return this.meetings()
@@ -118,32 +113,32 @@ export class DashboardComponent {
   }
 
   private readonly i18n = inject(I18nService);
-  /** Rollen-Key lokalisiert (admin→Administrator …); unbekannt → roher Key. */
+  /** Localized role key (admin→Administrator …); unknown → raw key. */
   roleLabel(role: string): string {
     const key = `role.${role}`;
     const label = this.i18n.translate(key as TranslationKey);
     return label === key ? role : label;
   }
 
-  /** Globale Rollen des Nutzers (Badges, #54). */
+  /** The user's global roles (badges). */
   readonly roles = computed(() => this.auth.roles());
-  /** Gremien-Zugehörigkeiten des Nutzers (Badges, #54). */
+  /** The user's gremium memberships (badges). */
   readonly gremien = computed(() => this.auth.gremien());
 
-  // --- Vertretung/Delegation (#delegation-rework): aktive Sitzungs-Vertretungen ---
+  // --- Substitution/delegation: active session-bound substitutions ---
   private readonly delegationsApi = inject(DelegationsApiService);
   private readonly delegationsRaw = toSignal(
     this.delegationsApi.list().pipe(catchError(() => of([] as Delegation[]))),
     { initialValue: [] as Delegation[] },
   );
-  /** Nur Vertretungen kommender/laufender Sitzungen (widerrufbare zuerst). */
+  /** Only substitutions of upcoming/running meetings (revocable first). */
   readonly delegations = computed<Delegation[]>(() =>
     this.delegationsRaw()
       .filter((d) => d.revocable)
       .slice(0, PREVIEW_ROWS),
   );
 
-  /** Ausgehend = ich werde vertreten (Richtung liefert der Server). */
+  /** Outgoing = I am being represented (direction comes from the server). */
   isOutgoing(d: Delegation): boolean {
     return d.direction === 'outgoing';
   }

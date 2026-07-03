@@ -153,9 +153,9 @@ describe('StatusTimelineComponent', () => {
     expect(await screen.findByText('Bitte ergänzen.')).toBeInTheDocument();
     // Author from the mapped comment (author, not author_name).
     expect(screen.getByText(/Referat/)).toBeInTheDocument();
-    // Status-Badge + Timeline tragen beide das Label.
+    // Status badge + timeline both carry the label.
     expect(screen.getAllByText('Eingereicht').length).toBeGreaterThan(1);
-    // editierbar → Bearbeitungs-Formular sichtbar
+    // editable → edit form visible
     expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
   });
 
@@ -191,7 +191,7 @@ describe('StatusTimelineComponent', () => {
         },
       ],
     });
-    // Token aus dem Fragment → Verify → Status sichtbar (kein 404, keine Query nötig).
+    // Token from the fragment → verify → status visible (no 404, no query needed).
     expect(await screen.findByText('Bitte ergänzen.')).toBeInTheDocument();
   });
 
@@ -200,7 +200,7 @@ describe('StatusTimelineComponent', () => {
     await setup(fakeApi({ application: locked }), { t: 'tok', app: 'app-1' });
     expect(await screen.findByText('Gesperrt')).toBeInTheDocument();
     expect(screen.getByText('Sommerfest')).toBeInTheDocument();
-    expect(screen.getByText('Veranstaltung')).toBeInTheDocument(); // select → Option-Label
+    expect(screen.getByText('Veranstaltung')).toBeInTheDocument(); // select → option label
     expect(screen.getByText('Ja')).toBeInTheDocument(); // checkbox → boolean
     expect(screen.getByText('Alpha')).toBeInTheDocument(); // multiselect → Array
     expect(screen.queryByRole('button', { name: /Änderungen speichern/ })).not.toBeInTheDocument();

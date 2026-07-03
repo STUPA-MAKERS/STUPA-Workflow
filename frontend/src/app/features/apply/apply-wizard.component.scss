@@ -6,7 +6,7 @@
   margin: 0 auto;
 }
 
-/* Konfigurierter Markdown-Info-Text unter der Typ-Auswahl (#18). */
+/* Configured markdown info text below the type selection. */
 .wizard__info {
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
@@ -51,28 +51,27 @@
 
 :host ::ng-deep formly-form {
   display: grid;
-  /* Abstand zwischen Fragen kommt symmetrisch aus margin/padding um den Trenner
-     (siehe formly-field + formly-field) — KEIN zusätzlicher grid-gap, sonst stapelt
-     sich der Abstand oben (gap + padding-top) und die Frage wirkt kopflastig (#7). */
+  /* Spacing between questions comes symmetrically from margin/padding around the
+     divider (see formly-field + formly-field) — NO extra grid-gap, else the spacing
+     stacks at the top (gap + padding-top) and the question looks top-heavy. */
   gap: 0;
 }
 
 :host ::ng-deep formly-field {
   display: block;
-  /* Grid-Items haben min-width:auto — ein über-breites Feld (z. B. eine Tabelle)
-     würde sonst die ganze Spalte und damit ALLE Felder über den Viewport hinaus
-     aufziehen (#mobile). */
+  /* Grid items have min-width:auto — an over-wide field (e.g. a table) would
+     otherwise stretch the whole column, and thus ALL fields, past the viewport. */
   min-width: 0;
   max-width: 100%;
-  /* `overflow-x: hidden` ließe `overflow-y` zu `auto` werden (CSS-Spec) und
-     beschnitt damit den Fokus-Rahmen oben/unten. `clip` hält die Y-Achse
-     `visible`; `overflow-clip-margin` lässt den Rahmen seitlich etwas atmen. */
+  /* `overflow-x: hidden` would force `overflow-y` to `auto` (CSS spec) and thus
+     clip the focus ring top/bottom. `clip` keeps the Y axis `visible`;
+     `overflow-clip-margin` lets the ring breathe a little sideways. */
   overflow-x: clip;
   overflow-clip-margin: var(--space-1);
 }
 
-/* Dünner Trenner zwischen aufeinanderfolgenden Fragen eines Schritts — gleich viel
-   Luft ober- wie unterhalb des Trenners (margin oben, padding unten). */
+/* Thin divider between consecutive questions of a step — equal space above and
+   below the divider (margin on top, padding on bottom). */
 :host ::ng-deep formly-field + formly-field {
   margin-top: var(--space-5);
   padding-top: var(--space-5);
@@ -129,7 +128,7 @@
   }
 }
 
-/* Mobil: „Weiter/Absenden" als volle Tap-Fläche (≥2.5rem), Optionen gut tippbar. */
+/* Mobile: "Next/Submit" as a full tap target (≥2.5rem), options easy to tap. */
 @media (max-width: 40rem) {
   .wizard__nav-right app-button {
     display: flex;

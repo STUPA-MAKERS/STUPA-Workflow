@@ -10,8 +10,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
-  /* Kopf auf normale Body-Breite zentrieren (wie Anträge); der Baum sitzt im linken
-     Rand außerhalb des Bodys (Breakout). */
+  /* Centre the header at normal body width (like applications); the tree sits in
+     the left margin outside the body (breakout). */
   width: 100%;
   max-width: var(--layout-max-width);
   margin-inline: auto;
@@ -27,7 +27,7 @@
   flex: 1 1 14rem;
 }
 
-/* Baum im linken Rand (Breakout), Editor im zentrierten Body — wie Anträge. */
+/* Tree in the left margin (breakout), editor in the centred body — like applications. */
 .bt__layout {
   display: grid;
   grid-template-columns:
@@ -48,10 +48,10 @@
   // past the fold and dragging the sticky element off-screen.
   max-height: 75vh;
   overflow-y: auto;
-  // Innen-Padding = Fade-Höhe: der erste/letzte Eintrag startet UNTER dem Fade,
-  // ist also in Ruhe nicht ausgeblendet — der Rand fadet erst beim Scrollen (#2).
+  // Inner padding = fade height: the first/last entry starts BELOW the fade, so it
+  // isn't dimmed at rest — the edge only fades once you scroll.
   padding-block: var(--space-5);
-  // Oben/unten in den Hintergrund ausblenden (wie die Sitzungs-Timeline, #2).
+  // Fade into the background top/bottom (like the meeting timeline).
   --fade: linear-gradient(
     to bottom,
     transparent,
@@ -302,8 +302,8 @@
   align-items: baseline;
 }
 
-/* --- Mobil (≤768px = 48rem): eine Spalte, Zeilen dürfen umbrechen, Aktionen
-   bleiben tappbar (min. 2.5rem). Desktop bleibt unberührt. --- */
+/* --- Mobile (<=768px = 48rem): single column, rows may wrap, actions stay
+   tappable (min. 2.5rem). Desktop unchanged. --- */
 @media (max-width: 48rem) {
   .bt__layout {
     grid-template-columns: 1fr;
@@ -318,7 +318,7 @@
     max-height: none;
     overflow-y: visible;
   }
-  /* Knoten-Zelle: Pfad + Name dürfen umbrechen statt abzuschneiden. */
+  /* Node cell: path + name may wrap instead of truncating. */
   .bt__node {
     flex-wrap: wrap;
   }
@@ -326,7 +326,7 @@
     max-width: 100%;
     white-space: normal;
   }
-  /* Aktions-Buttons: ausreichende Trefferfläche (min. 2.5rem), umbruchfähig. */
+  /* Action buttons: sufficient hit area (min. 2.5rem), wrappable. */
   .bt__col-actions {
     display: flex;
     flex-wrap: wrap;

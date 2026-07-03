@@ -1,7 +1,7 @@
 /**
- * Flow-Vorlagen (T-34). Jede Vorlage ist ein gültiger `FlowGraph` (genau ein
- * Initial, erreichbar) und dient als Startpunkt. #28-Redesign: nur normal + vote,
- * vote-State mit pass/fail-Branches.
+ * Flow presets. Each preset is a valid `FlowGraph` (exactly one initial, reachable)
+ * and serves as a starting point. Only normal + vote states; a vote state has
+ * pass/fail branches.
  */
 import type { FlowGraph } from '../admin.models';
 import type { TranslationKey } from '@core/i18n/translations';

@@ -4,56 +4,56 @@ import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 
 /**
- * App-Name aus der aktiven (auth-freien) Site-Config (#brand-name).
+ * App name from the active (auth-free) site config.
  *
- * Single Source of Truth für den konfigurierbaren App-Namen: lädt die öffentliche
- * Branding-Config einmal beim App-Start und stellt den Namen als Signal bereit, das
- * Header (aria-label) und Startseite (H1) lesen. Setzt zusätzlich `document.title`.
+ * Single source of truth for the configurable app name: loads the public
+ * branding config once at app start and exposes the name as a signal that the
+ * header (aria-label) and home page (H1) read. Also sets `document.title`.
  *
- * **Fallback:** ist der Name in der Config leer (oder noch nicht geladen), greift die
- * bestehende i18n — `app.title` für den vollen Namen, `home.heading` für die H1 —, so
- * dass nie ein leerer Titel/Heading erscheint. Das PWA-Manifest (name/short_name) wird
- * separat dynamisch vom Backend ausgeliefert.
+ * Fallback: if the name in the config is empty (or not yet loaded), the existing
+ * i18n applies — `app.title` for the full name, `home.heading` for the H1 — so
+ * an empty title/heading never appears. The PWA manifest (name/short_name) is
+ * served dynamically by the backend separately.
  */
 @Injectable({ providedIn: 'root' })
 export class BrandingService {
-  // `ApiClient` (→ HttpClient) erst in `init()` auflösen, nicht im Feld-Initializer:
-  // sonst zieht der root-`BrandingService` HttpClient in jede Komponente, die ihn
-  // injiziert, und deren Specs scheitern an NG0201 (kein HttpClient-Provider).
+  // Resolve `ApiClient` (→ HttpClient) in `init()`, not in the field initializer:
+  // otherwise the root `BrandingService` pulls HttpClient into every component
+  // that injects it, and their specs fail with NG0201 (no HttpClient provider).
   private readonly injector = inject(Injector);
   private readonly i18n = inject(I18nService);
   private readonly title = inject(Title);
 
-  /** Konfigurierter voller Name (leer ⇒ Fallback). */
+  /** Configured full name (empty ⇒ fallback). */
   private readonly _configuredName = signal('');
 
   /**
-   * Voller App-Name: Config-Wert, sonst i18n `app.title`. Reagiert auf Sprachwechsel
-   * (über den i18n-Fallback) und auf das Laden der Config.
+   * Full app name: config value, else i18n `app.title`. Reacts to language
+   * changes (via the i18n fallback) and to the config being loaded.
    */
   readonly appName = computed(
     () => this._configuredName().trim() || this.i18n.translate('app.title'),
   );
 
   /**
-   * Startseiten-Überschrift (H1): Config-Wert, sonst i18n `home.heading`. Per Vorgabe
-   * ersetzt der konfigurierte Name die GESAMTE Überschrift (ohne „Workflow"-Zusatz).
+   * Home heading (H1): config value, else i18n `home.heading`. By design the
+   * configured name replaces the ENTIRE heading (without a "Workflow" suffix).
    */
   readonly homeHeading = computed(
     () => this._configuredName().trim() || this.i18n.translate('home.heading'),
   );
 
   constructor() {
-    // Browser-Tab-Titel an den (config- oder i18n-basierten) App-Namen koppeln.
+    // Bind the browser tab title to the (config- or i18n-based) app name.
     effect(() => this.title.setTitle(this.appName()));
   }
 
-  /** Einmal beim App-Start aufrufen: aktive Branding-Config laden (best-effort). */
+  /** Call once at app start: load the active branding config (best-effort). */
   init(): void {
     this.injector.get(ApiClient).publicSiteConfig().subscribe({
       next: (cfg) => this._configuredName.set(cfg.branding?.appName ?? ''),
       error: () => {
-        /* leer lassen → i18n-/Default-Fallback bleibt */
+        /* leave empty → i18n/default fallback stays */
       },
     });
   }

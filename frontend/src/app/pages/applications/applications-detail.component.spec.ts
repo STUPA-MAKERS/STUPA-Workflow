@@ -118,25 +118,25 @@ function flushForm(http: HttpTestingController, id = 'app-1') {
     });
 }
 
-// `form` nur beim initialen Laden (loadApplication); ein refresh() lädt die Form nicht neu.
-// Statuswechsel laufen über den Flow → keine /transitions-Anfrage mehr.
+// `form` only on initial load (loadApplication); a refresh() does not reload the form.
+// Status changes run through the flow → no more /transitions request.
 function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
   http.expectOne(url('', id)).flush({ ...appWire(), id });
   http.expectOne(url('/versions', id)).flush(VERSIONS);
   http.expectOne(url('/comments', id)).flush(COMMENTS);
-  // Verwalter:innen laden zusätzlich den Kostenstellen-Baum (#17) — tolerant leeren.
+  // Managers additionally load the cost-centre tree — tolerate empty.
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
     req.flush([]);
   }
   if (form) flushForm(http, id);
 }
 
-// Das Anhänge-Panel lädt beim Rendern bestehende Anhänge — tolerant leeren (falls vorhanden).
+// The attachments panel loads existing attachments on render — tolerate empty (if any).
 function flushAttachments(http: HttpTestingController) {
   for (const req of http.match((r) => r.method === 'GET' && /\/attachments$/.test(r.url))) {
     req.flush([]);
   }
-  // Verwalter:innen laden zusätzlich den Kostenstellen-Baum (#17) — tolerant leeren.
+  // Managers additionally load the cost-centre tree — tolerate empty.
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
     req.flush([]);
   }
@@ -534,7 +534,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  // --- budget assignment (#17) --------------------------------------------
+  // --- budget assignment --------------------------------------------------
   function budgetTree() {
     return [
       {
@@ -565,7 +565,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
     http.expectOne((r) => r.method === 'GET' && r.url === '/api/budgets').flush(budgetTree());
-    // Top-Budget der zugeordneten Kostenstelle → HHJ-Liste wird nachgeladen (#fiscal).
+    // Top budget of the assigned cost centre → fiscal-year list is reloaded.
     http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
     flushForm(http);
     detectChanges();
@@ -598,7 +598,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
     http.expectOne((r) => r.method === 'GET' && r.url === '/api/budgets').flush(budgetTree());
-    // initiale HHJ-Liste der zugeordneten Kostenstelle (#fiscal)
+    // initial fiscal-year list of the assigned cost centre
     http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
     flushForm(http);
     flushAttachments(http);
@@ -608,7 +608,7 @@ describe('ApplicationsDetailComponent', () => {
     cmp.openBudgetDialog();
     expect(cmp.budgetDialogOpen()).toBe(true);
     expect(cmp.budgetChoice()).toBe('b1');
-    // Dialog öffnen lädt die HHJ-Liste des aktuellen Top-Budgets erneut
+    // opening the dialog reloads the fiscal-year list of the current top budget
     http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
 
     cmp.budgetChoice.set('');
@@ -764,7 +764,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(extra?.value).toBe('{"a":1}');
   });
 
-  // --- positions block (#1) -----------------------------------------------
+  // --- positions block ----------------------------------------------------
   it('renders the positions block with preferred-offer totals', async () => {
     const fields: FormFieldDef[] = [
       { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
@@ -906,7 +906,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  // --- edit (#24) ----------------------------------------------------------
+  // --- edit -----------------------------------------------------------------
   it('starts inline edit, cancels, and saves (success)', async () => {
     const { http, detectChanges, cmp, toast } = await setupWithFields(
       [{ key: 'title', type: 'text', label: { de: 'Titel' } }],
@@ -983,7 +983,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  // --- delete (#24, admin-only) -------------------------------------------
+  // --- delete (admin-only) ------------------------------------------------
   it('deletes the application and navigates to the list', async () => {
     const { http, detectChanges, cmp, toast, router } = await setup(
       ['application.read', 'application.manage'],

@@ -80,12 +80,12 @@ import type {
 } from './models';
 
 /**
- * Typisierter REST-Client gegen die OpenAPI-Contracts (sds/api.md).
+ * Typed REST client against the OpenAPI contracts.
  *
- * Antworten kommen in der Backend-Wire-Form (`*Wire`, camelCase via T-12
- * `_CamelModel`) herein und werden hier über `mappers.ts` in die FE-View-Modelle
- * übersetzt (i18n-Labels für die aktuelle `lang` aufgelöst). Components sehen
- * **nur** die View-Modelle.
+ * Responses arrive in the backend wire form (`*Wire`, camelCase via
+ * `_CamelModel`) and are translated here into the FE view models via
+ * `mappers.ts` (i18n labels resolved for the current `lang`). Components see
+ * only the view models.
  */
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
@@ -102,25 +102,25 @@ export class ApiClient {
     return this.http.post<LogoutOut>(`${this.base}/auth/logout`, {});
   }
 
-  // --- calendar (iCal-Abo, #ics) -------------------------------------------
-  /** GET /calendar/me — eigene Abo-URL (`url` null, solange noch nicht erzeugt). */
+  // --- calendar (iCal subscription) ----------------------------------------
+  /** GET /calendar/me — own subscription URL (`url` null until created). */
   myCalendar(): Observable<CalendarFeed> {
     return this.http.get<CalendarFeed>(`${this.base}/calendar/me`, {
       context: skipLoading(),
     });
   }
 
-  /** POST /calendar/me/rotate — Feed-Token (neu) erzeugen; alte URL wird ungültig. */
+  /** POST /calendar/me/rotate — (re)generate the feed token; the old URL is invalidated. */
   rotateCalendar(): Observable<CalendarFeed> {
     return this.http.post<CalendarFeed>(`${this.base}/calendar/me/rotate`, {});
   }
 
   /**
-   * POST /auth/magic-link/verify — Magic-Link-Token (aus der Mail-URL) gegen eine
-   * **HttpOnly-Applicant-Session-Cookie** eintauschen (api.md §1, security.md §1).
-   * Der Server setzt das Cookie; die Antwort trägt **keinen** Session-Token —
-   * Folge-Requests authentisieren über `withCredentials` (kein JS-Storage).
-   * `MagicLinkVerifyOut` ist ein reines `BaseModel` → `application_id` snake_case.
+   * POST /auth/magic-link/verify — exchange the magic-link token (from the mail
+   * URL) for an HttpOnly applicant session cookie. The server sets the cookie;
+   * the response carries no session token — follow-up requests authenticate via
+   * `withCredentials` (no JS storage). `MagicLinkVerifyOut` is a plain
+   * `BaseModel` → `application_id` snake_case.
    */
   verifyMagicLink(token: string): Observable<MagicLinkVerifyResult> {
     return this.http.post<MagicLinkVerifyResult>(`${this.base}/auth/magic-link/verify`, {
@@ -129,8 +129,8 @@ export class ApiClient {
   }
 
   // --- application-types (public) ------------------------------------------
-  /** GET /application-types — Backend liefert eine **Page**; FE will die Liste. */
-  /** `quiet` = als Typ-Cache im Hintergrund geladen (kein globaler Overlay). */
+  /** GET /application-types — the backend returns a Page; the FE wants the list. */
+  /** `quiet` = loaded in the background as a type cache (no global overlay). */
   applicationTypes(opts: { quiet?: boolean } = {}): Observable<ApplicationType[]> {
     return this.http
       .get<Page<ApplicationTypeListItemWire>>(`${this.base}/application-types`, {
@@ -139,10 +139,10 @@ export class ApiClient {
       .pipe(map((page) => page.items.map(mapApplicationType)));
   }
 
-  /** Effektive Form-Definition (Typ-Felder + ggf. Topf-Extra-Felder, forms §5.7). */
+  /** Effective form definition (type fields plus optional pot extra fields). */
   effectiveForm(typeId: Uuid, budgetPotId?: Uuid | null): Observable<EffectiveForm> {
     let params = new HttpParams();
-    // Backend erwartet `?budgetPotId=` (forms/router.py), **nicht** `?pot=`.
+    // The backend expects `?budgetPotId=`, not `?pot=`.
     if (budgetPotId) params = params.set('budgetPotId', budgetPotId);
     return this.http.get<EffectiveForm>(`${this.base}/application-types/${typeId}/form`, {
       params,
@@ -151,9 +151,9 @@ export class ApiClient {
   }
 
   /**
-   * Effektive Form eines **bestehenden** Antrags aus seiner **gepinnten** Version
-   * (forms §5.7, data-model §1). Liefert dieselben Felder, gegen die der Server
-   * validiert — auch wenn die aktive Form-Version inzwischen geändert wurde.
+   * Effective form of an existing application from its pinned version. Returns
+   * the same fields the server validates against — even if the active form
+   * version has since changed.
    */
   applicationForm(applicationId: Uuid): Observable<EffectiveForm> {
     return this.http.get<EffectiveForm>(`${this.base}/applications/${applicationId}/form`, {
@@ -181,7 +181,7 @@ export class ApiClient {
       );
   }
 
-  /** GET /applications/export.xlsx — gefilterte Antragsliste als Excel (P(`application.export`)). */
+  /** GET /applications/export.xlsx — filtered application list as Excel (P(`application.export`)). */
   exportApplicationsXlsx(query: ApplicationListQuery = {}): Observable<Blob> {
     let params = new HttpParams();
     for (const [key, value] of Object.entries(query)) {
@@ -196,7 +196,7 @@ export class ApiClient {
     });
   }
 
-  /** GET /applications/tasks — offene Entscheidungen für die eigene Rolle (#64). */
+  /** GET /applications/tasks — open decisions for the current role. */
   listTasks(): Observable<ApplicationListItem[]> {
     const lang = this.i18n.locale();
     return this.http
@@ -206,7 +206,7 @@ export class ApiClient {
       .pipe(map((items) => items.map((item) => mapApplicationListItem(item, lang))));
   }
 
-  /** `quiet` = Hintergrund-Reload nach einer Mutation (kein globaler Overlay). */
+  /** `quiet` = background reload after a mutation (no global overlay). */
   getApplication(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Application> {
     const lang = this.i18n.locale();
     return this.http
@@ -217,8 +217,8 @@ export class ApiClient {
   }
 
   /**
-   * GET /altcha/challenge — frische, server-signierte PoW-Challenge (Issue #23).
-   * Liefert `null`, wenn Altcha serverseitig deaktiviert ist (404 → kein Captcha).
+   * GET /altcha/challenge — fresh, server-signed PoW challenge. Returns `null`
+   * when Altcha is disabled server-side (404 → no captcha).
    */
   altchaChallenge(): Observable<AltchaChallenge | null> {
     return this.http.get<AltchaChallenge>(`${this.base}/altcha/challenge`).pipe(
@@ -228,7 +228,7 @@ export class ApiClient {
     );
   }
 
-  /** POST /applications — Body camelCase; Antwort ist `{ applicationId }` (kein Voll-DTO). */
+  /** POST /applications — camelCase body; response is `{ applicationId }` (not a full DTO). */
   createApplication(input: NewApplication): Observable<ApplicationCreated> {
     return this.http
       .post<ApplicationCreatedWire>(
@@ -238,7 +238,7 @@ export class ApiClient {
       .pipe(map(mapApplicationCreated));
   }
 
-  /** PATCH /applications/{id} — `data` aktualisieren (nur wenn state.editAllowed). */
+  /** PATCH /applications/{id} — update `data` (only when state.editAllowed). */
   updateApplication(id: Uuid, data: Record<string, unknown>): Observable<Application> {
     const lang = this.i18n.locale();
     return this.http
@@ -246,17 +246,17 @@ export class ApiClient {
       .pipe(map((wire) => mapApplication(wire, lang)));
   }
 
-  /** DELETE /applications/{id} — Verwalter:in oder Ersteller:in (#24). */
+  /** DELETE /applications/{id} — manager or creator. */
   deleteApplication(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/applications/${id}`);
   }
 
-  /** POST /applications/{id}/erasure-request — DSGVO Art. 17 Löschantrag stellen. */
+  /** POST /applications/{id}/erasure-request — file a GDPR Art. 17 erasure request. */
   requestErasure(id: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/applications/${id}/erasure-request`, {});
   }
 
-  /** `quiet` = Refresh nach einer Mutation (kein globaler Overlay). */
+  /** `quiet` = refresh after a mutation (no global overlay). */
   timeline(id: Uuid, opts: { quiet?: boolean } = {}): Observable<TimelineEntry[]> {
     const lang = this.i18n.locale();
     return this.http
@@ -267,8 +267,8 @@ export class ApiClient {
   }
 
   /**
-   * GET /applications/{id}/versions — Versionshistorie + Diff (Principal-only).
-   * Der Diff ist sprach-neutral (rohe Feldwerte) → kein `lang`-Mapping nötig.
+   * GET /applications/{id}/versions — version history + diff (principal-only).
+   * The diff is language-neutral (raw field values) → no `lang` mapping needed.
    */
   versions(id: Uuid): Observable<ApplicationVersion[]> {
     return this.http
@@ -278,8 +278,8 @@ export class ApiClient {
       .pipe(map((items) => items.map(mapVersion)));
   }
 
-  // --- comments (applicant: nur public) ------------------------------------
-  /** `quiet` = Hintergrund-/Refresh-Load (kein globaler Overlay). */
+  // --- comments (applicant: public only) -----------------------------------
+  /** `quiet` = background/refresh load (no global overlay). */
   comments(id: Uuid, opts: { quiet?: boolean } = {}): Observable<ApplicationComment[]> {
     return this.http
       .get<CommentOutWire[]>(`${this.base}/applications/${id}/comments`, {
@@ -288,7 +288,7 @@ export class ApiClient {
       .pipe(map((comments) => comments.map(mapComment)));
   }
 
-  /** Antragsteller dürfen nur `public` schreiben (Backend lehnt `internal` mit 403 ab). */
+  /** Applicants may write only `public` (the backend rejects `internal` with 403). */
   addComment(
     id: Uuid,
     body: string,
@@ -314,7 +314,7 @@ export class ApiClient {
     return this.http.post<TransitionResult>(`${this.base}/applications/${id}/transition`, req);
   }
 
-  /** Übergänge, die der Magic-Link-Antragsteller feuern darf (actorIsApplicant-Gate). */
+  /** Transitions the magic-link applicant may fire (actorIsApplicant gate). */
   applicantTransitions(id: Uuid): Observable<Transition[]> {
     const lang = this.i18n.locale();
     return this.http
@@ -329,12 +329,12 @@ export class ApiClient {
     );
   }
 
-  // --- files / attachments (T-13) ------------------------------------------
+  // --- files / attachments -------------------------------------------------
   /**
-   * POST /applications/{id}/attachments — Multipart-Upload (≤10 MB, A(edit)/P).
-   * Der Server scannt asynchron (ClamAV); die Antwort trägt `scanned=false` bis
-   * der Worker durch ist. Fehler: 413 (zu groß), 415 (Typ), 429 (Rate-Limit),
-   * 503 (Storage aus).
+   * POST /applications/{id}/attachments — multipart upload (≤10 MB, A(edit)/P).
+   * The server scans asynchronously (ClamAV); the response carries
+   * `scanned=false` until the worker is done. Errors: 413 (too large), 415
+   * (type), 429 (rate limit), 503 (storage off).
    */
   uploadAttachment(
     id: Uuid,
@@ -350,7 +350,7 @@ export class ApiClient {
       .pipe(map(mapAttachment));
   }
 
-  /** GET /applications/{id}/attachments — bestehende Anhänge (Panel-Hydration). */
+  /** GET /applications/{id}/attachments — existing attachments (panel hydration). */
   listAttachments(id: Uuid): Observable<Attachment[]> {
     return this.http
       .get<AttachmentOutWire[]>(`${this.base}/applications/${id}/attachments`, {
@@ -360,8 +360,8 @@ export class ApiClient {
   }
 
   /**
-   * GET /attachments/{id} — kurzlebige signierte MinIO-URL. 409 = noch nicht
-   * sauber gescannt / Quarantäne, 410 = abgelaufen/verbraucht (api.md §files).
+   * GET /attachments/{id} — short-lived signed MinIO URL. 409 = not yet scanned
+   * clean / quarantined, 410 = expired/consumed.
    */
   attachmentUrl(attachmentId: Uuid): Observable<SignedUrl> {
     return this.http
@@ -371,18 +371,18 @@ export class ApiClient {
       .pipe(map(mapSignedUrl));
   }
 
-  /** DELETE /attachments/{id} — Anhang löschen (Principal/Antragsteller/Ersteller:in). */
+  /** DELETE /attachments/{id} — delete an attachment (principal/applicant/creator). */
   deleteAttachment(attachmentId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/attachments/${attachmentId}`);
   }
 
-  // --- voting (api.md »voting«) --------------------------------------------
+  // --- voting --------------------------------------------------------------
   /**
-   * GET /votes/{id} — Vote-State + Tally. `VoteOut` ist ein `_CamelModel`
-   * (camelCase) und braucht keine Mapper-Schicht; bei `secret` liefert der
-   * Server in `tally` nur `counts`.
+   * GET /votes/{id} — vote state + tally. `VoteOut` is a `_CamelModel`
+   * (camelCase) and needs no mapper layer; for `secret` the server returns only
+   * `counts` in `tally`.
    */
-  /** `quiet` = Tally-Refresh nach Stimmabgabe (kein globaler Overlay). */
+  /** `quiet` = tally refresh after casting (no global overlay). */
   getVote(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Vote> {
     return this.http.get<Vote>(`${this.base}/votes/${id}`, {
       context: opts.quiet ? skipLoading() : undefined,
@@ -390,10 +390,10 @@ export class ApiClient {
   }
 
   /**
-   * POST /votes/{id}/ballot — Stimme abgeben (`choice` ∈ config.options).
-   * Idempotent: erneuter Cast mit gleicher Wahl bleibt `cast`; ein Wechsel
-   * liefert `changed` (nur wenn `config.allowChange`). 409 = Doppel/geschlossen,
-   * 403 = nicht stimmberechtigt — Components werten den Status aus.
+   * POST /votes/{id}/ballot — cast a ballot (`choice` ∈ config.options).
+   * Idempotent: re-casting the same choice stays `cast`; a change returns
+   * `changed` (only when `config.allowChange`). 409 = duplicate/closed, 403 =
+   * not eligible — components evaluate the status.
    */
   castBallot(id: Uuid, choice: string, asDelegation = false): Observable<BallotResult> {
     return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, {
@@ -402,15 +402,15 @@ export class ApiClient {
     });
   }
 
-  // --- meetings (Sitzungssteuerung, T-33) ----------------------------------
-  /** POST /meetings — Sitzung anlegen (P(meeting.manage)). */
+  // --- meetings ------------------------------------------------------------
+  /** POST /meetings — create a meeting (P(meeting.manage)). */
   createMeeting(body: MeetingCreateBody): Observable<Meeting> {
     return this.http
       .post<MeetingOutWire>(`${this.base}/meetings`, body)
       .pipe(map(mapMeeting));
   }
 
-  /** GET /gremien/{id}/meeting-members — Protokollant-Kandidaten fürs Anlegen (P(session.manage)). */
+  /** GET /gremien/{id}/meeting-members — protokollant candidates for creation (P(session.manage)). */
   listMeetingMembers(gremiumId: Uuid): Observable<MeetingMember[]> {
     return this.http.get<MeetingMember[]>(
       `${this.base}/gremien/${gremiumId}/meeting-members`,
@@ -418,7 +418,7 @@ export class ApiClient {
     );
   }
 
-  /** GET /meetings — Sitzungen auflisten (neueste zuerst), optional Gremium-gefiltert (#104). */
+  /** GET /meetings — list meetings (newest first), optionally gremium-filtered. */
   listMeetings(gremiumId?: Uuid): Observable<Meeting[]> {
     let params = new HttpParams();
     if (gremiumId) params = params.set('gremiumId', gremiumId);
@@ -428,11 +428,12 @@ export class ApiClient {
   }
 
   /**
-   * GET /meetings/timeline — Keyset-paginierte Timeline um *jetzt* (#104).
+   * GET /meetings/timeline — keyset-paginated timeline around *now*.
    *
-   * `direction: 'upcoming'` läuft chronologisch vorwärts, `'past'` rückwärts
-   * (Infinite-Scroll nach oben). `cursor` stammt aus `nextCursor` der Vorseite;
-   * `null`/leer ⇒ Beginn ab *jetzt*. `nextCursor === null` ⇒ Ende der Richtung.
+   * `direction: 'upcoming'` runs chronologically forward, `'past'` backward
+   * (infinite scroll upward). `cursor` comes from the previous page's
+   * `nextCursor`; `null`/empty ⇒ start from *now*. `nextCursor === null` ⇒ end
+   * of the direction.
    */
   listMeetingsTimeline(opts: {
     direction: TimelineDirection;
@@ -452,18 +453,18 @@ export class ApiClient {
   }
 
   /**
-   * GET /meetings/gremien — Gremien für den Filter der Sitzungsübersicht.
+   * GET /meetings/gremien — gremien for the meeting-overview filter.
    *
-   * Alle Gremien, in denen der Nutzer mind. EINE lesbare Sitzung hat (read-Recht)
-   * — nicht die Mitglieds-Gremien (#meetings-filter). Antwort ist bereits camelCase
-   * (`id`/`name`), daher kein Wire-Mapping nötig.
+   * All gremien in which the user has at least ONE readable meeting (read right)
+   * — not the member gremien. The response is already camelCase (`id`/`name`),
+   * so no wire mapping is needed.
    */
   listMeetingFilterGremien(): Observable<{ id: Uuid; name: string }[]> {
     return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/gremien`);
   }
 
-  /** GET /meetings/{id} — Sitzungs-State + Votes. */
-  /** `quiet` = Hintergrund-Reload (Refresh nach Vote-Aktion etc.; kein Overlay). */
+  /** GET /meetings/{id} — meeting state + votes. */
+  /** `quiet` = background reload (refresh after a vote action etc.; no overlay). */
   getMeeting(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Meeting> {
     return this.http
       .get<MeetingOutWire>(`${this.base}/meetings/${id}`, {
@@ -472,28 +473,28 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
-  /** PATCH /meetings/{id} — Status und/oder aktiven Antrag setzen. */
+  /** PATCH /meetings/{id} — set status and/or the active application. */
   patchMeeting(id: Uuid, body: MeetingPatchBody): Observable<Meeting> {
     return this.http
       .patch<MeetingOutWire>(`${this.base}/meetings/${id}`, body)
       .pipe(map(mapMeeting));
   }
 
-  /** DELETE /meetings/{id} — Sitzung löschen (P(session.manage)/Admin). */
+  /** DELETE /meetings/{id} — delete a meeting (P(session.manage)/admin). */
   deleteMeeting(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/meetings/${id}`);
   }
 
-  // --- attendance (#Meetings/#55/#56) --------------------------------------
-  /** GET /meetings/{id}/attendance — Roster der aktuellen Mitglieder + Status. */
-  /** `quiet` = Roster-Reload für Dialog/Refresh (kein globaler Overlay). */
+  // --- attendance ----------------------------------------------------------
+  /** GET /meetings/{id}/attendance — roster of current members + status. */
+  /** `quiet` = roster reload for dialog/refresh (no global overlay). */
   listAttendance(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<Attendance[]> {
     return this.http.get<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance`, {
       context: opts.quiet ? skipLoading() : undefined,
     });
   }
 
-  /** PUT /meetings/{id}/attendance/me — eigene Anwesenheit markieren. */
+  /** PUT /meetings/{id}/attendance/me — mark own attendance. */
   setOwnAttendance(meetingId: Uuid, status: AttendanceStatus): Observable<Attendance[]> {
     return this.http.put<Attendance[]>(
       `${this.base}/meetings/${meetingId}/attendance/me`,
@@ -501,7 +502,7 @@ export class ApiClient {
     );
   }
 
-  /** PUT /meetings/{id}/attendance/{principalId} — Mitglied setzen (Sitzungsleitung). */
+  /** PUT /meetings/{id}/attendance/{principalId} — set a member (meeting lead). */
   setMemberAttendance(
     meetingId: Uuid,
     principalId: Uuid,
@@ -513,16 +514,16 @@ export class ApiClient {
     );
   }
 
-  // --- agenda / Tagesordnung (#10/#58) -------------------------------------
-  /** GET /meetings/{id}/agenda — zugewiesene Anträge (geordnet). */
-  /** `quiet` = Agenda-Reload nach WS-Event/Mutation (kein globaler Overlay). */
+  // --- agenda --------------------------------------------------------------
+  /** GET /meetings/{id}/agenda — assigned applications (ordered). */
+  /** `quiet` = agenda reload after a WS event/mutation (no global overlay). */
   listAgenda(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<AgendaItem[]> {
     return this.http.get<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       context: opts.quiet ? skipLoading() : undefined,
     });
   }
 
-  /** GET /meetings/{id}/agenda/assignable — Abstimmungs-Anträge, noch nicht auf der TO. */
+  /** GET /meetings/{id}/agenda/assignable — vote applications not yet on the agenda. */
   listAssignableApplications(meetingId: Uuid): Observable<AssignableApplication[]> {
     return this.http.get<AssignableApplication[]>(
       `${this.base}/meetings/${meetingId}/agenda/assignable`,
@@ -530,28 +531,28 @@ export class ApiClient {
     );
   }
 
-  /** POST /meetings/{id}/agenda — Antrag auf die Tagesordnung setzen (Sitzungsleitung). */
+  /** POST /meetings/{id}/agenda — put an application on the agenda (meeting lead). */
   addAgendaItem(meetingId: Uuid, applicationId: Uuid): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       applicationId,
     });
   }
 
-  /** POST /meetings/{id}/agenda — Freitext-TOP (ohne Antrag) anlegen. */
+  /** POST /meetings/{id}/agenda — create a free-text agenda item (no application). */
   addAgendaFreetext(meetingId: Uuid, title: string): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       title,
     });
   }
 
-  /** DELETE /meetings/{id}/agenda/{itemId} — TOP von der Tagesordnung entfernen. */
+  /** DELETE /meetings/{id}/agenda/{itemId} — remove an item from the agenda. */
   removeAgendaItem(meetingId: Uuid, itemId: Uuid): Observable<AgendaItem[]> {
     return this.http.delete<AgendaItem[]>(
       `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
     );
   }
 
-  /** PATCH /meetings/{id}/agenda/{itemId} — Markdown-Text eines TOP setzen. */
+  /** PATCH /meetings/{id}/agenda/{itemId} — set the markdown text of an item. */
   setAgendaBody(meetingId: Uuid, itemId: Uuid, body: string): Observable<AgendaItem[]> {
     return this.http.patch<AgendaItem[]>(
       `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
@@ -559,7 +560,7 @@ export class ApiClient {
     );
   }
 
-  /** PATCH /meetings/{id}/agenda/{itemId} — Freitext-TOP umbenennen (Titel setzen). */
+  /** PATCH /meetings/{id}/agenda/{itemId} — rename a free-text item (set title). */
   renameAgendaItem(meetingId: Uuid, itemId: Uuid, title: string): Observable<AgendaItem[]> {
     return this.http.patch<AgendaItem[]>(
       `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
@@ -567,7 +568,7 @@ export class ApiClient {
     );
   }
 
-  /** PATCH /meetings/{id}/agenda/{itemId} — TOP als (nicht-)öffentlich markieren (#PII-Re-Add). */
+  /** PATCH /meetings/{id}/agenda/{itemId} — mark an item (non-)public. */
   setAgendaNonPublic(
     meetingId: Uuid,
     itemId: Uuid,
@@ -579,7 +580,7 @@ export class ApiClient {
     );
   }
 
-  /** PUT /meetings/{id}/agenda/order — TOPs in der gelieferten Reihenfolge anordnen. */
+  /** PUT /meetings/{id}/agenda/order — order items in the supplied sequence. */
   reorderAgenda(meetingId: Uuid, itemIds: Uuid[]): Observable<AgendaItem[]> {
     return this.http.put<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/order`, {
       itemIds,
@@ -587,8 +588,8 @@ export class ApiClient {
   }
 
   /**
-   * POST /meetings/{id}/votes — Live-Abstimmung für einen Antrag anlegen + öffnen,
-   * mit Beschlussfrage (fürs Protokoll). Antwort = aktualisierte Sitzung (#Meetings).
+   * POST /meetings/{id}/votes — create + open a live vote for an application,
+   * with a motion (for the protocol). Response = the updated meeting.
    */
   openMeetingVote(
     meetingId: Uuid,
@@ -607,45 +608,45 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
-  /** DELETE /meetings/{id}/votes/{voteId} — Beschlussfrage (inkl. Stimmen) löschen. */
+  /** DELETE /meetings/{id}/votes/{voteId} — delete a motion (incl. ballots). */
   deleteMeetingVote(meetingId: Uuid, voteId: Uuid): Observable<Meeting> {
     return this.http
       .delete<MeetingOutWire>(`${this.base}/meetings/${meetingId}/votes/${voteId}`)
       .pipe(map(mapMeeting));
   }
 
-  /** POST /votes/{id}/open — Vote öffnen (auch live; P(vote.manage)). */
+  /** POST /votes/{id}/open — open a vote (also live; P(vote.manage)). */
   openVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/open`, {});
   }
 
-  /** POST /votes/{id}/close — Vote schließen → Ergebnis → Flow-Branch. */
+  /** POST /votes/{id}/close — close a vote → result → flow branch. */
   closeVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/close`, {});
   }
 
-  /** POST /votes/{id}/cancel — Vote abbrechen (#12): kein Ergebnis, kein Branch. */
+  /** POST /votes/{id}/cancel — cancel a vote: no result, no branch. */
   cancelVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/cancel`, {});
   }
 
-  /** GET /site-config — öffentliche (auth-freie) aktive Branding-Config (#18). */
+  /** GET /site-config — public (auth-free) active branding config. */
   publicSiteConfig(): Observable<PublicSiteConfig> {
     return this.http.get<PublicSiteConfig>(`${this.base}/site-config`);
   }
 
-  // --- protocol (Protokoll-Editor, T-33) -----------------------------------
-  /** POST /meetings/{id}/protocol — Protokoll anlegen **oder** laden (idempotent). */
+  // --- protocol ------------------------------------------------------------
+  /** POST /meetings/{id}/protocol — create or load the protocol (idempotent). */
   loadProtocol(meetingId: Uuid): Observable<Protocol> {
     return this.http
       .post<ProtocolOutWire>(`${this.base}/meetings/${meetingId}/protocol`, {})
       .pipe(map(mapProtocol));
   }
 
-  /** GET /meetings/{id}/protocol — Protokoll **lesen** (404 ohne Protokoll).
+  /** GET /meetings/{id}/protocol — read the protocol (404 if none).
 
-      Für Reload/Status-Poll (#async-finalize): GETs unterliegen nicht dem
-      Default-Write-Rate-Limit — der 4s-Poll über den POST lief schnell in 429. */
+      For reload/status polling: GETs are not subject to the default write rate
+      limit — the 4s poll over the POST quickly ran into 429. */
   getProtocol(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<Protocol> {
     return this.http
       .get<ProtocolOutWire>(`${this.base}/meetings/${meetingId}/protocol`, {
@@ -654,14 +655,14 @@ export class ApiClient {
       .pipe(map(mapProtocol));
   }
 
-  /** PATCH /protocols/{id} — Markdown aktualisieren. */
+  /** PATCH /protocols/{id} — update markdown. */
   updateProtocol(protocolId: Uuid, markdown: string): Observable<Protocol> {
     return this.http
       .patch<ProtocolOutWire>(`${this.base}/protocols/${protocolId}`, { markdown })
       .pipe(map(mapProtocol));
   }
 
-  /** POST /protocols/{id}/votes — Abstimmungs-Snippets serverseitig einbetten. */
+  /** POST /protocols/{id}/votes — embed vote snippets server-side. */
   embedVotes(protocolId: Uuid, voteIds: Uuid[]): Observable<Protocol> {
     const body: ProtocolVotesBody = { voteIds };
     return this.http
@@ -676,15 +677,15 @@ export class ApiClient {
       .pipe(map(mapProtocol));
   }
 
-  // --- Benachrichtigungs-Präferenzen (#4-2, Self-Service) ------------------
-  /** GET /notifications/preferences — eigene Schalter (voller Katalog). */
+  // --- notification preferences (self-service) -----------------------------
+  /** GET /notifications/preferences — own toggles (full catalogue). */
   listNotificationPreferences(): Observable<NotificationPreference[]> {
     return this.http.get<NotificationPreference[]>(`${this.base}/notifications/preferences`, {
       context: skipLoading(),
     });
   }
 
-  /** PUT /notifications/preferences — eigene Schalter setzen (Bulk). */
+  /** PUT /notifications/preferences — set own toggles (bulk). */
   setNotificationPreferences(
     preferences: NotificationPreference[],
   ): Observable<NotificationPreference[]> {
@@ -693,32 +694,32 @@ export class ApiClient {
     });
   }
 
-  // --- OAuth-Grants + MCP-Setup (#MCP, Self-Service) -----------------------
-  /** GET /oauth/grants — eigene aktive Agent-/MCP-Grants. */
+  // --- OAuth grants + MCP setup (self-service) -----------------------------
+  /** GET /oauth/grants — own active agent/MCP grants. */
   listGrants(): Observable<OAuthGrant[]> {
     return this.http.get<OAuthGrant[]>(`${this.base}/oauth/grants`, {
       context: skipLoading(),
     });
   }
 
-  /** DELETE /oauth/grants/{id} — einen eigenen Grant widerrufen. */
+  /** DELETE /oauth/grants/{id} — revoke one of your own grants. */
   revokeGrant(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/oauth/grants/${id}`);
   }
 
-  /** DELETE /oauth/grants — alle eigenen Grants widerrufen (Not-Aus). */
+  /** DELETE /oauth/grants — revoke all your own grants (kill switch). */
   revokeAllGrants(): Observable<void> {
     return this.http.delete<void>(`${this.base}/oauth/grants`);
   }
 
-  /** GET /oauth/consent-request — schwebender Authorize-Request fürs Consent-FE. */
+  /** GET /oauth/consent-request — pending authorize request for the consent FE. */
   consentRequest(): Observable<ConsentRequest> {
     return this.http.get<ConsentRequest>(`${this.base}/oauth/consent-request`, {
       context: skipLoading(),
     });
   }
 
-  /** POST /oauth/consent — Scope+Lebensdauer bestätigen/ablehnen → Redirect-URL. */
+  /** POST /oauth/consent — approve/reject scope+lifetime → redirect URL. */
   submitConsent(body: {
     approve: boolean;
     scopes: string[];
@@ -727,12 +728,12 @@ export class ApiClient {
     return this.http.post<{ redirect: string }>(`${this.base}/oauth/consent`, body);
   }
 
-  /** GET /mcp/config — fertiger mcpServers-Schnipsel für diese Plattform (P(`mcp.use`)). */
+  /** GET /mcp/config — ready-made mcpServers snippet for this platform (P(`mcp.use`)). */
   mcpConfig(): Observable<McpSetup> {
     return this.http.get<McpSetup>(`${this.base}/mcp/config`);
   }
 
-  /** GET /mcp/package — MCP-Quellpaket als .tar.gz (P(`mcp.use`)). */
+  /** GET /mcp/package — MCP source package as .tar.gz (P(`mcp.use`)). */
   downloadMcpPackage(): Observable<Blob> {
     return this.http.get(`${this.base}/mcp/package`, { responseType: 'blob' });
   }

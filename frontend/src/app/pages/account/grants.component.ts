@@ -7,9 +7,9 @@ import { IconComponent } from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
 
 /**
- * Konto → API-Zugang (#MCP): der Nutzer verwaltet hier seine eigenen OAuth-Grants
- * (Agent-/MCP-Token) — auflisten + einzeln/alle widerrufen — und lädt (bei `mcp.use`)
- * das vorkonfigurierte MCP-Paket inkl. Setup-Schnipsel herunter.
+ * Account API access: the user manages their own OAuth grants (agent/MCP tokens) —
+ * list plus revoke individually or all — and (with `mcp.use`) downloads the
+ * preconfigured MCP package including the setup snippet.
  */
 @Component({
   selector: 'app-account-grants',
@@ -28,7 +28,7 @@ export class AccountGrantsComponent {
   readonly error = signal<string | null>(null);
   readonly setup = signal<McpSetup | null>(null);
 
-  /** MCP-Aktionen (Download/Setup) nur für Berechtigte; Admin hat es ohnehin. */
+  /** MCP actions (download/setup) only for entitled users; admin always has it. */
   readonly canUseMcp = computed(() => this.auth.canAny('mcp.use'));
 
   constructor() {
@@ -37,7 +37,7 @@ export class AccountGrantsComponent {
       this.api.mcpConfig().subscribe({
         next: (s) => this.setup.set(s),
         error: () => {
-          /* Setup-Schnipsel optional */
+          /* setup snippet optional */
         },
       });
     }
@@ -71,7 +71,7 @@ export class AccountGrantsComponent {
     });
   }
 
-  /** Pretty-printed mcpServers-Schnipsel zum Kopieren. */
+  /** Pretty-printed mcpServers snippet to copy. */
   readonly setupJson = computed(() => {
     const s = this.setup();
     return s ? JSON.stringify({ mcpServers: s.mcpServers }, null, 2) : '';

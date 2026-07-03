@@ -87,7 +87,7 @@
 .dash__row:last-child {
   border-bottom: none;
 }
-// Tap auf eine Zeile (Link/CTA aktiviert die ganze Zeile via :active-Kette).
+// Tap on a row (link/CTA activates the whole row via the :active chain).
 .dash__row:active {
   background: var(--color-surface-sunken);
   border-radius: var(--radius-md);
@@ -176,7 +176,7 @@
   font-size: var(--fs-sm);
 }
 
-/* Kompakte Sitzungs-Kachel: flacher Anchor (kein app-card), Badge oben rechts. */
+/* Compact meeting tile: flat anchor (no app-card), badge top-right. */
 .dash__session {
   position: relative;
   display: flex;
@@ -210,7 +210,7 @@
 }
 .dash__session-title {
   font-weight: var(--fw-semibold);
-  /* Platz für das Badge oben rechts. */
+  /* Room for the badge in the top-right. */
   padding-right: 4.5rem;
 }
 .dash__session-date {
@@ -219,12 +219,12 @@
   font-variant-numeric: tabular-nums;
 }
 .dash__session .dash__link {
-  /* „Live beitreten" unten links in der Kachel. */
+  /* "Join live" bottom-left in the tile. */
   margin-top: auto;
   align-self: start;
 }
 
-/* Mobil (≤768px): Listenzeilen dürfen umbrechen, CTA kompakter. */
+/* Mobile (≤768px): list rows may wrap, CTA more compact. */
 @media (max-width: 768px) {
   .dash__cta {
     padding: var(--space-4) var(--space-5);
@@ -238,7 +238,7 @@
   .dash__row-meta {
     flex-wrap: wrap;
   }
-  /* Schnellzugriff-Kacheln einspaltig — volle Tap-Flächen. */
+  /* Quick-access tiles single-column — full tap targets. */
   .dash__grid {
     grid-template-columns: 1fr;
   }

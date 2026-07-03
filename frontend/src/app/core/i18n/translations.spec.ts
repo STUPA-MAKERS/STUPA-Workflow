@@ -1,10 +1,10 @@
 import { de, en } from './translations';
 
 /**
- * Catalog-Parity: `en` ist als `Partial` typisiert (fehlende Keys fallen zur
- * Laufzeit auf DE zurück) — der Compiler fängt Drift also nicht. Dieser Test
- * stellt sicher, dass beide Locales exakt dieselbe Key-Menge führen, damit kein
- * String unbemerkt nur in einer Sprache existiert.
+ * Catalog parity: `en` is typed as `Partial` (missing keys fall back to DE at
+ * runtime) — so the compiler does not catch drift. This test ensures both
+ * locales carry exactly the same key set, so no string exists unnoticed in only
+ * one language.
  */
 describe('translation catalog parity', () => {
   const deKeys = Object.keys(de).sort();

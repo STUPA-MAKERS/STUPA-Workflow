@@ -10,13 +10,13 @@
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
-  /* Titel auf normale Body-Breite zentriert — fluchtet mit der Mittelspalte. */
+  /* Centre the title at normal body width; aligns with the middle column. */
   width: 100%;
   max-width: var(--layout-max-width);
   margin-inline: auto;
 }
 
-/* Status-/Empty-Zeilen ebenfalls auf Body-Breite (wie der Titel). */
+/* Status/empty rows at body width too (like the title). */
 .bd__status,
 .bd__empty {
   width: 100%;
@@ -24,8 +24,8 @@
   margin-inline: auto;
 }
 
-/* Metrik-Tabs im Übersicht-Overlay (#budget-sunburst) — gleiche Optik wie die
-   Navigations-Pills im App-Header, horizontal zentriert. */
+/* Metric tabs in the overview overlay — same look as the nav pills in the app
+   header, horizontally centred. */
 .bd__ovTabs {
   display: flex;
   justify-content: center;
@@ -56,8 +56,8 @@
   background: var(--color-primary-subtle);
 }
 
-/* Aktiver Tab darf beim Hover seinen Selektor-Hintergrund nicht verlieren:
-   `.bd__ovTab:hover` (Spezifität 0,2,0) schlug sonst `--active` (0,1,0). */
+/* Active tab must keep its selected background on hover: `.bd__ovTab:hover`
+   (specificity 0,2,0) would otherwise beat `--active` (0,1,0). */
 .bd__ovTab--active:hover {
   color: var(--color-primary);
   background: var(--color-primary-subtle);
@@ -116,16 +116,16 @@
   color: var(--color-text);
 }
 
-/* --- Gestapelt: Anträge UNTER der Tree-Tabelle, nicht daneben (#49). ------ */
+/* --- Stacked: applications below the tree table, not beside it. ---------- */
 .bd__cols {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-5);
 }
 
-/* Drei Zonen: Navigation (Budget→Jahr) | Hauptinhalt (Body-Breite) | Charts.
-   Mittelspalte auf ``--layout-max-width`` gekappt + durch symmetrische 1fr-Seiten
-   zentriert; nur Baum (links) und Charts (rechts) ragen in die Ränder hinaus. */
+/* Three zones: nav (budget->year) | main content (body width) | charts.
+   Middle column capped at ``--layout-max-width`` and centred via symmetric 1fr
+   sides; only the tree (left) and charts (right) break into the margins. */
 .bd__layout {
   display: grid;
   grid-template-columns:
@@ -139,11 +139,11 @@
   position: sticky;
   top: calc(var(--layout-header-height) + var(--space-4));
   min-width: 0;
-  /* an die Mittelspalte heranrücken (rechtsbündig im linken Rand). */
+  /* Pull toward the middle column (right-aligned in the left margin). */
   justify-self: end;
   width: 100%;
   max-width: 14rem;
-  /* schwebt mit und scrollt nicht weg, auch bei langem Baum. */
+  /* Stays in view and doesn't scroll away, even with a long tree. */
   max-height: 75vh;
   overflow-y: auto;
 }
@@ -170,7 +170,7 @@
 .bd__apps {
   min-width: 0;
 }
-/* Schmaler werden → Charts unter den Inhalt, Nav bleibt links. */
+/* Narrower: charts drop below the content, nav stays left. */
 @media (max-width: 60rem) {
   .bd__layout {
     grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr);
@@ -191,7 +191,7 @@
   }
 }
 
-/* Linker Auslastungs-Teil ohne Box (#Image14). */
+/* Left usage part without a box. */
 .bd__usage {
   min-width: 0;
 }
@@ -273,7 +273,7 @@
   vertical-align: bottom;
 }
 
-/* Auslastungs-Spalte: feste Breite → Balken zeilenübergreifend bündig (Image 14). */
+/* Usage column: fixed width so bars line up across rows. */
 .bd__table th:nth-child(2),
 .bd__table td:nth-child(2) {
   width: 12rem;
@@ -301,7 +301,7 @@
   background: var(--color-primary);
 }
 
-/* Zweifarbig (#budget): hellgrau = gebunden, primary = ausgegeben. */
+/* Two-tone: light grey = committed, primary = expended. */
 .bd__seg--bound {
   background: var(--color-border-strong, #8a8f98);
 }
@@ -343,8 +343,8 @@
   text-decoration: underline;
 }
 
-/* --- Mobil (≤768px = 48rem): eine Spalte — Picker (einklappbar) → Inhalt →
-   Charts. Desktop bleibt unberührt: der Toggle existiert dort nur versteckt. --- */
+/* --- Mobile (<=768px = 48rem): single column — picker (collapsible) -> content
+   -> charts. Desktop unchanged: the toggle only exists there, hidden. --- */
 .bd__nav-toggle {
   display: none;
 }
@@ -360,7 +360,7 @@
     max-height: none;
     overflow: visible;
   }
-  /* Toggle: zeigt das gewählte Budget/HHJ, klappt den Baum auf/zu. */
+  /* Toggle: shows the selected budget/fiscal year, expands/collapses the tree. */
   .bd__nav-toggle {
     display: flex;
     align-items: center;
@@ -390,8 +390,8 @@
   .bd__nav-body--open {
     display: block;
   }
-  /* Charts unter dem Inhalt: nebeneinander solange Platz, sonst umbrechen —
-     nichts ragt aus dem 375px-Viewport heraus. */
+  /* Charts below the content: side by side while there's room, else wrap —
+     nothing overflows the 375px viewport. */
   .bd__charts {
     position: static;
     justify-self: stretch;
@@ -406,7 +406,7 @@
     flex: 0 1 auto;
     min-width: 0;
   }
-  /* Kostenstellen-Zeile darf umbrechen statt zu überlaufen. */
+  /* Cost-centre row may wrap instead of overflowing. */
   .bd__ks {
     flex-wrap: wrap;
   }
@@ -414,8 +414,8 @@
     max-width: 100%;
     white-space: normal;
   }
-  /* Auslastungs-Balken: im Karten-Layout kollabiert der flex-Track sonst auf
-     Inhaltsbreite (≈0) — feste, rechtsbündige Breite gibt ihm Fläche. */
+  /* Usage bar: in the card layout the flex track otherwise collapses to content
+     width (~0) — a fixed, right-aligned width gives it room. */
   .bd__bar-cell {
     flex: 1 1 auto;
     max-width: 14rem;

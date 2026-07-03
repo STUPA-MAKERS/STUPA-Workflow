@@ -83,7 +83,7 @@
   </header>
 
   <div class="det__layout" [class.det__layout--editing]="editing()">
-  <!-- LINKS: Übergänge als schwebende Karte (#det) -->
+  <!-- Left rail: transitions as a floating card -->
   <aside class="det__rail det__rail--left">
     @if (canTransition() && transitions().length) {
       <app-card [heading]="'applications.transitions.title' | t">
@@ -104,9 +104,9 @@
     }
   </aside>
 
-  <!-- MITTE: Antragsdaten + Historie + Anhänge -->
+  <!-- Center: application data + history + attachments -->
   <div class="det__center">
-  <!-- Antragsdaten (Ansicht oder Inline-Bearbeitung der Ersteller:in/Verwalter:in) -->
+  <!-- Application data (view or inline edit by creator/manager) -->
   <app-card [heading]="'applications.detail.data.title' | t">
     @if (editing()) {
       <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
@@ -125,7 +125,7 @@
           }
         </dl>
       }
-      <!-- Kostenpositionen mit Vergleichsangeboten (#1) -->
+      <!-- Cost positions with comparison offers -->
       @for (pf of positionEntries(application); track pf.key) {
         <section class="flex flex-col gap-3 mt-4">
           <h3 class="m-0 text-base">{{ pf.label }}</h3>
@@ -204,11 +204,11 @@
     }
   </app-card>
 
-  <!-- Anhänge (T-13-Contract): Upload + signierte Download-URLs + Scan-Status -->
+  <!-- Attachments: upload + signed download URLs + scan status -->
   <app-attachments-panel [applicationId]="application.id" [canUpload]="canManage()" />
   </div><!-- /det__center -->
 
-  <!-- RECHTS: Kommentare als Chat (#det) -->
+  <!-- Right rail: comments as a chat -->
   <aside class="det__rail det__rail--right">
     <section class="det__chat" [attr.aria-label]="'applications.comments.title' | t">
       <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'applications.comments.title' | t }}</header>
@@ -286,7 +286,7 @@
   </div>
 </app-dialog>
 
-<!-- Kostenstelle zuordnen (#17): Tree-Picker im Dialog. -->
+<!-- Assign cost centre: tree picker in a dialog. -->
 <app-dialog
   [open]="budgetDialogOpen()"
   [title]="'applications.budget.title' | t"

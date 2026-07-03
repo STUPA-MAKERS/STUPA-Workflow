@@ -35,15 +35,14 @@ export const appConfig: ApplicationConfig = {
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
     ),
-    // Reihenfolge: loading (äußerste, misst volle Dauer) → auth (Credentials/Bearer)
-    // → Mock-Antwort.
+    // Order: loading (outermost, measures full duration) → auth (credentials/bearer)
+    // → mock response.
     //
-    // SICHERHEIT (#67): Der Mock-Interceptor wird **nur** im Dev-/Demo-Build in die
-    // Interceptor-Kette aufgenommen. In Prod-Builds ist `isDevMode()` false, der
-    // Interceptor wird also gar nicht registriert — so kann ihn keine zur Laufzeit
-    // angreifbare Eingabe (?mock=1, localStorage['useMockApi'], __USE_MOCK_API__)
-    // mehr aktivieren (Session-/Daten-Spoofing). Der zusätzliche Laufzeit-Guard im
-    // Interceptor (isDevMode()) bleibt als Verteidigung in der Tiefe bestehen.
+    // Security: the mock interceptor is wired into the chain only in the dev/demo
+    // build. In prod builds `isDevMode()` is false, so it is never registered — no
+    // runtime-attackable input (?mock=1, localStorage['useMockApi'],
+    // __USE_MOCK_API__) can activate it (session/data spoofing). The extra runtime
+    // guard in the interceptor (isDevMode()) remains as defence in depth.
     provideHttpClient(
       withInterceptors(
         isDevMode()
@@ -51,26 +50,26 @@ export const appConfig: ApplicationConfig = {
           : [loadingInterceptor, authInterceptor],
       ),
     ),
-    // Live-Vote-Quelle: im Mock-Betrieb die In-Memory-Simulation, sonst die echte
-    // WebSocket (WsService) gegen T-16 (api.md §4).
+    // Live-vote source: the in-memory simulation in mock mode, otherwise the real
+    // WebSocket (WsService).
     {
       provide: LIVE_VOTE_SOURCE,
       useFactory: () => (inject(USE_MOCK_API) ? inject(MockLiveVoteSource) : inject(WsService)),
     },
     provideFormly(),
-    // UI-Kit-Library (@stupa-makers/ui-kit) an die App-Dienste binden: i18n folgt der
-    // App-Locale (identische DE/EN-Strings), Lade-Overlay folgt dem LoadingService.
+    // Bind the UI-kit library (@stupa-makers/ui-kit) to app services: i18n follows
+    // the app locale (identical DE/EN strings), loading overlay follows LoadingService.
     { provide: UI_KIT_INTL, useFactory: () => uiKitIntlFromLang(inject(I18nService).locale) },
     { provide: UI_KIT_LOADING, useFactory: () => ({ visible: inject(LoadingService).visible }) },
     provideAppInitializer(() => {
       inject(ThemeService).init();
-      inject(I18nService); // initialisiert document.lang über Konstruktor-Default
-      inject(BrandingService).init(); // App-Name aus Site-Config → Tab-Titel/Header/Home (#brand-name)
+      inject(I18nService); // initializes document.lang via the constructor default
+      inject(BrandingService).init(); // app name from site config → tab title/header/home
       inject(AuthService).ensureLoaded().subscribe();
-      inject(SwUpdateService).init(); // PWA-Update-Hinweis (#5)
+      inject(SwUpdateService).init();
     }),
-    // PWA (#5): Service worker nur im Prod-Build (ngsw-config.json cached App-Shell
-    // + Assets; /api wird nicht gecacht). Registrierung erst wenn die App stabil ist.
+    // PWA: service worker only in the prod build (ngsw-config.json caches the app
+    // shell + assets; /api is not cached). Registered once the app is stable.
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

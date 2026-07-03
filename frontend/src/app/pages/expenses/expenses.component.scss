@@ -1,5 +1,5 @@
 :host { display: block; }
-/* Kopf auf normale Body-Breite zentrieren (wie Anträge); Baum im linken Rand. */
+/* Centre the header at normal body width (like applications); tree in the left margin. */
 .exp__head { width: 100%; max-width: var(--layout-max-width); margin: 0 auto var(--space-5); }
 .exp__title { margin: 0; }
 .exp__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
@@ -11,7 +11,7 @@
   color: var(--color-text);
   font: inherit;
 }
-/* Text-Inputs auf Control-Höhe → bündig mit app-select/datepicker daneben (#dropdown-height). */
+/* Text inputs at control height → flush with app-select/datepicker beside them. */
 input.exp__input {
   height: var(--control-height);
   box-sizing: border-box;
@@ -26,7 +26,7 @@ input.exp__input {
   gap: var(--space-5);
   align-items: start;
 }
-/* Kostenstellen-Baum im linken Rand (Breakout) + sticky (wie Anträge). */
+/* Cost-centre tree in the left margin (breakout) + sticky (like applications). */
 .exp__tree {
   justify-self: end;
   width: 100%;
@@ -63,7 +63,7 @@ input.exp__input {
 .exp__invDetails dt { color: var(--color-text-muted); }
 .exp__invDetails dd { margin: 0; }
 .exp__sentinel { height: 1px; }
-/* --- Tabelle (#25) --- */
+/* --- Table --- */
 .exp__tableWrap {
   overflow-x: auto;
   border: var(--border-width) solid var(--color-border);
@@ -95,7 +95,7 @@ input.exp__input {
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   white-space: nowrap;
-  /* Dunklerer, höherer Header wie die shared DataTable — #table-parity. */
+  /* Darker, taller header like the shared DataTable. */
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface-sunken);
 }
@@ -129,7 +129,7 @@ input.exp__input {
   max-width: 22rem;
   overflow-wrap: anywhere;
 }
-// Gekürzte Beschreibung aufklappen (#expenses-ux): inline-Link „mehr"/„weniger".
+// Expand a truncated description: inline "more"/"less" link.
 .exp__more {
   background: transparent;
   border: 0;
@@ -144,8 +144,8 @@ input.exp__input {
 .exp__more:hover {
   text-decoration: underline;
 }
-// Empfänger/Zahler (+ Kostenstelle) umbrechen statt überlaufen (#expenses-ux): lange
-// Namen/IBANs ohne Leerzeichen müssen brechen dürfen.
+// Wrap payee/payer (+ cost centre) instead of overflowing: long names/IBANs
+// without spaces must be allowed to break.
 .exp__cellMeta {
   max-width: 14rem;
   overflow-wrap: anywhere;
@@ -172,11 +172,11 @@ input.exp__input {
   gap: var(--space-1);
   justify-content: flex-end;
 }
-/* Zwei-Spalten-Reihe für zusammengehörige Felder (Daten, Beleg/Methode). */
+/* Two-column row for related fields (dates, receipt/method). */
 .exp__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
 .exp__textarea { resize: vertical; min-height: 4.5rem; }
 @media (max-width: 30rem) { .exp__grid2 { grid-template-columns: 1fr; } }
-/* Antrags-Typeahead (wie Nutzersuche) */
+/* Application typeahead (like the user search) */
 .exp__suggest {
   list-style: none;
   margin: var(--space-1) 0 0;
@@ -205,13 +205,13 @@ input.exp__input {
   font: inherit;
 }
 .exp__suggestItem:hover { background: var(--color-primary-subtle); }
-/* Betrags-Filter (von/bis) */
+/* Amount filter (from/to) */
 @media (max-width: 720px) {
   .exp__layout { grid-template-columns: 1fr; }
   .exp__tree { position: static; max-height: none; }
 }
-/* Mobil (≤768px): Baum hinter einklappbarem Toggle (Standard: zu),
-   eine Spalte. Desktop unverändert — Toggle existiert dort nur versteckt. */
+/* Mobile (≤768px): tree behind a collapsible toggle (default: closed),
+   single column. Desktop unchanged — the toggle only exists hidden there. */
 .exp__treeToggle {
   display: none;
 }
@@ -247,7 +247,7 @@ input.exp__input {
     display: block;
   }
 }
-/* Mobil (≤768px): Suche in voller Breite, Tabellenzeilen als Karten (rein CSS). */
+/* Mobile (≤768px): full-width search, table rows as cards (pure CSS). */
 @media (max-width: 768px) {
   .exp__search { flex: 1 1 100%; min-width: 0; }
   .exp__tableWrap {
@@ -276,8 +276,8 @@ input.exp__input {
     padding: 0;
     border-bottom: none;
   }
-  /* Karten-Aufbau (#mobile-cards): Beschreibung oben (fett, volle Breite),
-     dann Art-Badge + Betrag, dann eine gedämpfte Meta-Zeile. */
+  /* Card layout: description on top (bold, full width), then kind badge +
+     amount, then a muted meta row. */
   .exp__cellDesc {
     flex: 1 1 100%;
     min-width: 0;
@@ -286,15 +286,15 @@ input.exp__input {
     font-weight: var(--fw-medium);
   }
   .exp__cellKind { order: -2; }
-  /* Betrag prominent, rechtsbündig auf der Badge-Zeile. */
+  /* Amount prominent, right-aligned on the badge row. */
   .exp__amount {
     order: -1;
     margin-left: auto;
     font-size: var(--fs-md);
     font-weight: var(--fw-semibold);
   }
-  /* Sekundär-Infos (Daten, Empfänger, Kostenstelle, Antrag, Konto) klein +
-     gedämpft auf eigener, umbrechender Zeile → weniger gedrängt. */
+  /* Secondary info (dates, payee, cost centre, application, account) small +
+     muted on its own wrapping row → less crowded. */
   .exp__cellDate,
   .exp__cellMeta {
     flex: 0 1 auto;
@@ -303,19 +303,19 @@ input.exp__input {
     font-size: var(--fs-xs);
     color: var(--color-text-muted);
   }
-  /* Aktionen auf eigene Zeile (große Tap-Ziele). */
+  /* Actions on their own row (large tap targets). */
   .exp__actions { margin-left: auto; }
   .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
 }
 
-/* --- Unterbuchungen (#subbookings): volle Zeilen wie die Eltern, nur eingefärbt --- */
+/* --- Sub-bookings: full rows like the parents, just tinted --- */
 .exp__subCount {
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
   font-weight: var(--fw-semibold);
 }
-/* Identische Zell-Geometrie wie normale Zeilen (gleiche td-Regeln greifen); nur Hintergrund +
-   ein dezenter linker Akzent kennzeichnen die Unterbuchung. */
+/* Identical cell geometry to normal rows (same td rules apply); only the background +
+   a subtle left accent mark the sub-booking. */
 .exp__subRow > td {
   background: var(--color-surface-sunken);
 }

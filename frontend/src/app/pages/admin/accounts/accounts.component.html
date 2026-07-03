@@ -26,8 +26,8 @@
     <app-input id="acc-iban" [label]="'admin.accounts.iban' | t" [ngModel]="fIban()" (ngModelChange)="fIban.set($event)" name="iban" [placeholder]="'admin.accounts.ibanPlaceholder' | t" />
     <app-checkbox [ngModel]="fActive()" (ngModelChange)="fActive.set($event)" name="active">{{ 'admin.accounts.active' | t }}</app-checkbox>
 
-    <!-- FinTS-Bank-Verbindung (#fints): nur Endpunkt + BLZ. Persönliche Logins/PINs setzt
-         jeder Bucher selbst im Buchungs-Tab (#fints-percred). -->
+    <!-- FinTS bank connection: endpoint + bank code only. Each booker sets their own
+         login/PIN in the booking tab. -->
     <fieldset class="acc__fints">
       <legend class="acc__fintsLegend">{{ 'admin.accounts.fintsTitle' | t }}</legend>
       <p class="acc__hint">{{ 'admin.accounts.fintsDesc' | t }}</p>

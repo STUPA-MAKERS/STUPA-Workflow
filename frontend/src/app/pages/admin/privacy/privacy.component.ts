@@ -19,11 +19,11 @@ import { AdminApiService } from '../admin-api.service';
 import type { ErasureRequest } from '../admin.models';
 
 /**
- * Admin → Datenschutz (#PII-Re-Add, P `privacy.manage`): DSGVO-Verwaltung.
+ * Admin → privacy (permission `privacy.manage`): GDPR administration.
  *
- * Vier Bereiche: Löschantrags-Queue (ausführen/ablehnen), Principal-Löschung
- * (Art. 17), Auskunft-Export (Art. 15, XLSX) und der globale Aufbewahrungs-Default
- * (Art. 5(1)(e)). Mutationen werden serverseitig auditiert.
+ * Four areas: erasure-request queue (execute/reject), principal erasure
+ * (Art. 17), access export (Art. 15, XLSX) and the global retention default
+ * (Art. 5(1)(e)). Mutations are audited server-side.
  */
 @Component({
   selector: 'app-admin-privacy',

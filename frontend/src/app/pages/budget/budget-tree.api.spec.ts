@@ -436,7 +436,7 @@ describe('BudgetTreeApi', () => {
         })
         .subscribe();
       const req = http.expectOne((r) => r.url === `${BASE}/statement-lines`);
-      // linked=false ist gesetzt (nicht undefined) → als String übertragen.
+      // linked=false is set (not undefined) -> sent as a string.
       expect(req.request.params.get('linked')).toBe('false');
       expect(req.request.params.get('kind')).toBe('income');
       expect(req.request.params.get('q')).toBe('miete');

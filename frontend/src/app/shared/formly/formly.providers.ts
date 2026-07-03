@@ -9,11 +9,10 @@ import { FormlyDisplayType } from './types/formly-display.type';
 import { FormlyPositionsType } from './types/formly-positions.type';
 
 /**
- * Formly-Grundkonfiguration. Registriert die UI-Kit-gebundenen Feldtypen für die
- * Form-Definition (config_schemas §5.1): `input` deckt text/number/currency/date
- * (über `props.type`), dazu textarea/select/checkbox/multicheckbox sowie ein
- * read-only `display` für `markdown`/`computed`. Mapping in
- * `@shared/forms/formly-mapper`.
+ * Formly base configuration. Registers the UI-kit-bound field types for the form
+ * definition: `input` covers text/number/currency/date (via `props.type`), plus
+ * textarea/select/checkbox/multicheckbox and a read-only `display` for
+ * `markdown`/`computed`. Mapping in `@shared/forms/formly-mapper`.
  */
 export function provideFormly(): Provider {
   return provideFormlyCore({

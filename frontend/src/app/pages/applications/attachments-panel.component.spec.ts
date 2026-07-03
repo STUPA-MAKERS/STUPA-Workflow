@@ -32,7 +32,7 @@ async function setup(canUpload = true) {
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   const toast = view.fixture.debugElement.injector.get(ToastService);
-  // Hydration-GET (bestehende Anhänge) beim Init leeren.
+  // Empty the hydration GET (existing attachments) on init.
   http
     .expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`)
     .flush([]);

@@ -104,7 +104,7 @@ describe('toFormlyFields', () => {
     ];
     const out = toFormlyFields(fields, 'de');
     expect(out).toHaveLength(2);
-    // Abschnitts-Marker → keyless display-Überschrift; echtes Feld unverändert.
+    // Section marker → keyless display heading; real field unchanged.
     expect(out[0].type).toBe('display');
     expect(out[0].props?.['heading']).toBe(true);
     expect(out[0].props?.['label']).toBe('Schritt 1');

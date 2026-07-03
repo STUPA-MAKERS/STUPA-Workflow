@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
-/** Öffentliche Startseite — Applicant-fokussiert: ein Antrags-CTA, keine Konto-Hinweise. */
+/** Public home page — applicant-focused: one application CTA, no account hints. */
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -13,6 +13,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
   styleUrl: './home.component.scss',
 })
 export class HomeComponent {
-  /** Konfigurierbarer App-Name für die Eyebrow-Zeile (Fallback: i18n `app.title`, #brand-name). */
+  /** Configurable app name for the eyebrow line (fallback: i18n `app.title`). */
   readonly branding = inject(BrandingService);
 }

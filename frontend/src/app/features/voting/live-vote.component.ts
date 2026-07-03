@@ -18,10 +18,10 @@ import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from './vote-bars.component';
 
 /**
- * Mobiles Live-Vote (AK T-32): per WebSocket (api.md §4) freischalten → casten →
- * Ergebnis. Daumen-Bedienung (große Touch-Ziele), Reconnect-Banner bei
- * Verbindungsverlust (Session resynct via `subscribe`). Nicht stimmberechtigt
- * (Server-`error: not_eligible` **oder** fehlende FE-Permission) → Hinweis.
+ * Mobile live vote: unlock via WebSocket → cast → result. Thumb-friendly (large
+ * touch targets), reconnect banner on connection loss (the session resyncs via
+ * `subscribe`). Not eligible (server `error: not_eligible` or missing FE
+ * permission) → notice.
  */
 @Component({
   selector: 'app-live-vote',
@@ -62,7 +62,7 @@ export class LiveVoteComponent implements OnDestroy {
     this.result = this.session.result;
     this.errorCode = this.session.errorCode;
 
-    // Neue Abstimmung → eigene Wahl zurücksetzen.
+    // New vote → reset own choice.
     let lastVoteId: string | null = null;
     effect(() => {
       const id = this.vote()?.voteId ?? null;

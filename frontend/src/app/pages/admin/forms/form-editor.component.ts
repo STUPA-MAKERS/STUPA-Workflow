@@ -39,27 +39,26 @@ import {
 } from '../form-field.util';
 
 /**
- * Sichtbare Reihenfolge der Frage-Typen im »Frage hinzufügen«-Menü. `section` ist
- * **kein** wählbarer Typ mehr — Abschnitte werden über Gruppen-Container modelliert
- * (der Marker bleibt nur das Serialisierungs-Primitiv).
+ * Visible order of question types in the "add question" menu. `section` is **not**
+ * a selectable type anymore — sections are modeled via group containers (the
+ * marker stays only the serialization primitive).
  */
 const TYPE_MENU: readonly FieldType[] = FIELD_TYPES.filter((t) => t !== 'section');
 
-/** Stabile Adresse einer Frage: Gruppen-Index + Frage-Index innerhalb der Gruppe. */
+/** Stable address of a question: group index + question index within the group. */
 interface QPos {
   gi: number;
   qi: number;
 }
 
 /**
- * Formular-Editor im **Nextcloud-Forms-Stil** (#13), umgebaut auf explizite
- * **Frage-Gruppen**: jede Gruppe ist ein betitelter Container (= ein Wizard-Schritt),
- * der Gruppen-Titel ist die Schritt-Überschrift. Innerhalb einer Gruppe liegen die
- * Frage-Karten (Titel/Hilfe DE/EN, Pflicht, Optionen, ⋯-Panel …). Gruppen lassen
- * sich umsortieren/hinzufügen/löschen; Fragen innerhalb einer Gruppe verschieben.
- * Beim Speichern werden die Gruppen zurück in die flache `fields[]`-Liste serialisiert
- * (führender `section`-Marker je Gruppe), sodass Backend + Apply-Wizard unverändert
- * je Gruppe einen Schritt rendern.
+ * Form editor in **Nextcloud-Forms style**, rebuilt around explicit **question
+ * groups**: each group is a titled container (= one wizard step), the group title
+ * is the step heading. A group holds the question cards (title/help DE/EN,
+ * required, options, ⋯ panel …). Groups can be reordered/added/removed; questions
+ * move within a group. On save the groups serialize back into the flat `fields[]`
+ * list (a leading `section` marker per group), so backend + apply wizard render one
+ * step per group unchanged.
  */
 @Component({
   selector: 'app-form-editor',
@@ -84,41 +83,41 @@ export class FormEditorComponent {
   private readonly i18n = inject(I18nService);
 
   protected readonly typeId = signal<Uuid>('');
-  /** Versions-Sidebar — nach Save neu laden. */
+  /** Version sidebar — reload after save. */
   protected readonly history = viewChild(VersionHistoryComponent);
   protected readonly title = signal<I18nMap>({ de: '', en: '' });
   protected readonly description = signal<I18nMap>({ de: '', en: '' });
-  /** »Mit Budget«: erlaubt die Topf-Auswahl beim Antrag (application_type.has_budget). */
+  /** "With budget": allows pot selection on the application (application_type.has_budget). */
   protected readonly hasBudget = signal(false);
-  /** Vergleichsangebote-Regel (#5-4): erforderlich + Mindestanzahl. */
+  /** Comparison-offers rule: required + minimum count. */
   protected readonly cmpRequired = signal(false);
   protected readonly cmpMinCount = signal(2);
-  /** Vom Server geladene Zusatzfelder der Regel — beim Speichern erhalten (nicht im UI). */
+  /** Extra rule fields loaded from the server — preserved on save (not in the UI). */
   private cmpThreshold: string | null = null;
   private cmpAs: 'file' | 'field' | 'both' = 'file';
-  /** Editor-Zustand: Fragen, gruppiert in betitelte Container (= Wizard-Schritte). */
+  /** Editor state: questions grouped into titled containers (= wizard steps). */
   protected readonly groups = signal<QuestionGroup[]>([]);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
-  /** Aktuelle Form-Version ist aktiv? (für neue Anträge nutzbar, #forms) */
+  /** Is the current form version active? (usable for new applications) */
   protected readonly active = signal(false);
-  /** Aktuelle Form-Version (#5-4) — Anzeige, welche Version bearbeitet wird. */
+  /** Current form version — shows which version is being edited. */
   protected readonly formVersion = signal<number | null>(null);
-  /** Existiert überhaupt eine Form-Version (sonst nichts zu (de)aktivieren)? */
+  /** Does a form version exist at all (otherwise nothing to (de)activate)? */
   protected readonly hasVersion = signal(false);
   protected readonly togglingActive = signal(false);
-  /** Editieren vs. Vorschau (View/Edit-Toggle, NC-Forms). */
+  /** Edit vs. preview (view/edit toggle). */
   protected readonly preview = signal(false);
-  /** Welche Karten ihre erweiterten Optionen (⋯) zeigen — Schlüssel = "gi:qi". */
+  /** Which cards show their advanced options (⋯) — key = "gi:qi". */
   protected readonly expanded = signal<Record<string, boolean>>({});
-  /** Offen: das »Frage hinzufügen«-Typ-Menü je Gruppe (Gruppen-Index oder null). */
+  /** Open "add question" type menu per group (group index or null). */
   protected readonly typeMenuGroup = signal<number | null>(null);
-  /** Roh-Editierstrings der JsonLogic-Felder ("gi:qi" → {visibleIf, compute}). */
+  /** Raw edit strings of the JsonLogic fields ("gi:qi" → {visibleIf, compute}). */
   private readonly rawLogic = signal<Record<string, { visibleIf?: string; compute?: string }>>({});
-  /** Aktuell gezogene Gruppe (Drag-Reorder ganzer Gruppen). */
+  /** Currently dragged group (drag-reorder of whole groups). */
   private dragGroup: number | null = null;
 
-  /** Ursprünglicher Typ-Stand — nur bei Änderung wird der Typ gepatcht. */
+  /** Original type state — the type is patched only on change. */
   private originalTitle: I18nMap = { de: '', en: '' };
   private originalHasBudget = false;
   private originalCmpRequired = false;
@@ -130,17 +129,17 @@ export class FormEditorComponent {
     value: t,
     label: this.i18n.translate(`admin.form.type.${t}` as TranslationKey),
   }));
-  /** Gültige Ziel-Kennzahlen als Dropdown (nur serverseitig ausgewertete Werte). */
+  /** Valid promote targets as a dropdown (only server-evaluated values). */
   protected readonly promoteTargetOptions: SelectOption[] = PROMOTE_TARGETS.map((v) => ({
     value: v,
     label: this.i18n.translate(`admin.form.metric.${v}` as TranslationKey),
   }));
 
-  /** Flache Sicht der Frage-Felder (ohne Marker) — für Key-/Validierungs-Prüfungen. */
+  /** Flat view of the question fields (no markers) — for key/validation checks. */
   private readonly flatQuestions = computed(() => this.groups().flatMap((g) => g.fields));
 
   protected readonly duplicates = computed(() => duplicateKeys(this.flatQuestions()));
-  /** Validierungsfehler je Frage, indexiert über "gi:qi". */
+  /** Validation errors per question, indexed by "gi:qi". */
   protected readonly fieldErrors = computed(() => {
     const map: Record<string, string[]> = {};
     this.groups().forEach((g, gi) =>
@@ -188,7 +187,7 @@ export class FormEditorComponent {
     });
     this.api.getFormDraft(id).subscribe({
       next: (draft) => {
-        // Flache Felder in Gruppen entpacken (Split an `section`-Markern).
+        // Unpack flat fields into groups (split at `section` markers).
         this.groups.set(
           groupsFromFields(draft.fields.map((f) => ({ ...f, label: { ...f.label } }))),
         );
@@ -203,13 +202,13 @@ export class FormEditorComponent {
     });
   }
 
-  /** Nach einem Versions-Restore (Sidebar) den Editor-Stand neu laden. */
+  /** Reload the editor state after a version restore (sidebar). */
   protected onVersionRestored(): void {
     const id = this.typeId();
     if (id) this.load(id);
   }
 
-  /** Formular aktivieren/deaktivieren (#forms) — deaktiviert sperrt neue Anträge. */
+  /** Activate/deactivate the form — deactivated blocks new applications. */
   protected toggleActive(): void {
     const id = this.typeId();
     if (!id || this.togglingActive()) return;
@@ -248,12 +247,12 @@ export class FormEditorComponent {
   }
 
   // --- group helpers -------------------------------------------------------
-  /** Eine Gruppe in-place mutieren und das Signal anstoßen. */
+  /** Mutate a group in place and poke the signal. */
   private patchGroup(gi: number, fn: (g: QuestionGroup) => QuestionGroup): void {
     this.groups.update((list) => list.map((g, i) => (i === gi ? fn(g) : g)));
   }
 
-  /** Eine Frage in-place mutieren. */
+  /** Mutate a question in place. */
   private patchQuestion(pos: QPos, fn: (f: FormFieldDef) => FormFieldDef): void {
     this.patchGroup(pos.gi, (g) => ({
       ...g,
@@ -311,7 +310,7 @@ export class FormEditorComponent {
     });
   }
 
-  /** Frage innerhalb ihrer Gruppe verschieben; an den Rändern in die Nachbargruppe. */
+  /** Move a question within its group; at the edges into the neighboring group. */
   protected moveQuestion(pos: QPos, dir: -1 | 1): void {
     const groups = this.groups();
     const group = groups[pos.gi];
@@ -326,7 +325,7 @@ export class FormEditorComponent {
       });
       return;
     }
-    // An den Rand gestoßen → in die Nachbargruppe übergeben (falls vorhanden).
+    // Hit the edge → hand off to the neighboring group (if any).
     const ngi = pos.gi + dir;
     if (ngi < 0 || ngi >= groups.length) return;
     this.groups.update((list) => {
@@ -348,7 +347,7 @@ export class FormEditorComponent {
       next.options = [blankOption()];
     }
     if (type === 'computed' && !next.compute) next.compute = { var: '' };
-    // Nicht-numerische Typen können nicht in eine Kennzahl promotet werden (#13).
+    // Non-numeric types cannot be promoted into a metric.
     if (type !== 'number' && type !== 'currency') {
       delete next.isPromoted;
       delete next.promoteTarget;
@@ -356,7 +355,7 @@ export class FormEditorComponent {
     return next;
   }
 
-  /** PII-/Kennzahl-Schalter: beim Aktivieren eine gültige Ziel-Kennzahl vorbelegen. */
+  /** PII/metric toggle: on enable, prefill a valid promote target. */
   protected onPromotedToggle(pos: QPos, checked: boolean): void {
     this.patchQuestion(pos, (f) => {
       const next = { ...f, isPromoted: checked };
@@ -377,7 +376,7 @@ export class FormEditorComponent {
     }));
   }
 
-  /** Mutationen anstoßen, damit Computed-Signale (Validierung) neu rechnen. */
+  /** Poke mutations so computed signals (validation) recompute. */
   protected touch(): void {
     this.groups.update((list) => [...list]);
   }
@@ -403,12 +402,12 @@ export class FormEditorComponent {
     return type === 'positions';
   }
 
-  /** Numerisch (min/max + promotebar). */
+  /** Numeric (min/max + promotable). */
   protected isNumeric(type: FieldType): boolean {
     return type === 'number' || type === 'currency';
   }
 
-  /** Text (Längen/Pattern-Validierung sinnvoll). */
+  /** Text (length/pattern validation applies). */
   protected isText(type: FieldType): boolean {
     return type === 'text' || type === 'textarea';
   }
@@ -488,7 +487,7 @@ export class FormEditorComponent {
       this.toast.error(this.i18n.translate('admin.common.invalid'));
       return;
     }
-    // Gruppen → flache Felder (Marker je Gruppe), dann normalisieren wie bisher.
+    // Groups → flat fields (marker per group), then normalize as before.
     const flat = groupsToFields(this.groups());
     const normalized = flat.map(normalizeFormField);
     const description: I18nMap = { ...this.description() };
@@ -516,7 +515,7 @@ export class FormEditorComponent {
         this.originalHasBudget = this.hasBudget();
         this.originalCmpRequired = this.cmpRequired();
         this.originalCmpMinCount = this.cmpMinCount();
-        // Speichern legt eine neue, **aktive** Version an (#forms).
+        // Saving creates a new, **active** version.
         this.active.set(true);
         this.hasVersion.set(true);
         this.toast.success(this.i18n.translate('admin.common.saved'));

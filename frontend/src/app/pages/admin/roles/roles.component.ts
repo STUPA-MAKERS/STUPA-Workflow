@@ -18,7 +18,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import type { Role } from '../admin.models';
 
-/** Entwurf für eine neue globale Rolle. */
+/** Draft for a new global role. */
 interface RoleDraft {
   key: string;
   labelDe: string;
@@ -26,10 +26,10 @@ interface RoleDraft {
 }
 
 /**
- * Rollen & Rechte (#21) als **Baum-Tabelle**: jede (globale) Rolle ist eine Zeile;
- * Aufklappen zeigt ihre Berechtigungen als Checkbox-Detail. Im selben View ein
- * **Dialog** zum Anlegen globaler Rollen. Die Admin-Rolle ist gesperrt (immer alle
- * Rechte). Gremium-Rollen werden pro Gremium verwaltet — hier nur globale.
+ * Roles & permissions as a **tree table**: each (global) role is a row; expanding
+ * shows its permissions as a checkbox detail. The same view has a **dialog** to
+ * create global roles. The admin role is locked (always all rights). Gremium roles
+ * are managed per gremium — only global ones here.
  */
 @Component({
   selector: 'app-admin-roles',
@@ -62,7 +62,7 @@ export class AdminRolesComponent {
   protected readonly expanded = signal<Set<string>>(new Set());
   protected readonly addOpen = signal(false);
   protected readonly draft = signal<RoleDraft>({ key: '', labelDe: '', labelEn: '' });
-  /** Rolle, deren Löschung gerade bestätigt wird (#40). */
+  /** Role whose deletion is currently being confirmed. */
   protected readonly confirmRole = signal<Role | null>(null);
 
   protected readonly columns = computed<ColumnDef[]>(() => [
@@ -87,12 +87,12 @@ export class AdminRolesComponent {
     return role.key === 'admin';
   }
 
-  /** Alle Rollen außer admin/member sind löschbar (#38). */
+  /** All roles except admin/member are deletable. */
   protected canDelete(role: Role): boolean {
     return role.key !== 'admin' && role.key !== 'member';
   }
 
-  /** Zeilen-Klick klappt die Rechte auf/zu (#40). */
+  /** Row click expands/collapses the permissions. */
   protected onRowClick(row: unknown): void {
     this.toggle((row as Role).id);
   }
@@ -140,9 +140,9 @@ export class AdminRolesComponent {
     });
   }
 
-  // --- Umbenennen (Anzeigename; Key unveränderlich) ------------------------
+  // --- Rename (display name; key immutable) --------------------------------
   private readonly nameDrafts = signal<Record<string, { de: string; en: string }>>({});
-  /** Aktueller Namens-Entwurf (initial aus dem aktuellen Label). */
+  /** Current name draft (initially from the current label). */
   protected nameDraft(role: Role): { de: string; en: string } {
     return (
       this.nameDrafts()[role.id] ?? {
@@ -166,7 +166,7 @@ export class AdminRolesComponent {
     });
   }
 
-  // --- globale Rolle anlegen -----------------------------------------------
+  // --- create global role --------------------------------------------------
   protected openAdd(): void {
     this.draft.set({ key: '', labelDe: '', labelEn: '' });
     this.addOpen.set(true);

@@ -38,10 +38,10 @@ interface ReadonlyRow {
 }
 
 /**
- * Magic-Link Status-/Timeline-Seite (T-30, flows §2). Verifiziert den Token,
- * zeigt Status, Verlauf und öffentliche Kommentare und erlaubt das Bearbeiten der
- * Antwortdaten — read-only, wenn der aktuelle Status nicht editierbar ist
- * (`state.editAllowed`) oder der Link nur `view`-Scope hat.
+ * Magic-link status/timeline page. Verifies the token, shows status, history
+ * and public comments, and allows editing the answer data — read-only when the
+ * current status is not editable (`state.editAllowed`) or the link has only
+ * `view` scope.
  */
 @Component({
   selector: 'app-status-timeline',
@@ -75,16 +75,16 @@ export class StatusTimelineComponent {
   readonly timeline = signal<TimelineEntry[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
   readonly readonlyRows = signal<ReadonlyRow[]>([]);
-  /** Vom Antragsteller feuerbare Übergänge (actorIsApplicant-Gate); leer ⇒ keine Aktionen. */
+  /** Transitions the applicant can fire (actorIsApplicant gate); empty ⇒ no actions. */
   readonly actions = signal<Transition[]>([]);
-  /** Id des gerade feuernden Übergangs (Button-Spinner / Sperre). */
+  /** Id of the currently firing transition (button spinner / lock). */
   readonly firing = signal<string | null>(null);
 
   readonly editFields = signal<FormlyFieldConfig[]>([]);
   editModel: Record<string, unknown> = {};
   readonly editForm = new FormGroup({});
   readonly saving = signal(false);
-  /** Magic-Link-Scope: `view` sperrt die Bearbeitung unabhängig vom Status. */
+  /** Magic-link scope: `view` locks editing regardless of status. */
   private readonly editScope = signal(true);
 
   readonly commentBody = new FormControl('', {
@@ -93,7 +93,7 @@ export class StatusTimelineComponent {
   });
   readonly postingComment = signal(false);
 
-  /** DSGVO Art. 17: Anonymisierung der eigenen Antragsdaten beantragen. */
+  /** GDPR Art. 17: request anonymization of one's own application data. */
   readonly confirmErase = signal(false);
   readonly requestingErasure = signal(false);
 
@@ -101,26 +101,26 @@ export class StatusTimelineComponent {
     () => this.editScope() && Boolean(this.application()?.state?.editAllowed),
   );
 
-  /** Anhänge sind auch in gesperrten States nachreichbar (Belege/Rechnungen nach
-   *  der Entscheidung, #attachments-when-locked) — nur der Magic-Link-Scope zählt. */
+  /** Attachments can still be added in locked states (receipts/invoices after the
+   *  decision) — only the magic-link scope counts. */
   readonly canUploadAttachments = computed(() => this.editScope());
 
   constructor() {
     const snap = this.route.snapshot;
     const query = snap.queryParamMap;
-    // Magic-Link-Ziel ist /antrag/{id}#t={token}: Token steht im **Fragment**
-    // (kein Referer-/Log-Leak, security.md §1), die App-ID im Pfad. Query-Form
-    // (?t=&app=) bleibt als Fallback erhalten.
+    // Magic-link target is /antrag/{id}#t={token}: the token is in the fragment
+    // (no Referer/log leak), the app id in the path. The query form (?t=&app=)
+    // stays as a fallback.
     const fragmentParams = new URLSearchParams(snap.fragment ?? '');
     const token = fragmentParams.get('t') ?? query.get('t');
     const appId = snap.paramMap.get('id') ?? query.get('app') ?? query.get('id');
 
     if (token) {
-      // Magic-Link-Token gegen die HttpOnly-Applicant-Cookie eintauschen.
+      // Exchange the magic-link token for the HttpOnly applicant cookie.
       this.verifyAndLoad(token, appId);
     } else if (appId) {
-      // Kein Token in der URL (z. B. Reload nach Token-Strip): bestehende
-      // Cookie-Session nutzen — der Interceptor sendet sie via withCredentials.
+      // No token in the URL (e.g. reload after token strip): use the existing
+      // cookie session — the interceptor sends it via withCredentials.
       this.load(appId);
     } else {
       this.phase.set('error');
@@ -132,8 +132,8 @@ export class StatusTimelineComponent {
       next: (res) => {
         this.editScope.set(res.scope === 'edit');
         const appId = res.application_id ?? fallbackAppId ?? '';
-        // Token aus der URL entfernen (History-/Referer-Leak vermeiden) und die
-        // App-ID für einen späteren Reload behalten.
+        // Strip the token from the URL (avoid History/Referer leak) and keep the
+        // app id for a later reload.
         this.stripTokenFromUrl(appId);
         this.load(appId);
       },
@@ -144,9 +144,9 @@ export class StatusTimelineComponent {
   }
 
   /**
-   * Magic-Link-Token aus der URL streichen (S3): er darf nicht in History oder
-   * `Referer` landen. App-ID bleibt erhalten, damit ein Reload die bestehende
-   * Cookie-Session weiterverwenden kann.
+   * Strip the magic-link token from the URL: it must not land in History or
+   * `Referer`. The app id is kept so a reload can reuse the existing cookie
+   * session.
    */
   private stripTokenFromUrl(appId: string): void {
     if (typeof window === 'undefined' || typeof history === 'undefined') return;
@@ -154,17 +154,17 @@ export class StatusTimelineComponent {
       const url = new URL(this.location.href);
       const frag = new URLSearchParams(url.hash.replace(/^#/, ''));
       if (!url.searchParams.has('t') && !frag.has('t')) return;
-      url.searchParams.delete('t'); // Query-Form
-      frag.delete('t'); // Fragment-Form (/antrag/:id#t=…)
+      url.searchParams.delete('t'); // query form
+      frag.delete('t'); // fragment form (/antrag/:id#t=…)
       url.hash = frag.toString() ? `#${frag.toString()}` : '';
-      // App-ID für einen Reload erhalten. Der Pfad /antrag/:id trägt sie bereits;
-      // nur für die ?app=-Form ergänzen.
+      // Keep the app id for a reload. The path /antrag/:id already carries it;
+      // only add it for the ?app= form.
       if (appId && !url.pathname.includes(appId) && !url.searchParams.has('app')) {
         url.searchParams.set('app', appId);
       }
       history.replaceState(history.state, '', url.toString());
     } catch {
-      /* History-API nicht verfügbar — unkritisch */
+      /* History API unavailable — non-critical */
     }
   }
 
@@ -177,7 +177,7 @@ export class StatusTimelineComponent {
       application: this.api.getApplication(appId),
       timeline: this.api.timeline(appId),
       comments: this.api.comments(appId),
-      // Aktionen sind optional: ein Fehler darf die Statusseite nicht kippen.
+      // Actions are optional: an error must not break the status page.
       actions: this.api.applicantTransitions(appId).pipe(catchError(() => of([]))),
     }).subscribe({
       next: ({ application, timeline, comments, actions }) => {
@@ -193,7 +193,7 @@ export class StatusTimelineComponent {
     });
   }
 
-  /** Anzeigename eines Kommentars (Fallback: Antragsteller:in/Gremium) — wie intern. */
+  /** Display name of a comment (fallback: applicant/committee) — as internal. */
   authorName(comment: ApplicationComment): string {
     if (comment.author) return comment.author;
     return this.i18n.translate(
@@ -203,7 +203,7 @@ export class StatusTimelineComponent {
     );
   }
 
-  /** Initialen für den Chat-Avatar (wie intern). */
+  /** Initials for the chat avatar (as internal). */
   initial(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return '?';
@@ -212,7 +212,7 @@ export class StatusTimelineComponent {
     return (first + last).toUpperCase();
   }
 
-  /** Einen Antragsteller-Übergang feuern (actorIsApplicant-Gate) und neu laden. */
+  /** Fire an applicant transition (actorIsApplicant gate) and reload. */
   fireAction(t: Transition): void {
     const app = this.application();
     if (!app || this.firing()) return;
@@ -220,7 +220,7 @@ export class StatusTimelineComponent {
     this.api.fireApplicantTransition(app.id, { transitionId: t.id }).subscribe({
       next: () => {
         this.firing.set(null);
-        this.load(app.id); // Status/Verlauf/Aktionen spiegeln den neuen State.
+        this.load(app.id); // status/history/actions reflect the new state.
       },
       error: () => {
         this.firing.set(null);
@@ -235,7 +235,7 @@ export class StatusTimelineComponent {
         this.buildView(eff, application);
         this.phase.set('ready');
       },
-      // Form-Definition optional: Status/Timeline bleiben auch ohne sie nutzbar.
+      // Form definition optional: status/timeline stay usable without it.
       error: () => this.phase.set('ready'),
     });
   }
@@ -278,7 +278,7 @@ export class StatusTimelineComponent {
     return this.optionLabel(field, value, lang);
   }
 
-  /** Kostenpositionen kompakt (wie interne Detailseite): Anzahl + Σ der bevorzugten Angebote. */
+  /** Cost positions compact (as internal detail page): count + Σ of preferred offers. */
   private formatPositions(value: unknown): string {
     if (!Array.isArray(value)) return '';
     let total = 0;
@@ -294,9 +294,8 @@ export class StatusTimelineComponent {
   }
 
   /**
-   * Maschinen-Notizen der Timeline lesbar machen: automatische Übergänge aus
-   * Abstimmungen tragen `vote:<result>` (voting/service.py) — als übersetztes
-   * Ergebnis anzeigen statt roh.
+   * Make machine notes in the timeline readable: automatic transitions from votes
+   * carry `vote:<result>` — show a translated result instead of the raw value.
    */
   noteText(note: string): string {
     const resultKeys = {
@@ -346,7 +345,7 @@ export class StatusTimelineComponent {
     });
   }
 
-  /** DSGVO Art. 17: Anonymisierung der eigenen Antragsdaten beantragen. */
+  /** GDPR Art. 17: request anonymization of one's own application data. */
   doRequestErasure(): void {
     const app = this.application();
     if (!app || this.requestingErasure()) return;

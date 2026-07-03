@@ -5,11 +5,10 @@ import type { BudgetTreeNode } from './budget-tree.api';
 import { PALETTE } from './budget-year-tree.component';
 
 /**
- * Wiederverwendbarer Kostenstellen-Baum-Picker (#applications-tree). Gleiche Optik
- * wie der Budget→Jahr-Baum (`app-budget-year-tree`): farbige Punkte an den
- * Wurzeln, gepunktete hellgrüne Verbindungslinien zu Unterknoten, kompaktes
- * Hervorheben der Auswahl. Rekursiv über die gesamte Hierarchie. Optionaler
- * „Alle"-Knoten (Wert ``''``) ganz oben.
+ * Reusable cost-centre tree picker. Same look as the budget→year tree
+ * (`app-budget-year-tree`): coloured dots at the roots, dotted light-green
+ * connector lines to sub-nodes, compact selection highlight. Recursive over the
+ * whole hierarchy. Optional "all" node (value ``''``) at the top.
  */
 @Component({
   selector: 'app-cost-centre-tree',
@@ -20,15 +19,15 @@ import { PALETTE } from './budget-year-tree.component';
   styleUrl: './cost-centre-tree.component.scss',
 })
 export class CostCentreTreeComponent {
-  /** Voller Kostenstellen-Baum (Wurzeln mit ``children``). */
+  /** Full cost-centre tree (roots with ``children``). */
   readonly nodes = input<BudgetTreeNode[]>([]);
   readonly selectedId = input<string>('');
-  /** Label des „Alle"-Knotens; leer = keiner. */
+  /** Label of the "all" node; empty = none. */
   readonly allLabel = input<string>('');
   readonly ariaLabel = input<string>('');
   readonly emptyLabel = input<string>('');
 
-  /** Gewählte Kostenstelle (``''`` = Alle). */
+  /** Selected cost centre (``''`` = all). */
   readonly picked = output<Uuid | ''>();
 
   private readonly rootIds = computed(() => this.nodes().map((n) => n.id));

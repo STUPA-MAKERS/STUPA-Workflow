@@ -15,12 +15,11 @@ import {
 import { ToastService } from '@stupa-makers/ui-kit';
 
 /**
- * Admin-Übersicht der **sitzungsgebundenen** Vertretungen (#delegation-rework).
+ * Admin overview of session-bound representations.
  *
- * Delegationen legen die Mitglieder selbst auf der Sitzungsseite an (Self-Service,
- * Gremium muss es erlauben); Admins sehen hier alle aktiven/angelegten Vertretungen
- * und können sie notfalls widerrufen. Der Stellvertreter-Pool wird je Gremium in
- * der Mitgliederverwaltung gepflegt.
+ * Members create delegations themselves on the meeting page (self-service; the gremium
+ * must allow it); admins see all active/created representations here and can revoke them
+ * if needed. The substitute pool is maintained per gremium in the membership admin.
  */
 @Component({
   selector: 'app-delegations',

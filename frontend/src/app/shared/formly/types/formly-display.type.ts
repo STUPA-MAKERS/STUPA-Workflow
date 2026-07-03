@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 
-/** Formly-Feldtyp `display` — nicht-editierbarer Inhalt: Info-Text (`markdown`)
- * oder abgeleiteter Wert (`computed`). Liefert keinen Antragsteller-Input. */
+/** Formly field type `display` — non-editable content: info text (`markdown`)
+ * or a derived value (`computed`). Produces no applicant input. */
 @Component({
   selector: 'app-formly-display',
   standalone: true,
@@ -68,7 +68,7 @@ export class FormlyDisplayType extends FieldType<FieldTypeConfig> {
     return Boolean(this.props['computed']);
   }
 
-  /** Abschnitts-/Gruppen-Überschrift (statt Wert-Anzeige). */
+  /** Section/group heading (instead of a value display). */
   get isHeading(): boolean {
     return Boolean(this.props['heading']);
   }

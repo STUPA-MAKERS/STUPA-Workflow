@@ -69,7 +69,7 @@ async function setup(opts: { perms?: string[]; flushBudgets?: boolean } = {}) {
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   const router = view.fixture.debugElement.injector.get(Router);
   const cmp = view.fixture.componentInstance;
-  // Der Kostenstellen-Baum (linker Filter) wird im Konstruktor eager geladen.
+  // The cost-centre tree (left filter) is eagerly loaded in the constructor.
   if (opts.flushBudgets !== false) flushBudgets(http);
   return { ...view, http, router, cmp };
 }
@@ -78,7 +78,7 @@ function flushTypes(http: HttpTestingController) {
   http.expectOne('/api/application-types').flush(TYPES);
 }
 
-/** Kostenstellen-Baum (linker Filter-Picker) — eager im Konstruktor geladen. */
+/** Cost-centre tree (left filter picker) — eagerly loaded in the constructor. */
 function flushBudgets(http: HttpTestingController) {
   for (const req of http.match((r) => r.url === '/api/budgets')) req.flush([]);
 }
@@ -93,7 +93,7 @@ describe('ApplicationsListComponent', () => {
     detectChanges();
 
     expect(screen.getByRole('heading', { name: 'Anträge', level: 1 })).toBeInTheDocument();
-    // state appears both as the row badge and as a real status filter option (#review2 §2)
+    // state appears both as the row badge and as a real status filter option
     const badge = screen.getAllByText('Eingereicht').find((el) => el.tagName !== 'OPTION');
     expect(badge).toBeTruthy();
     expect(screen.getByText(/250/)).toBeInTheDocument();
@@ -184,7 +184,7 @@ describe('ApplicationsListComponent', () => {
     detectChanges();
 
     await userEvent.click(screen.getByRole('button', { name: 'Mehr laden' }));
-    // Nächster Offset = bisher geladene Trefferzahl (hier 1), Filter bleiben erhalten.
+    // Next offset = number of results loaded so far (here 1), filters preserved.
     const more = http.expectOne((r) => r.url === '/api/applications');
     expect(more.request.params.get('offset')).toBe('1');
     more.flush(listPage([ITEM2], 50));

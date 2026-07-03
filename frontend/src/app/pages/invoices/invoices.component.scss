@@ -10,9 +10,9 @@
   color: var(--color-text);
   font: inherit;
 }
-/* Texteingaben füllen ihre (Grid-)Zelle und dürfen darunter schrumpfen —
-   ohne min-width:0 erzwingt die intrinsische Feldbreite ein Überlaufen
-   des 1fr-Grids und damit den horizontalen Scroll im Dialog (#15). */
+/* Text inputs fill their (grid) cell and may shrink below it — without
+   min-width:0 the intrinsic field width forces the 1fr grid to overflow,
+   causing horizontal scroll in the dialog. */
 .inv__input { width: 100%; min-width: 0; box-sizing: border-box; }
 input.inv__input { height: var(--control-height); }
 .inv__search { min-width: 14rem; height: 2.25rem; }
@@ -102,7 +102,7 @@ input.inv__input { height: var(--control-height); }
   border-radius: var(--radius-sm);
 }
 .inv__fileChipRemove:hover { color: var(--color-danger); }
-/* Mobil (≤768px): Tabellenzeilen als Karten (rein CSS) — wie Buchungen. */
+/* Mobile (≤768px): table rows as cards (pure CSS) — like bookings. */
 @media (max-width: 768px) {
   .inv__search { flex: 1 1 100%; min-width: 0; }
   .inv__tableWrap { overflow-x: visible; border: none; border-radius: 0; background: transparent; }

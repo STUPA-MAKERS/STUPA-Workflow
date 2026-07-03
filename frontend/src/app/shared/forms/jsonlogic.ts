@@ -1,13 +1,14 @@
 /**
- * FE-Port des JsonLogic-Subsets (Backend `app/shared/jsonlogic.py`, data-model
- * §5.1 / flows §9.2). `visibleIf`/`compute` in Form-Feldern nutzen dieses Subset.
+ * FE port of the JsonLogic subset (backend `app/shared/jsonlogic.py`). Form fields'
+ * `visibleIf`/`compute` use this subset.
  *
- * **Kein `eval`** — deklarativer Baum, Whitelist-Operatoren. Semantik spiegelt das
- * Backend (Single Source of Truth bleibt der Server, der autoritativ re-validiert):
- * - Literal (kein Objekt) → unverändert zurück.
- * - Operation = Objekt mit **genau einem** Schlüssel = Operator.
- * - `and`/`or` werten **nicht** kurzschließend aus (alle Operanden evaluiert) —
- *   identisch zum Backend-Verhalten.
+ * **No `eval`** — a declarative tree with whitelisted operators. Semantics mirror
+ * the backend (the server stays the single source of truth and re-validates
+ * authoritatively):
+ * - a literal (non-object) → returned unchanged.
+ * - an operation = object with **exactly one** key = the operator.
+ * - `and`/`or` do **not** short-circuit (all operands are evaluated) — identical to
+ *   the backend behaviour.
  *
  * Whitelist: `== != > >= < <= and or not var + - * / in`.
  */
@@ -78,7 +79,7 @@ function num(value: unknown): number {
   return value;
 }
 
-/** Wertet einen JsonLogic-Ausdruck gegen `ctx` aus. Pure, kein Seiteneffekt. */
+/** Evaluate a JsonLogic expression against `ctx`. Pure, no side effects. */
 export function evalJsonLogic(expr: unknown, ctx: Record<string, unknown> = {}): unknown {
   if (!isRecord(expr)) return expr;
   const keys = Object.keys(expr);
@@ -154,9 +155,9 @@ function requireArity(op: string, args: unknown[], n: number): void {
 }
 
 /**
- * `visibleIf` auswerten. Kein Ausdruck ⇒ sichtbar. Eval-Fehler ⇒ **konservativ
- * sichtbar** (identisch zum Backend `_is_visible`: lieber validieren als still
- * überspringen).
+ * Evaluate `visibleIf`. No expression ⇒ visible. Eval error ⇒ **conservatively
+ * visible** (identical to the backend `_is_visible`: better to validate than to
+ * silently skip).
  */
 export function isFieldVisible(
   visibleIf: Record<string, unknown> | null | undefined,

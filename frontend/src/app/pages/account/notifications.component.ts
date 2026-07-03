@@ -8,10 +8,9 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { CheckboxComponent } from '@stupa-makers/ui-kit';
 
 /**
- * Konto → Benachrichtigungen (#4-2): der Nutzer wählt hier ab, welche
- * Mail-Benachrichtigungen er erhalten möchte (Opt-out, Default: alle an).
- * Login-Links (Magic-Link) sind essenziell und tauchen hier nicht auf.
- * Jeder Toggle speichert sofort (Bulk-PUT mit allen Schaltern).
+ * Account notifications: the user opts out of which mail notifications to receive
+ * (opt-out, default: all on). Login links (magic-link) are essential and are not
+ * listed here. Each toggle saves immediately (bulk PUT with all switches).
  */
 @Component({
   selector: 'app-account-notifications',
@@ -42,7 +41,7 @@ export class AccountNotificationsComponent {
     });
   }
 
-  /** Schalter umlegen → sofort speichern (Server liefert den effektiven Stand). */
+  /** Flip a switch → save immediately (server returns the effective state). */
   toggle(kind: string, enabled: boolean): void {
     const next = this.prefs().map((p) => (p.kind === kind ? { ...p, enabled } : p));
     this.prefs.set(next);
@@ -61,7 +60,7 @@ export class AccountNotificationsComponent {
     return this.lookup(`account.notifications.hint.${kind}`, '');
   }
 
-  /** i18n mit Fallback: unbekannte (neue) Kinds zeigen den rohen Key statt zu brechen. */
+  /** i18n with fallback: unknown (new) kinds show the raw key instead of breaking. */
   private lookup(key: string, fallback: string): string {
     const label = this.i18n.translate(key as TranslationKey);
     return label === key ? fallback : label;

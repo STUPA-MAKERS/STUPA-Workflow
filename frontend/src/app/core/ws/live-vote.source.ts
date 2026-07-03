@@ -2,23 +2,21 @@ import { InjectionToken, inject } from '@angular/core';
 import { WsService, type MeetingChannel } from './ws.service';
 
 /**
- * Quelle für Live-Vote-Kanäle (api.md §4). Abstrahiert das Öffnen eines
- * `MeetingChannel`, damit das Voting-Feature gegen die echte WebSocket
- * (`WsService` → T-16 `/api/ws/meetings/{id}[/beamer]`) **oder** gegen einen
- * In-Memory-Mock (Offline-/Dev-/Harness-Betrieb) laufen kann, ohne dass die
- * Components das unterscheiden.
+ * Source for live-vote channels. Abstracts opening a `MeetingChannel` so the
+ * voting feature can run against the real WebSocket (`WsService` →
+ * `/api/ws/meetings/{id}[/beamer]`) or against an in-memory mock
+ * (offline/dev/harness) without components telling them apart.
  */
 export interface LiveVoteSource {
-  /** Öffnet `/api/ws/meetings/{id}` (oder `…/beamer` read-only). */
+  /** Opens `/api/ws/meetings/{id}` (or `…/beamer` read-only). */
   connectMeeting(meetingId: string, beamer?: boolean): MeetingChannel;
 }
 
 /**
- * DI-Token für die Live-Vote-Quelle. Default = echte `WsService` (spricht den
- * T-16-Contract `/api/ws/meetings/{id}[/beamer]`, Auth via Session-Cookie beim
- * Handshake). Nur im Mock-Betrieb (`USE_MOCK_API`) wird in `app.config`
- * `MockLiveVoteSource` überschrieben — die Produktiv-/Integrationspfade laufen
- * gegen das echte Backend.
+ * DI token for the live-vote source. Default = the real `WsService` (speaks
+ * `/api/ws/meetings/{id}[/beamer]`, auth via session cookie at the handshake).
+ * Only in mock mode (`USE_MOCK_API`) is `MockLiveVoteSource` substituted in
+ * `app.config` — the production/integration paths run against the real backend.
  */
 export const LIVE_VOTE_SOURCE = new InjectionToken<LiveVoteSource>('LIVE_VOTE_SOURCE', {
   providedIn: 'root',

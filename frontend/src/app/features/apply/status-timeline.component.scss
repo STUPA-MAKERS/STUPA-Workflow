@@ -10,8 +10,8 @@
   max-width: 36rem;
 }
 
-/* 3-Spalten-Shell (Aktionen | Verlauf+Daten | Kommentare) wie die interne
-   Antrags-Detailseite. Ohne Aktionen bleiben zwei Spalten (Daten | Kommentare). */
+/* 3-column shell (actions | history+data | comments) like the internal application
+   detail page. Without actions, two columns remain (data | comments). */
 .status__shell {
   display: grid;
   gap: var(--space-6);
@@ -152,7 +152,7 @@
   }
 }
 
-/* Mobil: Aktions-Buttons als volle Tap-Flächen (≥2.5rem). */
+/* Mobile: action buttons as full tap targets (≥2.5rem). */
 @media (max-width: 40rem) {
   .status__actions {
     justify-content: stretch;
@@ -167,7 +167,7 @@
   }
 }
 
-/* --- Chat (Kommentare): identisch zur internen Detailansicht (#det) --- */
+/* --- Chat (comments): identical to the internal detail view --- */
 .det__chat {
   display: flex;
   flex-direction: column;

@@ -13,7 +13,7 @@
   }
 </header>
 
-<!-- Primäre CTA: neuen Antrag stellen (führt in den Apply-Wizard). -->
+<!-- Primary CTA: submit a new application (leads into the apply wizard). -->
 <a class="dash__cta" routerLink="/apply">
   <div class="dash__cta-text">
     <h2 class="m-0 mb-1 text-xl">{{ 'dashboard.apply.title' | t }}</h2>
@@ -22,7 +22,7 @@
   <span class="dash__cta-action">{{ 'dashboard.apply.cta' | t }} →</span>
 </a>
 
-<!-- Laufende / anstehende Sitzungen — große Shortcuts (#Sessions). -->
+<!-- Running / upcoming meetings — large shortcuts. -->
 @if (sessionShortcuts().length) {
   <section class="flex flex-col gap-3" aria-labelledby="dash-sessions-h">
     <h2 id="dash-sessions-h" class="dash__quick-h">{{ 'dashboard.sessions.title' | t }}</h2>
@@ -45,8 +45,8 @@
   </section>
 }
 
-<!-- Vertretung/Delegation (#delegation-rework): aktive sitzungsgebundene
-     Vertretungen — ausgehend (»du wirst vertreten«) und eingehend (»du vertrittst«). -->
+<!-- Substitution/delegation: active session-bound substitutions —
+     outgoing ("you are represented") and incoming ("you represent"). -->
 @if (delegations().length) {
   <section class="dash__delegations flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-deleg-h">
     <div class="flex items-start justify-between gap-3">
@@ -81,7 +81,7 @@
 
 @if (canReadApplications()) {
   <div class="dash__panels">
-    <!-- Offene Aufgaben: Anträge, die auf den Nutzer warten. -->
+    <!-- Open tasks: applications waiting on the user. -->
     <section class="flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-tasks-h">
       <div class="flex items-start justify-between gap-3">
         <div>
@@ -122,7 +122,7 @@
       }
     </section>
 
-    <!-- Meine Anträge: eigene/lesbare Anträge mit Status + Deep-Link. -->
+    <!-- My applications: own/readable applications with status + deep link. -->
     <section class="flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-apps-h">
       <div class="flex items-start justify-between gap-3">
         <div>

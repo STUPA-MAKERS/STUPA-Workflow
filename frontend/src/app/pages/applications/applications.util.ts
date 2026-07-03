@@ -2,9 +2,9 @@ import type { BadgeVariant } from '@stupa-makers/ui-kit';
 import type { ScanState } from '@core/api/models';
 
 /**
- * Anzeige-Titel eines Antrags aus den freien `data`-Feldern ableiten. Forms
- * haben kein garantiertes `title`-Feld; wir nehmen den ersten nicht-leeren
- * String aus den üblichen Schlüsseln, sonst den Fallback (i18n „Ohne Titel“).
+ * Derive an application's display title from the free `data` fields. Forms have
+ * no guaranteed `title` field; we take the first non-empty string from the usual
+ * keys, otherwise the fallback (i18n "untitled").
  */
 export function applicationTitle(
   data: Record<string, unknown> | null | undefined,
@@ -19,8 +19,8 @@ export function applicationTitle(
 }
 
 /**
- * Diff-/Daten-Feldwerte robust für die Anzeige stringifizieren: Skalare direkt,
- * Objekte/Arrays als kompaktes JSON, `null`/`undefined` als leerer String.
+ * Robustly stringify diff/data field values for display: scalars directly,
+ * objects/arrays as compact JSON, `null`/`undefined` as an empty string.
  */
 export function formatFieldValue(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -29,7 +29,7 @@ export function formatFieldValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** Scan-Zustand → Badge-Variante: läuft = warnend, bereit = grün, Befund = rot. */
+/** Scan state → badge variant: scanning = warning, ready = green, finding = red. */
 export function scanBadgeVariant(state: ScanState): BadgeVariant {
   switch (state) {
     case 'clean':
@@ -43,7 +43,7 @@ export function scanBadgeVariant(state: ScanState): BadgeVariant {
   }
 }
 
-/** Bytes menschenlesbar (binär, 1 Nachkommastelle ab KB). `0` → „0 B". */
+/** Human-readable bytes (binary, 1 decimal from KB up). `0` → "0 B". */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return '—';
   if (bytes < 1024) return `${bytes} B`;

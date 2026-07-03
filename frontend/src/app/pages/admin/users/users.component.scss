@@ -32,12 +32,12 @@
   outline-offset: 1px;
 }
 
-/* Suchen-Button auf Eingabe-Höhe (Task #5). */
+/* Search button at input height. */
 .users__search app-button button.btn {
   height: var(--control-height);
 }
 
-/* --- Nextcloud-artige Benutzer-Tabelle ----------------------------------- */
+/* --- Nextcloud-style user table ------------------------------------------ */
 .users__table {
   width: 100%;
   border-collapse: collapse;
@@ -76,7 +76,7 @@
 }
 
 .users__roles {
-  // Rollen-Tags nicht umbrechen, sondern horizontal scrollen (#48).
+  // Role tags do not wrap; scroll horizontally instead.
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -94,7 +94,7 @@
   white-space: nowrap;
 }
 
-// × sitzt INNERHALB des Badges (#50): kleiner Abstand links, erbt die Badge-Farbe.
+// × sits INSIDE the badge: small gap on the left, inherits the badge color.
 .users__tag-label + .users__tag-x {
   margin-left: var(--space-2);
 }
@@ -126,7 +126,7 @@
   white-space: nowrap;
 }
 
-/* --- Ausklappbare Zuweisen-Zeile ----------------------------------------- */
+/* --- Expandable assign row ------------------------------------------------ */
 .users__assign-row td {
   padding: 0;
   border-bottom: var(--border-width) solid var(--color-border);
@@ -152,13 +152,13 @@
   align-self: end;
 }
 
-/* Zuweisen-Button auf Höhe der Selects/Datepicker links (Task #5). */
+/* Assign button at the height of the selects/datepicker on the left. */
 .users__assign app-button button.btn {
   height: var(--control-height);
 }
 
-/* Mobil (≤768px): Zuweisen-Zeile gestapelt — jedes Control volle Breite,
-   damit Selects/Datepicker bei 375px erreichbar und tippbar bleiben. */
+/* Mobile (≤768px): assign row stacked — each control full width, so selects/
+   datepicker stay reachable and tappable at 375px. */
 @media (max-width: 768px) {
   .users__assign > * {
     flex: 1 1 100%;

@@ -104,7 +104,7 @@
   background: transparent;
 }
 
-/* Mobil (≤768px): Aktionen gestapelt in voller Breite, größere Tap-Flächen. */
+/* Mobile (≤768px): actions stacked full-width, larger tap targets. */
 @media (max-width: 768px) {
   .consent__actions {
     flex-direction: column-reverse;

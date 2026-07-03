@@ -31,9 +31,9 @@ interface Member {
 }
 
 /**
- * Mitglieder eines Gremiums (#18) — eigene **Unterseite** (`/admin/gremien/:id`).
- * Tabelle der Mitglieder; »Mitglied hinzufügen« öffnet einen **Dialog** mit
- * Inline-**Typeahead**-Suche (Vorschläge direkt unter dem Feld, Klick wählt aus).
+ * Members of a gremium — its own **subpage** (`/admin/gremien/:id`). Table of
+ * members; "add member" opens a **dialog** with inline **typeahead** search
+ * (suggestions right below the field, click selects).
  */
 @Component({
   selector: 'app-gremium-members',
@@ -106,14 +106,14 @@ export class GremiumMembersComponent {
     });
   });
 
-  // --- Stellvertreter-Pool (#delegation-rework) -----------------------------
+  // --- Substitute pool ------------------------------------------------------
   private readonly delegationsApi = inject(DelegationsApiService);
   readonly substitutes = signal<DelegationSubstitute[]>([]);
   readonly addSubOpen = signal(false);
   readonly subQuery = signal('');
   readonly subCandidates = signal<AdminPrincipal[]>([]);
   readonly subSelected = signal<AdminPrincipal | null>(null);
-  /** '' = gremium-weiter Stellvertreter (vertritt jedes Mitglied). */
+  /** '' = gremium-wide substitute (represents every member). */
   readonly subMemberId = signal('');
 
   readonly subColumns = computed<ColumnDef[]>(() => [
@@ -123,7 +123,7 @@ export class GremiumMembersComponent {
   ]);
   readonly subRowId = (s: unknown): string => (s as DelegationSubstitute).id;
 
-  /** Empfänger-Auswahl »vertritt«: alle Mitglieder oder ein konkretes. */
+  /** "Represents" recipient selection: all members or a specific one. */
   readonly memberOptions = computed<SelectOption[]>(() => {
     const byId = this.principalsById();
     const seen = new Set<string>();
@@ -148,7 +148,7 @@ export class GremiumMembersComponent {
       next: (r) => this.gremiumRoles.set(r),
       error: () => this.gremiumRoles.set([]),
     });
-    // Principal-Namen für die Anzeige (id → Principal).
+    // Principal names for display (id → Principal).
     this.api.listPrincipals('').subscribe({
       next: (p) => this.principalsById.set(new Map(p.map((x) => [x.id, x]))),
       error: () => this.principalsById.set(new Map()),
@@ -276,7 +276,7 @@ export class GremiumMembersComponent {
           this.addOpen.set(false);
           this.refresh();
         },
-        // 409 = überlappende Amtszeit (eine Rolle je Zeitpunkt).
+        // 409 = overlapping term (one role per point in time).
         error: (err: { status?: number }) =>
           this.toast.error(
             this.i18n.translate(
@@ -299,7 +299,7 @@ export class GremiumMembersComponent {
   private refresh(): void {
     this.api.listGremiumMemberships(this.gremiumId as Uuid).subscribe({
       next: (m) => this.memberships.set(m),
-      // Kein stilles Schlucken mehr (#5-3): 403/Fehler sichtbar machen statt leerer Tabelle.
+      // No silent swallowing: surface 403/errors instead of an empty table.
       error: () => {
         this.memberships.set([]);
         this.toast.error(this.i18n.translate('admin.gremien.membersLoadFailed'));

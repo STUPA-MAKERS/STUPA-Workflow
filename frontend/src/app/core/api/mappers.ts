@@ -1,13 +1,13 @@
 /**
- * Wire → View Mapper (T-40, Issue #17).
+ * Wire → view mappers.
  *
- * Reine Funktionen, die das Backend-JSON (`*Wire`, camelCase via T-12
- * `_CamelModel`) in die FE-View-Modelle übersetzen: i18n-Labels werden für die
- * angeforderte Sprache aufgelöst, Komfort-Felder (`isPublic`) abgeleitet und
- * optionale Felder auf einen festen `null`-Default normalisiert.
+ * Pure functions that translate the backend JSON (`*Wire`, camelCase via
+ * `_CamelModel`) into the FE view models: i18n labels are resolved for the
+ * requested language, convenience fields (`isPublic`) derived and optional
+ * fields normalized to a fixed `null` default.
  *
- * Bewusst DI-frei (kein Angular) → in `mappers.spec.ts` isoliert testbar; die
- * `lang` wird vom `ApiClient` (über `I18nService`) durchgereicht.
+ * Deliberately DI-free (no Angular) → isolated-testable in `mappers.spec.ts`;
+ * `lang` is passed through by the `ApiClient` (via `I18nService`).
  */
 
 import { resolveI18n } from '@shared/forms/i18n-text';
@@ -165,9 +165,9 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
 }
 
 /**
- * Backend-Diff-Maps in iterierbare, schlüsseltragende Listen auflösen. `null`
- * (kein Diff, z. B. erste Version) wird durchgereicht; fehlende Teil-Maps werden
- * defensiv auf `{}` normalisiert.
+ * Resolve the backend diff maps into iterable, key-carrying lists. `null` (no
+ * diff, e.g. first version) is passed through; missing sub-maps are defensively
+ * normalized to `{}`.
  */
 export function mapDiff(wire: DataDiffWire | null | undefined): DataDiff | null {
   if (!wire) return null;
@@ -190,7 +190,7 @@ export function mapAttachment(wire: AttachmentOutWire): Attachment {
     size: wire.size,
     scanned: wire.scanned,
     isComparisonOffer: wire.is_comparison_offer,
-    // `scanned=true` heißt nur „Scan fertig"; sauber-vs-Befund klärt der Download.
+    // `scanned=true` only means "scan finished"; clean-vs-finding is decided at download.
     scanState: wire.scanned ? 'clean' : 'scanning',
   };
 }
@@ -209,7 +209,7 @@ export function mapVersion(wire: VersionOutWire): ApplicationVersion {
   };
 }
 
-// --- Meetings + Protokoll (T-33) ------------------------------------------- //
+// --- Meetings + protocol --------------------------------------------------- //
 
 export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
   return {
@@ -278,7 +278,7 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
   };
 }
 
-/** FE-Eingabe → camelCase-Request-Body für `POST /applications`. */
+/** FE input → camelCase request body for `POST /applications`. */
 export function toApplicationCreateBody(input: NewApplication): ApplicationCreateBody {
   return {
     typeId: input.typeId,

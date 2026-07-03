@@ -5,15 +5,15 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
 
-/** Normalisierte Antrags-Zeile für die geteilte Tabelle. */
+/** Normalized application row for the shared table. */
 export interface ApplicationRow {
   id: string;
-  /** Anzeigetitel (bereits mit Fallback aufgelöst). */
+  /** Display title (already resolved with fallback). */
   title: string;
-  /** Antragstyp (graue Unterzeile + Typ-Spalte); leer = ausblenden. */
+  /** Application type (grey subline + type column); empty = hide. */
   typeLabel?: string | null;
   stateLabel?: string | null;
-  /** Frei konfigurierte State-Farbe (Hex); `null` → neutrales Badge. */
+  /** Freely configured state color (hex); `null` → neutral badge. */
   stateColor?: string | null;
   amount?: string | number | null;
   currency?: string | null;
@@ -27,11 +27,10 @@ export interface SortState {
 }
 
 /**
- * Geteilte Antrags-Tabelle (#shared-apps-table). Eine Optik für die Antragsliste
- * (`/applications`) **und** die Antrags-Tabelle unter Budget. Reines Präsentations-
- * Component: Zeilen kommen normalisiert herein, Sortierung ist optional
- * (Header nur klickbar, wenn ``sort`` gesetzt ist). Jede Zeile verlinkt in die
- * Antrags-Detailseite.
+ * Shared applications table. One look for the application list (`/applications`)
+ * **and** the applications table under budget. Pure presentation component: rows
+ * arrive normalized, sorting is optional (header only clickable when ``sort`` is
+ * set). Each row links to the application detail page.
  */
 @Component({
   selector: 'app-applications-table',
@@ -46,7 +45,7 @@ export class ApplicationsTableComponent {
 
   readonly rows = input<ApplicationRow[]>([]);
   readonly emptyText = input<string>('');
-  /** Aktuelle Sortierung; ``null`` → Header nicht klickbar. */
+  /** Current sort; ``null`` → header not clickable. */
   readonly sort = input<SortState | null>(null);
   readonly sortChange = output<SortState>();
 

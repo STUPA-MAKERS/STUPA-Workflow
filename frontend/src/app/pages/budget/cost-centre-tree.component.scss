@@ -1,14 +1,14 @@
-/* Selbst begrenzen (statt nur auf den Sidebar-Container zu hoffen): der Host
-   ist ohne display sonst inline → tall Inhalt entkommt dem overflow:auto des
-   Eltern. Block + 75vh + interner Scroll → Baum bleibt schwebend, nicht zu hoch. */
+/* Constrain ourselves (don't rely on the sidebar container): without display the
+   host is inline → tall content escapes the parent's overflow:auto. Block + 75vh +
+   internal scroll → the tree stays floating, not too tall. */
 :host {
   display: block;
   max-height: 75vh;
   overflow-y: auto;
-  // Innen-Padding = Fade-Höhe: der erste/letzte Eintrag startet UNTER dem Fade,
-  // ist also in Ruhe nicht ausgeblendet — der Rand fadet erst beim Scrollen (#2).
+  // Inner padding = fade height: the first/last item starts BELOW the fade, so it
+  // isn't hidden at rest — the edge only fades while scrolling.
   padding-block: var(--space-5);
-  // Oben/unten in den Hintergrund ausblenden (wie die Sitzungs-Timeline, #2).
+  // Fade top/bottom into the background (like the meeting timeline).
   --fade: linear-gradient(
     to bottom,
     transparent,
@@ -63,17 +63,17 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Gepunktete, hellgrüne Verbindungslinien (echter Baum: letzte Zeile ohne
-   durchlaufende Linie nach unten). */
+/* Dotted, light-green connector lines (real tree: last row without a
+   continuing line downward). */
 .cct__children {
   padding-left: calc(var(--space-3) + 4px);
 }
 .cct__children > .cct__branch {
   position: relative;
 }
-/* Senkrechte Linie zentriert unter der Punkt-/Knoten-Mitte. Punktmitte =
-   space-2 + 4.5px; Kind-Einzug = space-3 + 4px ⇒ linke Kante der 1px-Linie bei
-   space-2 − space-3 (Mitte landet damit auf der Punktmitte). */
+/* Vertical line centred under the dot/node centre. Dot centre = space-2 + 4.5px;
+   child indent = space-3 + 4px ⇒ the 1px line's left edge at space-2 − space-3
+   (so its centre lands on the dot centre). */
 .cct__children > .cct__branch::before {
   content: '';
   position: absolute;
@@ -82,22 +82,22 @@
   bottom: 0;
   border-left: 1px dotted var(--line-color, var(--color-success, #5fb37a));
 }
-/* Erstes Kind: Linie nach oben bis zum Punkt verlängern (verbunden). */
+/* First child: extend the line up to the dot (connected). */
 .cct__children > .cct__branch:first-child::before {
   top: calc(-1 * (var(--space-1) + 0.7em));
 }
-/* Letztes Kind: Linie endet am Querstrich (kein Überstand). */
+/* Last child: line ends at the crossbar (no overhang). */
 .cct__children > .cct__branch:last-child::before {
   bottom: auto;
   height: 0.8em;
 }
-/* Einziges Kind: vom Punkt bis zum eigenen Querstrich. */
+/* Only child: from the dot to its own crossbar. */
 .cct__children > .cct__branch:first-child:last-child::before {
   top: calc(-1 * (var(--space-1) + 0.7em));
   bottom: auto;
   height: calc(var(--space-1) + 0.7em + 0.8em);
 }
-/* Querstrich zum Knoten. */
+/* Crossbar to the node. */
 .cct__children > .cct__branch::after {
   content: '';
   position: absolute;

@@ -1,7 +1,7 @@
 import { Pipe, type PipeTransform, inject } from '@angular/core';
 import { I18nService } from './i18n.service';
 
-/** Format-Presets der lokalisierten Datumsausgabe. */
+/** Format presets for the localized date output. */
 export type LocalDateFormat = 'short' | 'medium' | 'mediumDate' | 'long' | 'time';
 
 const OPTIONS: Record<LocalDateFormat, Intl.DateTimeFormatOptions> = {
@@ -13,10 +13,10 @@ const OPTIONS: Record<LocalDateFormat, Intl.DateTimeFormatOptions> = {
 };
 
 /**
- * Lokalisierte Datums-/Zeitausgabe über `Intl.DateTimeFormat` auf Basis der **aktiven
- * UI-Sprache** (`I18nService.locale()`), nicht des fixen Angular-`LOCALE_ID` (das
- * sonst immer `en-US` liefert). Impure, damit ein Sprachwechsel die Ausgabe ohne
- * Reload aktualisiert (Datumsformatierung ist günstig).
+ * Localized date/time output via `Intl.DateTimeFormat` based on the active UI
+ * language (`I18nService.locale()`), not the fixed Angular `LOCALE_ID` (which
+ * would otherwise always yield `en-US`). Impure so a language switch updates the
+ * output without a reload (date formatting is cheap).
  */
 @Pipe({ name: 'ldate', standalone: true, pure: false })
 export class LocalizedDatePipe implements PipeTransform {

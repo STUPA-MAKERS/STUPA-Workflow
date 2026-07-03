@@ -26,8 +26,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Gepunktete, hellgrüne, kompakte Verbindungslinien zu den Jahren — echter
-   Baum: die letzte Zeile beendet die Senkrechte (kein Stray-Down-Line). */
+/* Dotted, light-green, compact connector lines to the years — a real tree:
+   the last row ends the vertical (no stray downward line). */
 .byt__years {
   list-style: none;
   margin: 0 0 var(--space-1) 0;
@@ -36,7 +36,7 @@
 .byt__years > li {
   position: relative;
 }
-/* Senkrechte zentriert unter der Punkt-/Knoten-Mitte (vgl. cost-centre-tree). */
+/* Vertical centred under the dot/node centre (cf. cost-centre-tree). */
 .byt__years > li::before {
   content: '';
   position: absolute;
@@ -45,7 +45,7 @@
   bottom: 0;
   border-left: 1px dotted var(--line-color, var(--color-success, #5fb37a));
 }
-/* Erstes Jahr: Linie nach oben bis zum Punkt verlängern (verbunden). */
+/* First year: extend the line up to the dot (connected). */
 .byt__years > li:first-child::before {
   top: calc(-1 * (var(--space-1) + 0.7em));
 }

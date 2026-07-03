@@ -21,20 +21,20 @@ import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tr
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { BudgetYearTreeComponent, type BudgetYearSelection } from './budget-year-tree.component';
 
-/** Eine Baumzeile (Knoten + Tiefe für die Einrückung). */
+/** A tree row (node + depth for indentation). */
 interface Row {
   node: BudgetTreeNode;
   depth: number;
 }
 
 /**
- * Budget-/Kostenstellen-Baum-Editor (#9/#22). **Budget-bezogen**: oben ein Budget
- * wählen, darunter dessen Kostenstellen-Unterbaum (`VS-800-40 – …`) bearbeiten.
+ * Budget/cost-centre tree editor. **Budget-scoped**: pick a budget at the top, then
+ * edit its cost-centre subtree (`VS-800-40 – …`) below.
  *
- * Budgets sind **nicht** an ein Gremium gebunden. **Haushaltsjahre werden INNERHALB
- * des Budgets** angelegt (eigene Karte je gewähltem Budget) — kein globales HHJ-
- * Dropdown. Verfügbar = Roll-Down (Zuteilung), gebunden = Roll-Up (zugeordnete
- * Anträge); die Zuteilung je Knoten ist pro gewähltem HHJ inline editierbar.
+ * Budgets are **not** bound to a gremium. **Fiscal years are created WITHIN the
+ * budget** (own card per selected budget) — no global fiscal-year dropdown.
+ * Available = roll-down (allocation), bound = roll-up (assigned applications); the
+ * allocation per node is inline-editable per selected fiscal year.
  */
 @Component({
   selector: 'app-budget-tree',
@@ -52,65 +52,65 @@ export class BudgetTreeComponent {
 
   readonly tree = signal<BudgetTreeNode[]>([]);
   readonly fiscalYears = signal<FiscalYear[]>([]);
-  /** HHJ je Top-Budget (für den linken Navigations-Baum). */
+  /** Fiscal years per top budget (for the left navigation tree). */
   readonly fiscalYearsByBudget = signal<Record<Uuid, FiscalYear[]>>({});
   readonly selectedTopId = signal('');
   readonly selectedFyId = signal('');
   readonly loading = signal(true);
   readonly loadError = signal(false);
 
-  /** Top-Budgets (Wurzeln) für den linken Baum. */
+  /** Top budgets (roots) for the left tree. */
   readonly tops = computed(() => this.tree().filter((n) => n.parentId === null));
 
-  /** Flow-State-Keys (globaler Flow) für die accepted/denied-Konfiguration. */
+  /** Flow-state keys (global flow) for the accepted/denied config. */
   readonly stateOptions = signal<SelectOption[]>([]);
 
-  /** Top-Budget anlegen (kein Gremium — Budgets sind gremium-unabhängig).
-   *  ``fiscalStartMonth``/``fiscalStartDay`` = HHJ-Stichtag (Default 01.01.). */
+  /** Create a top budget (no gremium — budgets are gremium-independent).
+   *  ``fiscalStartMonth``/``fiscalStartDay`` = fiscal-year cutoff (default 01.01.). */
   readonly newTop = signal<{
     key: string;
     name: string;
     fiscalStartMonth: number;
     fiscalStartDay: number;
   }>({ key: '', name: '', fiscalStartMonth: 1, fiscalStartDay: 1 });
-  /** Top-Budget-Dialog (über den Kopf-Button geöffnet). */
+  /** Top-budget dialog (opened via the header button). */
   readonly topOpen = signal(false);
-  /** Haushaltsjahr-Dialog (über den Kopf-Button geöffnet). */
+  /** Fiscal-year dialog (opened via the header button). */
   readonly fyOpen = signal(false);
-  /** Stichtag-Dialog (über den Kopf-Button, für das gewählte Top-Budget). */
+  /** Cutoff dialog (via the header button, for the selected top budget). */
   readonly stichtagOpen = signal(false);
-  /** Status-Konfigurations-Dialog (accepted/denied States des Top-Budgets). */
+  /** Status config dialog (accepted/denied states of the top budget). */
   readonly stateConfigOpen = signal(false);
-  /** Unterknoten anlegen: welcher Parent ist aufgeklappt + Entwurf. */
+  /** Add child node: which parent is expanded + the draft. */
   readonly addingChildOf = signal<Uuid | null>(null);
   readonly childDraft = signal<{ key: string; name: string }>({ key: '', name: '' });
-  /** Limit (Zuteilung) je Knoten setzen — per Dialog pro Zeile (#22). */
+  /** Set the limit (allocation) per node — via a per-row dialog. */
   readonly limitNode = signal<BudgetTreeNode | null>(null);
   readonly limitValue = signal('');
-  /** Kostenstelle bearbeiten (Schlüssel + Name + Sichtbarkeit) — per Dialog pro Zeile. */
+  /** Edit cost-centre (key + name + visibility) — via a per-row dialog. */
   readonly editNode = signal<BudgetTreeNode | null>(null);
   readonly editKey = signal('');
   readonly editName = signal('');
-  /** Im Budget-Tab ausblenden (#budget-hide) — reine Anzeige-Einstellung. */
+  /** Hide in the budget tab — display-only setting. */
   readonly editHidden = signal(false);
-  /** Sichtbarkeits-Gremium (#budget-scope): dessen Mitglieder sehen den Teilbaum
-   *  im Budget-Tab als Root; '' = keine Zuordnung. */
+  /** Visibility gremium: its members see the subtree in the budget tab as a root;
+   *  '' = no assignment. */
   readonly editViewGremium = signal('');
   readonly gremiumOptions = signal<SelectOption[]>([]);
-  /** Haushaltsjahr anlegen — INNERHALB des gewählten Budgets (nur das Jahr). */
+  /** Create a fiscal year — WITHIN the selected budget (only the year). */
   readonly newFy = signal<{ year: number }>({ year: new Date().getFullYear() });
 
   readonly selectedTop = computed<BudgetTreeNode | null>(
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
   );
 
-  /** Anzeige-Label des gewählten Budgets (für den HHJ-Dialog). */
+  /** Display label of the selected budget (for the fiscal-year dialog). */
   readonly selectedTopLabel = computed<string>(() => {
     const t = this.selectedTop();
     return t ? `${t.key} – ${t.name}` : '';
   });
 
-  /** Unterbaum des gewählten Budgets → flache Zeilen (Pre-Order) mit Tiefe. */
+  /** Subtree of the selected budget -> flat rows (pre-order) with depth. */
   readonly rows = computed<Row[]>(() => {
     const top = this.selectedTop();
     if (!top) return [];
@@ -136,13 +136,13 @@ export class BudgetTreeComponent {
 
   constructor() {
     this.reload();
-    // Gremien fürs Sichtbarkeits-Dropdown (#budget-scope) im Edit-Dialog.
+    // Gremien for the visibility dropdown in the edit dialog.
     this.adminApi.listGremienOptions().subscribe({
       next: (list) =>
         this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
       error: () => this.gremiumOptions.set([]),
     });
-    // Globaler Flow → State-Keys für die accepted/denied-Konfiguration (still degr.).
+    // Global flow -> state keys for the accepted/denied config (degrades silently).
     this.adminApi.getGlobalFlow().subscribe({
       next: (graph) =>
         this.stateOptions.set(
@@ -155,7 +155,7 @@ export class BudgetTreeComponent {
     });
   }
 
-  /** Aktuell gewähltes Top-Budget (für Farbe/State-Config). */
+  /** Currently selected top budget (for colour/state config). */
   private readonly currentTop = computed(() => this.selectedTop());
   readonly acceptedKeys = computed(() => new Set(this.currentTop()?.acceptedStateKeys ?? []));
   readonly deniedKeys = computed(() => new Set(this.currentTop()?.deniedStateKeys ?? []));
@@ -166,7 +166,7 @@ export class BudgetTreeComponent {
     return this.deniedKeys().has(key);
   }
 
-  // --- Anzeige-Helfer -------------------------------------------------------
+  // --- Display helpers ------------------------------------------------------
   money(value: string | number | null | undefined, currency: string): string {
     const n = value == null || value === '' ? 0 : Number(value);
     return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
@@ -177,9 +177,9 @@ export class BudgetTreeComponent {
     return node.byFiscalYear.find((a) => a.fiscalYearId === fy) ?? null;
   }
 
-  // --- Laden ----------------------------------------------------------------
-  /** Monoton steigende Lade-Sequenz: verwirft veraltete reload()-Fan-out-Antworten,
-   *  die nach einem neueren reload() eintreffen (sonst überschreiben sie HHJ/Auswahl). */
+  // --- Loading --------------------------------------------------------------
+  /** Monotonically increasing load sequence: discards stale reload() fan-out
+   *  responses arriving after a newer reload() (else they overwrite fiscal year/selection). */
   private reloadSeq = 0;
 
   private reload(): void {
@@ -195,8 +195,8 @@ export class BudgetTreeComponent {
         const topId = keep ? this.selectedTopId() : (tops[0]?.id ?? '');
         this.selectedTopId.set(topId);
         if (!topId) this.fiscalYears.set([]);
-        // HHJ aller Top-Budgets für den linken Baum (fehlertolerant); für das
-        // gewählte Budget zugleich die rechte HHJ-Liste setzen.
+        // Fiscal years of all top budgets for the left tree (fault-tolerant); for the
+        // selected budget also set the right fiscal-year list.
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
             next: (fys) => {
@@ -221,9 +221,9 @@ export class BudgetTreeComponent {
     });
   }
 
-  /** HHJ des gewählten Budgets laden (sie leben innerhalb des Budgets). Bumpt die
-   *  Lade-Sequenz, damit ein noch laufender reload()-Fan-out diese Auswahl nicht
-   *  nachträglich überschreibt — und umgekehrt. */
+  /** Load the selected budget's fiscal years (they live within the budget). Bumps
+   *  the load sequence so a still-running reload() fan-out doesn't overwrite this
+   *  selection afterwards — and vice versa. */
   private loadFiscalYears(topId: string): void {
     const seq = ++this.reloadSeq;
     this.api.listFiscalYears(topId as Uuid).subscribe({
@@ -245,9 +245,9 @@ export class BudgetTreeComponent {
     this.loadFiscalYears(id);
   }
 
-  /** Jahr im linken Baum gewählt → Budget + HHJ setzen. Bumpt die Lade-Sequenz,
-   *  damit ein noch laufender reload()-Fan-out diese Auswahl nicht nachträglich
-   *  überschreibt (analog zu loadFiscalYears/selectTop). */
+  /** Year picked in the left tree -> set budget + fiscal year. Bumps the load
+   *  sequence so a still-running reload() fan-out doesn't overwrite this selection
+   *  afterwards (like loadFiscalYears/selectTop). */
   onYearPicked(sel: BudgetYearSelection): void {
     ++this.reloadSeq;
     this.selectedTopId.set(sel.budgetId);
@@ -256,7 +256,7 @@ export class BudgetTreeComponent {
     this.selectedFyId.set(sel.fiscalYearId);
   }
 
-  /** Farbe einer Kostenstelle setzen/löschen (leer = automatisch). */
+  /** Set/clear a cost-centre's colour (empty = automatic). */
   saveColor(node: BudgetTreeNode, color: string): void {
     this.api.updateNode(node.id, { color: color || '' }).subscribe({
       next: () => {
@@ -267,7 +267,7 @@ export class BudgetTreeComponent {
     });
   }
 
-  /** Einen State-Key im accepted/denied-Set des Top-Budgets umschalten (#budget). */
+  /** Toggle a state key in the top budget's accepted/denied set. */
   toggleState(kind: 'accepted' | 'denied', key: string): void {
     const top = this.currentTop();
     if (!top) return;
@@ -279,7 +279,7 @@ export class BudgetTreeComponent {
       target.delete(key);
     } else {
       target.add(key);
-      other.delete(key); // ein State ist nicht gleichzeitig accepted UND denied
+      other.delete(key); // a state is never accepted AND denied at once
     }
     this.api
       .updateNode(top.id, {
@@ -292,7 +292,7 @@ export class BudgetTreeComponent {
       });
   }
 
-  // --- Knoten anlegen/löschen ----------------------------------------------
+  // --- Create/delete node ---------------------------------------------------
   patchTop<K extends 'key' | 'name'>(key: K, value: string): void {
     this.newTop.update((t) => ({ ...t, [key]: value }));
   }
@@ -335,7 +335,7 @@ export class BudgetTreeComponent {
       });
   }
 
-  /** HHJ-Stichtag des gewählten Top-Budgets ändern (leitet bestehende HHJ neu ab). */
+  /** Change the selected top budget's fiscal-year cutoff (re-derives existing years). */
   saveStichtag(key: 'fiscalStartMonth' | 'fiscalStartDay', value: string): void {
     const top = this.selectedTop();
     if (!top) return;
@@ -402,7 +402,7 @@ export class BudgetTreeComponent {
     });
   }
 
-  // --- Limit / Zuteilung (Dialog pro Zeile) --------------------------------
+  // --- Limit / allocation (per-row dialog) ---------------------------------
   openEditNode(node: BudgetTreeNode): void {
     this.editNode.set(node);
     this.editKey.set(node.key);
@@ -463,7 +463,7 @@ export class BudgetTreeComponent {
     });
   }
 
-  // --- Haushaltsjahre (innerhalb des Budgets) ------------------------------
+  // --- Fiscal years (within the budget) ------------------------------------
   patchFyYear(value: string): void {
     const year = Math.trunc(Number(value)) || new Date().getFullYear();
     this.newFy.set({ year });
@@ -495,7 +495,7 @@ export class BudgetTreeComponent {
   }
 }
 
-/** Ganzzahl auf ``[min, max]`` begrenzen. */
+/** Clamp an integer to [min, max]. */
 function clampRange(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }

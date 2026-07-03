@@ -1,4 +1,4 @@
-/** Blob als Datei-Download im Browser auslösen (Excel-Export #2). */
+/** Trigger a file download of a blob in the browser. */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -7,6 +7,6 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  // URL erst nach dem Klick freigeben (Safari/Firefox-sicher).
+  // Revoke the URL only after the click (Safari/Firefox-safe).
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }

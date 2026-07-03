@@ -5,7 +5,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { AltchaChallenge } from '@core/api/models';
 import { AltchaComponent } from './altcha.component';
 
-/** Challenge bauen, deren PoW von `number = 0` gelöst wird (Solver findet sofort). */
+/** Build a challenge whose PoW is solved by `number = 0` (solver finds it immediately). */
 function challengeForZero(): AltchaChallenge {
   const salt = 'abc?expires=9999999999';
   const challenge = createHash('sha256').update(`${salt}0`).digest('hex');
@@ -23,7 +23,7 @@ function renderWith(
 }
 
 describe('AltchaComponent', () => {
-  // jsdom hat kein Web-Crypto-`subtle` — im Browser/localhost vorhanden.
+  // jsdom has no Web Crypto `subtle`; present in the browser/localhost.
   beforeAll(() => {
     if (!globalThis.crypto?.subtle) {
       Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
@@ -55,8 +55,8 @@ describe('AltchaComponent', () => {
       }),
     );
     await waitFor(() => expect(solved).toHaveBeenCalledWith(expected));
-    // `findByText` pollt bis zum Re-Render des „verified"-State — der DOM-Update folgt
-    // dem `solved`-Emit erst im nächsten Change-Detection-Zyklus (sonst flaky unter Last).
+    // `findByText` polls until the "verified" state re-renders — the DOM update follows
+    // the `solved` emit only on the next change-detection cycle (else flaky under load).
     expect(await screen.findByText(/Bestätigt/)).toBeInTheDocument();
   });
 

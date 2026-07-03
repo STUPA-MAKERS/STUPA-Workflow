@@ -28,7 +28,7 @@
   margin-top: var(--space-6);
   font-size: var(--fs-sm);
 }
-/* Mobil (≤768px): kompakterer Hero, CTA als volle Tap-Fläche. */
+/* Mobile (≤768px): more compact hero, CTA as a full tap target. */
 @media (max-width: 768px) {
   .hero {
     padding-block: var(--space-6) var(--space-6);
