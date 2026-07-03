@@ -1,21 +1,8 @@
-"""applications-API-Router (T-12, api.md §3 »applications«).
+"""Applications API router.
 
-Endpunkte:
-
-* ``POST   /api/applications``                  — öffentlich (+Altcha-Reserve); Antrag
-  anlegen → Magic-Link-Mail (Hintergrund, scope=edit).
-* ``GET    /api/applications``                  — Principal (``application.read``);
-  gefilterte, gepagte Liste.
-* ``GET    /api/applications/{id}``             — A/P; Antrag (PII/interne Kommentare
-  nur für Principals).
-* ``PATCH  /api/applications/{id}``             — A(edit)/P; ``data`` → neue Version
-  (gesperrter State → 409).
-* ``GET    /api/applications/{id}/timeline``    — A/P; Status-Verlauf.
-* ``GET    /api/applications/{id}/versions``    — Principal; Versionshistorie + Diff.
-* ``POST   /api/applications/{id}/comments``    — A(public)/P; Kommentar.
-* ``GET    /api/applications/{id}/comments``    — A/P; Kommentare (Applicant: nur public).
-
-Fehler werden als ``ProblemDetail`` deklariert (T-10-Hook → problem+json).
+Public create (ALTCHA-guarded) plus applicant-or-principal (A/P) reads/edits:
+detail, patch (new version), timeline, versions, comments, erasure request.
+PII and internal comments are principal-only.
 """
 
 from __future__ import annotations
@@ -82,11 +69,9 @@ router = APIRouter(tags=["applications"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
-# Harte Obergrenze für den synchronen XLSX-Export (anti-DoS): die Workbook wird
-# vollständig in-request im Speicher gebaut, daher beschränken wir auf eine sinnvolle
-# Zeilenzahl. Wird die Treffermenge größer, antworten wir mit 413 statt 100k Zeilen zu
-# materialisieren — der/die Nutzer:in soll dann enger filtern. (Echtes Streaming /
-# Worker-Offload wäre die größere Lösung; siehe concerns.)
+# Hard cap for the synchronous XLSX export (anti-DoS): the workbook is built
+# fully in memory in-request, so larger result sets answer 413 and the user
+# must narrow the filter.
 EXPORT_MAX_ROWS = 10_000
 
 
@@ -104,12 +89,11 @@ ServiceDep = Annotated[ApplicationsService, Depends(get_applications_service)]
 async def _deliver_magic_link(
     settings: Settings, email: str, application_id: UUID, pool: object
 ) -> None:
-    """Magic-Link für den neuen Antrag in eigener Session ausstellen + versenden.
+    """Issue and send the magic link for a new application in its own session.
 
-    Läuft als Background-Task **nach** der 201-Antwort (flows §1: ``enqueue Mail``).
-    Nutzt die getestete T-10-Logik; Scope folgt dem Initial-State (edit). Der Versand
-    geht über die Mail-Queue (Worker, T-18); fehlt der arq-Pool, wird geloggt +
-    verworfen (`NotificationService`)."""
+    Runs as a background task after the 201 response; scope follows the initial
+    state (edit). Delivery goes through the mail queue — without an arq pool it
+    is logged and dropped (`NotificationService`)."""
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
@@ -129,7 +113,7 @@ MagicLinkSender = Callable[[Settings, str, UUID, object], Awaitable[None]]
 
 
 def get_magic_link_sender() -> MagicLinkSender:
-    """Injizierbarer Magic-Link-Versender (in Tests überschreibbar)."""
+    """Injectable magic-link sender (overridable in tests)."""
     return _deliver_magic_link
 
 
@@ -138,16 +122,15 @@ def get_magic_link_sender() -> MagicLinkSender:
     response_model=ApplicationCreated,
     status_code=status.HTTP_201_CREATED,
     dependencies=[
-        # Body-Cap (413): Content-Length-Schranke + gekapptes Lesen (auch chunked,
-        # Review #3). Die maßgebliche Prüfung der serialisierten Feldwerte erfolgt
-        # zusätzlich nach dem Parsen.
+        # Body cap (413): Content-Length bound plus capped reading (also chunked);
+        # the authoritative check on serialized field values happens after parsing.
         Depends(enforce_application_payload_limit),
         Depends(rate_limit_applications),
-        # Altcha nur für anonyme Einreichung; eingeloggte Nutzer:innen sind befreit (#24).
+        # ALTCHA only for anonymous submissions; logged-in users are exempt.
         Depends(verify_altcha_unless_authenticated),
     ],
-    # 400 = malformed JSON / Altcha ungültig, 413 = Body zu groß, 422 = Form-/Schema-
-    # Validierung, 429 = Rate-Limit (api.md §7).
+    # 400 malformed JSON / invalid ALTCHA, 413 body too large, 422 form/schema
+    # validation, 429 rate limit.
     responses=_errors(400, 404, 413, 422, 429),
 )
 async def create_application(
@@ -159,18 +142,17 @@ async def create_application(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     send_magic_link: Annotated[MagicLinkSender, Depends(get_magic_link_sender)],
 ) -> ApplicationCreated:
-    """Antrag anlegen. PII getrennt, v1-Version, Magic-Link-Mail enqueued.
+    """Create an application: PII split out, v1 version, magic-link mail enqueued.
 
-    Eingeloggte Nutzer:innen (#24) brauchen **kein** Altcha; fehlende
-    ``applicantEmail``/``applicantName`` werden aus dem Account abgeleitet und der
-    Audit-Akteur ist ihr Principal-``sub``. Anonyme Einreichung wie bisher (Altcha +
-    Pflicht-``applicantEmail``)."""
-    # Maßgebliche Schranke: serialisierte Feldwerte (unabhängig von Content-Length).
+    Logged-in users need no ALTCHA; missing ``applicantEmail``/``applicantName``
+    are derived from the account and the audit actor is their ``sub``. Anonymous
+    submissions require ALTCHA and ``applicantEmail``."""
+    # Authoritative bound: serialized field values (independent of Content-Length).
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
         raise PayloadTooLargeError(
             f"Application data exceeds {settings.max_application_payload_bytes} bytes."
         )
-    # Identität ableiten: explizite Angabe gewinnt, sonst der eingeloggte Account.
+    # Derive identity: explicit value wins, else the logged-in account.
     email = (
         str(payload.applicant_email)
         if payload.applicant_email
@@ -203,9 +185,9 @@ async def list_tasks(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[ApplicationListItem]:
-    """Offene Aufgaben des Principals (#64): Anträge in vote-States bzw. mit feuerbarem
-    Übergang — und die **eigenen** Anträge in bearbeitbarem State (auch ohne
-    ``application.read``, #24)."""
+    """List the principal's open tasks: applications in vote states or with a
+    firable transition, plus own applications in an editable state (even
+    without ``application.read``)."""
     return await service.list_tasks(principal)
 
 
@@ -230,16 +212,15 @@ async def list_applications(
     created_to: Annotated[date | None, Query(alias="createdTo")] = None,
     sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
-    # »Meine Anträge«: erzwingt den Owner-Filter auch für Principals MIT
-    # application.read (Dashboard-Karte) — sonst sähen Berechtigte dort alle.
+    # "My applications": forces the owner filter even for principals WITH
+    # application.read — otherwise they would see everything there.
     mine: Annotated[bool, Query()] = False,
 ) -> Page[ApplicationListItem]:
-    """Antragsliste (Filter: state/gremium/type/topf/q/Betrag/Datum; Sortierung; Paging).
+    """List applications (filters, sorting, paging).
 
-    Ohne ``application.read`` (und ohne Admin) sieht der Principal die **eigenen**
-    Anträge (``created_by``, #24) **und** den Gremium-Lesescope (#committee-read:
-    Anträge in einer Sicht-Kostenstelle bzw. ``vote``-State seiner Gremien).
-    ``mine=true`` erzwingt den reinen Eigentümer-Filter auch für Berechtigte."""
+    Without ``application.read`` (and not admin) the principal sees own
+    applications (``created_by``) plus the committee read scope.
+    ``mine=true`` forces the pure owner filter even for authorized readers."""
     can_read = (
         "admin" in principal.roles
         or principal.has("application.read")
@@ -260,8 +241,8 @@ async def list_applications(
         sort=sort,
         order=order,
         owner_sub=principal.sub if (mine or not can_read) else None,
-        # Gremium-Lesescope nur für Eingeschränkte (#committee-read); »mine« bleibt
-        # bewusst rein eigentümer-bezogen, Berechtigte sehen ohnehin alles.
+        # Committee read scope only for restricted principals; "mine" stays
+        # deliberately owner-only.
         committee_sub=principal.sub if restricted else None,
         limit=page.limit,
         offset=page.offset,
@@ -288,7 +269,7 @@ async def export_applications_xlsx(
     sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Response:
-    """Antragsliste als ``.xlsx`` (P(``application.export``)), Filter wie ``GET /applications``."""
+    """Export the application list as ``.xlsx``; filters as in ``GET /applications``."""
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_applications_workbook
 
     page = await service.list_applications(
@@ -304,13 +285,13 @@ async def export_applications_xlsx(
         created_to=created_to,
         sort=sort,
         order=order,
-        # +1 über der Kappe, damit wir »mehr als EXPORT_MAX_ROWS« sicher erkennen,
-        # selbst wenn ``total`` nicht zuverlässig gezählt wird.
+        # +1 over the cap so "more than EXPORT_MAX_ROWS" is detected reliably
+        # even if ``total`` is not counted.
         limit=EXPORT_MAX_ROWS + 1,
         offset=0,
     )
-    # Treffermenge zu groß → 413 statt riesige Workbook in-request zu bauen. Wir prüfen
-    # sowohl ``total`` (falls gezählt) als auch die tatsächlich gelieferten Zeilen.
+    # Result set too large -> 413 instead of building a huge workbook in-request;
+    # checks both ``total`` (if counted) and the actually returned rows.
     if page.total > EXPORT_MAX_ROWS or len(page.items) > EXPORT_MAX_ROWS:
         raise PayloadTooLargeError(
             f"Export exceeds {EXPORT_MAX_ROWS} rows; please narrow the filter."
@@ -344,7 +325,7 @@ async def get_application(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> ApplicationOut:
-    """Antrag lesen. PII/interne Sicht nur für Principals."""
+    """Read an application. PII/internal view for principals only."""
     principal = access.principal
     return await service.get(
         access.application_id,
@@ -366,8 +347,8 @@ async def get_application_form(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> EffectiveFormOut:
-    """Effektive Form des Antrags aus seiner **gepinnten** Version — so zeigt/bearbeitet
-    die Detailansicht denselben Stand, gegen den validiert wird (auch nach Form-Änderung)."""
+    """Effective form from the application's pinned version — the detail view
+    shows/edits the same state it is validated against, even after form changes."""
     return await service.effective_form(
         access.application_id, allow_unconfirmed=access.is_owning_applicant
     )
@@ -383,7 +364,7 @@ async def patch_application(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_edit)],
 ) -> ApplicationOut:
-    """Antragsdaten ändern → neue Version (gesperrter State → 409, außer
+    """Update application data as a new version (locked state -> 409, unless
     ``application.edit_any``)."""
     bypass = access.principal is not None and access.principal.has(EDIT_ANY_PERMISSION)
     return await service.patch(
@@ -405,7 +386,7 @@ async def delete_application(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> None:
-    """Antrag löschen — **nur Admin** (irreversibel; Verwalter:in/Ersteller:in nicht)."""
+    """Delete an application — admin only (irreversible; managers/creators may not)."""
     if "admin" not in principal.roles:
         raise ForbiddenError("Only an admin may delete applications.")
     await service.delete(application_id, actor=principal.sub)
@@ -420,7 +401,7 @@ async def get_timeline(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[TimelineEventOut]:
-    """Status-Timeline des Antrags."""
+    """Status timeline of the application."""
     return await service.timeline(
         access.application_id, allow_unconfirmed=access.is_owning_applicant
     )
@@ -436,9 +417,9 @@ async def get_versions(
     application_id: UUID,
     service: ServiceDep,
 ) -> list[VersionOut]:
-    """Versionshistorie + Diff (Principal-only)."""
-    # Principal-only Route: unbestätigte Gast-Einreichungen bleiben unsichtbar (404),
-    # spiegelnd zur Listen-Semantik (#AUD-032).
+    """Version history plus diff (principal-only)."""
+    # Principal-only route: unconfirmed guest submissions stay invisible (404),
+    # mirroring the list semantics.
     return await service.versions(application_id, allow_unconfirmed=False)
 
 
@@ -451,7 +432,7 @@ async def _deliver_comment_mails(
     body: str,
     pool: object,
 ) -> None:
-    """Kommentar-Mails (#4-1) in eigener Session — Background nach der 201-Antwort."""
+    """Send comment mails in an own session — background after the 201 response."""
     from app.modules.notifications.comments import send_comment_notifications
 
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
@@ -475,7 +456,7 @@ CommentMailSender = Callable[
 
 
 def get_comment_mail_sender() -> CommentMailSender:
-    """Injizierbarer Kommentar-Mail-Versender (in Tests überschreibbar)."""
+    """Injectable comment-mail sender (overridable in tests)."""
     return _deliver_comment_mails
 
 
@@ -492,15 +473,15 @@ async def add_comment(
     background: BackgroundTasks,
     request: Request,
     send_comment_mails: Annotated[CommentMailSender, Depends(get_comment_mail_sender)],
-    # Bewusst ``require_app_read`` (view-Scope genügt): Kommentieren ist Kommunikation,
-    # keine Antrags-Datenmutation — ein Antragsteller darf auch im gesperrten (view-only)
-    # Status noch öffentlich nachfragen. Entspricht api.md (POST comments = A(public)/P).
+    # Deliberately ``require_app_read`` (view scope suffices): commenting is
+    # communication, not a data mutation — applicants may still ask publicly in a
+    # locked (view-only) state.
     access: Annotated[Access, Depends(require_app_read)],
 ) -> CommentOut:
-    """Kommentar anlegen. Antragsteller dürfen nur ``public`` schreiben (sonst 403).
+    """Add a comment. Applicants may only post ``public`` (else 403).
 
-    Löst Kommentar-Mails aus (#4-1): Principal-Kommentar (public) → Antragsteller;
-    Antragsteller-Kommentar → alle, die am aktuellen State handeln können."""
+    Triggers comment mails: public principal comments go to the applicant;
+    applicant comments go to everyone who can act on the current state."""
     if payload.visibility == "internal" and not access.can_see_internal:
         raise ForbiddenError("Applicants may only post public comments.")
     author = access.principal.sub if access.principal is not None else None
@@ -535,7 +516,7 @@ async def list_comments(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[CommentOut]:
-    """Kommentare lesen. Antragsteller sehen nur ``public`` (api.md §3)."""
+    """List comments. Applicants see ``public`` only."""
     return await service.list_comments(
         access.application_id,
         include_internal=access.can_see_internal,
@@ -554,12 +535,12 @@ async def request_erasure(
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
-    # DSGVO Art. 17: wer den Antrag lesen darf (Antragsteller per Magic-Link,
-    # Ersteller:in, Berechtigte) darf die Löschung der zugehörigen PII beantragen.
+    # GDPR Art. 17: anyone allowed to read the application (magic-link applicant,
+    # creator, authorized principal) may request erasure of the associated PII.
     access: Annotated[Access, Depends(require_app_read)],
 ) -> Response:
-    """Löschantrag (DSGVO Art. 17) stellen → offener Eintrag in der ``/admin/privacy``-
-    Queue; benachrichtigt die Datenschutz-Verantwortlichen."""
+    """File an erasure request (GDPR Art. 17) into the ``/admin/privacy`` queue;
+    notifies the privacy officers."""
     result = await ErasureRequestService(session).create(
         subject_type="applicant",
         application_id=access.application_id,

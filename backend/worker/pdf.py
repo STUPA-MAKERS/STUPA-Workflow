@@ -1,11 +1,11 @@
-"""arq-Worker-Task: Antrags-PDF rendern (T-20, flows §6).
+"""arq worker task: render an application PDF.
 
-``render_pdf`` baut die :class:`RenderPipeline` (pytex + MinIO) aus den in ``ctx``
-hinterlegten Deps und rendert einen ``render_job`` end-to-end. Transiente
-Fehler (pytex 5xx/Transport, Storage) → ``arq.Retry`` mit linearem Backoff bis
-``pdf_max_tries``; danach wird der Job dauerhaft ``failed`` markiert (kein Endlos-Requeue).
-Idempotenz trägt der ``_job_id`` (= ``render:<id>``) beim Enqueue **und** der Job-Status
-(ein ``done`` Job wird nicht erneut gerendert).
+``render_pdf`` builds the :class:`RenderPipeline` (pytex + MinIO) from ``ctx`` deps
+and renders a ``render_job`` end-to-end. Transient errors (pytex 5xx/transport,
+storage) -> ``arq.Retry`` with linear backoff up to ``pdf_max_tries``; then the job
+is marked permanently ``failed`` (no endless requeue). Idempotency comes from the
+``_job_id`` (= ``render:<id>``) at enqueue and the job status (a ``done`` job is not
+re-rendered).
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB-Sessionmaker (in Tests via ``ctx['pdf_sessionmaker']`` injizierbar)."""
+    """DB sessionmaker (injectable in tests via ``ctx['pdf_sessionmaker']``)."""
     maker = ctx.get("pdf_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
@@ -48,7 +48,7 @@ def _pipeline(ctx: dict[str, Any]) -> RenderPipeline:
 
 
 async def render_pdf(ctx: dict[str, Any], job_id: str) -> str:
-    """Einen Render-Job abarbeiten. Retry bei transientem Fehler bis ``pdf_max_tries``."""
+    """Process one render job. Retry on transient error up to ``pdf_max_tries``."""
     settings: Settings = ctx["settings"]
     pipeline = _pipeline(ctx)
     jid = UUID(job_id)

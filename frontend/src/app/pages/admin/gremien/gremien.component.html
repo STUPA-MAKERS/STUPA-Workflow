@@ -33,7 +33,7 @@
   }
 </section>
 
-<!-- Anlegen/Bearbeiten als Dialog (#18/#19). -->
+<!-- Create/edit dialog. -->
 <app-dialog
   [open]="dialogOpen()"
   [title]="(editingId() ? 'admin.gremien.edit' : 'admin.gremien.create') | t"
@@ -108,8 +108,8 @@
       />
       <p class="text-xs text-muted m-0">{{ 'admin.gremien.quorumHint' | t }}</p>
     </div>
-    <!-- Zusatz-Protokoll-Empfänger (#protocol-recipients): erhalten finalisierte
-         Protokolle zusätzlich zu den aktiven Mitgliedern. -->
+    <!-- Extra protocol recipients: receive finalized protocols in addition to the
+         active members. -->
     <div class="flex flex-col gap-2">
       <label class="text-sm font-medium" for="grem-mail">{{ 'admin.gremien.mailRecipients' | t }}</label>
       <textarea
@@ -132,7 +132,7 @@
   </div>
 </app-dialog>
 
-<!-- Löschen mit Bestätigung (#41). -->
+<!-- Delete with confirmation. -->
 <app-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.gremien.deleteTitle' | t"

@@ -5,7 +5,7 @@ Kürzel (z. B. „KRZL") und keine IBAN, obwohl der echte Gegenpart in den SEPA-
 (``ABWE+``/``ABWA+`` → ``deviate_*``, ``IBAN+`` → ``gvc_applicant_iban``) im ``raw_payload``
 steckt. Diese Migration leitet ``counterparty_name``/``counterparty_iban`` für **offene**
 (``unmatched``/``suggested``) Zeilen einmalig neu ab — über dieselbe Logik wie der Parser
-(``bank_import.mt940_counterparty``).
+(``bank.normalize.mt940_counterparty``).
 
 Rein additiv: aktualisiert nur Zeilen, bei denen die Ableitung etwas Neues liefert; CAMT-/
 Datei-Zeilen ohne GVC-Felder bleiben unangetastet. Idempotent. Schon **gebuchte** Buchungen
@@ -29,7 +29,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     # Parser-Logik wiederverwenden (läuft einmalig beim Deploy → App-Import unkritisch).
-    from app.modules.budget.bank_import import mt940_counterparty
+    from app.modules.budget.bank.normalize import mt940_counterparty
 
     conn = op.get_bind()
     rows = conn.execute(

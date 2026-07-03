@@ -1,12 +1,12 @@
-"""Branded HTML-Mail-Layout (#4): ein Rahmen in Code, Inhalt aus Templates.
+"""Branded HTML mail layout: one frame in code, content from templates.
 
-Jede ausgehende Mail wird in dasselbe Layout gehüllt (Header mit Plattform-Name,
-Inhalts-Karte, Footer mit Auslöser-Hinweis + Link zu den Benachrichtigungs-
-Einstellungen). DB-Templates liefern nur den **inneren** Inhalt — liegt kein
-HTML-Body vor, wird der Text-Body escaped + umgebrochen übernommen, sodass auch
-text-only Templates eine ansehnliche HTML-Alternative bekommen.
+Every outgoing mail is wrapped in the same layout (header with platform name,
+content card, footer with trigger hint + link to the notification settings).
+DB templates provide only the **inner** content — without an HTML body the
+text body is escaped + wrapped so text-only templates get a decent HTML
+alternative.
 
-Inline-CSS (Mail-Clients ignorieren <style> teils), keine externen Ressourcen.
+Inline CSS (mail clients partly ignore <style>), no external resources.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from __future__ import annotations
 import html
 import re
 
-# Auslöser-Hinweis im Footer („Sie erhalten diese E-Mail, weil …") je Mail-Art.
+# Footer trigger hint ("you receive this email because …") per mail kind.
 _REASONS: dict[str, dict[str, str]] = {
     "magic_link": {
         "de": "Sie erhalten diese E-Mail, weil für Ihre Adresse ein "
@@ -103,24 +103,23 @@ _FOOTER_STYLE = "padding:16px 16px 0;font-size:12px;line-height:1.5;color:#6b768
 
 
 def reason_text(kind: str, lang: str) -> str:
-    """Footer-Hinweis für eine Mail-Art (Fallback: generischer Hinweis, DE)."""
+    """Return the footer hint for a mail kind (fallback: generic hint, DE)."""
     table = _REASONS.get(kind, _REASONS["generic"])
     return table.get(lang, table["de"])
 
 
-# URLs im (bereits escapten) Text — endet vor Whitespace/<; angehängte
-# Satzzeichen werden unten abgetrennt, damit »https://x.de/y.« klickbar bleibt.
+# URLs in the (already escaped) text — end before whitespace/<; trailing
+# punctuation is split off below so "https://x.de/y." stays clickable.
 _URL_RE = re.compile(r"https?://[^\s<]+")
 _TRAILING_PUNCT = ".,;:!?)]"
 _LINK_STYLE = "color:#0b6e4f;word-break:break-all;"
 
 
 def _linkify(escaped: str) -> str:
-    """URLs im escapten Text in klickbare ``<a href>`` verwandeln.
+    """Turn URLs in escaped text into clickable ``<a href>`` anchors.
 
-    Läuft NACH ``html.escape`` — ``&`` in Query-Strings steht als ``&amp;`` im
-    ``href``, was beim Klick korrekt dekodiert wird. Kein neues Injection-
-    Risiko: es wird nur bereits escapter Text in Anker gehüllt."""
+    Runs AFTER ``html.escape`` — no new injection risk since only already
+    escaped text is wrapped in anchors (``&amp;`` in hrefs decodes correctly)."""
 
     def repl(match: re.Match[str]) -> str:
         url = match.group(0)
@@ -134,8 +133,8 @@ def _linkify(escaped: str) -> str:
 
 
 def text_to_html(text: str) -> str:
-    """Plain-Text-Body → einfacher HTML-Inhalt (escaped, Absätze + Umbrüche,
-    URLs als klickbare Links)."""
+    """Convert a plain-text body to simple HTML (escaped, paragraphs + breaks,
+    URLs as clickable links)."""
     paragraphs = [p for p in text.split("\n\n") if p.strip()]
     rendered = [
         '<p style="margin:0 0 1em;">'
@@ -155,10 +154,10 @@ def render_layout(
     reason: str,
     lang: str = "de",
 ) -> str:
-    """Inneren Inhalt ins gebrandete Mail-Layout hüllen (vollständiges Dokument).
+    """Wrap inner content in the branded mail layout (full document).
 
-    ``content_html`` MUSS bereits sicher sein (autoescaped Jinja-Render bzw.
-    :func:`text_to_html`); alle übrigen Werte werden hier escaped."""
+    ``content_html`` MUST already be safe (autoescaped Jinja render or
+    :func:`text_to_html`); all other values are escaped here."""
     esc_title = html.escape(title)
     esc_site = html.escape(site_name)
     esc_reason = html.escape(reason)

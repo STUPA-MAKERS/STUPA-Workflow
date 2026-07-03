@@ -1,39 +1,38 @@
-"""Katalog der konfigurierbaren Benachrichtigungs-Arten (#4-2/#4-3).
+"""Catalog of configurable notification kinds.
 
-Eine *Art* (``kind``) bündelt fachlich zusammengehörige Mails; die
-Einstellungsseite (`/account/notifications`) bietet genau diese Keys an.
-Magic-Link-Mails sind essenziell (Login-Funktion) und bewusst NICHT
-abschaltbar — sie stehen daher nicht im Katalog.
+A *kind* groups mails that belong together; the settings page
+(``/account/notifications``) offers exactly these keys. Magic-link mails are
+essential (login function) and deliberately NOT opt-out-able — they are
+therefore not in the catalog.
 
-Versandseitig filtert :meth:`NotificationService.filter_by_preference`
-Empfänger-Adressen über diesen Katalog; unbekannte Kinds werden nie
-gefiltert (fail-open beim Versand, aber 422 beim Speichern unbekannter
-Keys über die API).
+On the sending side :meth:`NotificationService.filter_by_preference` filters
+recipient addresses through this catalog; unknown kinds are never filtered
+(fail-open on send, but 422 when saving unknown keys via the API).
 """
 
 from __future__ import annotations
 
 NOTIFICATION_KINDS: tuple[str, ...] = (
-    # Eigene Anträge: Statuswechsel/Updates (Flow-notify-Actions).
+    # Own applications: status changes/updates (flow notify actions).
     "status_update",
-    # Neue Kommentare zu Anträgen, die einen betreffen (#4-1).
+    # New comments on applications that concern the user.
     "comment",
-    # Antrag in einem State, in dem die eigene Rolle handeln kann (#4-3).
+    # Application in a state where the own role can act.
     "task",
-    # Erinnerung an liegengebliebene offene Aufgaben (#4-3).
+    # Reminder for stale open tasks.
     "task_reminder",
-    # Sitzungen: Einladung/Tagesordnung veröffentlicht (#4-3).
+    # Meetings: invitation/agenda published.
     "meeting",
-    # Abstimmungen geöffnet/geschlossen (#4-3).
+    # Votes opened/closed.
     "vote",
-    # Eigene Rolle zugewiesen/entzogen (#4-3).
+    # Own role assigned/revoked.
     "role_change",
-    # Stimm-Delegation erhalten/widerrufen (#4-3).
+    # Vote delegation received/revoked.
     "delegation",
-    # Sitzungsprotokoll finalisiert.
+    # Meeting protocol finalized.
     "protocol",
-    # Frist-Erinnerungen zu Anträgen.
+    # Deadline reminders on applications.
     "deadline",
-    # DSGVO-Löschanträge: eingegangen/ausgeführt/abgelehnt (#PII-Re-Add).
+    # GDPR erasure requests: received/executed/rejected.
     "privacy",
 )

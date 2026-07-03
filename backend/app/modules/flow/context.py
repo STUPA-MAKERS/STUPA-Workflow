@@ -1,37 +1,31 @@
-"""Guard-Kontext-Aufbau für die Flow-Engine (flows §9.2).
+"""Guard-context assembly for the flow engine.
 
-``eval_guard`` (T-05) ist eine **reine** Funktion über einem
-:class:`~app.shared.guards.GuardContext`. Dieses Modul füllt den Kontext aus dem
-Antrag + auslösendem Principal + abgeleiteten Fakten (#28-Redesign):
-
-* **Akteur** (``roles``/``actor_committees``) — globale Rollen + Gremium-
-  Mitgliedschaften des auslösenden Principals (nur für manuelle Übergänge relevant).
-* **Antragsteller** (``applicant_roles``/``applicant_committees``) — aus
-  ``data['_applicantRoles']`` bzw. den Mitgliedschaften des erstellenden Principals.
-* **Budget** (``budget_id``/``budget_fits``) — zugeordnete Kostenstelle + ob der
-  Betrag in den verfügbaren Rest (Allocation − Ausgaben) passt.
-* **Felder** (``field_values``/``field_types``) — Formularfeldwerte aus ``data`` +
-  Built-in ``amount`` (currency) samt abgeleiteten Typen für ``compare``/``hasField``.
+``eval_guard`` is a pure function over a :class:`~app.shared.guards.GuardContext`;
+this module fills that context from the application, the triggering principal,
+and derived facts: actor roles/committees (manual transitions only), applicant
+roles/committees, budget fit, and form field values/types for ``compare``.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership
+from app.modules.admin.models import ApplicationType, GremiumMembership
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import BudgetAllocation, BudgetExpense
+from app.modules.files.models import Attachment
 from app.modules.forms.models import FormField
 from app.shared.guards import GuardContext
 
-# Formularfeld-Typ → ``compare``-Wert-Typ (guards.COMPARE_TYPES).
+# Form field type -> ``compare`` value type (guards.COMPARE_TYPES).
 _FIELD_TYPE_MAP: dict[str, str] = {
     "number": "number",
     "currency": "currency",
@@ -42,12 +36,12 @@ _FIELD_TYPE_MAP: dict[str, str] = {
 
 
 def _compare_type(field_type: str) -> str:
-    """Formularfeld-Typ auf einen ``compare``-Wert-Typ abbilden (Default ``text``)."""
+    """Map a form field type to a ``compare`` value type (default ``text``)."""
     return _FIELD_TYPE_MAP.get(field_type, "text")
 
 
 async def _committees_for_sub(session: AsyncSession, sub: str | None) -> frozenset[str]:
-    """Gremium-IDs, in denen ``sub`` aktuell (Amtszeit-Fenster) Mitglied ist."""
+    """Return gremium ids where ``sub`` is currently (term window) a member."""
     if not sub:
         return frozenset()
     now = datetime.now(UTC)
@@ -68,12 +62,11 @@ async def _committees_for_sub(session: AsyncSession, sub: str | None) -> frozens
 
 
 async def _budget_fits(session: AsyncSession, app: Application) -> bool:
-    """``True`` wenn der Antragsbetrag in den freien Rest der Kostenstelle passt.
+    """Return True if the requested amount fits the cost centre's free remainder.
 
-    Verfügbar = Allocation des Knotens im Haushaltsjahr − Σ Ausgaben
-    (``kind='expense'``) + Σ Einnahmen (``kind='income'``) auf diesem Knoten/HHJ —
-    gleiche Richtung wie ``tree_rules.node_available``. Ohne Budget/HHJ/Betrag ⇒
-    ``False`` (fail-closed)."""
+    Available = node allocation − expenses + income for the fiscal year (same
+    direction as ``tree_rules.node_available``). Missing budget/fiscal
+    year/amount yields ``False`` (fail-closed)."""
     if app.budget_id is None or app.fiscal_year_id is None or app.amount is None:
         return False
     allocated = await session.scalar(
@@ -102,8 +95,36 @@ async def _budget_fits(session: AsyncSession, app: Application) -> bool:
     return app.amount <= available
 
 
+async def _has_attachment(session: AsyncSession, app: Application) -> bool:
+    """``True`` when the application has at least one non-quarantined attachment — for
+    the ``attachmentPresent`` guard (e.g. receipts/offers required).
+
+    ``storage_key IS NULL`` marks an attachment removed on a ClamAV hit; such a one does
+    not count as present."""
+    return bool(
+        await session.scalar(
+            select(
+                exists().where(
+                    Attachment.application_id == app.id,
+                    Attachment.storage_key.is_not(None),
+                )
+            )
+        )
+    )
+
+
+async def _application_type_key(session: AsyncSession, app: Application) -> str | None:
+    """Application type key (e.g. ``qsm``/``vsm``) for ``applicationTypeIs``.
+
+    ``None`` when the type (data drift) is unresolvable → the guard falls fail-closed
+    to ``False``."""
+    return await session.scalar(
+        select(ApplicationType.key).where(ApplicationType.id == app.type_id)
+    )
+
+
 async def _field_types(session: AsyncSession, app: Application) -> dict[str, str]:
-    """``{feldKey: compareTyp}`` der gepinnten Form + Built-in ``amount`` (currency)."""
+    """Return ``{fieldKey: compareType}`` of the pinned form plus built-in ``amount``."""
     rows = (
         await session.execute(
             select(FormField.key, FormField.type).where(
@@ -116,6 +137,71 @@ async def _field_types(session: AsyncSession, app: Application) -> dict[str, str
     return types
 
 
+async def build_base_context(
+    session: AsyncSession,
+    app: Application,
+    *,
+    manual: bool,
+    deadline_passed: bool = False,
+) -> GuardContext:
+    """Build the actor-free part of the guard context from DB + application (I/O).
+
+    Contains every fact derived from the application alone (applicant, budget,
+    fields, deadline). Actor fields stay at their empty defaults — overlay them
+    per actor with :func:`with_actor`.
+    """
+    raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
+    applicant_roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
+    applicant_committees = await _committees_for_sub(session, app.created_by)
+    application_type_key = await _application_type_key(session, app)
+    has_attachment = await _has_attachment(session, app)
+    # Fields (built-in amount + form data).
+    field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}
+    field_values["amount"] = app.amount
+    field_types = await _field_types(session, app)
+
+    return GuardContext(
+        manual=manual,
+        deadline_passed=deadline_passed,
+        applicant_roles=applicant_roles,
+        applicant_committees=applicant_committees,
+        budget_id=str(app.budget_id) if app.budget_id is not None else None,
+        budget_fits=await _budget_fits(session, app),
+        application_type_key=application_type_key,
+        has_attachment=has_attachment,
+        field_values=field_values,
+        field_types=field_types,
+    )
+
+
+def with_actor(
+    ctx: GuardContext,
+    *,
+    roles: frozenset[str],
+    committees: frozenset[str],
+    is_applicant: bool,
+) -> GuardContext:
+    """Overlay actor facts on a base context (pure, no I/O).
+
+    Actor gates only apply to manual transitions: on a non-manual context the
+    actor fields stay empty regardless of the arguments (fail-closed, same
+    semantics as the former monolithic ``build_context``).
+    """
+    if not ctx.manual:
+        return replace(
+            ctx,
+            roles=frozenset(),
+            actor_committees=frozenset(),
+            actor_is_applicant=False,
+        )
+    return replace(
+        ctx,
+        roles=roles,
+        actor_committees=committees,
+        actor_is_applicant=is_applicant,
+    )
+
+
 async def build_context(
     session: AsyncSession,
     app: Application,
@@ -125,39 +211,22 @@ async def build_context(
     deadline_passed: bool = False,
     as_applicant: bool = False,
 ) -> GuardContext:
-    """Vollständigen :class:`GuardContext` aus DB + Principal bauen (I/O).
+    """Build the full :class:`GuardContext` from DB + principal (I/O).
 
-    ``as_applicant=True`` markiert den Magic-Link-Antragsteller als Akteur
-    (``actorIsApplicant`` greift), unabhängig von ``created_by`` — der Link-Inhaber
-    *ist* die Antragsteller:in für genau diesen Antrag (#applicant-actions)."""
-    # Akteur (nur manuelle Übergänge nutzen die Akteur-Gates).
+    ``as_applicant=True`` marks the magic-link holder as the applicant actor
+    regardless of ``created_by`` — the link holder *is* the applicant for
+    exactly this application."""
+    base = await build_base_context(
+        session, app, manual=manual, deadline_passed=deadline_passed
+    )
     actor_committees = (
         await _committees_for_sub(session, principal.sub) if manual else frozenset()
     )
-    # Antragsteller.
-    raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
-    applicant_roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
-    applicant_committees = await _committees_for_sub(session, app.created_by)
-    # Akteur ist Antragsteller:in: Magic-Link-Inhaber:in (as_applicant) **oder**
-    # eingeloggte:r Ersteller:in, die/der selbst auslöst (#guard).
-    actor_is_applicant = manual and (
-        as_applicant or (app.created_by is not None and principal.sub == app.created_by)
-    )
-    # Felder (Built-in amount + Formulardaten).
-    field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}
-    field_values["amount"] = app.amount
-    field_types = await _field_types(session, app)
-
-    return GuardContext(
-        manual=manual,
-        deadline_passed=deadline_passed,
-        actor_is_applicant=actor_is_applicant,
-        roles=frozenset(principal.roles) if manual else frozenset(),
-        actor_committees=actor_committees,
-        applicant_roles=applicant_roles,
-        applicant_committees=applicant_committees,
-        budget_id=str(app.budget_id) if app.budget_id is not None else None,
-        budget_fits=await _budget_fits(session, app),
-        field_values=field_values,
-        field_types=field_types,
+    # Actor counts as applicant: magic-link holder or logged-in creator firing themselves.
+    return with_actor(
+        base,
+        roles=frozenset(principal.roles),
+        committees=actor_committees,
+        is_applicant=as_applicant
+        or (app.created_by is not None and principal.sub == app.created_by),
     )

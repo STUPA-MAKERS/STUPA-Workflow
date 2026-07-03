@@ -1,14 +1,10 @@
-"""``config_revision`` — append-only Snapshot-Kette versionierter Configs.
+"""``config_revision`` — append-only snapshot chain of versioned configs.
 
-Wie ``audit_entry`` **append-only**: ein DB-Trigger lehnt UPDATE/DELETE/TRUNCATE ab
-(Migration ``0034`` + Least-Privilege-Grant ``audit_writer``) — eine frühere Version
-kann **niemals** gelöscht werden (#config-versioning).
-
-``snapshot`` hält den vollständigen, wiederherstellbaren Config-Stand in seiner
-**natürlichen Form** (Forms: Felder+Beschreibung, Flow: ``FlowGraph``, Branding:
-``Branding``) — **nur Config, nie Principal-PII** (DSGVO-Löschung bleibt intakt).
-``version`` zählt monoton je (``entity_type``, ``entity_id``); ``prev_revision_id``
-verkettet die Stände (Diff = aufeinanderfolgende Snapshots).
+Like ``audit_entry``, a DB trigger rejects UPDATE/DELETE/TRUNCATE (migration
+0034 plus the ``audit_writer`` grant) — prior versions can never be deleted.
+``snapshot`` holds the full restorable config in its natural form, config only,
+never principal PII (keeps GDPR erasure intact). ``version`` counts
+monotonically per entity; ``prev_revision_id`` chains the states.
 """
 
 from __future__ import annotations
@@ -37,17 +33,17 @@ class ConfigRevision(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True, server_default=func.gen_random_uuid()
     )
-    # 'form' | 'flow' | 'site_config' (erweiterbar in Phase 2).
+    # 'form' | 'flow' | 'site_config'.
     entity_type: Mapped[str] = mapped_column(Text)
-    # uuid-String (form: application_type_id) bzw. 'global' (flow/site_config).
+    # UUID string (form: application_type_id) or 'global' (flow/site_config).
     entity_id: Mapped[str] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer)
     snapshot: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Vorgänger-Snapshot derselben Entität (NULL = erster Stand).
+    # Predecessor snapshot of the same entity (NULL = first state).
     prev_revision_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("config_revision.id", ondelete="RESTRICT"), nullable=True
     )
-    # OIDC-``sub`` des Auslösers (kein PII).
+    # OIDC ``sub`` of the trigger (no PII).
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

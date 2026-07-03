@@ -1,10 +1,10 @@
 /**
- * Guard-/Action-Builder + Validierung des Flow-Editors (T-34, #28-Redesign).
+ * Guard/action builder + validation for the flow editor.
  *
- * Spiegelt `app/shared/guards.py` (`validate_guard`/`validate_action`): rein
- * deklarativ, **Whitelist, kein `eval`**. Das Backend validiert autoritativ beim
- * Speichern der Flow-Version; diese Client-Prüfung gibt sofortiges UI-Feedback,
- * damit der Admin keinen Graphen baut, den der Server ablehnt.
+ * Mirrors `app/shared/guards.py` (`validate_guard`/`validate_action`): purely
+ * declarative, **whitelist, no `eval`**. The backend validates authoritatively on
+ * save of the flow version; this client check gives immediate UI feedback so the
+ * admin does not build a graph the server would reject.
  */
 import {
   ACTION_TYPES,
@@ -48,10 +48,10 @@ function children(op: string, value: unknown): Guard[] {
 }
 
 /**
- * Statische Guard-Prüfung (Speicher-Gate, wie Backend `validate_guard`):
- * genau ein Operator, nur Whitelist-Operatoren, korrekte Kombinator-Struktur,
- * `compare`-Form. `allowActorOps=false` (automatische Übergänge) verbietet
- * `roleIs`/`isInCommittee`. Leerer/`null`-Guard ⇒ kein Gate ⇒ ok.
+ * Static guard check (save gate, like backend `validate_guard`): exactly one
+ * operator, only whitelist operators, correct combinator structure, `compare`
+ * shape. `allowActorOps=false` (automatic transitions) forbids
+ * `roleIs`/`isInCommittee`. Empty/`null` guard ⇒ no gate ⇒ ok.
  */
 export function validateGuard(guard: Guard | null | undefined, allowActorOps = true): void {
   if (!guard) return;
@@ -84,12 +84,13 @@ export function validateGuard(guard: Guard | null | undefined, allowActorOps = t
     validateCompare(value);
     return;
   }
-  // Operatoren, die einen nicht-leeren Wert brauchen (sonst lehnt der Server ab).
+  // Operators that require a non-empty value (otherwise the server rejects).
   if (
     op === 'roleIs' ||
     op === 'isInCommittee' ||
     op === 'applicantRoleIs' ||
     op === 'applicantCommitteeIs' ||
+    op === 'applicationTypeIs' ||
     op === 'budgetIs' ||
     op === 'hasField'
   ) {
@@ -116,7 +117,7 @@ function validateCompare(spec: unknown): void {
   }
 }
 
-/** Action-Prüfung (Whitelist-Typ + Pflichtfelder), wie Backend `validate_action`. */
+/** Action check (whitelist type + required fields), like backend `validate_action`. */
 export function validateAction(action: ActionDef | null | undefined): void {
   if (!isRecord(action)) {
     throw new GuardError('action must be an object');
@@ -138,6 +139,10 @@ export function validateAction(action: ActionDef | null | undefined): void {
   } else if (type === 'assignBudget') {
     if (typeof action['budgetId'] !== 'string' || !action['budgetId']) {
       throw new GuardError('assignBudget action requires a budget');
+    }
+  } else if (type === 'assignBudgetFromField') {
+    if (typeof action['field'] !== 'string' || !action['field']) {
+      throw new GuardError('assignBudgetFromField action requires a field');
     }
   }
 }
@@ -166,19 +171,19 @@ export function isGuardValid(guard: Guard | null | undefined, allowActorOps = tr
   }
 }
 
-// --- Builder-Helfer ---------------------------------------------------------
+// --- builder helpers --------------------------------------------------------
 
-/** Blatt-Guard bauen, z. B. `buildLeaf('roleIs', 'stupa')` → `{roleIs:'stupa'}`. */
+/** Build a leaf guard, e.g. `buildLeaf('roleIs', 'stupa')` → `{roleIs:'stupa'}`. */
 export function buildLeaf(op: GuardLeafOperator, value: unknown): Guard {
   return { [op]: value };
 }
 
-/** Kombinator-Guard bauen (`and`/`or` mit n Kindern, `not` mit genau einem). */
+/** Build a combinator guard (`and`/`or` with n children, `not` with exactly one). */
 export function combine(op: GuardCombinator, kids: Guard[]): Guard {
   return op === 'not' ? { not: kids[0] } : { [op]: kids };
 }
 
-/** Lesbare Kurzbeschreibung eines Guards (Read-only-Anzeige). */
+/** Human-readable short description of a guard (read-only display). */
 export function describeGuard(guard: Guard | null | undefined): string {
   if (!guard) return '—';
   const keys = Object.keys(guard);

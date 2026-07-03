@@ -1,10 +1,8 @@
-"""Versand-Enqueue-Abstraktion (arq) + idempotenter Job-Key.
+"""Mail enqueue abstraction (arq) with an idempotent job key.
 
-Der Service kennt nur `MailQueue.enqueue` — nicht *wie* versendet wird. Produktiv
-legt `ArqMailQueue` einen `send_mail`-Job in Redis (Worker sendet async, blockiert
-die API nicht). Der arq-`_job_id` = `MailMessage.idempotency_key` → doppelte
-Enqueues desselben Mails koaleszieren (idempotent). `DirectMailQueue` versendet
-inline (Tests/DEV ohne Redis).
+`ArqMailQueue` enqueues a `send_mail` job in Redis; the arq `_job_id` =
+`MailMessage.idempotency_key`, so duplicate enqueues of the same mail coalesce.
+`DirectMailQueue` sends inline (tests/dev without Redis).
 """
 
 from __future__ import annotations
@@ -20,28 +18,26 @@ logger = logging.getLogger("app.mail")
 
 MAIL_TASK_NAME = "send_mail"
 
-# Obergrenze des In-Memory-Dedup-Caches von `DirectMailQueue`. Begrenzt den
-# Speicher einer (eigentlich nur für Tests/DEV gedachten) langlebigen Instanz;
-# älteste Keys werden FIFO/LRU verdrängt. Produktiv dedupliziert `ArqMailQueue`
-# über die arq-`_job_id`, nicht über diesen Cache.
+# Cap on the in-memory dedup cache of `DirectMailQueue`; oldest keys are evicted
+# LRU. Production dedups via the arq `_job_id`, not this cache.
 DIRECT_QUEUE_SEEN_MAX = 4096
 
 
 class MailQueue(Protocol):
-    """Enqueue-Schnittstelle (vom Service genutzt)."""
+    """Enqueue interface used by the service."""
 
     async def enqueue(self, msg: MailMessage) -> None: ...
 
 
 @dataclass(slots=True)
 class ArqMailQueue:
-    """arq-gestützte Queue: `send_mail`-Job mit idempotenter Job-Id."""
+    """arq-backed queue: `send_mail` job with an idempotent job id."""
 
-    pool: object  # arq.ArqRedis (lose typisiert: kein arq-Import in der API-Fläche)
+    pool: object  # arq.ArqRedis (loosely typed: no arq import in the API surface)
 
     async def enqueue(self, msg: MailMessage) -> None:
-        # `_job_id` = Idempotenz-Key: arq verwirft ein bereits vorhandenes Job-Id
-        # (gibt None zurück) → kein Doppelversand.
+        # `_job_id` = idempotency key: arq drops an already-present job id
+        # (returns None), so no double send.
         job = await self.pool.enqueue_job(  # type: ignore[attr-defined]
             MAIL_TASK_NAME, msg.to_payload(), _job_id=msg.idempotency_key or None
         )
@@ -51,11 +47,10 @@ class ArqMailQueue:
 
 @dataclass(slots=True)
 class DirectMailQueue:
-    """Inline-Versand (Tests/DEV): ruft den Sender direkt, kein Redis.
+    """Inline send (tests/dev): calls the sender directly, no Redis.
 
-    Eigene Idempotenz: schon gesehene Keys werden übersprungen. Der Cache ist auf
-    `max_seen` Einträge begrenzt (LRU-Verdrängung der ältesten Keys), damit eine
-    langlebige Instanz nicht unbegrenzt wächst.
+    Own idempotency: already-seen keys are skipped. The cache is capped at
+    `max_seen` entries (LRU eviction of the oldest keys).
     """
 
     sender: MailSender

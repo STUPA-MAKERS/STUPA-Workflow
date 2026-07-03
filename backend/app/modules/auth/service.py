@@ -1,8 +1,8 @@
-"""Auth-Orchestrierung (security.md §1/§2, api.md §1/§3).
+"""Auth orchestration.
 
-Bindet die Primitive (tokens/sessions/oidc/rbac) an DB + Settings:
-Magic-Link issue/verify, OIDC-Callback (Code→Token→Session), Principal-Upsert.
-Reine HTTP-Verdrahtung liegt im Router; hier nur Domänenlogik + I/O.
+Binds the primitives (tokens/sessions/oidc/rbac) to DB + settings: magic-link
+issue/verify, OIDC callback (code to token to session), principal upsert. Pure
+HTTP wiring lives in the router; only domain logic + I/O here.
 """
 
 from __future__ import annotations
@@ -30,8 +30,8 @@ from app.shared.errors import ForbiddenError, GoneError
 
 logger = logging.getLogger("app.auth")
 
-# Versand-Callback `(email, link)`. Sync **oder** async: T-18 liefert einen
-# async-Deliver (Mail-Render + arq-Enqueue); Bestands-Tests nutzen sync-Lambdas.
+# Delivery callback `(email, link)`. Sync or async: production uses an async
+# deliver (mail render + arq enqueue); legacy tests use sync lambdas.
 Deliver = Callable[[str, str], None | Awaitable[None]]
 
 
@@ -40,20 +40,18 @@ def _now() -> datetime:
 
 
 def _default_deliver(email: str, link: str) -> None:
-    """Mail-Versand-Platzhalter (echtes SMTP/Templating: T-18).
+    """Mail delivery placeholder.
 
-    **Kein Token in Logs** (security.md §1) — nur Empfänger-Domain wird vermerkt."""
+    No token in logs — only the recipient domain is recorded."""
     domain = email.rsplit("@", 1)[-1]
     logger.info("magic-link issued (recipient domain=%s)", domain)
 
 
-# --------------------------------------------------------------------------- #
-# Magic-Link
-# --------------------------------------------------------------------------- #
+# --- magic link ---
 async def _resolve_application(
     db: AsyncSession, *, email: str, application_id: object | None
 ) -> Application | None:
-    """Antrag zu (Mail[, application_id]) finden — über die PII-Tabelle `applicant`."""
+    """Find the application for (email[, application_id]) via the PII table `applicant`."""
     stmt = (
         select(Application)
         .join(ApplicantRow, ApplicantRow.application_id == Application.id)
@@ -66,7 +64,7 @@ async def _resolve_application(
 
 
 async def _scope_for(db: AsyncSession, app: Application) -> ApplicantScope:
-    """Edit-Scope nur, wenn der aktuelle State `edit_allowed` ist; sonst view."""
+    """Edit scope only if the current state is `edit_allowed`; otherwise view."""
     if app.current_state_id is None:
         return "edit"
     state = (
@@ -85,10 +83,10 @@ async def request_magic_link(
     application_id: object | None = None,
     deliver: Deliver = _default_deliver,
 ) -> None:
-    """Magic-Link anfordern. Versendet nur bei Treffer; Aufrufer antwortet **immer** 202."""
+    """Request a magic link. Sends only on a hit; the caller always answers 202."""
     app = await _resolve_application(db, email=email, application_id=application_id)
     if app is None:
-        return  # Anti-Enumeration: keine Auskunft nach außen.
+        return  # anti-enumeration: no information to the outside
 
     scope = await _scope_for(db, app)
     ttl = (
@@ -107,9 +105,9 @@ async def request_magic_link(
         )
     )
     await db.flush()
-    # Token im URL-Fragment (#), nicht im Query (?): Fragmente landen nicht in
-    # Referer-Headern, Server-/Proxy-Logs oder der Browser-History-Query (security.md §1).
-    # Das FE liest das Fragment und sendet den Token per POST an /auth/magic-link/verify.
+    # Token in the URL fragment (#), not the query (?): fragments do not land in
+    # Referer headers, server/proxy logs or the browser history query. The
+    # frontend reads the fragment and POSTs the token to /auth/magic-link/verify.
     link = f"{settings.public_base_url.rstrip('/')}/antrag/{app.id}#t={token}"
     result = deliver(email, link)
     if inspect.isawaitable(result):
@@ -119,9 +117,9 @@ async def request_magic_link(
 async def verify_magic_link(
     db: AsyncSession, settings: Settings, *, token: str
 ) -> tuple[str, ApplicantScope, str]:
-    """Token verifizieren → (`application_id`, scope, Applicant-Session-Token).
+    """Verify a token into (`application_id`, scope, applicant session token).
 
-    Ungültig/abgelaufen/verbraucht → `GoneError` (410). Single-use markiert `used_at`."""
+    Invalid/expired/used raises `GoneError` (410). Single-use marks `used_at`."""
     digest = tokens.hash_token(token, settings.magic_link_secret)
     row = (
         await db.execute(select(MagicLink).where(MagicLink.token_hash == digest))
@@ -134,9 +132,9 @@ async def verify_magic_link(
     if row.expires_at <= now:
         raise GoneError("Magic-Link expired.")
     if row.single_use:
-        # Atomare Einlösung: nur eine nebenläufige Verify gewinnt (Replay-Schutz).
-        # `WHERE used_at IS NULL` serialisiert auf DB-Ebene → 0 Zeilen = schon
-        # verbraucht → 410 (security.md §1).
+        # Atomic redemption: only one concurrent verify wins (replay protection).
+        # `WHERE used_at IS NULL` serializes at DB level -> 0 rows = already
+        # used -> 410.
         claimed = (
             await db.execute(
                 update(MagicLink)
@@ -147,8 +145,8 @@ async def verify_magic_link(
         ).scalar_one_or_none()
         if claimed is None:
             raise GoneError("Magic-Link already used.")
-    # E-Mail-Bestätigung: die erste erfolgreiche Verify macht eine (Gast-)Antragstellung
-    # sichtbar und schützt sie vor dem 12-h-Verwurf. Idempotent (nur solange NULL).
+    # Email confirmation: the first successful verify makes a (guest) submission
+    # visible and protects it from the 12-hour discard. Idempotent (only while NULL).
     await db.execute(
         update(Application)
         .where(
@@ -159,9 +157,9 @@ async def verify_magic_link(
     )
     scope: ApplicantScope = "edit" if row.scope == "edit" else "view"
     app_id = str(row.application_id)
-    # Serverseitige Session anlegen (statt zustandslosem Token): die zurückgegebene
-    # opake `sid` ist nur mit existierender `applicant_session`-Zeile gültig — ein
-    # allein aus `SESSION_SECRET` geschmiedeter Token greift nicht (security.md §1).
+    # Create a server-side session (instead of a stateless token): the returned
+    # opaque `sid` is valid only with an existing `applicant_session` row — a
+    # token forged from `SESSION_SECRET` alone does not work.
     expires_at = now + timedelta(hours=settings.applicant_session_ttl_hours)
     session_token = await sessions.create_applicant_session(
         db,
@@ -173,11 +171,9 @@ async def verify_magic_link(
     return app_id, scope, session_token
 
 
-# --------------------------------------------------------------------------- #
-# OIDC
-# --------------------------------------------------------------------------- #
+# --- OIDC ---
 async def upsert_principal(db: AsyncSession, claims: oidc.OidcClaims) -> PrincipalRow:
-    """Principal per OIDC-`sub` anlegen/aktualisieren (Identität + Gruppen-Cache)."""
+    """Create/update a principal by OIDC `sub` (identity + group cache)."""
     row = (
         await db.execute(select(PrincipalRow).where(PrincipalRow.sub == claims.sub))
     ).scalar_one_or_none()
@@ -195,24 +191,23 @@ async def upsert_principal(db: AsyncSession, claims: oidc.OidcClaims) -> Princip
 async def oidc_callback(
     db: AsyncSession, settings: Settings, *, code: str, verifier: str, nonce: str
 ) -> tuple[str, PrincipalRow]:
-    """Code→Token→verify→Principal-Upsert→Server-Session. Gibt (sid-Cookie, Principal)."""
+    """Exchange code, verify token, upsert principal, open session; returns (sid, principal)."""
     token_set = await oidc.exchange_code(settings, code=code, verifier=verifier)
     claims = await oidc.verify_id_token(
         settings, id_token=token_set["id_token"], nonce=nonce
     )
     row = await upsert_principal(db, claims)
-    # Deaktivierte Principals (#30) dürfen sich nicht anmelden — fail-closed schon
-    # beim Login, damit keine Session entsteht (die Request-Auflösung blockt sie
-    # ohnehin, vgl. deps.get_current_principal).
+    # Deactivated principals must not log in — fail-closed at login so no
+    # session is created (request resolution blocks them anyway).
     if row.active is False:
         raise ForbiddenError("Account is deactivated.")
-    # Bootstrap-Admins (#70): erstmaliger/idempotenter admin-Grant beim Login, sonst
-    # sperrt sich eine frische OIDC-Installation selbst aus. Der E-Mail-Bootstrap zählt
-    # nur bei verifizierter Mail (claims.email_verified). Committet der Aufrufer.
+    # Bootstrap admins: first/idempotent admin grant at login, otherwise a fresh
+    # OIDC installation locks itself out. Email bootstrap counts only with a
+    # verified mail claim. The caller commits.
     await ensure_admin_for_principal(
         db, settings, row, email_verified=claims.email_verified
     )
-    # Jeder Benutzer hält immer die globale member-Rolle (#61).
+    # Every user always holds the global member role.
     await ensure_member_for_principal(db, row)
     cookie = await sessions.create_principal_session(
         db,

@@ -36,14 +36,13 @@ class AuthError(RuntimeError):
     pass
 
 
-# Loopback hosts where cleartext http is tolerated for local dev (RFC 8252 §8.3).
+# Loopback hosts where cleartext http is tolerated for local dev (RFC 8252).
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
 
 
 def _require_secure_base(base_url: str) -> None:
-    """Reject cleartext http:// base URLs — OAuth code/tokens must not transit in the
-    clear. http:// is allowed ONLY for explicit loopback/dev (localhost/127.0.0.1/[::1]);
-    everything else MUST be https://. Apply before any discovery/token request."""
+    """Reject cleartext http:// base URLs; OAuth codes/tokens must not transit in
+    the clear. http:// is allowed only for loopback/dev hosts."""
     parsed = urlparse(base_url)
     if parsed.scheme == "https":
         return
@@ -57,14 +56,11 @@ def _require_secure_base(base_url: str) -> None:
 
 
 def _require_secure_endpoint(label: str, endpoint: str, base_url: str) -> None:
-    """Re-validate a discovery-supplied endpoint before using it for redirects/token POST.
+    """Re-validate a discovery-supplied endpoint before using it.
 
-    The discovery body is fetched over the https-validated ``base_url``, but its
-    ``authorization_endpoint``/``token_endpoint`` are otherwise trusted verbatim. A
-    compromised/MITM'd discovery document could point them at ``http://attacker/`` and
-    exfiltrate the auth code+verifier and tokens. Defence-in-depth: each endpoint MUST
-    (1) pass the same scheme rule as the base and (2) be same-origin (scheme+host+port)
-    as ``base_url`` so credentials never leave the platform origin."""
+    Endpoints must pass the base scheme rule and be same-origin with ``base_url``
+    so a tampered discovery document cannot divert the auth code/verifier or tokens.
+    """
     _require_secure_base(endpoint)
     ep = urlparse(endpoint)
     base = urlparse(base_url)
@@ -107,10 +103,8 @@ def _discover(base_url: str) -> dict:
             except ValueError:
                 last = f"non-JSON response at {url}"
                 continue
-            # Re-validate the endpoints the metadata yields BEFORE they are used for the
-            # browser redirect (code+verifier) or token/refresh POST. They must be https
-            # (or loopback) AND same-origin as base_url so credentials can't be sent to a
-            # cleartext/cross-origin endpoint injected via a tampered discovery body.
+            # Endpoints from the metadata must be https (or loopback) and same-origin
+            # as base_url before any browser redirect or token POST uses them.
             for label in ("authorization_endpoint", "token_endpoint"):
                 value = meta.get(label)
                 if not isinstance(value, str) or not value:
@@ -243,9 +237,8 @@ def _load(config: Config) -> dict | None:
 
 def _save(config: Config, tokens: dict) -> None:
     path = config.token_path()
-    # Atomically create the cache file mode 0600 from the start (no TOCTOU window where the
-    # secret is world-readable under the prevailing umask). Write to a sibling temp file and
-    # os.replace into place; permission failures on the secret MUST NOT be swallowed.
+    # Create the token cache atomically with mode 0600 from the start (no TOCTOU
+    # window where the secret is world-readable); permission failures must surface.
     payload = json.dumps(tokens).encode("utf-8")
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

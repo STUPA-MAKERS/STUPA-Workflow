@@ -1,9 +1,8 @@
-"""FastAPI App-Factory (T-02).
+"""FastAPI app factory.
 
-`create_app()` baut die App: Settings laden, Logging, Middleware (Trace-Id +
-Security-Header, CORS aus), Fehler-Contract-Handler, API-Router-Mount unter `/api`.
-Fachmodul-Router werden ab T-10 hier eingehängt. uvicorn-Entrypoint nutzt
-`--proxy-headers` (Dockerfile/compose, security.md §3).
+`create_app()` wires settings, logging, middleware (trace id + security headers,
+CORS off), the problem+json error contract, and all module routers under `/api`.
+The uvicorn entrypoint runs with `--proxy-headers`.
 """
 
 from __future__ import annotations
@@ -72,17 +71,17 @@ api_router = APIRouter(prefix="/api")
 
 @api_router.get("/health", tags=["meta"])
 def health() -> dict[str, str]:
-    """Liveness-Endpunkt (Container-Healthcheck)."""
+    """Liveness endpoint (container healthcheck)."""
     return {"status": "ok"}
 
 
-# Fachmodul-Router (einmalig auf Modulebene gemountet → keine Doppel-Registrierung
-# bei mehrfachem `create_app()` in Tests).
+# Module routers are mounted once at module level so repeated `create_app()`
+# calls in tests do not register them twice.
 api_router.include_router(auth_router)
 api_router.include_router(oauth_router)
 api_router.include_router(mcp_router)
-# Discovery auch unter /api spiegeln (RFC-Standard ist Root; /api ist aber immer
-# durch den Edge-Proxy erreichbar → robuste Fallback-Discovery für MCP-Clients).
+# Mirror OAuth discovery under /api: the RFC location is the root, but /api is
+# always reachable through the edge proxy, giving MCP clients a fallback.
 api_router.include_router(oauth_well_known_router)
 api_router.include_router(forms_router)
 api_router.include_router(application_types_router)
@@ -110,11 +109,10 @@ api_router.include_router(site_config_public_router)
 
 
 async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: no cover
-    """Beim Start gematchten Bestands-Principals die admin-Rolle geben (#70).
+    """Grant the admin role to matched existing principals on startup.
 
-    Best-effort: ohne Bootstrap-Config (Normalfall) kein DB-Zugriff; Fehler (DB nicht
-    erreichbar/migriert) werden geloggt, nicht propagiert — der App-Start bleibt robust.
-    Die Branch-Logik steckt in ``ensure_bootstrap_admins`` (unit-getestet)."""
+    Best-effort: without bootstrap config (the normal case) no DB access happens;
+    errors are logged, never propagated — app startup must not fail here."""
     if not (settings.bootstrap_admin_subject_set or settings.bootstrap_admin_email_set):
         return
     from app.modules.auth.bootstrap import ensure_bootstrap_admins
@@ -124,7 +122,7 @@ async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: n
         async with sessionmaker() as db:
             await ensure_bootstrap_admins(db, settings)
             await db.commit()
-    except Exception:  # noqa: BLE001 — Start darf an Bootstrap nie scheitern
+    except Exception:  # noqa: BLE001 — startup must never fail on bootstrap
         logging.getLogger("app.auth.bootstrap").warning(
             "bootstrap admin startup sweep skipped (db unavailable?)", exc_info=True
         )
@@ -133,12 +131,12 @@ async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: n
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    # arq-Pool best-effort öffnen (Mail-Versand + Scan-Jobs via Worker). Fehlt Redis → None.
+    # Open the arq pool best-effort (mail + scan jobs); without Redis it is None.
     app.state.arq_pool = await create_mail_pool(settings.redis_url)
-    # Object-Storage best-effort bauen (Upload, T-13). Ohne MinIO → None → Upload 503.
+    # Build object storage best-effort; without MinIO it is None and uploads 503.
     app.state.object_storage = build_object_storage(settings)
-    # Live-Vote (T-16): Redis-PubSub-Broker + Cast-Lock + Event-Publisher. Der Client
-    # ist lazy (verbindet erst beim ersten PUBLISH/SUBSCRIBE), daher hier billig.
+    # Live vote: Redis pub/sub broker + cast lock + event publisher. The client is
+    # lazy (connects on first PUBLISH/SUBSCRIBE), so this is cheap.
     import redis.asyncio as aioredis
 
     livevote_redis = aioredis.from_url(settings.redis_url)
@@ -162,11 +160,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def _flow_action_dispatcher(request: Request) -> ActionDispatcher:
-    """Flow-Action-Dispatcher (#28): `notify` (T-18), `webhook` (T-19) sowie
-    `addToNextSession`/`assignBudget` (inline auf Sitzungs-/Budget-Daten).
+    """Build the flow action dispatcher: notify, webhook, addToNextSession/assignBudget.
 
-    Liest den arq-Pool aus dem App-State (Lifespan); ohne Pool werden notify-Mails
-    bzw. Webhook-Deliveries geloggt + pending gehalten (kein API-Block)."""
+    Reads the arq pool from app state; without a pool, notify mails and webhook
+    deliveries are logged and kept pending (the API never blocks)."""
     pool = getattr(request.app.state, "arq_pool", None)
     return ChainActionDispatcher(
         [
@@ -187,11 +184,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Middleware (CORS bewusst nicht registriert → Cross-Origin aus). Reihenfolge:
-    # zuletzt hinzugefügt = äußerste Schicht. SecurityHeaders außen (Header auch auf
-    # CSRF/429-Antworten), dann Trace-Id (vor CSRF/Rate-Limit gesetzt), dann CSRF, dann
-    # das Default-Write-Rate-Limit innen. Alle sind BaseHTTPMiddleware → WS-Scopes
-    # laufen unberührt durch (Live-Vote nutzt eigene Cast-Limits).
+    # CORS is deliberately not registered (cross-origin off). Order: last added =
+    # outermost. SecurityHeaders outermost (headers also on CSRF/429 responses),
+    # then trace id, then CSRF, then the default write rate limit innermost. All
+    # are BaseHTTPMiddleware, so WebSocket scopes pass through untouched.
     app.add_middleware(DefaultWriteRateLimitMiddleware, settings=settings)
     app.add_middleware(CsrfMiddleware, settings=settings)
     app.add_middleware(RequestContextMiddleware)
@@ -199,15 +195,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
 
-    # Flow-Actions echt ausführen (statt No-op-Log): notify (T-18) + webhook (T-19).
     app.dependency_overrides[get_action_dispatcher] = _flow_action_dispatcher
 
     app.include_router(api_router)
-    # OAuth-Discovery (RFC 8414/9728) am Root, NICHT unter /api (Well-Known-Konvention).
+    # OAuth discovery (RFC 8414/9728) at the root, per well-known convention.
     app.include_router(oauth_well_known_router)
     use_problem_json_contract(app)
     return app
 
 
-# Modul-Level-App für uvicorn (`app.main:app`).
+# Module-level app for uvicorn (`app.main:app`).
 app = create_app()

@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  /* Auf Body-Breite zentriert — fluchtet mit der Mittelspalte des Layouts. */
+  /* Centered at body width — aligns with the layout's center column. */
   width: 100%;
   max-width: var(--layout-max-width);
   margin-inline: auto;
@@ -59,13 +59,13 @@
   margin: 0;
   word-break: break-word;
 }
-/* Edit-Formular: Formly-Felder vertikal Luft geben (Image #5: Spacing). */
+/* Edit form: give Formly fields vertical breathing room. */
 formly-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
-/* Kostenpositionen-Block (#1) */
+/* Cost-positions block */
 .det__pos-val {
   font-variant-numeric: tabular-nums;
 }
@@ -167,8 +167,8 @@ formly-form {
   resize: vertical;
 }
 
-/* --- Breakout-Layout: Übergänge + Chat schweben in den Rändern, Inhalt mittig
-       auf Body-Breite (wie Baum/Charts im Budget-Tab, #det). --- */
+/* --- Breakout layout: transitions + chat float in the margins, content centered
+       at body width (like the tree/charts in the budget tab). --- */
 .det__layout {
   display: grid;
   grid-template-columns:
@@ -203,7 +203,7 @@ formly-form {
   font-size: var(--fs-sm);
   margin: 0 0 var(--space-3);
 }
-/* Bearbeiten: Ränder ausblenden, Formular volle Breite. */
+/* Editing: hide the margins, form full width. */
 .det__layout--editing {
   grid-template-columns: 1fr;
 }
@@ -219,7 +219,7 @@ formly-form {
   }
 }
 
-/* --- Chat (Kommentare) — eigenständiges Panel (#det) --- */
+/* --- Chat (comments) — standalone panel --- */
 .det__chat {
   display: flex;
   flex-direction: column;
@@ -340,7 +340,39 @@ formly-form {
   outline-offset: 1px;
 }
 
-/* --- Edit-Formular: konsistente vertikale Abstände (#det Image 7) --- */
+/* --- Force-status dialog: mandatory reason --- */
+.det__forceReason {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+
+  span {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-text-muted);
+  }
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: var(--border-width) solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    font: inherit;
+    font-size: var(--fs-sm);
+    line-height: 1.4;
+  }
+
+  textarea:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
+}
+
+/* --- Edit form: consistent vertical spacing --- */
 formly-form formly-field {
   display: block;
 }
@@ -348,7 +380,7 @@ formly-form formly-field + formly-field {
   margin-top: var(--space-4);
 }
 
-/* --- Mobil (≤768px): Ränder in voller Breite stapeln, Zeilen einspaltig --- */
+/* --- Mobile (≤768px): stack the margins full-width, single-column rows --- */
 @media (max-width: 768px) {
   .det__meta {
     flex-wrap: wrap;

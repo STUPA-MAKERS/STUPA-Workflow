@@ -76,6 +76,20 @@ def test_form_field_select_requires_options() -> None:
     assert f.options is not None
 
 
+def test_form_field_dynamic_selects_need_no_options() -> None:
+    # gremium_select/budget_select bekommen ihre Optionen server-seitig injiziert —
+    # anders als select/multiselect brauchen sie im Formular KEINE Optionen.
+    for t in ("gremium_select", "budget_select"):
+        f = FormFieldDef(key="ziel", type=t, label={"de": "Ziel"})  # type: ignore[arg-type]
+        assert f.options is None
+
+
+def test_form_field_typed_inputs_valid() -> None:
+    for t in ("email", "iban", "daterange"):
+        f = FormFieldDef(key="f", type=t, label={"de": "x"})  # type: ignore[arg-type]
+        assert f.type == t
+
+
 def test_form_field_computed_requires_compute() -> None:
     with pytest.raises(ValidationError):
         FormFieldDef(key="a", type="computed", label={"de": "x"})

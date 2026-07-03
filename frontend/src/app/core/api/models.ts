@@ -1,35 +1,33 @@
 /**
- * API-DTOs — abgeleitet aus den OpenAPI-Contracts (sds/api.md §2/§5).
- * Single Source of Truth bleibt das Backend-OpenAPI; diese Typen sind die
- * FE-seitige Spiegelung für den typisierten API-Client. Bei Contract-Änderung
- * → abstimmen (tasks.md §Konventionen), nicht einseitig brechen.
+ * API DTOs — derived from the OpenAPI contracts. The backend OpenAPI is the
+ * single source of truth; these types are the FE-side mirror for the typed API
+ * client. On a contract change, coordinate rather than break unilaterally.
  *
- * Aufbau (T-40, Issue #17):
- *  - **`*Wire`-Typen** spiegeln das Backend-JSON **1:1** (T-12 `_CamelModel`:
- *    camelCase-Aliase via `by_alias`). Sie werden **nicht** direkt in Components
- *    konsumiert, sondern in der `ApiClient`-Schicht über `mappers.ts` in die
- *    FE-View-Modelle übersetzt.
- *  - **View-Modelle** (`Application`, `ApplicationComment`, …) sind die
- *    aufbereiteten, FE-freundlichen Shapes (i18n-Label bereits aufgelöst,
- *    Bool-Komfortfelder). Sie sind das, was Components/Templates sehen.
- *  - **`*Body`-Typen** sind Request-Bodies in der camelCase-Wire-Form.
+ * Layout:
+ *  - `*Wire` types mirror the backend JSON 1:1 (`_CamelModel`: camelCase aliases
+ *    via `by_alias`). They are not consumed directly in components but translated
+ *    into FE view models in the `ApiClient` layer via `mappers.ts`.
+ *  - View models (`Application`, `ApplicationComment`, …) are the FE-friendly
+ *    shapes (i18n label already resolved, boolean convenience fields). They are
+ *    what components/templates see.
+ *  - `*Body` types are request bodies in the camelCase wire form.
  */
 
 export type Uuid = string;
 export type IsoDateTime = string;
 export type Lang = 'de' | 'en';
 
-/** Konfigurierbarer mehrsprachiger Text (`*_i18n`-JSONB, overview §5). */
+/** Configurable multilingual text (`*_i18n` JSONB). */
 export type I18nMap = Record<string, string>;
 
-/** Öffentliche (auth-freie) aktive Branding-Config (#18) — bewusst lose typisiert:
- *  das FE liest hieraus nur die Freitexte (z. B. `applyInfo`) und den App-Namen. */
+/** Public (auth-free) active branding config — deliberately loosely typed: the FE
+ *  reads only the free texts (e.g. `applyInfo`) and the app name from it. */
 export interface PublicSiteConfig {
   version: number;
   branding?: {
-    /** Konfigurierter App-Name (sprach-neutral); leer ⇒ i18n-/Default-Fallback. */
+    /** Configured app name (language-neutral); empty ⇒ i18n/default fallback. */
     appName?: string;
-    /** Kurzname (PWA-Symbol); leer ⇒ Default-Fallback. */
+    /** Short name (PWA icon); empty ⇒ default fallback. */
     appShortName?: string;
     freetexts?: Partial<
       Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
@@ -37,7 +35,7 @@ export interface PublicSiteConfig {
   } | null;
 }
 
-/** Einheitliches Problem-Objekt (RFC-9457-nah, api.md §2). */
+/** Uniform problem object (close to RFC 9457). */
 export interface ProblemDetail {
   type: string;
   title: string;
@@ -49,11 +47,11 @@ export interface ProblemDetail {
 }
 
 /**
- * Principal (OIDC) inkl. Rollen/Permissions/Gruppen — GET /api/auth/me.
- * Feldnamen spiegeln das Backend-`MeOut` (auth/schemas.py) 1:1. `MeOut` ist ein
- * **reines** `BaseModel` (kein `_CamelModel`) → `display_name` bleibt snake_case.
+ * Principal (OIDC) incl. roles/permissions/groups — GET /api/auth/me.
+ * Field names mirror the backend `MeOut` 1:1. `MeOut` is a plain `BaseModel`
+ * (not a `_CamelModel`) → `display_name` stays snake_case.
  */
-/** Schlanke Gremium-Referenz (Mitgliedschaft eines Principals, #5). */
+/** Lean gremium reference (a principal's membership). */
 export interface GremiumRef {
   id: Uuid;
   name: string;
@@ -67,22 +65,22 @@ export interface Principal {
   roles: string[];
   permissions: string[];
   groups: string[];
-  /** Gremien, in denen der Principal Mitglied ist (#5) — Basis für »Meine Gremien«. */
+  /** Gremien the principal is a member of — basis for "My gremien". */
   gremien?: GremiumRef[];
-  /** Gremien, die der Principal verwaltet (Gremium-Rolle mit `session.manage`). */
+  /** Gremien the principal manages (gremium role with `session.manage`). */
   session_manage_gremien?: Uuid[];
-  /** ≥1 Kostenstelle ist einem Mitglieds-Gremium zugeordnet (#budget-scope). */
+  /** ≥1 cost centre is assigned to a member gremium. */
   has_scoped_budget_view?: boolean;
-  /** Principal steht in ≥1 Stellvertreter-Pool (#7) — Sitzungs-Timeline sichtbar. */
+  /** Principal is in ≥1 substitute pool — meeting timeline visible. */
   in_substitute_pool?: boolean;
 }
 
-/** Antwort von POST /api/auth/logout — RP-Initiated-Logout-URL (OIDC) oder null. */
+/** Response of POST /api/auth/logout — RP-initiated logout URL (OIDC) or null. */
 export interface LogoutOut {
   logout_url: string | null;
 }
 
-/** Einheitliche Listen-Hülle (Offset-Paging, overview §5 / api.md). */
+/** Uniform list envelope (offset paging). */
 export interface Page<T> {
   items: T[];
   total: number;
@@ -95,7 +93,7 @@ export interface ApplicationListQuery {
   gremium?: Uuid;
   type?: Uuid;
   topf?: Uuid;
-  /** Kostenstelle (Budget-Baum) inkl. Unterbaum. */
+  /** Cost centre (budget tree) incl. subtree. */
   budget?: Uuid;
   q?: string;
   amountMin?: number;
@@ -104,36 +102,36 @@ export interface ApplicationListQuery {
   createdTo?: string;
   sort?: 'createdAt' | 'amount';
   order?: 'asc' | 'desc';
-  /** Nur eigene Anträge — erzwingt den Owner-Filter auch mit `application.read`. */
+  /** Own applications only — forces the owner filter even with `application.read`. */
   mine?: boolean;
   limit?: number;
   offset?: number;
 }
 
 // =========================================================================== //
-// Wire-DTOs — exakte Spiegelung des Backend-JSON (T-12 `_CamelModel`).         //
+// Wire DTOs — exact mirror of the backend JSON (`_CamelModel`).                //
 // =========================================================================== //
 
-/** `StateOut` (applications/schemas.py) — `label` ist eine **i18n-Map**. */
+/** `StateOut` — `label` is an i18n map. */
 export interface StateOutWire {
   id: Uuid;
   key: string;
   label: I18nMap;
-  /** Anzeigefarbe des State-Badges (Hex), optional. */
+  /** Display colour of the state badge (hex), optional. */
   color?: string | null;
   editAllowed: boolean;
-  /** State-Art (#28): normal|vote. */
+  /** State kind: normal|vote. */
   kind?: string;
 }
 
-/** `ApplicantOut` — PII, nur für Berechtigte gefüllt. */
+/** `ApplicantOut` — PII, filled only for authorized readers. */
 export interface ApplicantOutWire {
   email?: string | null;
   name?: string | null;
   anonymized: boolean;
 }
 
-/** `ApplicationOut` — Antrag-Detail. */
+/** `ApplicationOut` — application detail. */
 export interface ApplicationOutWire {
   id: Uuid;
   typeId: Uuid;
@@ -154,7 +152,7 @@ export interface ApplicationOutWire {
   isOwner?: boolean;
 }
 
-/** `ApplicationListItem` — Listen-Eintrag (kein `data`/`applicant`). */
+/** `ApplicationListItem` — list entry (no `data`/`applicant`). */
 export interface ApplicationListItemWire {
   id: Uuid;
   typeId: Uuid;
@@ -168,16 +166,16 @@ export interface ApplicationListItemWire {
   updatedAt: IsoDateTime;
 }
 
-/** `ApplicationCreated` — 201-Antwort auf `POST /applications` (nur die ID). */
+/** `ApplicationCreated` — 201 response to `POST /applications` (id only). */
 export interface ApplicationCreatedWire {
   applicationId: Uuid;
 }
 
-/** Anwesenheits-Status eines Mitglieds in einer Sitzung (#Meetings). */
+/** Attendance status of a member in a meeting. */
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
 
-/** `AttendanceOut` — Anwesenheit eines Gremium-Mitglieds (GET/PUT …/attendance). */
-/** Aktuelles Gremium-Mitglied — Protokollant-Kandidat beim Anlegen einer Sitzung. */
+/** `AttendanceOut` — attendance of a gremium member (GET/PUT …/attendance). */
+/** Current gremium member — protokollant candidate when creating a meeting. */
 export interface MeetingMember {
   principalId: Uuid;
   displayName: string | null;
@@ -188,35 +186,35 @@ export interface Attendance {
   principalId: Uuid;
   displayName: string | null;
   email: string | null;
-  /** `null` = noch nicht erfasst. */
+  /** `null` = not recorded yet. */
   status: AttendanceStatus | null;
   source: 'self' | 'lead' | null;
-  /** Ist das der anfragende Nutzer (für die Selbst-Markierung)? */
+  /** Is this the requesting user (for self-marking)? */
   isSelf: boolean;
 }
 
-/** `AgendaItemOut` — ein TOP: zugeordneter Antrag oder Freitext (Tagesordnung, #10/#58). */
+/** `AgendaItemOut` — an agenda item: linked application or free text. */
 export interface AgendaItem {
   id: Uuid;
-  /** `null` bei einem Freitext-TOP (ohne Antrag). */
+  /** `null` for a free-text agenda item (no application). */
   applicationId: Uuid | null;
   title: string | null;
-  /** Markdown-Text dieses TOP (pro-TOP-Editor, #58). */
+  /** Markdown text of this agenda item (per-item editor). */
   body?: string | null;
   position: number;
-  /** Nicht-öffentlich: im öffentlichen Protokoll-PDF redigiert (#PII-Re-Add). */
+  /** Non-public: redacted in the public protocol PDF. */
   nonPublic?: boolean;
   stateLabel?: I18nMap | null;
 }
 
-/** `AssignableApplicationOut` — Antrag in einem Abstimmungs-State, noch nicht auf der TO. */
+/** `AssignableApplicationOut` — application in a vote state, not yet on the agenda. */
 export interface AssignableApplication {
   applicationId: Uuid;
   title: string | null;
   stateLabel?: I18nMap | null;
 }
 
-/** `AltchaChallengeOut` — server-signierte PoW-Challenge (GET /altcha/challenge). */
+/** `AltchaChallengeOut` — server-signed PoW challenge (GET /altcha/challenge). */
 export interface AltchaChallenge {
   algorithm: string;
   challenge: string;
@@ -225,7 +223,7 @@ export interface AltchaChallenge {
   maxnumber: number;
 }
 
-/** `TimelineEventOut` — Status-Übergang in der Timeline. */
+/** `TimelineEventOut` — status transition in the timeline. */
 export interface TimelineEventOutWire {
   fromStateId?: Uuid | null;
   toStateId: Uuid;
@@ -238,7 +236,7 @@ export interface TimelineEventOutWire {
 export type CommentVisibility = 'internal' | 'public';
 export type CommentAuthorKind = 'principal' | 'applicant';
 
-/** `CommentOut` — echte Backend-Feldnamen: `author`/`authorKind`/`visibility`/`at`. */
+/** `CommentOut` — real backend field names: `author`/`authorKind`/`visibility`/`at`. */
 export interface CommentOutWire {
   id: Uuid;
   author?: string | null;
@@ -248,39 +246,39 @@ export interface CommentOutWire {
   at: IsoDateTime;
 }
 
-/** `ApplicationTypeListItem` (application_types/schemas.py). */
+/** `ApplicationTypeListItem`. */
 export interface ApplicationTypeListItemWire {
   id: Uuid;
   name: string;
   hasBudget: boolean;
   active: boolean;
   activeFormVersionId?: Uuid | null;
-  /** Admin-Zusatzfelder (nur bei Berechtigung gefüllt). */
+  /** Admin extra fields (filled only when authorized). */
   key?: string | null;
   gremiumId?: Uuid | null;
 }
 
-/** `TransitionOut` (flow/schemas.py) — `label` ist eine i18n-Map. */
+/** `TransitionOut` — `label` is an i18n map. */
 export interface TransitionOutWire {
   id: Uuid;
   fromStateId: Uuid;
   toStateId: Uuid;
   label: I18nMap;
-  /** Optionale Farbe für den Entscheidungs-Button (#flow). */
+  /** Optional colour for the decision button. */
   color?: string | null;
 }
 
-/** Eine Feld-Änderung im Versions-Diff (`FieldChange`, applications/diff.py). */
+/** A field change in the version diff (`FieldChange`). */
 export interface FieldChangeWire {
   old: unknown;
   new: unknown;
 }
 
 /**
- * Struktur-Diff zweier `data`-Snapshots (`DataDiff`, applications/diff.py):
- * `added`/`removed` sind Feldwert-Maps, `changed` mappt Schlüssel → `{old,new}`.
- * Verschachtelte Felder werden **wertweise als Ganzes** verglichen (kein
- * rekursives Zell-Diff) — robust gegen heterogene Tabellen/Objekte (T-12).
+ * Structural diff of two `data` snapshots (`DataDiff`):
+ * `added`/`removed` are field-value maps, `changed` maps key → `{old,new}`.
+ * Nested fields are compared whole-value (no recursive cell diff) — robust
+ * against heterogeneous tables/objects.
  */
 export interface DataDiffWire {
   added: Record<string, unknown>;
@@ -288,7 +286,7 @@ export interface DataDiffWire {
   changed: Record<string, FieldChangeWire>;
 }
 
-/** `VersionOut` (applications/schemas.py) — eine Submission-Version + Diff. */
+/** `VersionOut` — one submission version + diff. */
 export interface VersionOutWire {
   version: number;
   data: Record<string, unknown>;
@@ -298,11 +296,11 @@ export interface VersionOutWire {
 }
 
 /**
- * `AttachmentOut` (files/schemas.py, T-13) — Anhang-Metadaten. **Reines
- * `BaseModel`** (kein `_CamelModel`) → `is_comparison_offer` bleibt snake_case.
- * `scanned` = ClamAV-Lauf **abgeschlossen** (nicht „sauber"!): das Scan-Ergebnis
- * (`scan_result`) wird bewusst nicht exponiert (security.md §6), Befund ⇒ Objekt
- * gelöscht. Sauber-vs-Befund klärt sich erst beim Download (200 vs. 409).
+ * `AttachmentOut` — attachment metadata. Plain `BaseModel` (not a `_CamelModel`)
+ * → `is_comparison_offer` stays snake_case. `scanned` = ClamAV run finished (not
+ * "clean"!): the scan result (`scan_result`) is deliberately not exposed; a
+ * positive finding ⇒ the object is deleted. Clean-vs-finding only resolves at
+ * download time (200 vs. 409).
  */
 export interface AttachmentOutWire {
   id: Uuid;
@@ -319,34 +317,41 @@ export interface SignedUrlOutWire {
   expiresIn: number;
 }
 
-// --- Request-Bodies (camelCase-Wire-Form) ---------------------------------- //
+// --- Request bodies (camelCase wire form) ---------------------------------- //
 
-/** Body für `POST /applications` (`ApplicationCreate`, by_alias). */
+/** Body for `POST /applications` (`ApplicationCreate`, by_alias). */
 export interface ApplicationCreateBody {
   typeId: Uuid;
   budgetPotId?: Uuid | null;
   data: Record<string, unknown>;
-  // Optional: für eingeloggte Nutzer:innen leitet das Backend die Identität aus dem
-  // Account ab (#24); anonyme Einreichung erzwingt sie serverseitig.
+  // Optional: for logged-in users the backend derives identity from the account;
+  // anonymous submission enforces it server-side.
   applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
 }
 
-/** Body für `POST /applications/{id}/comments` (`CommentCreate`). */
+/** Body for `POST /applications/{id}/comments` (`CommentCreate`). */
 export interface CommentCreateBody {
   body: string;
   visibility: CommentVisibility;
 }
 
-/** Body für `POST /applications/{id}/transition` (`TransitionRequest`). */
+/** Body for `POST /applications/{id}/transition` (`TransitionRequest`). */
 export interface TransitionRequestBody {
   transitionId: Uuid;
   note?: string | null;
 }
 
-/** `TransitionResult` — 200-Antwort eines erfolgreichen Übergangs. */
+/** `POST /applications/{id}/force-status` — privileged direct status override.
+ *  `note` (reason) is mandatory: the change bypasses the flow and is audited. */
+export interface ForceStatusBody {
+  stateId: Uuid;
+  note: string;
+}
+
+/** `TransitionResult` — 200 response of a successful transition. */
 export interface TransitionResult {
   newStateId: Uuid;
   statusEventId: Uuid;
@@ -354,18 +359,18 @@ export interface TransitionResult {
 }
 
 // =========================================================================== //
-// View-Modelle — FE-freundlich, i18n bereits aufgelöst (Output von mappers.ts). //
+// View models — FE-friendly, i18n already resolved (output of mappers.ts).      //
 // =========================================================================== //
 
-/** Status eines Antrags mit **aufgelöstem** Label (für die aktuelle `lang`). */
+/** Application status with resolved label (for the current `lang`). */
 export interface ApplicationState {
   id: Uuid;
   key: string;
   label: string;
-  /** Anzeigefarbe des State-Badges (Hex), optional. */
+  /** Display colour of the state badge (hex), optional. */
   color?: string | null;
   editAllowed: boolean;
-  /** State-Art (#28): normal|vote. */
+  /** State kind: normal|vote. */
   kind: string;
 }
 
@@ -391,10 +396,10 @@ export interface Application {
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   applicant: Applicant | null;
-  /** Darf der/die Anfragende bearbeiten/löschen (Verwalter:in oder Ersteller:in, #24)? */
+  /** May the requester edit/delete (manager or creator)? */
   canEdit: boolean;
-  /** Ist der/die Anfragende der/die Ersteller:in (Antragsteller:in)? Gating für die
-   *  Anonymisierungs-Anfrage (DSGVO Art. 17) — nur das Datensubjekt. */
+  /** Is the requester the creator (applicant)? Gates the anonymization request
+   *  (GDPR Art. 17) — only the data subject. */
   isOwner: boolean;
 }
 
@@ -411,12 +416,12 @@ export interface ApplicationListItem {
   updatedAt: IsoDateTime;
 }
 
-/** Ergebnis von `POST /applications` (FE-View). */
+/** Result of `POST /applications` (FE view). */
 export interface ApplicationCreated {
   applicationId: Uuid;
 }
 
-/** Timeline-Eintrag (FE-View) — `label` aus `toState` aufgelöst. */
+/** Timeline entry (FE view) — `label` resolved from `toState`. */
 export interface TimelineEntry {
   toStateId: Uuid;
   toState: ApplicationState | null;
@@ -426,7 +431,7 @@ export interface TimelineEntry {
   note: string | null;
 }
 
-/** Kommentar (FE-View) — `isPublic` aus `visibility` abgeleitet. */
+/** Comment (FE view) — `isPublic` derived from `visibility`. */
 export interface ApplicationComment {
   id: Uuid;
   author: string | null;
@@ -437,7 +442,7 @@ export interface ApplicationComment {
   at: IsoDateTime;
 }
 
-/** Antragstyp (FE-View) für die Wizard-Auswahl. */
+/** Application type (FE view) for the wizard selection. */
 export interface ApplicationType {
   id: Uuid;
   name: string;
@@ -448,17 +453,17 @@ export interface ApplicationType {
   gremiumId: Uuid | null;
 }
 
-/** Verfügbarer Übergang (FE-View) — `label` aufgelöst. */
+/** Available transition (FE view) — `label` resolved. */
 export interface Transition {
   id: Uuid;
   fromStateId: Uuid;
   toStateId: Uuid;
   label: string;
-  /** Optionale Farbe für den Entscheidungs-Button (#flow); null = Default. */
+  /** Optional colour for the decision button; null = default. */
   color: string | null;
 }
 
-/** Eine geänderte Feldzelle (FE-View) — `key` aus der Diff-Map herausgezogen. */
+/** A changed field cell (FE view) — `key` pulled out of the diff map. */
 export interface FieldChange {
   key: string;
   old: unknown;
@@ -466,9 +471,9 @@ export interface FieldChange {
 }
 
 /**
- * Versions-Diff (FE-View) — die Backend-Maps (`added`/`removed`/`changed`)
- * sind hier in iterierbare, schlüsseltragende Listen aufgelöst, damit Templates
- * direkt mit `@for` darüber rendern können.
+ * Version diff (FE view) — the backend maps (`added`/`removed`/`changed`) are
+ * resolved here into iterable, key-carrying lists so templates can render over
+ * them directly with `@for`.
  */
 export interface DataDiff {
   added: { key: string; value: unknown }[];
@@ -476,7 +481,7 @@ export interface DataDiff {
   changed: FieldChange[];
 }
 
-/** Eine Submission-Version (FE-View) für die Historie/Diff-Ansicht. */
+/** A submission version (FE view) for the history/diff view. */
 export interface ApplicationVersion {
   version: number;
   data: Record<string, unknown>;
@@ -486,15 +491,15 @@ export interface ApplicationVersion {
 }
 
 /**
- * Scan-Zustand eines Anhangs (FE-View). Aus dem Contract ableitbar:
- * - `scanning`    — `scanned=false`: ClamAV läuft noch, kein Download (→ 409).
- * - `clean`       — `scanned=true`: Scan fertig; Download grundsätzlich möglich.
- * - `quarantined` — clientseitig gesetzt, wenn der Download mit **409** abgewiesen
- *   wird (Befund/Quarantäne) — die Metadaten allein verraten das nicht.
+ * Scan state of an attachment (FE view). Derivable from the contract:
+ * - `scanning`    — `scanned=false`: ClamAV still running, no download (→ 409).
+ * - `clean`       — `scanned=true`: scan finished; download generally possible.
+ * - `quarantined` — set client-side when the download is rejected with 409
+ *   (finding/quarantine) — the metadata alone does not reveal this.
  */
 export type ScanState = 'scanning' | 'clean' | 'quarantined';
 
-/** Anhang (FE-View) — `isComparisonOffer` camelCase, `scanState` abgeleitet. */
+/** Attachment (FE view) — `isComparisonOffer` camelCase, `scanState` derived. */
 export interface Attachment {
   id: Uuid;
   filename: string;
@@ -505,25 +510,25 @@ export interface Attachment {
   scanState: ScanState;
 }
 
-/** Signierte Download-URL (FE-View). */
+/** Signed download URL (FE view). */
 export interface SignedUrl {
   url: string;
   expiresIn: number;
 }
 
-/** FE-Eingabe für einen neuen Antrag → via Mapper zu `ApplicationCreateBody`. */
+/** FE input for a new application → mapped to `ApplicationCreateBody`. */
 export interface NewApplication {
   typeId: Uuid;
   budgetPotId?: Uuid | null;
   data: Record<string, unknown>;
-  // Null für eingeloggte Nutzer:innen — das Backend leitet Identität/Altcha ab (#24).
+  // Null for logged-in users — the backend derives identity/altcha.
   applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
 }
 
-// --- Form-Definition (config_schemas §5.1) — Spiegel von FormFieldDef ---------
+// --- Form definition — mirror of FormFieldDef ---------------------------------
 
 export type FieldType =
   | 'text'
@@ -533,6 +538,14 @@ export type FieldType =
   | 'date'
   | 'select'
   | 'multiselect'
+  // Dynamic pickers: options injected server-side (committees / budget tree).
+  | 'gremium_select'
+  | 'budget_select'
+  // Typed inputs with built-in validation.
+  | 'email'
+  | 'iban'
+  // Date range {from, to}.
+  | 'daterange'
   | 'checkbox'
   | 'file'
   | 'table'
@@ -555,12 +568,12 @@ export interface FieldValidation {
   fileTypes?: string[];
   maxSizeMB?: number;
   maxRows?: number;
-  /** `positions`: Mindestzahl Vergleichsangebote je Position / Mindestzahl Positionen. */
+  /** `positions`: min comparison offers per position / min number of positions. */
   minOffers?: number;
   minPositions?: number;
 }
 
-/** Eine Feld-Definition der effektiven Form (camelCase wie das OpenAPI-by_alias). */
+/** A field definition of the effective form (camelCase like the OpenAPI by_alias). */
 export interface FormFieldDef {
   key: string;
   type: FieldType;
@@ -582,7 +595,7 @@ export interface FormSection {
   fields: FormFieldDef[];
 }
 
-/** Effektive Form-Definition — GET /api/application-types/{id}/form (forms §5.7). */
+/** Effective form definition — GET /api/application-types/{id}/form. */
 export interface EffectiveForm {
   applicationTypeId: Uuid;
   formVersionId: Uuid;
@@ -590,37 +603,36 @@ export interface EffectiveForm {
   sections: FormSection[];
 }
 
-// --- Magic-Link (api.md §1) ---------------------------------------------------
+// --- Magic link ---------------------------------------------------------------
 
 /**
- * Antwort von POST /api/auth/magic-link/verify (`MagicLinkVerifyOut`,
- * auth/schemas.py — T-10). Reines `BaseModel` (kein `_CamelModel`) → Feldnamen
- * bleiben snake_case (`application_id`). Die Applicant-Session läuft
- * **ausschließlich** über ein HttpOnly-Cookie (security.md §1) — **kein**
- * Session-Token im Body/JS.
+ * Response of POST /api/auth/magic-link/verify (`MagicLinkVerifyOut`). Plain
+ * `BaseModel` (not a `_CamelModel`) → field names stay snake_case
+ * (`application_id`). The applicant session runs exclusively via an HttpOnly
+ * cookie — no session token in the body/JS.
  */
 export interface MagicLinkVerifyResult {
   application_id: Uuid;
   scope: 'edit' | 'view';
 }
 
-// --- Voting (api.md »voting«, §4; config_schemas.VoteConfig — T-15) -----------
+// --- Voting -------------------------------------------------------------------
 
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
-/** `cancelled` — Antrag hat den vote-State manuell verlassen (Wahl abgebrochen). */
+/** `cancelled` — application left the vote state manually (vote aborted). */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 export type VoteResult = 'passed' | 'rejected' | 'tie';
 
-/** Beschlussfähigkeits-Schwelle (config_schemas.Quorum). */
+/** Quorum threshold. */
 export interface Quorum {
   type: 'count' | 'percent';
   value: number;
 }
 
 /**
- * Abstimmungs-Konfiguration (`VoteConfig`, config_schemas.py). Felder kommen
- * camelCase über das Backend-`_CamelModel`; Defaults spiegeln die Pydantic-
- * Defaults (`abstainCountsQuorum`/`allowChange` true, `secret` false).
+ * Vote configuration (`VoteConfig`). Fields arrive camelCase via the backend
+ * `_CamelModel`; defaults mirror the Pydantic defaults (`abstainCountsQuorum`/
+ * `allowChange` true, `secret` false).
  */
 export interface VoteConfig {
   options: string[];
@@ -633,8 +645,8 @@ export interface VoteConfig {
 }
 
 /**
- * Aggregiertes Zwischen-/Endergebnis (`TallyOut`). Bei `secret` enthält der
- * Server nur `counts` — **nie** einzelne Stimmende (api.md §4).
+ * Aggregated interim/final result (`TallyOut`). For `secret` the server returns
+ * only `counts` — never individual voters.
  */
 export interface Tally {
   counts: Record<string, number>;
@@ -645,9 +657,9 @@ export interface Tally {
 }
 
 /**
- * Vote-State + Tally — GET /api/votes/{id} (`VoteOut`). Reines `_CamelModel`,
- * daher 1:1 als View-Modell verwendbar (kein i18n-Label, Optionen sind
- * Roh-Keys, die das FE über `vote.option.*` übersetzt).
+ * Vote state + tally — GET /api/votes/{id} (`VoteOut`). Plain `_CamelModel`, so
+ * usable 1:1 as a view model (no i18n label; options are raw keys the FE
+ * translates via `vote.option.*`).
  */
 export interface Vote {
   id: Uuid;
@@ -662,38 +674,36 @@ export interface Vote {
   tally: Tally;
 }
 
-/** Antwort auf eine angenommene Stimme — POST /api/votes/{id}/ballot. */
+/** Response to an accepted ballot — POST /api/votes/{id}/ballot. */
 export interface BallotResult {
   status: 'cast' | 'changed';
 }
 
 // =========================================================================== //
-// Meetings + Protokoll (T-33) — api.md livevote/meetings + protocol.            //
-// Wire-Form camelCase (T-12 `_CamelModel`); Backend-Modul folgt mit T-16/T-22,  //
-// FE arbeitet bis dahin gegen den Mock (network-plan §4).                       //
+// Meetings + protocol. Wire form camelCase (`_CamelModel`).                     //
 // =========================================================================== //
 
-/** Sitzungs-Status (api.md §4 `meeting_state.status`); BE-Enum: `planned|live|closed`. */
+/** Meeting status; BE enum: `planned|live|closed`. */
 export type MeetingStatus = 'planned' | 'live' | 'closed';
-/** Status eines Votes innerhalb einer Sitzung. */
-/** `cancelled` — Antrag hat den vote-State manuell verlassen (Wahl abgebrochen). */
+/** Status of a vote within a meeting. */
+/** `cancelled` — application left the vote state manually (vote aborted). */
 export type MeetingVoteStatus = 'pending' | 'open' | 'closed' | 'cancelled';
 
-/** `MeetingVoteOut` — Vote-Zusammenfassung im Sitzungs-State (GET /meetings/{id}). */
+/** `MeetingVoteOut` — vote summary in the meeting state (GET /meetings/{id}). */
 export interface MeetingVoteOutWire {
   id: Uuid;
-  /** `null` = generische Beschlussfrage (Freitext-TOP), kein Antrag. */
+  /** `null` = generic motion (free-text agenda item), no application. */
   applicationId?: Uuid | null;
-  /** An welchen TOP die Abstimmung gebunden ist (Gruppierung im FE). */
+  /** Which agenda item the vote is bound to (grouping in the FE). */
   agendaItemId?: Uuid | null;
-  /** Antrags-Titel (vom Backend mitgeliefert; sonst aus dem Antrag aufzulösen). */
+  /** Application title (supplied by the backend; else resolved from the application). */
   title?: string | null;
-  /** Beschlussfrage der (Live-)Abstimmung — fürs Protokoll (#Meetings). */
+  /** Motion of the (live) vote — for the protocol. */
   question?: string | null;
-  /** Optionen (für die Stimmabgabe). */
+  /** Options (for casting). */
   options?: string[] | null;
   status: MeetingVoteStatus;
-  /** Endergebnis (z. B. `accepted`/`rejected`), erst nach `closed`. */
+  /** Final result (e.g. `accepted`/`rejected`), only after `closed`. */
   result?: string | null;
   counts?: Record<string, number> | null;
   leading?: string | null;
@@ -701,13 +711,11 @@ export interface MeetingVoteOutWire {
   voted?: number | null;
   present?: number | null;
   revealed?: boolean | null;
-  /** Grund einer Ablehnung: `quorum` = Quorum verfehlt, `majority` = Mehrheit verfehlt. */
+  /** Reason for rejection: `quorum` = quorum missed, `majority` = majority missed. */
   failedReason?: 'quorum' | 'majority' | null;
 }
 
-// (failedReason auf MeetingVoteOutWire ergänzt — Backend liefert den Grund nach Close.)
-
-/** `MeetingOut` — Sitzungs-State + Votes (GET /meetings/{id}). */
+/** `MeetingOut` — meeting state + votes (GET /meetings/{id}). */
 export interface MeetingOutWire {
   id: Uuid;
   title: string;
@@ -719,92 +727,92 @@ export interface MeetingOutWire {
   gremiumId?: Uuid | null;
   gremiumName?: string | null;
   votes: MeetingVoteOutWire[];
-  /** Verknüpftes Protokoll (falls bereits angelegt). */
+  /** Linked protocol (if already created). */
   protocolId?: Uuid | null;
   createdAt: IsoDateTime;
   protokollantId?: Uuid | null;
   protokollantName?: string | null;
-  /** Ist der anfragende Nutzer der zugewiesene Protokollant? (serverseitig aufgelöst). */
+  /** Is the requesting user the assigned protokollant? (resolved server-side). */
   isProtokollant?: boolean;
-  /** Master-Flag: darf der Nutzer die Sitzung führen (Protokoll/TOPs/Status)? */
+  /** Master flag: may the user run the meeting (protocol/agenda/status)? */
   canControl?: boolean;
-  /** Sitzung verwalten (anlegen/planen/Protokollant zuweisen). */
+  /** Manage the meeting (create/plan/assign protokollant). */
   canManage?: boolean;
-  /** Protokoll/TOPs schreiben (zugewiesener Protokollant oder Verwalter). */
+  /** Write protocol/agenda (assigned protokollant or manager). */
   canWrite?: boolean;
-  /** Beschlussfragen öffnen/schließen. */
+  /** Open/close motions. */
   canManageVotes?: boolean;
-  /** In dieser Sitzung stimmberechtigt (Rolle mit vote.cast). */
+  /** Eligible to vote in this meeting (role with vote.cast). */
   canVote?: boolean;
 }
 
-/** `ProtocolOut` — Sitzungsprotokoll (POST /meetings/{id}/protocol, PATCH /protocols/{id}). */
+/** `ProtocolOut` — meeting protocol (POST /meetings/{id}/protocol, PATCH /protocols/{id}). */
 export interface ProtocolOutWire {
   id: Uuid;
   meetingId: Uuid;
   markdown: string;
-  /** `rendering` = finalize angestoßen, der Worker rendert das PDF im Hintergrund. */
+  /** `rendering` = finalize triggered, the worker renders the PDF in the background. */
   status: 'draft' | 'rendering' | 'final';
-  /** Ergebnis-Link nach `finalize` (PDF in MinIO). */
+  /** Result link after `finalize` (PDF in MinIO). */
   pdfUrl?: string | null;
-  /** Redigierte öffentliche Variante — nur gesetzt, wenn ein TOP nicht-öffentlich ist. */
+  /** Redacted public variant — set only when an agenda item is non-public. */
   publicPdfUrl?: string | null;
   sentAt?: IsoDateTime | null;
 }
 
-// --- Request-Bodies (camelCase-Wire-Form) ---------------------------------- //
+// --- Request bodies (camelCase wire form) ---------------------------------- //
 
-/** Body für `POST /meetings` (`MeetingCreate`). */
+/** Body for `POST /meetings` (`MeetingCreate`). */
 export interface MeetingCreateBody {
   title: string;
   gremiumId?: Uuid | null;
-  /** Geplantes Sitzungsdatum (`YYYY-MM-DD`), optional. */
+  /** Planned meeting date (`YYYY-MM-DD`), optional. */
   date?: string | null;
-  /** Geplante Uhrzeit (`HH:mm`), optional (#34). */
+  /** Planned time (`HH:mm`), optional. */
   startTime?: string | null;
-  /** Geplante End-Uhrzeit (`HH:mm`), optional (#ics) — muss nach `startTime` liegen. */
+  /** Planned end time (`HH:mm`), optional — must be after `startTime`. */
   endTime?: string | null;
-  /** Zugewiesener Protokollant (Mitglied des Gremiums), optional. */
+  /** Assigned protokollant (member of the gremium), optional. */
   protokollantId?: Uuid | null;
 }
 
-/** Body für `PATCH /meetings/{id}` — Status, aktiven Antrag, Datum und/oder Protokollant. */
+/** Body for `PATCH /meetings/{id}` — status, active application, date and/or protokollant. */
 export interface MeetingPatchBody {
   status?: MeetingStatus;
   activeApplicationId?: Uuid | null;
-  /** Geplantes Sitzungsdatum (`YYYY-MM-DD`); für Vorab-Terminierung geplanter Sitzungen. */
+  /** Planned meeting date (`YYYY-MM-DD`); for pre-scheduling planned meetings. */
   date?: string | null;
-  /** Geplante Uhrzeit (`HH:mm`) (#34). */
+  /** Planned time (`HH:mm`). */
   startTime?: string | null;
-  /** Geplante End-Uhrzeit (`HH:mm`) (#ics). */
+  /** Planned end time (`HH:mm`). */
   endTime?: string | null;
-  /** Protokollant (um)setzen. */
+  /** (Re)assign the protokollant. */
   protokollantId?: Uuid | null;
 }
 
-/** Body für `PATCH /protocols/{id}` — Markdown aktualisieren. */
+/** Body for `PATCH /protocols/{id}` — update markdown. */
 export interface ProtocolPatchBody {
   markdown: string;
 }
 
-/** Body für `POST /protocols/{id}/votes` — Abstimmungen einbetten. */
+/** Body for `POST /protocols/{id}/votes` — embed votes. */
 export interface ProtocolVotesBody {
   voteIds: Uuid[];
 }
 
-/** `CalendarFeedOut` — eigene iCal-Abo-URL (`url` null, solange kein Token erzeugt). */
+/** `CalendarFeedOut` — own iCal subscription URL (`url` null until a token is created). */
 export interface CalendarFeed {
   url: string | null;
 }
 
-// --- View-Modelle ---------------------------------------------------------- //
+// --- View models ----------------------------------------------------------- //
 
-/** Vote-Zusammenfassung (FE-View) — `null`-Defaults normalisiert. */
+/** Vote summary (FE view) — `null` defaults normalized. */
 export interface MeetingVote {
   id: Uuid;
-  /** `null` = generische Beschlussfrage (Freitext-TOP). */
+  /** `null` = generic motion (free-text agenda item). */
   applicationId: Uuid | null;
-  /** TOP, an den die Abstimmung gebunden ist. */
+  /** Agenda item the vote is bound to. */
   agendaItemId: Uuid | null;
   title: string | null;
   question: string | null;
@@ -814,94 +822,94 @@ export interface MeetingVote {
   counts: Record<string, number> | null;
   leading: string | null;
   closesAt: IsoDateTime | null;
-  /** Teilnahme-Fortschritt: abgestimmte vs. anwesende Mitglieder. `revealed` = ob
-   *  `counts`/`leading` sichtbar sind (sonst nur Fortschritt, #vote-progress). */
+  /** Participation progress: voted vs. present members. `revealed` = whether
+   *  `counts`/`leading` are visible (otherwise progress only). */
   voted: number;
   present: number;
   revealed: boolean;
-  /** Grund einer Ablehnung: `quorum` = Quorum verfehlt, `majority` = Mehrheit verfehlt. */
+  /** Reason for rejection: `quorum` = quorum missed, `majority` = majority missed. */
   failedReason: 'quorum' | 'majority' | null;
 }
 
-/** Sitzung (FE-View). */
+/** Meeting (FE view). */
 export interface Meeting {
   id: Uuid;
   title: string;
-  /** Geplantes Sitzungsdatum (`YYYY-MM-DD`) oder `null`. */
+  /** Planned meeting date (`YYYY-MM-DD`) or `null`. */
   date: string | null;
-  /** Geplante Uhrzeit (`HH:mm`) oder `null` (#34). */
+  /** Planned time (`HH:mm`) or `null`. */
   startTime: string | null;
-  /** Geplante End-Uhrzeit (`HH:mm`) oder `null` (#ics). */
+  /** Planned end time (`HH:mm`) or `null`. */
   endTime: string | null;
   status: MeetingStatus;
   activeApplicationId: Uuid | null;
   gremiumId: Uuid | null;
-  /** Name des zugehörigen Gremiums (für Timeline-Anzeige, #104). */
+  /** Name of the associated gremium (for the timeline display). */
   gremiumName: string | null;
   votes: MeetingVote[];
   protocolId: Uuid | null;
   createdAt: IsoDateTime;
   protokollantId: Uuid | null;
   protokollantName: string | null;
-  /** Ist der angemeldete Nutzer der zugewiesene Protokollant dieser Sitzung? */
+  /** Is the logged-in user the assigned protokollant of this meeting? */
   isProtokollant: boolean;
-  /** Master-Flag: darf der Nutzer die Sitzung führen (Protokoll/TOPs/Status)? */
+  /** Master flag: may the user run the meeting (protocol/agenda/status)? */
   canControl: boolean;
-  /** Sitzung verwalten (anlegen/planen/Protokollant zuweisen). */
+  /** Manage the meeting (create/plan/assign protokollant). */
   canManage: boolean;
-  /** Protokoll/TOPs schreiben (zugewiesener Protokollant oder Verwalter). */
+  /** Write protocol/agenda (assigned protokollant or manager). */
   canWrite: boolean;
-  /** Beschlussfragen öffnen/schließen. */
+  /** Open/close motions. */
   canManageVotes: boolean;
-  /** In dieser Sitzung stimmberechtigt. */
+  /** Eligible to vote in this meeting. */
   canVote: boolean;
 }
 
-/** Richtung der Sitzungs-Timeline relativ zu *jetzt* (#104). */
+/** Direction of the meeting timeline relative to *now*. */
 export type TimelineDirection = 'past' | 'upcoming';
 
-/** `MeetingPage` — Cursor-Seite der Timeline (Wire). */
+/** `MeetingPage` — cursor page of the timeline (wire). */
 export interface MeetingPageWire {
   items: MeetingOutWire[];
   nextCursor?: string | null;
 }
 
-/** Sitzungs-Timeline-Seite (FE-View); `nextCursor === null` ⇒ Ende erreicht. */
+/** Meeting timeline page (FE view); `nextCursor === null` ⇒ end reached. */
 export interface MeetingPage {
   items: Meeting[];
   nextCursor: string | null;
 }
 
-/** Protokoll (FE-View) — `isFinal`/`isLocked` aus `status` abgeleitet. */
+/** Protocol (FE view) — `isFinal`/`isLocked` derived from `status`. */
 export interface Protocol {
   id: Uuid;
   meetingId: Uuid;
   markdown: string;
   status: 'draft' | 'rendering' | 'final';
   isFinal: boolean;
-  /** Nicht editierbar: final **oder** der Worker rendert gerade (`rendering`). */
+  /** Not editable: final or the worker is currently rendering (`rendering`). */
   isLocked: boolean;
   pdfUrl: string | null;
-  /** Redigierte öffentliche Variante (nicht-öffentliche TOPs), sonst null. */
+  /** Redacted public variant (non-public agenda items), else null. */
   publicPdfUrl: string | null;
   sentAt: IsoDateTime | null;
 }
 
 // =========================================================================== //
-// Benachrichtigungs-Präferenzen (#4-2) — Self-Service über das Konto-Popout.    //
+// Notification preferences — self-service via the account popout.               //
 // =========================================================================== //
 
-/** Schalter einer Benachrichtigungs-Art (`GET/PUT /notifications/preferences`). */
+/** Toggle for a notification kind (`GET/PUT /notifications/preferences`). */
 export interface NotificationPreference {
   kind: string;
   enabled: boolean;
 }
 
 // =========================================================================== //
-// OAuth-Grants + MCP-Setup (#MCP) — Self-Service über das Konto-Popout.          //
+// OAuth grants + MCP setup — self-service via the account popout.                //
 // =========================================================================== //
 
-/** Ein aktiver OAuth-Grant (Agent/MCP-Token) des eingeloggten Nutzers. */
+/** An active OAuth grant (agent/MCP token) of the logged-in user. */
 export interface OAuthGrant {
   id: string;
   clientId: string;
@@ -911,7 +919,7 @@ export interface OAuthGrant {
   refreshExpiresAt: IsoDateTime | null;
 }
 
-/** Fertiger MCP-Setup-Schnipsel + Metadaten (GET /mcp/config). */
+/** Ready-made MCP setup snippet + metadata (GET /mcp/config). */
 export interface McpSetup {
   mcpServers: Record<string, unknown>;
   baseUrl: string;
@@ -921,13 +929,13 @@ export interface McpSetup {
   note: string;
 }
 
-/** Eine im Consent angefragte Scope-Zeile (held = Nutzer besitzt das Recht). */
+/** A scope row requested in the consent (held = user has the right). */
 export interface ConsentScope {
   key: string;
   held: boolean;
 }
 
-/** Schwebender Authorize-Request für den Consent-Screen (#MCP). */
+/** Pending authorize request for the consent screen. */
 export interface ConsentRequest {
   clientId: string;
   canUseMcp: boolean;

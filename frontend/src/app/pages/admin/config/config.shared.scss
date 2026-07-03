@@ -91,7 +91,7 @@
   gap: var(--space-3);
 }
 
-/* Dialog-Formular (#39): Anlegen/Bearbeiten als Dialog statt Inline-Karte. */
+/* Dialog form: create/edit as a dialog instead of an inline card. */
 .cfg__form {
   display: flex;
   flex-direction: column;
@@ -104,7 +104,7 @@
   gap: var(--space-3);
 }
 
-/* Boolean-Spalte: farbiges ✓/✗ (konsistent mit Gremien). */
+/* Boolean column: colored ✓/✗ (consistent with the gremien view). */
 .cfg__yes,
 .cfg__no {
   font-size: var(--fs-md);
@@ -128,7 +128,7 @@ textarea {
   border-radius: var(--radius-md);
 }
 
-// Einheitliche Control-Höhe: native Felder bündig mit app-select/app-input (#85-Regression).
+// Uniform control height: native fields flush with app-select/app-input.
 input,
 select {
   height: var(--control-height);
@@ -140,8 +140,8 @@ textarea {
   padding: var(--space-2) var(--space-3);
 }
 
-/* Mobil (≤768px): Formular-Grid einspaltig; »wide«-Felder dürfen keine
-   implizite zweite Spalte erzwingen (sonst horizontaler Overflow bei 375px). */
+/* Mobile (≤768px): single-column form grid; "wide" fields must not force an
+   implicit second column (else horizontal overflow at 375px). */
 @media (max-width: 768px) {
   .cfg__grid {
     grid-template-columns: 1fr;

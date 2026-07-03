@@ -7,12 +7,12 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 type AltchaState = 'idle' | 'verifying' | 'solved' | 'error';
 
 /**
- * Altcha-Widget (Issue #23). Holt eine **server-signierte** PoW-Challenge
- * (`GET /altcha/challenge`), löst den Proof-of-Work lokal (sucht `number` mit
- * `SHA-256(salt+number) == challenge` per Web-Crypto) und liefert die
- * Base64-Lösung an den Wizard. Ohne konfiguriertes Altcha (404) meldet das
- * Widget `unavailable` → der Wizard verlangt dann keine Lösung. Das Submit ist
- * erst nach `solved` (bzw. `unavailable`) möglich.
+ * Altcha widget. Fetches a server-signed PoW challenge
+ * (`GET /altcha/challenge`), solves the proof-of-work locally (finds `number`
+ * with `SHA-256(salt+number) == challenge` via Web Crypto) and emits the
+ * base64 solution to the wizard. With Altcha unconfigured (404) the widget
+ * signals `unavailable`, so the wizard requires no solution. Submit is only
+ * possible after `solved` (or `unavailable`).
  */
 @Component({
   selector: 'app-altcha',
@@ -25,9 +25,9 @@ type AltchaState = 'idle' | 'verifying' | 'solved' | 'error';
 export class AltchaComponent {
   private readonly api = inject(ApiClient);
 
-  /** Emittiert die Base64-PoW-Lösung, sobald die Challenge gelöst ist. */
+  /** Emits the base64 PoW solution once the challenge is solved. */
   readonly solved = output<string>();
-  /** Emittiert, wenn Altcha serverseitig deaktiviert ist (kein Captcha nötig). */
+  /** Emits when Altcha is disabled server-side (no captcha needed). */
   readonly unavailable = output<void>();
 
   readonly state = signal<AltchaState>('idle');
@@ -38,7 +38,7 @@ export class AltchaComponent {
     try {
       const challenge = await firstValueFrom(this.api.altchaChallenge());
       if (!challenge) {
-        // Altcha aus (404) → kein Captcha erforderlich.
+        // Altcha off (404) → no captcha required.
         this.state.set('solved');
         this.unavailable.emit();
         return;
@@ -51,7 +51,7 @@ export class AltchaComponent {
     }
   }
 
-  /** Proof-of-Work lösen: `number` finden mit `SHA-256(salt+number) == challenge`. */
+  /** Solve the proof-of-work: find `number` with `SHA-256(salt+number) == challenge`. */
   private async solveChallenge(c: AltchaChallenge): Promise<string> {
     for (let number = 0; number <= c.maxnumber; number++) {
       if ((await sha256Hex(`${c.salt}${number}`)) === c.challenge) {
@@ -62,7 +62,7 @@ export class AltchaComponent {
           salt: c.salt,
           signature: c.signature,
         };
-        // Standard-Base64 (btoa) — der Payload ist reines ASCII (Hex/Int/„SHA-256").
+        // Standard base64 (btoa) — the payload is pure ASCII (hex/int/"SHA-256").
         return btoa(JSON.stringify(payload));
       }
     }
@@ -70,7 +70,7 @@ export class AltchaComponent {
   }
 }
 
-/** Hex-SHA-256 über Web-Crypto. */
+/** Hex SHA-256 via Web Crypto. */
 async function sha256Hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
   return Array.from(new Uint8Array(digest))

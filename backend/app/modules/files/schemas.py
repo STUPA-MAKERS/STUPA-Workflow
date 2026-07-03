@@ -1,9 +1,9 @@
-"""Pydantic-Schemas der files-API (api.md »files«).
+"""Pydantic schemas of the files API.
 
-``AttachmentOut`` folgt exakt dem dokumentierten Contract (FE-T-31). ``SignedUrlOut``
-liefert die **app-relative, authz-gated** Download-Route (kein direkter Bucket-Zugriff,
-security.md §6) — KEINE S3v4-signierte MinIO-URL (#AUD-055). Die Autorisierung erzwingt
-die ``/download``-Route unabhängig; ``expiresIn`` ist nur ein FE-Cache-Hinweis.
+``AttachmentOut`` follows the documented contract exactly. ``SignedUrlOut`` returns the
+app-relative, authz-gated download route (no direct bucket access) — NOT an S3v4-signed
+MinIO URL. The ``/download`` route enforces authorization independently; ``expiresIn`` is
+only a frontend cache hint.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 
 class AttachmentOut(BaseModel):
-    """Anhang-Metadaten (api.md §5 ``AttachmentOut``)."""
+    """Attachment metadata."""
 
     id: UUID
     filename: str
@@ -25,13 +25,13 @@ class AttachmentOut(BaseModel):
 
 
 class SignedUrlOut(BaseModel):
-    """App-relative, authz-gated Download-Route (security.md §6, #AUD-055).
+    """App-relative, authz-gated download route.
 
-    Die ``url`` ist die ``/api/attachments/{id}/download``-Route — sie trägt KEIN Token
-    und KEINE Signatur und läuft NICHT ab; die Autorisierung erzwingt der Endpunkt bei
-    jedem Aufruf selbst. ``expiresIn`` ist daher KEINE Sicherheits-/Ablaufgarantie,
-    sondern lediglich ein advisory FE-Cache-Hinweis (s).
+    ``url`` is the ``/api/attachments/{id}/download`` route — it carries no token and no
+    signature and does not expire; the endpoint enforces authorization on every call.
+    ``expiresIn`` is therefore not a security/expiry guarantee, only an advisory frontend
+    cache hint (seconds).
     """
 
     url: str
-    expiresIn: int  # advisory FE-Cache-Hinweis (s) — KEIN URL-Ablauf
+    expiresIn: int  # advisory frontend cache hint (s) — not a URL expiry

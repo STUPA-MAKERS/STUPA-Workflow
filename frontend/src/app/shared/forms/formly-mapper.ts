@@ -3,17 +3,19 @@ import type { FieldType, FormFieldDef, Lang } from '@core/api/models';
 import { evalJsonLogic, isFieldVisible, JsonLogicError } from './jsonlogic';
 import { resolveI18n } from './i18n-text';
 
-/** HTML-`type` für die `input`-Variante (text/number/currency/date/file). */
+/** HTML `type` for the `input` variant (text/number/currency/date/file). */
 const INPUT_HTML_TYPE: Partial<Record<FieldType, string>> = {
   text: 'text',
   number: 'number',
-  // 'currency' → eigener Branch im FormlyInputType (app-currency-input mit €/Format).
+  // 'currency' → its own branch in FormlyInputType (app-currency-input with €/format).
   currency: 'currency',
   date: 'date',
-  file: 'text', // Datei-Upload (Attachment-Referenz) — voller Upload folgt mit T-13.
+  file: 'text', // file upload (attachment reference) — full upload lands later.
+  email: 'email',
+  iban: 'text', // format check (mod-97) is done by the backend; free text field here.
 };
 
-/** Form-Feldtyp → registrierter Formly-Typ (`@shared/formly/formly.providers`). */
+/** Form field type → registered Formly type (`@shared/formly/formly.providers`). */
 const FORMLY_TYPE: Record<FieldType, string> = {
   text: 'input',
   number: 'input',
@@ -23,34 +25,41 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   textarea: 'textarea',
   select: 'select',
   multiselect: 'multicheckbox',
+  // Dynamic pickers: rendered as a normal select; the server supplies the options in
+  // the effective form (no hand-maintenance).
+  gremium_select: 'select',
+  budget_select: 'select',
+  email: 'input',
+  iban: 'input',
+  daterange: 'daterange',
   checkbox: 'checkbox',
   markdown: 'display',
   computed: 'display',
   table: 'display',
   positions: 'positions',
-  // Abschnitts-Marker sind strukturell; sie werden in `toFormlyFields` herausgefiltert
-  // und sollten nie gemappt werden (Backend strippt sie aus der effektiven Form).
+  // Section markers are structural; they are filtered out in `toFormlyFields` and
+  // should never be mapped (the backend strips them from the effective form).
   section: 'display',
 };
 
 /**
- * Eine effektive Form-Definition (`FormFieldDef[]`) in Formly-Feldkonfigurationen
- * übersetzen (T-30). Bildet ab:
- * - Labels/Hilfetexte via `resolveI18n` (aktive UI-Locale).
- * - `required` + `validation` (min/max/minLen/maxLen/pattern) → Formly-Props.
- * - `visibleIf` → `expressions.hide` (negiert; Eval-Fehler ⇒ konservativ sichtbar).
- * - `compute`/`computed` → `expressions['model.<key>']` (abgeleiteter Wert).
+ * Translate an effective form definition (`FormFieldDef[]`) into Formly field
+ * configs. Maps:
+ * - labels/help texts via `resolveI18n` (active UI locale).
+ * - `required` + `validation` (min/max/minLen/maxLen/pattern) → Formly props.
+ * - `visibleIf` → `expressions.hide` (negated; eval error ⇒ conservatively visible).
+ * - `compute`/`computed` → `expressions['model.<key>']` (derived value).
  *
- * `extraContext` liefert Nicht-Feld-Variablen (z. B. `has_budget`) an die
- * JsonLogic-Auswertung, analog zum Backend `validate_answers(context=…)`.
+ * `extraContext` supplies non-field variables (e.g. `has_budget`) to the JsonLogic
+ * evaluation, analogous to the backend `validate_answers(context=…)`.
  */
 export function toFormlyFields(
   fields: FormFieldDef[],
   lang: Lang | string,
   extraContext: Record<string, unknown> = {},
 ): FormlyFieldConfig[] {
-  // Abschnitts-/Gruppen-Marker (#13) als Überschrift rendern, statt sie zu verwerfen —
-  // so erscheinen Frage-Gruppen auch im Inline-Editor gruppiert.
+  // Render section/group markers as headings instead of discarding them — so
+  // question groups appear grouped in the inline editor too.
   return fields.map((f) =>
     f.type === 'section'
       ? sectionHeading(f, lang)
@@ -58,7 +67,7 @@ export function toFormlyFields(
   );
 }
 
-/** Abschnitts-Marker → nicht-editierbare Überschrift (Formly `display`, `heading`). */
+/** Section marker → non-editable heading (Formly `display`, `heading`). */
 function sectionHeading(f: FormFieldDef, lang: Lang | string): FormlyFieldConfig {
   const props: Record<string, unknown> = { heading: true, label: resolveI18n(f.label, lang) };
   if (f.help) props['description'] = resolveI18n(f.help, lang);
@@ -80,7 +89,13 @@ function mapField(
 
   if (FORMLY_TYPE[f.type] === 'input') props['type'] = INPUT_HTML_TYPE[f.type] ?? 'text';
 
-  if (f.options && (f.type === 'select' || f.type === 'multiselect')) {
+  if (
+    f.options &&
+    (f.type === 'select' ||
+      f.type === 'multiselect' ||
+      f.type === 'gremium_select' ||
+      f.type === 'budget_select')
+  ) {
     props['options'] = f.options.map((o) => ({ value: o.value, label: resolveI18n(o.label, lang) }));
   }
 

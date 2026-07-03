@@ -1,19 +1,17 @@
-"""Deadline-Service (T-44, flows §9.4): Scan + Lock + Idempotenz-Marker.
+"""Deadline service: scan + lock + idempotency markers.
 
-Reine DB-Schicht für den arq-Cron (:mod:`worker.deadlines`). Die fachliche Wirkung
-(Übergang feuern, Vote schließen, Erinnerung versenden) liegt im Worker; dieser
-Service liefert die **fälligen** Datensätze und setzt die Marker.
+Pure DB layer for the arq cron (:mod:`worker.deadlines`); the actual effect
+(fire transition, close vote, send reminder) lives in the worker.
 
-**Nebenläufigkeit (mehrere Worker).** Die ``lock_*``-Methoden selektieren eine **einzelne**
-Zeile mit ``FOR UPDATE SKIP LOCKED``: greift ein zweiter Worker dieselbe Frist ab, sieht
-er sie nicht (``None``) und überspringt — keine Doppelausführung (flows §9.4, Risiko-Note).
-Der Persistenz-Marker (``action_on_pass=NULL`` bzw. ``reminded_at``) verhindert die
-Wiederholung über Worker-Neustarts hinweg.
+Concurrency: the ``lock_*`` methods select a single row with ``FOR UPDATE SKIP
+LOCKED`` — a second worker sees ``None`` and skips, so nothing runs twice. The
+persistent marker (``action_on_pass=NULL`` / ``reminded_at``) prevents repeats
+across worker restarts.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -22,17 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.voting.models import Vote
 
-# Obergrenze je Cron-Tick (AUD-046): jeder Scan liefert höchstens so viele, **älteste
-# zuerst** (``due_at``/``closes_at`` aufsteigend). So drainiert ein großer Rückstau (z. B.
-# nach Downtime oder einem geteilten absolute-Policy-Rollover über tausende Anträge) über
-# mehrere Ticks, statt dass ein einzelner Tick die gesamte Kohorte sequenziell abarbeitet
-# und über die 1-Minuten-Kadenz hinaus läuft. Korrektheit unberührt (SKIP LOCKED +
-# Idempotenz-Marker): nicht gegriffene Zeilen bleiben fällig und kommen im nächsten Tick.
+# Cap per cron tick, oldest first: a large backlog drains over several ticks
+# instead of one tick overrunning the 1-minute cadence. Correctness is unaffected
+# (SKIP LOCKED + idempotency markers) — ungrabbed rows stay due for the next tick.
 DEFAULT_SCAN_LIMIT = 200
 
 
 class DeadlineService:
-    """An eine ``AsyncSession`` gebundene Frist-Operationen."""
+    """Deadline operations bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -47,7 +42,7 @@ class DeadlineService:
         type_id: UUID | None = None,
         action_on_pass: dict | None = None,
     ) -> Deadline:
-        """Frist anlegen/speichern (programmatische API — kein HTTP-Endpunkt, api.md)."""
+        """Create and persist a deadline (programmatic API, no HTTP endpoint)."""
         deadline = Deadline(
             kind=kind,
             due_at=due_at,
@@ -64,10 +59,8 @@ class DeadlineService:
     async def due_action_deadline_ids(
         self, now: datetime, *, limit: int = DEFAULT_SCAN_LIMIT
     ) -> list[UUID]:
-        """IDs fälliger Auto-Fristen (``due_at<=now`` ∧ ``action_on_pass`` gesetzt).
-
-        Pro Tick auf ``limit`` (älteste ``due_at`` zuerst) begrenzt → großer Rückstau
-        drainiert über mehrere Ticks (AUD-046)."""
+        """List due auto-deadline ids (``due_at<=now`` and ``action_on_pass`` set),
+        capped at ``limit`` oldest-first."""
         rows = (
             await self.session.execute(
                 select(Deadline.id)
@@ -84,17 +77,13 @@ class DeadlineService:
     async def due_reminder_ids(
         self, now: datetime, lead: timedelta, *, limit: int = DEFAULT_SCAN_LIMIT
     ) -> list[UUID]:
-        """IDs anstehender (oder bereits abgelaufener) Fristen, die noch nicht erinnert
-        wurden (``reminded_at IS NULL`` ∧ ``due_at <= now+lead``).
+        """List ids of upcoming (or already passed) deadlines not yet reminded.
 
-        **Keine untere Schranke** (``due_at > now``): War der Worker länger als das
-        Lead-Fenster aus oder wurde die Frist bereits-überfällig angelegt, würde eine
-        zweiseitige Bedingung die Zeile nie mehr greifen → die Erinnerung bliebe für
-        immer aus und die Zeile leckte im partiellen Index ``ix_deadline_reminder``
-        (AUD-037). So wird genau einmal eine (ggf. verspätete) Erinnerung versandt und
-        ``reminded_at`` gesetzt → die Zeile verlässt den Scan-Index.
-
-        Pro Tick auf ``limit`` (älteste ``due_at`` zuerst) begrenzt (AUD-046)."""
+        Deliberately no lower bound (``due_at > now``): if the worker was down
+        longer than the lead window, a two-sided condition would never match the
+        row again — the reminder would never be sent and the row would leak in the
+        partial index. This way exactly one (possibly late) reminder is sent and
+        ``reminded_at`` removes the row from the scan. Capped at ``limit``."""
         rows = (
             await self.session.execute(
                 select(Deadline.id)
@@ -111,9 +100,7 @@ class DeadlineService:
     async def due_open_vote_ids(
         self, now: datetime, *, limit: int = DEFAULT_SCAN_LIMIT
     ) -> list[UUID]:
-        """IDs offener Votes mit abgelaufenem Fenster (``closes_at<=now``).
-
-        Pro Tick auf ``limit`` (ältestes ``closes_at`` zuerst) begrenzt (AUD-046)."""
+        """List ids of open votes whose window has passed, capped at ``limit``."""
         rows = (
             await self.session.execute(
                 select(Vote.id)
@@ -132,8 +119,8 @@ class DeadlineService:
     async def lock_action_deadline(
         self, deadline_id: UUID, now: datetime
     ) -> Deadline | None:
-        """Fällige Auto-Frist exklusiv sperren (``SKIP LOCKED``) — ``None``, wenn von
-        einem anderen Worker gehalten oder zwischenzeitlich konsumiert."""
+        """Lock a due auto-deadline (``SKIP LOCKED``); ``None`` if held by another
+        worker or already consumed."""
         return (
             await self.session.execute(
                 select(Deadline)
@@ -149,9 +136,8 @@ class DeadlineService:
     async def lock_reminder(
         self, deadline_id: UUID, now: datetime, lead: timedelta
     ) -> Deadline | None:
-        """Anstehende (oder bereits abgelaufene), noch nicht erinnerte Frist exklusiv
-        sperren (``SKIP LOCKED``). Spiegelt :meth:`due_reminder_ids`: keine untere
-        Schranke, damit verspätete Erinnerungen genau einmal versandt werden (AUD-037)."""
+        """Lock a not-yet-reminded deadline (``SKIP LOCKED``). Mirrors
+        :meth:`due_reminder_ids`: no lower bound so late reminders go out once."""
         return (
             await self.session.execute(
                 select(Deadline)
@@ -165,7 +151,7 @@ class DeadlineService:
         ).scalar_one_or_none()
 
     async def lock_open_vote(self, vote_id: UUID, now: datetime) -> Vote | None:
-        """Offenen, abgelaufenen Vote exklusiv sperren (``SKIP LOCKED``)."""
+        """Lock an open, expired vote (``SKIP LOCKED``)."""
         return (
             await self.session.execute(
                 select(Vote)
@@ -181,16 +167,36 @@ class DeadlineService:
 
     # ----------------------------------------------------------------- markers
     async def consume_action(self, deadline: Deadline) -> None:
-        """Auto-Frist als gefeuert markieren (``action_on_pass=NULL``) + committen.
+        """Mark an auto-deadline as fired (``action_on_pass=NULL``) and commit.
 
-        Entfernt die Zeile aus dem partiellen Scan-Index → kein erneutes Feuern."""
+        Removes the row from the partial scan index — no re-firing."""
         deadline.action_on_pass = None
         await self.session.commit()
 
     async def mark_reminded(self, deadline: Deadline, now: datetime) -> None:
-        """Erinnerung als versandt markieren (``reminded_at=now``) + committen."""
+        """Mark the reminder as sent (``reminded_at=now``) and commit."""
         deadline.reminded_at = now
         await self.session.commit()
+
+
+async def flow_deadline_passed(session: AsyncSession, application_id: UUID) -> bool:
+    """Return whether a (possibly already consumed) flow deadline is due.
+
+    Flow deadlines always belong to the application's current state — the flow
+    engine clears them on every state change (``schedule_state_deadline``), so a
+    due row means the *current* state's deadline has passed. Shared by
+    ``FlowService._deadline_passed`` and the task-mail recipient resolution.
+    """
+    row = await session.scalar(
+        select(Deadline.id)
+        .where(
+            Deadline.application_id == application_id,
+            Deadline.kind == "flow_deadline",
+            Deadline.due_at <= datetime.now(UTC),
+        )
+        .limit(1)
+    )
+    return row is not None
 
 
 def resolve_due_at(
@@ -199,11 +205,9 @@ def resolve_due_at(
     submitted_at: datetime | None = None,
     changed_at: datetime | None = None,
 ) -> datetime | None:
-    """Konkrete Frist aus einer Policy + Antrags-Zeitpunkten ableiten (pure).
+    """Derive a concrete due date from a policy + application timestamps (pure).
 
-    ``absolute`` → das hinterlegte Datum; ``relative_submitted`` → Einreichung +
-    ``offset_days``; ``relative_changed`` → letzte Änderung + ``offset_days``.
-    Fehlt der nötige Bezugswert (z. B. kein ``submitted_at``), → ``None``."""
+    Missing reference value (e.g. no ``submitted_at``) yields ``None``."""
     if policy.kind == "absolute":
         return policy.absolute_at
     days = policy.offset_days or 0
@@ -215,11 +219,11 @@ def resolve_due_at(
 
 
 class DeadlinePolicyError(Exception):
-    """Verletzte Policy-Invariante (z. B. doppelter Key) → 409/422 im Router."""
+    """Violated policy invariant (e.g. duplicate key); mapped to 409/422."""
 
 
 class DeadlinePolicyService:
-    """CRUD der benannten Frist-Policies (Registry, admin-gepflegt)."""
+    """CRUD for the named deadline policies (admin-maintained registry)."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -279,7 +283,7 @@ class DeadlinePolicyService:
             policy.label = label
         if kind is not None:
             policy.kind = kind
-        # Wert-Felder passend zum (ggf. neuen) kind setzen; das jeweils andere leeren.
+        # Set the value field matching the (possibly new) kind; clear the other.
         effective_kind = kind if kind is not None else policy.kind
         if effective_kind == "absolute":
             if absolute_at is not None:
@@ -299,9 +303,9 @@ class DeadlinePolicyService:
 
 
 def transition_ref(action_on_pass: dict | None) -> UUID | None:
-    """Transition-UUID aus ``action_on_pass`` lesen (``{"transitionId": "<uuid>"}``).
+    """Read the transition UUID from ``action_on_pass``.
 
-    Defensiv: fehlender/ungültiger Wert → ``None`` (Aufrufer überspringt die Frist)."""
+    Defensive: missing/invalid value yields ``None`` (caller skips the row)."""
     if not action_on_pass:
         return None
     raw = action_on_pass.get("transitionId") or action_on_pass.get("transition_id")

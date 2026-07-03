@@ -1,98 +1,83 @@
-"""Permission-Katalog (Single Source fürs Admin-FE, api.md §1).
+"""Permission catalogue — the single source of selectable keys for the admin UI.
 
-Die autoritative Wahrheit über *zugewiesene* Permissions bleibt ``role_permission``
-(DB) — diese Liste ist der **Katalog wählbarer Keys**, den die Rollen-/Rechte-UI
-(``/admin/users``, #72) anbietet, damit das FE nicht hartkodiert, welche Permissions
-existieren. Deckungsgleich mit den Permission-Keys aus ``sds/api.md §1`` plus den von
-Bestands-Guards/Routen erzwungenen Keys (``flow.configure``/``form.configure``,
-``budget.view``/``protocol.write``), inkl. der in Migration 0010/0016 an die
-``admin``-Rolle nachgeseedeten Konfigurations-Permissions.
+The authoritative record of *assigned* permissions stays in ``role_permission``
+(DB); this list is only the catalogue of keys the roles/permissions UI offers, so
+the frontend never hardcodes which permissions exist.
 """
 
 from __future__ import annotations
 
-# Reihenfolge nach Bereich gruppiert (stabil → deterministischer Contract).
-# #28-Redesign: ``application.update`` (→ ``application.manage``) sowie
-# ``protocol.manage``/``protocol.write`` (→ ``meeting.manage``) entfallen;
-# ``application.transition`` gatet das Feuern manueller Flow-Übergänge.
-# #6-Granularität (Migration 0017 remappt Bestands-Zuweisungen):
-#   ``admin.config``  → ``admin.site`` / ``admin.gremien`` / ``admin.types``
-#   ``budget.manage`` → ``budget.structure`` (Baum/HHJ/Zuteilungen) /
-#                       ``budget.book`` (Buchungen/Umbuchungen)
-#   ``meeting.manage`` behält Sitzungen/Protokoll-Entwurf; ``protocol.finalize``
-#                       gatet das Finalisieren+Versenden separat
-#   ``audit.read``     behält die Lesesicht; ``audit.verify`` die Hash-Kette
+# Grouped by area for a stable, deterministic contract.
 PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read",
-    # Jeden Antrag lesen — Gremiums-/Eigentums-unabhängig (global). #app-read-all.
+    # Read every application, independent of gremium/ownership (global).
     "application.read_all",
     "application.create",
     "application.transition",
+    # Force an application into ANY state directly, bypassing the flow guards and
+    # transitions. An audit-sensitive override (every use is logged as a forced
+    # status_change and is revertable). Kept SEPARATE from application.transition —
+    # grant deliberately.
+    "application.force_status",
     "application.manage",
-    # Antragsdaten in JEDEM Flow-State ändern — hebt den State-Edit-Lock auf
-    # (state.edit_allowed). #app-edit-any.
+    # Edit application data in ANY flow state — overrides the state edit lock.
     "application.edit_any",
     "form.configure",
     "flow.configure",
     "vote.cast",
     "vote.manage",
     "meeting.manage",
-    # GLOBALE, rein additive LESE-Permission (#meeting-view-all): sieht JEDE Sitzung
-    # gremiumsübergreifend (Timeline/Liste, Detail, Agenda, Protokoll, Vote-Ergebnisse)
-    # — verwaltet/schreibt/stimmt aber NICHT. Widening bleibt strikt read-only; die
-    # Schreib-/Vote-Guards (meeting.manage/session.manage/vote.manage/vote.cast/
-    # protocol.write) bleiben unberührt.
+    # Global, purely additive READ permission: sees every meeting across gremien
+    # (timeline/list, detail, agenda, protocol, vote results) but never writes/votes.
     "meeting.view_all",
     "protocol.finalize",
-    # Löschen von Sitzungen mit FINALISIERTEM Protokoll (#16) — bewusst getrennt
-    # von meeting.manage; jedes Löschen landet als meeting_delete im Audit-Log.
+    # Delete meetings with a finalized protocol; separate from meeting.manage.
+    # Each delete is audited as meeting_delete.
     "meeting.delete_finalized",
     "budget.view",
     "budget.structure",
     "budget.book",
     "budget.export",
+    # Ignore a staged bank statement line (hide it from reconciliation). Kept
+    # SEPARATE from budget.book because it removes a transaction from the treasurer's
+    # to-reconcile view — an audit-sensitive act (every ignore/reactivate is logged
+    # as bank_line_ignore / bank_line_reactivate). Grant deliberately.
+    "budget.reconcile_ignore",
     "account.manage",
     "application.export",
     "webhook.manage",
-    # AUD-019: audit.read ist bewusst GLOBAL (kein Gremium-Scope). Das Audit-Log ist
-    # eine org-weite Forensik-/Integritätssicht (Hash-Kette), die Querschnitts-PII
-    # zeigen kann; sie ist nur Hochprivilegierten zugedacht und nicht pro-Gremium
-    # gefiltert. Wer sie nicht org-weit sehen soll, darf audit.read nicht erhalten.
+    # audit.read is deliberately GLOBAL (no gremium scope): the audit log is an
+    # org-wide forensic/integrity view (hash chain) that can expose cross-cutting PII.
     "audit.read",
     "audit.verify",
-    # #config-versioning: einen Config-Change aus dem Audit-Log zurücknehmen
-    # (Vorgänger-Stand wiederherstellen). Bewusst getrennt von audit.read/verify und
-    # destruktiv → standardmäßig nur der admin-Rolle zugeteilt (Migration 0034).
+    # Revert a config change from the audit log (restore the prior state).
+    # Destructive; admin-only by default.
     "audit.revert",
     "admin.site",
     "admin.gremien",
     "admin.types",
-    # Antragsarten LÖSCHEN — bewusst getrennt von admin.types (Anlegen/Bearbeiten);
-    # das Entfernen einer Antragsart ist destruktiv (Formular/Flow hängen dran).
+    # Delete application types; separate from admin.types (create/edit).
+    # Destructive (form/flow attached).
     "admin.types_delete",
-    # #per-page-admin (Migration 0026 remappt Bestands-Zuweisungen): die zuvor von
-    # ``admin.roles`` mitgegatete Personen-/Zugriffsverwaltung wird je Admin-Seite
-    # getrennt. ``admin.roles`` behält die Rollen-Definitions-Seite (/admin/roles);
-    # die übrigen Seiten bekommen eigene Keys.
+    # Per-page admin split: admin.roles keeps the role-definition page
+    # (/admin/roles); the other admin pages get their own keys below.
     "admin.roles",
-    # /admin/users — Benutzer (de)aktivieren + Rollen-Zuweisungen verwalten.
+    # /admin/users - (de)activate users and manage role assignments.
     "admin.users",
-    # /admin/group-mappings — IdP-Gruppen → Rollen-Mappings.
+    # /admin/group-mappings - IdP group -> role mappings.
     "admin.group_mappings",
-    # /admin/gremien/:id/roles — Gremium-Rollen-Definitionen.
+    # /admin/gremien/:id/roles - gremium role definitions.
     "admin.gremium_roles",
-    # /admin/delegations — Delegationen/Stellvertreter-Pool plattformweit verwalten.
+    # /admin/delegations - manage delegations/substitute pool platform-wide.
     "admin.delegations",
-    # /admin/deadlines — Fristen-Policies (zuvor von ``admin.types`` mitgegatet).
+    # /admin/deadlines - deadline policies.
     "admin.deadlines",
-    # Plattform-Benachrichtigungs-Config (#task-reminder): Erinnerungs-Schwellen,
-    # künftig Mail-Templates. Migration 0018 verteilt es an admin.site-Inhaber.
+    # Platform notification config: reminder thresholds and mail templates.
     "admin.notifications",
-    # /admin/privacy — DSGVO: Löschanträge bearbeiten, Principal/Antrag löschen,
-    # Auskunft exportieren, Aufbewahrung konfigurieren. Migration 0030 verteilt es
-    # an admin.site-Inhaber.
+    # /admin/privacy - GDPR: erasure requests, principal/application deletion,
+    # Auskunft export, retention config.
     "privacy.manage",
-    # MCP/Agent-Zugang: erlaubt das Ausstellen von OAuth-Token für API-Agenten
-    # (#MCP). Admin hat es ohnehin (Bypass); explizit zuweisbar für Nicht-Admins.
+    # MCP/agent access: issue OAuth tokens for API agents. Admins have it via the
+    # bypass; assignable to non-admins.
     "mcp.use",
 )

@@ -3,25 +3,25 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 
-/** Ein Vergleichsangebot innerhalb einer Kostenposition. */
+/** A comparison offer within a cost position. */
 interface Offer {
   label: string;
   value: number | null;
   preferred: boolean;
 }
 
-/** Eine Kostenposition mit mehreren Vergleichsangeboten. */
+/** A cost position with several comparison offers. */
 interface Position {
   label: string;
   offers: Offer[];
 }
 
 /**
- * Formly-Feldtyp `positions` (Kostenpositionen). Der Modellwert ist ein Array von
- * Positionen; jede trägt ≥ `minOffers` Vergleichsangebote, von denen genau eines
- * bevorzugt ist — dessen Wert ist der Positionswert. Der Gesamtbetrag (Σ Positionen)
- * fließt serverseitig in `amount`. Validität (min Positionen/Angebote, ein
- * bevorzugtes, Werte > 0) wird auf das FormControl gespiegelt.
+ * Formly field type `positions` (cost positions). The model value is an array of
+ * positions; each carries ≥ `minOffers` comparison offers, exactly one of which is
+ * preferred — its value is the position value. The total (Σ positions) flows into
+ * `amount` server-side. Validity (min positions/offers, one preferred, values > 0)
+ * is mirrored onto the FormControl.
  */
 @Component({
   selector: 'app-formly-positions',
@@ -106,7 +106,7 @@ interface Position {
   `,
   styles: [
     `
-      /* Eigenständiger, abgesetzter Block — klar vom restlichen Formular getrennt. */
+      /* Standalone, set-off block — clearly separated from the rest of the form. */
       .pos {
         display: flex; flex-direction: column; gap: var(--space-4);
         border: var(--border-width) solid var(--color-border);
@@ -126,8 +126,8 @@ interface Position {
       .pos__card-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
       .pos__title { flex: 1; min-width: 12rem; font-weight: var(--fw-medium); }
       .pos__value { font-size: var(--fs-sm); color: var(--color-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-      /* table-layout: fixed — sonst erzwingt die intrinsische Mindestbreite der
-         Eingaben (Default ~20ch) eine Tabelle breiter als der Mobile-Viewport. */
+      /* table-layout: fixed — otherwise the intrinsic min-width of the inputs
+         (~20ch default) forces a table wider than the mobile viewport. */
       .pos__offers { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); table-layout: fixed; }
       .pos__offers th { text-align: start; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); font-weight: var(--fw-semibold); padding: 0 var(--space-2) var(--space-2); }
       .pos__offers td { padding: var(--space-1) var(--space-2); vertical-align: middle; }
@@ -135,17 +135,17 @@ interface Position {
       .pos__num input { text-align: end; }
       .pos__pref { text-align: center; width: 5rem; }
       .pos__actcol { width: 2.5rem; }
-      /* Eingaben einheitlich zur restlichen App (Höhe/Polster/Radius). */
+      /* Inputs consistent with the rest of the app (height/padding/radius). */
       .pos input {
         padding: var(--space-2) var(--space-3);
         border: var(--border-width) solid var(--color-border);
         border-radius: var(--radius-md);
         background: var(--color-bg); color: inherit; width: 100%;
-        min-width: 0; /* Eingaben dürfen unter ihre intrinsische Breite schrumpfen */
+        min-width: 0; /* inputs may shrink below their intrinsic width */
         min-height: 2.25rem; font: inherit;
       }
       .pos input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-      /* Keine Browser-Spin-Buttons an Zahleneingaben (inkonsistent zum Rest). */
+      /* No browser spin buttons on number inputs (inconsistent with the rest). */
       .pos input[type='number'] { appearance: textfield; -moz-appearance: textfield; }
       .pos input[type='number']::-webkit-outer-spin-button,
       .pos input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -162,9 +162,9 @@ interface Position {
       .pos__add--sm { border-style: none; padding: var(--space-1) 0; }
       .pos__total { margin: 0; font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
       .pos__error { font-size: var(--fs-sm); color: var(--color-danger); margin: 0; }
-      /* Mobile (#mobile, 768px-Konvention): schmalere Spalten + kompaktere Polster,
-         Kopfzeile entfällt (Platzhalter/aria-labels tragen die Bedeutung) — die
-         Karte bleibt damit innerhalb des Viewports statt horizontal auszubrechen. */
+      /* Mobile (768px convention): narrower columns + tighter padding, the header
+         row is dropped (placeholders/aria-labels carry the meaning) — this keeps the
+         card within the viewport instead of overflowing horizontally. */
       @media (max-width: 768px) {
         .pos { padding: var(--space-3); }
         .pos__card { padding: var(--space-3); }
@@ -182,8 +182,8 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   private readonly i18n = inject(I18nService);
 
   ngOnInit(): void {
-    // Gültigkeit sofort spiegeln: ein leeres (min-)Positionsfeld ist ungültig, auch
-    // wenn der Antragsteller es nie berührt (sonst durchläuft es die Wizard-Pflicht).
+    // Mirror validity immediately: an empty (min-)positions field is invalid even if
+    // the applicant never touches it (otherwise it passes the wizard's required check).
     queueMicrotask(() => this.revalidate(this.positions));
   }
 
@@ -211,7 +211,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return this.t('apply.positions.invalid');
   }
 
-  // --- Inline-Validierung je Feld (#5): betroffenes Feld rot, Meldung am Ort. ---
+  // --- Inline per-field validation: mark the affected field red, message in place. ---
   protected titleInvalid(p: Position): boolean {
     return this.showError && !p.label.trim();
   }
@@ -222,7 +222,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return this.showError && (o.value === null || o.value <= 0);
   }
 
-  /** Konkrete, knappe Fehlermeldung je Positionskarte (oder '' wenn gültig). */
+  /** Concrete, terse error message per position card (or '' when valid). */
   protected cardError(p: Position): string {
     if (!this.showError) return '';
     if (p.offers.length < this.minOffers) return this.t('apply.positions.errMinOffers');
@@ -261,7 +261,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     this.revalidate(next);
   }
 
-  /** Validität auf das FormControl spiegeln (min Positionen/Angebote, ein bevorzugtes, Werte > 0). */
+  /** Mirror validity onto the FormControl (min positions/offers, one preferred, values > 0). */
   private revalidate(positions: Position[]): void {
     let ok = positions.length >= this.minPositions;
     for (const p of positions) {
@@ -326,7 +326,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     );
   }
 
-  /** Welche Wert-Zelle gerade bearbeitet wird (dann Rohwert statt formatiert). */
+  /** Which value cell is currently being edited (then raw value instead of formatted). */
   protected editing: { pi: number; oi: number } | null = null;
 
   protected beginEditValue(pi: number, oi: number): void {
@@ -336,8 +336,8 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     this.editing = null;
   }
 
-  /** Anzeigetext der Wert-Eingabe: beim Tippen roh, sonst auf 2 Nachkommastellen
-   *  lokalisiert formatiert (1.234,56) — ohne Währungssymbol (Spalte sagt €). */
+  /** Display text of the value input: raw while typing, otherwise formatted to 2
+   *  decimals localized (1.234,56) — without a currency symbol (the column says €). */
   protected offerValueText(pi: number, oi: number): string {
     const v = this.positions[pi]?.offers[oi]?.value ?? null;
     if (v === null) return '';
@@ -350,14 +350,14 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     }).format(v);
   }
 
-  /** Lokalisierte/freie Geldeingabe robust nach `number` parsen (akzeptiert „1.234,56"
-   *  und „1234.56"); leer/ungültig → `null`. */
+  /** Robustly parse a localized/free money input to `number` (accepts "1.234,56"
+   *  and "1234.56"); empty/invalid → `null`. */
   private parseNum(raw: string): number | null {
     const s = raw.trim();
     if (!s) return null;
     let cleaned = s.replace(/[^\d.,-]/g, '');
     if (cleaned.includes(',') && cleaned.includes('.')) {
-      // Letztes Trennzeichen ist das Dezimaltrennzeichen.
+      // The last separator is the decimal separator.
       cleaned =
         cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')
           ? cleaned.replace(/\./g, '').replace(',', '.')

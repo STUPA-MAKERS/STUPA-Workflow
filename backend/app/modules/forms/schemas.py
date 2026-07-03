@@ -1,8 +1,8 @@
-"""API-Schemata des Forms-Moduls (T-11).
+"""API schemas of the forms module.
 
-Request/Response-Modelle für Form-Version-CRUD und die effektive Form-Definition
-(`GET /api/application-types/{id}/form`). Feld-Definitionen sind ``FormFieldDef``
-(config_schemas §5.1, Single Source of Truth) — hier nur die Hüllen-Schemata.
+Request/response models for form-version CRUD and the effective form definition
+(`GET /api/application-types/{id}/form`). Field definitions are ``FormFieldDef`` (the
+single source of truth) — only the wrapper schemas live here.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.shared.config_schemas import FormFieldDef
 from app.shared.i18n import I18nMap
 
-# i18n-Labels der Standard-Sektionen (effective_form §5.7).
+# i18n labels of the standard sections.
 SECTION_LABELS: dict[str, I18nMap] = {
     "main": {"de": "Antrag", "en": "Application"},
     "budget": {"de": "Topf-spezifische Felder", "en": "Budget-specific fields"},
@@ -22,32 +22,32 @@ SECTION_LABELS: dict[str, I18nMap] = {
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields populatable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class FormVersionCreate(_CamelModel):
-    """Neue Form-Version anlegen (Definition wird validiert)."""
+    """Create a new form version (definition validated)."""
 
     fields: list[FormFieldDef] = Field(min_length=1)
     activate: bool = True
-    # NC-Forms-Beschreibung (mehrsprachiges Markdown), optional (#13).
+    # Form description (multilingual Markdown), optional.
     description: I18nMap | None = None
 
 
 class FormActiveSet(_CamelModel):
-    """Formular eines Typs aktivieren/deaktivieren (#forms).
+    """Activate/deactivate a type's form.
 
-    ``active=false`` ⇒ Typ hat keine aktive Form-Version mehr (für neue Anträge
-    gesperrt); ``active=true`` reaktiviert die **neueste** Version.
+    ``active=false`` ⇒ the type has no active form version (locked for new
+    applications); ``active=true`` reactivates the latest version.
     """
 
     active: bool
 
 
 class FormVersionOut(_CamelModel):
-    """Angelegte/aktive Form-Version."""
+    """Created/active form version."""
 
     id: UUID
     application_type_id: UUID = Field(alias="applicationTypeId")
@@ -58,11 +58,11 @@ class FormVersionOut(_CamelModel):
 
 
 class FormDraftOut(_CamelModel):
-    """Aktuelle (zuletzt angelegte) Form-Version eines Typs zum Bearbeiten (#13).
+    """A type's current (most recent) form version for editing.
 
-    Liefert die rohe Feld-Liste + Beschreibung (ohne Topf-Merge/Sektionen) für den
-    NC-Forms-Editor. ``formVersionId``/``version`` sind ``null``, wenn der Typ noch
-    keine Form-Version hat (frisch angelegt) → Editor startet leer.
+    Returns the raw field list + description (no pot merge/sections) for the form
+    editor. ``formVersionId``/``version`` are ``null`` when the type has no form version
+    yet (freshly created) → the editor starts empty.
     """
 
     application_type_id: UUID = Field(alias="applicationTypeId")
@@ -74,7 +74,7 @@ class FormDraftOut(_CamelModel):
 
 
 class FormSectionOut(_CamelModel):
-    """Ein Abschnitt der effektiven Form."""
+    """A section of the effective form."""
 
     key: str
     label: I18nMap
@@ -82,7 +82,7 @@ class FormSectionOut(_CamelModel):
 
 
 class EffectiveFormOut(_CamelModel):
-    """Effektive Form-Definition (Typ-Felder + ggf. Topf-Extra-Felder)."""
+    """Effective form definition (type fields + optional pot extra fields)."""
 
     application_type_id: UUID = Field(alias="applicationTypeId")
     form_version_id: UUID = Field(alias="formVersionId")

@@ -1,17 +1,10 @@
 /**
- * Admin-Config-DTOs (T-34) — Spiegel der admin-API (sds/api.md §3 »admin«) und
- * der Config-Schemas (config_schemas §5). camelCase wie das Backend-`_CamelModel`.
+ * Admin config DTOs — mirror of the admin API and the config schemas. camelCase like
+ * the backend `_CamelModel`. The backend OpenAPI stays the source of truth.
  *
- * Quelle der Wahrheit bleibt das Backend-OpenAPI. **Status der Endpunkte (Stand
- * Branch-Basis `origin/main` bc275a8): T-24 (admin-API) ist NICHT gemergt** —
- * `app/modules/admin` enthält nur Tabellen, keine Router. Diese Typen + der
- * `AdminApiService` sind daher gegen den Contract (api.md) gebaut; im Mock-Modus
- * (`USE_MOCK_API`) liefert ein In-Memory-Store Daten, damit die UIs entwickel-
- * und testbar sind. Beim Merge von T-24 nur die Mock-Schicht entfernen.
- *
- * Branding/Site-Config (#21) ist **nicht** Teil der SDS — der Contract hier ist
- * eine T-34-Festlegung (`/api/admin/site-config`). TODO(T-24/#21): mit Backend
- * abstimmen, sobald der Endpunkt existiert.
+ * In mock mode (`USE_MOCK_API`) an in-memory store provides data so the UIs are
+ * developable and testable. Branding/site-config uses the local `/api/admin/site-config`
+ * path, which is not part of the API spec.
  */
 import type {
   DataDiff,
@@ -21,18 +14,18 @@ import type {
   Uuid,
 } from '@core/api/models';
 
-// --- Flow-Graph (config_schemas §5.2) ---------------------------------------
+// --- Flow graph -------------------------------------------------------------
 
-/** State-Art im globalen Flow (#28-Redesign): nur noch normal + vote. */
+/** State kind in the global flow: only normal + vote. */
 export type StateKind = 'normal' | 'vote';
 
-/** Config eines States je nach `kind`. Leeres Objekt für `normal`. */
+/** Per-state config depending on `kind`. Empty object for `normal`. */
 export interface StateConfig {
-  /** vote: Gremium, das abstimmt. */
+  /** vote: the gremium that votes. */
   gremiumId?: string;
   /**
-   * Schlüssel einer benannten Deadline-Policy (#13): beim Betreten des States legt
-   * der Server eine Frist an, die der `deadlinePassed`-Übergang des States feuert.
+   * Key of a named deadline policy: on entering the state the server creates a
+   * deadline that the state's `deadlinePassed` transition fires.
    */
   deadlinePolicyKey?: string;
 }
@@ -40,54 +33,52 @@ export interface StateConfig {
 export interface StateDef {
   key: string;
   label: I18nMap;
-  /** Anzeigefarbe des State-Badges (Hex), optional. */
+  /** Display color of the state badge (hex), optional. */
   color?: string | null;
   editAllowed?: boolean;
   isInitial?: boolean;
-  /** Endzustand (#PII-Re-Add): terminale Anträge sind aufbewahrungs-/anonymisierbar. */
+  /** Terminal state: terminal applications are subject to retention/anonymization. */
   isTerminal?: boolean;
-  /** State-Art (#28); fehlt ⇒ `normal`. */
+  /** State kind; absent ⇒ `normal`. */
   kind?: StateKind | null;
-  /** Kind-spezifische Konfiguration (#28). */
+  /** Kind-specific configuration. */
   config?: StateConfig | null;
 }
 
-/** Ergebnis-Zweig eines vote-States (#28): pass/fail. */
+/** Result branch of a vote state: pass/fail. */
 export type TransitionBranch = 'pass' | 'fail';
 
 export interface TransitionDef {
   from: string;
   to: string;
   label?: I18nMap | null;
-  /** Optionale Farbe (#flow): färbt Pfeil im Editor + Entscheidungs-Button im Antrag. */
+  /** Optional color: tints the arrow in the editor + the decision button in the application. */
   color?: string | null;
   guard?: Guard | null;
   actions?: ActionDef[];
   order?: number | null;
-  /** Automatischer Übergang (#8): feuert ohne Nutzer-Aktion, sobald der Guard erfüllt ist. */
+  /** Automatic transition: fires without user action as soon as the guard holds. */
   automatic?: boolean;
-  /** Ergebnis-Zweig für vote-States (#28): pass/fail. */
+  /** Result branch for vote states: pass/fail. */
   branch?: TransitionBranch | null;
-  /** »Erfordert Aktion« (#requires-action): zählt als offene Aufgabe im Tasks-Tab.
-   *  Fehlt ⇒ `true`; `false` = rein optionale Aktion. */
+  /** "Requires action": counts as an open task in the tasks tab.
+   *  Absent ⇒ `true`; `false` = purely optional action. */
   requiresAction?: boolean;
 }
 
-/** Visuelle Node-Gruppe (#flow-groups) — reine Editor-Darstellung, die Engine
- *  ignoriert sie. Im Canvas ist eine Gruppe immer EIN beschrifteter Kasten;
- *  ihr Inhalt öffnet sich per Drill-Down (Breadcrumbs). Gruppen sind
- *  schachtelbar über `groupIds`; ein State/eine Gruppe steckt in höchstens
- *  einem Parent. */
+/** Visual node group — editor-only rendering; the engine ignores it. On the canvas a
+ *  group is always ONE labeled box; its content opens via drill-down (breadcrumbs).
+ *  Groups nest via `groupIds`; a state/group sits in at most one parent. */
 export interface FlowGroup {
   id: string;
   name: string;
   stateKeys: string[];
-  /** Direkt enthaltene Unter-Gruppen (Schachtelung). */
+  /** Directly contained sub-groups (nesting). */
   groupIds?: string[];
   color?: string | null;
 }
 
-/** Optionales Editor-Layout (Knoten-Positionen + Gruppen) — persistiert im Graphen. */
+/** Optional editor layout (node positions + groups) — persisted in the graph. */
 export interface FlowLayout {
   positions?: Record<string, { x: number; y: number }>;
   groups?: FlowGroup[];
@@ -99,33 +90,37 @@ export interface FlowGraph {
   layout?: FlowLayout | null;
 }
 
-// --- Guards (shared/guards.py — Whitelist, #28-Redesign) --------------------
+// --- Guards (shared/guards.py — whitelist) ----------------------------------
 
-/** Vergleichs-Operatoren des `compare`-Guards (typabhängig zur Laufzeit). */
+/** Comparison operators of the `compare` guard (type-dependent at runtime). */
 export type CompareOp = '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in';
 export const COMPARE_OPS: readonly CompareOp[] = ['==', '!=', '<', '<=', '>', '>=', 'in'] as const;
 
-/** Bedingungs-Operatoren (auf automatischen + manuellen Übergängen). */
+/** Condition operators (on automatic + manual transitions). */
 export type GuardConditionOp =
   | 'deadlinePassed'
   | 'applicantRoleIs'
   | 'applicantCommitteeIs'
+  | 'applicationTypeIs'
+  | 'attachmentPresent'
   | 'budgetIs'
   | 'budgetFitsApplication'
   | 'hasField'
   | 'compare';
-/** Akteur-Gates — nur auf **manuellen** Übergängen. */
+/** Actor gates — only on manual transitions. */
 export type GuardActorOp = 'roleIs' | 'isInCommittee' | 'actorIsApplicant';
 export type GuardLeafOperator = GuardConditionOp | GuardActorOp;
 export type GuardCombinator = 'and' | 'or' | 'not';
 
-/** Ein einzelner Guard-Knoten (genau ein Operator, wie `validate_guard`). */
+/** A single guard node (exactly one operator, like `validate_guard`). */
 export type Guard = Record<string, unknown>;
 
 export const GUARD_CONDITION_OPERATORS: readonly GuardConditionOp[] = [
   'deadlinePassed',
   'applicantRoleIs',
   'applicantCommitteeIs',
+  'applicationTypeIs',
+  'attachmentPresent',
   'budgetIs',
   'budgetFitsApplication',
   'hasField',
@@ -142,17 +137,23 @@ export const GUARD_LEAF_OPERATORS: readonly GuardLeafOperator[] = [
 ] as const;
 export const GUARD_COMBINATORS: readonly GuardCombinator[] = ['and', 'or', 'not'] as const;
 
-// --- Actions (#28: webhook/notify/addToNextSession/assignBudget) ------------
+// --- Actions (webhook/notify/addToNextSession/assignBudget) -----------------
 
-export type ActionType = 'webhook' | 'notify' | 'addToNextSession' | 'assignBudget';
+export type ActionType =
+  | 'webhook'
+  | 'notify'
+  | 'addToNextSession'
+  | 'assignBudget'
+  | 'assignBudgetFromField';
 export const ACTION_TYPES: readonly ActionType[] = [
   'webhook',
   'notify',
   'addToNextSession',
   'assignBudget',
+  'assignBudgetFromField',
 ] as const;
 
-/** Empfänger-Art einer `notify`-Action. */
+/** Recipient kind of a `notify` action. */
 export type NotifyRecipientKind = 'gremium' | 'role' | 'applicant' | 'email';
 export const NOTIFY_RECIPIENT_KINDS: readonly NotifyRecipientKind[] = [
   'gremium',
@@ -179,15 +180,15 @@ export interface Gremium {
   cdVariant: string;
   defaultLang: string;
   allowVoteDelegation: boolean;
-  /** Vorlauf (Minuten vor Sitzungsbeginn) für Nicht-Pool-Delegationen; 0 = bis Beginn. */
+  /** Lead time (minutes before the meeting starts) for non-pool delegations; 0 = until start. */
   delegationLeadMinutes?: number;
-  /** Delegation an Nutzer außerhalb von Gremium & Stellvertreter-Pool erlauben. */
+  /** Allow delegation to users outside the gremium & substitute pool. */
   delegationAllowExternal?: boolean;
-  /** Default-Quorum (% der Stimmberechtigten, die teilnehmen müssen); null = keins. */
+  /** Default quorum (% of eligible voters who must attend); null = none. */
   quorumPercent?: number | null;
 }
 
-/** Body für `POST /admin/gremien` (`GremiumCreate`). */
+/** Body for `POST /admin/gremien` (`GremiumCreate`). */
 export interface GremiumCreateBody {
   name: string;
   slug: string;
@@ -199,7 +200,7 @@ export interface GremiumCreateBody {
   quorumPercent?: number | null;
 }
 
-/** Body für `PATCH /admin/gremien/{id}` (`GremiumUpdate`) — alle Felder optional. */
+/** Body for `PATCH /admin/gremien/{id}` (`GremiumUpdate`) — all fields optional. */
 export interface GremiumUpdateBody {
   name?: string;
   slug?: string;
@@ -211,10 +212,10 @@ export interface GremiumUpdateBody {
   quorumPercent?: number | null;
 }
 
-/** CD-Varianten (pytex) als Dropdown statt Freitext (#18). */
+/** CD variants (pytex) as a dropdown instead of free text. */
 export const CD_VARIANTS: readonly string[] = ['stupa', 'asta', 'echo', 'makers', 'report'];
 
-/** Name → URL-Slug (#18, automatische Generierung). */
+/** Name → URL slug (auto-generated). */
 export function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -235,20 +236,20 @@ export interface Role {
   permissions: string[];
 }
 
-/** Mail-Template (admin-API `/admin/mail-templates`, #5-4): i18n Subject/Body/HTML. */
+/** Mail template (admin API `/admin/mail-templates`): i18n subject/body/HTML. */
 export interface MailTemplate {
-  /** Builtins (noch nicht überschrieben) haben keine DB-ID (#12). */
+  /** Builtins (not yet overridden) have no DB id. */
   id: Uuid | null;
   key: string;
   subjectI18n: I18nMap;
   bodyI18n: I18nMap;
   bodyHtmlI18n: I18nMap;
   placeholders: Record<string, string>;
-  /** 'override' = aus der DB; 'builtin' = unveränderter Katalog-Default. */
+  /** 'override' = from the DB; 'builtin' = unchanged catalogue default. */
   source: 'override' | 'builtin';
 }
 
-/** Override per Key anlegen/aktualisieren (#12, Katalog-Merge). */
+/** Create/update an override by key (catalogue merge). */
 export interface MailTemplateUpsertBody {
   key: string;
   subjectI18n: I18nMap;
@@ -256,7 +257,7 @@ export interface MailTemplateUpsertBody {
   bodyHtmlI18n: I18nMap;
 }
 
-/** Vorschau aus dem Editor-Entwurf (ohne ID, #12). */
+/** Preview from the editor draft (no id). */
 export interface MailPreviewPayload {
   subjectI18n: I18nMap;
   bodyI18n: I18nMap;
@@ -265,7 +266,7 @@ export interface MailPreviewPayload {
   context: Record<string, unknown>;
 }
 
-/** Gerenderte Vorschau eines Templates. */
+/** Rendered preview of a template. */
 export interface MailPreview {
   subject: string;
   text: string;
@@ -273,7 +274,7 @@ export interface MailPreview {
   lang: string;
 }
 
-/** OIDC-Gruppe → Rolle(+ optional Gremium) Mapping (admin-API `/group-mappings`, #5-4). */
+/** OIDC group → role (+ optional gremium) mapping (admin API `/group-mappings`). */
 export interface GroupMapping {
   id: Uuid;
   oidcGroup: string;
@@ -281,14 +282,14 @@ export interface GroupMapping {
   gremiumId?: Uuid | null;
 }
 
-/** Eingabe zum Anlegen/Ändern eines Group-Mappings. */
+/** Input to create/update a group mapping. */
 export interface GroupMappingBody {
   oidcGroup: string;
   roleId: Uuid;
   gremiumId?: Uuid | null;
 }
 
-/** Rollenzuweisung (admin-API `/role-assignments`) — Vertretung/Delegation. */
+/** Role assignment (admin API `/role-assignments`) — representation/delegation. */
 export interface RoleAssignment {
   id: Uuid;
   principalId: Uuid;
@@ -300,7 +301,7 @@ export interface RoleAssignment {
   delegateVoting: boolean;
 }
 
-/** Eingabe für eine neue Zuweisung (#72) — optionales tz-aware Gültigkeitsfenster. */
+/** Input for a new assignment — optional tz-aware validity window. */
 export interface RoleAssignmentInput {
   principalId: Uuid;
   roleId: Uuid;
@@ -310,14 +311,14 @@ export interface RoleAssignmentInput {
   delegateVoting?: boolean;
 }
 
-/** OIDC-Principal (Benutzer) inkl. seiner Rollenzuweisungen (admin-API `/principals`). */
+/** OIDC principal (user) incl. its role assignments (admin API `/principals`). */
 export interface AdminPrincipal {
   id: Uuid;
   sub: string;
   email?: string | null;
   displayName?: string | null;
   lastLogin?: string | null;
-  /** Aktiv/deaktiviert (#30). */
+  /** Active/deactivated. */
   active?: boolean;
   assignments: RoleAssignment[];
 }
@@ -331,10 +332,10 @@ export interface ApplicationTypeAdmin {
 }
 
 /**
- * Antragstyp (Formular) als Editier-Sicht des NC-Forms-Builders (#13). Spiegelt
- * `ApplicationTypeOut` der Admin-API; `name` ist die i18n-Map (Titel des Formulars).
+ * Application type (form) as the forms builder's edit view. Mirrors the admin API's
+ * `ApplicationTypeOut`; `name` is the i18n map (the form's title).
  */
-/** Vergleichsangebote-Regel eines Antragstyps (#5-4). */
+/** Comparison-offers rule of an application type. */
 export interface ComparisonOffers {
   required: boolean;
   minCount: number;
@@ -348,12 +349,12 @@ export interface ApplicationTypeFull {
   gremiumId?: Uuid | null;
   hasBudget: boolean;
   comparisonOffers?: ComparisonOffers | null;
-  /** DSGVO-Aufbewahrung in Monaten; null = globaler Default (#PII-Re-Add). */
+  /** DSGVO retention in months; null = global default. */
   retentionMonths?: number | null;
   activeFormVersionId?: Uuid | null;
 }
 
-/** Body für `POST /admin/application-types` — Antragstyp/Formular anlegen (#13). */
+/** Body for `POST /admin/application-types` — create an application type/form. */
 export interface ApplicationTypeCreateBody {
   key: string;
   name: I18nMap;
@@ -361,7 +362,7 @@ export interface ApplicationTypeCreateBody {
   hasBudget?: boolean;
 }
 
-/** Body für `PATCH /admin/application-types/{id}` — Titel/Gremium/Budget (#13). */
+/** Body for `PATCH /admin/application-types/{id}` — title/gremium/budget. */
 export interface ApplicationTypeUpdateBody {
   name?: I18nMap;
   gremiumId?: Uuid | null;
@@ -370,8 +371,8 @@ export interface ApplicationTypeUpdateBody {
 }
 
 /**
- * Aktuelle Form-Version eines Typs zum Bearbeiten (#13) — rohe Felder +
- * Beschreibung (NC-Forms-Editor). Beim frisch angelegten Typ ist `fields` leer.
+ * A type's current form version for editing — raw fields + description (forms editor).
+ * For a freshly created type `fields` is empty.
  */
 export interface FormDraft {
   applicationTypeId: Uuid;
@@ -385,10 +386,8 @@ export interface FormDraft {
 export type FormStatus = 'active' | 'draft' | 'inactive';
 
 /**
- * Überblicks-Zeile aktiver Formulare (#75): Anzeigename, zuständiges Gremium,
- * Status und aktive Form-Version. Aggregiert aus Application-Type + Form-Version;
- * im Mock geseedet. TODO(T-24): aus `/admin/application-types` (+ Versionen)
- * ableiten, sobald der Endpunkt steht.
+ * Overview row of active forms: display name, owning gremium, status and active form
+ * version. Aggregated from application type + form version; seeded in mock mode.
  */
 export interface FormOverviewItem {
   id: Uuid;
@@ -398,7 +397,7 @@ export interface FormOverviewItem {
   version: number;
 }
 
-// --- Notification-/Webhook-Config (config_schemas §5.4/§5.5) ----------------
+// --- Notification/webhook config --------------------------------------------
 
 export type EventName =
   | 'application_created'
@@ -446,19 +445,19 @@ export interface WebhookConfig {
   active: boolean;
 }
 
-/** Gremium-Rolle (#42) — eigener Rollensatz, getrennt von den globalen Rollen. */
+/** Gremium role — a separate role set, distinct from the global roles. */
 export interface GremiumRole {
   id: Uuid;
   gremiumId: Uuid;
   key: string;
   name: I18nMap;
-  /** Pflichtrolle (Vorstand/Manager/Mitglied) — vorhanden in jedem Gremium, nicht löschbar. */
+  /** Forced role (board/manager/member) — present in every gremium, not deletable. */
   forced?: boolean;
-  /** Granulare Sitzungs-Berechtigungen (session.manage/vote.manage/vote.cast/protocol.write). */
+  /** Granular meeting permissions (session.manage/vote.manage/vote.cast/protocol.write). */
   permissions?: string[];
 }
 
-/** Konfigurierbare granulare Gremium-Rollen-Berechtigungen (#Sessions). */
+/** Configurable granular gremium-role permissions. */
 export const GREMIUM_PERMISSIONS = [
   'session.manage',
   'vote.manage',
@@ -466,22 +465,22 @@ export const GREMIUM_PERMISSIONS = [
   'protocol.write',
 ] as const;
 
-/** Art einer benannten Frist-Policy. */
+/** Kind of a named deadline policy. */
 export type DeadlineKind = 'absolute' | 'relative_submitted' | 'relative_changed';
 
-/** Benannte Frist-Policy (Registry, vom Flow per `key` referenziert). */
+/** Named deadline policy (registry, referenced by the flow via `key`). */
 export interface DeadlinePolicy {
   id: Uuid;
   key: string;
   label: I18nMap;
   kind: DeadlineKind;
-  /** Nur bei `absolute`: fixes Datum (pro Semester pflegbar), ISO-String. */
+  /** Only for `absolute`: a fixed date (editable per semester), ISO string. */
   absoluteAt?: string | null;
-  /** Nur bei den relativen Varianten: Tage Versatz. */
+  /** Only for the relative variants: offset in days. */
   offsetDays?: number | null;
 }
 
-/** Zeitbegrenzte Gremium-Zugehörigkeit (#42, Amtszeit). */
+/** Time-bounded gremium membership (term of office). */
 export interface GremiumMembership {
   id: Uuid;
   principalId: Uuid;
@@ -491,45 +490,45 @@ export interface GremiumMembership {
   validUntil: string | null;
 }
 
-/** Append-only Audit-Eintrag (T-23, `GET /admin/audit`). */
+/** Append-only audit entry (`GET /admin/audit`). */
 export interface AuditEntry {
   id: number;
   at: string;
   actor: string | null;
-  /** Klarname des Akteurs (vom Backend aufgelöst); null = System/unbekannt. */
+  /** Actor's clear name (resolved by the backend); null = system/unknown. */
   actorName: string | null;
   action: string;
   targetType: string | null;
   targetId: string | null;
-  /** Menschenlesbares Ziel-Label (Antragstitel, Rollenname, …); null = unbekannt/gelöscht. */
+  /** Human-readable target label (application title, role name, …); null = unknown/deleted. */
   targetLabel?: string | null;
   data: Record<string, unknown>;
-  /** UUID → Klarname für die in `data` eingebetteten Entity-Referenzen (vom Backend
-   *  aufgelöst). Nur auflösbare Ids; sonst wird die rohe UUID gezeigt. */
+  /** UUID → clear name for entity references embedded in `data` (resolved by the
+   *  backend). Only resolvable ids; otherwise the raw UUID is shown. */
   resolvedIds?: Record<string, string>;
-  /** Aus dem Audit-Log zurücknehmbar (#config-versioning, vom Backend bestimmt) —
-   *  treibt den »Zurücknehmen«-Button. Das Backend bleibt beim Klick autoritativ. */
+  /** Revertible from the audit log (determined by the backend) — drives the
+   *  "revert" button. The backend stays authoritative on click. */
   revertable?: boolean;
   hash: string;
   prevHash: string | null;
 }
 
-/** Cursor-gepagte Audit-Antwort (Keyset auf `id`, neueste zuerst). */
+/** Cursor-paged audit response (keyset on `id`, newest first). */
 export interface AuditPage {
   items: AuditEntry[];
   nextCursor: number | null;
   hasMore: boolean;
 }
 
-/** Distinkter Akteur für den Audit-Actor-Filter. */
+/** Distinct actor for the audit actor filter. */
 export interface AuditActor {
   sub: string;
   name: string | null;
 }
 
 /**
- * Ein Config-Snapshot (Versions-Sidebar, #config-versioning). Append-only —
- * frühere Versionen sind nie löschbar; `isCurrent` markiert den aktiven Stand.
+ * A config snapshot (version sidebar). Append-only — earlier versions are never
+ * deletable; `isCurrent` marks the active state.
  */
 export interface ConfigRevision {
   id: Uuid;
@@ -542,7 +541,7 @@ export interface ConfigRevision {
   isCurrent: boolean;
 }
 
-/** Feld-Diff eines Config-Snapshots gegen seinen Vorgänger (Wire-Form). */
+/** Field diff of a config snapshot against its predecessor (wire form). */
 export interface ConfigRevisionDiffWire {
   id: Uuid;
   entityType: string;
@@ -552,7 +551,7 @@ export interface ConfigRevisionDiffWire {
   diff: DataDiffWire;
 }
 
-/** Feld-Diff eines Config-Snapshots (FE-View; `diff` in Array-Form für `@for`). */
+/** Field diff of a config snapshot (FE view; `diff` in array form for `@for`). */
 export interface ConfigRevisionDiff {
   id: Uuid;
   entityType: string;
@@ -562,23 +561,23 @@ export interface ConfigRevisionDiff {
   diff: DataDiff | null;
 }
 
-/** Ergebnis eines Audit-Log-Reverts. */
+/** Result of an audit-log revert. */
 export interface AuditRevertResult {
   revertedAuditId: number;
   entityType: string;
   entityId: string;
 }
 
-/** Plattform-Benachrichtigungs-Config (#task-reminder, P admin.notifications). */
+/** Platform notification config (P admin.notifications). */
 export interface NotificationSettings {
   taskReminderEnabled: boolean;
-  /** Tage ohne Statuswechsel, bis erinnert wird (≥ 1). */
+  /** Days without a status change before a reminder is sent (≥ 1). */
   taskReminderAfterDays: number;
-  /** Danach alle N Tage erneut; 0 = nur einmal je State-Aufenthalt. */
+  /** Then again every N days; 0 = only once per state visit. */
   taskReminderRepeatDays: number;
 }
 
-/** DSGVO-Löschantrag (Queue, P privacy.manage). */
+/** DSGVO erasure request (queue, P privacy.manage). */
 export type ErasureSubjectType = 'applicant' | 'principal';
 export type ErasureStatus = 'open' | 'executed' | 'rejected';
 
@@ -596,21 +595,21 @@ export interface ErasureRequest {
   reason?: string | null;
 }
 
-/** Plattformweite DSGVO-Config (globaler Aufbewahrungs-Default, P privacy.manage). */
+/** Platform-wide DSGVO config (global retention default, P privacy.manage). */
 export interface PrivacySettings {
   defaultRetentionMonths: number;
 }
 
-// --- Branding / Site-Config (#21 — T-34-Contract, nicht SDS) ----------------
+// --- Branding / site-config -------------------------------------------------
 
 export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon';
 
 export interface BrandingAsset {
-  /** Data-URL oder serverseitige Asset-URL der Bildmarke. */
+  /** Data URL or server-side asset URL of the image mark. */
   url: string;
   filename: string;
   mime: string;
-  /** Größe in Bytes (für die mime/size-Hinweis-Anzeige). */
+  /** Size in bytes (for the mime/size hint display). */
   size: number;
 }
 
@@ -625,19 +624,19 @@ export interface FooterColumn {
 }
 
 export interface SiteFreetexts {
-  /** Login-Hinweis, Landing/Welcome, Support, E-Mail-Footer — je i18n. */
+  /** Login hint, landing/welcome, support, email footer — each i18n. */
   loginHint: I18nMap;
   welcome: I18nMap;
   support: I18nMap;
   emailFooter: I18nMap;
-  /** Info-Text unter der Antrags-(Typ-)Auswahl (#18) — Markdown, je i18n. */
+  /** Info text below the application(-type) selection — Markdown, each i18n. */
   applyInfo?: I18nMap;
 }
 
 export interface Branding {
-  /** Voller App-Name (Browser-Tab, Kopfzeile, Startseite); leer ⇒ Default/i18n. */
+  /** Full app name (browser tab, header, home page); empty ⇒ default/i18n. */
   appName?: string;
-  /** Kurzer App-Name (PWA-Symbol/Startbildschirm); leer ⇒ Default. */
+  /** Short app name (PWA icon/home screen); empty ⇒ default. */
   appShortName?: string;
   logos: Partial<Record<LogoSlot, BrandingAsset>>;
   footerColumns: FooterColumn[];
@@ -646,24 +645,23 @@ export interface Branding {
   freetexts: SiteFreetexts;
 }
 
-/** Versionierte Site-Config: aktive Version + bearbeitbarer Entwurf (#21). */
+/** Versioned site config: active version + editable draft. */
 export interface SiteConfig {
   version: number;
   active: Branding;
   draft: Branding;
-  /** true, wenn `draft` ungespeicherte/unaktivierte Änderungen trägt. */
+  /** true when `draft` carries unsaved/unactivated changes. */
   hasDraftChanges: boolean;
 }
 
 /**
- * Akzeptierte Logo-MIME-Typen + Max-Größe (UI-Hinweis + Client-Guard).
+ * Accepted logo MIME types + max size (UI hint + client guard).
  *
- * **Sicherheit — img-only-Kontrakt:** Branding-Logos werden als `branding`-JSON
- * site-weit persistiert und ausschließlich über `<img src>` gerendert (nie inline
- * ins DOM injiziert). `image/svg+xml` ist **bewusst ausgeschlossen** — ein SVG
- * kann `<script>`/`on*`-Handler tragen und wäre für einen künftigen Inline-SVG-
- * Consumer ein gespeicherter XSS-Vektor. Nur Raster-Formate (PNG/JPEG/WebP/ICO).
- * Wer Logos konsumiert, MUSS bei `<img src>` bleiben.
+ * Security — img-only contract: branding logos are persisted site-wide as `branding`
+ * JSON and rendered only via `<img src>` (never injected inline into the DOM).
+ * `image/svg+xml` is deliberately excluded — an SVG can carry `<script>`/`on*`
+ * handlers and would be a stored XSS vector for a future inline-SVG consumer. Raster
+ * formats only (PNG/JPEG/WebP/ICO). Any logo consumer MUST stay on `<img src>`.
  */
 export const LOGO_ACCEPT_MIME: readonly string[] = [
   'image/png',
@@ -674,5 +672,5 @@ export const LOGO_ACCEPT_MIME: readonly string[] = [
 ] as const;
 export const LOGO_MAX_SIZE_MB = 2;
 
-/** Re-Export, damit Admin-Code nur aus `admin.models` importiert. */
+/** Re-export so admin code imports only from `admin.models`. */
 export type { FormFieldDef };

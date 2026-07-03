@@ -69,6 +69,7 @@ const LINE_MATCHED: StatementLine = {
   counterpartyIban: null,
   matchState: 'matched',
 };
+const LINE_IGNORED: StatementLine = { ...LINE, id: 'l-3', matchState: 'ignored' };
 
 const CRED: FintsCredentialStatus = {
   configured: true,
@@ -196,7 +197,7 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
   return { can: (p: string) => set.has(p), canAny: (...p: string[]) => p.some((x) => set.has(x)) };
 }
 
-/** Zugriff auf private Mitglieder (toast/i18n + private Helfer) — wie im Buchungen-Spec. */
+/** Access to private members (toast/i18n + private helpers). */
 interface Priv {
   toast: { success: (m: string) => void; error: (m: string) => void; show: (m: string, k: string) => void };
   i18n: { translate: (k: string, p?: Record<string, string>) => string };
@@ -211,9 +212,10 @@ interface Built {
 }
 
 /**
- * Komponente direkt instanziieren (Konstruktor lädt Konten-Optionen + Kostenstellen-Baum).
- * Werden Konten mitgegeben, flushen wir den Konto-Auswahl-Effekt via `TestBed.tick()` sofort
- * (Zeilen + Verbindungs-Status) — sonst feuert er unkontrolliert beim nächsten Fake-Timer-Tick.
+ * Instantiate the component directly (constructor loads account options + cost-centre
+ * tree). When accounts are provided, flush the account-selection effect via
+ * `TestBed.tick()` right away (lines + connection status) — else it fires uncontrolled
+ * on the next fake-timer tick.
  */
 function build(
   opts: {
@@ -231,7 +233,7 @@ function build(
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book']) },
-      // Host-Element für focusOtp() — ohne Fixture gibt es kein natives Component-Element.
+      // Host element for focusOtp() — without a fixture there's no native component element.
       { provide: ElementRef, useValue: new ElementRef(opts.host ?? document.createElement('div')) },
     ],
   });
@@ -247,7 +249,7 @@ function build(
   else treeReq.flush(opts.tree ?? []);
 
   if (!opts.accountsError && (opts.accounts?.length ?? 0) > 0) {
-    // Effekt: erstes Konto gewählt → Erstseite + Verbindungs-Status laden.
+    // Effect: first account selected → load the first page + connection status.
     TestBed.tick();
     http
       .expectOne((r) => r.url.endsWith('/statement-lines') && r.method === 'GET')
@@ -260,12 +262,12 @@ function build(
   return { cmp, http };
 }
 
-/** Nächsten GET /statement-lines (reload/fetch) abfangen + beantworten. */
+/** Catch + answer the next GET /statement-lines (reload/fetch). */
 function flushLines(http: HttpTestingController, body: StatementLinePage): void {
   http.expectOne((r) => r.url.endsWith('/statement-lines') && r.method === 'GET').flush(body);
 }
 
-/** OTP-Host mit sechs `[data-otp]`-Inputs für die Fokus-Steuerung. */
+/** OTP host with six `[data-otp]` inputs for focus control. */
 function otpHost(): HTMLElement {
   const div = document.createElement('div');
   for (let i = 0; i < 6; i++) {
@@ -282,7 +284,7 @@ describe('KontenComponent (unit)', () => {
     try {
       TestBed.inject(HttpTestingController).verify();
     } catch {
-      /* module bereits zurückgesetzt */
+      /* module already reset */
     }
     jest.useRealTimers();
   });
@@ -297,7 +299,7 @@ describe('KontenComponent (unit)', () => {
       { value: 'a-1', label: 'Hauptkonto' },
       { value: 'a-2', label: 'Sparkonto' },
     ]);
-    // Kostenstellen-Baum → Optionen (Top + Kind)
+    // Cost-centre tree → options (top + child)
     expect(cmp.costCentreOptions().length).toBe(2);
   });
 
@@ -318,11 +320,20 @@ describe('KontenComponent (unit)', () => {
     expect(no.cmp.canBook()).toBe(false);
   });
 
+  it('canIgnore reflects the budget.reconcile_ignore permission', () => {
+    const yes = build({ perms: ['budget.reconcile_ignore'] });
+    expect(yes.cmp.canIgnore()).toBe(true);
+    yes.http.verify();
+    TestBed.resetTestingModule();
+    const no = build({ perms: ['budget.book'] });
+    expect(no.cmp.canIgnore()).toBe(false);
+  });
+
   // ------------------------------------------------------------ account list
   it('selectAccount switches the account and discards a pending TAN session', () => {
     const { cmp } = build({ accounts: [ACC, ACC2] });
     cmp.sessionToken.set('tok-1');
-    cmp.selectAccount('a-1'); // gleiche Auswahl → No-op
+    cmp.selectAccount('a-1'); // same selection → no-op
     expect(cmp.sessionToken()).toBe('tok-1');
     cmp.selectAccount('a-2');
     expect(cmp.accountId()).toBe('a-2');
@@ -389,6 +400,14 @@ describe('KontenComponent (unit)', () => {
     expect(req2.request.params.get('linked')).toBe('false');
     req2.flush(linePage([]));
     expect(cmp.filterState()).toBe('open');
+
+    // 'ignored' maps to the explicit state filter, no linked flag.
+    cmp.setState('ignored');
+    const req3 = http.expectOne((r) => r.url.endsWith('/statement-lines'));
+    expect(req3.request.params.get('state')).toBe('ignored');
+    expect(req3.request.params.has('linked')).toBe(false);
+    req3.flush(linePage([]));
+    expect(cmp.filterState()).toBe('ignored');
   });
 
   it('fetch error on the initial page clears the list; on loadMore it keeps rows', () => {
@@ -402,7 +421,7 @@ describe('KontenComponent (unit)', () => {
     flushLines(http, linePage([LINE], 3));
     cmp.loadMore();
     http.expectOne((r) => r.url.endsWith('/statement-lines')).error(new ProgressEvent('err'));
-    expect(cmp.lines()).toEqual([LINE]); // Bestandszeilen bleiben
+    expect(cmp.lines()).toEqual([LINE]); // existing rows remain
     expect(cmp.loadingMore()).toBe(false);
   });
 
@@ -423,7 +442,7 @@ describe('KontenComponent (unit)', () => {
   it('loadMore is a no-op while loading, loadingMore or without more pages', () => {
     const { cmp, http } = build({ accounts: [ACC] });
     cmp.reloadLines();
-    flushLines(http, linePage([LINE], 1)); // total erreicht → hasMore false
+    flushLines(http, linePage([LINE], 1)); // total reached → hasMore false
     cmp.loadMore();
     http.expectNone((r) => r.url.endsWith('/statement-lines'));
     cmp.total.set(5);
@@ -452,7 +471,7 @@ describe('KontenComponent (unit)', () => {
 
   it('counterparty splits IBAN and name across all input shapes', () => {
     const { cmp } = build();
-    // IBAN gesetzt + Name mit IBAN-Präfix → Präfix entfernt
+    // IBAN set + name with an IBAN prefix → prefix removed
     expect(
       cmp.counterparty({
         ...LINE,
@@ -460,7 +479,7 @@ describe('KontenComponent (unit)', () => {
         counterpartyName: 'DE02120300000000202051 Max Muster',
       }),
     ).toEqual({ name: 'Max Muster', iban: 'DE02120300000000202051' });
-    // keine IBAN, aber Name beginnt mit einer → extrahiert
+    // no IBAN, but the name starts with one → extracted
     expect(
       cmp.counterparty({
         ...LINE,
@@ -468,12 +487,12 @@ describe('KontenComponent (unit)', () => {
         counterpartyName: 'DE02120300000000202051 Erika Muster',
       }),
     ).toEqual({ name: 'Erika Muster', iban: 'DE02120300000000202051' });
-    // keine IBAN, normaler Name → unverändert
+    // no IBAN, plain name → unchanged
     expect(cmp.counterparty({ ...LINE, counterpartyIban: null, counterpartyName: 'Copyshop' })).toEqual({
       name: 'Copyshop',
       iban: '',
     });
-    // beides leer/null
+    // both empty/null
     expect(cmp.counterparty({ ...LINE, counterpartyIban: null, counterpartyName: null })).toEqual({
       name: '',
       iban: '',
@@ -494,7 +513,7 @@ describe('KontenComponent (unit)', () => {
     expect(cmp.dateFrom()).toBe('2026-01-01');
     expect(cmp.dateTo()).toBe('');
     cmp.filterState.set('open');
-    // Status + Art + Datumsbereich = 3 (from/to zählen als eine Gruppe)
+    // status + kind + date range = 3 (from/to count as one group)
     expect(cmp.activeFilterCount()).toBe(3);
   });
 
@@ -519,8 +538,8 @@ describe('KontenComponent (unit)', () => {
     cmp.onSearch('miete');
     expect(cmp.searchQ()).toBe('miete');
     http.expectNone((r) => r.url.endsWith('/statement-lines'));
-    // Der Konto-Effekt trackt searchQ mit (fetch läuft im Effekt-Kontext) und lädt beim
-    // nächsten Scheduler-Tick einmal neu — der Debounce-Reload folgt erst bei 400 ms.
+    // The account effect also tracks searchQ (fetch runs in the effect context) and
+    // reloads once on the next scheduler tick — the debounced reload follows at 400 ms.
     jest.advanceTimersByTime(399);
     http.expectOne((r) => r.url.endsWith('/statement-lines')).flush(linePage([]));
     http.expectOne((r) => r.url.endsWith('/fints/credential') && r.method === 'GET').flush(CRED);
@@ -578,15 +597,15 @@ describe('KontenComponent (unit)', () => {
 
   it('saveCred is a no-op without account, login, pin or while saving', () => {
     const { cmp, http } = build({ accounts: [ACC] });
-    cmp.saveCred(); // login+pin fehlen
+    cmp.saveCred(); // login+pin missing
     cmp.credLogin.set('user1');
-    cmp.saveCred(); // pin fehlt
+    cmp.saveCred(); // pin missing
     cmp.credPin.set('1234');
     cmp.savingCred.set(true);
     cmp.saveCred(); // busy
     cmp.savingCred.set(false);
     cmp.accountId.set('');
-    cmp.saveCred(); // kein Konto
+    cmp.saveCred(); // no account
     http.expectNone((r) => r.url.endsWith('/fints/credential'));
   });
 
@@ -630,7 +649,7 @@ describe('KontenComponent (unit)', () => {
     http.expectOne((r) => r.url.endsWith('/accounts/a-1/fints/credential') && r.method === 'DELETE').flush(null);
     expect(cmp.sessionToken()).toBe('');
     expect(cmp.connectOpen()).toBe(false);
-    // loadCredStatus: Login `null` → leerer Login, PIN geleert
+    // loadCredStatus: login `null` → empty login, PIN cleared
     http
       .expectOne((r) => r.url.endsWith('/accounts/a-1/fints/credential') && r.method === 'GET')
       .flush({ ...CRED, hasCredential: false, fintsLogin: null });
@@ -646,7 +665,7 @@ describe('KontenComponent (unit)', () => {
     cmp.removeCred(); // busy
     cmp.savingCred.set(false);
     cmp.accountId.set('');
-    cmp.removeCred(); // kein Konto
+    cmp.removeCred(); // no account
     http.expectNone((r) => r.method === 'DELETE');
     cmp.accountId.set('a-1');
     cmp.removeCred();
@@ -678,7 +697,7 @@ describe('KontenComponent (unit)', () => {
     expect(cmp.connected()).toBe(true);
     expect(cmp.locked()).toBe(true);
     expect(cmp.lockedUntilLabel()).not.toBe('');
-    // abgelaufene Sperre → nicht mehr gesperrt
+    // expired lock → no longer locked
     cmp.credStatus.set({ ...CRED, fintsLockedUntil: '2020-01-01T00:00:00Z' });
     expect(cmp.locked()).toBe(false);
   });
@@ -717,7 +736,7 @@ describe('KontenComponent (unit)', () => {
     expect(success).toHaveBeenCalledWith('3 neu, 1 bereits vorhanden.');
     flushLines(http, linePage([LINE], 1));
     http.expectOne((r) => r.url.endsWith('/fints/credential') && r.method === 'GET').flush(CRED);
-    // refreshAccounts nach Sync: bestehende Auswahl bleibt erhalten
+    // refreshAccounts after sync: the existing selection is kept
     http.expectOne((r) => r.url.endsWith('/accounts/options')).flush([ACC, ACC2]);
     expect(cmp.accountId()).toBe('a-1');
     expect(cmp.accounts().length).toBe(2);
@@ -750,7 +769,7 @@ describe('KontenComponent (unit)', () => {
     expect(cmp.challenge()).toBe('');
     expect(cmp.challengeImage()).toBe('');
     expect(cmp.decoupled()).toBe(true);
-    // Defensive: needs_tan ganz ohne Token/Bild → leere Strings statt null
+    // Defensive: needs_tan with no token/image at all → empty strings instead of null
     cmp.startSync();
     http
       .expectOne((r) => r.url.endsWith('/fints/sync'))
@@ -769,10 +788,10 @@ describe('KontenComponent (unit)', () => {
       .flush({ code: 'fints_bank_locked' }, { status: 423, statusText: 'Locked' });
     expect(cmp.syncing()).toBe(false);
     expect(error).toHaveBeenCalledWith(priv(cmp).i18n.translate('fints.errBankLocked'));
-    // Sperre → Verbindungs-Status neu laden
+    // lock → reload the connection status
     http.expectOne((r) => r.url.endsWith('/fints/credential') && r.method === 'GET').flush(CRED);
 
-    // sonstiger Fehler → kein Status-Reload
+    // other error → no status reload
     cmp.startSync();
     http
       .expectOne((r) => r.url.endsWith('/fints/sync'))
@@ -788,13 +807,13 @@ describe('KontenComponent (unit)', () => {
 
   it('submitTan guards: no account, no session token, busy', () => {
     const { cmp, http } = build({ accounts: [ACC] });
-    cmp.submitTan(); // kein Token
+    cmp.submitTan(); // no token
     cmp.sessionToken.set('tok-1');
     cmp.tanBusy.set(true);
     cmp.submitTan(); // busy
     cmp.tanBusy.set(false);
     cmp.accountId.set('');
-    cmp.submitTan(); // kein Konto
+    cmp.submitTan(); // no account
     http.expectNone((r) => r.url.includes('/fints/sessions/'));
   });
 
@@ -810,7 +829,7 @@ describe('KontenComponent (unit)', () => {
     expect(req.request.body).toEqual({ tan: '123456' });
     req.flush({ ...SYNC_TAN, imported: 0 });
     expect(cmp.tanBusy()).toBe(false);
-    expect(cmp.sessionToken()).toBe('tok-1'); // Sitzung bleibt offen
+    expect(cmp.sessionToken()).toBe('tok-1'); // session stays open
     expect(show).toHaveBeenCalledWith('Noch nicht freigegeben — bitte in der App bestätigen.', 'info');
   });
 
@@ -902,12 +921,12 @@ describe('KontenComponent (unit)', () => {
     expect(cmp.otpDigits()[0]).toBe('7');
     expect(el.value).toBe('7');
     expect(cmp.tanCode()).toBe('7');
-    expect(focusSpy).toHaveBeenCalledTimes(1); // → Box 1
-    // letzte Box → kein Weiter-Fokus
+    expect(focusSpy).toHaveBeenCalledTimes(1); // → box 1
+    // last box → no forward focus
     el.value = '9';
     cmp.onOtpInput(5, { target: el } as unknown as Event);
     expect(focusSpy).toHaveBeenCalledTimes(1);
-    // Nicht-Ziffer → Slot geleert, kein Fokus-Sprung
+    // non-digit → slot cleared, no focus jump
     el.value = 'x';
     cmp.onOtpInput(1, { target: el } as unknown as Event);
     expect(cmp.otpDigits()[1]).toBe('');
@@ -922,14 +941,14 @@ describe('KontenComponent (unit)', () => {
     const prevent = jest.fn();
     cmp.onOtpKeydown(1, { key: 'Backspace', preventDefault: prevent } as unknown as KeyboardEvent);
     expect(prevent).toHaveBeenCalled();
-    expect(cmp.otpDigits()[0]).toBe(''); // vorherige Box geleert
+    expect(cmp.otpDigits()[0]).toBe(''); // previous box cleared
     expect(focusSpy).toHaveBeenCalledTimes(1);
-    // Box nicht leer → No-op
+    // box not empty → no-op
     cmp.otpDigits.set(['1', '2', '', '', '', '']);
     cmp.onOtpKeydown(1, { key: 'Backspace', preventDefault: prevent } as unknown as KeyboardEvent);
-    // erste Box → No-op
+    // first box → no-op
     cmp.onOtpKeydown(0, { key: 'Backspace', preventDefault: prevent } as unknown as KeyboardEvent);
-    // andere Taste → No-op
+    // other key → no-op
     cmp.onOtpKeydown(1, { key: 'a', preventDefault: prevent } as unknown as KeyboardEvent);
     expect(prevent).toHaveBeenCalledTimes(1);
     focusSpy.mockRestore();
@@ -943,23 +962,23 @@ describe('KontenComponent (unit)', () => {
       clipboardData: { getData: () => '12-34-56-78' },
       preventDefault: prevent,
     } as unknown as ClipboardEvent);
-    expect(cmp.otpDigits()).toEqual(['1', '2', '3', '4', '5', '6']); // auf 6 gekappt
+    expect(cmp.otpDigits()).toEqual(['1', '2', '3', '4', '5', '6']); // capped to 6
     expect(cmp.tanCode()).toBe('123456');
     expect(prevent).toHaveBeenCalled();
-    // Teil-Paste → Rest leer
+    // partial paste → rest empty
     cmp.onOtpPaste({
       clipboardData: { getData: () => '12' },
       preventDefault: prevent,
     } as unknown as ClipboardEvent);
     expect(cmp.otpDigits()).toEqual(['1', '2', '', '', '', '']);
-    // ohne Ziffern (oder ohne clipboardData) → No-op
+    // without digits (or without clipboardData) → no-op
     cmp.onOtpPaste({ clipboardData: null, preventDefault: prevent } as unknown as ClipboardEvent);
     expect(cmp.otpDigits()).toEqual(['1', '2', '', '', '', '']);
     focusSpy.mockRestore();
   });
 
   it('focusOtp tolerates a host without OTP boxes', () => {
-    const { cmp } = build(); // leerer Host → querySelector liefert null
+    const { cmp } = build(); // empty host → querySelector returns null
     const el = document.createElement('input');
     el.value = '5';
     expect(() => cmp.onOtpInput(0, { target: el } as unknown as Event)).not.toThrow();
@@ -972,7 +991,7 @@ describe('KontenComponent (unit)', () => {
     expect(cmp.importLine()?.id).toBe('l-1');
     expect(cmp.impBudgetId()).toBe('child-1');
     expect(cmp.impDescription()).toBe('Miete Mai');
-    // ein einziges HHJ → vorausgewählt
+    // a single fiscal year → preselected
     http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE]);
     expect(cmp.fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
     expect(cmp.impFiscalYearId()).toBe('fy-active');
@@ -999,7 +1018,7 @@ describe('KontenComponent (unit)', () => {
 
   it('loadFiscalYears skips unknown budgets and resets the options on error', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    cmp.onPickImportBudget('ghost'); // nicht im Baum → keine Anfrage
+    cmp.onPickImportBudget('ghost'); // not in the tree → no request
     http.expectNone((r) => r.url.includes('/fiscal-years'));
     cmp.onPickImportBudget('child-1');
     http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).error(new ProgressEvent('err'));
@@ -1046,9 +1065,9 @@ describe('KontenComponent (unit)', () => {
   it('confirmImport guards: no line, no budget, already booking; error toasts', () => {
     const { cmp, http } = build({ accounts: [ACC] });
     const error = jest.spyOn(priv(cmp).toast, 'error');
-    cmp.confirmImport(); // keine Zeile
+    cmp.confirmImport(); // no line
     cmp.importLine.set(LINE);
-    cmp.confirmImport(); // keine Kostenstelle
+    cmp.confirmImport(); // no cost centre
     cmp.impBudgetId.set('child-1');
     cmp.booking.set(true);
     cmp.confirmImport(); // busy
@@ -1098,7 +1117,7 @@ describe('KontenComponent (unit)', () => {
   it('onLinkSearch debounces and searches freely (no amount bounds) with a query', () => {
     jest.useFakeTimers();
     const { cmp, http } = build({ accounts: [ACC] });
-    cmp.onLinkSearch('x'); // ohne offenen Dialog → No-op
+    cmp.onLinkSearch('x'); // without an open dialog → no-op
     jest.advanceTimersByTime(300);
     http.expectNone((r) => r.url.endsWith('/expenses'));
     cmp.linkLine.set(LINE);
@@ -1137,7 +1156,7 @@ describe('KontenComponent (unit)', () => {
   it('closeLink clears the dialog and cancels a pending typeahead', () => {
     jest.useFakeTimers();
     const { cmp, http } = build({ accounts: [ACC] });
-    cmp.closeLink(); // ohne Timer → kein Fehler
+    cmp.closeLink(); // without a timer → no error
     cmp.linkLine.set(LINE);
     cmp.onLinkSearch('flyer');
     cmp.closeLink();
@@ -1150,9 +1169,9 @@ describe('KontenComponent (unit)', () => {
     const { cmp, http } = build({ accounts: [ACC] });
     const success = jest.spyOn(priv(cmp).toast, 'success');
     const error = jest.spyOn(priv(cmp).toast, 'error');
-    cmp.confirmLink(); // keine Zeile
+    cmp.confirmLink(); // no line
     cmp.linkLine.set(LINE);
-    cmp.confirmLink(); // keine Auswahl
+    cmp.confirmLink(); // no selection
     cmp.linkSelected.set(EXPENSE);
     cmp.booking.set(true);
     cmp.confirmLink(); // busy
@@ -1184,7 +1203,7 @@ describe('KontenComponent (unit)', () => {
     const success = jest.spyOn(priv(cmp).toast, 'success');
     const error = jest.spyOn(priv(cmp).toast, 'error');
     cmp.booking.set(true);
-    cmp.unlink(LINE_MATCHED); // busy → No-op
+    cmp.unlink(LINE_MATCHED); // busy → no-op
     http.expectNone((r) => r.url.endsWith('/unlink'));
     cmp.booking.set(false);
     cmp.unlink(LINE_MATCHED);
@@ -1201,11 +1220,73 @@ describe('KontenComponent (unit)', () => {
     expect(error).toHaveBeenCalledWith('Buchen fehlgeschlagen.');
   });
 
+  it('openIgnore + confirmIgnore posts the trimmed reason, closes, toasts, reloads; guard + close', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    const success = jest.spyOn(priv(cmp).toast, 'success');
+    cmp.confirmIgnore(); // no line selected → no-op
+    http.expectNone((r) => r.url.endsWith('/ignore'));
+    cmp.openIgnore(LINE);
+    expect(cmp.ignoreLine()).toEqual(LINE);
+    cmp.closeIgnore();
+    expect(cmp.ignoreLine()).toBeNull();
+
+    cmp.openIgnore(LINE);
+    cmp.ignoreReason.set('  Doppelbuchung  ');
+    cmp.booking.set(true);
+    cmp.confirmIgnore(); // busy → no-op
+    http.expectNone((r) => r.url.endsWith('/ignore'));
+    cmp.booking.set(false);
+    cmp.confirmIgnore();
+    const req = http.expectOne(
+      (r) => r.url.endsWith('/statement-lines/l-1/ignore') && r.method === 'POST',
+    );
+    expect(req.request.body).toEqual({ reason: 'Doppelbuchung' });
+    req.flush(null);
+    expect(cmp.ignoreLine()).toBeNull();
+    expect(cmp.booking()).toBe(false);
+    expect(success).toHaveBeenCalledWith('Transaktion ignoriert.');
+    flushLines(http, linePage([]));
+  });
+
+  it('confirmIgnore without a reason omits it and surfaces an error', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    const error = jest.spyOn(priv(cmp).toast, 'error');
+    cmp.openIgnore(LINE);
+    cmp.confirmIgnore();
+    const req = http.expectOne((r) => r.url.endsWith('/ignore'));
+    expect(req.request.body.reason).toBeUndefined();
+    req.error(new ProgressEvent('err'));
+    expect(cmp.booking()).toBe(false);
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('reactivate returns an ignored line to the queue; guard + error path', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    const success = jest.spyOn(priv(cmp).toast, 'success');
+    const error = jest.spyOn(priv(cmp).toast, 'error');
+    cmp.booking.set(true);
+    cmp.reactivate(LINE_IGNORED); // busy → no-op
+    http.expectNone((r) => r.url.endsWith('/reactivate'));
+    cmp.booking.set(false);
+    cmp.reactivate(LINE_IGNORED);
+    http
+      .expectOne((r) => r.url.endsWith('/statement-lines/l-3/reactivate') && r.method === 'POST')
+      .flush({ ...LINE_IGNORED, matchState: 'unmatched' });
+    expect(cmp.booking()).toBe(false);
+    expect(success).toHaveBeenCalledWith('Transaktion reaktiviert.');
+    flushLines(http, linePage([]));
+
+    cmp.reactivate(LINE_IGNORED);
+    http.expectOne((r) => r.url.endsWith('/reactivate')).error(new ProgressEvent('err'));
+    expect(cmp.booking()).toBe(false);
+    expect(error).toHaveBeenCalled();
+  });
+
   // ------------------------------------------------------------ destroy
   it('ngOnDestroy cancels pending search and typeahead timers', () => {
     jest.useFakeTimers();
-    // Ohne Konto: der Debounce-Reload liefe ohnehin in den Guard, aber der Link-Typeahead
-    // würde ohne clearTimeout nach 300 ms einen /expenses-Request feuern.
+    // Without an account the debounced reload would hit the guard anyway, but the link
+    // typeahead would fire an /expenses request after 300 ms without clearTimeout.
     const { cmp, http } = build();
     cmp.onSearch('miete');
     cmp.linkLine.set(LINE);
@@ -1223,8 +1304,8 @@ describe('KontenComponent (unit)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Gerenderte Tests: Konto-Effekt (Auswahl → Zeilen + Status laden), Tabelle,
-// Rechte-Gating und Infinite Scroll (IntersectionObserver-Zweig).
+// Rendered tests: account effect (selection → load lines + status), table,
+// permission gating and infinite scroll (IntersectionObserver branch).
 // ---------------------------------------------------------------------------
 
 async function setup(
@@ -1247,7 +1328,7 @@ async function setup(
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   http.match((r) => r.url.endsWith('/accounts/options')).forEach((req) => req.flush(opts.accounts ?? [ACC]));
   http.match((r) => r.url.endsWith('/budgets')).forEach((req) => req.flush([]));
-  // Effekt: Konto gewählt → Transaktionen + Verbindungs-Status laden.
+  // Effect: account selected → load transactions + connection status.
   view.detectChanges();
   http
     .match((r) => r.url.endsWith('/statement-lines') && r.method === 'GET')
@@ -1268,11 +1349,11 @@ describe('KontenComponent (rendered)', () => {
     expect(screen.getByText('DE02120300000000202051')).toBeInTheDocument();
     expect(screen.getByText(/−.*42/)).toBeInTheDocument();
     expect(screen.getByText(/\+.*10/)).toBeInTheDocument();
-    // offene Zeile → Verknüpfen/Importieren; verknüpfte → Trennen
+    // open row → link/import; linked → unlink
     expect(screen.getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Importieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Trennen' })).toBeInTheDocument();
-    // Kontostand aus der Konto-Option im Kopf
+    // balance from the account option in the header
     expect(screen.getByText(/Kontostand/)).toBeInTheDocument();
   });
 
@@ -1296,7 +1377,7 @@ describe('KontenComponent (rendered)', () => {
   });
 });
 
-// IntersectionObserver-Zweig: sichtbarer Sentinel lädt die nächste Seite.
+// IntersectionObserver branch: a visible sentinel loads the next page.
 describe('KontenComponent (infinite scroll)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
@@ -1314,14 +1395,14 @@ describe('KontenComponent (infinite scroll)', () => {
     (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = IOStub;
 
     const { http, detectChanges } = await setup({ page: linePage([LINE], 3) });
-    detectChanges(); // Sentinel gerendert → Effekt beobachtet ihn
+    detectChanges(); // sentinel rendered → the effect observes it
     expect(observe).toHaveBeenCalled();
 
     trigger?.([{ isIntersecting: true }]);
     http
       .match((r) => r.url.endsWith('/statement-lines') && r.method === 'GET')
       .forEach((req) => req.flush(linePage([LINE_MATCHED], 3, 1)));
-    // nicht sichtbar → kein weiterer Request
+    // not visible → no further request
     trigger?.([{ isIntersecting: false }]);
     http.expectNone((r) => r.url.endsWith('/statement-lines') && r.method === 'GET');
 

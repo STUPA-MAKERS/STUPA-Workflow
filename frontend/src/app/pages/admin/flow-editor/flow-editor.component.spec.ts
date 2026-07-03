@@ -41,11 +41,11 @@ const BUDGET_TREE = [
 ];
 
 async function setup(over: Overrides = {}) {
-  // Globaler Flow (#28): laden + speichern statt per-Typ.
+  // Global flow: loaded + saved as a whole, not per application type.
   const getGlobalFlow = over.getGlobalFlow ?? jest.fn(() => of(null));
   const createGlobalFlowVersion = over.createGlobalFlowVersion ?? jest.fn(() => of({ id: 'gfv1' }));
   const listApplicationTypes = jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }]));
-  // vote/approval-State-Config (#28): Gremien + Gremium-Rollen + globale Rollen.
+  // vote-state config: gremien + gremium roles + global roles.
   const listGremienOptions = over.listGremienOptions ?? jest.fn(() => of([{ id: 'g1', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' }]));
   const listGremiumRoles = jest.fn(() => of([{ id: 'gr1', key: 'vorsitz', name: { de: 'Vorsitz' } }]));
   const listRoles = over.listRoles ?? jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
@@ -53,7 +53,7 @@ async function setup(over: Overrides = {}) {
   const listWebhooks = over.listWebhooks ?? jest.fn(() => of([{ id: 'w1', name: 'Buchhaltung', url: 'https://h.test', events: [], active: true }]));
   const listConfigRevisions = jest.fn(() => of([]));
   const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles, listDeadlinePolicies, listWebhooks, listConfigRevisions };
-  // Kostenstellen (#7): Namen für `budgetIs`-Guard-Labels.
+  // Cost centres: names for `budgetIs` guard labels.
   const budgetApi = { tree: over.tree ?? jest.fn(() => of([])) };
   const toast = { success: jest.fn(), error: jest.fn(), info: jest.fn() };
   const view = await render(FlowEditorComponent, {
@@ -90,7 +90,7 @@ function ptr(clientX: number, clientY: number, extra: Partial<PointerEvent> = {}
   } as unknown as PointerEvent;
 }
 
-/** Baut über die Komponenten-API einen gültigen Graphen (a initial → b). */
+/** Builds a valid graph (a initial → b) through the component API. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildValid(c: any): void {
   c.addState();
@@ -138,7 +138,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     buildValid(c);
     c.selectEdge(0);
     fixture.detectChanges();
-    // Guard-Editor (Bedingung) erscheint in der Pane unter dem Graphen (#28).
+    // The guard editor renders in the pane below the graph.
     expect(screen.getByRole('heading', { name: 'Bedingung (Guard)' })).toBeInTheDocument();
     expect(screen.getAllByRole('combobox').length).toBeGreaterThan(0);
   });
@@ -201,7 +201,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.setStateKey('state', 'a');
     c.setStateKey('state2', 'b');
     c.setInitial('a');
-    // Zwei guarded + ein guard-loser Übergang von a → unterschiedliche Guards.
+    // Two guarded + one guard-less transition from a → distinct guards.
     c.graph.update((g: FlowGraph) => ({
       ...g,
       transitions: [
@@ -211,18 +211,18 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       ],
     }));
 
-    // Drei unterschiedliche Guards (x, y, kein Guard) → drei Gruppen.
+    // Three distinct guards (x, y, no guard) → three groups.
     const groups = c.guardGroupsFor('a');
     expect(groups.map((gp: { value: string }) => gp.value)).toEqual(['x', 'y', '']);
-    // Default-Knoten zeigt einen Ausgangs-Punkt je Gruppe.
+    // The node shows one connector dot per group.
     const nodeA = c.nodes().find((n: { key: string }) => n.key === 'a');
     expect(nodeA.dots).toHaveLength(3);
 
-    // Priorität: y vor x schieben → Reihenfolge dreht sich.
+    // Priority: move y above x → order flips.
     c.moveGuardUp('a', JSON.stringify({ roleIs: 'y' }));
     const after = c.guardGroupsFor('a');
     expect(after.map((gp: { value: string }) => gp.value)).toEqual(['y', 'x', '']);
-    // order-Felder spiegeln die Array-Reihenfolge (Auswertungspriorität).
+    // order fields mirror the array order (evaluation priority).
     expect(c.graph().transitions.map((t: { order?: number }) => t.order)).toEqual([0, 1, 2]);
   });
 
@@ -231,7 +231,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     buildValid(c);
-    fixture.detectChanges(); // Historie erfasst den Bau
+    fixture.detectChanges(); // history records the setup
     expect(c.graph().states).toHaveLength(2);
 
     c.selection.set({ kind: 'state', key: 'b' });
@@ -279,7 +279,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.selection.set({ kind: 'state', key: c.graph().states[0].key });
     const input = document.createElement('input');
     c.onKeydown({ key: 'Delete', target: input, preventDefault: () => {} } as unknown as KeyboardEvent);
-    expect(c.graph().states).toHaveLength(1); // nicht gelöscht
+    expect(c.graph().states).toHaveLength(1); // not deleted
   });
 
   it('saves nothing and warns when the graph is invalid', async () => {
@@ -290,8 +290,8 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(createGlobalFlowVersion).not.toHaveBeenCalled();
   });
 
-  // Gruppen (#flow-groups): Kasten auf der Ebene, Drill-Down mit Proxies,
-  // Auflösen hebt den Inhalt eine Ebene hoch.
+  // Groups: box on the level, drill-down with proxies, dissolving lifts the
+  // content one level up.
   it('groups render as one box; drill-down shows members + proxies', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -312,7 +312,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const groupId = c.groupBoxes()[0].id as string;
     expect(c.edges()).toHaveLength(1); // b→c ist intern unsichtbar
 
-    // Drill-Down: Member sichtbar, externer Ursprung a als Proxy links.
+    // Drill-down: members visible, external source a as a proxy on the left.
     c.openGroup(groupId);
     expect(c.breadcrumbs().map((g: { id: string }) => g.id)).toEqual([groupId]);
     expect(
@@ -320,7 +320,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     ).toEqual(['b', 'c']);
     expect(c.proxies().left.map((p: { pid: string }) => p.pid)).toEqual(['state:a']);
 
-    // Auflösen: Inhalt zurück auf die oberste Ebene.
+    // Dissolve: content returns to the top level.
     c.dissolveCurrentGroup();
     expect(c.currentGroupId()).toBeNull();
     expect(c.groupBoxes()).toHaveLength(0);
@@ -341,14 +341,14 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.multiSelGroups.set(new Set([inner]));
     c.createGroupFromSelection();
 
-    // Oberste Ebene: alles steckt in EINER (äußeren) Gruppe.
+    // Top level: everything sits in ONE (outer) group.
     expect(c.nodes()).toHaveLength(0);
     expect(c.groupBoxes()).toHaveLength(1);
     const outer = c.groupBoxes()[0].id as string;
     expect(outer).not.toBe(inner);
     expect(c.groupBoxes()[0].count).toBe(3); // a + b + c (transitiv)
 
-    // In der äußeren Ebene: a als Node + innere Gruppe als Kasten.
+    // On the outer level: a as a node + the inner group as a box.
     c.openGroup(outer);
     expect(c.nodes().map((n: { key: string }) => n.key)).toEqual(['a']);
     expect(c.groupBoxes().map((b: { id: string }) => b.id)).toEqual([inner]);
@@ -461,7 +461,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(lists.outgoing).toHaveLength(0);
   });
 
-  // --- state kind + config (#28) --------------------------------------------
+  // --- state kind + config ---------------------------------------------------
   it('switches a state to vote, sets the committee, and resets config on normal', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -564,7 +564,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.guardOpOptions(true).map((o: { value: string }) => o.value)).not.toContain('roleIs');
     expect(c.compareOpOptions().length).toBeGreaterThan(0);
     expect(c.recipientKindOptions().length).toBe(4);
-    expect(c.actionOptions().length).toBe(4);
+    expect(c.actionOptions().length).toBe(5);
     expect(c.actionLabel('notify')).toBeTruthy();
     expect(c.actionDesc('notify')).toBeTruthy();
     expect(c.kindLabel('vote')).toBeTruthy();
@@ -1278,7 +1278,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(rightPids.some((p: string) => p.startsWith('group:'))).toBe(true);
   });
 
-  // --- option-list fallbacks (constructor next-handlers, #branch-coverage) ----
+  // --- option-list fallbacks (constructor next-handlers) ----------------------
   it('falls back to keys/url when option labels are missing', async () => {
     const { fixture } = await setup({
       // role without a `de` label → falls back to its key in the label string
@@ -2728,5 +2728,29 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.createGroupFromSelection();
     expect(c.groups().some((g: { id: string }) => g.id === first)).toBe(false);
     expect(c.groups()).toHaveLength(1);
+  });
+
+  it('reorders the guard priority via the inspector stack buttons', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    c.graph.update((g: FlowGraph) => ({
+      ...g,
+      transitions: [
+        { from: 'a', to: 'b', guard: { roleIs: 'x' }, automatic: true, actions: [] },
+        { from: 'a', to: 'b', guard: { roleIs: 'y' }, automatic: true, actions: [] },
+      ],
+    }));
+    c.selection.set({ kind: 'state', key: 'a' });
+    fixture.detectChanges();
+    // Two guard groups → the priority stack renders one up/down pair per row.
+    const upButtons = screen.getAllByRole('button', { name: 'Nach oben' });
+    expect(upButtons.length).toBe(2);
+    upButtons[1].click();
+    expect(c.guardGroupsFor('a').map((gp: { value: string }) => gp.value)).toEqual(['y', 'x']);
+    fixture.detectChanges();
+    screen.getAllByRole('button', { name: 'Nach unten' })[0].click();
+    expect(c.guardGroupsFor('a').map((gp: { value: string }) => gp.value)).toEqual(['x', 'y']);
   });
 });

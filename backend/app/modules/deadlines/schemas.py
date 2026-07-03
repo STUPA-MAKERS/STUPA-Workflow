@@ -1,8 +1,8 @@
-"""API-Schemata der Deadline-Policy-Registry (benannte Fristen).
+"""API schemas for the deadline-policy registry.
 
-Eine Policy ist entweder ``absolute`` (fixes Datum, pro Semester pflegbar) oder
-relativ (``relative_submitted``/``relative_changed`` = Antrags-Zeitpunkt + Tage).
-Der Flow referenziert sie über ``key``; konkrete Fristen löst der Server daraus ab.
+A policy is either ``absolute`` (fixed date) or relative
+(``relative_submitted``/``relative_changed`` = application timestamp + days).
+The flow references it by ``key``; the server derives concrete deadlines.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ DeadlineKind = Literal["absolute", "relative_submitted", "relative_changed"]
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields also settable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -28,15 +28,14 @@ class DeadlinePolicyCreate(_CamelModel):
     key: str
     label: I18nMap
     kind: DeadlineKind
-    # tz-aware (UTC) only: naive Werte würden als timestamptz mit der DB-Session-TZ
-    # interpretiert und könnten so Stunden zu früh/spät feuern (Hausregel: alle
-    # datetimes tz-aware). ``AwareDatetime`` lehnt naive Eingaben am Rand mit 422 ab.
+    # tz-aware only: naive values would be interpreted in the DB session TZ and
+    # could fire hours off. ``AwareDatetime`` rejects naive input with 422.
     absolute_at: AwareDatetime | None = Field(default=None, alias="absoluteAt")
     offset_days: int | None = Field(default=None, alias="offsetDays")
 
 
 class DeadlinePolicyUpdate(_CamelModel):
-    """Teil-Update; gesetzte Felder werden übernommen (``key`` ist unveränderlich)."""
+    """Partial update; set fields are applied (``key`` is immutable)."""
 
     label: I18nMap | None = None
     kind: DeadlineKind | None = None

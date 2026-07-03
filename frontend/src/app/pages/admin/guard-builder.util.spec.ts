@@ -19,6 +19,13 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     expect(() => validateGuard({ deadlinePassed: true })).not.toThrow();
     expect(() => validateGuard({ hasField: 'iban' })).not.toThrow();
     expect(() => validateGuard({ compare: { field: 'amount', op: '>', value: 100 } })).not.toThrow();
+    // Neue Bedingungen (auch auf automatischen Übergängen erlaubt).
+    expect(() => validateGuard({ applicationTypeIs: 'qsm' }, false)).not.toThrow();
+    expect(() => validateGuard({ attachmentPresent: true }, false)).not.toThrow();
+  });
+
+  it('requires a non-empty application type key', () => {
+    expect(() => validateGuard({ applicationTypeIs: '' })).toThrow(/applicationTypeIs/);
   });
 
   it('rejects unknown operators', () => {
@@ -32,7 +39,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
   it('forbids actor gates on automatic transitions', () => {
     expect(() => validateGuard({ roleIs: 'x' }, false)).toThrow(/manual/);
     expect(() => validateGuard({ isInCommittee: 'g' }, false)).toThrow(/manual/);
-    // Bedingungen sind auf automatischen Übergängen erlaubt.
+    // Conditions are allowed on automatic transitions.
     expect(() => validateGuard({ deadlinePassed: true }, false)).not.toThrow();
   });
 
@@ -80,6 +87,9 @@ describe('validateAction (mirror of backend validate_action)', () => {
     expect(() => validateAction({ type: 'notify', recipients: [{ kind: 'applicant' }] })).not.toThrow();
     expect(() => validateAction({ type: 'addToNextSession', gremiumId: 'g1' })).not.toThrow();
     expect(() => validateAction({ type: 'assignBudget', budgetId: 'b1' })).not.toThrow();
+    expect(() =>
+      validateAction({ type: 'assignBudgetFromField', field: 'ziel_ks' }),
+    ).not.toThrow();
   });
 
   it('rejects missing required fields', () => {
@@ -88,6 +98,7 @@ describe('validateAction (mirror of backend validate_action)', () => {
     expect(() => validateAction({ type: 'notify', recipients: [{ kind: 'gremium' }] })).toThrow(/value/);
     expect(() => validateAction({ type: 'addToNextSession' })).toThrow(/committee/);
     expect(() => validateAction({ type: 'assignBudget' })).toThrow(/budget/);
+    expect(() => validateAction({ type: 'assignBudgetFromField' })).toThrow(/field/);
   });
 
   it('rejects unknown action types + non-objects', () => {

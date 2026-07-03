@@ -53,7 +53,7 @@
   border-radius: var(--radius-lg);
 }
 
-/* --- Gruppen-Container (= Wizard-Schritte) --- */
+/* --- Group containers (= wizard steps) --- */
 .fe__groups {
   display: flex;
   flex-direction: column;
@@ -184,13 +184,13 @@
   color: var(--color-text-muted);
 }
 
-/* Feld-Schlüssel (Slug) — immer oben sichtbar, technisch abgesetzt. */
+/* Field key (slug) — always visible on top, set apart technically. */
 .fe__key input {
   font-family: var(--font-mono, monospace);
   font-size: var(--fs-sm);
 }
 
-/* Hinweis (z. B. „promotet automatisch") — unaufdringlich neben den Schaltern. */
+/* Hint (e.g. "auto-promoted") — subtle, next to the switches. */
 .fe__note {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -243,8 +243,8 @@
 .fe__menu {
   position: absolute;
   z-index: var(--z-dropdown, 50);
-  /* Der »Frage hinzufügen«-Button ist stets das letzte Element der Seite; nach
-     unten öffnend liefe das Menü über den Footer hinaus. Daher nach OBEN öffnen. */
+  /* The "add question" button is always the last element on the page; opening
+     downward would overflow past the footer. So open UPWARD. */
   bottom: calc(100% + var(--space-2));
   left: 0;
   min-width: 14rem;
@@ -274,7 +274,7 @@
   background: var(--color-surface-sunken);
 }
 
-/* --- Vorschau --- */
+/* --- Preview --- */
 .fe__pv-title {
   margin: 0;
 }
@@ -311,7 +311,7 @@
   max-width: 28rem;
 }
 
-/* Gruppen-Überschrift in der Vorschau (= Schritt-Titel). */
+/* Group heading in the preview (= step title). */
 .fe__pv-group {
   display: flex;
   flex-direction: column;
@@ -329,7 +329,7 @@
   font-size: var(--fs-lg);
 }
 
-/* Dünner Trenner + großzügiger Abstand zwischen jeder Frage (Builder-Vorschau). */
+/* Thin divider + generous spacing between each question (builder preview). */
 .fe__divider {
   height: 0;
   margin: var(--space-3) 0;
@@ -337,8 +337,8 @@
   border-top: 1px solid var(--color-border);
 }
 
-/* Mobil (≤768px): Kopf-Toolbar umbrechen, Options-Zeilen (value/DE/EN/✕)
-   einspaltig stapeln, Typ-Select volle Kartenbreite — Basis-Nutzbarkeit bei 375px. */
+/* Mobile (≤768px): wrap the header toolbar, stack option rows (value/DE/EN/✕)
+   into a single column, type select full card width — basic usability at 375px. */
 @media (max-width: 768px) {
   .fe__head-tools {
     flex-wrap: wrap;

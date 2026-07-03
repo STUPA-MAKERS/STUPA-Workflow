@@ -1,10 +1,10 @@
-"""arq-Worker-Task: Mail-Versand (T-18).
+"""arq worker task: mail dispatch.
 
-`send_mail` rekonstruiert die `MailMessage` aus dem Queue-Payload und versendet sie
-über den in `ctx` hinterlegten `MailSender` (SMTP produktiv, Capturing in DEV/Test).
-Fehler → `arq.Retry` mit linearem Backoff bis `mail_max_tries`; danach »dead«
-(geloggt, kein Endlos-Requeue). Idempotenz trägt der `_job_id` (= idempotency_key)
-beim Enqueue — ein bereits laufender/abgeschlossener Job wird nicht doppelt erzeugt.
+``send_mail`` rebuilds the ``MailMessage`` from the queue payload and sends it via
+the ``MailSender`` in ``ctx`` (SMTP in prod, capturing in dev/test). On error ->
+``arq.Retry`` with linear backoff up to ``mail_max_tries``; then dead (logged, no
+endless requeue). The ``_job_id`` (= idempotency_key) at enqueue prevents duplicate
+jobs for an already running/completed send.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ logger = logging.getLogger("app.mail")
 
 
 def build_sender(settings: Settings) -> MailSender:
-    """SMTP-Sender, wenn `smtp_host` gesetzt — sonst Capturing (DEV/Test, kein Versand)."""
+    """SMTP sender when ``smtp_host`` is set, else capturing (dev/test, no real send)."""
     if settings.smtp_enabled:
         return SmtpMailSender(settings)
     logger.warning("SMTP not configured — mails are captured/dropped (no real send)")
@@ -40,13 +40,13 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 async def send_mail(ctx: dict[str, Any], payload: dict[str, object]) -> str:
-    """Eine Mail versenden. Retry bei Fehler bis `mail_max_tries`, dann »dead«."""
+    """Send one mail. Retry on error up to ``mail_max_tries``, then dead."""
     settings: Settings = ctx["settings"]
     sender: MailSender = ctx["mail_sender"]
     msg = MailMessage.from_payload(payload)
     try:
         await sender.send(msg)
-    except Exception as exc:  # noqa: BLE001 — transienter SMTP-Fehler → Retry
+    except Exception as exc:  # noqa: BLE001 - transient SMTP error -> retry
         job_try = int(ctx.get("job_try", 1))
         if job_try >= settings.mail_max_tries:
             logger.error(

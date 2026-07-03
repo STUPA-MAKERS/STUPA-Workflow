@@ -22,10 +22,10 @@ import {
 type ValueKind = 'none' | 'role' | 'committee' | 'compare' | 'text';
 
 /**
- * Rekursiver Guard-Editor (#28): baut einen booleschen Bedingungsbaum aus
- * **und/oder/nicht** + Blatt-Operatoren (roleIs/compare/…). Eingang/Ausgang ist das
- * geschachtelte ``Guard``-JSON, das der Server (``eval_guard``) bereits versteht.
- * Controlled component: liest ``guard`` und gibt bei jeder Änderung das neue Objekt aus.
+ * Recursive guard editor: builds a boolean condition tree from and/or/not + leaf
+ * operators (roleIs/compare/…). Input/output is the nested ``Guard`` JSON that the
+ * server (``eval_guard``) already understands. Controlled component: reads ``guard``
+ * and emits the new object on every change.
  */
 @Component({
   selector: 'app-guard-editor',
@@ -41,13 +41,13 @@ export class GuardEditorComponent {
   readonly guard = input<Guard | null>(null);
   readonly roleOptions = input<SelectOption[]>([]);
   readonly gremiumOptions = input<SelectOption[]>([]);
-  /** Automatische Übergänge dürfen keine Akteur-Guards (roleIs/isInCommittee). */
+  /** Automatic transitions may not use actor guards (roleIs/isInCommittee). */
   readonly automatic = input<boolean>(false);
   readonly guardChange = output<Guard | null>();
 
   protected readonly compareOps = COMPARE_OPS;
 
-  /** Aktueller Operator (``''`` = kein Guard). */
+  /** Current operator (``''`` = no guard). */
   protected readonly op = computed<string>(() => {
     const g = this.guard();
     return g ? Object.keys(g)[0] : '';
@@ -112,7 +112,7 @@ export class GuardEditorComponent {
       return;
     }
     if (op === 'and' || op === 'or') {
-      // Bestehende Kinder erhalten, falls schon Kombinator; sonst aktuelles Blatt einhängen.
+      // Keep existing children if already a combinator; else wrap the current leaf.
       const existing = this.children();
       const seed = existing.length ? existing : this.guard() ? [this.guard() as Guard] : [];
       this.guardChange.emit({ [op]: seed });
@@ -163,7 +163,13 @@ export class GuardEditorComponent {
   }
 
   private kindForOp(op: string): ValueKind {
-    if (op === 'deadlinePassed' || op === 'budgetFitsApplication' || op === 'actorIsApplicant' || !op)
+    if (
+      op === 'deadlinePassed' ||
+      op === 'budgetFitsApplication' ||
+      op === 'actorIsApplicant' ||
+      op === 'attachmentPresent' ||
+      !op
+    )
       return 'none';
     if (op === 'roleIs' || op === 'applicantRoleIs') return 'role';
     if (op === 'isInCommittee' || op === 'applicantCommitteeIs') return 'committee';
@@ -172,7 +178,12 @@ export class GuardEditorComponent {
   }
 
   private defaultLeaf(op: GuardLeafOperator): Guard {
-    if (op === 'deadlinePassed' || op === 'budgetFitsApplication' || op === 'actorIsApplicant')
+    if (
+      op === 'deadlinePassed' ||
+      op === 'budgetFitsApplication' ||
+      op === 'actorIsApplicant' ||
+      op === 'attachmentPresent'
+    )
       return { [op]: true };
     if (op === 'compare') return { compare: { field: '', op: '==', value: '' } };
     return { [op]: '' };

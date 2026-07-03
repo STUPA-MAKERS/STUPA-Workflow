@@ -10,14 +10,14 @@ interface AdminTile {
   title: TranslationKey;
   desc: TranslationKey;
   icon: IconName;
-  /** Sichtbar, wenn der Nutzer mindestens EINE dieser Permissions hat (ANY-of) —
-   *  spiegelt das Route-Guard-Recht (#5-1). Nur UX; das Backend bleibt autoritativ. */
+  /** Visible if the user has at least ONE of these permissions (ANY-of) —
+   *  mirrors the route-guard right. UX only; the backend stays authoritative. */
   permissions: string[];
 }
 
 /**
- * Admin-Landing (T-34). Einstieg in die Config-UIs. Jede Kachel ist eine eigene
- * (lazy) Route mit Icon-links-Layout und einzeiliger Beschreibung.
+ * Admin landing. Entry into the config UIs. Each tile is its own (lazy) route with
+ * an icon-left layout and a one-line description.
  */
 @Component({
   selector: 'app-admin-home',
@@ -30,8 +30,8 @@ interface AdminTile {
 export class AdminHomeComponent {
   private readonly auth = inject(AuthService);
 
-  // Permissions je Kachel = Route-Guard-Recht aus app.routes.ts. ANY-of, damit
-  // mehrfach-gegatete Routen (falls künftig) korrekt greifen.
+  // Per-tile permissions = route-guard right from app.routes.ts. ANY-of, so that
+  // multi-gated routes (if ever) resolve correctly.
   protected readonly tiles: AdminTile[] = [
     { link: 'users', title: 'admin.home.users', desc: 'admin.home.usersDesc', icon: 'members', permissions: ['admin.users'] },
     { link: 'roles', title: 'admin.home.roles', desc: 'admin.home.rolesDesc', icon: 'roles', permissions: ['admin.roles'] },
@@ -51,7 +51,7 @@ export class AdminHomeComponent {
     { link: 'mail-templates', title: 'admin.home.mailTemplates', desc: 'admin.home.mailTemplatesDesc', icon: 'send', permissions: ['admin.notifications'] },
   ];
 
-  /** Nur Kacheln, deren Recht der Nutzer hat (#5-1). Admin sieht alles (auth.can). */
+  /** Only tiles the user has the right for. Admin sees everything (auth.can). */
   protected readonly visibleTiles = computed(() =>
     this.tiles.filter((t) => this.auth.canAny(...t.permissions)),
   );

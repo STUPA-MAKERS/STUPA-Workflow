@@ -1,13 +1,11 @@
-"""Site-Config-/Branding-Service (#21, T-24).
+"""Site-config/branding service.
 
-Versioniert wie form/flow: der Draft wird bearbeitet (neue, inaktive Version oder
-In-place auf den bestehenden Draft — **nie** auf die aktive Version), Aktivierung
-schaltet ``active`` um (max. eine aktive, partial-unique) und schreibt einen
-``config_activation``-Audit-Eintrag.
-
-Die Draft/Activate-Form (``{version, active, draft, hasDraftChanges}``) ist exakt
-das, wogegen das T-34-FE gebaut ist. Branding wird gegen ``admin.branding.Branding``
-validiert (Bild-only-Logos, kein Inline-SVG); ungültiges Branding → 422 (Schema).
+Versioned like form/flow: edits go to the draft (a new inactive version or
+in-place on the existing draft — never on the active version); activation flips
+``active`` (at most one active, partial unique) and writes a
+``config_activation`` audit entry. Branding is validated against
+``admin.branding.Branding`` (image-only logos, no inline SVG); invalid branding
+fails with 422.
 """
 
 from __future__ import annotations
@@ -27,14 +25,13 @@ from app.modules.config_revision.service import (
 )
 from app.shared.errors import ConflictError
 
-# Default-App-Namen (Fallback, wenn die Config sie leer lässt) — 1:1 die Werte des
-# bisher statischen ``frontend/public/manifest.webmanifest``.
+# Default app names (fallback when the config leaves them empty) — the values
+# of the previously static ``frontend/public/manifest.webmanifest``.
 DEFAULT_APP_NAME = "STUPA Antragsplattform"
 DEFAULT_APP_SHORT_NAME = "StuPa"
 
-# Statische Manifest-Felder (alles außer name/short_name) — Single Source of Truth
-# fürs dynamisch ausgelieferte PWA-Manifest. Spiegelt das bisherige statische
-# ``frontend/public/manifest.webmanifest`` (Icons, theme_color, scope, … ).
+# Static manifest fields (everything except name/short_name) — single source of
+# truth for the dynamically served PWA manifest.
 _MANIFEST_BASE: dict = {
     "description": (
         "Antragsplattform des Studierendenparlaments — Anträge, Abstimmungen, "
@@ -106,7 +103,7 @@ def _branding(row: SiteConfigVersion | None) -> Branding:
 
 
 class SiteConfigService:
-    """An eine ``AsyncSession`` gebundene Site-Config-Operationen."""
+    """Site-config operations bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -130,7 +127,7 @@ class SiteConfigService:
         latest = await self._latest()
         active_branding = _branding(active)
         if latest is None or latest.active:
-            # Kein offener Draft → Draft spiegelt die aktive Version.
+            # No open draft: the draft mirrors the active version.
             return SiteConfigOut(
                 version=active.version if active else 0,
                 active=active_branding,
@@ -148,11 +145,11 @@ class SiteConfigService:
         latest = await self._latest()
         payload = branding.model_dump(by_alias=True)
         if latest is not None and not latest.active:
-            # Bestehenden Draft in-place aktualisieren (kein neuer Versionssprung).
+            # Update the existing draft in place (no new version bump).
             latest.branding = payload
             target_id = latest.id
         else:
-            # Neue Draft-Version oberhalb der aktiven anlegen (inaktiv).
+            # Create a new draft version above the active one (inactive).
             base = latest.version if latest is not None else 0
             row = SiteConfigVersion(
                 version=base + 1, active=False, branding=payload, created_by=actor
@@ -180,8 +177,7 @@ class SiteConfigService:
             .values(active=False)
         )
         latest.active = True
-        # Versionierter Snapshot der nun aktiven Branding-Config + verlinkter
-        # Audit-Eintrag (#config-versioning) — ersetzt den bisherigen reinen Audit-Call.
+        # Versioned snapshot of the now-active branding config plus linked audit entry.
         await ConfigRevisionService(self.session).record(
             entity_type=ENTITY_SITE_CONFIG,
             entity_id=GLOBAL_ID,
@@ -201,11 +197,11 @@ class SiteConfigService:
         action: AuditAction = AuditAction.CONFIG_CHANGE,
         extra_data: dict | None = None,
     ) -> SiteConfigOut:
-        """Eine Branding-Config als **neue aktive Version** zurückspielen (Restore/Revert).
+        """Replay a branding config as the new active version (restore/revert).
 
-        Legt direkt eine neue, aktive ``SiteConfigVersion`` aus dem Snapshot an
-        (deaktiviert die übrigen) und schreibt einen ``config_revision``/Audit-Eintrag.
-        Frühere Versionen bleiben erhalten (#config-versioning).
+        Creates a new active ``SiteConfigVersion`` from the snapshot (deactivates
+        the rest) and writes a ``config_revision``/audit entry. Earlier versions
+        are kept.
         """
         latest = await self._latest()
         base = latest.version if latest is not None else 0
@@ -232,17 +228,17 @@ class SiteConfigService:
         return await self.get()
 
     async def public(self) -> PublicSiteConfigOut:
-        """Öffentliche aktive Branding-Config (auth-frei, #21)."""
+        """Return the public active branding config (auth-free)."""
         active = await self._active()
         return PublicSiteConfigOut(
             version=active.version if active else 0, branding=_branding(active)
         )
 
     async def manifest(self) -> dict:
-        """PWA-Manifest aus der aktiven Branding-Config bauen (Single Source of Truth).
+        """Build the PWA manifest from the active branding config.
 
-        ``name``/``short_name`` kommen aus der Config (Fallback auf die Defaults, wenn
-        leer); alle übrigen Felder (Icons, theme_color, scope, …) sind statisch."""
+        ``name``/``short_name`` come from the config (defaults when empty); all
+        other fields are static."""
         branding = _branding(await self._active())
         return {
             "name": branding.app_name.strip() or DEFAULT_APP_NAME,

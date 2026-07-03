@@ -54,7 +54,7 @@ describe('authGuard', () => {
     http.verify();
   });
 
-  /** Führt den Guard aus, flusht den `/me`-Probe und liefert das Ergebnis. */
+  /** Runs the guard, flushes the `/me` probe and returns the result. */
   function run(
     data: Record<string, unknown>,
     principal: Principal | null,

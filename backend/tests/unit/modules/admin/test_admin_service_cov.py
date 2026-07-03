@@ -1,14 +1,14 @@
-"""DB-lose Voll-Coverage für ``ConfigService`` (app/modules/admin/service.py).
+"""DB-free full coverage of ``ConfigService`` (app/modules/admin/service/).
 
-Treibt jeden CRUD-Pfad (Gremium / Application-Type / globaler Flow / Rollen /
-Assignments / Principals / Group-Mappings / Webhooks) sowie alle Mapper und die
-Guard-/Conflict-/NotFound-Zweige.
+Drives every CRUD path (gremium / application type / global flow / roles /
+assignments / principals / group mappings / webhooks) plus all mappers and the
+guard/conflict/not-found branches.
 
-Es wird ein eigener ``AsyncSession``-Fake verwendet (kein Docker/Redis/Postgres):
-``execute``/``scalars`` ziehen aus einer geordneten Queue, ``scalar``/``get`` aus
-je eigenen Queues. ``flush`` vergibt IDs (DB-``gen_random_uuid()``-Ersatz). Jeder
-Audit-Schreibvorgang verbraucht intern zwei ``execute``-Aufrufe (Advisory-Lock +
-``prev_hash``-Select); die Tests legen die Queue entsprechend an.
+Uses a custom ``AsyncSession`` fake (no Docker/Redis/Postgres): ``execute``/
+``scalars`` pull from one ordered queue, ``scalar``/``get`` from their own
+queues. ``flush`` assigns ids (stand-in for DB ``gen_random_uuid()``). Every
+audit write internally consumes two ``execute`` calls (advisory lock +
+``prev_hash`` select); the tests size the queue accordingly.
 """
 
 from __future__ import annotations
@@ -36,17 +36,18 @@ from app.modules.admin.schemas import (
     WebhookCreate,
     WebhookUpdate,
 )
-from app.modules.admin.service import (
-    ConfigService,
+from app.modules.admin.service import ConfigService
+from app.modules.admin.service.application_types import _type_out
+from app.modules.admin.service.gremien import _gremium_out
+from app.modules.admin.service.rbac import (
     _assignment_out,
+    _mapping_out,
+    _principal_out,
+)
+from app.modules.admin.service.service_base import _iso, _parse_dt
+from app.modules.admin.service.webhooks import (
     _delivery_reason_class,
     _delivery_status_out,
-    _gremium_out,
-    _iso,
-    _mapping_out,
-    _parse_dt,
-    _principal_out,
-    _type_out,
     _webhook_out,
 )
 from app.shared.config_schemas import ComparisonOffers, FlowGraph

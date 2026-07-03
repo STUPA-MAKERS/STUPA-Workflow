@@ -1,15 +1,11 @@
-"""Protokoll-Tabellen (data-model §1 »protocol/protocol_vote_ref«, flows §7, T-22).
+"""Protocol tables.
 
-* :class:`Protocol` — ein Sitzungsprotokoll, **1:1** an eine ``meeting`` gebunden
-  (UNIQUE ``meeting_id`` → ``POST /meetings/{id}/protocol`` ist idempotent: anlegen
-  **oder** laden). ``markdown`` ist das versionierte Editor-Backing; ``finalize``
-  setzt ``status='final'`` + ``pdf_storage_key``/``sent_at``.
-* :class:`ProtocolVoteRef` — eingebettete Abstimmung (``POST /protocols/{id}/votes``).
-  UNIQUE(protocol_id, vote_id) macht das Einbetten idempotent (kein Doppel-Snippet).
-
-Wie alle Modul-Tabellen entstehen sie auf einem **frischen** Schema über
-``Base.metadata.create_all`` in Migration 0002 (Single-Source via ``app.models``);
-für ältere Schemata legt Migration 0013 sie idempotent (``checkfirst``) nach.
+* :class:`Protocol` — one meeting's minutes, 1:1 to ``meeting`` (UNIQUE
+  ``meeting_id`` makes ``POST /meetings/{id}/protocol`` idempotent: create or
+  load). ``markdown`` backs the editor; ``finalize`` sets ``status='final'``
+  plus ``pdf_storage_key``/``sent_at``.
+* :class:`ProtocolVoteRef` — an embedded vote; UNIQUE(protocol_id, vote_id)
+  makes embedding idempotent (no duplicate snippets).
 """
 
 from __future__ import annotations
@@ -29,14 +25,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
 
-# Erlaubter Lebenszyklus (data-model §1: draft → rendering → final).
-# ``rendering`` = finalize angestoßen, der Worker rendert das PDF im Hintergrund;
-# schlägt der Render dauerhaft fehl, fällt das Protokoll auf ``draft`` zurück.
+# Lifecycle: draft → rendering → final. ``rendering`` = finalize triggered and
+# the worker renders in the background; a permanently failed render falls back to ``draft``.
 PROTOCOL_STATUSES = ("draft", "rendering", "final")
 
 
 class Protocol(UUIDPkMixin, TimestampMixin, Base):
-    """Sitzungsprotokoll (Markdown-Backing + Finalisierungs-Zustand)."""
+    """Meeting minutes (Markdown backing + finalization state)."""
 
     __tablename__ = "protocol"
 
@@ -48,28 +43,28 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     )
     markdown: Mapped[str] = mapped_column(Text, server_default="")
     pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Redigierte öffentliche Variante (nur befüllt, wenn ein TOP nicht-öffentlich ist).
+    # Redacted public variant (only set when an agenda item is non-public).
     public_pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     author: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="draft")
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # pytex CD-Variante (vom Gremium übernommen) → ``protocol-stupa``/``protocol-asta``.
+    # pytex CD variant (taken from the gremium), e.g. ``protocol-stupa``/``protocol-asta``.
     cd_variant: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
             "status IN ('draft','rendering','final')", name="protocol_status"
         ),
-        # 1:1 Sitzung ↔ Protokoll: garantiert die Idempotenz von POST .../protocol.
+        # 1:1 meeting ↔ protocol: guarantees idempotency of POST .../protocol.
         UniqueConstraint("meeting_id", name="uq_protocol_meeting"),
         Index("ix_protocol_gremium_id", "gremium_id"),
     )
 
 
 class ProtocolVoteRef(UUIDPkMixin, Base):
-    """Eingebettete Abstimmung eines Protokolls (Snippet-Anker, data-model §1)."""
+    """Embedded vote of a protocol (snippet anchor)."""
 
     __tablename__ = "protocol_vote_ref"
 
@@ -81,7 +76,7 @@ class ProtocolVoteRef(UUIDPkMixin, Base):
     )
 
     __table_args__ = (
-        # Einbetten ist idempotent: ein Vote referenziert ein Protokoll höchstens einmal.
+        # Embedding is idempotent: a vote references a protocol at most once.
         UniqueConstraint("protocol_id", "vote_id", name="uq_protocol_vote_ref"),
         Index("ix_protocol_vote_ref_protocol_id", "protocol_id"),
     )

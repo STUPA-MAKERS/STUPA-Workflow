@@ -1,18 +1,17 @@
-"""Antrag → Markdown + YAML-Frontmatter (T-20, flows §6).
+"""Application → Markdown + YAML frontmatter.
 
-Reine, DB-freie Erzeugung: der :class:`ApplicationDoc` trägt alles, was das Dokument
-braucht (Felder + Werte + Verlauf + ggf. Abstimmungsergebnis); :func:`build_application_markdown`
-formt daraus Markdown mit Frontmatter. So ist die Generierung unit-testbar (Akzeptanz)
-und der Worker hält nur das Laden aus der DB.
+Pure, DB-free generation: ``ApplicationDoc`` carries everything the document needs
+(fields, values, timeline, optional vote result); ``build_application_markdown`` turns
+it into Markdown with frontmatter, keeping generation unit-testable and leaving the DB
+load to the worker.
 
-**Keine Injection**: das Ergebnis wird als HTTP-**Body** an den pytex-Client übergeben
-(kein Shell-Aufruf). Frontmatter-Skalare werden defensiv YAML-quotiert, damit ein
-Feldwert mit ``:`` / Zeilenumbruch / ``---`` weder das Frontmatter sprengt noch eine
-neue Direktive einschleust.
+No injection: the result is passed to the pytex client as an HTTP body (never a shell
+command). Frontmatter scalars are defensively YAML-quoted so a field value containing
+``:`` / a newline / ``---`` can neither break the frontmatter nor inject a directive.
 
-**Variante je Gremium** (flows §6): pytex kennt für Anträge die Report-Varianten
-``report`` / ``report-makers``; die Gremium-``cd_variant`` (stupa/asta/echo/makers/report)
-wählt sie aus, die Marke selbst trägt das ``gremium``-Frontmatter.
+Per-gremium variant: pytex offers the ``report`` / ``report-makers`` variants for
+applications; the gremium ``cd_variant`` selects one and the brand carries the
+``gremium`` frontmatter.
 """
 
 from __future__ import annotations
@@ -23,13 +22,13 @@ from datetime import datetime
 from app.shared.config_schemas import FormFieldDef
 from app.shared.i18n import resolve_i18n
 
-# cd_variant → pytex-Render-Variante (Antrags-Report). Default: "report".
+# cd_variant → pytex render variant (application report). Default: "report".
 _VARIANT_MAP = {"makers": "report-makers"}
 DEFAULT_VARIANT = "report"
 
 
 def variant_for(cd_variant: str | None) -> str:
-    """Gremium-``cd_variant`` → pytex-``variant`` (Antrags-Report)."""
+    """Gremium ``cd_variant`` → pytex ``variant`` (application report)."""
     if cd_variant is None:
         return DEFAULT_VARIANT
     return _VARIANT_MAP.get(cd_variant, DEFAULT_VARIANT)
@@ -37,7 +36,7 @@ def variant_for(cd_variant: str | None) -> str:
 
 @dataclass(slots=True)
 class TimelineItem:
-    """Ein Status-Verlaufseintrag (Zeitpunkt + Ziel-Status + optional Notiz)."""
+    """One status-timeline entry (time + target state + optional note)."""
 
     at: datetime
     state_label: str
@@ -46,7 +45,7 @@ class TimelineItem:
 
 @dataclass(slots=True)
 class VoteResult:
-    """Verdichtetes Abstimmungsergebnis (optional; nur wenn vorhanden)."""
+    """Condensed vote result (optional; only when present)."""
 
     title: str
     result: str
@@ -55,7 +54,7 @@ class VoteResult:
 
 @dataclass(slots=True)
 class ApplicationDoc:
-    """Alle Daten für ein Antrags-PDF — vom Service aus der DB befüllt."""
+    """All data for an application PDF — populated by the service from the DB."""
 
     application_id: str
     type_name: str
@@ -76,7 +75,7 @@ class ApplicationDoc:
 
 
 def _yaml_scalar(value: str) -> str:
-    """String als sicheres, doppelt-quotiertes YAML-Skalar (keine Direktiven-Injection)."""
+    """String as a safe double-quoted YAML scalar (no directive injection)."""
     out = []
     for ch in value:
         if ch == "\\":
@@ -97,7 +96,7 @@ def _yaml_scalar(value: str) -> str:
 
 
 def _format_value(value: object) -> str:
-    """Feldwert für die Markdown-Liste rendern (Liste → Komma-getrennt; None → »—«)."""
+    """Render a field value for the Markdown list (list → comma-joined; None → em dash)."""
     if value is None or value == "":
         return "—"
     if isinstance(value, bool):
@@ -106,28 +105,27 @@ def _format_value(value: object) -> str:
         parts = [_format_value(v) for v in value]  # type: ignore[arg-type]
         return ", ".join(p for p in parts if p != "—") or "—"
     if isinstance(value, dict):
-        # Verschachtelte Strukturen kompakt + flach darstellen (kein Markdown-Bruch).
+        # Render nested structures compactly and flat (no Markdown break).
         return ", ".join(f"{k}: {_format_value(v)}" for k, v in value.items())  # type: ignore[arg-type]
     return str(value)
 
 
 def _md_escape(text: str) -> str:
-    """Minimal-Escape für Markdown-Inline-Text (Zeilenumbruch → Leerzeichen)."""
+    """Minimal escape for inline Markdown text (newline → space)."""
     return text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
 
 
 def _sanitize_applicant_value(text: str) -> str:
-    """Antragsteller-Feldwert vor dem Markdown-Einbau RCE-/Traversal-entschärfen.
+    """Neutralise RCE/traversal in an applicant field value before Markdown embedding.
 
-    Anträge werden ``trusted`` gerendert (die ``report``-Variante braucht pytex'
-    Template-Maschinerie), und Feldwerte stammen aus dem **öffentlichen**
-    Antragsteller-Eingang — der am wenigsten vertrauenswürdige Pfad. ``_md_escape``
-    kollabiert zwar Zeilenumbrüche, neutralisiert aber den pytex-``eval``-Escape
-    (``[//]: # "EXPR"``) und Bild-Pfad-Traversal (``![a](/abs)``, ``![a](../x)``)
-    NICHT. Wir leiten den Wert daher durch denselben ``sanitize_user_markdown``,
-    der den Protokoll-Body härtet (security.md §2; AUD-006). Funktions-lokaler
-    Import bricht den Modul-Zyklus (``protocol.markdown`` importiert seinerseits
-    ``_md_escape``/``_yaml_scalar`` aus diesem Modul)."""
+    Applications render ``trusted`` (the ``report`` variant needs pytex' template
+    machinery) and field values come from the public applicant input — the least
+    trusted path. ``_md_escape`` collapses newlines but does NOT neutralise the pytex
+    ``eval`` escape (``[//]: # "EXPR"``) or image-path traversal (``![a](/abs)``,
+    ``![a](../x)``). We therefore route the value through the same
+    ``sanitize_user_markdown`` that hardens the protocol body. The function-local
+    import breaks the module cycle (``protocol.markdown`` in turn imports
+    ``_md_escape``/``_yaml_scalar`` from here)."""
     from app.modules.protocol.markdown import sanitize_user_markdown
 
     return sanitize_user_markdown(text)
@@ -152,7 +150,7 @@ def _frontmatter(doc: ApplicationDoc) -> list[str]:
 
 
 def build_application_markdown(doc: ApplicationDoc) -> str:
-    """Antrags-Dokument als Markdown + Frontmatter (deterministisch, injection-sicher)."""
+    """Application document as Markdown + frontmatter (deterministic, injection-safe)."""
     lang, default = doc.lang, doc.default_lang
     out: list[str] = []
     out.extend(_frontmatter(doc))
@@ -168,7 +166,7 @@ def build_application_markdown(doc: ApplicationDoc) -> str:
     out.append("")
     for f in doc.fields:
         if f.is_pii:
-            continue  # PII bleibt im `applicant`-Record, nicht im Gremium-PDF.
+            continue  # PII stays in the applicant record, not in the gremium PDF.
         label = resolve_i18n(f.label, lang, default) or f.key
         value = _sanitize_applicant_value(_format_value(doc.data.get(f.key)))
         out.append(f"- **{_md_escape(label)}:** {_md_escape(value)}")

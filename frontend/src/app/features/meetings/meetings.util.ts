@@ -1,20 +1,17 @@
 /**
- * Reine Helfer für den Protokoll-Editor (T-33) — DI-frei, isoliert testbar.
+ * Pure, DI-free helpers for the protocol editor.
  *
- *  - **Snippet-Bausteine**: erzeugen Markdown-Referenzen auf Anträge/Abstimmungen,
- *    die der pytex-Renderer (T-20/T-21) als Shortcodes auflöst. Die `:::antrag` /
- *    `:::vote`-Fences sind bewusst leichtgewichtig und für Menschen lesbar (Risiko
- *    „Snippets ↔ pytex-Shortcodes", T-33).
- *  - **`renderMarkdown`**: minimaler, abhängigkeitsfreier Markdown→HTML-Renderer
- *    für die Live-Vorschau. Escapt **zuerst** alle HTML-Entities → kein Roh-HTML
- *    aus dem Editor gelangt in die Ausgabe; Angular sanitisiert das `innerHTML`
- *    zusätzlich. Unterstützt Überschriften, Fett/Kursiv, Inline-Code, Listen,
- *    Zitate und Absätze — genug für Sitzungsprotokolle.
+ *  - Snippet builders produce markdown references to applications/votes that
+ *    the pytex renderer resolves as shortcodes (`:::antrag` / `:::vote`).
+ *  - `renderMarkdown` is a minimal, dependency-free Markdown→HTML renderer
+ *    for the live preview. It escapes ALL HTML entities FIRST, so no raw HTML
+ *    from the editor reaches the output; Angular additionally sanitizes the
+ *    `innerHTML`.
  */
 
 import type { MeetingVote } from '@core/api/models';
 
-/** HTML-Entities escapen (XSS-Schutz: Editor-Eingabe ist nie vertrauenswürdig). */
+/** Escape HTML entities (XSS: editor input is never trustworthy). */
 export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -24,16 +21,15 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Markdown-Snippet, das einen Antrag referenziert (pytex-Shortcode `:::antrag`). */
+/** Markdown snippet referencing an application (pytex shortcode `:::antrag`). */
 export function antragSnippet(applicationId: string, title: string | null): string {
   const heading = title?.trim() ? title.trim() : applicationId;
   return `\n:::antrag{#${applicationId}}\n### ${heading}\n:::\n`;
 }
 
 /**
- * TOP-Snippet aus einem Tagesordnungspunkt: nummerierte TOP-Überschrift, bei
- * Antrags-TOPs zusätzlich die Antrags-Referenz (pytex-Shortcode). Freitext-TOPs
- * (``applicationId === null``) tragen nur die Überschrift (#58).
+ * TOP snippet from an agenda item: numbered TOP heading, plus the application
+ * reference for application-bound TOPs. Freetext TOPs carry only the heading.
  */
 export function topSnippet(
   position: number,
@@ -46,9 +42,9 @@ export function topSnippet(
 }
 
 /**
- * Markdown-Snippet, das das Ergebnis einer Abstimmung einbettet. Enthält eine
- * lesbare Ergebnistabelle (Option → Stimmen) **und** den `:::vote`-Shortcode, an
- * den pytex die kanonische Auswertung hängt.
+ * Markdown snippet embedding a vote result: a readable tally table
+ * (option → count) AND the `:::vote` shortcode pytex hangs the canonical
+ * evaluation on.
  */
 export function voteSnippet(vote: MeetingVote): string {
   const lines: string[] = [`\n:::vote{#${vote.id}}`];
@@ -66,25 +62,23 @@ export function voteSnippet(vote: MeetingVote): string {
   return `\n${lines.join('\n')}`;
 }
 
-/** Markdown an der Cursor-Position (oder am Ende) in den Text einfügen. */
+/** Insert markdown at the caret position (or append at the end). */
 export function insertAt(text: string, snippet: string, caret: number | null): string {
   if (caret === null || caret < 0 || caret > text.length) return text + snippet;
   return text.slice(0, caret) + snippet + text.slice(caret);
 }
 
 /**
- * Nur Links mit sicherem Schema (kein `javascript:`-Vektor) durchlassen.
+ * Allow only links with a safe scheme (no `javascript:` vector).
  *
- * Zweite Verteidigungslinie (Defense-in-Depth, AUD-064): Die URL wird **vor**
- * der Interpolation in das `href="…"`-Attribut auf Zeichen geprüft, die aus dem
- * Attribut ausbrechen könnten. Da `inline()` den Text bereits HTML-escapt, kommt
- * ein rohes `"`/`<`/`>`/`'` hier als Entity (`&quot;` …) an — beide Formen werden
- * abgewiesen, damit selbst bei Wegfall der Angular-`innerHTML`-Sanitisierung kein
- * Attribut-Break-out (z. B. `href="…"onmouseover=…`) entstehen kann.
+ * Second line of defense: the URL is checked BEFORE interpolation into the
+ * `href="…"` attribute for characters that could break out of it. Since
+ * `inline()` already HTML-escaped the text, a raw `"`/`<`/`>`/`'` arrives as
+ * an entity — both forms are rejected, so even without Angular's innerHTML
+ * sanitization no attribute break-out can occur.
  */
 function safeUrl(url: string): boolean {
   if (!/^(https?:\/\/|mailto:|\/)/i.test(url)) return false;
-  // Roh- *und* escapte Form von "<>'  sowie Whitespace/Control-Chars ablehnen.
   if (/["'<>]|&(?:quot|lt|gt|#39|#x27);/i.test(url)) return false;
   // eslint-disable-next-line no-control-regex
   if (/[\s\x00-\x1f\x7f]/.test(url)) return false;
@@ -92,7 +86,7 @@ function safeUrl(url: string): boolean {
 }
 
 function inline(text: string): string {
-  // Reihenfolge: Code zuerst (schützt Inhalt), dann Links, fett vor kursiv.
+  // Order: code first (protects its content), then links, bold before italic.
   return escapeHtml(text)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (match, label: string, url: string) =>
@@ -104,7 +98,7 @@ function inline(text: string): string {
     .replace(/\*([^*]+)\*/g, '<em>$1</em>');
 }
 
-/** Zellen einer Pipe-Tabellen-Zeile (`| a | b |`) trimmen. */
+/** Trim the cells of a pipe-table row (`| a | b |`). */
 function tableCells(line: string): string[] {
   return line
     .trim()
@@ -114,12 +108,12 @@ function tableCells(line: string): string[] {
     .map((c) => c.trim());
 }
 
-/** Trenn-Zeile einer Pipe-Tabelle? (`| --- | :--: |`). */
+/** Separator row of a pipe table? (`| --- | :--: |`). */
 function isTableSeparator(line: string): boolean {
   return /^\|?[\s:|-]+\|?$/.test(line.trim()) && line.includes('-') && line.includes('|');
 }
 
-// GitHub-Callout-Typen (`> [!NOTE]` …) → Titel + CSS-Modifier.
+// GitHub callout kinds (`> [!NOTE]` …) → title + CSS modifier.
 const CALLOUT_TITLES: Record<string, string> = {
   note: 'Note',
   tip: 'Tip',
@@ -129,9 +123,9 @@ const CALLOUT_TITLES: Record<string, string> = {
 };
 
 /**
- * Eine Gruppe zusammenhängender ``>``-Zeilen rendern: GitHub-Callout
- * (`> [!NOTE]`/`[!TIP]`/`[!IMPORTANT]`/`[!WARNING]`/`[!CAUTION]`) oder sonst ein
- * gewöhnliches Blockzitat. Inhalt wird zeilenweise inline-gerendert.
+ * Render a group of consecutive `>` lines: a GitHub callout
+ * (`> [!NOTE]`/`[!TIP]`/…) or otherwise a plain blockquote. Content is
+ * rendered inline per line.
  */
 function renderQuote(lines: string[]): string {
   const marker = /^\[!(\w+)\]\s*(.*)$/.exec(lines[0].trim());
@@ -149,10 +143,10 @@ function renderQuote(lines: string[]): string {
 }
 
 /**
- * Minimaler, abhängigkeitsfreier Markdown→HTML-Renderer für die Vorschau
- * (siehe Datei-Header). Unterstützt Überschriften, Fett/Kursiv/Code, **Links**,
- * geordnete + ungeordnete Listen, Zitate, **Pipe-Tabellen**, Trennlinien und
- * Absätze — genug für Sitzungsprotokolle (inkl. der `voteSnippet`-Ergebnistabellen).
+ * Minimal, dependency-free Markdown→HTML renderer for the preview (see file
+ * header). Supports headings, bold/italic/code, links, ordered + unordered
+ * lists, quotes, pipe tables, horizontal rules and paragraphs — enough for
+ * meeting minutes (incl. the `voteSnippet` tally tables).
  */
 export function renderMarkdown(markdown: string): string {
   const lines = (markdown ?? '').replace(/\r\n/g, '\n').split('\n');
@@ -203,13 +197,13 @@ export function renderMarkdown(markdown: string): string {
       flushParagraph();
       closeList();
       const head = tableCells(line);
-      i += 2; // Kopf + Trenn-Zeile überspringen
+      i += 2; // skip header + separator row
       const body: string[][] = [];
       while (i < lines.length && lines[i].trim().startsWith('|')) {
         body.push(tableCells(lines[i]));
         i++;
       }
-      i--; // die for-Schleife inkrementiert gleich wieder
+      i--; // the for loop increments again
       const thead = `<thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead>`;
       const rows = body
         .map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`)
@@ -226,7 +220,7 @@ export function renderMarkdown(markdown: string): string {
     } else if (quote) {
       flushParagraph();
       closeList();
-      // Zusammenhängende ``>``-Zeilen sammeln (für GitHub-Callouts + mehrzeilige Zitate).
+      // Collect consecutive `>` lines (callouts + multi-line quotes).
       const quoteLines: string[] = [quote[1]];
       while (i + 1 < lines.length) {
         const m = /^>\s?(.*)$/.exec(lines[i + 1].trimEnd());

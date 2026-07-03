@@ -1,10 +1,4 @@
-"""ORM-Modelle für DSGVO/Privacy.
-
-* :class:`PrivacySettings` — plattformweite Single-Row-Config (id=1): globaler
-  Aufbewahrungs-Default in Monaten (DSB-Platzhalter 24), admin-gepflegt.
-* :class:`ErasureRequest` — Löschantrags-Queue (DSGVO Art. 17): Antragsteller-
-  Selbstauskunft per Magic-Link bzw. Admin-Anlage; Status open/executed/rejected.
-"""
+"""ORM models for privacy/GDPR: settings and the erasure-request queue."""
 
 from __future__ import annotations
 
@@ -19,12 +13,11 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class PrivacySettings(Base):
-    """Plattformweite DSGVO-Config (Single-Row id=1, admin-gepflegt über /admin/privacy)."""
+    """Platform-wide privacy config (single row id=1)."""
 
     __tablename__ = "privacy_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    # DSB-Platzhalter: Standard-Aufbewahrung in Monaten (Finanzordnung bestätigen).
     default_retention_months: Mapped[int] = mapped_column(
         Integer, server_default="24", default=24
     )
@@ -38,9 +31,11 @@ class PrivacySettings(Base):
 
 
 class ErasureRequest(UUIDPkMixin, CreatedAtMixin, Base):
-    """Löschantrag (DSGVO Art. 17). ``application_id``/``principal_id`` per FK
-    ``ON DELETE SET NULL`` — der Queue-Eintrag bleibt als Nachweis, auch wenn das
-    Subjekt hart gelöscht wird."""
+    """Erasure request (GDPR Art. 17).
+
+    FK ``ON DELETE SET NULL`` keeps the queue row as proof even after the subject is
+    hard-deleted.
+    """
 
     __tablename__ = "erasure_request"
 

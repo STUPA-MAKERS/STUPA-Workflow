@@ -1,8 +1,8 @@
-"""Auth-Endpunkte (api.md §3 »auth«).
+"""Auth endpoints.
 
-OIDC-Login/Callback (Keycloak, Auth Code + PKCE), Server-Session-Cookie,
-Magic-Link issue/verify, `/auth/me`, Logout. Token landen **nie** im JS oder Body —
-ausschließlich HttpOnly+Secure+SameSite=Lax-Cookies.
+OIDC login/callback (Keycloak, auth code + PKCE), server-session cookie,
+magic-link issue/verify, `/auth/me`, logout. Tokens never reach JS or the body —
+HttpOnly+Secure+SameSite=Lax cookies only.
 """
 
 from __future__ import annotations
@@ -41,11 +41,11 @@ from app.shared.errors import BadRequestError, NotFoundError, ProblemDetail
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
-_TX_MAX_AGE = 600  # OIDC-Transaktion: 10 min Fenster für Authorize→Callback.
+_TX_MAX_AGE = 600  # OIDC transaction: 10-minute window authorize -> callback.
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    """Problem-JSON für die angegebenen Fehler-Statuscodes dokumentieren."""
+    """Document problem+json for the given error status codes."""
     return {code: _PROBLEM for code in codes}
 
 
@@ -64,7 +64,7 @@ def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
     responses=_errors(404),
 )
 def login(settings: SettingsDep) -> RedirectResponse:
-    """Redirect zu Keycloak (Auth Code + PKCE). state/verifier/nonce im tx-Cookie."""
+    """Redirect to Keycloak (auth code + PKCE); state/verifier/nonce in the tx cookie."""
     if not settings.oidc_enabled:
         raise NotFoundError("OIDC is not configured.")
     verifier, challenge = oidc.generate_pkce()
@@ -93,7 +93,7 @@ async def callback(
     code: Annotated[str, Query()],
     state: Annotated[str, Query()],
 ) -> RedirectResponse:
-    """Code→Token→Session. CSRF/Replay-Schutz via state-Abgleich + nonce im id_token."""
+    """Code to token to session. CSRF/replay protection via state match + nonce in the id_token."""
     if not settings.oidc_enabled:
         raise NotFoundError("OIDC is not configured.")
     tx_cookie = request.cookies.get(settings.oidc_tx_cookie_name)
@@ -110,14 +110,12 @@ async def callback(
         )
     except OidcError as exc:
         raise BadRequestError("OIDC login failed.") from exc
-    # Principal + auth_session persistieren (get_session committet nie selbst); ohne
-    # Commit rollt der Request-Close beide Zeilen zurück → /auth/me 401 (konsistent
-    # mit verify_magic_link/logout).
+    # Persist principal + auth_session (get_session never commits itself);
+    # without a commit the request close would roll both rows back.
     await db.commit()
 
-    # Läuft gerade ein OAuth-AS-Login (MCP, ap_oauth_tx gesetzt), nach dem
-    # Code-Mint-Schritt weiterleiten statt auf die App-Startseite (same-origin,
-    # kein Open-Redirect).
+    # If an OAuth AS login is in flight (MCP, ap_oauth_tx set), continue to the
+    # code-mint step instead of the app home (same-origin, no open redirect).
     dest = settings.public_base_url
     if request.cookies.get(settings.oauth_tx_cookie_name):
         dest = settings.public_base_url.rstrip("/") + "/api/oauth/finish"
@@ -136,11 +134,10 @@ async def callback(
 async def logout(
     request: Request, db: DbSession, settings: SettingsDep, response: Response
 ) -> LogoutOut:
-    """Server-Session(en) beenden + Cookies löschen (idempotent). Beendet sowohl die
-    Principal- als auch eine etwaige Applicant-Session (serverseitig widerrufbar,
-    security.md §1). Liefert für OIDC die RP-Initiated-Logout-URL (Keycloak
-    `end_session`, id_token_hint), damit das FE auch die IdP-SSO-Session beendet
-    (security.md §2) — sonst überlebt der SSO-Login."""
+    """End the server session(s) and clear cookies (idempotent). Ends both the
+    principal and any applicant session. For OIDC, returns the RP-initiated
+    logout URL (Keycloak `end_session`, id_token_hint) so the frontend also
+    ends the IdP SSO session — otherwise the SSO login survives."""
     logout_url: str | None = None
     cookie = request.cookies.get(settings.session_cookie_name)
     if cookie:
@@ -171,7 +168,7 @@ async def me(
     principal: Annotated[Principal, Depends(require_principal())],
     db: DbSession,
 ) -> MeOut:
-    """Principal + aufgelöste Rollen/Permissions/Gruppen + eigene Gremien (#5)."""
+    """Return the principal plus resolved roles/permissions/groups and own gremien."""
     return MeOut(
         sub=principal.sub,
         email=principal.email,
@@ -187,8 +184,8 @@ async def me(
 
 
 async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
-    """Steht ``sub`` in mindestens einem Stellvertreter-Pool (#7)? FE-Gating der
-    Sitzungs-Timeline für Pool-Vertreter ohne eigene Mitgliedschaft."""
+    """Is ``sub`` in at least one substitute pool? Frontend gating of the
+    meeting timeline for pool substitutes without own membership."""
     from app.modules.auth.models import Principal as PrincipalRow
     from app.modules.delegations.models import DelegationSubstitute
 
@@ -202,8 +199,8 @@ async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
 
 
 async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
-    """Hat ein Mitglieds-Gremium des Principals eine Kostenstelle als
-    Sichtbarkeits-Root (#budget-scope)? Gating des Budget-Tabs im FE."""
+    """Does a member gremium of the principal own a cost centre as visibility
+    root? Frontend gating of the budget tab."""
     from app.modules.admin.gremium_roles import gremium_member_ids
     from app.modules.budget.tree_models import Budget
 
@@ -217,10 +214,10 @@ async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
 
 
 async def _session_manage_gremien(db: DbSession, sub: str) -> list[UUID]:
-    """Gremien, die ``sub`` über seine Gremium-Rolle verwaltet (``session.manage``).
+    """Gremien ``sub`` manages via their gremium role (``session.manage``).
 
-    Gleiche Quelle wie ``MeetingService.can_manage`` — FE-Gating (»Sitzung
-    anlegen«) und Server-Entscheidung bleiben deckungsgleich."""
+    Same source as ``MeetingService.can_manage`` — frontend gating ("create
+    meeting") and server decision stay congruent."""
     from app.modules.admin.gremium_roles import gremium_ids_with_permission
 
     return sorted(
@@ -229,13 +226,12 @@ async def _session_manage_gremien(db: DbSession, sub: str) -> list[UUID]:
 
 
 async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
-    """Gremien, in denen ``sub`` **Mitglied** ist (gültige ``gremium_membership``, #5).
+    """Gremien ``sub`` is a member of (valid ``gremium_membership``).
 
-    Nutzt dieselbe Quelle wie die serverseitige Sichtbarkeits-/Steuerungslogik
-    (``gremium_member_ids`` → ``GremiumMembership``), damit Frontend-Gating (Sitzungen-
-    Tab/-Zugriff) und Server-Filter übereinstimmen. (Die globale ``role_assignment``-
-    Mitgliedsrolle hat ``gremium_id = NULL`` und ist **keine** Gremium-Mitgliedschaft.)
-    Magic-Link-Applicants (kein Principal-Row) bekommen eine leere Liste.
+    Uses the same source as the server-side visibility logic
+    (``gremium_member_ids``) so frontend gating and server filters agree. The
+    global ``role_assignment`` member role has ``gremium_id = NULL`` and is NOT
+    a gremium membership. Magic-link applicants get an empty list.
     """
     from app.modules.admin.gremium_roles import gremium_member_ids
 
@@ -255,11 +251,11 @@ async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
 async def _deliver_magic_link(
     settings: Settings, email: str, application_id: UUID | None, pool: object
 ) -> None:
-    """Magic-Link-Erstellung/-Versand in eigener Session (Background-Task).
+    """Create/send the magic link in its own session (background task).
 
-    Läuft **nach** der 202-Antwort → die Antwortzeit ist für Treffer und Nicht-Treffer
-    identisch (keine Timing-Enumeration, security.md §1 / §11). Der Versand geht über
-    die Mail-Queue (Worker, T-18); fehlt der arq-Pool, wird geloggt + verworfen."""
+    Runs after the 202 response, so response time is identical for hit and
+    miss (no timing enumeration). Delivery goes through the mail queue; without
+    an arq pool it is logged and dropped."""
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
@@ -283,7 +279,7 @@ async def _deliver_magic_link(
         Depends(rate_limit_magic_link),
         Depends(verify_altcha),
     ],
-    # 400 = Altcha ungültig/fehlend, 413 = Body zu groß, 429 = Rate-Limit (api.md §7).
+    # 400 = ALTCHA invalid/missing, 413 = body too large, 429 = rate limit.
     responses=_errors(400, 413, 429),
 )
 async def request_magic_link(
@@ -292,8 +288,8 @@ async def request_magic_link(
     background: BackgroundTasks,
     request: Request,
 ) -> dict[str, str]:
-    """Magic-Link anfordern. Anti-Enumeration: **immer** 202 + konstanter Body, kein
-    Treffer-Leak. Die DB-Arbeit läuft im Hintergrund → konstante Antwortzeit."""
+    """Request a magic link. Anti-enumeration: always 202 with a constant body,
+    no hit leak. DB work runs in the background for constant response time."""
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(
         _deliver_magic_link, settings, str(body.email), body.application_id, pool
@@ -315,10 +311,10 @@ async def verify_magic_link(
     settings: SettingsDep,
     response: Response,
 ) -> MagicLinkVerifyOut:
-    """Token→Applicant-Session (Scope = genau eine App). Abgelaufen/verbraucht → 410.
+    """Verify a token into an applicant session (scoped to one application); expired/used -> 410.
 
-    Die Session wird **nur** als HttpOnly-Cookie gesetzt, nie im Body zurückgegeben
-    (kein im JS greifbarer Token, security.md §1)."""
+    The session is set only as an HttpOnly cookie, never returned in the body
+    (no token reachable from JS)."""
     app_id, scope, token = await service.verify_magic_link(
         db, settings, token=body.token
     )

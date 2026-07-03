@@ -25,7 +25,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: var(--fs-xs);
-  /* Dunklerer Header wie die Aufgaben-Tabelle (shared DataTable) — #table-parity. */
+  /* Darker header like the tasks table (shared DataTable). */
   background: var(--color-surface-sunken);
 }
 .atbl__num {
@@ -65,7 +65,7 @@
   color: var(--color-text-muted);
   font-weight: var(--fw-normal);
 }
-/* Mobil (≤768px): Zeilen als Karten stapeln (rein CSS, kein Markup-Diff). */
+/* Mobile (≤768px): stack rows as cards (pure CSS, no markup diff). */
 @media (max-width: 768px) {
   .atbl__wrap {
     overflow-x: visible;
@@ -101,18 +101,18 @@
   .atbl tbody tr:last-child td {
     border-bottom: none;
   }
-  /* Titel als volle erste Zeile der Karte. */
+  /* Title as the full first row of the card. */
   .atbl td:first-child {
     flex: 1 1 100%;
     min-width: 0;
   }
-  /* Typ + Datum als gedämpfte Meta-Angaben. */
+  /* Type + date as muted meta info. */
   .atbl td:nth-child(2),
   .atbl td:last-child {
     color: var(--color-text-muted);
     font-size: var(--fs-xs);
   }
-  /* Betrag rechtsbündig in der Meta-Zeile. */
+  /* Amount right-aligned in the meta row. */
   .atbl__num {
     margin-left: auto;
     font-weight: var(--fw-medium);

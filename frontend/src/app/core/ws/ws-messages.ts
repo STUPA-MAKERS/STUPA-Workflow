@@ -1,4 +1,4 @@
-/** Live-Vote WebSocket-Protokoll (sds/api.md §4). */
+/** Live-vote WebSocket protocol. */
 
 export interface MeetingStateMsg {
   type: 'meeting_state';
@@ -8,7 +8,7 @@ export interface MeetingStateMsg {
 export interface VoteOpenedMsg {
   type: 'vote_opened';
   voteId: string;
-  /** `null` = generische Beschlussfrage (Freitext-TOP). */
+  /** `null` = generic motion (free-text agenda item). */
   applicationId?: string | null;
   agendaItemId?: string | null;
   question?: string | null;
@@ -22,7 +22,7 @@ export interface VoteTallyMsg {
   eligible: number;
   quorumMet: boolean;
   leading: string | null;
-  /** Teilnahme-Fortschritt + Reveal-Schranke (#vote-progress). */
+  /** Participation progress + reveal gate. */
   cast?: number;
   present?: number;
   revealed?: boolean;
@@ -32,10 +32,10 @@ export interface VoteClosedMsg {
   voteId: string;
   result: string;
   counts: Record<string, number>;
-  /** Grund einer Ablehnung: `quorum` = Quorum verfehlt, `majority` = Mehrheit verfehlt. */
+  /** Reason for rejection: `quorum` = quorum missed, `majority` = majority missed. */
   failedReason?: 'quorum' | 'majority' | null;
 }
-/** Abstimmung abgebrochen (#12) — kein Ergebnis, kein Branch. */
+/** Vote cancelled — no result, no branch. */
 export interface VoteCancelledMsg {
   type: 'vote_cancelled';
   voteId: string;
@@ -44,7 +44,7 @@ export interface ErrorMsg {
   type: 'error';
   code: string;
 }
-/** Wer hat die Sitzungs-Seite gerade offen (#live-viewers) — Anzeigenamen. */
+/** Who currently has the meeting page open — display names. */
 export interface ViewersMsg {
   type: 'viewers';
   viewers: string[];

@@ -1,12 +1,11 @@
-"""arq-Worker-Task: Webhook-Zustellung (T-19, security.md §5 / flows §8).
+"""arq worker task: webhook delivery.
 
-``deliver_webhook`` lädt die ``webhook_delivery``, prüft den SSRF-Guard **zur Sende-
-Zeit** (DNS-Rebinding), signiert HMAC-SHA256 und stellt per HTTP-POST **ohne Redirects**
-zu. Das Status-/Backoff-Handling liegt im :class:`WebhookService`; transiente Fehler
-(Timeout/Transport/Non-2xx) → ``arq.Retry`` mit exponentiellem Backoff bis
-``webhook_max_tries``, danach Dead-Letter (``status=dead``). Der SSRF-Block ist
-permanent (kein Retry). Idempotenz trägt der Job-Key (``webhook:<id>``); ein erneuter
-Lauf auf bereits zugestellter Delivery ist harmlos (Status terminal).
+``deliver_webhook`` loads the ``webhook_delivery``, re-checks the SSRF guard at send
+time (DNS rebinding), signs HMAC-SHA256 and POSTs without following redirects. Status
+and backoff live in :class:`WebhookService`; transient errors (timeout/transport/
+non-2xx) -> ``arq.Retry`` with exponential backoff up to ``webhook_max_tries``, then
+dead-letter (``status=dead``). An SSRF block is permanent (no retry). Idempotency comes
+from the job key (``webhook:<id>``); re-running an already-delivered delivery is harmless.
 """
 
 from __future__ import annotations
@@ -31,13 +30,13 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB-Sessionmaker (in Tests via ``ctx['webhook_sessionmaker']`` injizierbar)."""
+    """DB sessionmaker (injectable in tests via ``ctx['webhook_sessionmaker']``)."""
     maker = ctx.get("webhook_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
 
 async def deliver_webhook(ctx: dict[str, Any], delivery_id: str) -> str:
-    """Eine Webhook-Delivery zustellen. Retry bei transientem Fehler, sonst terminal."""
+    """Deliver one webhook. Retry on transient error, else terminal."""
     settings: Settings = ctx["settings"]
     did = UUID(delivery_id)
     maker = _sessionmaker(ctx)
@@ -68,7 +67,7 @@ async def deliver_webhook(ctx: dict[str, Any], delivery_id: str) -> str:
 
 
 def _default_client_factory(settings: Settings) -> httpx.AsyncClient:  # pragma: no cover
-    """httpx-Client ohne Redirect-Folgen + festem Timeout (security.md §5)."""
+    """httpx client that never follows redirects, with a fixed timeout."""
     return httpx.AsyncClient(
         follow_redirects=False, timeout=settings.webhook_timeout_seconds
     )

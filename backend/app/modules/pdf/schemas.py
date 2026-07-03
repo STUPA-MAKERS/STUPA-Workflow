@@ -1,8 +1,8 @@
-"""Pydantic-Schemas der pdf-API (api.md »pdf«).
+"""Pydantic schemas for the pdf API.
 
-``JobOut`` folgt dem dokumentierten Job-Contract: Status + (bei Erfolg) eine
-kurzlebige, signierte Ergebnis-URL (``resultUrl``); nie ein direkter Bucket-Link
-(security.md §6). ``error`` ist eine pfadfreie Kurzkennung (kein Stacktrace-Leak).
+``JobOut`` follows the job contract: status + (on success) a short-lived signed result
+URL (``resultUrl``), never a direct bucket link. ``error`` is a path-free short code
+(no stacktrace leak).
 """
 
 from __future__ import annotations
@@ -13,11 +13,11 @@ from pydantic import BaseModel
 
 
 class JobOut(BaseModel):
-    """Render-Job-Status (api.md »pdf«: pending/running/done/failed + Ergebnis-Link)."""
+    """Render-job status (pending/running/done/failed + result link)."""
 
     id: UUID
     kind: str
     status: str
     applicationId: UUID | None = None
-    resultUrl: str | None = None  # signierte MinIO-URL, nur bei status="done"
+    resultUrl: str | None = None  # signed MinIO URL, only when status="done"
     error: str | None = None

@@ -26,19 +26,19 @@ import {
   slugify,
 } from '../admin.models';
 
-/** Editier-Formularzustand eines Gremiums (Slug wird automatisch erzeugt). */
+/** Edit form state of a gremium (the slug is generated automatically). */
 interface GremiumForm {
   name: string;
   cdVariant: string;
   defaultLang: string;
   allowVoteDelegation: boolean;
-  /** Vorlauf in Minuten vor Sitzungsbeginn für Nicht-Pool-Delegationen (#delegation-rework). */
+  /** Lead time in minutes before meeting start for non-pool delegations. */
   delegationLeadMinutes: number;
-  /** Delegation an Externe (außerhalb Gremium/Pool) erlauben. */
+  /** Allow delegation to externals (outside gremium/pool). */
   delegationAllowExternal: boolean;
-  /** Default-Quorum in % der Stimmberechtigten; null = keins. */
+  /** Default quorum in % of eligible voters; null = none. */
   quorumPercent: number | null;
-  /** Zusatz-Protokoll-Empfänger, eine Adresse je Zeile (#protocol-recipients). */
+  /** Extra protocol recipients, one address per line. */
   mailRecipients: string;
 }
 
@@ -55,7 +55,7 @@ function emptyForm(): GremiumForm {
   };
 }
 
-/** Textarea-Inhalt → Adressliste (Zeilen/Kommas/Semikolons als Trenner). */
+/** Textarea content → address list (newlines/commas/semicolons as separators). */
 function parseRecipients(raw: string): string[] {
   return raw
     .split(/[\n,;]+/)
@@ -64,10 +64,10 @@ function parseRecipients(raw: string): string[] {
 }
 
 /**
- * Gremien-Verwaltung (#18). Tabelle aller Gremien; Anlegen/Bearbeiten über einen
- * **Dialog** (nicht inline). CD-Variante als Dropdown, der Slug wird automatisch
- * aus dem Namen erzeugt, Stimm-Delegation ist eine Gremium-Einstellung (#14).
- * »Mitglieder« führt auf die **Unterseite** je Gremium (`/admin/gremien/:id`).
+ * Gremien administration. Table of all gremien; create/edit via a **dialog** (not
+ * inline). CD variant as a dropdown, the slug is generated automatically from the
+ * name, vote delegation is a per-gremium setting. "Members" leads to the
+ * **subpage** per gremium (`/admin/gremien/:id`).
  */
 @Component({
   selector: 'app-admin-gremien',
@@ -120,7 +120,7 @@ export class AdminGremienComponent {
     { value: 'en', label: this.i18n.translate('admin.gremien.langEn') },
   ]);
 
-  /** Vorschau des automatisch erzeugten Slugs. */
+  /** Preview of the automatically generated slug. */
   readonly slugPreview = computed(() => slugify(this.form().name) || '—');
 
   constructor() {
@@ -131,7 +131,7 @@ export class AdminGremienComponent {
     this.form.update((f) => ({ ...f, [key]: value }));
   }
 
-  /** Vorlauf-Eingabe (#delegation-rework): leer/ungültig → 0, sonst ≥ 0 ganzzahlig. */
+  /** Lead-time input: empty/invalid → 0, otherwise a non-negative integer. */
   patchLead(value: number | string | null): void {
     const n = Math.round(Number(value));
     this.form.update((f) => ({
@@ -140,7 +140,7 @@ export class AdminGremienComponent {
     }));
   }
 
-  /** Quorum-Eingabe: leer → null (kein Default), sonst auf 0–100 geklemmt. */
+  /** Quorum input: empty → null (no default), otherwise clamped to 0–100. */
   patchQuorum(value: number | string | null): void {
     let next: number | null;
     if (value === null || value === '' || value === undefined) {
@@ -171,7 +171,7 @@ export class AdminGremienComponent {
       mailRecipients: '',
     });
     this.dialogOpen.set(true);
-    // Zusatz-Empfänger nachladen (eigener Endpunkt, #protocol-recipients).
+    // Load extra recipients (dedicated endpoint).
     this.api.getGremiumMailRecipients(g.id).subscribe({
       next: ({ recipients }) =>
         this.form.update((f) => ({ ...f, mailRecipients: recipients.join('\n') })),
@@ -221,7 +221,7 @@ export class AdminGremienComponent {
     }
   }
 
-  /** Zusatz-Protokoll-Empfänger nach den Stammdaten speichern (#protocol-recipients). */
+  /** Save extra protocol recipients after the base data. */
   private saveRecipients(
     id: Uuid,
     key: 'admin.gremien.toast.created' | 'admin.gremien.toast.updated',

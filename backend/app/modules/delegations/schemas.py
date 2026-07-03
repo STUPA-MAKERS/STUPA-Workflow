@@ -1,9 +1,8 @@
-"""Delegation-DTOs (#delegation-rework). camelCase im JSON (FE-Kontrakt).
+"""Delegation DTOs (camelCase JSON).
 
-Eine Delegation ist **sitzungsgebunden**: angelegt wird sie mit ``meetingId`` +
-``delegateId``; Gremium und Gültigkeit ergeben sich aus der Sitzung. Der
-Stellvertreter-Pool (``substitutes``) und der Sitzungs-Kontext (Deadline,
-Empfänger-Optionen, eigener Status) haben eigene DTOs.
+A delegation is meeting-bound: created with ``meetingId`` + ``delegateId``; the
+gremium and validity derive from the meeting. The substitute pool and the meeting
+context have their own DTOs.
 """
 
 from __future__ import annotations
@@ -15,17 +14,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; populate-by-name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 # --------------------------------------------------------------------------- #
-# Sitzungs-Delegation
+# Meeting delegation
 # --------------------------------------------------------------------------- #
 class DelegationCreate(_CamelModel):
-    """Vertretung für **eine** Sitzung: ``delegateId`` erhält Zugang (und mit
-    ``delegateVoting`` das Stimmrecht) für die Sitzung ``meetingId``."""
+    """Delegation for one meeting: ``delegateId`` gains access (and, with
+    ``delegateVoting``, the vote) for meeting ``meetingId``."""
 
     meeting_id: UUID = Field(alias="meetingId")
     delegate_id: UUID = Field(alias="delegateId")
@@ -33,8 +32,7 @@ class DelegationCreate(_CamelModel):
 
 
 class DelegationOut(_CamelModel):
-    """Delegations-Sicht inkl. aufgelöster Anzeige-Namen (FE braucht keine
-    Principal-Lookups)."""
+    """Delegation view with resolved display names."""
 
     id: UUID
     meeting_id: UUID = Field(serialization_alias="meetingId")
@@ -49,19 +47,18 @@ class DelegationOut(_CamelModel):
     delegate_voting: bool = Field(serialization_alias="delegateVoting")
     via_pool: bool = Field(serialization_alias="viaPool")
     created_at: datetime = Field(serialization_alias="createdAt")
-    # Widerruf noch möglich (Sitzung ``planned`` + vor Beginn)?
+    # Still revocable (meeting planned and not started)?
     revocable: bool
-    # Richtung aus Sicht des Aufrufers: er delegiert (outgoing) / wird Vertreter
-    # (incoming); None = unbeteiligt (Admin-Sicht).
+    # Direction from the caller's view: outgoing / incoming; None = uninvolved (admin).
     direction: str | None = None
 
 
 # --------------------------------------------------------------------------- #
-# Stellvertreter-Pool
+# Substitute pool
 # --------------------------------------------------------------------------- #
 class SubstituteCreate(_CamelModel):
-    """Pool-Eintrag: ``substituteId`` darf ``memberId`` (oder, ohne ``memberId``,
-    jedes Mitglied) im Gremium ohne Vorlauf-Deadline vertreten."""
+    """Pool entry: ``substituteId`` may represent ``memberId`` (or any member when
+    ``memberId`` is unset) in the gremium with no lead-time deadline."""
 
     gremium_id: UUID = Field(alias="gremiumId")
     member_id: UUID | None = Field(default=None, alias="memberId")
@@ -80,25 +77,25 @@ class SubstituteOut(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# Sitzungs-Kontext (Meeting-Detail-Dialog / Dashboard-Karte)
+# Meeting context (meeting detail dialog / dashboard card)
 # --------------------------------------------------------------------------- #
 class RecipientOut(_CamelModel):
-    """Wählbarer Empfänger einer Delegation (Typeahead-Quelle)."""
+    """Selectable delegation recipient (typeahead source)."""
 
     principal_id: UUID = Field(serialization_alias="principalId")
     display_name: str | None = Field(default=None, serialization_alias="displayName")
-    # Über den Stellvertreter-Pool legitimiert → keine Vorlauf-Deadline.
+    # Legitimized via the substitute pool: no lead-time deadline.
     via_pool: bool = Field(serialization_alias="viaPool")
-    # Selbst Gremium-Mitglied (sonst: externer Empfänger).
+    # Gremium member (otherwise: external recipient).
     is_member: bool = Field(serialization_alias="isMember")
 
 
 class MeetingDelegationContext(_CamelModel):
-    """Alles, was das FE für den »Vertretung einrichten«-Dialog braucht."""
+    """Everything the frontend needs for the set-up-delegation dialog."""
 
     meeting_id: UUID = Field(serialization_alias="meetingId")
     gremium_id: UUID = Field(serialization_alias="gremiumId")
-    # Feature-Gates: Gremium-Schalter + globales Stimmrecht-Flag.
+    # Feature gates: gremium switch + global vote-delegation flag.
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
     voting_delegation_enabled: bool = Field(
         serialization_alias="votingDelegationEnabled"
@@ -106,14 +103,14 @@ class MeetingDelegationContext(_CamelModel):
     delegation_allow_external: bool = Field(
         serialization_alias="delegationAllowExternal"
     )
-    # Deadline für Nicht-Pool-Delegationen (ISO, UTC); None = nur Status-Gate
-    # (Sitzung ohne Termin). Pool-Delegationen gehen bis Sitzungsbeginn.
+    # Deadline for non-pool delegations (UTC); None = status gate only (meeting has
+    # no date). Pool delegations run until the meeting starts.
     deadline: datetime | None = None
     deadline_passed: bool = Field(serialization_alias="deadlinePassed")
     meeting_started: bool = Field(serialization_alias="meetingStarted")
-    # Darf der Aufrufer hier überhaupt delegieren (stimmberechtigtes Mitglied)?
+    # May the caller delegate here at all (voting member)?
     can_delegate: bool = Field(serialization_alias="canDelegate")
-    # Eigene ausgehende Delegation (max. eine) + an mich gerichtete.
+    # Own outgoing delegation (at most one) + incoming ones.
     my_delegation: DelegationOut | None = Field(
         default=None, serialization_alias="myDelegation"
     )
@@ -122,14 +119,14 @@ class MeetingDelegationContext(_CamelModel):
 
 
 class VoteDelegationStatus(_CamelModel):
-    """Delegations-Sicht des Aufrufers auf **eine** Abstimmung (vote-cast-Banner)."""
+    """Caller's delegation view of one vote (vote-cast banner)."""
 
-    # Eigenes Stimmrecht für diese Abstimmung wegdelegiert → cast würde 403 liefern.
+    # Own vote for this ballot is delegated away: casting would 403.
     blocked: bool
     delegated_to_name: str | None = Field(
         default=None, serialization_alias="delegatedToName"
     )
-    # Der Aufrufer übt ein delegiertes Stimmrecht aus (Badge »in Vertretung«).
+    # The caller is exercising a delegated vote (badge "as substitute").
     exercising: bool
     delegated_by_name: str | None = Field(
         default=None, serialization_alias="delegatedByName"

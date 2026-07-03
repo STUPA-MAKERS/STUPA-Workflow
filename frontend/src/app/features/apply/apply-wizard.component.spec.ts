@@ -68,9 +68,9 @@ function fakeApi(create = jest.fn(() => of({ applicationId: 'app-1' }))): Partia
     applicationTypes: () => of(TYPES),
     effectiveForm: () => of(EFF),
     createApplication: create as unknown as ApiClient['createApplication'],
-    // Anonyme Session (kein Principal) — Default-Pfad mit Kontakt-Schritt + Altcha (#24).
+    // Anonymous session (no principal) — default path with contact step + Altcha.
     me: (() => of(null)) as unknown as ApiClient['me'],
-    // Branding-Info unter der Typ-Auswahl (#18) — leer im Test-Default.
+    // Branding info below the type selection — empty in the test default.
     publicSiteConfig: () => of({ version: 1, branding: null }),
   };
 }
@@ -86,7 +86,7 @@ async function setup(create?: jest.Mock) {
   return view;
 }
 
-/** Wie {@link setup}, aber mit eingeloggter Session (Principal) für den #24-Pfad. */
+/** Like {@link setup}, but with a logged-in session (principal). */
 async function setupLoggedIn(create = jest.fn(() => of({ applicationId: 'app-1' }))) {
   const api = {
     ...fakeApi(create),
@@ -109,8 +109,8 @@ async function setupLoggedIn(create = jest.fn(() => of({ applicationId: 'app-1' 
 describe('ApplyWizardComponent', () => {
   beforeEach(() => {
     sessionStorage.clear();
-    // Locale auf DE pinnen — die deutschen Assertions unten sollen unabhängig
-    // von der jsdom-Navigator-Sprache (en-US) gelten.
+    // Pin locale to DE — the German assertions below must hold regardless
+    // of the jsdom navigator language (en-US).
     localStorage.setItem('ap.locale', 'de');
   });
   afterEach(() => localStorage.clear());
@@ -126,7 +126,7 @@ describe('ApplyWizardComponent', () => {
     await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
     const comp = fixture.componentInstance;
     expect(comp.effForm()).not.toBeNull();
-    // Antragsart + Kontakt + 2 Sektionen + Prüfen
+    // type + contact + 2 sections + review
     expect(comp.steps().length).toBe(5);
   });
 
@@ -135,8 +135,8 @@ describe('ApplyWizardComponent', () => {
     const comp = fixture.componentInstance;
     await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
     comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → Kontakt
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → Sektion main
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main section
 
     expect(screen.queryByLabelText(/Detailangaben/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByLabelText(/Details nötig/));
@@ -152,7 +152,7 @@ describe('ApplyWizardComponent', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
     comp.contactForm.setValue({ email: 'antrag@stupa.de', name: 'Max' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → Kontakt
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
     await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main
 
     await userEvent.type(screen.getByLabelText(/Titel/), 'Sommerfest');
@@ -162,7 +162,7 @@ describe('ApplyWizardComponent', () => {
 
     expect(screen.getByText('Sommerfest')).toBeInTheDocument();
 
-    // Altcha-Widget separat getestet — Lösung hier direkt einspeisen.
+    // Altcha widget tested separately — feed the solution in directly here.
     comp.onAltchaSolved('sol');
     fixture.detectChanges();
     expect(comp.canSubmit()).toBe(true);
@@ -208,22 +208,22 @@ describe('ApplyWizardComponent', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
     expect(comp.loggedIn()).toBe(true);
-    // Antragsart + 2 Sektionen + Prüfen — KEIN Kontakt-Schritt.
+    // type + 2 sections + review — NO contact step.
     expect(comp.steps().length).toBe(4);
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main direkt
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main directly
 
     await userEvent.type(screen.getByLabelText(/Titel/), 'Sommerfest');
     await userEvent.type(screen.getByLabelText(/Betrag/), '500');
     await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
     await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
 
-    // Kein Altcha-Widget, trotzdem absendbar.
+    // No Altcha widget, still submittable.
     expect(comp.canSubmit()).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: /Antrag absenden/ }));
 
     expect(create).toHaveBeenCalledTimes(1);
     const payload = create.mock.calls[0][0] as { applicantEmail: string | null; altcha: string | null };
-    // Identität/Altcha leitet das Backend ab → FE sendet null.
+    // The backend derives identity/Altcha → FE sends null.
     expect(payload.applicantEmail).toBeNull();
     expect(payload.altcha).toBeNull();
   });
@@ -232,8 +232,8 @@ describe('ApplyWizardComponent', () => {
     const { fixture } = await setup();
     const comp = fixture.componentInstance;
     await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → Kontakt
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // invalid email → bleibt
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // invalid email → stays
     expect(comp.currentStep()).toBe('contact');
   });
 
@@ -331,10 +331,10 @@ describe('ApplyWizardComponent', () => {
     const comp = fixture.componentInstance;
     await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
     comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → Kontakt
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
     await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main section
     expect(comp.currentStep()).toBe('section');
-    // Required Titel/Betrag empty → section invalid → stays.
+    // Required title/amount empty → section invalid → stays.
     await userEvent.click(screen.getByRole('button', { name: /Weiter/ }));
     expect(comp.currentStep()).toBe('section');
     expect(comp.activeIndex()).toBe(2);
@@ -345,7 +345,7 @@ describe('ApplyWizardComponent', () => {
     const comp = fixture.componentInstance;
     await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
     comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → Kontakt (idx 1)
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact (idx 1)
     expect(comp.activeIndex()).toBe(1);
     comp.prev();
     expect(comp.activeIndex()).toBe(0);
@@ -482,7 +482,7 @@ describe('ApplyWizardComponent', () => {
     expect(comp.model['title']).toBe('Entwurf');
     expect(comp.contactForm.controls.email.value).toBe('draft@b.de');
     expect(comp.contactForm.controls.name.value).toBe('Erika');
-    // AUD-038: der gespeicherte Schritt wird wiederhergestellt, nicht auf 0 zurückgesetzt.
+    // The saved step is restored, not reset to 0.
     expect(comp.activeIndex()).toBe(1);
   });
 
@@ -494,7 +494,7 @@ describe('ApplyWizardComponent', () => {
     const { fixture } = await setup();
     const comp = fixture.componentInstance;
     comp.selectType('t1');
-    // Antragsart + Kontakt + 2 Sektionen + Prüfen = 5 Schritte → max-Index 4.
+    // type + contact + 2 sections + review = 5 steps → max index 4.
     expect(comp.steps().length).toBe(5);
     expect(comp.activeIndex()).toBe(4);
   });
@@ -525,7 +525,7 @@ describe('ApplyWizardComponent', () => {
     comp.selectType('t1');
     expect(comp.model).toEqual({});
     expect(comp.contactForm.controls.email.value).toBe('');
-    // Schritt wird trotz fehlendem model/contact wiederhergestellt (AUD-038).
+    // The step is restored even with missing model/contact.
     expect(comp.activeIndex()).toBe(1);
   });
 

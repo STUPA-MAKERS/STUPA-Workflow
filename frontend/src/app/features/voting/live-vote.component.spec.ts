@@ -126,7 +126,7 @@ describe('LiveVoteComponent', () => {
   });
 
   it('renders the closed result without a tally block when none arrived', async () => {
-    // Schließt ohne vorheriges vote_tally → result-Block ohne app-vote-bars.
+    // Closes without a prior vote_tally → result block without app-vote-bars.
     const { channel, detectChanges } = await setup();
     channel.subject.next(OPEN_VOTE);
     channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 8, no: 1, abstain: 1 } });
@@ -140,7 +140,7 @@ describe('LiveVoteComponent', () => {
     channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 8, no: 1, abstain: 1 } });
     detectChanges();
     fixture.componentInstance.cast('yes');
-    // result() gesetzt → cast() ist ein No-op, kein cast-Frame.
+    // result() set → cast() is a no-op, no cast frame.
     expect(channel.sent.some((m) => m.type === 'cast')).toBe(false);
   });
 
@@ -158,7 +158,7 @@ describe('LiveVoteComponent', () => {
     detectChanges();
     fixture.componentInstance.cast('yes');
     expect(fixture.componentInstance.myChoice()).toBe('yes');
-    // Neue Abstimmung mit anderer voteId → effect setzt myChoice zurück.
+    // New vote with a different voteId → the effect resets myChoice.
     channel.subject.next({ ...OPEN_VOTE, voteId: 'v2' });
     detectChanges();
     expect(fixture.componentInstance.myChoice()).toBeNull();

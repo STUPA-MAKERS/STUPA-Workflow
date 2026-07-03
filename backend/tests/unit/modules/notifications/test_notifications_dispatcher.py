@@ -129,7 +129,8 @@ async def test_dispatch_task_notify_sends_kind_mail(
             captured["kw"] = kw
             return True
 
-    async def fake_actionable(session, *, state, gremium_id):  # noqa: ANN001
+    async def fake_actionable(session, *, application_id, state):  # noqa: ANN001
+        captured["application_id"] = application_id
         return ["team@x.de"]
 
     async def fake_state_actionable(session, state):  # noqa: ANN001
@@ -143,13 +144,15 @@ async def test_dispatch_task_notify_sends_kind_mail(
     )
     monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
     session = FakeSession(
-        executes=[[({"title": "Beamer"}, uuid.uuid4(), None)]],
+        executes=[[({"title": "Beamer"}, uuid.uuid4())]],
         scalar=[None],  # State-Lookup — kein Treffer nötig
     )
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
-    await disp.dispatch([_action("taskNotify")])
+    action = _action("taskNotify")
+    await disp.dispatch([action])
 
     assert captured["recipients"] == ["team@x.de"]
+    assert captured["application_id"] == action.application_id
     kw = captured["kw"]
     assert kw["kind"] == "task"  # type: ignore[index]
     assert kw["template_key"] == "task_new"  # type: ignore[index]
@@ -178,7 +181,7 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
     session = FakeSession(
-        executes=[[({"title": "Beamer"}, uuid.uuid4(), None)]],
+        executes=[[({"title": "Beamer"}, uuid.uuid4())]],
         scalar=[None],
     )
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)

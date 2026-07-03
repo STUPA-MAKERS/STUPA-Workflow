@@ -1,6 +1,6 @@
-/* Block-Host, damit die `.container`-Nav per margin-inline:auto sauber zentriert —
-   sonst (inline-Host-Default) bricht die Zentrierung und die Leiste sitzt ganz links,
-   versetzt zum gleich zentrierten Header-Logo (#breadcrumb-align). */
+/* Block host so the `.container` nav centers cleanly via margin-inline:auto —
+   otherwise (inline host default) centering breaks and the bar sits far left,
+   offset from the equally centered header logo. */
 :host {
   display: block;
 }
@@ -11,8 +11,8 @@
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
 }
-/* Erste Krume bündig zur Inhalts-Kante (H1): horizontales Pill-Padding nach links
-   herausziehen; die Hover-Box bleibt erhalten (#breadcrumb-align). */
+/* First crumb flush to the content edge (H1): pull the horizontal pill padding
+   out to the left; the hover box is preserved. */
 .bc__crumb:first-child {
   margin-left: calc(-1 * var(--space-2));
 }

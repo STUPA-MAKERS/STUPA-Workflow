@@ -1,7 +1,4 @@
-"""Flow-Versionierung: flow_version, state, transition (data-model §1 »Form/Flow«).
-
-Nur Tabellen (T-06). Guards/Engine: T-14.
-"""
+"""Flow versioning tables: flow_version, state, transition."""
 
 from __future__ import annotations
 
@@ -24,11 +21,10 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class FlowVersion(UUIDPkMixin, CreatedAtMixin, Base):
-    """Der **globale** Flow (#28): ein Graph für ALLE Antragstypen.
+    """The global flow: one graph for ALL application types.
 
-    Typ-gebundene Flows sind komplett entfernt (Migration 0019); welcher Pfad/
-    welches Gremium wann greift, regeln Decision-/Vote-States, nicht eine
-    Typ-Bindung. Es existiert genau eine aktive Zeile (partial unique)."""
+    Which path/gremium applies is decided by vote states, not a per-type
+    binding. Exactly one active row exists (partial unique index)."""
 
     __tablename__ = "flow_version"
 
@@ -38,7 +34,7 @@ class FlowVersion(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         UniqueConstraint("version"),
-        # Genau ein aktiver globaler Flow.
+        # Exactly one active global flow.
         Index(
             "uq_flow_version_one_active_global",
             "active",
@@ -49,7 +45,7 @@ class FlowVersion(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class State(UUIDPkMixin, Base):
-    """Status eines Flows. Genau ein `is_initial` pro flow_version (partial unique)."""
+    """A flow state. Exactly one ``is_initial`` per flow_version (partial unique)."""
 
     __tablename__ = "state"
 
@@ -61,14 +57,10 @@ class State(UUIDPkMixin, Base):
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
     edit_allowed: Mapped[bool] = mapped_column(Boolean, server_default="true")
     is_initial: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Endzustand (DSGVO-Aufbewahrung): terminale Anträge sind anonymisierbar.
+    # Terminal state (GDPR retention): terminal applications may be anonymized.
     is_terminal: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Global-Flow-Redesign (#28, Cleanup): nur noch zwei State-Arten.
-    #  * ``normal`` — gewöhnlicher Status; manuelle/automatische Übergänge per Guard.
-    #  * ``vote``   — ein Gremium stimmt ab; ``config={gremiumId,...}``; 2 Ausgänge
-    #                 (branch ``pass``/``fail``). (approval/decision entfernt — durch
-    #                 manuelle ``roleIs``-Übergänge bzw. automatische Guard-Übergänge
-    #                 abgedeckt.)
+    # Two kinds: ``normal`` (guarded manual/automatic transitions) and ``vote``
+    # (a gremium votes; ``config={gremiumId,...}``; two branch exits pass/fail).
     kind: Mapped[str] = mapped_column(Text, server_default="normal")
     config: Mapped[dict] = mapped_column(JSONB, server_default="{}")
 
@@ -97,19 +89,17 @@ class Transition(UUIDPkMixin, Base):
         ForeignKey("state.id", ondelete="CASCADE")
     )
     label_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Optionale Farbe (#flow): färbt Pfeil im Editor + Entscheidungs-Button im Antrag.
+    # Optional color: tints the editor arrow + the decision button on the application.
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
     guard: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     actions: Mapped[list] = mapped_column(JSONB, server_default="[]")
     order: Mapped[int] = mapped_column("order", Integer, server_default="0")
-    # Automatischer Übergang (#8): feuert ohne Nutzer-Aktion, sobald der Guard
-    # erfüllt ist (vom Worker zyklisch ausgewertet, ``manual=False``).
+    # Automatic transition: fires without user action once the guard holds
+    # (evaluated periodically by the worker, ``manual=False``).
     automatic: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Ergebnis-Zweig (#28): für die 2 Ausgänge von vote/approval-States —
-    # ``pass``/``fail`` bzw. ``accept``/``reject`` (sonst ``NULL``).
+    # Result branch for the two vote-state exits: ``pass``/``fail`` (else NULL).
     branch: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # »Erfordert Aktion« (#requires-action): zählt der feuerbare Übergang als offene
-    # Aufgabe (Tasks-Tab)? ``false`` = optionale Aktion, erzeugt keine Aufgabe.
+    # Does the firable transition count as an open task? False = optional action.
     requires_action: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
     __table_args__ = (Index("ix_transition_flow_version_id_from_state_id",

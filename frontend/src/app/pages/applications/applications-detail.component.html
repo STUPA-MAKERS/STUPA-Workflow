@@ -10,10 +10,13 @@
   <header class="det__head">
     <div class="flex items-start justify-between gap-4 flex-wrap">
       <h1 class="m-0">{{ title() }}</h1>
-      @if (application.canEdit && !editing()) {
+      @if ((application.canEdit || canForceStatus()) && !editing()) {
         <div class="det__ownerActions">
-          @if (application.state?.editAllowed) {
+          @if (application.canEdit && application.state?.editAllowed) {
             <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
+          }
+          @if (canForceStatus()) {
+            <app-button variant="secondary" size="sm" (click)="openForceDialog()">{{ 'applications.detail.forceStatus' | t }}</app-button>
           }
           @if (isAdmin()) {
             <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
@@ -83,7 +86,7 @@
   </header>
 
   <div class="det__layout" [class.det__layout--editing]="editing()">
-  <!-- LINKS: Übergänge als schwebende Karte (#det) -->
+  <!-- Left rail: transitions as a floating card -->
   <aside class="det__rail det__rail--left">
     @if (canTransition() && transitions().length) {
       <app-card [heading]="'applications.transitions.title' | t">
@@ -104,9 +107,9 @@
     }
   </aside>
 
-  <!-- MITTE: Antragsdaten + Historie + Anhänge -->
+  <!-- Center: application data + history + attachments -->
   <div class="det__center">
-  <!-- Antragsdaten (Ansicht oder Inline-Bearbeitung der Ersteller:in/Verwalter:in) -->
+  <!-- Application data (view or inline edit by creator/manager) -->
   <app-card [heading]="'applications.detail.data.title' | t">
     @if (editing()) {
       <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
@@ -125,7 +128,7 @@
           }
         </dl>
       }
-      <!-- Kostenpositionen mit Vergleichsangeboten (#1) -->
+      <!-- Cost positions with comparison offers -->
       @for (pf of positionEntries(application); track pf.key) {
         <section class="flex flex-col gap-3 mt-4">
           <h3 class="m-0 text-base">{{ pf.label }}</h3>
@@ -204,11 +207,11 @@
     }
   </app-card>
 
-  <!-- Anhänge (T-13-Contract): Upload + signierte Download-URLs + Scan-Status -->
+  <!-- Attachments: upload + signed download URLs + scan status -->
   <app-attachments-panel [applicationId]="application.id" [canUpload]="canManage()" />
   </div><!-- /det__center -->
 
-  <!-- RECHTS: Kommentare als Chat (#det) -->
+  <!-- Right rail: comments as a chat -->
   <aside class="det__rail det__rail--right">
     <section class="det__chat" [attr.aria-label]="'applications.comments.title' | t">
       <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'applications.comments.title' | t }}</header>
@@ -286,7 +289,7 @@
   </div>
 </app-dialog>
 
-<!-- Kostenstelle zuordnen (#17): Tree-Picker im Dialog. -->
+<!-- Assign cost centre: tree picker in a dialog. -->
 <app-dialog
   [open]="budgetDialogOpen()"
   [title]="'applications.budget.title' | t"
@@ -320,5 +323,42 @@
       [disabled]="budgetChoice() === (app()?.budgetId ?? '') && fiscalChoice() === (app()?.fiscalYearId ?? '')"
       (click)="assignBudget()"
     >{{ 'applications.budget.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Force status: privileged direct override (bypasses the flow). -->
+<app-dialog
+  [open]="forceDialogOpen()"
+  [title]="'applications.detail.forceStatusTitle' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="forceDialogOpen.set(false)"
+>
+  <p class="text-muted">{{ 'applications.detail.forceStatusLead' | t }}</p>
+  <app-select
+    [label]="'applications.detail.forceStatusField' | t"
+    [placeholder]="'applications.detail.forceStatusPlaceholder' | t"
+    [options]="forceStateOptions()"
+    [ngModel]="forceStateChoice()"
+    (ngModelChange)="forceStateChoice.set($event)"
+  />
+  <label class="det__forceReason">
+    <span>{{ 'applications.detail.forceStatusReason' | t }}</span>
+    <textarea
+      rows="3"
+      name="forceReason"
+      [placeholder]="'applications.detail.forceStatusReasonPlaceholder' | t"
+      [ngModel]="forceNote()"
+      (ngModelChange)="forceNote.set($event)"
+    ></textarea>
+  </label>
+  <div dialog-footer>
+    <app-button variant="ghost" size="sm" (click)="forceDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button
+      variant="danger"
+      size="sm"
+      [loading]="forcingStatus()"
+      [disabled]="!forceStateChoice() || !forceNote().trim()"
+      (click)="doForceStatus()"
+    >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button>
   </div>
 </app-dialog>

@@ -1,20 +1,10 @@
-"""Deadline-Tabelle (data-model »deadline«, flows §9.4, T-44).
+"""Deadline table.
 
-Eine :class:`Deadline` bindet einen Zeitpunkt (``due_at``) an einen Antrag und/oder
-Antragstyp und beschreibt **optional**, was bei Ablauf passiert:
-
-* ``action_on_pass`` (JSONB, NULL) = Referenz auf einen Flow-Übergang
-  (``{"transitionId": "<uuid>"}``). Ist er gesetzt, scannt der arq-Cron (flows §9.4)
-  die Frist und feuert den Übergang mit Guard ``deadlinePassed`` (Auto-Übergang bzw.
-  Wiedervorlage/Requeue, ``kind="requeue"``). Nach erfolgreichem Feuern wird
-  ``action_on_pass`` auf NULL gesetzt → die Frist verlässt den (partiellen) Scan-Index,
-  ein erneuter Lauf feuert **nicht** doppelt (Idempotenz-Marker).
-* ``reminded_at`` (timestamptz, NULL) markiert eine bereits versandte Erinnerung
-  (``deadline_approaching``) → genau-einmal-Semantik, auch bei parallelen Workern.
-
-Auf einem **frischen** Schema entsteht die Tabelle über ``Base.metadata.create_all``
-in Migration 0002 (Single-Source via ``app.models``); für ältere Schemata legt
-Migration 0014 sie **idempotent** (``checkfirst``) nach.
+A :class:`Deadline` binds a due time to an application and/or type. If
+``action_on_pass`` (``{"transitionId": "<uuid>"}``) is set, the arq cron fires
+that transition on expiry and then NULLs the field — the row leaves the partial
+scan index, so a rerun never fires twice (idempotency marker). ``reminded_at``
+marks an already-sent reminder for exactly-once semantics across workers.
 """
 
 from __future__ import annotations
@@ -39,27 +29,25 @@ from app.db import Base, UUIDPkMixin
 
 
 class Deadline(UUIDPkMixin, Base):
-    """Frist zu einem Antrag/Antragstyp mit optionaler Ablauf-Aktion (flows §9.4)."""
+    """Deadline for an application/type with an optional expiry action."""
 
     __tablename__ = "deadline"
 
-    # Antrags-Frist (CASCADE: gelöschter Antrag entfernt seine Fristen) — NULL bei
-    # rein typ-bezogenen Vorlagen-Fristen (``type_id``).
+    # NULL for type-only template deadlines.
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
     type_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application_type.id", ondelete="CASCADE"), nullable=True
     )
-    # Freitext-Klassifikation (z. B. ``flow_phase``, ``vote``, ``requeue``) — rein
-    # informativ/filterbar; die Wirkung steckt in ``action_on_pass``.
+    # Free-text classification (e.g. ``flow_phase``, ``vote``, ``requeue``);
+    # informational only — the effect lives in ``action_on_pass``.
     kind: Mapped[str] = mapped_column(Text)
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # = Transition-/Action-Ref; NULL = reine Erinnerungs-/Anzeige-Frist ohne Auto-Wirkung.
-    # ``none_as_null=True``: Python ``None`` MUSS als SQL NULL (nicht als JSONB-Skalar
-    # ``'null'``) gespeichert werden — sonst matcht ``action_on_pass IS NOT NULL`` (Scan +
-    # Partial-Index ``ix_deadline_due_at_action``) auch reine Erinnerungs-Fristen, und
-    # ``mark_fired`` (setzt ``None``) entfernte die Frist nie aus dem Scan (Doppel-Feuern).
+    # NULL = reminder/display-only deadline. ``none_as_null=True`` is required:
+    # Python ``None`` must be stored as SQL NULL, not JSONB ``'null'`` — otherwise
+    # ``action_on_pass IS NOT NULL`` (scan + partial index) matches reminder-only
+    # rows and ``mark_fired`` never removes a row from the scan (double firing).
     action_on_pass: Mapped[dict | None] = mapped_column(
         JSONB(none_as_null=True), nullable=True
     )
@@ -68,14 +56,13 @@ class Deadline(UUIDPkMixin, Base):
     )
 
     __table_args__ = (
-        # Cron-Scan der ablaufenden Auto-Fristen (data-model »deadline«): partiell, da nur
-        # Fristen mit Aktion gefeuert werden; nach dem Feuern fällt die Zeile heraus.
+        # Cron scan of expiring auto-deadlines; partial — fired rows drop out.
         Index(
             "ix_deadline_due_at_action",
             "due_at",
             postgresql_where=text("action_on_pass IS NOT NULL"),
         ),
-        # Erinnerungs-Scan: nur noch nicht erinnerte Fristen.
+        # Reminder scan: only not-yet-reminded deadlines.
         Index(
             "ix_deadline_reminder",
             "due_at",
@@ -85,28 +72,25 @@ class Deadline(UUIDPkMixin, Base):
 
 
 class DeadlinePolicy(UUIDPkMixin, Base):
-    """Benannte Frist-**Policy** (Registry), die der Flow per ``key`` referenziert.
+    """Named deadline policy (registry) referenced by the flow via ``key``.
 
-    Entkoppelt die konkrete Frist von der Flow-Definition: eine Policy lässt sich
-    z. B. pro Semester aktualisieren (``absolute``-Datum), **ohne** den Flow neu zu
-    versionieren. Zwei relative Varianten leiten die Frist aus dem Antrag ab:
-
-    * ``absolute``            — fixes ``due_at`` = ``absolute_at`` (pro Semester editierbar).
-    * ``relative_submitted``  — Einreichung (``application.created_at``) + ``offset_days``.
-    * ``relative_changed``    — letzte Änderung (``application.updated_at``) + ``offset_days``.
+    Decouples the concrete date from the flow definition — an ``absolute`` date
+    can be updated per semester without re-versioning the flow. Kinds:
+    ``absolute`` (fixed ``absolute_at``), ``relative_submitted`` /
+    ``relative_changed`` (application created/updated + ``offset_days``).
     """
 
     __tablename__ = "deadline_policy"
 
-    # Stabiler Referenz-Schlüssel (vom Flow benutzt); eindeutig.
+    # Stable reference key used by the flow; unique.
     key: Mapped[str] = mapped_column(Text, unique=True)
     label: Mapped[dict] = mapped_column(JSONB)  # I18nMap (de/en …)
     kind: Mapped[str] = mapped_column(Text)
-    # Nur bei ``absolute`` gesetzt (pro Semester nachpflegbar).
+    # Set only for ``absolute``.
     absolute_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Nur bei den relativen Varianten gesetzt (Tage Versatz).
+    # Set only for the relative kinds (day offset).
     offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

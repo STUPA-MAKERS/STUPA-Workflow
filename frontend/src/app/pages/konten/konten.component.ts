@@ -17,7 +17,6 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { Uuid } from '@core/api/models';
 import {
   BadgeComponent,
   ButtonComponent,
@@ -30,30 +29,28 @@ import {
   IconComponent,
   InputComponent,
   SelectComponent,
-  type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
   type AccountOption,
-  type BankSyncResult,
   BudgetTreeApi,
   type Expense,
   type ExpenseKind,
-  type FintsCredentialStatus,
   type StatementLine,
-  flattenBudgetOptions,
 } from '../budget/budget-tree.api';
+import type { Uuid } from '@core/api/models';
 import { PALETTE } from '../budget/budget-year-tree.component';
+import { ariaSortDir, formatEur, sortIndicator } from '../budget/expense-display.util';
+import { splitCounterparty } from './konten.util';
+import { FintsSyncState } from './fints-sync.state';
+import { KontenLinesState, type StatementSortField } from './konten-lines.state';
+import { KontenReconcileState } from './konten-reconcile.state';
 import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
 
 /**
- * Konten-Tab (#fints-konten): pro Bankkonto **alle** abgerufenen Transaktionen + Kontostand;
- * jede Transaktion ist optional **genau einer** Buchung zugeordnet. Layout wie der Buchungen-Tab
- * (Liste links, Tabelle rechts). Aktionen: Synchronisieren / Login / Datei-Import; pro Zeile
- * Link (an bestehende Buchung) · Import (neue Buchung) · Unlink (Zuordnung lösen).
- *
- * FinTS-Login/Sync/TAN leben hier (nicht mehr im Buchungen-Dialog). Direkter DB-Bezug n/a — alles
- * über die API; Schreibrechte serverseitig (budget.book).
+ * Accounts tab: per bank account all fetched transactions + balance; each line
+ * is linked to at most one booking. FinTS login/sync/TAN live here. Thin facade
+ * over the state modules below; its public surface also drives the specs.
  */
 @Component({
   selector: 'app-konten',
@@ -65,7 +62,6 @@ import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
     LocalizedDatePipe,
     BadgeComponent,
     ButtonComponent,
-    CheckboxComponent,
     DatepickerComponent,
     DialogComponent,
     FilterBarComponent,
@@ -74,6 +70,7 @@ import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
     IconComponent,
     InputComponent,
     SelectComponent,
+    CheckboxComponent,
     HScrollSyncDirective,
     RouterLink,
   ],
@@ -81,35 +78,46 @@ import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
   styleUrl: './konten.component.scss',
 })
 export class KontenComponent implements OnDestroy {
-  private readonly api = inject(BudgetTreeApi);
+  private readonly auth = inject(AuthService);
+  // Referenced via the same root instances by the state modules; specs spy here.
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
-  private readonly auth = inject(AuthService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly api = inject(BudgetTreeApi);
 
-  // Schreibrechte (#review): Sync/Import/Link/Unlink nur mit budget.book; View-only blendet sie aus.
+  private readonly linesState = new KontenLinesState();
+  private readonly sync = new FintsSyncState(this.linesState, this.host);
+  private readonly reconcile = new KontenReconcileState(this.linesState);
+
+  /** Sync/import/link/unlink need budget.book; view-only hides them. */
   readonly canBook = computed(() => this.auth.can('budget.book'));
-
-  // --- accounts (left list) ---
-  readonly accounts = signal<AccountOption[]>([]);
-  readonly accountId = signal<string>('');
-  readonly selectedAccount = computed<AccountOption | null>(
-    () => this.accounts().find((a) => a.id === this.accountId()) ?? null,
-  );
-
-  // --- transactions (serverseitig gefiltert + paginiert, #fints-konten) ---
-  private readonly PAGE = 30;
-  readonly lines = signal<StatementLine[]>([]);
-  readonly loadingLines = signal(false);
-  /** Nach-Mutations-Refresh läuft: Liste bleibt sichtbar, nur `aria-busy` (#expenses-ux). */
-  readonly refreshing = signal(false);
-  readonly loadingMore = signal(false);
-  readonly total = signal(0);
-  private nextOffset = 0;
-  readonly hasMore = computed(() => this.lines().length < this.total());
+  /** Ignoring/reactivating a line needs the dedicated audit-sensitive permission. */
+  readonly canIgnore = computed(() => this.auth.can('budget.reconcile_ignore'));
+  /** Mobile only: account list behind a collapsible toggle. */
+  readonly treeOpen = signal(false);
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
-  // --- Batch / Sammel-Aktionen (#expenses-ux) ---
+  // --- lines state (KontenLinesState) ----------------------------------------
+  readonly accounts = this.linesState.accounts;
+  readonly accountId = this.linesState.accountId;
+  readonly selectedAccount = this.linesState.selectedAccount;
+  readonly accountOptions = this.linesState.accountOptions;
+  readonly lines = this.linesState.lines;
+  readonly loadingLines = this.linesState.loadingLines;
+  readonly loadingMore = this.linesState.loadingMore;
+  readonly total = this.linesState.total;
+  readonly hasMore = this.linesState.hasMore;
+  readonly filterState = this.linesState.filterState;
+  readonly kind = this.linesState.kind;
+  readonly searchQ = this.linesState.searchQ;
+  readonly dateFrom = this.linesState.dateFrom;
+  readonly dateTo = this.linesState.dateTo;
+  readonly sortField = this.linesState.sortField;
+  readonly sortOrder = this.linesState.sortOrder;
+  readonly activeFilterCount = this.linesState.activeFilterCount;
+  readonly refreshing = this.linesState.refreshing;
+
+  // --- batch / bulk actions (#expenses-ux) ---
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkBusy = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
@@ -117,7 +125,7 @@ export class KontenComponent implements OnDestroy {
     const list = this.lines();
     return list.length > 0 && list.every((l) => this.selected().has(l.id));
   });
-  /** Auswahl-Teilmengen nach Match-Zustand → steuern, welcher Sammel-Button aktiv ist. */
+  /** Selection subsets by match state → drive which bulk button is active. */
   readonly selectedMatched = computed(
     () =>
       this.lines().filter((l) => this.selected().has(l.id) && l.matchState === 'matched').length,
@@ -132,118 +140,64 @@ export class KontenComponent implements OnDestroy {
   );
   readonly bulkConfirm = signal<null | 'unlink' | 'ignore'>(null);
 
-  // --- filter/sort (serverseitig) ---
-  readonly filterState = signal<'' | 'open' | 'linked'>('');
-  readonly kind = signal<'' | ExpenseKind>('');
-  readonly searchQ = signal('');
-  readonly dateFrom = signal('');
-  readonly dateTo = signal('');
-  readonly sortField = signal<'date' | 'amount'>('date');
-  readonly sortOrder = signal<'asc' | 'desc'>('desc');
-  readonly activeFilterCount = computed(
-    () =>
-      (this.filterState() ? 1 : 0) +
-      (this.kind() ? 1 : 0) +
-      (this.dateFrom() || this.dateTo() ? 1 : 0),
-  );
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  // --- FinTS state (FintsSyncState) --------------------------------------------
+  readonly credStatus = this.sync.credStatus;
+  readonly connectOpen = this.sync.connectOpen;
+  readonly credLogin = this.sync.credLogin;
+  readonly credPin = this.sync.credPin;
+  readonly savingCred = this.sync.savingCred;
+  readonly configured = this.sync.configured;
+  readonly connected = this.sync.connected;
+  readonly locked = this.sync.locked;
+  readonly lockedUntilLabel = this.sync.lockedUntilLabel;
+  readonly syncing = this.sync.syncing;
+  readonly sessionToken = this.sync.sessionToken;
+  readonly challenge = this.sync.challenge;
+  readonly challengeImage = this.sync.challengeImage;
+  readonly decoupled = this.sync.decoupled;
+  readonly tanCode = this.sync.tanCode;
+  readonly tanBusy = this.sync.tanBusy;
+  readonly hasPendingTan = this.sync.hasPendingTan;
+  readonly otpLength = this.sync.otpLength;
+  readonly otpSlots = this.sync.otpSlots;
+  readonly otpDigits = this.sync.otpDigits;
+  readonly otpMode = this.sync.otpMode;
+  readonly tanReady = this.sync.tanReady;
 
-  // Linker Baum mobil einklappbar (wie Buchungen-Tab).
-  readonly treeOpen = signal(false);
-
-  // --- FinTS credential / connect (je Bucher) — in Verbindungs-Dialog, nicht inline ---
-  readonly credStatus = signal<FintsCredentialStatus | null>(null);
-  readonly connectOpen = signal(false);
-  readonly credLogin = signal('');
-  readonly credPin = signal('');
-  readonly savingCred = signal(false);
-  readonly configured = computed(() => !!this.credStatus()?.configured);
-  readonly connected = computed(() => !!this.credStatus()?.hasCredential);
-  readonly locked = computed(() => {
-    const until = this.credStatus()?.fintsLockedUntil;
-    return !!until && new Date(until).getTime() > Date.now();
-  });
-  readonly lockedUntilLabel = computed(() => {
-    const until = this.credStatus()?.fintsLockedUntil;
-    return until ? new Date(until).toLocaleString() : '';
-  });
-
-  // --- sync / TAN ---
-  readonly syncing = signal(false);
-  readonly sessionToken = signal<string>('');
-  readonly challenge = signal<string>('');
-  readonly challengeImage = signal<string>('');
-  readonly decoupled = signal(false);
-  readonly tanCode = signal('');
-  readonly tanBusy = signal(false);
-  readonly hasPendingTan = computed(() => !!this.sessionToken());
-
-  // OTP (6 Boxen) — identisch zum bisherigen Dialog.
-  readonly otpLength = 6;
-  readonly otpSlots = Array.from({ length: 6 }, (_, i) => i);
-  readonly otpDigits = signal<string[]>(Array.from({ length: 6 }, () => ''));
-  readonly otpMode = signal(true);
-  readonly tanReady = computed(() => {
-    const t = this.tanCode().trim();
-    return this.otpMode() ? t.length === this.otpLength : t.length > 0;
-  });
-
-  // --- reconcile: cost-centre tree + fiscal years ---
-  private readonly costOptionsSig = signal<SelectOption[]>([]);
-  readonly costCentreOptions = computed<SelectOption[]>(() => this.costOptionsSig());
-  readonly fiscalYearOptions = signal<SelectOption[]>([]);
-  /** Knoten-Id → Top-Budget-Id (für die HHJ-Auswahl beim Import). */
-  private idToTopId = signal<Map<string, string>>(new Map());
-
-  // --- Import dialog ---
-  readonly importLine = signal<StatementLine | null>(null);
-  readonly impBudgetId = signal('');
-  readonly impFiscalYearId = signal('');
-  readonly impDescription = signal('');
-  readonly booking = signal(false);
-
-  // --- Link dialog: Typeahead wie der Mitglieder-Picker (/admin/gremien) ---
-  readonly linkLine = signal<StatementLine | null>(null);
-  readonly linkQuery = signal('');
-  readonly linkCandidates = signal<Expense[]>([]);
-  readonly linkSelected = signal<Expense | null>(null);
-  readonly linkLoading = signal(false);
-  private linkTimer: ReturnType<typeof setTimeout> | null = null;
-  candidateLabel(e: Expense): string {
-    const parts = [e.description, this.money(e.amount)];
-    if (e.correspondent) parts.push(e.correspondent);
-    if (e.pathKey) parts.push(e.pathKey);
-    return parts.join(' · ');
-  }
-
-  readonly accountOptions = computed<SelectOption[]>(() =>
-    this.accounts().map((a) => ({ value: a.id, label: a.name })),
-  );
+  // --- reconcile state (KontenReconcileState) ------------------------------------
+  readonly costCentreOptions = this.reconcile.costCentreOptions;
+  readonly fiscalYearOptions = this.reconcile.fiscalYearOptions;
+  readonly importLine = this.reconcile.importLine;
+  readonly impBudgetId = this.reconcile.impBudgetId;
+  readonly impFiscalYearId = this.reconcile.impFiscalYearId;
+  readonly impDescription = this.reconcile.impDescription;
+  readonly booking = this.reconcile.booking;
+  readonly linkLine = this.reconcile.linkLine;
+  readonly linkQuery = this.reconcile.linkQuery;
+  readonly linkCandidates = this.reconcile.linkCandidates;
+  readonly linkSelected = this.reconcile.linkSelected;
+  readonly linkLoading = this.reconcile.linkLoading;
+  readonly ignoreLine = this.reconcile.ignoreLine;
+  readonly ignoreReason = this.reconcile.ignoreReason;
 
   constructor() {
-    this.refreshAccounts();
-    this.api.tree().subscribe({
-      next: (tree) => {
-        this.costOptionsSig.set(flattenBudgetOptions(tree));
-        const map = new Map<string, string>();
-        const walk = (node: { id: string; children: unknown[] }, topId: string): void => {
-          map.set(node.id, topId);
-          for (const c of node.children) walk(c as { id: string; children: unknown[] }, topId);
-        };
-        for (const top of tree) walk(top, top.id);
-        this.idToTopId.set(map);
-      },
-      error: () => this.costOptionsSig.set([]),
-    });
-    // Konto gewählt → Transaktionen + Verbindungs-Status laden.
+    // Account picked → load lines + connection status. fetch() reads the filter
+    // signals inside this effect, so filter changes re-trigger it by design.
     effect(() => {
       const acc = this.accountId();
       if (acc) {
-        this.reloadLines();
-        this.loadCredStatus(acc);
+        this.linesState.reloadLines();
+        this.sync.loadCredStatus(acc);
       }
     });
-    // Infinite Scroll: Sentinel am Tabellenende sichtbar → nächste Seite (wie Buchungen).
+    // Keep the bulk selection pruned to rows that still exist (after refresh/reload/account switch).
+    effect(() => {
+      const ids = new Set(this.lines().map((l) => l.id));
+      this.selected.update((cur) =>
+        [...cur].every((x) => ids.has(x)) ? cur : new Set([...cur].filter((x) => ids.has(x))),
+      );
+    });
+    // Infinite scroll: sentinel at the table end → next page.
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
       if (!el || typeof IntersectionObserver === 'undefined') return;
@@ -256,390 +210,202 @@ export class KontenComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    if (this.linkTimer) clearTimeout(this.linkTimer);
+    this.linesState.dispose();
+    this.reconcile.dispose();
   }
 
-  /** Konten-Liste (inkl. aktuellem Kontostand) laden/auffrischen, Auswahl beibehalten (#review). */
-  private refreshAccounts(): void {
-    this.api.listAccountOptions().subscribe({
-      next: (accs) => {
-        this.accounts.set(accs);
-        if (!this.accountId() && accs.length) this.accountId.set(accs[0].id);
-      },
-      error: () => this.accounts.set([]),
-    });
-  }
-
-  selectAccount(id: string): void {
-    if (id === this.accountId()) return;
-    this.accountId.set(id);
-    this.resetTan();
-  }
-
-  /** Erste Seite (neu) laden — nach Konto-/Filterwechsel. */
-  reloadLines(): void {
-    if (!this.accountId()) return;
-    this.nextOffset = 0;
-    this.lines.set([]);
-    this.total.set(0);
-    this.loadingLines.set(true);
-    this.selected.set(new Set()); // neuer Datensatz / Kontowechsel → Auswahl verwerfen
-    this.fetch(true);
-  }
-
-  loadMore(): void {
-    if (this.loadingMore() || this.loadingLines() || !this.hasMore()) return;
-    this.loadingMore.set(true);
-    this.fetch(false);
-  }
-
-  /** Nach einer Mutation: das AKTUELL geladene Fenster (offset 0, EIN Request) neu holen
-   *  und die Liste atomar ersetzen — kein clear, kein `loadingLines`-Flip → Tabelle bleibt
-   *  gemountet, Scroll-Position bleibt erhalten (#expenses-ux). */
-  private refresh(): void {
-    if (!this.accountId() || this.refreshing()) return;
-    const windowLimit = Math.max(this.PAGE, Math.ceil(this.lines().length / this.PAGE) * this.PAGE);
-    this.refreshing.set(true);
-    this.api
-      .listStatementLines({ ...this.lineParams(), limit: windowLimit, offset: 0 })
-      .subscribe({
-        next: (page) => {
-          this.total.set(page.total);
-          this.lines.set(page.items);
-          this.nextOffset = page.offset + page.items.length;
-          this.pruneSelection();
-          this.refreshing.set(false);
-        },
-        error: () => this.refreshing.set(false),
-      });
-  }
-
-  /** Aktive Filter als Query-Teil — Basis für {@link fetch} und {@link refresh}. */
-  private lineParams() {
-    const linked =
-      this.filterState() === 'linked' ? true : this.filterState() === 'open' ? false : undefined;
-    return {
-      account: this.accountId() as Uuid,
-      linked,
-      kind: this.kind() || undefined,
-      q: this.searchQ().trim() || undefined,
-      dateFrom: this.dateFrom() || undefined,
-      dateTo: this.dateTo() || undefined,
-      sort: this.sortField(),
-      order: this.sortOrder(),
-    };
-  }
-
-  private fetch(initial: boolean): void {
-    this.api
-      .listStatementLines({ ...this.lineParams(), limit: this.PAGE, offset: this.nextOffset })
-      .subscribe({
-        next: (page) => {
-          this.total.set(page.total);
-          this.lines.update((cur) => (initial ? page.items : [...cur, ...page.items]));
-          this.nextOffset = page.offset + page.items.length;
-          this.loadingLines.set(false);
-          this.loadingMore.set(false);
-        },
-        error: () => {
-          if (initial) this.lines.set([]);
-          this.loadingLines.set(false);
-          this.loadingMore.set(false);
-        },
-      });
-  }
-
+  // --- display helpers ------------------------------------------------------------
+  /** Unsigned amount (the sign is rendered separately). */
   money(amount: string): string {
-    const n = Math.abs(Number(amount));
-    return n.toLocaleString(this.i18n.locale() === 'en' ? 'en-US' : 'de-DE', {
-      style: 'currency',
-      currency: 'EUR',
-    });
+    return formatEur(Math.abs(Number(amount)), this.i18n.locale());
   }
 
-  /** Kontostand **mit Vorzeichen** (negativ = überzogen) — #review: nicht abs() wie money(). */
+  /** Balance keeps its sign (negative = overdrawn). */
   balanceMoney(amount: string): string {
-    return Number(amount).toLocaleString(this.i18n.locale() === 'en' ? 'en-US' : 'de-DE', {
-      style: 'currency',
-      currency: 'EUR',
-    });
+    return formatEur(Number(amount), this.i18n.locale());
   }
 
   signedMoney(l: StatementLine): string {
     return (l.kind === 'income' ? '+' : '−') + this.money(l.amount);
   }
 
-  /** Gegenkonto in Name + IBAN trennen (#fints) — wie im alten Dialog. */
   counterparty(l: StatementLine): { name: string; iban: string } {
-    let iban = (l.counterpartyIban ?? '').trim();
-    let name = (l.counterpartyName ?? '').trim();
-    if (iban && name.startsWith(iban)) name = name.slice(iban.length).trim();
-    else if (!iban) {
-      const m = /^([A-Z]{2}\d{13,30})(.*)$/.exec(name);
-      if (m) {
-        iban = m[1];
-        name = m[2].trim();
-      }
-    }
-    return { name, iban };
+    return splitCounterparty(l);
   }
 
-  // ----------------------------------------------------- filter/sort (serverseitig)
-  setState(s: '' | 'open' | 'linked'): void {
-    this.filterState.set(s);
-    this.reloadLines();
-  }
-  setKind(k: '' | ExpenseKind): void {
-    this.kind.set(k);
-    this.reloadLines();
-  }
-  onDateFilter(which: 'from' | 'to', value: string): void {
-    (which === 'from' ? this.dateFrom : this.dateTo).set(value || '');
-    this.reloadLines();
-  }
-  resetFilters(): void {
-    this.filterState.set('');
-    this.kind.set('');
-    this.dateFrom.set('');
-    this.dateTo.set('');
-    this.reloadLines();
-  }
-  onSearch(v: string): void {
-    this.searchQ.set(v);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reloadLines(), 400);
-  }
-  onSort(field: 'date' | 'amount'): void {
-    if (this.sortField() === field) this.sortOrder.update((o) => (o === 'desc' ? 'asc' : 'desc'));
-    else {
-      this.sortField.set(field);
-      this.sortOrder.set('desc');
-    }
-    this.reloadLines();
-  }
-  sortInd(field: 'date' | 'amount'): string {
-    if (this.sortField() !== field) return '';
-    return this.sortOrder() === 'asc' ? ' ↑' : ' ↓';
-  }
-  ariaSort(field: 'date' | 'amount'): 'ascending' | 'descending' | 'none' {
-    if (this.sortField() !== field) return 'none';
-    return this.sortOrder() === 'asc' ? 'ascending' : 'descending';
-  }
-
-  // ----------------------------------------------------- account selector look
-  /** Farbpunkt je Konto wie im Budget-Selektor (#fints-konten) — Index-rotiert. */
+  /** Colour dot per account, palette rotated by index (like the budget picker). */
   dotColor(index: number): string {
     return PALETTE[((index % PALETTE.length) + PALETTE.length) % PALETTE.length];
   }
+
   accountBalance(a: AccountOption): string {
     return a.fintsLastBalance !== null ? this.balanceMoney(a.fintsLastBalance) : '';
   }
 
-  // ----------------------------------------------------- credential / connect (dialog)
-  private loadCredStatus(accountId: string): void {
-    this.api.fintsCredentialStatus(accountId as Uuid).subscribe({
-      next: (s) => {
-        this.credStatus.set(s);
-        this.credLogin.set(s.fintsLogin ?? '');
-        this.credPin.set('');
-      },
-      error: () => this.credStatus.set(null),
-    });
+  sortInd(field: StatementSortField): string {
+    return sortIndicator(this.sortField() === field, this.sortOrder());
   }
+
+  ariaSort(field: StatementSortField): 'ascending' | 'descending' | 'none' {
+    return ariaSortDir(this.sortField() === field, this.sortOrder());
+  }
+
+  // --- account / list delegates ----------------------------------------------------
+  selectAccount(id: string): void {
+    if (id === this.accountId()) return;
+    this.accountId.set(id);
+    this.sync.resetTan();
+  }
+
+  reloadLines(): void {
+    this.linesState.reloadLines();
+  }
+
+  loadMore(): void {
+    this.linesState.loadMore();
+  }
+
+  setState(s: '' | 'open' | 'linked' | 'ignored'): void {
+    this.linesState.setState(s);
+  }
+
+  setKind(k: '' | ExpenseKind): void {
+    this.linesState.setKind(k);
+  }
+
+  onDateFilter(which: 'from' | 'to', value: string): void {
+    this.linesState.onDateFilter(which, value);
+  }
+
+  resetFilters(): void {
+    this.linesState.resetFilters();
+  }
+
+  onSearch(v: string): void {
+    this.linesState.onSearch(v);
+  }
+
+  onSort(field: StatementSortField): void {
+    this.linesState.onSort(field);
+  }
+
+  // --- FinTS delegates ---------------------------------------------------------------
   openConnect(): void {
-    this.credLogin.set(this.credStatus()?.fintsLogin ?? '');
-    this.credPin.set('');
-    this.connectOpen.set(true);
+    this.sync.openConnect();
   }
+
   closeConnect(): void {
-    this.connectOpen.set(false);
-    this.credPin.set('');
+    this.sync.closeConnect();
   }
+
   saveCred(): void {
-    const acc = this.accountId();
-    const login = this.credLogin().trim();
-    const pin = this.credPin();
-    if (!acc || !login || !pin || this.savingCred()) return;
-    this.savingCred.set(true);
-    this.api.setFintsCredential(acc as Uuid, { fintsLogin: login, fintsPin: pin }).subscribe({
-      next: (s) => {
-        this.savingCred.set(false);
-        this.credStatus.set(s);
-        this.closeConnect();
-        this.toast.success(this.i18n.translate('fints.credSaved'));
-      },
-      error: (e) => {
-        this.savingCred.set(false);
-        this.toast.error(this.syncError(e));
-      },
-    });
+    this.sync.saveCred();
   }
+
   removeCred(): void {
-    const acc = this.accountId();
-    if (!acc || this.savingCred()) return;
-    this.savingCred.set(true);
-    this.api.deleteFintsCredential(acc as Uuid).subscribe({
-      next: () => {
-        this.savingCred.set(false);
-        this.resetTan();
-        this.closeConnect();
-        this.loadCredStatus(acc);
-        this.toast.success(this.i18n.translate('fints.credRemoved'));
-      },
-      error: () => {
-        this.savingCred.set(false);
-        this.toast.error(this.i18n.translate('fints.errBook'));
-      },
-    });
+    this.sync.removeCred();
   }
 
-  // ----------------------------------------------------- sync / TAN
   startSync(): void {
-    const acc = this.accountId();
-    if (!acc || this.syncing() || this.locked()) return;
-    if (!this.connected()) {
-      // Noch keine Zugangsdaten → Verbindungs-Dialog statt Fehler.
-      this.openConnect();
-      return;
-    }
-    this.resetTan();
-    this.syncing.set(true);
-    this.api.fintsSync(acc as Uuid).subscribe({
-      next: (res) => {
-        this.syncing.set(false);
-        this.handleSync(res);
-      },
-      error: (e) => {
-        this.syncing.set(false);
-        this.toast.error(this.syncError(e));
-        this.refreshOnLock(e);
-      },
-    });
+    this.sync.startSync();
   }
+
   submitTan(): void {
-    const acc = this.accountId();
-    const token = this.sessionToken();
-    if (!acc || !token || this.tanBusy()) return;
-    this.tanBusy.set(true);
-    this.api.fintsSubmitTan(acc as Uuid, token as Uuid, this.tanCode().trim()).subscribe({
-      next: (res) => {
-        this.tanBusy.set(false);
-        if (res.status === 'needs_tan') {
-          this.toast.show(this.i18n.translate('fints.tanPending'), 'info');
-          return;
-        }
-        this.resetTan();
-        this.handleSync(res);
-      },
-      error: (e) => {
-        this.tanBusy.set(false);
-        this.toast.error(this.syncError(e));
-        this.refreshOnLock(e);
-      },
-    });
+    this.sync.submitTan();
   }
-  private handleSync(res: BankSyncResult): void {
-    if (res.status === 'needs_tan') {
-      this.sessionToken.set(res.sessionToken ?? '');
-      this.challenge.set(res.challenge ?? '');
-      const img = res.challengeImage ?? '';
-      this.challengeImage.set(/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(img) ? img : '');
-      this.decoupled.set(res.decoupled);
-      return;
-    }
-    this.toast.success(
-      this.i18n.translate('fints.imported', {
-        imported: String(res.imported),
-        duplicates: String(res.duplicates),
-      }),
-    );
-    this.refresh();
-    this.loadCredStatus(this.accountId());
-    this.refreshAccounts(); // Kontostand/Anzeige nach Sync aktualisieren (#review)
-  }
-  private refreshOnLock(e: unknown): void {
-    const code = (e as { error?: { code?: string } })?.error?.code;
-    const acc = this.accountId();
-    if (acc && (code === 'fints_bank_locked' || code === 'fints_auth_rejected')) {
-      this.loadCredStatus(acc);
-    }
-  }
-  private syncError(e: unknown): string {
-    const code = (e as { error?: { code?: string } })?.error?.code;
-    if (code === 'fints_not_configured') return this.i18n.translate('fints.errNotConfigured');
-    if (code === 'fints_no_credential') return this.i18n.translate('fints.errNoCredential');
-    if (code === 'fints_pin_undecryptable') return this.i18n.translate('fints.errPin');
-    if (code === 'fints_tan_expired') return this.i18n.translate('fints.errTanExpired');
-    if (code === 'fints_bank_locked') return this.i18n.translate('fints.errBankLocked');
-    if (code === 'fints_auth_rejected') return this.i18n.translate('fints.errAuthRejected');
-    return this.i18n.translate('fints.errSync');
-  }
-  private resetTan(): void {
-    this.sessionToken.set('');
-    this.challenge.set('');
-    this.challengeImage.set('');
-    this.decoupled.set(false);
-    this.tanCode.set('');
-    this.resetOtp();
-    this.otpMode.set(true);
-  }
-  /** TAN-Dialog abbrechen (#fints-konten) — laufende Sitzung verwerfen. */
+
   closeTan(): void {
-    this.resetTan();
+    this.sync.closeTan();
   }
 
-  // OTP handlers (wie Dialog)
   onOtpInput(i: number, ev: Event): void {
-    const el = ev.target as HTMLInputElement;
-    const digit = el.value.replace(/\D/g, '').slice(-1);
-    this.otpDigits.update((d) => {
-      const n = [...d];
-      n[i] = digit;
-      return n;
-    });
-    el.value = digit;
-    this.syncTanFromDigits();
-    if (digit && i < this.otpLength - 1) this.focusOtp(i + 1);
-  }
-  onOtpKeydown(i: number, ev: KeyboardEvent): void {
-    if (ev.key === 'Backspace' && !this.otpDigits()[i] && i > 0) {
-      ev.preventDefault();
-      this.otpDigits.update((d) => {
-        const n = [...d];
-        n[i - 1] = '';
-        return n;
-      });
-      this.syncTanFromDigits();
-      this.focusOtp(i - 1);
-    }
-  }
-  onOtpPaste(ev: ClipboardEvent): void {
-    const digits = (ev.clipboardData?.getData('text') ?? '').replace(/\D/g, '');
-    if (!digits) return;
-    ev.preventDefault();
-    const chars = digits.slice(0, this.otpLength).split('');
-    this.otpDigits.set(Array.from({ length: this.otpLength }, (_, k) => chars[k] ?? ''));
-    this.syncTanFromDigits();
-    this.focusOtp(Math.min(chars.length, this.otpLength) - 1);
-  }
-  useSingleTanField(): void {
-    this.otpMode.set(false);
-    this.tanCode.set('');
-    this.resetOtp();
-  }
-  private syncTanFromDigits(): void {
-    this.tanCode.set(this.otpDigits().join(''));
-  }
-  private resetOtp(): void {
-    this.otpDigits.set(Array.from({ length: this.otpLength }, () => ''));
-  }
-  private focusOtp(i: number): void {
-    this.host.nativeElement.querySelector<HTMLInputElement>(`[data-otp="${i}"]`)?.focus();
+    this.sync.onOtpInput(i, ev);
   }
 
-  /** Deep-Link zu der Buchung eines gematchten Umsatzes (#expenses-ux, best-effort):
-   *  Buchungen-Tab, auf das Konto gefiltert + Referenz/Verwendungszweck als Suchtext. */
+  onOtpKeydown(i: number, ev: KeyboardEvent): void {
+    this.sync.onOtpKeydown(i, ev);
+  }
+
+  onOtpPaste(ev: ClipboardEvent): void {
+    this.sync.onOtpPaste(ev);
+  }
+
+  useSingleTanField(): void {
+    this.sync.useSingleTanField();
+  }
+
+  private syncError(e: unknown): string {
+    return this.sync.syncError(e);
+  }
+
+  private refreshOnLock(e: unknown): void {
+    this.sync.refreshOnLock(e);
+  }
+
+  // --- reconcile delegates --------------------------------------------------------------
+  candidateLabel(e: Expense): string {
+    return this.reconcile.candidateLabel(e);
+  }
+
+  openImport(line: StatementLine): void {
+    this.reconcile.openImport(line);
+  }
+
+  onPickImportBudget(id: string): void {
+    this.reconcile.onPickImportBudget(id);
+  }
+
+  closeImport(): void {
+    this.reconcile.closeImport();
+  }
+
+  confirmImport(): void {
+    this.reconcile.confirmImport();
+  }
+
+  openLink(line: StatementLine): void {
+    this.reconcile.openLink(line);
+  }
+
+  onLinkSearch(q: string): void {
+    this.reconcile.onLinkSearch(q);
+  }
+
+  pickLinkCandidate(e: Expense): void {
+    this.reconcile.pickLinkCandidate(e);
+  }
+
+  closeLink(): void {
+    this.reconcile.closeLink();
+  }
+
+  confirmLink(): void {
+    this.reconcile.confirmLink();
+  }
+
+  unlink(line: StatementLine): void {
+    this.reconcile.unlink(line);
+  }
+
+  openIgnore(line: StatementLine): void {
+    this.reconcile.openIgnore(line);
+  }
+
+  closeIgnore(): void {
+    this.reconcile.closeIgnore();
+  }
+
+  confirmIgnore(): void {
+    this.reconcile.confirmIgnore();
+  }
+
+  reactivate(line: StatementLine): void {
+    this.reconcile.reactivate(line);
+  }
+
+  // --- cross-links (#expenses-ux) ---------------------------------------------------
+  /** Deep-link to a matched line's booking (best-effort): Bookings tab filtered by the
+   *  account + the reference/purpose as the search text. */
   bookingLink(line: StatementLine): { account: string; q: string | null } {
     return {
       account: line.accountId,
@@ -647,149 +413,7 @@ export class KontenComponent implements OnDestroy {
     };
   }
 
-  // ----------------------------------------------------- per-row: Import
-  openImport(line: StatementLine): void {
-    this.importLine.set(line);
-    this.impBudgetId.set(line.suggestedBudgetId ?? '');
-    this.impDescription.set(line.purpose ?? '');
-    this.impFiscalYearId.set('');
-    if (line.suggestedBudgetId) this.loadFiscalYears(line.suggestedBudgetId);
-    else this.fiscalYearOptions.set([]);
-  }
-  onPickImportBudget(id: string): void {
-    this.impBudgetId.set(id);
-    this.loadFiscalYears(id);
-  }
-  private loadFiscalYears(budgetId: string): void {
-    const topId = this.idToTopId().get(budgetId);
-    this.impFiscalYearId.set('');
-    this.fiscalYearOptions.set([]);
-    if (!topId) return;
-    this.api.listFiscalYears(topId as Uuid).subscribe({
-      next: (fys) => {
-        this.fiscalYearOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
-        if (fys.length === 1) this.impFiscalYearId.set(fys[0].id);
-      },
-      error: () => this.fiscalYearOptions.set([]),
-    });
-  }
-  closeImport(): void {
-    this.importLine.set(null);
-  }
-  confirmImport(): void {
-    const line = this.importLine();
-    if (!line || !this.impBudgetId() || this.booking()) return;
-    this.booking.set(true);
-    this.api
-      .confirmStatementLine(line.id, {
-        budgetId: this.impBudgetId() as Uuid,
-        fiscalYearId: (this.impFiscalYearId() || undefined) as Uuid | undefined,
-        description: this.impDescription().trim() || undefined,
-      })
-      .subscribe({
-        next: () => {
-          this.booking.set(false);
-          this.closeImport();
-          this.toast.success(this.i18n.translate('fints.booked'));
-          this.refresh();
-        },
-        error: (e) => {
-          this.booking.set(false);
-          this.toast.error(this.syncError(e));
-        },
-      });
-  }
-
-  // ----------------------------------------------------- per-row: Link (Typeahead)
-  openLink(line: StatementLine): void {
-    this.linkLine.set(line);
-    this.linkQuery.set('');
-    this.linkSelected.set(null);
-    this.linkCandidates.set([]);
-    // Vorschlag: gleicher Betrag + Art (häufigster Treffer) — danach frei durchsuchbar.
-    this.searchLinkCandidates('', line, Math.abs(Number(line.amount)));
-  }
-  onLinkSearch(q: string): void {
-    this.linkQuery.set(q);
-    this.linkSelected.set(null);
-    const line = this.linkLine();
-    if (!line) return;
-    if (this.linkTimer) clearTimeout(this.linkTimer);
-    this.linkTimer = setTimeout(() => this.searchLinkCandidates(q.trim(), line), 300);
-  }
-  private searchLinkCandidates(q: string, line: StatementLine, amount?: number): void {
-    this.linkLoading.set(true);
-    this.api
-      .listExpenses({
-        account: this.accountId() as Uuid,
-        kind: line.kind,
-        unallocated: true,
-        q: q || undefined,
-        // Ohne Suchtext auf den exakten Betrag eingrenzen (offensichtliche Treffer zuerst);
-        // sobald gesucht wird, frei über alle offenen Buchungen des Kontos.
-        amountMin: q ? undefined : amount,
-        amountMax: q ? undefined : amount,
-        limit: 10,
-      })
-      .subscribe({
-        next: (page) => {
-          this.linkCandidates.set(page.items);
-          this.linkLoading.set(false);
-        },
-        error: () => {
-          this.linkCandidates.set([]);
-          this.linkLoading.set(false);
-        },
-      });
-  }
-  pickLinkCandidate(e: Expense): void {
-    this.linkSelected.set(e);
-    this.linkCandidates.set([]);
-    this.linkQuery.set(this.candidateLabel(e));
-  }
-  closeLink(): void {
-    this.linkLine.set(null);
-    if (this.linkTimer) clearTimeout(this.linkTimer);
-  }
-  confirmLink(): void {
-    const line = this.linkLine();
-    const sel = this.linkSelected();
-    if (!line || !sel || this.booking()) return;
-    this.booking.set(true);
-    this.api
-      .confirmStatementLine(line.id, { matchExpenseId: sel.id as Uuid })
-      .subscribe({
-        next: () => {
-          this.booking.set(false);
-          this.closeLink();
-          this.toast.success(this.i18n.translate('fints.linked'));
-          this.refresh();
-        },
-        error: (e) => {
-          this.booking.set(false);
-          this.toast.error(this.syncError(e));
-        },
-      });
-  }
-
-  // ----------------------------------------------------- per-row: Unlink
-  unlink(line: StatementLine): void {
-    if (this.booking()) return;
-    this.booking.set(true);
-    this.api.unlinkStatementLine(line.id).subscribe({
-      next: () => {
-        this.booking.set(false);
-        this.toast.success(this.i18n.translate('fints.unlinked'));
-        this.refresh();
-      },
-      error: () => {
-        this.booking.set(false);
-        this.toast.error(this.i18n.translate('fints.errBook'));
-      },
-    });
-  }
-
-  // ----------------------------------------------------- batch (#expenses-ux)
+  // --- batch (#expenses-ux) ---------------------------------------------------------
   isSelected(id: Uuid): boolean {
     return this.selected().has(id);
   }
@@ -803,12 +427,6 @@ export class KontenComponent implements OnDestroy {
   }
   toggleSelectAll(checked: boolean): void {
     this.selected.set(checked ? new Set(this.lines().map((l) => l.id)) : new Set());
-  }
-  /** Auswahl auf noch vorhandene Zeilen eindampfen (nach refresh/Sammel-Aktion);
-   *  fehlgeschlagene bleiben markiert (Retry möglich). */
-  private pruneSelection(): void {
-    const ids = new Set(this.lines().map((l) => l.id));
-    this.selected.update((cur) => new Set([...cur].filter((x) => ids.has(x))));
   }
 
   askBulk(kind: 'unlink' | 'ignore'): void {
@@ -851,7 +469,7 @@ export class KontenComponent implements OnDestroy {
   private afterBulk(kind: 'unlink' | 'ignore', count: number, failed: boolean): void {
     this.bulkBusy.set(false);
     this.bulkConfirm.set(null);
-    this.refresh(); // Server-Wahrheit + Auswahl auf Überlebende eindampfen
+    this.linesState.refresh();
     if (failed) {
       this.toast.error(this.i18n.translate('konten.bulk.error'));
     } else {

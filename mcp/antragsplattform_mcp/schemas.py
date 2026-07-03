@@ -61,14 +61,16 @@ class TransitionDef(WireModel):
     guard: dict[str, Any] | None = Field(
         default=None,
         description="Guard tree. Leaf operators: deadlinePassed, applicantRoleIs, "
-        "applicantCommitteeIs, budgetIs, budgetFitsApplication, hasField, "
-        "compare {field,op,value}; actor gates (manual only): roleIs, isInCommittee, "
-        "actorIsApplicant; combinators: and/or (list), not (single child).",
+        "applicantCommitteeIs, applicationTypeIs (application type key, e.g. 'qsm'/'vsm'), "
+        "attachmentPresent (bool — >=1 attachment), budgetIs, budgetFitsApplication, "
+        "hasField, compare {field,op,value}; actor gates (manual only): roleIs, "
+        "isInCommittee, actorIsApplicant; combinators: and/or (list), not (single child).",
     )
     actions: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Actions: notify {recipients}, webhook {webhookId}, "
-        "addToNextSession {gremiumId} (target must be a vote state), assignBudget {budgetId}.",
+        "addToNextSession {gremiumId} (target must be a vote state), assignBudget {budgetId}, "
+        "assignBudgetFromField {field} (assigns the budget UUID stored in that form field).",
     )
     order: int | None = None
     automatic: bool = False
@@ -112,8 +114,10 @@ class FlowGroupDef(WireModel):
 class FormFieldDef(WireModel):
     key: str = Field(description="Field key, ^[a-z][a-z0-9_]*$")
     type: str = Field(
-        description="text|textarea|number|currency|date|select|multiselect|checkbox|"
-        "file|table|markdown|computed|positions|section"
+        description="text|textarea|number|currency|date|select|multiselect|gremium_select|"
+        "budget_select|email|iban|daterange|checkbox|file|table|markdown|computed|positions|"
+        "section. gremium_select/budget_select options are injected by the server "
+        "(value=UUID); daterange value is {from,to} ISO dates."
     )
     label: I18nMap
     help: I18nMap | None = None

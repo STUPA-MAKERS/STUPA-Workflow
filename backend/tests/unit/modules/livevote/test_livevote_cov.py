@@ -21,7 +21,6 @@ from app.deps import get_current_principal
 from app.main import create_app
 from app.modules.auth.principal import Principal
 from app.modules.livevote import router as router_mod
-from app.modules.livevote import service as service_mod
 from app.modules.livevote.agenda_service import AgendaService, _title_of
 from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.broker import InMemoryBroker
@@ -45,9 +44,11 @@ from app.modules.livevote.router import (
     get_voting_service,
     get_voting_service_ws,
 )
-from app.modules.livevote.service import (
-    BrokerPublisher,
-    MeetingService,
+from app.modules.livevote.service import BrokerPublisher, MeetingService
+from app.modules.livevote.service import lifecycle as lifecycle_mod
+from app.modules.livevote.service import listing as listing_mod
+from app.modules.livevote.service import permissions as permissions_mod
+from app.modules.livevote.service.paging import (
     _decode_cursor,
     _decode_offset,
     _encode_cursor,
@@ -259,7 +260,7 @@ async def test_can_manage_via_gremium_permission(monkeypatch: pytest.MonkeyPatch
     async def _perms(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return {gid}
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _perms)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _perms)
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.can_manage(gid, _principal()) is True
     assert await svc.can_manage(uuid4(), _principal()) is False
@@ -287,7 +288,7 @@ async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _no_perm(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _no_perm)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _no_perm)
     m.protokollant_id = uuid4()
     svc2 = MeetingService(_QueueSession(executes=[res(m.protokollant_id)]))  # type: ignore[arg-type]
     assert await svc2.can_write(m, _principal()) is True
@@ -298,7 +299,7 @@ async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _write(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
         return {gid} if perm == "protocol.write" else set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _write)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _write)
     m.protokollant_id = None
     svc3 = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc3.can_write(m, _principal()) is True
@@ -312,7 +313,7 @@ async def test_can_manage_votes_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _none)
     # Protokollant-Zweig.
     m.protokollant_id = uuid4()
     svc2 = MeetingService(_QueueSession(executes=[res(m.protokollant_id)]))  # type: ignore[arg-type]
@@ -324,7 +325,7 @@ async def test_can_manage_votes_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _vm(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
         return {gid} if perm == "vote.manage" else set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _vm)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _vm)
     m.protokollant_id = None
     svc3 = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc3.can_manage_votes(m, _principal()) is True
@@ -342,7 +343,7 @@ async def test_can_vote_via_role(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _cast(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
         return {gid} if perm == "vote.cast" else set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _cast)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _cast)
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.can_vote(m, _principal()) is True
 
@@ -353,7 +354,7 @@ async def test_can_vote_via_delegation(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _none)
     # _delegated_meeting_ids(voting_only=True) liefert die Sitzung.
     svc = MeetingService(_QueueSession(executes=[res(m.id)]))  # type: ignore[arg-type]
     assert await svc.can_vote(m, _principal()) is True
@@ -365,7 +366,7 @@ async def test_can_vote_denied(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _none)
     svc = MeetingService(_QueueSession(executes=[res()]))  # type: ignore[arg-type]
     assert await svc.can_vote(m, _principal()) is False
 
@@ -378,7 +379,7 @@ async def test_is_member_admin_and_member(monkeypatch: pytest.MonkeyPatch) -> No
     async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {gid}
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _members)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     svc2 = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc2.is_member(gid, _principal()) is True
     assert await svc2.is_member(uuid4(), _principal()) is False
@@ -390,7 +391,7 @@ async def test_is_participant_member(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {gid}
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _members)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.is_participant(uuid4(), gid, _principal()) is True
 
@@ -411,7 +412,7 @@ async def test_is_participant_delegation(monkeypatch: pytest.MonkeyPatch) -> Non
     async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
     # is_member False (kein view_all) → _delegated_meeting_ids liefert mid.
     svc = MeetingService(_QueueSession(executes=[res(mid)]))  # type: ignore[arg-type]
     assert await svc.is_participant(mid, uuid4(), _principal()) is True
@@ -438,7 +439,7 @@ async def test_visible_gremium_ids_member_union_pool(
     async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {mg}
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _members)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     # _substitute_pool_gremium_ids → pg.
     svc = MeetingService(_QueueSession(executes=[res(pg)]))  # type: ignore[arg-type]
     assert await svc._visible_gremium_ids(_principal()) == {mg, pg}
@@ -738,7 +739,7 @@ async def test_list_with_gremium_filter_and_visibility(
     async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {m.gremium_id}
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _members)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     sess = _QueueSession(
         executes=[
             res(m.gremium_id),  # _substitute_pool_gremium_ids (in _visible)
@@ -776,7 +777,7 @@ async def test_decorate_non_admin_protokollant_flag(
     async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _none)
+    monkeypatch.setattr(listing_mod, "gremium_ids_with_permission", _none)
     # Die vier Perm-Queries laufen über das gemockte ``gremium_ids_with_permission``
     # und verbrauchen KEINE execute()-Ergebnisse. Übrige execute()-Reihenfolge:
     # proto, gremium-names, protokollant-names, _principal_id, _votes_for(votes).
@@ -813,7 +814,7 @@ async def test_list_filter_gremien_non_admin_visibility(
     async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {g1}
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _members)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     sess = _QueueSession(
         executes=[
             res(),  # _substitute_pool
@@ -855,7 +856,7 @@ async def test_list_timeline_past_with_cursor_and_gremium(
     async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {m.gremium_id}
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _members)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     sess = _QueueSession(
         executes=[
             res(m.gremium_id),  # _substitute_pool (in _visible)
@@ -933,7 +934,7 @@ async def test_search_timeline_pagination_and_gremium(
     async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {m1.gremium_id}
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _members)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     sess = _QueueSession(
         executes=[
             res(m1.gremium_id),  # _substitute_pool
@@ -965,7 +966,7 @@ async def test_create_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _none)
     from app.modules.livevote.schemas import MeetingCreate
 
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
@@ -1010,7 +1011,7 @@ async def test_resolve_protokollant_not_member(monkeypatch: pytest.MonkeyPatch) 
     async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _none)
+    monkeypatch.setattr(lifecycle_mod, "gremium_member_ids", _none)
     svc = MeetingService(_QueueSession(get_q=[SimpleNamespace(sub="x")]))  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
         await svc._resolve_protokollant(uuid4(), uuid4())
@@ -1024,7 +1025,7 @@ async def test_resolve_protokollant_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _member(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {gid}
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _member)
+    monkeypatch.setattr(lifecycle_mod, "gremium_member_ids", _member)
     pid = uuid4()
     svc = MeetingService(_QueueSession(get_q=[SimpleNamespace(sub="x")]))  # type: ignore[arg-type]
     assert await svc._resolve_protokollant(gid, pid) == pid
@@ -1039,7 +1040,7 @@ async def test_patch_wants_manage_forbidden(monkeypatch: pytest.MonkeyPatch) -> 
     async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _none)
     from app.modules.livevote.schemas import MeetingPatch
 
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
@@ -1056,8 +1057,8 @@ async def test_patch_wants_write_forbidden(monkeypatch: pytest.MonkeyPatch) -> N
     async def _nomember(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _none)
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _nomember)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _nomember)
     from app.modules.livevote.schemas import MeetingPatch
 
     # _get(meeting), then can_write: can_manage (perm none), _is_protokollant
@@ -1127,7 +1128,7 @@ async def test_patch_protokollant_resolved(monkeypatch: pytest.MonkeyPatch) -> N
         return {m.gremium_id}
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _member)
+    monkeypatch.setattr(lifecycle_mod, "gremium_member_ids", _member)
     from app.modules.livevote.schemas import MeetingPatch
 
     # _get; _resolve_protokollant get → row; _emit name/gremium/can_* (admin shortcut);
@@ -1299,7 +1300,7 @@ async def test_assert_can_read_delegation_branch(monkeypatch: pytest.MonkeyPatch
     async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
     # _get → m; _substitute_pool → empty; visible doesn't contain gremium;
     # _delegated_meeting_ids → m.id (allowed).
     sess = _QueueSession(executes=[res(m), res(), res(m.id)])
@@ -2676,7 +2677,7 @@ async def test_assert_can_read_forbidden(monkeypatch: pytest.MonkeyPatch) -> Non
     async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_member_ids", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
     # _get → m; _substitute_pool → empty (visible {}); _delegated → empty → 403.
     svc = MeetingService(_QueueSession(executes=[res(m), res(), res()]))  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
@@ -2730,7 +2731,7 @@ async def test_delete_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(service_mod, "gremium_ids_with_permission", _none)
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _none)
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
         await svc.delete(m.id, _principal())
@@ -2762,7 +2763,7 @@ async def test_delete_ok_audits(monkeypatch: pytest.MonkeyPatch) -> None:
         calls.append(kw)
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
-    monkeypatch.setattr(service_mod, "audit_record", _record)
+    monkeypatch.setattr(lifecycle_mod, "audit_record", _record)
     sess = _QueueSession(executes=[res(m)])
     svc = MeetingService(sess)  # type: ignore[arg-type]
     await svc.delete(m.id, _admin())

@@ -1,0 +1,116 @@
+@if (!protocol()) {
+  <!-- The protocol is created exclusively on session start. -->
+  @if (meeting().status === 'planned') {
+    <p class="mtg__beforeStart text-text-muted">{{ 'meetings.protocol.beforeStart' | t }}</p>
+  } @else {
+    <p class="text-text-muted">{{ 'meetings.protocol.none' | t }}</p>
+  }
+} @else if (protocol(); as proto) {
+  <div class="mtg__protoMeta">
+    <app-badge [variant]="proto.isFinal ? 'success' : proto.status === 'rendering' ? 'warning' : 'neutral'">
+      {{ (proto.isFinal ? 'meetings.protocol.final' : proto.status === 'rendering' ? 'meetings.protocol.rendering' : 'meetings.protocol.draft') | t }}
+    </app-badge>
+    @if (proto.publicPdfUrl) {
+      <!-- Non-public TOPs exist → internal (full) + redacted public PDF. -->
+      <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfInternal' | t }}</a>
+      <a class="text-primary text-sm font-medium" [href]="proto.publicPdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfPublic' | t }}</a>
+    } @else if (proto.pdfUrl) {
+      <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
+    }
+    @if (!proto.isLocked) {
+      <!-- Once locked (rendering/final) the editor is read-only → no autosave,
+           so any save indicator would only refer to the draft. -->
+      <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+        @switch (saveState()) {
+          @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+          @case ('saved') { ✓ {{ 'meetings.protocol.saved' | t }} }
+          @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+          @default {}
+        }
+      </span>
+    }
+  </div>
+
+  <div class="mtg__topEditor">
+    @if (top(); as top) {
+      <div class="mtg__topHead">
+        <h3 class="m-0 text-base">{{ 'meetings.agenda.top' | t: { n: topIndex() + 1 } }}: {{ top.title || ('meetings.agenda.untitled' | t) }}</h3>
+        @if (top.applicationId) {
+          <a class="text-primary text-sm font-medium" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
+        }
+      </div>
+      <app-markdown-editor
+        [docKey]="top.id"
+        [value]="top.body ?? ''"
+        [disabled]="proto.isLocked || !meeting().canWrite"
+        [placeholder]="'meetings.protocol.placeholder' | t"
+        (valueChange)="bodyChange.emit({ itemId: top.id, body: $event })"
+      />
+
+      <!-- Vote questions of this TOP. -->
+      <div class="mtg__topVotes">
+        @for (vote of votesForTop(top.id); track vote.id) {
+          <div class="mtg__vote">
+            <div class="mtg__voteHead">
+              <span class="font-medium mr-auto">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
+              <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
+              @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
+              @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
+                <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
+              }
+              @if (meeting().canManageVotes && !proto.isLocked) {
+                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="voteDelete.emit(vote.id)"><app-icon name="delete" /></app-button>
+              }
+            </div>
+            @if (vote.status === 'open') {
+              <p class="mtg__voteProgress">{{ 'meetings.vote.progress' | t: { voted: vote.voted, present: vote.present } }}</p>
+            }
+            @if (vote.revealed && vote.counts) {
+              <dl class="mtg__tally">
+                @for (entry of countEntries(vote); track entry.key) {
+                  <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
+                }
+              </dl>
+            } @else if (vote.status === 'open') {
+              <p class="mtg__voteHidden text-text-muted">{{ 'meetings.vote.progressHidden' | t }}</p>
+            }
+            @if (vote.status === 'open' && meeting().canVote) {
+              <div class="mtg__voteActions">
+                @for (opt of voteOptionsFor(vote); track opt) {
+                  <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="castVote.emit({ voteId: vote.id, choice: opt })">{{ optionLabel(opt) }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
+                }
+              </div>
+            }
+            @if (meeting().canManageVotes && vote.status === 'open') {
+              <app-button variant="danger" size="sm" (click)="voteClose.emit(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+              <app-button variant="ghost" size="sm" (click)="voteCancel.emit(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
+            }
+          </div>
+        }
+        @if (meeting().canManageVotes && !proto.isLocked && canAddVote(top)) {
+          <app-button size="sm" variant="secondary" (click)="voteDialog.emit(top)">
+            {{ (top.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}
+          </app-button>
+        }
+      </div>
+    } @else {
+      <p class="mtg__topEmpty text-text-muted">{{ 'meetings.protocol.selectTop' | t }}</p>
+    }
+  </div>
+
+  <!-- Finalizing happens implicitly when the session is closed. -->
+  <div class="mtg__protoActions">
+    @if (proto.isFinal) {
+      <p class="text-text-muted">{{ 'meetings.protocol.finalizedHint' | t }}</p>
+    } @else if (proto.status === 'rendering') {
+      <p class="text-text-muted">{{ 'meetings.protocol.renderingHint' | t }}</p>
+    } @else if (meeting().canWrite) {
+      @if (meeting().status === 'closed') {
+        <!-- The retry button lives as a repeat icon in the toolbar; only the hint here. -->
+        <p class="text-text-muted">{{ 'meetings.protocol.retryHint' | t }}</p>
+      } @else {
+        <p class="text-text-muted">{{ 'meetings.protocol.finalizeOnClose' | t }}</p>
+      }
+    }
+  </div>
+}

@@ -1,14 +1,14 @@
-"""Config-Schemas — Single Source of Truth (data-model §5).
+"""Config schemas — single source of truth.
 
-Pydantic-Modelle für Form-Definition, Flow-Graph, Voting-Regeln, Notification-
-Regeln, Webhook-Config, Comparison-Offers und Budget-Topf-Extra-Felder. Der Server
-validiert immer autoritativ; das FE bekommt den **JSON-Schema-Export** für Editoren
-und Client-Validierung (`export_json_schemas`).
+Pydantic models for form definition, flow graph, voting rules, notification rules,
+webhook config, comparison offers and budget-pot extra fields. The server always
+validates authoritatively; the FE gets the JSON-Schema export for editors and
+client-side validation (`export_json_schemas`).
 
-Guards/Actions/`visibleIf`/`compute` referenzieren die Whitelist-Evaluatoren in
-`jsonlogic` und `guards` — **kein `eval`**. Flow-Graphen werden mit
-`validate_flow_graph` geprüft (ein Initial-State, erreichbar, bekannte Operatoren/
-Action-Typen).
+Guards/actions/`visibleIf`/`compute` reference the whitelist evaluators in
+`jsonlogic` and `guards` — NO `eval`. Flow graphs are checked with
+`validate_flow_graph` (one initial state, all reachable, known operators/action
+types).
 """
 
 from __future__ import annotations
@@ -24,28 +24,28 @@ from app.shared.guards import GuardError, validate_action, validate_guard
 from app.shared.i18n import I18nMap
 from app.shared.jsonlogic import JsonLogicError, validate_jsonlogic
 
-# Feld-/State-Keys: kleinbuchstaben, snake-ähnlich (data-model §5.1).
+# Field/state keys: lowercase, snake-ish.
 KEY_PATTERN = r"^[a-z][a-z0-9_]*$"
 
-# Maximale Länge eines Feld-Validierungs-Patterns (Speicher-Gate, #sec-audit ReDoS).
-# Admin-verfasste Regexes laufen zur Antwort-Laufzeit synchron gegen — teils anonyme —
-# Eingabe; die Schranke begrenzt ihre Komplexität.
+# Max length of a field-validation pattern (save gate, ReDoS). Admin-authored regexes
+# run synchronously against possibly anonymous input at response time; the bound
+# limits their complexity.
 _MAX_PATTERN_LEN = 200
 
 
 def _redos_prone(pattern: str) -> bool:
-    """Konservativer ReDoS-Detektor: ``True`` bei einem **unbegrenzten** Quantor
-    (``*``/``+``/``{n,}``), dessen Rumpf selbst einen unbegrenzten Quantor enthält
-    (``(a+)+``, ``(a*)*``, ``([ab]+)+`` …) — die klassische katastrophale Backtracking-
-    Form. Best-effort über den internen ``re``-Parser; fehlt er, greift nur die
-    Längen-Schranke. Erkennt nicht jede ReDoS-Variante (z. B. ``(a|a)*``), schließt
-    aber die häufigste Klasse beim Speichern aus."""
+    """Conservative ReDoS detector: ``True`` for an unbounded quantifier
+    (``*``/``+``/``{n,}``) whose body itself contains an unbounded quantifier
+    (``(a+)+``, ``(a*)*``, ``([ab]+)+`` …) — the classic catastrophic-backtracking
+    form. Best-effort via the internal ``re`` parser; if absent, only the length
+    bound applies. Does not catch every ReDoS variant (e.g. ``(a|a)*``) but rules out
+    the most common class at save time."""
     try:
         from re import _parser as sre_parse  # type: ignore[attr-defined]
 
         tokens = sre_parse.parse(pattern)
         maxrepeat = sre_parse.MAXREPEAT
-    except Exception:  # pragma: no cover - CPython-Interna nicht verfügbar
+    except Exception:  # pragma: no cover - CPython internals unavailable
         return False
 
     def children(op_name: str, av: Any) -> tuple:
@@ -79,7 +79,7 @@ def _redos_prone(pattern: str) -> bool:
 
     try:
         return walk(tokens)
-    except Exception:  # pragma: no cover - unerwartete AST-Form → nur Längen-Schranke
+    except Exception:  # pragma: no cover - unexpected AST shape -> length bound only
         return False
 
 
@@ -91,19 +91,29 @@ FieldType = Literal[
     "date",
     "select",
     "multiselect",
+    # Committee/cost-centre pickers: a `select` whose options the server injects at
+    # render time from the current committees resp. budget tree (effective_form) —
+    # not hand-maintained in the form. Stored value = UUID.
+    "gremium_select",
+    "budget_select",
+    # Typed inputs with built-in validation (instead of a hand-maintained `pattern`).
+    "email",
+    "iban",
+    # Date range {from, to} — both ISO dates, from <= to.
+    "daterange",
     "checkbox",
     "file",
     "table",
     "markdown",
     "computed",
-    # Kostenpositionen: Liste von Positionen mit je ≥ minOffers Vergleichsangeboten;
-    # genau eines bevorzugt → dessen Wert = Positionswert; Σ Positionen = amount.
+    # Cost positions: list of positions, each with >= minOffers comparison offers;
+    # exactly one preferred -> its value = position value; sum of positions = amount.
     "positions",
-    # Abschnitts-Marker (mehrstufige Formulare): trägt nur ein Label und trennt die
-    # folgenden Felder in einen neuen Schritt. Kein Antwortwert, keine Validierung.
+    # Section marker (multi-step forms): carries only a label and splits the following
+    # fields into a new step. No answer value, no validation.
     "section",
 ]
-# Event-Namen (api.md §6) — geteilt von Notification- und Webhook-Config.
+# Event names — shared by notification and webhook config.
 EventName = Literal[
     "application_created",
     "application_updated",
@@ -122,17 +132,17 @@ EventName = Literal[
 
 
 class _CamelModel(BaseModel):
-    """Basis: camelCase-Aliase im JSON, Felder per Name befüllbar, kein Extra-Feld."""
+    """Base: camelCase aliases in JSON, fields fillable by name, no extra field."""
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 class FlowValidationError(Exception):
-    """Flow-Graph verletzt eine Struktur-Regel (Initial/Erreichbarkeit/Ref/Op/Action)."""
+    """Flow graph violates a structural rule (initial/reachability/ref/op/action)."""
 
 
 # --------------------------------------------------------------------------- #
-# 5.1 Form-Definition
+# Form definition
 # --------------------------------------------------------------------------- #
 class FieldOption(_CamelModel):
     value: str
@@ -148,25 +158,25 @@ class FieldValidation(_CamelModel):
     file_types: list[str] | None = Field(default=None, alias="fileTypes")
     max_size_mb: float | None = Field(default=None, alias="maxSizeMB", gt=0)
     max_rows: int | None = Field(default=None, alias="maxRows", ge=0)
-    # `positions`: Mindestzahl Vergleichsangebote je Position bzw. Mindestzahl Positionen.
+    # `positions`: minimum comparison offers per position / minimum positions.
     min_offers: int | None = Field(default=None, alias="minOffers", ge=1)
     min_positions: int | None = Field(default=None, alias="minPositions", ge=1)
-    # `positions`: Höchstzahl Positionen bzw. Vergleichsangebote je Position. Auch ohne
-    # Builder-Wert greift in der Engine eine Default-Decke (#sec-audit AUD-047), damit die
-    # Validierung/`positions_total` nicht allein vom Body-Cap begrenzt werden.
+    # `positions`: max positions / offers per position. Even without a builder value the
+    # engine applies a default cap so validation/`positions_total` are not bounded by
+    # the body cap alone.
     max_positions: int | None = Field(default=None, alias="maxPositions", ge=1)
     max_offers: int | None = Field(default=None, alias="maxOffers", ge=1)
 
     @field_validator("pattern")
     @classmethod
     def _check_pattern(cls, v: str | None) -> str | None:
-        """Pattern beim Speichern gegen ReDoS absichern (#sec-audit): Länge begrenzen
-        und katastrophale Backtracking-Formen ablehnen — das Pattern läuft sonst synchron
-        gegen (auch anonyme) Antwort-Eingabe ohne Timeout.
+        """Harden the pattern against ReDoS at save time: cap the length and reject
+        catastrophic-backtracking forms — otherwise the pattern runs synchronously
+        against (possibly anonymous) answer input without a timeout.
 
-        Die **Kompilierbarkeit** prüfen weiterhin ``validate_definition`` (Form-Speichern)
-        und die Antwort-Laufzeit (defensives 422) — hier NICHT, damit bereits gespeicherte
-        Formulare ladbar bleiben und der Vertrag der bestehenden Schichten erhalten bleibt."""
+        Compilability is still checked by ``validate_definition`` (form save) and at
+        answer runtime (defensive 422) — NOT here, so already-stored forms stay
+        loadable and the existing layers' contract is preserved."""
         if v is None:
             return v
         if len(v) > _MAX_PATTERN_LEN:
@@ -215,7 +225,7 @@ class FormFieldDef(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# 5.2 Flow-Graph
+# Flow graph
 # --------------------------------------------------------------------------- #
 StateKind = Literal["normal", "vote"]
 TransitionBranch = Literal["pass", "fail"]
@@ -227,9 +237,9 @@ class StateDef(_CamelModel):
     color: str | None = None
     edit_allowed: bool = Field(default=True, alias="editAllowed")
     is_initial: bool = Field(default=False, alias="isInitial")
-    # Endzustand (#PII-Re-Add): terminale Anträge sind aufbewahrungs-/anonymisierbar.
+    # Terminal state: terminal applications are retainable/anonymizable.
     is_terminal: bool = Field(default=False, alias="isTerminal")
-    # Global-Flow-Redesign (#28): State-Art + Konfiguration (vote/approval/decision).
+    # State kind + config (vote/approval/decision).
     kind: StateKind = "normal"
     config: dict[str, Any] = Field(default_factory=dict)
 
@@ -238,17 +248,17 @@ class TransitionDef(_CamelModel):
     from_: str = Field(alias="from")
     to: str
     label: I18nMap | None = None
-    # Optionale Farbe (#flow): Pfeil im Editor + Entscheidungs-Button im Antrag.
+    # Optional color: editor arrow + decision button in the application.
     color: str | None = None
     guard: dict[str, Any] | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     order: int | None = None
-    # Automatischer Übergang (#8): vom Worker gefeuert, sobald der Guard erfüllt ist.
+    # Automatic transition: fired by the worker once the guard is satisfied.
     automatic: bool = False
-    # Ergebnis-Zweig (#28) für vote/approval-States: pass/fail bzw. accept/reject.
+    # Result branch for vote/approval states: pass/fail.
     branch: TransitionBranch | None = None
-    # »Erfordert Aktion« (#requires-action): zählt der feuerbare Übergang als offene
-    # Aufgabe des Akteurs (Tasks-Tab)? ``False`` = rein optionale Aktion.
+    # "Requires action": does the firable transition count as an open actor task
+    # (Tasks tab)? ``False`` = purely optional action.
     requires_action: bool = Field(default=True, alias="requiresAction")
 
 
@@ -259,11 +269,11 @@ class FlowGraph(_CamelModel):
 
 
 def validate_flow_graph(graph: FlowGraph) -> None:
-    """Flow-Graph strukturell prüfen (flows §9.5). Wirft `FlowValidationError`.
+    """Structurally check a flow graph. Raises `FlowValidationError`.
 
-    Regeln: ≥1 State, **genau ein** Initial-State, keine doppelten State-Keys,
-    keine danglenden `from`/`to`-Refs, alle States vom Initial erreichbar,
-    Guards nur mit Whitelist-Operatoren, Actions nur mit bekannten Typen.
+    Rules: >= 1 state, exactly one initial state, no duplicate state keys, no dangling
+    `from`/`to` refs, all states reachable from initial, guards only with whitelisted
+    operators, actions only with known types.
     """
     states = graph.states
     if not states:
@@ -287,19 +297,19 @@ def validate_flow_graph(graph: FlowGraph) -> None:
             raise FlowValidationError(f"transition references unknown from-state: {t.from_!r}")
         if t.to not in key_set:
             raise FlowValidationError(f"transition references unknown to-state: {t.to!r}")
-        # Self-Loops sind nicht unterstützt: das optimistische Locking der Engine
-        # (``WHERE current_state_id = from_state``) kann konkurrierende Doppel-Feuerungen
-        # eines from==to-Übergangs nicht erkennen (doppelte Events/Actions).
+        # Self-loops are unsupported: the engine's optimistic locking
+        # (``WHERE current_state_id = from_state``) cannot detect concurrent double
+        # firings of a from==to transition (duplicate events/actions).
         if t.from_ == t.to:
             raise FlowValidationError(
                 f"transition {t.from_!r} -> {t.to!r}: self-loops are not supported"
             )
         try:
-            # Akteur-Gates (roleIs/isInCommittee) nur auf **manuellen** Übergängen.
+            # Actor gates (roleIs/isInCommittee) only on manual transitions.
             validate_guard(t.guard, allow_actor_ops=not t.automatic)
             for action in t.actions:
                 validate_action(action)
-                # ``addToNextSession`` darf nur in einen ``vote``-State führen (#28).
+                # ``addToNextSession`` may only lead into a ``vote`` state.
                 if action.get("type") == "addToNextSession" and kind_by_key.get(t.to) != "vote":
                     raise GuardError(
                         "addToNextSession action is only valid on a transition into a vote state"
@@ -313,9 +323,9 @@ def validate_flow_graph(graph: FlowGraph) -> None:
 
 
 def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
-    """``vote``-States strukturell prüfen (#28-Redesign — nur noch normal + vote).
+    """Structurally check ``vote`` states (only normal + vote exist).
 
-    ``vote`` — ``config.gremiumId`` Pflicht; genau 2 Ausgänge ``pass``/``fail``.
+    ``vote`` — ``config.gremiumId`` required; exactly 2 outgoing ``pass``/``fail``.
     """
     outgoing: dict[str, list[TransitionDef]] = {k: [] for k in key_set}
     for t in graph.transitions:
@@ -332,11 +342,10 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                     f"vote state {s.key!r} needs exactly two outgoing transitions "
                     "with branch 'pass' and 'fail'"
                 )
-            # Einen vote-State entscheidet AUSSCHLIESSLICH die Abstimmung (pass/fail)
-            # bzw. ein bewusster MANUELLER Abbruch (#abort-vote). Ein automatischer
-            # Nicht-Branch-Ausgang würde vom Worker sofort gefeuert, sobald sein
-            # Guard greift — der Antrag wäre „angenommen", ohne dass je abgestimmt
-            # wurde (#vote-bypass).
+            # A vote state is decided ONLY by the vote (pass/fail) or a deliberate
+            # manual abort. An automatic non-branch exit would be fired by the worker
+            # as soon as its guard holds — the application would be "approved" without
+            # any vote ever happening.
             for t in outgoing[s.key]:
                 if t.automatic and not t.branch:
                     raise FlowValidationError(
@@ -345,8 +354,8 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                         "manual exit may leave it"
                     )
         elif branches:
-            # Branch-Übergänge feuert nur das Vote-Ergebnis — auf einem normal-State
-            # wären sie weder manuell noch automatisch erreichbar (tote Kanten).
+            # Branch transitions are fired only by the vote outcome — on a normal state
+            # they would be reachable neither manually nor automatically (dead edges).
             raise FlowValidationError(
                 f"state {s.key!r} (kind={s.kind!r}) must not have branch transitions"
             )
@@ -374,14 +383,14 @@ def _assert_all_reachable(
 def _assert_no_automatic_cycle(
     key_set: set[str], transitions: list[TransitionDef]
 ) -> None:
-    """Im **automatischen** Teilgraphen darf es keinen Zyklus geben (#auto-cycle).
+    """The automatic subgraph must have no cycle.
 
-    Eine guard-lose ``automatic``-Transition feuert der Minuten-Cron sofort. Zwei
-    normale States A,B mit je einem automatischen Übergang zum anderen bestehen die
-    Erreichbarkeits-Prüfung, würden aber pro Cron-Lauf endlos hin- und herspringen —
-    je Hop ein StatusEvent + Audit-Row + Mailversand (Mailbomb / Audit-Bloat). Die
-    Selbst-Loops fängt bereits die from==to-Regel ab; hier verbleiben Zyklen über
-    ≥2 States. DFS über die automatischen Kanten, Back-Edge ⇒ Zyklus.
+    A guard-less ``automatic`` transition fires immediately on the minute cron. Two
+    normal states A,B each with an automatic transition to the other pass the
+    reachability check but would ping-pong forever per cron run — one StatusEvent +
+    audit row + mail send per hop (mail bomb / audit bloat). Self-loops are already
+    caught by the from==to rule; here we catch cycles over >= 2 states. DFS over the
+    automatic edges, back-edge -> cycle.
     """
     auto_adj: dict[str, list[str]] = {k: [] for k in key_set}
     for t in transitions:
@@ -412,7 +421,7 @@ def _assert_no_automatic_cycle(
 
 
 # --------------------------------------------------------------------------- #
-# 5.3 Voting-Regeln
+# Voting rules
 # --------------------------------------------------------------------------- #
 class Quorum(_CamelModel):
     type: Literal["count", "percent"]
@@ -437,7 +446,7 @@ class VoteConfig(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# 5.4 Notification-Regel
+# Notification rule
 # --------------------------------------------------------------------------- #
 class Recipient(_CamelModel):
     kind: Literal["group", "role", "applicant"]
@@ -461,7 +470,7 @@ class NotificationRule(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# 5.5 Webhook-Config
+# Webhook config
 # --------------------------------------------------------------------------- #
 class WebhookConfig(_CamelModel):
     name: str
@@ -471,7 +480,7 @@ class WebhookConfig(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# 5.6 Comparison-Offers-Regel
+# Comparison-offers rule
 # --------------------------------------------------------------------------- #
 class ComparisonOffers(_CamelModel):
     required: bool = False
@@ -481,7 +490,7 @@ class ComparisonOffers(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# 5.7 Budget-Topf-Extra-Feld
+# Budget-pot extra field
 # --------------------------------------------------------------------------- #
 class BudgetField(_CamelModel):
     field: FormFieldDef
@@ -489,11 +498,11 @@ class BudgetField(_CamelModel):
 
 
 # --------------------------------------------------------------------------- #
-# JSON-Schema-Export (für FE-Editoren / Client-Validierung, api.md /config-schemas)
+# JSON-Schema export (for FE editors / client validation)
 # --------------------------------------------------------------------------- #
 def _exported_models() -> dict[str, type[BaseModel]]:
-    """Exportierte Config-Modelle. ``Branding`` (T-24/#21) wird lazy importiert, um
-    den Import-Zyklus shared ↔ admin zu vermeiden."""
+    """Exported config models. ``Branding`` is imported lazily to avoid the
+    shared <-> admin import cycle."""
     from app.modules.admin.branding import Branding
 
     return {
@@ -509,7 +518,7 @@ def _exported_models() -> dict[str, type[BaseModel]]:
 
 
 def export_json_schemas() -> dict[str, dict[str, Any]]:
-    """Deterministischer JSON-Schema-Export aller Config-Modelle (by_alias)."""
+    """Deterministic JSON-Schema export of all config models (by_alias)."""
     return {
         name: model.model_json_schema(by_alias=True) for name, model in _exported_models().items()
     }

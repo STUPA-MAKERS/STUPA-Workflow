@@ -1,18 +1,15 @@
-"""Webhook-Dispatch-Service (T-19, flows §8 / security.md §5).
+"""Webhook dispatch service.
 
-Zwei Aufgaben, strikt getrennt:
+Two strictly separated jobs:
+* ``dispatch_event`` (API/flow side) - find the active, subscribed webhooks for a domain
+  event, create one ``webhook_delivery`` (``pending``) per webhook and enqueue a
+  ``deliver_webhook`` job. Idempotent over ``(webhook_id, idempotency_key)``: a flow
+  retry of the same status event creates no duplicate delivery.
+* ``deliver`` (worker side) - deliver one delivery: SSRF guard at send time, HMAC
+  signature, POST without redirects, write back status/attempts/backoff. Returns a
+  ``DeliveryOutcome``; the worker translates ``retry`` into ``arq.Retry``.
 
-* :meth:`WebhookService.dispatch_event` (API-/Flow-Seite) — zu einem Domain-Event die
-  **aktiven, abonnierten** Webhooks finden, je Webhook eine ``webhook_delivery``
-  (``pending``) anlegen und einen ``deliver_webhook``-Job enqueuen. Idempotent über
-  ``(webhook_id, idempotency_key)``: ein Flow-Retry desselben Status-Events legt keine
-  Doppel-Delivery an.
-* :meth:`WebhookService.deliver` (Worker-Seite) — eine Delivery zustellen: SSRF-Guard
-  zur Sende-Zeit, HMAC-Signatur, POST ohne Redirects, Status/Versuche/Backoff
-  zurückschreiben. Liefert ein :class:`DeliveryOutcome`; der Worker übersetzt
-  ``retry`` in ``arq.Retry``.
-
-Das pro-Webhook-``secret`` wird **nie** geloggt.
+The per-webhook ``secret`` is never logged.
 """
 
 from __future__ import annotations
@@ -50,16 +47,15 @@ logger = logging.getLogger("app.webhooks")
 
 OutcomeKind = Literal["ok", "retry", "dead", "gone"]
 
-# Wir verwerten ausschließlich den HTTP-**Statuscode**; der Response-Body interessiert
-# nie. Ein bösartiger/kompromittierter Empfänger könnte mit einem Multi-GB-Body den
-# (geteilten) arq-Worker per OOM töten — darum den Body **gestreamt** lesen und nach
-# diesem harten Limit abbrechen (security.md §5).
+# We only use the HTTP status code; the response body is never used. A malicious/
+# compromised receiver could OOM-kill the (shared) arq worker with a multi-GB body, so
+# read the body streamed and stop at this hard limit.
 _MAX_RESPONSE_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True, slots=True)
 class DeliveryOutcome:
-    """Ergebnis eines Zustellversuchs. ``defer`` = Backoff-Sekunden bei ``retry``."""
+    """Result of a delivery attempt. ``defer`` = backoff seconds on ``retry``."""
 
     kind: OutcomeKind
     attempts: int = 0
@@ -73,7 +69,7 @@ class WebhookService:
     settings: Settings
     queue: WebhookQueue | None = None
 
-    # ----------------------------------------------------------- dispatch #
+    # --- dispatch ---
     async def dispatch_event(
         self,
         event: str,
@@ -81,10 +77,10 @@ class WebhookService:
         payload: dict[str, object] | None = None,
         idempotency_base: str | None = None,
     ) -> int:
-        """Aktive, auf ``event`` abonnierte Webhooks → je eine Delivery + Job.
+        """Active webhooks subscribed to ``event`` -> one delivery + job each.
 
-        Gibt die Anzahl **neu** angelegter Deliveries zurück (Dedup übersprungene
-        zählen nicht)."""
+        Returns the number of newly created deliveries (dedup-skipped ones don't count).
+        """
         webhooks = (
             await self.session.scalars(
                 select(Webhook).where(
@@ -116,10 +112,9 @@ class WebhookService:
                 attempts=0,
                 idempotency_key=key,
             )
-            # Savepoint je Delivery: bei nebenläufigem Insert verletzt das
-            # unique(webhook_id, idempotency_key) — dann ist die Delivery bereits von
-            # einem anderen Lauf angelegt (= schon enqueued), also überspringen statt
-            # den ganzen Batch zu verlieren.
+            # Savepoint per delivery: a concurrent insert violates
+            # unique(webhook_id, idempotency_key) - the delivery is then already created
+            # by another run (= already enqueued), so skip it instead of losing the batch.
             try:
                 async with self.session.begin_nested():
                     self.session.add(delivery)
@@ -154,11 +149,12 @@ class WebhookService:
         payload: dict[str, object] | None = None,
         idempotency_base: str | None = None,
     ) -> int:
-        """Eine Delivery an **genau einen** (aktiven) Webhook anlegen + enqueuen (#28).
+        """Create + enqueue a delivery for exactly one (active) webhook.
 
-        Flow-Action ``webhook`` referenziert einen unter ``/admin/webhooks`` gepflegten
-        Webhook per Id. Fehlt/inaktiv ⇒ ``0`` (still übersprungen). Dedup über
-        ``(webhook_id, idempotency_key)``."""
+        The flow action ``webhook`` references a webhook maintained under
+        ``/admin/webhooks`` by id. Missing/inactive -> ``0`` (silently skipped). Dedup
+        over ``(webhook_id, idempotency_key)``.
+        """
         hook = await self.session.get(Webhook, webhook_id)
         if hook is None or not hook.active:
             logger.warning(
@@ -192,13 +188,13 @@ class WebhookService:
     async def _existing_keys(
         self, event: str, candidate_keys: Sequence[str]
     ) -> set[str]:
-        """Bereits vergebene Idempotenz-Keys für dieses Event (Dedup-Vorprüfung).
+        """Already-used idempotency keys for this event (dedup pre-check).
 
-        Nur auf die **konkreten** Kandidaten-Keys gescopet (``IN``), nicht auf alle
-        je angelegten Deliveries des Events — die Query bleibt O(#Webhooks) statt mit
-        der historischen Delivery-Anzahl zu wachsen (AUD-048). Korrektheit garantiert
-        ohnehin das ``unique(webhook_id, idempotency_key)`` + Savepoint; diese
-        Vorprüfung ist nur eine Optimierung."""
+        Scoped to the concrete candidate keys (``IN``), not all deliveries ever created
+        for the event, so the query stays O(#webhooks) instead of growing with delivery
+        history. Correctness is guaranteed by ``unique(webhook_id, idempotency_key)`` +
+        savepoint anyway; this pre-check is only an optimization.
+        """
         if not candidate_keys:
             return set()
         rows = (
@@ -211,7 +207,7 @@ class WebhookService:
         ).all()
         return {k for k in rows if k is not None}
 
-    # ------------------------------------------------------------- deliver #
+    # --- deliver ---
     async def deliver(
         self,
         delivery_id: UUID,
@@ -220,7 +216,7 @@ class WebhookService:
         resolver: Resolver = default_resolver,
         now: dt.datetime | None = None,
     ) -> DeliveryOutcome:
-        """Eine Delivery zustellen + Status persistieren (Worker)."""
+        """Deliver one delivery and persist the status (worker)."""
         import httpx
 
         moment = now or dt.datetime.now(tz=dt.UTC)
@@ -242,9 +238,9 @@ class WebhookService:
                 resolver=resolver,
             )
         except SsrfError:
-            # Sicherheits-Block ist **permanent** — kein Retry (Ziel ändert sich nicht).
-            # Bewusst ohne Fehlerdetail: die Meldung enthält Host/aufgelöste IP und
-            # würde interne Netz-Topologie in die Logs tragen.
+            # Security block is permanent - no retry (the target does not change).
+            # Deliberately without error detail: it contains host/resolved IP and would
+            # leak internal network topology into the logs.
             logger.warning(
                 "webhook delivery %s (webhook=%s) blocked by ssrf guard",
                 delivery_id,
@@ -252,8 +248,8 @@ class WebhookService:
             )
             return await self._finish(delivery, "dead", moment, response_code=None)
 
-        # DNS-Rebinding-Pinning: an die **validierte** IP connecten (kein erneutes
-        # Auflösen durch den Client), Host/TLS-SNI bleibt der Original-Host.
+        # DNS-rebinding pinning: connect to the validated IP (no client re-resolution);
+        # Host/TLS SNI stays the original host.
         ip_url, host_header = pin_url(hook.url, ips[0])
         body = canonical_body(delivery.payload)
         headers = build_headers(
@@ -276,19 +272,18 @@ class WebhookService:
     async def _send_capped(
         self, http_client: httpx.AsyncClient, request: httpx.Request
     ) -> int:
-        """POST senden + nur den **Statuscode** zurückgeben — Body gestreamt und auf
-        :data:`_MAX_RESPONSE_BYTES` gedeckelt lesen (OOM-Schutz, security.md §5).
+        """POST and return only the status code - read the body streamed and capped at
+        ``_MAX_RESPONSE_BYTES`` (OOM protection).
 
-        Der Body wird nie verwertet; wir lesen ihn nur so weit, bis das Limit erreicht
-        ist, und schließen dann den Stream. Verbindungs-Reuse bleibt durch das saubere
-        ``aclose`` (über den Context-Manager) intakt.
+        The body is never used; we read only until the limit and then close the stream.
+        Connection reuse stays intact via the clean ``aclose`` (context manager).
 
-        Das httpx-Timeout ist **pro Read** und wird von jedem Chunk zurückgesetzt; ein
-        bösartiger/„slow-drip“-Empfänger (1 Byte je Intervall) hielte den Stream sonst
-        beliebig lange offen und würde den geteilten arq-Worker-Slot blockieren (DoS,
-        AUD-011). Darum eine **harte Gesamt-Deadline** über alle Reads via
-        :func:`asyncio.timeout`. Ein Überschreiten wird als transienter Transportfehler
-        (``httpx.TimeoutException``) signalisiert → Retry-Pfad in :meth:`deliver`."""
+        The httpx timeout is per read and resets on each chunk; a malicious slow-drip
+        receiver (1 byte per interval) would otherwise hold the stream open indefinitely
+        and block the shared arq worker slot (DoS). Hence a hard total deadline over all
+        reads via ``asyncio.timeout``. Exceeding it is signalled as a transient transport
+        error (``httpx.TimeoutException``) -> retry path in ``deliver``.
+        """
         import httpx
 
         try:
@@ -299,13 +294,13 @@ class WebhookService:
                     async for chunk in response.aiter_bytes():
                         read += len(chunk)
                         if read >= _MAX_RESPONSE_BYTES:
-                            # Body zu groß: Lesen abbrechen — der Statuscode steht fest.
+                            # Body too large: stop reading - the status code is known.
                             break
                     return response.status_code
                 finally:
                     await response.aclose()
         except TimeoutError as exc:
-            # Gesamt-Deadline gerissen → wie Transport-Timeout behandeln (Retry).
+            # Total deadline hit -> treat like a transport timeout (retry).
             raise httpx.TimeoutException(
                 "webhook delivery exceeded total deadline"
             ) from exc
@@ -317,14 +312,14 @@ class WebhookService:
         status_code: int,
         delivery_id: UUID,
     ) -> DeliveryOutcome:
-        """Statuscode → Endzustand/Retry (Spec, unverändert zur vorigen Inline-Logik)."""
+        """Status code -> final state/retry."""
         if 200 <= status_code < 300:
             return await self._finish(
                 delivery, "ok", moment, response_code=status_code
             )
         if 400 <= status_code < 500:
-            # 4xx ist ein Client-/Config-Fehler — Wiederholung ändert nichts →
-            # sofort Dead-Letter, kein Retry (Spec).
+            # 4xx is a client/config error - a retry changes nothing -> immediate
+            # dead-letter, no retry.
             logger.warning(
                 "webhook delivery %s dead — non-retryable %s",
                 delivery_id,
@@ -339,7 +334,7 @@ class WebhookService:
     async def _fail(
         self, delivery: WebhookDelivery, moment: dt.datetime, *, response_code: int | None
     ) -> DeliveryOutcome:
-        """Fehlversuch verbuchen: Retry mit Backoff oder Dead-Letter bei Erschöpfung."""
+        """Record a failed attempt: retry with backoff, or dead-letter on exhaustion."""
         attempts = delivery.attempts + 1
         if attempts >= self.settings.webhook_max_tries:
             return await self._finish(
@@ -366,7 +361,7 @@ class WebhookService:
         response_code: int | None,
         attempts: int | None = None,
     ) -> DeliveryOutcome:
-        """Endzustand schreiben (``ok``/``dead``) — kein weiterer Versuch."""
+        """Write the final state (``ok``/``dead``) - no further attempt."""
         final_attempts = attempts if attempts is not None else delivery.attempts
         delivery.attempts = final_attempts
         delivery.status = kind

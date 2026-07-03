@@ -1,8 +1,8 @@
-"""Audit-Tabelle ``audit_entry`` (data-model §1, security.md §4).
+"""Audit table ``audit_entry``.
 
-Append-only Hash-Kette. ``id`` ist ``bigserial`` (Generierungs-Reihenfolge = Ketten-
-Reihenfolge). UPDATE/DELETE werden zusätzlich DB-seitig per Trigger abgelehnt
-(Migration ``0005`` + Least-Privilege-Grant ``audit_writer``); kein ORM-Mutate-Pfad.
+Append-only hash chain; ``id`` is bigserial, so insert order equals chain order.
+UPDATE/DELETE are additionally rejected DB-side by a trigger (migration 0005 plus
+the least-privilege ``audit_writer`` grant); there is no ORM mutate path.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ class AuditEntry(Base):
     __tablename__ = "audit_entry"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    # actor: Principal-``sub`` bzw. ``None`` für System-/anonyme Vorgänge.
+    # actor: principal ``sub``, or ``None`` for system/anonymous operations.
     actor: Mapped[str | None] = mapped_column(Text, nullable=True)
     action: Mapped[str] = mapped_column(Text)
     target_type: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -28,7 +28,7 @@ class AuditEntry(Base):
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    # data: NUR id-Referenzen/Metadaten — keine PII-Rohwerte (security.md §4).
+    # data: id references/metadata ONLY — never raw PII values.
     data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     prev_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     hash: Mapped[bytes] = mapped_column(LargeBinary)

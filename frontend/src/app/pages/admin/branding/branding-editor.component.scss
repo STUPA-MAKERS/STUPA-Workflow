@@ -62,7 +62,7 @@
   flex-wrap: wrap;
 }
 
-/* Zweispaltiger DE/EN-Editor (#16) — beide Sprachen nebeneinander. */
+/* Two-column DE/EN editor — both languages side by side. */
 .br__bi {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -84,7 +84,7 @@ textarea {
   border-radius: var(--radius-md);
 }
 
-// Einheitliche Control-Höhe: Text-Inputs bündig mit app-select/app-input (#85-Regression).
+// Uniform control height: text inputs flush with app-select/app-input.
 input:not([type='file']) {
   height: var(--control-height);
   box-sizing: border-box;
@@ -96,7 +96,7 @@ textarea {
   resize: vertical;
 }
 
-// Datei-Upload als kompakte, themenkonforme Schaltfläche (Image 5: native Button war gebrochen).
+// File upload as a compact, themed button (the native button was broken).
 input[type='file'] {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -147,7 +147,7 @@ input[type='file']::file-selector-button:hover {
   max-height: 1.75rem;
 }
 
-/* Platzhalter in der Vorschau, solange noch nichts gepflegt ist (Image 6: „immer leer“). */
+/* Placeholder in the preview while nothing is set yet. */
 .br__pv-ph {
   color: var(--color-text-muted);
   font-style: italic;
@@ -182,8 +182,8 @@ input[type='file']::file-selector-button:hover {
   font-size: var(--fs-xs);
 }
 
-/* Mobil (≤768px): Vorschau nicht mehr sticky (stapelt unter dem Editor);
-   Link-/Spalten-Inputs volle Breite, damit bei 375px nichts überläuft. */
+/* Mobile (≤768px): preview no longer sticky (stacks under the editor);
+   link/column inputs full width so nothing overflows at 375px. */
 @media (max-width: 768px) {
   .br__preview {
     position: static;

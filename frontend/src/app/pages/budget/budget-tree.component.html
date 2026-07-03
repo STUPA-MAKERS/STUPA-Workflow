@@ -39,7 +39,7 @@
 
     <main class="bt__main">
       @if (selectedTopId()) {
-        <!-- Kostenstellen-Baum des gewählten Budgets -->
+        <!-- Cost-centre tree of the selected budget -->
         <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
           <ng-template appCell="node" let-row>
             <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
@@ -111,7 +111,7 @@
   </div>
 </app-dialog>
 
-<!-- Kostenstelle bearbeiten (Schlüssel + Name) -->
+<!-- Edit cost-centre (key + name) -->
 <app-dialog
   [open]="!!editNode()"
   [title]="'budget.tree.editNode' | t"
@@ -130,8 +130,8 @@
         <span>{{ 'budget.tree.hiddenInBudget' | t }}</span>
       </label>
       <p class="text-muted m-0 text-xs bt__form-full">{{ 'budget.tree.hiddenInBudgetHint' | t }}</p>
-      <!-- Sichtbarkeits-Gremium (#budget-scope): dessen Mitglieder sehen diesen
-           Teilbaum im Budget-Tab als Root — ohne globale budget.*-Rechte. -->
+      <!-- Visibility gremium: its members see this subtree in the budget tab as a
+           root — without global budget.* permissions. -->
       <div class="bt__form-full">
         <app-select
           name="editViewGremium"
@@ -152,7 +152,7 @@
   </div>
 </app-dialog>
 
-<!-- Top-Budget anlegen (Dialog, über den Kopf-Button) -->
+<!-- Create top budget (dialog, via the header button) -->
 <app-dialog
   [open]="topOpen()"
   [title]="'budget.tree.createTop' | t"
@@ -179,7 +179,7 @@
   </div>
 </app-dialog>
 
-<!-- Haushaltsjahr anlegen (Dialog, über den Kopf-Button) — innerhalb des gewählten Budgets -->
+<!-- Create fiscal year (dialog, via the header button) — within the selected budget -->
 <app-dialog
   [open]="fyOpen()"
   [title]="'budget.tree.fyTitle' | t"
@@ -198,7 +198,7 @@
   </div>
 </app-dialog>
 
-<!-- HHJ-Stichtag des gewählten Budgets setzen (Dialog, über den Kopf-Button) -->
+<!-- Set the fiscal-year cutoff of the selected budget (dialog, via the header button) -->
 <app-dialog
   [open]="stichtagOpen()"
   [title]="'budget.tree.stichtagTitle' | t"
@@ -231,7 +231,7 @@
   </div>
 </app-dialog>
 
-<!-- Abgeschlossene/abgelehnte Flow-States des gewählten Budgets (Dialog) -->
+<!-- Accepted/denied flow states of the selected budget (dialog) -->
 <app-dialog
   [open]="stateConfigOpen()"
   [title]="'budget.tree.stateConfig' | t"

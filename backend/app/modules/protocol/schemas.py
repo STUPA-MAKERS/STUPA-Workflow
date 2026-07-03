@@ -1,8 +1,9 @@
-"""API-Schemata des Protokoll-Moduls (T-22, api.md »protocol«).
+"""API schemas of the protocol module.
 
-Wire-Form ist camelCase (T-12 ``_CamelModel``); das FE (T-33/#51) ist exakt gegen
-``ProtocolOut`` gebaut: ``markdown`` + ``status`` (draft/rendering/final) +
-``pdfUrl``/``sentAt`` nach ``finalize`` (``rendering`` = Worker rendert im Hintergrund).
+Wire form is camelCase (``_CamelModel``); the frontend is built exactly against
+``ProtocolOut``: ``markdown`` + ``status`` (draft/rendering/final) +
+``pdfUrl``/``sentAt`` after ``finalize`` (``rendering`` = worker renders in the
+background).
 """
 
 from __future__ import annotations
@@ -15,35 +16,35 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields fillable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class ProtocolPatch(_CamelModel):
-    """``PATCH /protocols/{id}`` — Markdown-Body aktualisieren (Entwurf)."""
+    """``PATCH /protocols/{id}`` — update the Markdown body (draft)."""
 
-    # Deployment-unabhängige Obergrenze (sauberes 422 statt nginx-413/pytex-Cap):
-    # 512 kB liegen komfortabel unter dem nginx-1-MiB- und dem pytex-4-MiB-Limit.
+    # Deployment-independent cap (clean 422 instead of nginx-413/pytex cap):
+    # 512 kB sits comfortably under the nginx 1 MiB and pytex 4 MiB limits.
     markdown: str = Field(max_length=512_000)
 
 
 class ProtocolVotesBody(_CamelModel):
-    """``POST /protocols/{id}/votes`` — Abstimmungen einbetten."""
+    """``POST /protocols/{id}/votes`` — embed votes."""
 
     vote_ids: list[UUID] = Field(alias="voteIds", min_length=1)
 
 
 class ProtocolOut(_CamelModel):
-    """Sitzungsprotokoll (alle Protokoll-Endpunkte liefern diese Form)."""
+    """Meeting minutes (all protocol endpoints return this shape)."""
 
     id: UUID
     meeting_id: UUID = Field(alias="meetingId")
     markdown: str
     status: Literal["draft", "rendering", "final"]
-    # Ergebnis-Link nach ``finalize`` (kurzlebige, signierte MinIO-URL; nie ein
-    # direkter Bucket-Link — security.md §6). NULL solange Entwurf / ohne Storage.
+    # Result link after ``finalize``: short-lived signed MinIO URL, never a
+    # direct bucket link. NULL while draft / without storage.
     pdf_url: str | None = Field(default=None, alias="pdfUrl")
-    # Redigierte öffentliche Variante — nur gesetzt, wenn ein TOP nicht-öffentlich ist.
+    # Redacted public variant — only set when an agenda item is non-public.
     public_pdf_url: str | None = Field(default=None, alias="publicPdfUrl")
     sent_at: datetime | None = Field(default=None, alias="sentAt")

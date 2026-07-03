@@ -6,10 +6,10 @@ import { BudgetTreeComponent } from './budget-tree.component';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 
 /**
- * AUD-039 regression: the reload() fan-out (one listFiscalYears per top-budget)
- * must not let an in-flight response from a previous reload/loadFiscalYears
- * resolve after a newer one and overwrite fiscalYears/selectedFyId with stale
- * data. The component bumps a reloadSeq and drops late responses.
+ * Regression: the reload() fan-out (one listFiscalYears per top-budget) must not
+ * let an in-flight response from a previous reload/loadFiscalYears resolve after
+ * a newer one and overwrite fiscalYears/selectedFyId with stale data. The
+ * component bumps a reloadSeq and drops late responses.
  */
 
 function fullNode(over: Partial<BudgetTreeNode>): BudgetTreeNode {

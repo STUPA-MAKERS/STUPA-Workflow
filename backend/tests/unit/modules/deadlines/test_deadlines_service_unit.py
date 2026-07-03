@@ -13,7 +13,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.modules.deadlines.service import DeadlineService, transition_ref
+from app.modules.deadlines.service import (
+    DeadlineService,
+    flow_deadline_passed,
+    transition_ref,
+)
 from tests._support.flow_fakes import fake_session, result
 
 NOW = datetime(2026, 6, 7, 12, 0, tzinfo=UTC)
@@ -120,3 +124,17 @@ def test_uuid_roundtrip_in_ref() -> None:
     # Defensive: bereits-UUID-Objekt als String akzeptiert.
     tid = uuid4()
     assert transition_ref({"transitionId": UUID(str(tid)).hex}) == tid
+
+
+# --------------------------------------------------------------------------- #
+# flow_deadline_passed (shared by FlowService + task-mail recipients)
+# --------------------------------------------------------------------------- #
+async def test_flow_deadline_passed_true_when_row_due() -> None:
+    session = fake_session()
+    session.scalar_results = [uuid4()]  # a due flow_deadline row exists
+    assert await flow_deadline_passed(session, uuid4()) is True
+
+
+async def test_flow_deadline_passed_false_without_due_row() -> None:
+    # Empty scalar queue -> None -> no due deadline.
+    assert await flow_deadline_passed(fake_session(), uuid4()) is False

@@ -24,10 +24,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    from app.modules.budget.bank_import import (
-        _normalize_purpose,
-        _split_booking_time,
+    from app.modules.budget.bank.normalize import (
         mt940_counterparty,
+        normalize_purpose,
+        split_booking_time,
     )
 
     conn = op.get_bind()
@@ -42,7 +42,7 @@ def upgrade() -> None:
     for row in rows:
         raw = row.raw_payload if isinstance(row.raw_payload, dict) else {}
         raw_purpose = raw.get("purpose")
-        purpose, _ = _split_booking_time(_normalize_purpose(raw_purpose))
+        purpose, _ = split_booking_time(normalize_purpose(raw_purpose))
         name, iban = mt940_counterparty(raw, credit=(row.amount or 0) > 0)
         changed_purpose = purpose is not None and purpose != row.purpose
         changed_cp = (name or iban) and (

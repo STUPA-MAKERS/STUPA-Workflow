@@ -30,7 +30,7 @@ def upgrade() -> None:
     # Gemeinsame, idempotente Routine (eine Logik, s. 0046). Bewusst KEINE Logik hier inline —
     # frühere Versionen dieser Revision liefen bereits; alembic überspringt sie. Die Korrektur
     # läuft als neue Revision 0046 erneut über dieselbe Funktion.
-    from app.modules.budget.bank_maintenance import dedup_staged_lines
+    from app.modules.budget.bank.maintenance import dedup_staged_lines
 
     dedup_staged_lines(op.get_bind())
 

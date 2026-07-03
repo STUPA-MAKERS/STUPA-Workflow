@@ -1,9 +1,9 @@
-"""Anhänge: ``attachment`` (data-model §1, security.md §6).
+"""Attachments: ``attachment``.
 
-Eine Zeile je hochgeladene Datei. Das Binär-Objekt liegt in MinIO (``storage_key``),
-nie in der DB. ``scanned``/``scan_result`` tragen das ClamAV-Ergebnis: bis ``scanned``
-gilt Quarantäne (kein Download), bei Befund wird das Objekt gelöscht (``storage_key``
-→ NULL) und ``scan_result`` hält die Signatur (security.md §6).
+One row per uploaded file. The binary object lives in MinIO (``storage_key``), never
+in the DB. ``scanned``/``scan_result`` carry the ClamAV result: quarantined (no
+download) until ``scanned``; on a finding the object is deleted (``storage_key`` →
+NULL) and ``scan_result`` holds the signature.
 """
 
 from __future__ import annotations
@@ -25,16 +25,16 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, UUIDPkMixin
 
-# DB-seitige Obergrenze (security.md §6 / data-model: CHECK(size <= 10485760)).
+# DB-side upper bound (CHECK(size <= 10485760)).
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 
 class Attachment(UUIDPkMixin, Base):
-    """Antrags-Anhang. ``application_id`` CASCADE: Löschen des Antrags räumt mit auf.
+    """Application attachment. ``application_id`` CASCADE: deleting the app cleans up.
 
-    ``field_key`` verknüpft optional mit einem Formularfeld (data-model). ``scanned`` =
-    ClamAV-Lauf abgeschlossen; ``scan_result`` = NULL/``clean``/Signatur. ``storage_key``
-    wird bei Befund auf NULL gesetzt (Objekt entfernt)."""
+    ``field_key`` optionally links to a form field. ``scanned`` = ClamAV run finished;
+    ``scan_result`` = NULL/``clean``/signature. ``storage_key`` is set to NULL on a
+    finding (object removed)."""
 
     __tablename__ = "attachment"
 

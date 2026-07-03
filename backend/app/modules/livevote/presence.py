@@ -1,16 +1,10 @@
-"""Live-Presence: wer hat die Sitzungs-Seite gerade offen (#live-viewers).
+"""Live presence: which voters currently have a meeting page open.
 
-Prozess-lokales Register der offenen **Voter**-WS-Verbindungen je Sitzung
-(Beamer zählen nicht — sie sind Anzeige, keine Person). Jede Verbindung erhält
-eine eigene Connection-ID, damit derselbe Nutzer mit zwei Tabs beim Schließen
-des ersten nicht aus der Liste fällt. Der Stand wird nach Join/Leave als
-``viewers``-Event über den Broker gefan-outet — das FE (Protokollant) zeigt die
-Namen live an.
-
-Bewusst in-memory (kein Redis): die Verbindungen leben im selben Prozess; stirbt
-er, sterben auch die WS-Verbindungen mit. Bei mehreren API-Replikas zeigt jede
-Instanz nur ihre eigenen Verbindungen — fürs aktuelle Single-Replica-Deployment
-ausreichend (dokumentierte Grenze).
+Process-local registry of open voter WS connections per meeting (beamer
+connections don't count — display only). Each connection gets its own id so a
+user with two tabs isn't dropped when one closes; join/leave fans a ``viewers``
+event out over the broker. In-memory by design: with multiple API replicas each
+instance sees only its own connections (documented single-replica limit).
 """
 
 from __future__ import annotations
@@ -22,20 +16,20 @@ from uuid import UUID, uuid4
 
 @dataclass
 class MeetingPresence:
-    """``meeting_id → {connection_id: (sub, anzeigename)}``."""
+    """``meeting_id → {connection_id: (sub, display_name)}``."""
 
     _viewers: dict[UUID, dict[str, tuple[str, str]]] = field(
         default_factory=lambda: defaultdict(dict)
     )
 
     def join(self, meeting_id: UUID, sub: str, name: str) -> tuple[str, list[str]]:
-        """Verbindung registrieren → (connection_id, aktuelle Namensliste)."""
+        """Register a connection → (connection_id, current name list)."""
         connection_id = uuid4().hex
         self._viewers[meeting_id][connection_id] = (sub, name)
         return connection_id, self.names(meeting_id)
 
     def leave(self, meeting_id: UUID, connection_id: str) -> list[str]:
-        """Verbindung austragen → aktuelle Namensliste."""
+        """Unregister a connection → current name list."""
         room = self._viewers.get(meeting_id)
         if room is not None:
             room.pop(connection_id, None)
@@ -44,12 +38,12 @@ class MeetingPresence:
         return self.names(meeting_id)
 
     def names(self, meeting_id: UUID) -> list[str]:
-        """Deduplizierte (je ``sub``), sortierte Anzeigenamen der Zuschauer."""
+        """Deduplicated (per ``sub``), sorted viewer display names."""
         seen: dict[str, str] = {}
         for sub, name in self._viewers.get(meeting_id, {}).values():
             seen.setdefault(sub, name)
         return sorted(seen.values(), key=str.casefold)
 
 
-# Ein Register je API-Prozess (die WS-Verbindungen leben im selben Prozess).
+# One registry per API process (WS connections live in the same process).
 PRESENCE = MeetingPresence()

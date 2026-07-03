@@ -37,13 +37,13 @@ import {
 } from '../budget/budget-tree.api';
 
 /**
- * Rechnungen-Tab (#invoices): Belege sehen/anlegen/verwalten — eigenständige Entität,
- * Buchungen verweisen optional auf **eine** Rechnung (1 : N).
+ * Invoices tab: view/create/manage receipts — a standalone entity; bookings
+ * optionally reference **one** invoice (1 : N).
  *
- * Import (#15): ein ZUGFeRD/Factur-X-PDF wird per Drag&Drop (Overlay) oder Datei-Picker
- * geparst; die Felder füllen den Erfassungs-Dialog vor (Review + Bestätigen). Ist kein
- * gültiges ZUGFeRD eingebettet (422 ``invoice_not_zugferd``), öffnet der leere Dialog
- * zur manuellen Erfassung.
+ * Import: a ZUGFeRD/Factur-X PDF is parsed via drag & drop (overlay) or the file
+ * picker; the fields prefill the entry dialog (review + confirm). If no valid
+ * ZUGFeRD is embedded (422 ``invoice_not_zugferd``), the empty dialog opens for
+ * manual entry.
  */
 @Component({
   selector: 'app-invoices',
@@ -85,12 +85,12 @@ export class InvoicesComponent implements OnDestroy {
   readonly q = signal('');
   readonly saving = signal(false);
   readonly importing = signal(false);
-  /** Manueller Beleg-Upload im Anlegen-Dialog läuft (#invoices). */
+  /** A manual receipt upload in the create dialog is in progress. */
   readonly attaching = signal(false);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Filter (Buchungen-Stil): Status, Brutto-Bereich, Rechnungs-/Fälligkeitsdatum.
-   *  Treiben jetzt die Server-Abfrage (#invoices serverseitige Suche). */
+  /** Filters (bookings style): status, gross range, issue/due date. These drive
+   *  the server query. */
   readonly statusFilter = signal<'' | InvoiceStatus>('');
   readonly grossMin = signal('');
   readonly grossMax = signal('');
@@ -99,7 +99,7 @@ export class InvoicesComponent implements OnDestroy {
   readonly dueFrom = signal('');
   readonly dueTo = signal('');
 
-  /** Zahl aktiver Filter (für den Indikator am Filter-Button) — ohne die Suche. */
+  /** Number of active filters (for the filter-button indicator) — excluding search. */
   readonly activeFilterCount = computed(
     () =>
       [
@@ -115,25 +115,25 @@ export class InvoicesComponent implements OnDestroy {
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
-  /** Suche (debounced ~400ms) treibt den ``q``-Parameter der Server-Abfrage. */
+  /** Search (debounced ~400ms) drives the ``q`` param of the server query. */
   onSearch(value: string): void {
     this.q.set(value);
     this.debouncedReload();
   }
 
-  /** Statusfilter setzen + neu laden (Server filtert). */
+  /** Set the status filter + reload (server filters). */
   setStatus(value: '' | InvoiceStatus): void {
     this.statusFilter.set(value);
     this.reload();
   }
 
-  /** Brutto-Bereichsfilter (debounced, da getippt). */
+  /** Gross-range filter (debounced, since typed). */
   onGrossFilter(which: 'min' | 'max', value: string): void {
     (which === 'min' ? this.grossMin : this.grossMax).set(value);
     this.debouncedReload();
   }
 
-  /** Datums-Bereichsfilter (Rechnungs-/Fälligkeitsdatum). */
+  /** Date-range filter (issue/due date). */
   onDateFilter(which: 'issueFrom' | 'issueTo' | 'dueFrom' | 'dueTo', value: string): void {
     ({
       issueFrom: this.issueFrom,
@@ -177,7 +177,7 @@ export class InvoicesComponent implements OnDestroy {
     })),
   );
 
-  // --- Anlegen / Import ---
+  // --- Create / import ---
   readonly createOpen = signal(false);
   readonly newNumber = signal('');
   readonly newSupplier = signal('');
@@ -188,14 +188,14 @@ export class InvoicesComponent implements OnDestroy {
   readonly newGross = signal('');
   readonly newStatus = signal<InvoiceStatus>('open');
   readonly newNote = signal('');
-  /** Beleg-Handle aus dem Import (leer = manuell). */
+  /** Receipt handle from the import (empty = manual). */
   readonly importToken = signal('');
   readonly importFileName = signal('');
   private importFileMime = '';
 
   readonly canSubmitCreate = computed(() => Number(this.newGross()) > 0);
 
-  // --- Bearbeiten / Löschen ---
+  // --- Edit / delete ---
   readonly editing = signal<Invoice | null>(null);
   readonly editNumber = signal('');
   readonly editSupplier = signal('');
@@ -212,7 +212,7 @@ export class InvoicesComponent implements OnDestroy {
   constructor() {
     this.reload();
 
-    // Infinite-Scroll: Sentinel am Listenende → nächste Seite nachladen.
+    // Infinite scroll: sentinel at the list end → load the next page.
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
       if (!el || typeof IntersectionObserver === 'undefined') return;
@@ -325,7 +325,7 @@ export class InvoicesComponent implements OnDestroy {
     input.value = '';
   }
 
-  /** PDF parsen (#15): Erfolg → Dialog vorgefüllt; kein ZUGFeRD → leerer Dialog. */
+  /** Parse a PDF: success → prefilled dialog; no ZUGFeRD → empty dialog. */
   private importFile(file: File): void {
     if (this.importing()) return;
     this.importing.set(true);
@@ -339,8 +339,8 @@ export class InvoicesComponent implements OnDestroy {
         this.importing.set(false);
         const code = (err as { error?: { code?: string } } | null)?.error?.code;
         if (code === 'invoice_not_zugferd') {
-          // Kein eingebettetes ZUGFeRD → manuell erfassen, aber das gedroppte PDF
-          // trotzdem als Beleg anhängen (#invoices).
+          // No embedded ZUGFeRD → enter manually, but still attach the dropped
+          // PDF as the receipt.
           this.openCreate();
           this.attachFile(file);
           this.toast.show(this.i18n.translate('invoices.toast.notZugferd'), 'info');
@@ -365,7 +365,7 @@ export class InvoicesComponent implements OnDestroy {
     this.importFileName.set(p.fileName);
     this.importFileMime = p.fileMime;
     this.createOpen.set(true);
-    // Dubletten-Warnung: gleiche Rechnungsnummer existiert bereits (#invoices).
+    // Duplicate warning: an invoice with the same number already exists.
     if (p.duplicate) {
       this.toast.show(
         this.i18n.translate('invoices.toast.duplicate', { number: p.number ?? '' }),
@@ -374,7 +374,7 @@ export class InvoicesComponent implements OnDestroy {
     }
   }
 
-  /** Beleg-PDF hochladen + als Anhang merken (manuell oder Nicht-ZUGFeRD-Drop). */
+  /** Upload the receipt PDF + remember it as an attachment (manual or non-ZUGFeRD drop). */
   private attachFile(file: File): void {
     if (this.attaching()) return;
     this.attaching.set(true);
@@ -526,8 +526,8 @@ export class InvoicesComponent implements OnDestroy {
 
   // ------------------------------------------------------------------- file
   openFile(i: Invoice): void {
-    // API streamt das PDF (MinIO ist intern). Blob → Objekt-URL im neuen Tab;
-    // ``downloadBlob`` löst zuverlässig aus (auch async, ohne Popup-Blocker).
+    // The API streams the PDF (MinIO is internal). Blob → object URL in a new tab;
+    // ``downloadBlob`` triggers reliably (even async, without popup blockers).
     this.api.invoiceFileBlob(i.id).subscribe({
       next: (blob) => downloadBlob(blob, i.fileName || 'beleg.pdf'),
       error: () => this.toast.error(this.i18n.translate('invoices.toast.failed')),

@@ -1,12 +1,7 @@
-"""config_revision-API-Router (#config-versioning).
+"""config_revision API router: list, diff, restore.
 
-* ``GET  /admin/config-revisions``            — Versions-Sidebar-Feed je Entität.
-* ``GET  /admin/config-revisions/{id}/diff``  — Feld-Diff gegen den Vorgänger.
-* ``POST /admin/config-revisions/{id}/restore`` — einen früheren Stand als neue
-  aktive Version zurückspielen (Vorwärts-Restore; pro Entität gegatet).
-
-Lesen ist für Audit- **oder** Config-Editoren freigegeben; der Restore verlangt die
-jeweilige Config-Permission (form.configure / flow.configure / admin.site).
+Reads are open to audit readers OR config editors; restore requires the entity's
+config permission (form.configure / flow.configure / admin.site).
 """
 
 from __future__ import annotations
@@ -38,14 +33,14 @@ router = APIRouter(prefix="/admin/config-revisions", tags=["config-revision"])
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _AUTH_ERRORS: dict[int | str, dict[str, Any]] = {401: _PROBLEM, 403: _PROBLEM}
 
-# Lesen: Audit-Leser ODER ein Config-Editor (Sidebar lebt in den Editoren).
+# Reads: audit readers OR a config editor (the sidebar lives in the editors).
 _READABLE = Depends(
     require_any_permission(
         "audit.read", "form.configure", "flow.configure", "admin.site"
     )
 )
 
-# Restore-Gate je Entität.
+# Per-entity restore gate.
 _RESTORE_PERM: dict[str, str] = {
     ENTITY_FORM: "form.configure",
     ENTITY_FLOW: "flow.configure",
@@ -79,7 +74,7 @@ async def list_config_revisions(
     entity_type: Annotated[str, Query(alias="entityType")],
     entity_id: Annotated[str, Query(alias="entityId")],
 ) -> list[ConfigRevisionOut]:
-    """Snapshots einer Entität (neueste zuerst) — Versions-Sidebar."""
+    """List snapshots of an entity (newest first) — version sidebar."""
     rows = await service.list_for(entity_type, entity_id)
     names = await AuditService(service.session).resolve_actor_names(
         [r.created_by for r in rows]
@@ -105,7 +100,7 @@ async def get_config_revision_diff(
     revision_id: UUID,
     service: ServiceDep,
 ) -> ConfigRevisionDiffOut:
-    """Feld-Diff eines Snapshots gegen seinen Vorgänger (#2-Diff)."""
+    """Field diff of a snapshot against its predecessor."""
     revision = await service.get(revision_id)
     if revision is None:
         raise NotFoundError(f"config revision {revision_id} not found")
@@ -134,10 +129,10 @@ async def restore_config_revision(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> None:
-    """Einen früheren Snapshot als **neue aktive Version** zurückspielen (Sidebar-Restore).
+    """Replay an earlier snapshot as the new active version (sidebar restore).
 
-    Vorwärts-Operation (kein Konflikt-Block): macht den gewählten Stand wieder aktuell;
-    frühere Versionen bleiben erhalten. Pro Entität gegatet (form/flow/site_config)."""
+    Forward operation (no conflict block): makes the chosen state current again;
+    earlier versions are kept. Gated per entity (form/flow/site_config)."""
     revision: ConfigRevision | None = await service.get(revision_id)
     if revision is None:
         raise NotFoundError(f"config revision {revision_id} not found")

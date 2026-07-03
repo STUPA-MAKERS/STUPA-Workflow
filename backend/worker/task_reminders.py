@@ -1,17 +1,14 @@
-"""Aufgaben-Erinnerungen (#task-reminder, Kind ``task_reminder``).
+"""Task reminders (kind ``task_reminder``).
 
-Stündlicher Cron: findet Anträge, die seit ``task_reminder_after_days`` Tagen
-unverändert in einem handlungsfähigen State stehen (mind. ein manueller
-Übergang mit ``requires_action`` bzw. ``vote``-State), und erinnert alle, die
-dort handeln können (Task-Semantik #64). Schwellen kommen aus der admin-
-gepflegten Plattform-Config (``notification_settings``); ``repeat_days=0``
-heißt: nur einmal je State-Aufenthalt.
+Hourly cron: finds applications sitting unchanged for ``task_reminder_after_days`` in
+an actionable state (at least one manual ``requires_action`` transition, or a ``vote``
+state) and reminds everyone who can act there. Thresholds come from the admin-managed
+platform config (``notification_settings``); ``repeat_days=0`` means once per state stay.
 
-``task_reminder_log`` (eine Zeile je Antrag, gebunden an das auslösende
-``status_event``) verhindert Doppelversand — ein State-Wechsel startet den
-Aufenthalt (und damit die Erinnerungs-Uhr) neu. Versand respektiert die
-per-User-Abwahl (#4-2) und nutzt das Template ``task_reminder`` (DB-Override,
-Builtin-Fallback).
+``task_reminder_log`` (one row per application, bound to the triggering
+``status_event``) prevents duplicate sends — a state change restarts the stay (and the
+reminder clock). Sends respect the per-user opt-out and use the ``task_reminder``
+template (DB override, builtin fallback).
 """
 
 from __future__ import annotations
@@ -43,14 +40,13 @@ logger = logging.getLogger("worker.task_reminders")
 
 
 def _naive_utc(dt: datetime) -> datetime:
-    """Auf naives UTC bringen. ``StatusEvent.at`` ist TIMESTAMP WITHOUT TIME ZONE —
-    asyncpg lehnt einen tz-bewussten Bind dagegen ab (DataError) und
-    ``now - entered_at`` wirft »can't subtract offset-naive and offset-aware«."""
+    """Coerce to naive UTC. ``StatusEvent.at`` is TIMESTAMP WITHOUT TIME ZONE, so
+    asyncpg rejects a tz-aware bind and ``now - entered_at`` would mix naive/aware."""
     return dt.astimezone(UTC).replace(tzinfo=None) if dt.tzinfo is not None else dt
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> Any:
-    """In Tests via ``ctx['sessionmaker']`` injizierbar (wie worker/deadlines)."""
+    """Injectable in tests via ``ctx['sessionmaker']`` (like worker/deadlines)."""
     maker = ctx.get("sessionmaker")
     if maker is not None:
         return maker
@@ -68,7 +64,7 @@ def _mail_queue(ctx: dict[str, Any]) -> Any:
 async def process_task_reminders(
     ctx: dict[str, Any], *, now: datetime | None = None
 ) -> int:
-    """Cron-Einstieg: fällige Erinnerungen versenden; gibt die Anzahl zurück."""
+    """Cron entry: send due reminders; returns the count."""
     now = now or datetime.now(UTC)
     settings: Settings = ctx.get("settings") or load_settings()
     maker = _sessionmaker(ctx)
@@ -100,7 +96,7 @@ async def process_task_reminders(
                     state=state,
                 ):
                     sent += 1
-            except Exception:  # noqa: BLE001 — Einzelfall darf den Zyklus nicht kippen
+            except Exception:  # noqa: BLE001 - one case must not break the cycle
                 logger.exception("task reminder failed (application=%s)", app_id)
     return sent
 
@@ -112,11 +108,11 @@ async def _due_applications(
     after: timedelta,
     repeat: timedelta | None,
 ) -> list[tuple[uuid.UUID, uuid.UUID | None, datetime, State | None]]:
-    """Fällige Anträge: (id, letztes status_event, Eintrittszeit, State).
+    """Due applications: (id, latest status_event, entered_at, state).
 
-    Fällig = bestätigter Antrag, State-Aufenthalt älter als ``after`` UND
-    (noch nie für diesen Aufenthalt erinnert ODER letzte Erinnerung älter als
-    ``repeat``; ``repeat=None`` = Einmal-Modus)."""
+    Due = confirmed application, state stay older than ``after`` AND (never reminded
+    for this stay OR last reminder older than ``repeat``; ``repeat=None`` = once).
+    """
     latest_event = (
         select(
             StatusEvent.application_id.label("app_id"),
@@ -176,7 +172,7 @@ async def _due_applications(
             .limit(1)
         )
         log = logs.get(app_id)
-        # Für diesen Aufenthalt bereits erinnert → nur im Wiederhol-Modus erneut.
+        # Already reminded for this stay -> re-send only in repeat mode.
         if (
             log is not None
             and log.status_event_id == event_id
@@ -200,16 +196,14 @@ async def _remind_one(
 ) -> bool:
     app_row = (
         await session.execute(
-            select(Application.data, Application.gremium_id).where(
-                Application.id == application_id
-            )
+            select(Application.data).where(Application.id == application_id)
         )
     ).first()
     if app_row is None:
         return False
-    data, gremium_id = app_row
+    (data,) = app_row
     recipients = await actionable_principal_emails(
-        session, state=state, gremium_id=gremium_id
+        session, application_id=application_id, state=state
     )
     if not recipients:
         return False
@@ -238,8 +232,8 @@ async def _remind_one(
             now.date().isoformat(),
         ),
     )
-    # Log auch ohne Versand (alle Empfänger abgewählt) setzen — sonst prüft jeder
-    # Lauf dieselben Abgewählten erneut. ``sent`` zählt nur echte Mails.
+    # Write the log even without a send (all recipients opted out), else every run
+    # re-checks the same opted-out set. ``sent`` counts only real mails.
     log = await session.get(TaskReminderLog, application_id)
     if log is None:
         session.add(

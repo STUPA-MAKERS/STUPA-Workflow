@@ -1,23 +1,15 @@
-"""WebSocket-Nachrichten-Schemata (api.md §4, Live-Vote).
+"""WebSocket message schemas for live voting.
 
-Getrennte Modelle für **Server→Client** (``meeting_state``, ``vote_opened``,
-``vote_tally``, ``vote_closed``, ``error``) und **Client→Server** (``cast``,
-``subscribe``). Jede Nachricht ist JSON ``{"type": …, …}``; ``type`` ist der
-Discriminator. Die Modelle sind die Single-Source des WS-Contracts (Schema-Test)
-und werden im Handler zum Validieren der eingehenden bzw. Serialisieren der
-ausgehenden Nachrichten genutzt.
+Separate models for server→client (``meeting_state``, ``vote_opened``,
+``vote_tally``, ``vote_closed``, ``error``) and client→server (``cast``,
+``subscribe``). Every message is JSON ``{"type": …, …}`` with ``type`` as the
+discriminator; the models are the single source of the WS contract.
 
-**Beamer/Geheimhaltung (requirements N1a):** ``vote_tally``/``vote_closed`` tragen
-ausschließlich Aggregate (``counts``/``quorumMet``/``leading``/``result``) — **nie**
-Wähler-Identitäten.
-
-**Geheime Abstimmung (``secret=true``), Regel »Counts erst bei Close« (api.md §4):**
-Solange ein geheimer Vote **offen** ist, darf der Live-Feed (Beamer **und** Voter)
-keinen Zwischenstand je Option preisgeben. ``vote_tally`` trägt dann nur die
-**Teilnahme** (``cast`` von ``eligible``) — ``counts`` ist leer ``{}`` und ``leading``
-``null``. Erst ``vote_closed`` liefert die vollen Aggregate. Das spiegelt die
-REST-Regel ``showBars = !secret || isClosed``. ``secret`` reist in ``vote_opened`` und
-``vote_tally`` mit, damit das FE (T-32) die Balken von Anfang an korrekt ausblendet.
+Secrecy rules: ``vote_tally``/``vote_closed`` carry aggregates only — never
+voter identities. While a secret vote is open, the live feed must not reveal
+per-option counts: ``vote_tally`` then carries only participation (``cast`` of
+``eligible``), ``counts`` is ``{}`` and ``leading`` is ``null``; full aggregates
+arrive only with ``vote_closed`` (mirrors ``showBars = !secret || isClosed``).
 """
 
 from __future__ import annotations
@@ -33,20 +25,17 @@ if TYPE_CHECKING:
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; per Feldname befüllbar (wie übriges API)."""
+    """camelCase aliases in JSON; fillable by field name (like the rest of the API)."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     def dump(self) -> dict[str, object]:
-        """JSON-fähiges Dict (camelCase, Enums/UUID als String) für ``send_json``."""
+        """JSON-ready dict (camelCase, enums/UUIDs as strings) for ``send_json``."""
         return self.model_dump(mode="json", by_alias=True)
 
 
-# --------------------------------------------------------------------------- #
-# Server → Client
-# --------------------------------------------------------------------------- #
 class MeetingStateEvent(_CamelModel):
-    """Aktueller Sitzungs-Zustand (Beamer + Voter)."""
+    """Current meeting state (beamer and voter)."""
 
     type: Literal["meeting_state"] = "meeting_state"
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
@@ -54,61 +43,59 @@ class MeetingStateEvent(_CamelModel):
 
 
 class ViewersEvent(_CamelModel):
-    """Wer hat die Sitzungs-Seite gerade offen (#live-viewers) — Anzeigenamen,
-    dedupliziert je Nutzer. Geht an den Voter-Kanal (nicht an den Beamer)."""
+    """Who currently has the meeting page open — display names, deduplicated
+    per user. Sent to the voter channel only (not the beamer)."""
 
     type: Literal["viewers"] = "viewers"
     viewers: list[str]
 
 
 class VoteOpenedEvent(_CamelModel):
-    """Abstimmung geöffnet — UI schaltet frei."""
+    """Vote opened — UI unlocks."""
 
     type: Literal["vote_opened"] = "vote_opened"
     vote_id: UUID = Field(alias="voteId")
-    # None = generische Beschlussfrage (Freitext-TOP), kein Antrag.
+    # None = generic motion (free-text agenda item), no application.
     application_id: UUID | None = Field(default=None, alias="applicationId")
     agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
-    # Beschlussfrage (»Worüber wird abgestimmt?«) — fürs Live-Dialog/Beamer.
+    # Motion text ("what is being voted on?") — for the live dialog/beamer.
     question: str | None = None
     options: list[str]
     closes_at: datetime | None = Field(default=None, alias="closesAt")
-    # Geheime Abstimmung → FE blendet Live-Balken aus (showBars = !secret || isClosed).
+    # Secret vote → FE hides live bars (showBars = !secret || isClosed).
     secret: bool = False
 
 
 class VoteTallyEvent(_CamelModel):
-    """Live-Zwischenstand — **nur Aggregate, keine Namen** (requirements N1a).
+    """Live interim tally — aggregates only, never names.
 
-    Bei einem **offenen geheimen** Vote bleibt ``counts`` leer und ``leading`` ``null``
-    (kein Zwischenstand); nur die Teilnahme (``cast`` von ``eligible``) ist sichtbar.
-    Über :meth:`from_vote` konstruieren, damit diese Regel an **einer** Stelle gilt.
+    For an open secret vote ``counts`` stays empty and ``leading`` ``null``;
+    only participation (``cast`` of ``eligible``) is visible. Construct via
+    :meth:`from_vote` so this rule lives in one place.
     """
 
     type: Literal["vote_tally"] = "vote_tally"
     vote_id: UUID = Field(alias="voteId")
-    # Stimmen je Option — leer ``{}`` solange der Vote geheim **und** offen ist.
-    # Stimmen je Option — leer ``{}`` solange der Tally **verdeckt** ist (siehe ``revealed``).
+    # Votes per option — empty ``{}`` while the tally is concealed (see ``revealed``).
     counts: dict[str, int]
-    # Abgegebene Stimmen (Teilnahme). Immer sichtbar (auch verdeckt): "N von M anwesend".
+    # Ballots cast (participation). Always visible, even concealed: "N of M present".
     cast: int = 0
     eligible: int
-    # Anwesende Mitglieder (Reveal-Nenner) + ob die Choice-Counts sichtbar sind.
+    # Present members (reveal denominator) + whether choice counts are visible.
     present: int = 0
     revealed: bool = True
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
-    # Geheime Abstimmung → FE blendet Live-Balken aus (showBars = !secret || isClosed).
+    # Secret vote → FE hides live bars (showBars = !secret || isClosed).
     secret: bool = False
 
     @classmethod
     def from_vote(cls, vote: VoteOut) -> VoteTallyEvent:
-        """Tally-Event aus einem Vote bauen. Die Reveal-Regel (geschlossen **oder** nicht
-        geheim **und** alle Anwesenden gestimmt) ist bereits im Service auf ``tally``
-        angewandt (``counts``/``leading`` verdeckt) — hier nur die Felder durchreichen.
-        ``cast`` kommt aus ``tally.voted`` (echte Teilnahme, auch wenn ``counts`` verdeckt).
-        ``revealed`` ist hier die Schutz-Schranke: bei ``False`` reisen **keine**
-        Choice-Counts/``leading`` mit (defensiv, falls der Service sie nicht schon leerte)."""
+        """Build the tally event from a vote.
+
+        The reveal rule is already applied to ``tally`` in the service; here
+        ``revealed`` is the safety gate: when ``False``, no choice counts or
+        ``leading`` travel along (defensive, even if the service missed it)."""
         revealed = vote.tally.revealed
         return cls(
             voteId=vote.id,
@@ -124,41 +111,38 @@ class VoteTallyEvent(_CamelModel):
 
 
 class VoteClosedEvent(_CamelModel):
-    """Abstimmung geschlossen — Endergebnis (aggregiert)."""
+    """Vote closed — final aggregated result."""
 
     type: Literal["vote_closed"] = "vote_closed"
     vote_id: UUID = Field(alias="voteId")
     result: Literal["passed", "rejected", "tie"]
     counts: dict[str, int]
-    # Warum scheiterte die Abstimmung (nur bei ``rejected``): ``quorum`` = Quorum
-    # verfehlt, ``majority`` = Mehrheit verfehlt. ``None`` bei ``passed``/``tie``.
+    # Why the vote failed (only for ``rejected``): ``quorum`` or ``majority``
+    # missed. ``None`` for ``passed``/``tie``.
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
 
 
 class VoteCancelledEvent(_CamelModel):
-    """Abstimmung abgebrochen (#12) — kein Ergebnis, kein Branch."""
+    """Vote cancelled — no result, no branch fired."""
 
     type: Literal["vote_cancelled"] = "vote_cancelled"
     vote_id: UUID = Field(alias="voteId")
 
 
 class ErrorEvent(_CamelModel):
-    """Fehler am WS (z. B. ``not_eligible``, ``read_only``, ``not_open``)."""
+    """WS error (e.g. ``not_eligible``, ``read_only``, ``not_open``)."""
 
     type: Literal["error"] = "error"
     code: str
 
 
-# --------------------------------------------------------------------------- #
-# Client → Server
-# --------------------------------------------------------------------------- #
 class CastMessage(_CamelModel):
-    """Stimmabgabe über den WS (serverseitig: group + unique + open + Lock).
+    """Ballot cast over the WS (server-side: group + unique + open + lock).
 
-    ``asDelegation=true`` = Vertretungs-Stimme (#delegation-rework) — eigene und
-    delegierte Stimme sind zwei getrennte Abgaben."""
+    ``asDelegation=true`` = proxy vote — own and delegated ballots are two
+    separate casts."""
 
     type: Literal["cast"]
     vote_id: UUID = Field(alias="voteId")
@@ -167,6 +151,6 @@ class CastMessage(_CamelModel):
 
 
 class SubscribeMessage(_CamelModel):
-    """Initialen/aktuellen State anfordern (Reconnect-Konsistenz)."""
+    """Request the initial/current state (reconnect consistency)."""
 
     type: Literal["subscribe"]

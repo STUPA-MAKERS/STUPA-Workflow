@@ -1,0 +1,73 @@
+:host {
+  display: contents;
+}
+.mtg__attTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.mtg__attRow td {
+  padding: var(--space-1) var(--space-1);
+  border-bottom: var(--border-width) solid var(--color-border);
+  vertical-align: middle;
+}
+.mtg__attRow:last-child td {
+  border-bottom: none;
+}
+.mtg__attStatus {
+  text-align: end;
+  white-space: nowrap;
+}
+.mtg__attBtns {
+  display: inline-flex;
+  gap: 3px;
+}
+.mtg__attBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.mtg__attBtn:hover:not(:disabled) {
+  background: var(--color-surface-sunken);
+}
+.mtg__attBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.mtg__attBtn--on.mtg__attBtn--present {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: #fff;
+}
+.mtg__attBtn--on.mtg__attBtn--excused {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+  color: #1a1a1a;
+}
+.mtg__attBtn--on.mtg__attBtn--absent {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #fff;
+}
+.mtg__tocEmpty {
+  padding: var(--space-4) var(--space-2);
+  text-align: center;
+  border: var(--border-width) dashed var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+}
+@media (max-width: 48rem) {
+  /* Attendance toggles: larger touch targets. */
+  .mtg__attBtn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}

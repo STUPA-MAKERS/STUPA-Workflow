@@ -1,41 +1,24 @@
-"""Reine Auszählung + Ergebnis-Logik (data-model §5.3, AK »result()-Matrix«).
+"""Pure tallying and result logic (no DB, no time - fully unit-testable).
 
-Zwei seiteneffektfreie Funktionen (keine DB, keine Zeit — voll unit-testbar):
+* ``tally`` counts cast votes per option and finds the leading result.
+* ``result`` applies quorum + majority rule -> passed | rejected | tie.
 
-* :func:`tally` — zählt abgegebene Stimmen je Option (``counts``) + ermittelt das
-  führende Ergebnis. Nichtzählende Optionen ignoriert.
-* :func:`result` — wendet Quorum + Mehrheitsregel an → ``passed | rejected | tie``.
+Decision model (Yes/No with optional abstention):
+* YES = approval, NO = rejection, ABSTAIN = abstention.
+* Abstention never counts toward the majority; it counts toward the quorum only
+  when ``abstainCountsQuorum`` (default True).
+* Extra n-options count as cast votes (quorum/turnout) but not toward the Yes/No majority.
 
-**Entscheidungsmodell (SDS-A3, dokumentierte Annahme, konfigurierbar über die
-Options-Konvention).** Die Abstimmung ist eine Ja/Nein-Entscheidung mit optionaler
-Enthaltung:
+Majority rules (``yes``/``no`` votes, ``cast`` = all cast, ``decisive = yes + no``):
+* ``simple``     - yes > no; tie when yes == no.
+* ``absolute``   - absolute majority of all cast: ``2*yes > cast`` (tie at ``2*yes == cast``).
+* ``two_thirds`` - accepted at >= 2/3 (``3*yes >= 2*decisive``); symmetrically rejected
+  at ``3*no >= 2*decisive``; otherwise a tie (blocking minority).
 
-* :data:`YES` (``"yes"``) = Zustimmung, :data:`NO` (``"no"``) = Ablehnung,
-  :data:`ABSTAIN` (``"abstain"``) = Enthaltung.
-* **Enthaltung** zählt nie zur Mehrheit; sie zählt nur zum **Quorum** und nur, wenn
-  ``abstainCountsQuorum`` (Default ``True``).
-* Weitere Optionen (n-Options) zählen als abgegebene Stimme (Quorum/Beteiligung),
-  fließen aber nicht in die Ja/Nein-Mehrheit ein.
+A tie is resolved via ``tieBreak`` (passed | rejected | tie). A missed quorum is
+always ``rejected`` (fail-closed), regardless of the majority.
 
-**Mehrheitsregeln** (``yes``/``no`` = Ja/Nein-Stimmen, ``cast`` = alle abgegebenen,
-``decisive = yes + no``):
-
-* ``simple``     — Ja > Nein. Patt bei Ja == Nein.
-* ``absolute``   — absolute Mehrheit aller abgegebenen Stimmen: ``2·yes > cast``.
-  Patt bei ``2·yes == cast`` (keine Seite erreicht die absolute Mehrheit).
-* ``two_thirds`` — **Zweidrittelmehrheit im Sinne des Vereins-/Satzungsrechts:
-  ``≥ ⅔``** (R5.1). Angenommen, wenn Ja **mindestens** zwei Drittel erreicht
-  (``3·yes ≥ 2·decisive``) — exakt ⅔ (z.B. 2:1) zählt also als angenommen.
-  Symmetrisch abgelehnt, wenn Nein die Zweidrittel erreicht (``3·no ≥ 2·decisive``).
-  Erreicht **keine** Seite die Zweidrittel (Sperrminorität, z.B. 3:2), ist das
-  Ergebnis ein **Patt** → ``tieBreak`` (Default ``rejected``).
-
-Ein **Patt** wird über ``tieBreak`` (``passed | rejected | tie``) aufgelöst; der
-Roh-Patt bleibt als ``tie`` erhalten, wenn ``tieBreak == "tie"``. **Verfehltes
-Quorum ⇒ ``rejected``** (fail-closed), unabhängig von der Mehrheit.
-
-Ganzzahl-Arithmetik (Vielfache statt Brüche) vermeidet Float-Rundung; das
-Prozent-Quorum nutzt :class:`~decimal.Decimal` für exakten Vergleich.
+Integer arithmetic avoids float rounding; the percent quorum uses Decimal for exactness.
 """
 
 from __future__ import annotations
@@ -56,10 +39,11 @@ FailedReason = Literal["quorum", "majority"]
 
 
 def failed_reason(result: VoteResult, quorum_met: bool) -> FailedReason | None:
-    """Warum scheiterte die Abstimmung? ``quorum`` (verfehlt) vor ``majority``.
+    """Why the vote failed: ``quorum`` (missed) takes precedence over ``majority``.
 
-    Nur für ein **abgelehntes** Ergebnis aussagekräftig; ``passed``/``tie`` ⇒ ``None``.
-    Verfehltes Quorum ist immer ``rejected`` (fail-closed) → es hat Vorrang."""
+    Only meaningful for a rejected result; passed/tie -> None. A missed quorum is
+    always rejected (fail-closed), so it wins.
+    """
     if result != "rejected":
         return None
     return "quorum" if not quorum_met else "majority"
@@ -67,7 +51,7 @@ def failed_reason(result: VoteResult, quorum_met: bool) -> FailedReason | None:
 
 @dataclass(frozen=True, slots=True)
 class Outcome:
-    """Ergebnis einer Auszählung (rein abgeleitet, kein I/O)."""
+    """Result of a tally (purely derived, no I/O)."""
 
     result: VoteResult
     quorum_met: bool
@@ -75,7 +59,7 @@ class Outcome:
 
 
 def tally(options: Iterable[str], choices: Iterable[str | None]) -> dict[str, int]:
-    """Stimmen je **bekannter** Option zählen (unbekannte/NULL-``choice`` ignoriert)."""
+    """Count votes per known option (unknown/NULL ``choice`` ignored)."""
     counts = {opt: 0 for opt in options}
     for choice in choices:
         if choice is not None and choice in counts:
@@ -84,7 +68,7 @@ def tally(options: Iterable[str], choices: Iterable[str | None]) -> dict[str, in
 
 
 def leading(counts: Mapping[str, int]) -> str | None:
-    """Führende Option oder ``None`` (keine Stimmen **oder** Gleichstand an der Spitze)."""
+    """Leading option, or None (no votes or a tie at the top)."""
     if not counts:
         return None
     top = max(counts.values())
@@ -95,23 +79,22 @@ def leading(counts: Mapping[str, int]) -> str | None:
 
 
 def _quorum_met(quorum: Quorum | None, participation: int, eligible: int) -> bool:
-    """Quorum prüfen. ``None`` ⇒ erfüllt. Prozent fail-closed, wenn keine Berechtigten."""
+    """Check the quorum. None -> met. Percent is fail-closed with no eligible voters."""
     if quorum is None:
         return True
     value = Decimal(str(quorum.value))
     if quorum.type == "count":
         return Decimal(participation) >= value
-    # percent: participation/eligible · 100 ≥ value  →  participation·100 ≥ value·eligible
+    # percent: participation/eligible * 100 >= value  ->  participation*100 >= value*eligible
     if eligible <= 0:
         return False
     return Decimal(participation) * Decimal(100) >= value * Decimal(eligible)
 
 
 def _majority(rule: str, yes: int, no: int, cast: int) -> VoteResult:
-    """Mehrheitsregel auf Ja/Nein anwenden → ``passed | rejected | tie`` (Roh-Patt)."""
+    """Apply the majority rule to Yes/No -> passed | rejected | tie (raw tie)."""
     if rule == "two_thirds":
-        # ≥ ⅔ (Satzungs-/Vereinsrecht, R5.1): exakt zwei Drittel zählt als
-        # angenommen. Symmetrisch: erreicht keine Seite ⅔ → Patt (Sperrminorität).
+        # >= 2/3 counts as accepted; if neither side reaches 2/3 -> tie (blocking minority).
         decisive = yes + no
         if decisive == 0:
             return "tie"
@@ -129,7 +112,7 @@ def _majority(rule: str, yes: int, no: int, cast: int) -> VoteResult:
 
 
 def _resolve_tie(tie_break: str) -> VoteResult:
-    """Roh-Patt über ``tieBreak`` auflösen (``passed | rejected | tie``)."""
+    """Resolve a raw tie via ``tieBreak`` (passed | rejected | tie)."""
     if tie_break == "passed":
         return "passed"
     if tie_break == "rejected":
@@ -138,14 +121,14 @@ def _resolve_tie(tie_break: str) -> VoteResult:
 
 
 def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outcome:
-    """Quorum + Mehrheit anwenden → :class:`Outcome` (data-model §5.3)."""
+    """Apply quorum + majority -> Outcome."""
     yes = counts.get(YES, 0)
     no = counts.get(NO, 0)
     abstain = counts.get(ABSTAIN, 0)
     cast = sum(counts.values())
 
-    # Beteiligung fürs Quorum: alle abgegebenen Stimmen, Enthaltungen nur wenn
-    # `abstainCountsQuorum` (Default True) — sonst zählen sie nicht zur Beteiligung.
+    # Turnout for the quorum: all cast votes; abstentions only when
+    # ``abstainCountsQuorum`` (default True).
     participation = cast if config.abstain_counts_quorum else cast - abstain
     quorum_met = _quorum_met(config.quorum, participation, eligible)
     lead = leading(counts)

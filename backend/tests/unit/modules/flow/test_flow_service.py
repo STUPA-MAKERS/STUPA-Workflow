@@ -712,3 +712,145 @@ async def test_revert_status_reschedules_restored_state_deadline() -> None:
     )
     # schedule_state_deadline committet (delete + früher Return ohne Policy-Key).
     assert db.committed >= 1
+
+
+# --------------------------------------------------------------------------- #
+# force_status (#force-status — privilegierter Direkt-Override)
+# --------------------------------------------------------------------------- #
+def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
+    return SimpleNamespace(id=state_id, flow_version_id=flow_id, config={})
+
+
+def _vote_cancel_stmts(db) -> list:
+    return [
+        s
+        for s in db.statements
+        if getattr(getattr(s, "table", None), "name", None) == "vote"
+    ]
+
+
+async def test_force_status_no_current_state_conflicts() -> None:
+    """Antrag ohne aktuellen State kann nicht direkt gesetzt werden → 409."""
+    app = _app(None, uuid4())
+    db = fake_session(result(app))
+    with pytest.raises(ConflictError) as ei:
+        await FlowService(db).force_status(app.id, uuid4(), _principal(), note="x")
+    assert ei.value.code == "conflict"
+    assert db.committed == 0
+
+
+async def test_force_status_unknown_target_state_404() -> None:
+    """Ziel-State existiert nicht → 404 (kein State-Wechsel)."""
+    flow_id = uuid4()
+    app = _app(uuid4(), flow_id)
+    db = fake_session(result(app), result())  # _load_state(target) → None
+    with pytest.raises(NotFoundError):
+        await FlowService(db).force_status(app.id, uuid4(), _principal(), note="x")
+    assert db.committed == 0
+
+
+async def test_force_status_foreign_flow_state_404() -> None:
+    """Ziel-State gehört zu einem ANDEREN Flow → 404 (keine Cross-Graph-Inkonsistenz)."""
+    flow_id, target_id = uuid4(), uuid4()
+    app = _app(uuid4(), flow_id)
+    foreign = _target_state(target_id, uuid4())  # anderer flow_version
+    db = fake_session(result(app), result(foreign))
+    with pytest.raises(NotFoundError, match="does not belong"):
+        await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
+
+
+async def test_force_status_same_state_conflicts() -> None:
+    """Zielzustand == aktueller Zustand → 409 (No-op)."""
+    flow_id, cur = uuid4(), uuid4()
+    app = _app(cur, flow_id)
+    target = _target_state(cur, flow_id)
+    db = fake_session(result(app), result(target))
+    with pytest.raises(ConflictError) as ei:
+        await FlowService(db).force_status(app.id, cur, _principal(), note="x")
+    assert ei.value.code == "conflict"
+    assert db.committed == 0
+
+
+async def test_force_status_concurrent_change_409_rolls_back() -> None:
+    """Konkurrierender Wechsel zwischen Lesen und UPDATE → rowcount 0 → 409 + rollback."""
+    flow_id, cur, target_id = uuid4(), uuid4(), uuid4()
+    app = _app(cur, flow_id)
+    target = _target_state(target_id, flow_id)
+    db = fake_session(result(app), result(target), result(rowcount=0))
+    with pytest.raises(ConflictError) as ei:
+        await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
+    assert ei.value.code == "conflict"
+    assert db.rolled_back == 1
+    assert db.committed == 0
+
+
+async def test_force_status_happy_writes_event_audit_and_cancels_votes() -> None:
+    """Happy path (Ziel-State ladbar): transitionsloses StatusEvent + forced-Audit,
+    offene Votes storniert, Frist neu materialisiert."""
+    flow_id, cur, target_id = uuid4(), uuid4(), uuid4()
+    app = _app(cur, flow_id)
+    target = _target_state(target_id, flow_id)
+    to_state = SimpleNamespace(id=target_id, config={})  # kein PolicyKey → schedule committet nur
+    db = fake_session(
+        result(app), result(target), result(rowcount=1),  # _load_app, _load_state, UPDATE
+        result(), result(), result(),  # _cancel_open_votes + Audit (lock, prev-hash)
+        result(to_state),  # _load_state(to_state)
+        result(),  # schedule_state_deadline: DELETE Altfristen
+    )
+    res = await FlowService(db).force_status(
+        app.id, target_id, _principal(), note="admin override"
+    )
+    assert res.new_state_id == target_id
+    assert res.dispatched_actions == []  # silent: no notifications
+    assert db.committed >= 1
+    # transitionsloses Event mit Grund + Actor.
+    event = db.added[0]
+    assert event.from_state_id == cur
+    assert event.to_state_id == target_id
+    assert event.transition_id is None
+    assert event.actor == "mgr-1"
+    assert event.note == "admin override"
+    # offene Votes storniert (ein UPDATE vote).
+    assert len(_vote_cancel_stmts(db)) == 1
+
+
+async def test_force_status_happy_without_loadable_target_state() -> None:
+    """Ziel-State nach Commit nicht ladbar (None) → kein Frist-Reschedule, Rest ok."""
+    flow_id, cur, target_id = uuid4(), uuid4(), uuid4()
+    app = _app(cur, flow_id)
+    target = _target_state(target_id, flow_id)
+    db = fake_session(
+        result(app), result(target), result(rowcount=1),
+        result(), result(), result(),  # cancel votes + audit
+        result(),  # _load_state(to_state) → None
+    )
+    res = await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
+    assert res.new_state_id == target_id
+    assert db.committed == 1  # nur der force-Commit (kein schedule-Commit)
+
+
+# --------------------------------------------------------------------------- #
+# list_states — Picker-Optionen (States des eigenen Flows)
+# --------------------------------------------------------------------------- #
+async def test_list_states_returns_flow_states() -> None:
+    flow_id = uuid4()
+    app = _app(uuid4(), flow_id)
+    s1 = SimpleNamespace(
+        id=uuid4(), key="draft", label_i18n={"de": "Entwurf"}, color=None,
+        edit_allowed=True, kind="normal",
+    )
+    s2 = SimpleNamespace(
+        id=uuid4(), key="done", label_i18n={}, color="#111",
+        edit_allowed=False, kind="normal",
+    )
+    db = fake_session(result(app), result(s1, s2))
+    out = await FlowService(db).list_states(app.id)
+    assert [o.key for o in out] == ["draft", "done"]
+    assert out[1].color == "#111"
+    assert out[0].edit_allowed is True
+
+
+async def test_list_states_unknown_application_404() -> None:
+    db = fake_session(result())  # kein Antrag
+    with pytest.raises(NotFoundError):
+        await FlowService(db).list_states(uuid4())

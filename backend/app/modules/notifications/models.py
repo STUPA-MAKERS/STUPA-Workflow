@@ -1,13 +1,12 @@
-"""Notifications-Tabellen (data-model §1): mail_template, notification_preference,
+"""Notification tables: mail_template, notification_preference,
 notification_settings, task_reminder_log.
 
-`mail_template` hält i18n-Subject/Body (Jinja2) + deklarierte Platzhalter.
-`notification_preference` speichert die per-User-Abwahl einzelner
-Benachrichtigungs-Arten (#4-2): kein Eintrag = aktiviert (Opt-out-Default).
-`notification_settings` ist die admin-konfigurierbare Plattform-Config
-(Single-Row, #task-reminder); `task_reminder_log` merkt sich den letzten
-Erinnerungs-Versand je Antrag (Einmal-/Wiederholungs-Logik).
-Versandlogik/Render: Service + Worker (T-18).
+``mail_template`` holds i18n subject/body (Jinja2) + declared placeholders.
+``notification_preference`` stores the per-user opt-out of individual
+notification kinds: no row = enabled (opt-out default).
+``notification_settings`` is the admin-configurable platform config
+(single row); ``task_reminder_log`` remembers the last reminder send per
+application (once/repeat logic). Rendering/sending: service + worker.
 """
 
 from __future__ import annotations
@@ -30,25 +29,25 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class MailTemplate(UUIDPkMixin, CreatedAtMixin, Base):
-    """Mail-Template: i18n-Subject/Body (Jinja2) + deklarierte Platzhalter."""
+    """Mail template: i18n subject/body (Jinja2) + declared placeholders."""
 
     __tablename__ = "mail_template"
 
     key: Mapped[str] = mapped_column(Text, unique=True)
     subject_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Body als Jinja2/Markdown; optionaler HTML-Body je Sprache separat (body_html_i18n).
+    # Body as Jinja2/Markdown; optional per-language HTML body (body_html_i18n).
     body_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     body_html_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Deklarierte Platzhalter (Doku/Vorschau): {"name": "...", "applicationId": "..."}.
+    # Declared placeholders (docs/preview): {"name": "...", "applicationId": "..."}.
     placeholders: Mapped[dict] = mapped_column(JSONB, server_default="{}")
 
 
 class NotificationPreference(Base):
-    """Per-User-Schalter je Benachrichtigungs-Art (#4-2).
+    """Per-user switch per notification kind.
 
-    Nur **Abweichungen** vom Default werden gespeichert (alle Arten sind per
-    Default aktiv); essenzielle Mails (Magic-Link) sind nicht abschaltbar und
-    tauchen hier nie auf. ``kind`` ∈ :data:`app.modules.notifications.kinds`.
+    Only **deviations** from the default are stored (all kinds are on by
+    default); essential mails (magic link) cannot be disabled and never
+    appear here. ``kind`` ∈ :data:`app.modules.notifications.kinds`.
     """
 
     __tablename__ = "notification_preference"
@@ -61,12 +60,12 @@ class NotificationPreference(Base):
 
 
 class NotificationSettings(Base):
-    """Plattformweite Benachrichtigungs-Config (Single-Row, admin-gepflegt).
+    """Platform-wide notification config (single row, admin-maintained).
 
-    Aufgaben-Erinnerungen (#task-reminder): ``task_reminder_after_days`` = Tage
-    ohne Statuswechsel, bis erinnert wird; ``task_reminder_repeat_days`` = danach
-    alle N Tage erneut (``0`` = nur einmal je State-Aufenthalt). Pflege über
-    ``/admin/notification-settings`` (P ``admin.notifications``).
+    Task reminders: ``task_reminder_after_days`` = days without a status
+    change until a reminder is sent; ``task_reminder_repeat_days`` = repeat
+    every N days after that (``0`` = only once per state stay). Managed via
+    ``/admin/notification-settings`` (permission ``admin.notifications``).
     """
 
     __tablename__ = "notification_settings"
@@ -83,7 +82,7 @@ class NotificationSettings(Base):
     )
 
     __table_args__ = (
-        # Single-Row-Garantie: es gibt genau die Zeile id=1.
+        # Single-row guarantee: exactly the row id=1 exists.
         CheckConstraint("id = 1", name="notification_settings_singleton"),
         CheckConstraint(
             "task_reminder_after_days >= 1", name="task_reminder_after_days_min"
@@ -95,10 +94,10 @@ class NotificationSettings(Base):
 
 
 class TaskReminderLog(Base):
-    """Letzter Aufgaben-Erinnerungs-Versand je Antrag (#task-reminder).
+    """Last task-reminder send per application.
 
-    ``status_event_id`` bindet die Erinnerung an den State-Aufenthalt: wechselt
-    der Antrag den State, zählt der Aufenthalt neu (Zeile wird überschrieben).
+    ``status_event_id`` binds the reminder to the state stay: when the
+    application changes state, the stay counts anew (row is overwritten).
     """
 
     __tablename__ = "task_reminder_log"

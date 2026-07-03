@@ -23,13 +23,13 @@ import { AdminApiService } from '../admin-api.service';
 import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
 
 /**
- * Versions-Sidebar (#config-versioning): listet die unveränderlichen Config-Snapshots
- * einer Entität (Forms/Flow/Branding), zeigt je Stand den Feld-Diff und erlaubt das
- * **Wiederherstellen** eines früheren Stands (Vorwärts-Restore → neue aktive Version).
- * Es gibt **bewusst kein Löschen** — eine Version ist nie entfernbar.
+ * Version sidebar: lists the immutable config snapshots of an entity
+ * (forms/flow/branding), shows the field diff per snapshot and allows
+ * **restoring** an earlier state (forward restore → new active version). There is
+ * **deliberately no delete** — a version is never removable.
  *
- * `entityType`/`entityId` steuern, welche Historie geladen wird; `restored` meldet dem
- * Editor einen erfolgreichen Restore (→ neu laden).
+ * `entityType`/`entityId` control which history is loaded; `restored` reports a
+ * successful restore to the editor (→ reload).
  */
 @Component({
   selector: 'app-version-history',
@@ -55,7 +55,7 @@ export class VersionHistoryComponent {
 
   readonly entityType = input.required<string>();
   readonly entityId = input.required<string>();
-  /** Emittiert nach erfolgreichem Restore — der Editor lädt seinen Stand neu. */
+  /** Emits after a successful restore — the editor reloads its state. */
   readonly restored = output<void>();
 
   protected readonly revisions = signal<ConfigRevision[]>([]);
@@ -66,7 +66,7 @@ export class VersionHistoryComponent {
   protected readonly restoring = signal(false);
 
   constructor() {
-    // Lädt (neu), sobald sich die Ziel-Entität ändert.
+    // (Re)loads whenever the target entity changes.
     effect(() => {
       const type = this.entityType();
       const id = this.entityId();
@@ -74,7 +74,7 @@ export class VersionHistoryComponent {
     });
   }
 
-  /** Von außen/nach Save aufrufbar: Liste neu laden. */
+  /** Callable externally/after save: reload the list. */
   reload(): void {
     this.load(this.entityType(), this.entityId());
   }
@@ -132,7 +132,7 @@ export class VersionHistoryComponent {
     });
   }
 
-  /** Auslöser-Klarname (sonst sub, sonst »System«). */
+  /** Actor display name (else sub, else "System"). */
   protected actor(rev: ConfigRevision): string {
     return rev.createdByName ?? rev.createdBy ?? this.i18n.translate('admin.audit.system');
   }

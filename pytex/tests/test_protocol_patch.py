@@ -1,10 +1,9 @@
 """Guard the protocol title-page monkeypatch and the runtime version string.
 
-AUD-061: the FastAPI ``version`` is read from ``importlib.metadata`` so it can
-never drift from the installed ``pytex-preprocessor`` pin, and the title-page
-patch fails loud (not silent) if the private ``_SCALAR_ROWS`` attribute is ever
-renamed by a future bump. These tests assert the two extra cover-page labels are
-actually installed and that the version surfaces the real pin.
+The FastAPI ``version`` is read from ``importlib.metadata`` so it cannot drift
+from the installed ``pytex-preprocessor`` pin, and the title-page patch fails
+loud if the private ``_SCALAR_ROWS`` attribute is ever renamed. These tests
+assert the extra cover-page labels are installed and the version matches the pin.
 """
 
 from __future__ import annotations

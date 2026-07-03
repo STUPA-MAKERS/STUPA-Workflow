@@ -1,12 +1,13 @@
-"""Anti-Abuse-Wiring für öffentliche Endpunkte (Issues #23/#24).
+"""Anti-abuse wiring for public endpoints.
 
-FastAPI-Dependencies, die Body-Cap (413), Rate-Limit (429 + `Retry-After`) und
-Altcha-Verifikation (400) **vor** der Endpoint-Logik erzwingen. Backends (Rate-Limiter,
-Altcha-Verifier, Redis-Client) werden lazy auf `app.state` gecacht und aus den injizierten
-`Settings` gebaut → in Tests via `dependency_overrides` ersetzbar.
+FastAPI dependencies that enforce a body cap (413), rate limits (429 +
+``Retry-After``), and Altcha verification (400) before the endpoint logic runs.
+Backends (rate limiter, Altcha verifier, Redis client) are lazily cached on
+``app.state`` and built from the injected ``Settings``, so tests can replace them via
+``dependency_overrides``.
 
-Bewusst als Dependencies (nicht Middleware): so bleibt die Drosselung pro Route
-konfigurierbar (api.md §7) und taucht sauber im OpenAPI-Contract auf.
+Deliberately dependencies, not middleware: throttling stays configurable per route
+and shows up cleanly in the OpenAPI contract.
 """
 
 from __future__ import annotations
@@ -43,17 +44,15 @@ _HOUR = 3600
 
 
 def client_ip(request: Request) -> str:
-    """Client-IP für den Rate-Limit-Schlüssel.
+    """Client IP for the rate-limit key.
 
-    Hinter dem Reverse-Proxy liefert uvicorn `--proxy-headers` (security.md §3) bereits
-    die echte IP in `request.client.host` (X-Forwarded-For nur von vertrauenswürdigen
-    Proxys, `FORWARDED_ALLOW_IPS`). Daher hier **kein** ungeprüftes Header-Parsing."""
+    Behind the reverse proxy, uvicorn ``--proxy-headers`` already yields the real IP in
+    ``request.client.host`` (X-Forwarded-For only from trusted proxies via
+    ``FORWARDED_ALLOW_IPS``), so no unchecked header parsing here."""
     return request.client.host if request.client is not None else "unknown"
 
 
-# --------------------------------------------------------------------------- #
-# Provider (lazy, auf app.state gecacht — in Tests überschreibbar)
-# --------------------------------------------------------------------------- #
+# --- Providers (lazy, cached on app.state; overridable in tests) ---
 def _redis_client(request: Request, settings: Settings) -> object:
     state = request.app.state
     client = getattr(state, "_antiabuse_redis", None)
@@ -106,19 +105,15 @@ RateLimiterDep = Annotated[RateLimiter, Depends(get_rate_limiter)]
 AltchaDep = Annotated["AltchaVerifier | NullAltchaVerifier", Depends(get_altcha_verifier)]
 
 
-# --------------------------------------------------------------------------- #
-# Body-Cap (413) — Content-Length-Schranke + gekapptes Lesen (anti-DoS)
-# --------------------------------------------------------------------------- #
+# --- Body cap (413) ---
 def body_cap(limit_attr: str) -> Callable[[Request, Settings], None]:
-    """Dependency-Factory: 413, wenn `Content-Length` `Settings.<limit_attr>` übersteigt.
+    """Dependency factory: 413 if ``Content-Length`` exceeds ``Settings.<limit_attr>``.
 
-    Defense-in-Depth, **nicht** die primäre Schranke: FastAPI puffert den Body, bevor
-    Dependencies laufen, und ein `Transfer-Encoding: chunked`-Request hat kein
-    `Content-Length` (Review #3). Die maßgebliche Größenschranke gegen unbegrenztes
-    Puffern ist daher `client_max_body_size` am Edge-nginx (`deploy/web/nginx.conf`);
-    `api` hat keine Host-Ports und ist nur über diesen Proxy erreichbar. Dieser Check
-    fängt ehrliche, zu große POSTs früh + billig ab und liefert den konsistenten
-    problem+json-413."""
+    Defense in depth, not the primary limit: FastAPI buffers the body before
+    dependencies run, and a chunked request has no ``Content-Length``. The authoritative
+    size limit is nginx ``client_max_body_size`` at the edge; ``api`` has no host ports
+    and is only reachable through that proxy. This check rejects honest oversized POSTs
+    early and cheaply with a consistent problem+json 413."""
 
     def dependency(request: Request, settings: SettingsDep) -> None:
         limit = int(getattr(settings, limit_attr))
@@ -133,9 +128,7 @@ enforce_auth_payload_limit = body_cap("max_auth_payload_bytes")
 enforce_application_payload_limit = body_cap("max_application_payload_bytes")
 
 
-# --------------------------------------------------------------------------- #
-# Rate-Limit (429)
-# --------------------------------------------------------------------------- #
+# --- Rate limit (429) ---
 async def _enforce(
     limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str
 ) -> None:
@@ -145,41 +138,40 @@ async def _enforce(
 
 
 def _is_oauth_principal(principal: Principal | None) -> bool:
-    """Über ein OAuth-Access-Token authentifiziert (MCP)? (#mcp)
+    """Authenticated via an OAuth access token (MCP)?
 
-    Nur der OAuth-Grant-Pfad setzt ``scope_permissions`` (am Consent auf ``mcp.use`` gegated);
-    Browser-Sessions lassen es ``None``. Der angemeldete MCP ist ein vertrauenswürdiger First-
-    Party-Client (kein anonymer Abuser) → die Frequenz-Drosseln werden für ihn übersprungen."""
+    Only the OAuth grant path sets ``scope_permissions`` (gated on ``mcp.use`` at
+    consent); browser sessions leave it ``None``. The logged-in MCP is a trusted
+    first-party client, so frequency throttles are skipped for it."""
     return principal is not None and principal.scope_permissions is not None
 
 
 def canonical_mail_key(email: str) -> str:
-    """Kanonische Form einer E-Mail für den Per-Mail-Rate-Limit-Schlüssel.
+    """Canonical form of an email for the per-mail rate-limit key.
 
-    Faltet Varianten, die an dieselbe Mailbox zustellen, auf **einen** Schlüssel
-    zusammen, damit das 3/Std-pro-Mail-Limit nicht durch Adress-Normalisierung
-    umgangen werden kann (AUD-026):
+    Folds variants that deliver to the same mailbox onto one key so the per-mail limit
+    cannot be bypassed by address normalization:
 
-    - `strip()` + NFC-Normalisierung gegen Unicode-/Whitespace-Varianten,
-    - Domain ge-`casefold`-t (case-insensitiv, IDN-tauglich),
-    - Local-Part ge-`casefold`-t und Provider-Plus-Tag entfernt
-      (`victim+1@host` → `victim@host`).
+    - ``strip()`` + NFC normalization against unicode/whitespace variants,
+    - domain casefolded (case-insensitive, IDN-friendly),
+    - local part casefolded and the provider plus-tag removed
+      (``victim+1@host`` -> ``victim@host``).
 
-    Rein für den Drossel-Schlüssel — **keine** Adressvalidierung (das macht der
-    Endpoint via `EmailStr`)."""
+    Purely for the throttle key, not address validation (the endpoint does that via
+    ``EmailStr``)."""
     normalized = unicodedata.normalize("NFC", email).strip()
     local, sep, domain = normalized.rpartition("@")
-    if not sep:  # kein '@' — Endpoint-Validierung lehnt das ohnehin ab
+    if not sep:  # no '@'; endpoint validation rejects this anyway
         return normalized.casefold()
     local = local.split("+", 1)[0]
     return f"{local.casefold()}@{domain.casefold()}"
 
 
 async def _json_field(request: Request, field: str) -> str | None:
-    """Feld aus dem (gecachten) JSON-Body lesen — defensiv, ohne hier zu validieren."""
+    """Read a field from the (cached) JSON body defensively, without validating here."""
     try:
         body = await request.json()
-    except Exception:  # noqa: BLE001 — kaputter Body → Endpoint-Validierung übernimmt
+    except Exception:  # noqa: BLE001 - broken body -> endpoint validation handles it
         return None
     if isinstance(body, dict):
         value = body.get(field)
@@ -191,7 +183,7 @@ async def _json_field(request: Request, field: str) -> str | None:
 async def rate_limit_magic_link(
     request: Request, settings: SettingsDep, limiter: RateLimiterDep
 ) -> None:
-    """`POST /auth/magic-link`: 5/Std/IP + 3/Std/Mail (api.md §7)."""
+    """``POST /auth/magic-link``: 5/h/IP + 3/h/mail."""
     await _enforce(
         limiter,
         f"magic-link:ip:{client_ip(request)}",
@@ -213,7 +205,7 @@ async def rate_limit_magic_link(
 async def rate_limit_magic_link_verify(
     request: Request, settings: SettingsDep, limiter: RateLimiterDep
 ) -> None:
-    """`POST /auth/magic-link/verify`: IP-Limit (Token hochentropisch → großzügig)."""
+    """``POST /auth/magic-link/verify``: IP limit (high-entropy token, so generous)."""
     await _enforce(
         limiter,
         f"magic-link-verify:ip:{client_ip(request)}",
@@ -229,9 +221,9 @@ async def rate_limit_applications(
     limiter: RateLimiterDep,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
 ) -> None:
-    """`POST /applications`: 10/Std/IP (api.md §7)."""
+    """``POST /applications``: 10/h/IP."""
     if _is_oauth_principal(principal):
-        return  # angemeldeter MCP → keine Drossel (#mcp)
+        return  # logged-in MCP -> no throttle
     await _enforce(
         limiter,
         f"applications:ip:{client_ip(request)}",
@@ -248,13 +240,13 @@ async def rate_limit_attachments(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> None:
-    """`POST /attachments`: 30/Std/applicant (api.md §7).
+    """``POST /attachments``: 30/h per applicant.
 
-    Schlüssel folgt der Identität: Principal-``sub`` bzw. (Antragsteller) die gebundene
-    ``application_id``; ohne Identität IP-Fallback. Die Auth-Dependency (401/403) läuft
-    separat — dieser Check drosselt nur die Frequenz."""
+    The key follows identity: principal ``sub`` or (applicant) the bound
+    ``application_id``, falling back to IP without identity. The auth dependency
+    (401/403) runs separately; this only throttles frequency."""
     if _is_oauth_principal(principal):
-        return  # angemeldeter MCP → keine Drossel (#mcp)
+        return  # logged-in MCP -> no throttle
     if principal is not None:
         key = f"attachments:principal:{principal.sub}"
     elif applicant is not None:
@@ -276,12 +268,13 @@ async def rate_limit_fints(
     limiter: RateLimiterDep,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
 ) -> None:
-    """`POST /accounts/*/fints/*` + `/statement/import`: pro Principal/Std (#fints-review).
+    """``POST /accounts/*/fints/*`` + ``/statement/import``: per principal/hour.
 
-    Bremst den FinTS-Sync als SSRF-Port-Scan-Orakel und wiederholte Bank-Logins (PIN-
-    Lockout-Missbrauch). Die Auth-Dependency (401/403) läuft separat; hier nur Frequenz."""
+    Throttles FinTS sync as an SSRF port-scan oracle and repeated bank logins
+    (PIN-lockout abuse). The auth dependency (401/403) runs separately; this only
+    throttles frequency."""
     if _is_oauth_principal(principal):
-        return  # angemeldeter MCP → keine Drossel (#mcp)
+        return  # logged-in MCP -> no throttle
     key = (
         f"fints:principal:{principal.sub}"
         if principal is not None
@@ -296,14 +289,12 @@ async def rate_limit_fints(
     )
 
 
-# --------------------------------------------------------------------------- #
-# Altcha (400)
-# --------------------------------------------------------------------------- #
+# --- Altcha (400) ---
 def require_altcha(field: str = "altcha") -> Callable[..., Awaitable[None]]:
-    """Dependency-Factory: verifiziert das Altcha-Solution-Feld aus dem JSON-Body.
+    """Dependency factory: verify the Altcha solution field from the JSON body.
 
-    Fehlend/ungültig/abgelaufen/wiederverwendet → 400. Ist Altcha aus (kein Secret),
-    liefert `get_altcha_verifier` den No-op-Verifier → Durchlass."""
+    Missing/invalid/expired/reused -> 400. When Altcha is off (no secret),
+    ``get_altcha_verifier`` returns the no-op verifier and requests pass through."""
 
     async def dependency(request: Request, verifier: AltchaDep) -> None:
         solution = await _json_field(request, field)
@@ -323,11 +314,11 @@ verify_altcha = require_altcha()
 def require_altcha_unless_authenticated(
     field: str = "altcha",
 ) -> Callable[..., Awaitable[None]]:
-    """Wie :func:`require_altcha`, **überspringt** Altcha aber für eingeloggte Nutzer:innen.
+    """Like :func:`require_altcha`, but skips Altcha for logged-in users.
 
-    Begründung (#24): eine gültige Principal-Session ist bereits ein Vertrauensanker —
-    Altcha (Bot-/Spam-Abwehr) ist nur für die anonyme öffentliche Einreichung nötig.
-    Anonyme Requests durchlaufen die normale Altcha-Prüfung (400 bei fehlend/ungültig).
+    A valid principal session is already a trust anchor; Altcha (bot/spam defense) is
+    only needed for anonymous public submission. Anonymous requests go through the
+    normal Altcha check (400 if missing/invalid).
     """
 
     inner = require_altcha(field)

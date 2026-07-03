@@ -18,8 +18,8 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { type Account, type AccountBody, BudgetTreeApi } from '../../budget/budget-tree.api';
 
 /**
- * Konten-Verwaltung (Verwaltung → Konten). Konto = Name + IBAN (Freitext); **nicht**
- * an Kostenstellen gebunden. Bei Buchungen optional referenzierbar. P(``account.manage``).
+ * Accounts admin. An account is name + IBAN (free text); not bound to a cost centre.
+ * Optionally referenced by bookings. P(``account.manage``).
  */
 @Component({
   selector: 'app-accounts',
@@ -59,8 +59,8 @@ export class AccountsComponent {
   readonly fName = signal('');
   readonly fIban = signal('');
   readonly fActive = signal(true);
-  // FinTS-**Bank-Verbindung** (#fints): nur Endpunkt + BLZ — für alle Bucher gleich. Die
-  // persönlichen Logins/PINs setzt jeder Bucher selbst im Buchungs-Tab (#fints-percred).
+  // FinTS bank connection: endpoint + bank code only, shared by all bookers. Each booker
+  // sets their own login/PIN in the booking tab.
   readonly fEndpoint = signal('');
   readonly fBlz = signal('');
   readonly saving = signal(false);

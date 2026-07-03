@@ -1,30 +1,14 @@
-"""pytex render service — thin FastAPI wrapper around ``pytex_api.render_blob`` (T-21).
+"""pytex render service: thin FastAPI wrapper around ``pytex_api.render_blob``.
 
-The platform generates Markdown server-side and needs a PDF back; pytex
-ships no REST surface, so this container exposes ``POST /render`` (and a
-``/health`` probe) over the blob API. The exact ``pytex-preprocessor`` version
-that ships is pinned in ``requirements.txt`` / ``pyproject.toml`` and surfaced
-at runtime via ``importlib.metadata`` (see ``_PYTEX_VERSION`` below) so the
-service version string never drifts from the installed renderer.
+Exposes ``POST /render`` plus a ``/health`` probe. Blob in / blob out: POST the
+source as the raw request body, pick kinds/trust/variant via query params, get
+``application/pdf`` (or ``text/plain`` ``.tex``) back. Every build runs in a
+per-request temp dir inside the library; no filesystem is exposed to the caller.
 
-Blob in / blob out: POST the Markdown source as the raw request body, pick the
-kinds / trust / variant via query params, get an ``application/pdf`` (or
-``text/plain`` ``.tex``) back. No filesystem is exposed to the caller — every
-build runs in a per-request temp dir inside the library.
-
-Design choices (SDS overview §1, deployment §1):
-* The service is internal-only (compose ``internal`` network, no host port) and
-  is fed first-party, app-generated documents, so the default trust level is
-  ``trusted`` — this unlocks the tectonic bundle/biber auto-download on the very
-  first build, after which the ``pytex_cache`` volume keeps subsequent builds
-  offline. Override per request via ``?trust_level=``.
-* The variant (``report`` / ``protocol-stupa`` / ``protocol-asta`` / …) defaults
-  to ``None`` so the library auto-detects it from the document's YAML
-  frontmatter; an explicit ``?variant=`` overrides that.
-* Errors are mapped to status codes and every detail string is scrubbed of
-  absolute filesystem paths, so no internal path or stacktrace leaks to clients
-  (``LimitError`` → 413, ``TrustError`` / ``CompileError`` / ``ApiError`` → 400,
-  anything else → 500).
+The service is internal-only and fed first-party, app-generated documents, so
+the default trust level is ``trusted``; ``variant`` defaults to ``None`` for
+auto-detection from the document's YAML frontmatter. Error details are scrubbed
+of absolute filesystem paths so no internal path or stacktrace leaks to clients.
 """
 
 from __future__ import annotations
@@ -56,11 +40,9 @@ _DEFAULT_TRUST = os.environ.get("PYTEX_DEFAULT_TRUST", "trusted").lower()
 # Hard ceiling on the body we even read, in front of the library's input cap;
 # keeps a giant upload out of memory. The library cap is aligned below.
 _MAX_BODY_BYTES = int(os.environ.get("PYTEX_MAX_BODY_BYTES", str(4 * 1024 * 1024)))
-# Compile wall-clock/cpu kill (seconds). The library default of 30 s is too tight
-# for the FIRST trusted build: tectonic lazily downloads its LaTeX bundle into
-# the cache volume on that run and gets killed mid-download — every retry starts
-# over and the render never succeeds. 120 s lets the warm-up complete; cached
-# builds finish in a few seconds anyway.
+# Compile wall-clock/cpu kill (seconds). The library's 30 s default kills the
+# first trusted build mid bundle-download; 120 s lets that warm-up complete,
+# and cached builds finish in a few seconds anyway.
 _WALL_TIMEOUT_S = float(os.environ.get("PYTEX_WALL_TIMEOUT_S", "120"))
 _CPU_TIMEOUT_S = float(os.environ.get("PYTEX_CPU_TIMEOUT_S", "120"))
 _LIMITS = BuildLimits(
@@ -71,23 +53,18 @@ _LIMITS = BuildLimits(
     max_input_bytes=_MAX_BODY_BYTES,
 )
 
-# Protokoll-Titelseite: pytex rendert nur seine fest verdrahteten
-# Frontmatter-Keys als Daten-Zeilen — »Beschlussfähigkeit« kennt es nicht.
-# Die Zeilen-Tabelle ist ein Modul-Tuple, das `_data_lines` zur Laufzeit liest;
-# wir erweitern sie hier (Wrapper-Patch statt Paket-Fork, #protocol-quorum).
+# Protocol title page: pytex only renders its hard-wired frontmatter keys as
+# data rows. Extend the module-level row table here (wrapper patch, not a fork).
 from pytex_markdown.protocol import document as _protocol_document  # noqa: E402
 
-# Fail loud, not silent: if a future pytex bump renames this private attribute
-# the patch must abort container start-up rather than quietly drop the extra
-# title-page rows. The silent existence check below is only a per-label
-# idempotency guard against re-applying on re-import.
+# Fail loud at start-up if a future pytex bump renames this private attribute;
+# the existence check below is only an idempotency guard against re-import.
 assert hasattr(_protocol_document, "_SCALAR_ROWS"), (
     "pytex-preprocessor no longer exposes `_protocol_document._SCALAR_ROWS`; "
     "the protocol title-page patch must be re-validated against the new version"
 )
 
 for _label, _keys in (
-    # Gremium als Titelseiten-Daten-Zeile (#14) — pytex kennt den Key nicht nativ.
     ("Gremium", ("gremium",)),
     ("Beschlussfähigkeit", ("beschlussfaehigkeit", "beschlussfähigkeit")),
 ):
@@ -97,9 +74,8 @@ for _label, _keys in (
             (_label, _keys),
         )
 
-# Surface the installed renderer version so the service version string can never
-# drift from what actually ships (AUD-061). Fall back to "unknown" only if the
-# package metadata is somehow absent (e.g. running from a raw checkout).
+# Surface the installed renderer version so the service version string cannot
+# drift from what actually ships; "unknown" only if package metadata is absent.
 try:
     _PYTEX_VERSION = _pkg_version("pytex-preprocessor")
 except PackageNotFoundError:  # pragma: no cover - metadata always present in the image
@@ -107,10 +83,9 @@ except PackageNotFoundError:  # pragma: no cover - metadata always present in th
 
 app = FastAPI(title="pytex render service", version=_PYTEX_VERSION)
 
-# Strip absolute filesystem paths (/home/..., /tmp/pytex-api-...) out of any
-# error detail before it reaches the client. Anchored to the known container
-# root prefixes only, so legitimate slash-containing detail (LaTeX command
-# fragments like /linewidth, fractions, URL path segments) survives intact.
+# Strip absolute filesystem paths out of any error detail before it reaches the
+# client. Anchored to known container root prefixes only, so legitimate
+# slash-containing detail (e.g. /linewidth, URL segments) survives intact.
 _PATH_RE = re.compile(r"/(?:tmp|app|cache|home|var|usr|root|opt|etc)/[^\s:'\"]*")
 
 
@@ -151,9 +126,8 @@ async def render(
     ),
 ) -> Response:
     """Render the raw request body (Markdown) to a PDF or LaTeX blob."""
-    # Reject oversized uploads from the declared Content-Length *before* reading
-    # the body into memory, so a giant POST never gets buffered. A missing or
-    # malformed header falls through to the post-read guard below.
+    # Reject oversized uploads from the declared Content-Length before buffering
+    # the body; a missing or malformed header falls through to the post-read guard.
     declared = request.headers.get("content-length")
     if declared is not None:
         try:

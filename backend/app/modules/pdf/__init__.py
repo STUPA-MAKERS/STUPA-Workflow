@@ -1,7 +1,7 @@
-"""PDF-Modul (T-20): Markdown-Gen + pytex-Client + MinIO.
+"""PDF module: application-Markdown generation, pytex client, MinIO storage.
 
-Antrags-PDFs entstehen **asynchron**: die API legt einen ``render_job`` an (202 +
-``jobId``), der arq-Worker baut das Markdown, ruft den pytex-Container ``POST /render``
-und legt das PDF in MinIO ab. ``GET /jobs/{id}`` liefert den Status + (bei Erfolg) eine
-kurzlebige, signierte Ergebnis-URL.
+Application PDFs render asynchronously: the API creates a ``render_job`` (202 +
+``jobId``), the arq worker builds the Markdown, calls pytex ``POST /render`` and
+stores the PDF in MinIO. ``GET /jobs/{id}`` returns the status plus, on success, a
+short-lived signed result URL.
 """

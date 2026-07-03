@@ -1,8 +1,8 @@
-// Konten-Tab (#fints-konten): pixelgleich zum Buchungen-Tab — exp__-Klassen 1:1 übernommen,
-// Konto-Selektor links im Stil des Budget-Selektors (cct__), TAN/OTP im Dialog (bank__).
+// Accounts tab: pixel-identical to the bookings tab — exp__ classes reused 1:1,
+// account selector on the left in the budget-selector style (cct__), TAN/OTP in the dialog (bank__).
 :host { display: block; }
 
-/* Kopf auf normale Body-Breite zentrieren (wie Anträge); Baum im linken Rand. */
+/* Centre the header at normal body width (like applications); tree in the left margin. */
 .exp__head { width: 100%; max-width: var(--layout-max-width); margin: 0 auto var(--space-5); }
 .exp__title { margin: 0; }
 .exp__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
@@ -54,7 +54,7 @@ input.exp__input {
 .exp__appLink { color: var(--color-primary); text-decoration: none; font-size: var(--fs-xs); }
 .exp__appLink:hover { text-decoration: underline; }
 .exp__sentinel { height: 1px; }
-/* --- Tabelle --- */
+/* --- Table --- */
 .exp__tableWrap {
   overflow-x: auto;
   border: var(--border-width) solid var(--color-border);
@@ -130,7 +130,7 @@ input.exp__input {
 }
 .block { display: block; }
 
-/* Mobil: Baum hinter einklappbarem Toggle, eine Spalte (wie Buchungen). */
+/* Mobile: tree behind a collapsible toggle, single column (like bookings). */
 .exp__treeToggle { display: none; }
 @media (max-width: 768px) {
   .exp__layout { grid-template-columns: 1fr; }
@@ -210,7 +210,7 @@ input.exp__input {
   .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
 }
 
-/* --- Konto-Selektor links: gleiche Optik wie der Budget-Selektor (cct__) --- */
+/* --- Account selector on the left: same look as the budget selector (cct__) --- */
 .cct__node {
   display: inline-flex;
   align-items: baseline;
@@ -252,7 +252,7 @@ input.exp__input {
   font-weight: var(--fw-medium);
 }
 
-/* --- TAN/OTP + Sperr-Banner im Dialog (aus dem Bankabgleich übernommen, #fints) --- */
+/* --- TAN/OTP + lock banner in the dialog (reused from bank reconciliation) --- */
 .bank__hint { margin: 0; font-size: var(--fs-xs); color: var(--color-text-muted); }
 .bank__locked {
   margin: 0;
@@ -327,7 +327,7 @@ input.exp__input {
   &:focus { outline: none; border-color: var(--color-primary); }
 }
 
-/* --- Dialoge (Import / Link): saubere vertikale Rhythmik + Typeahead --- */
+/* --- Dialogs (import / link): clean vertical rhythm + typeahead --- */
 .kon__dlg {
   display: flex;
   flex-direction: column;
@@ -354,13 +354,13 @@ input.exp__input {
   color: var(--color-success);
 }
 
-/* Typeahead-Vorschlagsliste (wie der Antrags-/Mitglieder-Picker). */
+/* Typeahead suggestion list (like the application/member picker). */
 .exp__suggest {
   list-style: none;
   margin: var(--space-1) 0 0;
   padding: var(--space-1);
-  /* Im Fluss (nicht absolut) → wächst den Dialog auf, statt am kurzen Dialog-Rand
-     abgeschnitten zu werden (#review). Eigener Scroll bei vielen Treffern. */
+  /* In flow (not absolute) → grows the dialog instead of being clipped at the
+     short dialog edge. Own scroll when there are many hits. */
   max-height: 14rem;
   overflow-y: auto;
   background: var(--color-surface);

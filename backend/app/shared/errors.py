@@ -1,11 +1,11 @@
-"""Einheitlicher Fehler-Contract (api.md §2, RFC-9457-nah).
+"""Unified error contract (RFC 9457-ish).
 
-Problem-JSON:
+Problem JSON:
     {"type","title","status","code","detail","errors":[{"field","msg"}],"traceId"}
 
-`AppError` + Subklassen tragen Status/Code/Title. `register_exception_handlers`
-mappt AppError, FastAPI-Validierung, Starlette-HTTP (z.B. unbekannte Route) und
-unbehandelte Exceptions auf das Problem-JSON. Nach außen **keine** Stacktraces/Pfade.
+``AppError`` and subclasses carry status/code/title. ``register_exception_handlers``
+maps AppError, FastAPI validation, Starlette HTTP (e.g. unknown route), and unhandled
+exceptions onto the problem JSON. No stack traces or paths are leaked outward.
 """
 
 from __future__ import annotations
@@ -23,16 +23,14 @@ logger = logging.getLogger("app.error")
 
 PROBLEM_CONTENT_TYPE = "application/problem+json"
 
-# FastAPI wirft GENAU diese `HTTPException(400)`, wenn das Parsen des Request-Bodys
-# fehlschlägt, das kein JSON-Decode-Fehler ist — v.a. kaputtes `multipart/form-data`
-# (fastapi/routing.py). Ungültiges JSON läuft dagegen über `RequestValidationError`
-# → 422. Damit ein unparsebarer Body **app-weit** denselben dokumentierten
-# problem+json-Status liefert (statt endpunktweise undokumentierter 400er — Contract
-# `negative_data_rejection`/undocumented-status, Issue #23/T-13), heben wir diesen Fall
-# auf 422 (validation_error) — denselben Status wie jede andere Body-Validierung.
+# FastAPI raises exactly this HTTPException(400) when body parsing fails in a way that
+# is not a JSON decode error (mainly broken multipart/form-data); invalid JSON goes
+# through RequestValidationError -> 422. We lift this case to 422 (validation_error) so
+# an unparseable body yields the same documented problem+json status app-wide instead of
+# an undocumented per-endpoint 400.
 _BODY_PARSE_ERROR_DETAIL = "There was an error parsing the body"
 
-# Status → stabiler Fehlercode (api.md §2).
+# Status -> stable error code.
 STATUS_CODE_MAP: dict[int, str] = {
     400: "bad_request",
     401: "unauthorized",
@@ -48,7 +46,7 @@ STATUS_CODE_MAP: dict[int, str] = {
     503: "service_unavailable",
 }
 
-# Status → menschenlesbarer Titel (Default, falls AppError keinen setzt).
+# Status -> human-readable title (default when AppError sets none).
 STATUS_TITLE_MAP: dict[int, str] = {
     400: "Bad Request",
     401: "Unauthorized",
@@ -89,7 +87,7 @@ def title_for(status: int) -> str:
 
 
 class AppError(Exception):
-    """Domänen-/HTTP-Fehler mit Mapping auf das Problem-JSON."""
+    """Domain/HTTP error mapped onto the problem JSON."""
 
     status: int = 500
 
@@ -111,7 +109,7 @@ class AppError(Exception):
             if errors is not None
             else None
         )
-        # Zusätzliche Antwort-Header (z.B. `Retry-After` bei 429).
+        # Extra response headers (e.g. ``Retry-After`` on 429).
         self.headers: dict[str, str] | None = headers
         super().__init__(self.detail or self.title)
 
@@ -156,13 +154,13 @@ class PayloadTooLargeError(AppError):
 
 
 class UnsupportedMediaTypeError(AppError):
-    """415 — Datei-Typ nicht erlaubt bzw. MIME-Sniff ≠ Endung (security.md §6)."""
+    """415 - file type not allowed or MIME sniff != extension."""
 
     status = 415
 
 
 class ValidationProblem(AppError):
-    """422 — Validierung gegen Form/Config (api.md). Name vermeidet Pydantic-Kollision."""
+    """422 - validation against form/config. Named to avoid a Pydantic collision."""
 
     status = 422
 
@@ -185,7 +183,7 @@ class RateLimitedError(AppError):
 
 
 class ServiceUnavailableError(AppError):
-    """503 — abhängiger Dienst nicht erreichbar (z. B. Object-Storage beim Upload)."""
+    """503 - a dependent service is unreachable (e.g. object storage during upload)."""
 
     status = 503
 
@@ -217,7 +215,7 @@ async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 def _validation_problem(
     request: Request, *, detail: str, errors: list[FieldError]
 ) -> JSONResponse:
-    """Einheitliches 422-problem+json für jede Body-/Parameter-Validierung."""
+    """Uniform 422 problem+json for any body/parameter validation."""
     problem = ProblemDetail(
         type="app://error/validation_error",
         title=title_for(422),
@@ -243,8 +241,8 @@ async def _validation_handler(
 async def _http_exception_handler(
     request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
-    # Body-Parse-Fehler (kaputtes multipart o.Ä.) vereinheitlichen auf 422 — nicht der
-    # endpunktspezifische, undokumentierte 400 von FastAPI (s. `_BODY_PARSE_ERROR_DETAIL`).
+    # Unify body-parse errors (broken multipart etc.) onto 422 instead of FastAPI's
+    # endpoint-specific, undocumented 400 (see ``_BODY_PARSE_ERROR_DETAIL``).
     if exc.status_code == 400 and exc.detail == _BODY_PARSE_ERROR_DETAIL:
         return _validation_problem(
             request,
@@ -265,7 +263,7 @@ async def _http_exception_handler(
 
 
 async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
-    # Intern volle Info loggen, nach außen nichts leaken (keine Pfade/Stacktraces).
+    # Log full detail internally, leak nothing outward (no paths/stack traces).
     logger.exception("Unhandled exception", exc_info=exc)
     problem = ProblemDetail(
         type="app://error/internal_error",
@@ -279,7 +277,7 @@ async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """Alle Handler an die App binden (Reihenfolge: spezifisch → generisch)."""
+    """Bind all handlers to the app (order: specific -> generic)."""
     app.add_exception_handler(AppError, _app_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, _validation_handler)  # type: ignore[arg-type]
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)  # type: ignore[arg-type]
@@ -287,7 +285,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 
 def _ensure_problem_components(schema: dict[str, object]) -> None:
-    """`ProblemDetail`(+`FieldError`) im components-Block registrieren (idempotent)."""
+    """Register ``ProblemDetail`` (+ ``FieldError``) in the components block (idempotent)."""
     components = schema.setdefault("components", {})
     assert isinstance(components, dict)
     schemas = components.setdefault("schemas", {})
@@ -303,12 +301,12 @@ def _ensure_problem_components(schema: dict[str, object]) -> None:
 
 
 def use_problem_json_contract(app: FastAPI) -> None:
-    """OpenAPI an den Fehler-Contract angleichen (api.md §2).
+    """Align OpenAPI with the error contract.
 
-    FastAPI dokumentiert Fehler-/422-Antworten als `application/json`; die Handler
-    liefern jedoch `application/problem+json` (RFC-9457-nah). Diese Anpassung schreibt
-    **alle** 4xx/5xx-Antworten auf `application/problem+json` + `ProblemDetail` um, damit
-    der Contract (Schemathesis content/status/schema) konsistent ist."""
+    FastAPI documents error/422 responses as ``application/json``, but the handlers
+    emit ``application/problem+json`` (RFC 9457-ish). This rewrites all 4xx/5xx
+    responses to ``application/problem+json`` + ``ProblemDetail`` so the contract is
+    consistent."""
     generate = app.openapi
 
     def custom_openapi() -> dict[str, object]:
@@ -327,18 +325,17 @@ def use_problem_json_contract(app: FastAPI) -> None:
             for operation in operations.values():
                 if not isinstance(operation, dict):
                     continue
-                # Opt-out: Endpunkte mit eigenem Fehler-Contract (z. B. RFC-6749-OAuth-
-                # Token-Fehler in OAuth-JSON statt problem+json) dokumentieren ihre
-                # Antworten selbst und werden hier NICHT umgeschrieben (s. oauth_router.token).
+                # Opt-out: endpoints with their own error contract (e.g. RFC 6749 OAuth
+                # token errors in OAuth JSON instead of problem+json) document their own
+                # responses and are NOT rewritten here.
                 if operation.get("x-error-contract") == "oauth":
                     continue
                 responses = operation.setdefault("responses", {})
-                # Jeder Body-annehmende Endpunkt kann bei unparsebarem/ungültigem Body
-                # ein 422 liefern (RequestValidationError bzw. vereinheitlichter
-                # Body-Parse-Fehler, s. `_http_exception_handler`). FastAPI dokumentiert
-                # 422 nur, wenn validierbare Felder existieren — multipart/File-Endpunkte
-                # bekommen es z.B. nicht zuverlässig. Darum hier global ergänzen, damit der
-                # Contract nicht endpunktweise an einem undokumentierten Status scheitert.
+                # Any body-accepting endpoint can return 422 on an unparseable/invalid
+                # body (RequestValidationError or the unified body-parse error). FastAPI
+                # only documents 422 when validatable fields exist, so multipart/File
+                # endpoints miss it; add it globally so the contract does not fail on an
+                # undocumented status.
                 if "requestBody" in operation and isinstance(responses, dict):
                     responses.setdefault(
                         "422", {"description": "Validation Error"}

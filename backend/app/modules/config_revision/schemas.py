@@ -1,7 +1,7 @@
-"""API-Schemata des config_revision-Moduls (#config-versioning).
+"""API schemas for the config_revision module.
 
-Lese-Sichten für die Versions-Sidebar (Liste) und den Feld-Diff (gleiche
-``DataDiff``-Form wie das Antrags-Detail, vom FE-``mapDiff`` konsumiert).
+Read views for the version sidebar and the field diff (same ``DataDiff`` shape
+as the application detail).
 """
 
 from __future__ import annotations
@@ -20,17 +20,17 @@ class _CamelModel(BaseModel):
 
 
 class ConfigRevisionOut(_CamelModel):
-    """Ein Config-Snapshot (Sidebar-Zeile)."""
+    """One config snapshot (sidebar row)."""
 
     id: UUID
     entity_type: str = Field(alias="entityType")
     entity_id: str = Field(alias="entityId")
     version: int
     at: datetime
-    # Auslöser-``sub`` + aufgelöster Klarname (wie im Audit-Log).
+    # Trigger ``sub`` plus resolved display name (as in the audit log).
     created_by: str | None = Field(default=None, alias="createdBy")
     created_by_name: str | None = Field(default=None, alias="createdByName")
-    # Jüngster Stand der Entität (= aktuell live).
+    # Newest state of the entity (= currently live).
     is_current: bool = Field(default=False, alias="isCurrent")
 
     @classmethod
@@ -54,7 +54,7 @@ class ConfigRevisionOut(_CamelModel):
 
 
 class ConfigRevisionDiffOut(_CamelModel):
-    """Feld-Diff eines Snapshots gegen seinen Vorgänger."""
+    """Field diff of a snapshot against its predecessor."""
 
     id: UUID
     entity_type: str = Field(alias="entityType")

@@ -11,7 +11,7 @@
   font-size: var(--fs-xs);
   color: var(--color-text-muted);
 }
-/* Umbenennen-Zeile: Key (schmal) + DE + EN als gleichmäßige Spalten (#16). */
+/* Rename row: key (narrow) + DE + EN as even columns. */
 .roles__nameEdit {
   display: grid;
   grid-template-columns: minmax(7rem, 0.5fr) 1fr 1fr;

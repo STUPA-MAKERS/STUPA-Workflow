@@ -1,0 +1,28 @@
+<section class="mtg__beamer" [attr.aria-label]="'meetings.beamer.heading' | t">
+  @if (vote(); as bv) {
+    <app-badge [variant]="voteVariant(bv.status)">{{ voteStatusKey(bv.status) | t }}</app-badge>
+    <h2 class="mtg__beamerQ">{{ bv.question || bv.title || ('meetings.vote.untitled' | t) }}</h2>
+    @if (bv.status === 'open') {
+      <p class="mtg__beamerProgress">{{ 'meetings.vote.progress' | t: { voted: bv.voted, present: bv.present } }}</p>
+    }
+    @if (bv.revealed && bv.counts) {
+      <dl class="mtg__beamerTally">
+        @for (entry of countEntries(bv); track entry.key) {
+          <div class="mtg__beamerOpt" [class.mtg__beamerOpt--lead]="entry.key === bv.leading">
+            <dd>{{ entry.value }}</dd>
+            <dt>{{ optionLabel(entry.key) }}</dt>
+          </div>
+        }
+      </dl>
+    } @else if (bv.status === 'open') {
+      <p class="mtg__beamerHidden">{{ 'meetings.vote.progressHidden' | t }}</p>
+    }
+    @if (bv.result) {
+      <span class="mtg__beamerResult">
+        <app-badge [variant]="voteResultVariant(bv.result)">{{ voteResultKey(bv.result) | t }}</app-badge>
+      </span>
+    }
+  } @else {
+    <p class="mtg__beamerIdle">{{ 'meetings.beamer.idle' | t }}</p>
+  }
+</section>

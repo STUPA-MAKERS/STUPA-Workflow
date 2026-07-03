@@ -1,13 +1,11 @@
-"""Flow-Action-Dispatcher mit `notify`-Handler (T-18 erfüllt das T-14-Interface).
+"""Flow action dispatcher handling ``notify`` and ``taskNotify`` actions.
 
-Die Flow-Engine (T-14) ruft nach Commit ``ActionDispatcher.dispatch(actions)``. Dieser
-Dispatcher behandelt ``notify``-Actions: er rendert die Mail(s) und legt sie via
-Mail-Queue ab (Worker sendet). Andere Worker-Action-Typen (``webhook`` etc.) gehören
-zu Folge-Tasks und werden hier nur protokolliert — nicht verworfen, nicht enqueued.
+The flow engine calls ``ActionDispatcher.dispatch(actions)`` after commit. This
+dispatcher renders the mail(s) and enqueues them via the mail queue (the worker
+sends); other action types are only logged here — not dropped, not enqueued.
 
-``DispatchedAction.idempotency_key`` ist stabil über (Antrag, Status-Event, Position,
-Typ) → er dient als Idempotenz-Basis, damit ein Worker-Retry **keinen** Doppelversand
-erzeugt (flows §9.3).
+``DispatchedAction.idempotency_key`` is stable over (application, status event,
+position, type), so a worker retry never causes a duplicate send.
 """
 
 from __future__ import annotations
@@ -33,7 +31,7 @@ logger = logging.getLogger("app.notifications")
 
 @dataclass(slots=True)
 class NotificationActionDispatcher:
-    """`ActionDispatcher`-Implementierung für `notify` (sonst No-op-Log)."""
+    """``ActionDispatcher`` implementation for ``notify`` (no-op log otherwise)."""
 
     sessionmaker: async_sessionmaker[AsyncSession]
     queue: MailQueue | None
@@ -63,7 +61,6 @@ class NotificationActionDispatcher:
                     ).where(Application.id == action.application_id)
                 )
             ).first() or (None, None, None)
-            # Antragstitel mitgeben (#4): Templates/Builtin nennen, WORUM es geht.
             title = (app_data or {}).get("title")
             context: dict[str, object] = {
                 "applicationId": str(action.application_id),
@@ -73,8 +70,8 @@ class NotificationActionDispatcher:
             }
             raw_lang = action.params.get("lang")
             lang = str(raw_lang) if raw_lang else None
-            # ``status`` (Label des aktuellen States) bereitstellen — das Default-/Status-
-            # Template referenziert ``{{ status }}``; ohne Wert scheitert StrictUndefined.
+            # Default/status templates reference ``{{ status }}``; without a value
+            # StrictUndefined would fail the render.
             if current_state_id is not None:
                 label_i18n = await session.scalar(
                     select(State.label_i18n).where(State.id == current_state_id)
@@ -101,8 +98,9 @@ class NotificationActionDispatcher:
 
 
     async def _dispatch_task(self, action: DispatchedAction) -> None:
-        """Task-Mail (#4-3): Antrag hat einen State erreicht, in dem die Empfänger
-        handeln können — Empfänger werden zur Versandzeit aufgelöst (Task-Semantik)."""
+        """Send a task mail: the application reached an actionable state.
+
+        Recipients are resolved at send time (task semantics)."""
         from app.modules.notifications.recipients import (
             actionable_principal_emails,
             state_actionable,
@@ -114,25 +112,24 @@ class NotificationActionDispatcher:
                     select(
                         Application.data,
                         Application.current_state_id,
-                        Application.gremium_id,
                     ).where(Application.id == action.application_id)
                 )
             ).first()
             if row is None:
                 return
-            data, state_id, gremium_id = row
+            data, state_id = row
             state = (
                 await session.scalar(select(State).where(State.id == state_id))
                 if state_id is not None
                 else None
             )
-            # Task-Mail nur, wenn am neuen State wirklich gehandelt werden kann (#9):
-            # vote-State oder ≥1 manueller Übergang mit requiresAction — sonst ist
-            # "du kannst handeln" schlicht falsch (reiner Durchgangs-/End-State).
+            # Task mail only if the new state is actually actionable (vote state or
+            # a manual transition with requiresAction) — otherwise "you can act"
+            # would be wrong for pass-through/end states.
             if not await state_actionable(session, state):
                 return
             recipients = await actionable_principal_emails(
-                session, state=state, gremium_id=gremium_id
+                session, application_id=action.application_id, state=state
             )
             if not recipients:
                 return
@@ -185,7 +182,7 @@ _BUILTIN_TASK_BODY = {
 
 
 def build_notify_dispatcher(pool: object) -> NotificationActionDispatcher:
-    """Dispatcher aus dem (optionalen) arq-Pool bauen — App-Wiring (main.py)."""
+    """Build the dispatcher from the (optional) arq pool — app wiring."""
     return NotificationActionDispatcher(
         get_sessionmaker(),
         mail_queue_from_pool(pool),  # type: ignore[arg-type]

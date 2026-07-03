@@ -3,17 +3,17 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
 import type { BudgetTreeNode, FiscalYear } from './budget-tree.api';
 
-/** Auswahl im linken Baum: Budget (Top) + Haushaltsjahr. */
+/** Selection in the left tree: budget (top) + fiscal year. */
 export interface BudgetYearSelection {
   budgetId: Uuid;
   fiscalYearId: Uuid;
 }
 
 /**
- * Linker Navigations-Baum **Budget → Haushaltsjahr** (#budget-redesign). Zwei
- * Ebenen: jedes Top-Budget, darunter seine HHJ (klickbar → wählt Budget+Jahr).
- * Aktuelles ist hervorgehoben; gepunktete, hellgrüne, kompakte Linien. Zeigt „…"
- * wenn ein Budget mehr als 5 HHJ hat. Wiederverwendbar (Dashboard + Admin).
+ * Left navigation tree **budget → fiscal year**. Two levels: each top budget,
+ * below it its fiscal years (clickable → selects budget + year). The current one
+ * is highlighted; dotted, light-green, compact lines. Shows "…" when a budget has
+ * more than 5 fiscal years. Reusable (dashboard + admin).
  */
 @Component({
   selector: 'app-budget-year-tree',
@@ -25,7 +25,7 @@ export interface BudgetYearSelection {
 })
 export class BudgetYearTreeComponent {
   readonly tops = input<BudgetTreeNode[]>([]);
-  /** HHJ je Top-Budget-Id. */
+  /** Fiscal years per top-budget id. */
   readonly fiscalYears = input<Record<Uuid, FiscalYear[]>>({});
   readonly selectedBudgetId = input<string>('');
   readonly selectedFyId = input<string>('');
@@ -53,7 +53,7 @@ export class BudgetYearTreeComponent {
       .join(', ');
   }
 
-  /** Knoten-Farbe (gesetzte Farbe oder stabile Palette nach Index). */
+  /** Node colour (set colour, or a stable palette by index). */
   dotColor(node: BudgetTreeNode): string {
     if (node.color) return node.color;
     const idx = this.palette().indexOf(node.id);
@@ -68,7 +68,7 @@ export class BudgetYearTreeComponent {
   }
 }
 
-/** Fallback-Palette für Knoten ohne gesetzte Farbe (stabil nach Index). */
+/** Fallback palette for nodes without a set colour (stable by index). */
 export const PALETTE: readonly string[] = [
   '#5fb37a',
   '#4a90d9',

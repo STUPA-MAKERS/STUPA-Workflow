@@ -1,8 +1,8 @@
-"""Audit-Log-Modul (T-23, security.md §4, data-model §1 ``audit_entry``).
+"""Audit-log module.
 
-Append-only Hash-Kette: ``hash = sha256(prev_hash || canonical_json(entry))``. Andere
-Module schreiben über die Service-Hook :func:`record` (re-exportiert), abfragbar über
-``GET /api/admin/audit`` (RBAC ``audit.read``).
+Append-only hash chain: ``hash = sha256(prev_hash || canonical_json(entry))``.
+Other modules write via the re-exported :func:`record` hook; entries are read
+through ``GET /api/admin/audit`` (RBAC ``audit.read``).
 """
 
 from __future__ import annotations

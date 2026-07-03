@@ -62,6 +62,20 @@ def test_applicant_role_and_committee() -> None:
     assert eval_guard({"applicantCommitteeIs": "g-0"}, ctx) is False
 
 
+# --- Antragstyp -------------------------------------------------------------
+def test_application_type_is() -> None:
+    ctx = GuardContext(application_type_key="qsm")
+    assert eval_guard({"applicationTypeIs": "qsm"}, ctx) is True
+    assert eval_guard({"applicationTypeIs": "vsm"}, ctx) is False
+    # Nicht auflösbarer Typ (z. B. Datendrift) ⇒ fail-closed False.
+    assert eval_guard({"applicationTypeIs": "qsm"}, GuardContext()) is False
+
+
+def test_application_type_is_condition_op_allowed_on_automatic() -> None:
+    # Bedingung (kein Akteur-Gate) → auch auf automatischen Übergängen erlaubt (Triage).
+    validate_guard({"applicationTypeIs": "qsm"}, allow_actor_ops=False)
+
+
 # --- Budget -----------------------------------------------------------------
 def test_budget_is_and_fits() -> None:
     ctx = GuardContext(budget_id="b-1", budget_fits=True)
@@ -75,6 +89,17 @@ def test_budget_is_and_fits() -> None:
 def test_deadline_passed() -> None:
     assert eval_guard({"deadlinePassed": True}, GuardContext(deadline_passed=True)) is True
     assert eval_guard({"deadlinePassed": True}, GuardContext(deadline_passed=False)) is False
+
+
+def test_attachment_present() -> None:
+    with_att = GuardContext(has_attachment=True)
+    without = GuardContext(has_attachment=False)
+    assert eval_guard({"attachmentPresent": True}, with_att) is True
+    assert eval_guard({"attachmentPresent": True}, without) is False
+    # Negiert: ``false`` ⇒ es darf KEIN Anhang vorliegen.
+    assert eval_guard({"attachmentPresent": False}, without) is True
+    # Bedingung (kein Akteur-Gate) → auf automatischen Übergängen erlaubt.
+    validate_guard({"attachmentPresent": True}, allow_actor_ops=False)
 
 
 # --- Felder -----------------------------------------------------------------
@@ -191,6 +216,8 @@ def test_validate_guard_rejects_bad_leaf_value_types() -> None:
         validate_guard({"isInCommittee": 7})
     with pytest.raises(GuardError, match="non-empty string"):
         validate_guard({"hasField": ""})
+    with pytest.raises(GuardError, match="non-empty string"):
+        validate_guard({"applicationTypeIs": ""})
     with pytest.raises(GuardError, match="boolean"):
         validate_guard({"deadlinePassed": "yes"})
     with pytest.raises(GuardError, match="boolean"):
@@ -205,6 +232,7 @@ def test_validate_action_ok() -> None:
     )
     validate_action({"type": "addToNextSession", "gremiumId": "g-1"})
     validate_action({"type": "assignBudget", "budgetId": "b-1"})
+    validate_action({"type": "assignBudgetFromField", "field": "ziel_kostenstelle"})
 
 
 def test_validate_action_required_fields() -> None:
@@ -220,6 +248,8 @@ def test_validate_action_required_fields() -> None:
         validate_action({"type": "addToNextSession"})
     with pytest.raises(GuardError, match="budgetId"):
         validate_action({"type": "assignBudget"})
+    with pytest.raises(GuardError, match="field"):
+        validate_action({"type": "assignBudgetFromField"})
 
 
 def test_validate_action_rejects_unknown_and_missing() -> None:
@@ -233,8 +263,10 @@ def test_validate_action_rejects_unknown_and_missing() -> None:
 
 def test_whitelists_exact() -> None:
     assert {
-        "deadlinePassed", "applicantRoleIs", "applicantCommitteeIs", "budgetIs",
-        "budgetFitsApplication", "hasField", "compare", "roleIs", "isInCommittee",
-        "actorIsApplicant", "and", "or", "not",
+        "deadlinePassed", "applicantRoleIs", "applicantCommitteeIs", "applicationTypeIs",
+        "attachmentPresent", "budgetIs", "budgetFitsApplication", "hasField", "compare",
+        "roleIs", "isInCommittee", "actorIsApplicant", "and", "or", "not",
     } == GUARD_OPERATORS
-    assert {"webhook", "notify", "addToNextSession", "assignBudget"} == ACTION_TYPES
+    assert {
+        "webhook", "notify", "addToNextSession", "assignBudget", "assignBudgetFromField",
+    } == ACTION_TYPES

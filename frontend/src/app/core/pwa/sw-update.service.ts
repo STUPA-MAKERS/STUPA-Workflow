@@ -6,22 +6,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 
 /**
- * PWA-Update-Fluss (#5): meldet sich der Service Worker mit einer neuen
- * App-Version (`VERSION_READY`), wird sie aktiviert und ein dauerhafter Toast
- * weist auf das nötige Neuladen hin. Ohne SW (Dev-Modus, alte Browser) ist
- * `isEnabled` false und nichts passiert.
+ * PWA update flow: when the service worker reports a new app version
+ * (`VERSION_READY`), it is activated and a persistent toast prompts the required
+ * reload. Without a SW (dev mode, old browsers) `isEnabled` is false and nothing
+ * happens.
  *
- * Aktive Aktualisierungserkennung: Der Service prüft auf Updates bei:
- * - Nach einer kurzen Verzögerung beim App-Start (boostrap-Deadlock überwinden)
- * - Regelmäßigen Intervallen (alle 5 Minuten)
- * - Wenn die App in den Vordergrund rückt (focus event)
- * → Benutzer sehen das Toast "neue Version verfügbar" zeitnah nach Deployments
+ * Active update detection: the service checks for updates:
+ * - after a short delay at app start (to break the bootstrap deadlock)
+ * - at regular intervals (every 5 minutes)
+ * - when the app comes to the foreground (focus event)
+ * → users see the "new version available" toast promptly after deployments.
  *
- * BOOTSTRAP DEADLOCK FIX: Alte Versionen haben die neue Polling-Logik nicht.
- * Ohne initialen Update-Check beim Start würden sie nie die neue Version
- * laden und damit nie die Polling-Logik bekommen. Daher wird checkForUpdate()
- * nach einer kurzen Verzögerung aufgerufen, um sicherzustellen, dass der
- * Service Worker bereits registriert ist.
+ * BOOTSTRAP DEADLOCK FIX: old versions do not have the new polling logic.
+ * Without an initial update check at start they would never load the new version
+ * and thus never get the polling logic. So checkForUpdate() is called after a
+ * short delay to ensure the service worker is already registered.
  */
 @Injectable({ providedIn: 'root' })
 export class SwUpdateService {
@@ -32,7 +31,7 @@ export class SwUpdateService {
   init(): void {
     if (!this.updates.isEnabled) return;
 
-    // Höre auf Updates, die bereit zur Aktivierung sind
+    // Listen for updates ready to activate.
     this.updates.versionUpdates
       .pipe(filter((e): e is VersionReadyEvent => e.type === 'VERSION_READY'))
       .subscribe(() => {
@@ -41,11 +40,10 @@ export class SwUpdateService {
         });
       });
 
-    // BOOTSTRAP-FIX: Warte eine kurze Zeit (1 Sekunde), damit der Service Worker
-    // Zeit hat, sich zu registrieren, bevor wir den ersten Update-Check durchführen.
-    // Die registerWhenStable-Strategie registriert den SW nach 30s oder wenn die App
-    // stabil ist. Mit dieser Verzögerung geben wir dem SW Zeit, registriert zu werden,
-    // bevor wir checkForUpdate() aufrufen.
+    // BOOTSTRAP FIX: wait a short while (1 second) so the service worker has time
+    // to register before we run the first update check. The registerWhenStable
+    // strategy registers the SW after 30s or once the app is stable; this delay
+    // gives the SW time to register before we call checkForUpdate().
     setTimeout(() => {
       this.checkForUpdatesOnce();
       this.setupPeriodicPolling();
@@ -54,23 +52,23 @@ export class SwUpdateService {
   }
 
   private checkForUpdatesOnce(): void {
-    // Versuche SOFORT einen Update-Check (nachdem der SW registriert ist).
-    // Dies überwindet das Deadlock-Problem, bei dem alte Versionen ohne Polling
-    // nie die neue Version mit Polling-Logik laden würden.
+    // Try an update check IMMEDIATELY (once the SW is registered). This breaks
+    // the deadlock where old versions without polling would never load the new
+    // version that has the polling logic.
     void this.updates.checkForUpdate().catch(() => {
-      // Fehler ignorieren und weitermachen
+      // Ignore errors and carry on.
     });
   }
 
   private setupPeriodicPolling(): void {
-    // Prüfe alle 5 Minuten auf Updates (300.000 ms)
+    // Check for updates every 5 minutes (300,000 ms).
     interval(5 * 60 * 1000)
       .pipe(concatMap(() => this.updates.checkForUpdate()))
       .subscribe();
   }
 
   private setupFocusListener(): void {
-    // Prüfe auf Updates, wenn die App in den Vordergrund kommt
+    // Check for updates when the app comes to the foreground.
     if (typeof window !== 'undefined') {
       fromEvent(window, 'focus')
         .pipe(concatMap(() => this.updates.checkForUpdate()))

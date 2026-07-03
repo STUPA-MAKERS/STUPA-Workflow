@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/angular';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 
-/** Direkten Zugriff auf die `protected`-Member für gezielte Branch-Abdeckung. */
+/** Direct access to the `protected` members for targeted branch coverage. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PieInternals = any;
 

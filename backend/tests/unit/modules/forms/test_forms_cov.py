@@ -361,6 +361,25 @@ def test_get_effective_form_with_budget_pot_adds_section() -> None:
     assert out.budget_pot_id == pot.id
 
 
+def test_get_effective_form_injects_dynamic_options() -> None:
+    # gremium_select/budget_select bekommen ihre Optionen server-seitig injiziert;
+    # die Fake-DB liefert keine → leere Liste (deckt _inject_dynamic_options +
+    # _gremium_field_options + _budget_field_options ab).
+    ver_id = uuid.uuid4()
+    at = _app_type(active_form_version_id=ver_id)
+    rows = [
+        _form_field_row("ziel_g", "gremium_select"),
+        _form_field_row("ziel_b", "budget_select", order=1),
+    ]
+    svc = FormsService(_Session(results=[_Result(rows)], gets=[at]))  # type: ignore[arg-type]
+    out = _run(svc.get_effective_form(at.id))
+    by_key = {f.key: f for s in out.sections for f in s.fields}
+    assert by_key["ziel_g"].type == "gremium_select"
+    assert by_key["ziel_g"].options == []
+    assert by_key["ziel_b"].type == "budget_select"
+    assert by_key["ziel_b"].options == []
+
+
 def test_get_effective_form_section_marker_label_preserved() -> None:
     # Sektion mit eigenem Marker-Label: s.label != None → wird direkt durchgereicht.
     ver_id = uuid.uuid4()

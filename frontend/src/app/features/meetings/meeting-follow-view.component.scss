@@ -1,0 +1,102 @@
+@use 'vote-block';
+
+:host {
+  display: contents;
+}
+/* Center the cards on body width (like toolbar + 3-column shell). */
+.mtg__follow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
+}
+.mtg__followTop {
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.mtg__preview {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+  min-height: 8rem;
+}
+.mtg__preview :first-child {
+  margin-top: 0;
+}
+.mtg__preview blockquote {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+.mtg__preview code {
+  background: var(--color-bg);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  font-size: 0.9em;
+}
+.mtg__preview .callout {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 4px solid var(--callout-color, var(--color-border-strong));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--callout-color, var(--color-border-strong)) 8%, transparent);
+}
+.mtg__preview .callout :last-child {
+  margin-bottom: 0;
+}
+.mtg__preview .callout__title {
+  font-weight: var(--fw-semibold);
+  color: var(--callout-color, var(--color-text));
+  margin: 0 0 var(--space-1);
+}
+.mtg__preview .callout--note { --callout-color: #1f6feb; }
+.mtg__preview .callout--tip { --callout-color: #1a7f37; }
+.mtg__preview .callout--important { --callout-color: #8250df; }
+.mtg__preview .callout--warning { --callout-color: #9a6700; }
+.mtg__preview .callout--caution { --callout-color: #cf222e; }
+.mtg__preview a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+.mtg__preview ul,
+.mtg__preview ol {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
+}
+.mtg__preview hr {
+  border: 0;
+  border-top: var(--border-width) solid var(--color-border);
+  margin: var(--space-3) 0;
+}
+.mtg__preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--space-2) 0;
+  font-size: var(--fs-sm);
+}
+.mtg__preview th,
+.mtg__preview td {
+  border: var(--border-width) solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
+  text-align: start;
+}
+.mtg__preview thead th {
+  background: var(--color-surface);
+  font-weight: var(--fw-semibold);
+}
+@media (max-width: 48rem) {
+  /* Markdown tables in the protocol scroll horizontally instead of overflowing. */
+  .mtg__preview table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}

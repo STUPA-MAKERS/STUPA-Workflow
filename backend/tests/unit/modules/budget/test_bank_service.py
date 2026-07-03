@@ -14,9 +14,10 @@ from typing import Any
 
 import pytest
 
-from app.modules.budget import bank_import, bank_service
-from app.modules.budget import fints_client as fc
-from app.modules.budget.bank_service import BankService
+from app.modules.budget.bank import client as fc
+from app.modules.budget.bank import service_base, statement
+from app.modules.budget.bank.service import BankService
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import (
     Account,
     AccountFintsCredential,
@@ -28,7 +29,6 @@ from app.modules.budget.tree_schemas import (
     ExpenseOut,
     FintsCredentialIn,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
 from app.shared.crypto import decrypt_secret, encrypt_secret
 from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
@@ -98,7 +98,7 @@ def _service(session: _Session, monkeypatch: pytest.MonkeyPatch, **over: Any) ->
     async def _noop(*_a: Any, **_k: Any) -> None:
         return None
 
-    monkeypatch.setattr(bank_service, "audit_record", _noop)
+    monkeypatch.setattr(service_base, "audit_record", _noop)
     # SSRF-Re-Validierung (DNS) ist separat getestet — im Unit-Test neutralisieren.
     monkeypatch.setattr(fc, "validate_fints_endpoint", lambda _u: None)
     return BankService(
@@ -224,7 +224,7 @@ async def test_credentials_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.asyncio
 async def test_require_principal_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ohne Principal-Id (interne Invariante) → 503."""
-    monkeypatch.setattr(bank_service, "audit_record", lambda *_a, **_k: None)
+    monkeypatch.setattr(service_base, "audit_record", lambda *_a, **_k: None)
     svc = BankService(_Session(), settings=_settings(), principal_id=None)  # type: ignore[arg-type]
     with pytest.raises(ServiceUnavailableError):
         svc._require_principal()
@@ -324,8 +324,8 @@ async def test_stage_lines_idempotent_count(monkeypatch: pytest.MonkeyPatch) -> 
     svc = _service(session, monkeypatch)
     acc = _account()
     lines = [
-        bank_import.StatementLine(amount=Decimal("10.00"), counterparty_iban="DEXP", bank_ref="a"),
-        bank_import.StatementLine(amount=Decimal("-5.00"), bank_ref="b"),
+        statement.StatementLine(amount=Decimal("10.00"), counterparty_iban="DEXP", bank_ref="a"),
+        statement.StatementLine(amount=Decimal("-5.00"), bank_ref="b"),
     ]
     # _suggest: keine Kandidaten (execute → leer), keine Memory (scalar → None);
     # dann pg_insert returning: erste neu (Zeile), zweite Dublette (leer).
@@ -333,7 +333,7 @@ async def test_stage_lines_idempotent_count(monkeypatch: pytest.MonkeyPatch) -> 
     session.scalar_q.append(None)
     session.execute_q.extend([_Result([]), _Result([])])  # line2: candidates, insert(dup)
     session.scalar_q.append(None)
-    imported, dup = await svc._stage_lines(acc, lines)
+    imported, dup, _superseded = await svc._stage_lines(acc, lines)
     assert (imported, dup) == (1, 1)
 
 
@@ -385,6 +385,18 @@ async def test_list_lines_paged_linked_and_income_filters(
         assert page.items == []
 
 
+@pytest.mark.asyncio
+async def test_list_lines_paged_excludes_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Alle view (state=None, include_ignored=False) hides set-aside lines."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    session.scalar_q.append(0)  # count
+    session.scalars_q.append(_Result([]))
+    page = await svc.list_lines_paged(account_id=None, state=None, include_ignored=False)
+    assert page.total == 0
+    assert page.items == []
+
+
 # --------------------------------------------------------------- ignore
 @pytest.mark.asyncio
 async def test_ignore_line(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -402,6 +414,57 @@ async def test_ignore_line_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _service(_Session(), monkeypatch)
     with pytest.raises(NotFoundError):
         await svc.ignore_line(uuid.uuid4())
+
+
+@pytest.mark.asyncio
+async def test_ignore_line_records_reason(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Optionaler Grund landet (getrimmt) in den Audit-Daten."""
+    captured: list[dict[str, Any]] = []
+
+    async def _capture(_session: Any, **kw: Any) -> None:
+        captured.append(kw)
+
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    monkeypatch.setattr(service_base, "audit_record", _capture)
+    line = _line()
+    session.put(line)
+    session.execute_q.append(_Result([(line.id,)]))  # Claim gewinnt
+    await svc.ignore_line(line.id, reason="  Doppelbuchung  ")
+    assert session.commits == 1
+    assert captured and captured[0]["data"] == {"reason": "Doppelbuchung"}
+
+
+@pytest.mark.asyncio
+async def test_reactivate_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    line = _line(match_state="ignored")
+    session.put(line)
+    session.execute_q.append(_Result([(line.id,)]))  # Claim (ignored -> unmatched) gewinnt
+    out = await svc.reactivate_line(line.id)
+    assert out.match_state == "unmatched"
+    assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_reactivate_line_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    svc = _service(_Session(), monkeypatch)
+    with pytest.raises(NotFoundError):
+        await svc.reactivate_line(uuid.uuid4())
+
+
+@pytest.mark.asyncio
+async def test_reactivate_line_rejects_non_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nur eine ignorierte Zeile ist reaktivierbar — sonst 422 (line_not_ignored)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    line = _line(match_state="matched")
+    session.put(line)
+    session.execute_q.append(_Result([]))  # Claim verfehlt (nicht ignored)
+    with pytest.raises(ValidationProblem) as ei:
+        await svc.reactivate_line(line.id)
+    assert ei.value.code == "line_not_ignored"
 
 
 # --------------------------------------------------------------- confirm
@@ -596,11 +659,11 @@ async def test_import_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     session.put(acc)
     def _parse(data: Any, *, filename: Any = None) -> Any:
         return (
-            [bank_import.StatementLine(amount=Decimal("10.00"), bank_ref="a")],
-            bank_import.StatementBalance(amount=Decimal("1234.56"), as_of=date(2026, 6, 30)),
+            [statement.StatementLine(amount=Decimal("10.00"), bank_ref="a")],
+            statement.StatementBalance(amount=Decimal("1234.56"), as_of=date(2026, 6, 30)),
         )
 
-    monkeypatch.setattr(bank_service.bank_import, "parse_statement_full", _parse)
+    monkeypatch.setattr(statement, "parse_statement_full", _parse)
     session.execute_q.extend([_Result([]), _Result([(uuid.uuid4(),)])])
     session.scalar_q.append(None)
     res = await svc.import_file(acc.id, b"data", filename="x.sta")
@@ -614,12 +677,12 @@ def test_apply_balance() -> None:
     BankService._apply_balance(acc, None)  # kein Saldo → unverändert
     assert acc.fints_last_balance is None
     BankService._apply_balance(
-        acc, bank_import.StatementBalance(amount=Decimal("99.00"), as_of=date(2026, 6, 30))
+        acc, statement.StatementBalance(amount=Decimal("99.00"), as_of=date(2026, 6, 30))
     )
     assert acc.fints_last_balance == Decimal("99.00")
     assert acc.fints_balance_at is not None
     # ohne Stichtag → now() (nur Nicht-None geprüft, Wert variabel)
-    BankService._apply_balance(acc, bank_import.StatementBalance(amount=Decimal("5.00")))
+    BankService._apply_balance(acc, statement.StatementBalance(amount=Decimal("5.00")))
     assert acc.fints_last_balance == Decimal("5.00")
 
 
@@ -628,16 +691,16 @@ def test_apply_balance_recency_guard() -> None:
     bekannten Stand nicht; gleicher Stichtag aktualisiert weiterhin."""
     acc = _account()
     BankService._apply_balance(
-        acc, bank_import.StatementBalance(amount=Decimal("99.00"), as_of=date(2026, 6, 30))
+        acc, statement.StatementBalance(amount=Decimal("99.00"), as_of=date(2026, 6, 30))
     )
     BankService._apply_balance(
-        acc, bank_import.StatementBalance(amount=Decimal("11.00"), as_of=date(2026, 6, 1))
+        acc, statement.StatementBalance(amount=Decimal("11.00"), as_of=date(2026, 6, 1))
     )
     assert acc.fints_last_balance == Decimal("99.00")  # älterer Import ignoriert
     assert acc.fints_balance_at == datetime(2026, 6, 30, tzinfo=UTC)
     # gleicher Stichtag → Update greift (Guard nur bei ECHT älterem Stand).
     BankService._apply_balance(
-        acc, bank_import.StatementBalance(amount=Decimal("77.00"), as_of=date(2026, 6, 30))
+        acc, statement.StatementBalance(amount=Decimal("77.00"), as_of=date(2026, 6, 30))
     )
     assert acc.fints_last_balance == Decimal("77.00")
 
@@ -681,9 +744,9 @@ async def test_import_file_unparseable(monkeypatch: pytest.MonkeyPatch) -> None:
     session.put(acc)
 
     def _boom(data: Any, filename: Any = None) -> Any:
-        raise bank_import.StatementParseError("nope")
+        raise statement.StatementParseError("nope")
 
-    monkeypatch.setattr(bank_service.bank_import, "parse_statement", _boom)
+    monkeypatch.setattr(statement, "parse_statement", _boom)
     with pytest.raises(ValidationProblem):
         await svc.import_file(acc.id, b"data", filename="x.bin")
 
@@ -701,7 +764,7 @@ async def test_sync_account_done(monkeypatch: pytest.MonkeyPatch) -> None:
             status="done",
             new_state=b"state",
             tan_mechanism="962",
-            lines=[bank_import.StatementLine(amount=Decimal("10.00"), bank_ref="a")],
+            lines=[statement.StatementLine(amount=Decimal("10.00"), bank_ref="a")],
         )
 
     monkeypatch.setattr(fc, "start_sync", _start)
@@ -718,6 +781,27 @@ async def test_sync_account_done(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cred.fints_state != "state"
     assert decrypt_secret(cred.fints_state, key=_KEY) == "state"
     assert cred.fints_last_sync_at is not None
+
+
+@pytest.mark.asyncio
+async def test_sync_account_ambiguous_account(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Konto nicht eindeutig zuordenbar → 422 (fints_account_ambiguous), KEIN Lock."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    acc = _account()
+    session.put(acc)
+
+    def _start(creds: Any, *, start_date: Any) -> fc.FintsOutcome:
+        raise fc.FintsAccountSelectionError("no match")
+
+    monkeypatch.setattr(fc, "start_sync", _start)
+    cred = _cred(account_id=acc.id)
+    session.scalar_q.append(cred)  # _load_credential
+    session.execute_q.append(_Result([]))  # _purge_expired_sessions
+    with pytest.raises(ValidationProblem) as ei:
+        await svc.sync_account(acc.id)
+    assert ei.value.code == "fints_account_ambiguous"
+    assert cred.fints_locked_until is None  # nicht als Bank-Fehler gewertet
 
 
 @pytest.mark.asyncio

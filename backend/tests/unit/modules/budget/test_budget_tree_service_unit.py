@@ -14,6 +14,7 @@ import pytest
 
 from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import (
     Budget,
     BudgetAllocation,
@@ -29,7 +30,6 @@ from app.modules.budget.tree_schemas import (
     FiscalYearUpdate,
     MoveFiscalYearRequest,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.auth_fakes import fake_session, result
 
@@ -165,8 +165,10 @@ async def test_update_node_stichtag_unchanged_skips_rederive() -> None:
 
 
 async def test_delete_node_ok() -> None:
+    # node, no child, no booking, no assigned application → allocations (if any)
+    # cascade away with the node; deletion proceeds.
     node = _budget()
-    sess = fake_session(result(node), result(), result())  # node, no child, no alloc
+    sess = fake_session(result(node), result(), result(), result())
     svc = BudgetTreeService(sess)
     await svc.delete_node(node.id)
     assert sess.deleted == [node]
@@ -180,12 +182,33 @@ async def test_delete_node_with_children() -> None:
         await svc.delete_node(node.id)
 
 
-async def test_delete_node_with_allocations() -> None:
+async def test_delete_node_with_bookings() -> None:
+    # A childless centre that carries bookings must not be silently cascade-wiped.
     node = _budget()
-    sess = fake_session(result(node), result(), result(uuid.uuid4()))  # no child, has alloc
+    sess = fake_session(result(node), result(), result(uuid.uuid4()))  # no child, has booking
     svc = BudgetTreeService(sess)
     with pytest.raises(ConflictError):
         await svc.delete_node(node.id)
+
+
+async def test_delete_node_with_assigned_applications() -> None:
+    # An application still assigned to the centre would be orphaned → block.
+    node = _budget()
+    # node, no child, no booking, has assigned application
+    sess = fake_session(result(node), result(), result(), result(uuid.uuid4()))
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ConflictError):
+        await svc.delete_node(node.id)
+
+
+async def test_delete_node_with_allocation_only_succeeds() -> None:
+    # Regression: a leaf that only has an allocation row (planning figure, no
+    # children/bookings/apps) is now deletable — the old guard wrongly blocked it.
+    node = _budget()
+    sess = fake_session(result(node), result(), result(), result())
+    svc = BudgetTreeService(sess)
+    await svc.delete_node(node.id)
+    assert sess.deleted == [node]
 
 
 async def test_delete_node_not_found() -> None:

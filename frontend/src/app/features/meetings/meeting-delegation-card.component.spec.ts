@@ -105,7 +105,7 @@ async function setup(meetingId = 'm-1') {
   return { ...view, http, cmp };
 }
 
-/** Den initialen Kontext-GET (vom effect) mit `body` beantworten. */
+/** Answer the initial context GET (from the effect) with `body`. */
 function flushContext(http: HttpTestingController, body: MeetingDelegationContext | null): void {
   const req = http.expectOne(`${BASE}/delegations/meetings/m-1/context`);
   if (body) req.flush(body);
@@ -188,10 +188,10 @@ describe('MeetingDelegationCardComponent', () => {
     );
     const opts = cmp.recipientOptions();
     expect(opts[0]).toEqual({ value: 'r-1', label: 'Alice' });
-    // Pool-Empfänger trägt das Suffix.
+    // Pool recipient carries the suffix.
     expect(opts[1].label).toContain('Bob');
     expect(opts[1].label).not.toBe('Bob');
-    // Ohne displayName fällt das Label auf die principalId zurück.
+    // Without displayName the label falls back to the principalId.
     expect(opts[2].label).toBe('r-3');
   });
 
@@ -224,8 +224,8 @@ describe('MeetingDelegationCardComponent', () => {
       const { http, cmp } = await setup();
       flushContext(http, ctx({ delegationAllowExternal: true }));
       cmp.search('al');
-      cmp.search('ali'); // distinctUntilChanged + debounce → nur die letzte zählt
-      // RxJS debounceTime(250) nutzt setTimeout — über jest-Fake-Timer vorspulen.
+      cmp.search('ali'); // distinctUntilChanged + debounce → only the last one counts
+      // RxJS debounceTime(250) uses setTimeout — advance via jest fake timers.
       await jest.advanceTimersByTimeAsync(260);
       const req = http.expectOne(`${BASE}/delegations/meetings/m-1/recipients?q=ali`);
       expect(req.request.method).toBe('GET');
@@ -234,7 +234,7 @@ describe('MeetingDelegationCardComponent', () => {
       ];
       req.flush(results);
       expect(cmp.searched()).toEqual(results);
-      // recipientOptions/selectedRecipient ziehen jetzt aus den Suchergebnissen.
+      // recipientOptions/selectedRecipient now draw from the search results.
       expect(cmp.recipientOptions()[0].value).toBe('ext-1');
       cmp.delegateId.set('ext-1');
       expect(cmp.selectedRecipient()?.isMember).toBe(false);
@@ -254,7 +254,7 @@ describe('MeetingDelegationCardComponent', () => {
   it('does nothing on create without a selected recipient', async () => {
     const { http, cmp } = await setup();
     flushContext(http, ctx());
-    cmp.create(); // delegateId leer → kein Request
+    cmp.create(); // delegateId empty → no request
     http.verify();
     expect(cmp.busy()).toBe(false);
   });
@@ -283,7 +283,7 @@ describe('MeetingDelegationCardComponent', () => {
     expect(cmp.busy()).toBe(false);
     expect(cmp.dialogOpen()).toBe(false);
     expect(toast.success).toHaveBeenCalled();
-    // reload() lädt den Kontext erneut.
+    // reload() re-fetches the context.
     http.expectOne(`${BASE}/delegations/meetings/m-1/context`).flush(ctx({ myDelegation: delegation() }));
     expect(cmp.ctx()?.myDelegation).not.toBeNull();
   });
@@ -309,7 +309,7 @@ describe('MeetingDelegationCardComponent', () => {
       .expectOne(`${BASE}/delegations`)
       .flush(null, { status: 500, statusText: 'Server Error' });
     expect(toast.error).toHaveBeenCalledTimes(1);
-    // Keine konkrete detail-Meldung → generischer i18n-Key.
+    // No specific detail message → generic i18n key.
     expect(toast.error).not.toHaveBeenCalledWith('Frist abgelaufen');
   });
 
@@ -347,7 +347,7 @@ describe('MeetingDelegationCardComponent', () => {
     flushContext(http, ctx({ myDelegation: delegation() }));
     cmp.revoke(delegation({ id: 'd-9' }));
     http.expectOne(`${BASE}/delegations/d-9`).flush(null);
-    // reload() schluckt Fehler still.
+    // reload() swallows errors silently.
     http
       .expectOne(`${BASE}/delegations/meetings/m-1/context`)
       .flush(null, { status: 500, statusText: 'err' });

@@ -1,11 +1,10 @@
 import { Pipe, type PipeTransform } from '@angular/core';
 
 /**
- * Anzeige-Kapitalisierung (#73): erster Buchstabe jedes Wortes groß, Rest
- * unverändert. Rein kosmetisch — der zugrundeliegende **Wert** (z. B. Rollen-Key
- * `member`) bleibt unangetastet, nur die Darstellung wird kapitalisiert. Trenner
- * sind Leerraum, `-` und `_`, damit `stupa_admin` → `Stupa_Admin` / `vote-manager`
- * → `Vote-Manager` lesbar werden.
+ * Display capitalization: uppercase the first letter of each word, rest unchanged.
+ * Purely cosmetic — the underlying **value** (e.g. the role key `member`) stays
+ * untouched, only the display is capitalized. Separators are whitespace, `-` and
+ * `_`, so `stupa_admin` → `Stupa_Admin` / `vote-manager` → `Vote-Manager` read well.
  */
 @Pipe({ name: 'capitalize', standalone: true, pure: true })
 export class CapitalizePipe implements PipeTransform {

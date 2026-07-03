@@ -1,9 +1,9 @@
-"""arq Worker — T-01-Skelett + Budget-Rollup-Refresh (T-17).
+"""arq worker: entry points + budget rollup refresh.
 
-No-op-``ping`` (Container-Healthcheck) plus ``refresh_budget_stats``: aktualisiert die
-Rollup-MVs (``mv_budget_usage``/``mv_status_distribution``) ``CONCURRENTLY`` per
-nächtlichem Cron (data-model §3). Statuswechsel/Vote-Close stoßen denselben Job an
-(Flow-Engine, T-14). ``CONCURRENTLY`` braucht eine AUTOCOMMIT-Verbindung → eigene Engine.
+No-op ``ping`` (container healthcheck) plus ``refresh_budget_stats``: refreshes the
+rollup MVs (``mv_budget_usage``/``mv_status_distribution``) ``CONCURRENTLY`` via a
+nightly cron. Status changes/vote-close trigger the same job. ``CONCURRENTLY`` needs
+an AUTOCOMMIT connection, hence a dedicated engine.
 """
 
 from __future__ import annotations
@@ -39,21 +39,18 @@ from worker.webhook import on_startup as webhook_on_startup
 
 
 async def ping(ctx: dict[str, object]) -> str:
-    """Platzhalter-Task."""
+    """Placeholder task."""
     return "pong"
 
 
-# Harte Per-Job-Deadline für ``deliver_webhook`` (AUD-011): ``deliver_webhook`` teilt sich
-# den arq-Worker mit Mail-Versand, Virenscan, PDF-/Protokoll-Render und den Fristen-/
-# Retention-Crons. Ein bösartiges/„slow-drip“-Webhook-Ziel darf einen Slot nicht bis zum
-# arq-Default (300 s) belegen. Der Service deckelt die einzelne Zustellung bereits per
-# ``asyncio.timeout`` auf ``webhook_timeout_seconds`` (Default 10 s); dieses kürzere,
-# HTTP-unabhängige Job-Timeout ist die zweite Schranke — mit Puffer für DB-I/O + ``aclose``.
+# Hard per-job deadline for ``deliver_webhook``: it shares the arq worker with mail,
+# scan, render and crons, so a slow/hostile target must not hold a slot to the arq
+# default (300 s). Second bound below the service's ``webhook_timeout_seconds`` cap.
 _WEBHOOK_JOB_TIMEOUT_SECONDS = 30.0
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
-    """Worker-Init: Mail- (T-18), Scan- (T-13), PDF-Render- (T-20) **und** Webhook-Deps (T-19)."""
+    """Worker init: mail, scan, PDF-render and webhook deps."""
     await mail_on_startup(ctx)
     await scan_on_startup(ctx)
     await pdf_on_startup(ctx)
@@ -63,8 +60,8 @@ async def _on_startup(ctx: dict[str, Any]) -> None:
 
 @lru_cache(maxsize=1)
 def _budget_engine() -> AsyncEngine:  # pragma: no cover
-    """Einmalige AUTOCOMMIT-Engine (Worker-Lebensdauer) — ``REFRESH … CONCURRENTLY``
-    darf nicht in einer Transaktion laufen. Gecacht → kein Pool-Leak je Refresh."""
+    """Single AUTOCOMMIT engine (worker lifetime); ``REFRESH ... CONCURRENTLY`` must
+    not run in a transaction. Cached to avoid a pool leak per refresh."""
     return create_async_engine(
         os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:pw@db/antrag"),
         isolation_level="AUTOCOMMIT",
@@ -72,13 +69,13 @@ def _budget_engine() -> AsyncEngine:  # pragma: no cover
 
 
 def _budget_sessionmaker() -> async_sessionmaker[AsyncSession]:  # pragma: no cover
-    """Sessionmaker auf der wiederverwendeten Engine. In Tests via
-    ``ctx['budget_sessionmaker']`` injiziert."""
+    """Sessionmaker on the reused engine (injected in tests via
+    ``ctx['budget_sessionmaker']``)."""
     return async_sessionmaker(_budget_engine(), expire_on_commit=False)
 
 
 async def refresh_budget_stats(ctx: dict[str, Any]) -> str:
-    """Beide Budget-Rollup-MVs neu berechnen (CONCURRENTLY)."""
+    """Recompute both budget rollup MVs (CONCURRENTLY)."""
     maker: Callable[[], Any] = ctx.get("budget_sessionmaker") or _budget_sessionmaker()
     async with maker() as session:
         await BudgetStatsService(session).refresh(concurrently=True)
@@ -86,7 +83,7 @@ async def refresh_budget_stats(ctx: dict[str, Any]) -> str:
 
 
 async def _shutdown(ctx: dict[str, Any]) -> None:  # pragma: no cover
-    """Gecachte Budget-Engine beim Worker-Stop sauber schließen (Pool freigeben)."""
+    """Dispose the cached budget engine on worker stop (release the pool)."""
     if _budget_engine.cache_info().currsize:
         await _budget_engine().dispose()
         _budget_engine.cache_clear()
@@ -100,8 +97,8 @@ class WorkerSettings:
         scan_attachment,
         render_pdf,
         render_protocol,
-        # Explizit kurzes Per-Job-Timeout, damit eine langsame/feindliche Webhook-Ziel-
-        # adresse keinen geteilten Worker-Slot bis zum arq-Default (300 s) bindet (AUD-011).
+        # Short per-job timeout so a slow/hostile webhook target cannot hold a shared
+        # worker slot to the arq default (300 s).
         func(deliver_webhook, timeout=_WEBHOOK_JOB_TIMEOUT_SECONDS),
         process_deadlines,
         process_task_reminders,
@@ -109,13 +106,13 @@ class WorkerSettings:
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
-        # DSGVO-Aufbewahrung (#PII-Re-Add): täglich terminale Anträge anonymisieren +
-        # abgelaufene Sessions/Magic-Links purgen. Budget-Daten bleiben unangetastet.
+        # GDPR retention: daily anonymize terminal applications + purge expired
+        # sessions/magic-links. Budget data is left untouched.
         cron(process_retention, hour=3, minute=30),
-        # Fristen/Votes minütlich scannen (flows §9.4, T-44) — idempotent + SKIP LOCKED.
+        # Scan deadlines/votes every minute — idempotent + SKIP LOCKED.
         cron(process_deadlines, second=0),
-        # Aufgaben-Erinnerungen stündlich (#task-reminder) — Schwellen in Tagen,
-        # Doppelversand über task_reminder_log ausgeschlossen.
+        # Task reminders hourly — thresholds in days; task_reminder_log prevents
+        # duplicate sends.
         cron(process_task_reminders, minute=10),
     ]
     on_startup = _on_startup

@@ -2,7 +2,7 @@
 
 Eine frühere Version von 0045 lief bereits auf der DB und ist in ``alembic_version`` als angewandt
 markiert — alembic führt sie NICHT erneut aus, auch nach korrigiertem Code. Damit die korrigierte,
-rohdaten-basierte Bereinigung (:func:`bank_maintenance.dedup_staged_lines`) auf bestehenden Daten
+rohdaten-basierte Bereinigung (:func:`bank.maintenance.dedup_staged_lines`) auf bestehenden Daten
 greift, ruft sie diese **neue** Revision auf. Identische, idempotente Logik wie 0045 — kein
 dupliziertes Skript, nur ein erneuter Aufruf derselben Funktion.
 """
@@ -20,7 +20,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    from app.modules.budget.bank_maintenance import dedup_staged_lines
+    from app.modules.budget.bank.maintenance import dedup_staged_lines
 
     dedup_staged_lines(op.get_bind())
 

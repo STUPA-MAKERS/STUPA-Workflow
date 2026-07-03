@@ -1,13 +1,13 @@
-"""Auto-Mails für Plattform-Ereignisse (#4-3): Sitzungen, Rollen, Delegationen.
+"""Auto mails for platform events: meetings, roles, delegations.
 
-Background-Task-Einstiege (eigene Session, nach der API-Antwort), alle
-**best effort**: ein Mail-Fehler darf den auslösenden Request nie brechen —
-Exceptions werden geloggt und verworfen. Versand läuft über
-:meth:`NotificationService.send_kind_mail` (Präferenz-Filter #4-2, Layout #4,
-DB-Template mit Builtin-Fallback).
+Background-task entry points (own session, after the API response), all
+best effort: a mail failure must never break the triggering request —
+exceptions are logged and dropped. Sending goes through
+:meth:`NotificationService.send_kind_mail` (preference filter, layout,
+DB template with builtin fallback).
 
-Status-Update- und Task-Mails je Statuswechsel laufen NICHT hier, sondern als
-implizite Flow-Actions (``build_implicit_notifications`` → Notify-Dispatcher).
+Status-update and task mails per status change run NOT here but as implicit
+flow actions (``build_implicit_notifications`` → notify dispatcher).
 """
 
 from __future__ import annotations
@@ -65,8 +65,8 @@ _BUILTIN_ROLE_REVOKED_BODY = {
     "revoked from you.\n",
 }
 
-# Sitzungsgebundene Vertretungen (#delegation-rework): der/die Vertreter:in
-# erhält die Mail; Kontext nennt Sitzung, Gremium und Delegierende:n.
+# Session-bound proxies: the substitute receives the mail; context names the
+# meeting, committee and delegating member.
 _BUILTIN_DELEGATION_GRANTED_SUBJECT = {
     "de": "Vertretung erhalten: {{ meetingTitle }}",
     "en": "Proxy received: {{ meetingTitle }}",
@@ -99,7 +99,7 @@ _BUILTIN_DELEGATION_REVOKED_BODY = {
 
 @dataclass(frozen=True, slots=True)
 class AssignmentMailInfo:
-    """Vor dem Versand (bzw. vor dem Löschen) eingesammelte Zuweisungs-Daten."""
+    """Assignment data collected before sending (or before deletion)."""
 
     assignment_id: uuid.UUID
     email: str | None
@@ -111,10 +111,10 @@ class AssignmentMailInfo:
 async def assignment_mail_info(
     session: object, assignment_id: uuid.UUID
 ) -> AssignmentMailInfo | None:
-    """Mail-relevante Daten einer Rollenzuweisung einsammeln (None = unbekannt).
+    """Collect mail-relevant data of a role assignment (None = unknown).
 
-    Best effort: schlägt die Abfrage fehl (z. B. gefakte Session in Tests),
-    fällt nur die Mail aus — nie der auslösende Request."""
+    Best effort: if the query fails, only the mail is skipped — never the
+    triggering request."""
     from app.modules.admin.models import Gremium
     from app.modules.auth.models import Principal, Role, RoleAssignment
 
@@ -134,7 +134,7 @@ async def assignment_mail_info(
                 .where(RoleAssignment.id == assignment_id)
             )
         ).first()
-    except Exception:  # noqa: BLE001 — Mail-Info ist best effort
+    except Exception:  # noqa: BLE001 — mail info is best effort
         logger.exception("assignment mail info failed (assignment=%s)", assignment_id)
         return None
     if row is None:
@@ -154,8 +154,8 @@ async def assignment_mail_info(
 
 @dataclass(frozen=True, slots=True)
 class DelegationMailInfo:
-    """Vor dem Versand (bzw. vor dem Widerruf) eingesammelte Vertretungs-Daten
-    (#delegation-rework: sitzungsgebundene ``meeting_delegation``-Zeile)."""
+    """Proxy data (session-bound ``meeting_delegation`` row) collected before
+    sending (or before revocation)."""
 
     delegation_id: uuid.UUID
     email: str | None
@@ -169,7 +169,7 @@ class DelegationMailInfo:
 async def meeting_delegation_mail_info(
     session: object, delegation_id: uuid.UUID
 ) -> DelegationMailInfo | None:
-    """Mail-relevante Daten einer Sitzungs-Vertretung einsammeln (best effort)."""
+    """Collect mail-relevant data of a meeting proxy (best effort)."""
     from app.modules.admin.models import Gremium
     from app.modules.auth.models import Principal
     from app.modules.delegations.models import MeetingDelegation
@@ -201,7 +201,7 @@ async def meeting_delegation_mail_info(
                 .where(MeetingDelegation.id == delegation_id)
             )
         ).first()
-    except Exception:  # noqa: BLE001 — Mail-Info ist best effort
+    except Exception:  # noqa: BLE001 — mail info is best effort
         logger.exception("delegation mail info failed (delegation=%s)", delegation_id)
         return None
     if row is None:
@@ -219,14 +219,14 @@ async def meeting_delegation_mail_info(
 
 
 class AutoMailer:
-    """Background-Einstiege der Auto-Mails — best effort, eigene Session."""
+    """Background entry points for auto mails — best effort, own session."""
 
     async def meeting_created(
         self, settings: Settings, meeting_id: uuid.UUID, pool: object
     ) -> None:
         try:
             await self._meeting_created(settings, meeting_id, pool)
-        except Exception:  # noqa: BLE001 — Mail darf den Request nie brechen
+        except Exception:  # noqa: BLE001 — mail must never break the request
             logger.exception("meeting mail failed (meeting=%s)", meeting_id)
 
     async def assignment_changed(
@@ -376,5 +376,5 @@ class AutoMailer:
 
 
 def get_auto_mailer() -> AutoMailer:
-    """Injizierbarer Auto-Mailer (in Tests überschreibbar)."""
+    """Injectable auto mailer (overridable in tests)."""
     return AutoMailer()

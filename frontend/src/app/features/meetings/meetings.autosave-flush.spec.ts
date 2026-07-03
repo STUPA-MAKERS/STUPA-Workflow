@@ -12,9 +12,9 @@ import type { MeetingOutWire, ProtocolOutWire } from '@core/api/models';
 import { WsService } from '@core/ws/ws.service';
 import { MeetingsComponent } from './meetings.component';
 
-// Fokus-Suite für AUD-012: Beim Wechsel des im Editor gewählten TOP darf eine
-// noch ausstehende debounced Auto-Speicherung des vorherigen TOP-Textes NICHT
-// still verloren gehen, sondern muss sofort an den Server gefeuert werden.
+// Focus suite: when switching the TOP selected in the editor, a still-pending
+// debounced autosave of the previous TOP's text must NOT be silently lost — it
+// must be fired to the server immediately.
 
 const MEETING: MeetingOutWire = {
   id: 'm-1',
@@ -129,13 +129,13 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
         AGENDA_ITEM({ id: 't-2', position: 1 }),
       ] as never);
 
-      // Im TOP t-1 tippen, aber NICHT bis zum Ende der Debounce warten.
+      // Type in TOP t-1, but do NOT wait until the debounce ends.
       cmp.onTopBodyChange('t-1', 'Wichtiges Protokoll');
       expect(cmp.saveState()).toBe('idle');
-      // Optimistisch lokal gehalten, damit der Text im UI nicht verschwindet.
+      // Kept locally (optimistic) so the text does not vanish in the UI.
       expect(cmp.agenda().find((a) => a.id === 't-1')?.body).toBe('Wichtiges Protokoll');
 
-      // Innerhalb des Debounce-Fensters zu t-2 wechseln → MUSS t-1 speichern.
+      // Switch to t-2 within the debounce window → MUST save t-1.
       cmp.selectTop('t-2');
       const req = http.expectOne('/api/meetings/m-1/agenda/t-1');
       expect(req.request.method).toBe('PATCH');
@@ -143,7 +143,7 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
       req.flush([AGENDA_ITEM({ body: 'Wichtiges Protokoll' })]);
       expect(cmp.selectedTopId()).toBe('t-2');
 
-      // Kein nachlaufender Timer mehr (sonst doppelter / verspäteter Save).
+      // No trailing timer left (else a duplicate / delayed save).
       jest.advanceTimersByTime(5000);
       http.verify();
     } finally {

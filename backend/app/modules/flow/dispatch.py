@@ -1,18 +1,9 @@
-"""Action-Dispatch der Flow-Engine (flows §9.3 Schritt 4).
+"""Action dispatch for the flow engine.
 
-Beim Feuern eines Übergangs entstehen **Worker-Actions** (``notify``, ``webhook``,
-``exportPdf``, ``budgetReserve``, ``budgetBook``, ``openVote``, ``requeue``). Sie
-werden **nach Commit** der Transaktion dispatcht — idempotent und retrybar.
-
-Dies ist bewusst nur das **Interface** (T-14): die konkreten Handler liegen in den
-Folge-Tasks (T-18 notify, T-19 webhook, T-20 exportPdf, T-17 budget, T-15 openVote/
-requeue). Bis dahin ist :class:`NullActionDispatcher` der Default — er protokolliert
-die Action (ohne Geheimnisse) und verwirft sie, statt eine noch fehlende Worker-
-Funktion zu enqueuen.
-
-``setEditLock`` ist **keine** Worker-Action: der Edit-Lock ergibt sich aus
-``state.edit_allowed`` des Ziel-States (T-12 ``assert_editable``/409) und wird in der
-Engine **inline** behandelt, nicht hier dispatcht.
+Firing a transition produces worker actions that are dispatched only after the
+transaction commits — idempotent and retryable. ``setEditLock`` is not a worker
+action: the edit lock derives from the target state's ``edit_allowed`` and is
+handled inline by the engine.
 """
 
 from __future__ import annotations
@@ -25,7 +16,7 @@ from uuid import UUID
 
 logger = logging.getLogger("app.flow.dispatch")
 
-# Worker-Actions (an den Worker dispatcht). #28-Redesign: nur noch diese vier.
+# Action types handed to the worker; everything else is handled inline.
 WORKER_ACTION_TYPES: frozenset[str] = frozenset(
     {
         "notify",
@@ -38,11 +29,10 @@ WORKER_ACTION_TYPES: frozenset[str] = frozenset(
 
 @dataclass(frozen=True, slots=True)
 class DispatchedAction:
-    """Eine an den Worker zu übergebende Flow-Action.
+    """A flow action to hand to the worker.
 
-    ``idempotency_key`` ist stabil über (Antrag, Status-Event, Position, Typ): ein
-    erneuter Worker-Lauf desselben Schlüssels darf **keinen** Doppeleffekt erzeugen
-    (flows §9.3: idempotent/retrybar)."""
+    ``idempotency_key`` is stable over (application, status event, position,
+    type): a retried worker run with the same key must not double-fire."""
 
     type: str
     application_id: UUID
@@ -59,16 +49,15 @@ def build_dispatched_actions(
     transition_id: UUID,
     status_event_id: UUID,
 ) -> list[DispatchedAction]:
-    """``transition.actions`` (JSONB) → Worker-Actions; ``setEditLock`` wird übersprungen.
+    """Map ``transition.actions`` (JSONB) to worker actions, skipping ``setEditLock``.
 
-    Unbekannte Typen sind durch das Speicher-Gate (``validate_action``, T-05)
-    ausgeschlossen; hier wird zusätzlich strikt auf die Worker-Whitelist gefiltert,
-    damit ein neuer (inline behandelter) Typ nicht versehentlich enqueued wird."""
+    Unknown types are already rejected at save time (``validate_action``); the
+    strict worker whitelist here keeps inline-handled types from being enqueued."""
     dispatched: list[DispatchedAction] = []
     for index, action in enumerate(actions):
         action_type = action.get("type")
         if action_type not in WORKER_ACTION_TYPES:
-            continue  # setEditLock o. Ä. → inline/no-op, nicht an den Worker.
+            continue  # setEditLock etc. are inline/no-op, not for the worker.
         params = {k: v for k, v in action.items() if k != "type"}
         dispatched.append(
             DispatchedAction(
@@ -90,16 +79,11 @@ def build_implicit_notifications(
     transition_id: UUID,
     status_event_id: UUID,
 ) -> list[DispatchedAction]:
-    """Implizite Auto-Mails je Statuswechsel (#4-3), zusätzlich zu den
-    konfigurierten Flow-Actions:
+    """Build implicit auto-mails per status change, on top of configured actions.
 
-    * ``notify`` an den Antragsteller (Status-Update) — entfällt, wenn der
-      Übergang bereits eine explizite ``notify``-Action mit Applicant-Empfänger
-      trägt (kein Doppelversand).
-    * ``taskNotify`` an alle, die am neuen State handeln können (Task-Mail);
-      der Handler löst die Empfänger zur Versandzeit auf.
-
-    Abwahl einzelner Arten regelt die Empfänger-Filterung (#4-2)."""
+    ``notify`` to the applicant (skipped if the transition already carries an
+    explicit applicant notify — no double send) plus ``taskNotify`` to everyone
+    who can act on the new state (recipients resolved at send time)."""
     applicant_covered = any(
         action.get("type") == "notify"
         and any(
@@ -137,16 +121,13 @@ def build_implicit_notifications(
 
 @runtime_checkable
 class ActionDispatcher(Protocol):
-    """Worker-Dispatch-Schnittstelle (konkrete Queue-Anbindung in T-18/19/20/17/15)."""
+    """Worker dispatch interface."""
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None: ...
 
 
 class NullActionDispatcher:
-    """Default-Dispatcher: protokolliert Actions (ohne Params/Geheimnisse) und verwirft sie.
-
-    Übergangslösung bis die ersten Worker-Handler existieren — der Contract (``fire``
-    erzeugt Actions) ist damit vollständig, ohne fehlende Worker-Funktionen zu enqueuen."""
+    """Default dispatcher: logs actions (without params/secrets) and drops them."""
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
         for action in actions:

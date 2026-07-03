@@ -6,14 +6,13 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { AuthService } from './auth.service';
 
 /**
- * Schützt OIDC-Routen (overview §4). Ablauf:
- * 1. Principal sicher geladen (`ensureLoaded`, einmalig) → synchrone Entscheidung.
- * 2. Keine Session → OIDC-Login (Full-Redirect); Navigation abgebrochen.
- * 3. `route.data.permission` gesetzt, aber fehlt → 403-Seite (`/forbidden`, #71).
+ * Protects OIDC routes. Flow:
+ * 1. Principal safely loaded (`ensureLoaded`, once) → synchronous decision.
+ * 2. No session → OIDC login (full redirect); navigation cancelled.
+ * 3. `route.data.permission` set but missing → 403 page (`/forbidden`).
  *
- * RBAC ist hier reine UX; der Server bleibt autoritativ (security.md §2). Die
- * Entscheidung fällt **nach** dem Laden des echten Principals — kein blindes
- * Wegwerfen vor Perm-Auswertung.
+ * RBAC here is pure UX; the server stays authoritative. The decision is made
+ * after loading the real principal — no blind rejection before evaluating perms.
  */
 export const authGuard: CanActivateFn = (route) => {
   const auth = inject(AuthService);
@@ -30,24 +29,24 @@ export const authGuard: CanActivateFn = (route) => {
       const permission = route.data['permission'] as string | string[] | undefined;
       const required = permission === undefined ? [] : ([] as string[]).concat(permission);
       if (required.length > 0 && !auth.canAny(...required)) {
-        // Gremium-Mitglieder dürfen ihre Sitzungen sehen, auch ohne meeting.manage/
-        // protocol.write (#sessions). Der Server scoped/autorisiert zusätzlich.
+        // Gremium members may see their meetings even without meeting.manage/
+        // protocol.write. The server additionally scopes/authorizes.
         const allowCommittee = route.data['allowCommitteeMember'] === true;
         if (allowCommittee && auth.gremien().length > 0) {
           return true;
         }
-        // Gremium-Scope des Budget-Tabs (#budget-scope): Mitglieder eines Gremiums
-        // mit zugeordneter Kostenstelle sehen den Tab ohne globale budget.*-Rechte;
-        // der Server liefert NUR die zugeordneten Teilbäume.
+        // Gremium scope of the budget tab: members of a gremium with an assigned
+        // cost centre see the tab without global budget.* rights; the server
+        // returns ONLY the assigned subtrees.
         if (
           route.data['allowScopedBudgetView'] === true &&
           auth.hasScopedBudgetView()
         ) {
           return true;
         }
-        // Delegations-Empfänger (#delegation-rework) können externe Nutzer ohne
-        // Permission/Gremium sein — diese Routen lassen jeden Angemeldeten durch;
-        // der Server bleibt autoritativ (Inhalt/403 kommen von dort).
+        // Delegation recipients can be external users without a permission/
+        // gremium — these routes let any authenticated user through; the server
+        // stays authoritative (content/403 come from there).
         if (route.data['allowAuthenticated'] === true) {
           return true;
         }

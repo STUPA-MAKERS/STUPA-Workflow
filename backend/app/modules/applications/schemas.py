@@ -1,8 +1,8 @@
-"""API-Schemata des applications-Moduls (T-12, api.md §3/§5).
+"""API schemas for the applications module.
 
-Request/Response-Hüllen für Antrag-CRUD, Timeline, Versionshistorie, Liste und
-Kommentare. PII (``applicant``-Mail/Name) wird **nur** an berechtigte Principals
-oder den Antragsteller selbst ausgegeben (``ApplicationOut.applicant``).
+Request/response shells for application CRUD, timeline, version history, list
+and comments. PII (``applicant`` mail/name) is emitted only to authorized
+principals or the applicant themselves (``ApplicationOut.applicant``).
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from app.shared.i18n import DEFAULT_LANG, I18nMap, Lang
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields populatable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -29,30 +29,30 @@ class _CamelModel(BaseModel):
 # Create
 # --------------------------------------------------------------------------- #
 class ApplicationCreate(_CamelModel):
-    """Antrag anlegen (api.md §5). ``data`` wird gegen die effektive Form validiert.
+    """Create an application. ``data`` is validated against the effective form.
 
-    Anonyme Einreichung: ``altcha`` wird serverseitig verifiziert (security.md §7,
-    Issue #23) und ``applicantEmail`` ist Pflicht. Eingeloggte Nutzer:innen (#24)
-    brauchen **kein** Altcha; ``applicantEmail``/``applicantName`` werden — falls leer
-    — aus dem Account abgeleitet. Der Router erzwingt die anonymen Pflichtfelder.
+    Anonymous submissions: ``altcha`` is verified server-side and
+    ``applicantEmail`` is required. Logged-in users need no ALTCHA;
+    ``applicantEmail``/``applicantName`` are derived from the account if empty.
+    The router enforces the anonymous required fields.
     """
 
     type_id: UUID = Field(alias="typeId")
     budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")
     data: dict[str, Any]
-    # Optional auf Schema-Ebene: für eingeloggte Nutzer:innen aus dem Account ableitbar
-    # (#24). Für anonyme Einreichung erzwingt der Router die Pflicht (422).
+    # Optional at schema level: derivable from the account for logged-in users.
+    # For anonymous submissions the router enforces it (422).
     applicant_email: EmailStr | None = Field(default=None, alias="applicantEmail")
-    # Obere Schranke (anti-DoS): persistierter Freitext (Anzeigename) wird gekappt.
+    # Upper bound (anti-DoS): persisted free text (display name) is capped.
     applicant_name: str | None = Field(default=None, alias="applicantName", max_length=256)
     lang: Lang = DEFAULT_LANG
-    # Strukturell schon im Schema validiert (malformt → 422); kryptografische Prüfung via
-    # `require_altcha` (security.md §7, Issue #23). Vgl. `MagicLinkRequest.altcha`.
+    # Structurally validated in the schema (malformed -> 422); cryptographic
+    # verification happens via `require_altcha`.
     altcha: AltchaSolutionStr | None = None
 
 
 class ApplicationCreated(_CamelModel):
-    """201-Antwort auf ``POST /applications`` — nur die ID (+ Mail-Hinweis im FE)."""
+    """201 response to ``POST /applications`` — just the id."""
 
     application_id: UUID = Field(alias="applicationId")
 
@@ -66,12 +66,12 @@ class StateOut(_CamelModel):
     label: I18nMap
     color: str | None = None
     edit_allowed: bool = Field(alias="editAllowed")
-    # State-Art (#28) — das FE zeigt z. B. bei ``approval`` Annehmen/Ablehnen-Aktionen.
+    # State kind — the frontend shows e.g. approve/reject actions for ``approval``.
     kind: str = "normal"
 
 
 class ApplicantOut(_CamelModel):
-    """PII des Antragstellers — nur für Berechtigte sichtbar."""
+    """Applicant PII — visible to authorized identities only."""
 
     email: str | None = None
     name: str | None = None
@@ -94,15 +94,15 @@ class ApplicationOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     applicant: ApplicantOut | None = None
-    # Darf der/die Anfragende bearbeiten/löschen (Verwalter:in oder Ersteller:in, #24)?
+    # May the requester edit/delete (manager or creator)?
     can_edit: bool = Field(default=False, alias="canEdit")
-    # Ist der/die Anfragende der/die Ersteller:in (Antragsteller:in)? Gating für die
-    # Anonymisierungs-Anfrage (DSGVO Art. 17): nur das Datensubjekt, nicht Verwaltung.
+    # Is the requester the creator (applicant)? Gates the anonymization request
+    # (GDPR Art. 17): only the data subject, not administration.
     is_owner: bool = Field(default=False, alias="isOwner")
 
 
 class ApplicationPatch(_CamelModel):
-    """Antragsdaten aktualisieren (neue Version nur wenn ``state.editAllowed``)."""
+    """Update application data (new version only if ``state.editAllowed``)."""
 
     data: dict[str, Any]
 
@@ -133,7 +133,7 @@ class VersionOut(_CamelModel):
 class ApplicationListItem(_CamelModel):
     id: UUID
     type_id: UUID = Field(alias="typeId")
-    # Antragstitel (System-Titelfeld ``data['title']``), für die Listenspalte (#13).
+    # Application title (system title field ``data['title']``) for the list column.
     title: str | None = None
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
@@ -148,9 +148,8 @@ class ApplicationListItem(_CamelModel):
 # Comments
 # --------------------------------------------------------------------------- #
 class CommentCreate(_CamelModel):
-    # Obere Schranke (anti-DoS): persistierter Freitext bekommt eine harte Kappe,
-    # damit ein einzelner Kommentar nicht beliebig groß wird (DB/Mail-Render). 10 000
-    # Zeichen reichen für jede reale Nachfrage; darüber → 422.
+    # Hard cap (anti-DoS): keeps a single comment from growing unbounded
+    # (DB/mail render); beyond it -> 422.
     body: str = Field(min_length=1, max_length=10_000)
     visibility: Literal["internal", "public"] = "public"
 

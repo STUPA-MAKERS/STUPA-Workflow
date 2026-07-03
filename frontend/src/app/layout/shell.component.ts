@@ -33,21 +33,21 @@ import type { FooterLink } from '../pages/admin/admin.models';
 interface NavItem {
   path: string;
   labelKey: Parameters<TranslatePipe['transform']>[0];
-  /** Sichtbar, wenn der Principal mind. eine dieser Permissions hat (leer = jede Session). */
+  /** Visible when the principal has at least one of these permissions (empty = any session). */
   permissions: string[];
-  /** Zusätzlich sichtbar für Mitglieder **irgendeines** Gremiums (z. B. Sitzungen, #sessions). */
+  /** Also visible to members of any committee (e.g. meetings). */
   inAnyCommittee?: boolean;
-  /** Zusätzlich sichtbar bei gescopter Budget-Sicht (#budget-scope). */
+  /** Also visible with a scoped budget view. */
   scopedBudgetView?: boolean;
   /**
-   * Exakter Aktiv-Abgleich (#106): nötig, wenn der Pfad Präfix eines anderen
-   * Nav-Eintrags ist (z. B. `/budget` vor `/budget/pots`) — sonst markiert die
-   * Kind-Route Eltern **und** Kind gleichzeitig aktiv.
+   * Exact active match: needed when the path is a prefix of another nav entry
+   * (e.g. `/budget` before `/budget/pots`) — otherwise the child route marks both
+   * parent and child active at once.
    */
   exact?: boolean;
 }
 
-/** App-Rahmen: Header (Logo/Nav/Theme/Sprache/Konto), Inhalt, Footer, Toasts. */
+/** App frame: header (logo/nav/theme/language/account), content, footer, toasts. */
 @Component({
   selector: 'app-shell',
   standalone: true,
@@ -76,44 +76,44 @@ export class ShellComponent {
   private readonly location = inject(LOCATION);
   private readonly route = inject(ActivatedRoute);
 
-  /** Inhalt volle Breite (Route-Data `wide`) — z. B. Budget-Tab mit zwei Sidebars. */
+  /** Full-width content (route data `wide`) — e.g. the budget tab with two sidebars. */
   readonly wide = signal(false);
 
-  /** Gepflegte Footer-Inhalte (#82): rechtliche Links + Copyright aus der aktiven Site-Config. */
+  /** Maintained footer content: legal links + copyright from the active site config. */
   private readonly legalLinks = signal<FooterLink[]>([]);
   private readonly copyright = signal<Record<string, string> | null>(null);
 
-  /** Rechtliche Links der aktiven Locale; leer ⇒ Default-Fußzeile (Impressum/Datenschutz). */
+  /** Legal links for the active locale; empty ⇒ default footer (imprint/privacy). */
   readonly footerLinks = computed(() =>
     this.legalLinks().map((l) => ({ url: l.url, label: resolveI18n(l.label, this.i18n.locale()) })),
   );
 
-  /** Gepflegte Copyright-Zeile der aktiven Locale (leer ⇒ Default-Co-Branding-Text). */
+  /** Maintained copyright line for the active locale (empty ⇒ default co-branding text). */
   readonly footerCopyright = computed(() => resolveI18n(this.copyright(), this.i18n.locale()));
 
   /**
-   * Theme-abhängige Wortmarke: schwarze Schrift auf hell, weiße auf dunkel
-   * (offizielle CD-Varianten). Die mehrfarbige Marke bleibt in beiden Modi lesbar.
+   * Theme-dependent wordmark: black type on light, white on dark (official CD
+   * variants). The multicolour mark stays legible in both modes.
    */
   readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
 
-  /** Logo-Klick: angemeldet → Dashboard, sonst öffentliche Startseite. */
+  /** Logo click: logged in → dashboard, otherwise the public landing page. */
   readonly brandTarget = computed(() => (this.auth.isAuthenticated() ? '/dashboard' : '/'));
 
   constructor() {
-    // Aktive Site-Config laden, damit die Fußzeile gepflegte rechtliche Links +
-    // Copyright zeigt (#82). Fehlschlag/leer ⇒ Default-Fußzeile (Impressum/Datenschutz).
+    // Load the active site config so the footer shows maintained legal links +
+    // copyright. Failure/empty ⇒ default footer (imprint/privacy).
     this.admin.getSiteConfig().subscribe({
       next: (cfg) => {
         this.legalLinks.set(cfg.active.legalLinks ?? []);
         this.copyright.set(cfg.active.copyright ?? null);
       },
       error: () => {
-        /* Default-Fußzeile bleibt */
+        /* keep the default footer */
       },
     });
 
-    // Volle Breite je Route-Data (tiefste aktive Route gewinnt).
+    // Full width per route data (deepest active route wins).
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),
@@ -133,10 +133,10 @@ export class ShellComponent {
 
   private readonly nav: NavItem[] = [
     { path: '/dashboard', labelKey: 'nav.dashboard', permissions: [] },
-    // Ohne application.read sieht man hier die eigenen Anträge/Aufgaben (#24).
+    // Without application.read, this shows one's own applications/tasks.
     { path: '/applications', labelKey: 'nav.applications', permissions: [] },
     { path: '/tasks', labelKey: 'nav.tasks', permissions: [] },
-    // Sitzungen: Verwalter/Protokollanten **oder** jedes Gremium-Mitglied (#sessions).
+    // Meetings: managers/minute-takers or any committee member.
     {
       path: '/meetings',
       labelKey: 'nav.meetings',
@@ -147,7 +147,7 @@ export class ShellComponent {
       path: '/budget',
       labelKey: 'nav.budget',
       permissions: ['budget.view', 'budget.structure', 'budget.book'],
-      // #budget-scope: Gremien mit zugeordneter Kostenstelle sehen den Tab gescoped.
+      // Committees with an assigned cost centre see the tab scoped.
       scopedBudgetView: true,
     },
     {
@@ -173,8 +173,8 @@ export class ShellComponent {
   ];
 
   /**
-   * RBAC-gefilterte Navigation (UX): nur bei aktiver Session, und nur Einträge,
-   * deren Permission der Principal besitzt. Server bleibt autoritativ (§2).
+   * RBAC-filtered navigation (UX): only with an active session, and only entries
+   * whose permission the principal holds. The server stays authoritative.
    */
   readonly visibleNav = computed(() => {
     if (!this.auth.isAuthenticated()) return [];
@@ -195,13 +195,13 @@ export class ShellComponent {
     const locale = value as Locale;
     if (locale === this.i18n.locale()) return;
     this.i18n.setLocale(locale);
-    // Server-gelieferte i18n-Werte (State-/Typ-/Transition-Labels, Formularfelder)
-    // werden beim Laden in der damaligen Sprache aufgelöst und aktualisieren sich
-    // sonst nicht. Aktuelle Ansicht neu laden → durchgängiger Sprachwechsel (#i18n).
+    // Server-provided i18n values (state/type/transition labels, form fields) are
+    // resolved in the then-current language at load time and otherwise do not
+    // update. Reload the current view → a consistent language switch.
     this.reloadForLocale();
   }
 
-  /** Seiten-Reload nach Sprachwechsel (in Tests überschreib-/spionierbar). */
+  /** Page reload after a language change (overridable/spyable in tests). */
   protected reloadForLocale(): void {
     if (typeof window !== 'undefined') {
       this.location.reload();
@@ -213,8 +213,8 @@ export class ShellComponent {
   }
 
   /**
-   * Mobile-Navigation (Hamburger-Drawer): ersetzt unterhalb von 720px die
-   * Header-Nav. Schließt bei Navigation, Backdrop-Klick und ESC.
+   * Mobile navigation (hamburger drawer): replaces the header nav below 720px.
+   * Closes on navigation, backdrop click and ESC.
    */
   readonly mobileNavOpen = signal(false);
 
@@ -232,7 +232,7 @@ export class ShellComponent {
     this.mobileNavOpen.set(false);
   }
 
-  /** Konto-Popout (#51): Aktionen wie Abmelden liegen nur hier, nicht direkt im Header. */
+  /** Account popout: actions like logout live only here, not directly in the header. */
   readonly accountMenuOpen = signal(false);
 
   toggleAccountMenu(): void {

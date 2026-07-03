@@ -203,7 +203,7 @@ def delete_group(graph: Graph, group_id: str) -> Graph:
     groups = _layout(g).get("groups") or []
     if not any(grp.get("id") == group_id for grp in groups):
         raise ValueError(f"unknown group id: {group_id!r}")
-    # Kinder der gelöschten Gruppe rücken auf die oberste Ebene (Referenz weg).
+    # Children of the deleted group move up to the top level (reference dropped).
     remaining = [
         {**grp, "groupIds": [c for c in _group_children(grp) if c != group_id]}
         for grp in groups

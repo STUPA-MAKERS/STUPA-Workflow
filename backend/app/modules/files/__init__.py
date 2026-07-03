@@ -1,10 +1,10 @@
-"""files-Modul (T-13): Anhang-Upload + MIME-Sniff + ClamAV + MinIO + signierte URLs.
+"""Files module: attachment upload + MIME sniff + ClamAV + MinIO + signed URLs.
 
-* :mod:`models`   — ``attachment``-Tabelle (data-model §1).
-* :mod:`mime`     — libmagic-Sniffing + Typ-Allowlist (security.md §6).
-* :mod:`storage`  — MinIO/S3-Backend + kurzlebige signierte URLs.
-* :mod:`scanner`  — ClamAV/clamd-Scan (Worker) + ``ScanVerdict``.
-* :mod:`queue`    — arq-Enqueue des ``scan_attachment``-Jobs (idempotent).
-* :mod:`service`  — Upload/Quarantäne/Download/Scan-Abschluss.
+* :mod:`models`   — ``attachment`` table.
+* :mod:`mime`     — libmagic sniffing + type allowlist.
+* :mod:`storage`  — MinIO/S3 backend + short-lived signed URLs.
+* :mod:`scanner`  — ClamAV/clamd scan (worker) + ``ScanVerdict``.
+* :mod:`queue`    — arq enqueue of the ``scan_attachment`` job (idempotent).
+* :mod:`service`  — upload/quarantine/download/scan completion.
 * :mod:`router`   — ``POST /applications/{id}/attachments``, ``GET /attachments/{id}``.
 """

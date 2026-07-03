@@ -34,32 +34,32 @@ import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.
 import { PALETTE } from './budget-year-tree.component';
 import { DialogComponent } from '@stupa-makers/ui-kit';
 
-/** Eine Baumzeile im Auslastungs-Teil. */
+/** A tree row in the usage section. */
 interface UsageRow {
   node: BudgetTreeNode;
   depth: number;
   allocated: number;
   committed: number;
-  /** Gebunden: angenommene Anträge minus gebundene Ausgaben (#25). */
+  /** Bound: accepted applications minus committed expenses. */
   bound: number;
-  /** Ausgegeben: tatsächliche Ausgaben (#25). */
+  /** Expended: actual expenses. */
   expended: number;
-  /** Einnahmen (#25). */
+  /** Income. */
   income: number;
   requested: number;
   available: number;
-  /** committed/(available+committed) in Prozent (null wenn Nenner 0). */
+  /** committed/(available+committed) as a percentage (null when denominator is 0). */
   percent: number | null;
 }
 
 /**
- * Budget-Statistik (#17 + #budget-redesign) als Drilldown über den Kostenstellen-Baum.
+ * Budget statistics as a drilldown over the cost-centre tree.
  *
- * Links: Navigations-Baum Budget zu Haushaltsjahr. Mitte: Breadcrumbs (ab Tiefe>0)
- * plus Auslastungs-Tabelle der gewaehlten Kostenstelle (allocated, committed,
- * beantragt, available) plus Antraege. Rechts: zwei gestapelte Tortendiagramme
- * (Zuteilung, Gebunden) ueber die direkten Unter-Kostenstellen. Auswahl liegt in
- * den Query-Params (teilbar).
+ * Left: budget-to-fiscal-year navigation tree. Middle: breadcrumbs (depth > 0)
+ * plus the usage table of the selected cost-centre (allocated, committed,
+ * requested, available) plus applications. Right: two stacked pie charts
+ * (allocation, committed) over the direct sub cost-centres. Selection lives in
+ * the query params (shareable).
  */
 @Component({
   selector: 'app-budget-dashboard',
@@ -97,18 +97,18 @@ export class BudgetDashboardComponent {
   readonly error = signal(false);
   readonly tree = signal<BudgetTreeNode[]>([]);
   readonly applications = signal<BudgetApplication[]>([]);
-  /** HHJ je Top-Budget (für den linken Baum). */
+  /** Fiscal years per top budget (for the left tree). */
   readonly fiscalYearsByBudget = signal<Record<Uuid, FiscalYear[]>>({});
 
   readonly selectedBudgetId = signal('');
   readonly selectedKsId = signal('');
   readonly selectedFyId = signal('');
 
-  /** Mobil (≤768px): linker Baum-Picker einklappbar — Desktop ignoriert das Flag,
-   *  dort blendet CSS den Toggle aus und zeigt den Baum immer. */
+  /** Mobile (<=768px): the left tree picker is collapsible — desktop ignores this
+   *  flag, where CSS hides the toggle and always shows the tree. */
   readonly navOpen = signal(false);
 
-  /** Label des Mobil-Toggles: gewähltes Budget + HHJ, sonst generischer Titel. */
+  /** Mobile toggle label: selected budget + fiscal year, else a generic title. */
   readonly navToggleLabel = computed(() => {
     const budget = this.nodeById().get(this.selectedBudgetId());
     if (!budget) return this.i18n.translate('budget.tree.navTitle');
@@ -122,9 +122,9 @@ export class BudgetDashboardComponent {
     this.navOpen.update((v) => !v);
   }
 
-  /** Baum ohne ausgeblendete Kostenstellen (#budget-hide): `hiddenInBudget`
-   *  entfernt den Knoten + Unterbaum aus ALLEN Ansichten des Budget-Tabs —
-   *  reine Anzeige, die Werte stecken weiter in den Eltern-Rollups. */
+  /** Tree without hidden cost-centres: `hiddenInBudget` removes the node + subtree
+   *  from ALL views of the budget tab — display only, the values still count in the
+   *  parent rollups. */
   private readonly visibleTree = computed<BudgetTreeNode[]>(() => {
     const prune = (nodes: BudgetTreeNode[]): BudgetTreeNode[] =>
       nodes
@@ -133,10 +133,10 @@ export class BudgetDashboardComponent {
     return prune(this.tree());
   });
 
-  /** Wurzeln für den linken Baum — die Forest-Roots der Server-Antwort: bei
-   *  Voll-Sicht die Top-Budgets, bei Gremium-Scope (#budget-scope) die
-   *  zugeordneten (Unter-)Kostenstellen. Nur Wurzeln **mit** Haushaltsjahr (#11);
-   *  der HHJ-Endpoint löst Unter-Kostenstellen auf ihren Top-Level-Vorfahren auf. */
+  /** Roots for the left tree — the forest roots of the server response: in full
+   *  view the top budgets, in gremium scope the assigned (sub) cost-centres. Only
+   *  roots **with** a fiscal year; the fiscal-year endpoint resolves sub
+   *  cost-centres to their top-level ancestor. */
   readonly tops = computed(() => {
     const fy = this.fiscalYearsByBudget();
     return this.visibleTree().filter((n) => (fy[n.id]?.length ?? 0) > 0);
@@ -156,7 +156,7 @@ export class BudgetDashboardComponent {
 
   private readonly selectedKs = computed(() => this.nodeById().get(this.selectedKsId()) ?? null);
 
-  /** Breadcrumbs vom Top-Budget bis zur aktuellen Kostenstelle. */
+  /** Breadcrumbs from the top budget to the current cost-centre. */
   readonly breadcrumbs = computed<BudgetTreeNode[]>(() => {
     const map = this.nodeById();
     let node = this.selectedKs();
@@ -185,7 +185,7 @@ export class BudgetDashboardComponent {
     return a ? Number(a.expended) : 0;
   }
 
-  /** Auslastungs-Zeilen: gewählte Kostenstelle + Unterbaum, flach. */
+  /** Usage rows: selected cost-centre + subtree, flattened. */
   readonly usageRows = computed<UsageRow[]>(() => {
     const ks = this.selectedKs();
     if (!ks) return [];
@@ -229,7 +229,7 @@ export class BudgetDashboardComponent {
     { key: 'expended', label: this.i18n.translate('budget.tree.col.expended'), align: 'end' },
     { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
   ]);
-  /** Antrags-Zeilen für die geteilte Tabelle (Optik wie ``/applications``). */
+  /** Application rows for the shared table (styled like ``/applications``). */
   readonly appRows = computed<ApplicationRow[]>(() =>
     this.applications().map((a) => ({
       id: a.applicationId,
@@ -247,18 +247,18 @@ export class BudgetDashboardComponent {
     })),
   );
 
-  /** Antragstitel mit Fallback (kurze Id), wenn kein Titel gesetzt ist. */
+  /** Application title with a fallback (short id) when no title is set. */
   titleOf(app: BudgetApplication): string {
     return app.title?.trim() || `${this.shortId(app.applicationId)}…`;
   }
 
-  /** i18n-Label-Map in der aktiven Sprache auflösen (Fallback de/en/erstes). */
+  /** Resolve an i18n label map in the active locale (fallback de/en/first). */
   private resolveLabel(map: Record<string, string>): string {
     return map[this.i18n.locale()] || map['de'] || map['en'] || Object.values(map)[0] || '';
   }
   readonly usageRowId = (r: unknown): string => (r as UsageRow).node.id;
 
-  // --- Pie-Daten: direkte Unter-Kostenstellen + Eigenanteil ------------------
+  // --- Pie data: direct sub cost-centres + own share ------------------------
   private color(node: BudgetTreeNode, idx: number): string {
     return node.color ?? PALETTE[idx % PALETTE.length];
   }
@@ -271,8 +271,8 @@ export class BudgetDashboardComponent {
       color: this.color(c, i),
       id: c.id,
     }));
-    // Eigenanteil des Knotens (nicht an Kinder weiterverteilt) — als eigenes Segment
-    // mit dem **Namen** und der **Farbe** der offenen Kostenstelle (#budget).
+    // Own share of the node (not distributed to children) — as its own segment
+    // with the **name** and **colour** of the open cost-centre.
     const own = metric(ks) - slices.reduce((s, x) => s + x.value, 0);
     if (own > 0.005) {
       slices.push({
@@ -288,14 +288,14 @@ export class BudgetDashboardComponent {
   readonly availablePie = computed<PieSlice[]>(() => this.pie((n) => this.availableOf(n)));
   readonly expendedPie = computed<PieSlice[]>(() => this.pie((n) => this.expendedOf(n)));
 
-  // --- Übersicht (Sunburst-Overlay, #budget-sunburst) -------------------------
+  // --- Overview (sunburst overlay) --------------------------------------------
   readonly overviewOpen = signal(false);
   readonly overviewMetric = signal<SunburstMetric>('allocated');
   readonly overviewMetrics: SunburstMetric[] = ['allocated', 'available', 'expended'];
-  /** Wurzel des Sunbursts = aktuell gewählte Kostenstelle. */
+  /** Root of the sunburst = currently selected cost-centre. */
   readonly overviewRoot = computed(() => this.selectedKs());
 
-  /** Unterbaum-Summe einer Metrik (gleiche Rechnung wie im Sunburst). */
+  /** Subtree sum of a metric (same calculation as the sunburst). */
   private metricTotal(node: BudgetTreeNode, metric: SunburstMetric): number {
     const valueOf = (n: BudgetTreeNode): number => {
       const a = n.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
@@ -309,21 +309,21 @@ export class BudgetDashboardComponent {
     return subtree(node);
   }
 
-  /** Nur Metriken MIT Daten bekommen einen Tab (#budget-sunburst). */
+  /** Only metrics WITH data get a tab. */
   readonly visibleOverviewMetrics = computed<SunburstMetric[]>(() => {
     const root = this.overviewRoot();
     if (!root) return [];
     return this.overviewMetrics.filter((m) => this.metricTotal(root, m) > 0);
   });
 
-  /** Gewählte Metrik, auf eine sichtbare zurückgefallen, falls ihre Daten weg sind. */
+  /** Selected metric, falling back to a visible one if its data is gone. */
   readonly activeOverviewMetric = computed<SunburstMetric>(() => {
     const visible = this.visibleOverviewMetrics();
     const current = this.overviewMetric();
     return visible.includes(current) ? current : (visible[0] ?? 'allocated');
   });
 
-  /** Segment-Klick im Sunburst: Kostenstelle öffnen + Overlay schließen. */
+  /** Sunburst segment click: open the cost-centre + close the overlay. */
   onOverviewPick(id: string): void {
     this.overviewOpen.set(false);
     this.selectKs(id);
@@ -337,23 +337,22 @@ export class BudgetDashboardComponent {
     this.load();
   }
 
-  // --- Anzeige-Helfer -------------------------------------------------------
+  // --- Display helpers ------------------------------------------------------
   money(value: string | number | null | undefined, currency = 'EUR'): string {
     const n = value == null || value === '' ? 0 : Number(value);
     return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
   }
-  /** Gesamtbudget der Zeile = verfügbar + gebunden + ausgegeben (= zugewiesen +
-   *  Einnahmen). Bezugsgröße der Auslastung, damit Einnahmen-finanzierte
-   *  Kostenstellen nicht über 100% laufen (#budget-usage). */
+  /** Row total budget = available + bound + expended (= allocated + income).
+   *  Reference value for usage so income-funded cost-centres don't exceed 100%. */
   private usageTotal(row: UsageRow): number {
     return row.available + row.committed;
   }
-  /** Gebundener Anteil am Gesamtbudget — hellgrau. */
+  /** Bound share of the total budget — light grey. */
   boundPct(row: UsageRow): number {
     const total = this.usageTotal(row);
     return total > 0 ? Math.max(0, Math.min(100, (row.bound / total) * 100)) : 0;
   }
-  /** Ausgegebener Anteil am Gesamtbudget — primary. */
+  /** Expended share of the total budget — primary. */
   expendedPct(row: UsageRow): number {
     const total = this.usageTotal(row);
     return total > 0 ? Math.max(0, Math.min(100, (row.expended / total) * 100)) : 0;
@@ -366,7 +365,7 @@ export class BudgetDashboardComponent {
     return this.i18n.translate(`budget.stage.${stage}` as TranslationKey);
   }
 
-  // --- Laden ----------------------------------------------------------------
+  // --- Loading --------------------------------------------------------------
   private load(): void {
     this.loading.set(true);
     this.error.set(false);
@@ -374,10 +373,10 @@ export class BudgetDashboardComponent {
       next: (tree) => {
         this.tree.set(tree);
         this.loading.set(false);
-        // Forest-Roots (#budget-scope: ggf. Unter-Kostenstellen); ausgeblendete
-        // (#budget-hide) sind im Tab nicht wählbar.
+        // Forest roots (may be sub cost-centres); hidden ones aren't selectable
+        // in the tab.
         const tops = tree.filter((n) => !n.hiddenInBudget);
-        // HHJ aller Top-Budgets laden (linker Baum) — parallel, fehlertolerant.
+        // Load fiscal years of all top budgets (left tree) — parallel, fault-tolerant.
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
             next: (fys) => {
@@ -400,15 +399,15 @@ export class BudgetDashboardComponent {
     });
   }
 
-  /** Erstauswahl aus den Query-Params wiederherstellen, sonst erstes Budget/HHJ. */
+  /** Restore the initial selection from the query params, else first budget/fiscal year. */
   private restored = false;
   private restoreOrDefault(tops: BudgetTreeNode[]): void {
     if (this.restored || !tops.length) return;
-    // Nur Budgets mit Haushaltsjahr sind im Budget-Tab auswählbar (#11).
+    // Only budgets with a fiscal year are selectable in the budget tab.
     const withFy = tops.filter(
       (t) => (this.fiscalYearsByBudget()[t.id]?.length ?? 0) > 0,
     );
-    if (!withFy.length) return; // noch keines mit HHJ (geladen) → später
+    if (!withFy.length) return; // none with a fiscal year loaded yet -> later
     const qp = this.route.snapshot.queryParamMap;
     const qpBudget = qp.get('budget');
     const budgetId =
@@ -418,7 +417,7 @@ export class BudgetDashboardComponent {
         ? qpBudget
         : withFy[0].id;
     const fys = this.fiscalYearsByBudget()[budgetId];
-    if (fys === undefined) return; // noch nicht geladen → später
+    if (fys === undefined) return; // not loaded yet -> later
     this.restored = true;
     const ksId = qp.get('ks') && this.nodeById().get(qp.get('ks')!) ? qp.get('ks')! : budgetId;
     const fyId = qp.get('fy') && fys.some((f) => f.id === qp.get('fy')) ? qp.get('fy')! : (fys[0]?.id ?? '');
@@ -443,7 +442,7 @@ export class BudgetDashboardComponent {
 
   selectBudget(id: string): void {
     this.selectedBudgetId.set(id);
-    this.selectedKsId.set(id); // Drilldown startet an der Wurzel
+    this.selectedKsId.set(id); // drilldown starts at the root
     const fys = this.fiscalYearsByBudget()[id] ?? [];
     this.selectedFyId.set(fys[0]?.id ?? '');
     this.syncUrl();
@@ -454,7 +453,7 @@ export class BudgetDashboardComponent {
     this.selectedBudgetId.set(sel.budgetId);
     this.selectedKsId.set(sel.budgetId);
     this.selectedFyId.set(sel.fiscalYearId);
-    // Mobil: nach der Jahr-Wahl den Picker wieder einklappen (Desktop egal).
+    // Mobile: collapse the picker again after picking a year (desktop unaffected).
     this.navOpen.set(false);
     this.syncUrl();
     this.reloadApplications();

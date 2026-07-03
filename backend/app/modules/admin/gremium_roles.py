@@ -1,12 +1,10 @@
-"""Gremium-Rollen + zeitbegrenzte Mitgliedschaften (#42).
+"""Gremium roles plus time-bound memberships.
 
-Getrennt von den globalen Rollen: ein eigener Rollen-Katalog (``gremium_role``) und
-Mitgliedschaften mit Amtszeit (``gremium_membership``). Kerninvariante: pro
-(Principal, Gremium) ist zu jedem Zeitpunkt **genau eine** Rolle aktiv — überlappende
-Amtszeiten sind verboten, nicht-überlappende (aufeinanderfolgende) erlaubt.
-
-Die Overlap-Prüfung ist eine reine Funktion (isoliert testbar); der Service kapselt
-DB-Zugriff + Audit.
+Separate from global roles: an own role catalog (``gremium_role``) and
+memberships with terms of office (``gremium_membership``). Core invariant: per
+(principal, gremium) exactly one role is active at any point in time —
+overlapping terms are forbidden, consecutive ones allowed. The overlap check is
+a pure function; the service wraps DB access plus audit.
 """
 
 from __future__ import annotations
@@ -31,13 +29,13 @@ from app.modules.audit.service import AuditService
 from app.modules.auth.models import Principal as PrincipalRow
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
-# Granulare, **pro Gremium-Rolle** konfigurierbare Berechtigungen (Sitzungs-Domäne).
-# Getrennt vom globalen 16-Permission-Satz: diese gelten nur innerhalb des Gremiums
-# und werden über die aktive ``gremium_membership`` aufgelöst.
-#   session.manage  — Sitzungen anlegen/bearbeiten, Protokollant zuweisen, Status setzen
-#   vote.manage     — Abstimmungen (Beschlussfragen) öffnen/schließen
-#   vote.cast       — in Sitzungs-Abstimmungen mitstimmen
-#   protocol.write  — als Protokollant zuweisbar / Protokoll schreiben
+# Granular per-gremium-role permissions (meeting domain). Separate from the
+# global permission set: these apply only within the gremium and resolve via
+# the active ``gremium_membership``.
+#   session.manage  — create/edit meetings, assign minute-taker, set status
+#   vote.manage     — open/close votes
+#   vote.cast       — vote in meeting votes
+#   protocol.write  — assignable as minute-taker / write the protocol
 GREMIUM_PERMISSIONS: tuple[str, ...] = (
     "session.manage",
     "vote.manage",
@@ -46,12 +44,10 @@ GREMIUM_PERMISSIONS: tuple[str, ...] = (
 )
 _ALL_PERMS: list[str] = list(GREMIUM_PERMISSIONS)
 
-# Pflicht-Gremium-Rollen: existieren in JEDEM Gremium und sind nicht löschbar.
-# ``vorstand`` + ``manager`` dürfen per Default Sitzungen verwalten (session.manage)
-# und Abstimmungen führen; ``member`` darf per Default nur mitstimmen (vote.cast).
-# Der je Sitzung zugewiesene **Protokollant** schreibt das Protokoll (zusätzlich zu
-# einer ``protocol.write``-Rolle). Anlegen beim Gremium-Erstellen + idempotenter
-# Backfill beim Auflisten (Bestands-Gremien via Migration 0040).
+# Forced gremium roles: exist in EVERY gremium and are not deletable.
+# ``vorstand`` + ``manager`` get all permissions by default; ``member`` only
+# vote.cast. Created on gremium creation, with idempotent backfill on listing
+# (existing gremien via migration 0040).
 FORCED_GREMIUM_ROLES: tuple[tuple[str, dict[str, str], list[str]], ...] = (
     ("vorstand", {"de": "Vorstand", "en": "Board"}, list(_ALL_PERMS)),
     ("manager", {"de": "Manager", "en": "Manager"}, list(_ALL_PERMS)),
@@ -64,7 +60,7 @@ FORCED_ROLE_DEFAULT_PERMS: dict[str, list[str]] = {
 
 
 def _time_valid_clause(now: datetime):
-    """SQLAlchemy-Klausel: ``gremium_membership`` ist zum Zeitpunkt ``now`` aktiv."""
+    """SQLAlchemy clause: the ``gremium_membership`` is active at ``now``."""
     return (
         (GremiumMembership.valid_from.is_(None))
         | (GremiumMembership.valid_from <= now)
@@ -77,7 +73,7 @@ def _time_valid_clause(now: datetime):
 async def active_gremium_roles(
     session: AsyncSession, sub: str, now: datetime | None = None
 ) -> list[tuple[UUID, GremiumRole]]:
-    """Aktive (Gremium, Rolle)-Paare eines Principals (zeit-validiert)."""
+    """Return a principal's active (gremium, role) pairs (time-validated)."""
     now = now or datetime.now(UTC)
     rows = (
         await session.execute(
@@ -93,7 +89,7 @@ async def active_gremium_roles(
 async def gremium_ids_with_permission(
     session: AsyncSession, sub: str, perm: str, now: datetime | None = None
 ) -> set[UUID]:
-    """Gremium-IDs, in denen die aktive Rolle des Principals ``perm`` gewährt."""
+    """Return gremium ids where the principal's active role grants ``perm``."""
     return {
         gid
         for gid, role in await active_gremium_roles(session, sub, now)
@@ -104,7 +100,7 @@ async def gremium_ids_with_permission(
 async def gremium_member_ids(
     session: AsyncSession, sub: str, now: datetime | None = None
 ) -> set[UUID]:
-    """Gremium-IDs, in denen der Principal aktuell (beliebige Rolle) Mitglied ist."""
+    """Return gremium ids where the principal is currently a member (any role)."""
     return {gid for gid, _ in await active_gremium_roles(session, sub, now)}
 
 
@@ -114,12 +110,10 @@ def intervals_overlap(
     b_from: datetime | None,
     b_until: datetime | None,
 ) -> bool:
-    """``True`` wenn sich die halboffenen Intervalle ``[from, until)`` überlappen.
+    """Return True if the half-open intervals ``[from, until)`` overlap.
 
-    ``None`` = unbegrenzt (``from=None`` ⇒ −∞, ``until=None`` ⇒ +∞). Zwei Intervalle
-    überlappen, wenn ``a_from < b_until`` **und** ``b_from < a_until`` (mit den
-    Unendlich-Sonderfällen). Aneinandergrenzende Intervalle (``a_until == b_from``)
-    überlappen **nicht** (halboffen)."""
+    ``None`` means unbounded. Adjacent intervals (``a_until == b_from``) do NOT
+    overlap (half-open)."""
     left_ok = a_from is None or b_until is None or a_from < b_until
     right_ok = b_from is None or a_until is None or b_from < a_until
     return left_ok and right_ok
@@ -137,7 +131,7 @@ def _iso(value: datetime | None) -> str | None:
 
 
 def _sanitize_perms(perms: list[str] | None) -> list[str]:
-    """Nur bekannte Gremium-Permissions, dedupliziert, in Katalog-Reihenfolge."""
+    """Keep only known gremium permissions, deduplicated, in catalog order."""
     given = set(perms or [])
     return [p for p in GREMIUM_PERMISSIONS if p in given]
 
@@ -165,7 +159,7 @@ def _membership_out(row: GremiumMembership) -> GremiumMembershipOut:
 
 
 class GremiumRoleService:
-    """CRUD für Gremium-Rollen + Mitgliedschaften (mit Overlap-Invariante)."""
+    """CRUD for gremium roles plus memberships (with the overlap invariant)."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -181,11 +175,10 @@ class GremiumRoleService:
 
     # ----------------------------------------------------------- role catalogue
     async def ensure_forced_roles(self, gremium_id: UUID) -> bool:
-        """Pflichtrollen (Vorstand/Schriftführung) idempotent für ein Gremium anlegen.
+        """Idempotently create the forced roles for a gremium.
 
-        Gibt ``True`` zurück, wenn etwas angelegt wurde. Committet **nicht** selbst —
-        der Aufrufer steuert die Transaktion (so nutzbar beim Gremium-Anlegen wie
-        beim Auflisten)."""
+        Returns ``True`` if something was created. Does not commit — the caller
+        controls the transaction."""
         present = set(
             (
                 await self.session.scalars(
@@ -210,7 +203,7 @@ class GremiumRoleService:
         return added
 
     async def list_roles(self, gremium_id: UUID) -> list[GremiumRoleOut]:
-        # Bestands-Gremien lazy nachrüsten, damit die Pflichtrollen immer da sind.
+        # Lazily backfill existing gremien so the forced roles are always present.
         if await self.ensure_forced_roles(gremium_id):
             await self.session.commit()
         rows = (
@@ -258,8 +251,7 @@ class GremiumRoleService:
         if payload.name is not None:
             row.name_i18n = payload.name
         if payload.permissions is not None:
-            # Granulare Berechtigungen sind auch auf Pflichtrollen editierbar
-            # (nur der Schlüssel/das Löschen ist bei Pflichtrollen gesperrt).
+            # Permissions are editable on forced roles too (only key/delete is locked).
             row.permissions = _sanitize_perms(payload.permissions)
         await self._audit(actor, "gremium_role", row.id)
         await self.session.commit()
@@ -303,8 +295,8 @@ class GremiumRoleService:
             raise NotFoundError(f"gremium role {payload.gremium_role_id} not found")
         if role.gremium_id != gremium_id:
             raise ConflictError("gremium role does not belong to this gremium")
-        # Unbekannte principal_id sauber als 404 — sonst platzt erst der FK beim
-        # Commit (IntegrityError → 500).
+        # Unknown principal_id as a clean 404 — otherwise the FK only fails at
+        # commit (IntegrityError -> 500).
         if await self.session.get(PrincipalRow, payload.principal_id) is None:
             raise NotFoundError(f"principal {payload.principal_id} not found")
         new_from = _parse_dt(payload.valid_from)
@@ -314,11 +306,10 @@ class GremiumRoleService:
                 "validFrom must be before validUntil.",
                 errors=[{"field": "validUntil", "msg": "must be after validFrom"}],
             )
-        # Overlap-Invariante: kein zeitlich überlappender Eintrag desselben Principals
-        # in DIESEM Gremium (genau eine aktive Rolle je Zeitpunkt). Diese Python-Prüfung
-        # ist nur ein Fast-Path mit klarer Fehlermeldung; verbindlich durchgesetzt wird
-        # die Invariante über die EXCLUDE-Constraint ``ex_gremium_membership_no_overlap``
-        # (schließt die TOCTOU-Lücke bei parallelen Inserts, AUD-029).
+        # Overlap invariant: no time-overlapping entry for the same principal in
+        # THIS gremium. This Python check is only a fast path with a clear error;
+        # the EXCLUDE constraint ``ex_gremium_membership_no_overlap`` enforces it
+        # authoritatively (closes the TOCTOU gap on parallel inserts).
         existing = (
             await self.session.scalars(
                 select(GremiumMembership).where(
@@ -341,10 +332,9 @@ class GremiumRoleService:
             valid_until=new_until,
         )
         self.session.add(row)
-        # Die EXCLUDE-Constraint wird beim INSERT (flush) geprüft, nicht erst beim
-        # Commit — der konkurrierende Race feuert also bereits hier. flush + Audit +
-        # Commit daher gemeinsam absichern und den IntegrityError in einen 409
-        # übersetzen (statt 500); der Client kann erneut versuchen.
+        # The EXCLUDE constraint fires at INSERT (flush), not at commit — so a
+        # concurrent race surfaces here. Guard flush + audit + commit together
+        # and translate the IntegrityError into a 409 (instead of 500).
         try:
             await self.session.flush()
             await self._audit(actor, "gremium_membership", row.id)

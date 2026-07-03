@@ -30,8 +30,8 @@ from app.modules.budget.invoice_import import (
     ParsedInvoice,
     UnsupportedInvoiceCurrencyError,
 )
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_schemas import InvoiceParseResult
-from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
 from app.shared.errors import UnsupportedMediaTypeError
 
@@ -302,7 +302,7 @@ async def test_parse_invoice_file_stores_and_returns(
         currency="EUR",
     )
     monkeypatch.setattr(
-        "app.modules.budget.tree_service.parse_zugferd_pdf", lambda _data: parsed
+        "app.modules.budget.tree.invoices.parse_zugferd_pdf", lambda _data: parsed
     )
     result = await _service(storage).parse_invoice_file(
         _blank_pdf(), filename="rechnung.pdf"

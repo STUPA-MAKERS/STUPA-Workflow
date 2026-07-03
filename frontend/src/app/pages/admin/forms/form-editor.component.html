@@ -31,7 +31,7 @@
       <p class="fe__alert" role="alert">{{ 'admin.form.dupKeys' | t: { keys: duplicates().join(', ') } }}</p>
     }
 
-    <!-- ============================ VORSCHAU ============================ -->
+    <!-- ============================ PREVIEW ============================ -->
     @if (preview()) {
       <article class="fe__preview">
         <h2 class="fe__pv-title">{{ resolved(title()) || ('admin.forms.untitled' | t) }}</h2>
@@ -80,7 +80,7 @@
         }
       </article>
     } @else {
-      <!-- ============================ BEARBEITEN ============================ -->
+      <!-- ============================ EDIT ============================ -->
       <article class="fe__meta">
         <div class="fe__row">
           <label class="fe__lbl">{{ 'admin.forms.nameDe' | t }}
@@ -100,7 +100,6 @@
           [hint]="'admin.forms.hasBudgetHint' | t"
         >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
 
-        <!-- Vergleichsangebote-Regel (#5-4) -->
         <app-checkbox
           [ngModel]="cmpRequired()"
           (ngModelChange)="cmpRequired.set($event)"
@@ -116,7 +115,7 @@
         <p class="py-4 text-muted">{{ 'admin.forms.empty' | t }}</p>
       }
 
-      <!-- ============================ GRUPPEN ============================ -->
+      <!-- ============================ GROUPS ============================ -->
       <div class="fe__groups">
         @for (group of groups(); track $index; let gi = $index) {
           <section class="fe__group" draggable="true" (dragstart)="onDragStart(gi)" (dragover)="onDragOver($event)" (drop)="onDrop(gi)">
@@ -224,7 +223,7 @@
                         }
                       </div>
 
-                      <!-- Validierung nur für Feldtypen, für die sie greift. -->
+                      <!-- Validation only for field types where it applies. -->
                       @if (isNumeric(field.type) || isText(field.type)) {
                         <fieldset class="fe__sub">
                           <legend>{{ 'admin.form.validation' | t }}</legend>
@@ -267,7 +266,7 @@
               }
             </ol>
 
-            <!-- »Frage hinzufügen« je Gruppe mit Typ-Menü (NC-Forms). -->
+            <!-- "Add question" per group with a type menu. -->
             <div class="fe__add">
               <app-button variant="secondary" size="sm" (click)="typeMenuGroup.set(typeMenuGroup() === gi ? null : gi)">
                 + {{ 'admin.forms.addQuestion' | t }}
@@ -286,7 +285,7 @@
         }
       </div>
 
-      <!-- »+ Gruppe« — eine neue Gruppe (= neuer Wizard-Schritt) anhängen. -->
+      <!-- "+ Group" — append a new group (= new wizard step). -->
       <div class="fe__add-group">
         <app-button size="sm" variant="secondary" (click)="addGroup()">
           + {{ 'admin.form.addGroup' | t }}

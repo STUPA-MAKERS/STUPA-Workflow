@@ -1,7 +1,7 @@
-"""API-Schemata des audit-Moduls (T-23, api.md ``/admin/audit``).
+"""API schemas for the audit module (read-only views).
 
-Nur Lese-Sichten. ``hash``/``prevHash`` als Hex ausgegeben (Integritätsnachweis,
-keine PII). ``data`` enthält per Vertrag nur id-Referenzen/Metadaten (security.md §4).
+``hash``/``prevHash`` are emitted as hex; ``data`` carries only id
+references/metadata by contract.
 """
 
 from __future__ import annotations
@@ -15,33 +15,32 @@ from app.modules.audit.models import AuditEntry
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields populatable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class AuditEntryOut(_CamelModel):
-    """Ein Audit-Eintrag (Lesesicht)."""
+    """One audit entry (read view)."""
 
     id: int
     at: datetime
     actor: str | None
-    # Klarname des Akteurs (display_name/email, vom Router aufgelöst); None bei
-    # System-/anonymen Vorgängen oder unbekanntem ``sub``.
+    # Actor display name (resolved by the router); None for system/anonymous
+    # operations or an unknown ``sub``.
     actor_name: str | None = Field(default=None, alias="actorName")
     action: str
     target_type: str | None = Field(alias="targetType")
     target_id: str | None = Field(alias="targetId")
-    # Menschenlesbares Ziel-Label (Antragstitel, Gremium-/Rollenname, …; #2),
-    # vom Router batch-aufgelöst; None wenn Ziel gelöscht/unbekannt.
+    # Human-readable target label, batch-resolved by the router; None if the
+    # target is deleted/unknown.
     target_label: str | None = Field(default=None, alias="targetLabel")
     data: dict[str, Any]
-    # UUID (als String) → Klarname für die in ``data`` eingebetteten Entity-Referenzen
-    # (#no-uuids-in-ui), vom Router batch-aufgelöst. Nur auflösbare Ids sind enthalten;
-    # das FE rendert „<Name> · <uuid>" und fällt sonst auf die rohe UUID zurück.
+    # UUID-string -> display name for entity references embedded in ``data``,
+    # batch-resolved by the router; only resolvable ids are included.
     resolved_ids: dict[str, str] = Field(default_factory=dict, alias="resolvedIds")
-    # Aus dem Audit-Log zurücknehmbar (#config-versioning), vom Router bestimmt. Treibt
-    # den »Zurücknehmen«-Button; das Backend bleibt beim Klick autoritativ (409 bei stale).
+    # Revertable from the audit log (determined by the router); the backend stays
+    # authoritative on the actual revert call (409 when stale).
     revertable: bool = False
     hash: str
     prev_hash: str | None = Field(alias="prevHash")
@@ -55,7 +54,7 @@ class AuditEntryOut(_CamelModel):
         resolved_ids: dict[str, str] | None = None,
         revertable: bool = False,
     ) -> AuditEntryOut:
-        """ORM-Zeile → Out-Schema (bytea-Hashes hex-kodiert)."""
+        """Map an ORM row to the out schema (bytea hashes hex-encoded)."""
         return cls(
             id=entry.id,
             at=entry.at,
@@ -74,10 +73,10 @@ class AuditEntryOut(_CamelModel):
 
 
 class AuditPageOut(_CamelModel):
-    """Cursor-gepagte Audit-Sicht (Keyset auf ``id`` desc, neueste zuerst).
+    """Cursor-paged audit view (keyset on ``id`` desc, newest first).
 
-    ``nextCursor`` = ``id`` für den nächsten Aufruf (Query ``before``), oder ``None``
-    am Ende. ``hasMore`` spiegelt dasselbe wider.
+    ``nextCursor`` is the ``id`` for the next call (query ``before``), or ``None``
+    at the end.
     """
 
     items: list[AuditEntryOut]
@@ -86,14 +85,14 @@ class AuditPageOut(_CamelModel):
 
 
 class AuditActorOut(_CamelModel):
-    """Akteur-Auswahl (für den Actor-Filter): ``sub`` + aufgelöster Klarname."""
+    """Actor option for the actor filter: ``sub`` plus resolved display name."""
 
     sub: str
     name: str | None = None
 
 
 class ChainVerificationOut(_CamelModel):
-    """Ergebnis der Ketten-Verifikation (``/admin/audit/verify``)."""
+    """Result of chain verification (``/admin/audit/verify``)."""
 
     valid: bool
     checked: int
@@ -102,7 +101,7 @@ class ChainVerificationOut(_CamelModel):
 
 
 class AuditRevertOut(_CamelModel):
-    """Ergebnis eines Audit-Log-Reverts (``POST /admin/audit/{id}/revert``)."""
+    """Result of an audit-log revert (``POST /admin/audit/{id}/revert``)."""
 
     reverted_audit_id: int = Field(alias="revertedAuditId")
     entity_type: str = Field(alias="entityType")

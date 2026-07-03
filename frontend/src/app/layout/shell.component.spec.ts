@@ -38,8 +38,8 @@ const wideRoutes = [
 ];
 
 async function setup() {
-  // `LOCATION` per DI mocken (#jest30): ein Pfad zu `location.reload()` darf
-  // nie das echte (unveränderliche) jsdom-Location treffen.
+  // Mock `LOCATION` via DI: a path to `location.reload()` must never hit the
+  // real (immutable) jsdom location.
   const location = createLocationMock();
   const view = await render(ShellComponent, {
     providers: [
@@ -52,8 +52,8 @@ async function setup() {
   });
   const auth = view.fixture.debugElement.injector.get(AuthService);
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // Shell lädt beim Start die aktive Site-Config für die Fußzeile (#82). Im
-  // Real-Modus (USE_MOCK_API=false) geht der Request raus — hier neutral flushen.
+  // The shell loads the active site config for the footer at start. In real mode
+  // (USE_MOCK_API=false) the request goes out — flush it neutrally here.
   http
     .match((r) => r.url.endsWith('/admin/site-config'))
     .forEach((req) =>
@@ -67,7 +67,7 @@ async function setup() {
   return { ...view, auth, http, location };
 }
 
-/** Authentifiziert den Principal und triggert die Nav-Sichtbarkeit. */
+/** Authenticates the principal and triggers nav visibility. */
 function login(auth: AuthService, http: HttpTestingController, principal: Principal): void {
   auth.ensureLoaded().subscribe();
   http.expectOne('/api/auth/me').flush(principal);
@@ -91,7 +91,7 @@ describe('ShellComponent', () => {
 
     expect(screen.getByRole('link', { name: /Dashboard/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Anträge/ })).toBeInTheDocument();
-    // member lacks admin.config → Verwaltung hidden
+    // member lacks admin.config → admin hidden
     expect(screen.queryByRole('link', { name: /Verwaltung/ })).not.toBeInTheDocument();
     expect(screen.getByText('Mia Member')).toBeInTheDocument();
     http.verify();
@@ -103,7 +103,7 @@ describe('ShellComponent', () => {
     fixture.detectChanges();
 
     const spy = jest.spyOn(auth, 'logout').mockImplementation(() => undefined);
-    // Logout liegt jetzt im Konto-Popout (#51): erst den Namen anklicken.
+    // Logout now lives in the account popout: click the name first.
     await userEvent.click(screen.getByRole('button', { name: /Mia Member/ }));
     await userEvent.click(screen.getByRole('menuitem', { name: /Abmelden|Sign out/ }));
     expect(spy).toHaveBeenCalled();
@@ -120,7 +120,7 @@ describe('ShellComponent', () => {
   });
 
   it('switches locale through the language selector and reloads the view', async () => {
-    // Sprachwechsel lädt neu (server-i18n in neuer Sprache) — in jsdom gestubbt.
+    // Language change reloads (server i18n in the new language) — stubbed in jsdom.
     const reload = jest
       .spyOn(
         ShellComponent.prototype as unknown as { reloadForLocale: () => void },

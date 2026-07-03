@@ -3,8 +3,8 @@ import { I18nService } from './i18n.service';
 import type { TranslationKey } from './translations';
 
 /**
- * `{{ 'nav.dashboard' | t }}` — impure, damit Locale-Wechsel sofort durchschlägt
- * (die aktive Locale ist ein Signal im Service).
+ * `{{ 'nav.dashboard' | t }}` — impure so a locale change takes effect
+ * immediately (the active locale is a signal in the service).
  */
 @Pipe({ name: 't', standalone: true, pure: false })
 export class TranslatePipe implements PipeTransform {

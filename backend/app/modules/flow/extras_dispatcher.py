@@ -1,17 +1,10 @@
-"""Flow-Action-Handler ``addToNextSession`` + ``assignBudget`` (#28).
+"""Flow action handlers for ``addToNextSession`` and ``assignBudget``.
 
-Erfüllt das T-14-Dispatch-Interface für die beiden Aktionen, die der Flow direkt auf
-Sitzungs-/Budget-Daten ausführt (kein Mail-/Webhook-Versand):
-
-* ``addToNextSession`` — den Antrag als TOP an die **nächste** (früheste zukünftige)
-  Sitzung des angegebenen Gremiums hängen. Existiert keine, wird geloggt + übersprungen
-  (Action ist nur auf Übergängen **in einen vote-State** zulässig — vom Graph-Validator
-  erzwungen, ``config_schemas``).
-* ``assignBudget`` — dem Antrag eine Kostenstelle (Budget-Baum) zuordnen; das
-  Haushaltsjahr wird aus dem **einzigen aktiven** HHJ des Top-Level-Knotens abgeleitet.
-
-Fehler je Action werden geloggt, nicht propagiert — eine fehlgeschlagene Action darf den
-bereits committeten State-Wechsel nicht zurücknehmen (flows §9.3, idempotent/retrybar).
+``addToNextSession`` appends the application as an agenda item to the earliest
+upcoming meeting of the given gremium (logged + skipped if none exists);
+``assignBudget`` attaches a cost centre and derives the fiscal year from the
+single active one of the top-level node. Per-action errors are logged, never
+propagated — a failed action must not roll back the committed state change.
 """
 
 from __future__ import annotations
@@ -45,7 +38,7 @@ _FLOW_ACTOR = "system:flow"
 
 @dataclass(slots=True)
 class FlowExtrasActionDispatcher:
-    """`ActionDispatcher` für ``addToNextSession`` + ``assignBudget`` (sonst No-op)."""
+    """``ActionDispatcher`` for ``addToNextSession`` + ``assignBudget`` (else no-op)."""
 
     sessionmaker: async_sessionmaker[AsyncSession]
 
@@ -56,9 +49,10 @@ class FlowExtrasActionDispatcher:
                     await self._add_to_next_session(action)
                 elif action.type == "assignBudget":
                     await self._assign_budget(action)
-            except Exception:  # noqa: BLE001 — Action-Fehler dürfen den bereits
-                # committeten State-Wechsel nicht kippen (flows §9.3) und nicht die
-                # restlichen Actions des Übergangs verhindern.
+                elif action.type == "assignBudgetFromField":
+                    await self._assign_budget_from_field(action)
+            except Exception:  # noqa: BLE001 — an action failure must not undo the
+                # committed state change nor block the transition's remaining actions.
                 logger.exception(
                     "flow action %s failed (key=%s) — skipped",
                     action.type,
@@ -109,58 +103,90 @@ class FlowExtrasActionDispatcher:
 
     # --------------------------------------------------------------- assignBudget
     async def _assign_budget(self, action: DispatchedAction) -> None:
-        budget_ref = action.params.get("budgetId")
-        if not budget_ref:
-            logger.warning("assignBudget without 'budgetId' — skipped")
+        budget_id = _parse_budget_uuid("assignBudget", action.params.get("budgetId"))
+        if budget_id is None:
             return
-        try:
-            budget_id = UUID(str(budget_ref))
-        except ValueError:
-            logger.warning("assignBudget invalid budgetId %r — skipped", budget_ref)
+        await self._do_assign(action.application_id, budget_id, source="flow")
+
+    # ------------------------------------------------------ assignBudgetFromField
+    async def _assign_budget_from_field(self, action: DispatchedAction) -> None:
+        """Assign the cost centre chosen in a form field (e.g. ``gremium_select``/
+        ``budget_select``) — one dynamic pick collapses many fixed triage edges into one.
+        """
+        field = action.params.get("field")
+        if not field:
+            logger.warning("assignBudgetFromField without 'field' — skipped")
             return
         async with self.sessionmaker() as session:
             app = await session.get(Application, action.application_id)
-            node = await session.get(Budget, budget_id)
-            if app is None or node is None:
+            if app is None:
                 logger.warning(
-                    "assignBudget: application %s or budget %s missing — skipped",
+                    "assignBudgetFromField: application %s missing — skipped",
                     action.application_id,
-                    budget_id,
                 )
                 return
-            app.budget_id = node.id
-            top = await self._top_level(session, node)
-            active_ids = (
-                await session.scalars(
-                    select(FiscalYear.id).where(
-                        FiscalYear.budget_id == top.id,
-                        FiscalYear.active.is_(True),
-                    )
+            raw = app.data.get(str(field)) if isinstance(app.data, dict) else None
+            budget_id = _parse_budget_uuid(f"assignBudgetFromField field {field!r}", raw)
+            if budget_id is None:
+                return
+            if await self._assign_node(session, app, budget_id, source="flow:field"):
+                await session.commit()
+
+    async def _do_assign(
+        self, application_id: UUID, budget_id: UUID, *, source: str
+    ) -> None:
+        async with self.sessionmaker() as session:
+            app = await session.get(Application, application_id)
+            if app is None:
+                logger.warning("assignBudget: application %s missing — skipped", application_id)
+                return
+            if await self._assign_node(session, app, budget_id, source=source):
+                await session.commit()
+
+    async def _assign_node(
+        self, session: AsyncSession, app: Application, budget_id: UUID, *, source: str
+    ) -> bool:
+        """Assign the cost centre + its single active fiscal year and write the audit.
+
+        ``True`` when assigned (caller commits), ``False`` when the node is missing
+        (nothing mutated)."""
+        node = await session.get(Budget, budget_id)
+        if node is None:
+            logger.warning("assignBudget: budget %s missing — skipped", budget_id)
+            return False
+        app.budget_id = node.id
+        top = await self._top_level(session, node)
+        active_ids = (
+            await session.scalars(
+                select(FiscalYear.id).where(
+                    FiscalYear.budget_id == top.id,
+                    FiscalYear.active.is_(True),
                 )
-            ).all()
-            # Eindeutiges aktives HHJ → setzen; sonst offen lassen (mehrdeutig/keins).
-            if len(active_ids) == 1:
-                app.fiscal_year_id = active_ids[0]
-            # Money mutation → audit trail (Hausregel; spiegelt BudgetTreeService).
-            await audit_record(
-                session,
-                actor=_FLOW_ACTOR,
-                action=AuditAction.BUDGET_ASSIGN,
-                target_type="application",
-                target_id=str(app.id),
-                data={
-                    "budgetId": str(app.budget_id),
-                    "fiscalYearId": (
-                        str(app.fiscal_year_id) if app.fiscal_year_id is not None else None
-                    ),
-                    "source": "flow",
-                },
             )
-            await session.commit()
+        ).all()
+        # Set only an unambiguous active fiscal year; otherwise leave open.
+        if len(active_ids) == 1:
+            app.fiscal_year_id = active_ids[0]
+        # Money mutation -> audit trail (house rule; mirrors BudgetTreeService).
+        await audit_record(
+            session,
+            actor=_FLOW_ACTOR,
+            action=AuditAction.BUDGET_ASSIGN,
+            target_type="application",
+            target_id=str(app.id),
+            data={
+                "budgetId": str(app.budget_id),
+                "fiscalYearId": (
+                    str(app.fiscal_year_id) if app.fiscal_year_id is not None else None
+                ),
+                "source": source,
+            },
+        )
+        return True
 
     @staticmethod
     async def _top_level(session: AsyncSession, node: Budget) -> Budget:
-        """Den Top-Level-Knoten (``parent_id IS NULL``) über die Eltern-Kette finden."""
+        """Walk the parent chain to the top-level node (``parent_id IS NULL``)."""
         current = node
         seen: set[UUID] = set()
         while current.parent_id is not None and current.parent_id not in seen:
@@ -172,6 +198,21 @@ class FlowExtrasActionDispatcher:
         return current
 
 
+def _parse_budget_uuid(label: str, ref: object) -> UUID | None:
+    """Parse a budget reference to ``UUID``; empty/invalid -> log + ``None`` (fail-closed).
+
+    A value read from a form field may be missing or garbage — then the application stays
+    without a cost centre (the budget guard is itself fail-closed)."""
+    if not ref:
+        logger.warning("%s: empty budget reference — skipped", label)
+        return None
+    try:
+        return UUID(str(ref))
+    except ValueError:
+        logger.warning("%s: invalid budget id %r — skipped", label, ref)
+        return None
+
+
 def build_flow_extras_dispatcher(pool: object) -> FlowExtrasActionDispatcher:
-    """Dispatcher fürs App-Wiring (main.py). Braucht keinen arq-Pool."""
+    """Build the dispatcher for app wiring; needs no arq pool."""
     return FlowExtrasActionDispatcher(get_sessionmaker())

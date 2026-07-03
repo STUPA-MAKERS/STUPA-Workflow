@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Application
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import Budget
 from app.modules.budget.tree_schemas import (
     AccountCreate,
@@ -35,7 +36,6 @@ from app.modules.budget.tree_schemas import (
     InvoiceCreate,
     TransferCreate,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.models import FormVersion
 from app.shared.errors import ConflictError, ValidationProblem
@@ -284,6 +284,22 @@ async def test_delete_with_children_conflicts(session: AsyncSession) -> None:
     await svc.create_node(BudgetNodeCreate(key="01", name="K", parentId=top.id))
     with pytest.raises(ConflictError):
         await svc.delete_node(top.id)
+
+
+async def test_delete_leaf_with_allocation_succeeds(session: AsyncSession) -> None:
+    """Regression: a childless cost centre that only carries an allocation (planning
+    figure) is deletable. The old guard blocked ANY node with an allocation row, and
+    since setting an allocation back to 0 keeps the row, such a leaf could never be
+    deleted."""
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"DA{_suffix()}", name="Top", gremiumId=g.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("500")))
+
+    await svc.delete_node(top.id)  # no children/bookings/apps → deletes cleanly
+
+    assert await session.get(Budget, top.id) is None  # allocation cascades away with it
 
 
 async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:

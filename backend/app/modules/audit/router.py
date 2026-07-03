@@ -1,20 +1,12 @@
-"""audit-API-Router (T-23, api.md ``/admin/audit``).
+"""Audit API router (``/api/admin/audit``): read, verify, revert.
 
-* ``GET /api/admin/audit``        — P(``audit.read``); gefiltertes, gepagtes Audit-Log.
-* ``GET /api/admin/audit/verify`` — P(``audit.read``); Hash-Ketten-Integrität.
+RBAC is fail-closed: 401 without a session, 403 without permission. The read
+view resolves actor subs, target ids and ``data`` UUIDs to display names
+server-side.
 
-RBAC fail-closed: ohne Session 401, ohne ``audit.read`` 403 (``require_principal``).
-Die rohen ``audit_entry``-Zeilen enthalten nur id-Referenzen + Hashes — aber die
-Lesesicht löst Akteur-``sub``, Ziel- und ``data``-UUIDs serverseitig auf Klarnamen,
-E-Mails und Titel auf (``resolve_actor_names``/``resolve_target_labels``/
-``resolve_data_ids``).
-
-WARNUNG (#AUD-019, Least-Privilege-Hinweis): ``audit.read`` ist eine GLOBALE,
-plattformweite Leseberechtigung OHNE Gremiums-Scoping. Das aufgelöste Log umfasst
-PII (Mitglieder-E-Mails, alle Antragstitel, alle Abstimmungsfragen) GREMIUMS-
-ÜBERGREIFEND. Die Berechtigung NICHT für „scoped"/gremiumsbeschränktes Auditing
-vergeben — es gibt keine solche Eingrenzung; ein Inhaber von ``audit.read`` liest das
-gesamte Plattform-Log. Standardmäßig nur der ``admin``-Rolle zuteilen.
+WARNING: ``audit.read`` is a GLOBAL platform-wide read permission with no
+gremium scoping — the resolved log exposes PII across all gremien. Grant it to
+the ``admin`` role only; there is no "scoped" auditing.
 """
 
 from __future__ import annotations
@@ -60,18 +52,16 @@ async def list_audit(
     service: ServiceDep,
     action: Annotated[str | None, Query()] = None,
     actor: Annotated[str | None, Query()] = None,
-    # tz-aware erzwingen (#AUD-034): die ``at``-Spalte ist ``timestamptz`` — ein
-    # naiver Wert würde vom asyncpg-Codec abgelehnt (DataError → 500). ``AwareDatetime``
-    # lässt Pydantic naive Eingaben schon bei der Validierung mit 422 zurückweisen.
+    # AwareDatetime: the ``at`` column is timestamptz — asyncpg rejects naive
+    # values with a 500, so Pydantic rejects them up front with 422.
     since: Annotated[AwareDatetime | None, Query()] = None,
     until: Annotated[AwareDatetime | None, Query()] = None,
     before: Annotated[int | None, Query(ge=1)] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
 ) -> AuditPageOut:
-    """Audit-Log lesen — Keyset-Paging (``before``-Cursor, neueste zuerst).
+    """Read the audit log — keyset paging (``before`` cursor, newest first).
 
-    Filter: ``action``/``actor``/Zeitfenster (``since``/``until``). Akteur-``sub``
-    wird auf den Klarnamen aufgelöst (``actorName``)."""
+    Filters: ``action``/``actor``/time window (``since``/``until``)."""
     items, has_more = await service.query_cursor(
         action=action,
         actor=actor,
@@ -91,7 +81,7 @@ async def list_audit(
             e,
             names.get(e.actor or ""),
             labels.get((e.target_type or "", e.target_id or "")),
-            # nur die in diesem Eintrag tatsächlich vorkommenden Ids weiterreichen
+            # pass on only the ids that actually occur in this entry
             {
                 k: resolved_ids[k]
                 for k in data_uuid_strings(e.data)
@@ -115,7 +105,7 @@ async def list_audit(
     responses=_AUTH_ERRORS,
 )
 async def list_audit_actors(service: ServiceDep) -> list[AuditActorOut]:
-    """Distinkte Akteure des Logs (für den Actor-Filter), Klarname aufgelöst."""
+    """List distinct log actors for the actor filter, with resolved names."""
     return [
         AuditActorOut(sub=sub, name=name) for sub, name in await service.list_actors()
     ]
@@ -124,12 +114,12 @@ async def list_audit_actors(service: ServiceDep) -> list[AuditActorOut]:
 @router.get(
     "/verify",
     response_model=ChainVerificationOut,
-    # #6: Ketten-Verifikation separat gegatet (audit.verify), Lesesicht bleibt audit.read.
+    # Chain verification is gated separately (audit.verify); reads stay audit.read.
     dependencies=[Depends(require_principal("audit.verify"))],
     responses=_AUTH_ERRORS,
 )
 async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:
-    """Hash-Kette nachrechnen → ``valid`` + ggf. erster Bruch (``brokenAt``/``reason``)."""
+    """Recompute the hash chain; reports ``valid`` plus the first break, if any."""
     result = await service.verify_chain()
     return ChainVerificationOut(
         valid=result.valid,
@@ -142,9 +132,8 @@ async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:
 @router.post(
     "/{entry_id}/revert",
     response_model=AuditRevertOut,
-    # #config-versioning: Rücknahme eines Config-Changes — eigene, destruktive
-    # Permission (getrennt von audit.read/verify). 404 Eintrag/Revision fehlt,
-    # 409 nicht revertierbar / stale (neuerer Stand existiert).
+    # Destructive: own permission, separate from audit.read/verify.
+    # 404 entry/revision missing, 409 not revertable or stale.
     dependencies=[Depends(require_principal("audit.revert"))],
     responses={**_AUTH_ERRORS, 404: _PROBLEM, 409: _PROBLEM},
 )
@@ -153,10 +142,10 @@ async def revert_audit_entry(
     session: DbSession,
     principal: Annotated[Principal, Depends(require_principal("audit.revert"))],
 ) -> AuditRevertOut:
-    """Den durch ``entry_id`` beschriebenen Config-Change zurücknehmen (Vorgänger-Stand
-    wiederherstellen, bei Konflikt 409). Der Revert ist selbst geloggt + revertierbar."""
-    # audit.revert ist die Router-Gatung; RevertService re-asserted zusätzlich die
-    # granulare Permission des Original-Vorgangs (#AUD-018) → principal durchreichen.
+    """Revert the change described by ``entry_id`` (restore the prior state; 409 on
+    conflict). The revert is itself logged and revertable."""
+    # audit.revert gates the route; RevertService additionally re-asserts the
+    # granular permission of the original operation, hence the principal pass-through.
     result = await RevertService(session).revert(entry_id, principal.sub, principal)
     return AuditRevertOut(
         revertedAuditId=result.reverted_audit_id,
