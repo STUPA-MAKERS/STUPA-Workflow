@@ -91,6 +91,16 @@ FieldType = Literal[
     "date",
     "select",
     "multiselect",
+    # Committee/cost-centre pickers: a `select` whose options the server injects at
+    # render time from the current committees resp. budget tree (effective_form) —
+    # not hand-maintained in the form. Stored value = UUID.
+    "gremium_select",
+    "budget_select",
+    # Typed inputs with built-in validation (instead of a hand-maintained `pattern`).
+    "email",
+    "iban",
+    # Date range {from, to} — both ISO dates, from <= to.
+    "daterange",
     "checkbox",
     "file",
     "table",

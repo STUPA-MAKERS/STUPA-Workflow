@@ -13,14 +13,15 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership
+from app.modules.admin.models import ApplicationType, GremiumMembership
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import BudgetAllocation, BudgetExpense
+from app.modules.files.models import Attachment
 from app.modules.forms.models import FormField
 from app.shared.guards import GuardContext
 
@@ -94,6 +95,34 @@ async def _budget_fits(session: AsyncSession, app: Application) -> bool:
     return app.amount <= available
 
 
+async def _has_attachment(session: AsyncSession, app: Application) -> bool:
+    """``True`` when the application has at least one non-quarantined attachment — for
+    the ``attachmentPresent`` guard (e.g. receipts/offers required).
+
+    ``storage_key IS NULL`` marks an attachment removed on a ClamAV hit; such a one does
+    not count as present."""
+    return bool(
+        await session.scalar(
+            select(
+                exists().where(
+                    Attachment.application_id == app.id,
+                    Attachment.storage_key.is_not(None),
+                )
+            )
+        )
+    )
+
+
+async def _application_type_key(session: AsyncSession, app: Application) -> str | None:
+    """Application type key (e.g. ``qsm``/``vsm``) for ``applicationTypeIs``.
+
+    ``None`` when the type (data drift) is unresolvable → the guard falls fail-closed
+    to ``False``."""
+    return await session.scalar(
+        select(ApplicationType.key).where(ApplicationType.id == app.type_id)
+    )
+
+
 async def _field_types(session: AsyncSession, app: Application) -> dict[str, str]:
     """Return ``{fieldKey: compareType}`` of the pinned form plus built-in ``amount``."""
     rows = (
@@ -124,6 +153,8 @@ async def build_base_context(
     raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
     applicant_roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
     applicant_committees = await _committees_for_sub(session, app.created_by)
+    application_type_key = await _application_type_key(session, app)
+    has_attachment = await _has_attachment(session, app)
     # Fields (built-in amount + form data).
     field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}
     field_values["amount"] = app.amount
@@ -136,6 +167,8 @@ async def build_base_context(
         applicant_committees=applicant_committees,
         budget_id=str(app.budget_id) if app.budget_id is not None else None,
         budget_fits=await _budget_fits(session, app),
+        application_type_key=application_type_key,
+        has_attachment=has_attachment,
         field_values=field_values,
         field_types=field_types,
     )

@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from uuid import UUID
 
 from app.shared.config_schemas import FormFieldDef
 from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlogic
@@ -291,6 +292,16 @@ def _validate_value(field: FormFieldDef, value: Any, errors: list[FieldError]) -
         _validate_select(field, value, errors)
     elif t == "multiselect":
         _validate_multiselect(field, value, errors)
+    elif t == "gremium_select":
+        _validate_uuid_ref(field, value, errors, "gremium id")
+    elif t == "budget_select":
+        _validate_uuid_ref(field, value, errors, "budget id")
+    elif t == "email":
+        _validate_email(field, value, errors)
+    elif t == "iban":
+        _validate_iban(field, value, errors)
+    elif t == "daterange":
+        _validate_daterange(field, value, errors)
     elif t == "checkbox":
         _validate_checkbox(field, value, errors)
     elif t == "file":
@@ -388,6 +399,73 @@ def _validate_multiselect(
     invalid = [v for v in value if not isinstance(v, str) or v not in allowed]
     if invalid:
         _err(errors, field.key, f"contains invalid options: {invalid}")
+
+
+def _validate_uuid_ref(
+    field: FormFieldDef, value: Any, errors: list[FieldError], label: str
+) -> None:
+    """Dynamic picker field (`gremium_select`/`budget_select`): the value must be a
+    well-formed UUID.
+
+    The server injects the options only at render time (``effective_form``) from the
+    current committees resp. budget tree; the pure (DB-free) answer validation has no
+    access to them — hence only the UUID form here. A value that names no real entity
+    finds no transition in the flow (fail-closed)."""
+    if not isinstance(value, str) or not value:
+        _err(errors, field.key, f"must be a {label}")
+        return
+    try:
+        UUID(value)
+    except ValueError:
+        _err(errors, field.key, f"is not a valid {label}")
+
+
+# Conservative e-mail pattern (one ``@``, no whitespace, a dot in the domain) —
+# mirrors the QSM/VSM form pattern without needing to hand-maintain it.
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _validate_email(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+    if not isinstance(value, str) or not _EMAIL_RE.match(value):
+        _err(errors, field.key, "is not a valid e-mail address")
+
+
+def _iban_mod97_ok(iban: str) -> bool:
+    """IBAN form + ISO-7064 mod-97 checksum. Spaces are ignored.
+
+    (Kept standalone — the bank module has its own internal variant for statements;
+    no cross-module dependency on a private function here.)"""
+    s = iban.replace(" ", "").upper()
+    if not (15 <= len(s) <= 34) or not s.isalnum() or not s[:2].isalpha() or not s[2:4].isdigit():
+        return False
+    # First four chars to the end; letters -> digits (A->10 … Z->35, ``int(ch, 36)``).
+    rearranged = s[4:] + s[:4]
+    return int("".join(str(int(ch, 36)) for ch in rearranged)) % 97 == 1
+
+
+def _validate_iban(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+    """Check IBAN: form + ISO-7064 mod-97 checksum (not just a regex)."""
+    if not isinstance(value, str) or not _iban_mod97_ok(value):
+        _err(errors, field.key, "is not a valid IBAN")
+
+
+def _validate_daterange(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+    """`daterange`: ``{"from": ISO, "to": ISO}`` with ``from <= to``."""
+    if not isinstance(value, dict):
+        _err(errors, field.key, "must be an object with 'from' and 'to'")
+        return
+    raw_from, raw_to = value.get("from"), value.get("to")
+    if not isinstance(raw_from, str) or not isinstance(raw_to, str):
+        _err(errors, field.key, "'from' and 'to' must be ISO date strings")
+        return
+    try:
+        d_from = date.fromisoformat(raw_from)
+        d_to = date.fromisoformat(raw_to)
+    except ValueError:
+        _err(errors, field.key, "'from'/'to' must be ISO dates (YYYY-MM-DD)")
+        return
+    if d_from > d_to:
+        _err(errors, field.key, "'from' must not be after 'to'")
 
 
 def _validate_checkbox(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:

@@ -592,7 +592,25 @@ def _ctx_app(
         fiscal_year_id=fiscal,
         amount=amount,
         form_version_id=uuid4(),
+        id=uuid4(),
+        type_id=uuid4(),
     )
+
+
+@pytest.fixture(autouse=True)
+def _ctx_extras_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+    """DB-frei: die neuen Kontext-Helfer ``_application_type_key`` + ``_has_attachment``
+    stubben (ihre realen Rümpfe deckt ``test_flow_context`` direkt ab). No-op für die
+    Nicht-Kontext-Tests dieser Datei."""
+
+    async def _atk(_session: object, _app: object) -> str | None:
+        return None
+
+    async def _ha(_session: object, _app: object) -> bool:
+        return False
+
+    monkeypatch.setattr(flow_context, "_application_type_key", _atk)
+    monkeypatch.setattr(flow_context, "_has_attachment", _ha)
 
 
 def _principal(**over: object) -> Principal:

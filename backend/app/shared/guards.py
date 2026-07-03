@@ -4,17 +4,18 @@ Guards decide whether a transition may fire. Declarative, whitelist, NO `eval`.
 The catalogue splits into:
 
 * Conditions (auto + manual): ``deadlinePassed``, ``applicantRoleIs``,
-  ``applicantCommitteeIs``, ``budgetIs``, ``budgetFitsApplication``, ``hasField``,
-  ``compare`` (typed comparison over a promoted/form field) — combined via
-  ``and``/``or``/``not``.
+  ``applicantCommitteeIs``, ``applicationTypeIs`` (application type key),
+  ``attachmentPresent`` (>= 1 attachment), ``budgetIs``, ``budgetFitsApplication``,
+  ``hasField``, ``compare`` (typed comparison over a promoted/form field) — combined
+  via ``and``/``or``/``not``.
 * Actor gates (manual transitions only): ``roleIs`` (global role), ``isInCommittee``
   (gremium membership). Forbidden on automatic transitions
   (``validate_guard(..., allow_actor_ops=False)``).
 
-Actions are one whitelisted type (``webhook``/``notify``/``addToNextSession``);
-dispatch happens in the engine — here only validation. An unknown operator/action
-type raises ``GuardError`` when the flow version is SAVED (not at runtime), see
-``validate_guard`` / ``validate_action``.
+Actions are one whitelisted type (``webhook``/``notify``/``addToNextSession``/
+``assignBudget``/``assignBudgetFromField``); dispatch happens in the engine — here only
+validation. An unknown operator/action type raises ``GuardError`` when the flow version
+is SAVED (not at runtime), see ``validate_guard`` / ``validate_action``.
 """
 
 from __future__ import annotations
@@ -35,6 +36,8 @@ GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
         "deadlinePassed",
         "applicantRoleIs",
         "applicantCommitteeIs",
+        "applicationTypeIs",
+        "attachmentPresent",
         "budgetIs",
         "budgetFitsApplication",
         "hasField",
@@ -66,22 +69,27 @@ _STRING_VALUE_OPERATORS: frozenset[str] = frozenset(
         "isInCommittee",
         "applicantRoleIs",
         "applicantCommitteeIs",
+        "applicationTypeIs",
         "budgetIs",
         "hasField",
     }
 )
 _BOOL_VALUE_OPERATORS: frozenset[str] = frozenset(
-    {"deadlinePassed", "budgetFitsApplication", "actorIsApplicant"}
+    {"deadlinePassed", "budgetFitsApplication", "actorIsApplicant", "attachmentPresent"}
 )
 
 # Whitelisted action types (dispatch in the engine).
-ACTION_TYPES: frozenset[str] = frozenset({"webhook", "notify", "addToNextSession", "assignBudget"})
+ACTION_TYPES: frozenset[str] = frozenset(
+    {"webhook", "notify", "addToNextSession", "assignBudget", "assignBudgetFromField"}
+)
 
 # Required string field per action type (``notify`` is checked separately).
+# ``assignBudgetFromField`` reads the cost-centre id from the named form field.
 _ACTION_REQUIRED_FIELD: dict[str, str] = {
     "webhook": "webhookId",
     "addToNextSession": "gremiumId",
     "assignBudget": "budgetId",
+    "assignBudgetFromField": "field",
 }
 
 # Valid ``notify`` recipient kinds.
@@ -102,6 +110,10 @@ class GuardContext:
     * ``applicant_roles``/``applicant_committees`` — the applicant.
     * ``budget_id`` — assigned cost centre (budget tree) as a string.
     * ``budget_fits`` — amount <= remaining of the cost centre.
+    * ``application_type_key`` — application type key (e.g. ``qsm``/``vsm``) for
+      ``applicationTypeIs``; ``None`` when unresolvable (fail-closed).
+    * ``has_attachment`` — at least one non-quarantined attachment on the application
+      (for ``attachmentPresent``).
     * ``field_values``/``field_types`` — promoted/form field values + type (incl.
       built-in ``amount`` = ``currency``) for ``compare``/``hasField``.
     """
@@ -116,6 +128,9 @@ class GuardContext:
     applicant_committees: frozenset[str] = frozenset()
     budget_id: str | None = None
     budget_fits: bool = False
+    application_type_key: str | None = None
+    # At least one non-quarantined attachment is present on the application.
+    has_attachment: bool = False
     field_values: Mapping[str, Any] = field(default_factory=dict)
     field_types: Mapping[str, str] = field(default_factory=dict)
 
@@ -251,9 +266,14 @@ _LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
     # Applicant
     "applicantRoleIs": lambda value, ctx: value in ctx.applicant_roles,
     "applicantCommitteeIs": lambda value, ctx: str(value) in ctx.applicant_committees,
+    # Application type (key, e.g. ``qsm``/``vsm``) — fail-closed when unresolvable.
+    "applicationTypeIs": lambda value, ctx: ctx.application_type_key is not None
+    and str(value) == ctx.application_type_key,
     # Budget
     "budgetIs": lambda value, ctx: ctx.budget_id is not None and str(value) == ctx.budget_id,
     "budgetFitsApplication": lambda value, ctx: ctx.budget_fits == bool(value),
+    # Attachments — ``true`` -> at least one attachment present, ``false`` -> none.
+    "attachmentPresent": lambda value, ctx: ctx.has_attachment == bool(value),
     # Deadlines
     "deadlinePassed": lambda value, ctx: ctx.deadline_passed == bool(value),
     # Fields

@@ -264,6 +264,81 @@ async def test_assign_budget_writes_audit_entry(monkeypatch: pytest.MonkeyPatch)
     assert session.committed == 1
 
 
+async def test_assign_budget_node_missing_no_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+    # App vorhanden, Knoten fehlt → _assign_node liefert False → kein Commit.
+    _stub_audit(monkeypatch)
+    app_id, node_id = uuid4(), uuid4()
+    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
+    session = _Session(store={app_id: app})  # Knoten nicht im Store
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
+    )
+    assert app.budget_id is None
+    assert session.committed == 0
+
+
+# ----------------------------------------------------------- assignBudgetFromField #
+async def test_assign_from_field_without_field_skipped() -> None:
+    session = _Session()
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudgetFromField")]
+    )
+    assert session.committed == 0
+
+
+async def test_assign_from_field_app_missing_skipped() -> None:
+    session = _Session(store={})
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudgetFromField", field="ziel", application_id=uuid4())]
+    )
+    assert session.committed == 0
+
+
+async def test_assign_from_field_value_absent_or_invalid_skipped() -> None:
+    # Feld fehlt in data → None; data kein dict → None; Müll-Wert → keine UUID.
+    app_id = uuid4()
+    for data in ({}, "not-a-dict", {"ziel": "garbage"}):
+        app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None, data=data)
+        session = _Session(store={app_id: app})
+        await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+            [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
+        )
+        assert session.committed == 0
+        assert app.budget_id is None
+
+
+async def test_assign_from_field_assigns_from_data(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _stub_audit(monkeypatch)
+    app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
+    app = SimpleNamespace(
+        id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
+    )
+    node = SimpleNamespace(id=node_id, parent_id=None)
+    session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
+    )
+    assert app.budget_id == node_id
+    assert app.fiscal_year_id == fy_id
+    assert session.committed == 1
+    assert calls[0]["data"]["source"] == "flow:field"
+
+
+async def test_assign_from_field_node_missing_no_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Feldwert ist eine gültige UUID, aber der Knoten fehlt → _assign_node False → kein Commit.
+    _stub_audit(monkeypatch)
+    app_id, node_id = uuid4(), uuid4()
+    app = SimpleNamespace(
+        id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
+    )
+    session = _Session(store={app_id: app})  # Knoten nicht im Store
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
+    )
+    assert app.budget_id is None
+    assert session.committed == 0
+
+
 # ------------------------------------------------------------------ _top_level #
 async def test_top_level_walks_parent_chain() -> None:
     root = SimpleNamespace(id=uuid4(), parent_id=None)

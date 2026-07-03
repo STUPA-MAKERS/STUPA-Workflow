@@ -90,6 +90,7 @@ export function validateGuard(guard: Guard | null | undefined, allowActorOps = t
     op === 'isInCommittee' ||
     op === 'applicantRoleIs' ||
     op === 'applicantCommitteeIs' ||
+    op === 'applicationTypeIs' ||
     op === 'budgetIs' ||
     op === 'hasField'
   ) {
@@ -138,6 +139,10 @@ export function validateAction(action: ActionDef | null | undefined): void {
   } else if (type === 'assignBudget') {
     if (typeof action['budgetId'] !== 'string' || !action['budgetId']) {
       throw new GuardError('assignBudget action requires a budget');
+    }
+  } else if (type === 'assignBudgetFromField') {
+    if (typeof action['field'] !== 'string' || !action['field']) {
+      throw new GuardError('assignBudgetFromField action requires a field');
     }
   }
 }
