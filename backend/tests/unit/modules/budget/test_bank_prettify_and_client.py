@@ -8,12 +8,35 @@ from types import SimpleNamespace
 import pytest
 
 from app.modules.budget.bank import normalize
+from app.modules.budget.bank.camt_parse import parse_camt
 from app.modules.budget.bank.client import (
     lines_from_camt_documents,
     lines_from_fetch_result,
 )
 from app.modules.budget.bank.service import BankService
 from app.modules.budget.bank.statement import StatementParseError
+
+# Combined camt.053 (ONE HKCAZ fetch, two accounts) — Sparkasse returns this even
+# for an account-scoped request. Each <Stmt> carries its own <Acct>/<IBAN>.
+_CAMT_COMBINED = b"""<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08">
+ <BkToCstmrStmt>
+  <Stmt><Acct><Id><IBAN>DE11111111111111111111</IBAN></Id></Acct>
+   <Ntry><Amt Ccy="EUR">10.00</Amt><CdtDbtInd>CRDT</CdtDbtInd>
+    <NtryDtls><TxDtls><RmtInf><Ustrd>KontoA</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
+  </Stmt>
+  <Stmt><Acct><Id><IBAN>DE22222222222222222222</IBAN></Id></Acct>
+   <Ntry><Amt Ccy="EUR">20.00</Amt><CdtDbtInd>CRDT</CdtDbtInd>
+    <NtryDtls><TxDtls><RmtInf><Ustrd>KontoB</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
+  </Stmt>
+ </BkToCstmrStmt></Document>"""
+# A statement WITHOUT an identifiable account IBAN — must never be filtered out.
+_CAMT_NO_ACCT = b"""<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08">
+ <BkToCstmrStmt><Stmt>
+   <Ntry><Amt Ccy="EUR">5.00</Amt><CdtDbtInd>CRDT</CdtDbtInd>
+    <NtryDtls><TxDtls><RmtInf><Ustrd>NoAcct</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
+ </Stmt></BkToCstmrStmt></Document>"""
 
 _CAMT_ONE = b"""<?xml version="1.0" encoding="UTF-8"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.052.001.08">
@@ -106,3 +129,33 @@ def test_lines_from_camt_documents_tolerates_empty_docs() -> None:
 def test_lines_from_camt_documents_raises_on_junk() -> None:
     with pytest.raises(StatementParseError):
         lines_from_camt_documents([b"not xml at all"])
+
+
+# ------------------------------------------------- account scoping (#konten all-accounts)
+def test_parse_camt_scopes_to_requested_iban() -> None:
+    """A combined camt.053 is filtered to the selected account (spaces tolerated)."""
+    only_a = parse_camt(_CAMT_COMBINED, iban="DE11 1111 1111 1111 1111 11")
+    assert [line.amount for line in only_a] == [Decimal("10.00")]
+    only_b = parse_camt(_CAMT_COMBINED, iban="de22222222222222222222")
+    assert [line.amount for line in only_b] == [Decimal("20.00")]
+
+
+def test_parse_camt_without_iban_keeps_all_statements() -> None:
+    lines = parse_camt(_CAMT_COMBINED)
+    assert sorted(line.amount for line in lines) == [Decimal("10.00"), Decimal("20.00")]
+
+
+def test_parse_camt_keeps_statement_without_identifiable_iban() -> None:
+    """Defensive: a scoped fetch must not drop a statement that omits its IBAN."""
+    lines = parse_camt(_CAMT_NO_ACCT, iban="DE11111111111111111111")
+    assert [line.amount for line in lines] == [Decimal("5.00")]
+
+
+def test_parse_camt_nonmatching_iban_yields_no_entries() -> None:
+    with pytest.raises(StatementParseError):
+        parse_camt(_CAMT_COMBINED, iban="DE99999999999999999999")
+
+
+def test_lines_from_fetch_result_scopes_camt_by_iban() -> None:
+    lines = lines_from_fetch_result(([_CAMT_COMBINED], [None]), "DE22222222222222222222")
+    assert [line.amount for line in lines] == [Decimal("20.00")]

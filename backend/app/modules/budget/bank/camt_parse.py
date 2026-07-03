@@ -28,8 +28,15 @@ from app.modules.budget.bank.statement import (
 )
 
 
-def parse_camt(data: bytes) -> list[StatementLine]:
+def parse_camt(data: bytes, iban: str | None = None) -> list[StatementLine]:
     """Parse a CAMT statement (report ``camt.052`` or statement ``camt.053``).
+
+    ``iban`` (optional) scopes the result to one account: a single HKCAZ fetch can
+    return a COMBINED camt.053 with one ``<Stmt>`` per account of the login, and
+    without scoping every account's bookings would be merged (and staged under the
+    one selected account). When ``iban`` is set, statements identifying a
+    DIFFERENT account are skipped; statements without an identifiable IBAN (and
+    ``iban=None``) are always kept, so file imports and minimal docs are unaffected.
 
     :raises StatementParseError: missing/broken CAMT XML or no usable entries."""
     try:
@@ -37,7 +44,7 @@ def parse_camt(data: bytes) -> list[StatementLine]:
     except ET.ParseError as exc:
         raise StatementParseError(f"unparseable CAMT XML: {exc}") from exc
 
-    entries = _findall_local(root, "Ntry")
+    entries = _scoped_entries(root, iban)
     if not entries:
         raise StatementParseError("CAMT XML contained no entries (Ntry)")
 
@@ -47,6 +54,32 @@ def parse_camt(data: bytes) -> list[StatementLine]:
     if not lines:
         raise StatementParseError("CAMT XML contained no usable entries")
     return lines
+
+
+def _scoped_entries(root: ET.Element, iban: str | None) -> list[ET.Element]:
+    """The ``Ntry`` elements, limited to the statement(s) of ``iban`` when given.
+
+    camt.053 groups bookings under one ``<Stmt>`` per account (camt.052 under
+    ``<Rpt>``), each carrying its own ``<Acct>/<IBAN>``. Drop a statement only when
+    it has an IBAN that does NOT match — never when the IBAN is absent or no
+    scope was requested (avoids an empty fetch if a bank omits/varies the IBAN).
+    A doc without any statement container falls back to a flat ``Ntry`` scan."""
+    want = (iban or "").replace(" ", "").upper()
+    statements = _findall_local(root, "Stmt") + _findall_local(root, "Rpt")
+    if not statements:
+        return _findall_local(root, "Ntry")
+    entries: list[ET.Element] = []
+    for stmt in statements:
+        if want:
+            # The statement's own account is the first <Acct> in document order;
+            # counterparty accounts are <DbtrAcct>/<CdtrAcct>, not <Acct>.
+            stmt_iban = (
+                _find_text_local(_find_local(stmt, "Acct"), "IBAN") or ""
+            ).replace(" ", "").upper()
+            if stmt_iban and stmt_iban != want:
+                continue
+        entries.extend(_findall_local(stmt, "Ntry"))
+    return entries
 
 
 @dataclass(slots=True)
