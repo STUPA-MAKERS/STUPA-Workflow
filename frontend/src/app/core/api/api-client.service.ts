@@ -15,6 +15,7 @@ import {
   mapMeetingPage,
   mapProtocol,
   mapSignedUrl,
+  mapState,
   mapTimelineEvent,
   mapTransition,
   mapVersion,
@@ -34,6 +35,7 @@ import type {
   ApplicationListItemWire,
   ApplicationListQuery,
   ApplicationOutWire,
+  ApplicationState,
   ApplicationType,
   ApplicationTypeListItemWire,
   ApplicationVersion,
@@ -66,9 +68,11 @@ import type {
   ProtocolVotesBody,
   SignedUrl,
   SignedUrlOutWire,
+  StateOutWire,
   TimelineDirection,
   TimelineEntry,
   TimelineEventOutWire,
+  ForceStatusBody,
   Transition,
   TransitionOutWire,
   TransitionRequestBody,
@@ -312,6 +316,32 @@ export class ApiClient {
 
   fireTransition(id: Uuid, req: TransitionRequestBody): Observable<TransitionResult> {
     return this.http.post<TransitionResult>(`${this.base}/applications/${id}/transition`, req);
+  }
+
+  /** GET /applications/{id}/flow-states — all states of the application's flow
+   *  (force-status picker options); needs `application.force_status`. */
+  flowStates(id: Uuid): Observable<ApplicationState[]> {
+    const lang = this.i18n.locale();
+    return this.http
+      .get<StateOutWire[]>(`${this.base}/applications/${id}/flow-states`, {
+        context: skipLoading(),
+      })
+      .pipe(
+        map((items) =>
+          items
+            .map((s) => mapState(s, lang))
+            .filter((s): s is ApplicationState => s !== null),
+        ),
+      );
+  }
+
+  /** POST /applications/{id}/force-status — force a status directly (privileged
+   *  override, bypasses guards/transitions); needs `application.force_status`. */
+  forceStatus(id: Uuid, req: ForceStatusBody): Observable<TransitionResult> {
+    return this.http.post<TransitionResult>(
+      `${this.base}/applications/${id}/force-status`,
+      req,
+    );
   }
 
   /** Transitions the magic-link applicant may fire (actorIsApplicant gate). */

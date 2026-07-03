@@ -13,9 +13,11 @@ from fastapi import APIRouter, Depends
 
 from app.deps import DbSession, require_principal
 from app.modules.applications.access import Access, require_app_edit, require_app_read
+from app.modules.applications.schemas import StateOut
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.schemas import (
+    ForceStatusRequest,
     TransitionOut,
     TransitionRequest,
     TransitionResult,
@@ -30,6 +32,10 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 # Fire manual transitions: own permission, separate from full application management.
 # Per-transition actor gates in the guard refine this.
 MANAGE_PERMISSION = "application.transition"
+
+# Force an application directly into any state (bypasses guards/transitions).
+# Deliberately separate from application.transition — an audited override.
+FORCE_PERMISSION = "application.force_status"
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -50,6 +56,7 @@ def get_flow_service(
 
 ServiceDep = Annotated[FlowService, Depends(get_flow_service)]
 PrincipalDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
+ForcePrincipalDep = Annotated[Principal, Depends(require_principal(FORCE_PERMISSION))]
 
 
 @router.get(
@@ -82,6 +89,43 @@ async def fire_transition(
     return await service.fire(
         application_id,
         payload.transition_id,
+        principal,
+        note=payload.note,
+    )
+
+
+# --- force status: privileged direct override (bypasses guards/transitions) ---
+@router.get(
+    "/applications/{application_id}/flow-states",
+    response_model=list[StateOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_flow_states(
+    application_id: UUID,
+    service: ServiceDep,
+    principal: ForcePrincipalDep,
+) -> list[StateOut]:
+    """All states of the application's flow — the force-status picker options."""
+    return await service.list_states(application_id)
+
+
+@router.post(
+    "/applications/{application_id}/force-status",
+    response_model=TransitionResult,
+    # 400 = malformed JSON body (FastAPI parser, before validation).
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def force_status(
+    application_id: UUID,
+    payload: ForceStatusRequest,
+    service: ServiceDep,
+    principal: ForcePrincipalDep,
+) -> TransitionResult:
+    """Force an application directly into ``payload.stateId`` → 200 ``{newStateId}`` or
+    409 (no current state / already there / concurrent change)."""
+    return await service.force_status(
+        application_id,
+        payload.state_id,
         principal,
         note=payload.note,
     )

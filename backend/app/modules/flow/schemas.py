@@ -35,6 +35,16 @@ class TransitionRequest(_CamelModel):
     note: str | None = None
 
 
+class ForceStatusRequest(_CamelModel):
+    """``POST /applications/{id}/force-status`` — force a status directly.
+
+    The privileged ``application.force_status`` override; ``note`` (the reason) is
+    mandatory since the change bypasses the flow and is audited."""
+
+    state_id: UUID = Field(alias="stateId")
+    note: str = Field(min_length=1)
+
+
 class TransitionResult(_CamelModel):
     """Result of a successful transition (200)."""
 

@@ -17,6 +17,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
   Application,
   ApplicationComment,
+  ApplicationState,
   ApplicationVersion,
   CommentVisibility,
   FormFieldDef,
@@ -192,6 +193,22 @@ export class ApplicationsDetailComponent {
   readonly deleting = signal(false);
   readonly confirmErase = signal(false);
   readonly requestingErasure = signal(false);
+
+  // Force status (privileged `application.force_status` override): dialog, the
+  // application's flow states (lazy-loaded), target selection + mandatory reason.
+  readonly canForceStatus = computed(() => this.auth.can('application.force_status'));
+  readonly forceDialogOpen = signal(false);
+  readonly forcingStatus = signal(false);
+  private readonly forceStates = signal<ApplicationState[]>([]);
+  readonly forceStateChoice = signal('');
+  readonly forceNote = signal('');
+  /** Target-state options — every state of the flow except the current one. */
+  readonly forceStateOptions = computed<SelectOption[]>(() => {
+    const currentId = this.app()?.state?.id ?? '';
+    return this.forceStates()
+      .filter((s) => s.id !== currentId)
+      .map((s) => ({ value: s.id, label: s.label || s.key }));
+  });
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
@@ -526,6 +543,49 @@ export class ApplicationsDetailComponent {
       error: () => {
         this.requestingErasure.set(false);
         this.toast.error(this.i18n.translate('applications.detail.eraseRequestFailed'));
+      },
+    });
+  }
+
+  /** Open the force-status dialog: lazy-load the flow's states, reset the form. */
+  openForceDialog(): void {
+    this.forceStateChoice.set('');
+    this.forceNote.set('');
+    if (!this.forceStates().length) {
+      const seq = this.loadSeq;
+      this.api.flowStates(this.id).subscribe({
+        next: (states) => {
+          if (seq === this.loadSeq) this.forceStates.set(states);
+        },
+        error: () => {},
+      });
+    }
+    this.forceDialogOpen.set(true);
+  }
+
+  /** Force the application directly into the chosen state (reason mandatory).
+   *  Bypasses the flow guards server-side; 403/409 → toast. */
+  doForceStatus(): void {
+    const stateId = this.forceStateChoice();
+    const note = this.forceNote().trim();
+    if (!stateId || !note || this.forcingStatus()) return;
+    this.forcingStatus.set(true);
+    this.api.forceStatus(this.id, { stateId, note }).subscribe({
+      next: () => {
+        this.forcingStatus.set(false);
+        this.forceDialogOpen.set(false);
+        this.toast.success(this.i18n.translate('applications.actions.success'));
+        this.refresh();
+      },
+      error: (err: { status?: number }) => {
+        this.forcingStatus.set(false);
+        const key =
+          err.status === 403
+            ? 'applications.transitions.forbidden'
+            : err.status === 409
+              ? 'applications.actions.conflict'
+              : 'applications.actions.error';
+        this.toast.error(this.i18n.translate(key));
       },
     });
   }
