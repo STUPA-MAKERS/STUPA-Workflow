@@ -1,20 +1,15 @@
-"""Server-seitige Fuzzy-Suche (#3/#4): Trigram-Ranking auf Postgres, ILIKE-Fallback.
+"""Server-side fuzzy search: trigram ranking on Postgres, ILIKE fallback.
 
-Eine winzige, dialekt-bewusste Hilfe, die aus einer Such-Query ``q`` + einer Liste
-durchsuchbarer Spalten/Ausdrücke ein **WHERE**-Prädikat und einen **Rang**-Ausdruck
-baut. Beide werden von den Listen-Services identisch in die Zähl- **und** Zeilen-Query
-gehängt — so driften ``total`` und Treffer nie auseinander (Infinite-Scroll-Bug).
+Builds a WHERE predicate and a rank expression from a search query ``q`` and a
+list of searchable columns/expressions. List services must apply both identically
+to the count AND the row query so ``total`` never drifts from the hits.
 
-* **Postgres** (Prod): ``pg_trgm``-Ähnlichkeit. Der Rang ist das Maximum der
-  Spalten-Ähnlichkeiten (``greatest(similarity(col, q), …)``); gefiltert wird über
-  ``rang > threshold``. Die GIN-Trigram-Indizes (Migration 0027) bedienen ``similarity``.
-* **Andere Dialekte** (SQLite in Unit-Stubs): kein ``pg_trgm`` → Substring-``ILIKE``
-  über alle Spalten; der Rang ist konstant ``0.0``, damit die Aufrufer **immer**
-  ``ORDER BY rang DESC`` schreiben dürfen (auf SQLite ein No-Op-Tiebreak).
+* Postgres: ``pg_trgm`` similarity; rank = max over columns, filter ``rank > threshold``.
+  GIN trigram indexes serve these operators.
+* Other dialects (SQLite unit stubs): substring ``ILIKE`` over all columns; rank is
+  a constant ``0.0`` so callers may always write ``ORDER BY rank DESC``.
 
-``q`` wird **immer** als gebundener Parameter geführt (nie in SQL interpoliert). Die
-Aufrufer strippen leere Queries selbst (``if q:``) — diese Hilfe nimmt an, dass ``q``
-bereits ein nicht-leerer Suchbegriff ist, strippt aber defensiv erneut.
+``q`` is always a bound parameter, never interpolated into SQL.
 """
 
 from __future__ import annotations
@@ -26,20 +21,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def escape_like(value: str) -> str:
-    """LIKE/ILIKE-Metazeichen (``\\``, ``%``, ``_``) escapen.
+    """Escape LIKE/ILIKE metacharacters (``\\``, ``%``, ``_``).
 
-    Für die Teilstring-Suche als ``col.ilike(f"%{escape_like(v)}%", escape="\\")``
-    nutzen — so wirken vom Nutzer eingegebene ``%``/``_`` als Literale statt als
-    Wildcards (kein Index-Bypass / keine Wildcard-Injection durch die Eingabe).
+    Use as ``col.ilike(f"%{escape_like(v)}%", escape="\\")`` so user-typed
+    ``%``/``_`` act as literals, not wildcards (no wildcard injection).
     """
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def dialect_of(session: AsyncSession) -> str:
-    """Dialekt-Name der gebundenen Engine (``"postgresql"`` / ``"sqlite"`` / …).
+    """Return the dialect name of the bound engine (``"postgresql"`` / ``"sqlite"`` / …).
 
-    Steuert in :func:`trigram_rank`, ob ``pg_trgm`` oder der ILIKE-Fallback greift.
-    Defensiv: ohne gebundene Engine ``"postgresql"`` (Prod-Default).
+    Defensive: without a bound engine, ``"postgresql"`` (prod default).
     """
     bind = session.bind
     return bind.dialect.name if bind is not None else "postgresql"
@@ -52,22 +45,16 @@ def trigram_rank(
     threshold: float = 0.3,
     dialect: str = "postgresql",
 ) -> tuple[ColumnElement[bool], ColumnElement[Any]]:
-    """``(where_clause, rank_expr)`` für eine Fuzzy-Suche über ``columns``.
+    """Build ``(where_clause, rank_expr)`` for a fuzzy search over ``columns``.
 
-    ``columns`` sind SQLAlchemy-Spalten **oder** -Ausdrücke (z. B. ``func.coalesce``,
-    ein Funktionsaufruf auf ``data``). ``q`` ist als Parameter gebunden; ``threshold``
-    ist die minimale Wort-Trigram-Ähnlichkeit (Postgres) für einen Treffer.
+    Postgres uses ``word_similarity(q, text)`` instead of ``similarity``: the
+    latter normalizes over the WHOLE column and collapses when a short query runs
+    against long text; ``word_similarity`` scores the best sub-word match, the
+    right measure for "does the query occur in the field". Rank = max over
+    columns, ``where = rank > threshold``; GIN trigram indexes serve both.
 
-    Postgres: nutzt ``word_similarity(q, text)`` statt ``similarity`` — letztere
-    normalisiert über die GANZE Spalte und kollabiert daher, sobald ein kurzer
-    Suchbegriff gegen langen Text (konkatenierte Antworten, Titel + Gremium) läuft;
-    ``word_similarity`` misst die beste Übereinstimmung mit einem **Teil**-Wort und
-    ist damit das richtige Maß für »kommt die Query im Feld vor«. Rang = Maximum über
-    die Spalten, ``where = rang > threshold``. Die GIN-Trigram-Indizes bedienen
-    ``word_similarity`` (Operator ``<%``) genauso wie ``similarity``.
-
-    Sonst (SQLite-Stubs): ``where = OR(coalesce(col,'') ILIKE %q%)``, ``rank = 0.0``
-    (Konstante; erlaubt bedingungsloses ``ORDER BY rank`` auch im Fallback).
+    Other dialects (SQLite stubs): ``where = OR(coalesce(col,'') ILIKE %q%)``,
+    ``rank = 0.0`` (constant, allows unconditional ``ORDER BY rank``).
     """
     needle = (q or "").strip()
     if dialect == "postgresql":

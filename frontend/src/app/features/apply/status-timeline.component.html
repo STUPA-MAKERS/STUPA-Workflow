@@ -41,10 +41,10 @@
           </div>
         </header>
 
-        <!-- 3-Spalten wie die interne Antrags-Detailseite: Aktionen links,
-             Verlauf + Antragsdaten Mitte, Kommentare (Chat) rechts. -->
+        <!-- 3 columns like the internal application detail page: actions left,
+             history + application data center, comments (chat) right. -->
         <div class="status__shell" [class.status__shell--actions]="actions().length">
-          <!-- LINKS: Antragsteller-Aktionen (nur wenn freigegeben, actorIsApplicant) -->
+          <!-- LEFT: applicant actions (only when enabled, actorIsApplicant) -->
           @if (actions().length) {
             <aside class="status__rail status__rail--left" [attr.aria-label]="'status.actions.title' | t">
               <app-card [heading]="'status.actions.title' | t">
@@ -66,7 +66,7 @@
             </aside>
           }
 
-          <!-- MITTE: Verlauf + Antragsdaten -->
+          <!-- CENTER: history + application data -->
           <div class="status__main">
             <app-card [heading]="'status.history.title' | t">
               @if (timeline().length) {
@@ -120,14 +120,14 @@
               }
             </app-card>
 
-            <!-- Anhänge: gleiches Panel wie intern. Upload auch in gesperrten States
-                 (Belege/Rechnungen nachreichen, #attachments-when-locked) — nur der
-                 edit-Scope des Magic-Links zählt, nicht der State-Lock. -->
+            <!-- Attachments: same panel as internal. Upload works in locked states too
+                 (add receipts/invoices later) — only the magic-link edit scope counts,
+                 not the state lock. -->
             <app-attachments-panel [applicationId]="app.id" [canUpload]="canUploadAttachments()" />
           </div>
 
-          <!-- RECHTS: Kommentare als Chat — identisch zur internen Detailansicht (#det).
-               »own« = eigene (Antragsteller-)Nachrichten rechts, Gremium links. -->
+          <!-- RIGHT: comments as chat — identical to the internal detail view.
+               "own" = the applicant's own messages on the right, committee on the left. -->
           <aside class="status__rail status__rail--right">
             <section class="det__chat" [attr.aria-label]="'status.comments.title' | t">
               <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'status.comments.title' | t }}</header>

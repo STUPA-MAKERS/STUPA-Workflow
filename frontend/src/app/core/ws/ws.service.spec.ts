@@ -3,14 +3,14 @@ import { WsService } from './ws.service';
 import type { ServerMessage } from './ws-messages';
 import { createLocationMock, provideLocationMock } from '../../../testing/location-mock';
 
-/** Minimaler WebSocket-Mock, der Event-Listener erfasst und manuell feuert. */
+/** Minimal WebSocket mock that captures event listeners and fires them manually. */
 class MockWebSocket {
   static CONNECTING = 0;
   static OPEN = 1;
   static CLOSING = 2;
   static CLOSED = 3;
   static instances: MockWebSocket[] = [];
-  /** Initialer readyState neuer Instanzen (Default OPEN; Tests setzen CONNECTING). */
+  /** Initial readyState of new instances (default OPEN; tests set CONNECTING). */
   static startState = MockWebSocket.OPEN;
   readyState = MockWebSocket.startState;
   sent: string[] = [];
@@ -21,7 +21,7 @@ class MockWebSocket {
     MockWebSocket.instances.push(this);
   }
 
-  /** Simuliert den abgeschlossenen Handshake: OPEN + `open`-Event. */
+  /** Simulates the completed handshake: OPEN + `open` event. */
   openNow(): void {
     this.readyState = MockWebSocket.OPEN;
     this.emit('open', {});
@@ -48,8 +48,8 @@ describe('WsService', () => {
     MockWebSocket.instances = [];
     MockWebSocket.startState = MockWebSocket.OPEN;
     (globalThis as { WebSocket: unknown }).WebSocket = MockWebSocket;
-    // `LOCATION` per DI mocken (#jest30) — jsdom ≥26 lässt `window.location`
-    // nicht mehr umdefinieren. Default: http://localhost.
+    // Mock `LOCATION` via DI — jsdom ≥26 no longer lets `window.location` be
+    // redefined. Default: http://localhost.
     svc = TestBed.configureTestingModule({
       providers: [provideLocationMock(createLocationMock())],
     }).inject(WsService);
@@ -96,20 +96,20 @@ describe('WsService', () => {
   });
 
   it('queues frames sent while CONNECTING and flushes them on open', () => {
-    // Realer Socket startet im Zustand CONNECTING. Ein synchron nach dem
-    // Verbindungsaufbau gesendetes `subscribe` (LiveVoteSession-Resync) darf
-    // NICHT verworfen werden — ohne Puffer ginge es auf echtem Socket verloren.
+    // A real socket starts in state CONNECTING. A `subscribe` sent synchronously
+    // right after connecting (LiveVoteSession resync) must NOT be dropped —
+    // without the buffer it would be lost on a real socket.
     MockWebSocket.startState = MockWebSocket.CONNECTING;
     const ch = svc.connectMeeting('m-1');
     const sock = MockWebSocket.instances[0];
 
     ch.send({ type: 'subscribe' });
     ch.send({ type: 'cast', voteId: 'v1', choice: 'yes' });
-    // Vor dem Handshake darf nichts auf der Leitung sein.
+    // Nothing may be on the wire before the handshake.
     expect(sock.sent).toEqual([]);
 
     sock.openNow();
-    // Beim Öffnen werden die gepufferten Frames in Reihenfolge geflusht.
+    // On open the buffered frames are flushed in order.
     expect(sock.sent).toEqual([
       JSON.stringify({ type: 'subscribe' }),
       JSON.stringify({ type: 'cast', voteId: 'v1', choice: 'yes' }),
@@ -147,7 +147,7 @@ describe('WsService', () => {
     expect(closeSpy).toHaveBeenCalled();
   });
 
-  /** Frischer Service mit eigener `LOCATION` (Protokoll/Host pro Test). */
+  /** Fresh service with its own `LOCATION` (protocol/host per test). */
   function serviceAt(protocol: string, host: string): WsService {
     TestBed.resetTestingModule();
     return TestBed.configureTestingModule({

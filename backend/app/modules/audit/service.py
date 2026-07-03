@@ -1,15 +1,10 @@
-"""Audit-Service (T-23): append-only Schreiben + Ketten-Verifikation + Abfrage.
+"""Audit service: append-only writes, chain verification, queries.
 
-* :meth:`AuditService.record` — neuen Eintrag an die Hash-Kette hängen. Vor dem Lesen
-  des Vorgänger-Hashes wird ein **Transaktions-Advisory-Lock** genommen → konkurrierende
-  Appends serialisieren, die Kette bleibt lückenlos (kein Race auf ``prev_hash``).
-* :meth:`AuditService.verify_chain` — Kette von Anfang an nachrechnen; erkennt sowohl
-  manipulierte Felder (``hash``-Mismatch) als auch entfernte/eingefügte Zeilen
-  (``prev_hash``-Link gebrochen).
-* :meth:`AuditService.query` — gefilterte, gepagte Lesesicht (RBAC im Router).
-
-Die Service-Hook :func:`record` kapselt den Standardfall für andere Module (T-10/14/15…):
-``await record(session, actor=…, action=…, target_type=…, target_id=…, data=…)``.
+:meth:`AuditService.record` takes a transaction advisory lock before reading the
+predecessor hash, so concurrent appends serialize and the chain has no
+``prev_hash`` races. :meth:`AuditService.verify_chain` recomputes the chain from
+genesis, catching both tampered fields and removed/inserted rows. The module-level
+:func:`record` hook is the standard entry point for other modules.
 """
 
 from __future__ import annotations
@@ -28,15 +23,15 @@ from app.modules.audit.hashing import canonical_payload, compute_hash
 from app.modules.audit.models import AuditEntry
 from app.shared.paging import Page
 
-# Fixer Advisory-Lock-Schlüssel: serialisiert Ketten-Appends prozessübergreifend.
+# Fixed advisory-lock key: serializes chain appends across processes.
 _CHAIN_LOCK_KEY = 0x4155_4449_5400  # "AUDIT\0"
 
 
 def data_uuid_strings(data: object) -> set[str]:
-    """Alle UUID-förmigen String-Werte (rekursiv) aus einem ``data``-Payload sammeln.
+    """Collect all UUID-shaped string values (recursively) from a ``data`` payload.
 
-    Genutzt für die Klarnamen-Auflösung der in ``data`` eingebetteten Entity-Ids
-    (#no-uuids-in-ui). Schlüssel werden ignoriert — nur Werte zählen."""
+    Used to resolve entity ids embedded in ``data`` to display names. Keys are
+    ignored — only values count."""
     found: set[str] = set()
 
     def walk(v: object) -> None:
@@ -59,7 +54,7 @@ def data_uuid_strings(data: object) -> set[str]:
 
 @dataclass(frozen=True, slots=True)
 class ChainVerification:
-    """Ergebnis von :meth:`AuditService.verify_chain`."""
+    """Result of :meth:`AuditService.verify_chain`."""
 
     valid: bool
     checked: int
@@ -68,7 +63,7 @@ class ChainVerification:
 
 
 class AuditService:
-    """An eine ``AsyncSession`` gebundener Audit-Service."""
+    """Audit service bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -83,16 +78,16 @@ class AuditService:
         data: dict[str, Any] | None = None,
         at: datetime | None = None,
     ) -> AuditEntry:
-        """Eintrag append-only an die Kette hängen (kein Commit — Aufrufer-Transaktion).
+        """Append an entry to the chain (no commit — caller's transaction).
 
-        ``data`` darf **keine** PII-Rohwerte enthalten (nur id-Referenzen/Metadaten,
-        security.md §4) — Verantwortung der aufrufenden Stelle."""
+        ``data`` must not contain raw PII values (id references/metadata only) —
+        this is the caller's responsibility."""
         action_value = str(action)
         payload = data or {}
         stamp = at or datetime.now(UTC)
 
-        # Append serialisieren, damit `prev_hash` konsistent bleibt. Der Schlüssel ist
-        # eine feste int-Konstante (kein User-Input) → direkt eingebettet, kein Bind nötig.
+        # Serialize appends so `prev_hash` stays consistent. The key is a fixed
+        # int constant (no user input), so embedding it directly is safe.
         await self.session.execute(text(f"SELECT pg_advisory_xact_lock({_CHAIN_LOCK_KEY})"))
         prev_hash = (
             await self.session.execute(
@@ -125,13 +120,12 @@ class AuditService:
     async def revertable_flags(
         self, entries: Sequence[AuditEntry]
     ) -> dict[int, bool]:
-        """Pro Audit-Eintrag: ist er aus dem Log zurücknehmbar (#config-versioning)?
+        """Determine per entry whether it is revertable from the log.
 
-        Günstige, weitgehend statische Eigenschaft für die Liste — **keine** teuren Head-/
-        Stale-Prüfungen pro Zeile (die übernimmt der Revert beim Klick, 409 sonst).
-        Config-Changes ohne Vorgänger (erster Stand) sind nicht revertierbar; Budget-
-        Änderungen brauchen den festgehaltenen Vorzustand. Ein Batch-Lookup löst den
-        Vorgänger-Check der Config-Snapshots auf."""
+        Cheap, mostly static property for the list view — no per-row head/stale
+        checks (the actual revert enforces those with 409). Config changes without
+        a predecessor are not revertable; budget updates need the captured prior
+        state. A batch lookup resolves the config-snapshot predecessor check."""
         flags: dict[int, bool] = {}
         revision_ids: dict[int, str] = {}
         for e in entries:
@@ -139,7 +133,7 @@ class AuditService:
             rid = data.get("revisionId")
             if rid:
                 revision_ids[e.id] = str(rid)
-                flags[e.id] = False  # erst nach Vorgänger-Bestätigung True
+                flags[e.id] = False  # becomes True only after predecessor confirmation
             elif e.action == AuditAction.STATUS_CHANGE:
                 flags[e.id] = bool(data.get("fromStateId") and data.get("toStateId"))
             elif e.action in REVERTABLE_BUDGET_ACTIONS:
@@ -162,7 +156,7 @@ class AuditService:
                 try:
                     uuid_map[uuid.UUID(rid)] = eid
                 except ValueError:
-                    continue  # defensiv: revisionId ist normalerweise immer eine UUID
+                    continue  # defensive: revisionId is normally always a UUID
             if uuid_map:
                 rows = (
                     await self.session.execute(
@@ -178,10 +172,10 @@ class AuditService:
         return flags
 
     async def verify_chain(self) -> ChainVerification:
-        """Kette ab Genesis nachrechnen; erster Bruch wird gemeldet (fail-closed).
+        """Recompute the chain from genesis; the first break is reported (fail-closed).
 
-        Streamt zeilenweise (server-side cursor) statt die gesamte Kette in den Speicher
-        zu laden — auch sehr lange Audit-Logs bleiben verifizierbar."""
+        Streams row by row (server-side cursor) instead of loading the whole
+        chain into memory, so very long logs stay verifiable."""
         prev_hash: bytes | None = None
         checked = 0
         stream = await self.session.stream_scalars(
@@ -226,7 +220,7 @@ class AuditService:
         limit: int = 50,
         offset: int = 0,
     ) -> Page[AuditEntry]:
-        """Gefilterte, absteigend (neueste zuerst) gepagte Audit-Sicht."""
+        """Filtered, descending (newest first) paged audit view."""
         stmt: Select[tuple[AuditEntry]] = select(AuditEntry)
         if action is not None:
             stmt = stmt.where(AuditEntry.action == action)
@@ -267,18 +261,14 @@ class AuditService:
         before: int | None = None,
         limit: int = 50,
     ) -> tuple[list[AuditEntry], bool]:
-        """Keyset-gepagte Audit-Sicht (``id`` desc). Gibt (items, has_more) zurück.
+        """Keyset-paged audit view (``id`` desc); returns (items, has_more).
 
-        ``before`` = Keyset-Cursor (nur Einträge mit ``id < before``). Es wird
-        ``limit + 1`` gelesen, um ``has_more`` ohne separaten COUNT zu bestimmen
-        (skaliert auf sehr lange Logs).
+        ``before`` is the keyset cursor (entries with ``id < before``); reading
+        ``limit + 1`` rows determines ``has_more`` without a separate COUNT.
 
-        Hinweis (#AUD-019): bewusst KEIN Gremiums-Filter — ``audit.read`` ist eine
-        globale, plattformweite Lesesicht. Wer die Berechtigung hält, sieht alle
-        Einträge gremiumsübergreifend (die Resolver hängen anschließend PII an).
-        Falls je echtes gremiumsbeschränktes Auditing nötig wird, müssen hier UND in
-        den Resolvern die Einträge auf die ``GremiumMembership``-Menge des Aufrufers
-        eingegrenzt werden."""
+        Deliberately NO gremium filter — ``audit.read`` is a global, platform-wide
+        read view. If scoped auditing is ever needed, both this query and the
+        resolvers must be restricted to the caller's ``GremiumMembership`` set."""
         stmt: Select[tuple[AuditEntry]] = select(AuditEntry)
         if action is not None:
             stmt = stmt.where(AuditEntry.action == action)
@@ -306,10 +296,10 @@ class AuditService:
     async def resolve_actor_names(
         self, subs: Sequence[str | None]
     ) -> dict[str, str | None]:
-        """``sub`` → Klarname (``display_name`` bevorzugt, sonst ``email``).
+        """Resolve ``sub`` to a display name (``display_name`` preferred, else ``email``).
 
-        Batch-Auflösung über die ``principal``-Tabelle. Unbekannte/None-``sub`` fehlen
-        in der Map (Aufrufer fällt auf ``sub`` bzw. „System" zurück)."""
+        Batch lookup over the ``principal`` table; unknown/None subs are absent
+        from the map."""
         from app.modules.auth.models import Principal
 
         wanted = {s for s in subs if s}
@@ -327,13 +317,11 @@ class AuditService:
     async def resolve_target_labels(
         self, targets: Sequence[tuple[str | None, str | None]]
     ) -> dict[tuple[str, str], str]:
-        """``(target_type, target_id)`` → menschenlesbares Ziel-Label (Batch, #2).
+        """Resolve ``(target_type, target_id)`` to a human-readable label (batch).
 
-        Best effort für die Audit-UI: nur Typen mit Namensquelle werden aufgelöst
-        (Antragstitel, Gremium-/Rollen-/Webhook-Name, …); gelöschte Ziele oder
-        nicht-UUID-Ids fehlen in der Map — das FE fällt auf ``type:id`` zurück.
-        Keine PII über die Lesesicht hinaus: alles hier ist Principals mit
-        ``audit.read`` ohnehin über die jeweiligen Admin-Sichten zugänglich."""
+        Best effort: only types with a name source are resolved; deleted targets
+        or non-UUID ids are absent from the map. No PII beyond the read view —
+        everything here is reachable via admin views for ``audit.read`` holders."""
         by_type: dict[str, set[uuid.UUID]] = {}
         for target_type, target_id in targets:
             if not target_type or not target_id:
@@ -341,7 +329,7 @@ class AuditService:
             try:
                 by_type.setdefault(target_type, set()).add(uuid.UUID(target_id))
             except ValueError:
-                continue  # z. B. export-Dateinamen — target_id ist selbst das Label
+                continue  # e.g. export filenames — target_id is itself the label
 
         labels: dict[tuple[str, str], str] = {}
 
@@ -438,15 +426,12 @@ class AuditService:
     async def resolve_data_ids(
         self, data_dicts: Sequence[dict[str, Any] | None]
     ) -> dict[str, str]:
-        """UUIDs in den ``data``-Payloads → Klarname (Batch, #no-uuids-in-ui).
+        """Resolve UUIDs in ``data`` payloads to display names (batch).
 
-        ``data`` trägt unbenannte Entity-Referenzen (``meetingId``, ``gremiumId``,
-        ``budgetId``, ``fiscalYearId``, ``applicationId``, …) als rohe UUIDs. Da die
-        Schlüssel **nicht** typisiert sind, werden alle UUID-förmigen Werte (rekursiv)
-        gesammelt und je Tabelle per ``id IN (...)`` aufgelöst — UUIDs sind global
-        eindeutig, daher keine Kollision. Nicht auflösbare/gelöschte Ids fehlen in der
-        Map; das FE zeigt dann die rohe UUID. Keine zusätzliche PII-Exposition (alles
-        hier ist für ``audit.read``-Principals ohnehin über die Admin-Sichten sichtbar).
+        ``data`` keys are untyped, so all UUID-shaped values are collected
+        recursively and resolved per table via ``id IN (...)`` — UUIDs are
+        globally unique, so no collisions. Unresolvable/deleted ids are absent
+        from the map. No extra PII exposure beyond the admin views.
         """
         candidates: set[uuid.UUID] = set()
         for d in data_dicts:
@@ -475,7 +460,7 @@ class AuditService:
         from app.modules.livevote.models import Meeting
         from app.modules.voting.models import Vote
 
-        # Antrag: Titel steckt im JSONB-``data`` (kein Spalten-Label).
+        # Application: the title lives in the JSONB ``data`` (no label column).
         for row_id, data in (
             await self.session.execute(
                 select(Application.id, Application.data).where(
@@ -498,7 +483,7 @@ class AuditService:
             )
         )
 
-        # Mehrspaltige / abgeleitete Labels (Reihenfolge egal — ``fill`` überschreibt nie).
+        # Multi-column / derived labels (order irrelevant — ``fill`` never overwrites).
         for row_id, display_name, email in (
             await self.session.execute(
                 select(Principal.id, Principal.display_name, Principal.email).where(
@@ -538,7 +523,7 @@ class AuditService:
         return labels
 
     async def list_actors(self) -> list[tuple[str, str | None]]:
-        """Distinkte Akteure (``sub``) des Logs + aufgelöster Klarname (für Filter)."""
+        """List distinct log actors (``sub``) with resolved display names."""
         subs = (
             (
                 await self.session.execute(
@@ -565,7 +550,7 @@ async def record(
     target_id: str | None = None,
     data: dict[str, Any] | None = None,
 ) -> AuditEntry:
-    """Service-Hook für andere Module: einen Audit-Eintrag schreiben (kein Commit)."""
+    """Service hook for other modules: write one audit entry (no commit)."""
     return await AuditService(session).record(
         actor=actor,
         action=action,

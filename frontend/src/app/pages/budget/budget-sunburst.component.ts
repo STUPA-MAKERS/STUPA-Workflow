@@ -13,10 +13,10 @@ import { SimplifyPathPipe } from '@shared/budget-path';
 import type { BudgetTreeNode } from './budget-tree.api';
 import { PALETTE } from './budget-year-tree.component';
 
-/** Metriken der Übersicht (Tab-Selector im Overlay, #budget-sunburst). */
+/** Overview metrics (tab selector in the overlay). */
 export type SunburstMetric = 'allocated' | 'available' | 'expended';
 
-/** Ein annulares Segment (eine Kostenstelle auf ihrer Tiefe). */
+/** An annular segment (one cost-centre at its depth). */
 interface SunSeg {
   id: string;
   name: string;
@@ -36,11 +36,11 @@ const R_CENTER = 64;
 const R_MAX = SIZE / 2 - 8;
 
 /**
- * Interaktiver Sunburst (#budget-sunburst): radiale Ringe über den ganzen
- * Kostenstellen-Unterbaum — je weiter außen, desto tiefer die Ebene. Das
- * Zentrum zeigt die Wurzel (gewählte Kostenstelle) mit Gesamtwert; Hover
- * zeigt einen Tooltip (Name, Betrag, Anteil), Klick meldet die Kostenstelle
- * (Drilldown im Tab). Rein SVG, keine Fremd-Lib.
+ * Interactive sunburst: radial rings over the whole cost-centre subtree — the
+ * further out, the deeper the level. The centre shows the root (selected
+ * cost-centre) with its total value; hover shows a tooltip (name, amount, share),
+ * click reports the cost-centre (drilldown in the tab). Pure SVG, no third-party
+ * lib.
  */
 @Component({
   selector: 'app-budget-sunburst',
@@ -56,7 +56,7 @@ export class BudgetSunburstComponent {
   readonly root = input<BudgetTreeNode | null>(null);
   readonly fyId = input<string>('');
   readonly metric = input<SunburstMetric>('allocated');
-  /** Klick auf ein Segment (oder das Zentrum) → Kostenstellen-Id. */
+  /** Click on a segment (or the centre) -> cost-centre id. */
   readonly nodeClick = output<string>();
 
   protected readonly SIZE = SIZE;
@@ -72,8 +72,8 @@ export class BudgetSunburstComponent {
     return a ? Number(a[this.metric()]) : 0;
   }
 
-  /** Unterbaum-Wert: eigener (nicht weiterverteilter) Anteil + Σ Kinder —
-   *  robust auch wenn die Metrik mal nicht sauber zum Parent aufsummiert. */
+  /** Subtree value: own (non-distributed) share + sum of children — robust even
+   *  when the metric doesn't cleanly sum up to the parent. */
   private subtree(node: BudgetTreeNode): number {
     const children = node.children.reduce((s, c) => s + this.subtree(c), 0);
     const own = Math.max(0, this.metricOf(node) - node.children.reduce((s, c) => s + this.metricOf(c), 0));
@@ -110,8 +110,8 @@ export class BudgetSunburstComponent {
         const v = this.subtree(c);
         if (v <= 0) return;
         const childSpan = span * (v / nodeVal);
-        // Gesetzte Farbe der Kostenstelle gewinnt (wie bei den kleinen Pies);
-        // ohne eigene Farbe erbt das Segment die des Eltern-Zweigs.
+        // The cost-centre's set colour wins (like the small pies); without its own
+        // colour the segment inherits the parent branch's colour.
         const childColor = c.color ?? color ?? PALETTE[i % PALETTE.length];
         const r0 = R_CENTER + (depth - 1) * ringW;
         out.push({
@@ -152,7 +152,7 @@ export class BudgetSunburstComponent {
   }
 }
 
-/** SVG-Pfad eines annularen Segments zwischen zwei Winkeln und zwei Radien. */
+/** SVG path of an annular segment between two angles and two radii. */
 function annular(start: number, end: number, r0: number, r1: number): string {
   if (end - start >= Math.PI * 2 - 1e-6) {
     return [

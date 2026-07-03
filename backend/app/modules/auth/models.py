@@ -1,7 +1,4 @@
-"""Identität & Rechte (data-model §1 »Identität & Rechte«).
-
-Nur Tabellen-Definitionen (T-06) — keine Logik. RBAC-Auflösung/Magic-Link: T-10.
-"""
+"""Identity and access tables — definitions only, no logic."""
 
 from __future__ import annotations
 
@@ -23,7 +20,7 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class Principal(UUIDPkMixin, Base):
-    """OIDC-Subjekt (Keycloak). PII (email) bleibt hier, nicht in `data`."""
+    """OIDC subject (Keycloak). PII (email) stays here, never in audit `data`."""
 
     __tablename__ = "principal"
 
@@ -34,21 +31,19 @@ class Principal(UUIDPkMixin, Base):
     last_login: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Aktiv/deaktiviert (#30) — deaktivierte Principals dürfen sich nicht anmelden.
+    # Deactivated principals must not log in.
     active: Mapped[bool] = mapped_column(
         Boolean, server_default="true", default=True
     )
-    # Persönlicher, rotierbarer Token für das iCal-Abo (#ics). Liegt im Klartext in
-    # der Subscription-URL (`/api/calendar/{token}.ics`) — low-sensitivity (exponiert
-    # nur Sitzungstitel/-zeiten der eigenen Gremien). Rotieren widerruft die alte URL.
+    # Personal, rotatable iCal feed token. Plaintext in the subscription URL —
+    # low sensitivity (exposes only meeting titles/times of the own gremien);
+    # rotating revokes the old URL.
     calendar_token: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        # Eindeutiger Feed-Token (Lookup im iCal-Endpunkt). Bewusst ein Unique-**Index**
-        # statt einer Unique-Constraint: die Migration kann ihn symmetrisch + idempotent
-        # erzeugen/droppen (CREATE/DROP INDEX IF [NOT] EXISTS) — eine Constraint bräuchte
-        # beim Downgrade ein DROP CONSTRAINT und ließe sich nicht so sauber rückrollen.
-        # Mehrere NULLs sind erlaubt (Postgres) → Pflicht nur bei gesetztem Wert.
+        # Unique feed token. Deliberately a unique index, not a constraint: the
+        # migration can create/drop it idempotently (CREATE/DROP INDEX IF
+        # [NOT] EXISTS). Multiple NULLs are allowed (Postgres).
         Index("uq_principal_calendar_token", "calendar_token", unique=True),
     )
 
@@ -61,7 +56,7 @@ class Role(UUIDPkMixin, Base):
 
 
 class RolePermission(Base):
-    """`PK(role_id, permission)` — Permission-Strings je Rolle."""
+    """`PK(role_id, permission)` — permission strings per role."""
 
     __tablename__ = "role_permission"
 
@@ -74,7 +69,7 @@ class RolePermission(Base):
 
 
 class RoleAssignment(UUIDPkMixin, Base):
-    """Rollenzuweisung mit Gremium-Scope + Gültigkeitsfenster (Vertretung)."""
+    """Role assignment with gremium scope plus validity window (representation)."""
 
     __tablename__ = "role_assignment"
 
@@ -86,11 +81,10 @@ class RoleAssignment(UUIDPkMixin, Base):
         ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
     )
     granted_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # `delegated_by` markiert eine **Selbst-Delegation/Vertretung** (T-45, R1.5): die
-    # `sub` des Mitglieds, das eines seiner eigenen Rechte zeitlich begrenzt abgibt.
-    # Bei reinen Admin-Zuweisungen (T-24) ist es `NULL`. Anker für »eigene Delegationen
-    # auflisten/widerrufen« und für die Doppel-Stimmrechts-Sperre (Delegierender darf
-    # nach Abgabe des Stimmrechts nicht selbst abstimmen).
+    # `delegated_by` marks a self-delegation: the `sub` of the member temporarily
+    # handing over one of their own rights (`NULL` for plain admin assignments).
+    # Anchor for listing/revoking own delegations and for the double-voting block
+    # (a delegator who handed over voting rights must not vote themselves).
     delegated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     valid_from: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -102,17 +96,17 @@ class RoleAssignment(UUIDPkMixin, Base):
 
     __table_args__ = (
         Index("ix_role_assignment_principal_id", "principal_id"),
-        # Lookup »aktive ausgehende (Stimm-)Delegationen eines Mitglieds« (cast-Sperre).
+        # Lookup "active outgoing (voting) delegations of a member" (cast block).
         Index("ix_role_assignment_delegated_by", "delegated_by"),
     )
 
 
 class AuthSession(UUIDPkMixin, CreatedAtMixin, Base):
-    """Server-Session eines OIDC-Principals (security.md §2).
+    """Server session of an OIDC principal.
 
-    Der Browser bekommt nur ein signiertes, opakes `sid` im HttpOnly+Secure+
-    SameSite=Lax-Cookie — kein JWT im JS. id/refresh-Token bleiben serverseitig
-    (Refresh/Logout). Über Instanzen konsistent via gemeinsamer DB."""
+    The browser gets only a signed, opaque `sid` in an HttpOnly+Secure+
+    SameSite=Lax cookie — no JWT in JS. id/refresh tokens stay server-side
+    (refresh/logout). Consistent across instances via the shared DB."""
 
     __tablename__ = "auth_session"
 
@@ -128,15 +122,14 @@ class AuthSession(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
-    """Server-Session eines Magic-Link-Antragstellers (security.md §1).
+    """Server session of a magic-link applicant.
 
-    Gegenstück zu :class:`AuthSession` für den A-Pfad: der Browser hält nur eine
-    signierte, **opake** `sid` (HttpOnly-Cookie / Bearer); `application_id`+`scope`
-    liegen serverseitig. Damit ist ein Applicant-Token NICHT mehr allein aus
-    `SESSION_SECRET` fälschbar (es braucht eine existierende Zeile) und serverseitig
-    widerrufbar — per Logout (Zeile gelöscht) oder Kill-Switch (`revoked_at` gesetzt,
-    z. B. bei Anonymisierung). `application_id`-FK `ON DELETE CASCADE` räumt die
-    Sessions mit, wenn der Antrag selbst gelöscht wird."""
+    Counterpart to :class:`AuthSession`: the browser holds only a signed, opaque
+    `sid`; `application_id`+`scope` live server-side. An applicant token is thus
+    NOT forgeable from `SESSION_SECRET` alone (it needs an existing row) and is
+    server-side revocable — via logout (row deleted) or kill switch
+    (`revoked_at`, e.g. on anonymization). The `application_id` FK cascades on
+    application delete."""
 
     __tablename__ = "applicant_session"
 
@@ -156,7 +149,7 @@ class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class GroupMapping(UUIDPkMixin, Base):
-    """OIDC-Gruppe → Rolle (optional, scope-bar je Gremium)."""
+    """OIDC group to role mapping (optional, scopable per gremium)."""
 
     __tablename__ = "group_mapping"
 

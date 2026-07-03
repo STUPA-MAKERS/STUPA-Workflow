@@ -4,12 +4,12 @@ import { map } from 'rxjs/operators';
 import { AuthService } from './auth.service';
 
 /**
- * Startseiten-Weiche: `/` ist die öffentliche Applicant-Landeseite (ein Antrags-CTA).
- * Angemeldete Nutzer:innen haben dort nichts zu suchen → Redirect auf `/dashboard`.
+ * Home-page switch: `/` is the public applicant landing page (a single apply CTA).
+ * Logged-in users have no business there → redirect to `/dashboard`.
  *
- * Reuse von `ensureLoaded()` (einmaliger, `shareReplay`-gecachter `/me`-Probe, beim
- * App-Start gesetzt); ohne Session bleibt die Landeseite offen. Als Guard (statt
- * Redirect in der Komponente), damit die Landeseite nicht kurz aufblitzt.
+ * Reuses `ensureLoaded()` (the one-time, `shareReplay`-cached `/me` probe set at
+ * app start); without a session the landing page stays open. Done as a guard
+ * (rather than a redirect in the component) so the landing page does not flash.
  */
 export const homeRedirectGuard: CanActivateFn = () => {
   const auth = inject(AuthService);

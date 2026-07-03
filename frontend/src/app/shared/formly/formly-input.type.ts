@@ -4,11 +4,11 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 import { CurrencyInputComponent, DatepickerComponent, InputComponent } from '@stupa-makers/ui-kit';
 
 /**
- * Formly-Feldtyp `input`, der das UI-Kit-Input nutzt — Brücke zwischen der
- * Form-Definition (forms-Engine, T-11) und dem Design-System. Datumsfelder
- * (`props.type === 'date'`) rendern den a11y-fähigen {@link DatepickerComponent};
- * Währungsfelder (`props.type === 'currency'`) den {@link CurrencyInputComponent}
- * (€-Symbol + lokalisierte Formatierung) — sonst ein rohes UI-Kit-Input.
+ * Formly field type `input` that uses the UI-kit input — the bridge between the
+ * form definition (forms engine) and the design system. Date fields
+ * (`props.type === 'date'`) render the a11y-capable {@link DatepickerComponent};
+ * currency fields (`props.type === 'currency'`) the {@link CurrencyInputComponent}
+ * (€ symbol + localized formatting) — otherwise a plain UI-kit input.
  */
 @Component({
   selector: 'app-formly-input',
@@ -49,7 +49,7 @@ import { CurrencyInputComponent, DatepickerComponent, InputComponent } from '@st
   `,
 })
 export class FormlyInputType extends FieldType<FieldTypeConfig> {
-  /** `min`/`max` können numerisch deklariert sein; der Datepicker will ISO-Strings. */
+  /** `min`/`max` may be declared numeric; the datepicker wants ISO strings. */
   asString(v: unknown): string {
     return v == null ? '' : String(v);
   }

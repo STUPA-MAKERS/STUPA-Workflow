@@ -1,9 +1,9 @@
-"""OIDC / Keycloak: Authorization Code + PKCE, Confidential Client (security.md §2).
+"""OIDC / Keycloak: authorization code + PKCE, confidential client.
 
-Endpunkte werden aus dem Realm-`issuer` nach Keycloak-Konvention abgeleitet (kein
-Discovery-Roundtrip beim Start). Token-Exchange via `httpx`; `id_token` wird gegen
-das JWKS signaturgeprüft (RS256) inkl. `aud`/`iss`/`nonce`. Alle Netz-/Verify-Fehler
-werden als `OidcError` signalisiert — der Service mappt sie auf 400/503.
+Endpoints are derived from the realm `issuer` per Keycloak convention (no
+discovery roundtrip at startup). Token exchange via `httpx`; the `id_token` is
+signature-verified against the JWKS (RS256) incl. `aud`/`iss`/`nonce`. All
+network/verify failures raise `OidcError` — the service maps them to 400/503.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ _HTTP_TIMEOUT = 10.0
 
 
 class OidcError(RuntimeError):
-    """OIDC-Flow fehlgeschlagen (Netz, Token-Exchange, Signatur, Claims)."""
+    """OIDC flow failed (network, token exchange, signature, claims)."""
 
 
 @dataclass(slots=True)
@@ -37,15 +37,15 @@ class OidcClaims:
     email: str | None
     name: str | None
     groups: list[str] = field(default_factory=list)
-    # `email_verified` (OIDC-Standard-Claim). Nur ein **verifizierter** Claim darf für
-    # den E-Mail-Bootstrap (#70) zählen — sonst könnte auf einem IdP mit
-    # Self-Registration ohne Mail-Verifikation ein beliebiger Account einen Token mit
-    # `email` = Bootstrap-Admin-Adresse minten und so beim ersten Login Admin werden.
+    # `email_verified` (standard OIDC claim). Only a verified claim may count for
+    # the email bootstrap — otherwise, on an IdP with self-registration and no
+    # mail verification, any account could mint a token with `email` set to a
+    # bootstrap-admin address and become admin on first login.
     email_verified: bool = False
 
 
 def generate_pkce() -> tuple[str, str]:
-    """(`code_verifier`, `code_challenge`) — S256, ohne Padding (RFC 7636)."""
+    """Generate (`code_verifier`, `code_challenge`) — S256, unpadded (RFC 7636)."""
     verifier = secrets.token_urlsafe(_VERIFIER_BYTES)
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
@@ -65,7 +65,7 @@ def _endpoint(issuer: str, suffix: str) -> str:
 
 
 def authorization_url(settings: Settings, *, state: str, challenge: str, nonce: str) -> str:
-    """Keycloak-Authorize-URL (Auth Code + PKCE) bauen."""
+    """Build the Keycloak authorize URL (auth code + PKCE)."""
     params = {
         "client_id": settings.oidc_client_id or "",
         "response_type": "code",
@@ -80,7 +80,7 @@ def authorization_url(settings: Settings, *, state: str, challenge: str, nonce: 
 
 
 async def exchange_code(settings: Settings, *, code: str, verifier: str) -> dict[str, str]:
-    """Authorization Code → Token-Set (Confidential Client + PKCE-verifier)."""
+    """Exchange the authorization code for a token set (confidential client + PKCE verifier)."""
     data = {
         "grant_type": "authorization_code",
         "code": code,
@@ -102,9 +102,9 @@ async def exchange_code(settings: Settings, *, code: str, verifier: str) -> dict
     return payload
 
 
-# JWKS-Cache je issuer: (Ablauf-Monotonzeit, keys). TTL begrenzt IdP-Last +
-# DoS-Amplifikation; bei unbekannter `kid` wird einmalig erzwungen neu geladen
-# (Key-Rotation), danach Fehler (security.md §2/§11).
+# JWKS cache per issuer: (expiry monotonic time, keys). The TTL bounds IdP load
+# and DoS amplification; an unknown `kid` forces one reload (key rotation),
+# after that it is an error.
 _JWKS_TTL_SECONDS = 300.0
 _jwks_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
@@ -137,7 +137,7 @@ def _find_key(keys: list[dict[str, Any]], kid: object) -> dict[str, Any] | None:
 
 
 async def _signing_key(settings: Settings, id_token: str) -> Any:
-    """Passenden JWKS-Schlüssel (`kid`) als Key-Objekt für PyJWT — mit TTL-Cache."""
+    """Find the matching JWKS key (`kid`) as a PyJWT key object — TTL-cached."""
     try:
         header = jwt.get_unverified_header(id_token)
     except jwt.PyJWTError as exc:
@@ -147,7 +147,7 @@ async def _signing_key(settings: Settings, id_token: str) -> Any:
     keys = await _get_jwks(issuer, force=False)
     jwk = _find_key(keys, kid)
     if jwk is None:
-        # Cache evtl. veraltet (Rotation) → einmalig erzwungen neu laden.
+        # Cache may be stale (rotation) -> force one reload.
         keys = await _get_jwks(issuer, force=True)
         jwk = _find_key(keys, kid)
     if jwk is None:
@@ -156,7 +156,7 @@ async def _signing_key(settings: Settings, id_token: str) -> Any:
 
 
 async def verify_id_token(settings: Settings, *, id_token: str, nonce: str) -> OidcClaims:
-    """`id_token` signatur-/claim-prüfen (aud/iss/exp/nonce) → `OidcClaims`."""
+    """Verify the `id_token` signature and claims (aud/iss/exp/nonce) into `OidcClaims`."""
     key = await _signing_key(settings, id_token)
     try:
         claims = jwt.decode(
@@ -184,7 +184,7 @@ async def verify_id_token(settings: Settings, *, id_token: str, nonce: str) -> O
 
 
 def end_session_url(settings: Settings, *, id_token: str | None) -> str | None:
-    """Keycloak-Logout-URL (optional id_token_hint + post_logout_redirect)."""
+    """Build the Keycloak logout URL (optional id_token_hint + post_logout_redirect)."""
     if not settings.oidc_issuer:
         return None
     params: dict[str, str] = {}

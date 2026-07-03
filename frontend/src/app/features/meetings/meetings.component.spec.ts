@@ -20,7 +20,7 @@ const MEETING: MeetingOutWire = {
   id: 'm-1',
   title: 'StuPa-Sitzung',
   status: 'live',
-  // Datum/Uhrzeit sind Pflicht (Settings-Dialog speichert sonst nicht) — wie eine echte Sitzung.
+  // Date/time are required (the settings dialog won't save otherwise) — like a real meeting.
   date: '2026-06-12',
   startTime: '17:00',
   endTime: null,
@@ -57,9 +57,9 @@ const MEETING: MeetingOutWire = {
   createdAt: '2026-06-12T17:00:00Z',
 };
 
-/** Domänen-Form (alle Felder Pflicht) für Stellen, die `Meeting` statt `MeetingOutWire`
- *  erwarten (z. B. `meeting.set` / `openSettings`) — sonst meckert tsc über die
- *  optionalen Wire-Felder. Inhaltlich identisch zur `MEETING`-Fixture. */
+/** Domain form (all fields required) for places expecting `Meeting` instead of
+ *  `MeetingOutWire` (e.g. `meeting.set` / `openSettings`) — else tsc complains about
+ *  the optional wire fields. Content-identical to the `MEETING` fixture. */
 const MEETING_MODEL: Meeting = {
   id: 'm-1',
   title: 'StuPa-Sitzung',
@@ -105,7 +105,7 @@ const PROTOCOL: ProtocolOutWire = {
   sentAt: null,
 };
 
-/** Fake-WsService, der einen steuerbaren Message-Strom liefert. */
+/** Fake WsService that provides a controllable message stream. */
 class FakeWs {
   readonly subject = new Subject<ServerMessage>();
   sent: unknown[] = [];
@@ -140,7 +140,7 @@ async function setup(
     gremien?: { id: string; name: string }[];
     meetings?: MeetingOutWire[];
     userId?: string | null;
-    /** Initiale Timeline-Requests NICHT automatisch beantworten (Test flusht selbst). */
+    /** Do NOT auto-answer the initial timeline requests (the test flushes itself). */
     skipTimelineFlush?: boolean;
   } = {},
 ) {
@@ -164,9 +164,9 @@ async function setup(
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // Gremien-Dropdown (#68) lädt beim Start `/gremien` (nur mit meeting.manage).
+  // Committee dropdown loads `/gremien` at start (only with meeting.manage).
   http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush(opts.gremien ?? []));
-  // Übersichts-Route lädt die Timeline (#104) — je eine Cursor-Seite past/upcoming.
+  // Overview route loads the timeline — one cursor page each past/upcoming.
   const isPast = (m: MeetingOutWire) => m.status === 'closed';
   if (!opts.skipTimelineFlush) {
     http
@@ -180,7 +180,7 @@ async function setup(
   return { ...view, http, ws, navigate };
 }
 
-/** Meeting + (Auto-)Protokoll + Anwesenheit + Tagesordnung laden — alle Requests beantworten. */
+/** Load meeting + (auto) protocol + attendance + agenda — answer all requests. */
 function flushLoad(http: HttpTestingController): void {
   http.expectOne('/api/meetings/m-1').flush(MEETING);
   http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
@@ -190,8 +190,8 @@ function flushLoad(http: HttpTestingController): void {
   flushDelegationContext(http);
 }
 
-/** Vertretungs-Karte (#delegation-rework): Sitzungs-Kontext neutral beantworten
- *  (Feature im Test-Gremium deaktiviert → Karte unsichtbar). */
+/** Delegation card: answer the meeting context neutrally (the feature is disabled
+ *  in the test committee → the card is hidden). */
 function flushDelegationContext(http: HttpTestingController): void {
   http
     .match((r) => r.url.endsWith('/api/delegations/meetings/m-1/context'))
@@ -225,7 +225,7 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText('Sitzungssteuerung')).toBeInTheDocument();
     expect(screen.getByText('Antrag A')).toBeInTheDocument();
     expect(screen.getByText('Antrag B')).toBeInTheDocument();
-    // Die Vertretungs-Karte lädt ihren Kontext erst nach dem Rendern — nachflushen.
+    // The delegation card loads its context only after rendering — flush again.
     flushDelegationContext(http);
     http.verify();
   });
@@ -253,7 +253,7 @@ describe('MeetingsComponent', () => {
   it('sets the active application via PATCH', async () => {
     const { http } = await setup();
     flushLoad(http);
-    // „Aktiv setzen" am zweiten (noch nicht aktiven) Vote.
+    // "Set active" on the second (not-yet-active) vote.
     const buttons = await screen.findAllByRole('button', { name: /Aktiv setzen/i });
     await userEvent.click(buttons[buttons.length - 1]);
     const req = http.expectOne('/api/meetings/m-1');
@@ -272,21 +272,21 @@ describe('MeetingsComponent', () => {
     ]);
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
 
-    // Schließen ist unwiderruflich: Toolbar-Button öffnet den Bestätigungs-Dialog,
-    // bestätigen schließt die Sitzung (PATCH status) und finalisiert implizit.
+    // Closing is irreversible: the toolbar button opens the confirmation dialog,
+    // confirming closes the meeting (PATCH status) and finalizes implicitly.
     await userEvent.click(await screen.findByRole('button', { name: 'Schließen' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Sitzung schließen' }));
     const closeReq = http.expectOne('/api/meetings/m-1');
     expect(closeReq.request.method).toBe('PATCH');
     expect(closeReq.request.body).toEqual({ status: 'closed' });
     closeReq.flush({ ...MEETING, status: 'closed' });
-    // Erst werden die TOP-Texte zum Protokoll-Markdown zusammengesetzt (PATCH) …
+    // First the TOP texts are assembled into the protocol markdown (PATCH) …
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
-    // Top-level `#` ohne „TOP n:"-Präfix — pytex nummeriert die TOPs selbst (#pdf).
+    // Top-level `#` without a "TOP n:" prefix — pytex numbers the TOPs itself.
     expect(saveReq.request.body.markdown).toContain('# Begrüßung');
     saveReq.flush(PROTOCOL);
-    // … danach finalisiert/gerendert.
+    // … then finalized/rendered.
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
     finReq.flush({ ...PROTOCOL, status: 'final', pdfUrl: 'https://example/p.pdf' });
@@ -295,7 +295,7 @@ describe('MeetingsComponent', () => {
   });
 
   it('offers separate internal + public PDF links when a redacted variant exists', async () => {
-    // Nicht-öffentliche TOPs ⇒ Backend liefert beide URLs (#PII-Re-Add).
+    // Non-public TOPs ⇒ the backend returns both URLs.
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush(MEETING);
     http.expectOne('/api/meetings/m-1/protocol').flush({
@@ -316,7 +316,7 @@ describe('MeetingsComponent', () => {
   });
 
   it('offers a single generic PDF link when nothing is redacted', async () => {
-    // Keine nicht-öffentlichen TOPs ⇒ nur ein PDF (publicPdfUrl null) — zugleich intern & öffentlich.
+    // No non-public TOPs ⇒ only one PDF (publicPdfUrl null) — both internal & public.
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush(MEETING);
     http.expectOne('/api/meetings/m-1/protocol').flush({
@@ -339,7 +339,7 @@ describe('MeetingsComponent', () => {
   it('marks non-public TOPs with a NÖ badge once the meeting is closed and finalized', async () => {
     const { http, container } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
-    // Finalisiert ⇒ Editor locked ⇒ NÖ-Checkbox weg, das Badge übernimmt die Anzeige.
+    // Finalized ⇒ editor locked ⇒ the non-public checkbox is gone; the badge takes over.
     http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final' });
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([
@@ -353,7 +353,7 @@ describe('MeetingsComponent', () => {
     const noe = Array.from(container.querySelectorAll('app-badge')).filter(
       (b) => b.textContent?.trim() === 'NÖ',
     );
-    expect(noe).toHaveLength(1); // nur der nicht-öffentliche TOP, nicht der öffentliche
+    expect(noe).toHaveLength(1); // only the non-public TOP, not the public one
   });
 
   it('shows no NÖ badge while the meeting is still live', async () => {
@@ -389,7 +389,7 @@ describe('MeetingsComponent', () => {
 
   it('retries a failed finalize via the toolbar repeat button', async () => {
     const { http } = await setup();
-    // Sitzung schon geschlossen, Protokoll wieder Entwurf ⇒ Render fehlgeschlagen.
+    // Meeting already closed, protocol back to draft ⇒ render failed.
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -399,7 +399,7 @@ describe('MeetingsComponent', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Finalisieren & versenden' }),
     );
-    // finalize() speichert erst das zusammengesetzte Markdown, dann POST /finalize.
+    // finalize() first saves the assembled markdown, then POST /finalize.
     http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
@@ -437,21 +437,21 @@ describe('MeetingsComponent', () => {
       id: null,
       gremien: [{ id: 'g-1', name: 'StuPa' }],
     });
-    // Anlegen über einen 2-Schritt-Dialog (#27): öffnen.
+    // Create via a 2-step dialog: open it.
     await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
-    // Schritt 1: Gremium wählen (lädt das Protokollant-Roster) + Pflicht-Termin.
-    // Im Dialog suchen: das Pflicht-Label trägt ein „*", und die Suchleiste der
-    // Übersicht erwähnt „Gremium" ebenfalls — beides macht eine globale Suche mehrdeutig.
+    // Step 1: choose committee (loads the minute-taker roster) + required date.
+    // Search within the dialog: the required label carries a "*", and the overview's
+    // search bar also mentions "Gremium" — both make a global search ambiguous.
     const dialog = await screen.findByRole('dialog');
     await userEvent.selectOptions(within(dialog).getByLabelText(/Gremium/), 'g-1');
     http.expectOne((r) => r.url.endsWith('/gremien/g-1/meeting-members')).flush([]);
-    // Datum/Uhrzeit über die Signals setzen — Datepicker/Time-Input parsen Freitext,
-    // was sich per userEvent kaum stabil tippen lässt.
+    // Set date/time via the signals — the datepicker/time input parse free text,
+    // which is hard to type stably via userEvent.
     fixture.componentInstance.newDate.set('2026-07-01');
     fixture.componentInstance.newTime.set('17:00');
     fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Weiter' }));
-    // Schritt 2: Titel überschreiben (wird sonst aus Gremium + Datum vorbelegt).
+    // Step 2: override the title (otherwise prefilled from committee + date).
     const input = await screen.findByLabelText('Titel');
     await userEvent.clear(input);
     await userEvent.type(input, 'Neue Sitzung');
@@ -467,7 +467,7 @@ describe('MeetingsComponent', () => {
       protokollantId: null,
     });
     req.flush({ ...MEETING, title: 'Neue Sitzung', protocolId: null });
-    // Wiederauffindbarkeit: nach dem Anlegen auf `/meetings/{id}` navigieren.
+    // Rediscoverability: navigate to `/meetings/{id}` after creation.
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
   });
 
@@ -477,7 +477,7 @@ describe('MeetingsComponent', () => {
       meetings: [{ ...MEETING, title: 'Vergangene Sitzung', status: 'closed' }],
     });
     expect(await screen.findByText('Vergangene Sitzung')).toBeInTheDocument();
-    // Die Timeline-Karte selbst ist die Öffnen-Affordanz (role=button, aria „Öffnen: …").
+    // The timeline card itself is the open affordance (role=button with an "open" aria-label).
     await userEvent.click(screen.getByRole('button', { name: /Öffnen/ }));
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
   });
@@ -485,7 +485,7 @@ describe('MeetingsComponent', () => {
   it('closes the session via PATCH status after confirming', async () => {
     const { http } = await setup();
     flushLoad(http);
-    // Toolbar "Schließen" öffnet den unwiderruflichen Bestätigungs-Dialog.
+    // The toolbar close button opens the irreversible confirmation dialog.
     await userEvent.click(await screen.findByRole('button', { name: 'Schließen' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Sitzung schließen' }));
     const req = http.expectOne('/api/meetings/m-1');
@@ -504,8 +504,8 @@ describe('MeetingsComponent', () => {
   });
 
   it('offers no on-demand protocol button — the protocol is created on start', async () => {
-    // #protocol-on-start: das Protokoll entsteht ausschließlich beim Start der Sitzung;
-    // ein manueller »Protokoll anlegen«-Button existiert nicht mehr.
+    // The protocol is created only at meeting start; a manual "create protocol"
+    // button no longer exists.
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, protocolId: null });
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -522,12 +522,12 @@ describe('MeetingsComponent', () => {
     flushLoad(http);
     const editBtns = await screen.findAllByRole('button', { name: /Sitzung bearbeiten/i });
     await userEvent.click(editBtns[0]);
-    // openSettings lädt das Roster erneut (Protokollant-Optionen).
+    // openSettings reloads the roster (minute-taker options).
     http.expectOne('/api/meetings/m-1/attendance').flush([
       { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false },
     ]);
-    // Exaktes Label: der Start-Button trägt jetzt eine aria-label „Protokollant zuweisen …",
-    // an der ein /Protokollant/-Regex sonst mehrdeutig wird.
+    // Exact label: the start button now carries an aria-label "Protokollant zuweisen …",
+    // which would otherwise make a /Protokollant/ regex ambiguous.
     const select = await screen.findByLabelText('Protokollant');
     await screen.findByRole('option', { name: 'Max P' });
     await userEvent.selectOptions(select, 'pr-1');
@@ -536,13 +536,13 @@ describe('MeetingsComponent', () => {
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body.protokollantId).toBe('pr-1');
     req.flush({ ...MEETING, protokollantId: 'pr-1', protokollantName: 'Max P' });
-    // Name erscheint nach dem Speichern (Karte/Toolbar).
+    // The name appears after saving (card/toolbar).
     expect(await screen.findByText(/Max P/)).toBeInTheDocument();
   });
 
   it('gives non-protokollants the live read/vote view once a protokollant is assigned', async () => {
-    // Sitzung mit zugewiesenem Protokollanten (jemand anderes) — der angemeldete
-    // Nutzer ist NICHT der Protokollant ⇒ Live-/Mitstimm-Ansicht, kein Manager-View.
+    // Meeting with an assigned minute-taker (someone else) — the logged-in user
+    // is NOT the minute-taker ⇒ live/voting view, not the manager view.
     const assigned: MeetingOutWire = {
       ...MEETING,
       canControl: false,
@@ -564,9 +564,9 @@ describe('MeetingsComponent', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Instanz-getriebene Tests: rufen die öffentlichen Methoden direkt auf und
-// prüfen Signals + HTTP. Erreicht die Verzweigungen, die das DOM allein nicht
-// auslöst (Fehlerpfade, Such-Debounce, Drag&Drop, WS-Nachrichten, Helfer).
+// Instance-driven tests: call the public methods directly and check signals +
+// HTTP. Reaches the branches the DOM alone does not trigger (error paths,
+// search debounce, drag & drop, WS messages, helpers).
 // ---------------------------------------------------------------------------
 type Cmp = MeetingsComponent;
 
@@ -580,7 +580,7 @@ const AGENDA_ITEM = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-/** Eine geladene Detail-Sitzung herstellen und die Instanz zurückgeben. */
+/** Set up a loaded detail meeting and return the instance. */
 async function loaded(opts: Parameters<typeof setup>[0] = {}) {
   const view = await setup(opts);
   view.http.expectOne('/api/meetings/m-1').flush(MEETING);
@@ -650,7 +650,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('labels vote options, falling back to the raw key when unknown', async () => {
       const { cmp } = await loaded();
-      expect(cmp.voteOptionLabel('yes')).not.toBe('yes'); // übersetzt
+      expect(cmp.voteOptionLabel('yes')).not.toBe('yes'); // translated
       expect(cmp.voteOptionLabel('weird-option')).toBe('weird-option');
     });
 
@@ -689,7 +689,7 @@ describe('MeetingsComponent — methods', () => {
         closesAt: null, voted: 0, present: 0, revealed: true, failedReason: null,
       });
       expect(fromCounts).toEqual(['a', 'b']);
-      // Weder Optionen noch Counts → leere Liste (deckt den ?? {} Fallback).
+      // Neither options nor counts → empty list (covers the ?? {} fallback).
       const empty = cmp.voteOptionsFor({
         id: 'v', applicationId: null, agendaItemId: null, title: null, question: null,
         options: [], status: 'open', result: null, counts: null, leading: null,
@@ -701,9 +701,9 @@ describe('MeetingsComponent — methods', () => {
     it('groups votes by TOP and collects loose votes', async () => {
       const { cmp } = await loaded();
       expect(cmp.votesForTop('app-1')).toEqual([]); // votesForTop matches agendaItemId
-      // MEETING-Votes haben keine agendaItemId → alle „lose".
+      // MEETING votes have no agendaItemId → all "loose".
       expect(cmp.looseVotes().length).toBe(2);
-      // Einen Vote an einen TOP binden → votesForTop trifft, looseVotes schrumpft.
+      // Bind a vote to a TOP → votesForTop matches, looseVotes shrinks.
       cmp.meeting.set({
         ...cmp.meeting()!,
         votes: [
@@ -717,9 +717,9 @@ describe('MeetingsComponent — methods', () => {
 
     it('selects the beamer vote: open first, else last closed, else null', async () => {
       const { cmp } = await loaded();
-      // MEETING hat einen offenen Vote (v-1).
+      // MEETING has one open vote (v-1).
       expect(cmp.beamerVote()?.id).toBe('v-1');
-      // Keine offenen Votes → letzter geschlossener.
+      // No open votes → last closed one.
       cmp.meeting.set({
         ...cmp.meeting()!,
         votes: [
@@ -728,7 +728,7 @@ describe('MeetingsComponent — methods', () => {
         ],
       });
       expect(cmp.beamerVote()?.id).toBe('c2');
-      // Weder offen noch geschlossen → null.
+      // Neither open nor closed → null.
       cmp.meeting.set({
         ...cmp.meeting()!,
         votes: [{ ...cmp.meeting()!.votes[0], id: 'p', status: 'pending' }],
@@ -744,7 +744,7 @@ describe('MeetingsComponent — methods', () => {
       ] as never);
       const opts = cmp.assignableOptions();
       expect(opts[0].label).toBe('Antrag A (Abstimmung)');
-      // Kein Titel → Fallback auf die applicationId, kein State → kein Suffix.
+      // No title → fall back to the applicationId, no state → no suffix.
       expect(opts[1]).toEqual({ value: 'app-2', label: 'app-2' });
     });
 
@@ -756,11 +756,11 @@ describe('MeetingsComponent — methods', () => {
         { principalId: 'pr-3', displayName: '', email: '' },
       ] as never);
       const opts = cmp.createProtokollantOptions();
-      // Erste Option ist immer „niemand".
+      // First option is always "nobody".
       expect(opts[0].value).toBe('');
       expect(opts[1]).toEqual({ value: 'pr-1', label: 'Max' });
-      expect(opts[2]).toEqual({ value: 'pr-2', label: 'b@x' }); // displayName leer → email
-      expect(opts[3]).toEqual({ value: 'pr-3', label: 'pr-3' }); // beide leer → id
+      expect(opts[2]).toEqual({ value: 'pr-2', label: 'b@x' }); // displayName empty → email
+      expect(opts[3]).toEqual({ value: 'pr-3', label: 'pr-3' }); // both empty → id
     });
   });
 
@@ -781,7 +781,7 @@ describe('MeetingsComponent — methods', () => {
         const { cmp, http } = await loaded();
         cmp.onTopBodyChange('t-1', 'Neuer Text');
         expect(cmp.saveState()).toBe('idle');
-        // Erneuter Aufruf vor Ablauf → Timer zurücksetzen (deckt clearTimeout-Zweig).
+        // Called again before it fires → reset the timer (covers the clearTimeout branch).
         cmp.onTopBodyChange('t-1', 'Neuer Text 2');
         jest.advanceTimersByTime(1000);
         expect(cmp.saveState()).toBe('saving');
@@ -813,7 +813,7 @@ describe('MeetingsComponent — methods', () => {
     it('does nothing on body change without a loaded meeting', async () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
-      cmp.onTopBodyChange('t-1', 'X'); // meeting() === null → früher return
+      cmp.onTopBodyChange('t-1', 'X'); // meeting() === null → early return
       expect(cmp.saveState()).toBe('idle');
     });
 
@@ -825,7 +825,7 @@ describe('MeetingsComponent — methods', () => {
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual({ applicationId: 'app-9' });
       req.flush([AGENDA_ITEM({ applicationId: 'app-9' })]);
-      // refreshAssignable lädt erneut.
+      // refreshAssignable reloads.
       http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
       expect(cmp.agendaPick()).toBe('');
       expect(cmp.savingAgenda()).toBe(false);
@@ -834,7 +834,7 @@ describe('MeetingsComponent — methods', () => {
     it('ignores addToAgenda without a pick / while saving', async () => {
       const { cmp, http } = await loaded();
       cmp.agendaPick.set('');
-      cmp.addToAgenda(); // kein appId → return
+      cmp.addToAgenda(); // no appId → return
       cmp.agendaPick.set('app-9');
       cmp.savingAgenda.set(true);
       cmp.addToAgenda(); // savingAgenda → return
@@ -862,7 +862,7 @@ describe('MeetingsComponent — methods', () => {
     it('ignores addFreetext when empty and handles its error', async () => {
       const { cmp, http } = await loaded();
       cmp.agendaFreetext.set('   ');
-      cmp.addFreetext(); // leer → return
+      cmp.addFreetext(); // empty → return
       cmp.agendaFreetext.set('Sonstiges');
       cmp.addFreetext();
       http.expectOne('/api/meetings/m-1/agenda').flush(null, { status: 500, statusText: 'e' });
@@ -954,11 +954,11 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http } = await loaded();
       cmp.startRename(AGENDA_ITEM({ title: 'Alt' }) as never);
       cmp.renameDraft.set('   ');
-      cmp.renameTop(AGENDA_ITEM({ title: 'Alt' }) as never); // leer → cancel
+      cmp.renameTop(AGENDA_ITEM({ title: 'Alt' }) as never); // empty → cancel
       expect(cmp.renamingTopId()).toBeNull();
       cmp.startRename(AGENDA_ITEM({ title: 'Alt' }) as never);
       cmp.renameDraft.set('Alt');
-      cmp.renameTop(AGENDA_ITEM({ title: 'Alt' }) as never); // unverändert → cancel
+      cmp.renameTop(AGENDA_ITEM({ title: 'Alt' }) as never); // unchanged → cancel
       expect(cmp.renamingTopId()).toBeNull();
       http.verify();
     });
@@ -982,7 +982,7 @@ describe('MeetingsComponent — methods', () => {
         AGENDA_ITEM({ id: 't-3', position: 2 }),
       ] as never);
       cmp.onTopDragStart(0);
-      cmp.onTopDrop(2); // t-1 ans Ende
+      cmp.onTopDrop(2); // t-1 to the end
       expect(cmp.agenda().map((a) => a.id)).toEqual(['t-2', 't-3', 't-1']);
       const req = http.expectOne('/api/meetings/m-1/agenda/order');
       expect(req.request.method).toBe('PUT');
@@ -1053,7 +1053,7 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http } = await loaded();
       cmp.setAttendance(
         { principalId: 'pr-2', displayName: 'X', email: null, status: 'present', source: null, isSelf: false } as never,
-        'present', // unverändert → return
+        'present', // unchanged → return
       );
       cmp.savingAttendance.set(true);
       cmp.setAttendance(
@@ -1082,7 +1082,7 @@ describe('MeetingsComponent — methods', () => {
       const req = http.expectOne('/api/meetings/m-1');
       expect(req.request.body).toEqual({ status: 'live' });
       req.flush({ ...MEETING, status: 'live', protocolId: 'p-1' });
-      // canWrite + protocolId → refreshProtocol nachladen.
+      // canWrite + protocolId → reload via refreshProtocol.
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     });
 
@@ -1090,7 +1090,7 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, status: 'planned', protokollantId: null });
       cmp.setStatus('live');
-      http.verify(); // kein PATCH
+      http.verify(); // no PATCH
     });
 
     it('refuses to change a closed session', async () => {
@@ -1127,7 +1127,7 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http } = await loaded();
       cmp.setActive('app-7');
       http.expectOne('/api/meetings/m-1').flush(null, { status: 500, statusText: 'e' });
-      expect(cmp.meeting()?.activeApplicationId).toBe('app-1'); // unverändert
+      expect(cmp.meeting()?.activeApplicationId).toBe('app-1'); // unchanged
     });
 
     it('does nothing on setActive without a meeting', async () => {
@@ -1161,7 +1161,7 @@ describe('MeetingsComponent — methods', () => {
     it('ignores savePlannedDate without a date / meeting / while saving', async () => {
       const { cmp, http } = await loaded();
       cmp.planDate.set('');
-      cmp.savePlannedDate(); // kein Datum → return
+      cmp.savePlannedDate(); // no date → return
       cmp.planDate.set('2026-07-01');
       cmp.savingDate.set(true);
       cmp.savePlannedDate(); // savingDate → return
@@ -1174,7 +1174,7 @@ describe('MeetingsComponent — methods', () => {
       const closeReq = http.expectOne('/api/meetings/m-1');
       expect(closeReq.request.body).toEqual({ status: 'closed' });
       closeReq.flush({ ...MEETING, status: 'closed' });
-      // protocol (draft, nicht isLocked) → finalize: erst Markdown-PATCH …
+      // protocol (draft, not isLocked) → finalize: first markdown PATCH …
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'final' });
     });
@@ -1184,7 +1184,7 @@ describe('MeetingsComponent — methods', () => {
       cmp.protocol.set({ ...cmp.protocol()!, status: 'final', isFinal: true, isLocked: true });
       cmp.closeMeeting();
       http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
-      http.verify(); // kein finalize
+      http.verify(); // no finalize
     });
 
     it('handles a closeMeeting error and guards against re-entry while finalizing', async () => {
@@ -1225,7 +1225,7 @@ describe('MeetingsComponent — methods', () => {
       http
         .expectOne('/api/votes/v-2/open')
         .flush({ detail: 'Antrag nicht im vote-State' }, { status: 409, statusText: 'Conflict' });
-      // voteActionFailed lädt die Sitzung neu.
+      // voteActionFailed reloads the meeting.
       http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'live' });
     });
 
@@ -1245,11 +1245,11 @@ describe('MeetingsComponent — methods', () => {
 
     it('decides whether a TOP may get another vote', async () => {
       const { cmp } = await loaded();
-      // Freitext-TOP: immer erlaubt.
+      // Free-text TOP: always allowed.
       expect(cmp.canAddVote(AGENDA_ITEM({ applicationId: null }) as never)).toBe(true);
-      // Antrags-TOP ohne Vote (votesForTop matcht agendaItemId) → erlaubt.
+      // Application TOP without a vote (votesForTop matches agendaItemId) → allowed.
       expect(cmp.canAddVote(AGENDA_ITEM({ id: 't-x', applicationId: 'app-1' }) as never)).toBe(true);
-      // Antrags-TOP mit gebundenem Vote → gesperrt.
+      // Application TOP with a bound vote → locked.
       cmp.meeting.set({
         ...cmp.meeting()!,
         votes: [{ ...cmp.meeting()!.votes[0], agendaItemId: 't-x' }],
@@ -1387,14 +1387,14 @@ describe('MeetingsComponent — methods', () => {
       const saveReq = http.expectOne('/api/protocols/p-1');
       expect(saveReq.request.body.markdown).toContain('# Antrag');
       expect(saveReq.request.body.markdown).toContain(':::antrag{#app-1}');
-      expect(saveReq.request.body.markdown).toContain('Tagesordnungspunkt'); // leerer Titel-Fallback
+      expect(saveReq.request.body.markdown).toContain('Tagesordnungspunkt'); // empty title fallback
       saveReq.flush(PROTOCOL);
-      // Async-Pfad: finalize gibt rendering zurück → Poll-Warteschleife.
+      // Async path: finalize returns rendering → poll loop.
       jest.useFakeTimers();
       try {
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
         expect(cmp.finalizing()).toBe(false);
-        // watchRendering pollt nach 4s erneut.
+        // watchRendering polls again after 4s.
         jest.advanceTimersByTime(4000);
         http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
       } finally {
@@ -1430,7 +1430,7 @@ describe('MeetingsComponent — methods', () => {
     it('ignores finalize without a protocol / when locked / while saving a TOP', async () => {
       const { cmp, http } = await loaded();
       cmp.protocol.set(null);
-      cmp.finalize(); // kein Protokoll → return
+      cmp.finalize(); // no protocol → return
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: true } as never);
       cmp.finalize(); // isLocked → return
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
@@ -1498,7 +1498,7 @@ describe('MeetingsComponent — methods', () => {
       cmp.settingsTime.set('17:00');
       cmp.saveSettings(); // settingsLocked → return
       expect(cmp.savingSettings()).toBe(false);
-      // Nun nicht geschlossen, aber Datum fehlt.
+      // Now not closed, but the date is missing.
       cmp.openSettings({ ...cmp.meeting()!, status: 'planned' });
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
       cmp.settingsDate.set('');
@@ -1616,15 +1616,15 @@ describe('MeetingsComponent — methods', () => {
       const cmp = fixture.componentInstance as Cmp;
       cmp.onCreateGremiumChange('g-1');
       http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
-      expect(cmp.createStep1Valid()).toBe(false); // Datum/Zeit fehlen
-      cmp.goToCreateStep2(); // invalid → bleibt auf 1
+      expect(cmp.createStep1Valid()).toBe(false); // date/time missing
+      cmp.goToCreateStep2(); // invalid → stays on 1
       expect(cmp.createStep()).toBe(1);
       cmp.newDate.set('2026-07-01');
       cmp.newTime.set('17:00');
       expect(cmp.createStep1Valid()).toBe(true);
       cmp.goToCreateStep2();
       expect(cmp.createStep()).toBe(2);
-      expect(cmp.newTitle().length).toBeGreaterThan(0); // vorbelegt
+      expect(cmp.newTitle().length).toBeGreaterThan(0); // prefilled
       cmp.backToCreateStep1();
       expect(cmp.createStep()).toBe(1);
     });
@@ -1636,16 +1636,16 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
       cmp.newDate.set('2026-07-01');
       cmp.newTime.set('17:00');
-      cmp.newTitle.set('Mein Titel'); // manuell gesetzt
+      cmp.newTitle.set('Mein Titel'); // set manually
       cmp.goToCreateStep2();
-      expect(cmp.newTitle()).toBe('Mein Titel'); // unangetastet
+      expect(cmp.newTitle()).toBe('Mein Titel'); // untouched
     });
 
     it('resets protokollant when changing the gremium with no id', async () => {
       const { fixture, http } = await setup({ id: null, gremien: [{ id: 'g-1', name: 'StuPa' }] });
       const cmp = fixture.componentInstance as Cmp;
       cmp.newProtokollant.set('pr-1');
-      cmp.onCreateGremiumChange(''); // kein gremiumId → keine member-Anfrage
+      cmp.onCreateGremiumChange(''); // no gremiumId → no member request
       expect(cmp.newProtokollant()).toBe('');
       expect(cmp.createMembers()).toEqual([]);
       http.verify();
@@ -1675,7 +1675,7 @@ describe('MeetingsComponent — methods', () => {
     it('ignores create with missing fields or while creating', async () => {
       const { fixture, http } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
-      cmp.create({ preventDefault() {} } as Event); // alles leer → return
+      cmp.create({ preventDefault() {} } as Event); // all empty → return
       cmp.newTitle.set('T');
       cmp.newGremiumId.set('g-1');
       cmp.newDate.set('2026-07-01');
@@ -1712,8 +1712,8 @@ describe('MeetingsComponent — methods', () => {
         meetings: [],
       });
       const cmp = fixture.componentInstance as Cmp;
-      // Standard-Auth: gremien=[] → keine Übersicht; per Signal-Override simulieren wäre
-      // aufwändig. Hier prüfen wir die Computed-Logik über die Flags.
+      // Standard auth: gremien=[] → no overview; simulating via a signal override
+      // would be costly. Here we check the computed logic via the flags.
       expect(cmp.showForbidden()).toBe(true);
       expect(cmp.showOverview()).toBe(false);
     });
@@ -1731,7 +1731,7 @@ describe('MeetingsComponent — methods', () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       expect(cmp.meeting()).toBeNull();
-      // canManage fällt auf canManageAny (true, da meeting.manage) zurück.
+      // canManage falls back to canManageAny (true, since meeting.manage).
       expect(cmp.canManage()).toBe(true);
       expect(cmp.canWrite()).toBe(false);
       expect(cmp.canManageVotes()).toBe(false);
@@ -1745,7 +1745,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.isFollower()).toBe(true);
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: true });
       expect(cmp.isFollower()).toBe(false);
-      // Ohne gewählten Protokollanten greift das Schreib-/Verwaltungs-Gate.
+      // Without a selected minute-taker the write/manage gate applies.
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: null, canWrite: false, canManage: false });
       expect(cmp.isFollower()).toBe(true);
       cmp.meeting.set(null);
@@ -1755,7 +1755,7 @@ describe('MeetingsComponent — methods', () => {
     it('loads more upcoming + past pages on scroll near the edges', async () => {
       const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
       const cmp = fixture.componentInstance as Cmp;
-      // initiale Timeline mit nextCursor → hasMore true.
+      // initial timeline with nextCursor → hasMore true.
       const reqs = http.match((r) => r.url.endsWith('/meetings/timeline'));
       reqs.forEach((req) => {
         const past = req.request.params.get('direction') === 'past';
@@ -1764,7 +1764,7 @@ describe('MeetingsComponent — methods', () => {
       fixture.detectChanges();
       expect(cmp.upcomingHasMore()).toBe(true);
       expect(cmp.pastHasMore()).toBe(true);
-      // Unterer Rand (scrollTop hoch → kein Past-Trigger; Boden erreicht → Upcoming).
+      // Bottom edge (scrollTop high → no past trigger; bottom reached → upcoming).
       const el = { scrollTop: 200, scrollHeight: 1000, clientHeight: 800 } as HTMLElement;
       cmp.onTimelineScroll(el);
       const upReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('direction') === 'upcoming');
@@ -1781,14 +1781,14 @@ describe('MeetingsComponent — methods', () => {
         req.flush({ items: past ? [{ ...MEETING, id: 'p1', status: 'closed' }] : [], nextCursor: past ? 'c1' : null });
       });
       fixture.detectChanges();
-      // Veränderliches Fake-Element: nach dem Anhängen wächst die Höhe, der rAF-Callback
-      // korrigiert dann scrollTop um die Höhendifferenz (Zeile 378).
+      // Mutable fake element: after appending, its height grows and the rAF callback
+      // then corrects scrollTop by the height difference.
       const el = { scrollTop: 0, scrollHeight: 1000, clientHeight: 5000 } as unknown as HTMLElement;
       cmp.onTimelineScroll(el); // scrollTop<=80 → loadMorePast
       const pastReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('direction') === 'past');
-      (el as { scrollHeight: number }).scrollHeight = 1500; // Liste ist gewachsen
+      (el as { scrollHeight: number }).scrollHeight = 1500; // the list has grown
       pastReq.flush({ items: [{ ...MEETING, id: 'p2', status: 'closed' }], nextCursor: null });
-      // rAF-Callback abwarten, damit die Scroll-Korrektur ausgeführt wird.
+      // Wait for the rAF callback so the scroll correction runs.
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       expect(cmp.pastItems().some((m) => m.id === 'p2')).toBe(true);
       expect(el.scrollTop).toBe(500); // scrollHeight(1500) - prevHeight(1000)
@@ -1819,7 +1819,7 @@ describe('MeetingsComponent — methods', () => {
       fixture.detectChanges();
       cmp.selectGremiumFilter('g-1');
       expect(cmp.gremiumFilter()).toBe('g-1');
-      // loadList feuert erneut zwei Timeline-Requests mit gremiumId.
+      // loadList fires two timeline requests again with gremiumId.
       const filtered = http.match((r) => r.url.endsWith('/meetings/timeline'));
       expect(filtered.length).toBe(2);
       expect(filtered[0].request.params.get('gremiumId')).toBe('g-1');
@@ -1829,8 +1829,8 @@ describe('MeetingsComponent — methods', () => {
     it('handles a timeline load error by clearing the lists', async () => {
       const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
       const cmp = fixture.componentInstance as Cmp;
-      // forkJoin bricht ab, sobald EIN Zweig fehlschlägt — der erste reicht; der
-      // andere wird verworfen (Cancelled), darf also nicht zusätzlich geflusht werden.
+      // forkJoin aborts as soon as ONE branch fails — the first is enough; the
+      // other is discarded (cancelled), so it must not be flushed additionally.
       const reqs = http.match((r) => r.url.endsWith('/meetings/timeline'));
       reqs[0].flush(null, { status: 500, statusText: 'e' });
       fixture.detectChanges();
@@ -1853,7 +1853,7 @@ describe('MeetingsComponent — methods', () => {
         req.flush({ items: [{ ...MEETING, id: 's1' }], nextCursor: 'c1' });
         expect(cmp.searchItems().length).toBe(1);
         expect(cmp.searchHasMore()).toBe(true);
-        // loadMoreSearch (Offset-Cursor) hängt an: scrollHeight-scrollTop-clientHeight <= 80.
+        // loadMoreSearch (offset cursor) appends: scrollHeight-scrollTop-clientHeight <= 80.
         const el = { scrollTop: 0, scrollHeight: 1000, clientHeight: 950 } as HTMLElement;
         cmp.onTimelineScroll(el);
         const more = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('cursor') === 'c1');
@@ -1871,7 +1871,7 @@ describe('MeetingsComponent — methods', () => {
         const { fixture, http } = await setup({ id: null });
         const cmp = fixture.componentInstance as Cmp;
         http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
-        cmp.onSearch('   '); // leer → runSearch fällt auf loadList zurück
+        cmp.onSearch('   '); // empty → runSearch falls back to loadList
         jest.advanceTimersByTime(400);
         const reloaded = http.match((r) => r.url.endsWith('/meetings/timeline'));
         expect(reloaded.length).toBe(2); // loadList: past + upcoming
@@ -1907,7 +1907,7 @@ describe('MeetingsComponent — methods', () => {
         jest.advanceTimersByTime(400);
         http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'q')
           .flush({ items: [], nextCursor: null });
-        cmp.selectGremiumFilter('g-2'); // searchActive → runSearch (kein loadList)
+        cmp.selectGremiumFilter('g-2'); // searchActive → runSearch (no loadList)
         const req = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('gremiumId') === 'g-2');
         req.flush({ items: [], nextCursor: null });
         expect(cmp.searchEmpty()).toBe(true);
@@ -1943,7 +1943,7 @@ describe('MeetingsComponent — methods', () => {
     it('keeps a still-valid selected TOP after an agenda reload', async () => {
       const { cmp, http, ws } = await loaded();
       cmp.selectedTopId.set('t-1');
-      // meeting_state broadcast triggert loadAgenda neu.
+      // meeting_state broadcast re-triggers loadAgenda.
       ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
       http.expectOne('/api/meetings/m-1/agenda').flush([
         { id: 't-1', applicationId: null, title: 'A', body: '', position: 0 },
@@ -1951,20 +1951,20 @@ describe('MeetingsComponent — methods', () => {
       ]);
       http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
-      expect(cmp.selectedTopId()).toBe('t-1'); // unverändert, weil noch gültig
+      expect(cmp.selectedTopId()).toBe('t-1'); // unchanged, still valid
     });
   });
 
   describe('protocol rendering lifecycle', () => {
     it('toasts a failure when a rendering protocol rolls back to draft', async () => {
       const { cmp, ws, http } = await loaded();
-      // Protokoll in den »rendering«-Zustand bringen.
+      // Bring the protocol into the "rendering" state.
       cmp.protocol.set({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-      // meeting_state mit nicht-finalem Protokoll → GET /protocol → applyProtocolUpdate.
+      // meeting_state with a non-final protocol → GET /protocol → applyProtocolUpdate.
       ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
-      // Rückrollung rendering → draft.
+      // Roll back rendering → draft.
       http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'draft', isFinal: false, isLocked: false });
       expect(cmp.protocol()?.status).toBe('draft');
     });
@@ -1976,10 +1976,10 @@ describe('MeetingsComponent — methods', () => {
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // Erster Poll nach 4s schlägt fehl → watchRendering(proto) erneut planen.
+        // First poll after 4s fails → reschedule watchRendering(proto).
         jest.advanceTimersByTime(4000);
         http.expectOne('/api/meetings/m-1/protocol').flush(null, { status: 500, statusText: 'e' });
-        // Zweiter Poll-Versuch nach weiteren 4s.
+        // Second poll attempt after another 4s.
         jest.advanceTimersByTime(4000);
         http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
         expect(cmp.protocol()?.isFinal).toBe(true);
@@ -2005,7 +2005,7 @@ describe('MeetingsComponent — methods', () => {
         ],
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);
-      // filterGremien-Request schlägt fehl → leere Liste.
+      // filterGremien request fails → empty list.
       http.expectOne('/api/meetings/gremien').flush(null, { status: 500, statusText: 'e' });
       const cmp = view.fixture.componentInstance as Cmp;
       expect(cmp.filterGremien()).toEqual([]);
@@ -2035,12 +2035,12 @@ describe('MeetingsComponent — methods', () => {
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);
       http.expectOne('/api/meetings/gremien').flush([]);
-      // canCreate (sessionManageGremien>0) → gremiumOptions wird geladen + gefiltert.
+      // canCreate (sessionManageGremien>0) → gremiumOptions is loaded + filtered.
       http.expectOne('/api/gremien').flush([
         { id: 'g-1', name: 'A' },
         { id: 'g-2', name: 'B' },
       ]);
-      // loadList feuert (protocol.write → canWriteGlobal) → Timeline-Requests beantworten.
+      // loadList fires (protocol.write → canWriteGlobal) → answer the timeline requests.
       http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) =>
         req.flush({ items: [], nextCursor: null }),
       );
@@ -2142,19 +2142,19 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, ws } = await loaded();
       ws.subject.next({ type: 'pong' } as unknown as ServerMessage);
       cmp.meeting.set(null);
-      ws.subject.next({ type: 'viewers', viewers: ['X'] }); // m null → früher return
+      ws.subject.next({ type: 'viewers', viewers: ['X'] }); // m null → early return
       expect(cmp.viewers()).toEqual([]);
     });
   });
 
   // -------------------------------------------------------------------------
-  // Verbleibende Verzweigungen (Branch-Coverage): Fallbacks, Guards, leere
-  // Maps, fehlende Meeting-Instanz, Stale-Search, Timeline-Höhe, Mock-Modus.
+  // Remaining branches (branch coverage): fallbacks, guards, empty maps,
+  // missing meeting instance, stale search, timeline height, mock mode.
   // -------------------------------------------------------------------------
   describe('branch coverage', () => {
     it('falls back to an empty string for an empty state-label map', async () => {
       const { cmp } = await loaded();
-      // map vorhanden, aber leer → map[locale]/map.de/Object.values()[0] alle leer ⇒ ''.
+      // map present but empty → map[locale]/map.de/Object.values()[0] all empty ⇒ ''.
       expect(cmp.stateLabelOf({})).toBe('');
     });
 
@@ -2164,8 +2164,8 @@ describe('MeetingsComponent — methods', () => {
         const { fixture, http } = await setup({ id: null });
         const cmp = fixture.componentInstance as Cmp;
         http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
-        cmp.onSearch('a'); // legt searchTimer an
-        cmp.onSearch('ab'); // searchTimer gesetzt → clearTimeout-Zweig
+        cmp.onSearch('a'); // sets up searchTimer
+        cmp.onSearch('ab'); // searchTimer set → clearTimeout branch
         jest.advanceTimersByTime(400);
         http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'ab')
           .flush({ items: [], nextCursor: null });
@@ -2181,23 +2181,23 @@ describe('MeetingsComponent — methods', () => {
         const { fixture, http } = await setup({ id: null });
         const cmp = fixture.componentInstance as Cmp;
         http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
-        // Erste Suche starten (in-flight lassen).
+        // Start the first search (leave it in-flight).
         cmp.onSearch('first');
         jest.advanceTimersByTime(400);
         const firstReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'first');
-        // Zweite Suche startet (erhöht searchSeq) BEVOR die erste antwortet.
+        // Second search starts (bumps searchSeq) BEFORE the first responds.
         cmp.onSearch('second');
         jest.advanceTimersByTime(400);
         const secondReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'second');
-        // Verspätete Antwort der ERSTEN Query → seq stimmt nicht mehr → verworfen (next-Zweig).
+        // Late response of the FIRST query → seq no longer matches → discarded (next branch).
         firstReq.flush({ items: [{ ...MEETING, id: 'stale' }], nextCursor: null });
         expect(cmp.searchItems().some((m) => m.id === 'stale')).toBe(false);
-        // Verspäteter FEHLER der zweiten … nachdem eine dritte Query lief → error-Zweig verworfen.
+        // Late ERROR of the second … after a third query ran → error branch discarded.
         cmp.onSearch('third');
         jest.advanceTimersByTime(400);
         const thirdReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'third');
         secondReq.flush(null, { status: 500, statusText: 'e' });
-        expect(cmp.loadingSearch()).toBe(true); // noch ladend (dritte Query offen)
+        expect(cmp.loadingSearch()).toBe(true); // still loading (third query open)
         thirdReq.flush({ items: [], nextCursor: null });
         expect(cmp.loadingSearch()).toBe(false);
       } finally {
@@ -2209,7 +2209,7 @@ describe('MeetingsComponent — methods', () => {
       const { fixture, http } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
-      // pastHasMore false + pastCursor null → früher return, kein Request.
+      // pastHasMore false + pastCursor null → early return, no request.
       const el = { scrollTop: 0, scrollHeight: 100, clientHeight: 50 } as HTMLElement;
       cmp.loadMorePast(el);
       expect(cmp.loadingPast()).toBe(false);
@@ -2229,7 +2229,7 @@ describe('MeetingsComponent — methods', () => {
         });
       });
       fixture.detectChanges();
-      // Einstellungen für u1 öffnen + speichern → replaceInTimeline ersetzt u1, lässt p1.
+      // Open + save settings for u1 → replaceInTimeline replaces u1, keeps p1.
       cmp.openSettings({ ...MEETING_MODEL, id: 'u1', status: 'planned', title: 'Alt' });
       http.expectOne('/api/meetings/u1/attendance').flush([]);
       cmp.settingsDate.set('2026-07-01');
@@ -2237,8 +2237,8 @@ describe('MeetingsComponent — methods', () => {
       cmp.saveSettings();
       const req = http.expectOne('/api/meetings/u1');
       req.flush({ ...MEETING, id: 'u1', status: 'planned', title: 'Neu' });
-      expect(cmp.upcomingItems().find((m) => m.id === 'u1')?.title).toBe('Neu'); // ersetzt
-      expect(cmp.pastItems().find((m) => m.id === 'p1')?.title).toBe('StuPa-Sitzung'); // unverändert
+      expect(cmp.upcomingItems().find((m) => m.id === 'u1')?.title).toBe('Neu'); // replaced
+      expect(cmp.pastItems().find((m) => m.id === 'p1')?.title).toBe('StuPa-Sitzung'); // unchanged
     });
 
     it('returns the raw iso date for an invalid date (NaN branch)', async () => {
@@ -2246,7 +2246,7 @@ describe('MeetingsComponent — methods', () => {
       const cmp = fixture.componentInstance as Cmp;
       cmp.onCreateGremiumChange('g-1');
       http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
-      // Ungültiges Datum → longDate gibt den Roh-String zurück (NaN-Zweig).
+      // Invalid date → longDate returns the raw string (NaN branch).
       cmp.newDate.set('not-a-date');
       cmp.newTime.set('17:00');
       cmp.goToCreateStep2();
@@ -2261,11 +2261,11 @@ describe('MeetingsComponent — methods', () => {
       try {
         cmp.onCreateGremiumChange('g-1');
         http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
-        // Gültiges Datum + locale=en → Intl mit 'en-US' (longDate en-Zweig).
+        // Valid date + locale=en → Intl with 'en-US' (longDate en branch).
         cmp.newDate.set('2026-07-01');
         cmp.newTime.set('17:00');
         cmp.goToCreateStep2();
-        // Englisches langes Datum (Monatsname auf Englisch).
+        // English long date (month name in English).
         expect(cmp.newTitle()).toContain('July');
       } finally {
         i18n.setLocale('de');
@@ -2276,7 +2276,7 @@ describe('MeetingsComponent — methods', () => {
       const { fixture, http } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
-      // Gremium-id, die NICHT in gremiumOptions vorkommt → find() → undefined → '' (?? '').
+      // A gremium id NOT present in gremiumOptions → find() → undefined → '' (?? '').
       cmp.newGremiumId.set('g-unknown');
       cmp.newDate.set('2026-07-01');
       cmp.newTime.set('17:00');
@@ -2293,10 +2293,10 @@ describe('MeetingsComponent — methods', () => {
         { principalId: 'pr-3', displayName: '', email: '', status: null, source: null, isSelf: false },
       ]);
       const opts = cmp.protokollantOptions();
-      // [0] = „niemand". Danach: displayName → email-Fallback → principalId-Fallback.
+      // [0] = "nobody". Then: displayName → email fallback → principalId fallback.
       expect(opts[1]).toEqual({ value: 'pr-1', label: 'Max' });
-      expect(opts[2]).toEqual({ value: 'pr-2', label: 'b@x' }); // displayName leer → email
-      expect(opts[3]).toEqual({ value: 'pr-3', label: 'pr-3' }); // beide leer → principalId
+      expect(opts[2]).toEqual({ value: 'pr-2', label: 'b@x' }); // displayName empty → email
+      expect(opts[3]).toEqual({ value: 'pr-3', label: 'pr-3' }); // both empty → principalId
     });
 
     it('returns empty vote lists when no meeting is loaded', async () => {
@@ -2312,16 +2312,16 @@ describe('MeetingsComponent — methods', () => {
       jest.useFakeTimers();
       try {
         const { cmp, fixture, http } = await loaded();
-        // bodyTimer (Zeile 692): noch nicht gefeuerter Autosave.
+        // bodyTimer: an autosave that has not fired yet.
         cmp.onTopBodyChange('t-1', 'X');
-        // renderPollTimer (Zeile 693): Protokoll rendert → watchRendering plant einen Poll.
+        // renderPollTimer: protocol rendering → watchRendering schedules a poll.
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // searchTimer (Zeile 694): laufende Such-Debounce.
+        // searchTimer: a running search debounce.
         cmp.onSearch('x');
-        fixture.destroy(); // ngOnDestroy → alle drei clearTimeout-Zweige
-        jest.advanceTimersByTime(8000); // keine Timer feuern mehr → keine Requests
+        fixture.destroy(); // ngOnDestroy → all three clearTimeout branches
+        jest.advanceTimersByTime(8000); // no timers fire anymore → no requests
         http.verify();
       } finally {
         jest.useRealTimers();
@@ -2332,7 +2332,7 @@ describe('MeetingsComponent — methods', () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       expect(cmp.meeting()).toBeNull();
-      // refreshProtocol ist privat — direkt aufrufen: if (!m) return (kein Request).
+      // refreshProtocol is private — call directly: if (!m) return (no request).
       const http = fixture.debugElement.injector.get(HttpTestingController);
       (cmp as unknown as { refreshProtocol(): void }).refreshProtocol();
       http.verify();
@@ -2352,32 +2352,32 @@ describe('MeetingsComponent — methods', () => {
         ],
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);
-      // Mock-Modus: connectLive() return früh (useMock) — kein WS-Kanal.
+      // Mock mode: connectLive() returns early (useMock) — no WS channel.
       http.expectOne('/api/meetings/m-1').flush(MEETING);
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
       flushDelegationContext(http);
-      expect(ws.closed).toBe(false); // connectMeeting wurde nie aufgerufen
+      expect(ws.closed).toBe(false); // connectMeeting was never called
     });
 
     it('re-watches a still-rendering protocol, clearing the prior poll timer', async () => {
       jest.useFakeTimers();
       try {
         const { cmp, ws, http } = await loaded();
-        // Finalisieren → rendering → watchRendering plant einen Poll-Timer (renderPollTimer).
+        // Finalize → rendering → watchRendering schedules a poll timer (renderPollTimer).
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // Bevor der 4s-Poll feuert, kommt ein meeting_state-Broadcast → getProtocol →
-        // applyProtocolUpdate → watchRendering ERNEUT, während der alte Timer noch läuft
-        // → clearTimeout(renderPollTimer)-Zweig (Zeile 1005).
+        // Before the 4s poll fires, a meeting_state broadcast arrives → getProtocol →
+        // applyProtocolUpdate → watchRendering AGAIN while the old timer still runs
+        // → clearTimeout(renderPollTimer) branch.
         ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
         http.expectOne('/api/meetings/m-1/agenda').flush([]);
         http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
         http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // Nun feuert der (neu geplante) Poll → final.
+        // Now the (rescheduled) poll fires → final.
         jest.advanceTimersByTime(4000);
         http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
         expect(cmp.protocol()?.isFinal).toBe(true);
@@ -2393,10 +2393,10 @@ describe('MeetingsComponent — methods', () => {
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // Meeting weg, bevor der Poll-Timer feuert → if (!m) return im Poll-Callback.
+        // Meeting gone before the poll timer fires → if (!m) return in the poll callback.
         cmp.meeting.set(null);
         jest.advanceTimersByTime(4000);
-        http.verify(); // kein GET /protocol
+        http.verify(); // no GET /protocol
       } finally {
         jest.useRealTimers();
       }
@@ -2411,8 +2411,8 @@ describe('MeetingsComponent — methods', () => {
 
     it('cancels a rename when the item turns out to be application-bound', async () => {
       const { cmp, http } = await loaded();
-      // renamingTopId manuell auf die App-TOP-id setzen (startRename würde sie ablehnen),
-      // dann renameTop → item.applicationId-Zweig der OR-Kette → cancel, kein Request.
+      // Set renamingTopId manually to the app TOP id (startRename would reject it),
+      // then renameTop → item.applicationId branch of the OR chain → cancel, no request.
       cmp.renamingTopId.set('t-app');
       cmp.renameDraft.set('Neu');
       cmp.renameTop(AGENDA_ITEM({ id: 't-app', applicationId: 'app-1', title: 'X' }) as never);
@@ -2422,8 +2422,8 @@ describe('MeetingsComponent — methods', () => {
 
     it('saves a renamed freetext TOP whose previous title was null (?? fallback)', async () => {
       const { cmp, http } = await loaded();
-      // item.title === null → die OR-Kette erreicht `title === (item.title ?? '')`,
-      // wertet `item.title ?? ''` mit dem null-Zweig aus → '' ≠ 'Neu' → speichern.
+      // item.title === null → the OR chain reaches `title === (item.title ?? '')`,
+      // evaluates `item.title ?? ''` via the null branch → '' ≠ 'Neu' → save.
       cmp.startRename(AGENDA_ITEM({ id: 't-1', applicationId: null, title: null }) as never);
       cmp.renameDraft.set('Neu');
       cmp.renameTop(AGENDA_ITEM({ id: 't-1', applicationId: null, title: null }) as never);
@@ -2436,16 +2436,16 @@ describe('MeetingsComponent — methods', () => {
     it('prefills the application vote dialog with an empty name when the title is null', async () => {
       const { cmp } = await loaded();
       cmp.openVoteDialog(AGENDA_ITEM({ applicationId: 'app-1', title: null }) as never);
-      // questionPrefill mit name='' (item.title ?? '') → Vorschlag enthält keinen Titel.
+      // questionPrefill with name='' (item.title ?? '') → the suggestion contains no title.
       expect(cmp.voteQuestion().length).toBeGreaterThanOrEqual(0);
       expect(cmp.voteDialogOpen()).toBe(true);
     });
 
     it('adds a live-opened vote with all optional fields defaulted', async () => {
       const { cmp, ws, fixture } = await loaded();
-      // vote_opened OHNE applicationId/agendaItemId/question/options → ?? null / ?? [] greifen.
-      // Bewusst minimale (Wire-)Nachricht: die optionalen Felder fehlen zur Laufzeit, daher
-      // der `as unknown as ServerMessage`-Cast (sonst verlangt VoteOpenedMsg `options`).
+      // vote_opened WITHOUT applicationId/agendaItemId/question/options → ?? null / ?? [] kick in.
+      // Deliberately minimal (wire) message: the optional fields are absent at runtime, hence
+      // the `as unknown as ServerMessage` cast (else VoteOpenedMsg requires `options`).
       ws.subject.next({ type: 'vote_opened', voteId: 'v-min', closesAt: null } as unknown as ServerMessage);
       fixture.detectChanges();
       const v = cmp.meeting()?.votes.find((x) => x.id === 'v-min');
@@ -2457,7 +2457,7 @@ describe('MeetingsComponent — methods', () => {
     });
 
     it('returns early from measureTimeline when there is no timeline element', async () => {
-      // Detail-Modus rendert KEINE Timeline → viewChild(tlScroll) ist undefined.
+      // Detail mode renders NO timeline → viewChild(tlScroll) is undefined.
       const { cmp } = await loaded();
       const measure = (cmp as unknown as { measureTimeline(): void }).measureTimeline.bind(cmp);
       expect(() => measure()).not.toThrow(); // if (!el) return
@@ -2471,11 +2471,11 @@ describe('MeetingsComponent — methods', () => {
       const el = fixture.nativeElement.querySelector('.mtg__timeline') as HTMLElement;
       expect(el).toBeTruthy();
       const measure = (cmp as unknown as { measureTimeline(): void }).measureTimeline.bind(cmp);
-      // 1) Ohne .footer / .main im DOM → footerH=0 (footer-Ternär false), mainPadBottom=0.
+      // 1) Without .footer / .main in the DOM → footerH=0 (footer ternary false), mainPadBottom=0.
       measure();
       expect(el.style.height).toMatch(/px$/);
-      // 2) Mit .footer (querySelector trifft) + .main-Vorfahr OHNE padding-bottom →
-      //    getComputedStyle liefert '' → Number.parseFloat → NaN → `|| 0` greift (Zeile 728).
+      // 2) With .footer (querySelector matches) + a .main ancestor WITHOUT padding-bottom →
+      //    getComputedStyle returns '' → Number.parseFloat → NaN → `|| 0` kicks in.
       const footer = document.createElement('div');
       footer.className = 'footer';
       Object.defineProperty(footer, 'offsetHeight', { value: 40, configurable: true });
@@ -2484,16 +2484,16 @@ describe('MeetingsComponent — methods', () => {
       mainNoPad.className = 'main';
       el.parentElement?.insertBefore(mainNoPad, el);
       mainNoPad.appendChild(el);
-      expect(el.closest('.main')).toBe(mainNoPad); // closest trifft den .main-Vorfahr
+      expect(el.closest('.main')).toBe(mainNoPad); // closest matches the .main ancestor
       measure();
       expect(el.style.height).toMatch(/px$/);
-      // 3) .main MIT parsebarer padding-bottom → parseFloat liefert die Zahl (Ternär-consequent).
+      // 3) .main WITH parseable padding-bottom → parseFloat returns the number (ternary consequent).
       const mainPadded = document.createElement('main');
       mainPadded.className = 'main';
       mainPadded.style.paddingBottom = '24px';
       mainNoPad.parentElement?.insertBefore(mainPadded, mainNoPad);
-      mainPadded.appendChild(mainNoPad); // el bleibt verschachtelt; closest trifft mainNoPad weiterhin
-      // closest() liefert den NÄCHSTEN .main (mainNoPad) — daher el direkt in mainPadded hängen.
+      mainPadded.appendChild(mainNoPad); // el stays nested; closest still matches mainNoPad
+      // closest() returns the NEAREST .main (mainNoPad) — so attach el directly into mainPadded.
       mainPadded.appendChild(el);
       expect(el.closest('.main')).toBe(mainPadded);
       measure();
@@ -2506,7 +2506,7 @@ describe('MeetingsComponent — methods', () => {
     it('defaults plan date/time to empty strings for a meeting without a date (?? fallback)', async () => {
       const { http, fixture } = await setup();
       const cmp = fixture.componentInstance as Cmp;
-      // adoptMeeting: m.date / m.startTime null → planDate/planTime fallen auf '' zurück.
+      // adoptMeeting: m.date / m.startTime null → planDate/planTime fall back to ''.
       http.expectOne('/api/meetings/m-1').flush({ ...MEETING, date: null, startTime: null });
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -2518,10 +2518,10 @@ describe('MeetingsComponent — methods', () => {
     });
 
     it('bails out of the now-marker scroll when the timeline disappears first', async () => {
-      // Übersicht mit Sitzungen → nowMarker + tlScroll werden gerendert, der Effect
-      // plant das doppelte rAF. BEVOR das rAF feuert, laden wir eine Sitzung → der
-      // `@if (!meeting())`-Block (inkl. Timeline) verschwindet → viewChild() = undefined
-      // → der innere rAF-Callback greift `if (!m || !s) return` (Zeile 637).
+      // Overview with meetings → nowMarker + tlScroll render, the effect schedules
+      // the double rAF. BEFORE the rAF fires, we load a meeting → the
+      // `@if (!meeting())` block (incl. the timeline) disappears → viewChild() = undefined
+      // → the inner rAF callback hits `if (!m || !s) return`.
       const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
       const cmp = fixture.componentInstance as Cmp;
       http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => {
@@ -2531,8 +2531,8 @@ describe('MeetingsComponent — methods', () => {
           nextCursor: null,
         });
       });
-      fixture.detectChanges(); // Effect plant das äußere rAF
-      // Sitzung „laden" → Timeline aus dem DOM nehmen, bevor die rAFs feuern.
+      fixture.detectChanges(); // the effect schedules the outer rAF
+      // "Load" a meeting → remove the timeline from the DOM before the rAFs fire.
       cmp.meeting.set(MEETING_MODEL);
       fixture.detectChanges();
       await new Promise<void>((resolve) =>
@@ -2542,9 +2542,9 @@ describe('MeetingsComponent — methods', () => {
     });
 
     it('positions the timeline at the now-marker once it is rendered', async () => {
-      // Übersicht mit Sitzungen in beiden Richtungen → nowMarker + tlScroll rendern.
-      // Der Effect scrollt einmalig (doppeltes rAF). Wir warten beide Frames ab,
-      // damit der innere rAF-Callback (inkl. der defensiven !m||!s-Zweige) ausgeführt wird.
+      // Overview with meetings in both directions → nowMarker + tlScroll render.
+      // The effect scrolls once (double rAF). We await both frames so the inner
+      // rAF callback (incl. the defensive !m||!s branches) runs.
       const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
       const cmp = fixture.componentInstance as Cmp;
       http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => {
@@ -2563,8 +2563,8 @@ describe('MeetingsComponent — methods', () => {
 
     it('does nothing in patchVote once the meeting has been cleared', async () => {
       const { cmp, http } = await loaded();
-      // openVote löst bei Erfolg patchVote aus — wenn das Meeting zwischenzeitlich
-      // null ist, greift der frühe Guard (if (!m) return) und kein State ändert sich.
+      // openVote triggers patchVote on success — if the meeting is null in the
+      // meantime, the early guard (if (!m) return) applies and no state changes.
       cmp.openVote('v-2');
       cmp.meeting.set(null);
       http.expectOne('/api/votes/v-2/open').flush(null, { status: 204, statusText: 'No Content' });

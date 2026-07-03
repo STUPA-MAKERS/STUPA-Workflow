@@ -1,8 +1,8 @@
-"""Admin-Router der Deadline-Policy-Registry (benannte Fristen).
+"""Admin router for the deadline-policy registry.
 
-CRUD unter ``/admin/deadline-policies``, gegated mit ``admin.deadlines`` (autoritativ).
-Der Flow referenziert eine Policy über ``key``; das Datum (z. B. pro Semester) lässt
-sich hier pflegen, **ohne** den Flow neu zu versionieren.
+CRUD under ``/admin/deadline-policies``, gated by ``admin.deadlines``. The flow
+references a policy by ``key``; dates are maintained here without re-versioning
+the flow.
 """
 
 from __future__ import annotations
@@ -24,11 +24,9 @@ from app.shared.errors import ConflictError, NotFoundError, ProblemDetail
 router = APIRouter(prefix="/admin/deadline-policies", tags=["deadlines"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
-# Frist-Policies haben eine eigene Admin-Seite (#per-page-admin: admin.deadlines,
-# zuvor admin.types). Migration 0026 gibt admin.types-Inhabern admin.deadlines mit.
 _CONFIG = Depends(require_principal("admin.deadlines"))
-# Lesen auch für den Flow-Editor (flow.configure) erlaubt — er braucht die Policies
-# als Auswahl für Fristen-Guards/Aktionen (#5-2). Schreiben bleibt admin.deadlines.
+# Reads are also allowed for the flow editor (flow.configure), which needs the
+# policies as options for deadline guards/actions; writes stay admin.deadlines.
 _CONFIG_READ = Depends(require_any_permission("admin.deadlines", "flow.configure"))
 
 

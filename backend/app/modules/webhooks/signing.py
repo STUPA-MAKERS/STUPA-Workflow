@@ -1,11 +1,10 @@
-"""HMAC-SHA256-Signatur + Versand-Header (security.md §5).
+"""HMAC-SHA256 signature + delivery headers.
 
-``X-Signature: sha256=<hex>`` über **``"{timestamp}.{body}"``** (HMAC mit dem pro-
-Webhook-``secret``); der ``X-Timestamp`` (Unix-Sekunden) geht so **mit in die
-Signatur** ein → ein Angreifer kann einen abgefangenen Body nicht mit frischem
-Timestamp erneut einspielen (Replay-Schutz, Stripe-Schema). Der Empfänger prüft
-Timestamp-Freshness **und** rekonstruiert die Signatur konstant-zeitig über
-``"{X-Timestamp}.{body}"``. Das ``secret`` wird **nie** geloggt oder ausgegeben.
+``X-Signature: sha256=<hex>`` over ``"{timestamp}.{body}"`` (HMAC with the per-webhook
+``secret``); the ``X-Timestamp`` (unix seconds) is part of the signature, so an attacker
+cannot replay an intercepted body with a fresh timestamp (Stripe scheme). The receiver
+checks timestamp freshness and reconstructs the signature in constant time over
+``"{X-Timestamp}.{body}"``. The ``secret`` is never logged or exposed.
 """
 
 from __future__ import annotations
@@ -21,19 +20,19 @@ EVENT_HEADER = "X-Webhook-Event"
 
 
 def canonical_body(payload: dict[str, Any]) -> bytes:
-    """Payload deterministisch serialisieren (stabile Bytes → stabile Signatur)."""
+    """Serialize the payload deterministically (stable bytes -> stable signature)."""
     return json.dumps(
         payload, separators=(",", ":"), sort_keys=True, ensure_ascii=False
     ).encode("utf-8")
 
 
 def signing_input(timestamp: int, body: bytes) -> bytes:
-    """Signatur-Eingabe ``"{timestamp}.{body}"`` (bindet Timestamp an den Body)."""
+    """Signing input ``"{timestamp}.{body}"`` (binds the timestamp to the body)."""
     return f"{timestamp}.".encode() + body
 
 
 def sign(secret: bytes, timestamp: int, body: bytes) -> str:
-    """``sha256=<hexdigest>`` der HMAC-SHA256 von ``"{timestamp}.{body}"``."""
+    """``sha256=<hexdigest>`` of HMAC-SHA256 over ``"{timestamp}.{body}"``."""
     digest = hmac.new(secret, signing_input(timestamp, body), hashlib.sha256).hexdigest()
     return f"sha256={digest}"
 
@@ -41,7 +40,7 @@ def sign(secret: bytes, timestamp: int, body: bytes) -> str:
 def build_headers(
     secret: bytes, body: bytes, *, event: str, timestamp: int
 ) -> dict[str, str]:
-    """Versand-Header (Signatur über ts+Body, Timestamp, Event, JSON-Content-Type)."""
+    """Delivery headers (signature over ts+body, timestamp, event, JSON content type)."""
     return {
         "Content-Type": "application/json",
         SIGNATURE_HEADER: sign(secret, timestamp, body),

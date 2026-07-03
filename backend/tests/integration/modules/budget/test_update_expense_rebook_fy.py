@@ -20,6 +20,7 @@ from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin.models import Gremium
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import BudgetExpense
 from app.modules.budget.tree_schemas import (
     BudgetNodeCreate,
@@ -27,7 +28,6 @@ from app.modules.budget.tree_schemas import (
     ExpenseUpdate,
     FiscalYearCreate,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.shared.errors import ValidationProblem
 
 pytestmark = pytest.mark.integration

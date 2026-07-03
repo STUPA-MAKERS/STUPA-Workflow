@@ -3,13 +3,13 @@ import { API_BASE_URL, USE_MOCK_API, detectMockFlag } from './api.config';
 import { createLocationMock, provideLocationMock } from '../../../testing/location-mock';
 
 /**
- * `detectMockFlag` liest das Mock-Opt-in aus globalem Flag / URL `?mock=1` /
- * `localStorage['useMockApi']`. Die `location` kommt seit #jest30 als Parameter
- * (DI-Token `LOCATION`) — die Branches sind darum pur mit Fake-Objekten testbar;
- * der Token-Factory-Pfad läuft einmal über TestBed + `provideLocationMock`.
+ * `detectMockFlag` reads the mock opt-in from a global flag / URL `?mock=1` /
+ * `localStorage['useMockApi']`. `location` is passed as a parameter (DI token
+ * `LOCATION`) — so the branches are purely testable with fake objects; the
+ * token-factory path runs once via TestBed + `provideLocationMock`.
  */
 describe('api.config', () => {
-  /** Fake-`Location` mit dem gewünschten Query-String. */
+  /** Fake `Location` with the desired query string. */
   function locWith(search: string): Location {
     return createLocationMock({ search }) as unknown as Location;
   }
@@ -52,8 +52,8 @@ describe('api.config', () => {
   });
 
   it('swallows errors thrown while reading URL/localStorage (catch branch)', () => {
-    // `new URLSearchParams(location.search)` wirft, weil `.search` ein werfender
-    // Getter ist; detectMockFlag muss fangen und false liefern.
+    // `new URLSearchParams(location.search)` throws because `.search` is a
+    // throwing getter; detectMockFlag must catch it and return false.
     const throwing = {
       get search(): string {
         throw new Error('boom');

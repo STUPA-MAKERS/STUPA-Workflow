@@ -1,13 +1,13 @@
 /**
- * a11y-Scan der Kern-Views (T-43, requirements N3 — WCAG 2.1 AA).
+ * a11y scan of the composite core views (WCAG 2.1 AA).
  *
- * Ergänzt den Primitiv-Scan (`shared/ui/a11y.spec.ts`) um die zusammengesetzten
- * Views: Shell-Landmarks (anonym + angemeldet), Fehlerseiten (403/404), den
- * Apply-Wizard (N1a Multi-Step) und die Live-Vote-Ansicht (Live-Regionen).
+ * Complements the primitive scan (`shared/ui/a11y.spec.ts`) with the composed
+ * views: shell landmarks (anonymous + authenticated), error pages (403/404), the
+ * apply wizard (multi-step) and the live-vote view (live regions).
  *
- * Für die Shell ist die `region`-Regel aktiv (Landmark-Struktur). Komponenten
- * ohne eigenes `<main>` werden in `<main>` gewrappt, damit Inhalte in einer
- * Landmark liegen.
+ * For the shell the `region` rule is active (landmark structure). Components
+ * without their own `<main>` are wrapped in `<main>` so content sits inside a
+ * landmark.
  */
 import { Component } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
@@ -142,9 +142,9 @@ describe('Kern-Views a11y (axe)', () => {
     const fakeApi: Partial<ApiClient> = {
       applicationTypes: () => of(TYPES),
       effectiveForm: () => of(EFF),
-      // Anonyme Session — AuthService.ensureLoaded() im Wizard-Konstruktor (#24).
+      // Anonymous session — AuthService.ensureLoaded() in the wizard constructor.
       me: (() => of(null)) as unknown as ApiClient['me'],
-      // Branding-Info unter der Typ-Auswahl (#18) — leer im Test.
+      // Branding info below the type selection — empty in the test.
       publicSiteConfig: () => of({ version: 1, branding: null }),
     };
 
@@ -239,8 +239,8 @@ describe('Kern-Views a11y (axe)', () => {
   });
 
   describe('Admin-Views (T-43 AC: Admin/Flow-Editor)', () => {
-    // Reads liefern aus admin.mock (USE_MOCK_API) bzw. werden gefaket — die
-    // Views sollen ihre volle Struktur (Headings/Tabellen/Forms) rendern.
+    // Reads come from admin.mock (USE_MOCK_API) or are faked — the views should
+    // render their full structure (headings/tables/forms).
     const adminHttp = [provideHttpClient(), provideHttpClientTesting()];
 
     @Component({
@@ -271,7 +271,7 @@ describe('Kern-Views a11y (axe)', () => {
     })
     class BrandingHost {}
 
-    /** Fake-AdminApiService: Reads mit minimalen Daten, Mutationen als No-op. */
+    /** Fake AdminApiService: reads return minimal data, mutations are no-ops. */
     function fakeAdminApi(): Partial<AdminApiService> {
       const role = {
         id: 'r-admin',
@@ -324,7 +324,7 @@ describe('Kern-Views a11y (axe)', () => {
         providers: [
           provideRouter([]),
           { provide: AdminApiService, useValue: fakeAdminApi() },
-          // Kostenstellen-Namen für Guard-Labels (#7) — leerer Baum genügt.
+          // Cost-centre names for guard labels — an empty tree is enough.
           { provide: BudgetTreeApi, useValue: { tree: () => of([]) } },
         ],
       });

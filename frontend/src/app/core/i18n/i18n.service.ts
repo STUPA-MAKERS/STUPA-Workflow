@@ -10,24 +10,24 @@ import {
 const STORAGE_KEY = 'ap.locale';
 
 /**
- * UI-i18n (DE/EN). Locale-Quelle: persistierte Wahl → Browser → DEFAULT_LOCALE.
- * Fehlende Keys der aktiven Locale fallen auf DE zurück (requirements §5).
- * Konfigurierbare DB-Texte (`*_i18n`) sind nicht Teil dieses Service.
+ * UI i18n (DE/EN). Locale source: persisted choice → browser → DEFAULT_LOCALE.
+ * Missing keys of the active locale fall back to DE. Configurable DB texts
+ * (`*_i18n`) are not part of this service.
  */
 @Injectable({ providedIn: 'root' })
 export class I18nService {
   private readonly _locale = signal<Locale>(this.resolveInitialLocale());
 
-  /** Aktive Locale (Signal, read-only nach außen). */
+  /** Active locale (signal, read-only to the outside). */
   readonly locale = this._locale.asReadonly();
   readonly locales = SUPPORTED_LOCALES;
 
-  /** Aktive Übersetzungstabelle (für Template-Bindings via `t`-Pipe). */
+  /** Active translation table (for template bindings via the `t` pipe). */
   readonly dictionary = computed(() => CATALOG[this._locale()]);
 
   constructor() {
-    // `<html lang>` ab dem ersten Paint mit der aufgelösten Locale synchronisieren
-    // (a11y/SEO) — nicht erst beim ersten manuellen Sprachwechsel.
+    // Sync `<html lang>` with the resolved locale from the first paint (a11y/SEO)
+    // — not only on the first manual language switch.
     if (typeof document !== 'undefined') {
       document.documentElement.lang = this._locale();
     }
@@ -40,7 +40,7 @@ export class I18nService {
     document.documentElement.lang = locale;
   }
 
-  /** Übersetzt einen Key; Fallback-Kette: aktive Locale → DE → Key selbst. */
+  /** Translates a key; fallback chain: active locale → DE → the key itself. */
   translate(key: TranslationKey, params?: Record<string, string | number>): string {
     const active = CATALOG[this._locale()];
     const raw = active[key] ?? CATALOG[DEFAULT_LOCALE][key] ?? key;
@@ -74,7 +74,7 @@ export class I18nService {
     try {
       localStorage.setItem(STORAGE_KEY, locale);
     } catch {
-      /* storage gesperrt — ignorieren */
+      /* storage blocked — ignore */
     }
   }
 }

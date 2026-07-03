@@ -1,0 +1,216 @@
+import { computed, inject, signal } from '@angular/core';
+import { I18nService } from '@core/i18n/i18n.service';
+import type { SelectOption } from '@stupa-makers/ui-kit';
+import { downloadBlob } from '@shared/download.util';
+import {
+  type AccountOption,
+  BudgetTreeApi,
+  type BudgetTreeNode,
+  type Expense,
+  type ExpenseKind,
+  flattenBudgetOptions,
+} from '../budget/budget-tree.api';
+
+export type ExpenseSortField = 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
+
+/**
+ * Bookings list: server-side filters/sort + offset paging, plus the cost-centre
+ * tree and account options backing the filters. Plain state module — construct
+ * in an injection context (component field initializer).
+ */
+export class ExpensesListState {
+  private readonly api = inject(BudgetTreeApi);
+  private readonly i18n = inject(I18nService);
+
+  private readonly PAGE = 20;
+  private nextOffset = 0;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  readonly budgetTree = signal<BudgetTreeNode[]>([]);
+  readonly items = signal<Expense[]>([]);
+  readonly total = signal(0);
+  readonly loading = signal(true);
+  readonly loadingMore = signal(false);
+  readonly hasMore = computed(() => this.items().length < this.total());
+  /** Shared in-flight flag for every mutating dialog (create/edit/delete/sub/transfer). */
+  readonly saving = signal(false);
+
+  readonly kind = signal<'' | ExpenseKind>('');
+  readonly q = signal('');
+  readonly amountMin = signal('');
+  readonly amountMax = signal('');
+  readonly createdFrom = signal('');
+  readonly createdTo = signal('');
+  readonly budgetId = signal('');
+  /** Account filter; empty = all accounts. */
+  readonly accountId = signal('');
+  readonly sortField = signal<ExpenseSortField>('paymentDate');
+  readonly sortOrder = signal<'asc' | 'desc'>('desc');
+
+  readonly activeFilterCount = computed(
+    () =>
+      [
+        this.kind(),
+        this.accountId(),
+        this.amountMin().trim(),
+        this.amountMax().trim(),
+        this.createdFrom(),
+        this.createdTo(),
+      ].filter((v) => String(v ?? '').trim() !== '').length,
+  );
+
+  readonly costCentreOptions = computed<SelectOption[]>(() =>
+    flattenBudgetOptions(this.budgetTree()),
+  );
+
+  readonly accounts = signal<AccountOption[]>([]);
+  readonly accountOptions = computed<SelectOption[]>(() =>
+    this.accounts().map((a) => ({ value: a.id, label: a.name })),
+  );
+  readonly accountFilterOptions = computed<SelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('expenses.filter.allAccounts') },
+    ...this.accountOptions(),
+  ]);
+
+  readonly exporting = signal(false);
+
+  constructor() {
+    this.api.tree().subscribe({
+      next: (tree) => this.budgetTree.set(tree),
+      error: () => this.budgetTree.set([]),
+    });
+    // Bookers may read account options without account.manage; server returns
+    // active accounts only.
+    this.api.listAccountOptions().subscribe({
+      next: (accs) => this.accounts.set(accs),
+      error: () => this.accounts.set([]),
+    });
+    this.reload();
+  }
+
+  setKind(k: '' | ExpenseKind): void {
+    this.kind.set(k);
+    this.reload();
+  }
+
+  selectAccount(id: string): void {
+    this.accountId.set(id);
+    this.reload();
+  }
+
+  selectBudget(id: string): void {
+    this.budgetId.set(id);
+    this.reload();
+  }
+
+  onSearch(value: string): void {
+    this.q.set(value);
+    this.debouncedReload();
+  }
+
+  onAmountFilter(which: 'min' | 'max', value: string): void {
+    (which === 'min' ? this.amountMin : this.amountMax).set(value);
+    this.debouncedReload();
+  }
+
+  onDateFilter(which: 'from' | 'to', value: string): void {
+    (which === 'from' ? this.createdFrom : this.createdTo).set(value);
+    this.debouncedReload();
+  }
+
+  resetFilters(): void {
+    this.kind.set('');
+    this.accountId.set('');
+    this.amountMin.set('');
+    this.amountMax.set('');
+    this.createdFrom.set('');
+    this.createdTo.set('');
+    this.reload();
+  }
+
+  onSort(field: ExpenseSortField): void {
+    if (this.sortField() === field) {
+      this.sortOrder.update((o) => (o === 'desc' ? 'asc' : 'desc'));
+    } else {
+      this.sortField.set(field);
+      this.sortOrder.set('desc');
+    }
+    this.reload();
+  }
+
+  private debouncedReload(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.reload(), 400);
+  }
+
+  reload(): void {
+    this.nextOffset = 0;
+    this.items.set([]);
+    this.total.set(0);
+    this.loading.set(true);
+    this.fetch(true);
+  }
+
+  loadMore(): void {
+    if (this.loadingMore() || this.loading() || !this.hasMore()) return;
+    this.loadingMore.set(true);
+    this.fetch(false);
+  }
+
+  private fetch(initial: boolean): void {
+    this.api
+      .listExpenses({
+        budget: this.budgetId() || undefined,
+        account: this.accountId() || undefined,
+        kind: this.kind() || undefined,
+        q: this.q().trim() || undefined,
+        amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,
+        amountMax: this.amountMax().trim() ? Number(this.amountMax()) : undefined,
+        createdFrom: this.createdFrom() || undefined,
+        createdTo: this.createdTo() || undefined,
+        sort: this.sortField(),
+        order: this.sortOrder(),
+        limit: this.PAGE,
+        offset: this.nextOffset,
+      })
+      .subscribe({
+        next: (page) => {
+          this.total.set(page.total);
+          this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
+          this.nextOffset = page.offset + page.items.length;
+          this.loading.set(false);
+          this.loadingMore.set(false);
+        },
+        error: () => {
+          this.loading.set(false);
+          this.loadingMore.set(false);
+        },
+      });
+  }
+
+  onExport(): void {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    this.api
+      .exportExpensesXlsx({
+        budget: this.budgetId() || undefined,
+        kind: this.kind() || undefined,
+        q: this.q().trim() || undefined,
+        amountMin: this.amountMin().trim() || undefined,
+        amountMax: this.amountMax().trim() || undefined,
+        createdFrom: this.createdFrom() || undefined,
+        createdTo: this.createdTo() || undefined,
+      })
+      .subscribe({
+        next: (blob) => {
+          downloadBlob(blob, 'buchungen.xlsx');
+          this.exporting.set(false);
+        },
+        error: () => this.exporting.set(false),
+      });
+  }
+
+  dispose(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+  }
+}

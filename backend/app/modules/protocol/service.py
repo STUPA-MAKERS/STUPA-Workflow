@@ -1,26 +1,23 @@
-"""Protokoll-Service (T-22, api.md »protocol«, flows §7).
+"""Protocol service.
 
-An eine ``AsyncSession`` gebundener Service für den Protokoll-Lebenszyklus:
+Bound to an ``AsyncSession``; drives the protocol lifecycle:
 
-* :meth:`get_or_create` — Protokoll einer Sitzung anlegen **oder** laden (idempotent
-  über UNIQUE ``meeting_id``); übernimmt ``gremium_id``/``cd_variant`` von Sitzung+Gremium.
-* :meth:`update_markdown` — Editor-Body aktualisieren (nur im Entwurf).
-* :meth:`embed_votes` — Abstimmungen als Markdown-Snippets anhängen + ``protocol_vote_ref``
-  schreiben (idempotent: schon referenzierte Votes werden übersprungen).
-* :meth:`finalize` — Markdown → pytex → PDF → MinIO → Mail an
+* :meth:`get_or_create` — create or load a meeting's protocol (idempotent via
+  UNIQUE ``meeting_id``); takes ``gremium_id``/``cd_variant`` from meeting+gremium.
+* :meth:`update_markdown` — update the editor body (draft only).
+* :meth:`embed_votes` — append votes as Markdown snippets + write
+  ``protocol_vote_ref`` (idempotent: already-referenced votes are skipped).
+* :meth:`finalize` — Markdown → pytex → PDF → MinIO → mail to
   MAIL_LIST(gremium); ``status='final'`` + ``sent_at``.
 
-**Wiederverwendung T-20** (keine Duplikation): pytex-Client, Object-Storage
-und die Mail-Queue/-``MailMessage`` stammen unverändert aus
-:mod:`app.modules.pdf` / :mod:`app.modules.notifications`. Der Render läuft hier
-**synchron** im Request (das FE T-33 erwartet ``ProtocolOut`` mit ``pdfUrl`` direkt
-aus der ``finalize``-Antwort, nicht den 202-Job-Pfad).
+Reuses the pytex client, object storage and mail queue from
+:mod:`app.modules.pdf` / :mod:`app.modules.notifications` unchanged.
 
-**Fail-Disziplin** (security.md §2): ist Storage bewusst »aus« (DEV/Demo ohne MinIO),
-wird ``finalize`` trotzdem abgeschlossen (``status='final'`` + Mail ohne PDF-Link).
-Schlägt ein **vorhandenes** Render-/Storage-Backend transient fehl, wirft der Service
-:class:`ServiceUnavailableError` (503) → die Session-Dependency rollt zurück, das
-Protokoll bleibt Entwurf und der Aufruf ist wiederholbar.
+Failure discipline: if storage is deliberately off (dev/demo without MinIO),
+``finalize`` still completes (``final`` + mail without PDF link). If an
+EXISTING render/storage backend fails transiently, the service raises
+:class:`ServiceUnavailableError` (503) → the session dependency rolls back,
+the protocol stays draft and the call is repeatable.
 """
 
 from __future__ import annotations
@@ -77,26 +74,25 @@ from app.shared.errors import (
 
 
 def protocol_storage_key(protocol_id: UUID) -> str:
-    """Deterministischer MinIO-Key (eigener ``pdf/protocol/``-Präfix, T-20-Schema)."""
+    """Deterministic MinIO key (own ``pdf/protocol/`` prefix)."""
     return f"pdf/protocol/{protocol_id}.pdf"
 
 
 def protocol_public_storage_key(protocol_id: UUID) -> str:
-    """MinIO-Key der redigierten öffentlichen Protokoll-Variante (#PII-Re-Add)."""
+    """MinIO key of the redacted public protocol variant."""
     return f"pdf/protocol/{protocol_id}-public.pdf"
 
 
-# Platzhalter für den Body nicht-öffentlicher TOPs im öffentlichen PDF (Nummerierung
-# bleibt erhalten, der Inhalt wird redigiert).
+# Placeholder for the body of non-public agenda items in the public PDF
+# (numbering stays, the content is redacted).
 _NON_PUBLIC_PLACEHOLDER = "*(nicht-öffentlicher Tagesordnungspunkt)*"
-# Neutrale Überschrift für nicht-öffentliche TOPs im öffentlichen PDF: der Original-
-# Titel kann den sensiblen Gegenstand kodieren (AUD-025), darf also nicht in die an die
-# Verteilerliste gemailte Variante. Die Nummerierung (pytex »TOP n«) bleibt erhalten.
+# Neutral heading for non-public items in the public PDF: the original title
+# may encode the sensitive subject and must not reach the mailed variant.
 _NON_PUBLIC_HEADING = "Nicht-öffentlicher Tagesordnungspunkt"
 
 
 class ProtocolService:
-    """Protokoll-Operationen + (synchrone) Finalisierung über die T-20-Infrastruktur."""
+    """Protocol operations + finalization over the shared render infrastructure."""
 
     def __init__(
         self,
@@ -124,12 +120,12 @@ class ProtocolService:
             raise NotFoundError(f"protocol {protocol_id} not found")
         return protocol
 
-    # --------------------------------------------------------- authz (per-Gremium)
-    # Das Protokoll montiert die pro-TOP-Bodies, die der Live-Stack (livevote) bereits
-    # PER GREMIUM autorisiert (zugewiesener Protokollant + Gremium-Rollen mit
-    # ``session.manage``/``protocol.write``). Globale ``meeting.manage`` als alleiniges
-    # Gate schloss genau diese per-Gremium-Protokollanten aus (AUD-016). Wir delegieren
-    # deshalb an ``MeetingService`` — identische Scope-Regeln wie ``/api/meetings/…``.
+    # --------------------------------------------------------- authz (per gremium)
+    # The protocol assembles the per-item bodies that the live stack already
+    # authorizes PER GREMIUM (assigned protokollant + gremium roles with
+    # ``session.manage``/``protocol.write``). Global ``meeting.manage`` alone
+    # would lock those users out, so we delegate to ``MeetingService`` —
+    # identical scope rules to ``/api/meetings/…``.
     def _meeting_service(self) -> MeetingService:
         return MeetingService(self.session)
 
@@ -142,22 +138,22 @@ class ProtocolService:
     async def authorize_write_meeting(
         self, meeting_id: UUID, principal: Principal
     ) -> None:
-        """Schreibrecht am Protokoll EINER Sitzung (POST …/protocol anlegen/laden).
+        """Check write access to a meeting's protocol (create/load).
 
-        Verwalter (``meeting.manage``/Gremium-``session.manage``), zugewiesener
-        Protokollant ODER Gremium-Rolle mit ``protocol.write`` — wie ``can_write``."""
+        Manager (``meeting.manage``/gremium ``session.manage``), assigned
+        protokollant OR gremium role with ``protocol.write`` — like ``can_write``."""
         meeting = await self._meeting(meeting_id)
         if not await self._meeting_service().can_write(meeting, principal):
             raise ForbiddenError("not allowed to write this meeting's minutes")
 
     async def authorize_write(self, protocol_id: UUID, principal: Principal) -> None:
-        """Schreibrecht an einem bestehenden Protokoll (PATCH / embed votes)."""
+        """Check write access to an existing protocol (PATCH / embed votes)."""
         protocol = await self._get(protocol_id)
         await self.authorize_write_meeting(protocol.meeting_id, principal)
 
     async def authorize_finalize(self, protocol_id: UUID, principal: Principal) -> None:
-        """Finalisieren+Versand: Schreibrecht UND ``protocol.finalize`` (global ODER
-        als Gremium-Rolle dieses Gremiums). Strenger als das reine Entwurf-Schreiben."""
+        """Finalize+send requires write access AND ``protocol.finalize``
+        (global OR as a gremium role of this gremium). Stricter than draft writing."""
         protocol = await self._get(protocol_id)
         meeting = await self._meeting(protocol.meeting_id)
         svc = self._meeting_service()
@@ -172,39 +168,37 @@ class ProtocolService:
         raise ForbiddenError("Missing permission(s): protocol.finalize")
 
     async def authorize_read(self, protocol_id: UUID, principal: Principal) -> None:
-        """Leserecht an einem Protokoll: dieselbe Sichtbarkeit wie die Sitzung
-        (``assert_can_read`` — Mitglieder/Pool-Vertreter des Gremiums, Delegations-
-        Empfänger, sowie globale ``meeting.view_all``/``meeting.manage``/Admin)."""
+        """Check read access: same visibility as the meeting (``assert_can_read``)."""
         protocol = await self._get(protocol_id)
         await self._meeting_service().assert_can_read(protocol.meeting_id, principal)
 
     async def authorize_read_meeting(
         self, meeting_id: UUID, principal: Principal
     ) -> None:
-        """Leserecht am Protokoll EINER Sitzung (GET …/protocol)."""
+        """Check read access to a meeting's protocol (GET …/protocol)."""
         await self._meeting_service().assert_can_read(meeting_id, principal)
 
     def _pdf_path(self, protocol: Protocol) -> str | None:
-        """App-relativer PDF-Pfad (über nginx /api/ erreichbar, nie ein Bucket-Link).
+        """App-relative PDF path (reachable via nginx /api/, never a bucket link).
 
-        MinIO liegt im ``internal``-Netz ohne Port-Publish; eine S3v4-signierte URL
-        bindet den (internen) Host in die Signatur → vom Browser unerreichbar. Statt
-        dessen streamt der ``/pdf``-Endpunkt die Bytes server-seitig aus dem Storage."""
+        MinIO sits on the internal network without a published port; an
+        S3v4-signed URL binds the internal host into the signature → unreachable
+        from the browser. The ``/pdf`` endpoint streams the bytes server-side."""
         if protocol.pdf_storage_key is not None and self.storage is not None:
             return f"/api/protocols/{protocol.id}/pdf"
         return None
 
     def _public_pdf_path(self, protocol: Protocol) -> str | None:
-        """App-relativer Pfad der redigierten öffentlichen Variante (#PII-Re-Add)."""
+        """App-relative path of the redacted public variant."""
         if protocol.public_pdf_storage_key is not None and self.storage is not None:
             return f"/api/protocols/{protocol.id}/pdf/public"
         return None
 
     async def get_pdf_bytes(self, protocol_id: UUID) -> bytes:
-        """PDF-Bytes des Protokolls aus dem Storage holen (für den ``/pdf``-Stream).
+        """Fetch the protocol's PDF bytes from storage (for the ``/pdf`` stream).
 
-        404, wenn das Protokoll fehlt, noch kein PDF gerendert wurde oder Storage »aus«
-        ist. Transiente Storage-Fehler → 503 (wiederholbar)."""
+        404 if the protocol is missing, no PDF is rendered yet, or storage is
+        off. Transient storage errors → 503 (repeatable)."""
         protocol = await self._get(protocol_id)
         if protocol.pdf_storage_key is None or self.storage is None:
             raise NotFoundError(f"protocol {protocol_id} has no PDF")
@@ -216,7 +210,7 @@ class ProtocolService:
             ) from exc
 
     async def get_public_pdf_bytes(self, protocol_id: UUID) -> bytes:
-        """Bytes der redigierten öffentlichen Variante (für den ``/pdf/public``-Stream)."""
+        """Fetch the redacted public variant's bytes (for the ``/pdf/public`` stream)."""
         protocol = await self._get(protocol_id)
         if protocol.public_pdf_storage_key is None or self.storage is None:
             raise NotFoundError(f"protocol {protocol_id} has no public PDF")
@@ -250,7 +244,7 @@ class ProtocolService:
     def _insert_values(
         meeting: Meeting, gremium: Gremium | None, author: str | None
     ) -> dict[str, object]:
-        """Spalten-Werte einer frischen ``protocol``-Zeile (``cd_variant`` vom Gremium)."""
+        """Column values of a fresh ``protocol`` row (``cd_variant`` from the gremium)."""
         return {
             "meeting_id": meeting.id,
             "gremium_id": meeting.gremium_id,
@@ -261,10 +255,10 @@ class ProtocolService:
         }
 
     async def get_by_meeting(self, meeting_id: UUID) -> ProtocolOut:
-        """Protokoll der Sitzung **lesen** (404 ohne Protokoll) — Reload-/Poll-Pfad.
+        """Read the meeting's protocol (404 without one) — reload/poll path.
 
-        Bewusst ohne Anlage-Seiteneffekt: das FE pollt während des Hintergrund-
-        Renders; ein GET unterliegt nicht dem Default-Write-Rate-Limit (#429)."""
+        Deliberately without a create side effect: the frontend polls during
+        the background render; a GET is not subject to the write rate limit."""
         protocol = await self._by_meeting(meeting_id)
         if protocol is None:
             raise NotFoundError(f"protocol for meeting {meeting_id} not found")
@@ -273,12 +267,12 @@ class ProtocolService:
     async def get_or_create(
         self, meeting_id: UUID, *, author: str | None = None
     ) -> ProtocolOut:
-        """Protokoll der Sitzung anlegen **oder** laden (idempotent). 404 ohne Sitzung.
+        """Create or load the meeting's protocol (idempotent). 404 without a meeting.
 
-        Race-sicher: bei parallelem POST verhindert ``INSERT … ON CONFLICT
-        (meeting_id) DO NOTHING`` die UNIQUE-Verletzung (kein ``IntegrityError`` → kein
-        500); das anschließende Re-Select liefert in **beiden** Fällen (selbst angelegt
-        **oder** vom Parallel-Request gewonnen) dieselbe Zeile zurück (idempotent)."""
+        Race-safe: on a parallel POST, ``INSERT … ON CONFLICT (meeting_id) DO
+        NOTHING`` avoids the UNIQUE violation (no ``IntegrityError`` → no 500);
+        the following re-select returns the same row in BOTH cases (created
+        here or won by the parallel request)."""
         existing = await self._by_meeting(meeting_id)
         if existing is not None:
             return self._to_out(existing)
@@ -286,8 +280,8 @@ class ProtocolService:
         meeting = await self.session.get(Meeting, meeting_id)
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
-        # Das Protokoll entsteht ausschließlich beim Start der Sitzung (planned→live),
-        # nie manuell vorab: vor dem Start kann nicht protokolliert werden.
+        # The protocol is created only when the meeting starts (planned→live),
+        # never manually in advance: no minutes before the start.
         if meeting.status == "planned":
             raise ConflictError(
                 "the meeting has not started — its minutes are created on start"
@@ -301,13 +295,13 @@ class ProtocolService:
         await self.session.commit()
 
         protocol = await self._by_meeting(meeting_id)
-        if protocol is None:  # nur falls die Zeile zwischen Insert+Select verschwand
+        if protocol is None:  # only if the row vanished between insert+select
             raise NotFoundError(f"protocol for meeting {meeting_id} not found")
         return self._to_out(protocol)
 
     # --------------------------------------------------------------- markdown
     async def update_markdown(self, protocol_id: UUID, markdown: str) -> ProtocolOut:
-        """Editor-Body aktualisieren. 409, wenn das Protokoll bereits final ist."""
+        """Update the editor body. 409 if the protocol is already final."""
         protocol = await self._get(protocol_id)
         self._ensure_draft(protocol)
         protocol.markdown = markdown
@@ -319,7 +313,7 @@ class ProtocolService:
     async def embed_votes(
         self, protocol_id: UUID, vote_ids: list[UUID]
     ) -> ProtocolOut:
-        """Abstimmungen als Snippets anhängen + ``protocol_vote_ref`` (idempotent)."""
+        """Append votes as snippets + write ``protocol_vote_ref`` (idempotent)."""
         protocol = await self._get(protocol_id)
         self._ensure_draft(protocol)
         already = set(
@@ -337,12 +331,12 @@ class ProtocolService:
         snippets: list[str] = []
         for vote_id in vote_ids:
             if vote_id in already:
-                continue  # schon eingebettet → kein Doppel-Snippet
-            await self._get_vote(vote_id)  # 404 + verhindert FK-IntegrityError beim Insert
+                continue  # already embedded → no duplicate snippet
+            await self._get_vote(vote_id)  # 404 + avoids FK IntegrityError on insert
             already.add(vote_id)
-            # Race-sicher: ON CONFLICT (protocol_id, vote_id) DO NOTHING. Schreibt ein
-            # Parallel-Request den Ref zuerst, liefert RETURNING nichts → kein Doppel-
-            # Snippet (idempotent, kein IntegrityError/500).
+            # Race-safe: ON CONFLICT (protocol_id, vote_id) DO NOTHING. If a
+            # parallel request wrote the ref first, RETURNING yields nothing →
+            # no duplicate snippet (idempotent, no IntegrityError/500).
             inserted = (
                 await self.session.execute(
                     pg_insert(ProtocolVoteRef)
@@ -352,7 +346,7 @@ class ProtocolService:
                 )
             ).first()
             if inserted is None:
-                continue  # nebenläufig bereits eingebettet
+                continue  # concurrently embedded already
             view = await voting.get(vote_id)
             snippets.append(
                 build_vote_snippet(
@@ -372,12 +366,12 @@ class ProtocolService:
 
     # -------------------------------------------------------------- finalize
     async def start_finalize(self, protocol_id: UUID) -> tuple[ProtocolOut, bool]:
-        """Finalisierung anstoßen: ``draft → rendering`` (committed, nicht-blockierend).
+        """Start finalization: ``draft → rendering`` (committed, non-blocking).
 
-        Der Aufrufer (Router) enqueued anschließend den ``render_protocol``-Worker-Job.
-        Idempotent: ein bereits ``rendering``/``final`` Protokoll wird unverändert
-        zurückgegeben — das zweite Tupel-Element ``False`` heißt »nichts enqueuen«
-        (kein Doppel-Render, kein Doppelversand)."""
+        The caller (router) then enqueues the ``render_protocol`` worker job.
+        Idempotent: an already ``rendering``/``final`` protocol is returned
+        unchanged — the second tuple element ``False`` means "do not enqueue"
+        (no double render, no double send)."""
         protocol = await self._get(protocol_id)
         if protocol.status in ("rendering", "final"):
             return self._to_out(protocol), False
@@ -387,10 +381,10 @@ class ProtocolService:
         return self._to_out(protocol), True
 
     async def revert_to_draft(self, protocol_id: UUID) -> None:
-        """``rendering → draft`` nach dauerhaftem Render-/Versand-Fehler.
+        """Roll back ``rendering → draft`` after a permanent render/send failure.
 
-        Das Protokoll bleibt damit re-finalisierbar und hängt **nie** in
-        ``rendering`` fest; ein bereits finales Protokoll bleibt unangetastet."""
+        The protocol stays re-finalizable and never hangs in ``rendering``;
+        an already final protocol is untouched."""
         protocol = await self._get(protocol_id)
         if protocol.status == "rendering":
             protocol.status = "draft"
@@ -398,29 +392,28 @@ class ProtocolService:
             await self.session.commit()
 
     async def finalize(self, protocol_id: UUID, *, now: datetime) -> ProtocolOut:
-        """Markdown → PDF → MinIO → Mail an MAIL_LIST(gremium); ``final``.
+        """Render Markdown → PDF → MinIO → mail to MAIL_LIST(gremium); ``final``.
 
-        Läuft im Worker (``render_protocol``, Status ``rendering``) **oder** synchron
-        als Fallback ohne Redis (Status noch ``draft``). Idempotent: ein bereits
-        finalisiertes Protokoll wird unverändert (mit frisch signierter URL)
-        zurückgegeben — kein zweiter Render, kein Doppelversand."""
+        Runs in the worker (``render_protocol``, status ``rendering``) OR
+        synchronously as fallback without Redis (status still ``draft``).
+        Idempotent: an already final protocol is returned unchanged — no second
+        render, no double send."""
         protocol = await self._get(protocol_id)
         if protocol.status == "final":
             return self._to_out(protocol)
 
-        # Render (pytex) läuft VOR dem Commit: ein dauerhafter Compile-Fehler (4xx)
-        # bzw. ein transienter pytex-Ausfall (5xx) rollt die Session zurück, das
-        # Protokoll bleibt Entwurf. Der Storage-``put`` und der Mail-Enqueue erfolgen
-        # aber bewusst ERST NACH erfolgreichem Commit (#pre-commit-side-effects):
-        # scheitert der Commit, gäbe es sonst ein verwaistes MinIO-Objekt und einen
-        # bereits eingereihten Versand-Job zu einer Zeile, die nie ``final`` wurde.
-        # ``_render_pdf`` setzt nur die Key-Spalten + liefert die Bytes; der Upload
-        # geschieht in ``_store`` post-commit.
+        # The pytex render runs BEFORE the commit: a permanent compile error
+        # (4xx) or a transient pytex outage (5xx) rolls the session back and
+        # the protocol stays draft. The storage ``put`` and the mail enqueue
+        # deliberately happen only AFTER a successful commit: if the commit
+        # failed, we would otherwise leave an orphaned MinIO object and an
+        # enqueued send job for a row that never became ``final``.
+        # ``_render_pdf`` only sets the key columns + returns the bytes; the
+        # upload happens post-commit in ``_store``.
         uploads: list[tuple[str, bytes]] = []
         if await self._has_non_public(protocol.meeting_id):
-            # Dual-Render: vollständiges internes PDF + redigiertes öffentliches PDF.
-            # Per Mail geht NUR die öffentliche Variante (nicht-öffentliche TOPs sollen
-            # nicht im Verteiler landen).
+            # Dual render: full internal PDF + redacted public PDF. Only the
+            # public variant is mailed (non-public items must not reach the list).
             internal_md = await self._build_document(protocol, public=False)
             internal_pdf = await self._render_pdf(protocol, internal_md, public=False)
             public_md = await self._build_document(protocol, public=True)
@@ -439,7 +432,7 @@ class ProtocolService:
         protocol.sent_at = now
         await self.session.flush()
         await self.session.commit()
-        # Ab hier ist der DB-Stand persistent — Seiteneffekte sind jetzt sicher.
+        # From here the DB state is persistent — side effects are safe now.
         await self._store(uploads)
         await self._send(protocol, mail_pdf)
         return self._to_out(protocol)
@@ -449,16 +442,15 @@ class ProtocolService:
         meeting = await self.session.get(Meeting, protocol.meeting_id)
         gremium = await self.session.get(Gremium, protocol.gremium_id)
         title = meeting.title if meeting is not None else "Protokoll"
-        # Quelle der Wahrheit ist der pro-TOP-Editor (Tagesordnung). Existieren TOPs,
-        # wird das Protokoll aus ihren Markdown-Bodies + Beschluss-Snippets montiert;
-        # andernfalls Fallback auf das frei editierte ``protocol.markdown`` (Bestand).
-        # ``public=True`` redigiert nicht-öffentliche TOPs (#PII-Re-Add).
+        # Source of truth is the per-item editor (agenda). If items exist, the
+        # protocol is assembled from their Markdown bodies + decision snippets;
+        # otherwise fall back to the freely edited ``protocol.markdown``.
+        # ``public=True`` redacts non-public items.
         assembled = await self._assemble_from_agenda(protocol.meeting_id, public=public)
-        # ``public=True`` redigiert auch die Header-Metadaten (AUD-025): in der an die
-        # Verteilerliste gemailte Variante dürfen weder die Namen der Anwesenden/Abwesenden
-        # noch der Protokollant erscheinen. ``_header_meta`` liefert dann leere Namenslisten
-        # + nur die Zähler (als Daten-Zeilen) und keinen Protokollanten-Namen — die
-        # Beschlussfähigkeit (Zähler-basiert) bleibt aussagekräftig.
+        # ``public=True`` also redacts the header metadata: the mailed variant
+        # must not carry attendee/absentee names or the protokollant's name.
+        # ``_header_meta`` then returns empty name lists + counters only (as
+        # data lines); the counter-based quorum statement stays meaningful.
         protokollant, present, absent, present_count, datalines = await self._header_meta(
             meeting, public=public
         )
@@ -482,7 +474,7 @@ class ProtocolService:
         )
 
     def _local_end_time(self, closed_at: object) -> _time | None:
-        """``meeting.closed_at`` (UTC) → lokale Uhrzeit für die »Ende«-Zeile (#14)."""
+        """Convert ``meeting.closed_at`` (UTC) to local time for the end line."""
         if not isinstance(closed_at, datetime):
             return None
         settings = self.settings or get_settings()
@@ -490,10 +482,10 @@ class ProtocolService:
         return closed_at.astimezone(tz).time().replace(second=0, microsecond=0)
 
     async def _quorate(self, gremium: object | None, present_count: int) -> bool | None:
-        """Beschlussfähigkeit: Anwesende vs. aktive Mitglieder (#protocol-quorum).
+        """Compute quorum: present vs. active members.
 
-        Schwelle = ``gremium.quorum_percent`` (falls gesetzt), sonst »mehr als die
-        Hälfte«. ``None`` ohne Gremium/Mitglieder — dann keine Aussage im PDF."""
+        Threshold = ``gremium.quorum_percent`` if set, else "more than half".
+        ``None`` without gremium/members — then no statement in the PDF."""
         gremium_id = getattr(gremium, "id", None)
         if gremium_id is None:
             return None
@@ -519,19 +511,16 @@ class ProtocolService:
     async def _header_meta(
         self, meeting: Meeting | None, *, public: bool = False
     ) -> tuple[str | None, list[str], list[str], int, list[str]]:
-        """Protokollant + Anwesenheits-Listen (Name oder Sub) für den Protokoll-Header.
+        """Resolve protokollant + attendance lists (name or sub) for the header.
 
-        Liefert ``(protokollant, present, absent, present_count, datalines)``. Der
-        ``present_count`` ist die wahre Zahl der Anwesenden (Quelle für die
-        Beschlussfähigkeit) — auch dann, wenn ``public=True`` die Namenslisten
-        unterdrückt.
+        Returns ``(protokollant, present, absent, present_count, datalines)``.
+        ``present_count`` is the true number of attendees (source for the
+        quorum) even when ``public=True`` suppresses the name lists.
 
-        ``public=True`` redigiert für die an die Verteilerliste gemailte Variante die
-        personenbezogenen Header-Metadaten (AUD-025): die vollständige Anwesenheits-/
-        Abwesenheits-Liste einer (potenziell nicht-öffentlichen) Sitzung sowie der
-        Protokollanten-Name dürfen nicht nach extern. Statt der Namen werden nur die
-        Zähler als Daten-Zeilen (``Anwesend: n`` / ``Abwesend: n``) ausgegeben; die
-        Beschlussfähigkeit (zähler-basiert) bleibt erhalten."""
+        ``public=True`` redacts person-related header metadata for the mailed
+        variant: full attendance lists and the protokollant's name must not go
+        external. Only the counters are emitted as data lines
+        (``Anwesend: n`` / ``Abwesend: n``)."""
         if meeting is None:
             return None, [], [], 0, []
         protokollant: str | None = None
@@ -555,7 +544,7 @@ class ProtocolService:
         absent = [name or sub for status, name, sub in rows if status == "absent"]
         present_count = len(present)
         if public:
-            # Namen + Protokollant raushalten; nur die Zähler als Daten-Zeilen behalten.
+            # Keep names + protokollant out; keep only the counters as data lines.
             datalines = [
                 f"Anwesend: {present_count}",
                 f"Abwesend: {len(absent)}",
@@ -564,7 +553,7 @@ class ProtocolService:
         return protokollant, present, absent, present_count, []
 
     async def _has_non_public(self, meeting_id: UUID) -> bool:
-        """Hat die Sitzung mind. einen nicht-öffentlichen TOP? (steuert Dual-Render)."""
+        """Return True if the meeting has a non-public agenda item (drives dual render)."""
         return bool(
             await self.session.scalar(
                 select(func.count())
@@ -579,11 +568,10 @@ class ProtocolService:
     async def _assemble_from_agenda(
         self, meeting_id: UUID, *, public: bool = False
     ) -> str:
-        """Protokoll-Markdown aus den TOP-Bodies + ihren Beschluss-Abstimmungen bauen.
+        """Build the protocol Markdown from agenda-item bodies + their decision votes.
 
-        ``public=True`` redigiert nicht-öffentliche TOPs: die Überschrift (und damit die
-        TOP-Nummerierung) bleibt erhalten, Body + Beschluss-Snippets werden durch einen
-        Platzhalter ersetzt."""
+        ``public=True`` redacts non-public items: the heading (and thus the
+        numbering) stays, body + decision snippets are replaced by a placeholder."""
         items = (
             await self.session.execute(
                 select(MeetingAgendaItem)
@@ -597,28 +585,27 @@ class ProtocolService:
         blocks: list[str] = []
         for item in items:
             heading = (item.title or "Tagesordnungspunkt").strip()
-            # Top-Level-``#`` OHNE »TOP n:«-Präfix: pytex nummeriert die Sections
-            # selbst als »TOP 1«, »TOP 2«, … (#pdf-format) — ``##`` würde als
-            # »TOP 0.1« nummeriert und ein eigenes Präfix doppelt erscheinen.
+            # Top-level ``#`` WITHOUT a "TOP n:" prefix: pytex numbers the
+            # sections itself as "TOP 1", "TOP 2", … — ``##`` would be numbered
+            # "TOP 0.1" and a manual prefix would appear twice.
             if public and item.non_public:
-                # Der Original-Titel kann den sensiblen Gegenstand kodieren (AUD-025) und
-                # darf nicht in die an die Verteilerliste gemailte öffentliche Variante.
-                # Neutrale Überschrift + redigierter Inhalt; Nummerierung bleibt stabil.
+                # The original title may encode the sensitive subject and must
+                # not reach the mailed public variant. Neutral heading +
+                # redacted content; numbering stays stable.
                 block = [f"# {_NON_PUBLIC_HEADING}", _NON_PUBLIC_PLACEHOLDER]
                 blocks.append("\n\n".join(block))
                 continue
             block = [f"# {heading}"]
             if item.body and item.body.strip():
-                # Body-Headings eine Ebene absenken: nur die TOP-Überschrift
-                # bleibt Top-Level (sonst zählte jedes ``#`` als eigener TOP).
+                # Demote body headings one level: only the item heading stays
+                # top-level (otherwise every ``#`` would count as its own TOP).
                 block.append(demote_headings(item.body.strip()))
             votes = (
                 await self.session.execute(
                     select(Vote)
                     .where(
                         Vote.agenda_item_id == item.id,
-                        # Stornierte Abstimmungen (Wahl abgebrochen) haben kein
-                        # Ergebnis — keine leere Tally-Box im Protokoll.
+                        # Cancelled votes have no result — no empty tally box.
                         Vote.status != "cancelled",
                     )
                     .order_by(Vote.created_at)
@@ -639,36 +626,36 @@ class ProtocolService:
     async def _render_pdf(
         self, protocol: Protocol, markdown: str, *, public: bool = False
     ) -> bytes | None:
-        """pytex → PDF-Bytes (VOR dem Commit). Setzt die Key-Spalte, lädt aber NICHT
-        hoch — der Storage-``put`` läuft post-commit in :meth:`_store`.
+        """Render pytex → PDF bytes (BEFORE the commit). Sets the key column but
+        does NOT upload — the storage ``put`` runs post-commit in :meth:`_store`.
 
-        ``public=True`` setzt ``public_pdf_storage_key`` statt ``pdf_storage_key``.
-        Ohne Storage »aus« (DEV) wird nicht gerendert (``None``); ein dauerhafter
-        pytex-Fehler → 400, ein transienter → 503 (Entwurf bleibt erhalten)."""
-        # Storage ist der bewusste An/Aus-Schalter (T-20-Konvention): fehlt er, läuft
-        # finalize ohne PDF weiter (Demo/Contract-CI ohne MinIO).
+        ``public=True`` sets ``public_pdf_storage_key`` instead of
+        ``pdf_storage_key``. With storage off (dev) nothing is rendered
+        (``None``); a permanent pytex error → 400, a transient one → 503
+        (the draft survives)."""
+        # Storage is the deliberate on/off switch: without it, finalize
+        # proceeds without a PDF (demo/contract CI without MinIO).
         if self.storage is None or self.pytex is None:
             return None
         try:
             variant = protocol_variant_for(protocol.cd_variant)
-            # RCE-Schutz (security.md §2; AUD-010): der nutzer-geschriebene Body
-            # (Protokollant) könnte pytex' Markdown-``eval``-Escape (``[//]: # "EXPR"``
-            # → eval im Container) tragen. Den entfernt ``sanitize_user_markdown``
-            # BEDINGUNGSLOS schon beim Zusammenbau (``build_protocol_document``), bevor
-            # das Markdown pytex erreicht — der einzige eval-Vektor ist damit weg;
-            # ``\write18``-Shell-Escape greift unter der tectonic-Engine ohnehin nicht.
-            # Darum rendert dieser Pfad ``trusted`` (Client-Default): die Protokoll-
-            # Variante (``protocol-stupa``/``-asta``) braucht pytex' Template-Maschinerie,
-            # die ``untrusted``/``sandboxed`` sperrt — untrusted ließ jeden Protokoll-
-            # Render mit 400 (pytex ``TrustError``) scheitern. Als zweite, unabhängige
-            # Linie (Defense-in-Depth) verifiziert ``PytexClient.render_pdf`` vor dem
-            # ``trusted``-Render strukturell, dass kein eval-Trigger überlebt hat — ein
-            # etwaiger Sanitizer-Bypass wird so zu einem eingedämmten Fehler statt RCE.
+            # RCE protection: the user-written body could carry pytex's
+            # Markdown ``eval`` escape (``[//]: # "EXPR"`` → eval in the
+            # container). ``sanitize_user_markdown`` removes it UNCONDITIONALLY
+            # during assembly (``build_protocol_document``) before the Markdown
+            # reaches pytex; ``\write18`` shell escape does not apply under
+            # tectonic. This path therefore renders ``trusted`` (client
+            # default): the protocol variant needs pytex's template machinery,
+            # which ``untrusted``/``sandboxed`` blocks (untrusted failed every
+            # protocol render with 400). As a second, independent line,
+            # ``PytexClient.render_pdf`` structurally verifies before the
+            # trusted render that no eval trigger survived — a sanitizer bypass
+            # becomes a contained error instead of RCE.
             pdf = await self.pytex.render_pdf(markdown, variant=variant)
         except PytexError as exc:
-            # 4xx = dauerhafter Eingabe-/Compile-Fehler (z. B. ungültiges LaTeX im
-            # Protokoll-Markdown): kein Retry, dem Nutzer den (gescrubbten) Grund
-            # zeigen statt eines irreführenden 503. 5xx/Transport bleibt transient.
+            # 4xx = permanent input/compile error (e.g. invalid LaTeX): no
+            # retry, show the (scrubbed) reason instead of a misleading 503.
+            # 5xx/transport stays transient.
             if not exc.retryable:
                 raise BadRequestError(
                     f"Protocol could not be rendered: {exc}", code="render_failed"
@@ -688,35 +675,35 @@ class ProtocolService:
         return pdf
 
     async def _store(self, uploads: list[tuple[str, bytes]]) -> None:
-        """Gerenderte PDFs NACH erfolgreichem Commit ins Object-Storage schreiben.
+        """Upload rendered PDFs to object storage AFTER a successful commit.
 
-        Erst jetzt entsteht das MinIO-Objekt — schlägt der vorausgehende Commit fehl,
-        gibt es kein verwaistes Objekt (#pre-commit-side-effects). Ohne Storage »aus«
-        bleibt ``uploads`` leer (``_render_pdf`` lieferte ``None``). Ein transienter
-        Storage-Fehler → 503: das Protokoll ist bereits ``final`` committed, der erneute
-        ``finalize`` ist über die ``status=='final'``-Idempotenz ein No-Op."""
+        Only now is the MinIO object created — a failed commit leaves no
+        orphaned object. With storage off, ``uploads`` is empty (``_render_pdf``
+        returned ``None``). A transient storage error → 503: the protocol is
+        already committed ``final``, so a repeated ``finalize`` is a no-op via
+        the ``status=='final'`` idempotency."""
         if self.storage is None:
             return
         try:
             for key, pdf in uploads:
                 await self.storage.put(key, pdf, "application/pdf")
         except StorageError as exc:
-            # Vorhandenes Backend transient nicht erreichbar → 503. Kein Pfad-Leak.
+            # Existing backend transiently unreachable → 503. No path leak.
             raise ServiceUnavailableError(
                 "Protocol rendering temporarily unavailable."
             ) from exc
 
     async def _send(self, protocol: Protocol, pdf: bytes | None) -> None:
-        """Protokoll an MAIL_LIST(gremium) — idempotenter Key, PDF als **Anhang**.
+        """Mail the protocol to MAIL_LIST(gremium) — idempotent key, PDF attached.
 
-        Subject/Body nennen Gremium + Sitzung (#4); die HTML-Fassung nutzt das
-        gebrandete Mail-Layout. Kein Link mehr (#protocol-mail-pdf): der frühere
-        ``/api/protocols/{id}/pdf``-Link verlangt Login + ``meeting.manage`` — für
-        Mitglieder und externe Verteiler-Adressen war er schlicht kaputt."""
+        Subject/body name gremium + meeting; the HTML version uses the branded
+        mail layout. Deliberately no link: the former
+        ``/api/protocols/{id}/pdf`` link required login + ``meeting.manage``
+        and was broken for members and external list addresses."""
         if self.mail_queue is None:
             return
         recipients = await self._recipients(protocol.gremium_id)
-        # Abgewählte Protokoll-Mails respektieren (#4-2).
+        # Respect opted-out protocol mails.
         recipients = await filter_recipients_by_preference(
             self.session, recipients, "protocol"
         )
@@ -774,13 +761,11 @@ class ProtocolService:
         )
 
     async def _recipients(self, gremium_id: UUID) -> list[str]:
-        """Flache, deduplizierte Empfängerliste des Gremiums.
+        """Build the flat, deduplicated recipient list of the gremium.
 
-        **Union** aus den aktiven Gremium-Mitgliedern (Amtszeit-Fenster, email≠NULL)
-        und den konfigurierten Zusatz-Verteilern (``mail_list``, pflegbar über
-        ``PUT /admin/gremien/{id}/mail-recipients``, #protocol-recipients) — die
-        Zusatz-Adressen erhalten das Protokoll **zusätzlich**, nicht statt der
-        Mitglieder."""
+        UNION of active gremium members (term window, email≠NULL) and the
+        configured extra lists (``mail_list``) — the extra addresses receive
+        the protocol in addition to, not instead of, the members."""
         seen: dict[str, None] = {}
         members = await RecipientResolver(self.session).resolve(
             [{"kind": "gremium", "ref": str(gremium_id)}]
@@ -807,8 +792,8 @@ class ProtocolService:
                 "Protocol is finalized and read-only.", code="conflict"
             )
         if protocol.status == "rendering":
-            # Während des Hintergrund-Renders ist der Inhalt eingefroren — sonst
-            # würde das PDF einen anderen Stand zeigen als der Editor.
+            # Content is frozen during the background render — the PDF would
+            # otherwise show a different state than the editor.
             raise ConflictError(
                 "Protocol is being rendered and is read-only.", code="conflict"
             )
@@ -821,11 +806,11 @@ class ProtocolService:
 
 
 def _vote_title(application_id: UUID | None, question: str | None = None) -> str:
-    """Snippet-Überschrift einer eingebetteten Abstimmung.
+    """Build the snippet heading of an embedded vote.
 
-    Antrags-TOP: Kurz-Referenz auf den Antrag. Generische Beschlussfrage (kein
-    Antrag): die Frage selbst. Der Protokollant kann die Überschrift im Editor frei
-    nacharbeiten."""
+    Application item: short reference to the application. Generic decision
+    question (no application): the question itself. The protokollant can edit
+    the heading freely in the editor."""
     if application_id is not None:
         return f"Abstimmung – Antrag {str(application_id)[:8]}"
     return question.strip() if question and question.strip() else "Beschlussfrage"

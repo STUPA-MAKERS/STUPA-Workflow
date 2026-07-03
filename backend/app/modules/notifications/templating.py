@@ -1,9 +1,9 @@
-"""Mail-Template-Render (Jinja2, i18n DE/EN, Platzhalter, Vorschau).
+"""Mail template rendering (Jinja2, i18n DE/EN, placeholders, preview).
 
-Reine Render-Logik auf Dicts (`*_i18n`) — keine DB. Sprache wird mit Fallback DE
-aufgelöst (i18n-Helfer), dann via **gesandboxtem** Jinja2 mit dem Kontext gerendert.
-Sandbox + `StrictUndefined`: unbekannte Platzhalter scheitern laut (Vorschau zeigt
-den Fehler), kein Zugriff auf gefährliche Attribute trotz Admin-Autorschaft.
+Pure render logic over `*_i18n` dicts; no DB. Language resolves with a DE fallback,
+then renders via a sandboxed Jinja2. Sandbox + `StrictUndefined`: unknown
+placeholders fail loudly and dangerous attributes stay inaccessible despite admin
+authorship.
 """
 
 from __future__ import annotations
@@ -20,12 +20,12 @@ _env_html = SandboxedEnvironment(undefined=StrictUndefined, autoescape=True)
 
 
 class TemplateRenderError(Exception):
-    """Render fehlgeschlagen (unbekannter Platzhalter, Syntaxfehler, …)."""
+    """Render failed (unknown placeholder, syntax error, ...)."""
 
 
 @dataclass(frozen=True, slots=True)
 class RenderedMail:
-    """Gerendertes Ergebnis (eine Sprache)."""
+    """Rendered result (single language)."""
 
     subject: str
     text: str
@@ -34,7 +34,7 @@ class RenderedMail:
 
 
 def _resolve(value: I18nMap | None, lang: str, default_lang: str) -> tuple[str | None, str]:
-    """Text + tatsächlich genutzte Sprache (für Anzeige/Debug)."""
+    """Return the text and the language actually used."""
     if not value:
         return None, lang
     if lang in value:
@@ -46,9 +46,8 @@ def _resolve(value: I18nMap | None, lang: str, default_lang: str) -> tuple[str |
 
 
 def _sanitize_subject(value: str) -> str:
-    """Header-Injection abwehren: CR/LF (und weitere Zeilenumbrüche) aus dem Subject
-    entfernen, sonst könnte Kontext-Input zusätzliche Mail-Header schmuggeln
-    (security.md). `splitlines()` deckt \\r \\n \\r\\n \\v \\f u. a. ab."""
+    """Strip CR/LF and other line breaks from the subject to block header injection;
+    context input could otherwise smuggle extra mail headers."""
     return " ".join(value.splitlines()).strip()
 
 
@@ -69,7 +68,7 @@ def render_mail(
     lang: str = "de",
     default_lang: str = "de",
 ) -> RenderedMail:
-    """Subject/Body (+ optional HTML) in `lang` rendern (Fallback `default_lang`)."""
+    """Render subject/body (+ optional HTML) in `lang` (fallback `default_lang`)."""
     subject_tpl, used = _resolve(subject_i18n, lang, default_lang)
     body_tpl, _ = _resolve(body_i18n, lang, default_lang)
     if subject_tpl is None or body_tpl is None:

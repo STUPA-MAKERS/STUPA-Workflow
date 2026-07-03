@@ -4,33 +4,31 @@ import { finalize } from 'rxjs';
 import { LoadingService } from './loading.service';
 
 /**
- * Per-Request-Opt-out für den globalen Ladebildschirm (#loading). `true` ⇒ dieser
- * Request zählt **nicht** in den Overlay-Zähler.
+ * Per-request opt-out for the global loading overlay. `true` ⇒ this request does
+ * not count toward the overlay counter.
  */
 export const SKIP_LOADING = new HttpContextToken<boolean>(() => false);
 
-/** Fertiger {@link HttpContext}, der den globalen Ladebildschirm unterdrückt. */
+/** Ready-made {@link HttpContext} that suppresses the global loading overlay. */
 export function skipLoading(): HttpContext {
   return new HttpContext().set(SKIP_LOADING, true);
 }
 
 /**
- * Speist den globalen Ladebildschirm (#loading) über den {@link LoadingService}.
+ * Feeds the global loading overlay via the {@link LoadingService}.
  *
- * Der Overlay soll **nur erscheinen, wenn Daten geladen werden** — daher zählen
- * ausschließlich **GET**-Requests, und nur solange sie nicht per
- * {@link SKIP_LOADING} ausgeklinkt sind:
+ * The overlay should only appear when data is being loaded — so only GET
+ * requests count, and only while they are not opted out via {@link SKIP_LOADING}:
  *
- * - **Mutationen** (POST/PUT/PATCH/DELETE) lösen den Overlay nie aus — sie haben
- *   lokales Feedback (Button-`loading`, optimistische Updates) und sollen die
- *   Sicht nicht aufblitzen lassen (Autosave, Vote, Reorder, Finalize …).
- * - **Hintergrund-GETs** (Status-Polls, Refresh nach Mutation/WS-Event, debounced
- *   Typeahead) **und** Loads, die bereits einen **lokalen** Spinner zeigen, setzen
- *   `SKIP_LOADING` und überspringen den Overlay — so stapeln sich nicht zwei
- *   Spinner.
+ * - Mutations (POST/PUT/PATCH/DELETE) never trigger the overlay — they have
+ *   local feedback (button `loading`, optimistic updates) and should not flash
+ *   the view (autosave, vote, reorder, finalize …).
+ * - Background GETs (status polls, refresh after a mutation/WS event, debounced
+ *   typeahead) and loads that already show a local spinner set `SKIP_LOADING`
+ *   and skip the overlay — so two spinners never stack.
  *
- * Als **äußerster** Interceptor registriert, damit die volle Request-Dauer
- * (inkl. Auth/Mock) erfasst wird.
+ * Registered as the outermost interceptor so the full request duration (incl.
+ * auth/mock) is captured.
  */
 export const loadingInterceptor: HttpInterceptorFn = (req, next) => {
   if (req.method !== 'GET' || req.context.get(SKIP_LOADING)) {

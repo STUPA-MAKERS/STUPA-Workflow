@@ -1,9 +1,8 @@
-"""Tagesordnungs-Service: Anträge ↔ Sitzung (#10/#58).
+"""Agenda service: applications ↔ meeting.
 
-»Zuweisbar« sind Anträge, deren **aktueller** State ein Abstimmungs-State
-(``kind=='vote'``) ist, dessen ``config.gremiumId`` auf das Sitzungs-Gremium zeigt —
-also genau die Anträge, über die dieses Gremium in dieser Sitzung abstimmt. Die
-Tagesordnung ist geordnet (``position``) und Quelle der Protokoll-TOPs.
+"Assignable" are applications whose current state is a vote state
+(``kind=='vote'``) with ``config.gremiumId`` pointing at the meeting's gremium.
+The agenda is ordered (``position``) and is the source of the protocol TOPs.
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ from app.shared.errors import ConflictError, NotFoundError
 
 
 def _title_of(data: dict[str, Any] | None) -> str | None:
-    """Antragstitel aus dem System-Feld ``title`` (oder ``None``)."""
+    """Return the application title from the system field ``title`` (or ``None``)."""
     if not data:
         return None
     value = data.get("title")
@@ -30,7 +29,7 @@ def _title_of(data: dict[str, Any] | None) -> str | None:
 
 
 class AgendaService:
-    """Tagesordnung einer Sitzung verwalten (Anträge zuweisen/entfernen/auflisten)."""
+    """Manage a meeting's agenda (assign/remove/list applications)."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -44,7 +43,7 @@ class AgendaService:
         return meeting
 
     async def _vote_states(self, gremium_id: UUID) -> dict[UUID, State]:
-        """Abstimmungs-States, deren ``config.gremiumId`` auf dieses Gremium zeigt."""
+        """Vote states whose ``config.gremiumId`` points at this gremium."""
         states = (
             await self.session.scalars(select(State).where(State.kind == "vote"))
         ).all()
@@ -56,7 +55,7 @@ class AgendaService:
         return out
 
     async def item(self, meeting_id: UUID, item_id: UUID) -> MeetingAgendaItem:
-        """Einen TOP der Sitzung laden (404, falls unbekannt)."""
+        """Load one agenda item of the meeting (404 if unknown)."""
         row = (
             await self.session.execute(
                 select(MeetingAgendaItem).where(
@@ -110,7 +109,7 @@ class AgendaService:
                 if app is not None and app.current_state_id is not None
                 else None
             )
-            # Antrag-TOP: Titel/Status aus dem Antrag; Freitext-TOP: ``title``-Spalte.
+            # Application item: title/status from the application; free-text item: ``title`` column.
             title = _title_of(app.data) if app is not None else r.title
             out.append(
                 AgendaItemOut(
@@ -133,11 +132,11 @@ class AgendaService:
         title: str | None = None,
         non_public: bool | None = None,
     ) -> list[AgendaItemOut]:
-        """Markdown-Text, Titel und/oder Sichtbarkeit eines TOP setzen (pro-TOP-Editor).
+        """Set an item's Markdown body, title and/or visibility.
 
-        ``body`` setzt (falls geliefert) den Markdown-Text; ``title`` benennt nur
-        **Freitext-TOPs** um (Antrag-TOPs erben den Titel vom Antrag); ``non_public``
-        schaltet die Redaktion im öffentlichen Protokoll-PDF um.
+        ``title`` only renames free-text items (application items inherit the
+        application's title); ``non_public`` toggles redaction in the public
+        protocol PDF.
         """
         row = (
             await self.session.execute(
@@ -162,7 +161,7 @@ class AgendaService:
     async def reorder(
         self, meeting_id: UUID, item_ids: list[UUID]
     ) -> list[AgendaItemOut]:
-        """TOPs in der gelieferten Reihenfolge anordnen (Drag&Drop)."""
+        """Reorder agenda items into the given order."""
         rows = {
             r.id: r
             for r in (
@@ -239,10 +238,10 @@ class AgendaService:
         title: str | None = None,
         non_public: bool = False,
     ) -> list[AgendaItemOut]:
-        """TOP setzen: Antrag (Abstimmungs-State des Gremiums) **oder** Freitext."""
+        """Add an agenda item: application (in a vote state of the gremium) or free text."""
         meeting = await self._meeting(meeting_id)
         if title is not None:
-            # Freitext-TOP (kein Antrag) — direkt anhängen.
+            # Free-text item (no application) — append directly.
             self.session.add(
                 MeetingAgendaItem(
                     meeting_id=meeting_id,

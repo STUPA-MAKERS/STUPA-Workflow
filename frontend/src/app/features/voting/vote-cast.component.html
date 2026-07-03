@@ -95,8 +95,8 @@
         }
 
         @if (isOpen() && delegation()?.exercising) {
-          <!-- Vertretungs-Stimme (#delegation-rework): GETRENNTE Abgabe unter dem
-               Stimmrecht des/der Delegierenden — darf von der eigenen abweichen. -->
+          <!-- Proxy ballot: cast separately under the delegator's voting right —
+               may differ from one's own. -->
           <h2 class="mt-2 text-base font-semibold">
             {{ 'voting.cast.delegation.proxyHeading' | t: { name: delegation()?.delegatedByName || '?' } }}
           </h2>

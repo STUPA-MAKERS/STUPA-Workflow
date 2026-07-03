@@ -1,0 +1,41 @@
+<table class="mtg__attTable">
+  <tbody>
+    @for (a of rows(); track a.principalId) {
+      <tr class="mtg__attRow">
+        <td class="font-medium w-full">
+          {{ a.displayName || a.email || a.principalId }}
+          @if (a.isSelf) { <span class="text-xs font-normal text-text-muted ml-1">{{ 'meetings.attendance.you' | t }}</span> }
+        </td>
+        <td class="mtg__attStatus">
+          @if (editAll() || a.isSelf) {
+            <span class="mtg__attBtns" role="group" [attr.aria-label]="'meetings.attendance.title' | t">
+              @for (s of statuses; track s) {
+                <button
+                  type="button"
+                  [class]="'mtg__attBtn mtg__attBtn--' + s"
+                  [class.mtg__attBtn--on]="a.status === s"
+                  [attr.aria-pressed]="a.status === s"
+                  [attr.aria-label]="key(s) | t"
+                  [title]="key(s) | t"
+                  [disabled]="saving() || locked()"
+                  (click)="statusChange.emit({ member: a, status: s })"
+                >
+                  <app-icon [name]="icon(s)" [size]="13" />
+                </button>
+              }
+            </span>
+          } @else {
+            <app-badge [variant]="a.status ? badge(a.status) : 'neutral'">
+              {{ (a.status ? key(a.status) : 'meetings.attendance.unknown') | t }}
+            </app-badge>
+            @if (a.source === 'lead') {
+              <span class="text-text-muted"> ({{ 'meetings.attendance.bySession' | t }})</span>
+            }
+          }
+        </td>
+      </tr>
+    } @empty {
+      <tr><td colspan="2" class="mtg__tocEmpty text-text-muted">{{ 'meetings.attendance.empty' | t }}</td></tr>
+    }
+  </tbody>
+</table>

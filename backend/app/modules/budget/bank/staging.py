@@ -1,16 +1,16 @@
-"""Datei-Import + idempotentes Staging von Kontoumsätzen (#fints).
+"""File import plus idempotent staging of statement lines.
 
-Beide Quellen (FinTS-Abruf, Datei-Import) münden hier: Zeilen werden mit
-Idempotenz-Schlüsseln versehen, format-übergreifend dedupliziert (#fints-batch),
-per ``ON CONFLICT DO NOTHING`` eingespielt und mit einem Buchungs-Vorschlag versehen.
+Both sources (FinTS fetch, file import) end up here: lines get idempotency keys,
+are deduped across formats, inserted via ``ON CONFLICT DO NOTHING`` and given a
+booking suggestion.
 
-**Format-Wechsel MT940 ↔ CAMT:** die Idempotenz-Schlüssel beider Formate sind nicht
-kompatibel (andere Bank-Referenz, andere Rohfelder). Damit der Umstieg auf den
-CAMT-Abruf das Abruf-Fenster nicht als Dubletten re-importiert, gleicht
-:meth:`StagingOps._consume_fingerprint` eingehende Zeilen zusätzlich inhaltlich
-(Wertstellung + Betrag + E2E-Ref bzw. kanonischer Zweck + Gegen-IBAN) gegen den
-Bestand ab. Aufgeteilte Sammelbuchungen ersetzen zudem ihre alte, ungebuchte
-Gesamt-Zeile (:meth:`StagingOps._supersede_batch_totals`).
+Format switch MT940 <-> CAMT: the two formats' idempotency keys are incompatible
+(different bank reference, different raw fields). So the switch to CAMT does not
+re-import the fetch window as duplicates, :meth:`StagingOps._consume_fingerprint`
+additionally compares incoming lines by content (value date + amount + E2E ref,
+or canonical purpose + counterparty IBAN) against the existing rows. Split batch
+bookings also replace their old unbooked total line
+(:meth:`StagingOps._supersede_batch_totals`).
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from app.shared.errors import ValidationProblem
 
 @dataclass(slots=True)
 class _Fingerprint:
-    """Inhaltlicher Vergleichs-Schlüssel einer Zeile (format-unabhängig, #fints-batch)."""
+    """Content comparison key of a line (format-independent)."""
 
     value_date: date | None
     amount: Decimal
@@ -49,12 +49,12 @@ class _Fingerprint:
 
 
 class StagingOps(BankServiceBase):
-    """Staging-Pfad: Datei-Import, Einspielen, Vorschlag."""
+    """Staging path: file import, insertion, suggestion."""
 
     async def import_file(
         self, account_id: uuid.UUID, data: bytes, *, filename: str | None
     ) -> BankImportResult:
-        """Option D (#fints): CAMT.053/MT940-Datei parsen + Umsätze stagen."""
+        """Parse a CAMT.053/MT940 file and stage its transactions."""
         acc = await self._account_or_404(account_id)
         max_bytes = self.settings.attachment_max_bytes
         if len(data) > max_bytes:
@@ -84,16 +84,16 @@ class StagingOps(BankServiceBase):
     async def _stage_lines(
         self, acc: Account, lines: list[statement.StatementLine]
     ) -> tuple[int, int, int]:
-        """Umsätze idempotent einspielen (``ON CONFLICT DO NOTHING``) + Vorschläge setzen.
+        """Insert lines idempotently (``ON CONFLICT DO NOTHING``) and set suggestions.
 
-        Liefert ``(neu, dubletten, ersetzte_sammel_zeilen)``."""
+        Returns ``(imported, duplicates, superseded_batch_lines)``."""
         if len(lines) > MAX_STATEMENT_LINES:
             raise ValidationProblem(
                 f"Statement has too many transactions (>{MAX_STATEMENT_LINES}).",
                 code="bank_statement_too_large",
             )
-        # EUR-only Ledger (DB-CHECK): Fremdwährungen NICHT still als EUR umdeuten, sondern
-        # klar ablehnen (#fints-review) — Cent-Beträge wären sonst falsch attribuiert.
+        # EUR-only ledger (DB CHECK): do NOT silently reinterpret foreign
+        # currencies as EUR — reject clearly, or cent amounts would be misattributed.
         non_eur = next((line.currency for line in lines if line.currency != "EUR"), None)
         if non_eur is not None:
             raise ValidationProblem(
@@ -105,9 +105,9 @@ class StagingOps(BankServiceBase):
         known = await self._existing_fingerprints(acc.id, lines)
         imported = 0
         for line in lines:
-            # Format-übergreifende Inhalts-Dublette (MT940 ↔ CAMT, #fints-batch): derselbe
-            # Umsatz aus dem jeweils anderen Format hat einen anderen Idempotenz-Schlüssel
-            # und käme am ON CONFLICT vorbei.
+            # Cross-format content duplicate (MT940 <-> CAMT): the same transaction
+            # from the other format has a different idempotency key and would slip
+            # past the ON CONFLICT.
             if self._consume_fingerprint(known, _line_fingerprint(line)):
                 continue
             suggested_budget, suggested_expense = await self._suggest(line)
@@ -140,13 +140,13 @@ class StagingOps(BankServiceBase):
         superseded = await self._supersede_batch_totals(acc.id, lines)
         return imported, len(lines) - imported, superseded
 
-    # --------------------------------------------- cross-format dedup (#fints-batch)
+    # ------------------------------------------------------ cross-format dedup
     async def _existing_fingerprints(
         self, account_id: uuid.UUID, lines: list[statement.StatementLine]
     ) -> dict[tuple[str, str], int]:
-        """Inhalts-Fingerprints der bereits gestageten Zeilen im Wertstellungs-Fenster der
-        eingehenden Zeilen — als Multiset (mehrere identische Zahlungen am selben Tag
-        bleiben mehrfach importierbar)."""
+        """Content fingerprints of already-staged lines within the incoming lines'
+        value-date window — as a multiset (several identical payments on the same
+        day stay importable multiple times)."""
         dates = [line.value_date for line in lines if line.value_date is not None]
         if not dates:
             return {}
@@ -182,12 +182,11 @@ class StagingOps(BankServiceBase):
     def _consume_fingerprint(
         known: dict[tuple[str, str], int], fp: _Fingerprint
     ) -> bool:
-        """Eine Bestand-Übereinstimmung verbrauchen (Multiset) — ``True`` = Dublette.
+        """Consume one existing match (multiset) — ``True`` = duplicate.
 
-        Übereinstimmung heißt: gleiche Wertstellung + Betrag **und** gleiche (nicht-leere)
-        E2E-Referenz — oder, ohne E2E, gleicher (nicht-leerer) kanonischer Zweck + gleiche
-        Gegen-IBAN. Zwei am selben Tag identische Zahlungen verbrauchen zwei Bestands-
-        Einträge und bleiben damit korrekt getrennt."""
+        Match means: same value date + amount AND same (non-empty) E2E reference —
+        or, without E2E, same (non-empty) canonical purpose + counterparty IBAN.
+        Two identical same-day payments consume two entries and stay separate."""
         for key in _fingerprint_keys(fp):
             count = known.get(key, 0)
             if count > 0:
@@ -198,13 +197,13 @@ class StagingOps(BankServiceBase):
     async def _supersede_batch_totals(
         self, account_id: uuid.UUID, lines: list[statement.StatementLine]
     ) -> int:
-        """Alte Gesamt-Zeilen aufgeteilter Sammelbuchungen entfernen (#fints-batch).
+        """Remove old total lines of split batch bookings.
 
-        Vor dem CAMT-Umstieg staged der MT940-Abruf eine Sammelbuchung als EINE Zeile
-        („DATEI-NR. … ANZAHL …", Gesamtbetrag). Kommen jetzt die Einzelumsätze derselben
-        Buchung (gleiche Wertstellung, Teilbeträge = Gesamtbetrag), wäre beides zusammen
-        doppelt. Ersetzt werden nur **ungebuchte** (unmatched/suggested) Gesamt-Zeilen,
-        deren Zweck das Sammel-Muster trägt; gebuchte/ignorierte bleiben unangetastet."""
+        Before the CAMT switch, the MT940 fetch staged a batch booking as ONE line
+        ("DATEI-NR. … ANZAHL …", total amount). When the single transactions of
+        the same booking arrive (same value date, parts = total), both together
+        would be double. Only unbooked (unmatched/suggested) total lines whose
+        purpose carries the batch pattern are replaced; matched/ignored stay."""
         totals: set[tuple[date | None, Decimal]] = set()
         for line in lines:
             if line.raw.get("batch") != "true":
@@ -245,10 +244,10 @@ class StagingOps(BankServiceBase):
     async def _suggest(
         self, line: statement.StatementLine
     ) -> tuple[uuid.UUID | None, uuid.UUID | None]:
-        """Vorschlag (Kostenstelle, bestehende Buchung) für einen Umsatz ermitteln."""
+        """Determine the suggestion (cost centre, existing booking) for a line."""
         kind = "income" if line.amount > 0 else "expense"
         amount = abs(line.amount)
-        # Kandidaten: gleicher Betrag + Art, noch nicht zugeordnet.
+        # Candidates: same amount + kind, not yet allocated.
         allocated = select(BankAllocation.expense_id)
         rows = (
             await self.session.execute(
@@ -257,12 +256,12 @@ class StagingOps(BankServiceBase):
                     BudgetExpense.amount == amount,
                     BudgetExpense.kind == kind,
                     BudgetExpense.id.not_in(allocated),
-                    # Nur Top-Level-Buchungen als Reconcile-Kandidaten (#subbookings-review):
-                    # eine Unterbuchung darf nicht eigenständig einem Umsatz zugeordnet werden.
+                    # Only top-level bookings as reconcile candidates: a sub-booking
+                    # must not be allocated to a statement line on its own.
                     BudgetExpense.parent_expense_id.is_(None),
                 )
-                # Deterministische Kandidaten-Reihenfolge (#fints-review): ohne ORDER BY
-                # entschiede die DB-Zeilenfolge bei gleichwertigen Treffern.
+                # Deterministic candidate order: without ORDER BY the DB row order
+                # would decide between equally scored hits.
                 .order_by(BudgetExpense.created_at, BudgetExpense.id)
                 .limit(50)
             )
@@ -286,7 +285,7 @@ class StagingOps(BankServiceBase):
         )
         if result.expense_id is not None:
             return result.budget_id, result.expense_id  # type: ignore[return-value]
-        # Kein Buchungstreffer → Kostenstelle aus dem Gegen-IBAN-Gedächtnis vorschlagen.
+        # No booking hit — suggest a cost centre from the counterparty-IBAN memory.
         budget_id = await self._memory_budget(line.counterparty_iban)
         return budget_id, None
 
@@ -311,11 +310,10 @@ def _line_fingerprint(line: statement.StatementLine) -> _Fingerprint:
 
 
 def _fingerprint_keys(fp: _Fingerprint) -> list[tuple[str, str]]:
-    """Vergleichs-Schlüssel eines Fingerprints: E2E-basiert und/oder Zweck+IBAN-basiert.
+    """Comparison keys of a fingerprint: E2E-based and/or purpose+IBAN-based.
 
-    Beide setzen Wertstellung + Betrag voraus; ohne Wertstellung (vorgemerkte Umsätze)
-    findet KEIN Inhalts-Vergleich statt (zu unscharf) — dann greift nur der
-    Idempotenz-Schlüssel."""
+    Both require value date + amount; without a value date (pending transactions)
+    NO content comparison happens (too fuzzy) — only the idempotency key applies."""
     if fp.value_date is None:
         return []
     base = f"{fp.value_date.isoformat()}|{fp.amount}"

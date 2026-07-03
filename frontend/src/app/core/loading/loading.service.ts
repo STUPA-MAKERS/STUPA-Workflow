@@ -1,15 +1,15 @@
 import { Injectable, signal } from '@angular/core';
 
-/** Verzögerung, bevor der Overlay erscheint — entflackert schnelle Requests. */
+/** Delay before the overlay appears — de-flickers fast requests. */
 const SHOW_DELAY_MS = 150;
-/** Mindest-Anzeigedauer, sobald sichtbar — verhindert Aufblitzen. */
+/** Minimum visible duration once shown — prevents flashing. */
 const MIN_VISIBLE_MS = 400;
 
 /**
- * Globaler Lade-Zustand (#loading). Zählt laufende HTTP-Requests (über den
- * {@link loadingInterceptor}); `visible` wird **nach** {@link SHOW_DELAY_MS} aktiv,
- * solange mindestens ein Request läuft, und bleibt mindestens {@link MIN_VISIBLE_MS}
- * sichtbar. So flackert der Ladebildschirm nicht bei schnellen Antworten.
+ * Global loading state. Counts in-flight HTTP requests (via the
+ * {@link loadingInterceptor}); `visible` turns on after {@link SHOW_DELAY_MS} as
+ * long as at least one request runs, and stays visible for at least
+ * {@link MIN_VISIBLE_MS}. This keeps the overlay from flickering on fast responses.
  */
 @Injectable({ providedIn: 'root' })
 export class LoadingService {
@@ -19,11 +19,11 @@ export class LoadingService {
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly _visible = signal(false);
-  /** True, wenn der Ladebildschirm angezeigt werden soll. */
+  /** True when the loading overlay should be shown. */
   readonly visible = this._visible.asReadonly();
 
-  // Timer/Uhr als überschreibbare Hooks → deterministisch testbar (ohne jest-Fake-
-  // Timer/zone.js-Wechselwirkung).
+  // Timer/clock as overridable hooks → deterministically testable (without
+  // jest fake-timer / zone.js interaction).
   protected now(): number {
     return Date.now();
   }
@@ -34,7 +34,7 @@ export class LoadingService {
     clearTimeout(id);
   }
 
-  /** Einen laufenden Request registrieren. */
+  /** Register an in-flight request. */
   inc(): void {
     this.count++;
     if (this.count !== 1) return;
@@ -49,7 +49,7 @@ export class LoadingService {
     }, SHOW_DELAY_MS);
   }
 
-  /** Einen abgeschlossenen Request abmelden (Erfolg **oder** Fehler). */
+  /** Deregister a completed request (success or error). */
   dec(): void {
     if (this.count > 0) this.count--;
     if (this.count === 0) this.scheduleHide();

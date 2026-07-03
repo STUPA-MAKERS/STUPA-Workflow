@@ -4,9 +4,9 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 
 /**
- * Konto → Kalender-Abo (#ics): zeigt die persönliche iCal-Feed-URL (Sitzungen der
- * eigenen Gremien) zum Kopieren und erlaubt das Rotieren (alte URL wird ungültig).
- * Der Feed-Token entsteht erst beim ersten »Erzeugen« — bis dahin ist `url` null.
+ * Account calendar subscription: shows the personal iCal feed URL (meetings of the
+ * user's own gremien) to copy, and allows rotating it (the old URL is invalidated).
+ * The feed token is created only on first "generate" — until then `url` is null.
  */
 @Component({
   selector: 'app-account-calendar',
@@ -38,7 +38,7 @@ export class AccountCalendarComponent {
     });
   }
 
-  /** Feed-Token (neu) erzeugen — invalidiert die bisherige URL. */
+  /** Generate a new feed token — invalidates the previous URL. */
   rotate(): void {
     if (this.busy()) return;
     this.busy.set(true);
@@ -56,7 +56,7 @@ export class AccountCalendarComponent {
     });
   }
 
-  /** Abo-URL in die Zwischenablage kopieren (best-effort; Clipboard-API optional). */
+  /** Copy the subscription URL to the clipboard (best-effort; Clipboard API optional). */
   copy(): void {
     const url = this.url();
     if (!url) return;

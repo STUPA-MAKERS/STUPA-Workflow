@@ -1,27 +1,24 @@
-"""FinTS-Online-Banking-Client (#fints) — Umsatz-Abruf mit PIN/TAN-SCA.
+"""FinTS online-banking client — transaction fetch with PIN/TAN SCA.
 
-Kapselt die ``fints``-Lib (lazy importiert) hinter zwei Schritten, weil die Starke
-Kundenauthentifizierung (PSD2/SCA) eine TAN verlangt, die **zwischen** zwei HTTP-Requests
-vom Menschen kommt:
+Wraps the ``fints`` lib (lazily imported) behind two steps, because PSD2 strong
+customer authentication requires a TAN that arrives from a human BETWEEN two
+HTTP requests: :func:`start_sync` opens the dialog and requests transactions,
+returning either the lines (``status='done'``) or a paused dialog state + TAN
+challenge (``status='needs_tan'``); :func:`submit_tan` resumes the paused dialog
+and sends the TAN (or an empty TAN to poll for decoupled pushTAN).
 
-* :func:`start_sync`  — Dialog öffnen, Umsätze anfragen. Liefert entweder die Umsätze
-  (``status='done'``) **oder** einen pausierten Dialog-Zustand + TAN-Challenge
-  (``status='needs_tan'``), den der Aufrufer persistiert und dem Nutzer zeigt.
-* :func:`submit_tan`  — pausierten Dialog fortsetzen und die TAN (oder bei *decoupled*
-  pushTAN eine leere TAN zum Pollen) senden. Wieder ``done`` oder erneut ``needs_tan``.
+Transactions are fetched preferably as CAMT (HKCAZ, ``get_transactions_xml``):
+only CAMT carries the single transactions (``TxDtls``) of batch bookings, which
+:mod:`.camt_parse` splits. Banks without HKCAZ (or with unusable CAMT) fall back
+to MT940 (HKKAZ) automatically.
 
-Umsätze werden **bevorzugt als CAMT** geholt (HKCAZ, ``get_transactions_xml``): nur CAMT
-trägt bei Sammelbuchungen (Sparkasse „DATEI-NR. … ANZAHL …") die Einzeltransaktionen
-(``TxDtls``), die :mod:`.camt_parse` in Einzelumsätze auflöst (#fints-batch). Banken ohne
-HKCAZ (oder mit unbrauchbarem CAMT) fallen automatisch auf MT940 (HKKAZ) zurück.
+The persistent client state (``deconstruct()``: ``system_id`` etc.) is returned
+after a successful sync and stored encrypted by the service — this keeps the
+~90-day SCA window open.
 
-Der **persistente** Client-Zustand (``deconstruct()``: ``system_id`` u. a.) wird nach
-erfolgreichem Sync zurückgegeben und vom Service **verschlüsselt** am Konto abgelegt —
-das hält das ~90-Tage-SCA-Fenster offen (security.md / #fints-research).
-
-Die Netz-Interaktion ist ohne echte Bank nicht testbar (``# pragma: no cover``); die reine
-Logik (TAN-Mechanismus-Wahl, Konto-Auswahl, Umsatz-Normalisierung, Ergebnis-Form) bleibt
-geprüft.
+The network interaction is untestable without a real bank (``# pragma: no
+cover``); the pure logic (TAN-mechanism choice, account selection, line
+normalization, result shape) stays covered.
 """
 
 from __future__ import annotations
@@ -53,38 +50,39 @@ logger = logging.getLogger(__name__)
 
 
 class FintsError(RuntimeError):
-    """FinTS-Abruf fehlgeschlagen (Verbindung, Login, Protokoll)."""
+    """FinTS fetch failed (connection, login, protocol)."""
 
 
 class FintsBankLockedError(FintsError):
-    """Bank hat den Zugang gesperrt (z. B. nach 3 Fehlversuchen, FinTS-Code 3938).
+    """Bank locked the access (e.g. after 3 failed attempts, FinTS code 3938).
 
-    **NICHT** automatisch erneut versuchen — jeder weitere Login zählt auf das Bank-
-    Fehlversuchskonto ein und kann die Sperre verschärfen, bis sie nur noch von der Bank
-    (Hotline/Filiale bzw. Online-Banking-Entsperrung) aufgehoben werden kann (#fints-review)."""
+    Do NOT retry automatically — every further login counts against the bank's
+    failed-attempt account and can escalate the lock until only the bank
+    (hotline/branch or online-banking unlock) can lift it."""
 
 
 class FintsAuthRejectedError(FintsError):
-    """Bank hat Anmeldung/Signatur abgelehnt (FinTS-Codes 9340/9910/9930/9931/9942).
+    """Bank rejected login/signature (FinTS codes 9340/9910/9930/9931/9942).
 
-    python-fints meldet diese irreführend als „PIN falsch" und **sperrt danach die PIN-
-    Instanz**. Ursache ist oft die Signatur (falsches/fehlendes TAN-Verfahren, fehlende
-    Produkt-ID), nicht zwingend die PIN. Vor Wiederholung Ursache klären — sonst droht nach
-    wenigen Versuchen die Bank-Sperre (#fints-review)."""
+    python-fints misleadingly reports these as "wrong PIN" and then blocks the
+    PIN instance. The cause is often the signature (wrong/missing TAN mechanism,
+    missing product id), not necessarily the PIN. Clarify the cause before
+    retrying — a few attempts away from a bank lock."""
 
 
 def _classify(exc: BaseException) -> FintsError:
-    """Lib-/Bank-Fehler auf unsere Fehlertypen abbilden (Bank-Sperre erkennen, #fints-review).
+    """Map lib/bank errors to our error types (detect bank locks).
 
-    **Die ganze Ausnahme-Kette** (``__cause__``/``__context__``) wird durchsucht, NICHT nur die
-    äußerste Ausnahme: python-fints sperrt bei 9340 u. a. die PIN-Instanz und der ``with
-    client:``-Teardown wirft daraufhin beim Schluss-Signieren ``Exception("Refusing to use PIN
-    after block")`` — diese **maskiert** den eigentlichen ``FinTSClientPINError``. Ohne den
-    Kettendurchlauf würde die Bank-Ablehnung als generischer 503 statt als 409+Cooldown gemeldet.
+    The WHOLE exception chain (``__cause__``/``__context__``) is searched, not
+    just the outermost exception: on 9340 python-fints blocks the PIN instance
+    and the ``with client:`` teardown then raises ``Exception("Refusing to use
+    PIN after block")`` at final signing — masking the actual
+    ``FinTSClientPINError``. Without the chain walk, the bank rejection would be
+    reported as a generic 503 instead of 409+cooldown.
 
-    Der Klartext der Lib-/Bank-Meldung wird **nicht** übernommen (kann Request-/Antwort-
-    Fragmente bzw. PIN/TAN tragen); nur der Fehler*typ* entscheidet. ``fints`` ist lazy
-    importiert, damit der reine Contract-Pfad die Lib nicht braucht."""
+    The lib/bank message text is NOT adopted (may carry request/response
+    fragments or PIN/TAN); only the error TYPE decides. ``fints`` is imported
+    lazily so the pure contract path does not need the lib."""
     from fints.exceptions import FinTSClientPINError, FinTSClientTemporaryAuthError
 
     seen: set[int] = set()
@@ -99,23 +97,21 @@ def _classify(exc: BaseException) -> FintsError:
     return FintsError("FinTS sync failed.")
 
 
-# Erlaubte MIME-Typen für den optischen TAN-Challenge (photoTAN/QR-TAN als ``<img>``).
+# Allowed MIME types for the optical TAN challenge (photoTAN/QR-TAN as ``<img>``).
 _ALLOWED_TAN_IMAGE_MIME = frozenset(
     {"image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"}
 )
 
 
 def validate_fints_endpoint(url: str, *, resolver: Resolver = default_resolver) -> None:
-    """FinTS-Endpunkt gegen SSRF prüfen (#fints-review).
+    """Check the FinTS endpoint against SSRF.
 
-    Erzwingt ``https`` (FinTS läuft über TLS) und delegiert die Host-/IP-Prüfung an den
-    bestehenden, gehärteten ``assert_allowed_url``-Guard (löst DNS auf, prüft **alle**
-    A/AAAA-Records, entpackt IPv4-mapped/6to4/**NAT64** und blockt jede nicht-globale
-    Adresse — inkl. loopback/privat/link-local/Metadaten-IP, alternativer IPv4-Kodierungen
-    und auf interne IPs auflösender öffentlicher Namen). ``resolver`` ist für Tests
-    injizierbar.
+    Enforces ``https`` (FinTS runs over TLS) and delegates the host/IP check to
+    the existing hardened ``assert_allowed_url`` guard (resolves DNS, checks all
+    A/AAAA records, unwraps IPv4-mapped/6to4/NAT64 and blocks every non-global
+    address). ``resolver`` is injectable for tests.
 
-    :raises ValueError: Schema ≠ https, oder vom SSRF-Guard abgelehnt.
+    :raises ValueError: scheme is not https, or rejected by the SSRF guard.
     """
     if urlsplit(url).scheme.lower() != "https":
         raise ValueError("FinTS endpoint must use https")
@@ -127,34 +123,34 @@ def validate_fints_endpoint(url: str, *, resolver: Resolver = default_resolver) 
 
 @dataclass(slots=True)
 class FintsOutcome:
-    """Ergebnis eines Sync-Schritts — fertig **oder** TAN benötigt."""
+    """Result of one sync step — done OR TAN required."""
 
     status: Literal["done", "needs_tan"]
     tan_mechanism: str | None = None
     # status == 'done':
     lines: list[StatementLine] = field(default_factory=list)
-    new_state: bytes | None = None  # client.deconstruct() → persistieren
-    # Live-Kontostand (HKSAL) zum Abruf-Zeitpunkt — best effort (#fints-konten).
+    new_state: bytes | None = None  # client.deconstruct() -> persist
+    # Live balance (HKSAL) at fetch time — best effort.
     balance: StatementBalance | None = None
-    # status == 'needs_tan' (alle für den Resume nötig):
+    # status == 'needs_tan' (all required for the resume):
     client_data: bytes | None = None
     dialog_data: bytes | None = None
     tan_data: bytes | None = None
     challenge: str | None = None
     challenge_html: str | None = None
-    # Optischer Challenge (photoTAN/QR-TAN) als fertige Data-URL ``data:<mime>;base64,…``
-    # zum direkten Anzeigen im ``<img>`` (#fints-qrtan).
+    # Optical challenge (photoTAN/QR-TAN) as a ready data URL
+    # ``data:<mime>;base64,…`` for direct display in an ``<img>``.
     challenge_image: str | None = None
     decoupled: bool = False
-    # True, wenn die TAN für die **Anmeldung selbst** (SCA bei frischer system_id) gebraucht
-    # wird — dann muss ``submit_tan`` nach der TAN-Bestätigung erst noch Konten + Umsätze holen
-    # (bei einer Daten-TAN liefert ``send_tan`` die Umsätze direkt). (#fints login-SCA)
+    # True when the TAN is needed for the LOGIN itself (SCA with a fresh
+    # system_id) — then ``submit_tan`` must fetch accounts + transactions after
+    # the confirmation (with a data TAN, ``send_tan`` delivers them directly).
     tan_for_login: bool = False
 
 
 @dataclass(slots=True)
 class FintsCredentials:
-    """Verbindungs-/Login-Daten eines Kontos (PIN im Klartext, nur im Speicher)."""
+    """Connection/login data of an account (PIN in plaintext, memory only)."""
 
     endpoint: str
     blz: str
@@ -163,14 +159,14 @@ class FintsCredentials:
     account_iban: str | None = None
     product_id: str | None = None
     tan_mechanism: str | None = None
-    state: bytes | None = None  # zuletzt persistierter Client-Zustand
-    start_date: date | None = None  # Abruf-Fenster-Beginn (vom Service gesetzt)
+    state: bytes | None = None  # last persisted client state
+    start_date: date | None = None  # fetch-window start (set by the service)
 
 
 def _pick_tan_mechanism(mechanisms: Mapping[str, object], preferred: str | None) -> str | None:
-    """TAN-Mechanismus wählen: zuvor genutzter, sonst *decoupled*/pushTAN, sonst erster.
+    """Pick a TAN mechanism: previously used, else decoupled/pushTAN, else first.
 
-    ``mechanisms`` = ``{security_function: TwoStepParameters}`` aus
+    ``mechanisms`` = ``{security_function: TwoStepParameters}`` from
     ``client.get_tan_mechanisms()``."""
     if not mechanisms:
         return None
@@ -184,7 +180,7 @@ def _pick_tan_mechanism(mechanisms: Mapping[str, object], preferred: str | None)
 
 
 def _select_account(accounts: Sequence[object], iban: str | None):  # type: ignore[no-untyped-def]  # noqa: ANN202
-    """SEPA-Konto per IBAN wählen (sonst das erste). Leere Liste → ``FintsError``."""
+    """Pick the SEPA account by IBAN (else the first). Empty list raises ``FintsError``."""
     if not accounts:
         raise FintsError("bank returned no SEPA accounts")
     if iban:
@@ -196,11 +192,11 @@ def _select_account(accounts: Sequence[object], iban: str | None):  # type: igno
 
 
 def lines_from_camt_documents(documents: Sequence[bytes]) -> list[StatementLine]:
-    """CAMT-Dokumente eines HKCAZ-Abrufs → Umsätze (#fints-batch).
+    """Convert CAMT documents of an HKCAZ fetch into lines.
 
-    Ein wohlgeformtes Dokument **ohne** Einträge (leerer Tag/leeres Abruf-Fenster) zählt
-    als 0 Umsätze; kaputtes XML wirft :class:`StatementParseError` (der Client fällt dann
-    auf MT940 zurück)."""
+    A well-formed document WITHOUT entries (empty day/fetch window) counts as 0
+    lines; broken XML raises :class:`StatementParseError` (the client then falls
+    back to MT940)."""
     lines: list[StatementLine] = []
     for doc in documents:
         if not doc:
@@ -215,12 +211,12 @@ def lines_from_camt_documents(documents: Sequence[bytes]) -> list[StatementLine]
 
 
 def lines_from_fetch_result(result: object) -> list[StatementLine]:
-    """Abruf-Ergebnis der ``fints``-Lib → Umsätze, form-agnostisch (#fints-batch).
+    """Convert a ``fints`` fetch result into lines, shape-agnostic.
 
-    ``get_transactions_xml`` liefert ``(booked_xml_docs, pending)``; ``get_transactions``
-    (und ``send_tan`` für einen MT940-Job) liefert ``mt940``-Transaktionen. ``send_tan``
-    reicht das Ergebnis des **ursprünglichen** Jobs durch, daher muss der TAN-Resume beide
-    Formen akzeptieren."""
+    ``get_transactions_xml`` returns ``(booked_xml_docs, pending)``;
+    ``get_transactions`` (and ``send_tan`` for an MT940 job) returns ``mt940``
+    transactions. ``send_tan`` passes through the ORIGINAL job's result, so the
+    TAN resume must accept both shapes."""
     if (
         isinstance(result, tuple)
         and len(result) == 2
@@ -246,10 +242,10 @@ def _build_client(creds: FintsCredentials) -> FinTS3PinTanClient:  # pragma: no 
 
 
 def _matrix_data_url(response: object) -> str | None:
-    """Optischen TAN-Challenge (photoTAN/QR-TAN) → Data-URL ``data:<mime>;base64,…``.
+    """Convert the optical TAN challenge (photoTAN/QR-TAN) into a data URL.
 
-    ``NeedTANResponse.challenge_matrix`` ist ``(mime: str, data: bytes)`` oder ``None``;
-    fehlerhafte/leere Werte ⇒ ``None`` (dann gibt es nur Text-Challenge + TAN-Eingabe)."""
+    ``NeedTANResponse.challenge_matrix`` is ``(mime: str, data: bytes)`` or
+    ``None``; malformed/empty values yield ``None`` (text challenge + TAN input only)."""
     matrix = getattr(response, "challenge_matrix", None)
     if not matrix:
         return None
@@ -259,8 +255,8 @@ def _matrix_data_url(response: object) -> str | None:
         return None
     if not data:
         return None
-    # Den bank-gelieferten MIME-Typ NICHT blind übernehmen — nur bekannte Bild-Typen in die
-    # Data-URL lassen (Defense-in-Depth fürs ``<img>``-Binding), sonst Default (#fints-review).
+    # Do NOT blindly adopt the bank-supplied MIME type — only known image types go
+    # into the data URL (defense in depth for the ``<img>`` binding), else default.
     candidate = str(mime or "").lower().strip()
     mime = candidate if candidate in _ALLOWED_TAN_IMAGE_MIME else "image/png"
     return f"data:{mime};base64,{base64.b64encode(bytes(data)).decode('ascii')}"
@@ -273,7 +269,7 @@ def _needs_tan(
     *,
     for_login: bool = False,
 ) -> FintsOutcome:  # pragma: no cover
-    """Dialog pausieren + alles für den späteren Resume einsammeln."""
+    """Pause the dialog and collect everything needed for the later resume."""
     dialog_data = client.pause_dialog()
     return FintsOutcome(
         status="needs_tan",
@@ -292,10 +288,10 @@ def _needs_tan(
 def _fetch_lines(
     client: FinTS3PinTanClient, account: object, start: date
 ) -> object:  # pragma: no cover
-    """Umsätze holen: CAMT (HKCAZ) bevorzugt, MT940 (HKKAZ) als Fallback (#fints-batch).
+    """Fetch transactions: CAMT (HKCAZ) preferred, MT940 (HKKAZ) as fallback.
 
-    Liefert entweder die fertigen Zeilen (``list[StatementLine]``) oder die
-    ``NeedTANResponse`` des Abrufs."""
+    Returns either the finished lines (``list[StatementLine]``) or the fetch's
+    ``NeedTANResponse``."""
     from fints.client import NeedTANResponse
     from fints.exceptions import FinTSUnsupportedOperation
 
@@ -311,8 +307,8 @@ def _fetch_lines(
         try:
             return lines_from_fetch_result(response)
         except StatementParseError:
-            # Kaputtes CAMT → lieber MT940 als gar kein Abruf; NICHT loggen, was drinstand
-            # (Umsatzdaten). Der Fallback normalisiert über denselben StatementLine-Pfad.
+            # Broken CAMT: better MT940 than no fetch; do NOT log the contents
+            # (transaction data). The fallback normalizes via the same path.
             logger.warning("FinTS: camt statements unparseable — falling back to MT940")
     response = client.get_transactions(account, start, end)  # type: ignore[arg-type]
     if isinstance(response, NeedTANResponse):
@@ -323,14 +319,14 @@ def _fetch_lines(
 def _fetch(
     client: FinTS3PinTanClient, creds: FintsCredentials, mechanism: str | None
 ) -> FintsOutcome:  # pragma: no cover
-    """Innerhalb eines offenen Dialogs: Konten + Umsätze holen, TAN-Bruch abfangen."""
+    """Within an open dialog: fetch accounts + transactions, catch TAN interrupts."""
     from fints.client import NeedTANResponse
 
     accounts = client.get_sepa_accounts()
     if isinstance(accounts, NeedTANResponse):
         return _needs_tan(client, accounts, mechanism)
     account = _select_account(list(accounts), creds.account_iban)
-    # Abruf-Fenster: ab ``start_date`` (vom Service begrenzt) bis heute.
+    # Fetch window: from ``start_date`` (capped by the service) until today.
     start = creds.start_date or date.today()
     result = _fetch_lines(client, account, start)
     if isinstance(result, NeedTANResponse):
@@ -346,13 +342,13 @@ def _fetch(
 def _live_balance(  # pragma: no cover
     client: FinTS3PinTanClient, account: object
 ) -> StatementBalance | None:
-    """HKSAL-Kontostand best-effort holen — Fehler/TAN-Bedarf werden geschluckt (der Saldo ist
-    optional; die Umsätze haben Vorrang). (#fints-konten)"""
+    """Fetch the HKSAL balance best-effort — errors/TAN demands are swallowed
+    (the balance is optional; the transactions take precedence)."""
     from fints.client import NeedTANResponse
 
     try:
         bal = client.get_balance(account)  # type: ignore[arg-type]
-    except Exception:  # noqa: BLE001 - Saldo ist optional, nie den Abruf scheitern lassen
+    except Exception:  # noqa: BLE001 - balance is optional, never fail the fetch
         return None
     if isinstance(bal, NeedTANResponse) or bal is None:
         return None
@@ -360,25 +356,26 @@ def _live_balance(  # pragma: no cover
 
 
 def start_sync(creds: FintsCredentials, *, start_date: date) -> FintsOutcome:  # pragma: no cover
-    """Schritt 1: Dialog öffnen und Umsätze ab ``start_date`` anfragen."""
+    """Step 1: open the dialog and request transactions from ``start_date``."""
     creds.start_date = start_date
     client = _build_client(creds)
     try:
-        # WICHTIG (#fints-percred): TAN-Verfahren erst über das NETZ holen
-        # (``fetch_tan_mechanisms``) — das befüllt BPD + erlaubte Sicherheitsfunktionen +
-        # system_id. Das reine ``get_tan_mechanisms`` liest nur aus der bei frischem Client
-        # (``from_data=None`` — nach jedem Credential-Setzen der Fall) LEEREN BPD und liefert
-        # ``{}`` → es würde KEIN Zwei-Schritt-Verfahren gewählt und python-fints signierte mit
-        # Ein-Schritt-PIN. Sparkassen (PSD2) lehnen das mit „9340 Ungültige Signatur" ab — von
-        # der Lib irreführend als „PIN falsch" gemeldet, was nach 3 Versuchen die Bank sperrt.
+        # IMPORTANT: fetch TAN mechanisms over the NETWORK first
+        # (``fetch_tan_mechanisms``) — that populates BPD + allowed security
+        # functions + system_id. Plain ``get_tan_mechanisms`` only reads the BPD,
+        # which is EMPTY on a fresh client (``from_data=None`` — the case after
+        # every credential set) and returns ``{}`` — no two-step mechanism would
+        # be chosen and python-fints would sign with one-step PIN. Sparkassen
+        # (PSD2) reject that with "9340 invalid signature" — misreported by the
+        # lib as "wrong PIN", which locks the bank account after 3 attempts.
         from fints.client import NeedTANResponse
 
         client.fetch_tan_mechanisms()
         mechanisms = client.get_tan_mechanisms()
         mechanism = _pick_tan_mechanism(dict(mechanisms), creds.tan_mechanism)
-        # Diagnose (#fints, KEINE Geheimnisse): Anzahl TAN-Verfahren + gewählte Sicherheits-
-        # funktion. Leer/None ⇒ python-fints signiert Ein-Schritt ⇒ Sparkasse-„9340". So ist
-        # ein einziger Live-Test eindeutig auswertbar, ohne blind Fehlversuche zu riskieren.
+        # Diagnostics (NO secrets): TAN mechanism count + chosen security
+        # function. Empty/None means one-step signing and a Sparkasse "9340" —
+        # this makes a single live test conclusive without risking blind retries.
         logger.info(
             "FinTS start_sync: %d TAN mechanism(s) available, selected=%s",
             len(mechanisms),
@@ -387,11 +384,12 @@ def start_sync(creds: FintsCredentials, *, start_date: date) -> FintsOutcome:  #
         if mechanism:
             client.set_tan_mechanism(mechanism)
         with client:
-            # Bei frischer ``system_id`` (nach jedem Credential-Setzen) verlangt die Bank SCA
-            # für die **Anmeldung selbst**: python-fints setzt dann ``init_tan_response`` im
-            # Dialog-Init. Ohne diese Bestätigung läuft ``get_sepa_accounts`` auf einer NICHT
-            # stark-authentifizierten Anmeldung → „9340 Ungültige Signatur". Also zuerst die
-            # Login-TAN anfordern; die Umsätze holt dann ``submit_tan`` nach der Bestätigung.
+            # With a fresh ``system_id`` (after every credential set) the bank
+            # demands SCA for the LOGIN itself: python-fints then sets
+            # ``init_tan_response`` at dialog init. Without that confirmation,
+            # ``get_sepa_accounts`` runs on a non-strongly-authenticated login —
+            # "9340 invalid signature". So request the login TAN first; the
+            # transactions are fetched by ``submit_tan`` after confirmation.
             login_tan = client.init_tan_response
             logger.info(
                 "FinTS start_sync: login SCA required=%s", isinstance(login_tan, NeedTANResponse)
@@ -400,15 +398,15 @@ def start_sync(creds: FintsCredentials, *, start_date: date) -> FintsOutcome:  #
                 outcome = _needs_tan(client, login_tan, mechanism, for_login=True)
             else:
                 outcome = _fetch(client, creds, mechanism)
-        # Dialog ist (sofern nicht pausiert) zu — persistenten Zustand sichern.
+        # The dialog is closed (unless paused) — save the persistent state.
         if outcome.status == "done":
             outcome.new_state = client.deconstruct(including_private=True)
         return outcome
     except FintsError:
         raise
-    except Exception as exc:  # noqa: BLE001 — Lib-/Netzfehler einheitlich kapseln
-        # Original-Fehler NUR serverseitig loggen — der Lib-/Bank-Text kann Request-/
-        # Antwort-Fragmente enthalten und PIN/TAN sind hier im Scope (#fints-review).
+    except Exception as exc:  # noqa: BLE001 — wrap lib/network errors uniformly
+        # Log the original error server-side ONLY — the lib/bank text can contain
+        # request/response fragments, and PIN/TAN are in scope here.
         logger.warning("FinTS sync failed", exc_info=exc)
         raise _classify(exc) from exc
 
@@ -416,7 +414,7 @@ def start_sync(creds: FintsCredentials, *, start_date: date) -> FintsOutcome:  #
 def submit_tan(  # pragma: no cover
     creds: FintsCredentials, pending: FintsOutcome, tan: str
 ) -> FintsOutcome:
-    """Schritt 2: pausierten Dialog fortsetzen + TAN senden (leer = decoupled-Poll)."""
+    """Step 2: resume the paused dialog and send the TAN (empty = decoupled poll)."""
     from fints.client import NeedRetryResponse, NeedTANResponse
 
     if pending.client_data is None or pending.dialog_data is None or pending.tan_data is None:
@@ -430,19 +428,19 @@ def submit_tan(  # pragma: no cover
         with client.resume_dialog(pending.dialog_data):
             result = client.send_tan(tan_response, tan)
             if isinstance(result, NeedTANResponse):
-                # Erneute TAN nötig (z. B. decoupled noch nicht freigegeben) — Flag erhalten.
+                # Another TAN needed (e.g. decoupled not yet approved) — keep the flag.
                 return _needs_tan(
                     client, result, pending.tan_mechanism, for_login=pending.tan_for_login
                 )
             if pending.tan_for_login:
-                # Login-SCA bestätigt → JETZT erst Konten + Umsätze holen (der Daten-Schritt
-                # kann seinerseits erneut eine TAN verlangen → dann Daten-TAN, for_login=False).
+                # Login SCA confirmed — only NOW fetch accounts + transactions
+                # (the data step may itself demand a TAN: data TAN, for_login=False).
                 outcome = _fetch(client, creds, pending.tan_mechanism)
                 if outcome.status == "done":
                     outcome.new_state = client.deconstruct(including_private=True)
                 return outcome
-            # ``send_tan`` liefert das Ergebnis des pausierten Jobs — CAMT-Tupel oder
-            # MT940-Transaktionen, je nachdem, welcher Abruf die TAN verlangt hat.
+            # ``send_tan`` returns the paused job's result — a CAMT tuple or MT940
+            # transactions, depending on which fetch demanded the TAN.
             lines = lines_from_fetch_result(result)
         return FintsOutcome(
             status="done",

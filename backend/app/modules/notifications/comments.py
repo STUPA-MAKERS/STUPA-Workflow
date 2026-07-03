@@ -1,17 +1,17 @@
-"""Kommentar-Benachrichtigungen (#4-1).
+"""Comment notifications.
 
-Zwei Richtungen, je nach Autor des Kommentars:
+Two directions, depending on the comment author:
 
-* **Principal kommentiert öffentlich** → Mail an die Antragsteller-Adresse
-  (interne Kommentare lösen bewusst NICHTS aus — Antragsteller sehen sie nie).
-* **Antragsteller kommentiert** → Mail an alle, die am aktuellen State handeln
-  können (Task-Semantik, #64): bei ``vote``-States die Mitglieder des
-  abstimmenden Gremiums, sonst genau die Principals, für die mindestens ein
-  manueller ``requires_action``-Übergang tatsächlich feuerbar ist.
+* **Principal comments publicly** → mail to the applicant address (internal
+  comments deliberately trigger NOTHING — applicants never see them).
+* **Applicant comments** → mail to everyone who can act at the current state
+  (task semantics): for ``vote`` states the members of the voting committee,
+  otherwise exactly the principals for whom at least one manual
+  ``requires_action`` transition is actually firable.
 
-Beide Wege respektieren die Abwahl der Art ``comment`` (#4-2) und nutzen die
-DB-Templates ``comment_applicant``/``comment_team`` (Builtin-Fallback).
-Aufruf erfolgt als Background-Task nach der Kommentar-Antwort (eigene Session).
+Both paths respect the ``comment`` kind opt-out and use the DB templates
+``comment_applicant``/``comment_team`` (builtin fallback). Called as a
+background task after the comment response (own session).
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ async def send_comment_notifications(
     visibility: str,
     body: str,
 ) -> int:
-    """Kommentar-Mails versenden (#4-1); gibt die Zahl der Mail-Jobs zurück."""
+    """Send comment mails; returns the number of mail jobs."""
     app_row = (
         await session.execute(
             select(
@@ -117,7 +117,7 @@ async def send_comment_notifications(
     }
 
     if author_kind == "principal":
-        # Interne Kommentare sind für Antragsteller unsichtbar → keine Mail.
+        # Internal comments are invisible to applicants → no mail.
         if visibility != "public":
             return 0
         recipients = await service.resolver.resolve(
@@ -157,7 +157,7 @@ async def send_comment_notifications(
             lang=settings.mail_default_lang,
             default_lang=settings.mail_default_lang,
         )
-    except TemplateRenderError as exc:  # defensiv — Builtin deckt alle Vars
+    except TemplateRenderError as exc:  # defensive — builtin covers all vars
         logger.warning("comment builtin render failed: %s", exc)
         return 0
     msg = MailMessage(

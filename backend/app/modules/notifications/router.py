@@ -1,13 +1,11 @@
-"""Notifications-API-Router (#4-2/#task-reminder, api.md »notifications«).
+"""Notifications API router.
 
-* ``GET /api/notifications/preferences`` — eigene Benachrichtigungs-Schalter
-  (voller Katalog, Default aktiviert).
-* ``PUT /api/notifications/preferences`` — Bulk-Update der eigenen Schalter.
-* ``GET/PUT /api/admin/notification-settings`` — Plattform-Config
-  (Aufgaben-Erinnerungen), P(``admin.notifications``).
+* ``GET /api/notifications/preferences`` — own notification switches (full catalogue, default on).
+* ``PUT /api/notifications/preferences`` — bulk update of own switches.
+* ``GET/PUT /api/admin/notification-settings`` — platform config, P(``admin.notifications``).
 
-Die Preferences-Endpunkte verlangen nur einen eingeloggten Principal (keine
-besondere Permission): jede:r verwaltet ausschließlich die eigenen Einstellungen.
+The preferences endpoints only require a logged-in principal: everyone manages
+their own settings only.
 """
 
 from __future__ import annotations
@@ -59,7 +57,7 @@ PrincipalDep = Annotated[Principal, Depends(require_principal())]
 async def get_preferences(
     service: ServiceDep, principal: PrincipalDep
 ) -> list[NotificationPreferenceOut]:
-    """Eigene Schalter lesen (voller Katalog; kein Eintrag = aktiviert)."""
+    """Read own switches (full catalogue; no entry means enabled)."""
     prefs = await service.get_preferences(principal.sub)
     return [NotificationPreferenceOut(kind=k, enabled=e) for k, e in prefs]
 
@@ -74,7 +72,7 @@ async def put_preferences(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> list[NotificationPreferenceOut]:
-    """Eigene Schalter setzen (Bulk; nur Abweichungen werden gespeichert)."""
+    """Set own switches (bulk; only deviations are stored)."""
     prefs = await service.set_preferences(
         principal.sub, [(p.kind, p.enabled) for p in payload.preferences]
     )
@@ -98,7 +96,7 @@ def _settings_out(row: NotificationSettings) -> NotificationSettingsOut:
 async def get_notification_settings(
     service: ServiceDep, _principal: NotifAdmin
 ) -> NotificationSettingsOut:
-    """Plattform-Config lesen (Aufgaben-Erinnerungen, #task-reminder)."""
+    """Read platform config (task reminders)."""
     return _settings_out(await service.get_notification_settings())
 
 
@@ -112,7 +110,7 @@ async def put_notification_settings(
     service: ServiceDep,
     principal: NotifAdmin,
 ) -> NotificationSettingsOut:
-    """Plattform-Config setzen (Teil-Update, auditiert als CONFIG_CHANGE)."""
+    """Set platform config (partial update, audited as CONFIG_CHANGE)."""
     row = await service.update_notification_settings(
         actor=principal.sub,
         task_reminder_enabled=payload.task_reminder_enabled,
@@ -122,15 +120,12 @@ async def put_notification_settings(
     return _settings_out(row)
 
 
-# --------------------------------------------------------------------------- #
-# Mail-Templates (#5-4) — P(admin.notifications). Service-CRUD existierte schon,
-# war aber nicht über die API erreichbar (kein Admin-UI).
-# --------------------------------------------------------------------------- #
+# --- Mail templates — P(admin.notifications) ---
 @templates_router.get("", response_model=list[MailTemplateOut], responses=_AUTH_ERRORS)
 async def list_mail_templates(
     service: ServiceDep, _principal: NotifAdmin
 ) -> list[MailTemplateOut]:
-    """Alle Mail-Templates (i18n Subject/Body/HTML + Platzhalter)."""
+    """All mail templates (i18n subject/body/HTML + placeholders)."""
     return await service.list_templates()
 
 
@@ -168,7 +163,7 @@ async def update_mail_template(
 async def upsert_mail_template(
     payload: MailTemplateUpsert, service: ServiceDep, _principal: NotifAdmin
 ) -> MailTemplateOut:
-    """Override per Key anlegen/aktualisieren (#12) — auch für Builtin-Keys."""
+    """Create/update an override by key, including builtin keys."""
     return await service.upsert_template(payload)
 
 
@@ -180,7 +175,7 @@ async def upsert_mail_template(
 async def reset_mail_template(
     key: str, service: ServiceDep, _principal: NotifAdmin
 ) -> MailTemplateOut:
-    """Override löschen → Builtin-Default wiederherstellen (#12)."""
+    """Delete the override, restoring the builtin default."""
     return await service.reset_template(key)
 
 
@@ -192,7 +187,7 @@ async def reset_mail_template(
 async def preview_mail_payload(
     payload: MailPreviewPayloadRequest, service: ServiceDep, _principal: NotifAdmin
 ) -> MailPreviewOut:
-    """Editor-Entwurf rendern (ohne persistierte ID, #12)."""
+    """Render an editor draft (no persisted id)."""
     return await service.preview_payload(payload)
 
 
@@ -207,5 +202,5 @@ async def preview_mail_template(
     service: ServiceDep,
     _principal: NotifAdmin,
 ) -> MailPreviewOut:
-    """Template mit Beispiel-Kontext + Sprache rendern (Vorschau)."""
+    """Render a template with sample context and language (preview)."""
     return await service.preview_template(template_id, payload)

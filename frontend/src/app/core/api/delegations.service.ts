@@ -1,11 +1,11 @@
 /**
- * Delegations-API (#delegation-rework) gegen `/api/delegations`.
+ * Delegations API against `/api/delegations`.
  *
- * Eine Delegation ist **sitzungsgebunden**: angelegt mit `meetingId` + `delegateId`
- * (optional Stimmrecht), Gremium/Gültigkeit ergeben sich aus der Sitzung. Dazu der
- * Sitzungs-Kontext (Gates, Deadline, Empfänger), der Vote-Status (Banner in der
- * Stimmabgabe) und der pro Gremium gepflegte Stellvertreter-Pool. RBAC bleibt
- * serverseitig autoritativ — dieser Client ist reine Datenanbindung.
+ * A delegation is session-bound: created with `meetingId` + `delegateId`
+ * (optional voting right); gremium/validity derive from the meeting. Plus the
+ * meeting context (gates, deadline, recipients), the vote status (banner in the
+ * ballot) and the per-gremium substitute pool. RBAC stays authoritative
+ * server-side — this client is pure data binding.
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
@@ -14,7 +14,7 @@ import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { IsoDateTime, Uuid } from '@core/api/models';
 
-/** Sitzungsgebundene Vertretung (GET/POST /delegations). */
+/** Session-bound representation (GET/POST /delegations). */
 export interface Delegation {
   readonly id: Uuid;
   readonly meetingId: Uuid;
@@ -29,36 +29,36 @@ export interface Delegation {
   readonly delegateVoting: boolean;
   readonly viaPool: boolean;
   readonly createdAt: IsoDateTime;
-  /** Widerruf noch möglich (Sitzung `planned` + vor Beginn)? */
+  /** Revocation still possible (meeting `planned` + before start)? */
   readonly revocable: boolean;
-  /** Richtung aus Sicht des Aufrufers; null = unbeteiligt (Admin-Sicht). */
+  /** Direction from the caller's view; null = uninvolved (admin view). */
   readonly direction: 'outgoing' | 'incoming' | null;
 }
 
-/** Body für POST /delegations. */
+/** Body for POST /delegations. */
 export interface DelegationInput {
   meetingId: Uuid;
   delegateId: Uuid;
   delegateVoting: boolean;
 }
 
-/** Wählbarer Empfänger (Typeahead-Quelle). */
+/** Selectable recipient (typeahead source). */
 export interface DelegationRecipient {
   readonly principalId: Uuid;
   readonly displayName: string | null;
-  /** Stellvertreter-Pool → keine Vorlauf-Deadline. */
+  /** Substitute pool → no lead-time deadline. */
   readonly viaPool: boolean;
   readonly isMember: boolean;
 }
 
-/** Kontext des »Vertretung einrichten«-Dialogs (GET /delegations/meetings/{id}/context). */
+/** Context of the "set up representation" dialog (GET /delegations/meetings/{id}/context). */
 export interface MeetingDelegationContext {
   readonly meetingId: Uuid;
   readonly gremiumId: Uuid;
   readonly allowVoteDelegation: boolean;
   readonly votingDelegationEnabled: boolean;
   readonly delegationAllowExternal: boolean;
-  /** Deadline für Nicht-Pool-Delegationen (ISO/UTC); null = nur Status-Gate. */
+  /** Deadline for non-pool delegations (ISO/UTC); null = status gate only. */
   readonly deadline: IsoDateTime | null;
   readonly deadlinePassed: boolean;
   readonly meetingStarted: boolean;
@@ -68,7 +68,7 @@ export interface MeetingDelegationContext {
   readonly recipients: readonly DelegationRecipient[];
 }
 
-/** Delegations-Sicht auf eine Abstimmung (GET /delegations/votes/{id}/status). */
+/** Delegation view of a vote (GET /delegations/votes/{id}/status). */
 export interface VoteDelegationStatus {
   readonly blocked: boolean;
   readonly delegatedToName: string | null;
@@ -76,18 +76,18 @@ export interface VoteDelegationStatus {
   readonly delegatedByName: string | null;
 }
 
-/** Stellvertreter-Pool-Eintrag (GET/POST /delegations/substitutes). */
+/** Substitute-pool entry (GET/POST /delegations/substitutes). */
 export interface DelegationSubstitute {
   readonly id: Uuid;
   readonly gremiumId: Uuid;
-  /** null = gremium-weiter Stellvertreter (vertritt jedes Mitglied). */
+  /** null = gremium-wide substitute (represents every member). */
   readonly memberId: Uuid | null;
   readonly memberName: string | null;
   readonly substituteId: Uuid;
   readonly substituteName: string | null;
 }
 
-/** Body für POST /delegations/substitutes. */
+/** Body for POST /delegations/substitutes. */
 export interface SubstituteInput {
   gremiumId: Uuid;
   memberId?: Uuid | null;
@@ -101,8 +101,8 @@ export class DelegationsApiService {
 
   list(meetingId?: Uuid): Observable<Delegation[]> {
     const params = meetingId ? new HttpParams().set('meetingId', meetingId) : undefined;
-    // Liste hat einen eigenen Lade-Indikator (bzw. läuft im Dashboard im Hintergrund)
-    // → globalen Overlay unterdrücken (#loading).
+    // The list has its own loading indicator (or runs in the background on the
+    // dashboard) → suppress the global overlay.
     return this.http.get<Delegation[]>(`${this.base}/delegations`, {
       params,
       context: skipLoading(),
@@ -117,7 +117,7 @@ export class DelegationsApiService {
     return this.http.delete<void>(`${this.base}/delegations/${id}`);
   }
 
-  /** `quiet` = Hintergrund-Reload nach Mutation (kein globaler Overlay). */
+  /** `quiet` = background reload after a mutation (no global overlay). */
   meetingContext(
     meetingId: Uuid,
     opts: { quiet?: boolean } = {},
@@ -129,7 +129,7 @@ export class DelegationsApiService {
   }
 
   recipients(meetingId: Uuid, q: string): Observable<DelegationRecipient[]> {
-    // Debounced Typeahead → nie den globalen Overlay aufblitzen lassen (#loading).
+    // Debounced typeahead → never flash the global overlay.
     return this.http.get<DelegationRecipient[]>(
       `${this.base}/delegations/meetings/${meetingId}/recipients`,
       { params: new HttpParams().set('q', q), context: skipLoading() },

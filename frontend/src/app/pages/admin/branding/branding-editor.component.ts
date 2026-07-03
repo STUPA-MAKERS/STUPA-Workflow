@@ -26,14 +26,13 @@ import {
 import { brandingLinkErrors } from '../branding.util';
 
 /**
- * Branding-/Site-Config-Editor (#21, T-34). Macht Logos, Fußzeile und Freitexte
- * über die UI pflegbar statt im Code. Logo-Upload mit Vorschau + mime/size-Guard,
- * Footer-Link-Spalten, i18n-Freitexte, **Live-Vorschau** und Versionierung
- * (aktiv vs. Entwurf) mit Aktivieren-Button.
+ * Branding/site-config editor. Makes logos, footer and free texts editable via the UI
+ * instead of in code. Logo upload with preview + mime/size guard, footer link columns,
+ * i18n free texts, a live preview, and versioning (active vs. draft) with an activate
+ * button.
  *
- * Gegen `/api/admin/site-config` (T-34-Contract — **kein** SDS-Endpunkt, im Mock
- * bedient). Erzeugt valides `branding`-JSON; TODO(T-24/#21): `branding`-Schema
- * aus `/admin/config-schemas` gegenprüfen, sobald Backend es exportiert.
+ * Works against `/api/admin/site-config` (not part of the API spec; served by the mock).
+ * Produces valid `branding` JSON.
  */
 @Component({
   selector: 'app-branding-editor',
@@ -56,20 +55,20 @@ export class BrandingEditorComponent {
   protected readonly hasDraftChanges = signal(false);
   protected readonly draft = signal<Branding | null>(null);
 
-  /** Aktiv-genutzte Sprache für die Vorschau. */
+  /** Currently active language for the preview. */
   protected readonly lang = computed(() => this.i18n.locale());
 
-  /** Unzulässige Link-URLs (Schema ≠ http(s)/mailto) — blockiert Speichern. */
+  /** Disallowed link URLs (scheme ≠ http(s)/mailto) — blocks saving. */
   protected readonly linkErrors = computed(() => brandingLinkErrors(this.draft()));
 
-  /** Versions-Sidebar — nach Aktivieren/Restore neu laden. */
+  /** Version sidebar — reload after activate/restore. */
   protected readonly history = viewChild(VersionHistoryComponent);
 
   constructor() {
     this.loadConfig();
   }
 
-  /** Aktive + Entwurfs-Branding laden (auch nach Versions-Restore). */
+  /** Load active + draft branding (also after a version restore). */
   protected loadConfig(): void {
     this.api.getSiteConfig().subscribe((cfg) => {
       this.version.set(cfg.version);
@@ -168,20 +167,20 @@ export class BrandingEditorComponent {
     });
   }
 
-  /** Antrags-Info (#18) lazy initialisieren — Bestands-Configs kennen das Feld nicht. */
+  /** Lazy-init the apply info — existing configs don't have this field. */
   protected applyInfo(d: Branding): I18nMap {
     d.freetexts.applyInfo ??= {};
     return d.freetexts.applyInfo;
   }
 
-  /** Nach In-Place-`[(ngModel)]`-Mutation das Signal neu emittieren (Vorschau). */
+  /** Re-emit the signal after an in-place `[(ngModel)]` mutation (preview). */
   protected reemit(): void {
     this.patch(() => {
-      /* nur re-emit */
+      /* re-emit only */
     });
   }
 
-  /** Mutation am Entwurf ausführen + Signal neu emittieren (Vorschau/Validierung). */
+  /** Apply a mutation on the draft + re-emit the signal (preview/validation). */
   protected patch(fn: (d: Branding) => void): void {
     const d = this.draft();
     if (!d) return;

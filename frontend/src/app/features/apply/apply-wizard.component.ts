@@ -47,10 +47,10 @@ type StepKind = 'type' | 'contact' | 'section' | 'review';
 const DRAFT_PREFIX = 'ap.draft.';
 
 /**
- * Öffentlicher Antrags-Wizard (T-30, flows §1 / requirements N1a).
- * Schritte: Antragsart → Kontakt → Form-Sektionen (aus effektiver Definition via
- * Formly, inkl. `visibleIf`/`computed` + Topf-Extra-Felder) → Prüfen/Altcha/Absenden.
- * Zwischenstand wird je Antragsart lokal gespeichert (Zwischenspeichern).
+ * Public application wizard.
+ * Steps: application type → contact → form sections (from the effective definition
+ * via Formly, incl. `visibleIf`/`computed` + pot extra fields) → review/Altcha/submit.
+ * Progress is saved locally per application type (autosave).
  */
 @Component({
   selector: 'app-apply-wizard',
@@ -76,7 +76,7 @@ export class ApplyWizardComponent {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
-  /** Eingeloggt? Dann entfällt der Kontakt-Schritt + Altcha; Identität kommt vom Account (#24). */
+  /** Logged in? Then the contact step + Altcha are skipped; identity comes from the account. */
   protected readonly loggedIn = this.auth.isAuthenticated;
 
   readonly types = signal<ApplicationType[]>([]);
@@ -87,10 +87,10 @@ export class ApplyWizardComponent {
   readonly loadingForm = signal(false);
   readonly submitting = signal(false);
   readonly altchaSolution = signal<string | null>(null);
-  /** Ob für anonyme Einreichung eine Altcha-Lösung nötig ist (false ⇒ Altcha aus). */
+  /** Whether an anonymous submission needs an Altcha solution (false ⇒ Altcha off). */
   readonly altchaRequired = signal(true);
 
-  /** Geteiltes Formly-Modell über alle Sektionen (stabile Referenz). */
+  /** Shared Formly model across all sections (stable reference). */
   model: Record<string, unknown> = {};
 
   readonly contactForm = new FormGroup({
@@ -103,7 +103,7 @@ export class ApplyWizardComponent {
 
   readonly steps = computed<Step[]>(() => {
     const t = (k: Parameters<I18nService['translate']>[0]) => this.i18n.translate(k);
-    // i18n.locale() lesen, damit das Signal bei Sprachwechsel neu berechnet.
+    // Read i18n.locale() so the signal recomputes on language change.
     this.i18n.locale();
     if (!this.effForm()) return [{ label: t('apply.steps.type') }];
     return [
@@ -114,7 +114,7 @@ export class ApplyWizardComponent {
     ];
   });
 
-  /** Index der ersten Form-Sektion: 1 ohne Kontakt-Schritt (eingeloggt), sonst 2. */
+  /** Index of the first form section: 1 without the contact step (logged in), else 2. */
   private readonly sectionBase = computed(() => (this.loggedIn() ? 1 : 2));
 
   readonly currentStep = computed<StepKind>(() => {
@@ -129,7 +129,7 @@ export class ApplyWizardComponent {
     () => this.sections()[this.activeIndex() - this.sectionBase()] ?? null,
   );
 
-  /** Im Review angezeigte Antragsteller-Mail: Account (eingeloggt) oder Kontakt-Feld. */
+  /** Applicant email shown in review: account (logged in) or contact field. */
   readonly reviewEmail = computed(() =>
     this.loggedIn()
       ? (this.auth.principal()?.email ?? this.auth.displayName())
@@ -138,7 +138,7 @@ export class ApplyWizardComponent {
 
   readonly summary = computed<SummaryRow[]>(() => this.buildSummary());
 
-  /** Konfigurierter Info-Text unter der Typ-Auswahl (#18) — Markdown, je Sprache. */
+  /** Configured info text below the type selection — markdown, per language. */
   private readonly applyInfo = signal<Record<string, string> | null>(null);
   readonly applyInfoHtml = computed(() => {
     const text = resolveI18n(this.applyInfo(), this.i18n.locale()).trim();
@@ -146,14 +146,14 @@ export class ApplyWizardComponent {
   });
 
   constructor() {
-    // Session laden (gecached), damit der Wizard Kontakt-Schritt/Altcha für
-    // eingeloggte Nutzer:innen überspringt (#24). /apply ist ungeschützt.
+    // Load the (cached) session so the wizard skips the contact step/Altcha for
+    // logged-in users. /apply is unprotected.
     this.auth.ensureLoaded().subscribe();
     this.api.applicationTypes().subscribe({
       next: (t) => this.types.set(t.filter((x) => x.active)),
       error: () => this.toast.error(this.i18n.translate('apply.error.typesLoad')),
     });
-    // Branding-Info unter der Antrags-Auswahl (#18) — public Endpoint, fehlertolerant.
+    // Branding info below the type selection — public endpoint, fault-tolerant.
     this.api.publicSiteConfig().subscribe({
       next: (cfg) => this.applyInfo.set(cfg.branding?.freetexts?.applyInfo ?? null),
       error: () => undefined,
@@ -223,15 +223,15 @@ export class ApplyWizardComponent {
     this.altchaSolution.set(solution);
   }
 
-  /** Altcha ist serverseitig deaktiviert (404) → keine Lösung verlangen. */
+  /** Altcha is disabled server-side (404) → require no solution. */
   onAltchaUnavailable(): void {
     this.altchaRequired.set(false);
   }
 
   readonly canSubmit = computed(
     () =>
-      // Eingeloggt: kein Altcha/Kontakt nötig; anonym: beides Pflicht (#24) —
-      // außer Altcha ist serverseitig aus.
+      // Logged in: no Altcha/contact needed; anonymous: both required —
+      // unless Altcha is off server-side.
       (this.loggedIn() || !this.altchaRequired() || this.altchaSolution() !== null) &&
       (this.loggedIn() || this.contactForm.valid) &&
       this.sections().every((s) => s.form.valid),
@@ -248,7 +248,7 @@ export class ApplyWizardComponent {
       typeId,
       budgetPotId: this.effForm()?.budgetPotId ?? null,
       data: { ...this.model },
-      // Eingeloggt: Identität/Altcha leitet das Backend aus dem Account ab (#24).
+      // Logged in: the backend derives identity/Altcha from the account.
       applicantEmail: this.loggedIn() ? null : this.contactForm.controls.email.value,
       applicantName: this.loggedIn() ? null : this.contactForm.controls.name.value || null,
       lang: this.i18n.locale(),
@@ -271,7 +271,7 @@ export class ApplyWizardComponent {
     });
   }
 
-  // --- draft (Zwischenspeichern) -------------------------------------------
+  // --- draft (autosave) ----------------------------------------------------
   private draftKey(): string | null {
     const id = this.typeId();
     return id ? `${DRAFT_PREFIX}${id}` : null;
@@ -290,7 +290,7 @@ export class ApplyWizardComponent {
         }),
       );
     } catch {
-      /* storage gesperrt — Zwischenspeichern ist best-effort */
+      /* storage blocked — autosave is best-effort */
     }
   }
 
@@ -315,14 +315,14 @@ export class ApplyWizardComponent {
           name: draft.contact.name ?? '',
         });
       }
-      // Sektionen sind vor restoreDraft() gebaut → steps() ist vollständig.
-      // Gespeicherten Schritt wiederherstellen, auf gültigen Bereich begrenzen.
+      // Sections are built before restoreDraft() → steps() is complete.
+      // Restore the saved step, clamped to the valid range.
       if (typeof draft.activeIndex === 'number' && Number.isFinite(draft.activeIndex)) {
         const max = this.steps().length - 1;
         this.activeIndex.set(Math.min(Math.max(Math.trunc(draft.activeIndex), 0), max));
       }
     } catch {
-      /* defekter Entwurf — ignorieren */
+      /* corrupt draft — ignore */
     }
   }
 
@@ -377,7 +377,7 @@ export class ApplyWizardComponent {
     return opt ? resolveI18n(opt.label, this.i18n.locale()) : String(value);
   }
 
-  /** Kostenpositionen im Review: Anzahl Positionen + Σ der bevorzugten Werte. */
+  /** Cost positions in review: number of positions + Σ of preferred values. */
   private formatPositions(value: unknown): string {
     if (!Array.isArray(value)) return '';
     let total = 0;

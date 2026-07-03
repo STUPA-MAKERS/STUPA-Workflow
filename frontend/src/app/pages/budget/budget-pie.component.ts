@@ -10,8 +10,8 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
-/** Ein Tortenstück: Beschriftung, Wert (in Währungseinheiten), Farbe.
- *  `id` (Kostenstellen-Id) macht das Stück klickbar (Drilldown, #budget). */
+/** A pie slice: label, value (in currency units), colour.
+ *  `id` (cost-centre id) makes the slice clickable (drilldown). */
 export interface PieSlice {
   label: string;
   value: number;
@@ -31,13 +31,12 @@ const R = 70;
 const INNER = 38;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
-const GROW = 7; // radiale Vergrößerung beim Hover
+const GROW = 7; // radial growth on hover
 
 /**
- * Interaktives Donut-Diagramm (#budget-redesign): Verteilung über Tortenstücke.
- * Kurzer Titel **darüber**, **keine** Box. Hover hebt das Stück hervor und lässt es
- * **radial wachsen** (animiert); ein Tooltip zeigt Label, Betrag, Prozent. Rein SVG,
- * keine Fremd-Lib.
+ * Interactive donut chart: distribution across pie slices. Short title **above**,
+ * **no** box. Hover highlights a slice and makes it **grow radially** (animated);
+ * a tooltip shows label, amount, percent. Pure SVG, no third-party lib.
  */
 @Component({
   selector: 'app-budget-pie',
@@ -135,7 +134,7 @@ export class BudgetPieComponent {
 
   readonly title = input<string>('');
   readonly slices = input<PieSlice[]>([]);
-  /** Klick auf ein Stück mit `id` → Kostenstellen-Id (Drilldown im Tab). */
+  /** Click on a slice with an `id` -> cost-centre id (drilldown in the tab). */
   readonly sliceClick = output<string>();
 
   protected readonly SIZE = SIZE;
@@ -149,7 +148,7 @@ export class BudgetPieComponent {
     const total = this.total();
     if (total <= 0) return [];
     const out: Arc[] = [];
-    let angle = -Math.PI / 2; // 12 Uhr
+    let angle = -Math.PI / 2; // 12 o'clock
     for (const s of this.slices()) {
       const frac = Math.max(0, s.value) / total;
       if (frac <= 0) continue;
@@ -191,10 +190,10 @@ export class BudgetPieComponent {
   }
 }
 
-/** SVG-Pfad eines Donut-Segments zwischen zwei Winkeln (Radiant). */
+/** SVG path of a donut segment between two angles (radians). */
 function donutArc(start: number, end: number): string {
-  // Voller Kreis (ein einzelnes 100%-Stück): start==end → ein einzelner Bogen
-  // zeichnet nichts. Stattdessen den ganzen Ring (Außenkreis CW, Loch CCW).
+  // Full circle (a single 100% slice): start==end -> a single arc draws nothing.
+  // Instead draw the whole ring (outer circle CW, hole CCW).
   if (end - start >= Math.PI * 2 - 1e-6) {
     return [
       `M ${CX - R} ${CY}`,

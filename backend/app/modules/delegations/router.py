@@ -1,13 +1,12 @@
-"""Delegations-Router (#delegation-rework).
+"""Delegations router.
 
-Mitglied-Self-Service für **sitzungsgebundene** Vertretungen: ``GET`` eigene
-Delegationen, ``POST`` anlegen, ``DELETE`` widerrufen, plus Sitzungs-Kontext
-(Deadline/Empfänger), Vote-Status (FE-Banner) und der pro Gremium gepflegte
-Stellvertreter-Pool. RBAC ist serverseitig **autoritativ** — jede Route verlangt
-eine Session (``require_principal`` → 401); die fachlichen Regeln (Gates,
-Deadline, Empfänger-Kreis, Ketten) prüft der Service. Admins (``admin.delegations``)
-sehen/widerrufen alle Delegationen; den Pool pflegt ``admin.delegations`` oder die
-Gremium-Rolle mit ``session.manage``. Fehler als ``ProblemDetail``.
+Member self-service for session-bound representations: list/create/revoke own
+delegations, meeting context (deadline/recipients), vote status, and the
+per-gremium substitute pool. RBAC is server-side authoritative — every route
+requires a session; the domain rules (gates, deadline, recipient circle, chains)
+are checked by the service. Admins (``admin.delegations``) see/revoke all;
+the pool is managed by ``admin.delegations`` or the gremium role with
+``session.manage``. Errors as ``ProblemDetail``.
 """
 
 from __future__ import annotations
@@ -50,8 +49,8 @@ def get_delegation_service(session: DbSession, settings: SettingsDep) -> Delegat
 
 ServiceDep = Annotated[DelegationService, Depends(get_delegation_service)]
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
-# Auth genügt (jedes Mitglied darf die eigene Stimme delegieren); die fachliche
-# Berechtigung (stimmberechtigtes Mitglied etc.) prüft der Service.
+# Auth is enough (any member may delegate their own vote); the domain
+# entitlement (voting member etc.) is checked by the service.
 Member = Annotated[Principal, Depends(require_principal())]
 
 
@@ -80,7 +79,7 @@ async def create_delegation(
     mailer: AutoMailerDep,
 ) -> DelegationOut:
     out = await service.create(payload, principal)
-    # Vertreter:in informieren (#4-3, Art delegation, abwählbar #4-2).
+    # Notify the delegate (kind "delegation", user opt-out possible).
     info = await meeting_delegation_mail_info(getattr(service, "session", None), out.id)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(mailer.delegation_changed, settings, info, granted=True, pool=pool)
@@ -101,7 +100,7 @@ async def revoke_delegation(
     request: Request,
     mailer: AutoMailerDep,
 ) -> Response:
-    # Mail-Daten VOR dem Widerruf einsammeln (#4-3) — danach ist die Zeile weg.
+    # Collect mail data BEFORE revoking — the row is gone afterwards.
     info = await meeting_delegation_mail_info(getattr(service, "session", None), delegation_id)
     await service.revoke(delegation_id, principal)
     pool = getattr(request.app.state, "arq_pool", None)
@@ -117,8 +116,8 @@ async def revoke_delegation(
 async def meeting_context(
     meeting_id: UUID, service: ServiceDep, principal: Member
 ) -> MeetingDelegationContext:
-    """Alles für den »Vertretung einrichten«-Dialog (Gates, Deadline, Empfänger,
-    eigener Status)."""
+    """Everything for the "set up representation" dialog (gates, deadline,
+    recipients, own status)."""
     return await service.meeting_context(meeting_id, principal)
 
 
@@ -133,7 +132,7 @@ async def recipients(
     principal: Member,
     q: Annotated[str, Query(max_length=100)] = "",
 ) -> list[RecipientOut]:
-    """Typeahead-Quelle für die Empfänger-Wahl (Mitglieder, Pool, ggf. extern)."""
+    """Typeahead source for recipient selection (members, pool, maybe external)."""
     return await service.recipients(meeting_id, q, principal)
 
 
@@ -145,7 +144,7 @@ async def recipients(
 async def vote_status(
     vote_id: UUID, service: ServiceDep, principal: Member
 ) -> VoteDelegationStatus:
-    """Delegations-Sicht des Aufrufers auf eine Abstimmung (vote-cast-Banner)."""
+    """Caller's delegation view of one vote (vote-cast banner)."""
     return await service.vote_status(vote_id, principal)
 
 

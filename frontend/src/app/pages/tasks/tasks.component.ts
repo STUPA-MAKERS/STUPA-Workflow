@@ -12,9 +12,9 @@ import {
 } from '@stupa-makers/ui-kit';
 
 /**
- * Aufgaben (#64): Anträge mit ausstehender Entscheidung für die eigene Rolle
- * (vote-States, in denen der Nutzer abstimmen darf). Tabellarisch; Klick auf eine
- * Zeile öffnet die Detailansicht (dort liegt das Abstimmen / der Übergang).
+ * Tasks: applications with a pending decision for the user's own role (vote states
+ * in which the user may vote). Tabular; clicking a row opens the detail view
+ * (which is where voting / the transition happens).
  */
 @Component({
   selector: 'app-tasks',
@@ -44,19 +44,19 @@ export class TasksComponent {
     { key: 'waiting', label: this.i18n.translate('tasks.col.waiting'), align: 'end', width: '10rem' },
   ]);
 
-  /** Antragstitel (System-Titelfeld) mit Fallback. */
+  /** Application title (system title field) with fallback. */
   protected titleOf(item: ApplicationListItem): string {
     return item.title?.trim() || this.i18n.translate('applications.list.untitled');
   }
 
-  /** Antragstyp-Name (über die geladenen Typen aufgelöst). */
+  /** Application-type name (resolved via the loaded types). */
   protected typeName(typeId: Uuid): string {
     return this.typesById().get(typeId) ?? '—';
   }
 
   /**
-   * Wartezeit als relative Angabe (z. B. „vor 5 Tagen") — für die Aufgaben-Queue
-   * zählt das Alter, nicht das genaue Datum. Auf Basis von ``createdAt``.
+   * Waiting time as a relative value (e.g. "5 days ago") — for the task queue the
+   * age matters, not the exact date. Based on ``createdAt``.
    */
   protected waitingSince(createdAt: string | null): string {
     if (!createdAt) return '—';

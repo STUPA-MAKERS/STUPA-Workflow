@@ -18,9 +18,9 @@
   </ng-template>
 </app-data-table>
 
-<!-- Stellvertreter-Pool (#delegation-rework): gewählte/bestimmte Vertreter, an die
-     ohne Vorlauf-Deadline (bis Sitzungsbeginn) delegiert werden darf — auch wenn
-     sie nicht selbst Mitglied sind (z. B. Fachschafts-Vertreter). -->
+<!-- Substitute pool: elected/appointed representatives that may be delegated to
+     without a lead-time deadline (until meeting start) — even if they are not
+     members themselves (e.g. faculty representatives). -->
 <section class="gm__pool" [attr.aria-label]="'admin.substitutes.title' | t">
   <header class="flex items-center justify-between gap-4 flex-wrap">
     <div>
@@ -51,7 +51,7 @@
   </app-data-table>
 </section>
 
-<!-- Stellvertreter hinzufügen: Dialog mit Typeahead (beliebige Nutzer). -->
+<!-- Add substitute: dialog with typeahead (any user). -->
 <app-dialog
   [open]="addSubOpen()"
   [title]="'admin.substitutes.add' | t"
@@ -100,7 +100,7 @@
   </div>
 </app-dialog>
 
-<!-- Mitglied hinzufügen: Dialog mit Typeahead -->
+<!-- Add member: dialog with typeahead. -->
 <app-dialog
   [open]="addOpen()"
   [title]="'admin.gremien.addMember' | t"

@@ -1,17 +1,10 @@
-"""Flow-Action-Handler ``addToNextSession`` + ``assignBudget`` (#28).
+"""Flow action handlers for ``addToNextSession`` and ``assignBudget``.
 
-Erfüllt das T-14-Dispatch-Interface für die beiden Aktionen, die der Flow direkt auf
-Sitzungs-/Budget-Daten ausführt (kein Mail-/Webhook-Versand):
-
-* ``addToNextSession`` — den Antrag als TOP an die **nächste** (früheste zukünftige)
-  Sitzung des angegebenen Gremiums hängen. Existiert keine, wird geloggt + übersprungen
-  (Action ist nur auf Übergängen **in einen vote-State** zulässig — vom Graph-Validator
-  erzwungen, ``config_schemas``).
-* ``assignBudget`` — dem Antrag eine Kostenstelle (Budget-Baum) zuordnen; das
-  Haushaltsjahr wird aus dem **einzigen aktiven** HHJ des Top-Level-Knotens abgeleitet.
-
-Fehler je Action werden geloggt, nicht propagiert — eine fehlgeschlagene Action darf den
-bereits committeten State-Wechsel nicht zurücknehmen (flows §9.3, idempotent/retrybar).
+``addToNextSession`` appends the application as an agenda item to the earliest
+upcoming meeting of the given gremium (logged + skipped if none exists);
+``assignBudget`` attaches a cost centre and derives the fiscal year from the
+single active one of the top-level node. Per-action errors are logged, never
+propagated — a failed action must not roll back the committed state change.
 """
 
 from __future__ import annotations
@@ -45,7 +38,7 @@ _FLOW_ACTOR = "system:flow"
 
 @dataclass(slots=True)
 class FlowExtrasActionDispatcher:
-    """`ActionDispatcher` für ``addToNextSession`` + ``assignBudget`` (sonst No-op)."""
+    """``ActionDispatcher`` for ``addToNextSession`` + ``assignBudget`` (else no-op)."""
 
     sessionmaker: async_sessionmaker[AsyncSession]
 
@@ -56,9 +49,8 @@ class FlowExtrasActionDispatcher:
                     await self._add_to_next_session(action)
                 elif action.type == "assignBudget":
                     await self._assign_budget(action)
-            except Exception:  # noqa: BLE001 — Action-Fehler dürfen den bereits
-                # committeten State-Wechsel nicht kippen (flows §9.3) und nicht die
-                # restlichen Actions des Übergangs verhindern.
+            except Exception:  # noqa: BLE001 — an action failure must not undo the
+                # committed state change nor block the transition's remaining actions.
                 logger.exception(
                     "flow action %s failed (key=%s) — skipped",
                     action.type,
@@ -138,10 +130,10 @@ class FlowExtrasActionDispatcher:
                     )
                 )
             ).all()
-            # Eindeutiges aktives HHJ → setzen; sonst offen lassen (mehrdeutig/keins).
+            # Set only an unambiguous active fiscal year; otherwise leave open.
             if len(active_ids) == 1:
                 app.fiscal_year_id = active_ids[0]
-            # Money mutation → audit trail (Hausregel; spiegelt BudgetTreeService).
+            # Money mutation -> audit trail (house rule; mirrors BudgetTreeService).
             await audit_record(
                 session,
                 actor=_FLOW_ACTOR,
@@ -160,7 +152,7 @@ class FlowExtrasActionDispatcher:
 
     @staticmethod
     async def _top_level(session: AsyncSession, node: Budget) -> Budget:
-        """Den Top-Level-Knoten (``parent_id IS NULL``) über die Eltern-Kette finden."""
+        """Walk the parent chain to the top-level node (``parent_id IS NULL``)."""
         current = node
         seen: set[UUID] = set()
         while current.parent_id is not None and current.parent_id not in seen:
@@ -173,5 +165,5 @@ class FlowExtrasActionDispatcher:
 
 
 def build_flow_extras_dispatcher(pool: object) -> FlowExtrasActionDispatcher:
-    """Dispatcher fürs App-Wiring (main.py). Braucht keinen arq-Pool."""
+    """Build the dispatcher for app wiring; needs no arq pool."""
     return FlowExtrasActionDispatcher(get_sessionmaker())

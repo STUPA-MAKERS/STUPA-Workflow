@@ -43,12 +43,11 @@ import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
 
 /**
- * Antrags-Liste (T-31, overview §4): Filter/Suche (`state/gremium/type/topf/q`)
- * + Offset-Paging. Der Filter-/Seitenzustand lebt in den **Query-Params** der
- * Route — so ist eine gefilterte Liste teil-/verlinkbar (z. B. aus dem Budget-
- * Bereich) und der Browser-Back funktioniert. Sichtbare Controls gibt es für
- * Suche/Typ/Status; `gremium`/`topf` werden aus der URL übernommen (Picker
- * folgen mit den Gremien-/Topf-Listen-Endpunkten aus T-24/Budget).
+ * Application list: filter/search (`state/gremium/type/topf/q`) + offset paging.
+ * Filter/page state lives in the route **query params** — so a filtered list is
+ * shareable/linkable (e.g. from the budget area) and browser-back works. Visible
+ * controls exist for search/type/status; `gremium`/`topf` are taken from the URL
+ * (pickers to follow with the gremium/pot list endpoints).
  */
 @Component({
   selector: 'app-applications-list',
@@ -71,26 +70,26 @@ export class ApplicationsListComponent implements OnDestroy {
 
   readonly limit = 20;
 
-  /** Erst-Ladevorgang (Filter-/Sortier-Wechsel) — blendet die ganze Liste aus. */
+  /** Initial load (filter/sort change) — hides the whole list. */
   readonly loading = signal(true);
-  /** Nachladen weiterer Seiten beim Scrollen (inkrementell, Liste bleibt sichtbar). */
+  /** Loading more pages while scrolling (incremental, list stays visible). */
   readonly loadingMore = signal(false);
   readonly error = signal(false);
-  /** Akkumulierte Anträge über alle bisher geladenen Seiten (Infinite-Scroll). */
+  /** Accumulated applications across all loaded pages so far (infinite scroll). */
   readonly items = signal<ApplicationListItem[]>([]);
   readonly total = signal(0);
-  /** Offset der **nächsten** zu ladenden Seite. */
+  /** Offset of the **next** page to load. */
   private nextOffset = 0;
-  /** Lauf-Nummer der Fetches: verspätete Antworten alter Filter werden verworfen. */
+  /** Fetch sequence number: late responses from old filters are discarded. */
   private fetchSeq = 0;
-  /** `gremium`/`topf` haben keine sichtbaren Controls — aus der URL gespiegelt. */
+  /** `gremium`/`topf` have no visible controls — mirrored from the URL. */
   private gremium = '';
   private topf = '';
   readonly types = signal<ApplicationType[]>([]);
 
-  /** Sichtbare Filter-Controls (gespiegelt aus den Query-Params). */
+  /** Visible filter controls (mirrored from the query params). */
   readonly q = signal('');
-  /** Debounce-Timer der Header-Suche (~400 ms, wie /expenses). */
+  /** Debounce timer of the header search (~400 ms, like /expenses). */
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   readonly typeId = signal('');
   readonly state = signal('');
@@ -100,22 +99,22 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
-  /** Kostenstellen-Baum für den linken Tree-Picker (gleiche Optik wie Budget-Tab). */
+  /** Cost-centre tree for the left tree picker (same look as the budget tab). */
   readonly budgetTree = signal<BudgetTreeNode[]>([]);
 
-  /** Im Budget-Tab ausgeblendete Kostenstellen (+ Unterbaum) aus dem Filter-Baum
-   *  entfernen — spiegelt `visibleTree` des Budget-Dashboards (#budget-hide). */
+  /** Remove cost centres (+ subtree) hidden in the budget tab from the filter
+   *  tree — mirrors the budget dashboard's `visibleTree`. */
   private pruneHidden(nodes: BudgetTreeNode[]): BudgetTreeNode[] {
     return nodes
       .filter((n) => !n.hiddenInBudget)
       .map((n) => ({ ...n, children: this.pruneHidden(n.children) }));
   }
-  /** Mobil: Baum hinter einklappbarem Toggle (Desktop immer sichtbar). */
+  /** Mobile: tree behind a collapsible toggle (desktop always visible). */
   readonly treeOpen = signal(false);
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
-  /** Zahl aktiver Filter (für den Indikator). */
+  /** Number of active filters (for the indicator). */
   readonly activeFilterCount = computed(
     () =>
       [
@@ -130,32 +129,32 @@ export class ApplicationsListComponent implements OnDestroy {
   );
 
   /**
-   * Status-Dropdown-Optionen aus den **realen** Status der geladenen Anträge
-   * akkumuliert (Wert = State-UUID, Label = aufgelöster State-Name). Der gesendete
-   * `state`-Filterwert bleibt die UUID (Contract: `current_state_id`). Einmal
-   * gesehene Status bleiben erhalten, damit der Filter nicht auf einen Wert kollabiert.
+   * Status dropdown options accumulated from the **real** states of the loaded
+   * applications (value = state UUID, label = resolved state name). The sent
+   * `state` filter value stays the UUID (contract: `current_state_id`). Once-seen
+   * states are kept so the filter does not collapse to a single value.
    */
   private readonly seenStates = signal<Map<string, string>>(new Map());
   readonly stateOptions = computed<SelectOption[]>(() =>
     [...this.seenStates()].map(([value, label]) => ({ value, label })),
   );
 
-  /** Noch ungeladene Anträge vorhanden? Steuert Sentinel + „Mehr laden". */
+  /** Any unloaded applications left? Controls the sentinel + "load more". */
   readonly hasMore = computed(() => this.items().length < this.total());
 
-  /** Sentinel am Listenende — sein Sichtbarwerden löst das Nachladen aus. */
+  /** Sentinel at the list end — becoming visible triggers the next load. */
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   private readonly typesById = computed(
     () => new Map(this.types().map((t) => [t.id, t.name])),
   );
 
-  /** Antragstyp-Optionen für den Filter (Wert = Typ-UUID, Label = Typ-Name). */
+  /** Application-type options for the filter (value = type UUID, label = type name). */
   readonly typeOptions = computed<SelectOption[]>(() =>
     this.types().map((type) => ({ value: type.id, label: type.name })),
   );
 
-  /** Antrags-Zeilen für die geteilte Tabelle. */
+  /** Application rows for the shared table. */
   readonly tableRows = computed<ApplicationRow[]>(() =>
     this.items().map((item) => ({
       id: item.id,
@@ -178,16 +177,16 @@ export class ApplicationsListComponent implements OnDestroy {
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),
     });
-    // Kostenstellen-Baum für den linken Filter-Picker (eager). Im Budget-Tab
-    // ausgeblendete Kostenstellen (`hiddenInBudget`) tauchen auch hier nicht auf.
+    // Cost-centre tree for the left filter picker (eager). Cost centres hidden
+    // in the budget tab (`hiddenInBudget`) do not appear here either.
     this.budgetApi.tree().subscribe({
       next: (tree) => this.budgetTree.set(this.pruneHidden(tree)),
       error: () => this.budgetTree.set([]),
     });
 
-    // Filter/Sortierung leben in den Query-Params: jede Änderung setzt die Liste
-    // zurück und lädt Seite 0 neu. Der Offset liegt **nicht** mehr in der URL
-    // (Infinite-Scroll), sondern wird intern hochgezählt.
+    // Filter/sort live in the query params: every change resets the list and
+    // reloads page 0. The offset is **no longer** in the URL (infinite scroll),
+    // it is counted up internally.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.q.set(pm.get('q') ?? '');
       this.typeId.set(pm.get('type') ?? '');
@@ -204,13 +203,12 @@ export class ApplicationsListComponent implements OnDestroy {
       this.reload();
     });
 
-    // True-Lazy-Infinite-Scroll: ein IntersectionObserver am Sentinel lädt die
-    // nächste Seite, sobald das Listenende in Sichtweite kommt (rootMargin als
-    // Prefetch). Der Effect re-bindet, sobald der Sentinel (nur bei hasMore)
-    // erscheint/verschwindet.
+    // True lazy infinite scroll: an IntersectionObserver on the sentinel loads the
+    // next page once the list end comes into view (rootMargin as prefetch). The
+    // effect re-binds whenever the sentinel (only with hasMore) appears/disappears.
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
-      // Kein Observer ohne DOM-API (SSR/Tests) — der „Mehr laden"-Button bleibt Fallback.
+      // No observer without a DOM API (SSR/tests) — the "load more" button stays fallback.
       if (!el || typeof IntersectionObserver === 'undefined') return;
       const obs = new IntersectionObserver(
         (entries) => {
@@ -223,7 +221,7 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
-  /** Kostenstelle im linken Baum wählen (``''`` = Alle); filtert die Liste. */
+  /** Select a cost centre in the left tree (``''`` = all); filters the list. */
   selectBudgetNode(id: string): void {
     this.budgetId.set(id);
     this.navigate({ budget: id || null, offset: null });
@@ -233,12 +231,12 @@ export class ApplicationsListComponent implements OnDestroy {
     return this.typesById().get(typeId) ?? typeId;
   }
 
-  /** Antragstitel (System-Titelfeld) mit Fallback „Ohne Titel". */
+  /** Application title (system title field) with fallback "untitled". */
   titleOf(item: ApplicationListItem): string {
     return item.title?.trim() || this.i18n.translate('applications.list.untitled');
   }
 
-  /** Reale Status der geladenen Anträge in die Dropdown-Optionen übernehmen. */
+  /** Merge the real states of the loaded applications into the dropdown options. */
   private collectStates(items: ApplicationListItem[]): void {
     const next = new Map(this.seenStates());
     let changed = false;
@@ -251,7 +249,7 @@ export class ApplicationsListComponent implements OnDestroy {
     if (changed) this.seenStates.set(next);
   }
 
-  /** Aktuelle Liste (Filter aus den Query-Params) als Excel exportieren. */
+  /** Export the current list (filters from the query params) as Excel. */
   onExport(): void {
     if (this.exporting()) return;
     this.exporting.set(true);
@@ -276,8 +274,8 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
-  /** Header-Live-Suche (#3): debounced ~400 ms → ``q``-Query-Param → Reload (mirror
-   *  /expenses). Der ``q``-Wert lebt weiter in der URL (teil-/verlinkbar). */
+  /** Header live search: debounced ~400 ms → ``q`` query param → reload (mirrors
+   *  /expenses). The ``q`` value lives on in the URL (shareable/linkable). */
   onSearch(value: string): void {
     this.q.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
@@ -320,12 +318,12 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
-  /** Sortier-Event der geteilten Tabelle → in die Query-Params. */
+  /** Sort event from the shared table → into the query params. */
   onSort(sort: SortState): void {
     this.navigate({ sort: sort.field, order: sort.order, offset: null });
   }
 
-  /** Nächste Seite anhängen (Sentinel sichtbar oder „Mehr laden"-Button). */
+  /** Append the next page (sentinel visible or "load more" button). */
   loadMore(): void {
     if (this.loadingMore() || this.loading() || !this.hasMore()) return;
     this.loadingMore.set(true);
@@ -340,7 +338,7 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
-  /** Liste zurücksetzen (Filter-/Sortier-Wechsel) und Seite 0 neu laden. */
+  /** Reset the list (filter/sort change) and reload page 0. */
   private reload(): void {
     this.nextOffset = 0;
     this.items.set([]);
@@ -351,7 +349,7 @@ export class ApplicationsListComponent implements OnDestroy {
     this.fetch(true);
   }
 
-  /** Query aus dem aktuellen Filter-Zustand für einen gegebenen Offset bauen. */
+  /** Build the query from the current filter state for a given offset. */
   private buildQuery(offset: number): ApplicationListQuery {
     const query: ApplicationListQuery = { limit: this.limit, offset };
     if (this.q().trim()) query.q = this.q().trim();
@@ -370,20 +368,20 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   /**
-   * Eine Seite holen. ``initial`` ersetzt die Liste (und zeigt bei Fehler den
-   * Vollfehler), sonst wird angehängt (Fehler beim Nachladen bleibt still — die
-   * bereits geladene Liste bleibt nutzbar).
+   * Fetch a page. ``initial`` replaces the list (and shows the full error on
+   * failure), otherwise it appends (a load-more error stays silent — the
+   * already-loaded list remains usable).
    */
   private fetch(initial: boolean): void {
-    // Lauf-Nummer gegen Out-of-order-Antworten: bei schnellen Filterwechseln darf
-    // eine verspätete Seite des alten Filters die aktuelle Liste nicht überschreiben.
+    // Sequence number against out-of-order responses: on fast filter changes a
+    // late page of the old filter must not overwrite the current list.
     const seq = ++this.fetchSeq;
     this.api.listApplications(this.buildQuery(this.nextOffset)).subscribe({
       next: (page) => {
         if (seq !== this.fetchSeq) return;
         this.total.set(page.total);
         this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
-        // Über die tatsächliche Trefferzahl hochzählen (letzte Seite < limit).
+        // Count up by the actual result count (last page < limit).
         this.nextOffset = page.offset + page.items.length;
         this.collectStates(page.items);
         this.loading.set(false);

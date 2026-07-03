@@ -6,10 +6,10 @@ export type ResolvedTheme = 'light' | 'dark';
 const STORAGE_KEY = 'ap.theme';
 
 /**
- * Theme-Steuerung (requirements N1, AK T-03):
- * - Preference: `system` (folgt OS) | `light` | `dark`, persistiert.
- * - Effektives Theme wird als `data-theme` auf <html> gesetzt.
- * - OS-Wechsel wird im `system`-Modus live übernommen (matchMedia-Listener).
+ * Theme control:
+ * - Preference: `system` (follows OS) | `light` | `dark`, persisted.
+ * - The effective theme is set as `data-theme` on <html>.
+ * - An OS change is picked up live in `system` mode (matchMedia listener).
  */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
@@ -19,14 +19,14 @@ export class ThemeService {
 
   readonly preference = this._preference.asReadonly();
 
-  /** Tatsächlich angewandtes Theme (`light` | `dark`). */
+  /** The actually applied theme (`light` | `dark`). */
   readonly resolved = computed<ResolvedTheme>(() => {
     const pref = this._preference();
     if (pref === 'system') return this._systemDark() ? 'dark' : 'light';
     return pref;
   });
 
-  /** Einmal beim App-Start aufrufen: Listener + initiales Anwenden. */
+  /** Call once at app start: listener + initial apply. */
   init(): void {
     this.media.addEventListener('change', this.onSystemChange);
     this.apply();
@@ -38,7 +38,7 @@ export class ThemeService {
     this.apply();
   }
 
-  /** Schaltet zwischen Hell und Dunkel um (auf Basis des aktuell Sichtbaren). */
+  /** Toggles between light and dark (based on what is currently visible). */
   toggle(): void {
     this.setPreference(this.resolved() === 'dark' ? 'light' : 'dark');
   }

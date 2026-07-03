@@ -1,8 +1,8 @@
-"""Anwendungs-Settings aus `.env` (Pydantic-Settings).
+"""Application settings from `.env` (pydantic-settings).
 
-Pflicht-Secrets ohne Default → fehlen sie, wirft `load_settings` einen klaren
-`SettingsError` (statt einer rohen Pydantic-ValidationError) beim Start.
-Layout/Namen siehe `deploy/.env.example`.
+Required secrets have no default: if missing, `load_settings` raises a clear
+`SettingsError` at startup instead of a raw pydantic ValidationError. See
+`deploy/.env.example` for layout and names.
 """
 
 import logging
@@ -12,14 +12,14 @@ from typing import Any
 from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Mindestlänge für Signing-/Client-Secrets (security.md §10: keine schwachen Secrets).
+# Minimum length for signing/client secrets (no weak secrets).
 _MIN_SECRET_LEN = 16
 
 _log = logging.getLogger("app.settings")
 
 
 class SettingsError(RuntimeError):
-    """Klarer Startfehler bei fehlender/ungültiger Konfiguration."""
+    """Clear startup error for missing/invalid configuration."""
 
 
 class Settings(BaseSettings):
@@ -30,48 +30,44 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # — Identität / Betrieb —
+    # Identity / operation.
     app_name: str = "Antragsplattform API"
     app_version: str = "0.0.2"
     environment: str = "development"
     log_level: str = "INFO"
     public_base_url: str = "http://localhost"
 
-    # — Härtungs-Schalter (fail-safe, security.md §3/§6) —
-    #   ``environment`` defaultet bewusst auf »development« (DEV-Ergonomie). Damit aber
-    #   produktionskritische Guards (Invoice-AV fail-closed, Proxy-Spoofing-Guard) nicht
-    #   *still* aussetzen, wenn jemand vergisst ENVIRONMENT=production zu setzen, gibt es
-    #   diesen expliziten Schalter: standardmäßig **an**. Wird er gesetzt (oder läuft
-    #   ``environment == "production"``), greifen die strengen Prüfungen. Nur für lokale
-    #   Sonderfälle bewusst auf ``false`` setzen. Siehe ``strict_security_enabled``.
+    # Hardening switch (fail-safe). ``environment`` defaults to "development" for
+    # DEV ergonomics; so production-critical guards (invoice AV fail-closed, proxy
+    # spoofing guard) do not silently disable when someone forgets to set
+    # ENVIRONMENT=production, this switch defaults ON. See ``strict_security_enabled``.
     strict_security: bool = True
 
-    # — Pflicht-Secrets (kein Default; Mindestlänge erzwungen) —
+    # Required secrets (no default; minimum length enforced).
     database_url: str
     session_secret: str = Field(min_length=_MIN_SECRET_LEN)
     magic_link_secret: str = Field(min_length=_MIN_SECRET_LEN)
 
-    # — Reverse-Proxy (security.md §3): eng, nie "*". In `production` ist "*" verboten
-    #   (X-Forwarded-* dürfte sonst von jeder Quelle gespooft werden) → SettingsError. —
+    # Reverse proxy: narrow, never "*". In production "*" is forbidden (X-Forwarded-*
+    # could otherwise be spoofed by any source) -> SettingsError.
     forwarded_allow_ips: str = "127.0.0.1"
 
-    # — CSRF (Double-Submit, security.md §10). Schützt cookie-authentifizierte
-    #   schreibende Requests; Bearer-Token-Requests sind ausgenommen. Namen folgen dem
-    #   Angular-Default (HttpClient liest `XSRF-TOKEN`, sendet `X-XSRF-TOKEN`), damit der
-    #   FE-Interceptor (frontend/.../auth.interceptor.ts) ohne Änderung greift. —
+    # CSRF (double-submit). Protects cookie-authenticated writes; bearer-token
+    # requests are exempt. Names follow the Angular default (HttpClient reads
+    # `XSRF-TOKEN`, sends `X-XSRF-TOKEN`) so the FE interceptor works unchanged.
     csrf_enabled: bool = True
     csrf_cookie_name: str = "XSRF-TOKEN"
     csrf_header_name: str = "X-XSRF-TOKEN"
 
-    # — CORS aus per Default (overview/security: kein Cross-Origin) —
+    # CORS off by default (no cross-origin).
     cors_allow_origins: list[str] = []
 
-    # — Optionale Infra (in späteren Tasks genutzt) —
+    # Optional infra.
     redis_url: str = "redis://redis:6379/0"
     db_migration_url: str | None = None
 
-    # — OIDC / Keycloak (security.md §2). Ohne vollständige Config ist OIDC »aus«
-    #   (Login/Callback → 503), Magic-Link bleibt unabhängig nutzbar. —
+    # OIDC / Keycloak. Without full config OIDC is off (login/callback -> 503);
+    # magic-link stays usable independently.
     oidc_issuer: str | None = None
     oidc_client_id: str | None = None
     oidc_client_secret: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
@@ -80,57 +76,55 @@ class Settings(BaseSettings):
     oidc_groups_claim: str = "groups"
     oidc_post_logout_redirect_url: str | None = None
 
-    # — Bootstrap-Admins (#70). Kommagetrennt: OIDC-`sub` und/oder E-Mail. Beim
-    #   OIDC-Login (Callback) **und** beim Startup wird den gematchten Principals
-    #   idempotent die `admin`-Rolle zugewiesen. Verhindert die Selbstaussperrung
-    #   einer frischen, echten OIDC-Installation (ohne Mock hätte niemand `admin.*`
-    #   und könnte daher auch keine Rollen vergeben). Leer = aus. —
+    # Bootstrap admins. Comma-separated OIDC `sub` and/or email. On OIDC login and
+    # at startup the matched principals are idempotently granted the `admin` role.
+    # Prevents lockout of a fresh real OIDC install (without a mock nobody would
+    # hold `admin.*` and thus could not assign roles). Empty = off.
     bootstrap_admin_subjects: str = ""
     bootstrap_admin_emails: str = ""
 
     @property
     def bootstrap_admin_subject_set(self) -> set[str]:
-        """OIDC-`sub`s aus `BOOTSTRAP_ADMIN_SUBJECTS` (kommagetrennt, getrimmt)."""
+        """OIDC `sub`s from `BOOTSTRAP_ADMIN_SUBJECTS` (comma-separated, trimmed)."""
         return {s.strip() for s in self.bootstrap_admin_subjects.split(",") if s.strip()}
 
     @property
     def bootstrap_admin_email_set(self) -> set[str]:
-        """E-Mails aus `BOOTSTRAP_ADMIN_EMAILS` (kommagetrennt, getrimmt, lowercase)."""
+        """Emails from `BOOTSTRAP_ADMIN_EMAILS` (comma-separated, trimmed, lowercased)."""
         return {
             e.strip().lower() for e in self.bootstrap_admin_emails.split(",") if e.strip()
         }
 
-    # — Session-/Applicant-Cookie (security.md §1/§2: HttpOnly+Secure+SameSite=Lax) —
+    # Session/applicant cookie (HttpOnly+Secure+SameSite=Lax).
     session_cookie_name: str = "ap_session"
     applicant_cookie_name: str = "ap_applicant"
     oidc_tx_cookie_name: str = "ap_oidc_tx"
     session_ttl_hours: int = 12
-    # Applicant-(Magic-Link)-Session: serverseitig (``applicant_session``-Tabelle),
-    # opake signierte ``sid``. Bewusst von ``session_ttl_hours`` ENTKOPPELT, damit das
-    # Antragsteller-Fenster unabhängig von der Principal-Session getunt werden kann
-    # (security.md §1 — kürzer = kleineres Replay-Fenster).
+    # Applicant (magic-link) session: server-side (``applicant_session`` table),
+    # opaque signed ``sid``. Deliberately decoupled from ``session_ttl_hours`` so the
+    # applicant window can be tuned independently (shorter = smaller replay window).
     applicant_session_ttl_hours: int = 12
     cookie_secure: bool = True
 
-    # — OAuth2-AS für native/MCP-Clients (browser-grant + PKCE, RFC 7636) —
-    # Öffentlicher Client (kein Secret); nur Loopback-Redirects erlaubt. Token sind
-    # opak + scoped (siehe app.modules.auth.oauth). Aktiv nur, wenn OIDC konfiguriert.
+    # OAuth2 AS for native/MCP clients (browser grant + PKCE, RFC 7636). Public
+    # client (no secret); loopback redirects only. Tokens are opaque + scoped (see
+    # app.modules.auth.oauth). Active only when OIDC is configured.
     oauth_mcp_client_id: str = "antragsplattform-mcp"
     oauth_tx_cookie_name: str = "ap_oauth_tx"
-    oauth_code_ttl_seconds: int = 300  # Authorization-Code: 5 min
-    oauth_access_ttl_seconds: int = 3600  # Access-Token: 1 h
-    oauth_refresh_ttl_seconds: int = 60 * 60 * 24 * 30  # Refresh-Token: 30 d
-    # Quellverzeichnis des MCP-Pakets für den Self-Service-Download; None → relativ
-    # zur Repo-Wurzel (`<repo>/mcp`). In Containern ohne Quellbaum → 404.
+    oauth_code_ttl_seconds: int = 300  # authorization code: 5 min
+    oauth_access_ttl_seconds: int = 3600  # access token: 1 h
+    oauth_refresh_ttl_seconds: int = 60 * 60 * 24 * 30  # refresh token: 30 d
+    # Source dir of the MCP package for the self-service download; None -> relative
+    # to the repo root (`<repo>/mcp`). In containers without a source tree -> 404.
     mcp_package_dir: str | None = None
 
-    # — Magic-Link-Laufzeiten (security.md §1) —
+    # Magic-link lifetimes.
     magic_link_edit_ttl_days: int = 7
     magic_link_action_ttl_minutes: int = 15
 
-    # — Mail/SMTP (T-18). Ohne `smtp_host` ist der Versand »aus« (Worker loggt +
-    #   verwirft statt zu senden) — DEV/Tests laufen ohne echten MTA. Das Passwort
-    #   ist ein Secret und wird **nie** geloggt. —
+    # Mail/SMTP. Without `smtp_host` sending is off (worker logs + drops instead of
+    # sending) so DEV/tests run without a real MTA. The password is a secret and is
+    # never logged.
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_user: str | None = None
@@ -141,154 +135,150 @@ class Settings(BaseSettings):
     mail_from: str = "noreply@antragsplattform.local"
     mail_from_name: str = "Antragsplattform"
     mail_default_lang: str = "de"
-    # Versand-Retry im Worker (arq): max. Versuche + Backoff-Basis (Sekunden).
+    # Worker (arq) send retry: max tries + backoff base (seconds).
     mail_max_tries: int = 5
     mail_retry_backoff_seconds: int = 30
 
     @property
     def smtp_enabled(self) -> bool:
-        """Echter Versand nur bei gesetztem `smtp_host`; sonst Worker-No-op (DEV/Test)."""
+        """Real sending only with `smtp_host` set; otherwise worker no-op (DEV/test)."""
         return bool(self.smtp_host)
 
-    # — Object-Storage / MinIO (T-13, security.md §6). Ohne `minio_endpoint` ist der
-    #   Upload »aus« (POST /attachments → 503); DEV/Contract-CI laufen ohne Bucket. Die
-    #   Keys sind Secrets und werden **nie** geloggt. —
+    # Object storage / MinIO. Without `minio_endpoint` upload is off (POST
+    # /attachments -> 503); DEV/contract CI run without a bucket. The keys are
+    # secrets and are never logged.
     minio_endpoint: str | None = None
     minio_access_key: str | None = None
     minio_secret_key: str | None = None
     minio_bucket: str = "attachments"
-    minio_secure: bool = False  # TLS zur MinIO-API (intern i. d. R. plain HTTP)
-    # Upload-Schranke (data-model: CHECK(size <= 10485760)) + Lebensdauer signierter URLs.
+    minio_secure: bool = False  # TLS to the MinIO API (usually plain HTTP internally)
+    # Upload cap (data model: CHECK(size <= 10485760)) + signed-URL lifetime.
     attachment_max_bytes: int = 10 * 1024 * 1024
     attachment_url_ttl_seconds: int = 300
 
-    # — ClamAV (T-13, security.md §6). Ohne `clamav_host` ist der Scan »aus«: Uploads
-    #   bleiben `scanned=false` (Quarantäne, kein Download) — fail-closed (DEV/Test). —
+    # ClamAV. Without `clamav_host` the scan is off: uploads stay `scanned=false`
+    # (quarantined, no download) — fail-closed (DEV/test).
     clamav_host: str | None = None
     clamav_port: int = 3310
     clamav_timeout_seconds: int = 60
-    # Scan-Retry im Worker (arq): max. Versuche + Backoff-Basis (Sekunden).
+    # Worker (arq) scan retry: max tries + backoff base (seconds).
     scan_max_tries: int = 5
     scan_retry_backoff_seconds: int = 30
 
-    # — Webhook-Dispatch (T-19, security.md §5). Versand läuft im arq-Worker; die API
-    #   legt nur ``webhook_delivery``-Zeilen + Jobs an. SSRF-Guard ist **immer** aktiv
-    #   (private/loopback/link-local/metadata blockiert); die optionale Host-Allowlist
-    #   schränkt zusätzlich auf erlaubte Ziel-Hosts ein (leer = jeder *öffentliche*
-    #   Host). Das pro-Webhook-``secret`` wird **nie** geloggt. —
+    # Webhook dispatch. Delivery runs in the arq worker; the API only creates
+    # ``webhook_delivery`` rows + jobs. The SSRF guard is always active
+    # (private/loopback/link-local/metadata blocked); the optional host allowlist
+    # additionally restricts targets (empty = any public host). The per-webhook
+    # ``secret`` is never logged.
     webhook_timeout_seconds: float = 10.0
     webhook_max_tries: int = 5
     webhook_retry_backoff_seconds: int = 30
-    #   Optionale Host-Allowlist für Webhook-Ziele. Leer = jeder *öffentliche* Host (der
-    #   SSRF-Guard bleibt unabhängig immer aktiv). In Produktion sollte sie gesetzt sein,
-    #   damit Ziele zusätzlich auf bekannte Hosts eingeschränkt werden — ``_strict_security_
-    #   warnings`` warnt laut, wenn sie unter Härtung leer ist (mirror zu FORWARDED_ALLOW_IPS).
+    # Optional host allowlist for webhook targets. Empty = any public host (the SSRF
+    # guard stays active regardless). Should be set in production; ``_strict_security_
+    # warnings`` warns loudly when it is empty under hardening.
     webhook_host_allowlist: list[str] = []
 
-    # --- Delegation/Vertretung (T-45, R1.5) --------------------------------- #
-    #   Stimmrecht-Delegation steht unter satzungsrechtlichem Vorbehalt (open-questions
-    #   Q5). Standardmäßig **aus**: eine Delegation darf Rollen/Rechte übertragen, aber
-    #   `delegateVoting=true` wird erst akzeptiert (sonst 422), wenn der Betreiber die
-    #   Stimmrecht-Delegation bewusst freischaltet. Reine Rechte-Delegation bleibt frei.
+    # Delegation. Vote delegation is subject to bylaws approval and defaults OFF: a
+    # delegation may transfer roles/rights, but `delegateVoting=true` is only
+    # accepted (else 422) once the operator explicitly enables vote delegation.
+    # Pure rights delegation stays free.
     delegation_voting_enabled: bool = False
-    #   Lokale Zeitzone für Sitzungstermine (`meeting.date`/`start_time` sind naiv
-    #   gespeichert): Basis der Delegations-Deadline (#delegation-rework).
+    # Local timezone for meeting times (`meeting.date`/`start_time` stored naive):
+    # basis of the delegation deadline.
     local_timezone: str = "Europe/Berlin"
 
-    # --- Deadlines/Cron (T-44, flows §9.4) ---------------------------------- #
-    #   Vorlauf für die `deadline_approaching`-Erinnerung: gesendet, sobald
-    #   `due_at - lead <= now < due_at` (Default 24 h).
+    # Deadlines/cron. Lead time for the `deadline_approaching` reminder: sent once
+    # `due_at - lead <= now < due_at` (default 24 h).
     deadline_reminder_lead_minutes: int = 1440
 
-    # --- FinTS-Bankabgleich (#fints) ---------------------------------------- #
-    #   Online-Banking-Abruf (PIN/TAN, z. B. Sparkasse) zum Abgleich echter Kontoumsätze
-    #   mit Buchungen. Ohne ``fints_enc_key`` ist das Feature **aus** (Endpunkte → 503):
-    #   die Bank-PIN wird ausschließlich **verschlüsselt** at-rest gehalten (Fernet, aus
-    #   diesem Secret abgeleitet), daher ist der Schlüssel Pflicht, sobald FinTS genutzt
-    #   wird. ``fints_product_id`` ist die bei der Deutschen Kreditwirtschaft registrierte
-    #   Produkt-Kennung (seit 2019 Pflicht für Produktiv-Zugriff, Registrierung per Mail an
-    #   registrierung@hbci-zka.de); ohne sie nutzt die Lib ihre Default-Kennung (DEV/Sandbox,
-    #   von echten Banken ggf. abgelehnt). Das Secret/die PIN werden **nie** geloggt.
+    # FinTS bank reconciliation. Online-banking fetch (PIN/TAN) to reconcile real
+    # transactions with bookings. Without ``fints_enc_key`` the feature is off
+    # (endpoints -> 503): the bank PIN is held encrypted at rest (Fernet, derived
+    # from this secret), so the key is required once FinTS is used.
+    # ``fints_product_id`` is the product id registered with the Deutsche
+    # Kreditwirtschaft (mandatory for production access since 2019); without it the
+    # lib uses its default id (DEV/sandbox, possibly rejected by real banks). The
+    # secret/PIN are never logged.
     fints_enc_key: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
     fints_product_id: str | None = None
-    # Obergrenze für das Abruf-Fenster (Tage) je Sync. Größere Fenster erzwingen bei vielen
-    # Banken eine frische SCA; 90 Tage = PSD2-Komfortfenster (security.md, #fints-research).
+    # Cap on the fetch window (days) per sync. Larger windows force a fresh SCA at
+    # many banks; 90 days = PSD2 comfort window.
     fints_max_days: int = 90
-    # Lebensdauer einer schwebenden TAN-Sitzung (zwischen Start-Sync und TAN-Eingabe).
+    # Lifetime of a pending TAN session (between start-sync and TAN entry).
     fints_tan_session_ttl_seconds: int = 600
-    # Sperr-Cooldown (#fints-review): Nach einer Bank-Sperre (FinTS 3938) oder Signatur-/PIN-
-    # Ablehnung (9340 u. a.) verweigert der Service für so viele Minuten jeden weiteren Sync
-    # dieses Buchers für das Konto. Schützt vor selbst-verschuldeter Eskalation der Sperre
-    # (3 Fehlversuche → Vollsperre). Die bankseitige Sperre selbst kann länger gelten und ggf.
-    # nur über die Bank (Online-Banking-Entsperrung/Hotline) aufgehoben werden.
+    # Lock cooldown: after a bank lock (FinTS 3938) or signature/PIN rejection (9340
+    # etc.) the service refuses any further sync for this bookkeeper+account for this
+    # many minutes. Guards against self-inflicted lock escalation (3 failed attempts
+    # -> full lock). The bank-side lock itself may last longer and may only be lifted
+    # via the bank (online-banking unlock/hotline).
     fints_lock_cooldown_minutes: int = 30
 
     @property
     def storage_enabled(self) -> bool:
-        """Object-Storage nur aktiv, wenn ein MinIO-Endpunkt gesetzt ist."""
+        """Object storage is active only when a MinIO endpoint is set."""
         return bool(self.minio_endpoint)
 
     @property
     def fints_enabled(self) -> bool:
-        """FinTS-Bankabgleich nur aktiv, wenn ein Verschlüsselungs-Schlüssel gesetzt ist
-        (die Bank-PIN darf nie unverschlüsselt persistiert werden, #fints)."""
+        """FinTS is active only when an encryption key is set (the bank PIN must never
+        be persisted unencrypted)."""
         return bool(self.fints_enc_key)
 
     @property
     def clamav_enabled(self) -> bool:
-        """ClamAV-Scan nur aktiv, wenn ein clamd-Host gesetzt ist."""
+        """ClamAV scan is active only when a clamd host is set."""
         return bool(self.clamav_host)
 
-    # — pytex-Render-Container (T-20/T-21, deployment §3). `api`→`pytex` nur `/render`.
-    #   `PYTEX_URL` zeigt auf den internen Container; `trusted` schaltet das
-    #   tectonic-Bundle frei (App-generierte, erst­partei­liche Dokumente). Der Render
-    #   kann dauern (Erst-Build lädt das Bundle) → großzügiger Timeout. —
+    # pytex render container. `api` -> `pytex` only `/render`. `PYTEX_URL` points at
+    # the internal container; `trusted` enables the tectonic bundle (app-generated,
+    # first-party documents). The render can be slow (first build fetches the
+    # bundle) -> generous timeout.
     pytex_url: str = "http://pytex:8099"
     pytex_trust: str = "trusted"
     pytex_timeout_seconds: int = 120
-    # PDF-Render-Retry im Worker (arq): max. Versuche + Backoff-Basis (Sekunden).
+    # Worker (arq) PDF render retry: max tries + backoff base (seconds).
     pdf_max_tries: int = 4
     pdf_retry_backoff_seconds: int = 30
-    # Lebensdauer der signierten Ergebnis-URL (GET /jobs/{id}).
+    # Lifetime of the signed result URL (GET /jobs/{id}).
     pdf_url_ttl_seconds: int = 300
 
-    # — Antrags-Payload-Obergrenze (öffentlicher POST /applications, anti-DoS) —
-    #   Gilt für die serialisierten Feldwerte (`data`) und als Content-Length-Schranke;
-    #   darüber → 413. 64 KiB reicht für alle realen Formulare.
+    # Application payload cap (public POST /applications, anti-DoS). Applies to the
+    # serialized field values (`data`) and as a Content-Length bound; above -> 413.
+    # 64 KiB covers every real form.
     max_application_payload_bytes: int = 65536
 
-    # — Body-Cap der Auth-POSTs (magic-link / verify, anti-DoS, Issue #24). Auth-Bodies
-    #   sind winzig (Mail/Token) → enge Schranke; darüber → 413. —
+    # Body cap of the auth POSTs (magic-link / verify, anti-DoS). Auth bodies are
+    # tiny (mail/token) -> tight bound; above -> 413.
     max_auth_payload_bytes: int = 8192
 
-    # — Altcha (Proof-of-Work, security.md §7, Issue #23). Ohne Secret ist die
-    #   Verifikation **aus** (Dev/Test); das Feld wird dann nur durchgereicht. Das
-    #   Secret wird mit dem Altcha-Sentinel geteilt (deploy/.env: ALTCHA_HMAC_SECRET). —
+    # Altcha (proof-of-work). Without a secret verification is off (dev/test); the
+    # field is then only passed through. The secret is shared with the Altcha
+    # sidecar (deploy/.env: ALTCHA_HMAC_SECRET).
     altcha_hmac_secret: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
     altcha_max_number: int = 100_000
     altcha_challenge_ttl_seconds: int = 300
 
-    # — Rate-Limiting (sliding window, security.md §8 / api.md §7, Issue #24). —
+    # Rate limiting (sliding window).
     rate_limit_enabled: bool = True
     rl_magic_link_ip_per_hour: int = 5
     rl_magic_link_mail_per_hour: int = 3
     rl_magic_link_verify_ip_per_hour: int = 20
     rl_applications_ip_per_hour: int = 10
-    rl_attachments_per_hour: int = 30  # POST /attachments: 30/Std/applicant (api.md §7)
-    # FinTS-Sync/TAN/Import: pro Principal/Std. Bremst SSRF-Port-Scan-Versuche + Bank-PIN-
-    # Lockout-Missbrauch über wiederholte Syncs (#fints-review).
+    rl_attachments_per_hour: int = 30  # POST /attachments: 30/h/applicant
+    # FinTS sync/TAN/import: per principal/h. Curbs SSRF port-scan attempts + bank-PIN
+    # lockout abuse via repeated syncs.
     rl_fints_per_hour: int = 60
-    # Default-Limit auf allen *schreibenden* Endpunkten (api.md §7): IP-Schlüssel,
-    # großzügig → fängt Endpunkte ohne eigenes (strengeres) Limit ab, Defense-in-Depth.
+    # Default limit on all writing endpoints: IP key, generous — catches endpoints
+    # without their own (stricter) limit, defense-in-depth.
     rl_default_write_per_hour: int = 100
 
     @model_validator(mode="after")
     def _no_wildcard_proxy_in_prod(self) -> "Settings":
-        """`production` darf `FORWARDED_ALLOW_IPS` nicht auf "*" setzen (security.md §3).
+        """`production` must not set `FORWARDED_ALLOW_IPS` to "*".
 
-        "*" würde uvicorn jede X-Forwarded-*-Quelle vertrauen lassen → IP-Spoofing
-        (Rate-Limit-Bypass, falsche Audit-IP). Außerhalb von `production` (Dev/CI/
-        Container-Smoke) bleibt "*" erlaubt."""
+        "*" would make uvicorn trust any X-Forwarded-* source -> IP spoofing
+        (rate-limit bypass, wrong audit IP). Outside `production` (dev/CI/container
+        smoke) "*" stays allowed."""
         if self.environment == "production" and "*" in self.forwarded_allow_ips:
             raise ValueError(
                 'FORWARDED_ALLOW_IPS must not be "*" in production (security.md §3).'
@@ -297,30 +287,25 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
-        """Läuft die App im Produktions-Profil (``ENVIRONMENT=production``)?"""
+        """Is the app running in the production profile (``ENVIRONMENT=production``)?"""
         return self.environment == "production"
 
     @property
     def strict_security_enabled(self) -> bool:
-        """Sollen die strengen Härtungs-Guards greifen (fail-safe)?
+        """Should the strict hardening guards apply (fail-safe)?
 
-        Wahr, sobald ``strict_security`` an ist **oder** ``environment == "production"``.
-        Konsumenten (Invoice-AV fail-closed, Proxy-Guard) sollten dies statt eines reinen
-        ``environment == "production"``-Checks abfragen, damit ein vergessenes
-        ENVIRONMENT=production die Guards nicht still deaktiviert."""
+        True as soon as ``strict_security`` is on OR ``environment == "production"``.
+        Consumers (invoice AV fail-closed, proxy guard) should query this instead of a
+        bare ``environment == "production"`` check, so a forgotten ENVIRONMENT=production
+        does not silently disable the guards."""
         return self.strict_security or self.is_production
 
     @model_validator(mode="after")
     def _strict_security_warnings(self) -> "Settings":
-        """Laute Warnungen, wenn die Konfiguration unter Härtung schwach bleibt.
+        """Warn loudly when the configuration stays weak under hardening.
 
-        Bricht den Start **nicht** ab (DEV-Ergonomie / Backward-Compat), macht aber im Log
-        sichtbar, dass produktionskritische Guards betroffen sind:
-
-        * ``environment != "production"`` → produktions-only Guards setzen ggf. aus
-          (Hinweis: ENVIRONMENT=production explizit setzen, siehe deploy/.env.example).
-        * leere ``webhook_host_allowlist`` unter Härtung → Webhook-Ziele nur per SSRF-Guard
-          gefiltert (mirror zu FORWARDED_ALLOW_IPS, security.md §5)."""
+        Does NOT abort startup (DEV ergonomics / backward compat), but makes visible
+        in the log that production-critical guards are affected."""
         if not self.is_production:
             _log.warning(
                 "ENVIRONMENT=%r (not 'production'): production-only security guards "
@@ -345,12 +330,12 @@ class Settings(BaseSettings):
 
     @property
     def altcha_enabled(self) -> bool:
-        """Altcha-Verifikation nur aktiv, wenn ein HMAC-Secret gesetzt ist."""
+        """Altcha verification is active only when an HMAC secret is set."""
         return bool(self.altcha_hmac_secret)
 
     @property
     def oidc_enabled(self) -> bool:
-        """OIDC nur aktiv, wenn alle Pflicht-Parameter gesetzt sind."""
+        """OIDC is active only when all required parameters are set."""
         return bool(
             self.oidc_issuer
             and self.oidc_client_id
@@ -360,7 +345,7 @@ class Settings(BaseSettings):
 
 
 def load_settings(**overrides: Any) -> Settings:
-    """Settings laden; fehlende Pflichtfelder → `SettingsError` mit klarer Meldung."""
+    """Load settings; missing required fields -> `SettingsError` with a clear message."""
     try:
         return Settings(**overrides)
     except ValidationError as exc:

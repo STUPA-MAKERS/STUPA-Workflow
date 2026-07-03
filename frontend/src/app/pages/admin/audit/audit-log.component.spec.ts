@@ -154,9 +154,9 @@ describe('AuditLogComponent (#45)', () => {
     });
     screen.getByRole('button', { expanded: false }).click();
     fixture.detectChanges();
-    // data-Chip: aufgelöste UUID als „<Name> · <uuid>".
+    // data chip: resolved UUID as "<name> · <uuid>".
     expect(screen.getByText('Finanzausschuss · g-1')).toBeInTheDocument();
-    // Akteur-Detail: Klarname · sub.
+    // actor detail: clear name · sub.
     expect(screen.getByText('Root Admin · kc|root')).toBeInTheDocument();
   });
 

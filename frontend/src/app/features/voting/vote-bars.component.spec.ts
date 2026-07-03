@@ -68,7 +68,7 @@ describe('VoteBarsComponent', () => {
   });
 
   it('treats options with no recorded count as zero', async () => {
-    // counts hat keinen Eintrag für »no« → ?? 0 greift (kein NaN-Balken).
+    // counts has no entry for "no" → the ?? 0 kicks in (no NaN bar).
     const { container } = await renderBars({
       options: ['yes', 'no'],
       counts: { yes: 3 },
@@ -108,7 +108,7 @@ describe('VoteBarsComponent', () => {
   });
 
   it('clamps bar width to 100% when a count exceeds the base', async () => {
-    // Mehr Stimmen als eligible (z. B. Resync-Glitch) → Balken bei 100% gekappt.
+    // More votes than eligible (e.g. resync glitch) → bar capped at 100%.
     const { container } = await renderBars({
       options: ['yes'],
       counts: { yes: 9 },

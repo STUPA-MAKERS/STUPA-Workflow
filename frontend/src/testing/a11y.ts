@@ -1,32 +1,31 @@
 /**
- * a11y-Test-Helfer (T-43, requirements N3 — WCAG 2.1 AA).
+ * a11y test helper (WCAG 2.1 AA).
  *
- * Kapselt `jest-axe` mit projektweiter Konfiguration und führt den axe-Scan
- * gegen einen gerenderten DOM-Knoten aus. Liefert das axe-Ergebnis zurück, das
- * der Aufrufer mit `toHaveNoViolations()` prüft (Matcher in `setup-jest.ts`
- * registriert).
+ * Wraps `jest-axe` with project-wide configuration and runs the axe scan against a
+ * rendered DOM node. Returns the axe result, which the caller checks with
+ * `toHaveNoViolations()` (matcher registered in `setup-jest.ts`).
  *
- * Hinweis Farbkontrast: axe kann `color-contrast` in jsdom nicht berechnen
- * (kein Layout/keine aufgelösten Computed-Styles) und meldet es als
- * „incomplete". Die Regel ist hier deaktiviert; Kontraste werden stattdessen
- * deterministisch in `styles/contrast.spec.ts` gegen die CD-Tokens geprüft.
+ * Colour-contrast note: axe cannot compute `color-contrast` in jsdom (no layout /
+ * no resolved computed styles) and reports it as "incomplete". The rule is disabled
+ * here; contrasts are instead checked deterministically in `styles/contrast.spec.ts`
+ * against the CD tokens.
  */
 import { axe, type AxeResults, type JestAxeConfigureOptions } from 'jest-axe';
 
-/** Standard-Regelkonfiguration für Unit-/Component-Scans in jsdom. */
+/** Default rule configuration for unit/component scans in jsdom. */
 export const A11Y_RULES: JestAxeConfigureOptions = {
   rules: {
-    // In jsdom nicht berechenbar — separat über Token-Test abgedeckt.
+    // Not computable in jsdom — covered separately by the token test.
     'color-contrast': { enabled: false },
-    // Einzelkomponenten werden ohne <main>/Landmark-Wrapper gerendert; die
-    // Landmark-Struktur wird im Shell-/View-Scan geprüft, nicht je Fragment.
+    // Single components render without a <main>/landmark wrapper; the landmark
+    // structure is checked in the shell/view scan, not per fragment.
     region: { enabled: false },
   },
 };
 
 /**
- * axe-Scan über einen DOM-Knoten (oder das Fixture-Root). Für Voll-View-Scans
- * (Shell mit Landmarks) `region` per `extraRules` wieder aktivieren.
+ * axe scan over a DOM node (or the fixture root). For full-view scans (shell with
+ * landmarks) re-enable `region` via `extraRules`.
  */
 export function runAxe(
   target: Element | Document,

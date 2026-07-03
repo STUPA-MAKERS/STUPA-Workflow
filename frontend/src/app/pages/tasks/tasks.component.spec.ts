@@ -45,9 +45,9 @@ describe('TasksComponent', () => {
     await setup([task('v1', 'vote')]);
     expect(screen.getByText('Mein Antrag')).toBeInTheDocument();
     expect(screen.getByText('Abstimmung')).toBeInTheDocument();
-    // Typ-Spalte (über die geladenen Typen aufgelöst).
+    // Type column (resolved via the loaded types).
     expect(await screen.findByText('Finanzantrag')).toBeInTheDocument();
-    // „Wartet seit"-Spalte zeigt eine relative Angabe (vor … Tagen).
+    // "Waiting since" column shows a relative value (… days ago).
     expect(screen.getByText(/Tag(en)?/)).toBeInTheDocument();
   });
 

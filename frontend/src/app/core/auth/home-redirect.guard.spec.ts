@@ -41,7 +41,7 @@ describe('homeRedirectGuard', () => {
 
   afterEach(() => http.verify());
 
-  /** Führt den Guard aus, flusht den `/me`-Probe und liefert das Ergebnis. */
+  /** Runs the guard, flushes the `/me` probe and returns the result. */
   function run(principal: Principal | null): boolean | UrlTree {
     let result!: boolean | UrlTree;
     TestBed.runInInjectionContext(() => {

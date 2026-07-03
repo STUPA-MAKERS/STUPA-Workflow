@@ -1,16 +1,15 @@
-"""Pure JsonLogic-Subset-Evaluator (data-model §5.1, flows §9.2).
+"""Pure JsonLogic-subset evaluator for form ``visibleIf``/``compute``.
 
-`visibleIf`/`compute` in Form-Feldern nutzen dieses Subset. **Kein `eval`/`exec`** —
-deklarativer Baum, Whitelist-Operatoren. Unbekannter Operator → `JsonLogicError`
-(nicht still ignoriert), damit Fehler beim Speichern auffallen, nicht zur Laufzeit.
+No ``eval``/``exec``: a declarative tree with whitelisted operators. An unknown
+operator raises ``JsonLogicError`` (never silently ignored) so errors surface at
+save time, not at runtime.
 
-Ausdruck:
-- Literal (kein Dict): wird unverändert zurückgegeben (Zahl/String/Bool/None/Liste).
-- Operation: Dict mit **genau einem** Schlüssel = Operator, Wert = Argument(e).
+Expression forms:
+- Literal (non-dict): returned unchanged (number/string/bool/None/list).
+- Operation: dict with exactly one key = operator, value = argument(s).
 
-Whitelist: ``== != > >= < <= and or not var + - * / in`` — als deklarative
-Operator→Funktions-Tabelle (:data:`_EVALUATORS`), aus der sich auch die
-Whitelist :data:`JSONLOGIC_OPERATORS` ableitet (eine Quelle der Wahrheit).
+The whitelist ``JSONLOGIC_OPERATORS`` derives from the ``_EVALUATORS`` dispatch
+table plus ``var`` — a single source of truth.
 """
 
 from __future__ import annotations
@@ -19,23 +18,22 @@ import operator
 from collections.abc import Callable
 from typing import Any
 
-# Maximale Verschachtelungstiefe eines Ausdrucks. Schützt Eval **und** Validierung
-# vor `RecursionError` (= 500 / Worker-Crash) bei tief verschachtelten Eingaben;
-# weit jenseits jedes realen `visibleIf`/`compute`.
+# Max expression nesting depth; guards eval and validation against RecursionError
+# on deeply nested input, far beyond any real visibleIf/compute.
 _MAX_DEPTH = 64
 
 
 class JsonLogicError(Exception):
-    """Ungültiger JsonLogic-Ausdruck (unbekannter Operator, falsche Arität, …)."""
+    """Invalid JsonLogic expression (unknown operator, wrong arity, ...)."""
 
 
 def _as_args(value: Any) -> list[Any]:
-    """Operator-Argumente immer als Liste (JsonLogic erlaubt Skalar-Kurzform)."""
+    """Normalize operator arguments to a list (JsonLogic allows a scalar shorthand)."""
     return value if isinstance(value, list) else [value]
 
 
 def _resolve_var(path: Any, ctx: dict[str, Any]) -> Any:
-    """`var`: Punkt-Pfad in `ctx` auflösen; `[pfad, default]` oder fehlend → default."""
+    """``var``: resolve a dotted path in ``ctx``; ``[path, default]`` or missing -> default."""
     default: Any = None
     if isinstance(path, list):
         default = path[1] if len(path) > 1 else None
@@ -62,7 +60,7 @@ def _num(value: Any) -> float:
 
 
 def _arity(op: str, n: int) -> Callable[[Callable[[list[Any]], Any]], Callable[[list[Any]], Any]]:
-    """Decorator: erzwingt genau ``n`` Operanden, sonst ``JsonLogicError``."""
+    """Decorator enforcing exactly ``n`` operands, else ``JsonLogicError``."""
 
     def wrap(fn: Callable[[list[Any]], Any]) -> Callable[[list[Any]], Any]:
         def run(args: list[Any]) -> Any:
@@ -76,7 +74,7 @@ def _arity(op: str, n: int) -> Callable[[Callable[[list[Any]], Any]], Callable[[
 
 
 def _compare(op: Callable[[float, float], bool]) -> Callable[[list[Any]], bool]:
-    """Numerischer 2-stelliger Vergleich über :func:`_num`-koerzierte Operanden."""
+    """Binary numeric comparison over ``_num``-coerced operands."""
 
     def run(args: list[Any]) -> bool:
         if len(args) != 2:
@@ -127,9 +125,9 @@ def _eval_multiply(args: list[Any]) -> float:
     return product
 
 
-# Operator → reine Auswertungsfunktion über die **bereits ausgewerteten** Argumente.
-# ``var`` ist nicht hier (löst einen Pfad statt Argumente auszuwerten); ``and``/``or``
-# werten NICHT kurzschließend aus (T-05: alle Operanden werden vorab evaluiert).
+# Operator -> pure function over the already-evaluated arguments. ``var`` is not here
+# (it resolves a path). ``and``/``or`` are non-short-circuiting: all operands are
+# evaluated up front.
 _EVALUATORS: dict[str, Callable[[list[Any]], Any]] = {
     "==": _arity("==", 2)(lambda a: a[0] == a[1]),
     "!=": _arity("!=", 2)(lambda a: a[0] != a[1]),
@@ -147,13 +145,13 @@ _EVALUATORS: dict[str, Callable[[list[Any]], Any]] = {
     "in": _eval_in,
 }
 
-# Whitelist der erlaubten Operatoren (Eval + Validierung), abgeleitet aus der
-# Dispatch-Tabelle + dem Sonderfall ``var`` — eine Quelle der Wahrheit.
+# Whitelist of allowed operators (eval + validation), derived from the dispatch
+# table plus the ``var`` special case — a single source of truth.
 JSONLOGIC_OPERATORS: frozenset[str] = frozenset(_EVALUATORS) | {"var"}
 
 
 def eval_jsonlogic(expr: Any, ctx: dict[str, Any] | None = None, *, _depth: int = 0) -> Any:
-    """Ausdruck gegen `ctx` auswerten. Pure, kein Seiteneffekt, kein `eval`."""
+    """Evaluate ``expr`` against ``ctx``. Pure, side-effect free, no ``eval``."""
     ctx = ctx or {}
     if not isinstance(expr, dict):
         return expr
@@ -172,10 +170,10 @@ def eval_jsonlogic(expr: Any, ctx: dict[str, Any] | None = None, *, _depth: int 
 
 
 def validate_jsonlogic(expr: Any, *, _depth: int = 0) -> None:
-    """Statisch prüfen, dass nur Whitelist-Operatoren vorkommen (Speicher-Gate).
+    """Statically check that only whitelisted operators occur (save-time gate).
 
-    Wirft `JsonLogicError` beim ersten unbekannten Operator / strukturellen Fehler /
-    bei Überschreiten der maximalen Verschachtelungstiefe.
+    Raises ``JsonLogicError`` on the first unknown operator, structural error, or
+    exceeding the maximum nesting depth.
     """
     if not isinstance(expr, dict):
         return

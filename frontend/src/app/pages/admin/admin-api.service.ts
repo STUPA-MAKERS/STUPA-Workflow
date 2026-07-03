@@ -1,17 +1,9 @@
 /**
- * Admin-Config-API-Client (T-34) gegen sds/api.md §3 »admin«.
+ * Admin config API client (against the admin section of the HTTP API).
  *
- * **WICHTIG — Vorgänger-Status:** T-24 (admin-API) ist auf der Branch-Basis
- * (`origin/main` bc275a8) **nicht gemergt**; `app/modules/admin` liefert nur
- * Tabellen, keine Router. Dieser Client baut deshalb gegen den **Contract**
- * (api.md). Im Mock-Modus (`USE_MOCK_API`, Default true bis das Backend steht)
- * bedient ein In-Memory-Store die UIs; im Real-Modus gehen die exakten REST-
- * Calls raus. Beim Merge von T-24 nur `USE_MOCK_API` auf false stellen — die
- * Real-Pfade sind bereits verdrahtet.
- *
- * Branding/Site-Config (#21) ist **kein** SDS-Endpunkt; der Pfad
- * `/api/admin/site-config` ist eine T-34-Festlegung. TODO(T-24/#21): mit Backend
- * abstimmen.
+ * In mock mode (`USE_MOCK_API`) an in-memory store serves the UIs; in real mode the
+ * exact REST calls go out. Branding/site-config uses the local `/api/admin/site-config`
+ * path, which is not part of the API spec.
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { skipLoading } from '@core/loading/loading.interceptor';
@@ -71,16 +63,16 @@ import {
   MOCK_WEBHOOKS,
 } from './admin.mock';
 
-/** JSON-Schema-Export des Backends (`export_json_schemas`, config_schemas). */
+/** Backend JSON-schema export (`export_json_schemas`). */
 export type ConfigSchemas = Record<string, Record<string, unknown>>;
 
-/** Antragstyp als Auswahl-Quelle (id + Anzeigename), #69. */
+/** Application type as a selection source (id + display name). */
 export interface ApplicationTypeOption {
   id: Uuid;
   name: string;
 }
 
-/** Roh-Form von `GET /admin/application-types` (`ApplicationTypeOut`). */
+/** Raw shape of `GET /admin/application-types` (`ApplicationTypeOut`). */
 interface ApplicationTypeOutWire {
   id: Uuid;
   nameI18n?: Record<string, string> | null;
@@ -96,7 +88,7 @@ export class AdminApiService {
   private readonly base = inject(API_BASE_URL);
   private readonly mock = inject(USE_MOCK_API);
 
-  // In-Memory-Store (nur Mock-Modus). Pro Service-Instanz, reicht für UI/Tests.
+  // In-memory store (mock mode only). Per service instance, enough for UI/tests.
   private readonly store = {
     gremien: structuredCopy(MOCK_GREMIEN),
     appTypes: structuredCopy(MOCK_APP_TYPES),
@@ -123,7 +115,7 @@ export class AdminApiService {
   }
 
   // --- Gremien / RBAC ------------------------------------------------------
-  /** `quiet` = die Gremien-Seite zeigt ihren eigenen Lade-Indikator (kein Overlay). */
+  /** `quiet` = the gremien page shows its own loading indicator (no overlay). */
   listGremien(opts: { quiet?: boolean } = {}): Observable<Gremium[]> {
     if (this.mock) return of(structuredCopy(this.store.gremien));
     return this.http.get<Gremium[]>(`${this.base}/admin/gremien`, {
@@ -132,17 +124,16 @@ export class AdminApiService {
   }
 
   /**
-   * Gremien-Stammdaten als Dropdown-Quelle (#68) — GET `/gremien` (kein
-   * Admin-Recht; jeder eingeloggte Principal). Anders als {@link listGremien}
-   * (`/admin/gremien`, P `admin.gremien`) für »Sitzung anlegen«/Budget nutzbar,
-   * wo der Akteur nur `meeting.manage`/`budget.*` hat.
+   * Gremien master data as a dropdown source — GET `/gremien` (no admin right; any
+   * logged-in principal). Unlike {@link listGremien} (`/admin/gremien`, P `admin.gremien`),
+   * usable for "create meeting"/budget where the actor only has `meeting.manage`/`budget.*`.
    */
   listGremienOptions(): Observable<Gremium[]> {
     if (this.mock) return of(structuredCopy(this.store.gremien));
     return this.http.get<Gremium[]>(`${this.base}/gremien`);
   }
 
-  /** POST /admin/gremien — Gremium anlegen (P `admin.gremien`), #105. */
+  /** POST /admin/gremien — create a gremium (P `admin.gremien`). */
   createGremium(body: GremiumCreateBody): Observable<Gremium> {
     if (this.mock) {
       const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, allowVoteDelegation: false, ...body };
@@ -152,7 +143,7 @@ export class AdminApiService {
     return this.http.post<Gremium>(`${this.base}/admin/gremien`, body);
   }
 
-  /** PATCH /admin/gremien/{id} — Gremium bearbeiten (P `admin.gremien`), #105. */
+  /** PATCH /admin/gremien/{id} — edit a gremium (P `admin.gremien`). */
   updateGremium(id: Uuid, body: GremiumUpdateBody): Observable<Gremium> {
     if (this.mock) {
       const row = this.store.gremien.find((g) => g.id === id);
@@ -170,7 +161,7 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/gremien/${id}`);
   }
 
-  /** GET /admin/gremien/{id}/mail-recipients — Zusatz-Protokoll-Empfänger (#protocol-recipients). */
+  /** GET /admin/gremien/{id}/mail-recipients — extra protocol recipients. */
   getGremiumMailRecipients(id: Uuid): Observable<{ recipients: string[] }> {
     if (this.mock) return of({ recipients: [] });
     return this.http.get<{ recipients: string[] }>(
@@ -178,7 +169,7 @@ export class AdminApiService {
     );
   }
 
-  /** PUT /admin/gremien/{id}/mail-recipients — Zusatz-Empfänger ersetzen (idempotent). */
+  /** PUT /admin/gremien/{id}/mail-recipients — replace extra recipients (idempotent). */
   setGremiumMailRecipients(id: Uuid, recipients: string[]): Observable<{ recipients: string[] }> {
     if (this.mock) return of({ recipients });
     return this.http.put<{ recipients: string[] }>(
@@ -192,7 +183,7 @@ export class AdminApiService {
     return this.http.get<Role[]>(`${this.base}/admin/roles`);
   }
 
-  // --- OIDC-Gruppen → Rolle Mappings (#5-4) ---------------------------------
+  // --- OIDC group → role mappings ------------------------------------------
   listGroupMappings(): Observable<GroupMapping[]> {
     return this.http.get<GroupMapping[]>(`${this.base}/admin/group-mappings`);
   }
@@ -206,29 +197,29 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/group-mappings/${id}`);
   }
 
-  // --- Mail-Templates (#5-4) ------------------------------------------------
+  // --- Mail templates -------------------------------------------------------
   listMailTemplates(): Observable<MailTemplate[]> {
     return this.http.get<MailTemplate[]>(`${this.base}/admin/mail-templates`);
   }
-  /** Override per Key anlegen/aktualisieren (#12) — auch für Builtin-Defaults. */
+  /** Create/update an override by key — also for builtin defaults. */
   upsertMailTemplate(body: MailTemplateUpsertBody): Observable<MailTemplate> {
     return this.http.put<MailTemplate>(`${this.base}/admin/mail-templates`, body);
   }
-  /** Override löschen → Builtin-Default wiederherstellen (#12). */
+  /** Delete an override → restore the builtin default. */
   resetMailTemplate(key: string): Observable<MailTemplate> {
     return this.http.delete<MailTemplate>(
       `${this.base}/admin/mail-templates/by-key/${encodeURIComponent(key)}`,
     );
   }
-  /** Vorschau aus dem Editor-Entwurf (ohne ID, #12). */
+  /** Preview from the editor draft (no id). */
   previewMailPayload(body: MailPreviewPayload): Observable<MailPreview> {
     return this.http.post<MailPreview>(`${this.base}/admin/mail-templates/preview`, body);
   }
 
   /**
-   * Antragstypen (id + Name) als Auswahl-Quelle für die Form-/Flow-Builder (#69).
-   * Nutzt das öffentliche `/application-types` (Page); ein `form.configure`-
-   * Principal erhält dort auch inaktive Typen. Im Mock eine kleine Stub-Liste.
+   * Application types (id + name) as a selection source for the form/flow builders.
+   * Uses the public `/application-types` (page); a `form.configure` principal also
+   * gets inactive types there. In mock mode a small stub list.
    */
   listApplicationTypes(): Observable<ApplicationTypeOption[]> {
     if (this.mock) return of(structuredCopy(MOCK_APP_TYPE_OPTIONS));
@@ -237,12 +228,12 @@ export class AdminApiService {
       .pipe(map((page) => page.items.map((t) => ({ id: t.id, name: t.name }))));
   }
 
-  /** Überblick aktiver Formulare (#75): Name/Gremium/Status/Version. */
+  /** Overview of active forms: name/gremium/status/version. */
   listForms(): Observable<FormOverviewItem[]> {
     if (this.mock) return of(structuredCopy(MOCK_FORMS));
-    // `/admin/application-types` liefert `ApplicationTypeOut` (nameI18n,
-    // activeFormVersionId …), nicht die FE-View → mappen statt roh casten,
-    // sonst zeigt die Tabelle leeren Namen + `status.undefined` (Image 11).
+    // `/admin/application-types` returns `ApplicationTypeOut` (nameI18n,
+    // activeFormVersionId …), not the FE view → map instead of raw-casting,
+    // else the table shows an empty name + `status.undefined`.
     return this.http
       .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`)
       .pipe(
@@ -258,7 +249,7 @@ export class AdminApiService {
       );
   }
 
-  /** Rechte einer Rolle ändern (#72) — PATCH /admin/roles/{id} (`permissions`). */
+  /** Change a role's permissions — PATCH /admin/roles/{id} (`permissions`). */
   saveRolePermissions(roleId: Uuid, permissions: string[]): Observable<Role> {
     if (this.mock) {
       const idx = this.store.roles.findIndex((r) => r.id === roleId);
@@ -268,7 +259,7 @@ export class AdminApiService {
     return this.http.patch<Role>(`${this.base}/admin/roles/${roleId}`, { permissions });
   }
 
-  /** Rolle umbenennen — Anzeigename (`label`), Key bleibt unverändert. */
+  /** Rename a role — display name (`label`); key stays unchanged. */
   renameRole(roleId: Uuid, label: I18nMap): Observable<Role> {
     if (this.mock) {
       const idx = this.store.roles.findIndex((r) => r.id === roleId);
@@ -278,7 +269,7 @@ export class AdminApiService {
     return this.http.patch<Role>(`${this.base}/admin/roles/${roleId}`, { label });
   }
 
-  /** Globale Rolle anlegen (#21) — POST /admin/roles (`RoleCreate`). */
+  /** Create a global role — POST /admin/roles (`RoleCreate`). */
   createRole(body: { key: string; label: I18nMap; permissions?: string[] }): Observable<Role> {
     if (this.mock) {
       const role: Role = {
@@ -293,7 +284,7 @@ export class AdminApiService {
     return this.http.post<Role>(`${this.base}/admin/roles`, body);
   }
 
-  /** Benutzer aktivieren/deaktivieren (#30) — PATCH /admin/principals/{id}. */
+  /** Activate/deactivate a user — PATCH /admin/principals/{id}. */
   setPrincipalActive(principalId: Uuid, active: boolean): Observable<AdminPrincipal> {
     if (this.mock) {
       const p = this.store.principals.find((x) => x.id === principalId);
@@ -303,7 +294,7 @@ export class AdminApiService {
     return this.http.patch<AdminPrincipal>(`${this.base}/admin/principals/${principalId}`, { active });
   }
 
-  /** Rolle löschen (#38) — DELETE /admin/roles/{id} (admin/member serverseitig geschützt). */
+  /** Delete a role — DELETE /admin/roles/{id} (admin/member protected server-side). */
   deleteRole(roleId: Uuid): Observable<void> {
     if (this.mock) {
       this.store.roles = this.store.roles.filter((r) => r.id !== roleId);
@@ -312,14 +303,14 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/roles/${roleId}`);
   }
 
-  /** Katalog wählbarer Permission-Keys (GET /admin/permissions). */
+  /** Catalogue of selectable permission keys (GET /admin/permissions). */
   listPermissions(): Observable<string[]> {
     if (this.mock) return of([...MOCK_PERMISSIONS]);
     return this.http.get<string[]>(`${this.base}/admin/permissions`);
   }
 
-  // --- Benutzer & Rollen (#72) --------------------------------------------
-  /** Benutzer (OIDC-Principals) auflisten/suchen — GET /admin/principals?q=. */
+  // --- Users & roles --------------------------------------------------------
+  /** List/search users (OIDC principals) — GET /admin/principals?q=. */
   listPrincipals(query?: string): Observable<AdminPrincipal[]> {
     if (this.mock) {
       const q = (query ?? '').trim().toLowerCase();
@@ -334,7 +325,7 @@ export class AdminApiService {
     return this.http.get<AdminPrincipal[]>(url);
   }
 
-  /** Rolle zuweisen (#72) — POST /admin/role-assignments. */
+  /** Assign a role — POST /admin/role-assignments. */
   assignRole(input: RoleAssignmentInput): Observable<RoleAssignment> {
     if (this.mock) {
       const assignment: RoleAssignment = {
@@ -354,7 +345,7 @@ export class AdminApiService {
     return this.http.post<RoleAssignment>(`${this.base}/admin/role-assignments`, input);
   }
 
-  /** Rolle entziehen (#72) — DELETE /admin/role-assignments/{id}. */
+  /** Revoke a role — DELETE /admin/role-assignments/{id}. */
   revokeRole(assignmentId: Uuid): Observable<void> {
     if (this.mock) {
       for (const p of this.store.principals) {
@@ -365,8 +356,8 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/role-assignments/${assignmentId}`);
   }
 
-  // --- Antragstypen / Formulare (#13 — NC-Forms) ---------------------------
-  /** Antragstypen als Editier-Sicht (id + i18n-Name + Gremium + Budget-Flag). */
+  // --- Application types / forms --------------------------------------------
+  /** Application types as an edit view (id + i18n name + gremium + budget flag). */
   listApplicationTypesFull(): Observable<ApplicationTypeFull[]> {
     if (this.mock) return of(structuredCopy(this.store.appTypes));
     return this.http
@@ -387,7 +378,7 @@ export class AdminApiService {
       );
   }
 
-  /** Neuen Antragstyp/Formular anlegen — POST /admin/application-types (#13). */
+  /** Create a new application type/form — POST /admin/application-types. */
   createApplicationType(body: ApplicationTypeCreateBody): Observable<ApplicationTypeFull> {
     if (this.mock) {
       const created: ApplicationTypeFull = {
@@ -419,7 +410,7 @@ export class AdminApiService {
       );
   }
 
-  /** Antragstyp-Stammdaten ändern (Titel/Gremium/Budget) — PATCH (#13). */
+  /** Edit application-type master data (title/gremium/budget) — PATCH. */
   updateApplicationType(id: Uuid, body: ApplicationTypeUpdateBody): Observable<void> {
     if (this.mock) {
       const row = this.store.appTypes.find((t) => t.id === id);
@@ -439,8 +430,8 @@ export class AdminApiService {
       .pipe(map(() => void 0));
   }
 
-  /** Antragsart löschen — eigene Permission ``admin.types_delete``; 409 bei
-   *  bestehenden Anträgen dieser Art (#delete-types). */
+  /** Delete an application type — dedicated permission ``admin.types_delete``; 409 if
+   *  applications of this type exist. */
   deleteApplicationType(id: Uuid): Observable<void> {
     if (this.mock) {
       this.store.appTypes = this.store.appTypes.filter((t) => t.id !== id);
@@ -451,7 +442,7 @@ export class AdminApiService {
       .pipe(map(() => void 0));
   }
 
-  /** Aktuelle Form-Version eines Typs zum Bearbeiten laden (#13). */
+  /** Load a type's current form version for editing. */
   getFormDraft(typeId: Uuid): Observable<FormDraft> {
     if (this.mock) {
       const draft = this.store.formDrafts[typeId];
@@ -463,8 +454,8 @@ export class AdminApiService {
     );
   }
 
-  // --- Form-/Flow-Versionen ------------------------------------------------
-  /** POST neue Form-Version (Definition serverseitig gegen JSON-Schema validiert). */
+  // --- Form/flow versions ---------------------------------------------------
+  /** POST a new form version (definition validated server-side against JSON schema). */
   createFormVersion(
     typeId: Uuid,
     fields: FormFieldDef[],
@@ -472,7 +463,7 @@ export class AdminApiService {
   ): Observable<{ id: Uuid }> {
     if (this.mock) {
       const id = `formver-${fields.length}`;
-      // Draft + Typ im Store nachführen, damit Reload den gespeicherten Stand zeigt.
+      // Update draft + type in the store so a reload shows the saved state.
       this.store.formDrafts[typeId] = {
         applicationTypeId: typeId,
         formVersionId: id,
@@ -491,7 +482,7 @@ export class AdminApiService {
     );
   }
 
-  /** Formular eines Typs aktivieren/deaktivieren (#forms) — gibt den aktualisierten Draft zurück. */
+  /** Activate/deactivate a type's form — returns the updated draft. */
   setFormActive(typeId: Uuid, active: boolean): Observable<FormDraft> {
     if (this.mock) {
       const draft = this.store.formDrafts[typeId];
@@ -506,13 +497,13 @@ export class AdminApiService {
     );
   }
 
-  /** Aktiven globalen Flow (#28) laden — `null`, wenn noch keiner existiert. */
+  /** Load the active global flow — `null` if none exists yet. */
   getGlobalFlow(): Observable<FlowGraph | null> {
     if (this.mock) return of(null);
     return this.http.get<FlowGraph | null>(`${this.base}/admin/flow-versions/global`);
   }
 
-  /** Globalen Flow als neue Version anlegen (#28). */
+  /** Create the global flow as a new version. */
   createGlobalFlowVersion(graph: FlowGraph): Observable<{ id: Uuid }> {
     if (this.mock) return of({ id: `gflow-${graph.states.length}` });
     return this.http.post<{ id: Uuid }>(`${this.base}/admin/flow-versions/global`, { graph });
@@ -531,7 +522,7 @@ export class AdminApiService {
       : this.http.post<WebhookConfig>(`${this.base}/admin/webhooks`, hook);
   }
 
-  // --- Gremium-Rollen (#42/#62 — pro Gremium) ------------------------------
+  // --- Gremium roles (per gremium) ------------------------------------------
   listGremiumRoles(gremiumId: Uuid): Observable<GremiumRole[]> {
     if (this.mock) return of(structuredCopy(this.store.gremiumRoles.filter((r) => r.gremiumId === gremiumId)));
     return this.http.get<GremiumRole[]>(`${this.base}/admin/gremien/${gremiumId}/roles`);
@@ -561,7 +552,7 @@ export class AdminApiService {
     return this.http.patch<GremiumRole>(`${this.base}/admin/gremium-roles/${id}`, body);
   }
 
-  /** Granulare Berechtigungen einer Gremium-Rolle setzen (#Sessions). */
+  /** Set a gremium role's granular permissions. */
   saveGremiumRolePermissions(id: Uuid, permissions: string[]): Observable<GremiumRole> {
     return this.updateGremiumRole(id, { permissions });
   }
@@ -574,7 +565,7 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/gremium-roles/${id}`);
   }
 
-  // --- Deadline-Policies (benannte Fristen, Registry) ----------------------
+  // --- Deadline policies (named deadlines, registry) ------------------------
   listDeadlinePolicies(): Observable<DeadlinePolicy[]> {
     if (this.mock) return of(structuredCopy(this.store.deadlinePolicies));
     return this.http.get<DeadlinePolicy[]>(`${this.base}/admin/deadline-policies`);
@@ -622,8 +613,8 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/gremium-memberships/${id}`);
   }
 
-  // --- Audit-Log (#45, P(audit.read)) --------------------------------------
-  /** Keyset-gepagtes Audit-Log. `before` = Cursor (id), Filter action/actor/Zeit. */
+  // --- Audit log (P(audit.read)) --------------------------------------------
+  /** Keyset-paged audit log. `before` = cursor (id); filter action/actor/time. */
   listAuditLog(
     opts: {
       limit?: number;
@@ -648,14 +639,14 @@ export class AdminApiService {
     });
   }
 
-  /** Distinkte Akteure des Audit-Logs (für den Actor-Filter). */
+  /** Distinct audit-log actors (for the actor filter). */
   listAuditActors(): Observable<AuditActor[]> {
     if (this.mock) return of([]);
     return this.http.get<AuditActor[]>(`${this.base}/admin/audit/actors`);
   }
 
-  /** Einen Config-Change aus dem Audit-Log zurücknehmen (P audit.revert).
-   *  409 = neuerer Stand existiert / nicht revertierbar; 404 = Eintrag/Revision fehlt. */
+  /** Revert a config change from the audit log (P audit.revert).
+   *  409 = a newer state exists / not revertible; 404 = entry/revision missing. */
   revertAuditEntry(entryId: number): Observable<AuditRevertResult> {
     return this.http.post<AuditRevertResult>(
       `${this.base}/admin/audit/${entryId}/revert`,
@@ -663,8 +654,8 @@ export class AdminApiService {
     );
   }
 
-  // --- Config-Versionen (#config-versioning) -------------------------------
-  /** Snapshots einer Config-Entität (neueste zuerst) — Versions-Sidebar. */
+  // --- Config versions ------------------------------------------------------
+  /** Snapshots of a config entity (newest first) — version sidebar. */
   listConfigRevisions(
     entityType: string,
     entityId: string,
@@ -679,7 +670,7 @@ export class AdminApiService {
     });
   }
 
-  /** Feld-Diff eines Snapshots gegen seinen Vorgänger (Wire → Array-Form). */
+  /** Field diff of a snapshot against its predecessor (wire → array form). */
   getConfigRevisionDiff(id: Uuid): Observable<ConfigRevisionDiff> {
     if (this.mock) {
       return of({
@@ -698,7 +689,7 @@ export class AdminApiService {
       .pipe(map((w) => ({ ...w, diff: mapDiff(w.diff) })));
   }
 
-  /** Einen früheren Snapshot als neue aktive Version zurückspielen (Sidebar-Restore). */
+  /** Restore an earlier snapshot as the new active version (sidebar restore). */
   restoreConfigRevision(id: Uuid): Observable<void> {
     return this.http.post<void>(
       `${this.base}/admin/config-revisions/${id}/restore`,
@@ -706,7 +697,7 @@ export class AdminApiService {
     );
   }
 
-  // --- Benachrichtigungs-Config (#task-reminder, P(admin.notifications)) ----
+  // --- Notification config (P(admin.notifications)) -------------------------
   getNotificationSettings(): Observable<NotificationSettings> {
     if (this.mock) {
       return of({ taskReminderEnabled: true, taskReminderAfterDays: 5, taskReminderRepeatDays: 7 });
@@ -725,7 +716,7 @@ export class AdminApiService {
     );
   }
 
-  // --- DSGVO/Privacy (#PII-Re-Add, P privacy.manage) -----------------------
+  // --- DSGVO/privacy (P privacy.manage) -------------------------------------
   listErasures(status?: ErasureStatus): Observable<ErasureRequest[]> {
     if (this.mock) {
       const rows = status
@@ -785,7 +776,7 @@ export class AdminApiService {
     return this.http.put<PrivacySettings>(`${this.base}/admin/privacy/settings`, settings);
   }
 
-  /** DSGVO-Auskunft (Art. 15) als XLSX-Blob (per E-Mail). */
+  /** DSGVO data export (Art. 15) as an XLSX blob (by email). */
   downloadAuskunft(email: string): Observable<Blob> {
     if (this.mock) return of(new Blob([], { type: 'application/octet-stream' }));
     const params = new HttpParams().set('email', email);
@@ -795,13 +786,13 @@ export class AdminApiService {
     });
   }
 
-  // --- Branding / Site-Config (#21 — Mock-Contract) ------------------------
+  // --- Branding / site-config -----------------------------------------------
   getSiteConfig(): Observable<SiteConfig> {
     if (this.mock) return of(structuredCopy(this.store.site));
     return this.http.get<SiteConfig>(`${this.base}/admin/site-config`);
   }
 
-  /** Entwurf speichern (noch nicht aktiv) — PUT /admin/site-config/draft. */
+  /** Save the draft (not yet active) — PUT /admin/site-config/draft. */
   saveBrandingDraft(draft: Branding): Observable<SiteConfig> {
     if (this.mock) {
       this.store.site.draft = structuredCopy(draft);
@@ -811,7 +802,7 @@ export class AdminApiService {
     return this.http.put<SiteConfig>(`${this.base}/admin/site-config/draft`, draft);
   }
 
-  /** Entwurf aktivieren → neue Version — POST /admin/site-config/activate. */
+  /** Activate the draft → new version — POST /admin/site-config/activate. */
   activateBranding(): Observable<SiteConfig> {
     if (this.mock) {
       this.store.site.active = structuredCopy(this.store.site.draft);
@@ -822,7 +813,7 @@ export class AdminApiService {
     return this.http.post<SiteConfig>(`${this.base}/admin/site-config/activate`, {});
   }
 
-  // --- intern --------------------------------------------------------------
+  // --- internal -------------------------------------------------------------
   private upsert<T extends { id: Uuid }>(list: T[], item: T, prefix: string): T {
     if (item.id) {
       const idx = list.findIndex((x) => x.id === item.id);
@@ -835,25 +826,25 @@ export class AdminApiService {
   }
 }
 
-/** Deep-Copy ohne `structuredClone`-Verfügbarkeitsannahme (jsdom-sicher). */
+/** Deep copy without assuming `structuredClone` is available (jsdom-safe). */
 function structuredCopy<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-/** Stabiler String-Hash (deterministische Mock-IDs, kein `Math.random`/`Date`). */
+/** Stable string hash (deterministic mock ids; no `Math.random`/`Date`). */
 function hashString(value: string): number {
   let h = 0;
   for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0;
   return h;
 }
 
-/** Antragstyp-Stubs für den Mock-Modus (#69) — echte Typen kommen vom Backend. */
+/** Application-type stubs for mock mode — real types come from the backend. */
 const MOCK_APP_TYPE_OPTIONS: ApplicationTypeOption[] = [
   { id: '11111111-1111-1111-1111-111111111111', name: 'Finanzantrag' },
   { id: '22222222-2222-2222-2222-222222222222', name: 'Sonstiger Antrag' },
 ];
 
-/** Minimaler Schema-Stub für den Mock-Modus (echte Schemas kommen vom Backend). */
+/** Minimal schema stub for mock mode (real schemas come from the backend). */
 const MOCK_CONFIG_SCHEMAS: ConfigSchemas = {
   FormFieldDef: { title: 'FormFieldDef', type: 'object' },
   FlowGraph: { title: 'FlowGraph', type: 'object' },

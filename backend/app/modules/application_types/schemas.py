@@ -1,9 +1,7 @@
-"""API-Schemata des application-types-Moduls (T-25).
+"""API schemas for the application-types module.
 
-Listen-DTO der Antragstypen. Casing folgt dem übrigen Backend (camelCase-Aliase,
-`populate_by_name`, vgl. applications/forms §5). ``name`` ist die für ``lang``
-aufgelöste i18n-Bezeichnung (overview §5) — das FE konsumiert einen fertigen String,
-nicht die rohe ``*_i18n``-Map.
+``name`` is the i18n label resolved for ``lang`` — the frontend consumes a
+ready string, not the raw ``*_i18n`` map.
 """
 
 from __future__ import annotations
@@ -17,46 +15,39 @@ from app.shared.paging import PageParams
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields populatable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class ApplicationTypeListQuery(PageParams):
-    """Query-Parameter der Typen-Liste: Paging (``limit``/``offset``) + ``lang``.
+    """List query params: paging plus ``lang``.
 
-    ``extra="forbid"`` → unbekannte Query-Parameter werden mit 422 abgelehnt (statt
-    still ignoriert); hält den Contract negativ-konform (schemathesis
-    ``negative_data_rejection``).
-
-    ``offset`` ist zusätzlich nach oben begrenzt: ein absurd großer Wert (> int4)
-    ließe das DB-``OFFSET`` overflowen → 500. Mit ``le`` wird er sauber als 422
-    abgelehnt (schemathesis ``server_error``).
+    ``extra="forbid"`` rejects unknown query params with 422 instead of silently
+    ignoring them; ``offset`` is capped at int4 max so the DB OFFSET cannot
+    overflow into a 500.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    # int4-Max: rein zur Overflow-Abwehr, keine fachliche Seiten-Obergrenze.
+    # int4 max: overflow guard only, not a business page limit.
     offset: int = Field(default=0, ge=0, le=2_147_483_647)
-    # `Lang`-Enum: ungültige Werte (z.B. `lang=null`) → 422 statt still ignoriert.
+    # Lang enum: invalid values (e.g. `lang=null`) fail with 422 instead of being ignored.
     lang: Lang = DEFAULT_LANG
 
 
 class ApplicationTypeListItem(_CamelModel):
-    """Ein Antragstyp in der Liste.
+    """One application type in the list.
 
-    Öffentliche Felder sind für die Antragstellung relevant (``id``/``name``/
-    ``hasBudget``/``active``/``activeFormVersionId``). ``key`` und ``gremiumId``
-    sind Admin-Zusatzfelder und nur bei berechtigtem Principal gefüllt (sonst
-    ``null``).
+    ``key`` and ``gremiumId`` are admin-only and ``null`` without permission.
     """
 
     id: UUID
     name: str
     has_budget: bool = Field(alias="hasBudget")
-    # `active` = für die Antragstellung anbietbar (es gibt eine aktive Form-Version).
+    # active = offerable for submission (an active form version exists).
     active: bool
     active_form_version_id: UUID | None = Field(default=None, alias="activeFormVersionId")
-    # Admin-Zusatzfelder (nur bei Berechtigung gefüllt).
+    # Admin-only fields (populated only with permission).
     key: str | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")

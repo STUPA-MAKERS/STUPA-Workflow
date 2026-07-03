@@ -70,7 +70,7 @@ describe('FormlySelectType (rendered)', () => {
 
   it('falls back to the default prompt when placeholder is genuinely undefined', async () => {
     // Render the type directly (no formly prop init) so props.placeholder is
-    // undefined → the `?? 'Bitte wählen …'` template fallback fires.
+    // undefined → the template's default-placeholder fallback fires.
     await render(FormlySelectType, {
       componentInputs: {
         field: {

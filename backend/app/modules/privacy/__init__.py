@@ -1,1 +1,1 @@
-"""DSGVO/Privacy-Modul: Anonymisierung, Löschanträge, Aufbewahrung, Auskunft."""
+"""Privacy/GDPR module: anonymization, erasure requests, retention, access export."""

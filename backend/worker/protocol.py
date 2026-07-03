@@ -1,14 +1,13 @@
-"""arq-Worker-Task: Protokoll finalisieren (T-22, async — ``finalize`` blockiert nie).
+"""arq worker task: finalize a protocol (async — ``finalize`` never blocks).
 
-``render_protocol`` baut den :class:`ProtocolService` aus den in ``ctx`` hinterlegten
-T-20-Deps (pytex + MinIO + Mail-Queue) und führt den eigentlichen Render+Versand
-aus, nachdem der Router das Protokoll auf ``rendering`` gesetzt und den Job enqueued
-hat. Transiente Fehler (pytex 5xx/Transport, Storage) → ``arq.Retry`` mit linearem
-Backoff bis ``pdf_max_tries``; **jeder dauerhafte Fehler setzt das Protokoll auf
-``draft`` zurück** (re-finalisierbar, nie in ``rendering`` hängen — der Versand
-gehört zur atomaren Finalisierung, ein Fehlschlag rollt alles zurück). Nach Erfolg
-**und** Rollback wird ``meeting_state`` auf ``meeting:{id}`` gebroadcastet, damit
-Live-Follower den Status-Flip sehen (das FE lädt das Protokoll daraufhin nach).
+``render_protocol`` builds the :class:`ProtocolService` from the ``ctx`` deps (pytex
++ MinIO + mail queue) and runs the render+send after the router set the protocol to
+``rendering`` and enqueued the job. Transient errors (pytex 5xx/transport, storage)
+-> ``arq.Retry`` with linear backoff up to ``pdf_max_tries``; any permanent error
+resets the protocol to ``draft`` (re-finalizable, never stuck in ``rendering`` — the
+send is part of the atomic finalization, a failure rolls everything back). After both
+success and rollback, ``meeting_state`` is broadcast on ``meeting:{id}`` so live
+followers see the status flip.
 """
 
 from __future__ import annotations
@@ -37,13 +36,13 @@ logger = logging.getLogger("app.protocol")
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB-Sessionmaker (in Tests via ``ctx['protocol_sessionmaker']`` injizierbar)."""
+    """DB sessionmaker (injectable in tests via ``ctx['protocol_sessionmaker']``)."""
     maker = ctx.get("protocol_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
 
 def _mail_queue(ctx: dict[str, Any]) -> MailQueue | None:
-    """Mail-Queue über denselben Redis (arq-Pool des Workers)."""
+    """Mail queue over the same Redis (the worker's arq pool)."""
     redis = ctx.get("redis")
     return ArqMailQueue(redis) if redis is not None else None
 
@@ -59,17 +58,18 @@ def _service(ctx: dict[str, Any], session: AsyncSession) -> ProtocolService:
 
 
 async def _revert_to_draft(ctx: dict[str, Any], protocol_id: UUID) -> None:
-    """``rendering → draft`` in frischer Session (die Job-Session ist gerollbackt)."""
+    """``rendering -> draft`` in a fresh session (the job session is rolled back)."""
     maker = _sessionmaker(ctx)
     async with maker() as session:
         await ProtocolService(session).revert_to_draft(protocol_id)
 
 
 async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> None:
-    """``meeting_state`` der zugehörigen Sitzung publizieren (Status-Flip fürs FE).
+    """Publish the meeting's ``meeting_state`` (status flip for the FE).
 
-    Best effort: ein Broadcast-Fehler darf den (bereits abgeschlossenen)
-    Render/Rollback nicht rückwirkend als fehlgeschlagen markieren."""
+    Best effort: a broadcast error must not retroactively fail the already-completed
+    render/rollback.
+    """
     redis = ctx.get("redis")
     if redis is None:
         return
@@ -86,20 +86,20 @@ async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> No
         return
     event = MeetingStateEvent(
         activeApplicationId=meeting.active_application_id,
-        # Text-Spalte; Werte sind durch den Service auf die Literale beschränkt.
+        # Text column; the service constrains values to the allowed literals.
         status=cast("Any", meeting.status),
     )
     try:
         await RedisBroker(redis).publish(meeting_channel(meeting.id), event.dump())
-    except Exception as exc:  # noqa: BLE001 — Broadcast ist nicht render-kritisch
+    except Exception as exc:  # noqa: BLE001 - broadcast is not render-critical
         logger.warning(
             "meeting_state broadcast failed (protocol=%s): %s", protocol_id, exc
         )
 
 
 async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
-    """Ein ``rendering``-Protokoll finalisieren (PDF + Mail). Retry bei transientem
-    Fehler bis ``pdf_max_tries``; dauerhafter Fehler → Rollback auf ``draft``."""
+    """Finalize a ``rendering`` protocol (PDF + mail). Retry on transient error up to
+    ``pdf_max_tries``; permanent error -> rollback to ``draft``."""
     settings: Settings = ctx["settings"]
     pid = UUID(protocol_id)
     try:
@@ -127,7 +127,7 @@ async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
         await _revert_to_draft(ctx, pid)
         await _broadcast_meeting_state(ctx, pid)
         return "dead"
-    except Exception as exc:  # noqa: BLE001 — dauerhaft (z. B. pytex-Compile-Fehler)
+    except Exception as exc:  # noqa: BLE001 - permanent (e.g. pytex compile error)
         logger.error(
             "protocol render failed permanently (protocol=%s): %s", protocol_id, exc
         )

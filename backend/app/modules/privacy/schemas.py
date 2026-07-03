@@ -1,4 +1,4 @@
-"""API-Schemata des Privacy-Moduls (camelCase im JSON, per Name befüllbar)."""
+"""Privacy module API schemas (camelCase JSON, populate-by-name)."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class ErasureRequestOut(_CamelModel):
 
 
 class ErasureRejectBody(_CamelModel):
-    """Ablehnungsgrund (für die Benachrichtigung an die betroffene Person)."""
+    """Rejection reason (used in the notification to the subject)."""
 
     reason: str | None = None
 

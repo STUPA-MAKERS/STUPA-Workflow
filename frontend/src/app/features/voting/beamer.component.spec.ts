@@ -117,7 +117,7 @@ describe('BeamerComponent', () => {
 
   it('reports zero cast count and a tie result key before any tally arrives', async () => {
     const { fixture } = await setup();
-    // Kein Tally → castCount() ist 0; kein Ergebnis → resultKey() fällt auf tie.
+    // No tally → castCount() is 0; no result → resultKey() falls back to tie.
     expect(fixture.componentInstance.castCount()).toBe(0);
     expect(fixture.componentInstance.resultKey()).toBe('vote.result.tie');
   });

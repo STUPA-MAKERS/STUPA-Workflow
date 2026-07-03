@@ -72,7 +72,7 @@ const PAGE: Page<ApplicationListItemWire> = {
   offset: 0,
 };
 
-// Offene Aufgaben (GET /applications/tasks): nur der actionable Antrag app-1.
+// Open tasks (GET /applications/tasks): only the actionable application app-1.
 const TASKS: ApplicationListItemWire[] = [item('app-1', 't1', OPEN_STATE)];
 
 async function setup(
@@ -110,7 +110,7 @@ async function setup(
   } else {
     appsReq.flush(PAGE);
   }
-  // „Offene Aufgaben" laden GET /applications/tasks getrennt von „Meine Anträge".
+  // "Open tasks" loads GET /applications/tasks separately from "my applications".
   const tasksReq = http.expectOne((r) => r.url.endsWith('/api/applications/tasks'));
   if (opts.tasksError) {
     tasksReq.flush(null, { status: 500, statusText: 'Server Error' });
@@ -123,14 +123,14 @@ async function setup(
   } else {
     typesReq.flush(TYPES);
   }
-  // Sitzungs-Shortcuts (#Sessions) laden `/meetings`.
+  // Meeting shortcuts load `/meetings`.
   http
     .match((r) => r.url.endsWith('/api/meetings') && r.method === 'GET')
     .forEach((req) => {
       if (opts.meetingsError) req.flush(null, { status: 500, statusText: 'Server Error' });
       else req.flush(opts.meetings ?? []);
     });
-  // Vertretungs-Karte (#delegation-rework) lädt `/delegations`.
+  // Substitution card loads `/delegations`.
   http
     .match((r) => r.url.endsWith('/api/delegations') && r.method === 'GET')
     .forEach((req) => {

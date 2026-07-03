@@ -1,38 +1,38 @@
 import { InjectionToken, inject } from '@angular/core';
 import { LOCATION } from '../browser/location.token';
 
-/** Basis-Pfad der REST-API (deployment.md: `web`-nginx routet `/api` → `api`). */
+/** Base path of the REST API (`web` nginx routes `/api` → `api`). */
 export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL', {
   providedIn: 'root',
   factory: () => '/api',
 });
 
 /**
- * Schaltet den In-Memory-Mock-Backend-Interceptor.
+ * Toggles the in-memory mock-backend interceptor.
  *
- * Default **`false`** (#67): das FE spricht das **echte** Backend (`/api`) an.
- * Der Mock ist nur noch ein **explizites** Opt-in für Dev/Harness/Tests:
- *   - globales Flag `window.__USE_MOCK_API__ = true` (vor dem Bootstrap gesetzt),
- *   - Query-Param `?mock=1`,
+ * Default `false`: the FE talks to the real backend (`/api`). The mock is only
+ * an explicit opt-in for dev/harness/tests:
+ *   - global flag `window.__USE_MOCK_API__ = true` (set before bootstrap),
+ *   - query param `?mock=1`,
  *   - `localStorage['useMockApi'] === '1'`.
- * Unit-Tests setzen den Token direkt per Provider (`{ provide: USE_MOCK_API, … }`).
+ * Unit tests set the token directly via a provider (`{ provide: USE_MOCK_API, … }`).
  */
 export const USE_MOCK_API = new InjectionToken<boolean>('USE_MOCK_API', {
   providedIn: 'root',
   factory: () => detectMockFlag(inject(LOCATION)),
 });
 
-/** Liest das Mock-Opt-in aus globalem Flag / URL / localStorage (Browser-only).
- *  `location` kommt per DI (#jest30) — pur testbar, ohne jsdom-`window.location`. */
+/** Reads the mock opt-in from global flag / URL / localStorage (browser only).
+ *  `location` comes via DI — purely testable, without jsdom `window.location`. */
 export function detectMockFlag(location: Location): boolean {
-  if (typeof window === 'undefined') return false; // SSR/Prerender → echtes API
+  if (typeof window === 'undefined') return false; // SSR/prerender → real API
   const w = window as Window & { __USE_MOCK_API__?: boolean };
   if (w.__USE_MOCK_API__ === true) return true;
   try {
     if (new URLSearchParams(location.search).get('mock') === '1') return true;
     if (window.localStorage?.getItem('useMockApi') === '1') return true;
   } catch {
-    // localStorage/URL im Sandbox/SSR nicht erreichbar → kein Mock.
+    // localStorage/URL unreachable in sandbox/SSR → no mock.
   }
   return false;
 }

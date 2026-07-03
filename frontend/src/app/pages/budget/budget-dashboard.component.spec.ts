@@ -15,7 +15,7 @@ import type {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Inst = any;
 
-/** Vollständige Allokations-View (alle Felder, damit Number(undefined)=NaN nie auftritt). */
+/** Full allocation view (all fields, so Number(undefined)=NaN never occurs). */
 function alloc(over: Partial<BudgetAllocationView> & { fiscalYearId: string }): BudgetAllocationView {
   return {
     fiscalYearId: over.fiscalYearId,

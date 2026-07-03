@@ -1,8 +1,8 @@
-"""Geteilte Schema-Basis des Budget-Moduls.
+"""Shared schema base of the budget module.
 
-Die alte Flach-Topf-API (``BudgetPot*``/``Assign*``/Stats) wurde durch die
-Kostenstellen-Baum-API (:mod:`app.modules.budget.tree_schemas`) abgelöst; übrig
-bleibt nur die gemeinsame camelCase-Basisklasse, die die Tree-Schemata erben.
+The legacy flat-pot API was replaced by the cost-centre tree API
+(:mod:`app.modules.budget.tree_schemas`); only the shared camelCase base class
+remains.
 """
 
 from __future__ import annotations
@@ -11,6 +11,6 @@ from pydantic import BaseModel, ConfigDict
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields populatable by name."""
 
     model_config = ConfigDict(populate_by_name=True)

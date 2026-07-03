@@ -35,10 +35,10 @@ function emptyDraft(): PolicyDraft {
 }
 
 /**
- * Fristen-Registry (#Deadlines): benannte Frist-Policies, die der Flow per `key`
- * referenziert. `absolute` trägt ein Datum (pro Semester pflegbar, ohne den Flow zu
- * ändern); die relativen Varianten leiten die Frist aus Einreichung bzw. letzter
- * Änderung + X Tagen ab. CRUD über die Admin-API (Dialog).
+ * Deadline registry: named deadline policies that the flow references via `key`.
+ * `absolute` carries a date (editable per semester, without changing the flow); the
+ * relative variants derive the deadline from submission or last change + X days.
+ * CRUD via the admin API (dialog).
  */
 @Component({
   selector: 'app-admin-deadlines',
@@ -95,7 +95,7 @@ export class AdminDeadlinesComponent {
     return this.i18n.translate(`admin.deadlines.kind.${kind}` as TranslationKey);
   }
 
-  /** Anzeige der konkreten Frist-Quelle: Datum bzw. „+ X Tage". */
+  /** Display the concrete deadline source: a date or "+ X days". */
   protected valueOf(p: DeadlinePolicy): string {
     if (p.kind === 'absolute') {
       return p.absoluteAt ? new Date(p.absoluteAt).toLocaleDateString(this.i18n.locale()) : '—';

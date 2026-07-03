@@ -32,10 +32,9 @@ function emptyDraft(): RoleDraft {
 }
 
 /**
- * Gremium-Rollen-Katalog (#42): der **eigene** Rollensatz für Gremien, getrennt von
- * den globalen Rollen. CRUD über die Admin-API; Anlegen/Bearbeiten als Dialog (#19).
- * Die konkrete (zeitlich begrenzte) Zuordnung passiert je Gremium auf dessen
- * Mitglieder-Unterseite.
+ * Gremium-role catalogue: the **own** role set for gremien, separate from the
+ * global roles. CRUD via the admin API; create/edit as a dialog. The concrete
+ * (time-bound) assignment happens per gremium on its members subpage.
  */
 @Component({
   selector: 'app-gremium-roles',
@@ -62,7 +61,7 @@ export class GremiumRolesComponent {
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
 
-  /** Gremium, dessen Rollen hier verwaltet werden (#62 — Rollen sind pro Gremium). */
+  /** Gremium whose roles are managed here (roles are per gremium). */
   private readonly gremiumId = this.route.snapshot.paramMap.get('id') as Uuid;
 
   protected readonly roles = signal<GremiumRole[]>([]);

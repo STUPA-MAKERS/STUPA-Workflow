@@ -32,8 +32,8 @@
   </section>
 } @else {
   <div class="bd__layout">
-    <!-- Links: Budget → Haushaltsjahr. Mobil (≤768px) einklappbar: Toggle nur dort
-         sichtbar (CSS), Desktop zeigt den Baum unverändert immer. -->
+    <!-- Left: Budget -> fiscal year. Collapsible on mobile (<=768px): the toggle is
+         shown only there via CSS; desktop always shows the tree. -->
     <aside class="bd__nav">
       <button
         type="button"
@@ -56,7 +56,7 @@
       </div>
     </aside>
 
-    <!-- Mitte: Breadcrumbs (ab Tiefe > 0) + Auslastung + Anträge -->
+    <!-- Middle: breadcrumbs (depth > 0) + usage + applications -->
     <main class="bd__main">
       @if (breadcrumbs().length > 1) {
         <nav class="flex flex-wrap items-center gap-2" [attr.aria-label]="'budget.breadcrumbs' | t">
@@ -103,8 +103,8 @@
       </section>
     </main>
 
-    <!-- Rechts: gestapelte Tortendiagramme über die direkten Unter-Kostenstellen;
-         Klick auf ein Segment öffnet die Kostenstelle (#budget). -->
+    <!-- Right: stacked pie charts over the direct sub cost-centres; clicking a
+         segment opens that cost-centre. -->
     <aside class="bd__charts">
       <app-budget-pie [title]="'budget.pie.allocated' | t" [slices]="allocPie()" (sliceClick)="selectKs($event)" />
       <app-budget-pie [title]="'budget.pie.committed' | t" [slices]="committedPie()" (sliceClick)="selectKs($event)" />
@@ -113,8 +113,8 @@
     </aside>
   </div>
 
-  <!-- Übersicht (#budget-sunburst): Sunburst über den ganzen Unterbaum der
-       gewählten Kostenstelle; Metrik per Tab-Selector umschaltbar. -->
+  <!-- Overview: sunburst over the whole subtree of the selected cost-centre;
+       metric switchable via the tab selector. -->
   <app-dialog
     [open]="overviewOpen()"
     [title]="'budget.overview.title' | t"

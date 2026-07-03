@@ -32,7 +32,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
   it('forbids actor gates on automatic transitions', () => {
     expect(() => validateGuard({ roleIs: 'x' }, false)).toThrow(/manual/);
     expect(() => validateGuard({ isInCommittee: 'g' }, false)).toThrow(/manual/);
-    // Bedingungen sind auf automatischen Übergängen erlaubt.
+    // Conditions are allowed on automatic transitions.
     expect(() => validateGuard({ deadlinePassed: true }, false)).not.toThrow();
   });
 

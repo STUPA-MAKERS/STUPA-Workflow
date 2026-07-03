@@ -39,6 +39,7 @@ from app.modules.budget.invoice_import import (
     _sane_amount,
     parse_zugferd_pdf,
 )
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_router import (
     ServiceDep,
     _find_subtree,
@@ -62,7 +63,6 @@ from app.modules.budget.tree_schemas import (
     TransferCreate,
     TransferOut,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
 
 # --------------------------------------------------------------------- ids

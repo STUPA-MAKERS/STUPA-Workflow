@@ -1,5 +1,5 @@
-/* Body (Kopf + Tabelle) auf normale Breite zentriert; der Baum sitzt im
-   linken Rand außerhalb des Bodys (Breakout, wie der Budget-Tab). */
+/* Body (head + table) centered at normal width; the tree sits in the left
+   margin outside the body (breakout, like the budget tab). */
 .apps__head {
   width: 100%;
   max-width: var(--layout-max-width);
@@ -45,8 +45,8 @@
     max-height: none;
   }
 }
-/* Mobil (≤768px): Baum hinter einklappbarem Toggle (Standard: zu),
-   eine Spalte. Desktop unverändert — Toggle existiert dort nur versteckt. */
+/* Mobile (≤768px): tree behind a collapsible toggle (default: closed),
+   single column. Desktop unchanged — the toggle only exists hidden there. */
 .apps__treeToggle {
   display: none;
 }
@@ -89,7 +89,7 @@
   align-items: center;
   gap: var(--space-2);
 }
-/* Header-Live-Suche (#3): gleiche Optik/Höhe wie der /expenses-Suchinput. */
+/* Header live search: same look/height as the /expenses search input. */
 .apps__search {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -108,12 +108,12 @@
 .apps__status--error {
   color: var(--color-danger);
 }
-/* Infinite-Scroll-Trigger: unsichtbar, sitzt vor dem Listenende, damit der
-   Observer (rootMargin 400px) frühzeitig nachlädt. */
+/* Infinite-scroll trigger: invisible, sits before the list end so the
+   observer (rootMargin 400px) loads the next page early. */
 .apps__sentinel {
   height: 1px;
 }
-/* Mobil (≤768px): Kopf-Aktionen dürfen umbrechen. */
+/* Mobile (≤768px): header actions may wrap. */
 @media (max-width: 768px) {
   .apps__headActions {
     flex-wrap: wrap;

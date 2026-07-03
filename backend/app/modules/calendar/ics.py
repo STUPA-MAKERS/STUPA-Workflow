@@ -1,14 +1,11 @@
-"""iCal-Feed-Builder (#ics) — Sitzungen → RFC5545 ``VCALENDAR`` (reine Funktion).
+"""iCal feed builder — meetings to RFC5545 ``VCALENDAR`` (pure function, no DB).
 
-Kennt **keine** DB: nimmt fertige :class:`MeetingEvent`-Werte und liefert die
-``.ics``-Bytes. ``icalendar`` wird **lazy** importiert (nur auf dem Feed-Pfad, wie
-openpyxl/minio) — der Import dieses Moduls bleibt billig.
+``icalendar`` is imported lazily (feed path only) to keep module import cheap.
 
-**Zeitzonen.** Sitzungen tragen lokale Uhrzeiten (Europe/Berlin). Terminierte Events
-werden nach UTC konvertiert und mit ``Z`` ausgegeben (``DTSTART:…T…Z``) — das spart
-den fehleranfälligen ``VTIMEZONE``-Block und ist über alle Clients eindeutig. Die
-DST-Wahl (CET/CEST) ergibt sich pro Datum aus :mod:`zoneinfo` (stdlib). Sitzungen ohne
-Uhrzeit werden als ganztägige Events (``VALUE=DATE``) ausgegeben.
+Timezones: meetings carry local times (Europe/Berlin). Timed events are
+converted to UTC and emitted with ``Z``, avoiding the error-prone ``VTIMEZONE``
+block; DST is resolved per date via :mod:`zoneinfo`. Meetings without a time
+become all-day events (``VALUE=DATE``).
 """
 
 from __future__ import annotations
@@ -20,27 +17,27 @@ from datetime import time as _time
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-if TYPE_CHECKING:  # pragma: no cover - nur Typen (icalendar lazy importiert)
+if TYPE_CHECKING:  # pragma: no cover - types only (icalendar imported lazily)
     from icalendar import Event
 
-# Lokale Zeitzone der Sitzungen (Anzeige-/Eingabezeit).
+# Local timezone of meetings (display/input time).
 _LOCAL_TZ = ZoneInfo("Europe/Berlin")
 
-# Default-Dauer terminierter Sitzungen ohne (gültige) End-Uhrzeit (Entscheidung #ics).
+# Default duration of timed meetings without a (valid) end time.
 DEFAULT_DURATION = timedelta(hours=1)
 
-# Erinnerungs-Vorlauf (VALARM): terminiert 1 h vorher, ganztägig 1 Tag vorher.
+# Reminder lead (VALARM): timed 1 h before, all-day 1 day before.
 _ALARM_LEAD_TIMED = timedelta(hours=-1)
 _ALARM_LEAD_ALLDAY = timedelta(days=-1)
 
 
 @dataclass(frozen=True, slots=True)
 class MeetingEvent:
-    """Eine Sitzung als Kalender-Event (vom Service aus :class:`Meeting` gemappt).
+    """A meeting as a calendar event (mapped from :class:`Meeting` by the service).
 
-    ``uid`` ist die stabile Meeting-ID (UID bleibt über Re-Renders gleich), ``stamp``
-    der ``created_at``-Zeitpunkt (deterministischer ``DTSTAMP``). Zeiten sind lokale
-    naive ``time``-Werte; ``date`` ist Pflicht (Events ohne Datum filtert der Service).
+    ``uid`` is the stable meeting id (constant across re-renders), ``stamp`` the
+    ``created_at`` timestamp (deterministic ``DTSTAMP``). Times are local naive
+    ``time`` values; ``date`` is required (undated events are filtered upstream).
     """
 
     uid: str
@@ -53,14 +50,14 @@ class MeetingEvent:
 
 
 def _as_utc(value: datetime) -> datetime:
-    """Aware-Datetime → UTC; naive Werte werden als UTC interpretiert (Defensive)."""
+    """Convert to UTC; naive values are treated as UTC (defensive)."""
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
 
 
 def _local_to_utc(day: _date, clock: _time) -> datetime:
-    """Lokale (Europe/Berlin) Datum+Uhrzeit → aware UTC-Datetime (DST-korrekt)."""
+    """Combine local (Europe/Berlin) date+time into an aware UTC datetime (DST-correct)."""
     return datetime.combine(day, clock, tzinfo=_LOCAL_TZ).astimezone(UTC)
 
 
@@ -77,12 +74,12 @@ def _build_event(
         ical.add("description", f"Gremium: {event.gremium_name}")
 
     if event.start_time is None:
-        # Ganztägig: DTSTART als reines DATE (kein DTEND → genau ein Tag).
+        # All-day: DTSTART as plain DATE (no DTEND -> exactly one day).
         ical.add("dtstart", event.date)
         lead = _ALARM_LEAD_ALLDAY
     else:
         start = _local_to_utc(event.date, event.start_time)
-        # End-Uhrzeit nur, wenn sie nach der Start-Uhrzeit liegt; sonst Default-Dauer.
+        # Use the end time only if it is after the start time; otherwise default duration.
         if event.end_time is not None and event.end_time > event.start_time:
             end = _local_to_utc(event.date, event.end_time)
         else:
@@ -106,10 +103,10 @@ def build_calendar(
     calendar_name: str = "STUPA — Sitzungen",
     default_duration: timedelta = DEFAULT_DURATION,
 ) -> bytes:
-    """Sitzungen → ``VCALENDAR``-Bytes (RFC5545, CRLF-gefaltet, escaped via icalendar).
+    """Render meetings to ``VCALENDAR`` bytes (RFC5545, CRLF-folded via icalendar).
 
-    ``domain`` macht die Event-UIDs global eindeutig + stabil (aus der öffentlichen
-    Basis-URL abgeleitet). ``events`` ist bereits gefiltert/​sortiert (Service).
+    ``domain`` makes event UIDs globally unique and stable; ``events`` arrive
+    pre-filtered and sorted.
     """
     from icalendar import Calendar
 

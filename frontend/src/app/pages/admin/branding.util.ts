@@ -1,26 +1,26 @@
 /**
- * Branding-Validierung (T-34 / #21). Footer- und Rechts-Links dürfen nur sichere
- * Schemata tragen — `http(s):` und `mailto:`. Andere (v.a. `javascript:`, `data:`)
- * werden **clientseitig abgelehnt**, da die URLs als `branding`-JSON site-weit
- * persistiert und in Header/Footer als Links gerendert werden (gespeicherter
- * XSS-Vektor sonst). Server validiert autoritativ; das ist Sofort-Feedback.
+ * Branding validation. Footer and legal links may only carry safe schemes —
+ * `http(s):` and `mailto:`. Others (notably `javascript:`, `data:`) are rejected
+ * client-side, because the URLs are persisted site-wide as `branding` JSON and
+ * rendered as links in header/footer (otherwise a stored XSS vector). The server
+ * validates authoritatively; this is instant feedback.
  */
 import type { Branding } from './admin.models';
 
 export const ALLOWED_LINK_SCHEMES: readonly string[] = ['http:', 'https:', 'mailto:'] as const;
 
-/** true, wenn `url` ein nicht-leerer Link mit erlaubtem Schema ist. */
+/** true when `url` is a non-empty link with an allowed scheme. */
 export function isAllowedLinkUrl(url: string | null | undefined): boolean {
   const u = (url ?? '').trim();
   if (!u) return false;
   try {
     return ALLOWED_LINK_SCHEMES.includes(new URL(u).protocol);
   } catch {
-    return false; // relativ/ungültig → ablehnen
+    return false; // relative/invalid → reject
   }
 }
 
-/** Alle unzulässigen Link-URLs eines Branding-Entwurfs (Footer + Rechts-Links). */
+/** All disallowed link URLs of a branding draft (footer + legal links). */
 export function brandingLinkErrors(branding: Branding | null | undefined): string[] {
   if (!branding) return [];
   const urls: string[] = [

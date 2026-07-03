@@ -1,0 +1,24 @@
+<section class="fe__transLists" [attr.aria-label]="'admin.flow.list.heading' | t">
+  <div class="fe__transCol">
+    <h3 class="m-0 text-md">{{ 'admin.flow.list.incoming' | t }} ({{ lists().incoming.length }})</h3>
+    @for (r of lists().incoming; track r.index) {
+      <button type="button" class="fe__transRow" (click)="selectTransition.emit(r.index)">
+        <span class="fe__transMain">@if (r.automatic) {<span aria-hidden="true">⚡ </span>}{{ r.label || (r.from + ' → ' + r.to) }}</span>
+        <span class="fe__transMeta">{{ r.from }} → {{ r.to }}@if (r.branch) { · {{ r.branch }}} · {{ r.guard }}</span>
+      </button>
+    } @empty {
+      <p class="text-muted text-sm m-0">{{ 'admin.flow.list.empty' | t }}</p>
+    }
+  </div>
+  <div class="fe__transCol">
+    <h3 class="m-0 text-md">{{ 'admin.flow.list.outgoing' | t }} ({{ lists().outgoing.length }})</h3>
+    @for (r of lists().outgoing; track r.index) {
+      <button type="button" class="fe__transRow" (click)="selectTransition.emit(r.index)">
+        <span class="fe__transMain">@if (r.automatic) {<span aria-hidden="true">⚡ </span>}{{ r.label || (r.from + ' → ' + r.to) }}</span>
+        <span class="fe__transMeta">{{ r.from }} → {{ r.to }}@if (r.branch) { · {{ r.branch }}} · {{ r.guard }}</span>
+      </button>
+    } @empty {
+      <p class="text-muted text-sm m-0">{{ 'admin.flow.list.empty' | t }}</p>
+    }
+  </div>
+</section>

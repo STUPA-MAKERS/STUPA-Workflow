@@ -1,24 +1,17 @@
-"""Branding-/Site-Config-Schema (#21, T-24) — Single Source of Truth fürs Editor-FE.
+"""Branding/site-config schema — single source of truth for the editor frontend.
 
-Logos, Footer (Link-Spalten + Copyright + rechtliche Links) und i18n-Freitexte sind
-config-driven statt hartkodiert. Das Schema wird über ``/admin/config-schemas`` mit
-ausgeliefert (`Branding` in :data:`app.shared.config_schemas`).
+Logos, footer (link columns + copyright + legal links) and i18n freetexts are
+config-driven. The schema is served via ``/admin/config-schemas``.
 
-**Sicherheitskontrakt (Logos).** Das FE liefert Logos als **Base64-Data-URL** inline
-im Branding-JSON (kein separater Upload). Der Server validiert autoritativ — das
-Client-Gate ist nur UX:
-
-* Data-URLs werden **dekodiert**; die **tatsächliche** Byte-Größe (nicht das
-  Client-Feld ``size``) wird gegen das 2-MB-Cap geprüft.
-* Der Bild-Typ wird aus den **dekodierten Magic-Bytes** bestimmt (PNG/JPEG/WebP/ICO-
-  Whitelist) und muss zum deklarierten ``mime`` passen — ein als ``image/png``
-  getarntes SVG/anderes Format fliegt raus. **Kein Inline-SVG** (XSS-Vektor).
-* http(s)-/absolute Asset-URLs sind erlaubt (nicht gefetcht → nur deklarierter
-  ``mime`` + Client-``size`` geprüft). Footer-/Legal-URLs weisen ``javascript:``/
-  ``data:``-Schemata ab.
-
-Freitexte/Labels haben serverseitige Längen-Caps (Schutz gegen JSONB-Aufblähen über
-das auth-freie ``GET /api/site-config``).
+Security contract (logos): the frontend sends logos inline as base64 data URLs;
+the server validates authoritatively. Data URLs are decoded and the actual byte
+size is checked against the 2 MB cap (not the client ``size`` field); the image
+type is sniffed from decoded magic bytes (PNG/JPEG/WebP/ICO whitelist) and must
+match the declared ``mime``. No inline SVG (XSS vector). http(s)/absolute asset
+URLs are allowed but not fetched, so only declared values are checked.
+Footer/legal URLs reject ``javascript:``/``data:`` schemes. Freetexts/labels
+have server-side length caps (guards the auth-free ``GET /api/site-config``
+against JSONB bloat).
 """
 
 from __future__ import annotations
@@ -31,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.shared.i18n import I18nMap
 
-# Bild-Whitelist für Logos/Favicon — bewusst **ohne** image/svg+xml (Inline-SVG-XSS).
+# Image whitelist for logos/favicon — deliberately without image/svg+xml (SVG XSS).
 ALLOWED_LOGO_MIME: frozenset[str] = frozenset(
     {
         "image/png",
@@ -41,16 +34,16 @@ ALLOWED_LOGO_MIME: frozenset[str] = frozenset(
         "image/vnd.microsoft.icon",
     }
 )
-MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB (FE LOGO_MAX_SIZE_MB)
+MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB (matches frontend LOGO_MAX_SIZE_MB)
 
-# Längen-Caps für i18n-Texte (Schutz gegen Aufblähen der auth-freien Public-Config).
+# Length caps for i18n texts (guards the auth-free public config against bloat).
 MAX_FREETEXT_CHARS = 10_000
 MAX_LABEL_CHARS = 500
 MAX_I18N_KEY_CHARS = 16
 
 LogoSlot = Literal["wordmark", "imagemark", "favicon"]
 
-# image/vnd.microsoft.icon ist ein Alias von image/x-icon → für den Vergleich normiert.
+# image/vnd.microsoft.icon is an alias of image/x-icon; normalized for comparison.
 _MIME_ALIASES = {"image/vnd.microsoft.icon": "image/x-icon"}
 
 
@@ -59,7 +52,7 @@ def _norm_mime(mime: str) -> str:
 
 
 def _sniff_image(data: bytes) -> str | None:
-    """Bild-Typ aus Magic-Bytes (None = unbekannt/kein Whitelist-Bild, z.B. SVG)."""
+    """Sniff the image type from magic bytes (None = unknown/not whitelisted, e.g. SVG)."""
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
     if data.startswith(b"\xff\xd8\xff"):
@@ -72,7 +65,7 @@ def _sniff_image(data: bytes) -> str | None:
 
 
 def _cap_i18n(value: I18nMap, limit: int) -> I18nMap:
-    """Längen-Cap je i18n-Wert + Sprach-Key (serverseitig autoritativ)."""
+    """Enforce length caps per i18n value and language key (server-side authoritative)."""
     for key, text in value.items():
         if len(key) > MAX_I18N_KEY_CHARS:
             raise ValueError(f"i18n key too long: {key!r}")
@@ -82,13 +75,13 @@ def _cap_i18n(value: I18nMap, limit: int) -> I18nMap:
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar; keine Extra-Felder."""
+    """camelCase aliases in JSON; fields populatable by name; no extra fields."""
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 def _reject_unsafe_url(url: str) -> str:
-    """`javascript:`/`data:`/`vbscript:`-Schemata in (Footer-)URLs abweisen."""
+    """Reject `javascript:`/`data:`/`vbscript:` schemes in (footer) URLs."""
     low = url.strip().lower()
     if low.startswith(("javascript:", "vbscript:", "data:")):
         raise ValueError("unsafe url scheme")
@@ -96,7 +89,7 @@ def _reject_unsafe_url(url: str) -> str:
 
 
 class BrandingAsset(_CamelModel):
-    """Logo-/Favicon-Asset: Base64-Data-URL (inline) oder Asset-URL. Bild-only, kein SVG."""
+    """Logo/favicon asset: inline base64 data URL or asset URL. Image-only, no SVG."""
 
     url: str
     filename: str = Field(max_length=MAX_LABEL_CHARS)
@@ -114,13 +107,13 @@ class BrandingAsset(_CamelModel):
     def _check_url_and_bytes(self) -> BrandingAsset:
         raw = self.url.strip()
         low = raw.lower()
-        # Inline-SVG in jeder Form abweisen (Markup oder data:image/svg+xml).
+        # Reject inline SVG in any form (markup or data:image/svg+xml).
         if "<svg" in low or "image/svg" in low:
             raise ValueError("inline SVG logos are not allowed")
         if low.startswith("data:"):
             self._validate_data_url(raw)
             return self
-        # Externe/absolute Asset-URL: nicht fetchbar → deklarierte Werte prüfen.
+        # External/absolute asset URL: not fetchable, so check declared values only.
         if not low.startswith(("https://", "http://", "/")):
             raise ValueError("logo url must be a data-URL, http(s) URL or absolute path")
         if self.size > MAX_LOGO_BYTES:
@@ -128,7 +121,7 @@ class BrandingAsset(_CamelModel):
         return self
 
     def _validate_data_url(self, raw: str) -> None:
-        """Data-URL dekodieren + gegen **echte** Bytes härten (Magic-Type + Größe)."""
+        """Decode the data URL and validate against the actual bytes (magic type + size)."""
         try:
             header, payload = raw.split(",", 1)
         except ValueError as exc:
@@ -141,14 +134,14 @@ class BrandingAsset(_CamelModel):
             raise ValueError(f"data-URL media type not allowed: {mediatype!r}")
         if _norm_mime(mediatype) != _norm_mime(self.mime):
             raise ValueError("data-URL media type does not match declared mime")
-        # Kodierte Länge grob begrenzen, bevor dekodiert wird (Aufwand beschränken).
+        # Roughly cap the encoded length before decoding (bounds the work).
         if len(payload) > MAX_LOGO_BYTES * 2:
             raise ValueError(f"logo exceeds {MAX_LOGO_BYTES} bytes")
         try:
             decoded = base64.b64decode(payload, validate=True)
         except (binascii.Error, ValueError) as exc:
             raise ValueError("invalid base64 logo payload") from exc
-        # **Echte** Größe gegen Cap — Client-`size` ist nicht vertrauenswürdig.
+        # Actual size against the cap — the client `size` field is untrusted.
         if len(decoded) > MAX_LOGO_BYTES:
             raise ValueError(f"logo exceeds {MAX_LOGO_BYTES} bytes")
         sniffed = _sniff_image(decoded)
@@ -184,13 +177,13 @@ class FooterColumn(_CamelModel):
 
 
 class SiteFreetexts(_CamelModel):
-    """i18n-Freitexte (Login-Hinweis, Welcome, Support, E-Mail-Footer, Antrags-Info)."""
+    """i18n freetexts (login hint, welcome, support, e-mail footer, apply info)."""
 
     login_hint: I18nMap = Field(default_factory=dict, alias="loginHint")
     welcome: I18nMap = Field(default_factory=dict)
     support: I18nMap = Field(default_factory=dict)
     email_footer: I18nMap = Field(default_factory=dict, alias="emailFooter")
-    # Info-Text unter der Antrags-(Typ-)Auswahl (#18) — Markdown, je Sprache.
+    # Info text below the application-type selection — Markdown, per language.
     apply_info: I18nMap = Field(default_factory=dict, alias="applyInfo")
 
     @field_validator("login_hint", "welcome", "support", "email_footer", "apply_info")
@@ -200,11 +193,11 @@ class SiteFreetexts(_CamelModel):
 
 
 class Branding(_CamelModel):
-    """Vollständige Branding-Config (aktiv oder Draft)."""
+    """Full branding config (active or draft)."""
 
-    # App-Name (config-driven, sprach-neutral). Treibt PWA-Manifest (name/short_name),
-    # Browser-Tab-Titel, Header-aria-label und die Home-H1. Leer → FE/Manifest fallen
-    # auf die hartkodierten Defaults bzw. die i18n-Werte (app.title/home.heading) zurück.
+    # App name (config-driven, language-neutral). Drives the PWA manifest,
+    # browser-tab title, header aria-label and the home H1. Empty falls back to
+    # the hardcoded defaults / i18n values.
     app_name: str = Field(default="", alias="appName", max_length=MAX_LABEL_CHARS)
     app_short_name: str = Field(
         default="", alias="appShortName", max_length=MAX_LABEL_CHARS

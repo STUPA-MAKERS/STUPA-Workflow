@@ -63,8 +63,7 @@
 </header>
 
 <div class="exp__layout">
-  <!-- Mobil (≤768px) einklappbar: Toggle nur dort sichtbar, Desktop zeigt
-       den Baum unverändert immer (wie der Budget-Tab-Picker). -->
+  <!-- Tree toggle is mobile-only; desktop always shows the tree. -->
   <aside class="exp__tree">
     <button
       type="button"
@@ -148,7 +147,7 @@
                   </td>
                 }
               </tr>
-              <!-- Unterbuchungen (#subbookings): volle Zeilen wie die Eltern, nur eingefärbt. -->
+              <!-- Sub-booking rows mirror the parent columns, tinted. -->
               @if (canManage() && isSubExpanded(e.id)) {
                 @for (c of subOf(e.id); track c.id) {
                   <tr class="exp__subRow" [class.exp__tr--income]="c.kind === 'income'">
@@ -196,7 +195,7 @@
   </div>
 </div>
 
-<!-- Anlegen -->
+<!-- Create dialog -->
 <app-dialog [open]="createOpen()" [title]="'expenses.add' | t" [closeLabel]="'action.cancel' | t" (closed)="createOpen.set(false)">
   <form id="exp-create" class="flex flex-col gap-2" (submit)="create($event)">
     <div class="inline-flex gap-1">
@@ -290,20 +289,20 @@
   </div>
 </app-dialog>
 
-<!-- Bearbeiten -->
+<!-- Edit dialog -->
 <app-dialog [open]="!!editing()" [title]="'expenses.edit' | t" [closeLabel]="'action.cancel' | t" (closed)="editing.set(null)">
   <form id="exp-edit" class="flex flex-col gap-2" (submit)="saveEdit($event)">
     <label class="text-sm font-medium mt-2" for="exp-edesc">{{ 'expenses.field.description' | t }}</label>
     <input id="exp-edesc" class="exp__input" [ngModel]="editDescription()" (ngModelChange)="editDescription.set($event)" name="edesc" />
     <label class="text-sm font-medium mt-2" for="exp-eamount">{{ 'expenses.field.amount' | t }}</label>
     @if ((editing()?.childCount ?? 0) > 0) {
-      <!-- Eltern-Betrag = Σ der Unterbuchungen → schreibgeschützt (#subbookings). -->
+      <!-- Parent amount = sum of children, read-only server-side. -->
       <p class="text-sm text-muted m-0">{{ 'expenses.sub.parentAmount' | t }}: <strong>{{ money(editing()!.amount) }}</strong></p>
     } @else {
       <app-currency-input name="eamount" [ngModel]="editAmount()" (ngModelChange)="editAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
     }
 
-    <!-- Unterbuchungen erben Kostenstelle/Konto vom Eltern → nicht einzeln änderbar (#subbookings). -->
+    <!-- Sub-bookings inherit cost centre/account from the parent. -->
     @if (!editing()?.applicationId && !editing()?.parentExpenseId) {
       <app-select name="ecc" [label]="'expenses.field.costCentre' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="editBudgetId()" (ngModelChange)="editBudgetId.set($event)" />
     }
@@ -341,7 +340,7 @@
   </div>
 </app-dialog>
 
-<!-- Unterbuchung manuell anlegen (#subbookings) -->
+<!-- Create sub-booking dialog -->
 <app-dialog [open]="!!subParent()" [title]="'expenses.sub.addTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeCreateSub()">
   @if (subParent(); as p) {
     <form id="exp-sub" class="flex flex-col gap-2" (submit)="createSub($event)">
@@ -365,7 +364,7 @@
   </div>
 </app-dialog>
 
-<!-- Verknüpfte Rechnung (read-only) -->
+<!-- Linked invoice (read-only) -->
 <app-dialog [open]="!!viewingInvoice()" [title]="'expenses.invoice.title' | t" [closeLabel]="'action.close' | t" (closed)="viewingInvoice.set(null)">
   @if (viewingInvoice(); as inv) {
     <dl class="exp__invDetails">
@@ -387,7 +386,7 @@
   }
 </app-dialog>
 
-<!-- Löschen -->
+<!-- Delete confirmation -->
 <app-dialog [open]="!!confirmDelete()" [title]="'expenses.delete.title' | t" [closeLabel]="'action.cancel' | t" (closed)="confirmDelete.set(null)">
   <p>{{ 'expenses.delete.body' | t: { description: confirmDelete()?.description ?? '' } }}</p>
   <div dialog-footer class="flex justify-end gap-3">
@@ -396,7 +395,7 @@
   </div>
 </app-dialog>
 
-<!-- Übertrag (KS → KS) -->
+<!-- Cost-centre transfer -->
 <app-dialog [open]="transferOpen()" [title]="'expenses.transferTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="transferOpen.set(false)">
   <form id="exp-transfer" class="flex flex-col gap-2" (submit)="createTransfer($event)">
     <app-select name="tfrom" [label]="'expenses.transferFrom' | t" [placeholder]="'expenses.field.costCentrePlaceholder' | t" [options]="costCentreOptions()" [required]="true" [ngModel]="tFromId()" (ngModelChange)="onTransferFrom($event)" />

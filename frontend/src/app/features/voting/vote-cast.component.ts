@@ -16,12 +16,12 @@ import { VoteBarsComponent } from './vote-bars.component';
 type Phase = 'loading' | 'error' | 'ready';
 
 /**
- * Vote-UI (flows §5, AK T-32): einzelne Abstimmung laden, Stimme abgeben.
- * - `open` → Optionen wählbar; `allowChange` erlaubt Umstimmen, sonst gesperrt.
- * - `closed` → read-only mit Ergebnis.
- * - nicht stimmberechtigt (FE-Permission **oder** Server-403) → Hinweis statt
- *   Stimmabgabe (RBAC bleibt serverseitig autoritativ, security.md §2).
- * Bei `secret` werden während der offenen Phase keine Counts gezeigt.
+ * Vote UI: load a single vote and cast a ballot.
+ * - `open` → options selectable; `allowChange` allows re-voting, else locked.
+ * - `closed` → read-only with the result.
+ * - not eligible (FE permission or server 403) → notice instead of casting
+ *   (RBAC stays authoritative server-side).
+ * With `secret`, no counts are shown during the open phase.
  */
 @Component({
   selector: 'app-vote-cast',
@@ -42,11 +42,11 @@ export class VoteCastComponent {
   readonly phase = signal<Phase>('loading');
   readonly vote = signal<Vote | null>(null);
   readonly myChoice = signal<string | null>(null);
-  /** Eigene Wahl der VERTRETUNGS-Stimme (#delegation-rework, getrennte Abgabe). */
+  /** Own choice for the PROXY ballot (separate submission). */
   readonly proxyChoice = signal<string | null>(null);
   readonly submitting = signal(false);
   readonly notEligible = signal(false);
-  /** Delegations-Sicht (#delegation-rework): Stimmrecht abgegeben / in Vertretung. */
+  /** Delegation view: voting right handed over / acting as proxy. */
   readonly delegation = signal<VoteDelegationStatus | null>(null);
 
   readonly isOpen = computed(() => this.vote()?.status === 'open');
@@ -54,12 +54,12 @@ export class VoteCastComponent {
   readonly allowChange = computed(() => this.vote()?.config.allowChange ?? true);
   readonly options = computed(() => this.vote()?.config.options ?? []);
   readonly secret = computed(() => Boolean(this.vote()?.secret));
-  /** Counts erst zeigen, wenn nicht (mehr) geheim: geschlossen oder nicht-secret. */
+  /** Show counts only once no longer secret: closed or non-secret. */
   readonly showBars = computed(() => Boolean(this.vote()) && (!this.secret() || this.isClosed()));
-  /** Bereits abgestimmt und Änderung gesperrt → Optionen ausgrauen. */
+  /** Already voted and change locked → grey out the options. */
   readonly locked = computed(() => this.myChoice() !== null && !this.allowChange());
 
-  /** Summe aller abgegebenen Stimmen (für „x von y"). */
+  /** Sum of all cast votes (for "x of y"). */
   readonly castCount = computed(() => {
     const tally = this.vote()?.tally;
     return tally ? Object.values(tally.counts).reduce((a, b) => a + b, 0) : 0;
@@ -78,12 +78,12 @@ export class VoteCastComponent {
       this.phase.set('error');
       return;
     }
-    // Stimmrecht-UX: fehlt die Permission, Hinweis zeigen (Server bleibt autoritativ).
+    // Eligibility UX: if the permission is missing, show a notice (server stays authoritative).
     this.notEligible.set(!this.auth.can('vote.cast'));
-    // Delegations-Status (#delegation-rework): erklärt ein 403 (Stimmrecht abgegeben)
-    // bzw. schaltet den separaten Vertretungs-Block frei. WICHTIG: `exercising`
-    // macht NICHT die eigene Stimme frei (externe Stellvertreter dürfen nur die
-    // Vertretungs-Stimme abgeben) — die zwei Abgaben sind getrennt.
+    // Delegation status: explains a 403 (voting right handed over) or unlocks the
+    // separate proxy block. IMPORTANT: `exercising` does NOT free one's own vote
+    // (external substitutes may only cast the proxy ballot) — the two submissions
+    // are separate.
     this.delegations.voteStatus(id).subscribe({
       next: (status) => {
         this.delegation.set(status);
@@ -135,7 +135,7 @@ export class VoteCastComponent {
             res.status === 'changed' ? 'voting.cast.toast.changed' : 'voting.cast.toast.cast',
           ),
         );
-        // Aktuellen Tally vom Server nachladen (kein optimistisches Raten).
+        // Reload the current tally from the server (no optimistic guessing).
         this.api.getVote(vote.id, { quiet: true }).subscribe((v) => this.vote.set(v));
       },
       error: (err: { status?: number; error?: ProblemDetail }) => {

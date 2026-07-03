@@ -1,12 +1,12 @@
-"""Stabile Event-Liste für Webhooks (api.md §6).
+"""Stable event list for webhooks.
 
-Single Source of Truth für die Event-Whitelist (Webhook-Abos, Schema-Validierung).
-Neue Events hier ergänzen.
+Single source of truth for the event whitelist (webhook subscriptions,
+schema validation). Add new events here.
 """
 
 from __future__ import annotations
 
-# Reihenfolge = Dokumentations-/Anzeige-Reihenfolge (api.md §6).
+# Order = documentation/display order.
 EVENTS: tuple[str, ...] = (
     "application_created",
     "application_updated",
@@ -30,5 +30,5 @@ EVENT_SET: frozenset[str] = frozenset(EVENTS)
 
 
 def is_event(value: str) -> bool:
-    """`True`, wenn `value` ein bekanntes Event ist (api.md §6)."""
+    """Return ``True`` if ``value`` is a known event."""
     return value in EVENT_SET

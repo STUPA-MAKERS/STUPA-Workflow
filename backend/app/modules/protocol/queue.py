@@ -1,16 +1,14 @@
-"""Protokoll-Render-Enqueue-Abstraktion (arq) — ``finalize`` blockiert nie (T-22).
+"""Protocol-render enqueue abstraction (arq) — ``finalize`` never blocks.
 
-Nach dem Statuswechsel ``draft → rendering`` legt der Router nur einen
-``render_protocol``-Job in Redis (gleicher arq-Pool wie Mail/PDF); der Worker
-rendert + versendet async. **Bewusst ohne** ``_job_id``: nach einem
-``rendering → draft``-Rollback (Render dauerhaft fehlgeschlagen) muss ein erneutes
-finalize einen frischen Job anlegen — eine idempotente Job-Id würde gegen das noch
-gespeicherte Ergebnis des alten Jobs koaleszieren und nie wieder rendern.
-Doppel-Enqueue verhindert stattdessen der Status selbst (``start_finalize``
-enqueued nur beim Wechsel von ``draft``); ein doppelt laufender Job ist harmlos
-(``finalize`` ist idempotent, Mail-Versand dedupet über den Idempotenz-Key).
-Fehlt Redis (DEV/Contract-CI), ist die Queue ``None`` → der Router rendert synchron
-als Fallback (kein Hänger in ``rendering``).
+After ``draft → rendering`` the router only enqueues a ``render_protocol`` job;
+the worker renders and mails async. Deliberately no ``_job_id``: after a
+``rendering → draft`` rollback a fresh finalize must enqueue a fresh job — an
+idempotent job id would coalesce against the old job's stored result and never
+render again. Double-enqueue is prevented by the status itself
+(``start_finalize`` only enqueues when leaving ``draft``); a duplicate running
+job is harmless (``finalize`` is idempotent, mail dedupes via idempotency key).
+Without Redis (dev/contract CI) the queue is ``None`` and the router renders
+synchronously as fallback (no hang in ``rendering``).
 """
 
 from __future__ import annotations
@@ -29,16 +27,16 @@ PROTOCOL_RENDER_TASK_NAME = "render_protocol"
 
 
 class ProtocolRenderQueue(Protocol):
-    """Enqueue-Schnittstelle (vom Router genutzt)."""
+    """Enqueue interface used by the router."""
 
     async def enqueue(self, protocol_id: UUID) -> None: ...
 
 
 @dataclass(slots=True)
 class ArqProtocolRenderQueue:
-    """arq-gestützte Queue für ``render_protocol``-Jobs."""
+    """arq-backed queue for ``render_protocol`` jobs."""
 
-    pool: object  # arq.ArqRedis (lose typisiert: kein arq-Import in der API-Fläche)
+    pool: object  # arq.ArqRedis (loosely typed: no arq import in the API surface)
 
     async def enqueue(self, protocol_id: UUID) -> None:
         await self.pool.enqueue_job(  # type: ignore[attr-defined]
@@ -49,5 +47,5 @@ class ArqProtocolRenderQueue:
 def protocol_render_queue_from_pool(
     pool: ArqRedis | None,
 ) -> ProtocolRenderQueue | None:
-    """Pool → :class:`ProtocolRenderQueue` (oder ``None``, wenn kein Pool)."""
+    """Wrap a pool as :class:`ProtocolRenderQueue` (``None`` if no pool)."""
     return ArqProtocolRenderQueue(pool) if pool is not None else None

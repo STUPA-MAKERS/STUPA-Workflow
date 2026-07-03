@@ -1,13 +1,8 @@
-"""application-types-API-Router (T-25, api.md §3 »applications«).
+"""Application-types API router.
 
-Endpunkt:
-
-* ``GET /api/application-types`` — öffentlich; gepagte Liste der für die
-  Antragstellung anbietbaren Typen. Ein berechtigter Principal
-  (``form.configure``) erhält zusätzlich inaktive Typen + Admin-Felder.
-
-Fehler werden als ``ProblemDetail`` deklariert (T-10-Hook → problem+json), damit der
-OpenAPI-Contract status/content/schema-konform ist.
+``GET /api/application-types`` — public, paged list of types offered for
+submission. A principal with ``form.configure`` additionally gets inactive
+types and admin-only fields.
 """
 
 from __future__ import annotations
@@ -27,14 +22,14 @@ from app.shared.paging import Page
 
 router = APIRouter(tags=["application-types"])
 
-# Principal mit dieser Permission sieht inaktive Typen + Admin-Zusatzfelder.
+# Principals with this permission see inactive types plus admin-only fields.
 _ADMIN_PERMISSION = "form.configure"
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    """Fehler-Status → ``ProblemDetail`` (content auf problem+json setzt T-10s Hook)."""
+    """Map error status codes to ``ProblemDetail`` responses."""
     return {code: _PROBLEM for code in codes}
 
 
@@ -55,7 +50,7 @@ async def list_application_types(
     query: Annotated[ApplicationTypeListQuery, Query()],
     principal: Annotated[Principal | None, Depends(get_current_principal)],
 ) -> Page[ApplicationTypeListItem]:
-    """Antragstypen auflisten (öffentlich; Admin-Sicht bei ``form.configure``)."""
+    """List application types (public; admin view with ``form.configure``)."""
     is_admin = principal is not None and principal.has(_ADMIN_PERMISSION)
     return await service.list_types(
         lang=query.lang,

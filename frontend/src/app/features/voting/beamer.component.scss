@@ -1,5 +1,5 @@
-// Beamer/Projektor: maximaler Kontrast über die Semantic-Tokens (Text 900 auf
-// Bg 50 in Light, Text 50 auf Bg 950 in Dark) + große Typo für Fernlesbarkeit.
+// Beamer/projector: maximum contrast via the semantic tokens (Text 900 on Bg 50
+// in light, Text 50 on Bg 950 in dark) + large type for readability at distance.
 :host {
   display: block;
   min-height: calc(100vh - var(--layout-header-height));

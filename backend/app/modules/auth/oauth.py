@@ -1,9 +1,9 @@
-"""Reine OAuth2-Helfer (DB-frei): Scope-Katalog, PKCE-Prüfung, Token-Erzeugung/-Hash.
+"""Pure OAuth2 helpers (DB-free): scope catalog, PKCE check, token generation/hashing.
 
-Scopes kappen die Rechte des eingeloggten Principals: ein scoped Token erhält genau die
-Schnittmenge aus den RBAC-Permissions des Nutzers und der dem Scope zugeordneten
-Permission-Menge (siehe ``Principal.scope_permissions``). Das gilt **auch** für Admins —
-der Admin-Bypass in ``Principal.has`` greift nur, wenn die Permission im Scope liegt.
+Scopes cap the logged-in principal's rights: a scoped token gets exactly the
+intersection of the user's RBAC permissions and the scope's permission set
+(``Principal.scope_permissions``). This applies to admins too — the admin
+bypass in ``Principal.has`` only works for in-scope permissions.
 """
 
 from __future__ import annotations
@@ -13,15 +13,14 @@ import hashlib
 import hmac
 import secrets
 
-# Permissions, die einem Agenten NIE gewährt werden dürfen — unabhängig von Scope
-# oder Admin-Status. `vote.cast` (eine Stimme abgeben) ist strikt menschlich (#MCP):
-# wird aus jeder Scope-Auflösung hart entfernt.
+# Permissions NEVER granted to an agent, regardless of scope or admin status.
+# `vote.cast` (casting a ballot) is strictly human: hard-removed from every
+# scope resolution.
 FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast"})
 
-# Scope-Key → erlaubte Permission-Keys (Teilmenge des PERMISSION_CATALOGUE).
-# `read` deckt alle lesenden Endpunkte; die `*:write`-Scopes ergänzen Mutationen.
-# Hinweis: `votes:write` umfasst NUR die Vote-VERWALTUNG (anlegen/öffnen/schließen),
-# nicht `vote.cast` — das Abstimmen selbst bleibt Menschen vorbehalten.
+# Scope key -> allowed permission keys. `read` covers all reading endpoints; the
+# `*:write` scopes add mutations. `votes:write` covers vote MANAGEMENT only
+# (create/open/close), never `vote.cast` — voting itself stays human.
 SCOPES: dict[str, frozenset[str]] = {
     "read": frozenset(
         {
@@ -57,17 +56,17 @@ SCOPES: dict[str, frozenset[str]] = {
     ),
 }
 
-# Voller kuratierter Umfang (MCP-Default-Request). Serverseitig auf die Rechte des
-# eingeloggten Nutzers gekappt — ein Nicht-Admin erhält nur seine Teilmenge.
+# Full curated range (MCP default request). Capped server-side to the logged-in
+# user's rights — a non-admin gets only their subset.
 DEFAULT_SCOPE = " ".join(SCOPES.keys())
 
-# Harte Obergrenze für jede Token-Lebensdauer (Sekunden). Es gibt KEINE nie ablaufenden
-# Tokens mehr (security): selbst der längste wählbare Wert ist hierdurch gedeckelt.
-MAX_LIFETIME_SECONDS = 90 * 24 * 3600  # 90 Tage
+# Hard cap for every token lifetime (seconds). There are NO never-expiring
+# tokens: even the longest selectable value is bounded by this.
+MAX_LIFETIME_SECONDS = 90 * 24 * 3600  # 90 days
 
-# Wählbare Token-Lebensdauern (Consent-UI) → Access-Token-TTL in Sekunden. Reihenfolge =
-# Anzeige. Eine "never"-Option gibt es bewusst nicht — jedes Token läuft ab (≤ 90d),
-# unabhängig vom jederzeit möglichen Widerruf über die Grants-Seite.
+# Selectable token lifetimes (consent UI) -> access-token TTL in seconds; order
+# = display order. Deliberately no "never" option — every token expires (<=90d)
+# regardless of the always-available revocation via the grants page.
 LIFETIMES: dict[str, int] = {
     "1h": 3600,
     "8h": 8 * 3600,
@@ -79,16 +78,16 @@ DEFAULT_LIFETIME = "30d"
 
 
 def resolve_lifetime(key: str | None) -> int:
-    """Lifetime-Key → Access-TTL (Sekunden). Unbekannt/``None`` → Default.
+    """Map a lifetime key to an access TTL in seconds (unknown/``None`` -> default).
 
-    Das Ergebnis ist immer endlich und durch ``MAX_LIFETIME_SECONDS`` gedeckelt — es
-    kann nie ``None`` (unbegrenzt) zurückgeben."""
+    The result is always finite and capped by ``MAX_LIFETIME_SECONDS`` — it can
+    never return ``None`` (unlimited)."""
     if key is None or key not in LIFETIMES:
         key = DEFAULT_LIFETIME
     return min(LIFETIMES[key], MAX_LIFETIME_SECONDS)
 
 
-# i18n-Schlüssel-Stamm je Scope für die Consent-UI (Label/Beschreibung im FE).
+# Display order of scopes in the consent UI (i18n keys live in the frontend).
 SCOPE_ORDER: tuple[str, ...] = (
     "read",
     "applications:write",
@@ -106,7 +105,7 @@ _TOKEN_BYTES = 32
 
 
 class OAuthError(ValueError):
-    """OAuth2-Protokollfehler (→ 400 invalid_request/invalid_grant am Endpoint)."""
+    """OAuth2 protocol error (mapped to 400 invalid_request/invalid_grant)."""
 
     def __init__(self, error: str, description: str = "") -> None:
         super().__init__(description or error)
@@ -115,9 +114,10 @@ class OAuthError(ValueError):
 
 
 def parse_scope(raw: str | None) -> list[str]:
-    """Space-separierten Scope-String → validierte, deduplizierte Liste.
+    """Parse a space-separated scope string into a validated, deduplicated list.
 
-    Unbekannte Scopes → ``OAuthError('invalid_scope')``. Leer → ``[DEFAULT_SCOPE]``.
+    Unknown scopes raise ``OAuthError('invalid_scope')``; empty falls back to
+    the default scope.
     """
     if not raw or not raw.strip():
         raw = DEFAULT_SCOPE
@@ -131,11 +131,10 @@ def parse_scope(raw: str | None) -> list[str]:
 
 
 def scope_permissions(scopes: list[str]) -> frozenset[str]:
-    """Vereinigung der Permission-Mengen aller Scopes, minus FORBIDDEN_PERMISSIONS.
+    """Union of all scopes' permission sets, minus FORBIDDEN_PERMISSIONS.
 
-    `vote.cast` & Co. werden hier hart entfernt — selbst wenn ein Scope sie je
-    enthielte oder der Nutzer Admin ist (der Admin-Bypass wird durch die Scope-Kappung
-    in ``Principal.has`` neutralisiert)."""
+    `vote.cast` is hard-removed here — even if a scope ever contained it or the
+    user is admin (the scope cap in ``Principal.has`` neutralizes the bypass)."""
     perms: set[str] = set()
     for s in scopes:
         perms |= SCOPES.get(s, frozenset())
@@ -155,17 +154,17 @@ def generate_refresh_token() -> str:
 
 
 def hash_token(token: str) -> bytes:
-    """SHA-256-Digest eines Tokens (für DB-Speicherung; Klartext nie persistiert)."""
+    """SHA-256 digest of a token (for DB storage; plaintext never persisted)."""
     return hashlib.sha256(token.encode("utf-8")).digest()
 
 
 def tokens_match(token: str, expected_hash: bytes) -> bool:
-    """Konstant-zeitiger Vergleich Token↔gespeicherter Hash."""
+    """Constant-time compare of a token against its stored hash."""
     return hmac.compare_digest(hash_token(token), expected_hash)
 
 
 def verify_pkce_s256(verifier: str, challenge: str) -> bool:
-    """RFC 7636 S256: ``base64url(sha256(verifier)) == challenge`` (konstant-zeitig)."""
+    """RFC 7636 S256: ``base64url(sha256(verifier)) == challenge`` (constant-time)."""
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     expected = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     return hmac.compare_digest(expected, challenge)

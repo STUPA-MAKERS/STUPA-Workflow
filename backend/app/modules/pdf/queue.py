@@ -1,10 +1,10 @@
-"""Render-Enqueue-Abstraktion (arq) — die API rendert nie selbst (T-20).
+"""Render-enqueue abstraction (arq) — the API never renders itself.
 
-Nach dem Anlegen der ``render_job``-Zeile legt der Service nur einen ``render_pdf``-Job
-in Redis (gleicher arq-Pool wie Mail/Scan); der Worker rendert async (202-Pfad,
-flows §6). Job-Id = ``render:<job_id>`` → ein erneuter Enqueue desselben Jobs
-koalesziert (idempotent). Fehlt Redis (DEV/Contract-CI), ist die Queue ``None`` → der
-Aufrufer hält den Job auf ``pending`` + loggt (kein API-Block, kein Crash).
+After creating the ``render_job`` row the service only puts a ``render_pdf`` job in
+Redis (same arq pool as mail/scan); the worker renders async. Job id =
+``render:<job_id>`` so re-enqueuing the same job coalesces (idempotent). Without Redis
+(dev/contract CI) the queue is ``None``, so the caller leaves the job ``pending`` and
+logs (no API block, no crash).
 """
 
 from __future__ import annotations
@@ -23,16 +23,16 @@ RENDER_TASK_NAME = "render_pdf"
 
 
 class RenderQueue(Protocol):
-    """Enqueue-Schnittstelle (vom Service genutzt)."""
+    """Enqueue interface used by the service."""
 
     async def enqueue(self, job_id: UUID) -> None: ...
 
 
 @dataclass(slots=True)
 class ArqRenderQueue:
-    """arq-gestützte Queue: ``render_pdf``-Job mit idempotenter Job-Id."""
+    """arq-backed queue: ``render_pdf`` job with an idempotent job id."""
 
-    pool: object  # arq.ArqRedis (lose typisiert: kein arq-Import in der API-Fläche)
+    pool: object  # arq.ArqRedis (loosely typed: no arq import on the API surface)
 
     async def enqueue(self, job_id: UUID) -> None:
         job = await self.pool.enqueue_job(  # type: ignore[attr-defined]
@@ -43,5 +43,5 @@ class ArqRenderQueue:
 
 
 def render_queue_from_pool(pool: ArqRedis | None) -> RenderQueue | None:
-    """Pool → :class:`RenderQueue` (oder ``None``, wenn kein Pool)."""
+    """Pool → ``RenderQueue`` (or ``None`` when there is no pool)."""
     return ArqRenderQueue(pool) if pool is not None else None

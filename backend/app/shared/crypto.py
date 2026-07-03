@@ -1,18 +1,16 @@
-"""Symmetrische Verschlüsselung sensibler At-Rest-Werte (Fernet).
+"""Symmetric encryption of sensitive at-rest values (Fernet).
 
-Hält Online-Banking-PINs (#fints) **verschlüsselt** in der DB. Der Fernet-Schlüssel
-wird aus dem konfigurierten ``fints_enc_key``-Secret abgeleitet (``sha256`` →
-url-safe-base64), weil Fernet einen exakten 32-Byte-base64-Schlüssel verlangt.
+Keeps online-banking PINs encrypted in the DB. The Fernet key is derived from the
+configured ``fints_enc_key`` secret (``sha256`` -> url-safe base64), because Fernet
+requires an exact 32-byte base64 key.
 
-**Wichtig (#fints-review):** ``sha256`` ist *kein* Passwort-KDF (kein Salt, kein
-Work-Factor). ``fints_enc_key`` MUSS daher ein **zufälliges, hochentropisches** Secret sein
-(z. B. ``python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key())"``
-oder 32 Zufallsbytes) — eine vom Menschen gewählte Passphrase wäre bei DB-Leak offline
-brute-forcebar. ``_MIN_SECRET_LEN`` prüft nur die Länge, nicht die Entropie.
+Important: ``sha256`` is not a password KDF (no salt, no work factor), so
+``fints_enc_key`` MUST be a random, high-entropy secret (e.g. ``Fernet.generate_key()``
+or 32 random bytes); a human-chosen passphrase would be offline-bruteforceable on a DB
+leak. ``_MIN_SECRET_LEN`` checks length only, not entropy.
 
-``cryptography`` ist bereits transitive Abhängigkeit (``pyjwt[crypto]``) und wird hier
-**lazy** importiert (der reine Contract-CI-Pfad lädt es nie). Klartext-PIN/Secret werden
-**nie** geloggt (security.md §10).
+``cryptography`` is already a transitive dependency and is imported lazily. Plaintext
+PIN/secret are never logged.
 """
 
 from __future__ import annotations
@@ -22,11 +20,11 @@ import hashlib
 
 
 class SecretCryptoError(RuntimeError):
-    """Ver-/Entschlüsselung fehlgeschlagen (ungültiger Token oder Schlüssel)."""
+    """Encryption/decryption failed (invalid token or key)."""
 
 
-def _fernet(key_material: str):  # type: ignore[no-untyped-def]  # noqa: ANN202 (Fernet aus lazy import)
-    """Fernet-Instanz aus beliebigem Secret (über sha256 auf 32 Byte normalisiert)."""
+def _fernet(key_material: str):  # type: ignore[no-untyped-def]  # noqa: ANN202  (Fernet from lazy import)
+    """Fernet instance from any secret (normalized to 32 bytes via sha256)."""
     from cryptography.fernet import Fernet
 
     digest = hashlib.sha256(key_material.encode("utf-8")).digest()
@@ -34,14 +32,15 @@ def _fernet(key_material: str):  # type: ignore[no-untyped-def]  # noqa: ANN202 
 
 
 def encrypt_secret(plaintext: str, *, key: str) -> str:
-    """Klartext mit dem abgeleiteten Schlüssel verschlüsseln → ASCII-Token (Fernet)."""
+    """Encrypt plaintext with the derived key -> ASCII token (Fernet)."""
     return _fernet(key).encrypt(plaintext.encode("utf-8")).decode("ascii")
 
 
 def decrypt_secret(token: str, *, key: str) -> str:
-    """Fernet-Token mit dem abgeleiteten Schlüssel entschlüsseln → Klartext.
+    """Decrypt a Fernet token with the derived key -> plaintext.
 
-    :raises SecretCryptoError: Token/Schlüssel passt nicht (z. B. nach Key-Rotation)."""
+    Raises:
+        SecretCryptoError: token/key mismatch (e.g. after key rotation)."""
     from cryptography.fernet import InvalidToken
 
     try:

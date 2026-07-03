@@ -1,15 +1,14 @@
-"""Pub/Sub-Fan-out für den Live-Vote-Kanal (api.md §4, flows §5).
+"""Pub/sub fan-out for the live-vote channel.
 
-Eine Nachricht, die eine App-Instanz auf ``meeting:{id}`` veröffentlicht, muss alle
-verbundenen Clients **über alle Instanzen hinweg** erreichen — daher Redis-PubSub.
+A message published on ``meeting:{id}`` by one app instance must reach all
+connected clients across all instances — hence Redis pub/sub.
 
-* :class:`RedisBroker` — Produktion: ``PUBLISH`` + ``SUBSCRIBE`` über ``redis.asyncio``.
-* :class:`InMemoryBroker` — Tests/Single-Prozess: ein gemeinsamer :class:`_Hub` (Default
-  pro Broker eigener Hub = eine Instanz). Mehrere Broker, die **denselben** Hub teilen,
-  simulieren mehrere App-Instanzen an einem Redis → deckt den Fan-out-Test ab.
+* :class:`RedisBroker` — production: ``PUBLISH``/``SUBSCRIBE`` via ``redis.asyncio``.
+* :class:`InMemoryBroker` — tests/single process; brokers sharing one :class:`_Hub`
+  simulate multiple app instances on one Redis.
 
-Beide liefern :meth:`subscribe` als async Context-Manager, der einen async Iterator
-über eingehende Nachrichten-Dicts ergibt; das Schließen räumt das Abo sauber ab.
+Both expose :meth:`subscribe` as an async context manager yielding an async
+iterator of message dicts; closing tears the subscription down cleanly.
 """
 
 from __future__ import annotations
@@ -22,24 +21,21 @@ from typing import Protocol
 
 
 class Subscription(Protocol):
-    """Async Iterator über eingehende Nachrichten (Dicts) eines Kanals."""
+    """Async iterator over a channel's incoming message dicts."""
 
     def __aiter__(self) -> AsyncIterator[dict[str, object]]: ...
 
 
 class MeetingBroker(Protocol):
-    """Pub/Sub-Abstraktion für den Kanal ``meeting:{id}``."""
+    """Pub/sub abstraction for the ``meeting:{id}`` channel."""
 
     async def publish(self, channel: str, message: dict[str, object]) -> None: ...
 
     def subscribe(self, channel: str) -> AbstractAsyncContextManager[Subscription]: ...
 
 
-# --------------------------------------------------------------------------- #
-# In-Memory (Tests / Single-Prozess)
-# --------------------------------------------------------------------------- #
 class _Hub:
-    """Geteiltes Routing-Backend: Kanal → Menge von Abonnenten-Queues."""
+    """Shared routing backend: channel → set of subscriber queues."""
 
     def __init__(self) -> None:
         self._channels: dict[str, set[asyncio.Queue[dict[str, object]]]] = {}
@@ -71,7 +67,7 @@ class _QueueSubscription:
 
 
 class InMemoryBroker:
-    """Prozess-lokaler Broker. ``hub`` teilen ⇒ mehrere Instanzen simulieren."""
+    """Process-local broker; share ``hub`` to simulate multiple instances."""
 
     def __init__(self, hub: _Hub | None = None) -> None:
         self._hub = hub or _Hub()
@@ -88,9 +84,6 @@ class InMemoryBroker:
             self._hub.unregister(channel, queue)
 
 
-# --------------------------------------------------------------------------- #
-# Redis (Produktion)
-# --------------------------------------------------------------------------- #
 class _RedisSubscription:
     def __init__(self, pubsub: object) -> None:
         self._pubsub = pubsub
@@ -106,7 +99,7 @@ class _RedisSubscription:
 
 
 class RedisBroker:
-    """``redis.asyncio``-gestützter PubSub-Broker (Fan-out über Instanzen)."""
+    """``redis.asyncio``-backed pub/sub broker (fan-out across instances)."""
 
     def __init__(self, client: object) -> None:
         self._client = client

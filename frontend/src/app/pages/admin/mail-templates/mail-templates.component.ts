@@ -12,9 +12,9 @@ const LANGS = ['de', 'en'] as const;
 type Lang = (typeof LANGS)[number];
 
 /**
- * Mail-Template-Editor (#5-4). Eigene Admin-Seite (`/admin/mail-templates`,
- * P `admin.notifications`): Liste der Templates links, Editor rechts mit
- * Sprach-Tabs für Betreff/Text/HTML, Platzhalter-Referenz und Live-Vorschau.
+ * Mail-template editor. Own admin page (`/admin/mail-templates`, permission
+ * `admin.notifications`): template list on the left, editor on the right with
+ * language tabs for subject/text/HTML, placeholder reference and live preview.
  */
 @Component({
   selector: 'app-mail-templates',
@@ -32,7 +32,7 @@ export class MailTemplatesComponent {
   readonly langs = LANGS;
   private readonly templates_ = signal<MailTemplate[]>([]);
   readonly templates = this.templates_.asReadonly();
-  // Auswahl per Key, nicht ID: Builtins (#12) haben keine DB-ID.
+  // Selection by key, not ID: builtins have no DB ID.
   readonly selectedKey = signal<string | null>(null);
   readonly draft = signal<MailTemplate | null>(null);
   readonly lang = signal<Lang>('de');
@@ -41,8 +41,8 @@ export class MailTemplatesComponent {
   readonly previewing = signal(false);
   readonly preview = signal<MailPreview | null>(null);
 
-  /** Template-Key lokalisiert (deadline_approaching → »Frist-Erinnerung« …);
-   *  unbekannt → roher Key (#mail-template-keys). */
+  /** Localized template key (deadline_approaching → "Deadline reminder" …);
+   *  unknown → raw key. */
   keyLabel(key: string): string {
     const k = `admin.mailTemplates.key.${key}`;
     const label = this.i18n.translate(k as TranslationKey);
@@ -74,7 +74,7 @@ export class MailTemplatesComponent {
     if (!tpl) return;
     this.selectedKey.set(key);
     this.preview.set(null);
-    // Tiefe Kopie der i18n-Maps, damit das Editieren das Original nicht mutiert.
+    // Deep copy of the i18n maps so editing does not mutate the original.
     this.draft.set({
       ...tpl,
       subjectI18n: { ...tpl.subjectI18n },
@@ -94,7 +94,7 @@ export class MailTemplatesComponent {
     const d = this.draft();
     if (!d || this.saving()) return;
     this.saving.set(true);
-    // Upsert per Key (#12): erzeugt eine Override, auch für Builtin-Defaults.
+    // Upsert by key: creates an override, also for builtin defaults.
     this.api
       .upsertMailTemplate({
         key: d.key,
@@ -132,7 +132,7 @@ export class MailTemplatesComponent {
     });
   }
 
-  /** Aktualisierte/zurückgesetzte Version in Liste + Editor übernehmen. */
+  /** Apply the updated/reset version to the list + editor. */
   private applyUpdate(tpl: MailTemplate): void {
     this.templates_.update((list) => list.map((t) => (t.key === tpl.key ? tpl : t)));
     if (this.selectedKey() === tpl.key) this.select(tpl.key);
@@ -142,10 +142,10 @@ export class MailTemplatesComponent {
     const d = this.draft();
     if (!d || this.previewing()) return;
     this.previewing.set(true);
-    // Beispiel-Kontext aus den Platzhaltern (Wert = Beschreibung als Platzhaltertext).
+    // Sample context from the placeholders (value = description as placeholder text).
     const context: Record<string, unknown> = {};
     for (const [key, desc] of Object.entries(d.placeholders)) context[key] = desc || key;
-    // Entwurf rendern (ohne ID): funktioniert für Builtins und Overrides (#12).
+    // Render the draft (without ID): works for builtins and overrides.
     this.api
       .previewMailPayload({
         subjectI18n: d.subjectI18n,

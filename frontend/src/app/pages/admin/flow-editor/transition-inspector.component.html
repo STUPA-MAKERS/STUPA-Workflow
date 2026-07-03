@@ -1,0 +1,59 @@
+<h2 class="text-md font-semibold m-0">{{ 'admin.flow.transitionInspector' | t }}</h2>
+<app-select
+  [label]="'admin.flow.from' | t"
+  [options]="stateOptions()"
+  [ngModel]="transition().from"
+  (ngModelChange)="fromChange.emit($event)"
+/>
+<app-select
+  [label]="'admin.flow.to' | t"
+  [options]="stateOptions()"
+  [ngModel]="transition().to"
+  (ngModelChange)="toChange.emit($event)"
+/>
+<label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.labelDe' | t }}
+  <input [ngModel]="transition().label?.['de'] ?? ''" (ngModelChange)="labelChange.emit({ lang: 'de', value: $event })" /></label>
+<label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.common.labelEn' | t }}
+  <input [ngModel]="transition().label?.['en'] ?? ''" (ngModelChange)="labelChange.emit({ lang: 'en', value: $event })" /></label>
+<label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.color' | t }}
+  <span class="fe__color-row">
+    <input
+      type="color"
+      [ngModel]="transition().color || '#3584e4'"
+      (ngModelChange)="colorChange.emit($event)"
+    />
+    @if (transition().color) {
+      <button type="button" class="border-0 bg-transparent text-muted cursor-pointer text-xs" (click)="colorChange.emit('')">
+        {{ 'admin.flow.colorClear' | t }}
+      </button>
+    }
+  </span>
+</label>
+<div class="p-3 border border-solid border-line rounded-md" [class.fe__auto--on]="!!transition().automatic">
+  <app-checkbox [ngModel]="!!transition().automatic" (ngModelChange)="automaticChange.emit($event)" [hint]="'admin.flow.automaticHint' | t">
+    {{ 'admin.flow.automatic' | t }}
+  </app-checkbox>
+</div>
+<!-- "Requires action" only makes sense for manual transitions — automatic
+     ones are fired by the worker and never create a task. -->
+@if (!transition().automatic) {
+  <div class="p-3 border border-solid border-line rounded-md">
+    <app-checkbox [ngModel]="transition().requiresAction !== false" (ngModelChange)="requiresActionChange.emit($event)" [hint]="'admin.flow.requiresActionHint' | t">
+      {{ 'admin.flow.requiresAction' | t }}
+    </app-checkbox>
+  </div>
+}
+
+<!-- Result branch only for vote source states (pass/fail). -->
+@if (branchOptions().length) {
+  <app-select
+    [label]="'admin.flow.branch' | t"
+    [placeholder]="'admin.flow.branchNone' | t"
+    [options]="branchOptions()"
+    [ngModel]="transition().branch ?? ''"
+    (ngModelChange)="branchChange.emit($event)"
+  />
+}
+
+<!-- Guard + actions live in their own pane below the graph. -->
+<app-button variant="danger" size="sm" (click)="remove.emit()">{{ 'admin.flow.removeTransition' | t }}</app-button>

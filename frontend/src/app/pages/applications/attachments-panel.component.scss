@@ -7,7 +7,7 @@
   gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
-/* --- Mehrfachauswahl (Sammel-Löschung) --- */
+/* --- Multi-select (bulk delete) --- */
 .att__bulkbar {
   display: flex;
   align-items: center;
@@ -24,7 +24,7 @@
 .att__bulkdel {
   margin-left: auto;
 }
-/* --- Drop-Overlay (Stil wie Rechnungen-Seite) --- */
+/* --- Drop overlay (style like the invoices page) --- */
 .att__dropOverlay {
   position: absolute;
   inset: 0;

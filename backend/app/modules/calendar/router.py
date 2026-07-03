@@ -1,10 +1,9 @@
-"""Kalender-Endpunkte (#ics): öffentlicher iCal-Feed + eigene Abo-URL.
+"""Calendar endpoints: public iCal feed plus own subscription URL.
 
-* ``GET /calendar/{token}.ics`` — **öffentlich**, per Feed-Token authentifiziert
-  (Kalender-Clients können sich nicht per OIDC anmelden). Liefert die Sitzungen der
-  Gremien des Token-Inhabers als ``text/calendar``.
-* ``GET /calendar/me`` — eigene Abo-URL lesen (``null``, falls noch nicht erzeugt).
-* ``POST /calendar/me/rotate`` — Feed-Token (neu) erzeugen; alte URL wird ungültig.
+``GET /calendar/{token}.ics`` is public, authenticated by the feed token
+(calendar clients cannot log in via OIDC). ``GET /calendar/me`` reads the own
+subscription URL; ``POST /calendar/me/rotate`` (re)generates the token and
+invalidates the old URL.
 """
 
 from __future__ import annotations
@@ -33,7 +32,7 @@ def _feed_url(settings: Settings, token: str) -> str:
 
 
 def _uid_domain(settings: Settings) -> str:
-    """Host der öffentlichen Basis-URL → stabile, globale Event-UID-Domain."""
+    """Derive the stable event-UID domain from the public base URL."""
     return urlsplit(settings.public_base_url).hostname or "stupa.local"
 
 
@@ -43,7 +42,7 @@ async def my_calendar(
     db: DbSession,
     settings: SettingsDep,
 ) -> CalendarFeedOut:
-    """Eigene Abo-URL (``null``, solange noch kein Feed-Token erzeugt wurde)."""
+    """Read the own subscription URL (``null`` until a feed token exists)."""
     token = await service.get_calendar_token(db, principal.sub)
     return CalendarFeedOut(url=_feed_url(settings, token) if token else None)
 
@@ -54,7 +53,7 @@ async def rotate_my_calendar(
     db: DbSession,
     settings: SettingsDep,
 ) -> CalendarFeedOut:
-    """Feed-Token (neu) erzeugen — invalidiert die bisherige Abo-URL."""
+    """(Re)generate the feed token — invalidates the previous subscription URL."""
     token = await service.rotate_calendar_token(db, principal.sub)
     await db.commit()
     return CalendarFeedOut(url=_feed_url(settings, token) if token else None)
@@ -70,7 +69,7 @@ async def rotate_my_calendar(
 async def calendar_feed(
     token: str, db: DbSession, settings: SettingsDep
 ) -> Response:
-    """Öffentlicher iCal-Feed (per Feed-Token). Unbekannter/​deaktivierter Token → 404."""
+    """Public iCal feed (by feed token); unknown/deactivated token yields 404."""
     principal = await service.principal_by_calendar_token(db, token)
     if principal is None:
         raise NotFoundError("Unknown calendar feed.")
@@ -79,7 +78,7 @@ async def calendar_feed(
         MeetingEvent(
             uid=str(meeting.id),
             title=meeting.title,
-            # member_meetings filtert ``date IS NOT NULL`` → hier garantiert gesetzt.
+            # member_meetings filters ``date IS NOT NULL``, so it is set here.
             date=cast(_date, meeting.date),
             start_time=meeting.start_time,
             end_time=meeting.end_time,
@@ -95,8 +94,8 @@ async def calendar_feed(
         media_type=_ICS_MEDIA_TYPE,
         headers={
             "Content-Disposition": 'inline; filename="stupa-sitzungen.ics"',
-            # Kurzer Cache: neue/​geänderte Sitzungen erscheinen zeitnah; ein rotierter
-            # Token (neue URL) ist ohnehin sofort gültig (eigener Cache-Key).
+            # Short cache: new/changed meetings show up promptly; a rotated token
+            # is a new URL and thus its own cache key.
             "Cache-Control": "private, max-age=300",
         },
     )

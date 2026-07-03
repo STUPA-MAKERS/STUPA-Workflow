@@ -20,9 +20,9 @@
   margin-top: 0;
 }
 
-/* Leerzustand sitzt INNERHALB der .card (die schon Rahmen+Radius+Surface liefert) —
-   daher nur zentrierter, gedämpfter Text mit space-6, KEIN eigener Rahmen (sonst
-   Box-in-Box). Optische Parität zum kanonischen .empty-state. */
+/* Empty state sits INSIDE .card (which already gives border+radius+surface), so it's
+   just centred, muted text — no own border (else box-in-box). Matches the canonical
+   .empty-state. */
 .grants__list-head,
 .mcp__config-head {
   display: flex;
@@ -129,7 +129,7 @@
   color: var(--color-danger);
 }
 
-/* Mobil (≤768px): Tabelle horizontal scrollbar, lange Befehle umbrechen. */
+/* Mobile (≤768px): table scrolls horizontally, long commands wrap. */
 @media (max-width: 768px) {
   .grants__table {
     display: block;

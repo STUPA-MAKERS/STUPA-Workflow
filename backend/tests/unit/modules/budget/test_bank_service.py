@@ -17,6 +17,7 @@ import pytest
 from app.modules.budget.bank import client as fc
 from app.modules.budget.bank import service_base, statement
 from app.modules.budget.bank.service import BankService
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import (
     Account,
     AccountFintsCredential,
@@ -28,7 +29,6 @@ from app.modules.budget.tree_schemas import (
     ExpenseOut,
     FintsCredentialIn,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.settings import load_settings
 from app.shared.crypto import decrypt_secret, encrypt_secret
 from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem

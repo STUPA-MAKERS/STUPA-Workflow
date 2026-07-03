@@ -7,8 +7,8 @@ import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { CardComponent } from '@stupa-makers/ui-kit';
 
 /**
- * Bestätigungsseite nach dem Absenden (T-30, flows §1). Bestätigt den Eingang
- * und weist auf die Magic-Link-Mail hin (Bearbeitung/Status ohne Login).
+ * Confirmation page after submission. Confirms receipt and points to the
+ * magic-link email (edit/status without login).
  */
 @Component({
   selector: 'app-apply-confirmation',

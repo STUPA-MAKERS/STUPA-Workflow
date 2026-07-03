@@ -42,7 +42,7 @@ import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue } from './applications.util';
 
-/** Vergleichsangebot bzw. Kostenposition für die strukturierte Detailanzeige (#1). */
+/** Comparison offer / cost position for the structured detail view. */
 interface DetailOffer {
   label?: string;
   value?: number | null;
@@ -54,15 +54,11 @@ interface DetailPosition {
 }
 
 /**
- * Antrags-Detail (T-31, overview §4): Felder, Versions-Historie/Diff, Kommentare
- * (intern/öffentlich) und RBAC-gegatete Statuswechsel-Aktionen mit Bestätigung
- * und 409-Handling.
+ * Application detail: fields, version history/diff, comments (internal/public),
+ * and RBAC-gated status-change actions with confirmation and 409 handling.
  *
- * RBAC ist UX-Gating (nicht autoritativ — der Server entscheidet): die Aktionen
- * und die interne Kommentar-Sichtbarkeit erscheinen nur mit `application.manage`.
- *
- * Anhänge sind hier bewusst ein **Platzhalter** — Upload/Download über signierte
- * URLs samt Scan-Status liefert T-13 (files); der Endpunkt existiert noch nicht.
+ * RBAC here is UX gating (not authoritative — the server decides): the actions and
+ * internal comment visibility appear only with `application.manage`.
  */
 @Component({
   selector: 'app-applications-detail',
@@ -100,35 +96,35 @@ export class ApplicationsDetailComponent {
   readonly app = signal<Application | null>(null);
   readonly versions = signal<ApplicationVersion[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
-  /** Feld-Definitionen der effektiven Form — für Labels/typisierte Werte (sonst leer). */
+  /** Field definitions of the effective form — for labels/typed values (else empty). */
   readonly formFields = signal<FormFieldDef[]>([]);
 
   readonly newComment = signal('');
   readonly visibility = signal<CommentVisibility>('public');
   readonly posting = signal(false);
 
-  /** Verfügbare manuelle Übergänge (vom Server guard-gefiltert) + laufender Fire. */
+  /** Available manual transitions (guard-filtered by the server) + in-flight fire. */
   readonly transitions = signal<Transition[]>([]);
   readonly firing = signal<Uuid | null>(null);
   readonly canTransition = computed(() => this.auth.can('application.transition'));
 
-  /** Kostenstellen-Zuordnung (#17): Baum, Dialog-Auswahl, laufende Zuweisung. */
+  /** Cost-centre assignment: tree, dialog selection, in-flight assignment. */
   protected readonly budgetTree = signal<BudgetTreeNode[]>([]);
   protected readonly budgetChoice = signal('');
   protected readonly assigningBudget = signal(false);
   protected readonly budgetDialogOpen = signal(false);
-  /** HHJ-Auswahl (#tz/fiscal): HHJ des Top-Budgets der gewählten Kostenstelle; leer =
-   *  „automatisch" (Server leitet das eine aktive HHJ ab, sonst 422). */
+  /** Fiscal-year choice: fiscal year of the top budget of the selected cost centre;
+   *  empty = "automatic" (server derives the single active year, else 422). */
   protected readonly fiscalYears = signal<FiscalYear[]>([]);
   protected readonly fiscalChoice = signal('');
-  /** ``budgetId`` → „VOLLER-PFAD – Name" (Badge der aktuellen Kostenstelle, #det). */
+  /** ``budgetId`` → "FULL-PATH – name" (badge of the current cost centre). */
   private readonly budgetLabels = computed(
     () => new Map(flattenBudgetOptions(this.budgetTree()).map((o) => [o.value, o.label])),
   );
   protected budgetLabel(id: string | null | undefined): string {
     return (id && this.budgetLabels().get(id)) || '';
   }
-  /** ``fiscalYearId`` → Anzeige (z. B. ``2026``) der aktuell geladenen HHJ. */
+  /** ``fiscalYearId`` → display (e.g. ``2026``) of the currently loaded fiscal year. */
   private readonly fiscalLabels = computed(
     () => new Map(this.fiscalYears().map((y) => [y.id, y.display])),
   );
@@ -145,14 +141,14 @@ export class ApplicationsDetailComponent {
         : `${y.display} (${this.i18n.translate('applications.budget.fiscalInactive')})`,
     })),
   ]);
-  /** Top-Budget (Wurzel) finden, dessen Teilbaum die Kostenstelle enthält. */
+  /** Find the top budget (root) whose subtree contains the cost centre. */
   private topLevelIdOf(budgetId: string): string | null {
     const contains = (n: BudgetTreeNode): boolean =>
       n.id === budgetId || (n.children?.some(contains) ?? false);
     for (const root of this.budgetTree()) if (contains(root)) return root.id;
     return null;
   }
-  /** HHJ des Top-Budgets der gewählten Kostenstelle laden (Dropdown + Badge). */
+  /** Load the fiscal years of the selected cost centre's top budget (dropdown + badge). */
   private loadFiscalYears(budgetId: string | null): void {
     const top = budgetId ? this.topLevelIdOf(budgetId) : null;
     if (!top) {
@@ -169,8 +165,8 @@ export class ApplicationsDetailComponent {
       },
     });
   }
-  /** Kostenstelle im Dialog gewählt: HHJ-Liste neu laden; HHJ-Auswahl nur dann
-   *  beibehalten, wenn die ursprüngliche Kostenstelle wieder gewählt ist. */
+  /** Cost centre picked in the dialog: reload the fiscal-year list; keep the
+   *  fiscal-year choice only if the original cost centre is re-selected. */
   protected onBudgetPicked(id: string): void {
     this.budgetChoice.set(id);
     this.fiscalChoice.set(
@@ -186,7 +182,7 @@ export class ApplicationsDetailComponent {
     this.budgetDialogOpen.set(true);
   }
 
-  // Inline-Bearbeitung (Ersteller:in/Verwalter:in, #24) + Löschen.
+  // Inline editing (creator/manager) + delete.
   readonly editing = signal(false);
   readonly editFields = signal<FormlyFieldConfig[]>([]);
   readonly savingEdit = signal(false);
@@ -199,7 +195,7 @@ export class ApplicationsDetailComponent {
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
-  /** Löschen ist admin-only (irreversibel). */
+  /** Delete is admin-only (irreversible). */
   readonly isAdmin = computed(() => this.auth.roles().includes('admin'));
   readonly fmt = formatFieldValue;
 
@@ -210,23 +206,23 @@ export class ApplicationsDetailComponent {
   );
 
   constructor() {
-    // `paramMap` (nicht `snapshot`): bei Detail→Detail-Navigation reused Angular
-    // die Komponente, der Konstruktor läuft dann **nicht** erneut — ein Snapshot
-    // bliebe auf der alten `id` stehen. Das Abo lädt bei jedem `id`-Wechsel neu.
+    // `paramMap` (not `snapshot`): on detail→detail navigation Angular reuses the
+    // component, so the constructor does **not** run again — a snapshot would keep
+    // the old `id`. The subscription reloads on every `id` change.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.loadApplication(pm.get('id') ?? '');
     });
   }
 
-  /** Lauf-Nummer der Ladevorgänge: verspätete Antworten eines früheren Antrags
-   *  (schneller Wechsel zwischen Detailseiten) dürfen den aktuellen nicht
-   *  überschreiben — jede Antwort prüft, ob sie noch zum letzten Ladelauf gehört. */
+  /** Load sequence number: late responses from an earlier application (fast
+   *  switching between detail pages) must not overwrite the current one — each
+   *  response checks it still belongs to the latest load. */
   private loadSeq = 0;
 
   private loadApplication(id: Uuid): void {
     this.id = id;
     const seq = ++this.loadSeq;
-    // Zustand für die (ggf. neue) id zurücksetzen, damit nichts Altes durchblitzt.
+    // Reset state for the (possibly new) id so nothing stale flashes through.
     this.app.set(null);
     this.versions.set([]);
     this.comments.set([]);
@@ -250,8 +246,8 @@ export class ApplicationsDetailComponent {
         this.app.set(app);
         this.loading.set(false);
         this.loadAux();
-        // Effektive Form aus der **gepinnten** Version des Antrags (nicht der aktiven) —
-        // so passen Labels/Edit-Felder zu den Daten, gegen die der Server validiert.
+        // Effective form from the application's **pinned** version (not the active one) —
+        // so labels/edit fields match the data the server validates against.
         this.api.applicationForm(app.id).subscribe({
           next: (eff) => {
             if (seq === this.loadSeq) this.formFields.set(eff.sections.flatMap((s) => s.fields));
@@ -270,8 +266,8 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Versionen/Kommentare/verfügbare Übergänge nachladen — Fehler degradieren still
-   *  zu leer. Übergänge nur mit der nötigen Permission (Server filtert zusätzlich). */
+  /** Load versions/comments/available transitions — errors degrade silently to
+   *  empty. Transitions only with the needed permission (server also filters). */
   private loadAux(): void {
     const seq = this.loadSeq;
     this.api.versions(this.id).subscribe({
@@ -296,7 +292,7 @@ export class ApplicationsDetailComponent {
         },
       });
     }
-    // Kostenstellen-Zuordnung (#17): Baum laden (Badge-Label + Dialog-Picker).
+    // Cost-centre assignment: load the tree (badge label + dialog picker).
     if (this.canManage()) {
       this.budgetChoice.set(this.app()?.budgetId ?? '');
       this.fiscalChoice.set(this.app()?.fiscalYearId ?? '');
@@ -304,7 +300,7 @@ export class ApplicationsDetailComponent {
         next: (tree) => {
           if (seq !== this.loadSeq) return;
           this.budgetTree.set(tree);
-          // HHJ-Liste für die aktuelle Kostenstelle laden (Badge-Anzeige des HHJ).
+          // Load the fiscal-year list for the current cost centre (badge display).
           this.loadFiscalYears(this.app()?.budgetId ?? null);
         },
         error: () => {
@@ -314,7 +310,7 @@ export class ApplicationsDetailComponent {
     }
   }
 
-  /** Kostenstelle zuordnen/lösen (#17): POST /assign-budget → Antrag neu laden. */
+  /** Assign/unassign the cost centre: POST /assign-budget → reload the application. */
   assignBudget(): void {
     if (this.assigningBudget()) return;
     this.assigningBudget.set(true);
@@ -340,8 +336,8 @@ export class ApplicationsDetailComponent {
       });
   }
 
-  /** Antragsdaten als Label/Wert-Zeilen: Feld-Definition → Label + typisierter Wert;
-   *  unbekannte Keys roh; `title` (im Kopf gezeigt) + reine Anzeigefelder weglassen. */
+  /** Application data as label/value rows: field definition → label + typed value;
+   *  unknown keys raw; omit `title` (shown in the header) + pure display fields. */
   dataEntries(app: Application): { key: string; label: string; value: string }[] {
     const lang = this.i18n.locale();
     const byKey = new Map(this.formFields().map((f) => [f.key, f]));
@@ -350,7 +346,7 @@ export class ApplicationsDetailComponent {
 
     const pushField = (f: FormFieldDef): void => {
       if (f.type === 'markdown' || f.type === 'computed') return;
-      // Kostenpositionen werden als eigener Block (Positionen + Angebote) gezeigt.
+      // Cost positions are shown as their own block (positions + offers).
       if (f.type === 'positions') return;
       if (f.key === 'title') return;
       if (!(f.key in app.data)) return;
@@ -359,7 +355,7 @@ export class ApplicationsDetailComponent {
     };
 
     for (const f of this.formFields()) pushField(f);
-    // Daten ohne passende Feld-Definition trotzdem zeigen (roh) — außer `title`.
+    // Still show data without a matching field definition (raw) — except `title`.
     for (const [key, value] of Object.entries(app.data)) {
       if (seen.has(key) || key === 'title' || byKey.has(key)) continue;
       rows.push({ key, label: key, value: formatFieldValue(value) });
@@ -367,7 +363,7 @@ export class ApplicationsDetailComponent {
     return rows;
   }
 
-  /** Einen Wert anhand seines Feldtyps anzeigefreundlich formatieren. */
+  /** Format a value for display based on its field type. */
   private formatByField(field: FormFieldDef, value: unknown): string {
     if (value === null || value === undefined || value === '') return '—';
     const lang = this.i18n.locale();
@@ -396,8 +392,8 @@ export class ApplicationsDetailComponent {
     return formatFieldValue(value);
   }
 
-  /** Kostenpositionen-Felder (falls vorhanden) als strukturierter Block für die
-   *  Detailansicht: je Position die Vergleichsangebote inkl. bevorzugtem (#1). */
+  /** Cost-position fields (if any) as a structured block for the detail view:
+   *  per position the comparison offers including the preferred one. */
   positionEntries(app: Application): {
     key: string;
     label: string;
@@ -418,7 +414,7 @@ export class ApplicationsDetailComponent {
     return out;
   }
 
-  /** Wert eines Vergleichsangebots / einer Position als Währung. */
+  /** Value of a comparison offer / position as currency. */
   money(value: number | null | undefined): string {
     const n = Number(value ?? 0);
     return new Intl.NumberFormat(this.i18n.locale(), {
@@ -427,17 +423,17 @@ export class ApplicationsDetailComponent {
     }).format(Number.isFinite(n) ? n : 0);
   }
 
-  /** Positionswert = Wert des bevorzugten Angebots. */
+  /** Position value = value of the preferred offer. */
   positionValue(p: DetailPosition): number {
     return p.offers.find((o) => o.preferred)?.value ?? 0;
   }
 
-  /** Σ über alle Positionswerte. */
+  /** Sum over all position values. */
   positionsTotal(positions: DetailPosition[]): number {
     return positions.reduce((s, p) => s + this.positionValue(p), 0);
   }
 
-  /** Kostenpositionen kompakt: Anzahl Positionen + Σ der bevorzugten Werte. */
+  /** Cost positions compact: number of positions + sum of preferred values. */
   private formatPositions(value: unknown): string {
     if (!Array.isArray(value)) return '—';
     let total = 0;
@@ -468,7 +464,7 @@ export class ApplicationsDetailComponent {
     return !!d && !d.added.length && !d.removed.length && !d.changed.length;
   }
 
-  // --- edit / delete (#24) -------------------------------------------------
+  // --- edit / delete -------------------------------------------------------
   startEdit(app: Application): void {
     const lang = this.i18n.locale();
     this.editFields.set(toFormlyFields(this.formFields(), lang, { has_budget: true }));
@@ -517,7 +513,7 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** DSGVO Art. 17: Löschung der eigenen Antragsdaten beantragen (Magic-Link-Sicht). */
+  /** GDPR Art. 17: request erasure of one's own application data (magic-link view). */
   doRequestErasure(): void {
     if (this.requestingErasure()) return;
     this.requestingErasure.set(true);
@@ -534,7 +530,7 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Anzeigename eines Kommentars (Autor oder rollenbasierter Fallback). */
+  /** Display name of a comment (author or role-based fallback). */
   protected authorName(comment: ApplicationComment): string {
     if (comment.author) return comment.author;
     return this.i18n.translate(
@@ -544,7 +540,7 @@ export class ApplicationsDetailComponent {
     );
   }
 
-  /** Initiale(n) für den Chat-Avatar. */
+  /** Initial(s) for the chat avatar. */
   protected initial(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return '?';
@@ -572,8 +568,8 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Einen manuellen Übergang feuern (#28): POST /transition → Antrag neu laden.
-   *  Der Server prüft den Guard erneut (403/409 möglich → Toast + Refresh). */
+  /** Fire a manual transition: POST /transition → reload the application.
+   *  The server re-checks the guard (403/409 possible → toast + refresh). */
   fire(t: Transition): void {
     if (this.firing() !== null) return;
     this.firing.set(t.id);
@@ -597,7 +593,7 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Antrag + abhängige Sektionen nach einem Übergang neu laden. */
+  /** Reload the application + dependent sections after a transition. */
   private refresh(): void {
     const seq = this.loadSeq;
     this.api.getApplication(this.id, { quiet: true }).subscribe({

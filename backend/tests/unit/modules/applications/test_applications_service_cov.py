@@ -19,9 +19,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
-import app.modules.applications.service as svc_mod
-from app.modules.applications.service import (
-    ApplicationsService,
+from app.modules.applications.service import ApplicationsService
+from app.modules.applications.service import create as create_mod
+from app.modules.applications.service import listing as listing_mod
+from app.modules.applications.service import reads as reads_mod
+from app.modules.applications.service.service_base import (
     _amount_currency,
     _field_from_row,
     _state_out,
@@ -404,7 +406,8 @@ def _reset_flow() -> None:
 
 @pytest.fixture
 def _patch_forms(monkeypatch: pytest.MonkeyPatch) -> type[_FakeForms]:
-    monkeypatch.setattr(svc_mod, "FormsService", _FakeForms)
+    monkeypatch.setattr(create_mod, "FormsService", _FakeForms)
+    monkeypatch.setattr(reads_mod, "FormsService", _FakeForms)
     return _FakeForms
 
 
@@ -785,13 +788,13 @@ async def test_pii_keys_for_type() -> None:
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 def _patch_search(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(svc_mod, "dialect_of", lambda _s: "postgresql")
+    monkeypatch.setattr(listing_mod, "dialect_of", lambda _s: "postgresql")
 
     def _rank(q: str, cols: list[Any], *, dialect: str = "postgresql") -> Any:
         from sqlalchemy import literal
         return literal(True), literal(1)
 
-    monkeypatch.setattr(svc_mod, "trigram_rank", _rank)
+    monkeypatch.setattr(listing_mod, "trigram_rank", _rank)
 
 
 async def test_list_applications_no_filters_default_sort() -> None:
@@ -866,13 +869,13 @@ async def test_list_applications_blank_q_skips_search() -> None:
 async def test_list_applications_sqlite_search_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(svc_mod, "dialect_of", lambda _s: "sqlite")
+    monkeypatch.setattr(listing_mod, "dialect_of", lambda _s: "sqlite")
 
     def _rank(q: str, cols: list[Any], *, dialect: str = "postgresql") -> Any:
         from sqlalchemy import literal
         return literal(True), literal(1)
 
-    monkeypatch.setattr(svc_mod, "trigram_rank", _rank)
+    monkeypatch.setattr(listing_mod, "trigram_rank", _rank)
     session = _Session(scalar_results=[0], scalars_results=[[]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     page = await svc.list_applications(q="foo", limit=10, offset=0)

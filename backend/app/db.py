@@ -1,9 +1,8 @@
-"""Async DB-Engine + Session-Lifecycle + Metadata-Registry (SQLAlchemy 2.0 async).
+"""Async DB engine, session lifecycle, and metadata registry (SQLAlchemy 2.0).
 
-Engine/Sessionmaker lazy + gecacht (kein Connect beim Import). `get_session` ist
-die FastAPI-Dependency (yield → close je Request). `Base` ist die deklarative
-Registry: alle Modul-Modelle (T-06) hängen ihre Tabellen in `Base.metadata` ein;
-Alembic (`migrations/`) und die Tests nutzen diese Metadata als Single Source.
+Engine/sessionmaker are lazy and cached (no connect at import time). `get_session`
+is the FastAPI dependency. All module models register on `Base.metadata`, which is
+the single source for Alembic and the tests.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.settings import get_settings
 
-# Deterministische Constraint-/Index-Namen → stabile, reviewbare Migrationen.
+# Deterministic constraint/index names keep migrations stable and reviewable.
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",
     "uq": "uq_%(table_name)s_%(column_0_N_name)s",
@@ -35,13 +34,13 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
-    """Gemeinsame deklarative Basis aller Modelle (Metadata-Registry)."""
+    """Shared declarative base of all models (metadata registry)."""
 
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 class UUIDPkMixin:
-    """`id uuid PK DEFAULT gen_random_uuid()` (pgcrypto, data-model §0)."""
+    """`id uuid PK DEFAULT gen_random_uuid()` (pgcrypto)."""
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid, primary_key=True, server_default=text("gen_random_uuid()")
@@ -84,7 +83,7 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
 
 
 async def get_session() -> AsyncGenerator[AsyncSession]:
-    """Request-scoped Session; bei Fehler Rollback, immer Close."""
+    """Yield a request-scoped session; rollback on error, always close."""
     session = get_sessionmaker()()
     try:
         yield session
@@ -96,6 +95,6 @@ async def get_session() -> AsyncGenerator[AsyncSession]:
 
 
 async def dispose_engine() -> None:
-    """Engine-Pool schließen (Shutdown/Lifespan)."""
+    """Dispose the engine pool (lifespan shutdown)."""
     if get_engine.cache_info().currsize:
         await get_engine().dispose()

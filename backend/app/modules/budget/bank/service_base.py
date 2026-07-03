@@ -1,8 +1,8 @@
-"""Gemeinsamer Unterbau der :class:`~.service.BankService`-Teilklassen (#fints).
+"""Shared base of the :class:`~.service.BankService` mixins.
 
-Konstruktor + Helfer, die mehrere Teilbereiche (Credentials, Sync, Staging, Reconcile,
-Listing) brauchen: Feature-/Principal-Gates, Konto-/Credential-Lookup, Audit-Hook,
-Kontostand-Übernahme und die Ausgabe-Projektion eines gestageten Umsatzes.
+Constructor plus helpers used by several sub-areas: feature/principal gates,
+account/credential lookup, audit hook, balance carry-over and the output
+projection of a staged statement line.
 """
 
 from __future__ import annotations
@@ -29,13 +29,13 @@ from app.shared.errors import NotFoundError, ServiceUnavailableError, Validation
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-# Obergrenze für die Zeilenzahl eines Imports/Abrufs (Anti-DoS): ein 10-MiB-MT940 kann
-# zehntausende Umsätze tragen; jede Zeile macht im Staging 1-2 Queries (#fints-review).
+# Cap on lines per import/fetch (anti-DoS): a 10-MiB MT940 can carry tens of
+# thousands of transactions, and each staged line costs 1-2 queries.
 MAX_STATEMENT_LINES = 10_000
 
 
 class BankServiceBase:
-    """FinTS-/Datei-gestützter Kontoabgleich (an eine Session gebunden) — Unterbau."""
+    """Base of the FinTS-/file-based account reconciliation (bound to a session)."""
 
     def __init__(
         self,
@@ -48,29 +48,29 @@ class BankServiceBase:
         self.session = session
         self.settings = settings or get_settings()
         self.actor = actor
-        # Persönliche FinTS-Zugangsdaten + TAN-Sitzungen sind je Bucher getrennt
-        # (#fints-percred); der Sync/Credential-Pfad braucht daher die Principal-Id. Der
-        # Datei-Import (kein Bankzugang) kommt ohne aus.
+        # Personal FinTS credentials and TAN sessions are separated per bookkeeper,
+        # so the sync/credential path needs the principal id; the file import
+        # (no bank access) works without it.
         self.principal_id = principal_id
 
     # ----------------------------------------------------------------- helpers
     def _require_enabled(self) -> str:
-        """FinTS-Verschlüsselungs-Schlüssel oder 503 (Feature aus)."""
+        """Return the FinTS encryption key or 503 (feature off)."""
         key = self.settings.fints_enc_key
         if not key:
             raise ServiceUnavailableError("FinTS is not configured (no encryption key set).")
         return key
 
     def _require_principal(self) -> uuid.UUID:
-        """Principal-Id des Buchers oder 503 (interne Invariante: der Router liefert sie
-        immer für authentifizierte FinTS-Aufrufe, #fints-percred)."""
+        """Return the bookkeeper's principal id or 503 (internal invariant: the
+        router always supplies it for authenticated FinTS calls)."""
         if self.principal_id is None:
             raise ServiceUnavailableError("FinTS requires an authenticated principal.")
         return self.principal_id
 
     async def _load_credential(self, account_id: uuid.UUID) -> AccountFintsCredential:
-        """Persönliche Zugangsdaten des Buchers für ein Konto laden — oder 422
-        ``fints_no_credential`` (das FE fordert dann das erstmalige Verbinden, #fints-percred)."""
+        """Load the bookkeeper's personal credentials for an account — or 422
+        ``fints_no_credential`` (the frontend then prompts for the initial connect)."""
         cred = await self.session.scalar(
             select(AccountFintsCredential).where(
                 AccountFintsCredential.account_id == account_id,
@@ -104,8 +104,8 @@ class BankServiceBase:
 
     @staticmethod
     def _apply_balance(acc: Account, balance: statement.StatementBalance | None) -> None:
-        """Bank-Kontostand + Stichtag am Konto ablegen (#fints-konten). Nur überschreiben, wenn
-        ein Saldo geliefert wurde (HKSAL/`:62F:`/CLBD); sonst bleibt der letzte bekannte Stand."""
+        """Store bank balance + as-of date on the account. Only overwrite when a
+        balance was delivered (HKSAL/`:62F:`/CLBD); otherwise keep the last known one."""
         if balance is None:
             return
         as_of = (
@@ -113,8 +113,8 @@ class BankServiceBase:
             if balance.as_of is not None
             else datetime.now(UTC)
         )
-        # Recency-Guard (#review): einen neueren Stand NICHT durch einen älteren Datei-Import
-        # überschreiben. Bei gleichem/keinem Stichtag (None) immer aktualisieren.
+        # Recency guard: never overwrite a newer balance with an older file
+        # import. With an equal/missing as-of date (None), always update.
         if (
             acc.fints_balance_at is not None
             and balance.as_of is not None
@@ -126,20 +126,20 @@ class BankServiceBase:
 
     @staticmethod
     def _line_out(line: BankStatementLine, suggested_path_key: str | None) -> StatementLineOut:
-        # Gegenkonto + Zweck IMMER aus den Rohdaten auflösen (#fints-raw) — nie aus den
-        # gespeicherten counterparty_*/purpose-Spalten (die könnten von einer älteren Parser-
-        # Version stammen, z. B. „KRZL"/geklebte IBAN/verklebter Zweck). MT940/FinTS liefert über
-        # die Rohfelder ein sauberes Ergebnis; CAMT-Roh ohne GVC-Felder → Fallback auf die Spalte.
+        # ALWAYS resolve counterparty + purpose from the raw data — never from the
+        # stored counterparty_*/purpose columns, which may stem from an older
+        # parser version (e.g. "KRZL" placeholder, glued IBAN/purpose). CAMT raw
+        # without GVC fields falls back to the column.
         name, iban = normalize.resolve_counterparty(line.raw_payload, credit=line.amount > 0)
         if not name and not iban:
-            # Fallback auf die gespeicherte Spalte (CAMT/alt) — Platzhalter trotzdem verwerfen.
+            # Fall back to the stored column (CAMT/legacy) — still drop placeholders.
             name = normalize.clean_counterparty_name(line.counterparty_name)
             iban = line.counterparty_iban
         purpose = normalize.resolve_purpose(line.raw_payload)
         if purpose is None:
             purpose = line.purpose
-        # Sparkassen-Sammelbuchungszwecke („DATEI-NR. …") menschenlesbar machen (#fints-batch)
-        # — reine Anzeige; Spalte/Rohdaten bleiben unverändert.
+        # Make Sparkasse batch-booking purposes ("DATEI-NR. ...") human-readable
+        # — display only; column/raw data stay unchanged.
         purpose = normalize.prettify_purpose(purpose)
         return StatementLineOut(
             id=line.id,

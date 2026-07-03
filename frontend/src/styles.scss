@@ -1,27 +1,26 @@
-// Globaler Style-Einstieg — Reihenfolge: Font → Tokens → Base → Tailwind-Utilities.
+// Global style entry — order: fonts → tokens → base → Tailwind utilities.
 @use 'fonts';
 @use 'tokens';
 @use 'base';
 
-// Tailwind (#tailwind): additive Utilities, Preflight ist in tailwind.config.js
-// deaktiviert → kein Base-Reset, keine optische Änderung. Sass reicht die
-// unbekannten @-Regeln unverändert an PostCSS/Tailwind weiter. Utilities zuletzt,
-// damit sie nach den Base-Styles greifen.
+// Tailwind: additive utilities, preflight is disabled in tailwind.config.js → no
+// base reset, no visual change. Sass passes the unknown @-rules through to
+// PostCSS/Tailwind unchanged. Utilities last so they apply after the base styles.
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-// Bank-Abgleich-Dialog (#fints): auf dem Desktop breiter als `lg` (44rem), damit die
-// Umsatz-Tabelle Platz hat. Bewusst global statt über eine ui-kit-`xl`-Größe gelöst, um
-// keine Submodul-Release-Kopplung einzuführen. Mobil (≤768px) bleibt der Dialog vollflächig
-// (eigene ui-kit-Media-Regel), darum erst ab 769px greifen.
+// Bank-reconcile dialog: wider than `lg` (44rem) on desktop so the transactions
+// table has room. Deliberately solved globally rather than via a ui-kit `xl` size to
+// avoid coupling to a submodule release. On mobile (≤768px) the dialog stays
+// full-width (its own ui-kit media rule), so this only applies from 769px up.
 //
-// Der `.dialog__backdrop`-Vorfahre hebt die Spezifität bewusst über die per
-// View-Encapsulation attributierte `.dialog--lg`-Regel des ui-kit (sonst Gleichstand →
-// Quell-Reihenfolge entscheidet und 44rem gewinnt).
+// The `.dialog__backdrop` ancestor deliberately raises specificity above the ui-kit's
+// view-encapsulation-attributed `.dialog--lg` rule (otherwise it's a tie → source
+// order decides and 44rem wins).
 @media (min-width: 769px) {
-  // Child-Kombinator statt freiem `:has(.bank)`: die Style-Neubewertung beim Ein-/Ausklappen
-  // muss so nur die direkten Kinder prüfen, nicht den ganzen (großen) Tabellen-Teilbaum.
+  // Child combinator instead of a bare `:has(.bank)`: on expand/collapse the style
+  // re-evaluation then only checks the direct children, not the whole (large) table subtree.
   .dialog__backdrop .dialog:has(> .dialog__body > .bank) {
     max-width: 64rem;
   }

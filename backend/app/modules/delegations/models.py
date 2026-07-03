@@ -1,18 +1,13 @@
-"""Sitzungs-Delegationen (#delegation-rework): Tabellen.
+"""Meeting-delegation tables.
 
-:class:`MeetingDelegation` — die **sitzungsgebundene** Vertretung: genau eine
-ausgehende Delegation je (Sitzung, Delegierender). Ersetzt das frühere Modell
-»``role_assignment`` mit ``delegated_by``« (T-45): eine Delegation gilt nie blanko
-für einen Zeitraum, sondern immer für **eine konkrete Sitzung**; ihr Gremium ist
-das der Sitzung. ``delegate_voting`` überträgt zusätzlich das Stimmrecht
-(exklusiver Transfer, kein Duplikat — der Delegierende ist für Votes dieser
-Sitzung gesperrt).
+:class:`MeetingDelegation` — session-bound representation: exactly one outgoing
+delegation per (meeting, delegator); the gremium is the meeting's.
+``delegate_voting`` additionally transfers the voting right (exclusive transfer,
+no duplicate — the delegator is blocked from voting in that meeting).
 
-:class:`DelegationSubstitute` — der pro Gremium gepflegte **Stellvertreter-Pool**
-(gewählte/bestimmte Vertreter, z. B. Fachschaften): an Pool-Mitglieder darf ohne
-Vorlauf-Deadline bis Sitzungsbeginn delegiert werden, auch wenn sie nicht selbst
-Gremium-Mitglied sind. ``member_principal_id IS NULL`` = Stellvertreter für jedes
-Mitglied des Gremiums, sonst nur für das benannte Mitglied.
+:class:`DelegationSubstitute` — per-gremium substitute pool: pool members may be
+delegated to without the lead-time deadline, even if not gremium members
+themselves. ``member_principal_id IS NULL`` = substitute for every member.
 """
 
 from __future__ import annotations
@@ -26,15 +21,15 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
-    """Vertretung für **eine** Sitzung; Stimmrecht optional mit übertragen."""
+    """Representation for a single meeting; voting right optionally transferred."""
 
     __tablename__ = "meeting_delegation"
 
     meeting_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("meeting.id", ondelete="CASCADE")
     )
-    # Denormalisiert (= meeting.gremium_id): erspart den Join im heißen
-    # Stimmrechts-Check (cast) und in »meine Delegationen«-Abfragen.
+    # Denormalized (= meeting.gremium_id): avoids the join in the hot
+    # voting-right check and in "my delegations" queries.
     gremium_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium.id", ondelete="CASCADE")
     )
@@ -45,19 +40,19 @@ class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("principal.id", ondelete="CASCADE")
     )
     delegate_voting: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Über den Stellvertreter-Pool legitimiert (→ keine Vorlauf-Deadline beim Anlegen).
+    # Legitimized via the substitute pool (no lead-time deadline on create).
     via_pool: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # ``sub`` des Anlegenden (Selbst-Service oder Admin) — Audit-Anker.
+    # ``sub`` of the creator (self-service or admin) — audit anchor.
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        # Genau eine ausgehende Vertretung je (Sitzung, Mitglied).
+        # Exactly one outgoing representation per (meeting, member).
         UniqueConstraint(
             "meeting_id", "delegator_principal_id", name="uq_meeting_delegation_delegator"
         ),
-        # Höchstens eine Stimmrechts-Übernahme je (Sitzung, Empfänger): ein Principal
-        # gibt genau einen Stimmzettel ab — eine zweite Stimm-Delegation an dieselbe
-        # Person verfiele stillschweigend (Transfer ≠ Duplikat).
+        # At most one voting-right takeover per (meeting, delegate): a principal
+        # casts exactly one ballot — a second voting delegation to the same
+        # person would silently lapse (transfer, not duplicate).
         Index(
             "uq_meeting_delegation_voting_delegate",
             "meeting_id",
@@ -71,15 +66,15 @@ class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
-    """Pool-Eintrag: ``substitute`` darf ``member`` (oder jedes Mitglied, wenn
-    ``member_principal_id IS NULL``) im Gremium ohne Vorlauf vertreten."""
+    """Pool entry: ``substitute`` may represent ``member`` (or every member if
+    ``member_principal_id IS NULL``) without the lead-time deadline."""
 
     __tablename__ = "delegation_substitute"
 
     gremium_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium.id", ondelete="CASCADE")
     )
-    # NULL = gremium-weiter Stellvertreter (vertritt jedes Mitglied).
+    # NULL = gremium-wide substitute (represents every member).
     member_principal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="CASCADE"), nullable=True
     )
@@ -89,8 +84,8 @@ class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        # NULLS NOT DISTINCT gibt es erst ab PG15 einheitlich — der gremium-weite
-        # Eintrag (member IS NULL) wird über einen partiellen Unique-Index dedupliziert.
+        # Gremium-wide entries (member IS NULL) are deduplicated via a partial
+        # unique index since UniqueConstraint treats NULLs as distinct.
         UniqueConstraint(
             "gremium_id",
             "member_principal_id",

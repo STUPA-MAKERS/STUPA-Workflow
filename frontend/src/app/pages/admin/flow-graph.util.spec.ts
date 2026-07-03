@@ -103,14 +103,14 @@ describe('validateFlowGraph', () => {
         { from: 'draft', to: 'voting' },
         { from: 'voting', to: 'passed', branch: 'pass' },
         { from: 'voting', to: 'failed', branch: 'fail' },
-        // Automatischer Nicht-Branch-Ausgang: würde am Vote vorbei sofort feuern.
+        // Automatic non-branch exit: would fire immediately, bypassing the vote.
         { from: 'voting', to: 'passed', automatic: true },
       ],
     });
     const v = validateFlowGraph(g);
     expect(v.valid).toBe(false);
     expect(v.errors.join(' ')).toContain('must not have automatic outgoing transitions');
-    // Manueller Ausgang (Wahl abbrechen) bleibt dagegen erlaubt.
+    // A manual exit (abort the vote), by contrast, stays allowed.
     g.transitions = g.transitions.filter((t) => !t.automatic);
     g.transitions.push({ from: 'voting', to: 'failed' });
     expect(validateFlowGraph(g).valid).toBe(true);
@@ -338,17 +338,17 @@ describe('autoLayout', () => {
         { from: 'a', to: 'c' },
         { from: 'b', to: 'd' },
         { from: 'c', to: 'd' },
-        // Abkürzung a→d: längster Pfad hält d trotzdem in Schicht 2.
+        // Shortcut a→d: the longest path still keeps d in layer 2.
         { from: 'a', to: 'd' },
       ],
     });
     const p = g.layout!.positions!;
-    // Spalten: a | b,c | d — d NICHT in Spalte 1 (längster Pfad, nicht BFS).
+    // Columns: a | b,c | d — d NOT in column 1 (longest path, not BFS).
     expect(p['b'].x).toBe(p['c'].x);
     expect(p['d'].x).toBeGreaterThan(p['b'].x);
-    // b und c teilen sich die Spalte ohne Überlappung.
+    // b and c share the column without overlap.
     expect(p['b'].y).not.toBe(p['c'].y);
-    // Einzel-Knoten-Schichten (a, d) sind gegenüber der 2er-Schicht zentriert.
+    // Single-node layers (a, d) are centered against the 2-node layer.
     const mid = (p['b'].y + p['c'].y) / 2;
     expect(p['a'].y).toBe(mid);
     expect(p['d'].y).toBe(mid);

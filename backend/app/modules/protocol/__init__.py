@@ -1,7 +1,6 @@
-"""Protokoll-Modul (T-22, api.md »protocol«, flows §7).
+"""Protocol module: meeting minutes.
 
-Sitzungsprotokoll (Markdown-Backing für den Editor) inkl. ``finalize`` → pytex →
-PDF → MinIO → Versand an die Gremium-Mailingliste. Baut auf der
-T-20-Render-Infrastruktur (:mod:`app.modules.pdf`) auf, ohne pytex/Storage/
-Mail-Code zu duplizieren.
+Markdown backing for the editor, plus ``finalize`` → pytex → PDF → MinIO →
+mail to the gremium mailing list. Reuses the render infrastructure from
+:mod:`app.modules.pdf` instead of duplicating pytex/storage/mail code.
 """

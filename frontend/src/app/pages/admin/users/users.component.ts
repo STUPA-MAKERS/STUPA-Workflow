@@ -21,7 +21,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, Role, RoleAssignment } from '../admin.models';
 
-/** Lokaler Formularzustand fürs Zuweisen einer Rolle je Benutzer. */
+/** Local form state for assigning a role per user. */
 interface AssignDraft {
   roleId: string;
   validFrom: string;
@@ -33,14 +33,14 @@ function emptyDraft(): AssignDraft {
 }
 
 /**
- * Benutzer & Rollen (#70/#72) als **Tabelle** (Nextcloud-User-Tabelle als Vorbild).
+ * Users & roles as a **table** (modeled on the Nextcloud user table).
  *
- * Eine Zeile je Principal: Name, E-Mail, OIDC-Subject, zugewiesene Rollen (Tags,
- * entziehbar), letzte Anmeldung. Rolle zuweisen passiert über eine pro Zeile
- * ausklappbare Mini-Form (Rolle + optionales tz-Gültigkeitsfenster = Vertretung).
- * **Gremium-Mitgliedschaft** wird hier bewusst nicht mehr gepflegt — das passiert
- * pro Gremium in der Gremien-Verwaltung. Die Rollen-**Rechte** liegen auf einer
- * eigenen Seite (`/admin/roles`). FE ist UX-Gate; der Server bleibt autoritativ.
+ * One row per principal: name, e-mail, OIDC subject, assigned roles (tags,
+ * revocable), last login. Assigning a role happens via a per-row expandable
+ * mini-form (role + optional tz validity window = substitution). **Gremium
+ * membership** is deliberately no longer maintained here — that happens per
+ * gremium in the gremien administration. The role **permissions** live on their
+ * own page (`/admin/roles`). FE is a UX gate; the server stays authoritative.
  */
 @Component({
   selector: 'app-admin-users',
@@ -71,14 +71,14 @@ export class UsersComponent {
   private readonly capitalize = inject(CapitalizePipe);
   private readonly auth = inject(AuthService);
 
-  /** OIDC-`sub` des angemeldeten Benutzers — für Selbst-Schutz (#44). */
+  /** OIDC `sub` of the logged-in user — for self-protection. */
   protected readonly mySub = computed(() => this.auth.principal()?.sub ?? null);
 
   protected readonly query = signal('');
   protected readonly principals = signal<AdminPrincipal[]>([]);
   protected readonly roles = signal<Role[]>([]);
   protected readonly drafts = signal<Record<string, AssignDraft>>({});
-  /** Welche Zeilen haben die „Rolle zuweisen"-Form ausgeklappt. */
+  /** Which rows have the "assign role" form expanded. */
   protected readonly expanded = signal<Set<string>>(new Set());
 
   protected readonly rolesById = computed(() => new Map(this.roles().map((r) => [r.id, r])));
@@ -98,12 +98,12 @@ export class UsersComponent {
     { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
   ]);
 
-  /** Nur globale Rollen (ohne Gremium-Scope) in der Rollen-Spalte zeigen. */
+  /** Show only global roles (without gremium scope) in the roles column. */
   protected globalAssignments(p: AdminPrincipal): RoleAssignment[] {
     return p.assignments.filter((a) => !a.gremiumId);
   }
   protected readonly rowId = (p: unknown): string => (p as AdminPrincipal).id;
-  /** Detail-Zeile (Zuweisen-Form) für aufgeklappte Principals. */
+  /** Detail row (assign form) for expanded principals. */
   protected readonly rowExpanded = (p: unknown): boolean => this.isExpanded((p as AdminPrincipal).id);
 
   constructor() {
@@ -111,7 +111,7 @@ export class UsersComponent {
     this.search();
   }
 
-  // --- Suche ----------------------------------------------------------------
+  // --- Search ---------------------------------------------------------------
   protected search(): void {
     this.api.listPrincipals(this.query()).subscribe({
       next: (list) => this.principals.set(list),
@@ -129,18 +129,18 @@ export class UsersComponent {
     return p.displayName || p.email || p.sub;
   }
 
-  /** Geschützte Rollen (admin #44/#40, member #61) — kein Entziehen-Kreuz. */
+  /** Protected roles (admin, member) — no revoke cross. */
   protected isAdminRole(roleId: string): boolean {
     const key = this.rolesById().get(roleId)?.key;
     return key === 'admin' || key === 'member';
   }
 
-  /** Eigener Account — Deaktivieren ist gesperrt (#44). */
+  /** Own account — deactivation is blocked. */
   protected isSelf(p: AdminPrincipal): boolean {
     return this.mySub() !== null && p.sub === this.mySub();
   }
 
-  // --- Ausklappen -----------------------------------------------------------
+  // --- Expand ---------------------------------------------------------------
   protected isExpanded(id: string): boolean {
     return this.expanded().has(id);
   }
@@ -154,7 +154,7 @@ export class UsersComponent {
     });
   }
 
-  // --- Zuweisen -------------------------------------------------------------
+  // --- Assign ---------------------------------------------------------------
   protected draftFor(principalId: string): AssignDraft {
     return this.drafts()[principalId] ?? emptyDraft();
   }
@@ -192,7 +192,7 @@ export class UsersComponent {
       });
   }
 
-  /** Benutzer aktivieren/deaktivieren (#30). */
+  /** Activate/deactivate a user. */
   protected setActive(principal: AdminPrincipal, active: boolean): void {
     this.api.setPrincipalActive(principal.id, active).subscribe({
       next: () => {
@@ -216,7 +216,7 @@ export class UsersComponent {
   }
 }
 
-/** Leeres Datum → null; ein `YYYY-MM-DD`-Wert → ISO-UTC-Mitternacht. */
+/** Empty date → null; a `YYYY-MM-DD` value → ISO UTC midnight. */
 function isoOrNull(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;

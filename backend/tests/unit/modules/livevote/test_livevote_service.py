@@ -463,14 +463,14 @@ class _DeletableSession(_FakeSession):
 
 
 def _audit_capture(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
-    import app.modules.livevote.service as livevote_service_mod
+    import app.modules.livevote.service.lifecycle as livevote_lifecycle_mod
 
     calls: list[dict] = []
 
     async def _record(session, **kw):  # noqa: ANN001, ANN202
         calls.append(kw)
 
-    monkeypatch.setattr(livevote_service_mod, "audit_record", _record)
+    monkeypatch.setattr(livevote_lifecycle_mod, "audit_record", _record)
     return calls
 
 
@@ -554,7 +554,7 @@ async def test_pool_substitute_sees_committee_timeline(
     """#7: Ein Stellvertreter-Pool-Mitglied sieht die Sitzungs-Timeline seiner Gremien
     (Mitglieds- ∪ Pool-Gremien), auch ohne eigene Mitgliedschaft."""
     from app.modules.auth.principal import Principal
-    from app.modules.livevote import service as livevote_service_mod
+    from app.modules.livevote.service import permissions as livevote_permissions_mod
     from tests._support.auth_fakes import fake_session, result
 
     member_g = uuid4()
@@ -563,7 +563,7 @@ async def test_pool_substitute_sees_committee_timeline(
     async def _members(_session, _sub, now=None):  # noqa: ANN001, ANN202
         return {member_g}
 
-    monkeypatch.setattr(livevote_service_mod, "gremium_member_ids", _members)
+    monkeypatch.setattr(livevote_permissions_mod, "gremium_member_ids", _members)
     # execute(...).scalars().all() → das Pool-Gremium.
     svc = MeetingService(fake_session(result(pool_g)))
     visible = await svc._visible_gremium_ids(
@@ -592,7 +592,7 @@ async def test_assert_can_read_denies_non_member(monkeypatch: pytest.MonkeyPatch
     """#12 sec-audit: ein fremder eingeloggter Nutzer darf Sitzungs-Details (Roster
     etc.) NICHT lesen — kein Mitglied/Pool/Verwalter/Delegations-Empfänger."""
     from app.modules.auth.principal import Principal
-    from app.modules.livevote import service as mod
+    from app.modules.livevote.service import permissions as mod
     from app.shared.errors import ForbiddenError
     from tests._support.auth_fakes import fake_session, result
 
@@ -612,7 +612,7 @@ async def test_assert_can_read_denies_non_member(monkeypatch: pytest.MonkeyPatch
 async def test_assert_can_read_allows_member(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mitglied des Sitzungs-Gremiums darf lesen."""
     from app.modules.auth.principal import Principal
-    from app.modules.livevote import service as mod
+    from app.modules.livevote.service import permissions as mod
     from tests._support.auth_fakes import fake_session, result
 
     meeting = Meeting(gremium_id=uuid4(), title="GV")
@@ -646,7 +646,7 @@ async def test_view_all_is_live_participant_without_membership(
     """#meeting-view-all: öffnet den Live-Read-Kanal gremiumsübergreifend, auch ohne
     Mitgliedschaft/Delegation (rein lesend — das Stimmrecht bleibt separat gegatet)."""
     from app.modules.auth.principal import Principal
-    from app.modules.livevote import service as mod
+    from app.modules.livevote.service import permissions as mod
     from tests._support.auth_fakes import fake_session
 
     async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
@@ -666,7 +666,7 @@ async def test_view_all_can_read_foreign_meeting(
     """#meeting-view-all: assert_can_read lässt den globalen Read-Holder ein Sitzungs-
     Detail eines FREMDEN Gremiums lesen (kein 403), ohne Mitglied/Delegierter zu sein."""
     from app.modules.auth.principal import Principal
-    from app.modules.livevote import service as mod
+    from app.modules.livevote.service import permissions as mod
     from tests._support.auth_fakes import fake_session, result
 
     meeting = Meeting(gremium_id=uuid4(), title="GV")

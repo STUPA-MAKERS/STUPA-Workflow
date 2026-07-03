@@ -1,4 +1,4 @@
-"""Gefilterte, paginierte Liste der gestageten Umsätze (#fints-konten)."""
+"""Filtered, paginated list of staged statement lines."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from app.shared.paging import Page
 
 
 class ListingOps(BankServiceBase):
-    """Lese-Pfad der gestageten Umsätze."""
+    """Read path of the staged statement lines."""
 
     async def list_lines_paged(
         self,
@@ -30,11 +30,11 @@ class ListingOps(BankServiceBase):
         limit: int = 50,
         offset: int = 0,
     ) -> Page[StatementLineOut]:
-        """Gestagete Umsätze gefiltert + offset-paginiert (#fints-konten).
+        """List staged lines, filtered and offset-paginated.
 
-        Filter: ``account``, ``state``, ``kind`` (income = Betrag > 0, expense < 0), Datumsbereich
-        (Valuta, sonst Buchungsdatum) und Volltext (``q``) über Gegenkonto/IBAN/Zweck. ``sort`` =
-        ``date`` (Default) | ``amount``."""
+        Filters: ``account``, ``state``, ``kind`` (income = amount > 0, expense < 0),
+        date range (value date, else booking date) and full text (``q``) over
+        counterparty/IBAN/purpose. ``sort`` = ``date`` (default) | ``amount``."""
         filters = []
         if account_id is not None:
             filters.append(BankStatementLine.account_id == account_id)
@@ -43,7 +43,7 @@ class ListingOps(BankServiceBase):
         if linked is True:
             filters.append(BankStatementLine.match_state == "matched")
         elif linked is False:
-            # „offen" = noch nicht gebucht (ungematcht/Vorschlag), ohne als irrelevant Markierte.
+            # "open" = not yet booked (unmatched/suggested), excluding ignored lines.
             filters.append(BankStatementLine.match_state.in_(("unmatched", "suggested")))
         if kind == "income":
             filters.append(BankStatementLine.amount > 0)

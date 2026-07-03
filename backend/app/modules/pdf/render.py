@@ -1,14 +1,13 @@
-"""Render-Pipeline (T-20, flows §6) — Markdown → pytex → MinIO.
+"""Render pipeline — Markdown → pytex → MinIO.
 
-Worker-seitige Orchestrierung eines ``render_job``: Status auf ``running`` setzen, das
-Antrags-Dokument laden (DB), Markdown bauen (DB-frei), pytex ``/render`` rufen, das PDF
-in MinIO ablegen (``storage_key``), dann ``done``. Die Infra-Abhängigkeiten
-(pytex/Storage) werden injiziert — fehlt MinIO, bleibt der Job ``pending``
-(DEV/Contract-CI, kein Crash).
+Worker-side orchestration of a ``render_job``: set status ``running``, load the
+application document (DB), build the Markdown (DB-free), call pytex ``/render``, store
+the PDF in MinIO (``storage_key``), then ``done``. Infra dependencies (pytex/storage)
+are injected — without MinIO the job stays ``pending`` (dev/contract CI, no crash).
 
-Fehler-Disziplin (security.md §2): ``error`` trägt nur eine **pfadfreie Kurzkennung**.
-Transiente Fehler (pytex 5xx/Transport, Storage) → :class:`RenderRetry`
-(Worker-Retry); dauerhafte (pytex 4xx) → Job sofort ``failed``.
+Error discipline: ``error`` holds only a path-free short code. Transient failures
+(pytex 5xx/transport, storage) → ``RenderRetry`` (worker retry); permanent ones
+(pytex 4xx) → job goes ``failed`` immediately.
 """
 
 from __future__ import annotations
@@ -30,27 +29,27 @@ logger = logging.getLogger("app.pdf")
 
 
 class RenderRetry(RuntimeError):
-    """Transienter Render-Fehler → Worker soll erneut versuchen."""
+    """Transient render failure → the worker should retry."""
 
 
 def _storage_key(application_id: UUID | None, job_id: UUID) -> str:
-    """Deterministischer MinIO-Key (eigener ``pdf/``-Präfix, getrennt von Anhängen)."""
+    """Deterministic MinIO key (own ``pdf/`` prefix, separate from attachments)."""
     app_part = str(application_id) if application_id is not None else "unknown"
     return f"pdf/{app_part}/{job_id}.pdf"
 
 
 @dataclass(slots=True)
 class RenderPipeline:
-    """Render einen ``render_job`` end-to-end. Deps werden injiziert (Worker-Wiring)."""
+    """Render a ``render_job`` end-to-end. Deps are injected (worker wiring)."""
 
     sessionmaker: async_sessionmaker[AsyncSession]
     pytex: PytexClient
     storage: ObjectStorage | None
 
     async def run(self, job_id: UUID) -> str:
-        """Job rendern. Rückgabe: done/failed/skipped/gone. Transient → ``RenderRetry``."""
+        """Render the job. Returns done/failed/skipped/gone. Transient → ``RenderRetry``."""
         if self.storage is None:
-            # Ohne Object-Storage gibt es keinen Ablageort → Job bleibt pending (DEV).
+            # Without object storage there is nowhere to store → job stays pending (dev).
             logger.warning("render skipped (job=%s) — object storage not configured", job_id)
             return "skipped"
 
@@ -60,7 +59,7 @@ class RenderPipeline:
                 logger.info("render target %s gone — skipped", job_id)
                 return "gone"
             if job.status == "done":
-                return "done"  # idempotent: bereits gerendert
+                return "done"  # idempotent: already rendered
             if job.application_id is None:
                 return await self._fail(session, job, "no_application")
 
@@ -94,7 +93,7 @@ class RenderPipeline:
         return await self.pytex.render_pdf(markdown, variant=doc.variant)
 
     async def _fail(self, session: AsyncSession, job: RenderJob, code: str) -> str:
-        """Job dauerhaft auf ``failed`` setzen (pfadfreie Kurzkennung)."""
+        """Set the job permanently to ``failed`` (path-free short code)."""
         job.status = "failed"
         job.error = code
         job.touch_finished(datetime.now(UTC))
@@ -102,7 +101,7 @@ class RenderPipeline:
         return "failed"
 
     async def mark_failed(self, job_id: UUID, code: str) -> None:
-        """Job nach erschöpften Retries dauerhaft auf ``failed`` setzen (Worker-Dead-Pfad)."""
+        """Permanently fail the job after retries are exhausted (worker dead-letter)."""
         async with self.sessionmaker() as session:
             job = await session.get(RenderJob, job_id)
             if job is None:

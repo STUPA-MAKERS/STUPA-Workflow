@@ -1,4 +1,4 @@
-"""Branch-/Zeilen-Vollabdeckung für :mod:`app.modules.budget.tree_service`.
+"""Branch-/Zeilen-Vollabdeckung für :mod:`app.modules.budget.tree`.
 
 Kritisches Modul (testing.md §1: ``budget`` → 100 % Branch). DB-los: ein lokaler
 ``_Session``-Fake (Spiegel der Support-Fakes, ergänzt um ``add_all``, iterierbares
@@ -27,9 +27,13 @@ from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.budget import tree_service as ts_mod
 from app.modules.budget.bank.statement import StatementLine
 from app.modules.budget.invoice_import import ParsedInvoice
+from app.modules.budget.tree import invoices as invoices_mod
+from app.modules.budget.tree import subbookings as subbookings_mod
+from app.modules.budget.tree.invoices import _validate_invoice_file_token
+from app.modules.budget.tree.service import BudgetTreeService
+from app.modules.budget.tree.view import _natural_path_key
 from app.modules.budget.tree_models import (
     Account,
     Budget,
@@ -49,11 +53,6 @@ from app.modules.budget.tree_schemas import (
     InvoiceUpdate,
     SubBookingCreate,
     TransferCreate,
-)
-from app.modules.budget.tree_service import (
-    BudgetTreeService,
-    _natural_path_key,
-    _validate_invoice_file_token,
 )
 from app.modules.files.mime import MimeRejected
 from app.modules.files.scanner import ScannerError, ScanVerdict
@@ -1206,8 +1205,8 @@ def _ok_storage(store: list[Any] | None = None) -> Any:
 
 
 async def test_store_invoice_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(ts_mod, "validate_upload", lambda fn, data: "application/pdf")
-    monkeypatch.setattr(ts_mod, "sanitize_filename", lambda fn: "safe.pdf")
+    monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "application/pdf")
+    monkeypatch.setattr(invoices_mod, "sanitize_filename", lambda fn: "safe.pdf")
     svc = BudgetTreeService(fake_session(), storage=_ok_storage(), settings=_settings())
     res = await svc.store_invoice_file(b"%PDF-1.4", filename="beleg.pdf")
     assert res.file_name == "safe.pdf"
@@ -1232,14 +1231,14 @@ async def test_validate_scan_store_mime_rejected(monkeypatch: pytest.MonkeyPatch
     def _reject(fn: Any, data: Any) -> str:
         raise MimeRejected("nope")
 
-    monkeypatch.setattr(ts_mod, "validate_upload", _reject)
+    monkeypatch.setattr(invoices_mod, "validate_upload", _reject)
     svc = BudgetTreeService(fake_session(), storage=_ok_storage(), settings=_settings())
     with pytest.raises(UnsupportedMediaTypeError):
         await svc._validate_scan_store(b"data", filename="x.pdf")
 
 
 async def test_validate_scan_store_not_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(ts_mod, "validate_upload", lambda fn, data: "image/png")
+    monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "image/png")
     svc = BudgetTreeService(fake_session(), storage=_ok_storage(), settings=_settings())
     with pytest.raises(UnsupportedMediaTypeError):
         await svc._validate_scan_store(b"data", filename="x.png")
@@ -1263,7 +1262,7 @@ async def test_scan_clean(monkeypatch: pytest.MonkeyPatch) -> None:
         async def scan(self, data: bytes) -> ScanVerdict:
             return ScanVerdict(clean=True)
 
-    monkeypatch.setattr(ts_mod, "build_scanner", lambda s: _Scanner())
+    monkeypatch.setattr(invoices_mod, "build_scanner", lambda s: _Scanner())
     svc = BudgetTreeService(fake_session(), settings=_settings())
     await svc._scan_or_raise(b"data")  # clean → no raise
 
@@ -1273,7 +1272,7 @@ async def test_scan_error_raises(monkeypatch: pytest.MonkeyPatch) -> None:
         async def scan(self, data: bytes) -> ScanVerdict:
             raise ScannerError("down")
 
-    monkeypatch.setattr(ts_mod, "build_scanner", lambda s: _Scanner())
+    monkeypatch.setattr(invoices_mod, "build_scanner", lambda s: _Scanner())
     svc = BudgetTreeService(fake_session(), settings=_settings())
     with pytest.raises(ServiceUnavailableError):
         await svc._scan_or_raise(b"data")
@@ -1284,7 +1283,7 @@ async def test_scan_infected_raises(monkeypatch: pytest.MonkeyPatch) -> None:
         async def scan(self, data: bytes) -> ScanVerdict:
             return ScanVerdict(clean=False, signature="EICAR")
 
-    monkeypatch.setattr(ts_mod, "build_scanner", lambda s: _Scanner())
+    monkeypatch.setattr(invoices_mod, "build_scanner", lambda s: _Scanner())
     svc = BudgetTreeService(fake_session(), settings=_settings())
     with pytest.raises(UnsupportedMediaTypeError):
         await svc._scan_or_raise(b"data")
@@ -1295,7 +1294,7 @@ async def test_scan_infected_unknown_signature(monkeypatch: pytest.MonkeyPatch) 
         async def scan(self, data: bytes) -> ScanVerdict:
             return ScanVerdict(clean=False, signature=None)
 
-    monkeypatch.setattr(ts_mod, "build_scanner", lambda s: _Scanner())
+    monkeypatch.setattr(invoices_mod, "build_scanner", lambda s: _Scanner())
     svc = BudgetTreeService(fake_session(), settings=_settings())
     with pytest.raises(UnsupportedMediaTypeError):
         await svc._scan_or_raise(b"data")
@@ -1325,14 +1324,14 @@ async def test_store_invoice_file_put_error() -> None:
 
 # --------------------------------------------------------- parse_invoice_file
 async def test_parse_invoice_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(ts_mod, "validate_upload", lambda fn, data: "application/pdf")
-    monkeypatch.setattr(ts_mod, "sanitize_filename", lambda fn: "safe.pdf")
+    monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "application/pdf")
+    monkeypatch.setattr(invoices_mod, "sanitize_filename", lambda fn: "safe.pdf")
     parsed = ParsedInvoice(
         number="R-100", issue_date=date(2026, 1, 1), due_date=date(2026, 2, 1),
         supplier="ACME", net_amount=Decimal("100"), tax_amount=Decimal("19"),
         gross_amount=Decimal("119"), currency="EUR",
     )
-    monkeypatch.setattr(ts_mod, "parse_zugferd_pdf", lambda data: parsed)
+    monkeypatch.setattr(invoices_mod, "parse_zugferd_pdf", lambda data: parsed)
     # _invoice_number_exists → existing scalars empty (no dup)
     sess = fake_session(result())
     svc = BudgetTreeService(sess, storage=_ok_storage(), settings=_settings())
@@ -1344,13 +1343,13 @@ async def test_parse_invoice_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_parse_invoice_file_duplicate(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(ts_mod, "validate_upload", lambda fn, data: "application/pdf")
-    monkeypatch.setattr(ts_mod, "sanitize_filename", lambda fn: "safe.pdf")
+    monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "application/pdf")
+    monkeypatch.setattr(invoices_mod, "sanitize_filename", lambda fn: "safe.pdf")
     parsed = ParsedInvoice(
         number="DUP", issue_date=None, due_date=None, supplier=None,
         net_amount=None, tax_amount=None, gross_amount=Decimal("5"), currency="EUR",
     )
-    monkeypatch.setattr(ts_mod, "parse_zugferd_pdf", lambda data: parsed)
+    monkeypatch.setattr(invoices_mod, "parse_zugferd_pdf", lambda data: parsed)
     sess = fake_session(result(uuid.uuid4()))  # dup found
     svc = BudgetTreeService(sess, storage=_ok_storage(), settings=_settings())
     res = await svc.parse_invoice_file(b"%PDF-1.4", filename="r.pdf")
@@ -1374,14 +1373,14 @@ async def test_parse_invoice_file_mime_rejected(monkeypatch: pytest.MonkeyPatch)
     def _reject(fn: Any, data: Any) -> str:
         raise MimeRejected("nope")
 
-    monkeypatch.setattr(ts_mod, "validate_upload", _reject)
+    monkeypatch.setattr(invoices_mod, "validate_upload", _reject)
     svc = BudgetTreeService(fake_session(), storage=_ok_storage(), settings=_settings())
     with pytest.raises(UnsupportedMediaTypeError):
         await svc.parse_invoice_file(b"data", filename="r.pdf")
 
 
 async def test_parse_invoice_file_not_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(ts_mod, "validate_upload", lambda fn, data: "image/png")
+    monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "image/png")
     svc = BudgetTreeService(fake_session(), storage=_ok_storage(), settings=_settings())
     with pytest.raises(UnsupportedMediaTypeError):
         await svc.parse_invoice_file(b"data", filename="r.png")
@@ -1809,9 +1808,9 @@ async def test_revert_expense_update_no_after_is_best_effort() -> None:
 
 # ----------------------------------------------------- sub-bookings (#subbookings)
 def test_subbooking_description() -> None:
-    assert ts_mod._subbooking_description("Miete", "ACME") == "Miete"
-    assert ts_mod._subbooking_description("  ", "ACME") == "ACME"
-    assert ts_mod._subbooking_description(None, None) == "Unterbuchung"
+    assert subbookings_mod._subbooking_description("Miete", "ACME") == "Miete"
+    assert subbookings_mod._subbooking_description("  ", "ACME") == "ACME"
+    assert subbookings_mod._subbooking_description(None, None) == "Unterbuchung"
 
 
 async def test_list_sub_expenses_ok() -> None:
@@ -1845,7 +1844,7 @@ async def test_import_sub_bookings_ok(monkeypatch: pytest.MonkeyPatch) -> None:
                       counterparty_iban="DE12", value_date=date(2026, 2, 1)),
         StatementLine(amount=Decimal("-20.00"), purpose="Strom", value_date=date(2026, 2, 2)),
     ]
-    monkeypatch.setattr(ts_mod, "parse_statement_full",
+    monkeypatch.setattr(subbookings_mod, "parse_statement_full",
                         lambda data, *, filename=None: (lines, None))
     sess = fake_session(
         result(),                       # existing children (Dedup) — keine
@@ -1929,7 +1928,9 @@ async def test_import_sub_bookings_foreign_currency_rejected(
 ) -> None:
     parent = _expense(id=uuid.uuid4())
     lines = [StatementLine(amount=Decimal("-10.00"), currency="USD", purpose="x")]
-    monkeypatch.setattr(ts_mod, "parse_statement_full", lambda d, *, filename=None: (lines, None))
+    monkeypatch.setattr(
+        subbookings_mod, "parse_statement_full", lambda d, *, filename=None: (lines, None)
+    )
     svc = BudgetTreeService(fake_session(gets=[parent]))
     with pytest.raises(ValidationProblem):
         await svc.import_sub_bookings(parent.id, b"d", filename=None, actor="u")
@@ -1953,7 +1954,9 @@ async def test_import_sub_bookings_skips_dupe_zero_and_wrong_direction(
         StatementLine(amount=Decimal("5.00"), purpose="Gutschrift", value_date=date(2026, 2, 3)),
         StatementLine(amount=Decimal("-12.00"), purpose="Neu", value_date=date(2026, 2, 4)),  # ok
     ]
-    monkeypatch.setattr(ts_mod, "parse_statement_full", lambda d, *, filename=None: (lines, None))
+    monkeypatch.setattr(
+        subbookings_mod, "parse_statement_full", lambda d, *, filename=None: (lines, None)
+    )
     sess = fake_session(
         result(dupe),                # existing children (Dedup)
         result(Decimal("42.00")),    # _recompute
@@ -1972,9 +1975,9 @@ async def test_import_sub_bookings_unparseable(monkeypatch: pytest.MonkeyPatch) 
     parent = _expense(id=uuid.uuid4())
 
     def _raise(data: Any, *, filename: Any = None) -> Any:
-        raise ts_mod.StatementParseError("nope")
+        raise subbookings_mod.StatementParseError("nope")
 
-    monkeypatch.setattr(ts_mod, "parse_statement_full", _raise)
+    monkeypatch.setattr(subbookings_mod, "parse_statement_full", _raise)
     svc = BudgetTreeService(fake_session(gets=[parent]))
     with pytest.raises(ValidationProblem):
         await svc.import_sub_bookings(parent.id, b"d", filename=None, actor="u")

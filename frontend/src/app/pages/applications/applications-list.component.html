@@ -4,9 +4,9 @@
       <h1 class="apps__title">{{ 'applications.list.title' | t }}</h1>
       <p class="text-muted">{{ 'applications.list.subtitle' | t }}</p>
     </div>
-    <!-- Filter in einem Popout (#20): Button mit Icon + Aktiv-Indikator. -->
+    <!-- Filters in a popout: button with icon + active indicator. -->
     <div class="apps__headActions">
-      <!-- Header-Live-Suche (#3): debounced, schreibt den ``q``-Query-Param. -->
+      <!-- Header live search: debounced, writes the q query param. -->
       <input
         class="apps__search"
         type="search"
@@ -77,8 +77,8 @@
 </header>
 
 <div class="apps__layout">
-<!-- Mobil (≤768px) einklappbar: Toggle nur dort sichtbar, Desktop zeigt
-     den Baum unverändert immer (wie der Budget-Tab-Picker). -->
+<!-- Collapsible on mobile (≤768px): toggle only shown there; desktop always
+     shows the tree (like the budget-tab picker). -->
 <aside class="apps__tree">
   <button
     type="button"
@@ -114,7 +114,7 @@
     (sortChange)="onSort($event)"
   />
 
-  <!-- Infinite-Scroll: Sentinel nur solange weitere Seiten existieren (#27). -->
+  <!-- Infinite scroll: sentinel only while more pages exist. -->
   @if (hasMore()) {
     <div #sentinel class="apps__sentinel" aria-hidden="true"></div>
     <div class="flex justify-center mt-4">

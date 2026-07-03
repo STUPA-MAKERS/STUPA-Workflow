@@ -1,7 +1,5 @@
-"""Antragstypen-Liste (T-25, api.md §3 »applications«).
+"""Public application-type listing (`GET /api/application-types`).
 
-Öffentlicher Listen-Endpunkt der Antragstypen für die Antragstellung
-(`GET /api/application-types`). Der typ-spezifische Form-Endpunkt
-(`/application-types/{id}/form`) liegt weiterhin im forms-Modul; die
-Konfig-CRUD (`/api/admin/application-types`) kommt mit T-24.
+The type-specific form endpoint lives in the forms module; the admin CRUD
+lives under `/api/admin/application-types`.
 """

@@ -16,15 +16,13 @@ import {
 const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group'];
 
 /**
- * Options-Provider für Dropdowns (#77). Bündelt die Quellen für Felder mit
- * eingeschränkten Optionen (Gremium, Rolle, Ereignis, Empfänger-Typ, Guard) an
- * **einer** Stelle, statt Freitext oder verstreute Inline-Listen. Bevorzugt
- * Admin-API/Config-Daten; wo die (im Mock) leer sind, greift eine saubere
- * Fallback-Liste. Labels folgen der aktiven Locale.
+ * Options provider for dropdowns. Bundles the sources for fields with restricted
+ * options (gremium, role, event, recipient kind, guard) in one place, instead of
+ * free text or scattered inline lists. Prefers admin-API/config data; where that is
+ * empty (in mock mode) a clean fallback list kicks in. Labels follow the active locale.
  *
- * Quellen sind mit »Mock aus« (#67) real verdrahtet: Gremien über `/gremien`
- * (#68, authentifiziert), Antragstypen über `/application-types` (#69), Rollen
- * über `/admin/roles`.
+ * With mock off, the sources are wired for real: gremien via `/gremien`
+ * (authenticated), application types via `/application-types`, roles via `/admin/roles`.
  */
 @Injectable({ providedIn: 'root' })
 export class AdminOptionsService {
@@ -32,9 +30,9 @@ export class AdminOptionsService {
   private readonly i18n = inject(I18nService);
 
   /**
-   * Gremien als Optionen (id → Anzeigename), aus `/gremien` (#68 —
-   * authentifiziert, kein Admin-Recht). So nutzbar in »Sitzung anlegen« und
-   * Budget, wo der Akteur nicht zwingend `admin.config` hat.
+   * Gremien as options (id → display name), from `/gremien` (authenticated, no admin
+   * right). Usable in "create meeting" and budget, where the actor does not
+   * necessarily have `admin.config`.
    */
   gremiumOptions(): Observable<SelectOption[]> {
     return this.api
@@ -43,9 +41,9 @@ export class AdminOptionsService {
   }
 
   /**
-   * Antragstypen als Optionen (id → Name) für Form-/Flow-Builder (#69), aus dem
-   * öffentlichen `/application-types`. Ersetzt das hartkodierte `'mock-type'`:
-   * der Builder speichert gegen eine **echte** Typ-UUID.
+   * Application types as options (id → name) for the form/flow builders, from the
+   * public `/application-types`. Replaces the hardcoded `'mock-type'`: the builder
+   * saves against a real type UUID.
    */
   applicationTypeOptions(): Observable<SelectOption[]> {
     return this.api
@@ -53,7 +51,7 @@ export class AdminOptionsService {
       .pipe(map((list) => list.map((t) => ({ value: t.id, label: t.name }))));
   }
 
-  /** Rollen als Optionen (key → lokalisiertes Label); Fallback-Liste wenn leer. */
+  /** Roles as options (key → localized label); fallback list when empty. */
   roleOptions(): Observable<SelectOption[]> {
     const lang = this.i18n.locale();
     return this.api.listRoles().pipe(
@@ -62,12 +60,12 @@ export class AdminOptionsService {
     );
   }
 
-  /** Ereignis-Namen (Whitelist) als humanisierte Optionen. */
+  /** Event names (whitelist) as humanized options. */
   eventOptions(): SelectOption[] {
     return EVENT_NAMES.map((ev) => ({ value: ev, label: humanizeEvent(ev) }));
   }
 
-  /** Empfänger-Typen (applicant/role/group) — Labels aus dem i18n-Katalog. */
+  /** Recipient kinds (applicant/role/group) — labels from the i18n catalogue. */
   recipientKindOptions(): SelectOption[] {
     return RECIPIENT_KINDS.map((k) => ({
       value: k,
@@ -75,13 +73,13 @@ export class AdminOptionsService {
     }));
   }
 
-  /** Guard-Operatoren (Whitelist) als Optionen — Wert == Schlüssel. */
+  /** Guard operators (whitelist) as options — value == key. */
   guardOperatorOptions(): SelectOption[] {
     return GUARD_LEAF_OPERATORS.map((op) => ({ value: op, label: op }));
   }
 }
 
-/** `status_changed` → `Status changed` (Anzeige, kein i18n-Key je Ereignis). */
+/** `status_changed` → `Status changed` (display only, no per-event i18n key). */
 function humanizeEvent(ev: EventName): string {
   const spaced = ev.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);

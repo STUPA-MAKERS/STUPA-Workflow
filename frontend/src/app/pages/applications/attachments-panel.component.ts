@@ -24,25 +24,23 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { formatBytes, scanBadgeVariant } from './applications.util';
 
 /**
- * Anhänge-Panel (T-31, gegen den T-13-files-Contract).
+ * Attachments panel.
  *
- * Upload (`POST /applications/{id}/attachments`, ≤10 MB, async ClamAV-Scan) und
- * Download über kurzlebige signierte URLs (`GET /attachments/{id}`).
+ * Upload (`POST /applications/{id}/attachments`, ≤10 MB, async ClamAV scan) and
+ * download via short-lived signed URLs (`GET /attachments/{id}`).
  *
- * **Bewusste Contract-Grenze:** T-13 bietet **keinen** List-Endpunkt und
- * `ApplicationOut` bettet keine Anhänge ein — daher zeigt das Panel die in
- * **dieser Sitzung** hochgeladenen Anhänge (Upload-Antworten). Bestehende
- * Anhänge eines Antrags sind ohne List-API nicht enumerierbar (Folge-Task).
+ * There is no list endpoint and `ApplicationOut` does not embed attachments — so
+ * the panel shows the attachments uploaded in **this session** (upload responses).
+ * Existing attachments of an application are not enumerable without a list API.
  *
- * Scan-Status: `scanned=false` ⇒ „In Prüfung" (kein Download). `scanned=true`
- * heißt nur „Scan fertig" — sauber-vs-Befund verrät erst der Download: 200 ⇒
- * bereit, **409** ⇒ Quarantäne (Zeile wird auf `quarantined` gesetzt), **410** ⇒
- * Link abgelaufen.
+ * Scan status: `scanned=false` ⇒ "scanning" (no download). `scanned=true` only
+ * means "scan done" — clean-vs-finding is revealed only by the download: 200 ⇒
+ * ready, **409** ⇒ quarantine (row set to `quarantined`), **410** ⇒ link expired.
  *
- * Upload-Wege: Datei-Picker (mehrfach) **und** Drag&Drop auf das Panel (Overlay-
- * Stil wie die Rechnungen-Seite). Mehrere Dateien werden sequentiell hochgeladen
- * (concatMap), damit das Rate-Limit (429) nicht durch parallele Requests kippt.
- * Anhänge sind mehrfach auswählbar (Checkbox je Zeile + „alle") für Sammel-Löschung.
+ * Upload paths: file picker (multiple) **and** drag&drop onto the panel (overlay
+ * style like the invoices page). Multiple files upload sequentially (concatMap)
+ * so the rate limit (429) does not trip from parallel requests. Attachments are
+ * multi-selectable (checkbox per row + "all") for bulk delete.
  */
 @Component({
   selector: 'app-attachments-panel',
@@ -73,7 +71,7 @@ export class AttachmentsPanelComponent {
   readonly downloadingId = signal<Uuid | null>(null);
   readonly removingId = signal<Uuid | null>(null);
 
-  /** Mehrfachauswahl (Sammel-Löschung) + laufende Sammel-Aktion. */
+  /** Multi-select (bulk delete) + in-flight bulk action. */
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkDeleting = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
@@ -82,15 +80,15 @@ export class AttachmentsPanelComponent {
     return list.length > 0 && list.every((a) => this.selected().has(a.id));
   });
 
-  /** Drag&Drop-Overlay (Stil wie Rechnungen-Seite). `dragDepth` zählt
-   *  enter/leave verschachtelter Kinder, damit das Overlay nicht flackert. */
+  /** Drag&drop overlay (style like the invoices page). `dragDepth` counts
+   *  enter/leave of nested children so the overlay does not flicker. */
   readonly dragActive = signal(false);
   private dragDepth = 0;
 
   readonly scanVariant = scanBadgeVariant;
 
   constructor() {
-    // Bestehende Anhänge laden, sobald die applicationId steht (Hydration nach Reload).
+    // Load existing attachments once the applicationId is set (hydration after reload).
     effect(() => {
       const id = this.applicationId();
       if (!id) return;
@@ -98,7 +96,7 @@ export class AttachmentsPanelComponent {
       this.api.listAttachments(id).subscribe({
         next: (list) => this.attachments.set(list),
         error: () => {
-          /* kein List-Endpunkt/Fehler → leer lassen (Upload zeigt Session-Stand) */
+          /* no list endpoint / error → leave empty (upload shows session state) */
         },
       });
     });
@@ -115,12 +113,12 @@ export class AttachmentsPanelComponent {
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.upload(Array.from(input.files ?? []));
-    // Reset, damit dieselbe Datei erneut gewählt werden kann (change feuert sonst nicht).
+    // Reset so the same file can be picked again (change would not fire otherwise).
     input.value = '';
   }
 
-  /** Mehrere Dateien sequentiell hochladen (concatMap → kein 429 durch Parallel-
-   *  Requests). Erfolg/Fehler werden je Datei verbucht, am Ende eine Sammel-Meldung. */
+  /** Upload multiple files sequentially (concatMap → no 429 from parallel
+   *  requests). Success/failure is tallied per file, with a summary toast at the end. */
   private upload(files: File[]): void {
     if (this.uploading() || !files.length) return;
     this.uploading.set(true);
@@ -197,7 +195,7 @@ export class AttachmentsPanelComponent {
     this.selected.set(checked ? new Set(this.attachments().map((a) => a.id)) : new Set());
   }
 
-  /** Ausgewählte Anhänge sequentiell löschen (concatMap), dann Auswahl leeren. */
+  /** Delete the selected attachments sequentially (concatMap), then clear the selection. */
   bulkDelete(): void {
     const ids = [...this.selected()];
     if (!ids.length || this.bulkDeleting()) return;
@@ -222,8 +220,8 @@ export class AttachmentsPanelComponent {
       });
   }
 
-  /** Erfolgreich gelöschte (DELETE ist idempotent) aus Liste + Auswahl entfernen.
-   *  Bei Teilausfall bleiben verbliebene markiert, damit ein Retry möglich ist. */
+  /** Remove successfully deleted (DELETE is idempotent) from list + selection.
+   *  On partial failure the remaining stay selected so a retry is possible. */
   private refreshAfterBulk(attempted: Uuid[]): void {
     const id = this.applicationId();
     this.api.listAttachments(id).subscribe({
@@ -267,7 +265,7 @@ export class AttachmentsPanelComponent {
       error: (err: { status?: number }) => {
         this.downloadingId.set(null);
         if (err.status === 409) {
-          // Befund/Quarantäne: Zeile dauerhaft als quarantined markieren.
+          // Finding/quarantine: mark the row permanently as quarantined.
           this.attachments.update((list) =>
             list.map((a) => (a.id === att.id ? { ...a, scanState: 'quarantined' as ScanState } : a)),
           );
@@ -297,7 +295,7 @@ export class AttachmentsPanelComponent {
     });
   }
 
-  /** Signierte URL öffnen (eigene Methode → in Tests stubbar). */
+  /** Open the signed URL (own method → stubbable in tests). */
   protected openUrl(url: string): void {
     window.open(url, '_blank', 'noopener');
   }

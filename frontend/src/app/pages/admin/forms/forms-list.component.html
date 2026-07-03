@@ -41,7 +41,7 @@
   }
 </section>
 
-<!-- Anlegen als Dialog (#19). -->
+<!-- Create dialog. -->
 <app-dialog
   [open]="dialogOpen()"
   [title]="'admin.forms.create' | t"
@@ -82,7 +82,7 @@
   </div>
 </app-dialog>
 
-<!-- Antragsart löschen (eigene Permission admin.types_delete). -->
+<!-- Delete application type (own permission admin.types_delete). -->
 <app-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.forms.delete' | t"

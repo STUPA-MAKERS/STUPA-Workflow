@@ -1,9 +1,8 @@
-"""DSGVO-Löschantrags-Mails (#PII-Re-Add): eingegangen/ausgeführt/abgelehnt.
+"""Erasure-request mails: received / executed / rejected.
 
-Best-effort versendet als Hintergrund-Task (Privacy-Router bzw. Applicant-Self-
-Service). Jeder Versand öffnet seinen eigenen Sessionmaker — die Funktionen laufen
-*nach* dem Commit der auslösenden Transaktion. Die Builtin-Betreff/Text-Dicts sind
-zugleich die Editor-Defaults (templates_catalogue.py).
+Sent best-effort as background tasks after the triggering transaction commits; each
+opens its own sessionmaker. The builtin subject/body dicts are also the editor
+defaults.
 """
 
 from __future__ import annotations
@@ -58,7 +57,7 @@ async def notify_erasure_requested(
     request_id: UUID,
     subject_type: str,
 ) -> None:
-    """Datenschutz-Verantwortliche (``privacy.manage``) über einen neuen Antrag informieren."""
+    """Notify the privacy admins (``privacy.manage``) of a new request."""
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
         recipients = await RecipientResolver(session).resolve(
@@ -87,7 +86,7 @@ async def notify_erasure_executed(
     email: str | None,
     subject_type: str,
 ) -> None:
-    """Die betroffene Person über die Ausführung informieren (sofern Mail bekannt)."""
+    """Notify the subject that the request was executed (if the email is known)."""
     if not email:
         return
     sessionmaker = get_sessionmaker()
@@ -113,7 +112,7 @@ async def notify_erasure_rejected(
     email: str | None,
     reason: str | None,
 ) -> None:
-    """Die betroffene Person über die Ablehnung (mit Grund) informieren."""
+    """Notify the subject that the request was rejected (with reason)."""
     if not email:
         return
     sessionmaker = get_sessionmaker()

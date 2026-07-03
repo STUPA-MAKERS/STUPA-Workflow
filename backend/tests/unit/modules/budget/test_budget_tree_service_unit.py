@@ -14,6 +14,7 @@ import pytest
 
 from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import (
     Budget,
     BudgetAllocation,
@@ -29,7 +30,6 @@ from app.modules.budget.tree_schemas import (
     FiscalYearUpdate,
     MoveFiscalYearRequest,
 )
-from app.modules.budget.tree_service import BudgetTreeService
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.auth_fakes import fake_session, result
 

@@ -49,10 +49,10 @@ describe('MockLiveVoteSource', () => {
     ch.messages$.subscribe((m) => {
       if (m.type === 'vote_tally') tallies.push(m);
     });
-    jest.advanceTimersByTime(200); // weit über die 12 Berechtigten hinaus
+    jest.advanceTimersByTime(200); // well beyond the 12 eligible voters
     const last = tallies[tallies.length - 1];
     const cast = Object.values(last.counts).reduce((a, b) => a + b, 0);
-    expect(cast).toBe(12); // bei eligible gedeckelt
+    expect(cast).toBe(12); // capped at eligible
     ch.close();
     jest.useRealTimers();
   });

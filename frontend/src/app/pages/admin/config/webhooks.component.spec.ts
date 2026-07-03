@@ -37,7 +37,7 @@ describe('WebhooksComponent', () => {
     const save = screen.getByRole('button', { name: 'Speichern' });
     expect(save).toBeDisabled();
 
-    // Gültige URL genügt — ohne ein einziges Ereignis ist Speichern erlaubt (#6).
+    // A valid URL is enough — saving is allowed even without a single event.
     await userEvent.type(screen.getByRole('textbox', { name: 'Ziel-URL' }), 'https://hook.test');
 
     expect(save).toBeEnabled();
@@ -59,7 +59,7 @@ describe('WebhooksComponent', () => {
     expect(c.draft().events).toEqual([]);
     c.toggleEvent('vote_closed'); // add a new one
     expect(c.draft().events).toEqual(['vote_closed']);
-    // Bearbeiten lässt das Original unberührt, bis gespeichert wird.
+    // Editing leaves the original untouched until saved.
     expect(c.hooks()[0].events).toEqual(['vote_opened']);
     c.save();
     expect(saveWebhook).toHaveBeenCalledTimes(1);

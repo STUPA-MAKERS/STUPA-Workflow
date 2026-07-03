@@ -1,8 +1,8 @@
-"""Kanonische Serialisierung + Hash-Kette des Audit-Logs (security.md §4).
+"""Canonical serialization and hash chain for the audit log.
 
-``hash = sha256(prev_hash || canonical_json(entry_ohne_hash))``. Reine, deterministische
-Funktionen ohne DB/IO — der Hash ist allein aus den Feldwerten reproduzierbar (Risiko
-laut Spec: stabile Key-Reihenfolge → ``sort_keys`` + kompakte Separatoren).
+``hash = sha256(prev_hash || canonical_json(entry_without_hash))``. Pure,
+deterministic functions without DB/IO — the hash is reproducible from field
+values alone (stable key order via ``sort_keys`` + compact separators).
 """
 
 from __future__ import annotations
@@ -22,14 +22,11 @@ def canonical_payload(
     at: datetime,
     data: dict[str, Any],
 ) -> bytes:
-    """Audit-Felder (ohne ``id``/``hash``/``prev_hash``) → kanonische UTF-8-Bytes.
+    """Serialize audit fields (without ``id``/``hash``/``prev_hash``) to canonical UTF-8 bytes.
 
-    ``sort_keys`` + kompakte Separatoren garantieren reproduzierbare Bytes unabhängig
-    von der Einfüge-Reihenfolge der Keys (auch im verschachtelten ``data``-JSONB).
-    ``at`` wird **nach UTC normalisiert** und als ISO-8601-String fixiert — der Hash
-    bleibt so unabhängig von der Server-Zeitzone reproduzierbar (naive Werte werden als
-    UTC interpretiert). Nicht JSON-native Werte in ``data`` lösen bewusst ``TypeError``
-    aus (fail-closed statt stillem ``str()``)."""
+    ``at`` is normalized to UTC ISO-8601 so the hash is independent of the server
+    timezone (naive values are treated as UTC). Non-JSON-native values in ``data``
+    deliberately raise ``TypeError`` (fail-closed instead of a silent ``str()``)."""
     at_utc = (at if at.tzinfo is not None else at.replace(tzinfo=UTC)).astimezone(UTC)
     payload = {
         "action": action,
@@ -48,8 +45,7 @@ def canonical_payload(
 
 
 def compute_hash(prev_hash: bytes | None, canonical: bytes) -> bytes:
-    """``sha256(prev_hash || canonical)`` als Roh-Digest (32 Byte).
+    """Compute ``sha256(prev_hash || canonical)`` as a raw 32-byte digest.
 
-    Genesis-Eintrag (kein Vorgänger) nutzt ``prev_hash = b""`` → die Kette ist trotzdem
-    eindeutig an ihren Anfang gebunden."""
+    The genesis entry (no predecessor) uses ``prev_hash = b""``."""
     return hashlib.sha256((prev_hash or b"") + canonical).digest()

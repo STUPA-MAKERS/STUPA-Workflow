@@ -33,24 +33,24 @@ import type {
 } from './models';
 
 /**
- * In-Memory-Mock-Backend für den Skelett-/FE-Betrieb (Mock erlaubt, T-03/T-30).
- * Aktiv nur wenn `USE_MOCK_API` true ist; greift ausschließlich für `/api/*`.
+ * In-memory mock backend for FE/skeleton operation. Active only when
+ * `USE_MOCK_API` is true; applies only to `/api/*`.
  *
- * Die Antworten sind in der **Backend-Wire-Form** (`*Wire`, camelCase via T-12
- * `_CamelModel`) — der `ApiClient` mappt sie wie beim echten Backend. So bleibt
- * der Mock contract-treu und die Mapper-Schicht wird mitgetestet (Issue #17).
+ * Responses are in the backend wire form (`*Wire`, camelCase via `_CamelModel`)
+ * — the `ApiClient` maps them like the real backend. This keeps the mock
+ * contract-true and exercises the mapper layer too.
  */
 const MOCK_PRINCIPAL: Principal = {
   sub: '00000000-0000-0000-0000-000000000001',
   display_name: 'Demo Mitglied',
   email: 'demo@stupa.example',
   roles: ['member'],
-  // application.manage (T-31) für RBAC-Aktionen auf der Detail-Seite;
-  // vote.manage/meeting.manage (T-32) für Beamer-/Manage-Ansichten;
-  // protocol.write (T-33) für den Protokoll-Editor;
+  // application.manage for RBAC actions on the detail page;
+  // vote.manage/meeting.manage for beamer/manage views;
+  // protocol.write for the protocol editor;
   // admin.site/gremien/types + form.configure/flow.configure/webhook.manage
-  // (T-34) für die Verwaltungs-UIs — alle im Mock gesetzt, damit der FE-Dev/
-  // Harness-/Demo-Betrieb die gegateten Ansichten zeigt.
+  // for the admin UIs — all set in the mock so FE dev/harness/demo shows the
+  // gated views.
   permissions: [
     'application.read',
     'application.manage',
@@ -66,7 +66,7 @@ const MOCK_PRINCIPAL: Principal = {
     'form.configure',
     'flow.configure',
     'webhook.manage',
-    // budget.view/budget.structure/budget.book (T-17/T-35) für das Budget-Statistik-Dashboard.
+    // budget.view/budget.structure/budget.book for the budget stats dashboard.
     'budget.view',
     'budget.structure',
     'budget.book',
@@ -78,7 +78,7 @@ const MOCK_PRINCIPAL: Principal = {
   ],
 };
 
-/** Laufende Demo-Abstimmung (api.md »voting«, GET /votes/{id}). */
+/** Running demo vote (GET /votes/{id}). */
 const MOCK_VOTE: Vote = {
   id: 'vote-demo',
   applicationId: 'app-demo',
@@ -270,9 +270,9 @@ const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
 };
 
 /**
- * Offene Entscheidungen für die eigene Rolle (#64): GET /applications/tasks.
- * Nur Anträge in vote-States, in denen der Principal handeln darf.
- * Approval-Zeilen tragen Inline-Annehmen/Ablehnen, vote-Zeilen öffnen das Detail.
+ * Open decisions for the current role: GET /applications/tasks.
+ * Only applications in vote states the principal may act on.
+ * Approval rows carry inline accept/reject, vote rows open the detail.
  */
 const MOCK_TASKS: ApplicationListItemWire[] = [
   {
@@ -386,7 +386,7 @@ const MOCK_TRANSITIONS: TransitionOutWire[] = [
 
 const LOGOUT_OUT = { logout_url: null };
 
-// --- meetings + Protokoll (T-33) — mutabler In-Memory-State ----------------- //
+// --- meetings + protocol — mutable in-memory state ------------------------- //
 const MOCK_MEETING_ID = 'd0000000-0000-0000-0000-000000000001';
 const MOCK_PROTOCOL_ID = 'e0000000-0000-0000-0000-000000000099';
 
@@ -466,7 +466,7 @@ let MOCK_PROTOCOL: ProtocolOutWire = {
   sentAt: null,
 };
 
-/** Vote-Status im Mock-Meeting setzen (gibt beim Schließen ein Ergebnis aus). */
+/** Set a vote's status in the mock meeting (emits a result on close). */
 function setVoteStatus(voteId: string, status: 'open' | 'closed'): void {
   MOCK_MEETING = {
     ...MOCK_MEETING,
@@ -483,10 +483,10 @@ function path(url: string): string {
 }
 
 export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
-  // SICHERHEIT (#67): Verteidigung in der Tiefe — der Mock darf ausschließlich im
-  // Dev-/Demo-Build greifen. In Prod ist `isDevMode()` false; selbst wenn der
-  // Interceptor versehentlich in die Kette geriete, kann ihn keine zur Laufzeit
-  // angreifbare Eingabe (?mock=1, localStorage, __USE_MOCK_API__) mehr aktivieren.
+  // Security: defense in depth — the mock may only take effect in the dev/demo
+  // build. In prod `isDevMode()` is false; even if the interceptor slipped into
+  // the chain, no runtime-attackable input (?mock=1, localStorage,
+  // __USE_MOCK_API__) can activate it.
   if (!isDevMode()) return next(req);
   if (!inject(USE_MOCK_API)) return next(req);
   if (!req.url.includes('/api/')) return next(req);
@@ -497,15 +497,15 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'GET') {
     if (p.endsWith('/auth/me')) return ok(MOCK_PRINCIPAL);
-    // Altcha im Mock-Betrieb aus → 404 (Widget meldet „unavailable", kein Captcha).
+    // Altcha off in mock mode → 404 (widget reports "unavailable", no captcha).
     if (p.endsWith('/altcha/challenge')) {
       return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
     }
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
-    // Sitzungs-Timeline VOR der generischen `/timeline`-Regel matchen — sonst
-    // fängt diese `/meetings/timeline` ab und liefert Antrags-Status-Events
-    // statt einer MeetingPage (war zuvor toter Code unterhalb).
+    // Match the meeting timeline BEFORE the generic `/timeline` rule — otherwise
+    // that one captures `/meetings/timeline` and returns application status
+    // events instead of a MeetingPage.
     if (p.endsWith('/meetings/timeline')) {
       const direction = req.params.get('direction') ?? 'upcoming';
       const page: MeetingPageWire = {
@@ -525,7 +525,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       return ok(signed);
     }
-    // Ausgaben/Einnahmen (#25): leere Seite (Tree-Mock fehlt ohnehin) — kein Konsolen-404.
+    // Expenses/income: empty page (no tree mock anyway) — avoids a console 404.
     if (p.endsWith('/expenses')) return ok({ items: [], total: 0, limit: 20, offset: 0 });
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
@@ -543,14 +543,14 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PUT') {
-    // TOPs umsortieren (…/agenda/order).
+    // Reorder agenda items (…/agenda/order).
     if (/\/meetings\/[^/]+\/agenda\/order$/.test(p)) {
       const ids = (req.body as { itemIds?: string[] } | null)?.itemIds ?? [];
       const byId = new Map(MOCK_AGENDA.map((a) => [a.id, a]));
       MOCK_AGENDA = ids.map((id, i) => ({ ...(byId.get(id) as MockAgendaItem), position: i }));
       return ok([...MOCK_AGENDA]);
     }
-    // Anwesenheit setzen (…/attendance/me oder …/attendance/{principalId}).
+    // Set attendance (…/attendance/me or …/attendance/{principalId}).
     const att = /\/meetings\/[^/]+\/attendance\/([^/]+)$/.exec(p);
     if (att) {
       const status = (req.body as { status?: string } | null)?.status ?? 'present';
@@ -568,7 +568,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'POST') {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
-    // Live-Abstimmung für einen Antrag öffnen (Beschlussfrage).
+    // Open a live vote for an application (motion).
     if (/\/meetings\/[^/]+\/votes$/.test(p)) {
       const body = req.body as { applicationId?: string; question?: string | null } | null;
       MOCK_MEETING = {
@@ -590,7 +590,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       return ok(MOCK_MEETING);
     }
-    // Antrag auf die Tagesordnung setzen.
+    // Put an application on the agenda.
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) {
       const body = req.body as { applicationId?: string; title?: string } | null;
       const appId = body?.applicationId;
@@ -610,8 +610,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok([...MOCK_AGENDA]);
     }
     if (p.endsWith('/auth/magic-link/verify')) {
-      // Cookie-Modell: der echte Server setzt eine HttpOnly-Applicant-Cookie;
-      // der Mock liefert nur Scope + App-ID, keinen Session-Token.
+      // Cookie model: the real server sets an HttpOnly applicant cookie; the
+      // mock returns only scope + app id, no session token.
       const res: MagicLinkVerifyResult = { application_id: MOCK_APP_ID, scope: 'edit' };
       return ok(res);
     }
@@ -630,7 +630,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok(created, 201);
     }
     if (p.endsWith('/attachments')) {
-      // Multipart-Upload: der echte Server scannt async → `scanned=false`.
+      // Multipart upload: the real server scans async → `scanned=false`.
       const created: AttachmentOutWire = {
         id: 'att00000-0000-0000-0000-000000000001',
         filename: 'mock-upload.pdf',
@@ -660,7 +660,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const res: BallotResult = { status: 'cast' };
       return ok(res, 201);
     }
-    // --- meetings + Protokoll (T-33) ---
+    // --- meetings + protocol ---
     if (p.endsWith('/finalize')) {
       MOCK_PROTOCOL = {
         ...MOCK_PROTOCOL,
@@ -683,7 +683,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/meetings')) {
       const body = (req.body as { title?: string; date?: string | null; startTime?: string | null } | null) ?? {};
       const title = body.title?.trim();
-      // BE legt neue Sitzungen mit Status `planned` an (#104 — keine Drift mehr).
+      // BE creates new meetings with status `planned`.
       MOCK_MEETING = {
         ...MOCK_MEETING,
         title: title || MOCK_MEETING.title,
@@ -716,7 +716,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PATCH') {
-    // Markdown-Text eines TOP setzen (…/agenda/{itemId}).
+    // Set the markdown text of an agenda item (…/agenda/{itemId}).
     const body = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
     if (body) {
       const text = (req.body as { body?: string } | null)?.body ?? '';

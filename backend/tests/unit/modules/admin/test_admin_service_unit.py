@@ -1,8 +1,8 @@
-"""Unit (ohne DB): ConfigService-Pfade vor jedem Session-Zugriff + Helfer (T-24).
+"""Unit (no DB): ConfigService paths that run before any session access + helpers.
 
-``create_flow_version`` validiert den Graph **vor** dem DB-Zugriff → ungültiger Flow
-endet als 422 (`ValidationProblem`), nicht als 500. Die Session wird dabei nie
-berührt, daher kein DB nötig.
+``create_global_flow_version`` validates the graph BEFORE touching the DB — an
+invalid flow ends as 422 (``ValidationProblem``), not 500. The session is never
+touched, so no DB is needed.
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ from datetime import UTC, datetime
 import pytest
 
 from app.modules.admin.schemas import FlowVersionCreate
-from app.modules.admin.service import ConfigService, _iso, _parse_dt
+from app.modules.admin.service import ConfigService
+from app.modules.admin.service.service_base import _iso, _parse_dt
 from app.shared.config_schemas import FlowGraph
 from app.shared.errors import ValidationProblem
 

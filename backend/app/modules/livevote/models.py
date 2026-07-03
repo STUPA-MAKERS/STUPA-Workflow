@@ -1,13 +1,8 @@
-"""Sitzungs-Tabelle (data-model §»Sitzung & Protokoll«, flows §5, T-16).
+"""Meeting table — a committee session that live-votes bind to.
 
-:class:`Meeting` — eine (Gremium-)Sitzung, an die Live-Votes gebunden werden.
-``status`` steuert den Live-Vote-Kanal (``planned`` → ``live`` → ``closed``),
-``active_application_id`` zeigt den aktuell auf dem Beamer behandelten Antrag.
-
-Wie alle Modul-Tabellen entsteht ``meeting`` auf einem **frischen** Schema über
-``Base.metadata.create_all`` in Migration 0002 (Single-Source via ``app.models``);
-für ältere Schemata legt Migration 0008 sie idempotent nach und ergänzt dort die
-zuvor bewusst FK-lose ``vote.meeting_id``-Spalte (T-15) um die echte Constraint.
+:class:`Meeting` — one committee session; ``status`` drives the live-vote channel
+(``planned`` → ``live`` → ``closed``), ``active_application_id`` is the application
+currently shown on the beamer.
 """
 
 from __future__ import annotations
@@ -35,7 +30,7 @@ from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
 
 class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
-    """Gremium-Sitzung; Anker des Live-Vote-Kanals ``meeting:{id}`` (flows §5)."""
+    """Committee session; anchor of the live-vote channel ``meeting:{id}``."""
 
     __tablename__ = "meeting"
 
@@ -44,15 +39,14 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     )
     title: Mapped[str] = mapped_column(Text)
     date: Mapped[_date | None] = mapped_column(Date, nullable=True)
-    # Geplante Uhrzeit (#34) — optional, ergänzt das Datum.
+    # Planned start time (optional), complements the date.
     start_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
-    # Geplante End-Uhrzeit (#ics) — optional; fehlt sie, nimmt der iCal-Feed eine
-    # Default-Dauer von 1 h ab ``start_time`` an. Muss (falls gesetzt) nach
-    # ``start_time`` liegen (Schema-Check beim Anlegen).
+    # Planned end time (optional); if unset the iCal feed assumes a 1h default
+    # duration from ``start_time``. When set, must be after ``start_time``.
     end_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
-    # Automatisch gesetzt beim Wechsel auf ``closed`` (#14) — liefert die
-    # »Ende«-Zeile der Protokoll-Titelseite. ``closed`` ist terminal.
+    # Set automatically on the transition to ``closed`` (terminal); provides the
+    # end line of the protocol title page.
     closed_at: Mapped[_datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -60,8 +54,8 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Der je Sitzung zugewiesene Protokollant (genau einer). Er führt die Live-Sitzung
-    # und schreibt das Protokoll; SET NULL, falls der Principal gelöscht wird.
+    # The single protokollant assigned per meeting; leads the live session and
+    # writes the protocol. SET NULL if the principal is deleted.
     protokollant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
     )
@@ -75,11 +69,11 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
-    """Anwesenheit je (Sitzung, Mitglied) (#Meetings/#55/#56).
+    """Attendance per (meeting, member).
 
-    ``status`` = present/excused/absent; ``source`` zeigt, wer den Eintrag setzte
-    (``self`` = Mitglied selbst, ``lead`` = Sitzungsleitung). Genau **ein** Eintrag
-    je (meeting, principal) — Upsert über die Unique-Constraint.
+    ``status`` = present/excused/absent; ``source`` is who set it (``self`` =
+    member, ``lead`` = session lead). Exactly one row per (meeting, principal),
+    upserted via the unique constraint.
     """
 
     __tablename__ = "meeting_attendance"
@@ -105,11 +99,10 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
 
 
 class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
-    """Tagesordnungspunkt: ein der Sitzung zugeordneter Antrag (#10/#58).
+    """Agenda item (TOP): an application assigned to the meeting.
 
-    Geordnete Liste (``position``) der auf der Sitzung zu behandelnden Anträge —
-    Quelle der Protokoll-TOPs und (perspektivisch) der Live-Abstimmungen. Pro
-    (Sitzung, Antrag) genau einmal.
+    Ordered list (``position``) of applications to handle in the meeting; source
+    of the protocol TOPs and live votes. One row per (meeting, application).
     """
 
     __tablename__ = "meeting_agenda_item"
@@ -117,17 +110,17 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     meeting_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("meeting.id", ondelete="CASCADE")
     )
-    # NULL = Freitext-TOP (kein Antrag); dann trägt ``title`` den TOP-Text.
+    # NULL = free-text TOP (no application); ``title`` then holds the TOP text.
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
-    # Freitext-Titel eines TOP ohne Antrag (z. B. »Verschiedenes«).
+    # Free-text title of a TOP without an application.
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Markdown-Text dieses TOP (pro-TOP-Editor); fließt ins finale Protokoll.
+    # Markdown body of this TOP (per-TOP editor); flows into the final protocol.
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")
-    # Nicht-öffentlich (#PII-Re-Add): im öffentlichen Protokoll-PDF durch einen
-    # Platzhalter ersetzt; die TOP-Nummerierung bleibt erhalten.
+    # Non-public: replaced by a placeholder in the public protocol PDF; the TOP
+    # numbering is preserved.
     non_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     __table_args__ = (

@@ -1,24 +1,22 @@
-"""Reine Form-Engine (T-11) — keine DB, keine HTTP-Abhängigkeit.
+"""Pure form engine — no DB, no HTTP dependency.
 
-Drei Kernfunktionen (Akzeptanzkriterien T-11):
+Three core functions:
 
-* :func:`validate_definition` — eine Form-Definition (Liste ``FormFieldDef``)
-  strukturell gegen das Config-Schema prüfen (eindeutige Keys, promoted-Felder
-  numerisch). Pro-Feld-Schema ist bereits durch ``FormFieldDef`` (T-05) gesichert.
-* :func:`effective_form` — Typ-Felder + Topf-Extra-Felder zu sektionierten
-  Abschnitten mergen (data-model §5.7). Die Topf-Sektion erscheint nur, wenn der
-  Antrag einem Topf zugeordnet ist.
-* :func:`validate_answers` — Antwortdaten gegen alle Feldtypen validieren
-  (required, ``visibleIf`` → sichtbar⇒Pflicht, ``compute`` → abgeleitete Felder).
-  Sammelt **alle** Feldfehler (kein Fail-Fast) → ``AnswerValidationError``.
+* :func:`validate_definition` — structurally validate a form definition (list of
+  ``FormFieldDef``) against the config schema (unique keys, promoted fields numeric).
+  Per-field schema is already guaranteed by ``FormFieldDef``.
+* :func:`effective_form` — merge type fields + pot extra fields into sectioned parts.
+  The pot section appears only when the application is assigned to a pot.
+* :func:`validate_answers` — validate answer data against all field types (required,
+  ``visibleIf`` → visible ⇒ required, ``compute`` → derived fields). Collects all field
+  errors (no fail-fast) → ``AnswerValidationError``.
 
-`visibleIf`/`compute` nutzen den JsonLogic-Subset-Evaluator aus T-05. **Hinweis
-(T-05):** dessen ``and``/``or`` werten *nicht* kurzschließend aus — alle Operanden
-werden evaluiert. Ein ``visibleIf`` wie ``{"and":[{"var":"x"},{">":[{"var":"y"},0]}]}``
-kann daher bei fehlendem ``y`` einen ``JsonLogicError`` werfen, statt auf ``x``
-abzubrechen. Bei der Sichtbarkeits-Auswertung wird ein solcher Fehler **konservativ
-als sichtbar** behandelt (Feld wird validiert statt still übersprungen), siehe
-:func:`_is_visible`.
+`visibleIf`/`compute` use the JsonLogic-subset evaluator. Its ``and``/``or`` do not
+short-circuit — all operands are evaluated. A ``visibleIf`` like
+``{"and":[{"var":"x"},{">":[{"var":"y"},0]}]}`` may therefore raise a ``JsonLogicError``
+on missing ``y`` instead of stopping at ``x``. During visibility evaluation such an
+error is treated conservatively as visible (the field is validated rather than silently
+skipped), see :func:`_is_visible`.
 """
 
 from __future__ import annotations
@@ -35,43 +33,42 @@ from typing import Any
 from app.shared.config_schemas import FormFieldDef
 from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlogic
 
-# Feldtypen, deren Wert numerisch ist (für promoted-Extraktion + min/max).
+# Field types whose value is numeric (for promoted extraction + min/max).
 _NUMERIC_TYPES = frozenset({"number", "currency"})
 _TEXT_TYPES = frozenset({"text", "textarea", "markdown"})
 
-# ReDoS-Härtung (security.md): ein admin-definiertes ``validation.pattern`` (Roh-Regex)
-# läuft gegen Antragsteller-Eingaben. Ein katastrophal backtrackender Ausdruck würde
-# sonst die Single-Replica-Event-Loop blockieren. Zwei voneinander unabhängige Grenzen:
-#   1. **Harte Längenobergrenze** des zu prüfenden Werts → beschränkt die Eingabegröße
-#      und damit den Worst-Case unbedingt (greift, auch wenn der Timeout nicht killbar
-#      ist). Werte darüber gelten als »passt nicht«.
-#   2. **Wand-Timeout** im Thread: der Match läuft in einem Worker-Thread; greift er
-#      nicht innerhalb des Budgets, gibt der Aufrufer (Event-Loop) die Kontrolle zurück
-#      und behandelt das Feld als ungültig. Der Thread kann nicht hart gekillt werden —
-#      die Längenobergrenze sorgt aber dafür, dass er beschränkt terminiert.
+# ReDoS hardening: an admin-defined ``validation.pattern`` (raw regex) runs against
+# applicant input; a catastrophically backtracking expression would otherwise block the
+# single-replica event loop. Two independent bounds:
+#   1. Hard input length cap → bounds the worst case unconditionally (holds even if the
+#      timeout is not killable). Longer values count as "no match".
+#   2. Wall-clock timeout in a thread: the match runs in a worker thread; if it does not
+#      finish within the budget the caller (event loop) regains control and treats the
+#      field as invalid. The thread cannot be hard-killed — the length cap ensures it
+#      terminates in bounded time.
 _PATTERN_MAX_INPUT_LEN = 4096
 _PATTERN_MATCH_TIMEOUT_SECONDS = 1.0
-# Geteilter, klein gehaltener Executor — Pattern-Matches sind selten und kurz.
+# Shared, small executor — pattern matches are rare and short.
 _PATTERN_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="form-regex")
 
 
 class _PatternMatchError(Exception):
-    """Pattern-Match scheiterte technisch (defekte Regex oder Zeitüberschreitung)."""
+    """Pattern match failed technically (broken regex or timeout)."""
 
 
 def _pattern_matches(pattern: str, value: str) -> bool:
-    """``re.fullmatch`` gegen ``value`` — längenbeschränkt + Wand-Timeout (ReDoS).
+    """``re.fullmatch`` against ``value`` — length-bounded + wall-clock timeout (ReDoS).
 
-    Wirft :class:`_PatternMatchError` bei defektem Pattern **oder** Timeout; ruft der
-    Aufrufer dann ein Feld als ungültig aus. Werte über :data:`_PATTERN_MAX_INPUT_LEN`
-    gelten unbedingt als »passt nicht« (kein Match-Versuch)."""
+    Raises :class:`_PatternMatchError` on a broken pattern or timeout; the caller then
+    flags the field invalid. Values over :data:`_PATTERN_MAX_INPUT_LEN` count
+    unconditionally as "no match" (no match attempt)."""
     if len(value) > _PATTERN_MAX_INPUT_LEN:
         return False
     future = _PATTERN_EXECUTOR.submit(_full_match, pattern, value)
     try:
         return future.result(timeout=_PATTERN_MATCH_TIMEOUT_SECONDS)
     except FutureTimeout as exc:
-        # Thread läuft beschränkt (Längen-Cap) weiter; wir geben die Kontrolle zurück.
+        # Thread keeps running bounded (length cap); we hand control back.
         raise _PatternMatchError("pattern match timed out") from exc
     except re.error as exc:
         raise _PatternMatchError("invalid pattern") from exc
@@ -81,13 +78,13 @@ def _full_match(pattern: str, value: str) -> bool:
     return re.fullmatch(pattern, value) is not None
 
 
-# Reservierter Schlüssel des System-Titelfelds: jeder Antrag MUSS einen Titel haben.
-# Der Server hängt es an jede effektive Form (nicht im Builder editierbar).
+# Reserved key of the system title field: every application MUST have a title. The
+# server prepends it to every effective form (not editable in the builder).
 SYSTEM_TITLE_KEY = "title"
 
 
 def system_title_field() -> FormFieldDef:
-    """Pflicht-Titelfeld, das der Server jeder effektiven Form voranstellt."""
+    """Required title field the server prepends to every effective form."""
     return FormFieldDef.model_validate(
         {
             "key": SYSTEM_TITLE_KEY,
@@ -99,19 +96,19 @@ def system_title_field() -> FormFieldDef:
 
 
 class FormDefinitionError(Exception):
-    """Form-Definition verletzt eine Struktur-Regel (Speicher-Gate, T-11)."""
+    """Form definition violates a structural rule (save gate)."""
 
 
 @dataclass(frozen=True)
 class FieldError:
-    """Ein Validierungsfehler für ein konkretes Antwortfeld (api.md §2 ``errors[]``)."""
+    """A validation error for a concrete answer field."""
 
     field: str
     msg: str
 
 
 class AnswerValidationError(Exception):
-    """Antwortdaten sind ungültig; trägt alle gesammelten Feldfehler (→ 422)."""
+    """Answer data is invalid; carries all collected field errors (→ 422)."""
 
     def __init__(self, errors: Sequence[FieldError]) -> None:
         self.errors: list[FieldError] = list(errors)
@@ -120,27 +117,25 @@ class AnswerValidationError(Exception):
 
 @dataclass(frozen=True)
 class FormSection:
-    """Ein Abschnitt der effektiven Form (``main`` = Typ, ``budget`` = Topf-Extra).
+    """A section of the effective form (``main`` = type, ``budget`` = pot extra).
 
-    ``label`` ist gesetzt, wenn der Abschnitt von einem ``section``-Marker im
-    Formular stammt (mehrstufige Formulare); sonst ``None`` (Standard-Labels
-    ``main``/``budget`` löst der Service auf)."""
+    ``label`` is set when the section comes from a ``section`` marker in the form
+    (multi-step forms); otherwise ``None`` (the service resolves the default labels
+    ``main``/``budget``)."""
 
     key: str
     fields: list[FormFieldDef]
     label: dict[str, str] | None = None
 
 
-# --------------------------------------------------------------------------- #
-# validate_definition
-# --------------------------------------------------------------------------- #
+# --- validate_definition ---
 def validate_definition(fields: Sequence[FormFieldDef]) -> None:
-    """Form-Definition strukturell prüfen. Wirft ``FormDefinitionError``.
+    """Structurally validate a form definition. Raises ``FormDefinitionError``.
 
-    Regeln: keine doppelten Feld-Keys; promoted-Felder müssen numerisch sein
-    (``number``/``currency``), da das Ziel (z. B. ``amount``) ``numeric`` ist;
-    ``visibleIf``/``compute`` nur mit Whitelist-Operatoren (T-05); ein gesetztes
-    ``pattern`` muss eine kompilierbare Regex sein (sonst 500 zur Antwort-Laufzeit).
+    Rules: no duplicate field keys; promoted fields must be numeric
+    (``number``/``currency``) since the target (e.g. ``amount``) is ``numeric``;
+    ``visibleIf``/``compute`` only with whitelist operators; a set ``pattern`` must be a
+    compilable regex (else 500 at answer runtime).
     """
     keys = [f.key for f in fields]
     duplicates = sorted({k for k in keys if keys.count(k) > 1})
@@ -169,23 +164,20 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
                 ) from exc
 
 
-# --------------------------------------------------------------------------- #
-# effective_form
-# --------------------------------------------------------------------------- #
+# --- effective_form ---
 def effective_form(
     type_fields: Sequence[FormFieldDef],
     pot_fields: Sequence[FormFieldDef] | None = None,
 ) -> list[FormSection]:
-    """Typ-Felder + Topf-Extra-Felder zu Abschnitten mergen (data-model §5.7).
+    """Merge type fields + pot extra fields into sections.
 
-    ``main`` enthält immer die Typ-Felder, denen das System-Pflichtfeld ``title``
-    vorangestellt wird (jeder Antrag MUSS einen Titel haben), sofern der Typ nicht
-    selbst eines mit diesem Schlüssel definiert. ``budget`` erscheint **nur**, wenn
-    ``pot_fields`` zugeordnet und nicht leer sind (Topf-Zuordnung).
+    ``main`` always contains the type fields, prefixed by the system-required ``title``
+    field (every application MUST have a title) unless the type defines one with that
+    key itself. ``budget`` appears only when ``pot_fields`` are assigned and non-empty.
     """
     sections = _split_sections(list(type_fields))
-    # System-Titelfeld dem ERSTEN Abschnitt voranstellen (nach dem Split, damit ein
-    # führender Marker keinen Titel-only-Schritt erzeugt), sofern nicht selbst definiert.
+    # Prepend the system title field to the FIRST section (after the split, so a leading
+    # marker does not create a title-only step) unless it is defined already.
     if not any(f.key == SYSTEM_TITLE_KEY for s in sections for f in s.fields):
         sections[0].fields.insert(0, system_title_field())
     if pot_fields:
@@ -194,10 +186,9 @@ def effective_form(
 
 
 def _split_sections(fields: Sequence[FormFieldDef]) -> list[FormSection]:
-    """Felder an ``section``-Markern in mehrere Abschnitte (= Wizard-Schritte)
-    aufteilen. Der Marker selbst trägt nur das Abschnitts-Label und erscheint
-    **nicht** als Feld. Ohne Marker entsteht genau ein ``main``-Abschnitt
-    (Rückwärtskompatibilität)."""
+    """Split fields at ``section`` markers into several sections (= wizard steps). The
+    marker itself carries only the section label and does not appear as a field. Without
+    markers exactly one ``main`` section results (backward compatibility)."""
     sections: list[FormSection] = []
     cur_key = "main"
     cur_label: dict[str, str] | None = None
@@ -205,8 +196,8 @@ def _split_sections(fields: Sequence[FormFieldDef]) -> list[FormSection]:
 
     for f in fields:
         if f.type == "section":
-            # Aktuellen Abschnitt schließen, sofern er Felder hat; sonst nur das
-            # Label des neuen Markers übernehmen (führende/aufeinanderfolgende Marker).
+            # Close the current section if it has fields; otherwise just take the new
+            # marker's label (leading/consecutive markers).
             if cur_fields:
                 sections.append(FormSection(key=cur_key, fields=cur_fields, label=cur_label))
                 cur_fields = []
@@ -220,24 +211,22 @@ def _split_sections(fields: Sequence[FormFieldDef]) -> list[FormSection]:
     return sections
 
 
-# --------------------------------------------------------------------------- #
-# validate_answers
-# --------------------------------------------------------------------------- #
+# --- validate_answers ---
 def validate_answers(
     fields: Sequence[FormFieldDef],
     data: Mapping[str, Any],
     context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Antwortdaten validieren + abgeleitete (``computed``) Felder berechnen.
+    """Validate answer data + compute derived (``computed``) fields.
 
-    ``context`` liefert Nicht-Feld-Variablen für ``visibleIf`` (z. B.
-    ``has_budget``). Rückgabe = ``data`` plus berechnete ``computed``-Werte.
-    Bei Fehlern → ``AnswerValidationError`` (alle Fehler gesammelt).
+    ``context`` supplies non-field variables for ``visibleIf`` (e.g. ``has_budget``).
+    Returns ``data`` plus computed ``computed`` values. On errors →
+    ``AnswerValidationError`` (all errors collected).
     """
     errors: list[FieldError] = []
     result: dict[str, Any] = dict(data)
 
-    # 1. computed-Felder berechnen (in Feld-Reihenfolge; dürfen andere Felder nutzen).
+    # 1. compute computed fields (in field order; may use other fields).
     base_ctx: dict[str, Any] = {**(context or {}), **result}
     for f in fields:
         if f.type == "computed" and f.compute is not None:
@@ -249,10 +238,10 @@ def validate_answers(
 
     eval_ctx: dict[str, Any] = {**(context or {}), **result}
 
-    # 2. Pro-Feld: Sichtbarkeit → required → Typ-Validierung.
+    # 2. per field: visibility → required → type validation.
     for f in fields:
         if f.type in ("computed", "section"):
-            continue  # abgeleitet bzw. reiner Struktur-Marker — kein Antwortwert
+            continue  # derived or a pure structural marker — no answer value
         if not _is_visible(f, eval_ctx):
             continue
         value = data.get(f.key)
@@ -268,7 +257,7 @@ def validate_answers(
 
 
 def _is_present(value: Any) -> bool:
-    """Wert gilt als vorhanden, wenn nicht ``None`` und nicht leer (String/Liste)."""
+    """A value counts as present if not ``None`` and not empty (string/list)."""
     if value is None:
         return False
     if isinstance(value, (str, list, dict)):
@@ -277,9 +266,9 @@ def _is_present(value: Any) -> bool:
 
 
 def _is_visible(field: FormFieldDef, ctx: Mapping[str, Any]) -> bool:
-    """``visibleIf`` auswerten. Kein Ausdruck ⇒ sichtbar. Eval-Fehler ⇒ konservativ
-    sichtbar (T-05 ``and``/``or`` ohne Kurzschluss → Feld wird validiert, nicht still
-    übersprungen)."""
+    """Evaluate ``visibleIf``. No expression ⇒ visible. Eval error ⇒ conservatively
+    visible (non-short-circuiting ``and``/``or`` → field is validated, not silently
+    skipped)."""
     if field.visible_if is None:
         return True
     try:
@@ -288,11 +277,9 @@ def _is_visible(field: FormFieldDef, ctx: Mapping[str, Any]) -> bool:
         return True
 
 
-# --------------------------------------------------------------------------- #
-# Typ-Validierung pro Feld
-# --------------------------------------------------------------------------- #
+# --- per-field type validation ---
 def _validate_value(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    """Einen vorhandenen Wert gegen seinen Feldtyp prüfen; Fehler anhängen."""
+    """Validate a present value against its field type; append errors."""
     t = field.type
     if t in _TEXT_TYPES:
         _validate_text(field, value, errors)
@@ -312,7 +299,7 @@ def _validate_value(field: FormFieldDef, value: Any, errors: list[FieldError]) -
         _validate_table(field, value, errors)
     elif t == "positions":
         _validate_positions(field, value, errors)
-    else:  # pragma: no cover via FormFieldDef.type (Literal) — defensiv geprüft im Test
+    else:  # pragma: no cover via FormFieldDef.type (Literal) — defensively checked in tests
         errors.append(FieldError(field=field.key, msg=f"unknown field type: {t!r}"))
 
 
@@ -335,9 +322,9 @@ def _validate_text(field: FormFieldDef, value: Any, errors: list[FieldError]) ->
         try:
             matched = _pattern_matches(v.pattern, value)
         except _PatternMatchError:
-            # Defekt gespeichertes Pattern ODER ReDoS-Timeout: defense-in-depth
-            # (validate_definition lehnt invalide Pattern schon beim Anlegen ab) —
-            # niemals 500/Hänger zur Laufzeit, sondern als Feldfehler ausweisen.
+            # Broken stored pattern OR ReDoS timeout: defense-in-depth (invalid patterns
+            # are already rejected at save time) — never 500/hang at runtime, surface it
+            # as a field error instead.
             _err(errors, field.key, "field has an invalid validation pattern")
             return
         if not matched:
@@ -354,8 +341,8 @@ def _validate_number(field: FormFieldDef, value: Any, errors: list[FieldError]) 
         _err(errors, field.key, "must be a number")
         return
     if not num.is_finite():
-        # NaN/Infinity (z. B. JSON "NaN"/Infinity): Vergleich mit min/max würde
-        # decimal.InvalidOperation werfen → 422 statt 500.
+        # NaN/Infinity: comparing with min/max would raise decimal.InvalidOperation
+        # -> 422 instead of 500.
         _err(errors, field.key, "must be a finite number")
         return
     v = field.validation
@@ -382,9 +369,9 @@ def _option_values(field: FormFieldDef) -> set[str]:
 
 
 def _validate_select(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    # FieldOption.value ist als str deklariert; nur Strings können gültige
-    # Optionen sein. Der isinstance-Guard erzwingt die Domäne und verhindert
-    # zugleich einen TypeError beim Membership-Test mit unhashbaren Werten.
+    # FieldOption.value is declared as str; only strings can be valid options. The
+    # isinstance guard enforces the domain and avoids a TypeError on the membership
+    # test with unhashable values.
     if not isinstance(value, str) or value not in _option_values(field):
         _err(errors, field.key, "is not a valid option")
 
@@ -396,8 +383,8 @@ def _validate_multiselect(
         _err(errors, field.key, "must be a list")
         return
     allowed = _option_values(field)
-    # Pro Element auf str prüfen, bevor wir gegen die (str-)Optionsmenge testen –
-    # sonst löst ein unhashbares Element (dict/list) einen TypeError → 500 aus.
+    # Check each element is a str before testing it against the (str) option set —
+    # otherwise an unhashable element (dict/list) raises a TypeError -> 500.
     invalid = [v for v in value if not isinstance(v, str) or v not in allowed]
     if invalid:
         _err(errors, field.key, f"contains invalid options: {invalid}")
@@ -409,7 +396,7 @@ def _validate_checkbox(field: FormFieldDef, value: Any, errors: list[FieldError]
 
 
 def _validate_file(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    # Antwortwert = Attachment-Referenz(en); Inhalt/Größe/MIME prüft der Upload.
+    # Answer value = attachment reference(s); content/size/MIME are checked by the upload.
     if isinstance(value, str):
         return
     if isinstance(value, list) and all(isinstance(v, str) for v in value):
@@ -422,10 +409,9 @@ def _validate_table(field: FormFieldDef, value: Any, errors: list[FieldError]) -
         _err(errors, field.key, "must be a list of rows")
         return
     v = field.validation
-    # Engine-Decke (AUD-047): kein falsy-`or` — ein explizit konfiguriertes maxRows=0
-    # (FieldValidation.max_rows hat ge=0, 0 ist gültig) MUSS erhalten bleiben und jede
-    # Zeile ablehnen. Zugleich auf die Engine-Decke kappen, sodass ein vom Builder
-    # gesetzter höherer Wert die obere Schranke nicht aushebeln kann.
+    # Engine cap: no falsy-`or` — an explicitly configured maxRows=0 (max_rows has ge=0,
+    # 0 is valid) MUST be preserved and reject every row. Also clamp to the engine cap so
+    # a higher builder value cannot lift the upper bound.
     configured = (
         v.max_rows if (v is not None and v.max_rows is not None) else _DEFAULT_MAX_ROWS
     )
@@ -437,21 +423,21 @@ def _validate_table(field: FormFieldDef, value: Any, errors: list[FieldError]) -
             _err(errors, field.key, f"row {i} must be an object")
 
 
-# Default-Mindestzahl Vergleichsangebote je Position, falls der Builder nichts setzt.
+# Default minimum comparison offers per position when the builder sets none.
 _DEFAULT_MIN_OFFERS = 3
 _DEFAULT_MIN_POSITIONS = 1
 
-# Engine-Decken (#sec-audit AUD-047): obere Schranken für Positionen/Angebote/Tabellen-
-# Zeilen, die auch OHNE Builder-Wert greifen — unabhängig vom Body-Cap. Verhindert, dass
-# ein gehobener Body-Cap oder ein authentifizierter Write-Pfad unbegrenzt viele Positionen/
-# Angebote durch `_validate_positions`/`positions_total`/JSONB-Persistenz schleust.
+# Engine caps: upper bounds for positions/offers/table rows that apply even WITHOUT a
+# builder value, independent of the body cap. Stops a raised body cap or an
+# authenticated write path from pushing unbounded positions/offers through
+# `_validate_positions`/`positions_total`/JSONB persistence.
 _DEFAULT_MAX_POSITIONS = 200
 _DEFAULT_MAX_OFFERS = 50
 _DEFAULT_MAX_ROWS = 1000
 
 
 def _offer_value(offer: Mapping[str, Any]) -> Decimal | None:
-    """Numerischen Angebots-Wert als ``Decimal`` ziehen (ungültig → ``None``)."""
+    """Pull the numeric offer value as ``Decimal`` (invalid -> ``None``)."""
     raw = offer.get("value")
     if isinstance(raw, bool) or raw is None:
         return None
@@ -463,8 +449,8 @@ def _offer_value(offer: Mapping[str, Any]) -> Decimal | None:
 
 
 def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    """Kostenpositionen prüfen: ≥ minPositions Positionen, je ≥ minOffers Angebote,
-    genau ein bevorzugtes Angebot, alle Werte endliche Zahlen > 0 (Position 0-indiziert)."""
+    """Validate cost positions: >= minPositions positions, each >= minOffers offers,
+    exactly one preferred offer, all values finite numbers > 0 (position 0-indexed)."""
     if not isinstance(value, list):
         _err(errors, field.key, "must be a list of positions")
         return
@@ -473,10 +459,9 @@ def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError
     min_positions = (
         v.min_positions if v and v.min_positions else None
     ) or _DEFAULT_MIN_POSITIONS
-    # Engine-Decke (AUD-047): max_positions/max_offers sind ge=1 (0 unmöglich), aber ein
-    # form.configure-Admin könnte einen Wert über der Default-Decke setzen und so erneut
-    # unbeschränktes Wachstum öffnen. Daher den konfigurierten Wert auf die Engine-Decke
-    # kappen (min), statt ihn nur als Default einzusetzen.
+    # Engine cap: max_positions/max_offers are ge=1 (0 impossible), but a form.configure
+    # admin could set a value above the default cap and reopen unbounded growth. So clamp
+    # the configured value to the engine cap (min) instead of only using it as a default.
     configured_positions = (
         v.max_positions
         if (v is not None and v.max_positions is not None)
@@ -528,9 +513,9 @@ def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError
 
 
 def positions_total(value: Any) -> Decimal | None:
-    """Σ der bevorzugten Angebots-Werte aller Positionen (= Positions-Gesamtbetrag).
+    """Sum of the preferred offer values across all positions (= position total).
 
-    ``None`` wenn keine gültige bevorzugte Position vorliegt (z. B. leere Liste).
+    ``None`` when there is no valid preferred position (e.g. an empty list).
     """
     if not isinstance(value, list):
         return None
@@ -550,19 +535,19 @@ def positions_total(value: Any) -> Decimal | None:
 
 
 # --------------------------------------------------------------------------- #
-# Promoted-Extraktion (für T-12/T-17)
+# Promoted extraction
 # --------------------------------------------------------------------------- #
 def extract_promoted(
     fields: Sequence[FormFieldDef], data: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Promoted-Feldwerte aus ``data`` ziehen → ``{promote_target: value}``.
+    """Pull promoted field values from ``data`` -> ``{promote_target: value}``.
 
-    Numerische Promoted-Felder (``amount``) werden zu ``Decimal`` normalisiert.
+    Numeric promoted fields (``amount``) are normalized to ``Decimal``.
     """
     out: dict[str, Any] = {}
     for f in fields:
-        # `positions` promotet implizit den Positions-Gesamtbetrag in `amount`
-        # (Σ der bevorzugten Angebote) — ohne isPromoted-Flag; additiv bei mehreren.
+        # `positions` implicitly promotes the position total into `amount` (sum of
+        # preferred offers) — without an isPromoted flag; additive across several.
         if f.type == "positions":
             total = positions_total(data.get(f.key))
             if total is not None:
@@ -578,7 +563,7 @@ def extract_promoted(
                 num = Decimal(str(value))
             except (InvalidOperation, ValueError):
                 continue
-            # NaN/Infinity nie als amount weiterreichen (kracht sonst in T-12/T-17).
+            # Never pass NaN/Infinity through as amount (would crash downstream).
             if not num.is_finite():
                 continue
             out[f.promote_target] = num

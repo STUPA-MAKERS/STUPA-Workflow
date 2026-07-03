@@ -1,4 +1,4 @@
-"""API-Schemata des Voting-Moduls (T-15, api.md »voting«)."""
+"""API schemas for the voting module."""
 
 from __future__ import annotations
 
@@ -12,22 +12,21 @@ from app.shared.config_schemas import VoteConfig
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields also settable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class VoteCreate(_CamelModel):
-    """``POST /applications/{id}/votes`` — Abstimmung anlegen (status ``draft``)."""
+    """``POST /applications/{id}/votes`` - create a vote (status ``draft``)."""
 
     config: VoteConfig
     eligible_group: str = Field(alias="eligibleGroup", min_length=1)
-    # Beschlussfrage (»Worüber wird abgestimmt?«) — fürs Protokoll (#Meetings).
+    # Resolution question, for the protocol.
     question: str | None = None
-    # Maßgebliche Zahl der Stimmberechtigten (Beschlussfähigkeits-Basis aus dem
-    # Roster der Gruppe/des Gremiums) — **Nenner** des Prozent-Quorums. NICHT aus
-    # eingeloggten Usern abgeleitet (das wäre fail-open). Pflicht für Prozent-Quorum;
-    # fehlt sie dort, ist das Quorum fail-closed nie erfüllt.
+    # Authoritative eligible-voter count (roster basis), the denominator of the
+    # percent quorum. NOT derived from logged-in users (that would be fail-open).
+    # Required for a percent quorum; if missing there, the quorum is fail-closed.
     eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
     opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
@@ -37,7 +36,7 @@ class VoteCreate(_CamelModel):
 
     @model_validator(mode="after")
     def _percent_quorum_needs_eligible(self) -> VoteCreate:
-        """Prozent-Quorum braucht eine maßgebliche Stimmberechtigten-Zahl (fail-closed)."""
+        """A percent quorum requires an eligible-voter count (fail-closed)."""
         quorum = self.config.quorum
         if quorum is not None and quorum.type == "percent" and self.eligible_count is None:
             raise ValueError(
@@ -47,51 +46,51 @@ class VoteCreate(_CamelModel):
 
 
 class BallotIn(_CamelModel):
-    """``POST /votes/{id}/ballot`` — Stimme abgeben (``choice`` ∈ ``config.options``).
+    """``POST /votes/{id}/ballot`` - cast a vote (``choice`` in ``config.options``).
 
-    ``asDelegation=true`` gibt die Vertretungs-Stimme ab (#delegation-rework):
-    eigenes und delegiertes Stimmrecht sind zwei getrennte Abgaben."""
+    ``asDelegation=true`` casts the represented vote: own and delegated voting
+    rights are two separate ballots.
+    """
 
     choice: str = Field(min_length=1)
     as_delegation: bool = Field(default=False, alias="asDelegation")
 
 
 class TallyOut(_CamelModel):
-    """Aggregiertes Zwischen-/Endergebnis (api.md). Bei ``secret`` nur ``counts``."""
+    """Aggregated interim/final result. Only ``counts`` when ``secret``."""
 
     counts: dict[str, int]
     eligible: int
-    # Teilnahme-Fortschritt (immer sichtbar, auch geheim/verdeckt): wie viele der
-    # **anwesenden** Mitglieder schon abgestimmt haben (#vote-progress).
+    # Turnout progress (always visible, even secret/hidden): how many of the
+    # present members have already voted.
     voted: int = 0
     present: int = 0
-    # ``counts``/``leading`` sind nur sichtbar, wenn ``revealed`` — d. h. geschlossen
-    # **oder** (nicht geheim **und** alle Anwesenden haben abgestimmt). Sonst verdeckt.
+    # ``counts``/``leading`` are only visible when ``revealed`` - i.e. closed, or
+    # (not secret and all present members have voted). Otherwise hidden.
     revealed: bool = True
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
     result: Literal["passed", "rejected", "tie"] | None = None
-    # Warum scheiterte die Abstimmung? ``quorum`` = Quorum verfehlt (fail-closed),
-    # ``majority`` = Quorum erreicht, aber Mehrheit verfehlt. ``None`` solange offen
-    # oder bei ``passed``/``tie``.
+    # Why the vote failed: ``quorum`` = quorum missed (fail-closed), ``majority`` =
+    # quorum met but majority missed. None while open or on passed/tie.
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
 
 
 class VoteOut(_CamelModel):
-    """Vote-State + Tally (``GET /votes/{id}``)."""
+    """Vote state + tally (``GET /votes/{id}``)."""
 
     id: UUID
-    # None = generische Beschlussfrage (Freitext-TOP), kein Antrag.
+    # None = generic resolution question (free-text TOP), no application.
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # Sitzung, an die der Vote hängt (Live-Vote, T-16); None bei reinem Async-Vote.
+    # Meeting the vote hangs on (live vote); None for a pure async vote.
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
     agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
     question: str | None = None
     eligible_group: str = Field(alias="eligibleGroup")
     config: VoteConfig
-    # ``cancelled``: Antrag hat den vote-State manuell verlassen (Wahl abgebrochen).
+    # ``cancelled``: the application left the vote state manually (vote aborted).
     status: Literal["draft", "open", "closed", "cancelled"]
     opens_at: datetime | None = Field(default=None, alias="opensAt")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
@@ -101,13 +100,13 @@ class VoteOut(_CamelModel):
 
 
 class BallotAccepted(_CamelModel):
-    """Antwort auf eine angenommene Stimme."""
+    """Response for an accepted ballot."""
 
     status: Literal["cast", "changed"]
 
 
 class VoteClosed(_CamelModel):
-    """Ergebnis des Schließens (``POST /votes/{id}/close``)."""
+    """Result of closing (``POST /votes/{id}/close``)."""
 
     id: UUID
     meeting_id: UUID | None = Field(default=None, alias="meetingId")

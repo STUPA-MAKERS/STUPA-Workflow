@@ -1,16 +1,12 @@
-"""DSGVO-Aufbewahrungs-Cron (Art. 5(1)(e), #PII-Re-Add).
+"""GDPR retention cron (daily sweep).
 
-Täglicher Sweep:
-* Terminale Anträge (``state.is_terminal``), deren letzter Stand länger als die
-  Aufbewahrungsfrist zurückliegt, werden **anonymisiert** (PII → NULL, ``data``-
-  PII-Felder + Versionshistorie geleert, Magic-Links/Anhänge entfernt). Frist =
-  ``COALESCE(application_type.retention_months, privacy_settings.default_retention_months)``.
-* Abgelaufene ``auth_session`` + benutzte/abgelaufene ``magic_link`` werden gepurged.
+Terminal applications past their retention window are anonymized; expired sessions
+and used/expired magic links are purged. Retention =
+``COALESCE(application_type.retention_months, privacy_settings.default_retention_months)``.
 
-Budget-/Geld-Daten (``budget*``/``expense``/``invoice``) werden NIE angefasst — sie
-sind Finanz-Aufbewahrungsobjekte außerhalb dieses DSGVO-Scopes.
-
-Idempotent + per-Zeile ``try/except`` (eine kaputte Zeile bricht den Zyklus nie ab).
+Budget/money data (``budget*``/``expense``/``invoice``) is NEVER touched: financial
+records outside this GDPR scope. Idempotent, with per-row try/except so one bad row
+never aborts the run.
 """
 
 from __future__ import annotations
@@ -42,26 +38,26 @@ _RETENTION_ACTOR = "system:retention"
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB-Sessionmaker (in Tests via ``ctx['retention_sessionmaker']`` injizierbar)."""
+    """DB sessionmaker (injectable in tests via ``ctx['retention_sessionmaker']``)."""
     maker = ctx.get("retention_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
 
 def _now() -> datetime:
-    """Zeitzonenbewusster Jetzt-Zeitpunkt (UTC) — freezegun-steuerbar in Tests."""
+    """Timezone-aware now (UTC); freezegun-controllable in tests."""
     return datetime.now(UTC)
 
 
 async def _due_application_ids(
     maker: async_sessionmaker[AsyncSession],
 ) -> list[UUID]:
-    """IDs terminaler, noch nicht anonymisierter Anträge jenseits ihrer Aufbewahrungsfrist."""
+    """IDs of terminal, not-yet-anonymized applications past their retention window."""
     async with maker() as session:
         default_months = (
             await session.scalar(select(PrivacySettings.default_retention_months))
         ) or 24
         retention = func.coalesce(ApplicationType.retention_months, default_months)
-        # Pro-Zeile-Schwelle: updated_at älter als (jetzt − Frist) → fällig.
+        # Per-row threshold: updated_at older than (now - retention) is due.
         cutoff = func.now() - func.make_interval(0, retention)
         stmt = (
             select(Application.id)
@@ -102,7 +98,7 @@ async def _anonymize_due(
                 )
                 await session.commit()
             count += 1
-        except Exception:  # noqa: BLE001 — kaputte Einzel-Zeile bricht den Zyklus nicht ab
+        except Exception:  # noqa: BLE001 - a bad single row must not abort the run
             logger.exception("retention anonymize failed (app=%s)", application_id)
     return count
 
@@ -110,10 +106,11 @@ async def _anonymize_due(
 async def _purge_expired(
     maker: async_sessionmaker[AsyncSession], now: datetime
 ) -> tuple[int, int]:
-    """Abgelaufene Sessions + benutzte/abgelaufene Magic-Links entfernen.
+    """Delete expired sessions and used/expired magic links.
 
-    WICHTIG: ausschließlich Auth-Artefakte — Budget-/``expense``-/``invoice``-Zeilen
-    sind Finanz-Aufbewahrungsobjekte und werden hier NIE gelöscht."""
+    Auth artifacts only: budget/``expense``/``invoice`` rows are financial records
+    and are NEVER deleted here.
+    """
     async with maker() as session:
         sessions = cast(
             "CursorResult[Any]",
@@ -134,8 +131,10 @@ async def _purge_expired(
 
 
 async def process_retention(ctx: dict[str, Any]) -> str:
-    """Entry-Point (arq-Cron): anonymisieren + purgen. Gibt eine Lauf-Zusammenfassung
-    zurück (arq loggt den Rückgabewert → Cron-Sichtbarkeit)."""
+    """Entry point (arq cron): anonymize + purge.
+
+    Returns a run summary; arq logs the return value for cron visibility.
+    """
     settings: Settings = ctx.get("settings") or load_settings()
     maker = _sessionmaker(ctx)
     now = _now()

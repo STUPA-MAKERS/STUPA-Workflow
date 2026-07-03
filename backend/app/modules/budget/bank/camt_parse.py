@@ -1,11 +1,10 @@
-"""CAMT.052/053-Auszüge (XML) → :class:`~.statement.StatementLine` (#fints).
+"""CAMT.052/053 statements (XML) to :class:`~.statement.StatementLine`.
 
-Namespace-tolerant (über local-name) und versions-tolerant (beliebige
-``camt.05x.001.yy``). **Sammelbuchungen** — ein ``Ntry`` mit mehreren ``TxDtls``
-(Sparkasse: „DATEI-NR. … ANZAHL …") — werden in **Einzelumsätze aufgeteilt**
-(#fints-batch): je ``TxDtls`` eine Zeile mit eigenem Betrag/Zweck/Gegenkonto.
-Nur wenn die Teilbeträge den Buchungsbetrag exakt ergeben, wird gesplittet;
-sonst bleibt es (konservativ) bei einer Zeile mit dem Gesamtbetrag.
+Namespace-tolerant (via local name) and version-tolerant (any
+``camt.05x.001.yy``). Batch bookings — one ``Ntry`` with several ``TxDtls`` —
+are split into single transactions, one line per ``TxDtls`` with its own
+amount/purpose/counterparty. Split only when the partial amounts add up exactly
+to the entry amount; otherwise conservatively keep one line with the total.
 """
 
 from __future__ import annotations
@@ -30,11 +29,11 @@ from app.modules.budget.bank.statement import (
 
 
 def parse_camt(data: bytes) -> list[StatementLine]:
-    """CAMT-Auszug (Report ``camt.052`` oder Statement ``camt.053``) → Umsätze.
+    """Parse a CAMT statement (report ``camt.052`` or statement ``camt.053``).
 
-    :raises StatementParseError: kein/kaputtes CAMT-XML oder keine verwertbaren Einträge."""
+    :raises StatementParseError: missing/broken CAMT XML or no usable entries."""
     try:
-        root = ET.fromstring(data)  # noqa: S314 - eigener Auszug, keine externen Entities
+        root = ET.fromstring(data)  # noqa: S314 - own statement, no external entities
     except ET.ParseError as exc:
         raise StatementParseError(f"unparseable CAMT XML: {exc}") from exc
 
@@ -52,10 +51,10 @@ def parse_camt(data: bytes) -> list[StatementLine]:
 
 @dataclass(slots=True)
 class _Entry:
-    """Vorverdaute ``Ntry``-Fakten, die jede daraus erzeugte Zeile teilt."""
+    """Pre-digested ``Ntry`` facts shared by every line derived from it."""
 
-    amount: Decimal  # vorzeichenbehaftet (inkl. Storno-Umkehr)
-    orig_credit: bool  # CdtDbtInd des Eintrags (Original-Richtung)
+    amount: Decimal  # signed (incl. reversal flip)
+    orig_credit: bool  # the entry's CdtDbtInd (original direction)
     reversal: bool
     currency: str
     booking_date: date | None
@@ -64,7 +63,7 @@ class _Entry:
 
 
 def _entry_facts(ntry: ET.Element) -> _Entry | None:
-    """Betrag/Richtung/Storno/Daten eines ``Ntry`` lesen — ``None`` = unbrauchbar."""
+    """Read amount/direction/reversal/dates of one ``Ntry`` — ``None`` = unusable."""
     amt_el = _find_local(ntry, "Amt")
     if amt_el is None or not (amt_el.text or "").strip():
         return None
@@ -72,8 +71,8 @@ def _entry_facts(ntry: ET.Element) -> _Entry | None:
         magnitude = Decimal((amt_el.text or "").strip())
     except (InvalidOperation, ValueError):
         return None
-    # Richtung **explizit** verlangen: ohne klares CRDT/DBIT ist die wirtschaftliche
-    # Richtung unbekannt — nicht still als Abgang annehmen (#fints-review).
+    # Require the direction explicitly: without a clear CRDT/DBIT the economic
+    # direction is unknown — do not silently assume outflow.
     ind = (_find_text_local(ntry, "CdtDbtInd") or "").upper()
     if ind.startswith("CRDT"):
         orig_credit = True
@@ -81,11 +80,11 @@ def _entry_facts(ntry: ET.Element) -> _Entry | None:
         orig_credit = False
     else:
         return None
-    # Storno (``RvslInd=true``) kehrt die wirtschaftliche Richtung um (Rückbuchung).
+    # A reversal (``RvslInd=true``) flips the economic direction (chargeback).
     reversal = (_find_text_local(ntry, "RvslInd") or "").strip().lower() in ("true", "1")
     credit = (not orig_credit) if reversal else orig_credit
-    # CAMT ``<Amt>`` ist spec-gemäß ≥ 0; ein negativer Wert würde das Vorzeichen unten
-    # erneut kippen → defensiv den Betrag entkoppeln (Richtung kommt nur aus dem Indikator).
+    # CAMT ``<Amt>`` is >= 0 per spec; a negative value would flip the sign again
+    # below — defensively decouple the amount (direction comes only from the indicator).
     amount = sane_amount(abs(magnitude) if credit else -abs(magnitude))
     return _Entry(
         amount=amount,
@@ -99,7 +98,7 @@ def _entry_facts(ntry: ET.Element) -> _Entry | None:
 
 
 def _lines_from_entry(ntry: ET.Element) -> list[StatementLine]:
-    """Ein ``Ntry`` → 1 Zeile (Einzelbuchung) oder n Zeilen (aufgeteilte Sammelbuchung)."""
+    """Map one ``Ntry`` to 1 line (single booking) or n lines (split batch booking)."""
     entry = _entry_facts(ntry)
     if entry is None:
         return []
@@ -115,11 +114,11 @@ def _lines_from_entry(ntry: ET.Element) -> list[StatementLine]:
 def _split_batch(
     ntry: ET.Element, entry: _Entry, tx_details: list[ET.Element]
 ) -> list[StatementLine] | None:
-    """Sammelbuchung in Einzelumsätze auflösen — oder ``None``, wenn das nicht sicher geht.
+    """Resolve a batch booking into single transactions — or ``None`` if unsafe.
 
-    Sicher heißt: jede ``TxDtls`` trägt einen eigenen ``TxAmt`` in der Eintrags-Währung und
-    die (vorzeichenbehafteten) Teilbeträge summieren sich exakt auf den Buchungsbetrag —
-    sonst würde der Split Beträge erfinden (z. B. bei Brutto/Netto-Abweichung durch Entgelte).
+    Safe means: every ``TxDtls`` carries its own ``TxAmt`` in the entry currency
+    and the signed partial amounts sum exactly to the entry amount — otherwise
+    the split would invent amounts (e.g. gross/net deviation due to fees).
     """
     lines: list[StatementLine] = []
     total = Decimal("0")
@@ -127,9 +126,9 @@ def _split_batch(
         amount = _tx_amount(tx, entry)
         if amount is None:
             return None
-        # Bank-Referenz je Teil-Transaktion (falls vorhanden). Die Eintrags-Referenz ist für
-        # alle Teile identisch und darf NICHT verwendet werden — sonst kollabierten alle
-        # Teilzeilen auf denselben Idempotenz-Schlüssel (#fints-batch).
+        # Bank reference per sub-transaction (if any). The entry reference is
+        # identical for all parts and must NOT be used — all sub-lines would
+        # collapse onto the same idempotency key.
         tx_ref = clean(_find_text_local(_find_local(tx, "Refs"), "AcctSvcrRef"))
         lines.append(_line_from_scope(tx, ntry, entry, amount=amount, bank_ref=tx_ref))
         total += amount
@@ -147,11 +146,11 @@ def _split_batch(
 
 
 def _tx_amount(tx: ET.Element, entry: _Entry) -> Decimal | None:
-    """Vorzeichenbehafteter Betrag einer Teil-Transaktion (``AmtDtls/TxAmt/Amt``).
+    """Signed amount of a sub-transaction (``AmtDtls/TxAmt/Amt``).
 
-    ``None``, wenn Betrag/Währung fehlen oder nicht zur Eintrags-Währung passen. Die Richtung
-    kommt aus dem ``CdtDbtInd`` der Teil-Transaktion, sonst vom Eintrag; ein Eintrags-Storno
-    kehrt sie um (wie beim ungeteilten Eintrag)."""
+    ``None`` when amount/currency are missing or do not match the entry currency.
+    Direction comes from the sub-transaction's ``CdtDbtInd``, else the entry's;
+    an entry reversal flips it (as for the unsplit entry)."""
     tx_amt = _find_local(tx, "TxAmt")
     amt_el = _find_local(tx_amt, "Amt") if tx_amt is not None else None
     if amt_el is None or not (amt_el.text or "").strip():
@@ -181,10 +180,10 @@ def _line_from_scope(
     amount: Decimal,
     bank_ref: str | None,
 ) -> StatementLine:
-    """Eine Zeile aus einem Detail-Scope (``TxDtls`` bzw. das ``Ntry`` selbst) bauen."""
+    """Build one line from a detail scope (``TxDtls`` or the ``Ntry`` itself)."""
     credit = amount > 0
-    # Gegenpartei folgt der **ursprünglichen** Richtung (Dbtr/Cdtr stehen im XML zur
-    # Originalrichtung) — bei Gutschrift der Debitor (Zahler), sonst der Kreditor.
+    # The counterparty follows the ORIGINAL direction (Dbtr/Cdtr in the XML refer
+    # to it) — on credit the debtor (payer), otherwise the creditor.
     orig_credit = (not credit) if entry.reversal else credit
     party_tag, acct_tag = ("Dbtr", "DbtrAcct") if orig_credit else ("Cdtr", "CdtrAcct")
     party = _find_local(scope, party_tag)
@@ -198,8 +197,8 @@ def _line_from_scope(
         "creditDebit": "CRDT" if entry.orig_credit else "DBIT",
         **({"reversal": "true"} if entry.reversal else {}),
         **({"booking_time": booking_time} if booking_time else {}),
-        # Roh-Zweck mitschreiben (#fints-raw): speist ``resolve_purpose`` und macht den
-        # Inhalts-Hash-Schlüssel aussagekräftig (Zeilen ohne Bank-Referenz).
+        # Record the raw purpose: feeds ``resolve_purpose`` and makes the
+        # content-hash key meaningful (lines without a bank reference).
         **({"purpose": purpose} if purpose else {}),
     }
     return StatementLine(
@@ -218,9 +217,9 @@ def _line_from_scope(
 
 
 def _purpose_text(scope: ET.Element, ntry: ET.Element) -> str | None:
-    """Verwendungszweck eines Scopes: alle ``Ustrd``-Zeilen (Banken teilen lange Zwecke auf
-    mehrere Elemente) zusammengesetzt; ohne ``Ustrd`` die ``AddtlNtryInf`` des Eintrags
-    (Sparkasse legt dort z. B. „SAMMELUEBERWEISUNG DATEI-NR. …" ab)."""
+    """Purpose of a scope: all ``Ustrd`` lines joined (banks split long purposes
+    across elements); without ``Ustrd``, the entry's ``AddtlNtryInf`` (Sparkasse
+    puts e.g. "SAMMELUEBERWEISUNG DATEI-NR. …" there)."""
     parts = [t for el in _findall_local(scope, "Ustrd") if (t := clean(el.text))]
     if parts:
         return " ".join(parts)
@@ -229,19 +228,19 @@ def _purpose_text(scope: ET.Element, ntry: ET.Element) -> str | None:
 
 # ------------------------------------------------------------------------ balance
 def camt_closing_balance(data: bytes) -> StatementBalance | None:
-    """CAMT-Schlusssaldo: ``<Bal>`` mit Code ``CLBD`` (Closing Booked); Vorzeichen aus
-    ``CdtDbtInd``. Fällt auf ``CLAV`` (Closing Available) zurück, wenn kein CLBD da ist."""
+    """CAMT closing balance: ``<Bal>`` with code ``CLBD`` (Closing Booked); sign
+    from ``CdtDbtInd``. Falls back to ``CLAV`` (Closing Available) without CLBD."""
     try:
-        root = ET.fromstring(data)  # noqa: S314 - eigener Auszug, keine externen Entities
+        root = ET.fromstring(data)  # noqa: S314 - own statement, no external entities
     except ET.ParseError:
         return None
     by_code: dict[str, ET.Element] = {}
     for bal in _findall_local(root, "Bal"):
         code = (_find_text_local(bal, "Cd") or "").upper()
         if code:
-            # Bei mehreren <Stmt> (mehrtägiger Export) gewinnt der LETZTE Schlusssaldo (#review).
+            # With several <Stmt> (multi-day export) the LAST closing balance wins.
             by_code[code] = bal
-    # `Element or Element` triggert die ElementTree-Truthiness-Deprecation → explizit prüfen.
+    # `Element or Element` trips the ElementTree truthiness deprecation — check explicitly.
     chosen = by_code.get("CLBD")
     if chosen is None:
         chosen = by_code.get("CLAV")
@@ -265,7 +264,7 @@ def camt_closing_balance(data: bytes) -> StatementBalance | None:
 
 # -------------------------------------------------------------------- XML helpers
 def _local(tag: str) -> str:
-    """Lokaler Tag-Name ohne ``{namespace}``-Präfix."""
+    """Local tag name without the ``{namespace}`` prefix."""
     return tag.rsplit("}", 1)[-1]
 
 
@@ -288,7 +287,7 @@ def _find_text_local(el: ET.Element | None, name: str) -> str | None:
 
 
 def _camt_date(el: ET.Element | None) -> date | None:
-    """CAMT ``BookgDt``/``ValDt`` → ``date`` (``Dt`` = YYYY-MM-DD, oder ``DtTm``)."""
+    """CAMT ``BookgDt``/``ValDt`` to ``date`` (``Dt`` = YYYY-MM-DD, or ``DtTm``)."""
     if el is None:
         return None
     raw = _find_text_local(el, "Dt") or _find_text_local(el, "DtTm")
