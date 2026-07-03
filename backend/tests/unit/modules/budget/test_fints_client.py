@@ -67,6 +67,14 @@ def test_select_account_empty_raises() -> None:
         fc._select_account([], None)
 
 
+def test_select_account_non_de_iban_no_kto_match_raises() -> None:
+    """Konfigurierte NICHT-DE-IBAN (kein KTO ableitbar) trifft nichts → klarer Fehler
+    statt still falsches Konto (deckt den ``if kto:``-False-Zweig ab)."""
+    accs = [_Acct("DE111", "1"), _Acct("DE222", "2")]
+    with pytest.raises(fc.FintsAccountSelectionError):
+        fc._select_account(accs, "FR761234567890")  # non-DE → kto leer, kein Treffer
+
+
 def test_kto_from_de_iban() -> None:
     assert fc._kto_from_de_iban("DE00123456780001234567") == "1234567"
     assert fc._kto_from_de_iban("FR761234567890") == ""  # nicht-DE
@@ -83,6 +91,23 @@ def test_account_scope_includes_iban_and_number() -> None:
     scope = fc._account_scope(acc, creds)
     assert "DE00123456780001234567" in scope  # konfigurierte IBAN
     assert "1234567" in scope  # KTO (aus Bank-accountnumber + IBAN), Nullen entfernt
+
+
+def test_account_scope_without_number_or_de_iban() -> None:
+    """Bank-Konto ohne accountnumber + NICHT-DE-IBAN als Credential: Scope enthält nur
+    die IBAN (deckt die leeren ``_norm_kto``/``_kto_from_de_iban``-Zweige ab)."""
+    acc = _Acct("", accountnumber="")  # keine KTO von der Bank
+    creds = fc.FintsCredentials(
+        endpoint="https://x", blz="1", login="u", pin="p",
+        account_iban="FR7612345678901234",  # non-DE → kein KTO ableitbar
+    )
+    scope = fc._account_scope(acc, creds)
+    assert scope == frozenset({fc._norm_iban("FR7612345678901234")})
+
+
+def test_mask_id_shortens_and_handles_short_values() -> None:
+    assert fc._mask_id("DE00123456780001234567") == "…4567"  # letzte 4
+    assert fc._mask_id("ab") == "…"  # < 4 Zeichen → nur Maske
 
 
 def test_outcome_dataclass_defaults() -> None:
