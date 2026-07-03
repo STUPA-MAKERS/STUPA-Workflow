@@ -862,6 +862,7 @@ async def list_statement_lines(
         Literal["unmatched", "suggested", "matched", "ignored"] | None, Query()
     ] = None,
     linked: Annotated[bool | None, Query()] = None,
+    include_ignored: Annotated[bool, Query(alias="includeIgnored")] = True,
     kind: Annotated[ExpenseKind | None, Query()] = None,
     q: Annotated[str | None, Query()] = None,
     date_from: Annotated[str | None, Query(alias="dateFrom")] = None,
@@ -873,11 +874,13 @@ async def list_statement_lines(
 ) -> Page[StatementLineOut]:
     """List staged bank transactions, filtered + offset-paged. Filters:
     ``account``, ``state``, ``kind``, ``q`` (counterparty/IBAN/purpose), date
-    range (``dateFrom``/``dateTo``); ``sort`` = date/amount."""
+    range (``dateFrom``/``dateTo``); ``sort`` = date/amount. ``includeIgnored``
+    = false hides set-aside lines when no explicit ``state`` is given (Alle view)."""
     return await service.list_lines_paged(
         account_id=account_id,
         state=state,
         linked=linked,
+        include_ignored=include_ignored,
         kind=kind,
         q=q,
         date_from=date_from,

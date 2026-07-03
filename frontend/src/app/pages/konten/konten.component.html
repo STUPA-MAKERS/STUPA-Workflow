@@ -116,7 +116,7 @@
           </thead>
           <tbody>
             @for (line of lines(); track line.id) {
-              <tr [class.exp__tr--income]="line.kind === 'income'" [class.exp__tr--ignored]="line.matchState === 'ignored'">
+              <tr [class.exp__tr--income]="line.kind === 'income'">
                 <td class="exp__cellDate">{{ (line.valueDate || line.bookingDate) ? ((line.valueDate || line.bookingDate) | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellKind">
                   <app-badge [variant]="line.kind === 'income' ? 'success' : 'neutral'">{{ (line.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
@@ -137,19 +137,19 @@
                     <span class="exp__actions">
                       @if (line.matchState === 'matched') {
                         @if (canBook()) {
-                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.unlink' | t" [title]="'konten.action.unlink' | t" (click)="unlink(line)"><app-icon name="remove" /></app-button>
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.unlink' | t" [title]="'konten.action.unlink' | t" (click)="unlink(line)"><app-icon name="link-slash" /></app-button>
                         }
                       } @else if (line.matchState === 'ignored') {
                         @if (canIgnore()) {
-                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.reactivate' | t" [title]="'konten.action.reactivate' | t" (click)="reactivate(line)"><app-icon name="play" /></app-button>
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.reactivate' | t" [title]="'konten.action.reactivate' | t" (click)="reactivate(line)"><app-icon name="eye" /></app-button>
                         }
                       } @else {
                         @if (canBook()) {
-                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.link' | t" [title]="'konten.action.link' | t" (click)="openLink(line)"><app-icon name="paperclip" /></app-button>
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.link' | t" [title]="'konten.action.link' | t" (click)="openLink(line)"><app-icon name="link" /></app-button>
                           <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.import' | t" [title]="'konten.action.import' | t" (click)="openImport(line)"><app-icon name="add" /></app-button>
                         }
                         @if (canIgnore()) {
-                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.ignore' | t" [title]="'konten.action.ignore' | t" (click)="openIgnore(line)"><app-icon name="stop" /></app-button>
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.ignore' | t" [title]="'konten.action.ignore' | t" (click)="openIgnore(line)"><app-icon name="eye-slash" /></app-button>
                         }
                       }
                     </span>
