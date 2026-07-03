@@ -37,6 +37,20 @@ _CAMT_NO_ACCT = b"""<?xml version="1.0" encoding="UTF-8"?>
    <Ntry><Amt Ccy="EUR">5.00</Amt><CdtDbtInd>CRDT</CdtDbtInd>
     <NtryDtls><TxDtls><RmtInf><Ustrd>NoAcct</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
  </Stmt></BkToCstmrStmt></Document>"""
+# Statements identified only by the proprietary account NUMBER (no IBAN) — older
+# Sparkasse SEPA accounts. Scoping must work by account number too.
+_CAMT_OTHR = b"""<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08">
+ <BkToCstmrStmt>
+  <Stmt><Acct><Id><Othr><Id>1234567</Id></Othr></Id></Acct>
+   <Ntry><Amt Ccy="EUR">10.00</Amt><CdtDbtInd>CRDT</CdtDbtInd>
+    <NtryDtls><TxDtls><RmtInf><Ustrd>KontoA</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
+  </Stmt>
+  <Stmt><Acct><Id><Othr><Id>7654321</Id></Othr></Id></Acct>
+   <Ntry><Amt Ccy="EUR">20.00</Amt><CdtDbtInd>CRDT</CdtDbtInd>
+    <NtryDtls><TxDtls><RmtInf><Ustrd>KontoB</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
+  </Stmt>
+ </BkToCstmrStmt></Document>"""
 
 _CAMT_ONE = b"""<?xml version="1.0" encoding="UTF-8"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.052.001.08">
@@ -140,22 +154,42 @@ def test_parse_camt_scopes_to_requested_iban() -> None:
     assert [line.amount for line in only_b] == [Decimal("20.00")]
 
 
-def test_parse_camt_without_iban_keeps_all_statements() -> None:
+def test_parse_camt_scopes_by_account_number_without_iban() -> None:
+    """Older Sparkasse accounts have no IBAN — scope by the account number."""
+    only_a = parse_camt(_CAMT_OTHR, account_ids=["1234567"])
+    assert [line.amount for line in only_a] == [Decimal("10.00")]
+
+
+def test_parse_camt_without_scope_keeps_all_statements() -> None:
     lines = parse_camt(_CAMT_COMBINED)
     assert sorted(line.amount for line in lines) == [Decimal("10.00"), Decimal("20.00")]
+    empty_scope = parse_camt(_CAMT_COMBINED, account_ids=[""])  # blank ids ignored
+    assert len(empty_scope) == 2
 
 
-def test_parse_camt_keeps_statement_without_identifiable_iban() -> None:
-    """Defensive: a scoped fetch must not drop a statement that omits its IBAN."""
+def test_parse_camt_keeps_statement_without_identifiable_account() -> None:
+    """Defensive: a scoped fetch must not drop a statement that omits its account."""
     lines = parse_camt(_CAMT_NO_ACCT, iban="DE11111111111111111111")
     assert [line.amount for line in lines] == [Decimal("5.00")]
 
 
-def test_parse_camt_nonmatching_iban_yields_no_entries() -> None:
+def test_parse_camt_nonmatching_scope_yields_no_entries() -> None:
     with pytest.raises(StatementParseError):
         parse_camt(_CAMT_COMBINED, iban="DE99999999999999999999")
 
 
-def test_lines_from_fetch_result_scopes_camt_by_iban() -> None:
-    lines = lines_from_fetch_result(([_CAMT_COMBINED], [None]), "DE22222222222222222222")
+def test_lines_from_fetch_result_scopes_camt_by_account_ids() -> None:
+    lines = lines_from_fetch_result(([_CAMT_COMBINED], [None]), ["DE22222222222222222222"])
     assert [line.amount for line in lines] == [Decimal("20.00")]
+
+
+def test_statement_account_ids_lists_all_accounts() -> None:
+    """Diagnostic helper: reveals every account present in a fetched document."""
+    from app.modules.budget.bank.camt_parse import statement_account_ids
+
+    assert statement_account_ids(_CAMT_COMBINED) == [
+        "DE11111111111111111111",
+        "DE22222222222222222222",
+    ]
+    assert statement_account_ids(_CAMT_OTHR) == ["1234567", "7654321"]
+    assert statement_account_ids(b"not xml") == []
