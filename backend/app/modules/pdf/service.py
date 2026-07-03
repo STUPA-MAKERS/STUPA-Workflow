@@ -1,17 +1,16 @@
-"""pdf-Service (T-20): Job-Lebenszyklus + Antrags-Dokument-Laden.
+"""pdf service: job lifecycle + application-document loading.
 
-Zwei Verantwortungen, bewusst getrennt:
+Two deliberately separated responsibilities:
 
-* **API-Seite** (an eine ``AsyncSession`` gebunden): :meth:`create_application_job`
-  legt die ``render_job``-Zeile an (``pending``), :meth:`get_job` liest den Status +
-  baut bei Erfolg eine kurzlebige, signierte Ergebnis-URL. Der eigentliche Render
-  läuft im Worker (202-Pfad).
-* **Daten-Laden**: :meth:`load_application_doc` zieht Felder + Werte + Verlauf + ggf.
-  Abstimmungsergebnis aus der DB in einen reinen :class:`ApplicationDoc` — den der
-  Worker an :mod:`app.modules.pdf.markdown` (DB-frei, unit-getestet) übergibt.
+* API side (bound to an ``AsyncSession``): ``create_application_job`` creates the
+  ``render_job`` row (``pending``); ``get_job`` reads the status and, on success,
+  builds a short-lived signed result URL. The actual render runs in the worker.
+* Data loading: ``load_application_doc`` pulls fields + values + timeline + optional
+  vote result from the DB into a plain ``ApplicationDoc`` that the worker hands to
+  ``app.modules.pdf.markdown`` (DB-free, unit-tested).
 
-Der Render-Pipeline-Code (pytex → MinIO) liegt in :mod:`app.modules.pdf.render`,
-damit die Infra-Abhängigkeiten nur worker-seitig injiziert werden.
+The render-pipeline code (pytex → MinIO) lives in ``app.modules.pdf.render`` so the
+infra dependencies are injected worker-side only.
 """
 
 from __future__ import annotations
@@ -38,7 +37,7 @@ from app.shared.i18n import resolve_i18n
 
 
 class PdfService:
-    """DB-gestützte Render-Job-Operationen + Antrags-Dokument-Aufbereitung."""
+    """DB-backed render-job operations + application-document assembly."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -47,10 +46,10 @@ class PdfService:
     async def create_application_job(
         self, application_id: UUID, *, idempotency_key: str | None = None
     ) -> RenderJob:
-        """``render_job`` (pending) für einen Antrag anlegen. 404, wenn der Antrag fehlt.
+        """Create a ``render_job`` (pending) for an application. 404 if it is missing.
 
-        Bei gesetztem ``idempotency_key`` (Flow-Action ``exportPdf``) wird ein bereits
-        vorhandener Job desselben Keys **wiederverwendet** (kein Doppel-Render)."""
+        With an ``idempotency_key`` set (flow action ``exportPdf``) an existing job of
+        the same key is reused (no double render)."""
         app = await self.session.get(Application, application_id)
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
@@ -83,7 +82,7 @@ class PdfService:
         storage: ObjectStorage | None = None,
         settings: Settings | None = None,
     ) -> JobOut:
-        """Job → ``JobOut``; bei ``done`` + Storage eine signierte Ergebnis-URL beilegen."""
+        """Job → ``JobOut``; on ``done`` + storage attach a signed result URL."""
         result_url: str | None = None
         if (
             job.status == "done"
@@ -107,7 +106,7 @@ class PdfService:
 
     # ------------------------------------------------------------- document loading
     async def load_application_doc(self, application_id: UUID) -> ApplicationDoc:
-        """Antrag + Felder + Werte + Verlauf + ggf. Abstimmungsergebnis → ``ApplicationDoc``."""
+        """Application + fields + values + timeline + optional vote result → ``ApplicationDoc``."""
         app = await self.session.get(Application, application_id)
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
@@ -179,7 +178,7 @@ class PdfService:
     async def _vote_result(
         self, application_id: UUID, lang: str, default_lang: str
     ) -> VoteResult | None:
-        """Jüngstes abgeschlossenes Voting des Antrags (mit Ergebnis), sonst ``None``."""
+        """Latest closed vote of the application (with a result), else ``None``."""
         vote = await self.session.scalar(
             select(Vote)
             .where(Vote.application_id == application_id, Vote.result.is_not(None))

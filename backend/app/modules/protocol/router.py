@@ -1,28 +1,16 @@
-"""Protokoll-API-Router (T-22, api.md »protocol«, flows §7).
+"""Protocol API router.
 
-Endpunkte, **serverseitig per Gremium** autorisiert (fail-closed). Die Authentifizierung
-gatet jeder Endpunkt über ``require_principal()``; die Berechtigung delegiert er an den
-:class:`MeetingService` (über ``ProtocolService``-Helfer) — **identische** Scope-Regeln
-wie der Live-Stack (``/api/meetings/…``):
+Endpoints are authorized server-side per gremium (fail-closed). Every endpoint
+gates authentication via ``require_principal()`` and delegates authorization to
+:class:`MeetingService` (through ``ProtocolService`` helpers) — the same scope
+rules as the live stack (``/api/meetings/…``). Global-permission gating alone
+would lock out per-gremium protokollants; ``resolve_principal`` deliberately
+does NOT merge gremium-role permissions into ``principal.permissions``, hence
+the delegation to the service.
 
-* ``POST  /api/meetings/{id}/protocol`` — anlegen/laden; ``can_write`` (Verwalter,
-  zugewiesener Protokollant ODER Gremium-Rolle mit ``protocol.write``).
-* ``GET   /api/meetings/{id}/protocol`` — lesen; ``assert_can_read`` (Sitzungs-Sicht).
-* ``PATCH /api/protocols/{id}``          — Markdown-Body aktualisieren; ``can_write``.
-* ``POST  /api/protocols/{id}/votes``    — Abstimmungen einbetten; ``can_write``.
-* ``POST  /api/protocols/{id}/finalize`` — → PDF → MinIO → MAIL_LIST; ``can_write`` UND
-  ``protocol.finalize`` (global ODER als Gremium-Rolle).
-* ``GET   /api/protocols/{id}/pdf[/public]`` — PDF streamen; ``assert_can_read``.
-
-Vorher gateten alle Endpunkte auf GLOBALE ``meeting.manage``/``protocol.finalize``/
-``meeting.view_all`` — das sperrte per-Gremium-Protokollanten ohne org-weite Permission
-aus (AUD-016: die TOP-Bodies waren per Gremium editierbar, das montierende Protokoll
-nicht). ``resolve_principal`` führt Gremium-Rollen-Permissions bewusst NICHT in
-``principal.permissions``, daher die Delegation an den Service.
-
-Der Service wird mit der **T-20-Render-Infrastruktur** verdrahtet (Object-Storage +
-arq-Mail-Pool aus dem App-State; pytex-Client aus den Settings) —
-keine Duplikation. Fehler werden als ``ProblemDetail`` (problem+json) deklariert.
+The service is wired with the shared render infrastructure (object storage +
+arq mail pool from app state; pytex client from settings). Errors are declared
+as ``ProblemDetail`` (problem+json).
 """
 
 from __future__ import annotations
@@ -58,7 +46,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def _mail_queue(request: Request) -> MailQueue | None:
-    """arq-Mail-Queue aus dem App-State-Pool (oder ``None`` ohne Redis)."""
+    """Build the arq mail queue from the app-state pool (``None`` without Redis)."""
     pool = getattr(request.app.state, "arq_pool", None)
     return ArqMailQueue(pool) if pool is not None else None
 
@@ -66,7 +54,7 @@ def _mail_queue(request: Request) -> MailQueue | None:
 def get_protocol_service(
     session: DbSession, request: Request, settings: SettingsDep
 ) -> ProtocolService:
-    """Service mit T-20-Render-Infra verdrahten (Storage/Mail aus State, pytex aus Settings)."""
+    """Wire the service with render infra (storage/mail from state, pytex from settings)."""
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
     return ProtocolService(
         session,
@@ -78,8 +66,8 @@ def get_protocol_service(
 
 
 ServiceDep = Annotated[ProtocolService, Depends(get_protocol_service)]
-# Alle Endpunkte verlangen nur Authentifizierung; die feingranulare (per-Gremium)
-# Berechtigung prüft jeder Endpunkt selbst über ``ProtocolService``→``MeetingService``.
+# Endpoints only require authentication here; fine-grained per-gremium
+# authorization is checked per endpoint via ProtocolService → MeetingService.
 PrincipalDep = Annotated[Principal, Depends(require_principal())]
 
 
@@ -91,7 +79,7 @@ PrincipalDep = Annotated[Principal, Depends(require_principal())]
 async def create_or_load_protocol(
     meeting_id: UUID, service: ServiceDep, principal: PrincipalDep
 ) -> ProtocolOut:
-    """Protokoll der Sitzung anlegen **oder** laden (idempotent, 1:1 zur Sitzung)."""
+    """Create or load the meeting's protocol (idempotent, 1:1 to the meeting)."""
     await service.authorize_write_meeting(meeting_id, principal)
     return await service.get_or_create(meeting_id, author=principal.sub)
 
@@ -104,15 +92,11 @@ async def create_or_load_protocol(
 async def get_protocol(
     meeting_id: UUID, service: ServiceDep, principal: PrincipalDep
 ) -> ProtocolOut:
-    """Protokoll der Sitzung **lesen** (404 ohne Protokoll) — Reload-/Poll-Pfad.
+    """Read the meeting's protocol (404 without one) — reload/poll path.
 
-    Der Status-Poll während des Hintergrund-Renders lief vorher über den POST und
-    schlug nach kurzer Zeit am Default-Write-Rate-Limit auf (429, #async-finalize).
-
-    Lese-Scope = Sitzungs-Sicht (``assert_can_read``): Mitglieder/Pool-Vertreter des
-    Gremiums, Delegations-Empfänger, sowie global ``meeting.view_all``/``meeting.manage``/
-    Admin. AUD-016: vorher global-permission-gegatet, was per-Gremium-Protokollanten
-    aussperrte."""
+    Read scope = meeting view (``assert_can_read``): gremium members/pool
+    substitutes, delegation recipients, plus global
+    ``meeting.view_all``/``meeting.manage``/admin."""
     await service.authorize_read_meeting(meeting_id, principal)
     return await service.get_by_meeting(meeting_id)
 
@@ -128,7 +112,7 @@ async def update_protocol(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> ProtocolOut:
-    """Editor-Body aktualisieren. 409, wenn das Protokoll bereits final ist."""
+    """Update the editor body. 409 if the protocol is already final."""
     await service.authorize_write(protocol_id, principal)
     return await service.update_markdown(protocol_id, payload.markdown)
 
@@ -144,7 +128,7 @@ async def embed_votes(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> ProtocolOut:
-    """Abstimmungen als Markdown-Snippets einbetten (idempotent)."""
+    """Embed votes as Markdown snippets (idempotent)."""
     await service.authorize_write(protocol_id, principal)
     return await service.embed_votes(protocol_id, payload.vote_ids)
 
@@ -157,16 +141,16 @@ async def embed_votes(
 async def finalize_protocol(
     protocol_id: UUID, service: ServiceDep, request: Request, principal: PrincipalDep
 ) -> ProtocolOut:
-    """Finalisierung anstoßen: ``status=rendering`` + ``render_protocol``-Worker-Job.
+    """Start finalization: ``status=rendering`` + a ``render_protocol`` worker job.
 
-    Schreibrecht UND ``protocol.finalize`` (global ODER als Gremium-Rolle) — strenger
-    als das Entwurf-Schreiben (#6).
+    Requires write access AND ``protocol.finalize`` (global or as gremium role) —
+    stricter than draft writing.
 
-    Nicht-blockierend (der pytex-Render läuft im arq-Worker); der Worker setzt
-    ``final`` + versendet die Mail, bei dauerhaftem Fehler fällt das Protokoll auf
-    ``draft`` zurück. Ohne Redis (DEV/Contract-CI) rendert der Request synchron als
-    Fallback — nie in ``rendering`` hängen. Idempotent: ``rendering``/``final``
-    wird unverändert zurückgegeben (kein Doppel-Render/-Versand)."""
+    Non-blocking (pytex render runs in the arq worker); the worker sets
+    ``final`` and sends the mail, a permanent failure falls back to ``draft``.
+    Without Redis the request renders synchronously as fallback — never stuck
+    in ``rendering``. Idempotent: ``rendering``/``final`` is returned unchanged
+    (no double render/send)."""
     await service.authorize_finalize(protocol_id, principal)
     out, needs_render = await service.start_finalize(protocol_id)
     if not needs_render:
@@ -174,8 +158,8 @@ async def finalize_protocol(
     pool = getattr(request.app.state, "arq_pool", None)
     queue = protocol_render_queue_from_pool(pool)
     if queue is None:
-        # Sync-Fallback ohne Redis: Fehler → Rollback auf ``draft`` (re-finalisierbar),
-        # dann den Fehler unverändert als problem+json durchreichen (Alt-Verhalten).
+        # Sync fallback without Redis: on error roll back to ``draft``
+        # (re-finalizable), then re-raise unchanged as problem+json.
         try:
             return await service.finalize(protocol_id, now=datetime.now(UTC))
         except Exception:
@@ -183,8 +167,8 @@ async def finalize_protocol(
             await service.revert_to_draft(protocol_id)
             raise
     await queue.enqueue(protocol_id)
-    # Follower sofort informieren (»Wird gerendert«-Tag): meeting_state-Broadcast;
-    # der Worker broadcastet erneut, wenn final/zurückgerollt.
+    # Inform followers immediately ("rendering" tag) via meeting_state broadcast;
+    # the worker broadcasts again once final/rolled back.
     broker = getattr(request.app.state, "broker", None)
     if broker is not None:
         await MeetingService(service.session, BrokerPublisher(broker)).broadcast_state(
@@ -201,13 +185,13 @@ async def finalize_protocol(
 async def get_protocol_pdf(
     protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
 ) -> Response:
-    """PDF des Protokolls inline streamen (MinIO liegt intern, kein Browser-Zugriff).
+    """Stream the protocol PDF inline (MinIO is internal, no browser access).
 
-    Server-seitiger Storage-Fetch statt presigned URL: MinIO ist nur im ``internal``-
-    Docker-Netz erreichbar, eine S3v4-signierte URL bindet den internen Host → vom
-    Browser unerreichbar. Über nginx ``/api/`` ist dieser Endpunkt erreichbar.
+    Server-side storage fetch instead of a presigned URL: MinIO is only
+    reachable on the internal Docker network, so an S3v4-signed URL would bind
+    the internal host and be unreachable from the browser.
 
-    Lese-Scope = Sitzungs-Sicht (``assert_can_read``) — wie der Protokoll-GET (AUD-016)."""
+    Read scope = meeting view (``assert_can_read``), like the protocol GET."""
     await service.authorize_read(protocol_id, principal)
     data = await service.get_pdf_bytes(protocol_id)
     return Response(
@@ -225,10 +209,10 @@ async def get_protocol_pdf(
 async def get_protocol_public_pdf(
     protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
 ) -> Response:
-    """Redigierte öffentliche Protokoll-Variante streamen (#PII-Re-Add).
+    """Stream the redacted public protocol variant.
 
-    Nur vorhanden, wenn die Sitzung mind. einen nicht-öffentlichen TOP hatte; sonst 404.
-    Gleiche Lese-Berechtigung wie das interne PDF (``assert_can_read``)."""
+    Only exists when the meeting had at least one non-public agenda item;
+    otherwise 404. Same read authorization as the internal PDF."""
     await service.authorize_read(protocol_id, principal)
     data = await service.get_public_pdf_bytes(protocol_id)
     return Response(

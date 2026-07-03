@@ -1,14 +1,14 @@
-"""Voting-API-Router (T-15, api.md »voting«).
+"""Voting API router.
 
-* ``POST /api/applications/{id}/votes`` — P(vote.manage); Abstimmung anlegen.
-* ``POST /api/votes/{id}/open``         — P(vote.manage); öffnen.
-* ``POST /api/votes/{id}/close``        — P(vote.manage); schließen → Ergebnis → Flow.
-* ``POST /api/votes/{id}/ballot``       — P(vote.cast)+Gruppe; Stimme abgeben.
-* ``GET  /api/votes/{id}``              — P; Vote-State + Tally (secret: nur counts).
+* ``POST /api/applications/{id}/votes`` - P(vote.manage); create a vote.
+* ``POST /api/votes/{id}/open``         - P(vote.manage); open.
+* ``POST /api/votes/{id}/close``        - P(vote.manage); close -> result -> flow.
+* ``POST /api/votes/{id}/ballot``       - P(vote.cast)+group; cast a vote.
+* ``GET  /api/votes/{id}``              - vote state + tally (secret: only counts).
 
-RBAC ist fail-closed: 401 ohne Session, 403 ohne Permission bzw. ohne Gruppen-
-Mitgliedschaft (``cast``). Die Gruppe steht am Vote (dynamisch) → die Prüfung passiert
-im Service nach dem Laden. Fehler werden als ``ProblemDetail`` deklariert (problem+json).
+RBAC is fail-closed: 401 without a session, 403 without the permission or group
+membership (``cast``). The group lives on the vote (dynamic), so the check runs in
+the service after loading. Errors are declared as ``ProblemDetail`` (problem+json).
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_action_dispatcher() -> ActionDispatcher:
-    """Worker-Dispatcher für die Flow-Actions beim Close (Default: No-op/Log)."""
+    """Dispatcher for flow actions on close (default: no-op/log)."""
     return NullActionDispatcher()
 
 
@@ -56,10 +56,10 @@ def get_voting_service(
 
 ServiceDep = Annotated[VotingService, Depends(get_voting_service)]
 PublisherDep = Annotated[MeetingPublisher, Depends(get_meeting_publisher)]
-# Lifecycle (create/open/close/cancel) ist NICHT mehr global-only gegated (#AUD-027):
-# das Router-Gate verlangt nur Auth (``ReaderDep``); die gremium-genaue ``vote.manage``-
-# Prüfung (admin / globale vote.manage / per-Gremium-Rolle) liegt fail-closed im Service
-# (``assert_can_manage*``), symmetrisch zum gescopten Read (``get_scoped``).
+# Lifecycle (create/open/close/cancel) is not global-only gated: the router gate only
+# requires auth; the gremium-scoped ``vote.manage`` check (admin / global vote.manage /
+# per-gremium role) is fail-closed in the service (``assert_can_manage*``), symmetric
+# with the scoped read (``get_scoped``).
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 
 
@@ -74,11 +74,11 @@ async def create_vote(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> VoteOut:
-    """Abstimmung (``draft``) zu einem Antrag anlegen.
+    """Create a draft vote on an application.
 
-    Gremium-scoped (#sec-audit, AUD-027): Admin, globale ``vote.manage`` ODER eine
-    Gremium-Rolle mit ``vote.manage`` für das Gremium des ``eligibleGroup`` — kein
-    Anlegen in fremden Gremien."""
+    Gremium-scoped: admin, global ``vote.manage``, or a gremium role with
+    ``vote.manage`` for the ``eligibleGroup`` gremium - no creating in other gremien.
+    """
     await service.assert_can_manage_group(payload.eligible_group, None, principal)
     return await service.create(application_id, payload)
 
@@ -94,12 +94,11 @@ async def open_vote(
     publisher: PublisherDep,
     principal: ReaderDep,
 ) -> VoteOut:
-    """Abstimmung öffnen (``draft`` → ``open``) → 409, wenn nicht ``draft``.
+    """Open a vote (``draft`` -> ``open``); 409 if not ``draft``.
 
-    Gremium-scoped (#sec-audit, AUD-027): Admin, globale ``vote.manage`` ODER eine
-    Gremium-Rolle mit ``vote.manage`` für das Gremium des Votes. Hängt der Vote an
-    einer Sitzung, broadcastet der Publisher ``vote_opened`` auf den Live-Vote-Kanal
-    (T-16); andernfalls no-op."""
+    Gremium-scoped ``vote.manage``. If the vote is bound to a meeting, the publisher
+    broadcasts ``vote_opened`` on the live-vote channel; otherwise no-op.
+    """
     await service.assert_can_manage_vote(vote_id, principal)
     vote = await service.open(vote_id, now=datetime.now(UTC))
     await publisher.vote_opened(vote)
@@ -117,12 +116,11 @@ async def close_vote(
     publisher: PublisherDep,
     principal: ReaderDep,
 ) -> VoteClosed:
-    """Abstimmung schließen → auszählen → Ergebnis → ``flow.fire(result_branch)``.
+    """Close a vote -> tally -> result -> ``flow.fire(result_branch)``.
 
-    Gremium-scoped (#sec-audit, AUD-027): Admin, globale ``vote.manage`` ODER eine
-    Gremium-Rolle mit ``vote.manage`` für das Gremium des Votes — kein Cross-Tenant-
-    Schließen (das den Flow des fremden Antrags feuern würde). Live-Vote (T-16):
-    broadcastet ``vote_closed`` auf den Sitzungs-Kanal (no-op ohne Sitzung)."""
+    Gremium-scoped ``vote.manage`` - no cross-tenant close (which would fire another
+    application's flow). Broadcasts ``vote_closed`` on the meeting channel (no-op if no meeting).
+    """
     await service.assert_can_manage_vote(vote_id, principal)
     closed = await service.close(vote_id, principal)
     await publisher.vote_closed(closed)
@@ -140,12 +138,12 @@ async def cancel_vote(
     publisher: PublisherDep,
     principal: ReaderDep,
 ) -> VoteOut:
-    """Abstimmung abbrechen (#12): ``open`` → ``cancelled`` — kein Ergebnis, kein
-    Branch; der Antrag bleibt im ``vote``-State. Der Ausweg, wenn das Quorum nicht
-    zustande kommt (``close`` ist dann blockiert).
+    """Cancel a vote: ``open`` -> ``cancelled`` - no result, no branch; the application
+    stays in the ``vote`` state. The escape hatch when the quorum is not reached
+    (``close`` is then blocked).
 
-    Gremium-scoped (#sec-audit, AUD-027): Admin, globale ``vote.manage`` ODER eine
-    Gremium-Rolle mit ``vote.manage`` für das Gremium des Votes."""
+    Gremium-scoped ``vote.manage``.
+    """
     await service.assert_can_manage_vote(vote_id, principal)
     vote = await service.cancel(vote_id)
     await publisher.vote_cancelled(vote)
@@ -162,17 +160,17 @@ async def cast_ballot(
     payload: BallotIn,
     service: ServiceDep,
     publisher: PublisherDep,
-    # Nur Auth am Gate (#delegation-rework): ein externer Stellvertreter hat kein
-    # globales ``vote.cast`` — die Autorisierung (vote.cast+Gruppe für die eigene
-    # Stimme, Delegations-Zeile für die Vertretungs-Stimme) liegt im Service.
+    # Auth-only gate: an external substitute has no global ``vote.cast``; the
+    # authorization (vote.cast+group for the own vote, delegation row for the
+    # represented vote) lives in the service.
     principal: ReaderDep,
 ) -> BallotAccepted:
-    """Stimme abgeben — 403 (nicht in Gruppe), 409 (geschlossen/Doppel), 422 (Option).
+    """Cast a vote - 403 (not in group), 409 (closed/double), 422 (option).
 
-    Broadcastet anschließend ``vote_tally`` (#vote-progress): ohne das Event blieb
-    der »N von M abgestimmt«-Zähler aller verbundenen Clients bis zum Reload stale.
-    Nur Aggregate — die Reveal-Regel verdeckt counts/leading, bis alle Anwesenden
-    abgestimmt haben (``VoteTallyEvent.from_vote``)."""
+    Then broadcasts ``vote_tally`` so every client's 'N of M voted' counter stays
+    fresh. Aggregates only - the reveal rule hides counts/leading until all present
+    members have voted (``VoteTallyEvent.from_vote``).
+    """
     accepted = await service.cast(
         vote_id,
         principal,
@@ -194,8 +192,9 @@ async def get_vote(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> VoteOut:
-    """Vote-State + aggregiertes Tally (bei ``secret`` nur ``counts``, nie Wähler).
+    """Vote state + aggregated tally (only ``counts`` when ``secret``, never voters).
 
-    Gescopt auf den Lesekreis des Votes (#sec-audit): Sitzungs-Mitglieder/Teilnehmer
-    bzw. Lese-/Verwaltungs-Permission — 403 für Fremd-Gremien (kein Cross-Tenant-Lesen)."""
+    Scoped to the vote's read audience: meeting members/participants or a
+    read/manage permission - 403 for other gremien (no cross-tenant read).
+    """
     return await service.get_scoped(vote_id, principal)

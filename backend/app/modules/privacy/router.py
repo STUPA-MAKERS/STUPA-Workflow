@@ -1,14 +1,8 @@
-"""Admin-Router DSGVO/Privacy (``/admin/privacy``, gegated mit ``privacy.manage``).
+"""Admin privacy router (``/admin/privacy``, gated by ``privacy.manage``).
 
-* ``GET    /admin/privacy/erasures``                 — Löschantrags-Queue.
-* ``POST   /admin/privacy/erasures/{id}/execute``    — ausführen (anonymisieren/löschen).
-* ``POST   /admin/privacy/erasures/{id}/reject``     — ablehnen (mit Grund).
-* ``POST   /admin/privacy/principals/{id}/erase``    — Principal direkt löschen (Art. 17).
-* ``GET    /admin/privacy/auskunft``                 — Auskunft (Art. 15) als XLSX.
-* ``GET/PUT /admin/privacy/settings``                — globaler Aufbewahrungs-Default.
-
-Benachrichtigungen (erasure_executed/rejected) feuert der Aufrufer best-effort als
-Hintergrund-Task (notifications/privacy.py).
+Erasure-request queue (list/execute/reject), direct principal erasure, GDPR access
+export (XLSX, Art. 15), and the global retention default. Erasure notifications are
+fired best-effort as background tasks.
 """
 
 from __future__ import annotations
@@ -50,12 +44,11 @@ _EMAIL_ADAPTER: TypeAdapter[str] = TypeAdapter(EmailStr)
 
 
 def _canonical_email(raw: str) -> str:
-    """Trim, RFC-validate und normalisieren (lowercase) — sonst 422.
+    """Trim, RFC-validate and lowercase the email, else 422.
 
-    Die CITEXT-Spalten matchen ohnehin case-insensitiv; die Normalisierung
-    hält den ``pii_export``-Audit-``target_id`` (Art. 30) als gültige,
-    kanonische E-Mail nachvollziehbar und verhindert still leere Exporte
-    auf Tipp-/Formatfehlern."""
+    Keeps the ``pii_export`` audit ``target_id`` a valid canonical email and avoids
+    silently empty exports on typos.
+    """
     try:
         return _EMAIL_ADAPTER.validate_python(raw.strip()).lower()
     except ValidationError as exc:
@@ -81,8 +74,8 @@ def get_settings_service(session: DbSession) -> PrivacySettingsService:
 
 
 def _files_with_storage(session: DbSession, request: Request) -> FilesService:
-    """FilesService mit dem (optionalen) Object-Storage aus dem App-State — damit die
-    Anonymisierung Antrags-Anhänge inkl. Storage-Objekte entfernt."""
+    """FilesService wired to the app-state object storage so anonymization also
+    removes attachment objects."""
     storage = getattr(request.app.state, "object_storage", None)
     return FilesService(session, storage=storage)
 
@@ -95,7 +88,7 @@ def _out(request_row: Any) -> ErasureRequestOut:
     return ErasureRequestOut.model_validate(request_row, from_attributes=True)
 
 
-# --------------------------------------------------------------- erasure queue
+# erasure queue
 @router.get(
     "/erasures",
     response_model=list[ErasureRequestOut],
@@ -166,7 +159,7 @@ async def reject_erasure(
     return _out(result)
 
 
-# ------------------------------------------------------------ principal erasure
+# principal erasure
 @router.post(
     "/principals/{principal_id}/erase",
     status_code=204,
@@ -182,7 +175,7 @@ async def erase_principal(
     return Response(status_code=204)
 
 
-# ------------------------------------------------------------------- settings
+# settings
 @router.get(
     "/settings",
     response_model=PrivacySettingsOut,
@@ -209,20 +202,18 @@ async def put_settings(
     return PrivacySettingsOut.model_validate(settings, from_attributes=True)
 
 
-# ------------------------------------------------------------------- Auskunft
+# access export
 @router.get("/auskunft", dependencies=[_CONFIG], responses=_errors(401, 403, 422))
 async def auskunft(
     session: DbSession,
     principal: ConfigPrincipal,
     email: Annotated[str, Query(min_length=1)],
 ) -> Response:
-    """DSGVO Art. 15: alle zu ``email`` gespeicherten personenbezogenen Daten als XLSX.
+    """GDPR Art. 15: export all personal data stored for ``email`` as XLSX.
 
-    Die E-Mail wird RFC-validiert und kanonisiert (sonst 422), damit weder still
-    leere Exporte auf Tippfehlern entstehen noch ein ungültiger ``target_id`` im
-    Audit landet. Auditiert als ``pii_export`` mit der kanonischen E-Mail als
-    ``target_id`` — Rechenschaftspflicht (Art. 30): es muss nachvollziehbar
-    bleiben, WESSEN Daten exportiert wurden."""
+    Audited as ``pii_export`` with the canonical email as ``target_id`` so it stays
+    traceable whose data was exported.
+    """
     email = _canonical_email(email)
     data = await AuskunftService(session).collect(email)
     workbook = build_auskunft_workbook(**data)

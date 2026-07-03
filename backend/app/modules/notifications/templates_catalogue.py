@@ -1,16 +1,14 @@
-"""Zentraler Katalog **aller** Benachrichtigungs-Mail-Templates (#12).
+"""Central catalogue of *all* notification mail templates.
 
-Jede Mail, die die Plattform versendet, ist hier mit ihrem ``key`` gelistet —
-samt Builtin-Betreff/Text (die *gleichen* Objekte, die der Versand als Fallback
-nutzt) und Platzhalter-Hinweisen. Der Editor (`/admin/mail-templates`) zeigt
-darüber **jede** Mail an: liegt eine DB-Override vor, gewinnt diese, sonst der
-Builtin-Default. Damit driften Editor-Anzeige und tatsächlicher Versand nicht
-auseinander (kein Seed-Kopieren in die DB).
+Every mail the platform sends is listed here by its ``key``, with the builtin
+subject/body (the *same* objects the sender uses as fallback) and placeholder
+hints. The editor (`/admin/mail-templates`) shows every mail through it: a DB
+override wins if present, else the builtin default, so editor and actual send
+never drift apart (no seed-copying into the DB).
 
-Importiert die Builtins aus den jeweiligen Versendermodulen; nur ``task_reminder``
-(im Worker versendet) und ``deadline_approaching`` (sonst Fallback auf
-``status_update``) werden hier als Single Source definiert — der Worker bzw.
-``handle_notify_action`` greift darauf zurück.
+Imports the builtins from the respective sender modules; only ``task_reminder``
+(sent by the worker) and ``deadline_approaching`` (otherwise falling back to
+``status_update``) are defined here as single source.
 """
 
 from __future__ import annotations
@@ -20,9 +18,9 @@ from dataclasses import dataclass
 from app.modules.notifications import action_dispatcher, auto, comments, privacy
 from app.modules.notifications import service as _svc
 
-# --- Builtins, die nur hier leben (Single Source) -------------------------- #
-# task_reminder: vom Worker (``worker/task_reminders.py``) versendet, der diese
-# Konstanten von hier importiert (kein app→worker-Import).
+# --- Builtins defined only here (single source) ---
+# task_reminder: sent by the worker (``worker/task_reminders.py``), which imports
+# these constants from here (no app→worker import).
 TASK_REMINDER_SUBJECT: dict[str, str] = {
     "de": "Erinnerung: offene Aufgabe"
     "{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
@@ -39,8 +37,8 @@ TASK_REMINDER_BODY: dict[str, str] = {
     "waiting for action for {{ daysOpen }} days"
     "{% if status %} (status: {{ status }}){% endif %}.\n",
 }
-# deadline_approaching: ``handle_notify_action`` nutzt dies als Builtin-Fallback,
-# wenn keine DB-Override existiert (zuvor: generischer status_update-Text).
+# deadline_approaching: ``handle_notify_action`` uses this as the builtin
+# fallback when no DB override exists.
 DEADLINE_APPROACHING_SUBJECT: dict[str, str] = {
     "de": "Frist-Erinnerung"
     "{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
@@ -56,8 +54,8 @@ DEADLINE_APPROACHING_BODY: dict[str, str] = {
     "is approaching{% if dueAt %} (due: {{ dueAt }}){% endif %}.\n",
 }
 # status_update_team: committee-facing default for flow `notify` actions without
-# an explicit templateKey and non-applicant recipients (bug #2) — the applicant
-# default (`status_update`) reads "Your application" and is wrong for the team.
+# an explicit templateKey and non-applicant recipients — the applicant default
+# (`status_update`) reads "Your application" and is wrong for the team.
 STATUS_UPDATE_TEAM_SUBJECT: dict[str, str] = {
     "de": "Statuswechsel: Antrag"
     "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
@@ -78,7 +76,7 @@ STATUS_UPDATE_TEAM_BODY: dict[str, str] = {
 
 @dataclass(frozen=True, slots=True)
 class MailTemplateSpec:
-    """Builtin-Spezifikation einer Mail (Versand-Fallback + Editor-Default)."""
+    """Builtin spec for a mail (send fallback + editor default)."""
 
     key: str
     kind: str
@@ -87,12 +85,12 @@ class MailTemplateSpec:
     placeholders: dict[str, str]
 
 
-# Reihenfolge = Anzeigereihenfolge im Editor.
+# Order = display order in the editor.
 TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "status_update",
         "status_update",
-        _svc._BUILTIN_NOTIFY_SUBJECT,  # noqa: SLF001 — gemeinsamer Builtin
+        _svc._BUILTIN_NOTIFY_SUBJECT,  # noqa: SLF001 — shared builtin
         _svc._BUILTIN_NOTIFY_BODY,  # noqa: SLF001
         {
             "applicationTitle": "Titel des Antrags",

@@ -1,9 +1,9 @@
-"""Anwesenheits-Service für Sitzungen (#Meetings/#55/#56).
+"""Meeting attendance service.
 
-Roster = die **aktuellen** Mitglieder des Sitzungs-Gremiums (gremium_membership im
-gültigen Amtszeit-Fenster). Mitglieder markieren sich selbst (``source='self'``),
-die Sitzungsleitung kann jede:n setzen (``source='lead'``). Pro (Sitzung, Mitglied)
-existiert genau ein Eintrag (Upsert über die Unique-Constraint).
+Roster = the current members of the meeting's gremium (membership within the
+valid term window). Members mark themselves (``source='self'``); the meeting
+lead can set anyone (``source='lead'``). Exactly one record per
+(meeting, member), upserted via the unique constraint.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 
 class AttendanceService:
-    """Roster + Anwesenheits-Upsert, an eine ``AsyncSession`` gebunden."""
+    """Roster plus attendance upsert, bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -40,7 +40,7 @@ class AttendanceService:
         return meeting
 
     async def _current_members(self, gremium_id: UUID) -> list[PrincipalRow]:
-        """Aktuelle Gremium-Mitglieder (Amtszeit-Fenster gültig), je Principal einmalig."""
+        """Current gremium members (term window valid), each principal once."""
         now = datetime.now(UTC)
         rows = (
             await self.session.execute(
@@ -63,7 +63,7 @@ class AttendanceService:
         return list(rows)
 
     async def members(self, gremium_id: UUID) -> list[MeetingMemberOut]:
-        """Aktuelle Gremium-Mitglieder als Protokollant-Kandidaten (ohne Sitzung)."""
+        """Current gremium members as protokollant candidates (no meeting needed)."""
         return [
             MeetingMemberOut(
                 principalId=m.id, displayName=m.display_name, email=m.email
@@ -72,7 +72,7 @@ class AttendanceService:
         ]
 
     async def roster(self, meeting_id: UUID, requester_sub: str) -> list[AttendanceOut]:
-        """Mitglieder + ihre (ggf. noch leere) Anwesenheit für diese Sitzung."""
+        """Members plus their (possibly still empty) attendance for this meeting."""
         meeting = await self._meeting(meeting_id)
         members = await self._current_members(meeting.gremium_id)
         records = (
@@ -130,10 +130,10 @@ class AttendanceService:
 
     @staticmethod
     def _ensure_not_closed(meeting: Meeting) -> None:
-        """Anwesenheit ist nach dem Schließen eingefroren (#attendance-lock).
+        """Attendance is frozen once the meeting is closed.
 
-        Das finalisierte Protokoll trägt die Anwesenheitslisten — nachträgliche
-        Änderungen würden PDF und System auseinanderlaufen lassen → 409."""
+        The finalized protocol carries the attendance list — later changes would
+        let PDF and system diverge, so this raises 409."""
         if meeting.status == "closed":
             raise ConflictError(
                 "Attendance is read-only once the meeting is closed.", code="conflict"
@@ -142,7 +142,7 @@ class AttendanceService:
     async def set_self(
         self, meeting_id: UUID, status: AttendanceStatus, requester_sub: str
     ) -> list[AttendanceOut]:
-        """Eigene Anwesenheit setzen (nur Gremium-Mitglieder, nicht nach Schließen)."""
+        """Set one's own attendance (gremium members only, not after closing)."""
         meeting = await self._meeting(meeting_id)
         self._ensure_not_closed(meeting)
         member = next(
@@ -165,7 +165,7 @@ class AttendanceService:
         status: AttendanceStatus,
         requester_sub: str,
     ) -> list[AttendanceOut]:
-        """Anwesenheit eines Mitglieds durch die Sitzungsleitung setzen (nicht nach Schließen)."""
+        """Set a member's attendance as meeting lead (not after closing)."""
         meeting = await self._meeting(meeting_id)
         self._ensure_not_closed(meeting)
         members = await self._current_members(meeting.gremium_id)

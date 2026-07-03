@@ -1,13 +1,6 @@
-"""DSGVO/Privacy-Services.
+"""Privacy/GDPR services: principal erasure, erasure-request queue, retention settings.
 
-* :class:`PrincipalService` — Principal-Erasure (Art. 17): PII leeren, ``sub`` als
-  Pseudonym behalten, Sessions verwerfen.
-* :class:`ErasureRequestService` — Löschantrags-Queue (open → executed | rejected),
-  dispatcht beim Ausführen auf Anonymisierung (Antrag) bzw. Principal-Erasure.
-* :class:`PrivacySettingsService` — globaler Aufbewahrungs-Default (Single-Row).
-
-Benachrichtigungen feuert der Router/Worker best-effort *nach* dem Commit
-(notifications/privacy.py), nicht die Services selbst.
+Notifications are fired best-effort by the router/worker after commit, not here.
 """
 
 from __future__ import annotations
@@ -43,13 +36,13 @@ def _now() -> datetime:
 
 
 def _i18n(value: dict[str, str] | None, locale: str) -> str:
-    """Lokalisierten Wert (Fallback de→en) aus einem I18n-Map ziehen."""
+    """Pick a localized value from an i18n map (fallback de then en)."""
     data = value or {}
     return data.get(locale) or data.get("de") or data.get("en") or ""
 
 
 class PrincipalService:
-    """Erasure eines Principals (DSGVO Art. 17)."""
+    """Principal erasure (GDPR Art. 17)."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -57,10 +50,11 @@ class PrincipalService:
     async def erase(
         self, principal_id: UUID, *, actor: str, commit: bool = True
     ) -> Principal:
-        """PII leeren (email/display_name/calendar_token/oidc_groups → NULL),
-        deaktivieren, Sessions verwerfen. ``sub`` bleibt als Pseudonym (Audit-Kette +
-        Keycloak-Verknüpfung); die Keycloak-User-Löschung erfolgt **out-of-band** —
-        die Rest-Pseudonymität des ``sub`` hängt daran."""
+        """Null the PII fields, deactivate, and drop sessions.
+
+        ``sub`` is kept as a pseudonym for the audit chain; Keycloak user deletion is
+        out-of-band and the remaining pseudonymity depends on it.
+        """
         principal = await self.session.get(Principal, principal_id)
         if principal is None:
             raise NotFoundError(f"principal {principal_id} not found")
@@ -87,7 +81,7 @@ class PrincipalService:
 
 
 class PrivacySettingsService:
-    """Single-Row-Config (globaler Aufbewahrungs-Default in Monaten)."""
+    """Single-row config: global retention default in months."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -95,7 +89,7 @@ class PrivacySettingsService:
     async def get(self) -> PrivacySettings:
         settings = await self.session.get(PrivacySettings, 1)
         if settings is None:
-            # Defensive: Seed-Zeile fehlt (frisches Schema ohne Migration-Seed) → anlegen.
+            # Seed row missing (fresh schema without migration seed): create it.
             settings = PrivacySettings(id=1)
             self.session.add(settings)
             await self.session.flush()
@@ -110,7 +104,7 @@ class PrivacySettingsService:
 
 
 class ErasureRequestService:
-    """Löschantrags-Queue (DSGVO Art. 17): open → executed | rejected."""
+    """Erasure-request queue (GDPR Art. 17): open -> executed | rejected."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -128,15 +122,15 @@ class ErasureRequestService:
             raise ValidationProblem("applicant erasure requires an application_id")
         if subject_type == "principal" and principal_id is None:
             raise ValidationProblem("principal erasure requires a principal_id")
-        # Existenz prüfen, statt die FK erst beim Flush brechen zu lassen (404 statt 500).
+        # Check existence up front so a bad FK is a 404, not a 500 on flush.
         if (
             application_id is not None
             and await self.session.get(Application, application_id) is None
         ):
             raise NotFoundError(f"application {application_id} not found")
         if subject_type == "applicant" and email is None and application_id is not None:
-            # Antragsteller-Mail jetzt mitnehmen — nach der Anonymisierung ist sie
-            # NULL, würde aber für die Bestätigungs-Mail gebraucht.
+            # Capture the applicant email now; anonymization nulls it but the
+            # confirmation mail still needs it.
             email = await self.session.scalar(
                 select(Applicant.email).where(
                     Applicant.application_id == application_id
@@ -186,9 +180,10 @@ class ErasureRequestService:
     async def execute(
         self, request_id: UUID, *, actor: str, files: FilesService | None = None
     ) -> ErasureRequest:
-        """Antrag ausführen: Antrag anonymisieren bzw. Principal löschen, atomar mit
-        dem Statuswechsel. ``files`` (mit Storage) ermöglicht das Entfernen der
-        Antrags-Anhänge inkl. Storage-Objekte."""
+        """Execute the request: anonymize the application or erase the principal,
+        atomically with the status change. ``files`` (with storage) also removes
+        attachment objects.
+        """
         request = await self._require_open(request_id)
         if request.subject_type == "applicant" and request.application_id is not None:
             await ApplicationsService(self.session).anonymize(
@@ -244,16 +239,17 @@ class ErasureRequestService:
 
 
 class AuskunftService:
-    """DSGVO-Auskunft (Art. 15): alle zu einer E-Mail gespeicherten PII zusammentragen."""
+    """GDPR access request (Art. 15): gather all PII stored for an email."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
     async def collect(self, email: str, *, locale: str = "de") -> dict[str, Any]:
-        """Antragsteller-Datensätze (per Mail), zugehörige Anträge + ``data`` +
-        Versionshistorie, vom Subjekt einsehbare Kommentare, Anhang-Metadaten und
-        den passenden Principal-Datensatz sammeln. Liefert fertige Reihen für
-        :func:`build_auskunft_workbook` (Art. 15: Vollständigkeit)."""
+        """Gather applicants, their applications + data + version history, subject-
+        visible comments, attachment metadata, and the matching principal.
+
+        Returns rows ready for :func:`build_auskunft_workbook`.
+        """
         applicants = list(
             (
                 await self.session.scalars(
@@ -336,10 +332,8 @@ class AuskunftService:
                 for v in vrows
             ]
 
-            # Kommentare, die das Subjekt betreffen/einsehen kann: eigene
-            # (author_kind='applicant') sowie öffentliche (für die/den
-            # Antragsteller:in sichtbare) Kommentare. Interne Principal-Notizen
-            # bleiben außen vor (nicht für das Subjekt bestimmt).
+            # Only comments the subject can see: own (author_kind='applicant') and
+            # public ones. Internal principal notes are excluded.
             crows = list(
                 (
                     await self.session.scalars(
@@ -366,7 +360,7 @@ class AuskunftService:
                 for c in crows
             ]
 
-            # Anhang-Metadaten (Dateinamen können PII sein) — ohne das Binär-Objekt.
+            # Attachment metadata (filenames may be PII); no binary object.
             arows = list(
                 (
                     await self.session.scalars(
@@ -424,14 +418,11 @@ def build_auskunft_workbook(
     comments: Sequence[Mapping[str, Any]] = (),
     attachments: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
-    """DSGVO-Auskunft (Art. 15) als ``.xlsx``-Bytes — vollständig.
+    """GDPR access request (Art. 15) as ``.xlsx`` bytes.
 
-    Baut auf dem geteilten :func:`app.shared.xlsx.build_auskunft_workbook`
-    (Konto/Anträge/Versionen) auf und ergänzt zwei Blätter für die
-    vom Subjekt einsehbaren **Kommentare** und die **Anhang-Metadaten**
-    (Dateinamen können PII sein), die der Erasure-Pfad bereits als PII
-    behandelt. Reichert die Mappe nachträglich an, statt das geteilte,
-    DB-agnostische Workbook-Modul zu ändern."""
+    Extends the shared :func:`app.shared.xlsx.build_auskunft_workbook` with two extra
+    sheets for subject-visible comments and attachment metadata.
+    """
     from io import BytesIO
 
     from openpyxl import load_workbook
@@ -460,9 +451,8 @@ def build_auskunft_workbook(
             cell.font = Font(bold=True)
         ws.freeze_panes = "A2"
         for row in rows:
-            # Formula-Injection neutralisieren (Comment.body / Attachment.filename
-            # sind antragstellerseitig befüllt) — gleicher Schutz wie die geteilten
-            # Basis-Blätter via app.shared.xlsx._safe.
+            # Neutralize formula injection (applicant-supplied body/filename), same
+            # protection as the shared base sheets via app.shared.xlsx._safe.
             ws.append([_safe(cell) for cell in row])
         widths = [len(str(h)) for h in headers]
         for r in ws.iter_rows(min_row=2, values_only=True):

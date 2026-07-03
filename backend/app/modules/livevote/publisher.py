@@ -1,12 +1,11 @@
-"""Live-Vote-Publisher-Anschluss für das Voting-Modul (flows §5).
+"""Live-vote publisher seam for the voting module.
 
-Die Sitzungs-Steuerung läuft über die bestehenden Voting-REST-Endpunkte
-(``POST /votes/{id}/open|close``); diese müssen die passenden WS-Events auf den
-Kanal ``meeting:{id}`` veröffentlichen. Damit das Voting-Modul **nicht** auf den
-Broker/Live-Vote koppelt (und kein Import-Zyklus entsteht), hängt es nur an diesem
-leaf-Protokoll. Default ist :class:`NullPublisher` (no-op) — die echte,
-Broker-gestützte Implementierung wird in ``create_app`` injiziert
-(:class:`app.modules.livevote.service.BrokerPublisher`).
+Session control runs through the voting REST endpoints, which must publish the
+matching WS events on the ``meeting:{id}`` channel. The voting module depends
+only on this leaf protocol so it doesn't couple to the broker (no import cycle).
+Default is :class:`NullPublisher` (no-op); the broker-backed implementation
+(:class:`app.modules.livevote.service.BrokerPublisher`) is injected in
+``create_app``.
 """
 
 from __future__ import annotations
@@ -20,7 +19,7 @@ if TYPE_CHECKING:
 
 
 class MeetingPublisher(Protocol):
-    """Veröffentlicht Live-Vote-Events; no-op, falls der Vote keiner Sitzung hängt."""
+    """Publishes live-vote events; no-op when the vote isn't bound to a meeting."""
 
     async def vote_opened(self, vote: VoteOut) -> None: ...
 
@@ -32,7 +31,7 @@ class MeetingPublisher(Protocol):
 
 
 class NullPublisher:
-    """Default ohne Broker: verwirft Events (Vote-API bleibt funktionsfähig)."""
+    """Default without a broker: drops events (the vote API stays functional)."""
 
     async def vote_opened(self, vote: VoteOut) -> None:
         return None
@@ -48,7 +47,7 @@ class NullPublisher:
 
 
 def get_meeting_publisher(request: Request) -> MeetingPublisher:
-    """Publisher aus dem App-State (Lifespan); ohne Broker → :class:`NullPublisher`."""
+    """Publisher from app state; falls back to :class:`NullPublisher` without a broker."""
     publisher = getattr(request.app.state, "meeting_publisher", None)
     if publisher is None:
         return NullPublisher()

@@ -1,7 +1,7 @@
-"""API-Schemata des Notifications-Moduls (T-18, data-model §5.4).
+"""API schemas of the notifications module.
 
-Request/Response für `mail_template`-CRUD + Mail-Vorschau. camelCase im JSON
-(per-Name befüllbar); i18n-Maps sind frei strukturierte Dicts (`{lang: text}`).
+Request/response for ``mail_template`` CRUD and mail preview. JSON is camelCase
+(populate-by-name); i18n maps are free-form ``{lang: text}`` dicts.
 """
 
 from __future__ import annotations
@@ -15,13 +15,13 @@ from app.shared.i18n import I18nMap
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase JSON aliases; fields populatable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class MailTemplateCreate(_CamelModel):
-    """Neues Mail-Template."""
+    """A new mail template."""
 
     key: str = Field(min_length=1)
     subject_i18n: I18nMap = Field(alias="subjectI18n")
@@ -31,7 +31,7 @@ class MailTemplateCreate(_CamelModel):
 
 
 class MailTemplateUpdate(_CamelModel):
-    """Teil-Update eines Templates (Key bleibt unveränderlich)."""
+    """Partial update of a template (key stays immutable)."""
 
     subject_i18n: I18nMap | None = Field(default=None, alias="subjectI18n")
     body_i18n: I18nMap | None = Field(default=None, alias="bodyI18n")
@@ -40,10 +40,11 @@ class MailTemplateUpdate(_CamelModel):
 
 
 class MailTemplateUpsert(_CamelModel):
-    """Override per ``key`` anlegen/aktualisieren (#12 Katalog-Merge).
+    """Create/update an override by ``key``.
 
-    Editor speichert sowohl Builtin- (noch keine DB-Zeile) als auch Override-
-    Templates über denselben Weg — Key statt ID, da Builtins keine ID haben."""
+    The editor saves both builtin (no DB row yet) and override templates the
+    same way — keyed by ``key`` rather than id, since builtins have no id.
+    """
 
     key: str = Field(min_length=1)
     subject_i18n: I18nMap = Field(alias="subjectI18n")
@@ -52,28 +53,28 @@ class MailTemplateUpsert(_CamelModel):
 
 
 class MailTemplateOut(_CamelModel):
-    """Template wie im Editor — Override (DB) oder Builtin-Default (#12)."""
+    """Template as shown in the editor — override (DB) or builtin default."""
 
-    # Builtins (noch nicht überschrieben) haben keine DB-ID.
+    # Builtins (not yet overridden) have no DB id.
     id: UUID | None = None
     key: str
     subject_i18n: I18nMap = Field(serialization_alias="subjectI18n")
     body_i18n: I18nMap = Field(serialization_alias="bodyI18n")
     body_html_i18n: I18nMap = Field(serialization_alias="bodyHtmlI18n")
     placeholders: dict[str, str]
-    # 'override' = aus der DB; 'builtin' = aus dem Katalog (unverändert).
+    # 'override' = from the DB; 'builtin' = from the catalogue (unchanged).
     source: Literal["override", "builtin"] = "override"
 
 
 class MailPreviewRequest(_CamelModel):
-    """Vorschau-Anfrage: Template mit Beispiel-Kontext + Sprache rendern."""
+    """Preview request: render a template with sample context and language."""
 
     lang: str = "de"
     context: dict[str, object] = Field(default_factory=dict)
 
 
 class MailPreviewPayloadRequest(_CamelModel):
-    """Vorschau aus dem Editor-Entwurf (ohne persistierte ID, #12)."""
+    """Preview from an editor draft (no persisted id)."""
 
     subject_i18n: I18nMap = Field(alias="subjectI18n")
     body_i18n: I18nMap = Field(alias="bodyI18n")
@@ -83,7 +84,7 @@ class MailPreviewPayloadRequest(_CamelModel):
 
 
 class MailPreviewOut(_CamelModel):
-    """Gerenderte Vorschau."""
+    """Rendered preview."""
 
     subject: str
     text: str
@@ -92,29 +93,29 @@ class MailPreviewOut(_CamelModel):
 
 
 class NotificationPreferenceOut(_CamelModel):
-    """Effektiver Schalter einer Benachrichtigungs-Art (#4-2)."""
+    """Effective switch for one notification kind."""
 
     kind: str
     enabled: bool
 
 
 class NotificationPreferencesUpdate(_CamelModel):
-    """Bulk-Update der eigenen Benachrichtigungs-Schalter."""
+    """Bulk update of own notification switches."""
 
     preferences: list[NotificationPreferenceOut]
 
 
 class NotificationSettingsOut(_CamelModel):
-    """Plattformweite Benachrichtigungs-Config (#task-reminder, Single-Row)."""
+    """Platform-wide notification config (single row)."""
 
     task_reminder_enabled: bool = Field(alias="taskReminderEnabled")
     task_reminder_after_days: int = Field(alias="taskReminderAfterDays", ge=1)
-    # 0 = nur einmal je State-Aufenthalt erinnern.
+    # 0 = remind only once per state visit.
     task_reminder_repeat_days: int = Field(alias="taskReminderRepeatDays", ge=0)
 
 
 class NotificationSettingsUpdate(_CamelModel):
-    """Teil-Update der Plattform-Config (nur gesetzte Felder ändern)."""
+    """Partial update of the platform config (only set fields change)."""
 
     task_reminder_enabled: bool | None = Field(
         default=None, alias="taskReminderEnabled"

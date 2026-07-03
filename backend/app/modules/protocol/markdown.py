@@ -1,29 +1,26 @@
-"""Protokoll → Markdown + YAML-Frontmatter + Vote-Snippets (T-22, flows §7).
+"""Protocol → Markdown + YAML frontmatter + vote snippets.
 
-Reine, DB-freie Erzeugung (unit-testbar, Akzeptanzkriterium »build_markdown bettet
-referenzierte Votes/Decisions korrekt ein«):
+Pure, DB-free generation (unit-testable):
 
-* :func:`build_protocol_document` legt das YAML-Frontmatter (``typ: protokoll``,
-  ``gremium`` → pytex-Variante) **vor** den vom Editor gelieferten Markdown-Body.
-* :func:`build_vote_snippet` rendert eine Abstimmung als Markdown-Abschnitt
-  (Titel + Ergebnis + Stimmen), der beim Einbetten an den Body angehängt wird.
+* :func:`build_protocol_document` puts the YAML frontmatter (``typ: protokoll``,
+  ``gremium`` → pytex variant) before the editor-supplied Markdown body.
+* :func:`build_vote_snippet` renders a vote as a Markdown section appended to
+  the body when embedding.
 
-**Injection-Härtung** (security.md §2): das Ergebnis geht als HTTP-**Body** an den
-pytex-Client (kein Shell). Frontmatter-Skalare werden YAML-quotiert; Snippet-Text
-wird Markdown-escaped — beides wiederverwendet aus :mod:`app.modules.pdf.markdown`
-(keine Duplikation). Der Editor-Body ist nutzer-geschrieben; :func:`sanitize_user_markdown`
-entschärft vor der Ausgabe pytex' ``eval``-Escape (``[//]: # "EXPR"`` → RCE im Container)
-in JEDER CommonMark-Form (ein-/mehrzeilig, container-verschachtelt, Whitespace im
-Label) sowie Bilder mit absolutem/``..``-Pfad. Normales Markdown (Überschriften, Listen,
-Hervorhebung, echte Links/Bilder) bleibt erhalten. Dieser Sanitizer IST der
-RCE-Schutz: der Service rendert den Body ``trusted`` (Client-Default), weil die
-Protokoll-Variante pytex' Template-Maschinerie braucht — ``untrusted`` würde sie
-sperren und jeden Render mit 400 abbrechen.
+Injection hardening: the result goes to the pytex client as an HTTP body (no
+shell). Frontmatter scalars are YAML-quoted; snippet text is Markdown-escaped —
+both reused from :mod:`app.modules.pdf.markdown`. The editor body is
+user-written; :func:`sanitize_user_markdown` strips pytex's ``eval`` escape
+(``[//]: # "EXPR"`` → RCE in the container) in EVERY CommonMark form
+(single-/multi-line, container-nested, whitespace in the label) plus images
+with absolute/``..`` paths. Normal Markdown survives. This sanitizer IS the RCE
+protection: the service renders the body ``trusted`` (client default) because
+the protocol variant needs pytex's template machinery — ``untrusted`` would
+block it and fail every render with 400.
 
-**Variante je Gremium** (flows §7): pytex kennt die Protokoll-Varianten
-``protocol-stupa`` / ``protocol-asta``; die Gremium-``cd_variant`` wählt sie.
-Für andere ``cd_variant`` bleibt die Variante ``None`` → pytex erkennt sie aus dem
-``typ: protokoll``-Frontmatter.
+Variant per gremium: pytex knows the protocol variants ``protocol-stupa`` /
+``protocol-asta``, selected by the gremium ``cd_variant``. For other values the
+variant stays ``None`` → pytex detects it from the ``typ: protokoll`` frontmatter.
 """
 
 from __future__ import annotations
@@ -33,63 +30,58 @@ from dataclasses import dataclass, field
 from datetime import date as _date
 from datetime import time as _time
 
-try:  # marko ist (über pytex_markdown) im Render-Pfad vorhanden; optional gehärtet.
+try:  # marko is present in the render path (via pytex_markdown); optional hardening.
     import marko as _marko  # pyright: ignore[reportMissingImports]
-except ImportError:  # pragma: no cover - Primärschutz (Regex) bleibt ohne marko aktiv
+except ImportError:  # pragma: no cover - primary regex protection works without marko
     _marko = None  # type: ignore[assignment]
 
 from app.modules.pdf.markdown import _md_escape, _yaml_scalar
 
-# --- RCE-Defense-in-Depth (security.md §2) ----------------------------------
-# pytex hat im ``trusted``-Modus einen Markdown-``eval``-Escape: eine
-# Link-Referenz-Definition der Form ``[//]: # "EXPR"`` (im PDF unsichtbar) führt
-# ``eval(EXPR, pytex_namespace())`` IM pytex-Container aus → Remote Code Execution.
-# pytex feuert das eval AUSSCHLIESSLICH, wenn CommonMark die Definition mit
-# ``label == "//"`` UND ``dest == "#"`` parst (pytex_markdown ``_eval_comment``).
-# Der Body ist nutzer-geschrieben (Protokollant); da die Protokoll-Variante pytex'
-# Template-Maschinerie braucht und deshalb ``trusted`` gerendert wird, ist DIESER
-# Sanitizer der RCE-Schutz.
+# --- RCE defense in depth ----------------------------------------------------
+# pytex in ``trusted`` mode has a Markdown ``eval`` escape: a link reference
+# definition of the form ``[//]: # "EXPR"`` (invisible in the PDF) runs
+# ``eval(EXPR, pytex_namespace())`` inside the pytex container → RCE. pytex
+# fires the eval ONLY when CommonMark parses the definition with
+# ``label == "//"`` AND ``dest == "#"``. The body is user-written, and the
+# protocol variant must render ``trusted``, so THIS sanitizer is the RCE guard.
 #
-# WICHTIG (AUD-001): Eine zeilen-orientierte Regex (``^[ \t]*[...]: #``) ist KEIN
-# verlässlicher Schutz — eine Link-Referenz-Definition ist ein CommonMark-Block,
-# der mehrzeilig (``[//]:\n#\n"EXPR"``), in Containern verschachtelt
-# (``> [//]: # "EXPR"``, ``- [//]: # "EXPR"``, ``1. [//]: # "EXPR"``) und mit
-# Whitespace/Zeilenumbruch im Label (``[ // ]``, ``[//\n]``) auftreten darf und so
-# jede einfache Zeilen-Regex umgeht. Wir entfernen daher die GESAMTE
-# eval-fähige Definition: Kopf ``[label] : #`` (``#``-Ziel exakt — KEIN
-# ``#fragment``) plus optionalen Titel (``"…"``/``'…'``/``(…)``), tolerant
-# gegenüber Whitespace und Zeilenumbruch an jeder von CommonMark erlaubten Stelle.
-# pytex' ``_eval_comment`` feuert ausschließlich für ``label='//'`` + ``dest='#'``;
-# ``dest='#'`` setzt eine bare-``#``-Definition voraus, deren Kopf hier matcht.
-# Echte Referenz-Links (``[foo]: #section``), Inline-Links/Bilder und der
-# Abstimmungs-Callout (``> [!abstimmung]``) bleiben unberührt.
+# A line-oriented regex (``^[ \t]*[...]: #``) is NOT reliable — a link
+# reference definition is a CommonMark block that may span lines
+# (``[//]:\n#\n"EXPR"``), nest in containers (``> [//]: # "EXPR"``,
+# ``- [//]: # "EXPR"``) and carry whitespace/newlines inside the label
+# (``[ // ]``), bypassing any simple per-line regex. We therefore remove the
+# ENTIRE eval-capable definition: head ``[label] : #`` (bare ``#`` target — not
+# ``#fragment``) plus optional title (``"…"``/``'…'``/``(…)``), tolerant of
+# whitespace and newlines wherever CommonMark allows them. Real reference
+# links (``[foo]: #section``), inline links/images and the vote callout
+# (``> [!abstimmung]``) are untouched.
 _EVAL_REFDEF_RE = re.compile(
-    r"\[[^\]]*\]\s*:\s*#"  # Definitions-Kopf, Ziel exakt ``#`` …
-    r"(?=[ \t\r\n\"'(]|$)"  # … bare-``#`` (von WS/Titel-Delimiter/Zeilenende gefolgt)
-    r"[ \t]*"  # Whitespace vor optionalem Titel
-    r"(?:\r?\n[ \t]*)?"  # Titel darf in der mehrzeiligen Form auf der Folgezeile stehen
-    r"""(?:"[^"]*"|'[^']*'|\([^)]*\)|[^\r\n]*)?""",  # optionaler Titel bzw. Resttext
+    r"\[[^\]]*\]\s*:\s*#"  # definition head, target exactly ``#`` …
+    r"(?=[ \t\r\n\"'(]|$)"  # … bare ``#`` (followed by WS/title delimiter/EOL)
+    r"[ \t]*"  # whitespace before the optional title
+    r"(?:\r?\n[ \t]*)?"  # multi-line form may put the title on the next line
+    r"""(?:"[^"]*"|'[^']*'|\([^)]*\)|[^\r\n]*)?""",  # optional title / rest of line
     re.DOTALL,
 )
 
 
 def _strip_eval_refdefs(markdown: str) -> str:
-    r"""Eval-fähige ``[label]: # "EXPR"``-Definitionen restlos entfernen.
+    r"""Remove eval-capable ``[label]: # "EXPR"`` definitions entirely.
 
-    Streicht Kopf **und** Ausdruck jeder bare-``#``-Link-Referenz-Definition (in
-    jeder CommonMark-Form), sodass pytex' ``_eval_comment``-Trigger gar nicht erst
-    in den Markdown-Baum gelangt. Normales Markdown bleibt unberührt."""
+    Strips head and expression of every bare-``#`` link reference definition
+    (in any CommonMark form) so pytex's eval trigger never reaches the
+    Markdown tree. Normal Markdown is untouched."""
     return _EVAL_REFDEF_RE.sub("", markdown)
 
 
 def _has_eval_refdef(markdown: str) -> bool:
-    """Parst ``markdown`` mit marko und meldet einen verbleibenden eval-Trigger.
+    """Parse ``markdown`` with marko and report a remaining eval trigger.
 
-    Strukturelle Verifikation (AUD-001): ein ``LinkRefDef``-Knoten mit
-    ``label == "//"`` und ``dest == "#"`` irgendwo im Baum (oder in
-    ``document.link_ref_defs``) würde pytex' eval auslösen. Ohne installiertes
-    marko greift allein der Regex-Primärschutz; dann gilt der Body als sauber."""
-    if _marko is None:  # pragma: no cover - Regex-Primärschutz deckt alle Vektoren
+    Structural verification: a ``LinkRefDef`` node with ``label == "//"`` and
+    ``dest == "#"`` anywhere in the tree (or in ``document.link_ref_defs``)
+    would fire pytex's eval. Without marko installed only the primary regex
+    protection applies and the body counts as clean."""
+    if _marko is None:  # pragma: no cover - primary regex protection covers all vectors
         return False
     document = _marko.Markdown().parse(markdown)
     refs = getattr(document, "link_ref_defs", {}) or {}
@@ -111,29 +103,27 @@ def _has_eval_refdef(markdown: str) -> bool:
     return _walk(document)
 
 
-# pytex' interner Marker für den ausgewerteten Ausdruck: ``\iffalse{pytex(...)}\fi``
-# (LaTeX-``\iffalse``-Block, der die Auswertung kapselt). Im Editor-Body hat er
-# nichts zu suchen → entfernen (auch mehrzeilig, non-greedy).
+# pytex's internal marker for the evaluated expression: ``\iffalse{pytex(...)}\fi``.
+# It has no business in an editor body → remove (multi-line too, non-greedy).
 _PYTEX_IFFALSE_RE = re.compile(
     r"\\iffalse\s*\{?\s*pytex\s*\(.*?\)\s*\}?\s*\\fi",
     re.DOTALL | re.IGNORECASE,
 )
-# FIX 3 (Bild-Pfad-Traversal, narrow): Markdown-Bilder ``![alt](PFAD)`` mit
-# absolutem (``/...``) oder ``../``-Traversal-Pfad könnten via ``\includegraphics``
-# einen Container-Dateipfad referenzieren. pytex beschränkt zwar auf Bild-Endungen
-# (Restrisiko gering), aber ein lesbares Bild außerhalb des Render-Verzeichnisses
-# könnte exfiltriert werden. Solche Bild-Pfade werden zum Klartext-Platzhalter
-# entschärft; relative In-Repo-Pfade bleiben unberührt.
+# Image path traversal: Markdown images ``![alt](PATH)`` with an absolute
+# (``/...``) or ``../`` traversal path could reference a container file via
+# ``\includegraphics`` and exfiltrate a readable image outside the render dir.
+# Such paths are neutralized to a plain-text placeholder; relative in-repo
+# paths stay untouched.
 _UNSAFE_IMAGE_RE = re.compile(
     r"!\[(?P<alt>[^\]]*)\]\(\s*(?P<path>[^)\s]+)[^)]*\)",
 )
 
 
 def _is_unsafe_image_path(path: str) -> bool:
-    """Bild-Pfad mit absolutem Root- oder ``..``-Traversal-Anteil? (FIX 3)."""
+    """Return True for absolute-root or ``..`` traversal image paths."""
     if path.startswith(("/", "\\")) or re.match(r"^[a-zA-Z]:[\\/]", path):
-        return True  # absolut (POSIX/UNC/Windows-Laufwerk)
-    # ``../`` an beliebiger Stelle (auch URL-encoded ``%2e%2e``) ist Traversal.
+        return True  # absolute (POSIX/UNC/Windows drive)
+    # ``../`` anywhere (also URL-encoded ``%2e%2e``) is traversal.
     normalized = path.replace("\\", "/").lower()
     return "../" in normalized or "%2e%2e" in normalized
 
@@ -141,28 +131,26 @@ def _is_unsafe_image_path(path: str) -> bool:
 def _neutralize_unsafe_image(match: re.Match[str]) -> str:
     path = match.group("path")
     if not _is_unsafe_image_path(path):
-        return match.group(0)  # harmloser relativer Pfad → unverändert
+        return match.group(0)  # harmless relative path → unchanged
     alt = match.group("alt").strip() or "Bild"
-    # Pfad NICHT durchreichen — als Klartext-Platzhalter entschärfen.
+    # Do NOT pass the path through — neutralize to a plain-text placeholder.
     return f"*[{_md_escape(alt)} (Bild entfernt)]*"
 
 
 def sanitize_user_markdown(markdown: str) -> str:
-    """Nutzer-Markdown von pytex-``eval``-Escapes (+ Pfad-Traversal-Bildern) befreien.
+    """Strip pytex ``eval`` escapes (+ path-traversal images) from user Markdown.
 
-    Entfernt RCE-Vektoren (``[//]: # "…"``-Kommentar-Eval in JEDER CommonMark-Form —
-    ein-/mehrzeilig, container-verschachtelt, Whitespace im Label — sowie
-    ``\\iffalse{pytex(…)}\\fi``) und entschärft Bilder mit absolutem/``..``-Pfad
-    (FIX 3). **Normales** Markdown (Überschriften, Listen, Hervorhebung, echte
-    Links/Bilder mit relativem Pfad, Abstimmungs-Callouts) bleibt vollständig
-    erhalten. Der eval-Trigger wird über das marko-Parse strukturell verifiziert
-    (AUD-001): solange ein eval-fähiger ``LinkRefDef`` überlebt, wird erneut
-    entschärft — der Body erreicht pytex garantiert ohne eval-Vektor."""
+    Removes the RCE vectors (``[//]: # "…"`` comment eval in every CommonMark
+    form, and ``\\iffalse{pytex(…)}\\fi``) and neutralizes images with
+    absolute/``..`` paths. Normal Markdown (headings, lists, emphasis, real
+    links/images with relative paths, vote callouts) is fully preserved. The
+    eval trigger is verified structurally via the marko parse: as long as an
+    eval-capable ``LinkRefDef`` survives, stripping repeats — the body is
+    guaranteed to reach pytex without an eval vector."""
     cleaned = _PYTEX_IFFALSE_RE.sub("", markdown)
     cleaned = _strip_eval_refdefs(cleaned)
-    # Strukturelle Absicherung: sollte (z. B. durch künftige marko-Versionen) doch
-    # ein eval-fähiger LinkRefDef überleben, erneut entfernen, bis keiner mehr da
-    # ist. Begrenzt, damit die Schleife nicht ewig läuft.
+    # Structural backstop: should an eval-capable LinkRefDef survive (e.g. via a
+    # future marko version), strip again until none remains. Bounded loop.
     for _ in range(3):
         if not _has_eval_refdef(cleaned):
             break
@@ -170,12 +158,12 @@ def sanitize_user_markdown(markdown: str) -> str:
     cleaned = _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, cleaned)
     return cleaned
 
-# Gremium-``cd_variant`` → pytex-Protokoll-Variante (flows §7).
+# Gremium ``cd_variant`` → pytex protocol variant.
 _PROTOCOL_VARIANTS = {"stupa", "asta"}
 
 
 def protocol_variant_for(cd_variant: str | None) -> str | None:
-    """``cd_variant`` → pytex-``variant`` (``protocol-<cd>``) oder ``None`` (Auto)."""
+    """Map ``cd_variant`` to a pytex ``variant`` (``protocol-<cd>``) or ``None`` (auto)."""
     if cd_variant in _PROTOCOL_VARIANTS:
         return f"protocol-{cd_variant}"
     return None
@@ -183,34 +171,32 @@ def protocol_variant_for(cd_variant: str | None) -> str | None:
 
 @dataclass(slots=True)
 class ProtocolDoc:
-    """Alle Kopf-Daten eines Protokolls (vom Service aus der DB befüllt)."""
+    """All header data of a protocol (filled from the DB by the service)."""
 
     title: str
     gremium_name: str | None
     cd_variant: str | None
     date: _date | None
     markdown: str
-    # Zusätzliche Titelseiten-/Header-Daten (#protocol-metadata, pytex-Protokoll-Header).
     start_time: _time | None = None
-    # Sitzungsende (#14, lokale Zeit) — aus ``meeting.closed_at``; mit Start ergibt
-    # das die »Zeit: Start – Ende«-Titelseiten-Zeile (pytex ``beginn``/``ende``).
+    # Meeting end (local time) from ``meeting.closed_at``; with start this forms
+    # the "Zeit: Start – Ende" title-page line (pytex ``beginn``/``ende``).
     end_time: _time | None = None
     protokollant: str | None = None
     present: list[str] = field(default_factory=list)
     absent: list[str] = field(default_factory=list)
     datalines: list[str] = field(default_factory=list)
-    # Beschlussfähigkeit (anwesende vs. aktive Mitglieder); None = keine Aussage.
+    # Quorum (present vs. active members); None = no statement.
     quorate: bool | None = None
 
 
-# Unterschriften-Block (pytex ``signature_block_from_meta``): die Schriftführung
-# zieht ihren Namen aus dem ``protokoll``-Frontmatter, der Vorstand bleibt eine
-# Blanko-Linie zum handschriftlichen Unterschreiben (Vault-Konvention).
+# Signature block (pytex ``signature_block_from_meta``): the secretary's name
+# comes from the frontmatter, the board stays a blank line for hand-signing.
 _SIGNATURES = ["Schriftführung", "Vorstand"]
 
 
 def _yaml_list(key: str, items: list[str]) -> list[str]:
-    """YAML-Block-Liste (leere Liste ⇒ nichts) — Werte werden quotiert/escaped."""
+    """Build a YAML block list (empty list ⇒ nothing) with quoted/escaped values."""
     if not items:
         return []
     return [f"{key}:", *(f"  - {_yaml_scalar(i)}" for i in items)]
@@ -223,14 +209,14 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
     if doc.cd_variant:
         lines.append(f"cd: {_yaml_scalar(doc.cd_variant)}")
     if doc.date is not None:
-        # ``datum`` füllt den Protokoll-Header (Datum + Uhrzeit), ``date`` die
-        # Report-Titelseite.
+        # ``datum`` fills the protocol header (date + time), ``date`` the
+        # report title page.
         datum = doc.date.isoformat()
         if doc.start_time is not None:
             datum = f"{datum} {doc.start_time.strftime('%H:%M')}"
         lines.append(f"datum: {_yaml_scalar(datum)}")
         lines.append(f"date: {_yaml_scalar(doc.date.isoformat())}")
-    # Start/Ende (#14): pytex rendert daraus die »Zeit: Start – Ende«-Daten-Zeile.
+    # pytex renders start/end into the "Zeit: Start – Ende" data line.
     if doc.start_time is not None:
         lines.append(f"beginn: {_yaml_scalar(doc.start_time.strftime('%H:%M'))}")
     if doc.end_time is not None:
@@ -240,27 +226,26 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
     lines += _yaml_list("anwesend", doc.present)
     lines += _yaml_list("abwesend", doc.absent)
     if doc.quorate is not None:
-        # Beschlussfähigkeit als Titelseiten-Daten-Zeile (#protocol-quorum) — der
-        # pytex-Wrapper registriert den Key in der Daten-Zeilen-Tabelle.
+        # Quorum as a title-page data line; the pytex wrapper registers the key.
         quorate = "Gegeben" if doc.quorate else "Nicht gegeben"
         lines.append(f"beschlussfaehigkeit: {_yaml_scalar(quorate)}")
     lines += _yaml_list("datalines", doc.datalines)
-    # Unterschriften-Seite (pytex rendert die Signatur-Linien aus dieser Liste).
+    # Signature page (pytex renders the signature lines from this list).
     lines += _yaml_list("unterschriften", _SIGNATURES)
     lines.append("---")
     return lines
 
 
 def build_protocol_document(doc: ProtocolDoc) -> str:
-    """Frontmatter + Editor-Body → finales Markdown (deterministisch).
+    """Combine frontmatter + editor body into the final Markdown (deterministic).
 
-    Der nutzer-geschriebene Body wird durch :func:`sanitize_user_markdown` von
-    pytex-``eval``-Escapes (RCE, security.md §2) und Pfad-Traversal-Bildern befreit;
-    normales Markdown bleibt verbatim. Frontmatter-Skalare bleiben YAML-quotiert.
-    Der eval-Escape ist damit weg, bevor pytex den Body sieht; ``\\write18``-Shell-
-    Escape greift unter der tectonic-Engine ohnehin nicht. Der Service rendert diesen
-    Pfad ``trusted`` (Client-Default) — die Protokoll-Variante braucht pytex'
-    Template-Maschinerie, die ``untrusted`` sperrt."""
+    The user-written body is cleaned of pytex ``eval`` escapes (RCE) and
+    path-traversal images via :func:`sanitize_user_markdown`; normal Markdown
+    stays verbatim. Frontmatter scalars stay YAML-quoted. The eval escape is
+    gone before pytex sees the body; ``\\write18`` shell escape does not apply
+    under the tectonic engine anyway. The service renders this path ``trusted``
+    (client default) — the protocol variant needs pytex's template machinery,
+    which ``untrusted`` blocks."""
     body = sanitize_user_markdown(doc.markdown).strip("\n")
     out = [*_frontmatter(doc), ""]
     if body:
@@ -273,30 +258,29 @@ def build_vote_snippet(
     counts: dict[str, int] | None,
     question: str | None = None,
 ) -> str:
-    """Eine Abstimmung als pytex-Protokoll-Callout (``> [!abstimmung]``) → eingebaute
-    Vote-Tally-Box im PDF (statt einer Aufzählung). Die Stimmen-Zeile (``yes/no/abstain``
-    bzw. ``ja/nein/enthaltung``) erkennt pytex und rendert die Zähl-Box. Alle Werte
-    werden escaped; der Titel ist **fett** (#pdf-format). Eine separate
-    »Ergebnis: …«-Zeile entfällt — das Ergebnis liest sich aus der Zähl-Box.
+    """Render a vote as a pytex protocol callout (``> [!abstimmung]``).
 
-    Bleibt Teil des editierbaren Markdowns (Blockquote-Callout)."""
+    pytex turns the counts line (``yes/no/abstain`` resp. ``ja/nein/enthaltung``)
+    into the built-in tally box in the PDF. All values are escaped; the title is
+    bold. No separate result line — the result reads from the tally box.
+    Remains part of the editable Markdown (blockquote callout)."""
     head = question.strip() if question and question.strip() else title
     lines = [f"> [!abstimmung] **{_md_escape(head)}**"]
     if counts:
-        # pytex erkennt die Tally-Zeile an ≥2 von ja/nein/enthaltung (yes/no/abstain) —
-        # die Antrags-Optionen tragen genau diese Schlüssel.
+        # pytex detects the tally line by ≥2 of ja/nein/enthaltung (yes/no/abstain) —
+        # the ballot options carry exactly these keys.
         tally = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())
         lines.append(f"> {tally}")
     return "\n".join(lines)
 
 
 def demote_headings(markdown: str) -> str:
-    """Alle ATX-Headings im TOP-Body **eine Ebene absenken** (#pdf-format).
+    """Demote all ATX headings in an agenda-item body by one level.
 
-    Die TOP-Überschrift selbst ist das einzige Top-Level-``#`` (pytex nummeriert
-    sie als »TOP n«); vom Protokollanten im Body geschriebene ``#``-Headings
-    würden sonst als eigene TOPs mitnummeriert. Code-Fences bleiben unberührt;
-    Ebene 6 bleibt 6 (tiefer kennt Markdown nicht)."""
+    The agenda-item heading itself is the only top-level ``#`` (pytex numbers
+    it as "TOP n"); ``#`` headings written by the secretary in the body would
+    otherwise be numbered as separate TOPs. Code fences are untouched; level 6
+    stays 6."""
     out: list[str] = []
     in_fence = False
     for line in markdown.split("\n"):

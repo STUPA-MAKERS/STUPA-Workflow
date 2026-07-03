@@ -1,10 +1,8 @@
-"""Excel-Export-Helfer (TASKS #2).
+"""Excel export helpers for the budget tree and application list.
 
-Baut ``.xlsx``-Workbooks für den Budget-Baum und die Antragsliste. ``openpyxl``
-wird **lazy** importiert (nur auf dem Export-Pfad), damit der Contract-CI ohne
-das Paket lädt. Die Endpunkte (``/budget/export.xlsx`` /
-``/applications/export.xlsx``) reichen bereits gefilterte Daten herein — dieses
-Modul kennt keine DB, nur Reihen → Bytes.
+``openpyxl`` is imported lazily (only on the export path) so environments without
+the package still load. Endpoints pass already-filtered data in; this module knows
+no DB, only rows -> bytes.
 """
 
 from __future__ import annotations
@@ -16,7 +14,7 @@ from decimal import Decimal
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:  # pragma: no cover - nur Typen
+if TYPE_CHECKING:  # pragma: no cover - types only
     from app.modules.applications.schemas import ApplicationListItem
     from app.modules.budget.tree_schemas import BudgetTreeNodeOut
 
@@ -29,18 +27,17 @@ def _num(value: Decimal | float | None) -> float | None:
     return float(value) if value is not None else None
 
 
-# Zeichen, die am Zellanfang eine aktive Formel (oder DDE) auslösen können, wenn
-# Excel/LibreOffice die Datei öffnet — CSV/XLSX-Formula-Injection.
+# Leading characters that can trigger an active formula/DDE when Excel/LibreOffice
+# opens the file — CSV/XLSX formula injection.
 _FORMULA_PREFIXES: tuple[str, ...] = ("=", "+", "-", "@", "\t", "\r")
 
 
 def _safe(value: Any) -> Any:
-    """Formula-Injection neutralisieren.
+    """Neutralize formula injection.
 
-    Strings, die mit einem gefährlichen Zeichen (``= + - @`` oder Tab/CR)
-    beginnen, werden mit einem führenden Apostroph als Text markiert, sodass
-    Tabellenkalkulationen sie nicht als Formel auswerten. Nicht-Strings (Zahlen,
-    ``None``) bleiben unverändert.
+    Strings starting with a dangerous character (``= + - @`` or tab/CR) get a
+    leading apostrophe so spreadsheets treat them as text, not formulas.
+    Non-strings (numbers, ``None``) pass through unchanged.
     """
     if isinstance(value, str) and value[:1] in _FORMULA_PREFIXES:
         return "'" + value
@@ -48,12 +45,12 @@ def _safe(value: Any) -> Any:
 
 
 def _append(worksheet: Any, row: Sequence[Any]) -> None:
-    """``ws.append`` mit Formula-Injection-Schutz für **jede** Zelle."""
+    """``ws.append`` with formula-injection protection on every cell."""
     worksheet.append([_safe(cell) for cell in row])
 
 
 def _autosize(worksheet: Any, headers: Sequence[str]) -> None:
-    """Spaltenbreite grob an die längste Zelle je Spalte anpassen."""
+    """Roughly fit column widths to the longest cell per column."""
     widths = [len(str(h)) for h in headers]
     for row in worksheet.iter_rows(min_row=2, values_only=True):
         for i, cell in enumerate(row):
@@ -87,10 +84,10 @@ def build_budget_workbook(
     fiscal_year_labels: dict[Any, str],
     fiscal_year_id: Any | None = None,
 ) -> bytes:
-    """Budget-Baum als ``.xlsx``-Bytes — **ein Blatt je Haushaltsjahr**.
+    """Budget tree as ``.xlsx`` bytes — one sheet per fiscal year.
 
-    ``roots`` ist bereits auf die sichtbare Auswahl (Gremium/Teilbaum) reduziert;
-    ``fiscal_year_id`` filtert optional auf ein einzelnes HHJ (= nur dessen Blatt).
+    ``roots`` is already reduced to the visible selection (gremium/subtree);
+    ``fiscal_year_id`` optionally filters to a single fiscal year (its sheet only).
     """
     from openpyxl import Workbook
 
@@ -105,7 +102,7 @@ def build_budget_workbook(
     ]
     nodes = list(_iter_nodes(roots))
 
-    # HHJ in Baum-Reihenfolge sammeln (stabil), optional auf eines gefiltert.
+    # Collect fiscal years in tree order (stable), optionally filtered to one.
     fy_order: list[Any] = []
     for _depth, node in nodes:
         for alloc in node.by_fiscal_year:
@@ -115,7 +112,7 @@ def build_budget_workbook(
                 fy_order.append(alloc.fiscal_year_id)
 
     wb = Workbook()
-    # Standardblatt entfernen; pro HHJ ein eigenes anlegen.
+    # Remove the default sheet; create one per fiscal year.
     default_ws = wb.active
     if default_ws is not None:
         wb.remove(default_ws)
@@ -161,7 +158,7 @@ def build_budget_workbook(
 
 
 def _sheet_title(label: str, used: set[str]) -> str:
-    """Excel-konformer, eindeutiger Blattname (≤31 Zeichen, ohne ``[]:*?/\\``)."""
+    """Excel-safe, unique sheet name (<=31 chars, without ``[]:*?/\\``)."""
     safe = "".join("_" if c in '[]:*?/\\' else c for c in label).strip() or "HHJ"
     safe = safe[:31]
     base = safe
@@ -181,7 +178,7 @@ def build_applications_workbook(
     gremium_names: dict[Any, str],
     locale: str = "de",
 ) -> bytes:
-    """Antragsliste als ``.xlsx``-Bytes (Reihenfolge/Filter wie übergeben)."""
+    """Application list as ``.xlsx`` bytes (order/filter as passed)."""
     from openpyxl import Workbook
 
     headers = [
@@ -196,7 +193,7 @@ def build_applications_workbook(
     ]
     wb = Workbook()
     ws = wb.active
-    assert ws is not None  # noqa: S101 - openpyxl liefert immer ein aktives Sheet
+    assert ws is not None  # noqa: S101 - openpyxl always returns an active sheet
     ws.title = "Anträge"
     _header_row(ws, headers)
 
@@ -226,7 +223,7 @@ def build_applications_workbook(
 
 
 def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
-    """Buchungen (Ausgaben/Einnahmen) als ``.xlsx``-Bytes (Reihenfolge/Filter wie übergeben)."""
+    """Bookings (expenses/income) as ``.xlsx`` bytes (order/filter as passed)."""
     from openpyxl import Workbook
 
     kind_label = (
@@ -239,7 +236,7 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
     ]
     wb = Workbook()
     ws = wb.active
-    assert ws is not None  # noqa: S101 - openpyxl liefert immer ein aktives Sheet
+    assert ws is not None  # noqa: S101 - openpyxl always returns an active sheet
     ws.title = "Buchungen"
     _header_row(ws, headers)
     for e in items:
@@ -269,15 +266,16 @@ def build_auskunft_workbook(
     versions: Sequence[Mapping[str, Any]],
     principal: Mapping[str, Any] | None,
 ) -> bytes:
-    """DSGVO-Auskunft (Art. 15) als ``.xlsx``-Bytes — alle zu ``email`` gespeicherten
-    personenbezogenen Daten. DB-agnostisch: erhält fertig aufbereitete Reihen.
+    """GDPR Auskunft (Art. 15) as ``.xlsx`` bytes — all personal data stored for ``email``.
 
-    Drei Blätter: Konto (Principal), Anträge (inkl. ``data`` als JSON), Versionen."""
+    DB-agnostic: receives already-prepared rows. Three sheets: account (principal),
+    applications (incl. ``data`` as JSON), versions.
+    """
     from openpyxl import Workbook
 
     wb = Workbook()
     ws_account = wb.active
-    assert ws_account is not None  # noqa: S101 - openpyxl liefert immer ein aktives Sheet
+    assert ws_account is not None  # noqa: S101 - openpyxl always returns an active sheet
     ws_account.title = "Konto"
     acc_headers = ["Feld", "Wert"]
     _header_row(ws_account, acc_headers)

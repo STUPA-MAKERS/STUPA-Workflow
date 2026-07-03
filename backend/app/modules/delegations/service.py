@@ -1,30 +1,27 @@
-"""Delegation-Service (#delegation-rework) — Sicherheitskern.
+"""Delegation service — security core.
 
-Eine Delegation ist **sitzungsgebunden** (``meeting_delegation``): genau eine
-ausgehende Vertretung je (Sitzung, Mitglied), Gremium = Gremium der Sitzung,
-optional mit Stimmrecht (exklusiver **Transfer**, kein Duplikat). Das frühere
-Blanko-Zeitraum-Modell (``role_assignment.delegated_by``, T-45) ist abgelöst;
-Alt-Zeilen bleiben für den RBAC-Resolver gültig, zählen aber **nicht** mehr für
-das Stimmrecht.
+A delegation is session-bound (``meeting_delegation``): exactly one outgoing
+delegation per (meeting, member), gremium = the meeting's gremium, optionally
+carrying the vote (an exclusive transfer, never a duplicate).
 
-Serverseitig erzwungene Invarianten:
+Server-enforced invariants:
 
-* **Feature-Gates:** Sitzungs-Delegation nur, wenn das Gremium sie erlaubt
-  (``allow_vote_delegation``); ``delegate_voting`` zusätzlich nur bei global
-  freigeschaltetem Stimmrecht-Transfer (``delegation_voting_enabled``, 422).
-* **Nur eigene Stimme:** der Delegierende muss selbst stimmberechtigtes Mitglied
-  des Sitzungs-Gremiums sein (Gremium-Rolle mit ``vote.cast``, direktes
-  Assignment oder OIDC-/Group-Mapping) — sonst 403.
-* **Keine Ketten:** pro Sitzung tritt ein Principal entweder als Delegierender
-  ODER als Empfänger auf, nie beides (422).
-* **Empfänger-Kreis:** Gremium-Mitglieder und der Stellvertreter-Pool sind immer
-  wählbar; sonstige Nutzer nur bei ``delegation_allow_external`` (403).
-* **Deadline:** Nicht-Pool-Delegationen bis ``Sitzungsbeginn − delegation_lead_
-  minutes`` (Gremium-Config); Pool-Delegationen bis Sitzungsbeginn. Immer nur
-  solange die Sitzung ``planned`` ist (422). Widerruf bis Sitzungsbeginn.
-* **Transfer ≠ Duplikat:** höchstens eine Stimm-Delegation je (Sitzung,
-  Empfänger) (409); der Delegierende ist für Votes der Sitzung gesperrt
-  (:func:`voting_delegation_check`, Nutzung wird auditiert).
+* Feature gates: session delegation only when the gremium allows it
+  (``allow_vote_delegation``); ``delegate_voting`` additionally only when the
+  global vote transfer is enabled (``delegation_voting_enabled``, 422).
+* Own vote only: the delegator must itself be a voting member of the meeting's
+  gremium (gremium role with ``vote.cast``, direct assignment, or OIDC/group
+  mapping) — else 403.
+* No chains: per meeting a principal is either delegator or recipient, never
+  both (422).
+* Recipient set: gremium members and the substitute pool are always eligible;
+  other users only with ``delegation_allow_external`` (403).
+* Deadline: non-pool delegations until ``meeting start − delegation_lead_minutes``
+  (gremium config); pool delegations until meeting start. Only while the meeting
+  is ``planned`` (422). Revocation until meeting start.
+* Transfer != duplicate: at most one vote delegation per (meeting, recipient)
+  (409); the delegator is blocked from the meeting's votes
+  (:func:`voting_delegation_check`, use is audited).
 """
 
 from __future__ import annotations
@@ -65,32 +62,30 @@ from app.shared.errors import (
     ValidationProblem,
 )
 
-# Permission, die die volle (fremde) Delegations-Sicht/-Verwaltung freischaltet
-# (#per-page-admin: eigene Seite /admin/delegations → eigener Key).
+# Permission granting full (foreign) delegation view/management.
 _ADMIN_PERM = "admin.delegations"
-# Gremium-Rollen-Permission, die den Stellvertreter-Pool pflegen darf.
+# Gremium-role permission allowed to manage the substitute pool.
 _POOL_MANAGE_PERM = "session.manage"
-# Advisory-Lock-Basisschlüssel ("DELEG\0"): serialisiert ``create`` je Sitzung,
-# damit die Ketten-Prüfung (read-then-insert) nicht von einem parallelen Anlegen
-# unterlaufen wird. Mit ``meeting_id`` zu zwei int4-Argumenten kombiniert.
+# Advisory-lock base key: serializes ``create`` per meeting so the no-chains
+# check (read-then-insert) cannot be raced by a concurrent insert; combined with
+# ``meeting_id`` into two int4 arguments.
 _CREATE_LOCK_KEY = 0x4445_4C45  # "DELE"
 
 
 def _escape_like(needle: str) -> str:
-    """LIKE/ILIKE-Metazeichen im Nutzer-Suchbegriff neutralisieren.
+    """Neutralize LIKE/ILIKE metacharacters in a user search term.
 
-    ``%``/``_`` (und der Escape-Char ``\\`` selbst) sind im Muster sonst
-    Wildcards: ein vom Nutzer eingegebenes ``%`` würde sonst »alles« matchen.
-    Mit ``.ilike(pattern, escape='\\')`` aufrufen.
+    ``%``/``_`` (and the escape char ``\\`` itself) are otherwise wildcards.
+    Call with ``.ilike(pattern, escape='\\')``.
     """
     return needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def meeting_start_utc(meeting: Meeting, tz_name: str) -> datetime | None:
-    """Sitzungsbeginn als aware-UTC; ``None`` wenn die Sitzung kein Datum hat.
+    """Meeting start as aware UTC; ``None`` if the meeting has no date.
 
-    ``meeting.date``/``start_time`` sind naiv gespeichert und meinen lokale Zeit
-    (``settings.local_timezone``); ohne Uhrzeit gilt Tagesbeginn (00:00 lokal).
+    ``date``/``start_time`` are stored naive as local time
+    (``settings.local_timezone``); without a time, start of day (00:00 local).
     """
     if meeting.date is None:
         return None
@@ -101,7 +96,7 @@ def meeting_start_utc(meeting: Meeting, tz_name: str) -> datetime | None:
 async def _membership_with_vote_cast(
     session: AsyncSession, principal_id: UUID, gremium_id: UUID, now: datetime
 ) -> bool:
-    """Aktive Gremium-Mitgliedschaft, deren Rolle ``vote.cast`` gewährt."""
+    """Whether an active gremium membership grants ``vote.cast``."""
     rows = (
         (
             await session.execute(
@@ -127,10 +122,10 @@ async def _membership_with_vote_cast(
 async def _independently_eligible(
     session: AsyncSession, principal_id: UUID, gremium_id: UUID, now: datetime
 ) -> bool:
-    """Eigenständig stimmberechtigt im Gremium — **ohne** Delegationen.
+    """Whether the principal is independently vote-eligible — without delegations.
 
-    Quellen wie der RBAC-Resolver: Gremium-Rolle mit ``vote.cast``, direkt
-    gehaltenes ``role_assignment`` mit Gremium-Scope, OIDC-Gruppe (direkt oder via
+    Same sources as the RBAC resolver: gremium role with ``vote.cast``, a directly
+    held gremium-scoped ``role_assignment``, or OIDC group (direct or via
     ``group_mapping``).
     """
     if await _membership_with_vote_cast(session, principal_id, gremium_id, now):
@@ -178,20 +173,20 @@ async def voting_delegation_check(
     sub: str,
     meeting_id: UUID | None,
     eligible_group: str,
-    now: datetime,  # noqa: ARG001 — Signatur-Konsistenz; Delegationen sind sitzungsgebunden
+    now: datetime,  # noqa: ARG001 - signature consistency; delegations are session-bound
 ) -> tuple[bool, str | None]:
-    """Zwei-seitiges Stimmrecht-Verdikt für ``sub`` → ``(blocked, delegator_sub)``.
+    """Two-sided vote verdict for ``sub`` → ``(blocked, delegator_sub)``.
 
-    Sitzungsgebunden: nur ``meeting_delegation``-Zeilen **dieser** Sitzung zählen,
-    und nur wenn das Vote-Gremium (``eligible_group`` = ``str(gremium_id)``) zum
-    Delegations-Gremium passt. Votes ohne Sitzung kennen keine Delegation.
+    Session-bound: only ``meeting_delegation`` rows of this meeting count, and only
+    when the vote's gremium (``eligible_group`` == ``str(gremium_id)``) matches the
+    delegation gremium. Votes without a meeting have no delegation.
 
-    * ausgehende Zeile mit ``delegate_voting`` → **blocked** (Transfer: nur der
-      Empfänger stimmt).
-    * eingehende Zeile mit ``delegate_voting`` → ``delegator_sub`` = ``sub`` des/der
-      Delegierenden: der Aufrufer darf ZUSÄTZLICH zur eigenen Stimme eine
-      Vertretungs-Stimme abgeben (Ballot läuft unter ``delegator_sub`` — Transfer,
-      kein Duplikat) und ist damit auch als Externe:r stimmberechtigt.
+    * outgoing row with ``delegate_voting`` → blocked (transfer: only the recipient
+      votes).
+    * incoming row with ``delegate_voting`` → ``delegator_sub`` is the delegator's
+      ``sub``: the caller may cast one delegated ballot in addition to their own
+      (ballot runs under ``delegator_sub`` — a transfer, not a duplicate) and is
+      thereby vote-eligible even as an external.
     """
     if meeting_id is None:
         return False, None
@@ -231,13 +226,13 @@ async def voting_delegation_check(
 
 
 class DelegationService:
-    """An eine ``AsyncSession`` + ``Settings`` gebundener Delegations-Service."""
+    """Delegation service bound to an ``AsyncSession`` + ``Settings``."""
 
     def __init__(self, session: AsyncSession, settings: Settings) -> None:
         self.session = session
         self.settings = settings
 
-    # ----------------------------------------------------------------- helpers
+    # --- helpers ---
     async def _principal_row(
         self, *, sub: str | None = None, pid: UUID | None = None
     ) -> PrincipalRow | None:
@@ -274,7 +269,7 @@ class DelegationService:
         return gremium
 
     async def _pool_substitute_ids(self, gremium_id: UUID, member_id: UUID) -> set[UUID]:
-        """Pool-Empfänger für ``member_id``: persönliche + gremium-weite Einträge."""
+        """Pool recipients for ``member_id``: personal + gremium-wide entries."""
         rows = (
             (
                 await self.session.execute(
@@ -293,7 +288,7 @@ class DelegationService:
         return set(rows)
 
     async def _member_ids(self, gremium_id: UUID, now: datetime) -> set[UUID]:
-        """Aktive Gremium-Mitglieder (beliebige Rolle)."""
+        """Active gremium members (any role)."""
         rows = (
             (
                 await self.session.execute(
@@ -312,7 +307,7 @@ class DelegationService:
         return set(rows)
 
     async def _pool_member_gremium_ids(self, sub: str) -> set[UUID]:
-        """Gremien, in deren Stellvertreter-Pool ``sub`` steht (eigene Sicht)."""
+        """Gremien whose substitute pool contains ``sub`` (self view)."""
         pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
         rows = (
             await self.session.execute(
@@ -324,13 +319,12 @@ class DelegationService:
         return set(rows)
 
     async def _assert_can_view_gremium(self, gremium_id: UUID, actor: Principal) -> None:
-        """Sicht auf das Roster/den Pool eines Gremiums absichern (#sec-audit).
+        """Guard view of a gremium's roster/pool against cross-tenant PII reads.
 
-        Erlaubt für globale Leser/Verwalter (``admin``-Rolle, ``admin.delegations``,
-        ``meeting.manage``, ``meeting.view_all``) sowie Mitglieder, Stellvertreter-Pool
-        und Träger der Gremium-Rolle ``session.manage`` **dieses** Gremiums — dieselbe
-        Sichtbarkeit wie die Sitzungs-Timeline. Sonst 403: zuvor gab jede
-        eingeloggte Identität fremde Roster/Pool-PII preis (Cross-Tenant-Lesen)."""
+        Allowed for global readers/managers (``admin`` role, ``admin.delegations``,
+        ``meeting.manage``, ``meeting.view_all``) plus members, the substitute pool,
+        and holders of this gremium's ``session.manage`` role (same visibility as the
+        meeting timeline). Otherwise 403."""
         if (
             "admin" in actor.roles
             or actor.has(_ADMIN_PERM)
@@ -389,8 +383,8 @@ class DelegationService:
                 delegate_name=names.get(d.delegate_principal_id),
                 delegate_voting=d.delegate_voting,
                 via_pool=d.via_pool,
-                # Frisch eingefügte Zeile: ``created_at`` füllt erst der DB-Default
-                # (server_default) — bis zum Re-Select gilt der Anlege-Zeitpunkt.
+                # Freshly inserted row: ``created_at`` is filled by the DB default
+                # only on re-select; until then use the creation time.
                 created_at=d.created_at or now,
                 revocable=self._revocable(meeting, now),
                 direction=self._direction(d, me_id),
@@ -410,10 +404,10 @@ class DelegationService:
         ).all()
         return [(d, m, g) for d, m, g in rows]
 
-    # ------------------------------------------------------------------ create
+    # --- create ---
     async def create(self, payload: DelegationCreate, actor: Principal) -> DelegationOut:
-        """Sitzungs-Delegation anlegen. 403 (Gate/Empfänger-Kreis/kein Stimmrecht),
-        404 (Sitzung/Empfänger), 409 (Doppel), 422 (Fenster/Ketten/Selbst)."""
+        """Create a session delegation. 403 (gate/recipient/not eligible),
+        404 (meeting/recipient), 409 (duplicate), 422 (window/chain/self)."""
         now = datetime.now(UTC)
         meeting = await self._meeting(payload.meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
@@ -443,19 +437,19 @@ class DelegationService:
                 errors=[{"field": "delegateId", "msg": "must differ from delegator"}],
             )
 
-        # Nur die eigene Stimme ist delegierbar: der Delegierende muss eigenständig
-        # stimmberechtigtes Mitglied des Sitzungs-Gremiums sein.
+        # Own vote only: the delegator must be an independently eligible voting
+        # member of the meeting's gremium.
         if not await _independently_eligible(self.session, me.id, gremium.id, now):
             raise ForbiddenError("Only voting members of the meeting's gremium may delegate.")
 
-        # Empfänger-Kreis: Mitglied | Pool | extern (nur wenn freigeschaltet).
+        # Recipient set: member | pool | external (only when enabled).
         pool_ids = await self._pool_substitute_ids(gremium.id, me.id)
         member_ids = await self._member_ids(gremium.id, now)
         via_pool = delegate.id in pool_ids
         if not via_pool and delegate.id not in member_ids and not gremium.delegation_allow_external:
             raise ForbiddenError("Recipient must be a gremium member or a designated substitute.")
 
-        # Deadline: Pool bis Sitzungsbeginn, sonst Beginn − Vorlauf (Gremium-Config).
+        # Deadline: pool until meeting start, else start − lead time (gremium config).
         start = meeting_start_utc(meeting, self.settings.local_timezone)
         if start is not None:
             deadline = (
@@ -467,12 +461,10 @@ class DelegationService:
                     errors=[{"field": "meetingId", "msg": "deadline passed"}],
                 )
 
-        # Keine Ketten: je Sitzung ist man entweder Delegierender oder Empfänger.
-        # Read-then-insert ohne Lock kann von zwei parallelen Anlege-Vorgängen
-        # unterlaufen werden (A→B und B→C gleichzeitig). Daher die Anlage je Sitzung
-        # mit einem transaktionsgebundenen Advisory-Lock serialisieren (analog
-        # audit/service.py): zweites int4-Argument = stabile Ableitung aus der
-        # ``meeting_id`` (Hash auf 32 Bit). Der Lock fällt mit dem Commit/Rollback.
+        # No chains: per meeting one is either delegator or recipient. Serialize the
+        # per-meeting insert with a transaction-scoped advisory lock so a concurrent
+        # insert (A→B and B→C at once) cannot race the read-then-insert check; the
+        # second int4 arg is a stable 32-bit derivation of ``meeting_id``.
         meeting_lock_arg = int.from_bytes(meeting.id.bytes[:4], "big") - 0x8000_0000
         await self.session.execute(
             text("SELECT pg_advisory_xact_lock(:k1, :k2)").bindparams(
@@ -535,9 +527,9 @@ class DelegationService:
         await self.session.commit()
         return (await self._out([(row, meeting, gremium)], now, me.id))[0]
 
-    # -------------------------------------------------------------------- list
+    # --- list ---
     async def list(self, actor: Principal, meeting_id: UUID | None = None) -> list[DelegationOut]:
-        """Eigene (ausgehende **und** eingehende) Delegationen; Admins alle."""
+        """Own (outgoing and incoming) delegations; admins see all."""
         now = datetime.now(UTC)
         me = await self._principal_row(sub=actor.sub)
         where = []
@@ -554,11 +546,11 @@ class DelegationService:
             )
         return await self._out(await self._joined(*where), now, me.id if me else None)
 
-    # ------------------------------------------------------------------ revoke
+    # --- revoke ---
     async def revoke(self, delegation_id: UUID, actor: Principal) -> None:
-        """Delegation widerrufen (Hard-Delete → sofort wirksam). 404/403/422.
+        """Revoke a delegation (hard delete, effective immediately). 404/403/422.
 
-        Delegierender: bis Sitzungsbeginn (Sitzung ``planned``). Admin: immer.
+        Delegator: until meeting start (meeting ``planned``). Admin: always.
         """
         row = await self.session.get(MeetingDelegation, delegation_id)
         if row is None:
@@ -585,16 +577,16 @@ class DelegationService:
         )
         await self.session.commit()
 
-    # --------------------------------------------------------- meeting context
+    # --- meeting context ---
     async def meeting_context(self, meeting_id: UUID, actor: Principal) -> MeetingDelegationContext:
-        """Kontext für den »Vertretung einrichten«-Dialog einer Sitzung.
+        """Context for a meeting's "set up delegation" dialog.
 
-        404 (Sitzung), 403 (kein Mitglied/Pool/Verwalter des Sitzungs-Gremiums):
-        Roster + Empfänger-Namen sind PII und dürfen nicht an Fremde gehen."""
+        404 (meeting), 403 (not a member/pool/manager of the meeting's gremium):
+        roster + recipient names are PII and must not leak to outsiders."""
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
-        # #sec-audit: vor dem Bauen des Rosters/Empfänger-PII die Sicht prüfen.
+        # Check view rights before building the roster / recipient PII.
         await self._assert_can_view_gremium(gremium.id, actor)
         me = await self._principal_row(sub=actor.sub)
 
@@ -660,17 +652,17 @@ class DelegationService:
             recipients=recipients,
         )
 
-    # -------------------------------------------------------------- recipients
+    # --- recipients ---
     async def recipients(self, meeting_id: UUID, q: str, actor: Principal) -> list[RecipientOut]:
-        """Typeahead: erlaubte Empfänger; bei ``delegation_allow_external``
-        zusätzlich plattformweite Suche nach Name/Mail.
+        """Typeahead of eligible recipients; with ``delegation_allow_external`` also
+        a platform-wide search by name/email.
 
-        404 (Sitzung), 403 (kein Mitglied/Pool/Verwalter des Sitzungs-Gremiums):
-        die zurückgegebenen Namen sind PII und nur für Berechtigte sichtbar."""
+        404 (meeting), 403 (not a member/pool/manager of the meeting's gremium):
+        the returned names are PII, visible only to the authorized."""
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
-        # #sec-audit: vor dem Auflösen von Empfänger-Namen die Sicht prüfen.
+        # Check view rights before resolving recipient names.
         await self._assert_can_view_gremium(gremium.id, actor)
         me = await self._principal_row(sub=actor.sub)
         if me is None:
@@ -691,8 +683,7 @@ class DelegationService:
             if not needle or needle in (names.get(pid) or "").lower()
         ]
         if gremium.delegation_allow_external and needle:
-            # LIKE-Metazeichen escapen (#sec): das Nutzer-``%``/``_`` darf nicht als
-            # Wildcard wirken.
+            # Escape LIKE metacharacters so the user's ``%``/``_`` is not a wildcard.
             pattern = f"%{_escape_like(needle)}%"
             rows = (
                 await self.session.execute(
@@ -721,9 +712,9 @@ class DelegationService:
         out.sort(key=lambda r: (not r.via_pool, not r.is_member, (r.display_name or "").lower()))
         return out[:20]
 
-    # ------------------------------------------------------------- vote status
+    # --- vote status ---
     async def vote_status(self, vote_id: UUID, actor: Principal) -> VoteDelegationStatus:
-        """Delegations-Sicht des Aufrufers auf eine Abstimmung (FE-Banner)."""
+        """The caller's delegation view of a vote (frontend banner)."""
         vote = await self.session.get(Vote, vote_id)
         if vote is None:
             raise NotFoundError(f"vote {vote_id} not found")
@@ -773,7 +764,7 @@ class DelegationService:
             delegated_by_name=names.get(delegated_by) if delegated_by else None,
         )
 
-    # ------------------------------------------------------- substitute pool
+    # --- substitute pool ---
     async def _require_pool_manage(self, gremium_id: UUID, actor: Principal) -> None:
         if actor.has(_ADMIN_PERM):
             return
@@ -785,10 +776,9 @@ class DelegationService:
             )
 
     async def substitutes_list(self, gremium_id: UUID, actor: Principal) -> list[SubstituteOut]:
-        """Pool eines Gremiums — sichtbar nur für Mitglieder/Pool/Verwalter **dieses**
-        Gremiums (#sec-audit; ``admin.delegations``/``meeting.*``/``session.manage``
-        oder Mitgliedschaft/Pool). Zuvor las jede eingeloggte Identität fremde
-        Pool-PII (Namen). 404 (Gremium), 403 (keine Sicht)."""
+        """A gremium's pool — visible only to members/pool/managers of this gremium
+        (``admin.delegations``/``meeting.*``/``session.manage`` or membership/pool).
+        404 (gremium), 403 (no view)."""
         await self._gremium(gremium_id)
         await self._assert_can_view_gremium(gremium_id, actor)
         rows = (
@@ -821,7 +811,7 @@ class DelegationService:
         ]
 
     async def substitute_create(self, payload: SubstituteCreate, actor: Principal) -> SubstituteOut:
-        """Pool-Eintrag anlegen — ``admin.delegations`` oder Gremium-``session.manage``."""
+        """Create a pool entry — ``admin.delegations`` or gremium ``session.manage``."""
         await self._require_pool_manage(payload.gremium_id, actor)
         await self._gremium(payload.gremium_id)
         substitute = await self._principal_row(pid=payload.substitute_id)
@@ -883,7 +873,7 @@ class DelegationService:
         )
 
     async def substitute_delete(self, substitute_id: UUID, actor: Principal) -> None:
-        """Pool-Eintrag löschen — gleiche Rechte wie Anlegen."""
+        """Delete a pool entry — same rights as creating one."""
         row = await self.session.get(DelegationSubstitute, substitute_id)
         if row is None:
             raise NotFoundError(f"substitute {substitute_id} not found")

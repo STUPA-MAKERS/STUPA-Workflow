@@ -1,7 +1,6 @@
-"""Einheitliches Offset-Paging (overview §5, api.md).
+"""Uniform offset paging.
 
-`PageParams` = Query-Defaults; `Page[T]` = Antwort-Hülle. Cursor-Paging später
-modulweise ergänzbar.
+``PageParams`` holds the query defaults; ``Page[T]`` is the response wrapper.
 """
 
 from __future__ import annotations

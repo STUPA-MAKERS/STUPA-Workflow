@@ -1,13 +1,12 @@
-"""Flow-Action-Dispatcher mit ``exportPdf``-Handler (T-20 erfüllt das T-14-Interface).
+"""Flow-action dispatcher with an ``exportPdf`` handler.
 
-Die Flow-Engine (T-14) ruft nach Commit ``ActionDispatcher.dispatch(actions)``. Dieser
-Dispatcher behandelt ``exportPdf``: er legt einen ``render_job`` an (idempotent über
-``DispatchedAction.idempotency_key`` → ein Status-Event erzeugt **keinen** Doppel-Render)
-und enqueued ihn (Worker rendert). Andere Action-Typen werden nur protokolliert.
+The flow engine calls ``ActionDispatcher.dispatch(actions)`` after commit. This
+dispatcher handles ``exportPdf``: it creates a ``render_job`` (idempotent via
+``DispatchedAction.idempotency_key`` so one status event never double-renders) and
+enqueues it for the worker. Other action types are only logged.
 
-:class:`ChainActionDispatcher` verkettet mehrere Dispatcher (notify **und** exportPdf),
-da die App nur **einen** Dispatcher injizieren kann; jeder ignoriert die Typen, die er
-nicht kennt.
+``ChainActionDispatcher`` chains several dispatchers (notify and exportPdf), since the
+app injects a single dispatcher; each ignores the types it does not handle.
 """
 
 from __future__ import annotations
@@ -29,7 +28,7 @@ logger = logging.getLogger("app.pdf")
 
 @dataclass(slots=True)
 class PdfActionDispatcher:
-    """``ActionDispatcher``-Implementierung für ``exportPdf`` (sonst No-op-Log)."""
+    """``ActionDispatcher`` for ``exportPdf`` (other types are a no-op log)."""
 
     sessionmaker: async_sessionmaker[AsyncSession]
     queue: RenderQueue | None
@@ -65,7 +64,7 @@ class PdfActionDispatcher:
 
 @dataclass(slots=True)
 class ChainActionDispatcher:
-    """Mehrere Dispatcher der Reihe nach aufrufen (notify + exportPdf …)."""
+    """Call several dispatchers in order (notify + exportPdf …)."""
 
     dispatchers: Sequence[ActionDispatcher]
 
@@ -75,7 +74,7 @@ class ChainActionDispatcher:
 
 
 def build_pdf_dispatcher(pool: object) -> PdfActionDispatcher:
-    """Dispatcher aus dem (optionalen) arq-Pool bauen — App-Wiring (main.py)."""
+    """Build the dispatcher from the optional arq pool (app wiring)."""
     return PdfActionDispatcher(
         get_sessionmaker(),
         render_queue_from_pool(pool),  # type: ignore[arg-type]

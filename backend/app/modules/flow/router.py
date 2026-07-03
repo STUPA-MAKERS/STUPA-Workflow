@@ -1,12 +1,7 @@
-"""Flow-API-Router (T-14, api.md »flow«).
+"""Flow API router: list available transitions and fire one.
 
-* ``GET  /api/applications/{id}/transitions`` — P(application.manage); verfügbare
-  Übergänge (Guards geprüft) für den aktuellen Principal.
-* ``POST /api/applications/{id}/transition``  — P(application.manage); Übergang feuern
-  → 409 bei Guard-Fail/State-Konflikt.
-
-RBAC ist fail-closed (401 ohne Session, 403 ohne Permission). Fehler werden als
-``ProblemDetail`` deklariert (problem+json-Contract, T-05/T-10-Hook).
+RBAC is fail-closed (401 without session, 403 without permission); errors are
+declared as ``ProblemDetail`` (problem+json contract).
 """
 
 from __future__ import annotations
@@ -32,8 +27,8 @@ router = APIRouter(tags=["flow"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
-# Manuelle Übergänge feuern (#28-Redesign): eigene Permission, getrennt von der
-# vollen Antrags-Verwaltung. Akteur-Gates im Guard verfeinern pro Übergang.
+# Fire manual transitions: own permission, separate from full application management.
+# Per-transition actor gates in the guard refine this.
 MANAGE_PERMISSION = "application.transition"
 
 
@@ -42,7 +37,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_action_dispatcher() -> ActionDispatcher:
-    """Worker-Dispatcher (Default: No-op/Log; konkrete Queue-Anbindung T-18/19/20/17/15)."""
+    """Worker dispatcher (default: no-op/log; concrete queue wiring elsewhere)."""
     return NullActionDispatcher()
 
 
@@ -67,14 +62,14 @@ async def list_transitions(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> list[TransitionOut]:
-    """Verfügbare Übergänge (Guards für den Principal erfüllt)."""
+    """Available transitions (guards satisfied for the principal)."""
     return await service.available_transitions(application_id, principal)
 
 
 @router.post(
     "/applications/{application_id}/transition",
     response_model=TransitionResult,
-    # 400 = malformed JSON body (FastAPI-Parser, vor der Validierung) — wie T-12.
+    # 400 = malformed JSON body (FastAPI parser, before validation).
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def fire_transition(
@@ -83,7 +78,7 @@ async def fire_transition(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> TransitionResult:
-    """Übergang feuern → 200 ``{newStateId}`` oder 409 (Guard/State-Konflikt)."""
+    """Fire a transition → 200 ``{newStateId}`` or 409 (guard/state conflict)."""
     return await service.fire(
         application_id,
         payload.transition_id,
@@ -92,8 +87,8 @@ async def fire_transition(
     )
 
 
-# --- Antragsteller-Aktionen (#applicant-actions): Magic-Link-Zugriff (A/P) auf
-# Übergänge, die per ``actorIsApplicant``-Guard ausdrücklich freigegeben sind. ----
+# --- applicant actions: magic-link (A/P) access to transitions explicitly opened via
+# the ``actorIsApplicant`` guard ---
 @router.get(
     "/applications/{application_id}/applicant-transitions",
     response_model=list[TransitionOut],
@@ -104,7 +99,7 @@ async def list_applicant_transitions(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[TransitionOut]:
-    """Vom Antragsteller feuerbare Übergänge (nur ``actorIsApplicant``-Gate)."""
+    """Transitions the applicant may fire (only the ``actorIsApplicant`` gate)."""
     return await service.available_applicant_transitions(access.application_id)
 
 
@@ -119,8 +114,8 @@ async def fire_applicant_transition(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_edit)],
 ) -> TransitionResult:
-    """Übergang als Antragsteller feuern — 403, wenn nicht per ``actorIsApplicant``
-    freigegeben (Magic-Link/Ersteller:in, ohne ``application.manage``)."""
+    """Fire a transition as the applicant — 403 if not opened via ``actorIsApplicant``
+    (magic-link/creator, without ``application.manage``)."""
     return await service.fire_as_applicant(
         access.application_id, payload.transition_id, note=payload.note
     )

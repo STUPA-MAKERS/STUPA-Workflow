@@ -1,1 +1,1 @@
-"""Fristen/Deadlines + zeitgesteuerte Verarbeitung (T-44, flows §9.4, R12)."""
+"""Deadlines and time-driven processing."""

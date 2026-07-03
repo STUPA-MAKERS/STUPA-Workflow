@@ -1,9 +1,8 @@
-"""arq-Pool-Lifecycle + Mail-Queue-Bereitstellung (T-18).
+"""arq pool lifecycle and mail-queue provisioning.
 
-Die API *sendet* nie selbst — sie legt Jobs in Redis (arq), der Worker versendet.
-Der Pool wird beim App-Start **best-effort** geöffnet: fehlt Redis (z. B. im
-Contract-CI ohne Redis-Service), bleibt der Pool `None` → die Mail-Queue ist
-`None` → Aufrufer loggen + überspringen (kein Start-Crash, kein API-Block).
+The API never sends mail itself; it enqueues jobs in Redis (arq) for the worker.
+The pool is opened best-effort at startup: if Redis is missing the pool stays
+``None`` and the mail queue stays ``None``, so callers log and skip (no crash).
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ _POOL_OPEN_TIMEOUT = 5.0
 
 
 async def create_mail_pool(redis_url: str) -> ArqRedis | None:
-    """arq-Pool öffnen (best-effort). Bei Fehler/Timeout → `None` + Warnung."""
+    """Open the arq pool best-effort; return None on error/timeout."""
     from arq import create_pool
     from arq.connections import RedisSettings
 
@@ -32,17 +31,17 @@ async def create_mail_pool(redis_url: str) -> ArqRedis | None:
             create_pool(RedisSettings.from_dsn(redis_url)),
             timeout=_POOL_OPEN_TIMEOUT,
         )
-    except Exception as exc:  # noqa: BLE001 — Start nie blocken (Redis optional)
+    except Exception as exc:  # noqa: BLE001 - never block startup (Redis optional)
         logger.warning("mail pool unavailable (%s): %s", type(exc).__name__, exc)
         return None
 
 
 async def close_mail_pool(pool: ArqRedis | None) -> None:
-    """Pool schließen (Shutdown)."""
+    """Close the pool on shutdown."""
     if pool is not None:
         await pool.aclose()
 
 
 def mail_queue_from_pool(pool: ArqRedis | None) -> MailQueue | None:
-    """Pool → `MailQueue` (oder `None`, wenn kein Pool)."""
+    """Wrap the pool in a MailQueue, or None when there is no pool."""
     return ArqMailQueue(pool) if pool is not None else None

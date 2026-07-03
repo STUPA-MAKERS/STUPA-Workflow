@@ -1,17 +1,8 @@
-"""Live-Vote/Meeting-Router (T-16, api.md §4).
+"""Live-vote/meeting router (REST + WebSocket).
 
-REST (problem+json):
-* ``POST  /api/meetings``            — P(meeting.manage); Sitzung anlegen.
-* ``GET   /api/meetings/{id}``       — P; Sitzungs-State.
-* ``PATCH /api/meetings/{id}``       — P(meeting.manage); Steuerung → ``meeting_state``.
-
-WebSocket (api.md §4):
-* ``/api/ws/meetings/{id}``          — P + Gremium-Gruppe; Voter-Kanal (cast/subscribe).
-* ``/api/ws/meetings/{id}/beamer``   — P(meeting.manage); read-only Beamer-Stream.
-
-Auth ist fail-closed: REST 401/403 via ``require_principal``; WS schließt mit
-``4401`` (keine Session) bzw. ``4403`` (nicht berechtigt) **nach** einem
-``error``-Frame ``not_eligible`` (api.md §4).
+Auth is fail-closed: REST 401/403 via ``require_principal``; the WS closes with
+``4401`` (no session) or ``4403`` (not eligible) after a ``not_eligible`` error
+frame.
 """
 
 from __future__ import annotations
@@ -70,21 +61,20 @@ router = APIRouter(tags=["livevote"])
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 MANAGE_PERMISSION = "meeting.manage"
 
-# Single-Prozess-Fallback, falls die Lifespan keinen Broker/Locker auf den App-State
-# gelegt hat (z. B. Tests ohne Wiring). Prod nutzt Redis (s. ``create_app``).
+# Single-process fallback when lifespan didn't wire a broker/locker onto app
+# state (e.g. tests). Production uses Redis.
 _FALLBACK_BROKER = InMemoryBroker()
 _FALLBACK_LOCKER = InMemoryLocker()
 
-# Pro (Sitzung, Principal) gleichzeitig offene WS-Verbindungen (DoS-Schutz,
-# security.md): ein einzelner Nutzer soll nicht beliebig viele Sockets öffnen
-# (jeder hält ein Abo + Empfangs-Task). In-Prozess-Zähler (pro Worker-Prozess); für
-# Single-Worker-Deployments ausreichend, ein verteiltes Limit liegt an Redis/Ingress.
+# Cap on concurrent WS connections per (meeting, principal) (DoS guard): one user
+# can't open unbounded sockets (each holds a subscription + receive task).
+# Per-process counter; a distributed limit would live at Redis/ingress.
 _MAX_CONNECTIONS_PER_PRINCIPAL = 5
 _connection_counts: dict[tuple[UUID, str], int] = {}
 
 
 def _try_acquire_slot(meeting_id: UUID, sub: str) -> bool:
-    """Einen Verbindungs-Slot belegen (``False``, wenn das Limit erreicht ist)."""
+    """Take a connection slot (``False`` when the limit is reached)."""
     key = (meeting_id, sub)
     current = _connection_counts.get(key, 0)
     if current >= _MAX_CONNECTIONS_PER_PRINCIPAL:
@@ -94,7 +84,7 @@ def _try_acquire_slot(meeting_id: UUID, sub: str) -> bool:
 
 
 def _release_slot(meeting_id: UUID, sub: str) -> None:
-    """Einen belegten Verbindungs-Slot freigeben (idempotent, räumt 0-Einträge auf)."""
+    """Release a connection slot (idempotent; cleans up zero entries)."""
     key = (meeting_id, sub)
     current = _connection_counts.get(key, 0)
     if current <= 1:
@@ -107,9 +97,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-# --------------------------------------------------------------------------- #
-# Provider (aus App-State; in Tests via dependency_overrides ersetzbar)
-# --------------------------------------------------------------------------- #
+# Providers (from app state; overridable in tests via dependency_overrides).
 def get_broker_rest(request: Request) -> MeetingBroker:
     return getattr(request.app.state, "broker", None) or _FALLBACK_BROKER
 
@@ -133,7 +121,7 @@ def get_meeting_service_ws(
     session: DbSession,
     broker: Annotated[MeetingBroker, Depends(get_broker_ws)],
 ) -> MeetingService:
-    """Meeting-Service für den WS-Pfad (Broker aus dem WS-App-State)."""
+    """Meeting service for the WS path (broker from WS app state)."""
     return MeetingService(session, BrokerPublisher(broker))
 
 
@@ -150,7 +138,7 @@ def get_voting_service(session: DbSession) -> VotingService:
 
 
 def get_voting_service_ws(session: DbSession) -> VotingService:
-    """Voting-Service für den WS-Cast-Pfad (eigene Session, Flow-Dispatch default)."""
+    """Voting service for the WS cast path (own session, default flow dispatch)."""
     return VotingService(session)
 
 
@@ -159,7 +147,7 @@ async def get_ws_principal(
     session: DbSession,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Principal | None:
-    """Handshake-Principal aus dem Session-Cookie (``None`` ohne gültige Session)."""
+    """Handshake principal from the session cookie (``None`` without a valid session)."""
     return await resolve_ws_principal(websocket, session, settings)
 
 
@@ -179,9 +167,7 @@ VotingServiceWsDep = Annotated[VotingService, Depends(get_voting_service_ws)]
 WsPrincipalDep = Annotated[Principal | None, Depends(get_ws_principal)]
 
 
-# --------------------------------------------------------------------------- #
 # REST
-# --------------------------------------------------------------------------- #
 @router.post("/meetings", response_model=MeetingOut, responses=_errors(400, 401, 403, 422))
 async def create_meeting(
     payload: MeetingCreate,
@@ -192,11 +178,12 @@ async def create_meeting(
     request: Request,
     mailer: AutoMailerDep,
 ) -> MeetingOut:
-    """Sitzung (``planned``) anlegen — Sitzungsverwalter (``session.manage``)/Admin.
+    """Create a ``planned`` meeting — session manager (``session.manage``)/admin.
 
-    Die RBAC ist gremium-genau (Vorstand/Manager des Gremiums oder globale
-    ``meeting.manage``); der Service wirft 403, wenn der Principal das Gremium nicht
-    verwalten darf. Gremium-Mitglieder erhalten eine Sitzungs-Mail (#4-3)."""
+    RBAC is committee-scoped (committee board/manager or global
+    ``meeting.manage``); the service raises 403 when the principal may not manage
+    the committee. Committee members receive a meeting mail.
+    """
     meeting = await service.create(payload, principal)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(mailer.meeting_created, settings, meeting.id, pool)
@@ -214,9 +201,10 @@ async def list_meeting_members(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[MeetingMemberOut]:
-    """Aktuelle Gremium-Mitglieder als Protokollant-Kandidaten — wer das Gremium
-    verwalten darf (``session.manage``/Admin). Beim Anlegen einer Sitzung steht noch
-    kein Roster bereit; diese Liste füllt die Protokollant-Auswahl im Create-Dialog."""
+    """Current committee members as protokollant candidates — for whoever may
+    manage the committee (``session.manage``/admin). Fills the protokollant picker
+    in the create dialog before a roster exists.
+    """
     if not await service.can_manage(gremium_id, principal):
         raise ForbiddenError("not allowed to manage meetings for this committee")
     return await attendance.members(gremium_id)
@@ -228,7 +216,7 @@ async def list_meetings(
     principal: ReaderDep,
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
 ) -> list[MeetingOut]:
-    """Sitzungen auflisten (neueste zuerst), optional Gremium-gefiltert (#104)."""
+    """List meetings (newest first), optionally committee-filtered."""
     return await service.list(principal, gremium_id)
 
 
@@ -242,15 +230,14 @@ async def list_meetings_timeline(
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
     q: Annotated[str | None, Query()] = None,
 ) -> MeetingPage:
-    """Keyset-paginierte Sitzungs-Timeline um *jetzt* herum (#104).
+    """Keyset-paginated meeting timeline around *now*.
 
-    ``upcoming`` liefert anstehende Sitzungen chronologisch vorwärts, ``past`` die
-    vergangenen rückwärts (für Infinite-Scroll nach oben). ``cursor`` stammt aus
-    ``nextCursor`` der vorigen Seite; ``None`` ⇒ Beginn ab *jetzt*.
-
-    Mit ``q`` kollabiert die Timeline in eine **einzige** relevanz-sortierte Liste
-    (Fuzzy-Suche, #search): ``direction`` ist dann bedeutungslos, ``cursor`` trägt
-    einen Offset, ``nextCursor === null`` ⇒ Ende der Trefferliste."""
+    ``upcoming`` returns upcoming meetings forward, ``past`` past ones backward.
+    ``cursor`` comes from the previous page's ``nextCursor``; ``None`` starts at
+    *now*. With ``q`` the timeline collapses into a single relevance-sorted list
+    (fuzzy search): ``direction`` is then irrelevant, ``cursor`` carries an offset,
+    ``nextCursor === null`` ends the results.
+    """
     return await service.list_timeline(
         principal,
         direction=direction,
@@ -270,24 +257,25 @@ async def list_meeting_filter_gremien(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[MeetingGremiumOut]:
-    """Gremien für den Filter der Sitzungsübersicht (#meetings-filter).
+    """Committees for the meeting-overview filter.
 
-    Liefert alle Gremien, in denen der Principal MINDESTENS EINE lesbare Sitzung hat
-    — nicht die Mitglieds-Gremien. Muss VOR ``/meetings/{meeting_id}`` stehen, sonst
-    fängt der UUID-Pfad ``gremien`` ab."""
+    Returns committees where the principal has at least one readable meeting, not
+    their member committees. Must precede ``/meetings/{meeting_id}`` or the UUID
+    path captures ``gremien``.
+    """
     return await service.list_filter_gremien(principal)
 
 
 @router.get("/meetings/{meeting_id}", response_model=MeetingOut, responses=_errors(401, 403, 404))
 async def get_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDep) -> MeetingOut:
-    """Sitzungs-State."""
+    """Meeting state."""
     await service.assert_can_read(meeting_id, principal)
     return await service.get(meeting_id, principal)
 
 
 @router.delete("/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404))
 async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDep) -> None:
-    """Sitzung löschen — nur Sitzungsverwalter (``session.manage``)/Admin."""
+    """Delete a meeting — session manager (``session.manage``)/admin only."""
     await service.delete(meeting_id, principal)
 
 
@@ -299,31 +287,27 @@ async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: Reade
 async def patch_meeting(
     meeting_id: UUID, payload: MeetingPatch, service: ServiceDep, principal: ReaderDep
 ) -> MeetingOut:
-    """Steuerung/Planung → ``meeting_state``-Broadcast.
+    """Control/plan a meeting → ``meeting_state`` broadcast.
 
-    Feld-genaue RBAC im Service: Status/aktiver Antrag = ``canWrite`` (Protokollant
-    oder Verwalter); Datum/Zeit/Protokollant = ``canManage`` (Sitzungsverwalter).
-
-    Start (planned→live): nach dem atomaren Status-Wechsel legt der Router das
-    Protokoll an (idempotent). Das Protokoll entsteht ausschließlich hier — nicht
-    manuell vorab. Der Service hat zuvor sichergestellt, dass ein Protokollant
-    feststeht (sonst 409)."""
+    Field-scoped RBAC in the service: status/active application = ``canWrite``
+    (protokollant or manager); date/time/protokollant = ``canManage`` (session
+    manager). On start (planned→live) the router creates the protocol (idempotent)
+    — only here, never manually; the service has ensured a protokollant is set
+    (else 409).
+    """
     updated = await service.patch(meeting_id, payload, principal)
     if payload.status == "live" and updated.status == "live":
-        # Lokaler Import: ``protocol`` hängt von ``livevote`` — Modul-Level wäre ein
-        # Zyklus. Dieselbe Session wie der Service (eine Transaktion/ein Commit).
+        # Local import: ``protocol`` depends on ``livevote``; module-level would
+        # cycle. Same session as the service (one transaction/commit).
         from app.modules.protocol.service import ProtocolService
 
         await ProtocolService(service.session).get_or_create(meeting_id, author=principal.sub)
-        # Frisch lesen, damit die Antwort die neue ``protocolId`` trägt (das FE lädt
-        # das Protokoll direkt nach dem Start darüber nach).
+        # Re-read so the response carries the new ``protocolId``.
         return await service.get(meeting_id, principal)
     return updated
 
 
-# --------------------------------------------------------------------------- #
-# Anwesenheit (#Meetings/#55/#56)
-# --------------------------------------------------------------------------- #
+# Attendance
 @router.get(
     "/meetings/{meeting_id}/attendance",
     response_model=list[AttendanceOut],
@@ -335,8 +319,8 @@ async def list_attendance(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Anwesenheits-Roster (aktuelle Gremium-Mitglieder + Status)."""
-    # #12 sec-audit: Roster (Namen/E-Mails) nur für Berechtigte der Sitzung.
+    """Attendance roster (current committee members + status)."""
+    # Roster (names/emails) only for principals allowed to read the meeting.
     await service.assert_can_read(meeting_id, principal)
     return await attendance.roster(meeting_id, principal.sub)
 
@@ -352,7 +336,7 @@ async def set_own_attendance(
     attendance: AttendanceDep,
     principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Eigene Anwesenheit markieren (nur Gremium-Mitglieder)."""
+    """Mark own attendance (committee members only)."""
     return await attendance.set_self(meeting_id, payload.status, principal.sub)
 
 
@@ -369,16 +353,14 @@ async def set_member_attendance(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Anwesenheit eines Mitglieds setzen — wer die Sitzung führt (Protokollant/Verwalter)."""
+    """Set a member's attendance — whoever leads the meeting (protokollant/manager)."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to set members' attendance")
     return await attendance.set_for(meeting_id, principal_id, payload.status, principal.sub)
 
 
-# --------------------------------------------------------------------------- #
-# Tagesordnung (#10/#58)
-# --------------------------------------------------------------------------- #
+# Agenda
 @router.get(
     "/meetings/{meeting_id}/agenda",
     response_model=list[AgendaItemOut],
@@ -387,7 +369,7 @@ async def set_member_attendance(
 async def list_agenda(
     meeting_id: UUID, agenda: AgendaDep, service: ServiceDep, principal: ReaderDep
 ) -> list[AgendaItemOut]:
-    """Tagesordnung der Sitzung (zugewiesene Anträge, geordnet)."""
+    """Meeting agenda (assigned applications, ordered)."""
     await service.assert_can_read(meeting_id, principal)
     return await agenda.list(meeting_id)
 
@@ -406,29 +388,28 @@ async def open_meeting_vote(
     broker: BrokerRestDep,
     principal: ReaderDep,
 ) -> MeetingOut:
-    """Beschlussfrage eines TOP in dieser Sitzung anlegen + sofort öffnen (Live-Vote).
+    """Open a live vote on a TOP in this meeting (created + opened at once).
 
-    Verwalter/Protokollant/``vote.manage``. Antrags-TOPs erlauben genau **eine**
-    Abstimmung (sie feuert beim Schließen den pass/fail-Branch); Freitext-TOPs
-    erlauben **mehrere** generische Beschlussfragen. ``eligibleGroup`` = Gremium der
-    Sitzung; der Quorum-Nenner (Stimmberechtigte) wird serverseitig aus dem Roster
-    abgeleitet (Mitglieder mit ``vote.cast``) und ist kein Eingabefeld (AUD-042).
-    Broadcastet ``vote_opened``."""
+    Manager/protokollant/``vote.manage``. Application TOPs allow exactly one vote
+    (it fires the pass/fail branch on close); free-text TOPs allow several generic
+    questions. ``eligibleGroup`` = the meeting's committee; the quorum denominator
+    is derived server-side from the roster (members with ``vote.cast``), never a
+    client input. Broadcasts ``vote_opened``.
+    """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
-    # Abstimmungen erst ab Start: vor »live« gibt es kein Protokoll, in dem das
-    # Ergebnis festgehalten würde.
+    # Votes only after start: before ``live`` there is no protocol to record the
+    # result in.
     if meeting.status != "live":
         raise ConflictError("the meeting has not started — start it before opening a vote")
     item = await agenda.item(meeting_id, payload.agenda_item_id)
     if item.application_id is not None:
         if await service.agenda_item_has_vote(item.id):
             raise ConflictError("this application TOP already has a decision vote")
-        # Fail-fast statt erst beim Schließen: die Entscheidung eines Antrags-Votes
-        # feuert den pass/fail-Branch des AKTUELLEN States. Ist der Antrag nicht in
-        # einem vote-State, wäre der Vote unschließbar (409 erst beim close — die
-        # abgegebenen Stimmen wären umsonst, #abort-vote).
+        # Fail-fast: an application vote fires the pass/fail branch of the current
+        # state on close. If the application isn't in a vote state the vote would
+        # be unclosable, wasting the cast ballots.
         kind = await service.application_state_kind(item.application_id)
         if kind != "vote":
             raise ConflictError(
@@ -441,10 +422,8 @@ async def open_meeting_vote(
         "majorityRule": payload.majority_rule,
         "secret": payload.secret,
     }
-    # Quorum-Default aus dem Gremium: wenn der Aufrufer keins angibt, übernimmt der
-    # Vote das per-Gremium konfigurierte Prozent-Quorum (% der Stimmberechtigten, die
-    # teilnehmen müssen). Explizit gesetzte Quoren bleiben unberührt (hier gibt es
-    # bisher keine — der Open-Body kennt kein Quorum-Feld, daher reiner Default).
+    # Committee quorum default: without an explicit percent, the vote inherits the
+    # committee's configured percent quorum.
     if payload.quorum_percent is not None:
         config_data["quorum"] = {"type": "percent", "value": payload.quorum_percent}
     else:
@@ -452,9 +431,8 @@ async def open_meeting_vote(
         if default_quorum is not None:
             config_data["quorum"] = {"type": "percent", "value": default_quorum}
     config = VoteConfig.model_validate(config_data)
-    # Der Quorum-Nenner wird IMMER aus dem echten Roster abgeleitet, nie vom Client
-    # übernommen — sonst könnte ein ``canManageVotes``-Inhaber das Quorum manipulieren
-    # (AUD-042).
+    # Quorum denominator is always derived from the real roster, never from the
+    # client, so a ``canManageVotes`` holder can't manipulate the quorum.
     eligible = await service.vote_eligible_count(meeting.gremium_id)
     create = VoteCreate(
         config=config,
@@ -482,7 +460,7 @@ async def delete_meeting_vote(
     voting: VotingDep,
     principal: ReaderDep,
 ) -> MeetingOut:
-    """Eine Beschlussfrage löschen (Stimmen inklusive). Verwalter/Protokollant/``vote.manage``."""
+    """Delete a vote (ballots included). Manager/protokollant/``vote.manage``."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to delete a vote in this meeting")
@@ -498,7 +476,7 @@ async def delete_meeting_vote(
 async def list_assignable(
     meeting_id: UUID, agenda: AgendaDep, service: ServiceDep, principal: ReaderDep
 ) -> list[AssignableApplicationOut]:
-    """Anträge in einem Abstimmungs-State dieses Gremiums, noch nicht auf der TO."""
+    """Applications in a vote state of this committee, not yet on the agenda."""
     await service.assert_can_read(meeting_id, principal)
     return await agenda.assignable(meeting_id)
 
@@ -515,7 +493,7 @@ async def add_agenda_item(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AgendaItemOut]:
-    """TOP setzen (Antrag oder Freitext) — nur Sitzungsleitung/Admin (#Meetings)."""
+    """Add a TOP (application or free-text) — session lead/admin only."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
@@ -536,7 +514,7 @@ async def remove_agenda_item(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AgendaItemOut]:
-    """TOP von der Tagesordnung entfernen — nur Sitzungsleitung/Admin."""
+    """Remove a TOP from the agenda — session lead/admin only."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
@@ -555,7 +533,7 @@ async def reorder_agenda(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AgendaItemOut]:
-    """TOPs umsortieren (Drag&Drop) — nur Sitzungsleitung/Admin."""
+    """Reorder TOPs — session lead/admin only."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
@@ -575,12 +553,12 @@ async def set_agenda_body(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AgendaItemOut]:
-    """Markdown-Text/Titel eines TOP setzen (pro-TOP-Editor) — nur Sitzungsleitung/Admin."""
+    """Set a TOP's markdown body/title (per-TOP editor) — session lead/admin only."""
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    # Protokollieren (TOP-Text) erst ab Start. Reine Titel-Umbenennung (Freitext-TOP)
-    # gehört zur Planung und bleibt vor »live« erlaubt.
+    # Minute-taking (TOP body) only after start; renaming a free-text TOP is
+    # planning and stays allowed before ``live``.
     if payload.body is not None and meeting.status != "live":
         raise ConflictError("the meeting has not started — start it before taking minutes")
     items = await agenda.set_body(
@@ -590,14 +568,12 @@ async def set_agenda_body(
         title=payload.title,
         non_public=payload.non_public,
     )
-    # Live-Follower über den geänderten TOP-Text informieren (#live-refresh).
+    # Notify live followers of the changed TOP text.
     await service.broadcast_state(meeting_id, principal)
     return items
 
 
-# --------------------------------------------------------------------------- #
 # WebSocket
-# --------------------------------------------------------------------------- #
 async def _authorize(
     websocket: WebSocket,
     meeting_id: UUID,
@@ -606,7 +582,7 @@ async def _authorize(
     *,
     beamer: bool,
 ) -> Principal | None:
-    """Handshake-Auth/RBAC. Gibt ``None`` zurück, wenn bereits geschlossen wurde."""
+    """Handshake auth/RBAC. Returns ``None`` when already closed."""
     if principal is None:
         await websocket.close(code=WS_UNAUTHENTICATED)
         return None
@@ -615,11 +591,10 @@ async def _authorize(
     except NotFoundError:
         await websocket.close(code=WS_NOT_FOUND)
         return None
-    # Voter-Kanal: aktive Gremium-Mitglieder UND Delegations-Empfänger der Sitzung
-    # (#delegation-rework — externe Stellvertreter) dürfen live mitlesen (das
-    # STIMMRECHT ist separat über ``vote.cast``/Delegations-Check gegatet); die
-    # »Beamer«-Ansicht für Mitglieder ist eine FE-Anzeige auf derselben Verbindung.
-    # Der dedizierte read-only Beamer-Kanal bleibt ``meeting.manage``-gegatet.
+    # Voter channel: active committee members and the meeting's delegation
+    # recipients (external substitutes) may read live; the actual vote right is
+    # gated separately via ``vote.cast``/delegation check. The dedicated read-only
+    # beamer channel stays ``meeting.manage``-gated.
     eligible = (
         principal.has(MANAGE_PERMISSION)
         if beamer
@@ -647,9 +622,9 @@ async def _serve(
     authorized = await _authorize(websocket, meeting_id, principal, meetings, beamer=beamer)
     if authorized is None:
         return
-    # Verbindungs-Cap je (Sitzung, Principal) — VOR dem Accept prüfen, damit ein
-    # flutender Client gar nicht erst aufmacht (DoS-Schutz). Bei Überschreitung:
-    # ``not_eligible``-Frame + 4403 (wie der RBAC-Verstoß).
+    # Connection cap per (meeting, principal), checked before accept so a flooding
+    # client never opens (DoS guard). On excess: a ``too_many_connections`` frame +
+    # close 4403 (same code as the RBAC rejection).
     if not _try_acquire_slot(meeting_id, authorized.sub):
         await websocket.accept()
         await websocket.send_json(ErrorEvent(code="too_many_connections").dump())
@@ -681,7 +656,7 @@ async def meeting_socket(
     broker: BrokerWsDep,
     locker: LockerWsDep,
 ) -> None:
-    """Voter-Kanal: Live-State, ``cast`` (Lock + unique), ``subscribe`` (Reconnect)."""
+    """Voter channel: live state, ``cast`` (lock + unique), ``subscribe`` (reconnect)."""
     await _serve(websocket, meeting_id, principal, meetings, voting, broker, locker, beamer=False)
 
 
@@ -695,5 +670,5 @@ async def beamer_socket(
     broker: BrokerWsDep,
     locker: LockerWsDep,
 ) -> None:
-    """Read-only Beamer-Stream: nur ``meeting_state|vote_opened|vote_tally|vote_closed``."""
+    """Read-only beamer stream: only ``meeting_state|vote_opened|vote_tally|vote_closed``."""
     await _serve(websocket, meeting_id, principal, meetings, voting, broker, locker, beamer=True)

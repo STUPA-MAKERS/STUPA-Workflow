@@ -1,14 +1,14 @@
-"""Render-Jobs: ``render_job`` (T-20, api.md »pdf«).
+"""Render jobs: the ``render_job`` table.
 
-Eine Zeile je angestoßenem PDF-Render. Der asynchrone Pfad (flows §6) braucht einen
-persistenten Status, den ``GET /jobs/{id}`` ausliest: ``pending`` → ``running`` →
-``done``/``failed``. Das PDF selbst liegt in MinIO (``storage_key``), nie in der DB;
-``error`` hält eine **kurze, pfadfreie** Fehlerkennung (security.md §2: kein Leak).
+One row per triggered PDF render. The async path needs a persistent status that
+``GET /jobs/{id}`` reads: ``pending`` → ``running`` → ``done``/``failed``. The PDF
+itself lives in MinIO (``storage_key``), never in the DB; ``error`` holds a short,
+path-free failure code (no leak).
 
-``idempotency_key`` (UNIQUE, NULL erlaubt) trägt die Flow-Action-Idempotenz
-(``exportPdf``): derselbe Status-Event darf **keinen** zweiten Job erzeugen. Der
-REST-Pfad (``POST /applications/{id}/pdf``) lässt den Key NULL → jeder Aufruf ist ein
-frischer, expliziter Render-Wunsch.
+``idempotency_key`` (UNIQUE, NULL allowed) carries flow-action idempotency
+(``exportPdf``): the same status event must not create a second job. The REST path
+(``POST /applications/{id}/pdf``) leaves the key NULL, so every call is a fresh,
+explicit render request.
 """
 
 from __future__ import annotations
@@ -27,16 +27,16 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
 
-# Erlaubte Job-Status (api.md »pdf«: pending/done/failed; running = in Arbeit).
+# Allowed job statuses (pending/done/failed; running = in progress).
 JOB_STATUSES = ("pending", "running", "done", "failed")
 
-# Bislang einzige Job-Art; als Spalte geführt, damit ``/jobs`` später weitere
-# Render-Arten (z. B. Protokoll, T-22) ohne Schema-Änderung aufnehmen kann.
+# The only job kind so far; kept as a column so ``/jobs`` can later accept further
+# render kinds (e.g. protocol) without a schema change.
 JOB_KIND_APPLICATION_PDF = "application_pdf"
 
 
 class RenderJob(UUIDPkMixin, TimestampMixin, Base):
-    """Asynchroner Render-Auftrag + sein Ergebnis-/Fehlerzustand."""
+    """Async render request plus its result/error state."""
 
     __tablename__ = "render_job"
 
@@ -57,11 +57,11 @@ class RenderJob(UUIDPkMixin, TimestampMixin, Base):
             "status IN ('pending','running','done','failed')", name="render_job_status"
         ),
         Index("ix_render_job_application_id", "application_id"),
-        # Flow-Action-Idempotenz: ein Status-Event ⇒ höchstens ein Job (NULL = REST-Pfad,
-        # mehrfach erlaubt — Postgres behandelt NULLs in UNIQUE als verschieden).
+        # Flow-action idempotency: one status event ⇒ at most one job (NULL = REST path,
+        # allowed repeatedly — Postgres treats NULLs in UNIQUE as distinct).
         Index("ix_render_job_idempotency_key", "idempotency_key", unique=True),
     )
 
     def touch_finished(self, now: datetime) -> None:
-        """``finished_at`` setzen (done/failed) — Worker-seitig nach Abschluss."""
+        """Set ``finished_at`` (done/failed), worker-side after completion."""
         self.finished_at = now

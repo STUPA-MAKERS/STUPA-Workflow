@@ -1,18 +1,15 @@
-"""HTTP-Middleware: Trace-Id + Security-Header + CSRF (security.md §3/§10).
+"""HTTP middleware: trace id, security headers, CSRF, default write rate limit.
 
-- `RequestContextMiddleware`: vergibt pro Request eine Trace-Id (`request.state`
-  + `X-Trace-Id`-Header), nutzbar im Fehler-Contract.
-- `SecurityHeadersMiddleware`: setzt Basis-Hardening-Header an der App. Die App liefert
-  ausschließlich JSON (kein HTML/JS) → strikte CSP `default-src 'none'`. Die SPA-HTML
-  bekommt ihre (lockerere, nonce-fähige) CSP am Edge/`web`-nginx. HSTS setzt der NPM
-  (TLS terminiert dort, security.md §3/§10).
-- `CsrfMiddleware`: Double-Submit-Token (security.md §10). Schützt cookie-
-  authentifizierte **schreibende** Requests (POST/PUT/PATCH/DELETE). Bearer-Token-
-  Requests (Authorization-Header) sind nicht CSRF-fähig → ausgenommen; Requests ohne
-  Auth-Cookie haben nichts zu schützen → ausgenommen. Der Token wird als nicht-HttpOnly
-  Cookie ausgegeben (FE liest + spiegelt ihn im `X-CSRF-Token`-Header).
+- `RequestContextMiddleware`: per-request trace id (`request.state` + `X-Trace-Id`).
+- `SecurityHeadersMiddleware`: base hardening headers. The app serves JSON only,
+  so the CSP is a strict `default-src 'none'`; the SPA gets its own CSP at the
+  edge nginx, and HSTS is set by the TLS-terminating proxy.
+- `CsrfMiddleware`: double-submit token for cookie-authenticated write requests.
+  Bearer-token requests are not CSRF-able and are exempt, as are requests without
+  an auth cookie. The token is a non-HttpOnly cookie the frontend mirrors into
+  the `X-CSRF-Token` header.
 
-CORS bewusst **aus** (kein CORSMiddleware) — kein Cross-Origin per Default.
+CORS is deliberately off (no CORSMiddleware) — no cross-origin by default.
 """
 
 from __future__ import annotations
@@ -34,8 +31,7 @@ TRACE_HEADER = "X-Trace-Id"
 PROBLEM_JSON = "application/problem+json"
 _HOUR = 3600
 
-# Strikte, für eine reine JSON-API passende CSP: kein aktiver Inhalt erlaubt; in
-# `<iframe>` einbetten verboten (Clickjacking). Die SPA-CSP steht im `web`-nginx.
+# Strict CSP for a pure JSON API: no active content, no framing (clickjacking).
 _API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
 
 _SECURITY_HEADERS = {
@@ -69,11 +65,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 def _has_auth_cookie(request: Request, settings: Settings) -> bool:
-    """True, wenn der Request mit einem Auth-**Cookie** kommt (session/applicant).
+    """Return True if the request carries an auth cookie (session/applicant).
 
-    Nur solche Requests sind CSRF-relevant: der Browser sendet das Cookie automatisch
-    cross-site mit. Bearer-Token im Authorization-Header werden hier nicht erfasst und
-    sind ohnehin nicht CSRF-fähig."""
+    Only those requests are CSRF-relevant: the browser sends cookies cross-site
+    automatically. Bearer tokens are not CSRF-able and are ignored here."""
     return bool(
         request.cookies.get(settings.session_cookie_name)
         or request.cookies.get(settings.applicant_cookie_name)
@@ -81,11 +76,11 @@ def _has_auth_cookie(request: Request, settings: Settings) -> bool:
 
 
 class CsrfMiddleware(BaseHTTPMiddleware):
-    """Double-Submit-CSRF-Schutz (security.md §10).
+    """Double-submit CSRF protection.
 
-    Erzwingt bei unsicheren Methoden mit Auth-Cookie und **ohne** Bearer-Header, dass
-    `X-CSRF-Token` mit dem CSRF-Cookie übereinstimmt (konstantzeitiger Vergleich). Setzt
-    das CSRF-Cookie auf jeder Antwort, falls es fehlt, damit das FE es spiegeln kann."""
+    For unsafe methods with an auth cookie and no bearer header, `X-CSRF-Token`
+    must match the CSRF cookie (constant-time compare). Sets the CSRF cookie on
+    any response that lacks it so the frontend can mirror it."""
 
     def __init__(self, app: object, settings: Settings | None = None) -> None:
         super().__init__(app)  # type: ignore[arg-type]
@@ -122,8 +117,8 @@ class CsrfMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        # CSRF-Cookie ausstellen, falls es fehlt: nicht-HttpOnly (FE muss es lesen),
-        # SameSite=Lax als Basisschutz, Secure analog zu den Auth-Cookies.
+        # Issue the CSRF cookie if missing: non-HttpOnly (frontend must read it),
+        # SameSite=Lax as base protection, Secure matching the auth cookies.
         if settings.csrf_enabled and not request.cookies.get(settings.csrf_cookie_name):
             response.set_cookie(
                 settings.csrf_cookie_name,
@@ -138,14 +133,13 @@ class CsrfMiddleware(BaseHTTPMiddleware):
 
 
 class DefaultWriteRateLimitMiddleware(BaseHTTPMiddleware):
-    """Default-Rate-Limit auf **allen schreibenden** Endpunkten (api.md §7, security.md §8).
+    """Default rate limit for all write endpoints.
 
-    Greift nur bei unsicheren HTTP-Methoden (POST/PUT/PATCH/DELETE), keyed per IP, mit
-    großzügigem Limit → fängt Endpunkte ohne eigenes (strengeres) Limit ab. Als Middleware
-    (statt Route-Dependency) verdrahtet: läuft uniform für jede HTTP-Route, lässt aber
-    WebSocket-Scopes unberührt (BaseHTTPMiddleware reicht non-http durch). 429 +
-    `Retry-After` als problem+json. Bei deaktiviertem Rate-Limit liefert der Builder den
-    No-op-Limiter → Durchlass."""
+    Applies only to unsafe methods, keyed per IP, with a generous limit — a
+    backstop for endpoints without their own stricter limit. Wired as middleware
+    so it runs uniformly for every HTTP route while WebSocket scopes pass through
+    (BaseHTTPMiddleware forwards non-http). Responds 429 + `Retry-After` as
+    problem+json; with rate limiting disabled the builder yields a no-op limiter."""
 
     def __init__(
         self,

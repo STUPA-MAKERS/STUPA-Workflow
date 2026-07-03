@@ -1,6 +1,6 @@
-"""Querschnitt-Helfer: Fehler-Contract, Paging, i18n (overview §5).
+"""Cross-cutting helpers: error contract, paging, i18n.
 
-Config-Schemas + Evaluatoren (T-05, data-model §5 / flows §9): `config_schemas`
-(Pydantic-SSoT + JSON-Schema-Export), `jsonlogic` (pure JsonLogic-Subset),
-`guards` (pure Guard-/Action-Evaluator). Beide deklarativ, Whitelist, **kein eval**.
+Config schemas and evaluators: ``config_schemas`` (Pydantic SSoT + JSON-Schema
+export), ``jsonlogic`` (pure JsonLogic subset), ``guards`` (pure guard/action
+evaluator). All declarative, whitelist, no eval.
 """

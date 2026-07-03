@@ -1,10 +1,7 @@
-"""Virenscan (ClamAV/clamd) — ``VirusScanner``-Protokoll + ``ScanVerdict``.
+"""Virus scanning (ClamAV/clamd): ``VirusScanner`` protocol + ``ScanVerdict``.
 
-Der Worker scannt das hochgeladene Objekt über ``clamd`` (INSTREAM). Ergebnis ist ein
-:class:`ScanVerdict` (``clean`` + optionale Signatur). Transport bleibt austauschbar:
-Tests injizieren einen Stub-Scanner (clean / EICAR), produktiv läuft ``ClamdScanner``.
-
-``clamd`` wird **lazy** importiert (nur im Worker-Pfad nötig).
+The worker scans the uploaded object via ``clamd`` INSTREAM. ``clamd`` is imported
+lazily (only needed on the worker path).
 """
 
 from __future__ import annotations
@@ -15,33 +12,33 @@ from typing import Protocol
 
 from app.settings import Settings
 
-# Offizielle EICAR-Testsignatur (kein echter Virus) — für Quarantäne-Tests/-Fakes.
+# Official EICAR test signature (not a real virus) for quarantine tests/fakes.
 EICAR_TEST_BYTES = (
     rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 )
 
 
 class ScannerError(RuntimeError):
-    """ClamAV nicht erreichbar / Scan fehlgeschlagen (→ Retry im Worker)."""
+    """ClamAV unreachable or scan failed; worker retries (fail-closed)."""
 
 
 @dataclass(frozen=True, slots=True)
 class ScanVerdict:
-    """Scan-Ergebnis. ``clean=False`` → ``signature`` trägt den Fund."""
+    """Scan result. When ``clean=False``, ``signature`` carries the finding."""
 
     clean: bool
     signature: str | None = None
 
 
 class VirusScanner(Protocol):
-    """Vom Worker genutzte Scan-Schnittstelle."""
+    """Scan interface used by the worker."""
 
     async def scan(self, data: bytes) -> ScanVerdict: ...
 
 
 @dataclass(slots=True)
 class ClamdScanner:
-    """clamd-Backend (TCP INSTREAM). Blockierender Call → Threadpool."""
+    """clamd backend (TCP INSTREAM). Blocking call runs in a threadpool."""
 
     host: str
     port: int = 3310
@@ -55,7 +52,7 @@ class ClamdScanner:
         daemon = clamd.ClamdNetworkSocket(
             host=self.host, port=self.port, timeout=self.timeout_seconds
         )
-        # clamd-Format: {"stream": ("OK"|"FOUND", signature_or_None)}
+        # clamd format: {"stream": ("OK"|"FOUND", signature_or_None)}
         result = daemon.instream(io.BytesIO(data))
         if not result or "stream" not in result:
             raise ScannerError("clamd returned no result")
@@ -67,12 +64,12 @@ class ClamdScanner:
     async def scan(self, data: bytes) -> ScanVerdict:
         try:
             return await asyncio.to_thread(self._scan_sync, data)
-        except Exception as exc:  # noqa: BLE001 — transient → ScannerError (Retry)
+        except Exception as exc:  # noqa: BLE001 - transient -> ScannerError (retry)
             raise ScannerError(f"scan failed: {type(exc).__name__}") from exc
 
 
 def build_scanner(settings: Settings) -> VirusScanner | None:
-    """clamd-Scanner aus den Settings bauen — ``None``, wenn ClamAV »aus« ist."""
+    """Build a clamd scanner from settings; ``None`` when ClamAV is disabled."""
     if not settings.clamav_enabled:
         return None
     assert settings.clamav_host is not None

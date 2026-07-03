@@ -1,11 +1,11 @@
-"""Mail-Versand: `MailMessage` + `MailSender`-Protokoll (SMTP / Capturing).
+"""Mail sending: ``MailMessage`` + ``MailSender`` protocol (SMTP/capturing).
 
-Trennung Domäne ↔ Transport: Der Service baut reine `MailMessage`-Werte; ein
-`MailSender` versendet sie. So bleibt der Versand testbar (Capturing-Sender
-fängt Mails, kein echtes SMTP) und der Worker injiziert produktiv den SMTP-Sender.
+Domain/transport split: the service builds pure ``MailMessage`` values; a
+``MailSender`` sends them. Sending stays testable (capturing sender, no real
+SMTP) and the worker injects the SMTP sender in production.
 
-**Secrets/PII nicht loggen** (security.md §1): Logs tragen nur Empfänger-Domains +
-Idempotenz-Key, nie Adressen, Betreff, Body oder das SMTP-Passwort.
+Never log secrets/PII: logs carry only recipient domains + idempotency key,
+never addresses, subject, body or the SMTP password.
 """
 
 from __future__ import annotations
@@ -24,11 +24,9 @@ logger = logging.getLogger("app.mail")
 
 @dataclass(frozen=True, slots=True)
 class MailAttachment:
-    """Ein Mail-Anhang (reiner Wert; ``content`` reist base64-kodiert durch die Queue).
-
-    Eingeführt für den Protokoll-Versand (#protocol-mail-pdf): der frühere
-    PDF-Link zeigte auf einen login-/permission-pflichtigen API-Endpunkt und war
-    für die Empfänger (Mitglieder, externe Verteiler) wertlos."""
+    """A mail attachment (pure value; ``content`` travels base64-encoded
+    through the queue). Attachments are sent instead of PDF links because
+    links would require login/permission and are useless to external lists."""
 
     filename: str
     mime: str
@@ -52,24 +50,24 @@ class MailAttachment:
 
 @dataclass(frozen=True, slots=True)
 class MailMessage:
-    """Eine versandfertige Mail (reiner Wert, serialisierbar für die Queue)."""
+    """A ready-to-send mail (pure value, serializable for the queue)."""
 
     to: tuple[str, ...]
     subject: str
     text: str
     html: str | None = None
     idempotency_key: str = ""
-    # Optional gesetzte Kopf-Infos; Defaults zieht der Sender aus den Settings.
+    # Optional header info; the sender takes defaults from the settings.
     from_addr: str | None = None
     from_name: str | None = None
     attachments: tuple[MailAttachment, ...] = ()
 
     def recipient_domains(self) -> list[str]:
-        """Empfänger-Domains (für Logs ohne PII)."""
+        """Return recipient domains (for PII-free logs)."""
         return sorted({addr.rsplit("@", 1)[-1] for addr in self.to if "@" in addr})
 
     def to_payload(self) -> dict[str, object]:
-        """JSON-serialisierbares Dict für die arq-Queue."""
+        """Return a JSON-serializable dict for the arq queue."""
         return {
             "to": list(self.to),
             "subject": self.subject,
@@ -83,7 +81,7 @@ class MailMessage:
 
     @classmethod
     def from_payload(cls, payload: dict[str, object]) -> MailMessage:
-        """Aus dem Queue-Payload rekonstruieren (Gegenstück zu `to_payload`)."""
+        """Reconstruct from the queue payload (inverse of ``to_payload``)."""
         raw_attachments = payload.get("attachments") or []
         return cls(
             to=tuple(payload["to"]),  # type: ignore[arg-type]
@@ -101,16 +99,16 @@ class MailMessage:
 
 
 def compute_idempotency_key(*parts: str) -> str:
-    """Deterministischer Schlüssel aus den Bestandteilen (event|app|template|rcpt).
+    """Build a deterministic key from the parts (event|app|template|rcpt).
 
-    Gleiche Eingabe → gleicher Key → Queue/Sender dedupliziert (idempotenter Versand).
+    Same input → same key → queue/sender deduplicates (idempotent sending).
     """
     digest = hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
     return f"mail:{digest}"
 
 
 def build_email_message(msg: MailMessage, settings: Settings) -> EmailMessage:
-    """`MailMessage` → RFC-5322 `EmailMessage` (Text + optional HTML + Anhänge)."""
+    """Build an RFC-5322 ``EmailMessage`` (text + optional HTML + attachments)."""
     email = EmailMessage()
     from_addr = msg.from_addr or settings.mail_from
     from_name = msg.from_name or settings.mail_from_name
@@ -132,14 +130,14 @@ def build_email_message(msg: MailMessage, settings: Settings) -> EmailMessage:
 
 
 class MailSender(Protocol):
-    """Versand-Schnittstelle (vom Service genutzt, vom Worker injiziert)."""
+    """Send interface (used by the service, injected by the worker)."""
 
     async def send(self, msg: MailMessage) -> None: ...
 
 
 @dataclass(slots=True)
 class CapturingMailSender:
-    """Test-/DEV-Sender: sammelt Mails statt zu senden (kein echtes SMTP)."""
+    """Test/dev sender: collects mails instead of sending (no real SMTP)."""
 
     sent: list[MailMessage] = field(default_factory=list)
 
@@ -154,15 +152,15 @@ class CapturingMailSender:
 
 @dataclass(slots=True)
 class SmtpMailSender:
-    """Echter async SMTP-Versand (aiosmtplib). Passwort wird nie geloggt."""
+    """Real async SMTP sending (aiosmtplib). The password is never logged."""
 
     settings: Settings
 
     async def send(self, msg: MailMessage) -> None:
-        import aiosmtplib  # lokal: Worker-Pfad, hält den API-Import schlank
+        import aiosmtplib  # local: worker path, keeps the API import lean
 
         s = self.settings
-        if not msg.to:  # nichts zu senden (Resolver lieferte keine Empfänger)
+        if not msg.to:  # nothing to send (resolver returned no recipients)
             return
         email = build_email_message(msg, s)
         logger.info(
@@ -171,7 +169,7 @@ class SmtpMailSender:
             msg.recipient_domains(),
             msg.idempotency_key,
         )
-        await aiosmtplib.send(  # pragma: no cover — echtes Netzwerk-I/O
+        await aiosmtplib.send(  # pragma: no cover — real network I/O
             email,
             hostname=s.smtp_host,
             port=s.smtp_port,

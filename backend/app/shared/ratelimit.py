@@ -1,14 +1,13 @@
-"""Rate-Limiting (sliding window, security.md §8 / api.md §7, Issue #24).
+"""Sliding-window rate limiting, keyed per IP/mail with configurable limits.
 
-Schlüssel pro IP/Mail; Limits konfigurierbar. Backends:
+Backends:
+- ``NullRateLimiter``: always allows (rate limiting off).
+- ``InMemoryRateLimiter``: process-local (tests/single-worker dev), injectable ``now``.
+- ``RedisRateLimiter``: sliding window over a sorted set (ZSET), shared across workers.
+  Fail-open: if Redis is unreachable the request is allowed (availability over
+  throttling) and the error is logged.
 
-- `NullRateLimiter`: immer erlaubt (Rate-Limiting aus).
-- `InMemoryRateLimiter`: prozesslokal (Tests/Single-Worker-Dev), `now` injizierbar.
-- `RedisRateLimiter`: Sliding-Window über ein Sorted-Set (ZSET) — geteilt über alle
-  Worker. **Fail-open**: ist Redis nicht erreichbar, wird der Request durchgelassen
-  (Verfügbarkeit vor Drosselung) und der Fehler geloggt.
-
-Kein Redis-`EVAL`/Lua (und kein Python-`eval`): atomar genug via Pipeline.
+No Redis ``EVAL``/Lua and no Python ``eval``: atomic enough via a pipeline.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ logger = logging.getLogger("app.ratelimit")
 @dataclass(frozen=True)
 class RateLimitResult:
     allowed: bool
-    retry_after: int  # Sekunden bis zum nächsten erlaubten Versuch (0 wenn erlaubt).
+    retry_after: int  # Seconds until the next allowed attempt (0 when allowed).
 
 
 @runtime_checkable
@@ -42,14 +41,14 @@ def _wall_clock() -> float:
 
 
 class NullRateLimiter:
-    """Rate-Limiting deaktiviert — jeder Request erlaubt."""
+    """Rate limiting disabled — every request allowed."""
 
     async def hit(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult:
         return RateLimitResult(allowed=True, retry_after=0)
 
 
 class InMemoryRateLimiter:
-    """Sliding-Window im Prozess. Für Tests/Dev; nicht über Worker geteilt."""
+    """In-process sliding window. For tests/dev; not shared across workers."""
 
     def __init__(self, *, now: Callable[[], float] | None = None) -> None:
         self._hits: defaultdict[str, deque[float]] = defaultdict(deque)
@@ -71,7 +70,7 @@ class InMemoryRateLimiter:
 
 
 class RedisRateLimiter:
-    """Sliding-Window über ein Redis-ZSET (Score = Zeitstempel). Fail-open."""
+    """Sliding window over a Redis ZSET (score = timestamp). Fail-open."""
 
     def __init__(
         self,
@@ -88,8 +87,7 @@ class RedisRateLimiter:
         now = self._now()
         window_start = now - window_seconds
         redis_key = f"{self._prefix}{key}"
-        # Eindeutiges Member (uuid statt Prozess-Counter): kollisionsfrei auch über
-        # mehrere Worker/Prozesse, die sich denselben ZSET-Key teilen.
+        # Unique member (uuid): collision-free across workers sharing the same ZSET key.
         member = f"{now}:{uuid4().hex}"
         try:
             pipe = self._client.pipeline()  # type: ignore[attr-defined]
@@ -100,7 +98,7 @@ class RedisRateLimiter:
             results = await pipe.execute()
             count = int(results[2])
             if count > limit:
-                # Eigenen Eintrag zurücknehmen → blockierte Versuche zählen nicht mit.
+                # Remove our own entry so blocked attempts don't count.
                 await self._client.zrem(redis_key, member)  # type: ignore[attr-defined]
                 oldest = await self._client.zrange(  # type: ignore[attr-defined]
                     redis_key, 0, 0, withscores=True
@@ -110,6 +108,6 @@ class RedisRateLimiter:
                 )
                 return RateLimitResult(allowed=False, retry_after=max(1, retry_after))
             return RateLimitResult(allowed=True, retry_after=0)
-        except Exception as exc:  # noqa: BLE001 — fail-open: Verfügbarkeit vor Drosselung
+        except Exception as exc:  # noqa: BLE001 - fail-open: availability over throttling
             logger.warning("rate-limit backend unavailable, allowing request: %s", exc)
             return RateLimitResult(allowed=True, retry_after=0)

@@ -1,12 +1,12 @@
-"""MIME-Sniffing (libmagic) + Typ-Allowlist (security.md §6).
+"""MIME sniffing (libmagic) + type allowlist.
 
-Der **Inhalt** entscheidet, nicht die Endung: ``sniff_mime`` liest den Magic-Header der
-Bytes. ``validate_upload`` lehnt ab, wenn der gesniffte Typ nicht in der Allowlist liegt
-**oder** nicht zur Datei-Endung passt (Sniff ≠ Endung → 415). So lässt sich eine
-``evil.exe`` nicht als ``foto.png`` tarnen.
+Content decides, not the extension: ``sniff_mime`` reads the magic header of the bytes.
+``validate_upload`` rejects when the sniffed type is not in the allowlist or does not
+match the file extension (sniff != extension → 415), so ``evil.exe`` cannot masquerade
+as ``foto.png``.
 
-``python-magic`` (libmagic) wird **lazy** importiert — die System-Lib muss nur dort
-vorhanden sein, wo wirklich hochgeladen wird (Worker/API-Runtime), nicht im Contract-CI.
+``python-magic`` (libmagic) is imported lazily — the system lib is only needed where
+uploads actually happen (worker/API runtime), not in contract CI.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import io
 import os
 import zipfile
 
-# Erlaubte gesniffte MIME-Typen (PDF / Bild / Office), security.md §6.
+# Allowed sniffed MIME types (PDF / image / Office).
 ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
     {
         "application/pdf",
@@ -23,11 +23,9 @@ ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
         "image/jpeg",
         "image/gif",
         "image/webp",
-        # Office (alt + OOXML). OOXML wird von libmagic teils als application/zip
-        # erkannt → zip ist (nur) bei .docx/.xlsx/.pptx zulässig, und dann zusätzlich
-        # nur, wenn der Container die OOXML-Struktur trägt (siehe _is_ooxml_container).
-        # Ein als .pdf getarntes Zip fliegt am Endungs-Abgleich raus, ein beliebiges
-        # Zip als .docx am Struktur-Check.
+        # Office (legacy + OOXML). libmagic sometimes sniffs OOXML as application/zip
+        # → zip is allowed only for .docx/.xlsx/.pptx, and then only when the container
+        # carries the OOXML structure (see _is_ooxml_container).
         "application/zip",
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -41,8 +39,8 @@ ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# Endung → akzeptable gesniffte MIME-Typen. OOXML-Container sniffen oft als
-# ``application/zip`` (älteres libmagic) → bewusst mit zugelassen.
+# Extension → acceptable sniffed MIME types. OOXML containers often sniff as
+# ``application/zip`` (older libmagic) → deliberately allowed too.
 _OOXML_ZIP = {"application/zip"}
 _EXT_TO_MIME: dict[str, frozenset[str]] = {
     ".pdf": frozenset({"application/pdf"}),
@@ -70,11 +68,10 @@ _EXT_TO_MIME: dict[str, frozenset[str]] = {
     ".odp": frozenset({"application/vnd.oasis.opendocument.presentation"}),
 }
 
-# OOXML-Endung → erwartetes Top-Level-Verzeichnis im ZIP-Container. Wird beim
-# strukturellen Abgleich genutzt, wenn libmagic OOXML nur als ``application/zip``
-# snifft: ein echtes OOXML-Paket enthält ``[Content_Types].xml`` **und** das
-# format-spezifische Verzeichnis (word/ | xl/ | ppt/). So lässt sich kein
-# beliebiges ZIP als Office-Dokument tarnen.
+# OOXML extension → expected top-level dir in the ZIP container. Used for the
+# structural check when libmagic sniffs OOXML only as ``application/zip``: a real
+# OOXML package contains ``[Content_Types].xml`` and the format-specific dir
+# (word/ | xl/ | ppt/), so an arbitrary ZIP cannot pose as an Office document.
 _OOXML_REQUIRED_DIR: dict[str, str] = {
     ".docx": "word/",
     ".xlsx": "xl/",
@@ -83,26 +80,26 @@ _OOXML_REQUIRED_DIR: dict[str, str] = {
 
 
 class MimeRejected(Exception):
-    """Datei nicht akzeptiert (nicht erlaubter Typ oder Sniff ≠ Endung)."""
+    """File not accepted (disallowed type or sniff != extension)."""
 
 
 def sniff_mime(data: bytes) -> str:
-    """Gesniffter MIME-Typ der Bytes (libmagic). Leerer Input → ``application/x-empty``."""
+    """Sniffed MIME type of the bytes (libmagic). Empty input → ``application/x-empty``."""
     if not data:
         return "application/x-empty"
-    import magic  # lazy: libmagic nur auf dem Upload-Pfad nötig
+    import magic  # lazy: libmagic only needed on the upload path
 
     return magic.from_buffer(data, mime=True)
 
 
 def file_extension(filename: str | None) -> str:
-    """Kleingeschriebene Endung inkl. Punkt (``""`` wenn keine)."""
+    """Lowercased extension including the dot (``""`` if none)."""
     if not filename:
         return ""
     return os.path.splitext(filename)[1].lower()
 
 
-# Erlaubte Zeichen im gespeicherten Dateinamen (alles andere → ``_``).
+# Allowed characters in the stored filename (everything else → ``_``).
 _FILENAME_SAFE = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._- "
 )
@@ -110,25 +107,25 @@ _FILENAME_MAX = 200
 
 
 def sanitize_filename(filename: str | None) -> str:
-    """Dateinamen härten: Pfadanteile entfernen, Control-/Sonderzeichen ersetzen.
+    """Harden a filename: drop path components, replace control/special characters.
 
-    Schützt sowohl den ``storage_key`` (kein ``../``-Traversal, keine NUL/Slashes) als
-    auch den gespeicherten Anzeigenamen. Fällt auf ``upload`` zurück, wenn nach der
-    Bereinigung nichts Brauchbares übrig bleibt; begrenzt die Länge."""
+    Protects both the ``storage_key`` (no ``../`` traversal, no NUL/slashes) and the
+    stored display name. Falls back to ``upload`` if nothing usable remains after
+    cleaning; caps the length."""
     raw = (filename or "").replace("\\", "/")
-    base = os.path.basename(raw).strip()  # Pfadanteile (inkl. ``../``) verwerfen
+    base = os.path.basename(raw).strip()  # drop path components (incl. ``../``)
     cleaned = "".join(c if c in _FILENAME_SAFE else "_" for c in base).strip(" .")
     cleaned = cleaned[:_FILENAME_MAX]
     return cleaned or "upload"
 
 
 def _is_ooxml_container(data: bytes, ext: str) -> bool:
-    """``True`` wenn ``data`` ein echtes OOXML-Paket für ``ext`` ist.
+    """Whether ``data`` is a real OOXML package for ``ext``.
 
-    Verlangt einen lesbaren ZIP-Container mit ``[Content_Types].xml`` **und** dem
-    format-spezifischen Top-Level-Verzeichnis (``word/``/``xl/``/``ppt/``). So wird
-    ein als ``.docx/.xlsx/.pptx`` getarntes Beliebig-ZIP abgewiesen, obwohl libmagic
-    es nur als ``application/zip`` sniffen mag.
+    Requires a readable ZIP container with ``[Content_Types].xml`` and the
+    format-specific top-level dir (``word/``/``xl/``/``ppt/``), so an arbitrary ZIP
+    posing as ``.docx/.xlsx/.pptx`` is rejected even though libmagic may only sniff
+    it as ``application/zip``.
     """
     required_dir = _OOXML_REQUIRED_DIR.get(ext)
     if required_dir is None:
@@ -144,16 +141,17 @@ def _is_ooxml_container(data: bytes, ext: str) -> bool:
 
 
 def validate_upload(filename: str | None, data: bytes) -> str:
-    """Bytes prüfen → gesniffter MIME-Typ, oder :class:`MimeRejected`.
+    """Validate bytes → sniffed MIME type, or raise :class:`MimeRejected`.
 
-    Regeln (security.md §6):
+    Rules:
 
-    1. Gesniffter Typ muss in :data:`ALLOWED_MIME_TYPES` liegen.
-    2. Endung muss bekannt sein **und** der gesniffte Typ zu ihr passen (Sniff ≠ Endung
-       → Ablehnung). So zählt der Inhalt, nicht die behauptete Endung.
-    3. Snifft ein OOXML-Upload nur als ``application/zip`` (älteres libmagic), muss der
-       ZIP-Container zusätzlich die OOXML-Struktur tragen (``[Content_Types].xml`` +
-       ``word/``/``xl/``/``ppt/``) — sonst zählt es als beliebiges ZIP und fliegt raus.
+    1. Sniffed type must be in :data:`ALLOWED_MIME_TYPES`.
+    2. Extension must be known and the sniffed type must match it (sniff != extension
+       → reject). Content counts, not the claimed extension.
+    3. If an OOXML upload sniffs only as ``application/zip`` (older libmagic), the ZIP
+       container must additionally carry the OOXML structure (``[Content_Types].xml`` +
+       ``word/``/``xl/``/``ppt/``) — otherwise it counts as an arbitrary ZIP and is
+       rejected.
     """
     sniffed = sniff_mime(data)
     if sniffed not in ALLOWED_MIME_TYPES:

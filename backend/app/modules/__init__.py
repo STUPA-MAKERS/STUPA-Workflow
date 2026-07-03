@@ -1,5 +1,4 @@
-"""Fachmodule (auth, applications, forms, flow, ...). Router-Mount via main.create_app.
+"""Domain modules (auth, applications, forms, flow, ...).
 
-Skelett (T-02) enthält noch keine Module — diese kommen ab T-10 (overview §3).
-Jedes Modul exportiert künftig einen `router` (prefix unter /api).
+Each module exports a `router` mounted under /api by main.create_app.
 """

@@ -1,18 +1,18 @@
-"""WebSocket-Verbindungs-Handler für den Live-Vote-Kanal (api.md §4, flows §5).
+"""WebSocket connection handler for the live-vote channel.
 
-Trennt Auth/RBAC (Handshake), den Empfang von Client-Nachrichten (``cast``/
-``subscribe``) und den Broker-Fan-out (Server→Client) sauber:
+Separates handshake auth/RBAC, client message handling (``cast``/``subscribe``)
+and broker fan-out (server→client):
 
-* **Auth am Handshake** (security.md, Risiko »Cookie beim Upgrade«): Session-Cookie →
-  Principal. Kein Principal → Close ``4401``. Voter-Kanal verlangt Gruppen-
-  Mitgliedschaft des Sitzungs-Gremiums; Beamer-Kanal verlangt ``meeting.manage``.
-  Verstoß ⇒ ``{"type":"error","code":"not_eligible"}`` + Close ``4403``.
-* **Beamer = read-only**: erhält nur ``meeting_state|vote_opened|vote_tally|
-  vote_closed`` (Fan-out gefiltert) und darf **nicht** casten (``read_only``).
-* **Cast**: serialisiert pro Wähler über den verteilten Lock ``vote:{id}:cast:{sub}``,
-  dann ``VotingService.cast`` (idempotent, DB-unique) → ``vote_tally`` broadcast.
-* **Disconnect**: beide Tasks werden bei ``WebSocketDisconnect`` sauber abgeräumt
-  (Abo via Broker-Context-Manager geschlossen).
+* **Auth at handshake**: session cookie → principal; none → close ``4401``.
+  The voter channel requires gremium membership, the beamer channel
+  ``meeting.manage``; violation ⇒ ``not_eligible`` error + close ``4403``.
+* **Beamer is read-only**: receives only ``meeting_state|vote_opened|vote_tally|
+  vote_closed`` (filtered fan-out) and must not cast (``read_only``).
+* **Cast**: serialized per voter via the distributed lock
+  ``vote:{id}:cast:{sub}``, then ``VotingService.cast`` (idempotent, DB-unique)
+  → ``vote_tally`` broadcast.
+* **Disconnect**: both tasks are torn down cleanly on ``WebSocketDisconnect``
+  (subscription closed via the broker context manager).
 """
 
 from __future__ import annotations
@@ -50,29 +50,28 @@ from app.shared.errors import AppError, ForbiddenError
 
 logger = logging.getLogger("app.livevote")
 
-# Events, die der read-only Beamer-Stream durchlässt (api.md §4).
+# Events the read-only beamer stream lets through.
 _BEAMER_EVENTS = frozenset(
     {"meeting_state", "vote_opened", "vote_tally", "vote_closed"}
 )
-# Close-Codes (anwendungsdefiniert, 4000–4999).
+# Application-defined close codes (4000–4999).
 WS_UNAUTHENTICATED = 4401
 WS_FORBIDDEN = 4403
 WS_NOT_FOUND = 4404
 
-# Inbound-Throttle (DoS-Schutz, security.md): jede Client-Nachricht (``cast``/
-# ``subscribe``) trifft die DB bzw. nimmt einen verteilten Lock. Ein Token-Bucket
-# begrenzt die Rate je Verbindung — ``_THROTTLE_BURST`` Frames sofort, danach
-# nachfüllen mit ``_THROTTLE_RATE`` Tokens/Sekunde. Überzählige Frames bekommen
-# ``rate_limited`` und werden verworfen (kein DB/Lock-Zugriff).
+# Inbound throttle (DoS protection): every client message hits the DB or takes a
+# distributed lock. A per-connection token bucket allows ``_THROTTLE_BURST``
+# frames at once, refilled at ``_THROTTLE_RATE`` tokens/second; excess frames get
+# ``rate_limited`` and are dropped without touching DB/lock.
 _THROTTLE_RATE = 5.0
 _THROTTLE_BURST = 10.0
 
 
 def _allowed_origins(settings: Settings) -> set[str]:
-    """Erlaubte WS-Origins: die öffentliche Basis-URL + konfigurierte CORS-Origins.
+    """Allowed WS origins: the public base URL plus configured CORS origins.
 
-    Normalisiert auf ``scheme://host[:port]`` (ohne Pfad/Trailing-Slash), passend zum
-    ``Origin``-Header eines Browsers."""
+    Normalized to ``scheme://host[:port]`` (no path/trailing slash), matching a
+    browser's ``Origin`` header."""
     origins = {o.rstrip("/") for o in settings.cors_allow_origins if o}
     base = (settings.public_base_url or "").rstrip("/")
     if base:
@@ -81,17 +80,16 @@ def _allowed_origins(settings: Settings) -> set[str]:
 
 
 def origin_allowed(origin: str | None, settings: Settings) -> bool:
-    """CSRF-Schutz für den WS-Handshake (security.md, Risiko »Cookie beim Upgrade«).
+    """CSRF protection for the WS handshake.
 
-    Die CSRF-Middleware (Double-Submit) läuft für WebSocket-Upgrades NICHT — ein
-    cookie-authentifizierter Cross-Origin-Upgrade (forged-WebSocket/CSWSH) käme sonst
-    durch. Deshalb prüfen wir den ``Origin``-Header hier eigenständig (unabhängig von
-    SameSite, das ältere Browser nicht durchsetzen).
+    The double-submit CSRF middleware does not run for WebSocket upgrades, so a
+    cookie-authenticated cross-origin upgrade (CSWSH) would get through; the
+    ``Origin`` header is therefore checked here, independent of SameSite.
 
-    Fehlt der Header komplett (Nicht-Browser-Clients: native/MCP/CLI/Tests senden
-    keinen ``Origin``), greift der Cookie-/Session-Check als alleiniges Gate — diese
-    Clients sind nicht CSRF-anfällig. Ist er gesetzt, MUSS er auf der Allowlist stehen.
-    Ohne konfigurierte Origins (Default) bleibt das Verhalten unverändert (kein Gate).
+    A missing header (non-browser clients: native/MCP/CLI/tests) falls back to
+    the cookie/session check alone — those clients are not CSRF-prone. If set,
+    it MUST be on the allowlist. With no configured origins (default) there is
+    no gate.
     """
     if origin is None:
         return True
@@ -102,13 +100,11 @@ def origin_allowed(origin: str | None, settings: Settings) -> bool:
 
 
 async def _neutralize_close(websocket: WebSocket) -> None:
-    """``websocket.close`` zum No-op machen (idempotenter Close).
+    """Make ``websocket.close`` a no-op (idempotent close).
 
-    Nach unserem 4403-Close würde der nachgelagerte ``close(4401)`` des Routers auf der
-    bereits geschlossenen Verbindung mit ``RuntimeError`` scheitern (Starlette: »Cannot
-    call send once a close message has been sent«). Wir ersetzen die Bound-Method durch
-    einen No-op, damit der Doppel-Close geräuschlos verpufft (der Client hat den 4403
-    bereits erhalten)."""
+    After our 4403 close, the router's follow-up ``close(4401)`` would raise
+    ``RuntimeError`` in Starlette ("Cannot call send once a close message has
+    been sent"); replacing the bound method silences the double close."""
 
     async def _noop(code: int = 1000, reason: str | None = None) -> None:  # noqa: ARG001
         return None
@@ -119,14 +115,13 @@ async def _neutralize_close(websocket: WebSocket) -> None:
 async def resolve_ws_principal(
     websocket: WebSocket, db: AsyncSession, settings: Settings
 ) -> Principal | None:
-    """Session-Cookie am WS-Handshake → Principal (``None`` ohne gültige Session).
+    """Resolve the session cookie at the WS handshake to a principal (``None`` if invalid).
 
-    Vor dem Cookie-Check wird der ``Origin``-Header gegen die Allowlist geprüft
-    (CSWSH-Schutz, s. :func:`origin_allowed`): bei Mismatch schließt der Handshake
-    sofort mit ``4403`` und gibt ``None`` zurück."""
-    # CSRF/CSWSH am Upgrade: fremder Origin ⇒ 4403, noch VOR dem Cookie. Den
-    # ``close``-Aufruf des Routers (würde sonst doppelt schließen) entschärfen wir,
-    # indem wir hier selbst schließen und ``close`` zum No-op machen.
+    Before the cookie check the ``Origin`` header is validated against the
+    allowlist (CSWSH protection, see :func:`origin_allowed`); on mismatch the
+    handshake closes with ``4403`` and returns ``None``."""
+    # CSWSH at upgrade: foreign origin ⇒ 4403 BEFORE the cookie check; we close
+    # here ourselves and turn the router's later ``close`` into a no-op.
     origin = websocket.headers.get("origin")
     if not origin_allowed(origin, settings):
         logger.info("ws handshake rejected: disallowed origin %r", origin)
@@ -157,7 +152,7 @@ async def resolve_ws_principal(
 
 
 class LiveVoteConnection:
-    """Eine WS-Sitzung (Voter **oder** Beamer) auf dem Kanal ``meeting:{id}``."""
+    """One WS session (voter or beamer) on the ``meeting:{id}`` channel."""
 
     def __init__(
         self,
@@ -180,18 +175,16 @@ class LiveVoteConnection:
         self.publisher = BrokerPublisher(broker)
         self.meetings = meetings
         self.voting = voting
-        # Token-Bucket-Zustand (DoS-Throttle): volle Burst-Kapazität zum Verbindungs-
-        # start, monoton getaktet (``time.monotonic``) — robust gegen Wall-Clock-Sprünge
-        # und unabhängig von einer laufenden Event-Loop.
+        # Token-bucket state (DoS throttle): full burst capacity at connect,
+        # clocked with ``time.monotonic`` — robust against wall-clock jumps.
         self._tokens = _THROTTLE_BURST
         self._last_refill = time.monotonic()
 
     def _allow_frame(self) -> bool:
-        """Token-Bucket: ``True``, wenn ein Inbound-Frame ein Token entnehmen darf.
+        """Token bucket: ``True`` if an inbound frame may take a token.
 
-        Füllt zunächst anteilig zur verstrichenen Zeit nach (gedeckelt auf den Burst),
-        entnimmt dann ein Token. Reicht es nicht, ist die Verbindung über ihrem
-        Ratenlimit → ``False`` (der Aufrufer verwirft den Frame)."""
+        Refills proportionally to elapsed time (capped at the burst), then takes
+        one token; if none is left the caller drops the frame."""
         now = time.monotonic()
         elapsed = now - self._last_refill
         self._last_refill = now
@@ -209,7 +202,7 @@ class LiveVoteConnection:
         await self._send(ErrorEvent(code=code).dump())
 
     async def _send_state(self) -> None:
-        """Aktuellen State liefern (Connect + ``subscribe``-Reconnect, flows §5)."""
+        """Send the current state (connect and ``subscribe`` reconnect)."""
         meeting = await self.meetings.get(self.meeting_id)
         await self._send(
             MeetingStateEvent(
@@ -230,7 +223,7 @@ class LiveVoteConnection:
                 secret=vote_out.secret,
             ).dump()
         )
-        # ``from_vote`` setzt die »Counts erst bei Close«-Regel für geheime Votes durch.
+        # ``from_vote`` enforces the counts-only-after-close rule for secret votes.
         await self._send(VoteTallyEvent.from_vote(vote_out).dump())
 
     # ------------------------------------------------------------------ cast
@@ -243,13 +236,9 @@ class LiveVoteConnection:
         except ValidationError:
             await self._send_error("invalid_message")
             return
-        # Defense-in-depth: der Vote MUSS zu der Sitzung gehören, für die diese
-        # Verbindung autorisiert ist. ``VotingService.cast`` prüft Eligibility zwar
-        # erneut am vote-eigenen ``eligible_group``/``meeting_id`` und broadcastet das
-        # Tally in den Kanal des vote-eigenen Meetings — ein Cross-Meeting-Frame wäre
-        # also folgenlos. Wir weisen ihn dennoch vor Lock/DB-Cast ab, damit eine
-        # Verbindung auf Sitzung A keinen Cast gegen einen Vote aus Sitzung B treiben
-        # kann (Kanal-Bindung, security.md). Unbekannter Vote ⇒ derselbe Pfad.
+        # Defense-in-depth channel binding: the vote MUST belong to the meeting this
+        # connection is authorized for; cross-meeting or unknown votes are rejected
+        # before lock/DB even though ``VotingService.cast`` re-checks eligibility.
         try:
             target = await self.voting.get(msg.vote_id)
         except AppError:
@@ -258,7 +247,7 @@ class LiveVoteConnection:
         if target.meeting_id != self.meeting_id:
             await self._send_error("not_eligible")
             return
-        # Eigene und Vertretungs-Abgabe getrennt locken (zwei legitime Casts).
+        # Lock own and delegated casts separately (two legitimate casts).
         suffix = ":proxy" if msg.as_delegation else ""
         lock_key = f"vote:{msg.vote_id}:cast:{self.principal.sub}{suffix}"
         async with self.locker.acquire(lock_key) as acquired:
@@ -305,12 +294,11 @@ class LiveVoteConnection:
             try:
                 raw = await self.ws.receive_json()
             except json.JSONDecodeError:
-                # Nicht-JSON-Frame: Verbindung bleibt offen, Client bekommt error.
+                # Non-JSON frame: connection stays open, client gets an error.
                 await self._send_error("invalid_message")
                 continue
-            # DoS-Throttle (vor jeder DB-/Lock-berührenden Verarbeitung): überzählige
-            # Frames eines flutenden Clients werden verworfen, die Verbindung bleibt
-            # offen (legitimer Burst läuft normal weiter).
+            # DoS throttle before any DB/lock work: excess frames of a flooding
+            # client are dropped, the connection stays open.
             if not self._allow_frame():
                 await self._send_error("rate_limited")
                 continue
@@ -320,14 +308,14 @@ class LiveVoteConnection:
                 await self._send_error("invalid_message")
 
     async def run(self) -> None:
-        """Abo öffnen, initialen State senden, Fan-out + Empfang bis Disconnect."""
+        """Open the subscription, send initial state, fan out and receive until disconnect."""
         channel = meeting_channel(self.meeting_id)
         async with self.broker.subscribe(channel) as subscription:
             await self._send_state()
-            # Presence (#live-viewers): Voter-Verbindungen registrieren und den
-            # Stand broadcasten — der eigene Broadcast liefert dem frischen Client
-            # zugleich den Initial-Snapshot (Abo besteht bereits). Beamer zählen
-            # nicht (Anzeige, keine Person); ihr Event-Filter blendet `viewers` aus.
+            # Presence: register voter connections and broadcast the roster — the
+            # own broadcast doubles as the fresh client's initial snapshot (the
+            # subscription already exists). Beamers do not count (display, not a
+            # person); their event filter hides `viewers`.
             connection_id: str | None = None
             if not self.beamer:
                 name = (
@@ -344,22 +332,21 @@ class LiveVoteConnection:
             pump = asyncio.create_task(self._pump(subscription))
             receive = asyncio.create_task(self._receive())
             try:
-                # Beide Tasks RENNEN gegeneinander (FIRST_COMPLETED): endet ``_pump``
-                # zuerst (z. B. ``send_json``-/Serialisierungsfehler), reißt das die
-                # Verbindung ab — sonst stoppte der Client still den Broadcast-Empfang,
-                # während der Socket offen bliebe. Endet ``_receive`` zuerst
-                # (Disconnect), läuft alles wie gehabt.
+                # Race both tasks (FIRST_COMPLETED): if ``_pump`` ends first (e.g.
+                # a send/serialization error) the connection is torn down — the
+                # client must not silently stop receiving broadcasts on an open
+                # socket. ``_receive`` ending first is a normal disconnect.
                 done, _pending = await asyncio.wait(
                     {pump, receive}, return_when=asyncio.FIRST_COMPLETED
                 )
-                # Exception des fertigen Tasks abrufen (sonst geschluckt) — Disconnect
-                # ist erwartet, ein toter Pump wird geloggt.
+                # Fetch the finished task's exception (otherwise swallowed) —
+                # disconnect is expected, a dead pump is logged.
                 for task in done:
                     try:
                         task.result()
                     except WebSocketDisconnect:
                         pass
-                    except Exception:  # noqa: BLE001 — Pump-Fehler reißt die Verbindung ab
+                    except Exception:  # noqa: BLE001 — pump failure tears the connection down
                         logger.warning(
                             "live-vote pump/receive task failed", exc_info=True
                         )
@@ -372,5 +359,5 @@ class LiveVoteConnection:
                         await self.broker.publish(
                             channel, ViewersEvent(viewers=names).dump()
                         )
-                    except Exception:  # noqa: BLE001 — Abgang darf den Close nicht stören
+                    except Exception:  # noqa: BLE001 — leaving must not break the close
                         logger.debug("viewers broadcast on leave failed", exc_info=True)

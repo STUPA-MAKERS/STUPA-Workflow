@@ -1,9 +1,5 @@
-"""Modell-Aggregator: importiert alle Modul-Modelle, damit `Base.metadata`
-vollständig befüllt ist (Single Source für Alembic-`migrations/` und Tests).
-
-T-06 deckt den DB-Kern ab (data-model §1–4). Spätere Tasks ergänzen ihre Modelle
-+ eigene Migrationen.
-"""
+"""Model aggregator: imports all module models so `Base.metadata` is fully
+populated (single source for Alembic and tests)."""
 
 from __future__ import annotations
 

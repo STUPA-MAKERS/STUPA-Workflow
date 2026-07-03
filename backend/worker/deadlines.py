@@ -1,25 +1,22 @@
-"""arq-Cron-Task: zeitgesteuerte Frist-/Vote-Verarbeitung (T-44, flows §9.4, R12).
+"""arq cron task: scheduled deadline/vote processing.
 
-``process_deadlines`` läuft periodisch (minütlich, ``worker.main``) und erledigt drei
-idempotente Schritte gegen einen **zeitzonenbewussten** ``now`` (UTC):
+``process_deadlines`` runs periodically (per-minute) against a tz-aware ``now``
+(UTC) and performs idempotent steps:
 
-1. **Erinnerungen** — Fristen im (oder über das) Lead-Fenster (``due_at <= now+lead``),
-   die noch nicht erinnert wurden → ``notify(deadline_approaching)`` + ``reminded_at``
-   setzen (genau einmal). Keine untere Schranke: nach einem >Lead-Ausfall wird die
-   Erinnerung verspätet, aber genau einmal nachgeholt, statt für immer auszubleiben und
-   die Zeile im Scan-Index zu hinterlassen (AUD-037).
-2. **Auto-Übergänge / Wiedervorlage** — abgelaufene Fristen mit ``action_on_pass`` →
-   ``flow.fire`` (Guard ``deadlinePassed``, ``manual=False``); danach ``action_on_pass``
-   leeren (Idempotenz-Marker). ``kind="requeue"`` ist der Wiedervorlage-Fall: der Antrag
-   geht über den referenzierten Übergang aus »vertagt« zurück (Historie = ``status_event``).
-3. **Vote-Auto-Close** — offene Votes mit abgelaufenem ``closes_at`` → ``voting.close``
-   (zählt aus, feuert den Ergebnis-Branch).
+1. Reminders — deadlines within (or past) the lead window not yet reminded ->
+   ``notify(deadline_approaching)`` + set ``reminded_at`` (exactly once). No lower
+   bound: after a >lead outage the reminder fires late but exactly once.
+2. Auto-transitions / requeue — expired deadlines with ``action_on_pass`` ->
+   ``flow.fire`` (guard ``deadlinePassed``, ``manual=False``); then clear
+   ``action_on_pass`` (idempotency marker). ``kind="requeue"`` returns the
+   application via the referenced transition.
+3. Vote auto-close — open votes past ``closes_at`` -> ``voting.close`` (tallies,
+   fires the result branch).
 
-**Nebenläufigkeit.** Jede Einheit wird in eigener Session via ``FOR UPDATE SKIP LOCKED``
-gesperrt (``DeadlineService.lock_*``): ein zweiter Worker sieht die gesperrte Zeile nicht
-und überspringt → keine Doppelausführung (Akzeptanzkriterium). Zusätzlich sind die
-fachlichen Operationen selbst idempotent (optimistisches Locking in ``flow.fire``;
-Status-Check in ``voting.close``; ``_job_id``-Dedup beim Mail-Enqueue).
+Concurrency: each unit is locked in its own session via ``FOR UPDATE SKIP
+LOCKED`` so a second worker skips it — no double execution. The operations are
+themselves idempotent (optimistic locking in ``flow.fire``; status check in
+``voting.close``; ``_job_id`` dedup on mail enqueue).
 """
 
 from __future__ import annotations
@@ -54,7 +51,7 @@ from app.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("app.deadlines")
 
-# Gast-Anträge ohne E-Mail-Bestätigung werden nach diesem Fenster verworfen (#confirm).
+# Guest applications without email confirmation are discarded after this window.
 _GUEST_CONFIRM_TTL = timedelta(hours=12)
 
 
@@ -63,20 +60,19 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB-Sessionmaker (in Tests via ``ctx['deadlines_sessionmaker']`` injizierbar)."""
+    """DB sessionmaker (injectable in tests via ``ctx['deadlines_sessionmaker']``)."""
     maker = ctx.get("deadlines_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
 
 def _now() -> datetime:
-    """Zeitzonenbewusster Jetzt-Zeitpunkt (UTC) — freezegun-steuerbar in Tests."""
+    """Tz-aware now (UTC); freezegun-controllable in tests."""
     return datetime.now(UTC)
 
 
 def _system_principal() -> Principal:
-    """Akteur für cron-getriggerte Übergänge (kein User). Guards der Auto-Übergänge
-    sind ``deadlinePassed``/``voteResult`` (kein RBAC); ``application.manage`` deckt
-    etwaige Rollen-Guards der Requeue-/Ergebnis-Branches ab."""
+    """Actor for cron-triggered transitions (no user); ``application.manage`` covers
+    any role guards on requeue/result branches."""
     return Principal(
         sub="system:deadlines",
         roles=["system"],
@@ -85,7 +81,7 @@ def _system_principal() -> Principal:
 
 
 def _mail_queue(ctx: dict[str, Any]) -> MailQueue | None:
-    """Mail-Queue aus dem arq-Redis-Pool (oder Test-Injektion). ``None`` ohne Redis."""
+    """Mail queue from the arq Redis pool (or test injection); ``None`` without Redis."""
     queue = ctx.get("mail_queue")
     if queue is not None:
         return queue  # type: ignore[return-value]
@@ -93,11 +89,9 @@ def _mail_queue(ctx: dict[str, Any]) -> MailQueue | None:
     return ArqMailQueue(pool) if pool is not None else None
 
 
-# --------------------------------------------------------------------------- #
-# Entry point
-# --------------------------------------------------------------------------- #
+# --- Entry point ---
 async def process_deadlines(ctx: dict[str, Any]) -> str:
-    """Erinnerungen + Auto-Übergänge + Vote-Auto-Close (idempotent, SKIP LOCKED)."""
+    """Reminders + auto-transitions + vote auto-close (idempotent, SKIP LOCKED)."""
     settings: Settings = ctx.get("settings") or load_settings()
     now = _now()
     reminded = await _process_reminders(ctx, settings, now)
@@ -111,16 +105,14 @@ async def process_deadlines(ctx: dict[str, Any]) -> str:
     )
 
 
-# --------------------------------------------------------------------------- #
-# 4. Verwurf unbestätigter Gast-Anträge (#confirm)
-# --------------------------------------------------------------------------- #
+# --- Discard unconfirmed guest applications ---
 async def _discard_unconfirmed(ctx: dict[str, Any], now: datetime) -> int:
-    """Gast-Anträge ohne E-Mail-Bestätigung nach 12 h hart löschen.
+    """Hard-delete guest applications unconfirmed after the TTL window.
 
-    Nur anonyme (``created_by IS NULL``) **und** unbestätigte
-    (``email_confirmed_at IS NULL``) Anträge älter als das TTL-Fenster. FK-Abhängige
-    (Applicant/Versionen/Status-Events/Dateien …) kaskadieren; idempotent (ein zweiter
-    Lauf findet nichts mehr)."""
+    Only anonymous (``created_by IS NULL``) and unconfirmed
+    (``email_confirmed_at IS NULL``) applications older than the TTL. FK-dependent
+    rows cascade; idempotent (a second run finds nothing).
+    """
     maker = _sessionmaker(ctx)
     cutoff = now - _GUEST_CONFIRM_TTL
     async with maker() as session:
@@ -141,9 +133,7 @@ async def _discard_unconfirmed(ctx: dict[str, Any], now: datetime) -> int:
     return discarded
 
 
-# --------------------------------------------------------------------------- #
-# 1. Reminders
-# --------------------------------------------------------------------------- #
+# --- Reminders ---
 async def _process_reminders(
     ctx: dict[str, Any], settings: Settings, now: datetime
 ) -> int:
@@ -156,7 +146,7 @@ async def _process_reminders(
         try:
             if await _remind_one(ctx, settings, deadline_id, now, lead):
                 sent += 1
-        except Exception:  # noqa: BLE001 — kaputte Einzel-Frist darf den Zyklus nicht abbrechen
+        except Exception:  # noqa: BLE001 - one broken deadline must not abort the cycle
             logger.exception("deadline reminder failed (deadline=%s)", deadline_id)
     return sent
 
@@ -174,7 +164,7 @@ async def _remind_one(
         svc = DeadlineService(session)
         deadline = await svc.lock_reminder(deadline_id, now, lead)
         if deadline is None:
-            return False  # anderer Worker / nicht mehr fällig
+            return False  # another worker / no longer due
         type_id = deadline.type_id
         if type_id is None and deadline.application_id is not None:
             type_id = await session.scalar(
@@ -200,9 +190,7 @@ async def _remind_one(
     return True
 
 
-# --------------------------------------------------------------------------- #
-# 2. Auto-transitions / requeue
-# --------------------------------------------------------------------------- #
+# --- Auto-transitions / requeue ---
 async def _process_actions(
     ctx: dict[str, Any], settings: Settings, now: datetime
 ) -> int:
@@ -214,7 +202,7 @@ async def _process_actions(
         try:
             if await _fire_one(ctx, deadline_id, now):
                 fired += 1
-        except Exception:  # noqa: BLE001 — kaputte Einzel-Frist darf den Zyklus nicht abbrechen
+        except Exception:  # noqa: BLE001 - one broken deadline must not abort the cycle
             logger.exception("deadline action failed (deadline=%s)", deadline_id)
     return fired
 
@@ -226,7 +214,7 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
         svc = DeadlineService(session)
         deadline = await svc.lock_action_deadline(deadline_id, now)
         if deadline is None:
-            return False  # anderer Worker / bereits konsumiert
+            return False  # another worker / already consumed
         application_id = deadline.application_id
         transition_id = transition_ref(deadline.action_on_pass)
         if application_id is None or transition_id is None:
@@ -234,13 +222,13 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
                 "deadline %s has action_on_pass without application/transition — skipped",
                 deadline_id,
             )
-            await svc.consume_action(deadline)  # nicht erneut scannen
+            await svc.consume_action(deadline)  # do not scan again
             return False
         flow = FlowService(session, dispatcher)
         fired = False
-        # Marker VOR dem Feuern vormerken: `fire` committet ihn atomar mit dem
-        # State-Wechsel — kein Fenster, in dem ein zweiter Worker die schon
-        # gefeuerte Frist erneut greifen kann (das Row-Lock fällt mit dem Commit).
+        # Stage the marker before firing: ``fire`` commits it atomically with the
+        # state change, so no window lets a second worker re-grab an already-fired
+        # deadline (the row lock releases with the commit).
         deadline.action_on_pass = None
         try:
             await flow.fire(
@@ -253,34 +241,31 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
             )
             fired = True
         except ConflictError as exc:
-            # Guard nicht erfüllt oder Zustand bereits gewechselt (konkurrierende
-            # Transition) — die Frist ist verbraucht, nicht erneut feuern.
+            # Guard not met or state already changed (concurrent transition) — the
+            # deadline is consumed, do not fire again.
             logger.info("deadline %s transition not applied: %s", deadline_id, exc)
         except NotFoundError as exc:
             logger.warning("deadline %s references missing app/transition: %s", deadline_id, exc)
-        # Fehlerpfade (kein Commit durch `fire` bzw. Rollback) — Marker hier
-        # persistieren; nach erfolgreichem `fire` ist das ein No-op.
+        # Error paths (no commit from ``fire`` / rollback) — persist the marker here;
+        # after a successful ``fire`` this is a no-op.
         await svc.consume_action(deadline)
     return fired
 
 
-# --------------------------------------------------------------------------- #
-# 2b. Automatische Übergänge (#8)
-# --------------------------------------------------------------------------- #
+# --- Automatic transitions ---
 async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
-    """Konfigurierte **automatische** Übergänge feuern, deren Guard erfüllt ist (#8).
+    """Fire configured automatic transitions whose guard passes.
 
-    Scannt Anträge, deren aktueller State eine ausgehende ``automatic``-Transition
-    besitzt, und feuert (``manual=False``) den ersten passenden. Idempotent über das
-    optimistische Locking in ``flow.fire``; je Antrag eigene Session.
+    Scans applications whose current state has an outgoing ``automatic`` transition
+    and fires (``manual=False``) the first matching one. Idempotent via optimistic
+    locking in ``flow.fire``; own session per application.
     """
     maker = _sessionmaker(ctx)
     dispatcher = ctx.get("flow_dispatcher") or build_notify_dispatcher(ctx.get("redis"))
     async with maker() as session:
         auto_states = select(Transition.from_state_id).where(Transition.automatic)
-        # Pro Tick begrenzt (älteste zuerst): eine große Auto-Übergangs-Kohorte
-        # drainiert über mehrere Ticks, statt einen Tick über die Kadenz zu ziehen
-        # (AUD-046). Idempotent via optimistischem Locking in ``flow.fire``.
+        # Capped per tick (oldest first): a large cohort drains across several ticks
+        # instead of stretching one tick past the cadence.
         ids = list(
             (
                 await session.execute(
@@ -305,14 +290,12 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
                     advanced += 1
         except (ConflictError, NotFoundError) as exc:
             logger.info("auto-transition skipped (app=%s): %s", application_id, exc)
-        except Exception:  # noqa: BLE001 — ein kaputter Antrag darf den Zyklus nicht abbrechen
+        except Exception:  # noqa: BLE001 - one broken application must not abort the cycle
             logger.exception("auto-transition failed (app=%s)", application_id)
     return advanced
 
 
-# --------------------------------------------------------------------------- #
-# 3. Vote auto-close
-# --------------------------------------------------------------------------- #
+# --- Vote auto-close ---
 async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
     maker = _sessionmaker(ctx)
     async with maker() as session:
@@ -322,7 +305,7 @@ async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
         try:
             if await _close_one(ctx, vote_id, now):
                 closed += 1
-        except Exception:  # noqa: BLE001 — kaputter Einzel-Vote darf den Zyklus nicht abbrechen
+        except Exception:  # noqa: BLE001 - one broken vote must not abort the cycle
             logger.exception("vote auto-close failed (vote=%s)", vote_id)
     return closed
 
@@ -334,12 +317,11 @@ async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
         svc = DeadlineService(session)
         vote = await svc.lock_open_vote(vote_id, now)
         if vote is None:
-            return False  # anderer Worker / bereits geschlossen
+            return False  # another worker / already closed
         voting = VotingService(session, dispatcher)
         try:
-            # ``now`` mitgeben, damit ein zeit-gebundener Vote mit abgelaufenem
-            # Fenster und unerfülltem Quorum terminal (fail-Branch) schließt statt
-            # ewig vom Cron erneut gegriffen zu werden (#stuck-vote).
+            # Pass ``now`` so a time-bound vote past its window with unmet quorum
+            # closes terminally (fail branch) instead of being re-grabbed forever.
             closed = await voting.close(vote.id, _system_principal(), now=now)
         except ConflictError as exc:
             logger.info("vote %s auto-close skipped: %s", vote_id, exc)
@@ -348,22 +330,20 @@ async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
             logger.warning("vote %s auto-close — app missing: %s", vote_id, exc)
             return False
     logger.info("vote auto-closed (vote=%s)", vote_id)
-    # Live-Vote (T-16, AUD-045): den ``vote_closed``-Broadcast nachholen, den sonst
-    # nur der REST-Router feuert — sonst zeigen Beamer/Voter den zeit-geschlossenen
-    # Vote bis zum Reload als »offen«. NACH dem Commit (Session-Block verlassen) und
-    # best-effort: ein Broker-Hiccup darf den bereits geschlossenen Vote nicht
-    # nachträglich als fehlgeschlagen markieren. No-op für Standalone-Votes
-    # (``meeting_id is None``).
+    # Replay the ``vote_closed`` broadcast the REST router would normally fire, else
+    # beamer/voters show the time-closed vote as open until reload. After the commit
+    # and best-effort: a broker hiccup must not fail the already-closed vote. No-op
+    # for standalone votes (``meeting_id is None``).
     await _broadcast_vote_closed(ctx, closed)
     return True
 
 
 async def _broadcast_vote_closed(ctx: dict[str, Any], closed: VoteClosed) -> None:
-    """``vote_closed`` über den Redis-Broker fan-outen (best effort)."""
+    """Fan out ``vote_closed`` over the Redis broker (best effort)."""
     redis = ctx.get("redis")
     if redis is None:
         return
     try:
         await BrokerPublisher(RedisBroker(redis)).vote_closed(closed)
-    except Exception as exc:  # noqa: BLE001 — Broadcast ist nicht close-kritisch
+    except Exception as exc:  # noqa: BLE001 - broadcast is not close-critical
         logger.warning("vote_closed broadcast failed (vote=%s): %s", closed.id, exc)

@@ -1,17 +1,9 @@
-"""Guard-Kontext-Aufbau für die Flow-Engine (flows §9.2).
+"""Guard-context assembly for the flow engine.
 
-``eval_guard`` (T-05) ist eine **reine** Funktion über einem
-:class:`~app.shared.guards.GuardContext`. Dieses Modul füllt den Kontext aus dem
-Antrag + auslösendem Principal + abgeleiteten Fakten (#28-Redesign):
-
-* **Akteur** (``roles``/``actor_committees``) — globale Rollen + Gremium-
-  Mitgliedschaften des auslösenden Principals (nur für manuelle Übergänge relevant).
-* **Antragsteller** (``applicant_roles``/``applicant_committees``) — aus
-  ``data['_applicantRoles']`` bzw. den Mitgliedschaften des erstellenden Principals.
-* **Budget** (``budget_id``/``budget_fits``) — zugeordnete Kostenstelle + ob der
-  Betrag in den verfügbaren Rest (Allocation − Ausgaben) passt.
-* **Felder** (``field_values``/``field_types``) — Formularfeldwerte aus ``data`` +
-  Built-in ``amount`` (currency) samt abgeleiteten Typen für ``compare``/``hasField``.
+``eval_guard`` is a pure function over a :class:`~app.shared.guards.GuardContext`;
+this module fills that context from the application, the triggering principal,
+and derived facts: actor roles/committees (manual transitions only), applicant
+roles/committees, budget fit, and form field values/types for ``compare``.
 """
 
 from __future__ import annotations
@@ -32,7 +24,7 @@ from app.modules.budget.tree_models import BudgetAllocation, BudgetExpense
 from app.modules.forms.models import FormField
 from app.shared.guards import GuardContext
 
-# Formularfeld-Typ → ``compare``-Wert-Typ (guards.COMPARE_TYPES).
+# Form field type -> ``compare`` value type (guards.COMPARE_TYPES).
 _FIELD_TYPE_MAP: dict[str, str] = {
     "number": "number",
     "currency": "currency",
@@ -43,12 +35,12 @@ _FIELD_TYPE_MAP: dict[str, str] = {
 
 
 def _compare_type(field_type: str) -> str:
-    """Formularfeld-Typ auf einen ``compare``-Wert-Typ abbilden (Default ``text``)."""
+    """Map a form field type to a ``compare`` value type (default ``text``)."""
     return _FIELD_TYPE_MAP.get(field_type, "text")
 
 
 async def _committees_for_sub(session: AsyncSession, sub: str | None) -> frozenset[str]:
-    """Gremium-IDs, in denen ``sub`` aktuell (Amtszeit-Fenster) Mitglied ist."""
+    """Return gremium ids where ``sub`` is currently (term window) a member."""
     if not sub:
         return frozenset()
     now = datetime.now(UTC)
@@ -69,12 +61,11 @@ async def _committees_for_sub(session: AsyncSession, sub: str | None) -> frozens
 
 
 async def _budget_fits(session: AsyncSession, app: Application) -> bool:
-    """``True`` wenn der Antragsbetrag in den freien Rest der Kostenstelle passt.
+    """Return True if the requested amount fits the cost centre's free remainder.
 
-    Verfügbar = Allocation des Knotens im Haushaltsjahr − Σ Ausgaben
-    (``kind='expense'``) + Σ Einnahmen (``kind='income'``) auf diesem Knoten/HHJ —
-    gleiche Richtung wie ``tree_rules.node_available``. Ohne Budget/HHJ/Betrag ⇒
-    ``False`` (fail-closed)."""
+    Available = node allocation − expenses + income for the fiscal year (same
+    direction as ``tree_rules.node_available``). Missing budget/fiscal
+    year/amount yields ``False`` (fail-closed)."""
     if app.budget_id is None or app.fiscal_year_id is None or app.amount is None:
         return False
     allocated = await session.scalar(
@@ -104,7 +95,7 @@ async def _budget_fits(session: AsyncSession, app: Application) -> bool:
 
 
 async def _field_types(session: AsyncSession, app: Application) -> dict[str, str]:
-    """``{feldKey: compareTyp}`` der gepinnten Form + Built-in ``amount`` (currency)."""
+    """Return ``{fieldKey: compareType}`` of the pinned form plus built-in ``amount``."""
     rows = (
         await session.execute(
             select(FormField.key, FormField.type).where(
@@ -187,20 +178,18 @@ async def build_context(
     deadline_passed: bool = False,
     as_applicant: bool = False,
 ) -> GuardContext:
-    """Vollständigen :class:`GuardContext` aus DB + Principal bauen (I/O).
+    """Build the full :class:`GuardContext` from DB + principal (I/O).
 
-    ``as_applicant=True`` markiert den Magic-Link-Antragsteller als Akteur
-    (``actorIsApplicant`` greift), unabhängig von ``created_by`` — der Link-Inhaber
-    *ist* die Antragsteller:in für genau diesen Antrag (#applicant-actions)."""
+    ``as_applicant=True`` marks the magic-link holder as the applicant actor
+    regardless of ``created_by`` — the link holder *is* the applicant for
+    exactly this application."""
     base = await build_base_context(
         session, app, manual=manual, deadline_passed=deadline_passed
     )
-    # Akteur (nur manuelle Übergänge nutzen die Akteur-Gates).
     actor_committees = (
         await _committees_for_sub(session, principal.sub) if manual else frozenset()
     )
-    # Akteur ist Antragsteller:in: Magic-Link-Inhaber:in (as_applicant) **oder**
-    # eingeloggte:r Ersteller:in, die/der selbst auslöst (#guard).
+    # Actor counts as applicant: magic-link holder or logged-in creator firing themselves.
     return with_actor(
         base,
         roles=frozenset(principal.roles),

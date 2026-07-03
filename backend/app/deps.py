@@ -1,12 +1,12 @@
-"""Auth-Dependencies (api.md §1, security.md §1/§2) — reale Auflösung (T-10).
+"""FastAPI auth dependencies.
 
-- `get_current_principal`: Session-Cookie → `auth_session` → RBAC-aufgelöster Principal.
-- `get_current_applicant`: signierte opake `sid` (Bearer / Cookie) → `applicant_session` → Scope.
-- `require_principal(*perms)` 401/403, `require_group(group)` 401/403,
-  `require_applicant(scope)` 401 + Scope-Prüfung.
+- `get_current_principal`: session cookie or OAuth bearer → RBAC-resolved principal.
+- `get_current_applicant`: signed opaque `sid` (bearer/cookie) → applicant session + scope.
+- `require_principal`/`require_group`/`require_applicant`: 401 without auth, 403 on
+  missing permission/group/scope.
 
-`Principal`/`Applicant` werden aus `app.modules.auth.principal` re-exportiert (leaf →
-kein Import-Zyklus deps ↔ auth).
+`Principal`/`Applicant` are re-exported from `app.modules.auth.principal` (leaf
+module, avoids a deps ↔ auth import cycle).
 """
 
 from __future__ import annotations
@@ -43,11 +43,11 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 def _bearer_token(request: Request, settings: Settings) -> str | None:
-    """Applicant-Token aus `Authorization: Bearer` oder HttpOnly-Cookie.
+    """Read the applicant token from `Authorization: Bearer` or the HttpOnly cookie.
 
-    **Kein `?t=`-Query** mehr: Token im Query leckt über Referer/History/Logs
-    (security.md §1). Der Magic-Link transportiert seinen Token im URL-Fragment; das
-    FE tauscht ihn per POST gegen das Cookie."""
+    Deliberately no `?t=` query support: tokens in the query leak via
+    Referer/history/logs. The magic link carries its token in the URL fragment;
+    the frontend exchanges it for the cookie via POST."""
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         return auth[7:]
@@ -55,10 +55,10 @@ def _bearer_token(request: Request, settings: Settings) -> str | None:
 
 
 def _principal_bearer_token(request: Request) -> str | None:
-    """`Authorization: Bearer apat_…` → OAuth-Access-Token (sonst `None`).
+    """Return the OAuth access token from `Authorization: Bearer apat_…`, else `None`.
 
-    Nur das `apat_`-Präfix gilt als Principal-Token; signierte Applicant-Bearer
-    (Magic-Link) werden hier ignoriert und vom Applicant-Pfad behandelt.
+    Only the `apat_` prefix counts as a principal token; signed applicant bearers
+    (magic link) are ignored here and handled by the applicant path.
     """
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -70,7 +70,7 @@ def _principal_bearer_token(request: Request) -> str | None:
 async def _principal_from_access_token(
     db: AsyncSession, token: str, now: datetime
 ) -> Principal | None:
-    """OAuth-Access-Token → scoped Principal (oder `None`, wenn ungültig/abgelaufen)."""
+    """Resolve an OAuth access token to a scoped principal, `None` if invalid/expired."""
     resolved = await oauth_service.resolve_access_token(db, token=token, now=now)
     if resolved is None:
         return None
@@ -81,10 +81,8 @@ async def _principal_from_access_token(
     if row is None or row.active is False:
         return None
     principal = await rbac.resolve_principal(db, row, now)
-    # Kill-Switch: Access-Tokens stammen ausschließlich aus dem OAuth-Grant-Flow, der
-    # am Consent auf `mcp.use` gegated ist. Wird diese Permission später entzogen,
-    # müssen bereits ausgestellte Tokens sofort wirkungslos werden — daher hier gegen
-    # die UNGESCOPTE Permission-Menge (vor der Scope-Kappung) erneut prüfen.
+    # Kill switch: revoking `mcp.use` must invalidate already-issued tokens, so
+    # re-check against the UNSCOPED permission set (before scope capping).
     if not principal.has("mcp.use"):
         return None
     principal.scope_permissions = oauth.scope_permissions(oauth.parse_scope(scope))
@@ -96,11 +94,10 @@ async def get_current_principal(
     db: DbSession,
     settings: SettingsDep,
 ) -> Principal | None:
-    """Auth → Principal: OAuth-Bearer-Token (MCP) ODER Session-Cookie (Browser).
+    """Resolve the principal from an OAuth bearer token (MCP) or the session cookie.
 
-    Reihenfolge: ein `Authorization: Bearer apat_…`-Token (OAuth-Access-Token) wird
-    zuerst aufgelöst und kappt die Permissions auf den Token-Scope; sonst fällt es auf
-    das Session-Cookie zurück. `None`, wenn nichts Gültiges vorliegt.
+    A `Bearer apat_…` token is resolved first and caps permissions to the token
+    scope; otherwise falls back to the session cookie. `None` if nothing valid.
     """
     now = datetime.now(UTC)
     bearer = _principal_bearer_token(request)
@@ -133,11 +130,11 @@ async def get_current_applicant(
     db: DbSession,
     settings: SettingsDep,
 ) -> Applicant | None:
-    """Serverseitige Magic-Link-Session (signierte opake `sid`, Bearer/Cookie) → Applicant.
+    """Resolve the server-side magic-link session (signed opaque `sid`) to an Applicant.
 
-    Die `sid` wird signaturgeprüft, dann gegen `applicant_session` aufgelöst: kein
-    Zugriff ohne existierende, nicht-widerrufene, nicht-abgelaufene Zeile — ein allein
-    aus `SESSION_SECRET` geschmiedeter Token findet keine Zeile und ergibt `None`."""
+    The `sid` is signature-checked, then looked up in `applicant_session`: no access
+    without an existing, unrevoked, unexpired row — a token forged from
+    `SESSION_SECRET` alone matches no row and yields `None`."""
     token = _bearer_token(request, settings)
     if not token:
         return None
@@ -155,7 +152,7 @@ async def get_current_applicant(
 
 
 def require_principal(*perms: str) -> Callable[..., Principal]:
-    """401 ohne Session, 403 bei fehlender Permission."""
+    """Return a dependency: 401 without a session, 403 on missing permission."""
 
     def dependency(
         principal: Annotated[Principal | None, Depends(get_current_principal)],
@@ -171,10 +168,10 @@ def require_principal(*perms: str) -> Callable[..., Principal]:
 
 
 def require_any_permission(*perms: str) -> Callable[..., Principal]:
-    """401 ohne Session, 403 wenn KEINE der Permissions vorliegt (ANY-of, #6).
+    """Return a dependency: 401 without a session, 403 unless ANY permission matches.
 
-    Für geteilte Lese-Endpunkte, die mehrere Admin-Bereiche bedienen
-    (z. B. ``/admin/config-schemas`` für Typ- UND Branding-Editoren)."""
+    For shared read endpoints serving multiple admin areas
+    (e.g. ``/admin/config-schemas`` for both type and branding editors)."""
 
     def dependency(
         principal: Annotated[Principal | None, Depends(get_current_principal)],
@@ -189,7 +186,7 @@ def require_any_permission(*perms: str) -> Callable[..., Principal]:
 
 
 def require_group(group: str) -> Callable[..., Principal]:
-    """401 ohne Session, 403 wenn Principal nicht in der (Gremium-)Gruppe ist."""
+    """Return a dependency: 401 without a session, 403 if not in the (gremium) group."""
 
     def dependency(
         principal: Annotated[Principal | None, Depends(get_current_principal)],
@@ -204,7 +201,7 @@ def require_group(group: str) -> Callable[..., Principal]:
 
 
 def require_applicant(scope: ApplicantScope = "view") -> Callable[..., Applicant]:
-    """401 ohne gültigen Magic-Link-Token; 403 wenn der Scope nicht ausreicht."""
+    """Return a dependency: 401 without a valid magic-link token, 403 on insufficient scope."""
 
     def dependency(
         applicant: Annotated[Applicant | None, Depends(get_current_applicant)],

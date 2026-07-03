@@ -1,4 +1,4 @@
-"""API-Schemata des Live-Vote/Meeting-Moduls (T-16, api.md §4)."""
+"""API schemas for the live-vote/meeting module."""
 
 from __future__ import annotations
 
@@ -14,22 +14,22 @@ MeetingStatus = Literal["planned", "live", "closed"]
 
 
 class _CamelModel(BaseModel):
-    """camelCase-Aliase im JSON; Felder per Name befüllbar."""
+    """camelCase aliases in JSON; fields settable by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class MeetingCreate(_CamelModel):
-    """``POST /api/meetings`` — Sitzung anlegen (Status ``planned``)."""
+    """``POST /api/meetings`` — create a meeting (status ``planned``)."""
 
     gremium_id: UUID = Field(alias="gremiumId")
     title: str = Field(min_length=1)
-    # Termin ist Pflicht: ohne Datum/Uhrzeit lässt sich keine Sitzung planen.
+    # Date is required: a meeting can't be scheduled without one.
     date: _date
     start_time: _time = Field(alias="startTime")
-    # Optionale End-Uhrzeit (#ics); fehlt sie, nimmt der iCal-Feed 1 h Dauer an.
+    # Optional end time; if unset the iCal feed assumes a 1h duration.
     end_time: _time | None = Field(default=None, alias="endTime")
-    # Genau ein zugewiesener Protokollant (Mitglied des Gremiums).
+    # Exactly one assigned protokollant (a committee member).
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
 
     @model_validator(mode="after")
@@ -40,9 +40,9 @@ class MeetingCreate(_CamelModel):
 
 
 class MeetingPatch(_CamelModel):
-    """``PATCH /api/meetings/{id}`` — Sitzungs-Steuerung/Planung.
+    """``PATCH /api/meetings/{id}`` — control/plan a meeting.
 
-    Mindestens ein Feld muss gesetzt sein; jede Änderung publiziert ``meeting_state``.
+    At least one field must be set; any change publishes ``meeting_state``.
     """
 
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
@@ -54,8 +54,8 @@ class MeetingPatch(_CamelModel):
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
-        # ``date``/``protokollantId`` zählen mit: geplante Sitzungen vorab terminieren
-        # bzw. den Protokollanten (um)setzen.
+        # ``date``/``protokollantId`` count too: schedule a planned meeting or
+        # (re)assign its protokollant.
         managed = {
             "date",
             "start_time",
@@ -71,38 +71,37 @@ class MeetingPatch(_CamelModel):
 
 
 class MeetingVoteOut(_CamelModel):
-    """Eine an die Sitzung gebundene Abstimmung (für die Sitzungssteuerung)."""
+    """A vote bound to the meeting (for session control)."""
 
     id: UUID
-    # NULL = generische Beschlussfrage (Freitext-TOP), kein Antrag.
+    # NULL = generic question (free-text TOP), no application.
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # An welchen TOP die Abstimmung gebunden ist (für die Gruppierung im FE).
+    # Which TOP the vote is bound to (for grouping in the FE).
     agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
     question: str | None = None
-    # Optionen (für die Stimmabgabe im FE).
+    # Options (for casting in the FE).
     options: list[str] = Field(default_factory=list)
-    # ``cancelled``: Antrag hat den vote-State manuell verlassen (Wahl abgebrochen).
+    # ``cancelled``: the application left the vote state manually (vote aborted).
     status: Literal["draft", "open", "closed", "cancelled"]
     result: str | None = None
-    # Aktueller Stimmenstand (Option → Anzahl) + führende Option — bleibt nach einem
-    # Reload erhalten (vorher nur über den Live-WS-Pfad sichtbar).
+    # Current tally (option → count) + leading option; survives a reload.
     counts: dict[str, int] | None = None
     leading: str | None = None
-    # Teilnahme-Fortschritt (abgestimmte vs. anwesende Mitglieder) + ``revealed``: ob
-    # ``counts``/``leading`` sichtbar sind (geschlossen oder alle Anwesenden haben
-    # abgestimmt und nicht geheim), sonst verdeckt (#vote-progress).
+    # Participation progress (voted vs. present) + ``revealed``: whether
+    # ``counts``/``leading`` are visible (closed, or all present voted and not
+    # secret), otherwise hidden.
     voted: int = 0
     present: int = 0
     revealed: bool = True
-    # Grund einer Ablehnung (nach Close): ``quorum`` = Quorum verfehlt, ``majority`` =
-    # Mehrheit verfehlt. ``None`` solange offen oder bei ``passed``/``tie``.
+    # Rejection reason (after close): ``quorum`` = quorum missed, ``majority`` =
+    # majority missed. ``None`` while open or on ``passed``/``tie``.
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
 
 
 class MeetingOut(_CamelModel):
-    """Sitzungs-State (``GET /api/meetings/{id}``)."""
+    """Meeting state (``GET /api/meetings/{id}``)."""
 
     id: UUID
     gremium_id: UUID = Field(alias="gremiumId")
@@ -111,7 +110,7 @@ class MeetingOut(_CamelModel):
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
     end_time: _time | None = Field(default=None, alias="endTime")
-    # Automatisch beim Schließen gesetzt (#14) — »Ende« der Protokoll-Titelseite.
+    # Set automatically on close — end line of the protocol title page.
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
     status: MeetingStatus
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
@@ -119,18 +118,17 @@ class MeetingOut(_CamelModel):
     created_at: _datetime = Field(alias="createdAt")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
     protokollant_name: str | None = Field(default=None, alias="protokollantName")
-    # Ist der ANFRAGENDE Principal der zugewiesene Protokollant dieser Sitzung? Das FE
-    # kann das nicht selbst berechnen (es kennt nur `sub`, nicht die interne
-    # principal_id), deshalb serverseitig auflösen (#protokollant-view).
+    # Is the requesting principal this meeting's protokollant? Resolved
+    # server-side because the FE knows only ``sub``, not the internal principal_id.
     is_protokollant: bool = Field(default=False, alias="isProtokollant")
-    # Master-Flag fürs FE: darf der Principal die Sitzung **führen** (Protokoll/TOPs/
-    # Status)? = Protokollant oder Sitzungsverwalter. Granulare Flags darunter.
+    # Master flag for the FE: may the principal lead the meeting (protocol/TOPs/
+    # status)? = protokollant or session manager. Granular flags below.
     can_control: bool = Field(default=False, alias="canControl")
     can_manage: bool = Field(default=False, alias="canManage")
     can_write: bool = Field(default=False, alias="canWrite")
     can_manage_votes: bool = Field(default=False, alias="canManageVotes")
     can_vote: bool = Field(default=False, alias="canVote")
-    # An die Sitzung gebundene Abstimmungen (Sitzungssteuerung).
+    # Votes bound to the meeting (session control).
     votes: list[MeetingVoteOut] = Field(default_factory=list)
 
 
@@ -138,11 +136,11 @@ TimelineDirection = Literal["past", "upcoming"]
 
 
 class MeetingPage(_CamelModel):
-    """Cursor-Seite der Sitzungs-Timeline (#104).
+    """Cursor page of the meeting timeline.
 
-    Keyset-paginiert um *jetzt* herum: ``upcoming`` läuft chronologisch vorwärts
-    (frühestes zuerst), ``past`` rückwärts (jüngstes zuerst). ``nextCursor`` ist
-    ``None``, sobald in dieser Richtung keine weiteren Sitzungen folgen.
+    Keyset-paginated around *now*: ``upcoming`` runs forward (earliest first),
+    ``past`` backward (latest first). ``nextCursor`` is ``None`` once no further
+    meetings follow in that direction.
     """
 
     items: list[MeetingOut]
@@ -150,14 +148,12 @@ class MeetingPage(_CamelModel):
 
 
 class MeetingGremiumOut(_CamelModel):
-    """Gremium (id + Name) für den Gremium-Filter der Sitzungsübersicht
-    (#meetings-filter).
+    """Committee (id + name) for the meeting-overview filter.
 
-    Quelle ist NICHT die Mitgliedschaft, sondern die Sichtbarkeit: ein Gremium
-    erscheint genau dann, wenn der Principal dort MINDESTENS EINE lesbare Sitzung
-    hat. Damit kann ein Pool-Vertreter/Delegations-Empfänger ohne Mitgliedschaft
-    sein Gremium filtern, während ein Mitglied eines sitzungslosen Gremiums es
-    nicht angeboten bekommt.
+    Source is visibility, not membership: a committee appears iff the principal
+    has at least one readable meeting there. So a pool substitute/delegation
+    recipient without membership can filter their committee, while a member of a
+    meeting-less committee isn't offered it.
     """
 
     id: UUID
@@ -168,20 +164,20 @@ AttendanceStatus = Literal["present", "excused", "absent"]
 
 
 class AttendanceOut(_CamelModel):
-    """Anwesenheit eines Gremium-Mitglieds für eine Sitzung (#Meetings)."""
+    """Attendance of a committee member for a meeting."""
 
     principal_id: UUID = Field(alias="principalId")
     display_name: str | None = Field(default=None, alias="displayName")
     email: str | None = None
-    # ``None`` = noch nicht erfasst (Mitglied der Roster ohne Eintrag).
+    # ``None`` = not yet recorded (roster member without an entry).
     status: AttendanceStatus | None = None
     source: Literal["self", "lead"] | None = None
-    # Ist der anfragende Principal dieses Mitglied (für die Selbst-Markierung)?
+    # Is the requesting principal this member (for self-marking)?
     is_self: bool = Field(default=False, alias="isSelf")
 
 
 class MeetingMemberOut(_CamelModel):
-    """Aktuelles Gremium-Mitglied — Protokollant-Kandidat beim Anlegen einer Sitzung."""
+    """Current committee member — protokollant candidate when creating a meeting."""
 
     principal_id: UUID = Field(alias="principalId")
     display_name: str | None = Field(default=None, alias="displayName")
@@ -189,28 +185,28 @@ class MeetingMemberOut(_CamelModel):
 
 
 class AttendanceSetBody(_CamelModel):
-    """``PUT …/attendance/{principalId}`` bzw. ``…/me`` — Anwesenheit setzen."""
+    """``PUT …/attendance/{principalId}`` or ``…/me`` — set attendance."""
 
     status: AttendanceStatus
 
 
 class AgendaItemOut(_CamelModel):
-    """Tagesordnungspunkt: ein zugeordneter Antrag **oder** Freitext-TOP (#10/#58)."""
+    """Agenda item: an assigned application or free-text TOP."""
 
     id: UUID
     application_id: UUID | None = Field(default=None, alias="applicationId")
     title: str | None = None
-    # Markdown-Text dieses TOP (pro-TOP-Editor).
+    # Markdown body of this TOP (per-TOP editor).
     body: str | None = None
     position: int = 0
-    # Nicht-öffentlich: im öffentlichen Protokoll-PDF redigiert (#PII-Re-Add).
+    # Non-public: redacted in the public protocol PDF.
     non_public: bool = Field(default=False, alias="nonPublic")
-    # Aktueller Status des Antrags (i18n-Label), z. B. zum Anzeigen in der Liste.
+    # Current application status (i18n label), e.g. to show in the list.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
 
 
 class AssignableApplicationOut(_CamelModel):
-    """Antrag in einem Abstimmungs-State des Sitzungs-Gremiums (noch nicht auf der TO)."""
+    """Application in a vote state of the meeting's committee (not yet on the agenda)."""
 
     application_id: UUID = Field(alias="applicationId")
     title: str | None = None
@@ -218,12 +214,12 @@ class AssignableApplicationOut(_CamelModel):
 
 
 class MeetingVoteOpenBody(_CamelModel):
-    """``POST /meetings/{id}/votes`` — Beschlussfrage eines TOP öffnen (Live-Vote).
+    """``POST /meetings/{id}/votes`` — open a live vote on a TOP.
 
-    Bindet eine neue Abstimmung an den TOP (``agendaItemId``) und öffnet sie sofort.
-    Bei Antrags-TOPs ist genau **eine** Abstimmung erlaubt (sie feuert beim Schließen
-    den pass/fail-Branch des Antrags); Freitext-TOPs erlauben **mehrere** generische
-    Beschlussfragen. ``question`` (Beschlussfrage) wandert ins Protokoll-Snippet.
+    Binds a new vote to the TOP (``agendaItemId``) and opens it at once.
+    Application TOPs allow exactly one vote (it fires the application's pass/fail
+    branch on close); free-text TOPs allow several generic questions.
+    ``question`` goes into the protocol snippet.
     """
 
     agenda_item_id: UUID = Field(alias="agendaItemId")
@@ -233,11 +229,10 @@ class MeetingVoteOpenBody(_CamelModel):
         default="simple", alias="majorityRule"
     )
     secret: bool = False
-    # Der Quorum-Nenner (Stimmberechtigte) wird IMMER serverseitig aus dem aktuellen
-    # Roster abgeleitet (``vote_eligible_count``) — er ist KEIN Eingabefeld. Ein vom
-    # Client gelieferter Wert könnte das Quorum gegen das echte Roster manipulieren
-    # (AUD-042), daher bewusst entfernt.
-    # Explizites Prozent-Quorum (0–100). ``None`` ⇒ Default des Gremiums (falls gesetzt).
+    # The quorum denominator is always derived server-side from the current
+    # roster (``vote_eligible_count``), never a client input, so it can't be
+    # manipulated against the real roster.
+    # Explicit percent quorum (0–100). ``None`` ⇒ committee default (if set).
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100
     )
@@ -250,9 +245,9 @@ class MeetingVoteOpenBody(_CamelModel):
 
 
 class AgendaAddBody(_CamelModel):
-    """``POST /meetings/{id}/agenda`` — TOP setzen: Antrag **oder** Freitext.
+    """``POST /meetings/{id}/agenda`` — add a TOP: application or free-text.
 
-    Genau eins von ``applicationId`` / ``title`` ist Pflicht.
+    Exactly one of ``applicationId`` / ``title`` is required.
     """
 
     application_id: UUID | None = Field(default=None, alias="applicationId")
@@ -267,10 +262,10 @@ class AgendaAddBody(_CamelModel):
 
 
 class AgendaBodyBody(_CamelModel):
-    """``PATCH …/agenda/{itemId}`` — Markdown-Text und/oder Titel eines TOP setzen.
+    """``PATCH …/agenda/{itemId}`` — set a TOP's markdown body and/or title.
 
-    ``title`` benennt nur **Freitext-TOPs** um (Antrag-TOPs erben den Titel vom
-    Antrag); ``body`` setzt den Markdown-Text. Beide sind optional.
+    ``title`` renames only free-text TOPs (application TOPs inherit the title
+    from the application); ``body`` sets the markdown text. Both optional.
     """
 
     body: str | None = None
@@ -279,6 +274,6 @@ class AgendaBodyBody(_CamelModel):
 
 
 class AgendaReorderBody(_CamelModel):
-    """``PUT …/agenda/order`` — TOPs in der gelieferten Reihenfolge anordnen."""
+    """``PUT …/agenda/order`` — order TOPs as supplied."""
 
     item_ids: list[UUID] = Field(alias="itemIds")
