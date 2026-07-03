@@ -1,13 +1,10 @@
-"""Build-time cache warm-up: tectonic-Bundle + Pakete der CD-Varianten laden.
+"""Build-time cache warm-up: fetch the tectonic bundle + CD-variant packages.
 
-Läuft im ``docker build`` (mit Netz) gegen ``XDG_CACHE_HOME=/cache-seed``. Der
-Entrypoint kopiert den Seed beim Start in das (leere) ``/cache``-Volume — zur
-LAUFZEIT braucht der Container damit kein Internet mehr: tectonic lädt Bundle
-und LaTeX-Pakete sonst lazy pro Dokument nach, was hinter einer Egress-Sperre
-mit »error sending request … operation timed out« jeden Render killt.
-
-Gewärmt wird je Protokoll-Variante ein realistisches Dokument (Vote-Callout,
-Tabelle, Logos) — das zieht die im Protokoll-Pfad benötigten Pakete in den Cache.
+Runs during ``docker build`` (with network) against ``XDG_CACHE_HOME=/cache-seed``;
+the entrypoint copies the seed into the empty ``/cache`` volume on start. Without
+it, tectonic lazily downloads bundle and LaTeX packages per document at runtime,
+which fails behind the egress block. Rendering one realistic document per protocol
+variant pulls the packages the protocol path needs into the cache.
 """
 
 from __future__ import annotations
@@ -40,7 +37,7 @@ Text mit **Fett**, *kursiv* und Umlauten: äöüß.
 | A | 1,00 € |
 """
 
-# Erst-Build darf lange dauern (Bundle-Download) — großzügiges Limit.
+# The first build may take long (bundle download); use a generous limit.
 _LIMITS = BuildLimits(wall_timeout_s=600.0, cpu_timeout_s=600.0)
 
 
