@@ -16,9 +16,10 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import ApplicationType
+from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.models import BudgetField, BudgetPot
+from app.modules.budget.tree_models import Budget
 from app.modules.config_revision.service import (
     ENTITY_FORM,
     ConfigRevisionService,
@@ -37,7 +38,7 @@ from app.modules.forms.validation import (
     effective_form,
     validate_definition,
 )
-from app.shared.config_schemas import FormFieldDef
+from app.shared.config_schemas import FieldOption, FormFieldDef
 from app.shared.errors import NotFoundError, ValidationProblem
 
 
@@ -59,6 +60,28 @@ def _row_to_field_def(row: FormField) -> FormFieldDef:
             "promoteTarget": row.promote_target,
         }
     )
+
+
+# Field types whose options the server injects dynamically (not hand-maintained).
+DYNAMIC_OPTION_TYPES: frozenset[str] = frozenset({"gremium_select", "budget_select"})
+
+
+def _inject_dynamic_options(
+    fields: list[FormFieldDef], options_by_type: dict[str, list[FieldOption]]
+) -> list[FormFieldDef]:
+    """Set server-side options on dynamic picker fields.
+
+    ``options_by_type`` maps field type -> options (``gremium_select`` from the
+    committees, ``budget_select`` from the budget tree). Other fields are left as-is;
+    only the affected ones are copied (immutable ``FormFieldDef``)."""
+    if not any(f.type in options_by_type for f in fields):
+        return fields
+    return [
+        f.model_copy(update={"options": options_by_type[f.type]})
+        if f.type in options_by_type
+        else f
+        for f in fields
+    ]
 
 
 def _field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
@@ -161,6 +184,15 @@ class FormsService:
         )
         sections = effective_form(type_fields, pot_fields)
 
+        # Dynamic picker fields get their options injected server-side only here (not
+        # hand-maintained in the form) — one lookup each, only if the type has such a field.
+        present = {f.type for s in sections for f in s.fields} & DYNAMIC_OPTION_TYPES
+        options_by_type: dict[str, list[FieldOption]] = {}
+        if "gremium_select" in present:
+            options_by_type["gremium_select"] = await self._gremium_field_options()
+        if "budget_select" in present:
+            options_by_type["budget_select"] = await self._budget_field_options()
+
         return EffectiveFormOut(
             applicationTypeId=type_id,
             formVersionId=version_id,
@@ -170,11 +202,38 @@ class FormsService:
                     key=s.key,
                     # Marker sections carry their own label; main/budget from the defaults.
                     label=s.label or SECTION_LABELS.get(s.key) or SECTION_LABELS["main"],
-                    fields=s.fields,
+                    fields=_inject_dynamic_options(s.fields, options_by_type),
                 )
                 for s in sections
             ],
         )
+
+    async def _gremium_field_options(self) -> list[FieldOption]:
+        """Current committees as `select` options (id -> name) for `gremium_select`.
+
+        The stored answer value is the committee UUID; the label is the name in both
+        languages (committee names are not i18n-split)."""
+        rows = (
+            await self.session.execute(select(Gremium.id, Gremium.name).order_by(Gremium.name))
+        ).all()
+        return [
+            FieldOption(value=str(gid), label={"de": name, "en": name}) for gid, name in rows
+        ]
+
+    async def _budget_field_options(self) -> list[FieldOption]:
+        """Active cost centres as `select` options (id -> "name (path key)") for
+        `budget_select`. The stored answer value is the budget UUID."""
+        rows = (
+            await self.session.execute(
+                select(Budget.id, Budget.name, Budget.path_key)
+                .where(Budget.active.is_(True))
+                .order_by(Budget.path_key)
+            )
+        ).all()
+        return [
+            FieldOption(value=str(bid), label={"de": f"{name} ({path})", "en": f"{name} ({path})"})
+            for bid, name, path in rows
+        ]
 
     async def create_form_version(
         self,

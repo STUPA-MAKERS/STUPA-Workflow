@@ -61,6 +61,11 @@
               <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.actBudget' | t }}
                 <input [ngModel]="actionParam(act, 'budgetId')" (ngModelChange)="actionParamChange.emit({ ai, key: 'budgetId', value: $event })" [attr.placeholder]="'admin.flow.actBudgetPh' | t" /></label>
             }
+            @case ('assignBudgetFromField') {
+              <label class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.flow.actBudgetField' | t }}
+                <input [ngModel]="actionParam(act, 'field')" (ngModelChange)="actionParamChange.emit({ ai, key: 'field', value: $event })" [attr.placeholder]="'admin.flow.actBudgetFieldPh' | t" /></label>
+              <p class="text-xs text-muted">{{ 'admin.flow.actBudgetFieldHint' | t }}</p>
+            }
             @case ('notify') {
               <span class="text-sm font-medium">{{ 'admin.flow.actRecipients' | t }}</span>
               @for (r of recipientsOf(act); track $index; let ri = $index) {

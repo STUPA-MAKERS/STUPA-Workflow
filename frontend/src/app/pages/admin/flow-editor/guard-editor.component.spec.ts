@@ -87,6 +87,7 @@ describe('GuardEditorComponent', () => {
         [{ deadlinePassed: true }, 'none'],
         [{ budgetFitsApplication: true }, 'none'],
         [{ actorIsApplicant: true }, 'none'],
+        [{ attachmentPresent: true }, 'none'],
         [{ roleIs: 'a' }, 'role'],
         [{ applicantRoleIs: 'a' }, 'role'],
         [{ isInCommittee: 'g' }, 'committee'],
@@ -94,6 +95,7 @@ describe('GuardEditorComponent', () => {
         [{ compare: { field: 'f', op: '==', value: '' } }, 'compare'],
         [{ hasField: 'iban' }, 'text'],
         [{ budgetIs: 'b1' }, 'text'],
+        [{ applicationTypeIs: 'qsm' }, 'text'],
       ];
       for (const [guard, expected] of cases) {
         setGuard(guard);
@@ -189,6 +191,12 @@ describe('GuardEditorComponent', () => {
 
       c.onOpChange('actorIsApplicant');
       expect(last()).toEqual({ actorIsApplicant: true });
+
+      c.onOpChange('attachmentPresent');
+      expect(last()).toEqual({ attachmentPresent: true });
+
+      c.onOpChange('applicationTypeIs');
+      expect(last()).toEqual({ applicationTypeIs: '' });
 
       c.onOpChange('compare');
       expect(last()).toEqual({ compare: { field: '', op: '==', value: '' } });

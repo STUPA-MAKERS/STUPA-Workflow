@@ -11,6 +11,8 @@ const INPUT_HTML_TYPE: Partial<Record<FieldType, string>> = {
   currency: 'currency',
   date: 'date',
   file: 'text', // file upload (attachment reference) — full upload lands later.
+  email: 'email',
+  iban: 'text', // format check (mod-97) is done by the backend; free text field here.
 };
 
 /** Form field type → registered Formly type (`@shared/formly/formly.providers`). */
@@ -23,6 +25,13 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   textarea: 'textarea',
   select: 'select',
   multiselect: 'multicheckbox',
+  // Dynamic pickers: rendered as a normal select; the server supplies the options in
+  // the effective form (no hand-maintenance).
+  gremium_select: 'select',
+  budget_select: 'select',
+  email: 'input',
+  iban: 'input',
+  daterange: 'daterange',
   checkbox: 'checkbox',
   markdown: 'display',
   computed: 'display',
@@ -80,7 +89,13 @@ function mapField(
 
   if (FORMLY_TYPE[f.type] === 'input') props['type'] = INPUT_HTML_TYPE[f.type] ?? 'text';
 
-  if (f.options && (f.type === 'select' || f.type === 'multiselect')) {
+  if (
+    f.options &&
+    (f.type === 'select' ||
+      f.type === 'multiselect' ||
+      f.type === 'gremium_select' ||
+      f.type === 'budget_select')
+  ) {
     props['options'] = f.options.map((o) => ({ value: o.value, label: resolveI18n(o.label, lang) }));
   }
 

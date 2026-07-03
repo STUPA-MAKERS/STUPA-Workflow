@@ -460,6 +460,51 @@ def test_multiselect_unhashable_element_is_422_not_500() -> None:
         validate_answers([f], {"m": [1, ["x"]]})
 
 
+@pytest.mark.parametrize("ftype", ["gremium_select", "budget_select"])
+def test_dynamic_select_uuid_valid_invalid(ftype: str) -> None:
+    f = _field("ziel", ftype)
+    good = "00000000-0000-0000-0000-0000000060e1"
+    assert validate_answers([f], {"ziel": good}) == {"ziel": good}
+    # (Ein leerer String gilt als »nicht vorhanden« und wird — nicht-Pflicht — übersprungen.)
+    for bad in ("not-a-uuid", 42):
+        with pytest.raises(AnswerValidationError):
+            validate_answers([f], {"ziel": bad})
+
+
+def test_email_field_valid_invalid() -> None:
+    f = _field("mail", "email")
+    assert validate_answers([f], {"mail": "a@b.de"}) == {"mail": "a@b.de"}
+    for bad in ("no-at", "a@b", "a b@c.de", 1):
+        with pytest.raises(AnswerValidationError):
+            validate_answers([f], {"mail": bad})
+
+
+def test_iban_field_checksum() -> None:
+    f = _field("iban", "iban")
+    # Gültige Test-IBAN (Mod-97) — Leerzeichen erlaubt.
+    assert validate_answers([f], {"iban": "DE89 3704 0044 0532 0130 00"}) == {
+        "iban": "DE89 3704 0044 0532 0130 00"
+    }
+    for bad in ("DE00370400440532013000", "GB82WEST12345698765432X!", "short", 1):
+        with pytest.raises(AnswerValidationError):
+            validate_answers([f], {"iban": bad})
+
+
+def test_daterange_field_valid_invalid() -> None:
+    f = _field("zr", "daterange")
+    ok = {"from": "2026-01-01", "to": "2026-01-03"}
+    assert validate_answers([f], {"zr": ok}) == {"zr": ok}
+    for bad in (
+        "not-a-dict",
+        {"from": "2026-01-01"},  # 'to' fehlt
+        {"from": "2026-01-05", "to": "2026-01-01"},  # from > to
+        {"from": "nope", "to": "2026-01-01"},  # kein ISO
+        {"from": 1, "to": 2},  # keine Strings
+    ):
+        with pytest.raises(AnswerValidationError):
+            validate_answers([f], {"zr": bad})
+
+
 def test_checkbox_valid_invalid() -> None:
     f = _field("agree", "checkbox")
     assert validate_answers([f], {"agree": True}) == {"agree": True}

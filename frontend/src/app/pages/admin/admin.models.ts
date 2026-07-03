@@ -101,6 +101,8 @@ export type GuardConditionOp =
   | 'deadlinePassed'
   | 'applicantRoleIs'
   | 'applicantCommitteeIs'
+  | 'applicationTypeIs'
+  | 'attachmentPresent'
   | 'budgetIs'
   | 'budgetFitsApplication'
   | 'hasField'
@@ -117,6 +119,8 @@ export const GUARD_CONDITION_OPERATORS: readonly GuardConditionOp[] = [
   'deadlinePassed',
   'applicantRoleIs',
   'applicantCommitteeIs',
+  'applicationTypeIs',
+  'attachmentPresent',
   'budgetIs',
   'budgetFitsApplication',
   'hasField',
@@ -135,12 +139,18 @@ export const GUARD_COMBINATORS: readonly GuardCombinator[] = ['and', 'or', 'not'
 
 // --- Actions (webhook/notify/addToNextSession/assignBudget) -----------------
 
-export type ActionType = 'webhook' | 'notify' | 'addToNextSession' | 'assignBudget';
+export type ActionType =
+  | 'webhook'
+  | 'notify'
+  | 'addToNextSession'
+  | 'assignBudget'
+  | 'assignBudgetFromField';
 export const ACTION_TYPES: readonly ActionType[] = [
   'webhook',
   'notify',
   'addToNextSession',
   'assignBudget',
+  'assignBudgetFromField',
 ] as const;
 
 /** Recipient kind of a `notify` action. */

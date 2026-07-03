@@ -531,6 +531,14 @@ export type FieldType =
   | 'date'
   | 'select'
   | 'multiselect'
+  // Dynamic pickers: options injected server-side (committees / budget tree).
+  | 'gremium_select'
+  | 'budget_select'
+  // Typed inputs with built-in validation.
+  | 'email'
+  | 'iban'
+  // Date range {from, to}.
+  | 'daterange'
   | 'checkbox'
   | 'file'
   | 'table'

@@ -64,6 +64,42 @@ describe('toFormlyFields', () => {
     expect(multi.type).toBe('multicheckbox');
   });
 
+  it('maps dynamic selects (gremium/budget) as selects with injected options', () => {
+    const fields: FormFieldDef[] = [
+      {
+        key: 'g',
+        type: 'gremium_select',
+        label: { de: 'Gremium' },
+        options: [{ value: 'id-1', label: { de: 'StuPa' } }],
+      },
+      {
+        key: 'b',
+        type: 'budget_select',
+        label: { de: 'KS' },
+        options: [{ value: 'id-2', label: { de: 'VSM-1 (VSM-1)' } }],
+      },
+    ];
+    const [g, b] = toFormlyFields(fields, 'de');
+    expect(g.type).toBe('select');
+    expect(g.props?.['options']).toEqual([{ value: 'id-1', label: 'StuPa' }]);
+    expect(b.type).toBe('select');
+    expect(b.props?.['options']).toEqual([{ value: 'id-2', label: 'VSM-1 (VSM-1)' }]);
+  });
+
+  it('maps email/iban to inputs and daterange to its own type', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'mail', type: 'email', label: { de: 'E-Mail' } },
+      { key: 'iban', type: 'iban', label: { de: 'IBAN' } },
+      { key: 'zr', type: 'daterange', label: { de: 'Zeitraum' } },
+    ];
+    const [mail, iban, zr] = toFormlyFields(fields, 'de');
+    expect(mail.type).toBe('input');
+    expect(mail.props?.type).toBe('email');
+    expect(iban.type).toBe('input');
+    expect(iban.props?.type).toBe('text');
+    expect(zr.type).toBe('daterange');
+  });
+
   it('maps markdown/checkbox/computed and wires the computed expression', () => {
     const fields: FormFieldDef[] = [
       { key: 'info', type: 'markdown', label: { de: 'Info' }, help: { de: 'Hinweistext' } },

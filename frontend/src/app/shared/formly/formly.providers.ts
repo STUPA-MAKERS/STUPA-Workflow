@@ -7,6 +7,7 @@ import { FormlyCheckboxType } from './types/formly-checkbox.type';
 import { FormlyMultiCheckboxType } from './types/formly-multicheckbox.type';
 import { FormlyDisplayType } from './types/formly-display.type';
 import { FormlyPositionsType } from './types/formly-positions.type';
+import { FormlyDateRangeType } from './types/formly-daterange.type';
 
 /**
  * Formly base configuration. Registers the UI-kit-bound field types for the form
@@ -24,6 +25,7 @@ export function provideFormly(): Provider {
       { name: 'multicheckbox', component: FormlyMultiCheckboxType },
       { name: 'display', component: FormlyDisplayType },
       { name: 'positions', component: FormlyPositionsType },
+      { name: 'daterange', component: FormlyDateRangeType },
     ],
     validationMessages: [
       { name: 'required', message: 'Dieses Feld ist erforderlich.' },

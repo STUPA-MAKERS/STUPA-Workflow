@@ -18,9 +18,18 @@ import pytest
 
 from app.modules.auth.principal import Principal
 from app.modules.flow import context as flow_context
-from app.modules.flow.context import build_base_context, build_context, with_actor
+
+# Original helper-Bindings (unabhängig vom autouse-Monkeypatch, der die Modul-Attribute
+# ersetzt) — für die direkten Coverage-Tests ihrer realen Rümpfe.
+from app.modules.flow.context import (
+    _application_type_key,
+    _has_attachment,
+    build_base_context,
+    build_context,
+    with_actor,
+)
 from app.shared.guards import GuardContext
-from tests._support.flow_fakes import fake_session
+from tests._support.flow_fakes import FakeSession, fake_session
 
 
 def _app(**over: Any) -> SimpleNamespace:
@@ -31,6 +40,7 @@ def _app(**over: Any) -> SimpleNamespace:
         "fiscal_year_id": None,
         "amount": Decimal("5"),
         "form_version_id": uuid4(),
+        "type_id": uuid4(),
     }
     base.update(over)
     return SimpleNamespace(**base)
@@ -55,9 +65,17 @@ def _pure_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _bf(_session: object, _app: object) -> bool:
         return False
 
+    async def _atk(_session: object, _app: object) -> str | None:
+        return "qsm"
+
+    async def _ha(_session: object, _app: object) -> bool:
+        return False
+
     monkeypatch.setattr(flow_context, "_committees_for_sub", _cs)
     monkeypatch.setattr(flow_context, "_field_types", _ft)
     monkeypatch.setattr(flow_context, "_budget_fits", _bf)
+    monkeypatch.setattr(flow_context, "_application_type_key", _atk)
+    monkeypatch.setattr(flow_context, "_has_attachment", _ha)
 
 
 # --------------------------------------------------------------------------- #
@@ -130,6 +148,23 @@ async def test_base_context_collects_actor_free_facts() -> None:
     assert ctx.field_values["feld"] == 1
     assert ctx.field_values["amount"] == app.amount
     assert ctx.field_types == {"amount": "currency"}
+    assert ctx.application_type_key == "qsm"
+    assert ctx.has_attachment is False
+
+
+async def test_application_type_key_helper_reads_scalar() -> None:
+    session = FakeSession()
+    session.scalar_results = ["qsm"]
+    assert await _application_type_key(cast("Any", session), cast("Any", _app())) == "qsm"
+
+
+async def test_has_attachment_helper_reads_scalar() -> None:
+    present = FakeSession()
+    present.scalar_results = [True]
+    assert await _has_attachment(cast("Any", present), cast("Any", _app(id=uuid4()))) is True
+    absent = FakeSession()
+    absent.scalar_results = [None]
+    assert await _has_attachment(cast("Any", absent), cast("Any", _app(id=uuid4()))) is False
 
 
 async def test_base_context_data_not_dict() -> None:
