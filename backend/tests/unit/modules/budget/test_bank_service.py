@@ -404,6 +404,57 @@ async def test_ignore_line_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
         await svc.ignore_line(uuid.uuid4())
 
 
+@pytest.mark.asyncio
+async def test_ignore_line_records_reason(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Optionaler Grund landet (getrimmt) in den Audit-Daten."""
+    captured: list[dict[str, Any]] = []
+
+    async def _capture(_session: Any, **kw: Any) -> None:
+        captured.append(kw)
+
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    monkeypatch.setattr(service_base, "audit_record", _capture)
+    line = _line()
+    session.put(line)
+    session.execute_q.append(_Result([(line.id,)]))  # Claim gewinnt
+    await svc.ignore_line(line.id, reason="  Doppelbuchung  ")
+    assert session.commits == 1
+    assert captured and captured[0]["data"] == {"reason": "Doppelbuchung"}
+
+
+@pytest.mark.asyncio
+async def test_reactivate_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    line = _line(match_state="ignored")
+    session.put(line)
+    session.execute_q.append(_Result([(line.id,)]))  # Claim (ignored -> unmatched) gewinnt
+    out = await svc.reactivate_line(line.id)
+    assert out.match_state == "unmatched"
+    assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_reactivate_line_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    svc = _service(_Session(), monkeypatch)
+    with pytest.raises(NotFoundError):
+        await svc.reactivate_line(uuid.uuid4())
+
+
+@pytest.mark.asyncio
+async def test_reactivate_line_rejects_non_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nur eine ignorierte Zeile ist reaktivierbar — sonst 422 (line_not_ignored)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    line = _line(match_state="matched")
+    session.put(line)
+    session.execute_q.append(_Result([]))  # Claim verfehlt (nicht ignored)
+    with pytest.raises(ValidationProblem) as ei:
+        await svc.reactivate_line(line.id)
+    assert ei.value.code == "line_not_ignored"
+
+
 # --------------------------------------------------------------- confirm
 def _canned_expense(kind: str = "expense") -> ExpenseOut:
     return ExpenseOut(

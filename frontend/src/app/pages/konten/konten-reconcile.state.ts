@@ -214,6 +214,54 @@ export class KontenReconcileState {
     });
   }
 
+  // --- ignore (P(budget.reconcile_ignore); audit-sensitive) ---
+  readonly ignoreLine = signal<StatementLine | null>(null);
+  readonly ignoreReason = signal('');
+
+  openIgnore(line: StatementLine): void {
+    this.ignoreLine.set(line);
+    this.ignoreReason.set('');
+  }
+
+  closeIgnore(): void {
+    this.ignoreLine.set(null);
+  }
+
+  confirmIgnore(): void {
+    const line = this.ignoreLine();
+    if (!line || this.booking()) return;
+    this.booking.set(true);
+    this.api.ignoreStatementLine(line.id, this.ignoreReason().trim() || undefined).subscribe({
+      next: () => {
+        this.booking.set(false);
+        this.closeIgnore();
+        this.toast.success(this.i18n.translate('konten.ignored'));
+        this.lines.reloadLines();
+      },
+      error: (e) => {
+        this.booking.set(false);
+        this.toast.error(this.i18n.translate(fintsErrorKey(e)));
+      },
+    });
+  }
+
+  /** Undo an ignore — the line returns to the open reconcile queue. */
+  reactivate(line: StatementLine): void {
+    if (this.booking()) return;
+    this.booking.set(true);
+    this.api.reactivateStatementLine(line.id).subscribe({
+      next: () => {
+        this.booking.set(false);
+        this.toast.success(this.i18n.translate('konten.reactivated'));
+        this.lines.reloadLines();
+      },
+      error: (e) => {
+        this.booking.set(false);
+        this.toast.error(this.i18n.translate(fintsErrorKey(e)));
+      },
+    });
+  }
+
   dispose(): void {
     if (this.linkTimer) clearTimeout(this.linkTimer);
   }

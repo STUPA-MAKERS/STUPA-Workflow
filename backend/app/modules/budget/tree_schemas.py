@@ -608,6 +608,13 @@ class ConfirmLineRequest(_CamelModel):
         return self
 
 
+class IgnoreLineRequest(_CamelModel):
+    """Ignore a staged transaction. ``reason`` is optional free text kept in the
+    audit log (bank_line_ignore) only — not stored on the line."""
+
+    reason: str | None = Field(default=None, max_length=500)
+
+
 # ------------------------------------------------------------------- transfer
 class TransferCreate(_CamelModel):
     """Transfer cost centre -> cost centre (same fiscal year).

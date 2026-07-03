@@ -33,6 +33,11 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "budget.structure",
     "budget.book",
     "budget.export",
+    # Ignore a staged bank statement line (hide it from reconciliation). Kept
+    # SEPARATE from budget.book because it removes a transaction from the treasurer's
+    # to-reconcile view — an audit-sensitive act (every ignore/reactivate is logged
+    # as bank_line_ignore / bank_line_reactivate). Grant deliberately.
+    "budget.reconcile_ignore",
     "account.manage",
     "application.export",
     "webhook.manage",

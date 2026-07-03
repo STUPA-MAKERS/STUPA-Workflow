@@ -80,6 +80,8 @@ export class KontenComponent implements OnDestroy {
 
   /** Sync/import/link/unlink need budget.book; view-only hides them. */
   readonly canBook = computed(() => this.auth.can('budget.book'));
+  /** Ignoring/reactivating a line needs the dedicated audit-sensitive permission. */
+  readonly canIgnore = computed(() => this.auth.can('budget.reconcile_ignore'));
   /** Mobile only: account list behind a collapsible toggle. */
   readonly treeOpen = signal(false);
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
@@ -140,6 +142,8 @@ export class KontenComponent implements OnDestroy {
   readonly linkCandidates = this.reconcile.linkCandidates;
   readonly linkSelected = this.reconcile.linkSelected;
   readonly linkLoading = this.reconcile.linkLoading;
+  readonly ignoreLine = this.reconcile.ignoreLine;
+  readonly ignoreReason = this.reconcile.ignoreReason;
 
   constructor() {
     // Account picked → load lines + connection status. fetch() reads the filter
@@ -219,7 +223,7 @@ export class KontenComponent implements OnDestroy {
     this.linesState.loadMore();
   }
 
-  setState(s: '' | 'open' | 'linked'): void {
+  setState(s: '' | 'open' | 'linked' | 'ignored'): void {
     this.linesState.setState(s);
   }
 
@@ -339,5 +343,21 @@ export class KontenComponent implements OnDestroy {
 
   unlink(line: StatementLine): void {
     this.reconcile.unlink(line);
+  }
+
+  openIgnore(line: StatementLine): void {
+    this.reconcile.openIgnore(line);
+  }
+
+  closeIgnore(): void {
+    this.reconcile.closeIgnore();
+  }
+
+  confirmIgnore(): void {
+    this.reconcile.confirmIgnore();
+  }
+
+  reactivate(line: StatementLine): void {
+    this.reconcile.reactivate(line);
   }
 }

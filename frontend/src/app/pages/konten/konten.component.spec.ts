@@ -69,6 +69,7 @@ const LINE_MATCHED: StatementLine = {
   counterpartyIban: null,
   matchState: 'matched',
 };
+const LINE_IGNORED: StatementLine = { ...LINE, id: 'l-3', matchState: 'ignored' };
 
 const CRED: FintsCredentialStatus = {
   configured: true,
@@ -319,6 +320,15 @@ describe('KontenComponent (unit)', () => {
     expect(no.cmp.canBook()).toBe(false);
   });
 
+  it('canIgnore reflects the budget.reconcile_ignore permission', () => {
+    const yes = build({ perms: ['budget.reconcile_ignore'] });
+    expect(yes.cmp.canIgnore()).toBe(true);
+    yes.http.verify();
+    TestBed.resetTestingModule();
+    const no = build({ perms: ['budget.book'] });
+    expect(no.cmp.canIgnore()).toBe(false);
+  });
+
   // ------------------------------------------------------------ account list
   it('selectAccount switches the account and discards a pending TAN session', () => {
     const { cmp } = build({ accounts: [ACC, ACC2] });
@@ -390,6 +400,14 @@ describe('KontenComponent (unit)', () => {
     expect(req2.request.params.get('linked')).toBe('false');
     req2.flush(linePage([]));
     expect(cmp.filterState()).toBe('open');
+
+    // 'ignored' maps to the explicit state filter, no linked flag.
+    cmp.setState('ignored');
+    const req3 = http.expectOne((r) => r.url.endsWith('/statement-lines'));
+    expect(req3.request.params.get('state')).toBe('ignored');
+    expect(req3.request.params.has('linked')).toBe(false);
+    req3.flush(linePage([]));
+    expect(cmp.filterState()).toBe('ignored');
   });
 
   it('fetch error on the initial page clears the list; on loadMore it keeps rows', () => {
@@ -1200,6 +1218,68 @@ describe('KontenComponent (unit)', () => {
     http.expectOne((r) => r.url.endsWith('/unlink')).error(new ProgressEvent('err'));
     expect(cmp.booking()).toBe(false);
     expect(error).toHaveBeenCalledWith('Buchen fehlgeschlagen.');
+  });
+
+  it('openIgnore + confirmIgnore posts the trimmed reason, closes, toasts, reloads; guard + close', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    const success = jest.spyOn(priv(cmp).toast, 'success');
+    cmp.confirmIgnore(); // no line selected → no-op
+    http.expectNone((r) => r.url.endsWith('/ignore'));
+    cmp.openIgnore(LINE);
+    expect(cmp.ignoreLine()).toEqual(LINE);
+    cmp.closeIgnore();
+    expect(cmp.ignoreLine()).toBeNull();
+
+    cmp.openIgnore(LINE);
+    cmp.ignoreReason.set('  Doppelbuchung  ');
+    cmp.booking.set(true);
+    cmp.confirmIgnore(); // busy → no-op
+    http.expectNone((r) => r.url.endsWith('/ignore'));
+    cmp.booking.set(false);
+    cmp.confirmIgnore();
+    const req = http.expectOne(
+      (r) => r.url.endsWith('/statement-lines/l-1/ignore') && r.method === 'POST',
+    );
+    expect(req.request.body).toEqual({ reason: 'Doppelbuchung' });
+    req.flush(null);
+    expect(cmp.ignoreLine()).toBeNull();
+    expect(cmp.booking()).toBe(false);
+    expect(success).toHaveBeenCalledWith('Transaktion ignoriert.');
+    flushLines(http, linePage([]));
+  });
+
+  it('confirmIgnore without a reason omits it and surfaces an error', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    const error = jest.spyOn(priv(cmp).toast, 'error');
+    cmp.openIgnore(LINE);
+    cmp.confirmIgnore();
+    const req = http.expectOne((r) => r.url.endsWith('/ignore'));
+    expect(req.request.body.reason).toBeUndefined();
+    req.error(new ProgressEvent('err'));
+    expect(cmp.booking()).toBe(false);
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('reactivate returns an ignored line to the queue; guard + error path', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    const success = jest.spyOn(priv(cmp).toast, 'success');
+    const error = jest.spyOn(priv(cmp).toast, 'error');
+    cmp.booking.set(true);
+    cmp.reactivate(LINE_IGNORED); // busy → no-op
+    http.expectNone((r) => r.url.endsWith('/reactivate'));
+    cmp.booking.set(false);
+    cmp.reactivate(LINE_IGNORED);
+    http
+      .expectOne((r) => r.url.endsWith('/statement-lines/l-3/reactivate') && r.method === 'POST')
+      .flush({ ...LINE_IGNORED, matchState: 'unmatched' });
+    expect(cmp.booking()).toBe(false);
+    expect(success).toHaveBeenCalledWith('Transaktion reaktiviert.');
+    flushLines(http, linePage([]));
+
+    cmp.reactivate(LINE_IGNORED);
+    http.expectOne((r) => r.url.endsWith('/reactivate')).error(new ProgressEvent('err'));
+    expect(cmp.booking()).toBe(false);
+    expect(error).toHaveBeenCalled();
   });
 
   // ------------------------------------------------------------ destroy

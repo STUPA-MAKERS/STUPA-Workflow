@@ -32,6 +32,7 @@
             <app-button [variant]="filterState() === '' ? 'primary' : 'ghost'" size="sm" (click)="setState('')">{{ 'expenses.filter.all' | t }}</app-button>
             <app-button [variant]="filterState() === 'open' ? 'primary' : 'ghost'" size="sm" (click)="setState('open')">{{ 'konten.filter.open' | t }}</app-button>
             <app-button [variant]="filterState() === 'linked' ? 'primary' : 'ghost'" size="sm" (click)="setState('linked')">{{ 'konten.filter.linked' | t }}</app-button>
+            <app-button [variant]="filterState() === 'ignored' ? 'primary' : 'ghost'" size="sm" (click)="setState('ignored')">{{ 'konten.filter.ignored' | t }}</app-button>
           </div>
         </app-filter-field>
         <app-filter-field [label]="'expenses.filter.kind' | t">
@@ -115,10 +116,13 @@
           </thead>
           <tbody>
             @for (line of lines(); track line.id) {
-              <tr [class.exp__tr--income]="line.kind === 'income'">
+              <tr [class.exp__tr--income]="line.kind === 'income'" [class.exp__tr--ignored]="line.matchState === 'ignored'">
                 <td class="exp__cellDate">{{ (line.valueDate || line.bookingDate) ? ((line.valueDate || line.bookingDate) | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellKind">
                   <app-badge [variant]="line.kind === 'income' ? 'success' : 'neutral'">{{ (line.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
+                  @if (line.matchState === 'ignored') {
+                    <app-badge variant="neutral">{{ 'konten.badge.ignored' | t }}</app-badge>
+                  }
                 </td>
                 <td class="exp__cellMeta">
                   @let cp = counterparty(line);
@@ -129,13 +133,24 @@
                 <td class="exp__cellDesc">{{ line.purpose || '—' }}</td>
                 <td class="exp__num exp__amount" [class.exp__amount--income]="line.kind === 'income'">{{ signedMoney(line) }}</td>
                 <td class="exp__num">
-                  @if (canBook()) {
+                  @if (canBook() || canIgnore()) {
                     <span class="exp__actions">
                       @if (line.matchState === 'matched') {
-                        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.unlink' | t" [title]="'konten.action.unlink' | t" (click)="unlink(line)"><app-icon name="remove" /></app-button>
+                        @if (canBook()) {
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.unlink' | t" [title]="'konten.action.unlink' | t" (click)="unlink(line)"><app-icon name="remove" /></app-button>
+                        }
+                      } @else if (line.matchState === 'ignored') {
+                        @if (canIgnore()) {
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.reactivate' | t" [title]="'konten.action.reactivate' | t" (click)="reactivate(line)"><app-icon name="play" /></app-button>
+                        }
                       } @else {
-                        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.link' | t" [title]="'konten.action.link' | t" (click)="openLink(line)"><app-icon name="paperclip" /></app-button>
-                        <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.import' | t" [title]="'konten.action.import' | t" (click)="openImport(line)"><app-icon name="add" /></app-button>
+                        @if (canBook()) {
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.link' | t" [title]="'konten.action.link' | t" (click)="openLink(line)"><app-icon name="paperclip" /></app-button>
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.import' | t" [title]="'konten.action.import' | t" (click)="openImport(line)"><app-icon name="add" /></app-button>
+                        }
+                        @if (canIgnore()) {
+                          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="booking()" [ariaLabel]="'konten.action.ignore' | t" [title]="'konten.action.ignore' | t" (click)="openIgnore(line)"><app-icon name="stop" /></app-button>
+                        }
                       }
                     </span>
                   }
@@ -300,5 +315,26 @@
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="closeLink()">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" [loading]="booking()" [disabled]="!linkSelected()" (click)="confirmLink()">{{ 'konten.action.link' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Ignore a transaction (audit-sensitive) — optional reason -->
+<app-dialog [open]="!!ignoreLine()" [title]="'konten.ignoreTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeIgnore()">
+  @if (ignoreLine(); as line) {
+    <div class="kon__dlg">
+      <p class="kon__dlgSummary">
+        <span class="kon__dlgAmount" [class.kon__dlgAmount--income]="line.kind === 'income'">{{ signedMoney(line) }}</span>
+        <span>{{ counterparty(line).name || counterparty(line).iban || '—' }}</span>
+      </p>
+      <p class="text-sm text-muted m-0">{{ 'konten.ignoreHint' | t }}</p>
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium" for="ign-reason">{{ 'konten.ignoreReason' | t }}</label>
+        <input id="ign-reason" class="exp__input" [ngModel]="ignoreReason()" (ngModelChange)="ignoreReason.set($event)" name="ignreason" maxlength="500" [placeholder]="'konten.ignoreReasonPlaceholder' | t" />
+      </div>
+    </div>
+  }
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeIgnore()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [loading]="booking()" (click)="confirmIgnore()">{{ 'konten.action.ignore' | t }}</app-button>
   </div>
 </app-dialog>

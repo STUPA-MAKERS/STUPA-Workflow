@@ -75,6 +75,7 @@ class AuditAction(StrEnum):
     BANK_STATEMENT_IMPORT = "bank_statement_import"
     BANK_LINE_RECONCILE = "bank_line_reconcile"
     BANK_LINE_IGNORE = "bank_line_ignore"
+    BANK_LINE_REACTIVATE = "bank_line_reactivate"
     BANK_LINE_UNLINK = "bank_line_unlink"
 
 
