@@ -699,6 +699,7 @@ export class BudgetTreeApi {
       account?: Uuid;
       state?: string;
       linked?: boolean;
+      includeIgnored?: boolean;
       kind?: ExpenseKind;
       q?: string;
       dateFrom?: string;
@@ -713,6 +714,7 @@ export class BudgetTreeApi {
     if (opts.account) params['account'] = opts.account;
     if (opts.state) params['state'] = opts.state;
     if (opts.linked !== undefined) params['linked'] = String(opts.linked);
+    if (opts.includeIgnored !== undefined) params['includeIgnored'] = String(opts.includeIgnored);
     if (opts.kind) params['kind'] = opts.kind;
     if (opts.q) params['q'] = opts.q;
     if (opts.dateFrom) params['dateFrom'] = opts.dateFrom;

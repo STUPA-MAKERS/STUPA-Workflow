@@ -385,6 +385,18 @@ async def test_list_lines_paged_linked_and_income_filters(
         assert page.items == []
 
 
+@pytest.mark.asyncio
+async def test_list_lines_paged_excludes_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Alle view (state=None, include_ignored=False) hides set-aside lines."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    session.scalar_q.append(0)  # count
+    session.scalars_q.append(_Result([]))
+    page = await svc.list_lines_paged(account_id=None, state=None, include_ignored=False)
+    assert page.total == 0
+    assert page.items == []
+
+
 # --------------------------------------------------------------- ignore
 @pytest.mark.asyncio
 async def test_ignore_line(monkeypatch: pytest.MonkeyPatch) -> None:

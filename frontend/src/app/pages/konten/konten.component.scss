@@ -51,11 +51,6 @@ input.exp__input {
 .exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
 .exp__amount--income { color: var(--color-success, #2e7d32); }
 .exp__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
-/* Ignored lines are set aside — dim them but keep them legible for the audit view. */
-.exp__tr--ignored .exp__cellDate,
-.exp__tr--ignored .exp__cellMeta,
-.exp__tr--ignored .exp__cellDesc,
-.exp__tr--ignored .exp__amount { opacity: 0.55; }
 .exp__sentinel { height: 1px; }
 /* --- Table --- */
 .exp__tableWrap {

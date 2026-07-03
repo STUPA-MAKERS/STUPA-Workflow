@@ -4,6 +4,15 @@
   gap: var(--space-6);
 }
 
+/* Flex/grid items default to min-width:auto, so a long, non-breaking application
+   title (e.g. "Anschaffung Powerstation (~1 kWh) + Solarpanel") forces a panel
+   wider than the viewport on mobile. Clamp the item chain to 0 so the nowrap
+   .dash__row-title ellipsizes instead of overflowing the page. */
+:host > *,
+.dash__panels > * {
+  min-width: 0;
+}
+
 /* --- Primary CTA --------------------------------------------------------- */
 .dash__cta {
   display: flex;

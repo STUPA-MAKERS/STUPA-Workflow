@@ -21,6 +21,7 @@ class ListingOps(BankServiceBase):
         account_id: uuid.UUID | None,
         state: str | None,
         linked: bool | None = None,
+        include_ignored: bool = True,
         kind: str | None = None,
         q: str | None = None,
         date_from: str | None = None,
@@ -40,6 +41,9 @@ class ListingOps(BankServiceBase):
             filters.append(BankStatementLine.account_id == account_id)
         if state is not None:
             filters.append(BankStatementLine.match_state == state)
+        elif not include_ignored:
+            # "Alle" view: show matched + open lines, but hide the set-aside ones.
+            filters.append(BankStatementLine.match_state != "ignored")
         if linked is True:
             filters.append(BankStatementLine.match_state == "matched")
         elif linked is False:

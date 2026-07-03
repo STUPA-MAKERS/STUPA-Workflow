@@ -82,7 +82,8 @@ export class KontenLinesState {
 
   private fetch(initial: boolean): void {
     // 'linked'/'open' map to the linked flag (matched vs unmatched+suggested,
-    // excludes ignored); 'ignored' filters the explicit state; '' = everything.
+    // excludes ignored); 'ignored' filters the explicit state; '' = Alle, which
+    // shows matched + open but hides set-aside (ignored) lines.
     const fs = this.filterState();
     const linked = fs === 'linked' ? true : fs === 'open' ? false : undefined;
     this.api
@@ -90,6 +91,7 @@ export class KontenLinesState {
         account: this.accountId() as Uuid,
         state: fs === 'ignored' ? 'ignored' : undefined,
         linked,
+        includeIgnored: fs === '' ? false : undefined,
         kind: this.kind() || undefined,
         q: this.searchQ().trim() || undefined,
         dateFrom: this.dateFrom() || undefined,
