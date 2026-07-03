@@ -14,6 +14,11 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read_all",
     "application.create",
     "application.transition",
+    # Force an application into ANY state directly, bypassing the flow guards and
+    # transitions. An audit-sensitive override (every use is logged as a forced
+    # status_change and is revertable). Kept SEPARATE from application.transition —
+    # grant deliberately.
+    "application.force_status",
     "application.manage",
     # Edit application data in ANY flow state — overrides the state edit lock.
     "application.edit_any",

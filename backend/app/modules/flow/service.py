@@ -24,6 +24,7 @@ from sqlalchemy import CursorResult, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application, StatusEvent
+from app.modules.applications.schemas import StateOut
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.principal import Principal
@@ -593,3 +594,132 @@ class FlowService:
             await self.session.refresh(app)
             await self.schedule_state_deadline(app, restored_state)
         return status_event_id
+
+    # --- force status (privileged override) ---
+    async def list_states(self, application_id: UUID) -> list[StateOut]:
+        """All states of the application's OWN flow version (for the force-status picker).
+
+        Scoped to ``app.flow_version_id`` — not the active global flow — so every
+        returned ``id`` is a valid target for :meth:`force_status` (a state row in the
+        same graph the application currently lives in; running applications may sit on an
+        older flow version). Ordered initial-first, then by key for a stable list."""
+        app = await self._load_app(application_id)
+        states = (
+            (
+                await self.session.execute(
+                    select(State)
+                    .where(State.flow_version_id == app.flow_version_id)
+                    .order_by(State.is_initial.desc(), State.key)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [
+            StateOut(
+                id=s.id,
+                key=s.key,
+                label=s.label_i18n,
+                color=s.color,
+                editAllowed=s.edit_allowed,
+                kind=s.kind,
+            )
+            for s in states
+        ]
+
+    async def force_status(
+        self,
+        application_id: UUID,
+        target_state_id: UUID,
+        principal: Principal,
+        *,
+        note: str,
+    ) -> TransitionResult:
+        """Force an application directly into ``target_state_id``, bypassing the flow.
+
+        The ``application.force_status`` override: no transition, no guard, no
+        ``from_state`` adjacency check. Mirrors the direct state flip of
+        :meth:`revert_status` — optimistic-locked ``UPDATE``, a transition-less
+        :class:`StatusEvent`, a ``status_change`` audit entry marked ``forced`` (itself
+        revertable), open-vote cancellation (so a vote state left by force does not hang
+        open) and deadline re-materialization. Deliberately fires NO applicant/task
+        notifications or webhooks — a manual override is silent.
+
+        404 if the target state does not belong to the application's flow; 409 if the
+        application has no current state, is already in the target state, or a concurrent
+        change moved it first."""
+        app = await self._load_app(application_id)
+        from_state_id = app.current_state_id
+        if from_state_id is None:
+            raise ConflictError(
+                "Application has no current state to change.", code="conflict"
+            )
+        target = await self._load_state(target_state_id)
+        if target is None or target.flow_version_id != app.flow_version_id:
+            raise NotFoundError(
+                "target state does not belong to this application's flow"
+            )
+        if target_state_id == from_state_id:
+            raise ConflictError(
+                "Application is already in the target state.", code="conflict"
+            )
+        # Optimistic locking as in fire()/revert_status — a concurrent transition has
+        # already moved the state → rowcount 0 → 409.
+        result = cast(
+            "CursorResult[Any]",
+            await self.session.execute(
+                update(Application)
+                .where(
+                    Application.id == app.id,
+                    Application.current_state_id == from_state_id,
+                )
+                .values(current_state_id=target_state_id)
+            ),
+        )
+        if result.rowcount != 1:
+            await self.session.rollback()
+            raise ConflictError(
+                "Concurrent status change detected; try again.", code="conflict"
+            )
+        event = StatusEvent(
+            application_id=app.id,
+            from_state_id=from_state_id,
+            to_state_id=target_state_id,
+            transition_id=None,
+            actor=principal.sub,
+            note=note,
+        )
+        self.session.add(event)
+        await self.session.flush()
+        status_event_id = event.id
+        # Leaving a (possibly vote) state by force: cancel open votes so none hangs open
+        # (its close() would otherwise find no branch in the new state — open forever).
+        await self._cancel_open_votes(app.id)
+        # Audit as a forced status_change (id-refs only, no PII/raw note). Carries both
+        # from/to state ids, so it is revertable from the audit log (undo a mistake).
+        await AuditService(self.session).record(
+            actor=principal.sub,
+            action=AuditAction.STATUS_CHANGE,
+            target_type="application",
+            target_id=str(app.id),
+            data={
+                "fromStateId": str(from_state_id),
+                "toStateId": str(target_state_id),
+                "transitionId": None,
+                "statusEventId": str(status_event_id),
+                "manual": True,
+                "hasNote": True,
+                "forced": True,
+            },
+        )
+        await self.session.commit()
+        # Materialize the new state's deadline, like fire().
+        to_state = await self._load_state(target_state_id)
+        if to_state is not None:
+            await self.session.refresh(app)
+            await self.schedule_state_deadline(app, to_state)
+        return TransitionResult(
+            newStateId=target_state_id,
+            statusEventId=status_event_id,
+            dispatchedActions=[],
+        )

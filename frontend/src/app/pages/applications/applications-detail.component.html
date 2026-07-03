@@ -10,10 +10,13 @@
   <header class="det__head">
     <div class="flex items-start justify-between gap-4 flex-wrap">
       <h1 class="m-0">{{ title() }}</h1>
-      @if (application.canEdit && !editing()) {
+      @if ((application.canEdit || canForceStatus()) && !editing()) {
         <div class="det__ownerActions">
-          @if (application.state?.editAllowed) {
+          @if (application.canEdit && application.state?.editAllowed) {
             <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
+          }
+          @if (canForceStatus()) {
+            <app-button variant="secondary" size="sm" (click)="openForceDialog()">{{ 'applications.detail.forceStatus' | t }}</app-button>
           }
           @if (isAdmin()) {
             <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
@@ -320,5 +323,42 @@
       [disabled]="budgetChoice() === (app()?.budgetId ?? '') && fiscalChoice() === (app()?.fiscalYearId ?? '')"
       (click)="assignBudget()"
     >{{ 'applications.budget.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Force status: privileged direct override (bypasses the flow). -->
+<app-dialog
+  [open]="forceDialogOpen()"
+  [title]="'applications.detail.forceStatusTitle' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="forceDialogOpen.set(false)"
+>
+  <p class="text-muted">{{ 'applications.detail.forceStatusLead' | t }}</p>
+  <app-select
+    [label]="'applications.detail.forceStatusField' | t"
+    [placeholder]="'applications.detail.forceStatusPlaceholder' | t"
+    [options]="forceStateOptions()"
+    [ngModel]="forceStateChoice()"
+    (ngModelChange)="forceStateChoice.set($event)"
+  />
+  <label class="det__forceReason">
+    <span>{{ 'applications.detail.forceStatusReason' | t }}</span>
+    <textarea
+      rows="3"
+      name="forceReason"
+      [placeholder]="'applications.detail.forceStatusReasonPlaceholder' | t"
+      [ngModel]="forceNote()"
+      (ngModelChange)="forceNote.set($event)"
+    ></textarea>
+  </label>
+  <div dialog-footer>
+    <app-button variant="ghost" size="sm" (click)="forceDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button
+      variant="danger"
+      size="sm"
+      [loading]="forcingStatus()"
+      [disabled]="!forceStateChoice() || !forceNote().trim()"
+      (click)="doForceStatus()"
+    >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button>
   </div>
 </app-dialog>

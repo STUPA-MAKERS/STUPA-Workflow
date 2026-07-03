@@ -344,6 +344,13 @@ export interface TransitionRequestBody {
   note?: string | null;
 }
 
+/** `POST /applications/{id}/force-status` — privileged direct status override.
+ *  `note` (reason) is mandatory: the change bypasses the flow and is audited. */
+export interface ForceStatusBody {
+  stateId: Uuid;
+  note: string;
+}
+
 /** `TransitionResult` — 200 response of a successful transition. */
 export interface TransitionResult {
   newStateId: Uuid;

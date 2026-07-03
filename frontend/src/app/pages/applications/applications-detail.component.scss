@@ -340,6 +340,38 @@ formly-form {
   outline-offset: 1px;
 }
 
+/* --- Force-status dialog: mandatory reason --- */
+.det__forceReason {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+
+  span {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-text-muted);
+  }
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: var(--border-width) solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    font: inherit;
+    font-size: var(--fs-sm);
+    line-height: 1.4;
+  }
+
+  textarea:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
+}
+
 /* --- Edit form: consistent vertical spacing --- */
 formly-form formly-field {
   display: block;
