@@ -36,7 +36,7 @@ export class KontenLinesState {
   readonly total = signal(0);
   readonly hasMore = computed(() => this.lines().length < this.total());
 
-  readonly filterState = signal<'' | 'open' | 'linked'>('');
+  readonly filterState = signal<'' | 'open' | 'linked' | 'ignored'>('');
   readonly kind = signal<'' | ExpenseKind>('');
   readonly searchQ = signal('');
   readonly dateFrom = signal('');
@@ -81,11 +81,14 @@ export class KontenLinesState {
   }
 
   private fetch(initial: boolean): void {
-    const linked =
-      this.filterState() === 'linked' ? true : this.filterState() === 'open' ? false : undefined;
+    // 'linked'/'open' map to the linked flag (matched vs unmatched+suggested,
+    // excludes ignored); 'ignored' filters the explicit state; '' = everything.
+    const fs = this.filterState();
+    const linked = fs === 'linked' ? true : fs === 'open' ? false : undefined;
     this.api
       .listStatementLines({
         account: this.accountId() as Uuid,
+        state: fs === 'ignored' ? 'ignored' : undefined,
         linked,
         kind: this.kind() || undefined,
         q: this.searchQ().trim() || undefined,
@@ -112,7 +115,7 @@ export class KontenLinesState {
       });
   }
 
-  setState(s: '' | 'open' | 'linked'): void {
+  setState(s: '' | 'open' | 'linked' | 'ignored'): void {
     this.filterState.set(s);
     this.reloadLines();
   }

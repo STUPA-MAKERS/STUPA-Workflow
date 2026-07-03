@@ -57,6 +57,7 @@ from app.modules.budget.tree_schemas import (
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
+    IgnoreLineRequest,
     InvoiceCreate,
     InvoiceFileResult,
     InvoiceOut,
@@ -905,12 +906,28 @@ async def confirm_statement_line(
 @router.post(
     "/statement-lines/{line_id}/ignore",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404),
+    dependencies=[Depends(require_principal("budget.reconcile_ignore"))],
+    responses=_errors(401, 403, 404, 422),
 )
-async def ignore_statement_line(line_id: UUID, service: BankServiceDep) -> None:
-    """Mark a transaction as irrelevant — it is kept (idempotent import)."""
-    await service.ignore_line(line_id)
+async def ignore_statement_line(
+    line_id: UUID, service: BankServiceDep, payload: IgnoreLineRequest | None = None
+) -> None:
+    """Mark a transaction as irrelevant — it is kept (idempotent import).
+
+    Gated by the dedicated ``budget.reconcile_ignore`` permission (audit-sensitive);
+    an optional ``reason`` is recorded in the audit log."""
+    await service.ignore_line(line_id, reason=payload.reason if payload else None)
+
+
+@router.post(
+    "/statement-lines/{line_id}/reactivate",
+    response_model=StatementLineOut,
+    dependencies=[Depends(require_principal("budget.reconcile_ignore"))],
+    responses=_errors(401, 403, 404, 422),
+)
+async def reactivate_statement_line(line_id: UUID, service: BankServiceDep) -> StatementLineOut:
+    """Undo an ignore: return an ignored transaction to the open reconcile queue."""
+    return await service.reactivate_line(line_id)
 
 
 @router.post(

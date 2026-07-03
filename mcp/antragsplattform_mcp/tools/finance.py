@@ -224,9 +224,20 @@ async def confirm_statement_line(line_id: str, confirm: S.ConfirmLineRequest) ->
 
 
 @group.tool
-async def ignore_statement_line(line_id: str) -> dict:
-    """Mark a staged transaction as irrelevant (kept for idempotent re-import). Requires budget.book."""
-    return await api().post(f"/statement-lines/{line_id}/ignore")
+async def ignore_statement_line(line_id: str, reason: str | None = None) -> dict:
+    """Mark a staged transaction as irrelevant (kept for idempotent re-import). ``reason`` is an
+    optional free-text note recorded in the audit log. Audit-sensitive — requires the dedicated
+    budget.reconcile_ignore permission."""
+    return await api().post(
+        f"/statement-lines/{line_id}/ignore", json={"reason": reason} if reason else None
+    )
+
+
+@group.tool
+async def reactivate_statement_line(line_id: str) -> dict:
+    """Undo an ignore (#konten): return an ignored transaction to the open reconcile queue
+    (``unmatched``). Requires budget.reconcile_ignore."""
+    return await api().post(f"/statement-lines/{line_id}/reactivate")
 
 
 @group.tool

@@ -224,8 +224,11 @@ class ReconcileOps(BankServiceBase):
         )
         await self.session.execute(stmt)
 
-    async def ignore_line(self, line_id: uuid.UUID) -> None:
-        """Mark a line as irrelevant — it is kept (idempotent import)."""
+    async def ignore_line(self, line_id: uuid.UUID, reason: str | None = None) -> None:
+        """Mark a line as irrelevant — it is kept (idempotent import).
+
+        ``reason`` (optional free text) is recorded in the audit entry only; this
+        is an audit-sensitive act gated by ``budget.reconcile_ignore``."""
         line = await self.session.get(BankStatementLine, line_id)
         if line is None:
             raise NotFoundError(f"statement line {line_id} not found")
@@ -247,8 +250,42 @@ class ReconcileOps(BankServiceBase):
             raise ValidationProblem(
                 "A matched statement line cannot be ignored.", code="line_already_matched"
             )
-        await self._audit(AuditAction.BANK_LINE_IGNORE, target_id=str(line_id))
+        clean_reason = (reason or "").strip()
+        await self._audit(
+            AuditAction.BANK_LINE_IGNORE,
+            target_id=str(line_id),
+            data={"reason": clean_reason} if clean_reason else None,
+        )
         await self.session.commit()
+
+    async def reactivate_line(self, line_id: uuid.UUID) -> StatementLineOut:
+        """Revert an ignored line back to ``unmatched`` so it re-enters the open
+        reconciliation queue. Audited (bank_line_reactivate)."""
+        line = await self.session.get(BankStatementLine, line_id)
+        if line is None:
+            raise NotFoundError(f"statement line {line_id} not found")
+        # Only an ignored line can be reactivated — never touch a matched
+        # (booked) or already-open line, so the reconcile state stays coherent.
+        claimed = (
+            await self.session.execute(
+                update(BankStatementLine)
+                .where(
+                    BankStatementLine.id == line_id,
+                    BankStatementLine.match_state == "ignored",
+                )
+                .values(match_state="unmatched")
+                .returning(BankStatementLine.id)
+            )
+        ).first()
+        if claimed is None:
+            raise ValidationProblem(
+                "Only an ignored statement line can be reactivated.",
+                code="line_not_ignored",
+            )
+        line.match_state = "unmatched"
+        await self._audit(AuditAction.BANK_LINE_REACTIVATE, target_id=str(line_id))
+        await self.session.commit()
+        return self._line_out(line, None)
 
     async def unlink_line(self, line_id: uuid.UUID) -> StatementLineOut:
         """Unlink line <-> booking: remove the ``bank_allocation`` and set the line

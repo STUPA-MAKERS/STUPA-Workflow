@@ -727,9 +727,17 @@ export class BudgetTreeApi {
   confirmStatementLine(lineId: Uuid, body: ConfirmLineBody): Observable<Expense> {
     return this.http.post<Expense>(`${this.base}/statement-lines/${lineId}/confirm`, body);
   }
-  /** Mark a statement line as irrelevant. */
-  ignoreStatementLine(lineId: Uuid): Observable<void> {
-    return this.http.post<void>(`${this.base}/statement-lines/${lineId}/ignore`, {});
+  /** Mark a statement line as irrelevant (P(``budget.reconcile_ignore``)); optional
+   * audit reason. */
+  ignoreStatementLine(lineId: Uuid, reason?: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/statement-lines/${lineId}/ignore`, {
+      reason: reason?.trim() || undefined,
+    });
+  }
+  /** Undo an ignore — the line returns to the open reconcile queue
+   * (P(``budget.reconcile_ignore``)). */
+  reactivateStatementLine(lineId: Uuid): Observable<StatementLine> {
+    return this.http.post<StatementLine>(`${this.base}/statement-lines/${lineId}/reactivate`, {});
   }
   /** Remove the statement-line<->booking link — the booking stays, the line reopens. */
   unlinkStatementLine(lineId: Uuid): Observable<StatementLine> {
