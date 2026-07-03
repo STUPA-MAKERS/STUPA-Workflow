@@ -286,6 +286,22 @@ async def test_delete_with_children_conflicts(session: AsyncSession) -> None:
         await svc.delete_node(top.id)
 
 
+async def test_delete_leaf_with_allocation_succeeds(session: AsyncSession) -> None:
+    """Regression: a childless cost centre that only carries an allocation (planning
+    figure) is deletable. The old guard blocked ANY node with an allocation row, and
+    since setting an allocation back to 0 keeps the row, such a leaf could never be
+    deleted."""
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"DA{_suffix()}", name="Top", gremiumId=g.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("500")))
+
+    await svc.delete_node(top.id)  # no children/bookings/apps → deletes cleanly
+
+    assert await session.get(Budget, top.id) is None  # allocation cascades away with it
+
+
 async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:
     """Fuzzy-Suche (#3) gegen echtes Postgres: pg_trgm filtert + rankt Buchungen.
 

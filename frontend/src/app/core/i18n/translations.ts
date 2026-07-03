@@ -1152,7 +1152,8 @@ export const de = {
   'budget.tree.toast.created': 'Kostenstelle angelegt.',
   'budget.tree.toast.failed': 'Aktion fehlgeschlagen.',
   'budget.tree.toast.deleted': 'Kostenstelle gelöscht.',
-  'budget.tree.toast.deleteFailed': 'Löschen fehlgeschlagen (nur ohne Kinder/Zuteilungen).',
+  'budget.tree.toast.deleteFailed':
+    'Löschen fehlgeschlagen (nur ohne Unter-Kostenstellen, Buchungen oder zugewiesene Anträge).',
   'budget.tree.toast.allocated': 'Zuteilung gespeichert.',
   'budget.tree.toast.stichtagSaved': 'Stichtag gespeichert.',
   'budget.tree.toast.fyCreated': 'Haushaltsjahr angelegt.',
@@ -3299,7 +3300,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.toast.created': 'Cost centre created.',
   'budget.tree.toast.failed': 'Action failed.',
   'budget.tree.toast.deleted': 'Cost centre deleted.',
-  'budget.tree.toast.deleteFailed': 'Delete failed (only without children/allocations).',
+  'budget.tree.toast.deleteFailed':
+    'Delete failed (only without sub cost centres, bookings or assigned applications).',
   'budget.tree.toast.allocated': 'Allocation saved.',
   'budget.tree.toast.stichtagSaved': 'Cutoff date saved.',
   'budget.tree.toast.fyCreated': 'Fiscal year created.',
