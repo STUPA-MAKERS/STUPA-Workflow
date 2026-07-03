@@ -99,7 +99,9 @@ def _stmt_account_ids(stmt: ET.Element) -> set[str]:
     if acct is None:
         return set()
     ids = {_norm_id(_find_text_local(acct, "IBAN"))}
-    ids.add(_norm_id(_find_text_local(_find_local(acct, "Othr"), "Id")))
+    # The proprietary account number is compared with leading zeros stripped —
+    # banks pad it inconsistently between the account list and the statement.
+    ids.add(_norm_id(_find_text_local(_find_local(acct, "Othr"), "Id")).lstrip("0"))
     return {i for i in ids if i}
 
 

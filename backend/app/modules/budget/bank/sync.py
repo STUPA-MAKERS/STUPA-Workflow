@@ -18,6 +18,7 @@ from sqlalchemy import delete
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.bank import client as fints_client
 from app.modules.budget.bank.client import (
+    FintsAccountSelectionError,
     FintsAuthRejectedError,
     FintsBankLockedError,
     FintsError,
@@ -133,6 +134,14 @@ class SyncOps(StagingOps):
                 "FinTS access was rejected or locked by the bank — do not retry.",
                 code=self._lock_code(exc),
             ) from exc
+        except FintsAccountSelectionError as exc:
+            # Ambiguous account (login has several, none matched the configured
+            # IBAN): a config problem, not a bank error — 422 with a clear code so
+            # the treasurer sets the IBAN, and NEVER a silently wrong fetch.
+            raise ValidationProblem(
+                "This account could not be matched at the bank — set its IBAN.",
+                code="fints_account_ambiguous",
+            ) from exc
         except FintsError as exc:
             # Do NOT pass the lib/bank error text to the client (may carry
             # sensitive data) — the client already logged it server-side.
@@ -189,6 +198,11 @@ class SyncOps(StagingOps):
             raise ConflictError(
                 "FinTS access was rejected or locked by the bank — do not retry.",
                 code=self._lock_code(exc),
+            ) from exc
+        except FintsAccountSelectionError as exc:
+            raise ValidationProblem(
+                "This account could not be matched at the bank — set its IBAN.",
+                code="fints_account_ambiguous",
             ) from exc
         except FintsError as exc:
             raise ServiceUnavailableError(

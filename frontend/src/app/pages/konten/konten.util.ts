@@ -24,6 +24,7 @@ const FINTS_ERROR_KEYS: Record<string, TranslationKey> = {
   fints_tan_expired: 'fints.errTanExpired',
   fints_bank_locked: 'fints.errBankLocked',
   fints_auth_rejected: 'fints.errAuthRejected',
+  fints_account_ambiguous: 'fints.errAccountAmbiguous',
 };
 
 /** Toast i18n key for a FinTS problem+json error (generic sync error fallback). */
