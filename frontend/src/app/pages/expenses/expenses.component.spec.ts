@@ -4,12 +4,13 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ExpensesComponent } from './expenses.component';
+import { ExpensesListState } from './expenses-list.state';
 import type {
   BudgetTreeNode,
   Expense,
@@ -237,6 +238,8 @@ function build(
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
+      provideRouter([]),
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: new Map() } } },
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book', 'budget.export']) },
     ],
@@ -1618,5 +1621,390 @@ describe('ExpensesComponent (infinite scroll)', () => {
 
     delete (globalThis as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
     http.verify();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Batch / bulk actions + cross-links + URL sync (#expenses-ux). The facade
+// members added on top of the state modules: selection, bulk delete/export/
+// reassign, ksLink and the query-param adoption + mirror effects.
+// ---------------------------------------------------------------------------
+
+/** Stub URL.createObjectURL/revokeObjectURL + anchor click for blob downloads. */
+function stubDownload(): { create: jest.SpyInstance; click: jest.SpyInstance; restore: () => void } {
+  (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
+  (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
+  const create = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
+  const revoke = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  return {
+    create,
+    click,
+    restore: () => {
+      create.mockRestore();
+      revoke.mockRestore();
+      click.mockRestore();
+    },
+  };
+}
+
+describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => {
+    try {
+      TestBed.inject(HttpTestingController).verify();
+    } catch {
+      /* module already reset */
+    }
+    jest.useRealTimers();
+  });
+
+  it('ksLink resolves the top budget node; null when the cost centre is unknown', () => {
+    const inTree: Expense = { ...EXPENSE, budgetId: 'child-1' };
+    const { cmp } = build({ tree: ROOT_TREE, expenses: page([inTree], 1) });
+    expect(cmp.ksLink(inTree)).toEqual({ budget: 'top-1', ks: 'child-1', fy: 'fy-1' });
+    // budgetId not part of the tree → no top node.
+    expect(cmp.ksLink(EXPENSE)).toEqual({ budget: null, ks: 'b-1', fy: 'fy-1' });
+  });
+
+  it('isSelected/toggleSelect add and remove a single row', () => {
+    const { cmp } = build();
+    expect(cmp.isSelected('e-1')).toBe(false);
+    cmp.toggleSelect('e-1', true);
+    expect(cmp.isSelected('e-1')).toBe(true);
+    expect(cmp.selectedCount()).toBe(1);
+    cmp.toggleSelect('e-1', false);
+    expect(cmp.isSelected('e-1')).toBe(false);
+    expect(cmp.selectedCount()).toBe(0);
+  });
+
+  it('toggleSelectAll selects/clears every current row; allSelected reflects it', () => {
+    const e2 = { ...EXPENSE, id: 'e-2' };
+    const { cmp } = build({ expenses: page([EXPENSE, e2], 2) });
+    expect(cmp.allSelected()).toBe(false);
+    cmp.toggleSelectAll(true);
+    expect([...cmp.selected()].sort()).toEqual(['e-1', 'e-2']);
+    expect(cmp.allSelected()).toBe(true);
+    cmp.toggleSelectAll(false);
+    expect(cmp.selectedCount()).toBe(0);
+    expect(cmp.allSelected()).toBe(false);
+  });
+
+  it('askBulk only opens the confirm dialog when something is selected', () => {
+    const { cmp } = build({ expenses: page([EXPENSE], 1) });
+    cmp.askBulk('delete'); // nothing selected → no-op
+    expect(cmp.bulkConfirm()).toBeNull();
+    cmp.toggleSelect('e-1', true);
+    cmp.askBulk('delete');
+    expect(cmp.bulkConfirm()).toBe('delete');
+  });
+
+  it('runBulk is a no-op while busy or without a pending action', () => {
+    const { cmp } = build({ expenses: page([EXPENSE], 1) });
+    cmp.runBulk(); // bulkConfirm null → nothing
+    cmp.toggleSelect('e-1', true);
+    cmp.bulkConfirm.set('delete');
+    cmp.bulkBusy.set(true);
+    cmp.runBulk(); // busy → nothing (no DELETE below)
+    // Direct empty-selection guards inside runBulkDelete / runBulkExport.
+    cmp.bulkBusy.set(false);
+    cmp.selected.set(new Set());
+    cmp.runBulk();
+    cmp.bulkConfirm.set('export');
+    cmp.runBulk(); // ids empty → no export request
+  });
+
+  it('runBulk delete removes the selected rows, refreshes and toasts', () => {
+    const e2 = { ...EXPENSE, id: 'e-2' };
+    const { cmp, http } = build({ expenses: page([EXPENSE, e2], 2) });
+    const { success } = toastSpies(cmp);
+    cmp.toggleSelect('e-1', true);
+    cmp.toggleSelect('e-2', true);
+    cmp.askBulk('delete');
+    cmp.runBulk();
+    http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE').flush(null);
+    http.expectOne((r) => r.url.endsWith('/budget-expenses/e-2') && r.method === 'DELETE').flush(null);
+    // afterBulk → list.refresh() → one GET /expenses (window reload).
+    flushList(http, page([], 0));
+    expect(cmp.bulkConfirm()).toBeNull();
+    expect(cmp.bulkBusy()).toBe(false);
+    expect(success).toHaveBeenCalledWith('2 Buchung(en) gelöscht.');
+    // prune effect empties the (now-stale) selection.
+    TestBed.tick();
+    expect(cmp.selectedCount()).toBe(0);
+  });
+
+  it('runBulk delete toasts an error and still refreshes on a failed delete', () => {
+    const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
+    const { error } = toastSpies(cmp);
+    cmp.toggleSelect('e-1', true);
+    cmp.askBulk('delete');
+    cmp.runBulk();
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE')
+      .error(new ProgressEvent('err'));
+    flushList(http, page([EXPENSE], 1));
+    expect(cmp.bulkBusy()).toBe(false);
+    expect(cmp.bulkConfirm()).toBeNull();
+    expect(error).toHaveBeenCalledWith('Sammel-Löschung fehlgeschlagen.');
+  });
+
+  it('runBulk export streams only the selected ids as xlsx', () => {
+    const dl = stubDownload();
+    const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
+    cmp.toggleSelect('e-1', true);
+    cmp.askBulk('export');
+    cmp.runBulk();
+    expect(cmp.bulkBusy()).toBe(true);
+    const req = http.expectOne((r) => r.url.endsWith('/expenses/export.xlsx'));
+    expect(req.request.params.getAll('ids')).toEqual(['e-1']);
+    expect(req.request.responseType).toBe('blob');
+    req.flush(new Blob(['x']));
+    expect(cmp.bulkBusy()).toBe(false);
+    expect(cmp.bulkConfirm()).toBeNull();
+    expect(dl.create).toHaveBeenCalled();
+    dl.restore();
+  });
+
+  it('runBulk export clears busy and toasts on error', () => {
+    const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
+    const { error } = toastSpies(cmp);
+    cmp.toggleSelect('e-1', true);
+    cmp.bulkConfirm.set('export');
+    cmp.runBulk();
+    http.expectOne((r) => r.url.endsWith('/expenses/export.xlsx')).error(new ProgressEvent('err'));
+    expect(cmp.bulkBusy()).toBe(false);
+    expect(cmp.bulkConfirm()).toBeNull();
+    expect(error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
+  });
+
+  it('canSubmitReassign requires a target budget or a category', () => {
+    const { cmp } = build();
+    expect(cmp.canSubmitReassign()).toBe(false);
+    cmp.bulkBudgetId.set('b-1');
+    expect(cmp.canSubmitReassign()).toBe(true);
+    cmp.bulkBudgetId.set('');
+    cmp.bulkCategory.set('   ');
+    expect(cmp.canSubmitReassign()).toBe(false);
+    cmp.bulkCategory.set('Werbung');
+    expect(cmp.canSubmitReassign()).toBe(true);
+  });
+
+  it('openBulkReassign only opens with a selection and resets the form', () => {
+    const { cmp } = build({ expenses: page([EXPENSE], 1) });
+    cmp.bulkBudgetId.set('stale');
+    cmp.bulkCategory.set('stale');
+    cmp.openBulkReassign(); // nothing selected → no-op
+    expect(cmp.bulkReassignOpen()).toBe(false);
+    cmp.toggleSelect('e-1', true);
+    cmp.openBulkReassign();
+    expect(cmp.bulkReassignOpen()).toBe(true);
+    expect(cmp.bulkBudgetId()).toBe('');
+    expect(cmp.bulkCategory()).toBe('');
+  });
+
+  it('runBulkReassign patches the cost centre for standalone rows only and refreshes', () => {
+    const bound = { ...EXPENSE, id: 'e-bound', applicationId: 'app-1' };
+    const { cmp, http } = build({ expenses: page([EXPENSE, bound], 2) });
+    const { success } = toastSpies(cmp);
+    cmp.toggleSelect('e-1', true);
+    cmp.toggleSelect('e-bound', true);
+    cmp.openBulkReassign();
+    cmp.bulkBudgetId.set('b-9');
+    cmp.bulkCategory.set('  Reise  ');
+    cmp.runBulkReassign();
+    // standalone → budgetId + category
+    const r1 = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH');
+    expect(r1.request.body).toEqual({ category: 'Reise', budgetId: 'b-9' });
+    r1.flush({ ...EXPENSE });
+    // bound → only category (cost centre inherited from the application)
+    const r2 = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-bound') && r.method === 'PATCH');
+    expect(r2.request.body).toEqual({ category: 'Reise' });
+    r2.flush({ ...bound });
+    flushList(http, page([EXPENSE, bound], 2));
+    expect(cmp.bulkBusy()).toBe(false);
+    expect(cmp.bulkReassignOpen()).toBe(false);
+    expect(success).toHaveBeenCalledWith('2 Buchung(en) aktualisiert.');
+  });
+
+  it('runBulkReassign moves the cost centre only (no category) when just a budget is set', () => {
+    const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
+    cmp.toggleSelect('e-1', true);
+    cmp.openBulkReassign();
+    cmp.bulkBudgetId.set('b-7'); // no category → the category branch stays false
+    cmp.runBulkReassign();
+    const req = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH');
+    expect(req.request.body).toEqual({ budgetId: 'b-7' });
+    req.flush({ ...EXPENSE });
+    flushList(http, page([EXPENSE], 1));
+    expect(cmp.bulkReassignOpen()).toBe(false);
+  });
+
+  it('runBulkReassign is a no-op without a selection, while busy or when nothing to submit', () => {
+    const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
+    cmp.runBulkReassign(); // empty selection
+    cmp.toggleSelect('e-1', true);
+    cmp.runBulkReassign(); // canSubmitReassign false (no budget/category)
+    cmp.bulkBudgetId.set('b-2');
+    cmp.bulkBusy.set(true);
+    cmp.runBulkReassign(); // busy
+    http.expectNone((r) => r.method === 'PATCH');
+  });
+
+  it('runBulkReassign toasts an error on a failed patch', () => {
+    const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
+    const { error } = toastSpies(cmp);
+    cmp.toggleSelect('e-1', true);
+    cmp.openBulkReassign();
+    cmp.bulkCategory.set('Reise');
+    cmp.runBulkReassign();
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH')
+      .error(new ProgressEvent('err'));
+    flushList(http, page([EXPENSE], 1));
+    expect(cmp.bulkBusy()).toBe(false);
+    expect(error).toHaveBeenCalledWith('Sammel-Umbuchung fehlgeschlagen.');
+  });
+
+  it('the selection-prune effect keeps live rows and drops vanished ones', () => {
+    const e2 = { ...EXPENSE, id: 'e-2' };
+    const { cmp } = build({ expenses: page([EXPENSE, e2], 2) });
+    cmp.selected.set(new Set(['e-1', 'e-2']));
+    TestBed.tick(); // all still present → selection kept
+    expect([...cmp.selected()].sort()).toEqual(['e-1', 'e-2']);
+    cmp.items.set([EXPENSE]); // e-2 vanished
+    TestBed.tick();
+    expect([...cmp.selected()]).toEqual(['e-1']);
+  });
+
+  it('mirrors the active filters into the URL query params', () => {
+    const { cmp } = build();
+    const router = TestBed.inject(Router);
+    const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    TestBed.tick(); // initial run: everything empty → nulls
+    expect(nav).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: { budget: null, account: null, kind: null, q: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      }),
+    );
+    cmp.budgetId.set('b-1');
+    cmp.accountId.set('a-2');
+    cmp.kind.set('income');
+    cmp.q.set('  flyer  ');
+    TestBed.tick();
+    expect(nav).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: { budget: 'b-1', account: 'a-2', kind: 'income', q: 'flyer' },
+      }),
+    );
+    nav.mockRestore();
+  });
+});
+
+describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => {
+    try {
+      TestBed.inject(HttpTestingController).verify();
+    } catch {
+      /* module already reset */
+    }
+  });
+
+  function buildWithQuery(query: [string, string][]): { cmp: ExpensesComponent; http: HttpTestingController } {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: new Map(query) } } },
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const cmp = TestBed.runInInjectionContext(() => new ExpensesComponent());
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
+    http.expectOne((r) => r.url.endsWith('/accounts/options')).flush([]);
+    http
+      .expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET')
+      .flush({ items: [], total: 0, limit: 200, offset: 0 });
+    // Filters present → applyQueryParams() returns true → a SECOND reload fires,
+    // so there are two GET /expenses in flight.
+    http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET').forEach((req) => req.flush(page([])));
+    return { cmp, http };
+  }
+
+  it('adopts budget/account/kind/q filters from the URL and reloads', () => {
+    const { cmp } = buildWithQuery([
+      ['budget', 'b-1'],
+      ['account', 'a-9'],
+      ['kind', 'income'],
+      ['q', 'foo'],
+    ]);
+    expect(cmp.budgetId()).toBe('b-1');
+    expect(cmp.accountId()).toBe('a-9');
+    expect(cmp.kind()).toBe('income');
+    expect(cmp.q()).toBe('foo');
+  });
+
+  it('ignores an unrecognised kind but still adopts the other filters', () => {
+    const { cmp } = buildWithQuery([
+      ['kind', 'weird'],
+      ['budget', 'b-2'],
+    ]);
+    expect(cmp.kind()).toBe(''); // invalid value not applied
+    expect(cmp.budgetId()).toBe('b-2');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ExpensesListState.refresh() in isolation — the post-mutation window reload.
+// ---------------------------------------------------------------------------
+describe('ExpensesListState.refresh (#expenses-ux)', () => {
+  afterEach(() => {
+    try {
+      TestBed.inject(HttpTestingController).verify();
+    } catch {
+      /* module already reset */
+    }
+  });
+
+  function buildState(): { state: ExpensesListState; http: HttpTestingController } {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const state = TestBed.runInInjectionContext(() => new ExpensesListState());
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
+    http.expectOne((r) => r.url.endsWith('/accounts/options')).flush([]);
+    http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
+    return { state, http };
+  }
+
+  it('early-returns a concurrent refresh and clears the flag on success', () => {
+    const { state, http } = buildState();
+    state.refresh();
+    state.refresh(); // refreshing() already true → early return, no second request
+    const reqs = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    expect(reqs.length).toBe(1);
+    reqs[0].flush(page([EXPENSE], 1));
+    expect(state.refreshing()).toBe(false);
+    expect(state.items()).toEqual([EXPENSE]);
+  });
+
+  it('clears the refreshing flag on an error', () => {
+    const { state, http } = buildState();
+    state.refresh();
+    http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').error(new ProgressEvent('err'));
+    expect(state.refreshing()).toBe(false);
   });
 });

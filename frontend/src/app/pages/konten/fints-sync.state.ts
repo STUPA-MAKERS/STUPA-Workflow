@@ -183,7 +183,7 @@ export class FintsSyncState {
         duplicates: String(res.duplicates),
       }),
     );
-    this.lines.reloadLines();
+    this.lines.refresh();
     this.loadCredStatus(this.lines.accountId());
     this.lines.refreshAccounts();
   }

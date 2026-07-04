@@ -34,6 +34,8 @@ export class ExpensesListState {
   readonly hasMore = computed(() => this.items().length < this.total());
   /** Shared in-flight flag for every mutating dialog (create/edit/delete/sub/transfer). */
   readonly saving = signal(false);
+  /** Post-mutation refresh in flight: the list stays visible, only `aria-busy` (#expenses-ux). */
+  readonly refreshing = signal(false);
 
   readonly kind = signal<'' | ExpenseKind>('');
   readonly q = signal('');
@@ -157,22 +159,45 @@ export class ExpensesListState {
     this.fetch(false);
   }
 
+  /** Active filters as the shared query part for {@link fetch} and {@link refresh}. */
+  private filterParams() {
+    return {
+      budget: this.budgetId() || undefined,
+      account: this.accountId() || undefined,
+      kind: this.kind() || undefined,
+      q: this.q().trim() || undefined,
+      amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,
+      amountMax: this.amountMax().trim() ? Number(this.amountMax()) : undefined,
+      createdFrom: this.createdFrom() || undefined,
+      createdTo: this.createdTo() || undefined,
+      sort: this.sortField(),
+      order: this.sortOrder(),
+    };
+  }
+
+  /** Post-mutation: refetch the currently-loaded window (offset 0, one request) and
+   *  atomic-replace the list — no clear, no `loading` flip → the table stays mounted and
+   *  scroll position + all infinite-scroll pages survive (#expenses-ux). */
+  refresh(): void {
+    if (this.refreshing()) return;
+    const windowLimit = Math.max(this.PAGE, Math.ceil(this.items().length / this.PAGE) * this.PAGE);
+    this.refreshing.set(true);
+    this.api
+      .listExpenses({ ...this.filterParams(), limit: windowLimit, offset: 0 })
+      .subscribe({
+        next: (page) => {
+          this.total.set(page.total);
+          this.items.set(page.items);
+          this.nextOffset = page.offset + page.items.length;
+          this.refreshing.set(false);
+        },
+        error: () => this.refreshing.set(false),
+      });
+  }
+
   private fetch(initial: boolean): void {
     this.api
-      .listExpenses({
-        budget: this.budgetId() || undefined,
-        account: this.accountId() || undefined,
-        kind: this.kind() || undefined,
-        q: this.q().trim() || undefined,
-        amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,
-        amountMax: this.amountMax().trim() ? Number(this.amountMax()) : undefined,
-        createdFrom: this.createdFrom() || undefined,
-        createdTo: this.createdTo() || undefined,
-        sort: this.sortField(),
-        order: this.sortOrder(),
-        limit: this.PAGE,
-        offset: this.nextOffset,
-      })
+      .listExpenses({ ...this.filterParams(), limit: this.PAGE, offset: this.nextOffset })
       .subscribe({
         next: (page) => {
           this.total.set(page.total);

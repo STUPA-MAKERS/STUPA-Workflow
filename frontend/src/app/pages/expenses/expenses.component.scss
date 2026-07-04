@@ -325,3 +325,59 @@ input.exp__input {
 .exp__subRow:hover > td {
   background: var(--color-surface-sunken);
 }
+
+/* --- Sticky Action-Spalte (#expenses-ux) ---
+   Rechteste Spalte am Rand angepinnt, damit die Aktionen ohne Horizontal-Scroll
+   erreichbar bleiben. Nur Desktop — mobil (≤768px) greift der Karten-Reflow oben
+   (overflow-x: visible), dort wäre sticky sinnlos. */
+@media (min-width: 769px) {
+  .exp__table th.exp__stickyCol,
+  .exp__table td.exp__stickyCol {
+    position: sticky;
+    right: 0;
+    box-shadow: -6px 0 6px -6px color-mix(in srgb, var(--color-text) 22%, transparent);
+  }
+  /* Zellen müssen deckend sein, um darunter durchscrollende Spalten zu verdecken. */
+  .exp__table td.exp__stickyCol {
+    background: var(--color-surface);
+    z-index: 1;
+  }
+  .exp__table th.exp__stickyCol {
+    background: var(--color-surface-sunken);
+    z-index: 2;
+  }
+  /* Reihenfolge-sensitiv: Hover-/Unterbuchungs-Overrides MÜSSEN nach der generischen
+     Zell-Regel stehen (gleiche Spezifität → Quelltext-Reihenfolge entscheidet). */
+  .exp__table tbody tr:hover td.exp__stickyCol {
+    background: var(--color-surface-sunken);
+  }
+  .exp__subRow > td.exp__stickyCol {
+    background: var(--color-surface-sunken);
+  }
+}
+
+/* --- Batch / Sammel-Aktionen (#expenses-ux) --- */
+.exp__bulkbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.exp__bulkcount {
+  font-weight: var(--fw-semibold);
+  margin-inline-end: auto;
+}
+.exp__check {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+@media (max-width: 768px) {
+  /* In der Karten-Ansicht die Checkbox nach vorne ziehen. */
+  .exp__check { order: -4; flex: 0 0 auto; }
+}

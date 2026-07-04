@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -78,6 +78,7 @@ interface UsageRow {
     BudgetSunburstComponent,
     DialogComponent,
     ApplicationsTableComponent,
+    RouterLink,
   ],
   templateUrl: './budget-dashboard.component.html',
   styleUrl: './budget-dashboard.component.scss',

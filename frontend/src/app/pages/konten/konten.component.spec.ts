@@ -10,6 +10,7 @@ import { render, screen } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { KontenComponent } from './konten.component';
+import { KontenLinesState } from './konten-lines.state';
 import { PALETTE } from '../budget/budget-year-tree.component';
 import type {
   AccountOption,
@@ -1408,5 +1409,190 @@ describe('KontenComponent (infinite scroll)', () => {
 
     delete (globalThis as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
     http.verify();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Batch / bulk actions + cross-links (#expenses-ux): selection, unlink/ignore
+// in bulk, the match-state subset computeds and the bookingLink deep-link.
+// ---------------------------------------------------------------------------
+
+const LINE_SUGGESTED: StatementLine = { ...LINE, id: 'l-4', matchState: 'suggested' };
+
+describe('KontenComponent (batch/bulk #expenses-ux)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => {
+    try {
+      TestBed.inject(HttpTestingController).verify();
+    } catch {
+      /* module already reset */
+    }
+    jest.useRealTimers();
+  });
+
+  it('bookingLink prefers reference, then endToEndId, then purpose', () => {
+    const { cmp } = build();
+    expect(cmp.bookingLink(LINE)).toEqual({ account: 'a-1', q: 'Miete Mai' }); // purpose
+    expect(cmp.bookingLink({ ...LINE, reference: 'RF-1' })).toEqual({ account: 'a-1', q: 'RF-1' });
+    expect(cmp.bookingLink({ ...LINE, purpose: null, endToEndId: 'E2E-9' })).toEqual({
+      account: 'a-1',
+      q: 'E2E-9',
+    });
+    expect(
+      cmp.bookingLink({ ...LINE, purpose: null, reference: null, endToEndId: null }),
+    ).toEqual({ account: 'a-1', q: null });
+  });
+
+  it('isSelected/toggleSelect/toggleSelectAll manage the selection', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    cmp.reloadLines();
+    flushLines(http, linePage([LINE, LINE_SUGGESTED, LINE_MATCHED, LINE_IGNORED], 4));
+    expect(cmp.isSelected('l-1')).toBe(false);
+    cmp.toggleSelect('l-1', true);
+    expect(cmp.isSelected('l-1')).toBe(true);
+    cmp.toggleSelect('l-1', false);
+    expect(cmp.selectedCount()).toBe(0);
+    expect(cmp.allSelected()).toBe(false);
+    cmp.toggleSelectAll(true);
+    expect(cmp.selectedCount()).toBe(4);
+    expect(cmp.allSelected()).toBe(true);
+    // subset computeds by match state
+    expect(cmp.selectedMatched()).toBe(1); // l-2
+    expect(cmp.selectedIgnorable()).toBe(2); // l-1 unmatched + l-4 suggested
+    cmp.toggleSelectAll(false);
+    expect(cmp.selectedCount()).toBe(0);
+  });
+
+  it('askBulk opens only when the relevant subset is non-empty', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    cmp.reloadLines();
+    flushLines(http, linePage([LINE], 1)); // unmatched only
+    cmp.toggleSelect('l-1', true);
+    cmp.askBulk('unlink'); // selectedMatched 0 → no-op
+    expect(cmp.bulkConfirm()).toBeNull();
+    cmp.askBulk('ignore'); // selectedIgnorable 1 → opens
+    expect(cmp.bulkConfirm()).toBe('ignore');
+  });
+
+  it('runBulk unlink releases the matched lines, refreshes and toasts', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    const success = jest.spyOn(priv(cmp).toast, 'success');
+    cmp.reloadLines();
+    flushLines(http, linePage([LINE_MATCHED], 1));
+    cmp.toggleSelect('l-2', true);
+    cmp.askBulk('unlink');
+    cmp.runBulk();
+    http
+      .expectOne((r) => r.url.endsWith('/statement-lines/l-2/unlink') && r.method === 'POST')
+      .flush({ ...LINE_MATCHED, matchState: 'unmatched' });
+    flushLines(http, linePage([])); // afterBulk → refresh
+    expect(cmp.bulkConfirm()).toBeNull();
+    expect(cmp.bulkBusy()).toBe(false);
+    expect(success).toHaveBeenCalledWith('1 Zuordnung(en) gelöst.');
+    TestBed.tick(); // prune effect empties the stale selection
+    expect(cmp.selectedCount()).toBe(0);
+  });
+
+  it('runBulk ignore covers unmatched and suggested lines', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    const success = jest.spyOn(priv(cmp).toast, 'success');
+    cmp.reloadLines();
+    flushLines(http, linePage([LINE, LINE_SUGGESTED], 2));
+    cmp.toggleSelectAll(true);
+    cmp.askBulk('ignore');
+    expect(cmp.bulkConfirm()).toBe('ignore');
+    cmp.runBulk();
+    http.expectOne((r) => r.url.endsWith('/statement-lines/l-1/ignore') && r.method === 'POST').flush(null);
+    http.expectOne((r) => r.url.endsWith('/statement-lines/l-4/ignore') && r.method === 'POST').flush(null);
+    flushLines(http, linePage([]));
+    expect(success).toHaveBeenCalledWith('2 Umsatz/Umsätze ignoriert.');
+    TestBed.tick();
+    expect(cmp.selectedCount()).toBe(0);
+  });
+
+  it('runBulk is a no-op without a pending action, while busy or with no eligible line', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    cmp.reloadLines();
+    flushLines(http, linePage([LINE], 1)); // unmatched
+    cmp.runBulk(); // bulkConfirm null → nothing
+    cmp.bulkConfirm.set('unlink');
+    cmp.bulkBusy.set(true);
+    cmp.runBulk(); // busy → nothing
+    cmp.bulkBusy.set(false);
+    cmp.toggleSelect('l-1', true);
+    cmp.bulkConfirm.set('unlink'); // unmatched line → no matched-eligible row
+    cmp.runBulk();
+    expect(cmp.bulkConfirm()).toBeNull(); // eligible-empty branch resets the dialog
+    http.expectNone((r) => r.url.endsWith('/unlink'));
+  });
+
+  it('afterBulk toasts an error and still refreshes on a failed bulk op', () => {
+    const { cmp, http } = build({ accounts: [ACC] });
+    const error = jest.spyOn(priv(cmp).toast, 'error');
+    cmp.reloadLines();
+    flushLines(http, linePage([LINE_MATCHED], 1));
+    cmp.toggleSelect('l-2', true);
+    cmp.askBulk('unlink');
+    cmp.runBulk();
+    http.expectOne((r) => r.url.endsWith('/statement-lines/l-2/unlink')).error(new ProgressEvent('err'));
+    flushLines(http, linePage([])); // refresh still runs
+    expect(cmp.bulkBusy()).toBe(false);
+    expect(cmp.bulkConfirm()).toBeNull();
+    expect(error).toHaveBeenCalledWith('Sammel-Aktion fehlgeschlagen.');
+    TestBed.tick();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// KontenLinesState.refresh() in isolation — the post-mutation window reload.
+// ---------------------------------------------------------------------------
+describe('KontenLinesState.refresh (#expenses-ux)', () => {
+  afterEach(() => {
+    try {
+      TestBed.inject(HttpTestingController).verify();
+    } catch {
+      /* module already reset */
+    }
+  });
+
+  function buildState(accounts: AccountOption[]): { state: KontenLinesState; http: HttpTestingController } {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const state = TestBed.runInInjectionContext(() => new KontenLinesState());
+    http.expectOne((r) => r.url.endsWith('/accounts/options')).flush(accounts);
+    return { state, http };
+  }
+
+  it('is a no-op without a selected account', () => {
+    const { state, http } = buildState([]);
+    expect(state.accountId()).toBe('');
+    state.refresh();
+    http.expectNone((r) => r.url.endsWith('/statement-lines'));
+  });
+
+  it('early-returns a concurrent refresh and clears the flag on success', () => {
+    const { state, http } = buildState([ACC]); // refreshAccounts selects a-1
+    state.refresh();
+    state.refresh(); // refreshing() already true → early return
+    const reqs = http.match((r) => r.url.endsWith('/statement-lines') && r.method === 'GET');
+    expect(reqs.length).toBe(1);
+    reqs[0].flush(linePage([LINE], 1));
+    expect(state.refreshing()).toBe(false);
+    expect(state.lines()).toEqual([LINE]);
+  });
+
+  it('clears the refreshing flag on an error', () => {
+    const { state, http } = buildState([ACC]);
+    state.refresh();
+    http
+      .expectOne((r) => r.url.endsWith('/statement-lines') && r.method === 'GET')
+      .error(new ProgressEvent('err'));
+    expect(state.refreshing()).toBe(false);
   });
 });

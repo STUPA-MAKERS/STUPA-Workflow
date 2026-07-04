@@ -91,17 +91,34 @@
   </aside>
 
   <div class="exp__main">
-    @if (loadingLines()) {
+    @if (loadingLines() && !lines().length) {
       <p class="exp__status" aria-live="polite">{{ 'fints.loading' | t }}</p>
     } @else if (!selectedAccount()) {
       <div class="empty-state">{{ 'konten.pickAccount' | t }}</div>
     } @else if (!lines().length) {
       <div class="empty-state">{{ (activeFilterCount() || searchQ() ? 'fints.emptyFiltered' : 'konten.empty') | t }}</div>
     } @else {
-      <div class="exp__tableWrap">
+      @if ((canBook() || canIgnore()) && selectedCount()) {
+        <div class="exp__bulkbar">
+          <span class="exp__bulkcount">{{ 'konten.bulk.selectedCount' | t: { count: selectedCount() } }}</span>
+          @if (canBook() && selectedMatched()) {
+            <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="askBulk('unlink')">{{ 'konten.bulk.unlinkSelected' | t }}</app-button>
+          }
+          @if (canIgnore() && selectedIgnorable()) {
+            <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="askBulk('ignore')">{{ 'konten.bulk.ignoreSelected' | t }}</app-button>
+          }
+          <app-button variant="ghost" size="sm" (click)="toggleSelectAll(false)">{{ 'konten.bulk.clear' | t }}</app-button>
+        </div>
+      }
+      <div class="exp__tableWrap" appHScrollSync [attr.aria-busy]="refreshing()">
         <table class="exp__table">
           <thead>
             <tr>
+              @if (canBook() || canIgnore()) {
+                <th scope="col" class="exp__check">
+                  <app-checkbox [ngModel]="allSelected()" (ngModelChange)="toggleSelectAll($event)" [attr.aria-label]="'expenses.bulk.selectAll' | t" />
+                </th>
+              }
               <th scope="col" [attr.aria-sort]="ariaSort('date')">
                 <button type="button" class="exp__sort" (click)="onSort('date')">{{ 'fints.col.date' | t }}{{ sortInd('date') }}</button>
               </th>
@@ -111,12 +128,17 @@
               <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
                 <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'fints.col.amount' | t }}{{ sortInd('amount') }}</button>
               </th>
-              <th scope="col" class="exp__num"></th>
+              <th scope="col" class="exp__num exp__stickyCol"></th>
             </tr>
           </thead>
           <tbody>
             @for (line of lines(); track line.id) {
               <tr [class.exp__tr--income]="line.kind === 'income'">
+                @if (canBook() || canIgnore()) {
+                  <td class="exp__check">
+                    <app-checkbox [ngModel]="isSelected(line.id)" (ngModelChange)="toggleSelect(line.id, $event)" [attr.aria-label]="line.purpose || line.counterpartyName || ''" />
+                  </td>
+                }
                 <td class="exp__cellDate">{{ (line.valueDate || line.bookingDate) ? ((line.valueDate || line.bookingDate) | ldate: 'mediumDate') : '—' }}</td>
                 <td class="exp__cellKind">
                   <app-badge [variant]="line.kind === 'income' ? 'success' : 'neutral'">{{ (line.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-badge>
@@ -130,9 +152,14 @@
                   @if (cp.iban) { <span class="exp__mono block">{{ cp.iban }}</span> }
                   @if (!cp.name && !cp.iban) { — }
                 </td>
-                <td class="exp__cellDesc">{{ line.purpose || '—' }}</td>
+                <td class="exp__cellDesc">
+                  {{ line.purpose || '—' }}
+                  @if (line.matchState === 'matched') {
+                    <a class="exp__appLink block" [routerLink]="['/expenses']" [queryParams]="bookingLink(line)">{{ 'konten.viewBooking' | t }}</a>
+                  }
+                </td>
                 <td class="exp__num exp__amount" [class.exp__amount--income]="line.kind === 'income'">{{ signedMoney(line) }}</td>
-                <td class="exp__num">
+                <td class="exp__num exp__stickyCol">
                   @if (canBook() || canIgnore()) {
                     <span class="exp__actions">
                       @if (line.matchState === 'matched') {
@@ -315,6 +342,24 @@
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="closeLink()">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" [loading]="booking()" [disabled]="!linkSelected()" (click)="confirmLink()">{{ 'konten.action.link' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Sammel-Trennen (Bestätigung) -->
+<app-dialog [open]="bulkConfirm() === 'unlink'" [title]="'konten.bulk.unlinkTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="bulkConfirm.set(null)">
+  <p>{{ 'konten.bulk.unlinkBody' | t: { count: selectedMatched() } }}</p>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="bulkConfirm.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="bulkBusy()" (click)="runBulk()">{{ 'konten.bulk.unlinkConfirm' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Sammel-Ignorieren (Bestätigung) -->
+<app-dialog [open]="bulkConfirm() === 'ignore'" [title]="'konten.bulk.ignoreTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="bulkConfirm.set(null)">
+  <p>{{ 'konten.bulk.ignoreBody' | t: { count: selectedIgnorable() } }}</p>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="bulkConfirm.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="bulkBusy()" (click)="runBulk()">{{ 'konten.bulk.ignoreConfirm' | t }}</app-button>
   </div>
 </app-dialog>
 

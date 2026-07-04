@@ -98,7 +98,7 @@ export class ExpenseSubBookingsState {
         this.toast.success(
           this.i18n.translate('expenses.sub.imported', { count: String(children.length) }),
         );
-        this.list.reload();
+        this.list.refresh();
       },
       error: (err) => {
         this.subImporting.update((s) => {
@@ -152,7 +152,7 @@ export class ExpenseSubBookingsState {
           this.expandedSub.update((s) => new Set(s).add(parent.id));
           this.loadSub(parent.id);
           this.toast.success(this.i18n.translate('expenses.sub.added'));
-          this.list.reload();
+          this.list.refresh();
         },
         error: () => {
           this.list.saving.set(false);

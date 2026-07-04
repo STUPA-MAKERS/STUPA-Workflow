@@ -32,6 +32,8 @@ export class KontenLinesState {
 
   readonly lines = signal<StatementLine[]>([]);
   readonly loadingLines = signal(false);
+  /** Post-mutation refresh in flight: the list stays visible, only `aria-busy` (#expenses-ux). */
+  readonly refreshing = signal(false);
   readonly loadingMore = signal(false);
   readonly total = signal(0);
   readonly hasMore = computed(() => this.lines().length < this.total());
@@ -80,27 +82,50 @@ export class KontenLinesState {
     this.fetch(false);
   }
 
-  private fetch(initial: boolean): void {
-    // 'linked'/'open' map to the linked flag (matched vs unmatched+suggested,
-    // excludes ignored); 'ignored' filters the explicit state; '' = Alle, which
-    // shows matched + open but hides set-aside (ignored) lines.
+  /** Active filters as the shared query part for {@link fetch} and {@link refresh}.
+   *  'linked'/'open' map to the linked flag (matched vs unmatched+suggested, excludes
+   *  ignored); 'ignored' filters the explicit state; '' = Alle, which shows matched +
+   *  open but hides set-aside (ignored) lines. */
+  private lineQuery() {
     const fs = this.filterState();
     const linked = fs === 'linked' ? true : fs === 'open' ? false : undefined;
+    return {
+      account: this.accountId() as Uuid,
+      state: fs === 'ignored' ? 'ignored' : undefined,
+      linked,
+      includeIgnored: fs === '' ? false : undefined,
+      kind: this.kind() || undefined,
+      q: this.searchQ().trim() || undefined,
+      dateFrom: this.dateFrom() || undefined,
+      dateTo: this.dateTo() || undefined,
+      sort: this.sortField(),
+      order: this.sortOrder(),
+    };
+  }
+
+  /** Post-mutation: refetch the currently-loaded window (offset 0, one request) and
+   *  atomic-replace the list — no clear, no `loadingLines` flip → the table stays mounted
+   *  and scroll position survives (#expenses-ux). */
+  refresh(): void {
+    if (!this.accountId() || this.refreshing()) return;
+    const windowLimit = Math.max(this.PAGE, Math.ceil(this.lines().length / this.PAGE) * this.PAGE);
+    this.refreshing.set(true);
     this.api
-      .listStatementLines({
-        account: this.accountId() as Uuid,
-        state: fs === 'ignored' ? 'ignored' : undefined,
-        linked,
-        includeIgnored: fs === '' ? false : undefined,
-        kind: this.kind() || undefined,
-        q: this.searchQ().trim() || undefined,
-        dateFrom: this.dateFrom() || undefined,
-        dateTo: this.dateTo() || undefined,
-        sort: this.sortField(),
-        order: this.sortOrder(),
-        limit: this.PAGE,
-        offset: this.nextOffset,
-      })
+      .listStatementLines({ ...this.lineQuery(), limit: windowLimit, offset: 0 })
+      .subscribe({
+        next: (page) => {
+          this.total.set(page.total);
+          this.lines.set(page.items);
+          this.nextOffset = page.offset + page.items.length;
+          this.refreshing.set(false);
+        },
+        error: () => this.refreshing.set(false),
+      });
+  }
+
+  private fetch(initial: boolean): void {
+    this.api
+      .listStatementLines({ ...this.lineQuery(), limit: this.PAGE, offset: this.nextOffset })
       .subscribe({
         next: (page) => {
           this.total.set(page.total);

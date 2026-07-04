@@ -268,7 +268,7 @@ export class ExpenseDialogsState {
           this.createOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.toast.created'));
           this.loadInvoices();
-          this.list.reload();
+          this.list.refresh();
         },
         error: (err) => {
           this.list.saving.set(false);
@@ -350,7 +350,7 @@ export class ExpenseDialogsState {
           if (e.parentExpenseId) {
             // Sub-booking edited: refresh the parent panel + parent amount.
             this.sub.loadSub(e.parentExpenseId);
-            this.list.reload();
+            this.list.refresh();
           } else {
             // childCount/parentExpenseId are unreliable in the single-item
             // response → keep them from the known row.
@@ -387,7 +387,7 @@ export class ExpenseDialogsState {
         if (e.parentExpenseId) {
           // Sub-booking deleted: refresh the parent panel + parent amount.
           this.sub.loadSub(e.parentExpenseId);
-          this.list.reload();
+          this.list.refresh();
         } else {
           this.list.items.update((rows) => rows.filter((x) => x.id !== e.id));
           this.list.total.update((t) => Math.max(0, t - 1));
@@ -450,7 +450,7 @@ export class ExpenseDialogsState {
           this.list.saving.set(false);
           this.transferOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.transferToast'));
-          this.list.reload();
+          this.list.refresh();
         },
         error: (err) => {
           this.list.saving.set(false);

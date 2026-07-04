@@ -10,6 +10,9 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { from } from 'rxjs';
+import { concatMap } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
@@ -17,6 +20,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  CheckboxComponent,
   DatepickerComponent,
   DialogComponent,
   FilterBarComponent,
@@ -27,18 +31,21 @@ import {
   SelectComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import type {
-  AccountOption,
-  Expense,
-  ExpenseKind,
-  StatementLine,
+import {
+  type AccountOption,
+  BudgetTreeApi,
+  type Expense,
+  type ExpenseKind,
+  type StatementLine,
 } from '../budget/budget-tree.api';
+import type { Uuid } from '@core/api/models';
 import { PALETTE } from '../budget/budget-year-tree.component';
 import { ariaSortDir, formatEur, sortIndicator } from '../budget/expense-display.util';
 import { splitCounterparty } from './konten.util';
 import { FintsSyncState } from './fints-sync.state';
 import { KontenLinesState, type StatementSortField } from './konten-lines.state';
 import { KontenReconcileState } from './konten-reconcile.state';
+import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
 
 /**
  * Accounts tab: per bank account all fetched transactions + balance; each line
@@ -63,6 +70,9 @@ import { KontenReconcileState } from './konten-reconcile.state';
     IconComponent,
     InputComponent,
     SelectComponent,
+    CheckboxComponent,
+    HScrollSyncDirective,
+    RouterLink,
   ],
   templateUrl: './konten.component.html',
   styleUrl: './konten.component.scss',
@@ -73,6 +83,7 @@ export class KontenComponent implements OnDestroy {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly api = inject(BudgetTreeApi);
 
   private readonly linesState = new KontenLinesState();
   private readonly sync = new FintsSyncState(this.linesState, this.host);
@@ -104,6 +115,30 @@ export class KontenComponent implements OnDestroy {
   readonly sortField = this.linesState.sortField;
   readonly sortOrder = this.linesState.sortOrder;
   readonly activeFilterCount = this.linesState.activeFilterCount;
+  readonly refreshing = this.linesState.refreshing;
+
+  // --- batch / bulk actions (#expenses-ux) ---
+  readonly selected = signal<ReadonlySet<Uuid>>(new Set());
+  readonly bulkBusy = signal(false);
+  readonly selectedCount = computed(() => this.selected().size);
+  readonly allSelected = computed(() => {
+    const list = this.lines();
+    return list.length > 0 && list.every((l) => this.selected().has(l.id));
+  });
+  /** Selection subsets by match state → drive which bulk button is active. */
+  readonly selectedMatched = computed(
+    () =>
+      this.lines().filter((l) => this.selected().has(l.id) && l.matchState === 'matched').length,
+  );
+  readonly selectedIgnorable = computed(
+    () =>
+      this.lines().filter(
+        (l) =>
+          this.selected().has(l.id) &&
+          (l.matchState === 'unmatched' || l.matchState === 'suggested'),
+      ).length,
+  );
+  readonly bulkConfirm = signal<null | 'unlink' | 'ignore'>(null);
 
   // --- FinTS state (FintsSyncState) --------------------------------------------
   readonly credStatus = this.sync.credStatus;
@@ -154,6 +189,13 @@ export class KontenComponent implements OnDestroy {
         this.linesState.reloadLines();
         this.sync.loadCredStatus(acc);
       }
+    });
+    // Keep the bulk selection pruned to rows that still exist (after refresh/reload/account switch).
+    effect(() => {
+      const ids = new Set(this.lines().map((l) => l.id));
+      this.selected.update((cur) =>
+        [...cur].every((x) => ids.has(x)) ? cur : new Set([...cur].filter((x) => ids.has(x))),
+      );
     });
     // Infinite scroll: sentinel at the table end → next page.
     effect((onCleanup) => {
@@ -359,5 +401,80 @@ export class KontenComponent implements OnDestroy {
 
   reactivate(line: StatementLine): void {
     this.reconcile.reactivate(line);
+  }
+
+  // --- cross-links (#expenses-ux) ---------------------------------------------------
+  /** Deep-link to a matched line's booking (best-effort): Bookings tab filtered by the
+   *  account + the reference/purpose as the search text. */
+  bookingLink(line: StatementLine): { account: string; q: string | null } {
+    return {
+      account: line.accountId,
+      q: line.reference || line.endToEndId || line.purpose || null,
+    };
+  }
+
+  // --- batch (#expenses-ux) ---------------------------------------------------------
+  isSelected(id: Uuid): boolean {
+    return this.selected().has(id);
+  }
+  toggleSelect(id: Uuid, checked: boolean): void {
+    this.selected.update((cur) => {
+      const next = new Set(cur);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+  toggleSelectAll(checked: boolean): void {
+    this.selected.set(checked ? new Set(this.lines().map((l) => l.id)) : new Set());
+  }
+
+  askBulk(kind: 'unlink' | 'ignore'): void {
+    const n = kind === 'unlink' ? this.selectedMatched() : this.selectedIgnorable();
+    if (!n) return;
+    this.bulkConfirm.set(kind);
+  }
+  runBulk(): void {
+    const kind = this.bulkConfirm();
+    if (!kind || this.bulkBusy()) return;
+    const eligible = this.lines()
+      .filter(
+        (l) =>
+          this.selected().has(l.id) &&
+          (kind === 'unlink'
+            ? l.matchState === 'matched'
+            : l.matchState === 'unmatched' || l.matchState === 'suggested'),
+      )
+      .map((l) => l.id);
+    if (!eligible.length) {
+      this.bulkConfirm.set(null);
+      return;
+    }
+    this.bulkBusy.set(true);
+    let done = 0;
+    from(eligible)
+      .pipe(
+        concatMap((id) =>
+          kind === 'unlink' ? this.api.unlinkStatementLine(id) : this.api.ignoreStatementLine(id),
+        ),
+      )
+      .subscribe({
+        next: () => {
+          done++;
+        },
+        error: () => this.afterBulk(kind, done, true),
+        complete: () => this.afterBulk(kind, done, false),
+      });
+  }
+  private afterBulk(kind: 'unlink' | 'ignore', count: number, failed: boolean): void {
+    this.bulkBusy.set(false);
+    this.bulkConfirm.set(null);
+    this.linesState.refresh();
+    if (failed) {
+      this.toast.error(this.i18n.translate('konten.bulk.error'));
+    } else {
+      const key = kind === 'unlink' ? 'konten.bulk.unlinkDone' : 'konten.bulk.ignoreDone';
+      this.toast.success(this.i18n.translate(key, { count: String(count) }));
+    }
   }
 }

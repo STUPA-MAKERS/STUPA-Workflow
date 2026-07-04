@@ -11,12 +11,16 @@ import {
 } from '@angular/core';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { from } from 'rxjs';
+import { concatMap } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  CheckboxComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   DialogComponent,
@@ -28,9 +32,24 @@ import {
 } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
-import type { Expense, ExpenseKind, Invoice } from '../budget/budget-tree.api';
-import { ariaSortDir, formatEur, sortIndicator } from '../budget/expense-display.util';
+import {
+  BudgetTreeApi,
+  type Expense,
+  type ExpenseKind,
+  type ExpenseUpdate,
+  type Invoice,
+} from '../budget/budget-tree.api';
+import type { Uuid } from '@core/api/models';
+import {
+  ariaSortDir,
+  findTopBudgetNode,
+  formatEur,
+  problemDetail,
+  sortIndicator,
+} from '../budget/expense-display.util';
 import { SimplifyPathPipe } from '@shared/budget-path';
+import { downloadBlob } from '@shared/download.util';
+import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
 import { ExpenseDialogsState } from './expense-dialogs.state';
 import { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import { ExpensesListState, type ExpenseSortField } from './expenses-list.state';
@@ -60,7 +79,10 @@ import { ExpensesListState, type ExpenseSortField } from './expenses-list.state'
     FilterRangeComponent,
     IconComponent,
     SelectComponent,
+    CheckboxComponent,
     CostCentreTreeComponent,
+    HScrollSyncDirective,
+    RouterLink,
   ],
   templateUrl: './expenses.component.html',
   styleUrl: './expenses.component.scss',
@@ -70,6 +92,9 @@ export class ExpensesComponent implements OnDestroy {
   private readonly i18n = inject(I18nService);
   // Referenced via the same root instance by the state modules; specs spy here.
   private readonly toast = inject(ToastService);
+  private readonly api = inject(BudgetTreeApi);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   private readonly list = new ExpensesListState();
   private readonly sub = new ExpenseSubBookingsState(this.list);
@@ -102,6 +127,24 @@ export class ExpensesComponent implements OnDestroy {
   readonly accountOptions = this.list.accountOptions;
   readonly accountFilterOptions = this.list.accountFilterOptions;
   readonly exporting = this.list.exporting;
+  readonly refreshing = this.list.refreshing;
+
+  // --- batch / bulk actions (#expenses-ux) ---
+  readonly selected = signal<ReadonlySet<Uuid>>(new Set());
+  readonly bulkBusy = signal(false);
+  readonly selectedCount = computed(() => this.selected().size);
+  readonly allSelected = computed(() => {
+    const list = this.items();
+    return list.length > 0 && list.every((e) => this.selected().has(e.id));
+  });
+  /** Bulk confirm dialog: null = closed, else the pending yes/no action. */
+  readonly bulkConfirm = signal<null | 'delete' | 'export'>(null);
+  readonly bulkReassignOpen = signal(false);
+  readonly bulkBudgetId = signal('');
+  readonly bulkCategory = signal('');
+  readonly canSubmitReassign = computed(
+    () => !!this.bulkBudgetId() || !!this.bulkCategory().trim(),
+  );
 
   // --- dialog state (ExpenseDialogsState) ------------------------------------
   readonly createOpen = this.dialogs.createOpen;
@@ -165,6 +208,35 @@ export class ExpensesComponent implements OnDestroy {
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   constructor() {
+    // Adopt filters from the URL (shareable + survives a real reload; target of the
+    // Budget/Konten cross-links). The list state already fired an initial reload in its
+    // own constructor — re-run it only if the URL actually carried filters.
+    if (this.applyQueryParams()) this.list.reload();
+
+    // Mirror active filters back into the URL on every change.
+    effect(() => {
+      const queryParams = {
+        budget: this.budgetId() || null,
+        account: this.accountId() || null,
+        kind: this.kind() || null,
+        q: this.q().trim() || null,
+      };
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams,
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+
+    // Keep the bulk selection pruned to rows that still exist (after refresh/reload/delete).
+    effect(() => {
+      const ids = new Set(this.items().map((e) => e.id));
+      this.selected.update((cur) =>
+        [...cur].every((x) => ids.has(x)) ? cur : new Set([...cur].filter((x) => ids.has(x))),
+      );
+    });
+
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
       if (!el || typeof IntersectionObserver === 'undefined') return;
@@ -177,6 +249,20 @@ export class ExpensesComponent implements OnDestroy {
       obs.observe(el);
       onCleanup(() => obs.disconnect());
     });
+  }
+
+  /** Adopt budget/account/kind/q filters from the URL; returns true if any were present. */
+  private applyQueryParams(): boolean {
+    const qp = this.route.snapshot.queryParamMap;
+    const budget = qp.get('budget');
+    const account = qp.get('account');
+    const kind = qp.get('kind');
+    const q = qp.get('q');
+    if (budget) this.budgetId.set(budget);
+    if (account) this.accountId.set(account);
+    if (kind === 'expense' || kind === 'income') this.kind.set(kind);
+    if (q) this.q.set(q);
+    return !!(budget || account || kind || q);
   }
 
   ngOnDestroy(): void {
@@ -366,5 +452,123 @@ export class ExpensesComponent implements OnDestroy {
 
   createTransfer(event: Event): void {
     this.dialogs.createTransfer(event);
+  }
+
+  // --- cross-links (#expenses-ux) ---------------------------------------------------
+  /** Deep-link target for the cost-centre cell → Budget tab drilled into this KS. */
+  ksLink(e: Expense): { budget: string | null; ks: string; fy: string } {
+    const top = findTopBudgetNode(this.budgetTree(), e.budgetId);
+    return { budget: top?.id ?? null, ks: e.budgetId, fy: e.fiscalYearId };
+  }
+
+  // --- batch (#expenses-ux) ---------------------------------------------------------
+  isSelected(id: Uuid): boolean {
+    return this.selected().has(id);
+  }
+  toggleSelect(id: Uuid, checked: boolean): void {
+    this.selected.update((cur) => {
+      const next = new Set(cur);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+  toggleSelectAll(checked: boolean): void {
+    this.selected.set(checked ? new Set(this.items().map((e) => e.id)) : new Set());
+  }
+
+  askBulk(kind: 'delete' | 'export'): void {
+    if (!this.selectedCount()) return;
+    this.bulkConfirm.set(kind);
+  }
+  runBulk(): void {
+    if (this.bulkBusy()) return;
+    if (this.bulkConfirm() === 'delete') this.runBulkDelete();
+    else if (this.bulkConfirm() === 'export') this.runBulkExport();
+  }
+
+  private runBulkDelete(): void {
+    const ids = [...this.selected()];
+    if (!ids.length) return;
+    this.bulkBusy.set(true);
+    let done = 0;
+    from(ids)
+      .pipe(concatMap((id) => this.api.deleteExpense(id)))
+      .subscribe({
+        next: () => {
+          done++;
+        },
+        error: () => this.afterBulk('delete', done, true),
+        complete: () => this.afterBulk('delete', done, false),
+      });
+  }
+
+  /** Export only the selected bookings (the server narrows by ``ids``). */
+  private runBulkExport(): void {
+    const ids = [...this.selected()];
+    if (!ids.length) return;
+    this.bulkBusy.set(true);
+    this.api.exportExpensesXlsx({ ids }).subscribe({
+      next: (blob) => {
+        downloadBlob(blob, 'buchungen-auswahl.xlsx');
+        this.bulkBusy.set(false);
+        this.bulkConfirm.set(null);
+      },
+      error: (err) => {
+        this.bulkBusy.set(false);
+        this.bulkConfirm.set(null);
+        this.toast.error(problemDetail(err) ?? this.i18n.translate('expenses.toast.failed'));
+      },
+    });
+  }
+
+  openBulkReassign(): void {
+    if (!this.selectedCount()) return;
+    this.bulkBudgetId.set('');
+    this.bulkCategory.set('');
+    this.bulkReassignOpen.set(true);
+  }
+  runBulkReassign(): void {
+    const ids = [...this.selected()];
+    if (!ids.length || this.bulkBusy() || !this.canSubmitReassign()) return;
+    const byId = new Map(this.items().map((e) => [e.id, e]));
+    const budgetId = this.bulkBudgetId();
+    const category = this.bulkCategory().trim();
+    this.bulkBusy.set(true);
+    let done = 0;
+    from(ids)
+      .pipe(
+        concatMap((id) => {
+          const e = byId.get(id);
+          const patch: ExpenseUpdate = {};
+          if (category) patch.category = category;
+          // Cost centre only for standalone bookings (bound/sub inherit it).
+          if (budgetId && e && !e.applicationId && !e.parentExpenseId) {
+            patch.budgetId = budgetId as Uuid;
+          }
+          return this.api.updateExpense(id, patch);
+        }),
+      )
+      .subscribe({
+        next: () => {
+          done++;
+        },
+        error: () => this.afterBulk('reassign', done, true),
+        complete: () => this.afterBulk('reassign', done, false),
+      });
+  }
+
+  private afterBulk(kind: 'delete' | 'reassign', count: number, failed: boolean): void {
+    this.bulkBusy.set(false);
+    this.bulkConfirm.set(null);
+    this.bulkReassignOpen.set(false);
+    this.list.refresh(); // server truth (e.g. transfer legs); the prune effect fixes selection
+    if (failed) {
+      const key = kind === 'delete' ? 'expenses.bulk.deleteError' : 'expenses.bulk.reassignError';
+      this.toast.error(this.i18n.translate(key));
+    } else {
+      const key = kind === 'delete' ? 'expenses.bulk.deleteDone' : 'expenses.bulk.reassignDone';
+      this.toast.success(this.i18n.translate(key, { count: String(count) }));
+    }
   }
 }

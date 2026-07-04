@@ -113,7 +113,7 @@ export class KontenReconcileState {
           this.booking.set(false);
           this.closeImport();
           this.toast.success(this.i18n.translate('fints.booked'));
-          this.lines.reloadLines();
+          this.lines.refresh();
         },
         error: (e) => {
           this.booking.set(false);
@@ -188,7 +188,7 @@ export class KontenReconcileState {
         this.booking.set(false);
         this.closeLink();
         this.toast.success(this.i18n.translate('fints.linked'));
-        this.lines.reloadLines();
+        this.lines.refresh();
       },
       error: (e) => {
         this.booking.set(false);
@@ -205,7 +205,7 @@ export class KontenReconcileState {
       next: () => {
         this.booking.set(false);
         this.toast.success(this.i18n.translate('fints.unlinked'));
-        this.lines.reloadLines();
+        this.lines.refresh();
       },
       error: () => {
         this.booking.set(false);
@@ -236,7 +236,7 @@ export class KontenReconcileState {
         this.booking.set(false);
         this.closeIgnore();
         this.toast.success(this.i18n.translate('konten.ignored'));
-        this.lines.reloadLines();
+        this.lines.refresh();
       },
       error: (e) => {
         this.booking.set(false);
@@ -253,7 +253,7 @@ export class KontenReconcileState {
       next: () => {
         this.booking.set(false);
         this.toast.success(this.i18n.translate('konten.reactivated'));
-        this.lines.reloadLines();
+        this.lines.refresh();
       },
       error: (e) => {
         this.booking.set(false);

@@ -465,8 +465,12 @@ async def export_expenses_xlsx(
     amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
     created_from: Annotated[str | None, Query(alias="createdFrom")] = None,
     created_to: Annotated[str | None, Query(alias="createdTo")] = None,
+    ids: Annotated[list[UUID] | None, Query()] = None,
 ) -> Response:
-    """Export filtered bookings as ``.xlsx`` — same content as the list."""
+    """Export filtered bookings as ``.xlsx`` — same content as the list.
+
+    ``ids`` (optional, #expenses-ux) restricts the export to the selected bookings:
+    the filtered page is narrowed to those IDs (selection ⊆ current filter)."""
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_expenses_workbook
 
     page = await service.list_expenses_paged(
@@ -481,14 +485,18 @@ async def export_expenses_xlsx(
         limit=10_000,
         offset=0,
     )
-    data = build_expenses_workbook(page.items)
+    items = page.items
+    if ids:
+        wanted = set(ids)
+        items = [e for e in items if e.id in wanted]
+    data = build_expenses_workbook(items)
     await audit_record(
         service.session,
         actor=principal.sub,
         action=AuditAction.EXPORT,
         target_type="export",
         target_id="buchungen.xlsx",
-        data={"rows": len(page.items)},
+        data={"rows": len(items)},
     )
     await service.session.commit()
     return Response(
