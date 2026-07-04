@@ -390,7 +390,9 @@ input.exp__input {
   .exp__table td.exp__stickyCol {
     position: sticky;
     right: 0;
-    box-shadow: -6px 0 6px -6px color-mix(in srgb, var(--color-text) 22%, transparent);
+    /* Trenner zur scrollenden Fläche: schlichte Token-Border statt Schatten-
+       Verlauf — passt zum restlichen Tabellen-Look (#expenses-ux2). */
+    border-inline-start: var(--border-width) solid var(--color-border);
   }
   .exp__table td.exp__stickyCol {
     background: var(--color-surface);
@@ -405,21 +407,34 @@ input.exp__input {
   }
 }
 
-/* --- Batch / Sammel-Aktionen (#expenses-ux) --- */
+/* --- Batch / Sammel-Aktionen: schwebende Bottom-Bar (#expenses-ux2) ---
+   Fixiert unten mittig, erscheint nur bei aktiver Auswahl — identisch zum
+   Buchungen-Tab. */
 .exp__bulkbar {
+  position: fixed;
+  bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-sticky);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
+  max-width: min(calc(100vw - 2 * var(--space-4)), 56rem);
   padding: var(--space-2) var(--space-3);
-  background: var(--color-surface-sunken);
+  background: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
 }
 .exp__bulkcount {
   font-weight: var(--fw-semibold);
-  margin-inline-end: auto;
+}
+/* Platz am Listenende, damit die schwebende Bar die letzten Zeilen/den
+   Nachlade-Button nicht verdeckt. */
+.exp__layout:has(.exp__bulkbar) {
+  padding-bottom: 4.5rem;
 }
 .exp__check {
   width: 1%;

@@ -340,6 +340,35 @@ async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:
     assert empty.total == 0 and empty.items == []
 
 
+async def test_list_expenses_exact_id_filter(session: AsyncSession) -> None:
+    """``id``-Filter (#expenses-ux2): der exakte Buchungs-Deeplink (Konten →
+    »Buchung ansehen«) liefert genau diese eine Buchung — auch ohne weitere Filter."""
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"ID{_suffix()}", name="Top", gremiumId=g.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    first = await svc.book_expense(
+        ExpenseCreate(
+            budgetId=top.id, fiscalYearId=fy.id, amount=Decimal("10"), description="Erste"
+        ),
+        actor="tester",
+    )
+    await svc.book_expense(
+        ExpenseCreate(
+            budgetId=top.id, fiscalYearId=fy.id, amount=Decimal("20"), description="Zweite"
+        ),
+        actor="tester",
+    )
+
+    page = await svc.list_expenses_paged(expense_id=first.id)
+    assert page.total == 1
+    assert [e.id for e in page.items] == [first.id]
+
+    # Fremde UUID ⇒ leer, nicht 404 (die Liste bleibt eine Filteransicht).
+    empty = await svc.list_expenses_paged(expense_id=uuid.uuid4())
+    assert empty.total == 0 and empty.items == []
+
+
 async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> None:
     """Server-seitige Rechnungssuche (#invoices): Fuzzy-``q`` + Filter + Offset-Paging.
 

@@ -98,16 +98,23 @@
     } @else if (!lines().length) {
       <div class="empty-state">{{ (activeFilterCount() || searchQ() ? 'fints.emptyFiltered' : 'konten.empty') | t }}</div>
     } @else {
+      <!-- Floating bulk bar: fixed at the bottom centre while a selection exists (#expenses-ux2). -->
       @if ((canBook() || canIgnore()) && selectedCount()) {
-        <div class="exp__bulkbar">
+        <div class="exp__bulkbar" role="toolbar" [attr.aria-label]="'konten.bulk.selectedCount' | t: { count: selectedCount() }">
           <span class="exp__bulkcount">{{ 'konten.bulk.selectedCount' | t: { count: selectedCount() } }}</span>
           @if (canBook() && selectedMatched()) {
-            <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="askBulk('unlink')">{{ 'konten.bulk.unlinkSelected' | t }}</app-button>
+            <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="askBulk('unlink')">
+              <span class="inline-flex items-center gap-2"><app-icon name="link-slash" [size]="14" /> {{ 'konten.bulk.unlinkSelected' | t }}</span>
+            </app-button>
           }
           @if (canIgnore() && selectedIgnorable()) {
-            <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="askBulk('ignore')">{{ 'konten.bulk.ignoreSelected' | t }}</app-button>
+            <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="askBulk('ignore')">
+              <span class="inline-flex items-center gap-2"><app-icon name="eye-slash" [size]="14" /> {{ 'konten.bulk.ignoreSelected' | t }}</span>
+            </app-button>
           }
-          <app-button variant="ghost" size="sm" (click)="toggleSelectAll(false)">{{ 'konten.bulk.clear' | t }}</app-button>
+          <app-button variant="ghost" size="sm" (click)="toggleSelectAll(false)">
+            <span class="inline-flex items-center gap-2"><app-icon name="remove" [size]="14" /> {{ 'konten.bulk.clear' | t }}</span>
+          </app-button>
         </div>
       }
       <div class="exp__tableWrap" appHScrollSync [attr.aria-busy]="refreshing()">

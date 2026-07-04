@@ -46,6 +46,9 @@ export class ExpensesListState {
   readonly budgetId = signal('');
   /** Account filter; empty = all accounts. */
   readonly accountId = signal('');
+  /** Exact-booking filter (deep link from Konten). No own control — set only via
+   *  the URL, but it counts as an active filter so the reset button clears it. */
+  readonly expenseId = signal('');
   readonly sortField = signal<ExpenseSortField>('paymentDate');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
@@ -54,6 +57,7 @@ export class ExpensesListState {
       [
         this.kind(),
         this.accountId(),
+        this.expenseId(),
         this.amountMin().trim(),
         this.amountMax().trim(),
         this.createdFrom(),
@@ -123,6 +127,7 @@ export class ExpensesListState {
   resetFilters(): void {
     this.kind.set('');
     this.accountId.set('');
+    this.expenseId.set('');
     this.amountMin.set('');
     this.amountMax.set('');
     this.createdFrom.set('');
@@ -162,6 +167,7 @@ export class ExpensesListState {
   /** Active filters as the shared query part for {@link fetch} and {@link refresh}. */
   private filterParams() {
     return {
+      id: this.expenseId() || undefined,
       budget: this.budgetId() || undefined,
       account: this.accountId() || undefined,
       kind: this.kind() || undefined,

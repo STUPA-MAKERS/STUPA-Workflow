@@ -173,6 +173,25 @@ async def test_list_lines_with_filters(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_lines_matched_expense_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Matched Zeile → ``matchedExpenseId`` aus ``bank_allocation`` (bei Splits gewinnt
+    die älteste Zuordnung); offene Zeilen bleiben ohne (#expenses-ux2)."""
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    open_line = _line(amount=Decimal("-9.00"))
+    matched = _line(amount=Decimal("-20.00"), match_state="matched")
+    exp_a, exp_b = uuid.uuid4(), uuid.uuid4()
+    session.scalar_q.append(2)  # count
+    session.scalars_q.append(_Result([open_line, matched]))
+    # Allokationen (created_at aufsteigend): setdefault ⇒ die erste gewinnt.
+    session.execute_q.append(_Result([(matched.id, exp_a), (matched.id, exp_b)]))
+    page = await svc.list_lines_paged(account_id=uuid.uuid4(), state=None)
+    by_id = {item.id: item for item in page.items}
+    assert by_id[matched.id].matched_expense_id == exp_a
+    assert by_id[open_line.id].matched_expense_id is None
+
+
+@pytest.mark.asyncio
 async def test_confirm_line_description_override(monkeypatch: pytest.MonkeyPatch) -> None:
     from datetime import UTC, datetime
 

@@ -404,9 +404,13 @@ export class KontenComponent implements OnDestroy {
   }
 
   // --- cross-links (#expenses-ux) ---------------------------------------------------
-  /** Deep-link to a matched line's booking (best-effort): Bookings tab filtered by the
-   *  account + the reference/purpose as the search text. */
-  bookingLink(line: StatementLine): { account: string; q: string | null } {
+  /** Deep-link to a matched line's booking. Exact via the allocation's booking id
+   *  (hidden, resettable ``id`` filter in the Bookings tab); older lines without a
+   *  ``matchedExpenseId`` fall back to account + reference/purpose text search. */
+  bookingLink(
+    line: StatementLine,
+  ): { id: string } | { account: string; q: string | null } {
+    if (line.matchedExpenseId) return { id: line.matchedExpenseId };
     return {
       account: line.accountId,
       q: line.reference || line.endToEndId || line.purpose || null,

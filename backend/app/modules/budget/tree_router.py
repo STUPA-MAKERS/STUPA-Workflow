@@ -408,6 +408,7 @@ async def book_expense(
 )
 async def list_expenses(
     service: ServiceDep,
+    expense_id: Annotated[UUID | None, Query(alias="id")] = None,
     budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
     account_id: Annotated[UUID | None, Query(alias="account")] = None,
@@ -426,10 +427,12 @@ async def list_expenses(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[ExpenseOut]:
-    """List bookings filtered + sorted + offset-paged. ``budget`` includes the
-    subtree; ``kind`` = ``expense``/``income``; ``q`` searches descriptions;
-    ``amountMin``/``amountMax`` = amount range; ``sort``/``order`` = column sort."""
+    """List bookings filtered + sorted + offset-paged. ``id`` = exact booking
+    (deep link from the accounts tab); ``budget`` includes the subtree; ``kind`` =
+    ``expense``/``income``; ``q`` searches descriptions; ``amountMin``/``amountMax``
+    = amount range; ``sort``/``order`` = column sort."""
     return await service.list_expenses_paged(
+        expense_id=expense_id,
         budget_id=budget_id,
         fiscal_year_id=fiscal_year_id,
         account_id=account_id,

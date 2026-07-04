@@ -131,6 +131,8 @@ export interface StatementLine {
   suggestedBudgetId: Uuid | null;
   suggestedPathKey: string | null;
   suggestedExpenseId: Uuid | null;
+  /** Booking of a `matched` line — deep-link target for "view booking". */
+  matchedExpenseId: Uuid | null;
   createdAt: string;
 }
 
@@ -348,6 +350,8 @@ export interface InvoicePage {
 
 /** Filter/paging of the bookings list. */
 export interface ExpenseQuery {
+  /** Exact booking (deep link from the accounts tab). */
+  id?: Uuid;
   budget?: Uuid;
   fiscalYear?: Uuid;
   account?: Uuid;

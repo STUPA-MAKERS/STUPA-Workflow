@@ -51,6 +51,9 @@
         </app-button>
       }
       @if (canManage()) {
+        <app-button variant="secondary" size="sm" (click)="openImportDialog()">
+          <span class="inline-flex items-center gap-2"><app-icon name="upload" [size]="16" /> {{ 'expenses.sub.import' | t }}</span>
+        </app-button>
         <app-button variant="secondary" size="sm" (click)="openTransfer()">
           <span class="inline-flex items-center gap-2"><app-icon name="repeat" [size]="16" /> {{ 'expenses.transfer' | t }}</span>
         </app-button>
@@ -89,15 +92,31 @@
     @if (loading() && !items().length) {
       <p class="exp__status" aria-live="polite">{{ 'expenses.loading' | t }}</p>
     } @else if (items().length) {
+      <!-- Floating bulk bar: fixed at the bottom centre while a selection exists (#expenses-ux2). -->
       @if (canManage() && selectedCount()) {
-        <div class="exp__bulkbar">
+        <div class="exp__bulkbar" role="toolbar" [attr.aria-label]="'expenses.bulk.selectedCount' | t: { count: selectedCount() }">
           <span class="exp__bulkcount">{{ 'expenses.bulk.selectedCount' | t: { count: selectedCount() } }}</span>
-          <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="openBulkReassign()">{{ 'expenses.bulk.reassign' | t }}</app-button>
+          <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="openBulkReassign()">
+            <span class="inline-flex items-center gap-2"><app-icon name="repeat" [size]="14" /> {{ 'expenses.bulk.reassign' | t }}</span>
+          </app-button>
           @if (canExport()) {
-            <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="askBulk('export')">{{ 'expenses.bulk.exportSelected' | t }}</app-button>
+            <app-button variant="secondary" size="sm" [disabled]="bulkBusy()" (click)="askBulk('export')">
+              <span class="inline-flex items-center gap-2"><app-icon name="export" [size]="14" /> {{ 'expenses.bulk.exportSelected' | t }}</span>
+            </app-button>
           }
-          <app-button variant="danger" size="sm" [loading]="bulkBusy()" [disabled]="bulkBusy()" (click)="askBulk('delete')">{{ 'expenses.bulk.deleteSelected' | t }}</app-button>
-          <app-button variant="ghost" size="sm" (click)="toggleSelectAll(false)">{{ 'expenses.bulk.clear' | t }}</app-button>
+          <app-button
+            variant="danger"
+            size="sm"
+            [loading]="bulkBusy()"
+            [disabled]="bulkBusy() || bulkDeleteBlocked()"
+            [title]="bulkDeleteBlocked() ? ('expenses.bulk.deleteAllBlocked' | t) : ('expenses.bulk.deleteSelected' | t)"
+            (click)="askBulk('delete')"
+          >
+            <span class="inline-flex items-center gap-2"><app-icon name="delete" [size]="14" /> {{ 'expenses.bulk.deleteSelected' | t }}</span>
+          </app-button>
+          <app-button variant="ghost" size="sm" (click)="toggleSelectAll(false)">
+            <span class="inline-flex items-center gap-2"><app-icon name="remove" [size]="14" /> {{ 'expenses.bulk.clear' | t }}</span>
+          </app-button>
         </div>
       }
       <div class="exp__tableWrap" appHScrollSync [attr.aria-busy]="refreshing()">
@@ -168,8 +187,6 @@
                         <span class="inline-flex items-center gap-1"><app-icon [name]="isSubExpanded(e.id) ? 'chevron-up' : 'chevron-down'" [size]="14" />@if (e.childCount) {<span class="exp__subCount">{{ e.childCount }}</span>}</span>
                       </app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'expenses.sub.add' | t" [title]="'expenses.sub.add' | t" (click)="openCreateSub(e)"><app-icon name="add" /></app-button>
-                      <input #subfile type="file" class="sr-only" accept=".xml,.sta,.mt940,.txt" (change)="onSubFile(e, $event)" [attr.aria-label]="'expenses.sub.import' | t" />
-                      <app-button variant="ghost" size="sm" [iconOnly]="true" [loading]="isSubImporting(e.id)" [ariaLabel]="'expenses.sub.import' | t" [title]="'expenses.sub.import' | t" (click)="subfile.click()"><app-icon name="upload" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!e.invoiceId" [ariaLabel]="'expenses.action.viewInvoice' | t" [title]="'expenses.action.viewInvoice' | t" (click)="openInvoiceDialog(e)"><app-icon name="document" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(e)"><app-icon name="edit" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(e)"><app-icon name="delete" /></app-button>
@@ -398,6 +415,48 @@
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="closeCreateSub()">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" [disabled]="!canSubmitSub()" [loading]="saving()" (click)="createSub($event)">{{ 'expenses.sub.add' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Global CAMT/MT940 import: pick target booking + file (#expenses-ux2) -->
+<app-dialog [open]="importOpen()" [title]="'expenses.sub.importTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeImportDialog()">
+  <form id="exp-import" class="flex flex-col gap-2" (submit)="submitImport($event)">
+    <p class="text-sm text-muted m-0">{{ 'expenses.sub.importHint' | t }}</p>
+    <div class="relative flex flex-col gap-1">
+      <label class="text-sm font-medium mt-2" for="exp-imp-target">{{ 'expenses.sub.importTarget' | t }}</label>
+      <input
+        id="exp-imp-target"
+        class="exp__input"
+        type="search"
+        autocomplete="off"
+        role="combobox"
+        [attr.aria-expanded]="importCandidates().length > 0"
+        aria-autocomplete="list"
+        [placeholder]="'expenses.sub.importTargetPlaceholder' | t"
+        [ngModel]="importQuery()"
+        (ngModelChange)="onImportSearch($event)"
+        (focus)="onImportSearch(importQuery())"
+        name="impsearch"
+      />
+      @if (importCandidates().length) {
+        <ul class="exp__suggest" role="listbox">
+          @for (c of importCandidates(); track c.id) {
+            <li>
+              <button type="button" class="exp__suggestItem" (click)="pickImportTarget(c)">{{ importCandidateLabel(c) }}</button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+    @if (importTarget(); as sel) {
+      <p class="m-0 text-sm">{{ 'konten.linkPicked' | t }}: <strong>{{ importCandidateLabel(sel) }}</strong></p>
+    }
+    <label class="text-sm font-medium mt-2" for="exp-imp-file">{{ 'expenses.sub.importFile' | t }}</label>
+    <input id="exp-imp-file" class="exp__input" type="file" accept=".xml,.sta,.mt940,.txt" (change)="onImportFile($event)" name="impfile" />
+  </form>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeImportDialog()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!canSubmitImport()" [loading]="importBusy()" (click)="submitImport($event)">{{ 'expenses.sub.importSubmit' | t }}</app-button>
   </div>
 </app-dialog>
 

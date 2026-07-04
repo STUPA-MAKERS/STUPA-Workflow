@@ -547,6 +547,9 @@ class StatementLineOut(_CamelModel):
     suggested_budget_id: UUID | None = Field(default=None, alias="suggestedBudgetId")
     suggested_path_key: str | None = Field(default=None, alias="suggestedPathKey")
     suggested_expense_id: UUID | None = Field(default=None, alias="suggestedExpenseId")
+    # Booking of a ``matched`` line (from ``bank_allocation``; the oldest one for
+    # split payments) — deep-link target for "view booking" (#expenses-ux).
+    matched_expense_id: UUID | None = Field(default=None, alias="matchedExpenseId")
     created_at: datetime = Field(alias="createdAt")
 
 
