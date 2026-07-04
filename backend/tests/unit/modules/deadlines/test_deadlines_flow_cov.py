@@ -99,6 +99,91 @@ def test_resolve_unknown_kind_is_none() -> None:
     assert resolve_due_at(_policy("bogus")) is None
 
 
+def test_resolve_absolute_without_date_is_none() -> None:
+    assert resolve_due_at(_policy("absolute", absolute_at=None)) is None
+
+
+# --- at_time / timezone wall-clock snap (DST-correct) --------------------- #
+_JUN = datetime(2026, 6, 9, 0, 0, tzinfo=UTC)  # Berlin summer time (UTC+2)
+_JAN = datetime(2026, 1, 15, 0, 0, tzinfo=UTC)  # Berlin winter time (UTC+1)
+
+
+def test_resolve_absolute_snaps_to_at_time_summer() -> None:
+    p = _policy("absolute", absolute_at=_JUN, at_time="23:59", timezone="Europe/Berlin")
+    assert resolve_due_at(p) == datetime(2026, 6, 9, 21, 59, tzinfo=UTC)
+
+
+def test_resolve_absolute_snaps_to_at_time_winter_dst() -> None:
+    # Same at_time, different UTC offset (CET vs CEST) → proves DST handling.
+    p = _policy("absolute", absolute_at=_JAN, at_time="23:59", timezone="Europe/Berlin")
+    assert resolve_due_at(p) == datetime(2026, 1, 15, 22, 59, tzinfo=UTC)
+
+
+def test_resolve_relative_snaps_to_at_time() -> None:
+    submitted = datetime(2026, 6, 1, 10, 0, tzinfo=UTC)
+    p = _policy("relative_submitted", offset_days=14, at_time="23:59", timezone="Europe/Berlin")
+    assert resolve_due_at(p, submitted_at=submitted) == datetime(2026, 6, 15, 21, 59, tzinfo=UTC)
+
+
+def test_resolve_malformed_at_time_falls_back_to_raw() -> None:
+    for bad in ("nope", "25:00", "12:60"):
+        p = _policy("absolute", absolute_at=_JUN, at_time=bad, timezone="Europe/Berlin")
+        assert resolve_due_at(p) == _JUN
+
+
+def test_resolve_unknown_timezone_falls_back_to_local_default() -> None:
+    # Invalid tz → _zone loops to the configured local default (Europe/Berlin).
+    p = _policy("absolute", absolute_at=_JUN, at_time="12:00", timezone="Bogus/Zone")
+    assert resolve_due_at(p) == datetime(2026, 6, 9, 10, 0, tzinfo=UTC)
+
+
+def test_resolve_none_timezone_uses_local_default() -> None:
+    p = _policy("absolute", absolute_at=_JUN, at_time="12:00", timezone=None)
+    assert resolve_due_at(p) == datetime(2026, 6, 9, 10, 0, tzinfo=UTC)
+
+
+# --- recurring (rolling window) ------------------------------------------ #
+def _recurring(dates: object, **kw: object) -> DeadlinePolicy:
+    return _policy("recurring", dates=dates, **kw)
+
+
+def test_resolve_recurring_picks_earliest_future_date() -> None:
+    p = _recurring(
+        ["2026-06-01", "2026-07-01", "2026-08-01"], at_time="23:59", timezone="Europe/Berlin"
+    )
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
+    assert resolve_due_at(p, now=now) == datetime(2026, 7, 1, 21, 59, tzinfo=UTC)
+
+
+def test_resolve_recurring_without_at_time_uses_local_midnight() -> None:
+    p = _recurring(["2026-07-01"], timezone="Europe/Berlin")
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
+    # 2026-07-01 00:00 Berlin (CEST, UTC+2) == 2026-06-30 22:00 UTC.
+    assert resolve_due_at(p, now=now) == datetime(2026, 6, 30, 22, 0, tzinfo=UTC)
+
+
+def test_resolve_recurring_all_passed_is_none() -> None:
+    p = _recurring(["2026-01-01", "2026-02-01"], timezone="Europe/Berlin")
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
+    assert resolve_due_at(p, now=now) is None
+
+
+def test_resolve_recurring_without_now_is_none() -> None:
+    assert resolve_due_at(_recurring(["2026-07-01"])) is None
+
+
+@pytest.mark.parametrize("dates", [None, [], "2026-07-01"])
+def test_resolve_recurring_missing_or_empty_dates_is_none(dates: object) -> None:
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
+    assert resolve_due_at(_recurring(dates), now=now) is None
+
+
+def test_resolve_recurring_skips_invalid_entries() -> None:
+    p = _recurring(["not-a-date", 123, "2026-07-01"], timezone="Europe/Berlin")
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
+    assert resolve_due_at(p, now=now) == datetime(2026, 6, 30, 22, 0, tzinfo=UTC)
+
+
 # =========================================================================== #
 # service.py — DeadlineService Scans/Locks/Create/Marker
 # =========================================================================== #

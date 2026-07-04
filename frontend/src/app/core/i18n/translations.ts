@@ -1764,6 +1764,15 @@ export const de = {
   'admin.deadlines.date': 'Datum',
   'admin.deadlines.offsetDays': 'Tage Versatz',
   'admin.deadlines.days': 'Tage',
+  'admin.deadlines.dates': 'Termine',
+  'admin.deadlines.datesHint':
+    'Liste von Terminen; verwendet wird jeweils der nächste noch ausstehende.',
+  'admin.deadlines.addDate': 'Termin hinzufügen',
+  'admin.deadlines.removeDate': 'Termin entfernen',
+  'admin.deadlines.atTime': 'Uhrzeit',
+  'admin.deadlines.atTimeHint':
+    'Optional: feste Uhrzeit (Ortszeit der Zeitzone). Leer = Zeitpunkt der Auslösung.',
+  'admin.deadlines.timezone': 'Zeitzone',
   'admin.deadlines.deleteTitle': 'Frist löschen',
   'admin.deadlines.deleteConfirm': '„{{name}}" wirklich löschen?',
   'admin.deadlines.col.name': 'Bezeichnung',
@@ -1772,6 +1781,7 @@ export const de = {
   'admin.deadlines.kind.absolute': 'Festes Datum',
   'admin.deadlines.kind.relative_submitted': 'Einreichung + X Tage',
   'admin.deadlines.kind.relative_changed': 'Letzte Änderung + X Tage',
+  'admin.deadlines.kind.recurring': 'Wiederkehrende Termine',
   'admin.deleg.title': 'Vertretung / Delegation',
   'admin.deleg.subtitle':
     'Sitzungsgebundene Vertretungen im Überblick. Mitglieder richten ihre Vertretung selbst auf der Sitzungsseite ein; der Stellvertreter-Pool wird je Gremium in der Mitgliederverwaltung gepflegt.',
@@ -3954,6 +3964,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.deadlines.date': 'Date',
   'admin.deadlines.offsetDays': 'Offset in days',
   'admin.deadlines.days': 'days',
+  'admin.deadlines.dates': 'Dates',
+  'admin.deadlines.datesHint': 'A list of dates; the next one still ahead is used.',
+  'admin.deadlines.addDate': 'Add date',
+  'admin.deadlines.removeDate': 'Remove date',
+  'admin.deadlines.atTime': 'Time of day',
+  'admin.deadlines.atTimeHint':
+    'Optional: fixed time (local to the timezone). Empty = the moment it fires.',
+  'admin.deadlines.timezone': 'Timezone',
   'admin.deadlines.deleteTitle': 'Delete deadline',
   'admin.deadlines.deleteConfirm': 'Really delete “{{name}}”?',
   'admin.deadlines.col.name': 'Label',
@@ -3962,6 +3980,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.deadlines.kind.absolute': 'Fixed date',
   'admin.deadlines.kind.relative_submitted': 'Submission + X days',
   'admin.deadlines.kind.relative_changed': 'Last change + X days',
+  'admin.deadlines.kind.recurring': 'Recurring dates',
   'admin.deleg.title': 'Proxy / Delegation',
   'admin.deleg.subtitle':
     'Overview of meeting-bound proxies. Members set up their proxy on the meeting page; the substitute pool is maintained per body in the member administration.',

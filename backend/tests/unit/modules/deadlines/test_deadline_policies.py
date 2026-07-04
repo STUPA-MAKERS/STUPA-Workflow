@@ -140,6 +140,55 @@ def test_create_relative_policy(
     assert fake_service.created is not None and fake_service.created["offset_days"] == 7
 
 
+def test_create_recurring_policy(
+    app: FastAPI, app_client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_admin(app)
+    res = app_client.post(
+        "/api/admin/deadline-policies",
+        json={
+            "key": "windows",
+            "label": {"de": "Fenster"},
+            "kind": "recurring",
+            "dates": ["2026-06-01", "2026-07-01"],
+            "atTime": "23:59",
+            "timezone": "Europe/Berlin",
+        },
+    )
+    assert res.status_code == 201
+    assert res.json()["kind"] == "recurring"
+    assert fake_service.created is not None
+    assert fake_service.created["dates"] == ["2026-06-01", "2026-07-01"]
+    assert fake_service.created["at_time"] == "23:59"
+
+
+def test_create_recurring_without_dates_is_422(app: FastAPI, app_client: TestClient) -> None:
+    _as_admin(app)
+    res = app_client.post(
+        "/api/admin/deadline-policies",
+        json={"key": "w", "label": {"de": "W"}, "kind": "recurring", "dates": []},
+    )
+    assert res.status_code == 422
+
+
+def test_create_invalid_at_time_is_422(app: FastAPI, app_client: TestClient) -> None:
+    _as_admin(app)
+    res = app_client.post(
+        "/api/admin/deadline-policies",
+        json={"key": "a", "label": {"de": "A"}, "kind": "absolute", "atTime": "25:00"},
+    )
+    assert res.status_code == 422
+
+
+def test_create_invalid_timezone_is_422(app: FastAPI, app_client: TestClient) -> None:
+    _as_admin(app)
+    res = app_client.post(
+        "/api/admin/deadline-policies",
+        json={"key": "a", "label": {"de": "A"}, "kind": "absolute", "timezone": "Bogus/Zone"},
+    )
+    assert res.status_code == 422
+
+
 # --------------------------------------------------------------------------- #
 # Flow-Enforcement: schedule_state_deadline + guard scanner
 # --------------------------------------------------------------------------- #

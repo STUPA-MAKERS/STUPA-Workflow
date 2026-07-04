@@ -67,6 +67,9 @@ async def create_policy(body: DeadlinePolicyCreate, service: ServiceDep) -> Dead
             kind=body.kind,
             absolute_at=body.absolute_at,
             offset_days=body.offset_days,
+            at_time=body.at_time,
+            timezone=body.timezone,
+            dates=body.dates,
         )
     except DeadlinePolicyError as exc:
         raise ConflictError(str(exc), code="deadline_policy_key") from exc
@@ -91,6 +94,9 @@ async def update_policy(
         kind=body.kind,
         absolute_at=body.absolute_at,
         offset_days=body.offset_days,
+        at_time=body.at_time,
+        timezone=body.timezone,
+        dates=body.dates,
     )
     return DeadlinePolicyOut.model_validate(updated, from_attributes=True)
 

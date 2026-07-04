@@ -241,4 +241,94 @@ describe('AdminDeadlinesComponent', () => {
     c.patch('key', 'x');
     expect(c.draft()).toBeNull();
   });
+
+  it('valueOf renders recurring as a date count and appends atTime', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.valueOf({ kind: 'recurring', dates: ['2026-06-01', '2026-07-01'] } as DeadlinePolicy)).toBe('2 Termine');
+    expect(c.valueOf({ kind: 'recurring', dates: null } as DeadlinePolicy)).toBe('0 Termine');
+    expect(
+      c.valueOf({ kind: 'relative_changed', offsetDays: 7, atTime: '23:59' } as DeadlinePolicy),
+    ).toBe('+ 7 Tage · 23:59');
+  });
+
+  it('canSave for recurring needs at least one non-empty date', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openAdd();
+    c.patch('key', 'windows');
+    c.patch('kind', 'recurring');
+    expect(c.canSave()).toBe(false); // no dates yet
+    c.addDate();
+    expect(c.canSave()).toBe(false); // blank date
+    c.setDate(0, '2026-07-01');
+    expect(c.canSave()).toBe(true);
+    c.removeDate(0);
+    expect(c.canSave()).toBe(false);
+  });
+
+  it('saves a recurring policy with dates, atTime and timezone', async () => {
+    const { fixture, api } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openAdd();
+    c.patch('key', 'windows');
+    c.patch('kind', 'recurring');
+    c.addDate();
+    c.setDate(0, '2026-07-01');
+    c.addDate();
+    c.setDate(1, ''); // blank entry is dropped on save
+    c.patch('atTime', '23:59');
+    c.save();
+    expect(api.createDeadlinePolicy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'windows',
+        kind: 'recurring',
+        dates: ['2026-07-01'],
+        atTime: '23:59',
+        timezone: 'Europe/Berlin',
+        absoluteAt: null,
+        offsetDays: null,
+      }),
+    );
+  });
+
+  it('omits timezone when neither atTime nor recurring dates are set', async () => {
+    const { fixture, api } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openAdd();
+    c.patch('key', 'plain');
+    c.patch('absoluteAt', '2026-01-01');
+    c.save();
+    expect(api.createDeadlinePolicy).toHaveBeenCalledWith(
+      expect.objectContaining({ atTime: null, timezone: null, dates: null }),
+    );
+  });
+
+  it('openEdit pre-fills recurring dates, atTime and timezone', async () => {
+    const recurring: DeadlinePolicy[] = [
+      {
+        id: 'rec-1',
+        key: 'w',
+        label: { de: 'W' },
+        kind: 'recurring',
+        dates: ['2026-06-01', '2026-07-01'],
+        atTime: '23:59',
+        timezone: 'Europe/Vienna',
+      },
+    ];
+    const api = { ...makeApi(), listDeadlinePolicies: jest.fn(() => of(recurring)) };
+    const { fixture } = await setup(api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openEdit(0);
+    const d = c.draft();
+    expect(d.kind).toBe('recurring');
+    expect(d.dates).toEqual(['2026-06-01', '2026-07-01']);
+    expect(d.atTime).toBe('23:59');
+    expect(d.timezone).toBe('Europe/Vienna');
+  });
 });

@@ -77,8 +77,14 @@ class DeadlinePolicy(UUIDPkMixin, Base):
     Decouples the concrete date from the flow definition — an ``absolute`` date
     can be updated per semester without re-versioning the flow. Kinds:
     ``absolute`` (fixed ``absolute_at``), ``relative_submitted`` /
-    ``relative_changed`` (application created/updated + ``offset_days``).
-    """
+    ``relative_changed`` (application created/updated + ``offset_days``),
+    ``recurring`` (earliest of ``dates`` still ahead — a rolling submission
+    window).
+
+    ``at_time``/``timezone`` optionally anchor the wall-clock: when ``at_time``
+    (``"HH:MM"``) is set the resolved date is snapped to that local time in
+    ``timezone`` and converted to UTC (DST-correct). When unset the historical
+    instant arithmetic is kept (backward compatible)."""
 
     __tablename__ = "deadline_policy"
 
@@ -92,6 +98,12 @@ class DeadlinePolicy(UUIDPkMixin, Base):
     )
     # Set only for the relative kinds (day offset).
     offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Optional wall-clock anchor: ``"HH:MM"`` local time in ``timezone`` (an IANA
+    # zone, e.g. ``Europe/Berlin``). Both NULL ⇒ raw instant arithmetic.
+    at_time: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timezone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Set only for ``recurring``: ordered list of ``"YYYY-MM-DD"`` calendar dates.
+    dates: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -101,7 +113,8 @@ class DeadlinePolicy(UUIDPkMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('absolute','relative_submitted','relative_changed')",
+            "kind IN ('absolute','relative_submitted','relative_changed',"
+            "'recurring')",
             name="deadline_policy_kind",
         ),
     )

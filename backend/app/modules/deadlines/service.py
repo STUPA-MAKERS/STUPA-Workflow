@@ -11,19 +11,29 @@ across worker restarts.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+import re
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.voting.models import Vote
+from app.settings import get_settings
 
 # Cap per cron tick, oldest first: a large backlog drains over several ticks
 # instead of one tick overrunning the 1-minute cadence. Correctness is unaffected
 # (SKIP LOCKED + idempotency markers) — ungrabbed rows stay due for the next tick.
 DEFAULT_SCAN_LIMIT = 200
+
+_RELATIVE_KINDS = frozenset({"relative_submitted", "relative_changed"})
+
+
+def _is_relative(kind: str) -> bool:
+    """Whether ``kind`` derives its due date from an application timestamp + offset."""
+    return kind in _RELATIVE_KINDS
 
 
 class DeadlineService:
@@ -199,23 +209,104 @@ async def flow_deadline_passed(session: AsyncSession, application_id: UUID) -> b
     return row is not None
 
 
+_HHMM_RE = re.compile(r"^(\d{2}):(\d{2})$")
+
+
+def _parse_hhmm(raw: str | None) -> tuple[int, int] | None:
+    """Parse a ``"HH:MM"`` string into ``(hour, minute)`` or ``None`` if invalid."""
+    m = _HHMM_RE.match(raw or "")
+    if m is None:
+        return None
+    hh, mm = int(m.group(1)), int(m.group(2))
+    return (hh, mm) if hh <= 23 and mm <= 59 else None
+
+
+def _zone(name: str | None) -> ZoneInfo:
+    """Resolve an IANA zone name, defaulting to the configured local timezone.
+
+    An unknown/invalid name (never expected — schemas validate on write) falls
+    back to the local timezone, then UTC, so resolution never raises."""
+    for candidate in (name, get_settings().local_timezone):
+        if candidate:
+            try:
+                return ZoneInfo(candidate)
+            except (ZoneInfoNotFoundError, ValueError):
+                continue
+    return ZoneInfo("UTC")
+
+
+def _snap_to_at_time(policy: DeadlinePolicy, dt: datetime) -> datetime:
+    """Snap ``dt`` to ``policy.at_time`` local wall-clock in ``policy.timezone``.
+
+    DST-correct: the date is read in the target zone, combined with ``at_time``
+    there, then converted back to UTC. ``at_time`` unset (or malformed) ⇒ ``dt``
+    is returned unchanged — the historical raw-instant behaviour."""
+    hhmm = _parse_hhmm(policy.at_time)
+    if hhmm is None:
+        return dt
+    tz = _zone(policy.timezone)
+    local_date = dt.astimezone(tz).date()
+    local = datetime(
+        local_date.year, local_date.month, local_date.day, hhmm[0], hhmm[1], tzinfo=tz
+    )
+    return local.astimezone(UTC)
+
+
+def _combine_local_date(policy: DeadlinePolicy, day: date) -> datetime:
+    """Combine a calendar ``day`` with ``policy.at_time`` (or local midnight) in
+    ``policy.timezone`` and return the UTC instant."""
+    hhmm = _parse_hhmm(policy.at_time) or (0, 0)
+    tz = _zone(policy.timezone)
+    return datetime(
+        day.year, day.month, day.day, hhmm[0], hhmm[1], tzinfo=tz
+    ).astimezone(UTC)
+
+
+def _recurring_due(policy: DeadlinePolicy, now: datetime | None) -> datetime | None:
+    """Earliest of ``policy.dates`` strictly after ``now`` (a rolling window).
+
+    ``None`` once every date has passed (or ``now``/``dates`` missing)."""
+    if now is None or not policy.dates:
+        return None
+    upcoming: list[datetime] = []
+    for raw in policy.dates:
+        if not isinstance(raw, str):
+            continue
+        try:
+            day = date.fromisoformat(raw[:10])
+        except ValueError:
+            continue
+        due = _combine_local_date(policy, day)
+        if due > now:
+            upcoming.append(due)
+    return min(upcoming) if upcoming else None
+
+
 def resolve_due_at(
     policy: DeadlinePolicy,
     *,
+    now: datetime | None = None,
     submitted_at: datetime | None = None,
     changed_at: datetime | None = None,
 ) -> datetime | None:
     """Derive a concrete due date from a policy + application timestamps (pure).
 
-    Missing reference value (e.g. no ``submitted_at``) yields ``None``."""
+    ``at_time``/``timezone`` snap the result to a local wall-clock time
+    (DST-correct) when set; ``recurring`` returns the earliest of ``dates`` still
+    ahead of ``now``. A missing reference value (e.g. no ``submitted_at``) or an
+    exhausted ``recurring`` schedule yields ``None``."""
+    if policy.kind == "recurring":
+        return _recurring_due(policy, now)
     if policy.kind == "absolute":
-        return policy.absolute_at
+        return _snap_to_at_time(policy, policy.absolute_at) if policy.absolute_at else None
     days = policy.offset_days or 0
     if policy.kind == "relative_submitted":
-        return submitted_at + timedelta(days=days) if submitted_at else None
-    if policy.kind == "relative_changed":
-        return changed_at + timedelta(days=days) if changed_at else None
-    return None
+        anchor = submitted_at
+    elif policy.kind == "relative_changed":
+        anchor = changed_at
+    else:
+        return None
+    return _snap_to_at_time(policy, anchor + timedelta(days=days)) if anchor else None
 
 
 class DeadlinePolicyError(Exception):
@@ -254,6 +345,9 @@ class DeadlinePolicyService:
         kind: str,
         absolute_at: datetime | None,
         offset_days: int | None,
+        at_time: str | None = None,
+        timezone: str | None = None,
+        dates: list | None = None,
     ) -> DeadlinePolicy:
         if await self.get_by_key(key):
             raise DeadlinePolicyError(f"deadline policy key already exists: {key!r}")
@@ -262,7 +356,10 @@ class DeadlinePolicyService:
             label=label,
             kind=kind,
             absolute_at=absolute_at if kind == "absolute" else None,
-            offset_days=offset_days if kind != "absolute" else None,
+            offset_days=offset_days if _is_relative(kind) else None,
+            at_time=at_time,
+            timezone=timezone,
+            dates=list(dates) if kind == "recurring" and dates else None,
         )
         self.session.add(policy)
         await self.session.flush()
@@ -278,21 +375,34 @@ class DeadlinePolicyService:
         kind: str | None = None,
         absolute_at: datetime | None = None,
         offset_days: int | None = None,
+        at_time: str | None = None,
+        timezone: str | None = None,
+        dates: list | None = None,
     ) -> DeadlinePolicy:
         if label is not None:
             policy.label = label
         if kind is not None:
             policy.kind = kind
-        # Set the value field matching the (possibly new) kind; clear the other.
+        # The editor submits the whole form, so the wall-clock anchor is replaced
+        # wholesale (``None`` clears it) rather than treated as a sparse patch.
+        policy.at_time = at_time
+        policy.timezone = timezone
+        # Set the value field matching the (possibly new) kind; clear the others.
         effective_kind = kind if kind is not None else policy.kind
         if effective_kind == "absolute":
             if absolute_at is not None:
                 policy.absolute_at = absolute_at
             policy.offset_days = None
+            policy.dates = None
+        elif effective_kind == "recurring":
+            policy.dates = list(dates) if dates else None
+            policy.absolute_at = None
+            policy.offset_days = None
         else:
             if offset_days is not None:
                 policy.offset_days = offset_days
             policy.absolute_at = None
+            policy.dates = None
         await self.session.commit()
         await self.session.refresh(policy)
         return policy

@@ -466,7 +466,11 @@ export const GREMIUM_PERMISSIONS = [
 ] as const;
 
 /** Kind of a named deadline policy. */
-export type DeadlineKind = 'absolute' | 'relative_submitted' | 'relative_changed';
+export type DeadlineKind =
+  | 'absolute'
+  | 'relative_submitted'
+  | 'relative_changed'
+  | 'recurring';
 
 /** Named deadline policy (registry, referenced by the flow via `key`). */
 export interface DeadlinePolicy {
@@ -478,6 +482,12 @@ export interface DeadlinePolicy {
   absoluteAt?: string | null;
   /** Only for the relative variants: offset in days. */
   offsetDays?: number | null;
+  /** Optional wall-clock anchor `"HH:MM"` (local time in `timezone`, DST-correct). */
+  atTime?: string | null;
+  /** IANA timezone for `atTime` (e.g. `Europe/Berlin`). */
+  timezone?: string | null;
+  /** Only for `recurring`: ordered list of `YYYY-MM-DD` dates (rolling window). */
+  dates?: string[] | null;
 }
 
 /** Time-bounded gremium membership (term of office). */

@@ -19,7 +19,29 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 
-const KINDS: DeadlineKind[] = ['absolute', 'relative_submitted', 'relative_changed'];
+const KINDS: DeadlineKind[] = [
+  'absolute',
+  'relative_submitted',
+  'relative_changed',
+  'recurring',
+];
+
+const DEFAULT_TZ = 'Europe/Berlin';
+
+/** Full IANA zone list from the runtime, with a small fallback for old engines. */
+function buildTimezoneOptions(): SelectOption[] {
+  const intl = Intl as unknown as { supportedValuesOf?: (key: string) => string[] };
+  let zones: string[] = [];
+  try {
+    zones = intl.supportedValuesOf ? intl.supportedValuesOf('timeZone') : [];
+  } catch {
+    zones = [];
+  }
+  if (zones.length === 0) {
+    zones = ['UTC', 'Europe/Berlin', 'Europe/London', 'Europe/Vienna', 'Europe/Zurich'];
+  }
+  return zones.map((z) => ({ value: z, label: z }));
+}
 
 interface PolicyDraft {
   key: string;
@@ -28,17 +50,32 @@ interface PolicyDraft {
   kind: DeadlineKind;
   absoluteAt: string;
   offsetDays: number | null;
+  atTime: string;
+  timezone: string;
+  dates: string[];
 }
 
 function emptyDraft(): PolicyDraft {
-  return { key: '', labelDe: '', labelEn: '', kind: 'absolute', absoluteAt: '', offsetDays: null };
+  return {
+    key: '',
+    labelDe: '',
+    labelEn: '',
+    kind: 'absolute',
+    absoluteAt: '',
+    offsetDays: null,
+    atTime: '',
+    timezone: DEFAULT_TZ,
+    dates: [],
+  };
 }
 
 /**
  * Deadline registry: named deadline policies that the flow references via `key`.
  * `absolute` carries a date (editable per semester, without changing the flow); the
- * relative variants derive the deadline from submission or last change + X days.
- * CRUD via the admin API (dialog).
+ * relative variants derive the deadline from submission or last change + X days;
+ * `recurring` rolls through a list of dates (the earliest still ahead is used).
+ * `atTime`/`timezone` optionally pin the wall-clock (DST-correct). CRUD via the
+ * admin API (dialog).
  */
 @Component({
   selector: 'app-admin-deadlines',
@@ -73,6 +110,7 @@ export class AdminDeadlinesComponent {
     value: k,
     label: this.kindLabel(k),
   }));
+  protected readonly timezoneOptions: SelectOption[] = buildTimezoneOptions();
 
   protected readonly columns = computed<ColumnDef[]>(() => [
     { key: 'label', label: this.i18n.translate('admin.deadlines.col.name') },
@@ -95,10 +133,19 @@ export class AdminDeadlinesComponent {
     return this.i18n.translate(`admin.deadlines.kind.${kind}` as TranslationKey);
   }
 
-  /** Display the concrete deadline source: a date or "+ X days". */
+  /** Display the concrete deadline source: a date, "+ X days", or a date count. */
   protected valueOf(p: DeadlinePolicy): string {
+    const base = this.baseValue(p);
+    return p.atTime ? `${base} · ${p.atTime}` : base;
+  }
+
+  private baseValue(p: DeadlinePolicy): string {
     if (p.kind === 'absolute') {
       return p.absoluteAt ? new Date(p.absoluteAt).toLocaleDateString(this.i18n.locale()) : '—';
+    }
+    if (p.kind === 'recurring') {
+      const n = p.dates?.length ?? 0;
+      return `${n} ${this.i18n.translate('admin.deadlines.dates')}`;
     }
     return p.offsetDays != null ? `+ ${p.offsetDays} ${this.i18n.translate('admin.deadlines.days')}` : '—';
   }
@@ -118,6 +165,9 @@ export class AdminDeadlinesComponent {
       kind: p.kind,
       absoluteAt: p.absoluteAt ? p.absoluteAt.slice(0, 10) : '',
       offsetDays: p.offsetDays ?? null,
+      atTime: p.atTime ?? '',
+      timezone: p.timezone ?? DEFAULT_TZ,
+      dates: p.dates ? [...p.dates] : [],
     });
   }
 
@@ -130,10 +180,26 @@ export class AdminDeadlinesComponent {
     this.draft.update((d) => (d ? { ...d, [key]: value } : d));
   }
 
+  protected addDate(): void {
+    this.draft.update((d) => (d ? { ...d, dates: [...d.dates, ''] } : d));
+  }
+
+  protected removeDate(index: number): void {
+    this.draft.update((d) => (d ? { ...d, dates: d.dates.filter((_, i) => i !== index) } : d));
+  }
+
+  protected setDate(index: number, value: string): void {
+    this.draft.update((d) =>
+      d ? { ...d, dates: d.dates.map((x, i) => (i === index ? value : x)) } : d,
+    );
+  }
+
   protected canSave(): boolean {
     const d = this.draft();
     if (!d || !d.key.trim()) return false;
-    return d.kind === 'absolute' ? !!d.absoluteAt : d.offsetDays != null && Number(d.offsetDays) >= 0;
+    if (d.kind === 'absolute') return !!d.absoluteAt;
+    if (d.kind === 'recurring') return d.dates.some((x) => !!x.trim());
+    return d.offsetDays != null && Number(d.offsetDays) >= 0;
   }
 
   protected save(): void {
@@ -141,11 +207,16 @@ export class AdminDeadlinesComponent {
     if (!d || !this.canSave()) return;
     const label = { de: d.labelDe.trim() || d.key, en: d.labelEn.trim() || d.labelDe.trim() || d.key };
     const absoluteAt = d.kind === 'absolute' ? new Date(d.absoluteAt).toISOString() : null;
-    const offsetDays = d.kind === 'absolute' ? null : Number(d.offsetDays);
+    const offsetDays =
+      d.kind === 'relative_submitted' || d.kind === 'relative_changed' ? Number(d.offsetDays) : null;
+    const dates = d.kind === 'recurring' ? d.dates.map((x) => x.trim()).filter(Boolean) : null;
+    const atTime = d.atTime.trim() || null;
+    const timezone = atTime || dates ? d.timezone || DEFAULT_TZ : null;
+    const body = { label, kind: d.kind, absoluteAt, offsetDays, atTime, timezone, dates };
     const id = this.editingId();
     const req = id
-      ? this.api.updateDeadlinePolicy(id, { label, kind: d.kind, absoluteAt, offsetDays })
-      : this.api.createDeadlinePolicy({ key: d.key.trim(), label, kind: d.kind, absoluteAt, offsetDays });
+      ? this.api.updateDeadlinePolicy(id, body)
+      : this.api.createDeadlinePolicy({ key: d.key.trim(), ...body });
     req.subscribe({
       next: (saved) => {
         this.policies.update((list) =>
