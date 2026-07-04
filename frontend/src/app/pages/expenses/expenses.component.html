@@ -141,7 +141,7 @@
               <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
                 <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'expenses.col.amount' | t }}{{ sortInd('amount') }}</button>
               </th>
-              @if (canManage()) { <th scope="col" class="exp__num exp__stickyCol"></th> }
+              @if (canManage()) { <th scope="col" class="exp__num exp__stickyCol">{{ 'table.actions' | t }}</th> }
             </tr>
           </thead>
           <tbody>
@@ -452,7 +452,21 @@
       <p class="m-0 text-sm">{{ 'konten.linkPicked' | t }}: <strong>{{ importCandidateLabel(sel) }}</strong></p>
     }
     <label class="text-sm font-medium mt-2" for="exp-imp-file">{{ 'expenses.sub.importFile' | t }}</label>
-    <input id="exp-imp-file" class="exp__input" type="file" accept=".xml,.sta,.mt940,.txt" (change)="onImportFile($event)" name="impfile" />
+    <div class="flex items-center gap-2 flex-wrap">
+      <input
+        #impFileInput
+        id="exp-imp-file"
+        type="file"
+        class="sr-only"
+        accept=".xml,.sta,.mt940,.txt"
+        (change)="onImportFile($event)"
+        name="impfile"
+      />
+      <app-button type="button" variant="secondary" size="sm" (click)="impFileInput.click()">
+        <span class="inline-flex items-center gap-2"><app-icon name="upload" [size]="16" /> {{ 'expenses.sub.importChooseFile' | t }}</span>
+      </app-button>
+      <span class="text-sm" [class.text-muted]="!importFile()">{{ importFile()?.name || ('expenses.sub.importNoFile' | t) }}</span>
+    </div>
   </form>
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="closeImportDialog()">{{ 'action.cancel' | t }}</app-button>

@@ -1994,9 +1994,11 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
     http
       .expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET')
       .flush({ items: [], total: 0, limit: 200, offset: 0 });
-    // Filters present → applyQueryParams() returns true → a SECOND reload fires,
-    // so there are two GET /expenses in flight.
-    http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET').forEach((req) => req.flush(page([])));
+    // Exactly ONE reload — the component adopts the URL filters first, then loads
+    // once (the old double-reload raced and could show the unfiltered list).
+    const reqs = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    expect(reqs.length).toBe(1);
+    reqs.forEach((req) => req.flush(page([])));
     return { cmp, http };
   }
 
@@ -2059,9 +2061,38 @@ describe('ExpensesListState.refresh (#expenses-ux)', () => {
     const state = TestBed.runInInjectionContext(() => new ExpensesListState());
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
     http.expectOne((r) => r.url.endsWith('/accounts/options')).flush([]);
+    // The state no longer auto-loads (#expenses-ux2) — the component triggers the
+    // first reload after adopting URL filters; mirror that here.
+    state.reload();
     http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
     return { state, http };
   }
+
+  it('a reload discards the stale response of an older filter state', () => {
+    const { state, http } = buildState();
+    state.reload(); // request A (old filter state)
+    state.expenseId.set('e-1');
+    state.reload(); // request B (new filter state)
+    const [reqA, reqB] = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    // B (filtered) resolves first, then the stale A — A must NOT overwrite the list.
+    reqB.flush(page([EXPENSE], 1));
+    reqA.flush(page([{ ...EXPENSE, id: 'stale' }, EXPENSE], 2));
+    expect(state.items()).toEqual([EXPENSE]);
+    expect(state.total()).toBe(1);
+  });
+
+  it('a stale refresh response is dropped after an intervening reload', () => {
+    const { state, http } = buildState();
+    state.refresh(); // in flight …
+    state.reload(); // … filter changes meanwhile
+    const [refreshReq, reloadReq] = http.match(
+      (r) => r.url.endsWith('/expenses') && r.method === 'GET',
+    );
+    reloadReq.flush(page([EXPENSE], 1));
+    refreshReq.flush(page([{ ...EXPENSE, id: 'stale' }], 1));
+    expect(state.refreshing()).toBe(false);
+    expect(state.items()).toEqual([EXPENSE]);
+  });
 
   it('early-returns a concurrent refresh and clears the flag on success', () => {
     const { state, http } = buildState();
