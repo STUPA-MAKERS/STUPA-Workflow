@@ -24,8 +24,7 @@ from app.modules.notifications import service as _svc
 TASK_REMINDER_SUBJECT: dict[str, str] = {
     "de": "Erinnerung: offene Aufgabe"
     "{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
-    "en": "Reminder: open task"
-    '{% if applicationTitle %} — "{{ applicationTitle }}"{% endif %}',
+    "en": 'Reminder: open task{% if applicationTitle %} — "{{ applicationTitle }}"{% endif %}',
 }
 TASK_REMINDER_BODY: dict[str, str] = {
     "de": "Hallo,\n\nder Antrag"
@@ -40,10 +39,8 @@ TASK_REMINDER_BODY: dict[str, str] = {
 # deadline_approaching: ``handle_notify_action`` uses this as the builtin
 # fallback when no DB override exists.
 DEADLINE_APPROACHING_SUBJECT: dict[str, str] = {
-    "de": "Frist-Erinnerung"
-    "{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
-    "en": "Deadline reminder"
-    '{% if applicationTitle %} — "{{ applicationTitle }}"{% endif %}',
+    "de": "Frist-Erinnerung{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
+    "en": 'Deadline reminder{% if applicationTitle %} — "{{ applicationTitle }}"{% endif %}',
 }
 DEADLINE_APPROACHING_BODY: dict[str, str] = {
     "de": "Hallo,\n\neine Frist"
@@ -57,10 +54,8 @@ DEADLINE_APPROACHING_BODY: dict[str, str] = {
 # an explicit templateKey and non-applicant recipients — the applicant default
 # (`status_update`) reads "Your application" and is wrong for the team.
 STATUS_UPDATE_TEAM_SUBJECT: dict[str, str] = {
-    "de": "Statuswechsel: Antrag"
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
-    "en": "Status change: application"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
+    "de": "Statuswechsel: Antrag{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
+    "en": 'Status change: application{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
 }
 STATUS_UPDATE_TEAM_BODY: dict[str, str] = {
     "de": "Hallo,\n\nder Antrag"
@@ -153,6 +148,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
             "applicationTitle": "Titel des Antrags",
             "status": "Aktueller Status",
             "comment": "Kommentartext (Auszug)",
+            "commentAuthor": "Name der Kommentar-Autor:in",
+            "commentAuthorInitials": "Initialen der Kommentar-Autor:in",
             "applicationId": "ID des Antrags",
         },
     ),
@@ -165,6 +162,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
             "applicationTitle": "Titel des Antrags",
             "status": "Aktueller Status",
             "comment": "Kommentartext (Auszug)",
+            "commentAuthor": "Name der Kommentar-Autor:in",
+            "commentAuthorInitials": "Initialen der Kommentar-Autor:in",
             "applicationId": "ID des Antrags",
         },
     ),

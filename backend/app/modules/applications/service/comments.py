@@ -42,6 +42,7 @@ class CommentOps(ApplicationsServiceBase):
             body=comment.body,
             visibility=visibility,  # type: ignore[arg-type]
             at=comment.at,
+            isOwn=True,  # the creator is always the viewer of the 201 response
         )
 
     async def list_comments(
@@ -50,7 +51,12 @@ class CommentOps(ApplicationsServiceBase):
         *,
         include_internal: bool,
         allow_unconfirmed: bool = True,
+        viewer_sub: str | None = None,
+        viewer_is_applicant: bool = False,
     ) -> list[CommentOut]:
+        """List comments; ``viewer_*`` marks the viewer's own comments (`isOwn`):
+        principals match on the stored author ``sub``, the (magic-link) applicant
+        owns every applicant comment of their application."""
         await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         stmt = select(Comment).where(Comment.application_id == application_id)
         if not include_internal:
@@ -65,6 +71,11 @@ class CommentOps(ApplicationsServiceBase):
                 body=c.body,
                 visibility=c.visibility,  # type: ignore[arg-type]
                 at=c.at,
+                isOwn=(
+                    c.author == viewer_sub
+                    if c.author_kind == "principal" and viewer_sub is not None
+                    else c.author_kind == "applicant" and viewer_is_applicant
+                ),
             )
             for c in rows
         ]

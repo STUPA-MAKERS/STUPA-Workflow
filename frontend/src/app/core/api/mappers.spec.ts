@@ -199,8 +199,21 @@ describe('mapComment', () => {
       body: 'Hallo',
       visibility: 'public',
       isPublic: true,
+      isOwn: false,
       at: '2026-06-05T13:00:00Z',
     });
+  });
+
+  it('maps isOwn from the wire (default false when absent)', () => {
+    const wire: CommentOutWire = {
+      id: 'c3',
+      authorKind: 'principal',
+      body: 'meins',
+      visibility: 'public',
+      at: '2026-06-05T13:00:00Z',
+      isOwn: true,
+    };
+    expect(mapComment(wire).isOwn).toBe(true);
   });
 
   it('derives isPublic=false for an internal comment and null author', () => {

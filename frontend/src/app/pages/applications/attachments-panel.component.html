@@ -74,6 +74,20 @@
             </app-badge>
           </div>
           <div class="flex items-center gap-2">
+            @if (canPreview(att)) {
+              <app-button
+                variant="ghost"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'applications.attachments.preview' | t"
+                [title]="'applications.attachments.preview' | t"
+                [loading]="previewLoadingId() === att.id"
+                [disabled]="previewLoadingId() !== null && previewLoadingId() !== att.id"
+                (click)="openPreview(att)"
+              >
+                <app-icon name="eye" [size]="15" />
+              </app-button>
+            }
             <app-button
               variant="secondary"
               size="sm"
@@ -117,3 +131,25 @@
     </div>
   }
 </div>
+
+<!-- Große Inline-Vorschau (Bild/PDF) — ohne Download. -->
+<app-dialog
+  class="att__previewDlg"
+  size="lg"
+  [open]="previewing() !== null"
+  [title]="previewing()?.filename ?? ''"
+  [closeLabel]="'applications.attachments.previewClose' | t"
+  (closed)="closePreview()"
+>
+  @if (previewing(); as att) {
+    @if (previewIsImage()) {
+      @if (previewUrl(); as url) {
+        <img class="att__previewImg" [src]="url" [alt]="att.filename" />
+      }
+    } @else {
+      @if (previewFrameUrl(); as frameUrl) {
+        <iframe class="att__previewFrame" [src]="frameUrl" [title]="att.filename"></iframe>
+      }
+    }
+  }
+</app-dialog>

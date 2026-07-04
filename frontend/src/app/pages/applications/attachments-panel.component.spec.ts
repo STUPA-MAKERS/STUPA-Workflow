@@ -675,4 +675,83 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.dragActive()).toBe(false);
     http.verify();
   });
+
+  // ------------------------------------------------------- inline preview
+  it('offers a preview only for clean images/PDFs and opens the PDF in an iframe dialog', async () => {
+    const { http, detectChanges, fixture } = await setup();
+    await uploadFile();
+    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    detectChanges();
+
+    const cmp = fixture.componentInstance;
+    // canPreview: clean PDF yes, scanning/foreign mime no.
+    expect(cmp.canPreview({ ...cmp.attachments()[0] })).toBe(true);
+    expect(cmp.canPreview({ ...cmp.attachments()[0], scanState: 'scanning' })).toBe(false);
+    expect(cmp.canPreview({ ...cmp.attachments()[0], mime: 'application/zip' })).toBe(false);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
+    const req = http.expectOne(dlUrl('att-1'));
+    expect(req.request.method).toBe('GET');
+    req.flush({ url: '/api/attachments/att-1/download?sig=ok', expiresIn: 120 });
+    detectChanges();
+
+    expect(cmp.previewing()?.id).toBe('att-1');
+    expect(cmp.previewIsImage()).toBe(false);
+    expect(cmp.previewFrameUrl()).not.toBeNull();
+    expect(screen.getByTitle('plan.pdf')).toBeInTheDocument(); // iframe
+
+    cmp.closePreview();
+    detectChanges();
+    expect(cmp.previewing()).toBeNull();
+    expect(cmp.previewFrameUrl()).toBeNull();
+    http.verify();
+  });
+
+  it('previews a clean image as <img> (no iframe)', async () => {
+    const { http, detectChanges, fixture } = await setup();
+    await uploadFile('foto.png');
+    http
+      .expectOne(uploadUrl)
+      .flush(wire({ id: 'att-9', filename: 'foto.png', mime: 'image/png', scanned: true }), {
+        status: 201,
+        statusText: 'Created',
+      });
+    detectChanges();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
+    http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
+    detectChanges();
+
+    expect(fixture.componentInstance.previewIsImage()).toBe(true);
+    expect(screen.getByAltText('foto.png')).toBeInTheDocument();
+    http.verify();
+  });
+
+  it('marks quarantined on 409 preview and toasts on 410/500', async () => {
+    const { http, detectChanges, fixture, toast } = await setup();
+    const error = jest.spyOn(toast, 'error');
+    await uploadFile();
+    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    detectChanges();
+    const cmp = fixture.componentInstance;
+
+    cmp.openPreview(cmp.attachments()[0]);
+    http.expectOne(dlUrl('att-1')).flush({}, { status: 409, statusText: 'Conflict' });
+    expect(cmp.attachments()[0].scanState).toBe('quarantined');
+    expect(cmp.previewing()).toBeNull();
+    expect(error).toHaveBeenCalledTimes(1);
+
+    // 410 + generic error paths (attachment object reused directly).
+    cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
+    http.expectOne(dlUrl('att-1')).flush({}, { status: 410, statusText: 'Gone' });
+    expect(error).toHaveBeenCalledTimes(2);
+    cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
+    http.expectOne(dlUrl('att-1')).flush({}, { status: 500, statusText: 'Err' });
+    expect(error).toHaveBeenCalledTimes(3);
+    // Guard: while a preview request is in flight, further opens are ignored.
+    cmp.previewLoadingId.set('att-1');
+    cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
+    cmp.previewLoadingId.set(null);
+    http.verify();
+  });
 });

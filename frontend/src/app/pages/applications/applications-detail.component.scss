@@ -112,6 +112,34 @@ formly-form {
   flex-direction: column;
   gap: var(--space-4);
 }
+/* Klappkopf der Versionshistorie: ganze Kopfzeile ist der Toggle. */
+.det__historyToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.det__historyMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+.det__historyCount {
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-2);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+}
 .det__diff {
   margin: 0;
   padding: 0;

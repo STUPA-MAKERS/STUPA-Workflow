@@ -625,6 +625,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         body,
         visibility: visibility ?? 'public',
         at: '2026-06-05T14:00:00Z',
+        isOwn: true, // the mock viewer created it
       };
       MOCK_COMMENTS.push(created);
       return ok(created, 201);

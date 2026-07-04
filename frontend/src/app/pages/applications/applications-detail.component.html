@@ -123,7 +123,13 @@
           @for (entry of dataEntries(application); track entry.key) {
             <div class="det__dataRow">
               <dt>{{ entry.label }}</dt>
-              <dd>{{ entry.value }}</dd>
+              <dd>
+                @if (entry.md) {
+                  <app-markdown-view [src]="entry.value" />
+                } @else {
+                  {{ entry.value }}
+                }
+              </dd>
             </div>
           }
         </dl>
@@ -159,8 +165,24 @@
     }
   </app-card>
 
-  <!-- Versions-Historie + Diff -->
-  <app-card [heading]="'applications.history.title' | t">
+  <!-- Versions-Historie + Diff (einklappbar, standardmäßig zu) -->
+  <app-card>
+    <button
+      card-header
+      type="button"
+      class="det__historyToggle"
+      [attr.aria-expanded]="historyOpen()"
+      (click)="historyOpen.set(!historyOpen())"
+    >
+      <span class="text-lg font-semibold">{{ 'applications.history.title' | t }}</span>
+      <span class="det__historyMeta">
+        @if (versions().length > 1) {
+          <span class="det__historyCount">{{ versions().length }}</span>
+        }
+        <app-icon [name]="historyOpen() ? 'chevron-up' : 'chevron-down'" [size]="13" />
+      </span>
+    </button>
+    @if (historyOpen()) {
     @if (versions().length > 1) {
       <ol class="det__history">
         @for (version of versions(); track version.version) {
@@ -205,6 +227,7 @@
     } @else {
       <p class="text-muted">{{ 'applications.history.empty' | t }}</p>
     }
+    }
   </app-card>
 
   <!-- Attachments: upload + signed download URLs + scan status -->
@@ -219,7 +242,7 @@
         @for (comment of comments(); track comment.id) {
           <article
             class="det__msg"
-            [class.det__msg--own]="comment.authorKind !== 'applicant'"
+            [class.det__msg--own]="comment.isOwn"
           >
             <span class="det__avatar" aria-hidden="true">{{ initial(authorName(comment)) }}</span>
             <div class="det__msgBody">
@@ -243,6 +266,7 @@
             [placeholder]="'applications.comments.placeholder' | t"
             [ngModel]="newComment()"
             (ngModelChange)="newComment.set($event)"
+            (keydown.enter)="onComposerEnter($event)"
             name="comment"
             [attr.aria-label]="'applications.comments.add' | t"
           ></textarea>

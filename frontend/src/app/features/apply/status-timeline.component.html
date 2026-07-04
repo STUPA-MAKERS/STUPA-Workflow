@@ -133,7 +133,7 @@
               <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'status.comments.title' | t }}</header>
               <div class="det__chatScroll">
                 @for (c of comments(); track c.id) {
-                  <article class="det__msg" [class.det__msg--own]="c.authorKind === 'applicant'">
+                  <article class="det__msg" [class.det__msg--own]="c.isOwn">
                     <span class="det__avatar" aria-hidden="true">{{ initial(authorName(c)) }}</span>
                     <div class="det__msgBody">
                       <div class="flex items-baseline gap-2 text-xs text-muted">
@@ -155,6 +155,7 @@
                     rows="1"
                     [formControl]="commentBody"
                     [placeholder]="'status.comments.placeholder' | t"
+                    (keydown.enter)="$event.preventDefault(); addComment()"
                     [attr.aria-label]="'status.comments.label' | t"
                   ></textarea>
                   <app-button

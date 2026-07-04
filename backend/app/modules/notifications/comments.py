@@ -51,16 +51,17 @@ _BUILTIN_APPLICANT_SUBJECT = {
 _BUILTIN_APPLICANT_BODY = {
     "de": "Hallo,\n\nzu Ihrem Antrag"
     "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} "
-    "gibt es einen neuen Kommentar:\n\n{{ comment }}\n",
+    "gibt es einen neuen Kommentar"
+    "{% if commentAuthor %} von {{ commentAuthor }}{% endif %}:"
+    "\n\n{{ comment }}\n",
     "en": "Hello,\n\nthere is a new comment on your application"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}:'
+    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}'
+    "{% if commentAuthor %} from {{ commentAuthor }}{% endif %}:"
     "\n\n{{ comment }}\n",
 }
 _BUILTIN_TEAM_SUBJECT = {
-    "de": "Rückfrage zum Antrag"
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
-    "en": "Applicant comment on"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
+    "de": "Rückfrage zum Antrag{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
+    "en": 'Applicant comment on{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
 }
 _BUILTIN_TEAM_BODY = {
     "de": "Hallo,\n\nder/die Antragsteller:in hat den Antrag"
@@ -75,6 +76,64 @@ _BUILTIN_TEAM_BODY = {
 
 _COMMENT_EXCERPT_LEN = 1000
 
+# --- Stylized chat message for the HTML mail (mirrors the web-UI chat) ------ #
+# One shared bubble snippet: avatar with initials, author name, gray
+# left-aligned bubble — the same look as a foreign message in the web UI.
+# Rendered with Jinja autoescape; `| e … | safe` only turns the *inserted*
+# ``<br>`` into markup, the comment text itself stays escaped.
+_CHAT_BUBBLE_HTML = (
+    '<table role="presentation" cellpadding="0" cellspacing="0"'
+    ' style="margin:16px 0 0;">'
+    "<tr>"
+    '<td style="vertical-align:top;padding-right:8px;">'
+    '<div style="width:28px;height:28px;border-radius:50%;background:#e5e9f0;'
+    "color:#6b7686;font-size:11px;font-weight:600;text-align:center;"
+    'line-height:28px;">{{ commentAuthorInitials }}</div>'
+    "</td>"
+    '<td style="vertical-align:top;">'
+    '<div style="font-size:12px;color:#6b7686;margin:0 0 3px;">'
+    '<strong style="color:#1f2933;">{{ commentAuthor }}</strong></div>'
+    '<div style="background:#eef1f5;border-radius:0 12px 12px 12px;'
+    'padding:8px 12px;font-size:14px;line-height:1.5;color:#1f2933;">'
+    "{{ comment | e | replace('\\n', '<br>' | safe) }}</div>"
+    "</td>"
+    "</tr>"
+    "</table>"
+)
+
+_BUILTIN_APPLICANT_BODY_HTML = {
+    "de": '<p style="margin:0 0 1em;">Hallo,</p>'
+    '<p style="margin:0;">zu Ihrem Antrag'
+    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} "
+    "gibt es einen neuen Kommentar:</p>" + _CHAT_BUBBLE_HTML,
+    "en": '<p style="margin:0 0 1em;">Hello,</p>'
+    '<p style="margin:0;">there is a new comment on your application'
+    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}:</p>' + _CHAT_BUBBLE_HTML,
+}
+_BUILTIN_TEAM_BODY_HTML = {
+    "de": '<p style="margin:0 0 1em;">Hallo,</p>'
+    '<p style="margin:0;">der/die Antragsteller:in hat den Antrag'
+    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} kommentiert"
+    "{% if status %} (aktueller Status: {{ status }}){% endif %}:</p>" + _CHAT_BUBBLE_HTML,
+    "en": '<p style="margin:0 0 1em;">Hello,</p>'
+    '<p style="margin:0;">the applicant commented on the application'
+    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}'
+    "{% if status %} (current status: {{ status }}){% endif %}:</p>" + _CHAT_BUBBLE_HTML,
+}
+
+# Fallback author label when no display name is known (applicant comments).
+_APPLICANT_AUTHOR_FALLBACK = {"de": "Antragsteller:in", "en": "Applicant"}
+
+
+def _initials(name: str) -> str:
+    """Initial(s) for the mail avatar — same rule as the web-UI chat."""
+    parts = [p for p in name.split() if p]
+    if not parts:
+        return "?"
+    first = parts[0][0]
+    last = parts[-1][0] if len(parts) > 1 else ""
+    return (first + last).upper()
+
 
 async def send_comment_notifications(
     session: AsyncSession,
@@ -86,6 +145,7 @@ async def send_comment_notifications(
     author_kind: str,
     visibility: str,
     body: str,
+    author_name: str | None = None,
 ) -> int:
     """Send comment mails; returns the number of mail jobs."""
     app_row = (
@@ -109,11 +169,21 @@ async def send_comment_notifications(
             iter(state.label_i18n.values())
         )
 
+    # Author label for the chat bubble: display name, else the localized
+    # applicant fallback (matches the web-UI author fallback).
+    author_label = (author_name or "").strip()
+    if not author_label:
+        author_label = _APPLICANT_AUTHOR_FALLBACK.get(
+            settings.mail_default_lang, _APPLICANT_AUTHOR_FALLBACK["de"]
+        )
+
     context = {
         "applicationId": str(application_id),
         "applicationTitle": title.strip() if isinstance(title, str) else "",
         "status": status_label,
         "comment": body[:_COMMENT_EXCERPT_LEN],
+        "commentAuthor": author_label,
+        "commentAuthorInitials": _initials(author_label),
     }
 
     if author_kind == "principal":
@@ -124,13 +194,17 @@ async def send_comment_notifications(
             [{"kind": "applicant"}], application_id=application_id
         )
         template_key = APPLICANT_TEMPLATE_KEY
-        builtin = (_BUILTIN_APPLICANT_SUBJECT, _BUILTIN_APPLICANT_BODY)
+        builtin = (
+            _BUILTIN_APPLICANT_SUBJECT,
+            _BUILTIN_APPLICANT_BODY,
+            _BUILTIN_APPLICANT_BODY_HTML,
+        )
     else:
         recipients = await actionable_principal_emails(
             session, application_id=application_id, state=state
         )
         template_key = TEAM_TEMPLATE_KEY
-        builtin = (_BUILTIN_TEAM_SUBJECT, _BUILTIN_TEAM_BODY)
+        builtin = (_BUILTIN_TEAM_SUBJECT, _BUILTIN_TEAM_BODY, _BUILTIN_TEAM_BODY_HTML)
 
     recipients = await filter_recipients_by_preference(session, recipients, "comment")
     if not recipients:
@@ -153,6 +227,7 @@ async def send_comment_notifications(
         rendered = render_mail(
             subject_i18n=builtin[0],
             body_i18n=builtin[1],
+            body_html_i18n=builtin[2],
             context=context,
             lang=settings.mail_default_lang,
             default_lang=settings.mail_default_lang,

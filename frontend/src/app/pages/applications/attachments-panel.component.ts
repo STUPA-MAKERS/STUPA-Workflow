@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
@@ -19,6 +20,7 @@ import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { CardComponent } from '@stupa-makers/ui-kit';
 import { CheckboxComponent } from '@stupa-makers/ui-kit';
+import { DialogComponent } from '@stupa-makers/ui-kit';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { formatBytes, scanBadgeVariant } from './applications.util';
@@ -53,6 +55,7 @@ import { formatBytes, scanBadgeVariant } from './applications.util';
     ButtonComponent,
     CardComponent,
     CheckboxComponent,
+    DialogComponent,
     IconComponent,
   ],
   templateUrl: './attachments-panel.component.html',
@@ -70,6 +73,22 @@ export class AttachmentsPanelComponent {
   readonly uploading = signal(false);
   readonly downloadingId = signal<Uuid | null>(null);
   readonly removingId = signal<Uuid | null>(null);
+
+  /** Inline preview (image/PDF) in a large dialog — no download needed. */
+  private readonly sanitizer = inject(DomSanitizer);
+  readonly previewing = signal<Attachment | null>(null);
+  readonly previewLoadingId = signal<Uuid | null>(null);
+  /** Raw signed URL (img binding) — Angular sanitizes URL contexts itself. */
+  readonly previewUrl = signal<string | null>(null);
+  readonly previewIsImage = computed(() =>
+    (this.previewing()?.mime ?? '').startsWith('image/'),
+  );
+  /** iframes need an explicitly trusted resource URL; the signed URL comes
+   *  from our own API (app-relative), so trusting it is safe. */
+  readonly previewFrameUrl = computed<SafeResourceUrl | null>(() => {
+    const url = this.previewUrl();
+    return url === null ? null : this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  });
 
   /** Multi-select (bulk delete) + in-flight bulk action. */
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
@@ -252,6 +271,46 @@ export class AttachmentsPanelComponent {
       default:
         return 'applications.attachments.error.upload';
     }
+  }
+
+  /** Preview only for scanned-clean images/PDFs (browser-renderable). */
+  canPreview(att: Attachment): boolean {
+    return (
+      att.scanState === 'clean' &&
+      (att.mime.startsWith('image/') || att.mime === 'application/pdf')
+    );
+  }
+
+  /** Open the large preview dialog: fetch a signed URL, render inline.
+   *  Same 409/410 semantics as download (quarantine/expired). */
+  openPreview(att: Attachment): void {
+    if (this.previewLoadingId()) return;
+    this.previewLoadingId.set(att.id);
+    this.api.attachmentUrl(att.id).subscribe({
+      next: (signed) => {
+        this.previewLoadingId.set(null);
+        this.previewUrl.set(signed.url);
+        this.previewing.set(att);
+      },
+      error: (err: { status?: number }) => {
+        this.previewLoadingId.set(null);
+        if (err.status === 409) {
+          this.attachments.update((list) =>
+            list.map((a) => (a.id === att.id ? { ...a, scanState: 'quarantined' as ScanState } : a)),
+          );
+          this.toast.error(this.i18n.translate('applications.attachments.download.conflict'));
+        } else if (err.status === 410) {
+          this.toast.error(this.i18n.translate('applications.attachments.download.gone'));
+        } else {
+          this.toast.error(this.i18n.translate('applications.attachments.download.error'));
+        }
+      },
+    });
+  }
+
+  closePreview(): void {
+    this.previewing.set(null);
+    this.previewUrl.set(null);
   }
 
   download(att: Attachment): void {

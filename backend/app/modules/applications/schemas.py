@@ -161,3 +161,5 @@ class CommentOut(_CamelModel):
     body: str
     visibility: Literal["internal", "public"]
     at: datetime
+    # Whether the requesting viewer wrote this comment (chat alignment in the FE).
+    is_own: bool = Field(default=False, alias="isOwn")

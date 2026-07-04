@@ -760,6 +760,7 @@ async def test_deliver_comment_mails_invokes_send(
         author_kind,
         visibility,
         body,
+        author_name=None,
     ):
         captured.update(
             application_id=application_id,
@@ -767,6 +768,7 @@ async def test_deliver_comment_mails_invokes_send(
             author_kind=author_kind,
             visibility=visibility,
             body=body,
+            author_name=author_name,
         )
         return 1
 
@@ -774,13 +776,14 @@ async def test_deliver_comment_mails_invokes_send(
 
     aid, cid = uuid4(), uuid4()
     await _deliver_comment_mails(
-        _settings(), aid, cid, "principal", "public", "hallo", pool=None
+        _settings(), aid, cid, "principal", "public", "hallo", "Mia M.", pool=None
     )
     assert captured["application_id"] == aid
     assert captured["comment_id"] == cid
     assert captured["author_kind"] == "principal"
     assert captured["visibility"] == "public"
     assert captured["body"] == "hallo"
+    assert captured["author_name"] == "Mia M."
 
 
 # --- Router-Endpunkte (list_tasks, get_form, erasure) via TestClient ------- #

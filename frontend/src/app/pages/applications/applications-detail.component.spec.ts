@@ -166,6 +166,10 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.getAllByText('Version 2').length).toBeGreaterThan(0);
     // applicant fact
     expect(screen.getByText('Mia')).toBeInTheDocument();
+    // history is collapsed by default → expand, then the diff is visible
+    expect(screen.queryByText('Fest')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
+    detectChanges();
     // version diff: changed title old → new
     expect(screen.getByText('Fest')).toBeInTheDocument();
     // comment body
@@ -217,6 +221,28 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  it('sends on Enter, keeps typing on Shift+Enter', async () => {
+    const { http, detectChanges } = await setup();
+    flushAll(http);
+    detectChanges();
+
+    const input = screen.getByLabelText('Kommentar hinzufügen');
+    // Shift+Enter: no request (newline stays local).
+    await userEvent.type(input, 'Hallo{Shift>}{Enter}{/Shift}');
+    http.expectNone(url('/comments'));
+    // Plain Enter submits.
+    await userEvent.type(input, '{Enter}');
+    const post = http.expectOne(url('/comments'));
+    expect(post.request.method).toBe('POST');
+    post.flush(
+      { id: 'c9', author: null, authorKind: 'principal', body: 'Hallo', visibility: 'public', at: '2026-06-05T13:00:00Z', isOwn: true },
+      { status: 201, statusText: 'Created' },
+    );
+    detectChanges();
+    flushAttachments(http);
+    http.verify();
+  });
+
   it('labels a present-but-empty diff as "no field changes"', async () => {
     const { http, detectChanges } = await setup();
     http.expectOne(url('')).flush(appWire());
@@ -225,6 +251,8 @@ describe('ApplicationsDetailComponent', () => {
       { version: 2, data: {}, diff: { added: {}, removed: {}, changed: {} }, changedBy: null, at: '2026-06-05T11:00:00Z' },
     ]);
     http.expectOne(url('/comments')).flush(COMMENTS);
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
     detectChanges();
     expect(screen.getByText('Keine Feldänderungen.')).toBeInTheDocument();
     flushForm(http);
