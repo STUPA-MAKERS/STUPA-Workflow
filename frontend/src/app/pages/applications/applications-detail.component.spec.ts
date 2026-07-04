@@ -166,6 +166,10 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.getAllByText('Version 2').length).toBeGreaterThan(0);
     // applicant fact
     expect(screen.getByText('Mia')).toBeInTheDocument();
+    // history is collapsed by default → expand, then the diff is visible
+    expect(screen.queryByText('Fest')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
+    detectChanges();
     // version diff: changed title old → new
     expect(screen.getByText('Fest')).toBeInTheDocument();
     // comment body
@@ -225,6 +229,8 @@ describe('ApplicationsDetailComponent', () => {
       { version: 2, data: {}, diff: { added: {}, removed: {}, changed: {} }, changedBy: null, at: '2026-06-05T11:00:00Z' },
     ]);
     http.expectOne(url('/comments')).flush(COMMENTS);
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
     detectChanges();
     expect(screen.getByText('Keine Feldänderungen.')).toBeInTheDocument();
     flushForm(http);

@@ -166,9 +166,17 @@ class _FakeService:
         )
 
     async def list_comments(  # noqa: ANN001
-        self, application_id, *, include_internal, allow_unconfirmed=True
+        self,
+        application_id,
+        *,
+        include_internal,
+        allow_unconfirmed=True,
+        viewer_sub=None,
+        viewer_is_applicant=False,
     ):
         self.last_include_internal = include_internal
+        self.last_viewer_sub = viewer_sub
+        self.last_viewer_is_applicant = viewer_is_applicant
         return []
 
 
@@ -213,7 +221,8 @@ def _as_principal(app: FastAPI, *perms: str) -> None:
 def _as_applicant(app: FastAPI, application_id: UUID, scope: str = "edit") -> None:
     app.dependency_overrides[get_current_principal] = lambda: None
     app.dependency_overrides[get_current_applicant] = lambda: Applicant(
-        application_id=str(application_id), scope=scope  # type: ignore[arg-type]
+        application_id=str(application_id),
+        scope=scope,  # type: ignore[arg-type]
     )
 
 
@@ -473,9 +482,7 @@ def test_list_applications_amount_date_sort_passed(
     assert kw["sort"] == "amount" and kw["order"] == "asc"
 
 
-def test_list_applications_rejects_bad_sort_422(
-    app: FastAPI, client: TestClient
-) -> None:
+def test_list_applications_rejects_bad_sort_422(app: FastAPI, client: TestClient) -> None:
     _as_principal(app, "application.read")
     assert client.get("/api/applications?sort=bogus").status_code == 422
 
@@ -546,9 +553,7 @@ def test_applications_export_caps_rows(app: FastAPI, client: TestClient) -> None
     assert big.name_maps_called is False
 
 
-def test_applications_export_caps_rows_by_item_count(
-    app: FastAPI, client: TestClient
-) -> None:
+def test_applications_export_caps_rows_by_item_count(app: FastAPI, client: TestClient) -> None:
     """Auch wenn ``total`` nicht zählt: mehr gelieferte Zeilen als Kappe → 413 (FIX 6)."""
     from app.modules.applications.router import EXPORT_MAX_ROWS
 

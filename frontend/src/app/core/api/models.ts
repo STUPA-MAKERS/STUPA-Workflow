@@ -244,6 +244,8 @@ export interface CommentOutWire {
   body: string;
   visibility: CommentVisibility;
   at: IsoDateTime;
+  /** Viewer wrote this comment (server-side determined — chat alignment). */
+  isOwn?: boolean;
 }
 
 /** `ApplicationTypeListItem`. */
@@ -439,6 +441,8 @@ export interface ApplicationComment {
   body: string;
   visibility: CommentVisibility;
   isPublic: boolean;
+  /** Viewer wrote this comment — own messages right, all others left/gray. */
+  isOwn: boolean;
   at: IsoDateTime;
 }
 

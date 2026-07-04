@@ -40,6 +40,7 @@ import {
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
+import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue } from './applications.util';
 
@@ -78,6 +79,7 @@ interface DetailPosition {
     SelectComponent,
     CostCentreTreeComponent,
     AttachmentsPanelComponent,
+    MarkdownViewComponent,
   ],
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
@@ -103,6 +105,9 @@ export class ApplicationsDetailComponent {
   readonly newComment = signal('');
   readonly visibility = signal<CommentVisibility>('public');
   readonly posting = signal(false);
+
+  /** Versionshistorie eingeklappt (Default) — Toggle im Kartenkopf. */
+  readonly historyOpen = signal(false);
 
   /** Available manual transitions (guard-filtered by the server) + in-flight fire. */
   readonly transitions = signal<Transition[]>([]);
@@ -354,11 +359,13 @@ export class ApplicationsDetailComponent {
   }
 
   /** Application data as label/value rows: field definition → label + typed value;
-   *  unknown keys raw; omit `title` (shown in the header) + pure display fields. */
-  dataEntries(app: Application): { key: string; label: string; value: string }[] {
+   *  unknown keys raw; omit `title` (shown in the header) + pure display fields.
+   *  Long text (`textarea`) is flagged `md` and rendered as Markdown (keeps
+   *  newlines and simple formatting). */
+  dataEntries(app: Application): { key: string; label: string; value: string; md: boolean }[] {
     const lang = this.i18n.locale();
     const byKey = new Map(this.formFields().map((f) => [f.key, f]));
-    const rows: { key: string; label: string; value: string }[] = [];
+    const rows: { key: string; label: string; value: string; md: boolean }[] = [];
     const seen = new Set<string>();
 
     const pushField = (f: FormFieldDef): void => {
@@ -368,14 +375,19 @@ export class ApplicationsDetailComponent {
       if (f.key === 'title') return;
       if (!(f.key in app.data)) return;
       seen.add(f.key);
-      rows.push({ key: f.key, label: resolveI18n(f.label, lang), value: this.formatByField(f, app.data[f.key]) });
+      rows.push({
+        key: f.key,
+        label: resolveI18n(f.label, lang),
+        value: this.formatByField(f, app.data[f.key]),
+        md: f.type === 'textarea',
+      });
     };
 
     for (const f of this.formFields()) pushField(f);
     // Still show data without a matching field definition (raw) — except `title`.
     for (const [key, value] of Object.entries(app.data)) {
       if (seen.has(key) || key === 'title' || byKey.has(key)) continue;
-      rows.push({ key, label: key, value: formatFieldValue(value) });
+      rows.push({ key, label: key, value: formatFieldValue(value), md: false });
     }
     return rows;
   }
@@ -607,6 +619,12 @@ export class ApplicationsDetailComponent {
     const first = parts[0][0];
     const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
     return (first + last).toUpperCase();
+  }
+
+  /** Enter sendet (Shift+Enter = Zeilenumbruch; Angulars `keydown.enter`
+   *  matcht nur den unmodifizierten Enter). */
+  protected onComposerEnter(event: Event): void {
+    this.submitComment(event);
   }
 
   submitComment(event: Event): void {

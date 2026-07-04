@@ -77,6 +77,7 @@ const COMMENTS: ApplicationComment[] = [
     body: 'Bitte ergänzen.',
     visibility: 'public',
     isPublic: true,
+    isOwn: false,
     at: '2026-06-05T13:00:00Z',
   },
 ];
@@ -341,8 +342,8 @@ describe('StatusTimelineComponent', () => {
 
   it('uses the kind-based author fallback when a comment has no explicit author', async () => {
     const comments: ApplicationComment[] = [
-      { id: 'c2', author: null, authorKind: 'applicant', body: 'Hallo', visibility: 'public', isPublic: true, at: '2026-06-05T13:00:00Z' },
-      { id: 'c3', author: null, authorKind: 'principal', body: 'Antwort', visibility: 'public', isPublic: true, at: '2026-06-05T14:00:00Z' },
+      { id: 'c2', author: null, authorKind: 'applicant', body: 'Hallo', visibility: 'public', isPublic: true, isOwn: true, at: '2026-06-05T13:00:00Z' },
+      { id: 'c3', author: null, authorKind: 'principal', body: 'Antwort', visibility: 'public', isPublic: true, isOwn: false, at: '2026-06-05T14:00:00Z' },
     ];
     await setup(fakeApi({ comments: () => of(comments) }), { t: 'tok', app: 'app-1' });
     await screen.findByText('Hallo');

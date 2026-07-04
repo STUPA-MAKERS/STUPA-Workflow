@@ -1,0 +1,59 @@
+/* Namespaced (encapsulation: None — [innerHTML] content has no Angular
+   scoping attributes). Compact typography for text inside detail cards. */
+.mdv {
+  line-height: 1.55;
+  word-break: break-word;
+}
+.mdv > :first-child {
+  margin-top: 0;
+}
+.mdv > :last-child {
+  margin-bottom: 0;
+}
+.mdv p {
+  margin: 0 0 var(--space-2);
+}
+.mdv h4,
+.mdv h5,
+.mdv h6 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--fs-md);
+}
+.mdv h5 {
+  font-size: var(--fs-sm);
+}
+.mdv h6 {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.mdv ul,
+.mdv ol {
+  margin: 0 0 var(--space-2);
+  padding-left: 1.25rem;
+}
+.mdv code {
+  background: var(--color-surface-sunken);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  font-size: 0.9em;
+}
+.mdv pre {
+  background: var(--color-surface-sunken);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin: 0 0 var(--space-2);
+}
+.mdv pre code {
+  background: transparent;
+  padding: 0;
+}
+.mdv blockquote {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+.mdv a {
+  color: var(--color-primary);
+}

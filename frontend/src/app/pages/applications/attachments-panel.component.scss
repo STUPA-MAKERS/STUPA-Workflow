@@ -72,3 +72,25 @@
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
+
+/* --- Große Datei-Vorschau (Bild/PDF) --- */
+/* Dialogbreite über die lg-Stufe hinaus: fast Vollbild (ui-kit-Override,
+   ::ng-deep wie bei den Button-Overrides üblich). */
+.att__previewDlg ::ng-deep .dialog {
+  max-width: min(80rem, 96vw);
+}
+.att__previewImg {
+  display: block;
+  max-width: 100%;
+  max-height: 72dvh;
+  margin: 0 auto;
+  border-radius: var(--radius-md);
+}
+.att__previewFrame {
+  display: block;
+  width: 100%;
+  height: 72dvh;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}

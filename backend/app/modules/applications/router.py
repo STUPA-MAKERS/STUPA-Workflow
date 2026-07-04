@@ -99,9 +99,9 @@ async def _deliver_magic_link(
     async with sessionmaker() as db:
 
         async def deliver(recipient: str, link: str) -> None:
-            await NotificationService(
-                db, queue=queue, settings=settings
-            ).send_magic_link(email=recipient, link=link)
+            await NotificationService(db, queue=queue, settings=settings).send_magic_link(
+                email=recipient, link=link
+            )
 
         await auth_service.request_magic_link(
             db, settings, email=email, application_id=application_id, deliver=deliver
@@ -161,9 +161,7 @@ async def create_application(
     if not email:
         raise ValidationProblem(
             "Applicant email required.",
-            errors=[
-                {"field": "applicantEmail", "msg": "required for anonymous submissions"}
-            ],
+            errors=[{"field": "applicantEmail", "msg": "required for anonymous submissions"}],
         )
     payload.applicant_email = email
     if not payload.applicant_name and principal:
@@ -430,6 +428,7 @@ async def _deliver_comment_mails(
     author_kind: str,
     visibility: str,
     body: str,
+    author_name: str | None,
     pool: object,
 ) -> None:
     """Send comment mails in an own session — background after the 201 response."""
@@ -447,11 +446,12 @@ async def _deliver_comment_mails(
             author_kind=author_kind,
             visibility=visibility,
             body=body,
+            author_name=author_name,
         )
 
 
 CommentMailSender = Callable[
-    [Settings, UUID, UUID, str, str, str, object], Awaitable[None]
+    [Settings, UUID, UUID, str, str, str, str | None, object], Awaitable[None]
 ]
 
 
@@ -502,6 +502,7 @@ async def add_comment(
         access.author_kind,
         payload.visibility,
         payload.body,
+        comment.author,  # resolved display name for the mail bubble
         pool,
     )
     return comment
@@ -521,6 +522,8 @@ async def list_comments(
         access.application_id,
         include_internal=access.can_see_internal,
         allow_unconfirmed=access.is_owning_applicant,
+        viewer_sub=access.principal.sub if access.principal is not None else None,
+        viewer_is_applicant=access.is_owning_applicant,
     )
 
 
